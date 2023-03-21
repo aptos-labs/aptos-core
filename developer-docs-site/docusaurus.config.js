@@ -106,6 +106,11 @@ const config = {
                 docId: "whats-new-in-docs",
               },
               {
+                label: "Latest Releases",
+                type: "doc",
+                docId: "releases/index",
+              },
+              {
                 label: "Read the Aptos White Paper",
                 type: "doc",
                 docId: "aptos-white-paper/index",
@@ -183,6 +188,11 @@ const config = {
                 label: "Move Structure",
                 type: "doc",
                 docId: "guides/move-guides/move-structure",
+              },
+              {
+                label: "Bytecode for Dependencies",
+                type: "doc",
+                docId: "guides/move-guides/bytecode-dependencies",
               },
               {
                 label: "How Base Gas Works",

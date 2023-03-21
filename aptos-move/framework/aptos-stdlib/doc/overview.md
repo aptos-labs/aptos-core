@@ -12,6 +12,8 @@ This is the reference documentation of the Aptos standard library.
 ## Index
 
 
+-  [`0x1::algebra`](algebra.md#0x1_algebra)
+-  [`0x1::algebra_bls12381`](algebra_bls12381.md#0x1_algebra_bls12381)
 -  [`0x1::any`](any.md#0x1_any)
 -  [`0x1::aptos_hash`](hash.md#0x1_aptos_hash)
 -  [`0x1::big_vector`](big_vector.md#0x1_big_vector)
@@ -21,12 +23,14 @@ This is the reference documentation of the Aptos standard library.
 -  [`0x1::copyable_any`](copyable_any.md#0x1_copyable_any)
 -  [`0x1::debug`](debug.md#0x1_debug)
 -  [`0x1::ed25519`](ed25519.md#0x1_ed25519)
+-  [`0x1::fixed_point64`](fixed_point64.md#0x1_fixed_point64)
 -  [`0x1::from_bcs`](from_bcs.md#0x1_from_bcs)
 -  [`0x1::math128`](math128.md#0x1_math128)
 -  [`0x1::math64`](math64.md#0x1_math64)
 -  [`0x1::math_fixed`](math_fixed.md#0x1_math_fixed)
 -  [`0x1::multi_ed25519`](multi_ed25519.md#0x1_multi_ed25519)
 -  [`0x1::pool_u64`](pool_u64.md#0x1_pool_u64)
+-  [`0x1::pool_u64_unbound`](pool_u64_unbound.md#0x1_pool_u64_unbound)
 -  [`0x1::ristretto255`](ristretto255.md#0x1_ristretto255)
 -  [`0x1::secp256k1`](secp256k1.md#0x1_secp256k1)
 -  [`0x1::simple_map`](simple_map.md#0x1_simple_map)

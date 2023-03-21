@@ -14,7 +14,6 @@ use aptos_config::config::{
 };
 use aptos_db::{AptosDB, GetRestoreHandler};
 use aptos_executor_types::VerifyExecutionMode;
-use aptos_logger::{Level, Logger};
 use aptos_types::transaction::Version;
 use clap::Parser;
 use std::{path::PathBuf, sync::Arc};
@@ -61,8 +60,6 @@ pub struct Opt {
 
 impl Opt {
     pub async fn run(self) -> Result<()> {
-        Logger::new().level(Level::Info).init();
-
         let restore_handler = Arc::new(AptosDB::open(
             self.db_dir,
             false,                       /* read_only */

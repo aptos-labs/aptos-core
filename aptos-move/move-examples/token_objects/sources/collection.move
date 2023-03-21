@@ -5,7 +5,9 @@
 /// Being built upon objects enables collections to be relatively flexible. As core primitives it
 /// supports:
 /// * Common fields: name, uri, description, creator
-/// * A mutability config for uri and description
+/// * MutatorRef leaving mutability configuration to a higher level component
+/// * Addressed by a global identifier of creator's address and collection name, thus collections
+///   cannot be deleted as a restriction of the object model.
 /// * Optional support for collection-wide royalties
 /// * Optional support for tracking of supply
 ///
@@ -13,29 +15,28 @@
 /// * Events on mint or burn -- that's left to the collection creator.
 ///
 /// TODO:
-/// * Add Royalty reading and consider mutation
-/// * Consider supporting changing the name of the collection.
-/// * Consider supporting changing the aspects of supply
+/// * Consider supporting changing the name of the collection with the MutatorRef. This would
+///   require adding the field original_name.
+/// * Consider supporting changing the aspects of supply with the MutatorRef.
 /// * Add aggregator support when added to framework
-/// * Update ObjectId to be an acceptable param to move
+/// * Update Object<T> to be viable input as a transaction arg and then update all readers as view.
 module token_objects::collection {
     use std::error;
     use std::option::{Self, Option};
     use std::signer;
     use std::string::{Self, String};
 
+    use aptos_framework::event;
     use aptos_framework::object::{Self, ConstructorRef, Object};
+
+    use token_objects::royalty::{Self, Royalty};
 
     friend token_objects::token;
 
     /// The collections supply is at its maximum amount
-    const EEXCEEDS_MAX_SUPPLY: u64 = 0;
+    const EEXCEEDS_MAX_SUPPLY: u64 = 1;
     /// The collection does not exist
-    const ECOLLECTION_DOES_NOT_EXIST: u64 = 1;
-    /// The provided signer is not the creator
-    const ENOT_CREATOR: u64 = 2;
-    /// Attempted to mutate an immutable field
-    const EFIELD_NOT_MUTABLE: u64 = 3;
+    const ECOLLECTION_DOES_NOT_EXIST: u64 = 2;
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Represents the common fields for a collection.
@@ -44,35 +45,24 @@ module token_objects::collection {
         creator: address,
         /// A brief description of the collection.
         description: String,
-        /// Determines which fields are mutable.
-        mutability_config: MutabilityConfig,
         /// An optional categorization of similar token.
         name: String,
         /// The Uniform Resource Identifier (uri) pointing to the JSON file stored in off-chain
         /// storage; the URL length will likely need a maximum any suggestions?
         uri: String,
+        /// Emitted upon any mutation of the collection.
+        mutation_events: event::EventHandle<MutationEvent>,
     }
 
-    /// This config specifies which fields in the TokenData are mutable
-    struct MutabilityConfig has copy, drop, store {
-        description: bool,
-        uri: bool,
+    /// Contains the mutated fields name. This makes the life of indexers easier, so that they can
+    /// directly understand the behavior in a writeset.
+    struct MutationEvent has drop, store {
+        mutated_field_name: String,
     }
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
-    /// The royalty of a token within this collection -- this optional
-    struct Royalty has drop, key {
-        numerator: u64,
-        denominator: u64,
-        /// The recipient of royalty payments. See the `shared_account` for how to handle multiple
-        /// creators.
-        payee_address: address,
-    }
-
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
-    /// Aggregable supply tracker, this is can be used for maximum parallel minting but only for
-    /// for uncapped mints. Currently disabled until this library is in the framework.
-    struct AggregableSupply has key {
+    /// This enables mutating description and URI by higher level services.
+    struct MutatorRef has drop, store {
+        self: address,
     }
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
@@ -80,106 +70,126 @@ module token_objects::collection {
     struct FixedSupply has key {
         current_supply: u64,
         max_supply: u64,
+        total_minted: u64,
     }
 
+    /// Creates a fixed-sized collection, or a collection that supports a fixed amount of tokens.
+    /// This is useful to create a guaranteed, limited supply on-chain digital asset. For example,
+    /// a collection 1111 vicious vipers. Note, creating restrictions such as upward limits results
+    /// in data structures that prevent Aptos from parallelizing mints of this collection type.
     public fun create_fixed_collection(
         creator: &signer,
         description: String,
         max_supply: u64,
-        mutability_config: MutabilityConfig,
         name: String,
         royalty: Option<Royalty>,
         uri: String,
     ): ConstructorRef {
-        let collection_seed = create_collection_seed(&name);
-        let creator_ref = object::create_named_object(creator, collection_seed);
-        let object_signer = object::generate_signer(&creator_ref);
-
-        let collection = Collection {
-            creator: signer::address_of(creator),
-            description,
-            mutability_config,
-            name,
-            uri,
-        };
-        move_to(&object_signer, collection);
-
         let supply = FixedSupply {
             current_supply: 0,
             max_supply,
-        };
-        move_to(&object_signer, supply);
-
-        if (option::is_some(&royalty)) {
-            move_to(&object_signer, option::extract(&mut royalty))
+            total_minted: 0,
         };
 
-        creator_ref
+        create_collection_internal(
+            creator,
+            description,
+            name,
+            royalty,
+            uri,
+            option::some(supply),
+        )
     }
 
-    public fun create_aggregable_collection(
+    /// Creates an untracked collection, or a collection that supports an arbitrary amount of
+    /// tokens. This is useful for mass airdrops that fully leverage Aptos parallelization.
+    public fun create_untracked_collection(
         creator: &signer,
         description: String,
-        mutability_config: MutabilityConfig,
         name: String,
         royalty: Option<Royalty>,
         uri: String,
     ): ConstructorRef {
+        create_collection_internal<FixedSupply>(
+            creator,
+            description,
+            name,
+            royalty,
+            uri,
+            option::none(),
+        )
+    }
+
+    inline fun create_collection_internal<Supply: key>(
+        creator: &signer,
+        description: String,
+        name: String,
+        royalty: Option<Royalty>,
+        uri: String,
+        supply: Option<Supply>,
+    ): ConstructorRef {
         let collection_seed = create_collection_seed(&name);
-        let creator_ref = object::create_named_object(creator, collection_seed);
-        let object_signer = object::generate_signer(&creator_ref);
+        let constructor_ref = object::create_named_object(creator, collection_seed);
+        let object_signer = object::generate_signer(&constructor_ref);
 
         let collection = Collection {
             creator: signer::address_of(creator),
             description,
-            mutability_config,
             name,
             uri,
+            mutation_events: object::new_event_handle(&object_signer),
         };
         move_to(&object_signer, collection);
 
-        let supply = AggregableSupply { };
-        move_to(&object_signer, supply);
-
-        if (option::is_some(&royalty)) {
-            move_to(&object_signer, option::extract(&mut royalty))
+        if (option::is_some(&supply)) {
+            move_to(&object_signer, option::destroy_some(supply))
+        } else {
+            option::destroy_none(supply)
         };
 
-        creator_ref
+        if (option::is_some(&royalty)) {
+            royalty::init(&constructor_ref, option::extract(&mut royalty))
+        };
+
+        constructor_ref
     }
 
-    public fun init_royalty(object_signer: &signer, royalty: Royalty) {
-        move_to(object_signer, royalty);
-    }
-
+    /// Generates the collections address based upon the creators address and the collection's name
     public fun create_collection_address(creator: &address, name: &String): address {
         object::create_object_address(creator, create_collection_seed(name))
     }
 
+    /// Named objects are derived from a seed, the collection's seed is its name.
     public fun create_collection_seed(name: &String): vector<u8> {
         *string::bytes(name)
     }
 
-    public fun create_mutability_config(description: bool, uri: bool): MutabilityConfig {
-        MutabilityConfig { description, uri }
-    }
-
-    public fun create_royalty(numerator: u64, denominator: u64, payee_address: address): Royalty {
-        Royalty { numerator, denominator, payee_address }
-    }
-
-    public(friend) fun increment_supply(creator: &address, name: &String) acquires FixedSupply {
+    /// Called by token on mint to increment supply if there's an appropriate Supply struct.
+    public(friend) fun increment_supply(
+        creator: &address,
+        name: &String,
+    ): Option<u64> acquires FixedSupply {
         let collection_addr = create_collection_address(creator, name);
+        assert!(
+            exists<Collection>(collection_addr),
+            error::not_found(ECOLLECTION_DOES_NOT_EXIST),
+        );
+
         if (exists<FixedSupply>(collection_addr)) {
             let supply = borrow_global_mut<FixedSupply>(collection_addr);
             supply.current_supply = supply.current_supply + 1;
+            supply.total_minted = supply.total_minted + 1;
             assert!(
                 supply.current_supply <= supply.max_supply,
                 error::out_of_range(EEXCEEDS_MAX_SUPPLY),
             );
+            option::some(supply.total_minted)
+        } else {
+            option::none()
         }
     }
 
+    /// Called by token on burn to decrement supply if there's an appropriate Supply struct.
     public(friend) fun decrement_supply(creator: &address, name: &String) acquires FixedSupply {
         let collection_addr = create_collection_address(creator, name);
         if (exists<FixedSupply>(collection_addr)) {
@@ -194,17 +204,14 @@ module token_objects::collection {
         description: String,
         name: String,
         uri: String,
-        mutable_description: bool,
-        mutable_uri: bool,
         max_supply: u64,
         enable_royalty: bool,
         royalty_numerator: u64,
         royalty_denominator: u64,
         royalty_payee_address: address,
     ) {
-        let mutability_config = create_mutability_config(mutable_description, mutable_uri);
         let royalty = if (enable_royalty) {
-            option::some(create_royalty(
+            option::some(royalty::create(
                 royalty_numerator,
                 royalty_denominator,
                 royalty_payee_address,
@@ -214,10 +221,9 @@ module token_objects::collection {
         };
 
         if (max_supply == 0) {
-            create_aggregable_collection(
+            create_untracked_collection(
                 creator,
                 description,
-                mutability_config,
                 name,
                 royalty,
                 uri,
@@ -227,7 +233,6 @@ module token_objects::collection {
                 creator,
                 description,
                 max_supply,
-                mutability_config,
                 name,
                 royalty,
                 uri,
@@ -235,86 +240,86 @@ module token_objects::collection {
         };
     }
 
+    /// Creates a MutatorRef, which gates the ability to mutate any fields that support mutation.
+    public fun generate_mutator_ref(ref: &ConstructorRef): MutatorRef {
+        let object = object::object_from_constructor_ref<Collection>(ref);
+        MutatorRef { self: object::object_address(&object) }
+    }
+
     // Accessors
-    inline fun verify<T: key>(collection: &Object<T>): address {
+
+    inline fun borrow<T: key>(collection: &Object<T>): &Collection {
         let collection_address = object::object_address(collection);
         assert!(
             exists<Collection>(collection_address),
             error::not_found(ECOLLECTION_DOES_NOT_EXIST),
         );
-        collection_address
+        borrow_global<Collection>(collection_address)
+    }
+
+    public fun count<T: key>(collection: Object<T>): Option<u64> acquires FixedSupply {
+        let collection_address = object::object_address(&collection);
+        assert!(
+            exists<Collection>(collection_address),
+            error::not_found(ECOLLECTION_DOES_NOT_EXIST),
+        );
+
+        if (exists<FixedSupply>(collection_address)) {
+            let supply = borrow_global_mut<FixedSupply>(collection_address);
+            option::some(supply.current_supply)
+        } else {
+            option::none()
+        }
     }
 
     public fun creator<T: key>(collection: Object<T>): address acquires Collection {
-        let collection_address = verify(&collection);
-        borrow_global<Collection>(collection_address).creator
+        borrow(&collection).creator
     }
 
     public fun description<T: key>(collection: Object<T>): String acquires Collection {
-        let collection_address = verify(&collection);
-        borrow_global<Collection>(collection_address).description
-    }
-
-    public fun is_description_mutable<T: key>(collection: Object<T>): bool acquires Collection {
-        let collection_address = verify(&collection);
-        borrow_global<Collection>(collection_address).mutability_config.description
-    }
-
-    public fun is_uri_mutable<T: key>(collection: Object<T>): bool acquires Collection {
-        let collection_address = verify(&collection);
-        borrow_global<Collection>(collection_address).mutability_config.uri
+        borrow(&collection).description
     }
 
     public fun name<T: key>(collection: Object<T>): String acquires Collection {
-        let collection_address = verify(&collection);
-        borrow_global<Collection>(collection_address).name
+        borrow(&collection).name
     }
 
     public fun uri<T: key>(collection: Object<T>): String acquires Collection {
-        let collection_address = verify(&collection);
-        borrow_global<Collection>(collection_address).uri
+        borrow(&collection).uri
     }
 
     // Mutators
 
-    public fun set_description<T: key>(
-        creator: &signer,
-        collection: Object<T>,
-        description: String,
-    ) acquires Collection {
-        let collection_address = verify(&collection);
-        let collection = borrow_global_mut<Collection>(collection_address);
+    inline fun borrow_mut(mutator_ref: &MutatorRef): &mut Collection {
         assert!(
-            collection.creator == signer::address_of(creator),
-            error::permission_denied(ENOT_CREATOR),
+            exists<Collection>(mutator_ref.self),
+            error::not_found(ECOLLECTION_DOES_NOT_EXIST),
         );
-
-        assert!(
-            collection.mutability_config.description,
-            error::permission_denied(EFIELD_NOT_MUTABLE),
-        );
-
-        collection.description = description;
+        borrow_global_mut<Collection>(mutator_ref.self)
     }
 
-    public fun set_uri<T: key>(
-        creator: &signer,
-        collection: Object<T>,
+    public fun set_description(
+        mutator_ref: &MutatorRef,
+        description: String,
+    ) acquires Collection {
+        let collection = borrow_mut(mutator_ref);
+        collection.description = description;
+        event::emit_event(
+            &mut collection.mutation_events,
+            MutationEvent { mutated_field_name: string::utf8(b"description") },
+        );
+    }
+
+    public fun set_uri(
+        mutator_ref: &MutatorRef,
         uri: String,
     ) acquires Collection {
-        let collection_address = verify(&collection);
-        let collection = borrow_global_mut<Collection>(collection_address);
-        assert!(
-            collection.creator == signer::address_of(creator),
-            error::permission_denied(ENOT_CREATOR),
-        );
-
-        assert!(
-            collection.mutability_config.uri,
-            error::permission_denied(EFIELD_NOT_MUTABLE),
-        );
-
+        let collection = borrow_mut(mutator_ref);
         collection.uri = uri;
+        event::emit_event(
+            &mut collection.mutation_events,
+            MutationEvent { mutated_field_name: string::utf8(b"uri") },
+        );
     }
 
     // Tests
@@ -323,7 +328,7 @@ module token_objects::collection {
     entry fun test_create_and_transfer(creator: &signer, trader: &signer) {
         let creator_address = signer::address_of(creator);
         let collection_name = string::utf8(b"collection name");
-        create_immutable_collection_helper(creator, *&collection_name);
+        create_collection_helper(creator, *&collection_name);
 
         let collection = object::address_to_object<Collection>(
             create_collection_address(&creator_address, &collection_name),
@@ -337,91 +342,46 @@ module token_objects::collection {
     #[expected_failure(abort_code = 0x80001, location = aptos_framework::object)]
     entry fun test_duplicate_collection(creator: &signer) {
         let collection_name = string::utf8(b"collection name");
-        create_immutable_collection_helper(creator, *&collection_name);
-        create_immutable_collection_helper(creator, collection_name);
+        create_collection_helper(creator, *&collection_name);
+        create_collection_helper(creator, collection_name);
     }
 
     #[test(creator = @0x123)]
-    #[expected_failure(abort_code = 0x50003, location = Self)]
-    entry fun test_immutable_set_description(creator: &signer) acquires Collection {
+    entry fun test_set_description(creator: &signer) acquires Collection {
         let collection_name = string::utf8(b"collection name");
-        create_immutable_collection_helper(creator, *&collection_name);
+        let constructor_ref = create_collection_helper(creator, *&collection_name);
         let collection = object::address_to_object<Collection>(
             create_collection_address(&signer::address_of(creator), &collection_name),
         );
-        set_description(creator, collection, string::utf8(b"fail"));
-    }
-
-    #[test(creator = @0x123)]
-    #[expected_failure(abort_code = 0x50003, location = Self)]
-    entry fun test_immutable_set_uri(creator: &signer) acquires Collection {
-        let collection_name = string::utf8(b"collection name");
-        create_immutable_collection_helper(creator, *&collection_name);
-        let collection = object::address_to_object<Collection>(
-            create_collection_address(&signer::address_of(creator), &collection_name),
-        );
-        set_uri(creator, collection, string::utf8(b"fail"));
-    }
-
-    #[test(creator = @0x123)]
-    entry fun test_mutable_set_description(creator: &signer) acquires Collection {
-        let collection_name = string::utf8(b"collection name");
-        create_mutable_collection_helper(creator, *&collection_name);
-        let collection = object::address_to_object<Collection>(
-            create_collection_address(&signer::address_of(creator), &collection_name),
-        );
+        let mutator_ref = generate_mutator_ref(&constructor_ref);
         let description = string::utf8(b"no fail");
         assert!(description != description(collection), 0);
-        set_description(creator, collection, *&description);
+        set_description(&mutator_ref, *&description);
         assert!(description == description(collection), 1);
     }
 
     #[test(creator = @0x123)]
-    entry fun test_mutable_set_uri(creator: &signer) acquires Collection {
+    entry fun test_set_uri(creator: &signer) acquires Collection {
         let collection_name = string::utf8(b"collection name");
-        create_mutable_collection_helper(creator, *&collection_name);
+        let constructor_ref = create_collection_helper(creator, *&collection_name);
+        let mutator_ref = generate_mutator_ref(&constructor_ref);
         let collection = object::address_to_object<Collection>(
             create_collection_address(&signer::address_of(creator), &collection_name),
         );
         let uri = string::utf8(b"no fail");
         assert!(uri != uri(collection), 0);
-        set_uri(creator, collection, *&uri);
+        set_uri(&mutator_ref, *&uri);
         assert!(uri == uri(collection), 1);
     }
 
-    // Test helpers
-
     #[test_only]
-    fun create_immutable_collection_helper(creator: &signer, name: String) {
-        create_collection(
+    fun create_collection_helper(creator: &signer, name: String): ConstructorRef {
+        create_untracked_collection(
             creator,
             string::utf8(b"collection description"),
             name,
+            option::none(),
             string::utf8(b"collection uri"),
-            false,
-            false,
-            1,
-            false,
-            0,
-            0,
-            signer::address_of(creator),
-        );
-    }
-
-    #[test_only]
-    fun create_mutable_collection_helper(creator: &signer, name: String) {
-        create_collection(
-            creator,
-            string::utf8(b"collection description"),
-            name,
-            string::utf8(b"collection uri"),
-            true,
-            true,
-            1,
-            true,
-            10,
-            10,
-            signer::address_of(creator),
-        );
+        )
     }
 }

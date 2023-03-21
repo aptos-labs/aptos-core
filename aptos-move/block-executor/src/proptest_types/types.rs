@@ -4,20 +4,18 @@
 
 use crate::{
     errors::{Error, Result},
-    scheduler::TxnIndex,
-    task::{
-        ExecutionStatus, ExecutorTask, ModulePath, Transaction as TransactionType,
-        TransactionOutput,
-    },
+    task::{ExecutionStatus, ExecutorTask, Transaction as TransactionType, TransactionOutput},
 };
 use aptos_aggregator::{
     delta_change_set::{delta_add, delta_sub, deserialize, serialize, DeltaOp},
     transaction::AggregatorValue,
 };
+use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
+    executable::ModulePath,
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
     write_set::{TransactionWrite, WriteOp},
 };
@@ -304,6 +302,9 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         let is_module_read = |_| -> bool { module_access.1 };
         let is_delta = |_, _: &V| -> Option<DeltaOp> { None };
 
+        // Module deletion isn't allowed.
+        let allow_deletes = !(module_access.0 || module_access.1);
+
         Transaction::Write {
             incarnation: Arc::new(AtomicUsize::new(0)),
             writes_and_deltas: Self::writes_and_deltas_from_gen(
@@ -311,7 +312,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                 self.keys_modified,
                 &is_module_write,
                 &is_delta,
-                true,
+                allow_deletes,
             ),
             reads: Self::reads_from_gen(universe, self.keys_read, &is_module_read),
         }
@@ -380,7 +381,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                 self.keys_modified,
                 &is_module_write,
                 &is_delta,
-                true,
+                false, // Module deletion isn't allowed
             ),
             reads: Self::reads_from_gen(universe, self.keys_read, &is_module_read),
         }
@@ -389,7 +390,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
 
 impl<K, V> TransactionType for Transaction<K, V>
 where
-    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
+    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     V: Debug + Send + Sync + Debug + Clone + TransactionWrite + 'static,
 {
     type Key = K;
@@ -411,7 +412,7 @@ impl<K, V> Task<K, V> {
 
 impl<K, V> ExecutorTask for Task<K, V>
 where
-    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
+    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
 {
     type Argument = ();
@@ -457,7 +458,7 @@ where
                 ))
             },
             Transaction::SkipRest => ExecutionStatus::SkipRest(Output(vec![], vec![], vec![])),
-            Transaction::Abort => ExecutionStatus::Abort(txn_idx),
+            Transaction::Abort => ExecutionStatus::Abort(txn_idx as usize),
         }
     }
 }
@@ -467,7 +468,7 @@ pub struct Output<K, V>(Vec<(K, V)>, Vec<(K, DeltaOp)>, Vec<Option<Vec<u8>>>);
 
 impl<K, V> TransactionOutput for Output<K, V>
 where
-    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
+    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
 {
     type Txn = Transaction<K, V>;

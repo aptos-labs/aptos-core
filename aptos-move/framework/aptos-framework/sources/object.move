@@ -225,9 +225,19 @@ module aptos_framework::object {
         create_signer(ref.self)
     }
 
-    /// Returns the address of within a ConstructorRef
+    /// Returns the address associated with the constructor
+    public fun address_from_constructor_ref(ref: &ConstructorRef): address {
+        ref.self
+    }
+
+    /// Returns an Object<T> from within a DeleteRef
     public fun object_from_constructor_ref<T: key>(ref: &ConstructorRef): Object<T> {
         address_to_object<T>(ref.self)
+    }
+
+    /// Returns whether or not the ConstructorRef can be used to create DeleteRef
+    public fun can_generate_delete_ref(ref: &ConstructorRef): bool {
+        ref.can_delete
     }
 
     // Signer required functions
@@ -248,7 +258,12 @@ module aptos_framework::object {
 
     // Deletion helpers
 
-    /// Returns the address of within a DeleteRef.
+    /// Returns the address associated with the constructor
+    public fun address_from_delete_ref(ref: &DeleteRef): address {
+        ref.self
+    }
+
+    /// Returns an Object<T> from within a DeleteRef.
     public fun object_from_delete_ref<T: key>(ref: &DeleteRef): Object<T> {
         address_to_object<T>(ref.self)
     }
@@ -270,6 +285,11 @@ module aptos_framework::object {
     /// Create a signer for the ExtendRef
     public fun generate_signer_for_extending(ref: &ExtendRef): signer {
         create_signer(ref.self)
+    }
+
+    /// Returns an address from within a ExtendRef.
+    public fun address_from_extend_ref(ref: &ExtendRef): address {
+        ref.self
     }
 
     // Transfer functionality

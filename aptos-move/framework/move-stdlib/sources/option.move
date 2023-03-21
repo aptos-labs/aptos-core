@@ -164,9 +164,9 @@ module std::option {
         vector::borrow_mut(&mut t.vec, 0)
     }
     spec borrow_mut {
-        pragma opaque;
         include AbortsIfNone<Element>;
         ensures result == spec_borrow(t);
+        ensures t == old(t);
     }
 
     /// Swap the old value inside `t` with `e` and return the old value
@@ -322,6 +322,12 @@ module std::option {
     /// Returns true if the option contains an element which satisfies predicate.
     public inline fun any<Element>(o: &Option<Element>, p: |&Element|bool): bool {
         is_some(o) && p(borrow(o))
+    }
+
+    /// Utility function to destroy an option that is not droppable.
+    public inline fun destroy<Element>(o: Option<Element>, d: |Element|) {
+        let vec = to_vec(o);
+        vector::destroy(vec, |e| d(e));
     }
 
     spec module {} // switch documentation context back to module level

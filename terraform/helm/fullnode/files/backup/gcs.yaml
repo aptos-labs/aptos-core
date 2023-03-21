@@ -9,3 +9,4 @@ commands:
   open_for_read: 'gsutil -q cp "gs://$BUCKET/$SUB_DIR/$FILE_HANDLE" - | gzip -cd'
   save_metadata_line: 'gzip -c | gsutil -q cp - "gs://$BUCKET/$SUB_DIR/metadata/$FILE_NAME"'
   list_metadata_files: '(gsutil -q ls gs://$BUCKET/$SUB_DIR/metadata/ ||:) | sed -ne "s#gs://.*/metadata/#metadata/#p"'
+  backup_metadata_file: 'gsutil mv gs://$BUCKET/$SUB_DIR/metadata/$FILE_NAME gs://$BUCKET/$SUB_DIR/metadata_backup/$FILE_NAME'

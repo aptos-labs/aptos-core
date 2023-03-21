@@ -2,25 +2,25 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    counters,
-    scheduler::{Scheduler, TxnIndex},
-    task::{ModulePath, Transaction},
-    txn_last_input_output::ReadDescriptor,
+    counters, scheduler::Scheduler, task::Transaction, txn_last_input_output::ReadDescriptor,
 };
 use anyhow::Result;
 use aptos_aggregator::delta_change_set::{deserialize, serialize, DeltaOp};
-use aptos_mvhashmap::{MVHashMap, MVHashMapError, MVHashMapOutput};
+use aptos_logger::error;
+use aptos_mvhashmap::{
+    types::{MVCodeError, MVCodeOutput, MVDataError, MVDataOutput, TxnIndex},
+    MVHashMap,
+};
 use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
+    executable::{ExecutableTestType, ModulePath},
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
     vm_status::{StatusCode, VMStatus},
     write_set::TransactionWrite,
 };
+use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use move_binary_format::errors::Location;
 use std::{cell::RefCell, collections::BTreeMap, hash::Hash, sync::Arc};
-
-/// Resolved and serialized data for WriteOps, None means deletion.
-pub type ResolvedData = Option<Vec<u8>>;
 
 /// A struct that is always used by a single thread performing an execution task. The struct is
 /// passed to the VM and acts as a proxy to resolve reads first in the shared multi-version
@@ -29,8 +29,8 @@ pub type ResolvedData = Option<Vec<u8>>;
 /// TODO(issue 10177): MvHashMapView currently needs to be sync due to trait bounds, but should
 /// not be. In this case, the read_dependency member can have a RefCell<bool> type and the
 /// captured_reads member can have RefCell<Vec<ReadDescriptor<K>>> type.
-pub(crate) struct MVHashMapView<'a, K, V> {
-    versioned_map: &'a MVHashMap<K, V>,
+pub(crate) struct MVHashMapView<'a, K, V: TransactionWrite> {
+    versioned_map: &'a MVHashMap<K, V, ExecutableTestType>, // TODO: proper generic type
     scheduler: &'a Scheduler,
     captured_reads: RefCell<Vec<ReadDescriptor<K>>>,
 }
@@ -38,7 +38,7 @@ pub(crate) struct MVHashMapView<'a, K, V> {
 /// A struct which describes the result of the read from the proxy. The client
 /// can interpret these types to further resolve the reads.
 #[derive(Debug)]
-pub enum ReadResult<V> {
+pub(crate) enum ReadResult<V> {
     // Successful read of a value.
     Value(Arc<V>),
     // Similar to above, but the value was aggregated and is an integer.
@@ -55,7 +55,10 @@ impl<
         V: TransactionWrite + Send + Sync,
     > MVHashMapView<'a, K, V>
 {
-    pub(crate) fn new(versioned_map: &'a MVHashMap<K, V>, scheduler: &'a Scheduler) -> Self {
+    pub(crate) fn new(
+        versioned_map: &'a MVHashMap<K, V, ExecutableTestType>,
+        scheduler: &'a Scheduler,
+    ) -> Self {
         Self {
             versioned_map,
             scheduler,
@@ -68,14 +71,29 @@ impl<
         self.captured_reads.take()
     }
 
+    // TODO: Actually fill in the logic to record fetched executables, etc.
+    fn fetch_code(
+        &self,
+        key: &K,
+        txn_idx: TxnIndex,
+    ) -> anyhow::Result<MVCodeOutput<V, ExecutableTestType>, MVCodeError> {
+        // Add a fake read from storage to register in reads for now in order
+        // for the read / write path intersection fallback for modules to still work.
+        self.captured_reads
+            .borrow_mut()
+            .push(ReadDescriptor::from_storage(key.clone()));
+
+        self.versioned_map.fetch_code(key, txn_idx)
+    }
+
     /// Captures a read from the VM execution.
-    fn read(&self, key: &K, txn_idx: TxnIndex) -> ReadResult<V> {
-        use MVHashMapError::*;
-        use MVHashMapOutput::*;
+    fn fetch_data(&self, key: &K, txn_idx: TxnIndex) -> ReadResult<V> {
+        use MVDataError::*;
+        use MVDataOutput::*;
 
         loop {
-            match self.versioned_map.read(key, txn_idx) {
-                Ok(Version(version, v)) => {
+            match self.versioned_map.fetch_data(key, txn_idx) {
+                Ok(Versioned(version, v)) => {
                     let (idx, incarnation) = version;
                     self.captured_reads
                         .borrow_mut()
@@ -177,6 +195,22 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
             txn_idx,
         }
     }
+
+    fn get_base_value(&self, state_key: &T::Key) -> anyhow::Result<Option<StateValue>> {
+        let ret = self.base_view.get_state_value(state_key);
+
+        if ret.is_err() {
+            // Even speculatively, reading from base view should not return an error.
+            // Thus, this critical error log and count does not need to be buffered.
+            let log_context = AdapterLogSchema::new(self.base_view.id(), self.txn_idx as usize);
+            alert!(
+                log_context,
+                "[VM, StateView] Error getting data from storage for {:?}",
+                state_key
+            );
+        }
+        ret
+    }
 }
 
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TStateView for LatestView<'a, T, S> {
@@ -184,40 +218,41 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TStateView for LatestView<
 
     fn get_state_value(&self, state_key: &T::Key) -> anyhow::Result<Option<StateValue>> {
         match self.latest_view {
-            ViewMapKind::MultiVersion(map) => match map.read(state_key, self.txn_idx) {
-                ReadResult::Value(v) => Ok(v.as_state_value()),
-                ReadResult::U128(v) => Ok(Some(StateValue::new_legacy(serialize(&v)))),
-                ReadResult::Unresolved(delta) => {
-                    let from_storage = self
-                        .base_view
-                        .get_state_value_bytes(state_key)?
-                        .map_or(Err(VMStatus::Error(StatusCode::STORAGE_ERROR)), |bytes| {
-                            Ok(deserialize(&bytes))
-                        })?;
-                    let result = delta
-                        .apply_to(from_storage)
-                        .map_err(|pe| pe.finish(Location::Undefined).into_vm_status())?;
-                    Ok(Some(StateValue::new_legacy(serialize(&result))))
+            ViewMapKind::MultiVersion(map) => match state_key.module_path() {
+                Some(_) => {
+                    use MVCodeError::*;
+                    use MVCodeOutput::*;
+
+                    match map.fetch_code(state_key, self.txn_idx) {
+                        Ok(Executable(_)) => unreachable!("Versioned executable not implemented"),
+                        Ok(Module((v, _))) => Ok(v.as_state_value()),
+                        Err(Dependency(_)) => {
+                            // Return anything (e.g. module does not exist) to avoid waiting,
+                            // because parallel execution will fall back to sequential anyway.
+                            Ok(None)
+                        },
+                        Err(NotFound) => self.base_view.get_state_value(state_key),
+                    }
                 },
-                ReadResult::None => self.base_view.get_state_value(state_key),
+                None => match map.fetch_data(state_key, self.txn_idx) {
+                    ReadResult::Value(v) => Ok(v.as_state_value()),
+                    ReadResult::U128(v) => Ok(Some(StateValue::new_legacy(serialize(&v)))),
+                    ReadResult::Unresolved(delta) => {
+                        let from_storage =
+                            self.base_view.get_state_value_bytes(state_key)?.map_or(
+                                Err(VMStatus::Error(StatusCode::STORAGE_ERROR, None)),
+                                |bytes| Ok(deserialize(&bytes)),
+                            )?;
+                        let result = delta
+                            .apply_to(from_storage)
+                            .map_err(|pe| pe.finish(Location::Undefined).into_vm_status())?;
+                        Ok(Some(StateValue::new_legacy(serialize(&result))))
+                    },
+                    ReadResult::None => self.get_base_value(state_key),
+                },
             },
             ViewMapKind::BTree(map) => map.get(state_key).map_or_else(
-                || {
-                    // let ret =
-                    self.base_view.get_state_value(state_key)
-
-                    // TODO: common treatment with the above case.
-                    // TODO: enable below when logging isn't a circular dependency.
-                    // Even speculatively, reading from base view should not return an error.
-                    // let log_context = AdapterLogSchema::new(self.base_view.id(), self.txn_idx);
-                    // error!(
-                    //     log_context,
-                    //     "[VM, StateView] Error getting data from storage for {:?}", state_key
-                    // );
-                    // Alert (increase critical error count).
-                    // log_context.alert();
-                    // ret
-                },
+                || self.get_base_value(state_key),
                 |v| Ok(v.as_state_value()),
             ),
         }

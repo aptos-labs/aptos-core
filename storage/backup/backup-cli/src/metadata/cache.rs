@@ -34,7 +34,7 @@ static TEMP_METADATA_CACHE_DIR: Lazy<TempPath> = Lazy::new(|| {
     dir
 });
 
-#[derive(Parser)]
+#[derive(Clone, Parser)]
 pub struct MetadataCacheOpt {
     #[clap(
         long = "metadata-cache-dir",

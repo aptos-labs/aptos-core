@@ -11,6 +11,7 @@ pub(crate) const MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE: u64 = 4000;
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ConsensusConfig {
+    // Use getters to read the correct value with/without quorum store.
     pub max_sending_block_txns: u64,
     pub max_sending_block_txns_quorum_store_override: u64,
     pub max_sending_block_bytes: u64,
@@ -141,12 +142,36 @@ impl ConsensusConfig {
         self.safety_rules.set_data_dir(data_dir);
     }
 
-    // TODO: This is ugly. Remove this and configs when quorum store is always the default.
-    pub fn apply_quorum_store_overrides(&mut self) {
-        self.max_sending_block_txns = self.max_sending_block_txns_quorum_store_override;
-        self.max_sending_block_bytes = self.max_sending_block_bytes_quorum_store_override;
-        self.max_receiving_block_txns = self.max_receiving_block_txns_quorum_store_override;
-        self.max_receiving_block_bytes = self.max_receiving_block_bytes_quorum_store_override;
+    pub fn max_sending_block_txns(&self, quorum_store_enabled: bool) -> u64 {
+        if quorum_store_enabled {
+            self.max_sending_block_txns_quorum_store_override
+        } else {
+            self.max_sending_block_txns
+        }
+    }
+
+    pub fn max_sending_block_bytes(&self, quorum_store_enabled: bool) -> u64 {
+        if quorum_store_enabled {
+            self.max_sending_block_bytes_quorum_store_override
+        } else {
+            self.max_sending_block_bytes
+        }
+    }
+
+    pub fn max_receiving_block_txns(&self, quorum_store_enabled: bool) -> u64 {
+        if quorum_store_enabled {
+            self.max_receiving_block_txns_quorum_store_override
+        } else {
+            self.max_receiving_block_txns
+        }
+    }
+
+    pub fn max_receiving_block_bytes(&self, quorum_store_enabled: bool) -> u64 {
+        if quorum_store_enabled {
+            self.max_receiving_block_bytes_quorum_store_override
+        } else {
+            self.max_receiving_block_bytes
+        }
     }
 }
 

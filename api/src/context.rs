@@ -12,7 +12,8 @@ use crate::{
 };
 use anyhow::{bail, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_api_types::{
-    AptosErrorCode, AsConverter, BcsBlock, GasEstimation, LedgerInfo, TransactionOnChainData,
+    AptosErrorCode, AsConverter, BcsBlock, GasEstimation, LedgerInfo, ResourceGroup,
+    TransactionOnChainData,
 };
 use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::HashValue;
@@ -50,7 +51,7 @@ use futures::{channel::oneshot, SinkExt};
 use itertools::Itertools;
 use move_core_types::language_storage::{ModuleId, StructTag};
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::HashMap,
     sync::{Arc, RwLock},
 };
 
@@ -344,7 +345,7 @@ impl Context {
             .map(|(key, value)| {
                 if resolver.is_resource_group(&key) {
                     // An error here means a storage invariant has been violated
-                    bcs::from_bytes::<BTreeMap<StructTag, Vec<u8>>>(&value)
+                    bcs::from_bytes::<ResourceGroup>(&value)
                         .map(|map| {
                             map.into_iter()
                                 .map(|(key, value)| (key, value))

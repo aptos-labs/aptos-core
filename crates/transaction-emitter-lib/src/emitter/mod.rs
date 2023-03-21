@@ -43,7 +43,7 @@ use tokio::{runtime::Handle, task::JoinHandle, time};
 // Max is 100k TPS for 3 hours
 const MAX_TXNS: u64 = 1_000_000_000;
 
-const MAX_RETRIES: usize = 6;
+const MAX_RETRIES: usize = 8;
 
 // This retry policy is used for important client calls necessary for setting
 // up the test (e.g. account creation) and collecting its results (e.g. checking
@@ -197,7 +197,10 @@ pub struct EmitJobRequest {
     expected_gas_per_txn: u64,
     prompt_before_spending: bool,
 
-    delay_after_minting: Duration,
+    coordination_delay_between_instances: Duration,
+
+    init_retry_count: usize,
+    init_retry_interval: Duration,
 }
 
 impl Default for EmitJobRequest {
@@ -218,7 +221,9 @@ impl Default for EmitJobRequest {
             expected_max_txns: MAX_TXNS,
             expected_gas_per_txn: aptos_global_constants::MAX_GAS_AMOUNT,
             prompt_before_spending: false,
-            delay_after_minting: Duration::from_secs(0),
+            coordination_delay_between_instances: Duration::from_secs(0),
+            init_retry_count: MAX_RETRIES,
+            init_retry_interval: Duration::from_secs(5),
         }
     }
 }
@@ -305,8 +310,11 @@ impl EmitJobRequest {
         self
     }
 
-    pub fn delay_after_minting(mut self, delay_after_minting: Duration) -> Self {
-        self.delay_after_minting = delay_after_minting;
+    pub fn coordination_delay_between_instances(
+        mut self,
+        coordination_delay_between_instances: Duration,
+    ) -> Self {
+        self.coordination_delay_between_instances = coordination_delay_between_instances;
         self
     }
 
@@ -603,7 +611,8 @@ impl TxnEmitter {
         );
         let txn_executor = RestApiTransactionExecutor {
             rest_clients: req.rest_clients.clone(),
-            max_retries: MAX_RETRIES,
+            max_retries: req.init_retry_count,
+            retry_after: req.init_retry_interval,
         };
         let mut all_accounts = account_minter
             .create_accounts(&txn_executor, &req, &mode_params, num_accounts)
@@ -623,12 +632,12 @@ impl TxnEmitter {
         )
         .await;
 
-        if !req.delay_after_minting.is_zero() {
+        if !req.coordination_delay_between_instances.is_zero() {
             info!(
                 "Sleeping after minting/txn generator initialization for {}s",
-                req.delay_after_minting.as_secs()
+                req.coordination_delay_between_instances.as_secs()
             );
-            tokio::time::sleep(req.delay_after_minting).await;
+            tokio::time::sleep(req.coordination_delay_between_instances).await;
         }
 
         let total_workers = req.rest_clients.len() * workers_per_endpoint;

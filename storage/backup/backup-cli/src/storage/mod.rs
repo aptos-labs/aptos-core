@@ -168,6 +168,10 @@ pub trait BackupStorage: Send + Sync {
     ///   2. But the cache does expect the content stays the same for a file handle, so when
     /// reorganising metadata files, give them new unique names.
     async fn list_metadata_files(&self) -> Result<Vec<FileHandle>>;
+    /// Move a metadata file to the metadata file backup folder.
+    async fn backup_metadata_file(&self, file_handle: &FileHandleRef) -> Result<()>;
+    /// Save a vector of metadata lines to file. If the file exists, this will overwrite
+    async fn save_metadata_lines(&self, name: &ShellSafeName, lines: &[TextLine]) -> Result<()>;
 }
 
 #[derive(Parser)]

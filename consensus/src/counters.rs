@@ -5,8 +5,9 @@
 use aptos_metrics_core::{
     exponential_buckets, op_counters::DurationHistogram, register_counter, register_gauge,
     register_gauge_vec, register_histogram, register_histogram_vec, register_int_counter,
-    register_int_counter_vec, register_int_gauge, register_int_gauge_vec, Counter, Gauge, GaugeVec,
-    Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
+    register_int_counter_vec, register_int_gauge, register_int_gauge_vec, AverageIntCounter,
+    Counter, Gauge, GaugeVec, Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge,
+    IntGaugeVec,
 };
 use once_cell::sync::Lazy;
 
@@ -185,14 +186,20 @@ pub static LEADER_REPUTATION_ROUND_HISTORY_SIZE: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Number of rounds we were collecting votes for proposer
-/// (similar to PROPOSALS_COUNT, but can be larger, if we failed in creating/sending of the proposal)
-pub static CHAIN_HEALTH_BACKOFF_TRIGGERED: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!(
+/// Counts when chain_health backoff is triggered
+pub static CHAIN_HEALTH_BACKOFF_TRIGGERED: Lazy<AverageIntCounter> = Lazy::new(|| {
+    AverageIntCounter::register(
         "aptos_chain_health_backoff_triggered",
-        "Total voting power of all votes collected for the round this node was proposer",
+        "Counts when chain_health backoff is triggered",
     )
-    .unwrap()
+});
+
+/// Counts when waiting for full blocks is triggered
+pub static WAIT_FOR_FULL_BLOCKS_TRIGGERED: Lazy<AverageIntCounter> = Lazy::new(|| {
+    AverageIntCounter::register(
+        "aptos_wait_for_full_blocks_triggered",
+        "Counts when waiting for full blocks is triggered",
+    )
 });
 
 /// How many pending blocks are there, when we make a proposal
@@ -627,17 +634,17 @@ pub static QUORUM_STORE_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Counters(queued,dequeued,dropped) related to block retrieval channel
-pub static BLOCK_RETRIEVAL_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
+/// Counters(queued,dequeued,dropped) related to rpc request channel
+pub static RPC_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_consensus_block_retrieval_channel_msgs_count",
-        "Counters(queued,dequeued,dropped) related to block retrieval channel",
+        "aptos_consensus_rpc_channel_msgs_count",
+        "Counters(queued,dequeued,dropped) related to rpc request channel",
         &["state"]
     )
     .unwrap()
 });
 
-/// Counters(queued,dequeued,dropped) related to block retrieval task
+/// Counters(queued,dequeued,dropped) related to block retrieval per epoch task
 pub static BLOCK_RETRIEVAL_TASK_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_consensus_block_retrieval_task_msgs_count",

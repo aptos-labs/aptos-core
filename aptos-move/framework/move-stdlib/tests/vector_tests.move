@@ -1,6 +1,7 @@
 #[test_only]
 module std::vector_tests {
     use std::vector as V;
+    use std::vector;
 
     struct R has store { }
     struct Droppable has drop {}
@@ -87,6 +88,29 @@ module std::vector_tests {
             assert!(*V::borrow(&v1, i) == i, i);
             i = i + 1;
         }
+    }
+
+    #[test]
+    fun test_trim() {
+        {
+            let v = V::empty<u64>();
+            assert!(&V::trim(&mut v, 0) == &vector[], 0);
+        };
+        {
+            let v = vector[1];
+            assert!(&V::trim(&mut v, 1) == &vector[], 1);
+            assert!(&V::trim(&mut v, 0) == &vector[1], 2);
+        };
+        {
+            let v = vector[1, 2];
+            assert!(&V::trim(&mut v, 0) == &vector[1, 2], 3);
+        };
+    }
+    #[test]
+    #[expected_failure(abort_code = V::EINDEX_OUT_OF_BOUNDS)]
+    fun test_trim_fail() {
+        let v = vector[1];
+        V::trim(&mut v, 2);
     }
 
     #[test]
@@ -535,6 +559,23 @@ module std::vector_tests {
     }
 
     #[test]
+    fun test_foldr() {
+        // use non-commutative minus operation to test the difference between fold and foldr
+        {
+            let v = vector[3, 2, 1];
+            // ((100 - 3) - 2) - 1 = 94
+            let s = V::fold(v, 100, |l, r| l - r);
+            assert!(s == 94, 0)
+        };
+        {
+            let v = vector[3, 2, 1];
+            // 3 - (2 - (1 - 0)) = 2
+            let s = V::foldr(v, 0, |l, r| l - r);
+            assert!(s == 2, 1)
+        }
+    }
+
+    #[test]
     fun test_map() {
         let v = vector[1, 2, 3];
         let s = V::map(v, |x| x + 1);
@@ -567,5 +608,73 @@ module std::vector_tests {
         let v = vector[1, 2, 3];
         let r = V::all(&v, |x| *x >= 1);
         assert!(r, 0)
+    }
+
+    #[test]
+    fun test_rotate() {
+        let v = vector[1, 2, 3, 4, 5];
+        assert!(vector::rotate(&mut v, 2) == 3, 0);
+        assert!(&v == &vector[3, 4, 5, 1, 2], 1);
+
+        assert!(vector::rotate_slice(&mut v, 1, 2, 5) == 4, 2);
+        assert!(&v == &vector[3, 5, 1, 2, 4], 3);
+
+        assert!(vector::rotate_slice(&mut v, 0, 0, 5) == 5, 2);
+        assert!(&v == &vector[3, 5, 1, 2, 4], 3);
+        assert!(vector::rotate_slice(&mut v, 0, 5, 5) == 0, 2);
+        assert!(&v == &vector[3, 5, 1, 2, 4], 3);
+    }
+
+    #[test]
+    fun test_partition() {
+        let v = vector[1, 2, 3, 4, 5];
+        assert!(vector::partition(&mut v, |n| *n % 2 == 0) == 2, 0);
+        assert!(&v == &vector[2, 4, 3, 1, 5], 1);
+
+        assert!(vector::partition(&mut v, |_n| false) == 0, 0);
+        assert!(&v == &vector[2, 4, 3, 1, 5], 1);
+
+        assert!(vector::partition(&mut v, |_n| true) == 5, 0);
+        assert!(&v == &vector[2, 4, 3, 1, 5], 1);
+    }
+
+    fun test_stable_partition() {
+        let v:vector<u64> = vector[1, 2, 3, 4, 5];
+
+        assert!(vector::stable_partition(&mut v, |n| *n % 2 == 0) == 2, 0);
+        assert!(&v == &vector[2, 4, 1, 3, 5], 1);
+
+        assert!(vector::partition(&mut v, |_n| false) == 0, 0);
+        assert!(&v == &vector[2, 4, 1, 3, 5], 1);
+
+        assert!(vector::partition(&mut v, |_n| true) == 5, 0);
+        assert!(&v == &vector[2, 4, 1, 3, 5], 1);
+    }
+
+    fun test_insert() {
+        let v:vector<u64> = vector[1, 2, 3, 4, 5];
+
+        vector::insert(&mut v,2, 6);
+        assert!(&v == &vector[1, 2, 6, 3, 4, 5], 1);
+
+        vector::insert(&mut v,6, 7);
+        assert!(&v == &vector[1, 2, 6, 3, 4, 5, 7], 1);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = V::EINDEX_OUT_OF_BOUNDS)]
+    fun test_insert_out_of_bounds() {
+        let v:vector<u64> = vector[1, 2, 3, 4, 5];
+
+        vector::insert(&mut v,6, 6);
+    }
+
+    #[test_only]
+    struct MoveOnly {}
+
+    #[test]
+    fun test_destroy() {
+        let v = vector[MoveOnly {}];
+        vector::destroy(v, |m| { let MoveOnly {} = m; })
     }
 }
