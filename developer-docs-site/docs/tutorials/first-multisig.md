@@ -17,7 +17,7 @@ Try out the above tutorials (which include dependency installations) before movi
 
 ## Step 1: Pick an SDK
 
-This tutorial, a community contribution, was created for the [Python SDK](../sdks/python-sdk.md).
+This tutorial is a community contribution created for the [Python SDK](../sdks/python-sdk.md).
 
 Other developers are invited to add support for the [TypeScript SDK](../sdks/ts-sdk/index.md), [Rust SDK](../sdks/rust-sdk.md), and [Unity SDK](../sdks/unity-sdk.md)!
 
@@ -71,13 +71,13 @@ For each user, note the [account address](../concepts/accounts.md#account-addres
 
 ## Step 4: Generate a multisig account
 
-Next generate a [K-of-N multi-signer](../concepts/accounts.md#multi-signer-authentication) public key and account address for a multisig account requiring two of the three signatures:
+Next, generate a [K-of-N multi-signer](../concepts/accounts.md#multi-signer-authentication) public key and account address for a multisig account requiring two of the three signatures:
 
 ```python title="multisig.py snippet"
 :!: static/sdks/python/examples/multisig.py section_2
 ```
 
-The multisig account address depends on the public keys of the single signers. (Hence, it will be different for each example.) But the output should resemble:
+The multisig account address depends on the public keys of the single signers, so it will be different for each example. That being said, the output should resemble:
 
 ```zsh title=Output
 === 2-of-3 Multisig account ===
@@ -87,12 +87,12 @@ Account address:    0x08cac3b7b7ce4fbc5b18bc039279d7854e4c898cbf82518ac2650b565a
 
 ## Step 5: Fund all accounts
 
-Next fund all accounts:
+Next, fund all of the accounts:
 
 ```python title="multisig.py snippet"
 :!: static/sdks/python/examples/multisig.py section_3
 ```
-
+Output:
 ```zsh title=Output
 === Funding accounts ===
 Alice's balance:  10000000
@@ -106,9 +106,9 @@ Multisig balance: 40000000
 This transaction will send 100 octas from the multisig account to Chad's account.
 Since it is a two-of-three multisig account, signatures are required from only two individual signers.
 
-### Step 6.1: Gather individual signatures
+### Gather individual signatures
 
-First generate a raw transaction, signed by Alice and Bob, but not by Chad.
+First, generate a raw transaction signed by Alice and Bob, but not by Chad.
 
 ```python title="multisig.py snippet"
 :!: static/sdks/python/examples/multisig.py section_4
@@ -122,28 +122,28 @@ Alice: 0x41b9dd65857df2d8d8fba251336357456cc9f17974de93292c13226f560102eac1e70dd
 Bob:   0x6305101f8f3ad5a75254a8fa74b0d9866756abbf359f9e4f2b54247917caf8c52798a36c5a81c77505ebc1dc9b80f2643e8fcc056bcc4f795e80b229fa41e509
 ```
 
-### Step 6.2: Submit the multisig transaction
+### Submit the multisig transaction
 
-Next generate a [multisig authenticator](../guides/sign-a-transaction.md#multisignature-transactions) and submit the transaction:
+Next, generate a [multisig authenticator](../guides/sign-a-transaction.md#multisignature-transactions) and submit the transaction:
 
 
 ```python title="multisig.py snippet"
 :!: static/sdks/python/examples/multisig.py section_5
 ```
-
+Output:
 ```zsh title=Output
 === Submitting transfer transaction ===
 Transaction hash: 0x3ff2a848bf6145e6df3abb3ccb8b94fefd07ac16b4acb0c694fa7fa30b771f8c
 ```
 
-### Step 6.3: Check balances
+### Check balances
 
 Check the new account balances:
 
 ```python title="multisig.py snippet"
 :!: static/sdks/python/examples/multisig.py section_6
 ```
-
+Output:
 ```zsh title=Output
 === New account balances===
 Alice's balance:  10000000
@@ -153,20 +153,20 @@ Multisig balance: 39999300
 ```
 
 Note that even though Alice and Bob signed the transaction, their account balances have not changed.
-Chad, however, has received 100 octas from the multisig account, which assumed the gas costs of the transaction and thus has had more than 100 octas deducted.
+However, Chad has received 100 octas from the multisig account, which assumed the gas costs of the transaction and thus has had more than 100 octas deducted.
 
 ## Step 7: Create a vanity address multisig
 
 In this section, a fourth user named Deedee will generate a vanity address, then rotate her account to the two-of-three multisig.
 
-### Step 7.1 Generate a vanity address
+### Generate a vanity address
 
 A fourth user, Deedee, wants her account address to start with `0xdd..`, so she generates random accounts until she finds one with a matching account address:
 
 ```python title="multisig.py snippet"
 :!: static/sdks/python/examples/multisig.py section_7
 ```
-
+Output:
 ```zsh title=Output
 === Funding vanity address ===
 Deedee's address:    0xdd86860ae7f77f58d08188e1c39fbc6a2f7cec782f09f6767f8367d84357ed57
@@ -174,7 +174,7 @@ Deedee's public key: 0xdbf02311c45903f0217e9ab76ca64007c2876363118bb422922410d4c
 Deedee's balance:    50000000
 ```
 
-### Step 7.2 Sign a rotation proof challenge
+### Sign a rotation proof challenge
 
 Deedee and the two-of-three multisig must both sign a `RotationProofChallenge`, yielding two signatures.
 Deedee's signature, `cap_rotate_key`, verifies that she approves of the authentication key rotation.
@@ -184,14 +184,14 @@ Here, Bob and Chad provide individual signatures for the multisig:
 ```python title="multisig.py snippet"
 :!: static/sdks/python/examples/multisig.py section_8
 ```
-
+Output:
 ```zsh title=Output
 === Signing rotation proof challenge ===
 cap_rotate_key:   0x3b2906df78bb79f210051e910985c358572c2ec7cdd03f688480fb6adf8d538df48a52787d5651d85f2959dcca88d58da49709c9c0dc9c3c58b67169ec1e1c01
 cap_update_table: 0x965fd11d7afe14396e5af40b8ffb78e6eb6f7caa1f1b1d8c7b819fdd6045864e70258788ec1670a3989c85f8cc604f4b54e43e1ce173a59aa0a6f7cf124fd902dcbb2ad53467d05c144260b2be1814777c082d8db437698b00e6a2109a015a565ff5783e827a21a4c07ae332b56398b69dfdbcc08b8ad5585dc1ac649b74730760000000
 ```
 
-### Step 7.3 Rotate the authentication key
+### Rotate the authentication key
 
 Now that the relevant signatures have been gathered, the authentication key rotation transaction can be submitted.
 After it executes, the rotated authentication key matches the address of the first multisig account (the one that sent octas to Chad):
@@ -199,7 +199,7 @@ After it executes, the rotated authentication key matches the address of the fir
 ```python title="multisig.py snippet"
 :!: static/sdks/python/examples/multisig.py section_9
 ```
-
+Output:
 ```zsh title=Output
 === Submitting authentication key rotation transaction ===
 Auth key pre-rotation: 0xdd86860ae7f77f58d08188e1c39fbc6a2f7cec782f09f6767f8367d84357ed57
@@ -217,14 +217,15 @@ In this section, the multisig vanity account will publish a simple package, upgr
 
 Move source code for this section is found in the [`upgrade_and_govern`](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/upgrade_and_govern) directory.
 
-### Step 8.1: Review genesis package
+### Review genesis package
 
-The `UpgradeAndGovern` genesis package (version `1.0.0`) contains a simple `.toml` manifest and a single Move source file:
+The `UpgradeAndGovern` genesis package (version `1.0.0`) contains a simple `.toml` manifest and a single Move source file.
 
+The `.toml` manifest can be found in:
 ```toml title="Move.toml"
 :!: static/move-examples/upgrade_and_govern/genesis/Move.toml manifest
 ```
-
+The `.move` source file can be found in:
 ```rust title="parameters.move"
 :!: static/move-examples/upgrade_and_govern/genesis/sources/parameters.move module
 ```
@@ -233,7 +234,7 @@ As soon as the package is published, a `GovernanceParameters` resource is moved 
 Then, the `get_parameters()` function can be used to look up the governance parameters, but note that in this version there is no setter function.
 The setter function will be added later.
 
-### Step 8.2: Publish genesis package
+### Publish genesis package
 
 Here, Alice and Chad will sign off on the publication transaction.
 
@@ -242,7 +243,7 @@ All compilation and publication operations are handled via the ongoing Python sc
 ```python title="multisig.py snippet"
 :!: static/sdks/python/examples/multisig.py section_10
 ```
-
+Output:
 ```zsh title=Output
 === Genesis publication ===
 Running aptos CLI command: aptos move compile --save-metadata --package-dir ../../../../aptos-move/move-examples/upgrade_and_govern/genesis --named-addresses upgrade_and_govern=0xdd86860ae7f77f58d08188e1c39fbc6a2f7cec782f09f6767f8367d84357ed57
@@ -258,7 +259,7 @@ Package name from on-chain registry: UpgradeAndGovern
 On-chain upgrade number: 0
 ```
 
-### Step 8.3: Review package upgrades
+### Review package upgrades
 
 The `UpgradeAndGovern` upgrade package adds the following parameter setter functionality at the end of `parameters.move`:
 
@@ -268,7 +269,7 @@ The `UpgradeAndGovern` upgrade package adds the following parameter setter funct
 
 Here, the account that the package is published under, `upgrade_and_govern`, has the authority to change the `GovernanceParameter` values from the genesis values to the new `parameter_1` and `parameter_2` values.
 
-There is also a new module, `transfer.move`:
+There is also a new module called `transfer.move`:
 
 ```rust title=transfer.move
 :!: static/move-examples/upgrade_and_govern/upgrade/sources/transfer.move module
@@ -282,7 +283,7 @@ Lastly, the manifest has been updated with the new version number `1.1.0`:
 :!: static/move-examples/upgrade_and_govern/upgrade/Move.toml manifest
 ```
 
-### Step 8.4: Upgrade the package
+### Upgrade the package
 
 Alice, Bob, and Chad will all sign off on this publication transaction, which results in an upgrade.
 This process is almost identical to that of the genesis publication, with the new `transfer` module listed after the `parameters` module:
@@ -295,6 +296,7 @@ This process is almost identical to that of the genesis publication, with the ne
 Modules that `use` other modules must be listed *after* the modules they use.
 :::
 
+Output:
 ```zsh title=Output
 === Upgrade publication ===
 Running aptos CLI command: aptos move compile --save-metadata --package-dir ../../../../aptos-move/move-examples/upgrade_and_govern/upgrade --named-addresses upgrade_and_govern=0xdd86860ae7f77f58d08188e1c39fbc6a2f7cec782f09f6767f8367d84357ed57
@@ -311,7 +313,7 @@ On-chain upgrade number: 1
 
 Note that the on-chain upgrade number has been incremented by 1.
 
-### Step 8.6: Review the governance script
+### Review the governance script
 
 The `UpgradeAndGovern` upgrade package also includes a Move script at `set_and_transfer.move`:
 
@@ -329,7 +331,7 @@ Hence in a non-script approach, extra operational complexity can quickly introdu
 
 A Move script, by contrast, collapses multiple governance function calls into a single transaction; and moreover, Move scripts can be published in a public forum like GitHub so that all signatories can review the actual function calls before they sign the script.
 
-### Step 8.5: Execute the governance script
+### Execute the governance script
 
 Alice and Bob sign off on the Move script, which sends coins from the vanity multisig account to their personal accounts.
 Here, the amounts sent to each account are specified in the hard-coded values from the script.
@@ -447,7 +449,7 @@ options:
 
 </details>
 
-### Step 9.1 Keyfiles
+### Keyfiles
 
 Unlike the `aptos` CLI which stores private keys in plain text on disk, AMEE encrypts single-signer private keys in a [JSON](https://docs.python.org/3/library/json.html) keyfile format with password protection:
 
@@ -577,7 +579,7 @@ sh examples/multisig.sh keyfiles
 Try running the shell script yourself, then experiment with variations on the commands!
 :::
 
-### Step 9.2 Metafiles
+### Metafiles
 
 AMEE manages multisig account metadata through metafiles, which assimilate information from multiple single-signer keyfiles.
 
@@ -855,7 +857,7 @@ Thus far all AMEE operations have been conducted off-chain, because the relevant
 
 As such, all multisig metafiles have `"address": null`, since an on-chain account address has not yet been linked with any of the multisig accounts.
 
-### Step 9.3 Authentication key rotation
+### Authentication key rotation
 
 In this section, the authentication key for Ace's vanity account will be rotated to a 1-of-2 multisig including Ace and Bee, then to a 2-of-2 multisig, and finally back to Ace as a single signer.
 Here the demo script uses devnet to automatically fund Ace's account from the faucet, but note that Bee's account does not need to be funded, because only her *signature* is required throughout operations.
@@ -1681,7 +1683,7 @@ In practice, note that the consensus mechanism will probably entail something li
 
 Theoretically this can be scaled to as many as 32 independent signatories, but note that higher numbers of signatories introduce logistical complexities (e.g. sending signature files back and forth in a group chat, or running shell commands with 32 arguments).
 
-### Step 9.4 Protocol governance
+### Protocol governance
 
 In this section AMEE will be used to [publish and upgrade the same `UpgradeAndGovern` package as above](#step-8-perform-move-package-governance), then to invoke a different governance script, all under the authority of a 1-of-2 multisig account:
 
