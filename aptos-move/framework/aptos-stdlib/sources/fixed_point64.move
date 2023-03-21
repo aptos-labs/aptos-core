@@ -111,6 +111,7 @@ module aptos_std::fixed_point64 {
         FixedPoint64 { value: (quotient as u128) }
     }
     spec create_from_rational {
+        pragma timeout = 100;
         pragma opaque;
         include CreateFromRationalAbortsIf;
         ensures result == spec_create_from_rational(numerator, denominator);
