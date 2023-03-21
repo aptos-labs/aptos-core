@@ -6,8 +6,7 @@
 #[macro_use]
 extern crate criterion;
 
-use aptos_crypto::{msm_all_bench_cases, rand, serialize, test_utils::random_bytes};
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use aptos_crypto::test_utils::random_bytes;
 use ark_bls12_381::{Fq12, Fr, G1Affine, G1Projective, G2Affine, G2Projective};
 use ark_ec::{
     hashing::HashToCurve, pairing::Pairing, short_weierstrass::Projective, AffineRepr, CurveGroup,
@@ -18,14 +17,34 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::test_rng;
 use criterion::{BenchmarkId, Criterion};
 use rand::thread_rng;
-use serde::{Deserialize, Serialize};
 use std::{
     ops::{Add, Div, Mul, Neg},
     time::Duration,
 };
 
-#[derive(Debug, CryptoHasher, BCSCryptoHash, Serialize, Deserialize)]
-struct TestAptosCrypto(String);
+fn msm_all_bench_cases() -> Vec<usize> {
+    let series_until_65 = (1..65).step_by(2);
+    let series_until_129 = (64..129).step_by(4);
+    let series_until_257 = (129..257).step_by(8);
+    series_until_65
+        .chain(series_until_129)
+        .chain(series_until_257)
+        .collect::<Vec<_>>()
+}
+
+macro_rules! rand {
+    ($typ:ty) => {{
+        <$typ>::rand(&mut test_rng())
+    }};
+}
+
+macro_rules! serialize {
+    ($obj:expr, $method:ident) => {{
+        let mut buf = vec![];
+        $obj.$method(&mut buf).unwrap();
+        buf
+    }};
+}
 
 fn bench_group(c: &mut Criterion) {
     let mut group = c.benchmark_group("ark_bls12_381");
@@ -49,8 +68,7 @@ fn bench_group(c: &mut Criterion) {
         b.iter_with_setup(
             || {
                 let k = rand!(Fr);
-                let buf = serialize!(k, serialize_uncompressed);
-                buf
+                serialize!(k, serialize_uncompressed)
             },
             |buf| {
                 let _k = Fr::deserialize_uncompressed(buf.as_slice()).unwrap();
@@ -228,8 +246,7 @@ fn bench_group(c: &mut Criterion) {
         b.iter_with_setup(
             || {
                 let e = rand!(Fq12);
-                let buf = serialize!(e, serialize_uncompressed);
-                buf
+                serialize!(e, serialize_uncompressed)
             },
             |buf| {
                 let _e = Fq12::deserialize_uncompressed(buf.as_slice()).unwrap();
@@ -387,8 +404,7 @@ fn bench_group(c: &mut Criterion) {
         b.iter_with_setup(
             || {
                 let p = rand!(G1Affine);
-                let buf = serialize!(p, serialize_compressed);
-                buf
+                serialize!(p, serialize_compressed)
             },
             |buf| {
                 let _p = G1Affine::deserialize_uncompressed(buf.as_slice());
@@ -400,8 +416,7 @@ fn bench_group(c: &mut Criterion) {
         b.iter_with_setup(
             || {
                 let p = rand!(G1Affine);
-                let buf = serialize!(p, serialize_uncompressed);
-                buf
+                serialize!(p, serialize_uncompressed)
             },
             |buf| {
                 let _p = G1Affine::deserialize_uncompressed(buf.as_slice());
@@ -583,8 +598,7 @@ fn bench_group(c: &mut Criterion) {
         b.iter_with_setup(
             || {
                 let p = rand!(G2Affine);
-                let buf = serialize!(p, serialize_compressed);
-                buf
+                serialize!(p, serialize_compressed)
             },
             |buf| {
                 let _p = G2Affine::deserialize_uncompressed(buf.as_slice());
@@ -596,8 +610,7 @@ fn bench_group(c: &mut Criterion) {
         b.iter_with_setup(
             || {
                 let p = rand!(G2Affine);
-                let buf = serialize!(p, serialize_uncompressed);
-                buf
+                serialize!(p, serialize_uncompressed)
             },
             |buf| {
                 let _p = G2Affine::deserialize_uncompressed(buf.as_slice());

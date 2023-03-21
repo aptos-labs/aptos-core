@@ -74,10 +74,6 @@ name = "bls12381"
 harness = false
 
 [[bench]]
-name = "blst"
-harness = false
-
-[[bench]]
 name = "ed25519"
 harness = false
 
