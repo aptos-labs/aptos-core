@@ -128,7 +128,7 @@ An Aptos node is a peer entity of the Aptos network that tracks the state of the
 ### Consensus Protocol
 
 - A **consensus protocol** is collectively executed by n validators to accept or reject a transaction and to agree on the ordering of transactions and [execution results](#execution-result).
-- See [BFT](#byzantine-fault-tolerance-bft)
+- See [BFT](#byzantine-fault-tolerance-bft).
 
 ## D
 
@@ -213,7 +213,7 @@ then there is a guarantee that T_N will never be included in the blockchain.
 
 ### Indexer
 
-- [Indexer](../concepts/indexing.md) is the component of Aptos that retrieves, processes, and efficiently stores raw data in the database to provide speedy access to the Aptos blockchain state.
+- [Indexer](../guides/indexing.md) is the component of Aptos that retrieves, processes, and efficiently stores raw data in the database to provide speedy access to the Aptos blockchain state.
 
 ## L
 
