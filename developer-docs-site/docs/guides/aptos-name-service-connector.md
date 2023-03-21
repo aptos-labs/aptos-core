@@ -7,16 +7,16 @@ The Aptos Name Service provides a React UI package that provides developers with
 
 ## Use Aptos Name Service Connector
 
-To use the `aptos-name-connector` component, you will need to install it using npm or yarn:
+To use the `aptos-names-connector` component, you will need to install it using npm or yarn:
 ```
-npm install "@aptos-labs/aptos-name-connector"
+npm install "@aptos-labs/aptos-names-connector"
 ```
 
 
 Once you have installed the package, you can import the `AnsConnector` component and use it in your React application:
 
 ```
-import { AnsConnector } from "@aptos-labs/aptos-name-connector";
+import { AnsConnector } from "@aptos-labs/aptos-names-connector";
 
 function MyComponent() {
   const handleSignTransaction = async () => {
