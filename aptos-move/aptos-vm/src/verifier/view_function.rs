@@ -9,9 +9,7 @@ use aptos_framework::RuntimeModuleMetadataV1;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{identifier::IdentStr, vm_status::StatusCode};
 use move_vm_runtime::session::LoadedFunctionInstantiation;
-use move_vm_types::gas::{UnmeteredGasMeter};
-use std::io::Cursor;
-use move_binary_format::normalized::Type;
+use move_vm_types::loaded_data::runtime_types::Type;
 
 /// Validate view function call. This checks whether the function is marked as a view
 /// function, and validates the arguments.
@@ -62,13 +60,13 @@ pub(crate) fn validate_view_function<S: MoveResolverExt>(
                     );
                 }
                 if construction {
-                    construction.push(idx);
+                    needs_construction.push(idx);
                 }
             },
         }
     }
     if !needs_construction.is_empty()
-        && transaction_arg_validation::construct_args(session, &needs_validation, &mut args, fun_inst)
+        && transaction_arg_validation::construct_args(session, &needs_construction, &mut args, fun_inst)
         .is_err()
     {
         return Err(
