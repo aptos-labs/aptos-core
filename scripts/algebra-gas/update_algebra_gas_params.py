@@ -1,9 +1,12 @@
+#!/usr/bin/env python3
+
 import argparse
 import fit_linear_model
 import load_bench_ns
 import load_bench_datapoints
 from math import ceil
 from pathlib import Path
+from time import time
 
 MUL = 20
 
@@ -84,7 +87,8 @@ def main(gas_per_ns):
     lines = path.read_text().split('\n')
     lid_begin = lines.index('    // Algebra gas parameters begin.')
     lid_end = lines.index('    // Algebra gas parameters end.')
-    new_lines = lines[:lid_begin+1] + get_algebra_lines(gas_per_ns) + lines[lid_end:]
+    generator_note_line = f'    // Generated at time {time()} by `scripts/algebra-gas/update_algebra_gas_params.py`.'
+    new_lines = lines[:lid_begin+1] + [generator_note_line] + get_algebra_lines(gas_per_ns) + lines[lid_end:]
     path.write_text('\n'.join(new_lines))
 
 if __name__=='__main__':
