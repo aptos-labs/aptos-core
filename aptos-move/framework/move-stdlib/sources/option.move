@@ -46,6 +46,11 @@ module std::option {
         Option{ vec: vec(e) }
     }
 
+    public fun from_vector<Element>(vec: vector<Element>): Option<Element> {
+        assert!(vector::length(&vec) <= 1);
+        Option { vec }
+    }
+
     /// Return true if `t` does not hold a value
     public fun is_none<Element>(t: &Option<Element>): bool {
         vector::is_empty(&t.vec)
