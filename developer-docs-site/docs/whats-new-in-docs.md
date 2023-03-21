@@ -13,9 +13,9 @@ This page shows the key updates to the developer documentation on this site. Not
 
 ## 19 March 2023
 
-- Published a tutorial on using the Aptos [multi-signature (multisig)](./tutorials/first-multisig.md) feature that introduces assorted [K-of-N multi-signer authentication](./concepts/accounts.md#multi-signer-authentication) operations and employs scripts for the first time in Aptos documentation. 
+- Published a tutorial on using the Aptos [multi-signature (multisig)](./tutorials/first-multisig.md) feature that introduces assorted [K-of-N multi-signer authentication](./concepts/accounts.md#multi-signer-authentication) operations and employs scripts for the first time in Aptos documentation.
 
-  Find this tutorial - provided by [alnoki](https://github.com/alnoki) - on the [Community Highlists](./community/contributions/index.md) page.
+  Find this tutorial - provided by [alnoki](https://github.com/alnoki) - on the [Community Highlights](./community/contributions/index.md) page.
 
 ## 16 March 2023
 
@@ -166,7 +166,7 @@ This page shows the key updates to the developer documentation on this site. Not
 
 - Added [Node Inspection Service](nodes/measure/node-inspection-service.md) document that explains how to access node metrics for validators and fullnodes and highlights key metrics for monitoring.
 
-- Added instructions for [running archival nodes](guides/state-sync.md#running-archival-nodes), specifically avoiding fast syncing and ledger pruning. 
+- Added instructions for [running archival nodes](guides/state-sync.md#running-archival-nodes), specifically avoiding fast syncing and ledger pruning.
 
 ## 29 December 2022
 
@@ -370,7 +370,7 @@ The [hardware requirements](nodes/validator-node/operator/node-requirements.md#h
 
 ## 12 September 2022
 
-- A new set of documents on Aptos [Coin and Token](concepts/coin-and-token/index.md) are posted. 
+- A new set of documents on Aptos [Coin and Token](concepts/coin-and-token/index.md) are posted.
 - A new document describing how to [bootstrap a new fullnode using data restore](nodes/full-node/bootstrap-fullnode.md) is posted.
 
 ## 06 September 2022
