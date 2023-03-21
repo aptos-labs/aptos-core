@@ -17,16 +17,6 @@ module fungible_asset::node_code_coin {
     #[test_only]
     use aptos_framework::object::{create_object_address, address_to_object};
 
-    /// Defines a `Coin` type that has `name` and `symbol`.
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
-    struct Coin has key {
-        /// Name of the coin, i.e., "USDT".
-        name: String,
-        /// Symbol of the coin, usually a shorter version of the name.
-        /// For example, Singapore Dollar is SGD.
-        symbol: String,
-    }
-
     /// Create an coin object with built-in managing capabilities.
     public entry fun create_coin(
         creator: &signer,
@@ -38,8 +28,6 @@ module fungible_asset::node_code_coin {
         // TODO(lightmark): create_named_object vs create_object_from_account, which one to choose here.
         let creator_ref = object::create_named_object(creator, *string::bytes(&name));
         let object_signer = object::generate_signer(&creator_ref);
-        move_to(&object_signer, Coin { name, symbol });
-
         initialize_managing_capabilities(&creator_ref, max_supply, decimals);
     }
 
