@@ -511,8 +511,8 @@ The endpoints for each faucet are:
 - Devnet: https://faucet.devnet.aptoslabs.com
 - Testnet: https://faucet.testnet.aptoslabs.com
 
-### Calling the faucet: JS / TS
-If you're building a client in JS / TS, you should make use of the [@aptos-labs/aptos-faucet-client](https://www.npmjs.com/package/@aptos-labs/aptos-faucet-client) package. This client is generated based on the OpenAPI spec published by the faucet service.
+### Calling the faucet: JavaScript / TypeScript
+If you are building a client in JavaSscript or TypeScript, you should make use of the [@aptos-labs/aptos-faucet-client](https://www.npmjs.com/package/@aptos-labs/aptos-faucet-client) package. This client is generated based on the OpenAPI spec published by the faucet service.
 
 Example use:
 ```typescript
@@ -533,11 +533,11 @@ async function callFaucet(amount: number, address: string): Promise<string[]> {
 ```
 
 ### Calling the faucet: Other languages
-If you're trying to call the faucet in other languages, you have two options:
+If you are trying to call the faucet in other languages, you have two options:
 1. Generate a client from the [OpenAPI spec](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-faucet/doc/spec.yaml).
 2. Call the faucet on your own.
 
-For the latter, you'll want to build a query similar to this:
+For the latter, you will want to build a query similar to this:
 ```
 curl -X POST 'https://faucet.devnet.aptoslabs.com/mint?amount=10000&address=0xd0f523c9e73e6f3d68c16ae883a9febc616e484c4998a72d8899a1009e5a89d6'
 ```
