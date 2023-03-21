@@ -12,7 +12,7 @@ This document focuses on the **testnet** network and accompanies the command lin
 Other [Aptos networks](./system-integrators-guide.md#choose-a-network) and methods of interaction:
   * **Devnet** - To see how to interact with the Aptos Faucet in software, conduct [your first transaction](../tutorials/first-transaction.md) in devnet. 
   * **Local testnet** - Start a local testnet with a faucet to [develop locally](../nodes/local-testnet/index.md) with your preferred method. 
-  * **Mainnet** - There is no faucet available in mainnet to fund your account, so the method for obtaining the Aptos APT tokens is beyond the scope of this site and entirely up to you. Apart from the difference in the funding process, the rest of your workflow remains the same as in devnet and testnet. Just remember, in mainnet you are working with real, monetary value that cannot simply be recreated.
+  * **Mainnet** - There is no faucet available in mainnet to fund your account, so the method for obtaining the Aptos APT tokens is beyond the scope of this site and entirely up to you. Apart from the difference in the funding process, the rest of your workflow remains the same as in devnet and testnet.
 
 ## Prerequisites
 
