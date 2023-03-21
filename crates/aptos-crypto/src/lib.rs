@@ -14,7 +14,6 @@ pub mod hash;
 pub mod hkdf;
 pub mod multi_ed25519;
 pub mod noise;
-pub mod pippenger;
 pub mod test_utils;
 pub mod traits;
 pub mod validatable;

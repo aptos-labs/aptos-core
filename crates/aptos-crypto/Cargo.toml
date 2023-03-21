@@ -90,10 +90,6 @@ name = "noise"
 harness = false
 
 [[bench]]
-name = "pippenger"
-harness = false
-
-[[bench]]
 name = "ristretto255"
 harness = false
 
