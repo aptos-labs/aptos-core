@@ -220,15 +220,18 @@ impl BufferManager {
 
         // todo: if the unhappy path is too bad, can try multiple proposers or retry with more proposers
 
-        for proposer in item.get_first_k_proposers(self.verifier.len() / 5) {
-            // Send the randomness shares through the first k proposers,
-            // otherwise all blocks are Nil/genesis blocks that do not need randomness
-            let rand_shares = RandShares::new(item_hash, self.author, item.epoch(), item.gen_dummy_rand_share_vec(self.author));
 
-            self.rand_msg_tx
-            .send_rand_shares(rand_shares, proposer)
+        // Send the randomness shares through the first k proposers,
+        // otherwise all blocks are Nil/genesis blocks that do not need randomness
+        let rand_shares = RandShares::new(item_hash, self.author, item.epoch(), item.gen_dummy_rand_share_vec(self.author));
+        // for proposer in item.get_first_k_proposers(self.verifier.len() / 5) {
+        //     self.rand_msg_tx
+        //     .send_rand_shares(rand_shares.clone(), proposer)
+        //     .await;
+        // }
+        self.rand_msg_tx
+            .broadcast_rand_shares(rand_shares)
             .await;
-        }
 
         self.buffer.push_back(item);
     }
