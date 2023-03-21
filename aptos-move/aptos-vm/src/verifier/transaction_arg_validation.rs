@@ -128,21 +128,9 @@ pub(crate) fn validate_combine_signer_and_txn_args<S: MoveResolverExt>(
             .chain(args)
             .collect()
     };
-    for idx in needs_construction {
-        let mut cursor = Cursor::new(&combined_args[idx][..]);
-        let mut new_arg = vec![];
-        // Perhaps in a future we should do proper gas metering here
+    if !needs_construction.is_empty() {
         let mut gas_meter = UnmeteredGasMeter;
-        recursively_construct_arg(session, &func.parameters[idx], &mut cursor, &mut gas_meter, &mut new_arg)?;
-        // Check cursor has parsed everything
-        // is_empty is not enabled
-        if cursor.position() != combined_args[idx].len() as u64 {
-            return Err(VMStatus::Error(
-                StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-                None,
-            ));
-        }
-        combined_args[idx] = new_arg;
+        construct_args(session, &needs_construction[..], &mut combined_args, func, &mut gas_meter)?;
     }
     Ok(combined_args)
 }
@@ -169,32 +157,37 @@ pub(crate) fn is_valid_txn_arg<S: MoveResolverExt>(
     }
 }
 
-fn validate_and_construct<S: MoveResolverExt>(
+// Construct arguments. Walk through the arguments and according to the signature
+// construct arguments that require so.
+// TODO: This needs a more solid story and a tighter integration with the VM.
+pub(crate) fn construct_args<S: MoveResolverExt>(
     session: &mut SessionExt<S>,
-    expected_type: &Type,
-    constructor: &FunctionId,
-    cursor: &mut Cursor<&[u8]>,
+    idxs: &[usize],
+    args: &mut Vec<Vec<u8>>,
+    func: &LoadedFunctionInstantiation,
     gas_meter: &mut impl GasMeter,
-) -> Result<Vec<u8>, VMStatus> {
-    let (module, function, instantiation) = session.load_function_with_type_arg_inference(
-        &constructor.module_id,
-        IdentStr::new(constructor.func_name).expect(""),
-        expected_type,
-    )?;
-    let mut args = vec![];
-    for param_type in &instantiation.parameters {
-        let mut arg = vec![];
-        recursively_construct_arg(session, param_type, cursor, gas_meter, &mut arg)?;
-        args.push(arg);
+) -> Result<(), VMStatus> {
+    for (idx, ty) in func.parameters.iter().enumerate() {
+        if !idxs.contains(&idx) {
+            continue;
+        }
+        let arg = &mut args[idx];
+        let mut cursor = Cursor::new(&arg[..]);
+        let mut new_arg = vec![];
+        // Perhaps in a future we should do proper gas metering here
+        recursively_construct_arg(session, ty, &mut cursor, gas_meter, &mut new_arg)?;
+        // Check cursor has parsed everything
+        // is_empty is not enabled
+        if cursor.position() != arg.len() as u64 {
+            return Err(VMStatus::Error(
+                StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
+                None,
+            ));
+        }
+        *arg = new_arg;
     }
-    let serialized_result = session
-        .execute_instantiated_function(module, function, instantiation, args, gas_meter)
-        .map_err(|_| VMStatus::Error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT, None))?;
-    let mut ret_vals = serialized_result.return_values;
-    // We know ret_vals.len() == 1
-    Ok(ret_vals.pop().expect("Always a result").0)
+    Ok(())
 }
-
 // A Cursor is used to recursively walk the serialized arg manually and correctly.
 pub(crate) fn recursively_construct_arg<S: MoveResolverExt>(
     session: &mut SessionExt<S>,
@@ -220,11 +213,11 @@ pub(crate) fn recursively_construct_arg<S: MoveResolverExt>(
             // performed in `is_valid_txn_arg`
             let st = session
                 .get_struct_type(*idx)
-                .ok_or(VMStatus::Error(StatusCode::ABORT_TYPE_MISMATCH_ERROR, None))?;
+                .expect("unreachable, type must exist");
             let full_name = format!("{}::{}", st.module.short_str_lossless(), st.name);
             let constructor = ALLOWED_STRUCTS
                 .get(&full_name)
-                .ok_or(VMStatus::Error(StatusCode::INTERNAL_TYPE_ERROR, None))?;
+                .expect("unreachable: struct must be allowed");
             arg.append(&mut validate_and_construct(
                 session,
                 ty,
@@ -240,10 +233,36 @@ pub(crate) fn recursively_construct_arg<S: MoveResolverExt>(
         U128 => read_n_bytes(16, cursor, arg)?,
         U256 | Address => read_n_bytes(32, cursor, arg)?,
         Signer | Reference(_) | MutableReference(_) | TyParam(_) => {
-            return Err(VMStatus::Error(StatusCode::ABORT_TYPE_MISMATCH_ERROR, None))
+            unreachable!("Validation is only for arguments with String")
         },
     };
     Ok(())
+}
+
+fn validate_and_construct<S: MoveResolverExt>(
+    session: &mut SessionExt<S>,
+    expected_type: &Type,
+    constructor: &FunctionId,
+    cursor: &mut Cursor<&[u8]>,
+    gas_meter: &mut impl GasMeter,
+) -> Result<Vec<u8>, VMStatus> {
+    let (module, function, instantiation) = session.load_function_with_type_arg_inference(
+        &constructor.module_id,
+        IdentStr::new(constructor.func_name).expect(""),
+        expected_type,
+    )?;
+    let mut args = vec![];
+    for param_type in &instantiation.parameters {
+        let mut arg = vec![];
+        recursively_construct_arg(session, param_type, cursor, gas_meter, &mut arg)?;
+        args.push(arg);
+    }
+    let serialized_result = session
+        .execute_instantiated_function(module, function, instantiation, args, gas_meter)
+        .map_err(|_| VMStatus::Error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT, None))?;
+    let mut ret_vals = serialized_result.return_values;
+    // We know ret_vals.len() == 1
+    Ok(ret_vals.pop().expect("Always a result").0)
 }
 
 // String is a vector of bytes, so both string and vector carry a length in the serialized format.
