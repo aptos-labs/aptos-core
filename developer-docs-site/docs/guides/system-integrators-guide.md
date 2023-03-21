@@ -502,17 +502,17 @@ To learn more about coin creation, make ["Your First Coin"](../tutorials/first-c
 
 ## Integrating with the faucet
 
-This explains how to integrate with the Aptos faucet. This is targeted at SDK and wallet creators; if you are a dev using either of these tools, access the faucet through the SDK / wallet instead.
+This explains how to integrate with the [Aptos Faucet](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos-faucet). This is targeted at SDK and wallet creators; if you are a developer using either of these tools, access the faucet through the SDK / wallet instead.
 
 ### Differences between devnet and testnet
-Effectively none. In the past the testnet faucet had a captcha in front of it, making it unqueryable by normal means. This is no longer true.
+What are the differences between devnet and testnet? Effectively none. In the past, the testnet faucet had a Captcha in front of it, making it unqueryable by normal means. This is no longer true.
 
 The endpoints for each faucet are:
 - Devnet: https://faucet.devnet.aptoslabs.com
 - Testnet: https://faucet.testnet.aptoslabs.com
 
 ### Calling the faucet: JavaScript / TypeScript
-If you are building a client in JavaSscript or TypeScript, you should make use of the [@aptos-labs/aptos-faucet-client](https://www.npmjs.com/package/@aptos-labs/aptos-faucet-client) package. This client is generated based on the OpenAPI spec published by the faucet service.
+If you are building a client in JavaScript or TypeScript, you should make use of the [@aptos-labs/aptos-faucet-client](https://www.npmjs.com/package/@aptos-labs/aptos-faucet-client) package. This client is generated based on the OpenAPI spec published by the faucet service.
 
 Example use:
 ```typescript
@@ -542,4 +542,4 @@ For the latter, you will want to build a query similar to this:
 curl -X POST 'https://faucet.devnet.aptoslabs.com/mint?amount=10000&address=0xd0f523c9e73e6f3d68c16ae883a9febc616e484c4998a72d8899a1009e5a89d6'
 ```
 
-This means mint 10000 OCTA to address 0xd0f523c9e73e6f3d68c16ae883a9febc616e484c4998a72d8899a1009e5a89d6.
+This means mint 10000 OCTA to address `0xd0f523c9e73e6f3d68c16ae883a9febc616e484c4998a72d8899a1009e5a89d6`.
