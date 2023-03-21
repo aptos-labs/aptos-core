@@ -58,7 +58,7 @@ static NEW_ALLOWED_STRUCTS: ConstructorMap = Lazy::new(|| {
         }),
         ("0x1::option::Option", FunctionId {
             module_id: ModuleId::new(AccountAddress::ONE, Identifier::from(ident_str!("option"))),
-            func_name: ident_str!("from_vector"),
+            func_name: ident_str!("from_vec"),
         }),
         ("0x1::fixed_point32::FixedPoint32", FunctionId {
             module_id: ModuleId::new(
@@ -220,7 +220,7 @@ pub(crate) fn construct_args<S: MoveResolverExt>(
         let mut new_arg = vec![];
         recursively_construct_arg(
             session,
-            ty,
+            &ty.subst(&func.type_arguments).unwrap(),
             allowed_structs,
             &mut cursor,
             &mut gas_meter,
@@ -290,6 +290,7 @@ pub(crate) fn recursively_construct_arg<S: MoveResolverExt>(
         U128 => read_n_bytes(16, cursor, arg)?,
         U256 | Address => read_n_bytes(32, cursor, arg)?,
         Signer | Reference(_) | MutableReference(_) | TyParam(_) => {
+            println!("{ty:?}");
             unreachable!("Validation is only for arguments with String")
         },
     };
@@ -319,7 +320,7 @@ fn validate_and_construct<S: MoveResolverExt>(
         let mut arg = vec![];
         recursively_construct_arg(
             session,
-            param_type,
+            &param_type.subst(&instantiation.type_arguments).unwrap(),
             allowed_structs,
             cursor,
             gas_meter,
