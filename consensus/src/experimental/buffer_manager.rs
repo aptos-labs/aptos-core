@@ -48,7 +48,7 @@ pub const LOOP_INTERVAL_MS: u64 = 1500;
 
 // Each validator will send a randomness share of size rand_size * rand_num / 100 (assuming 100 validators and even distribution)
 pub const RAND_SIZE: usize = 96;
-pub const RAND_NUM: usize = 1000;
+pub const RAND_NUM: usize = 100;
 pub const SHARE_SIZE: usize = RAND_SIZE * RAND_NUM / 100;
 pub const DECISION_SIZE: usize = RAND_SIZE;
 
@@ -224,14 +224,14 @@ impl BufferManager {
         // Send the randomness shares through the first k proposers,
         // otherwise all blocks are Nil/genesis blocks that do not need randomness
         let rand_shares = RandShares::new(item_hash, self.author, item.epoch(), item.gen_dummy_rand_share_vec(self.author));
-        // for proposer in item.get_first_k_proposers(self.verifier.len() / 5) {
-        //     self.rand_msg_tx
-        //     .send_rand_shares(rand_shares.clone(), proposer)
-        //     .await;
-        // }
-        self.rand_msg_tx
-            .broadcast_rand_shares(rand_shares)
+        for proposer in item.get_first_k_proposers(self.verifier.len() / 5) {
+            self.rand_msg_tx
+            .send_rand_shares(rand_shares.clone(), proposer)
             .await;
+        }
+        // self.rand_msg_tx
+        //     .broadcast_rand_shares(rand_shares)
+        //     .await;
 
         self.buffer.push_back(item);
     }
@@ -290,7 +290,7 @@ impl BufferManager {
                 let current_cursor = self.buffer.find_elem_by_key(*self.buffer.head_cursor(), item_id);
                 if current_cursor.is_some() {
                     let mut item = self.buffer.take(&current_cursor);
-                    if item.is_ordered() {
+                    if item.is_ordered() && item.get_blocks().len() == rand_decisions.decisions().len() {
                         // add the randomness to block
                         item.update_rand_decisions(*rand_decisions.clone());
                         if item.get_blocks().len() != rand_decisions.decisions().len() {
