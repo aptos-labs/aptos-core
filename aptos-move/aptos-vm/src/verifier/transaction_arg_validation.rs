@@ -290,7 +290,6 @@ pub(crate) fn recursively_construct_arg<S: MoveResolverExt>(
         U128 => read_n_bytes(16, cursor, arg)?,
         U256 | Address => read_n_bytes(32, cursor, arg)?,
         Signer | Reference(_) | MutableReference(_) | TyParam(_) => {
-            println!("{ty:?}");
             unreachable!("Validation is only for arguments with String")
         },
     };
