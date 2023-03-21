@@ -190,6 +190,11 @@ const config = {
                 docId: "guides/move-guides/move-structure",
               },
               {
+                label: "Bytecode for Dependencies",
+                type: "doc",
+                docId: "guides/move-guides/bytecode-dependencies",
+              },
+              {
                 label: "How Base Gas Works",
                 type: "doc",
                 docId: "concepts/base-gas",

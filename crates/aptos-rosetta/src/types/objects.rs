@@ -1736,8 +1736,8 @@ impl InternalOperation {
             ),
             InternalOperation::DistributeStakingRewards(distribute_staking_rewards) => (
                 aptos_stdlib::staking_contract_distribute(
-                    distribute_staking_rewards.operator,
                     distribute_staking_rewards.staker,
+                    distribute_staking_rewards.operator,
                 ),
                 distribute_staking_rewards.sender,
             ),

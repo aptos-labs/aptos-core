@@ -4,13 +4,14 @@ slug: "index"
 hidden: false
 ---
 
-# Aptos Typescript SDK
+# Aptos TypeScript SDK
 
-Aptos provides a fully supported TypeScript SDK with the source code in the [Aptos-core GitHub](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/typescript/sdk) repository. Much of the functionality of the Typescript SDK can be found in the [Rust](../rust-sdk.md) and [Python](../python-sdk.md) SDKs. Nevertheless, Aptos strongly encourages you to use the Typescript SDK for app development whenever possible.
+Aptos provides a fully supported TypeScript SDK with the source code in the [Aptos-core GitHub](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/typescript/sdk) repository. Much of the functionality of the TypeScript SDK can be found in the [Rust](../rust-sdk.md) and [Python](../python-sdk.md) SDKs. Nevertheless, Aptos strongly encourages you to use the TypeScript SDK for app development whenever possible.
 
-## Installing the Typescript SDK
+## Installing the TypeScript SDK
 
-1. Make sure you [downloaded the latest precompiled binary for the Aptos CLI](../../cli-tools/aptos-cli-tool/install-aptos-cli.md#download-precompiled-binary). On a terminal run the below command to install the Typescript SDK from [npmjs](https://www.npmjs.com/package/aptos):
+1. Make sure you [downloaded the latest precompiled binary for the Aptos CLI](/cli-tools/aptos-cli-tool/install-aptos-cli/#download-precompiled-binary).
+2. On a terminal run the below command to install the TypeScript SDK from [npmjs](https://www.npmjs.com/package/aptos):
    ```bash
    npm i aptos
    ```
@@ -31,13 +32,13 @@ Aptos provides a fully supported TypeScript SDK with the source code in the [Apt
    The above command installs the TS SDK and should not be confused as installing the Aptos CLI.
    :::
 
-## Using the Typescript SDK
+## Using the TypeScript SDK
 
 See the [Developer Tutorials](../../tutorials/index.md) for code examples showing how to use the Typescript SDK.
 
-## Typescript SDK Architecture
+## TypeScript SDK Architecture
 
-See the [Typescript SDK Architecture](./typescript-sdk-overview.md) for the components that make up the Typescript SDK.
+See the [TypeScript SDK Architecture](./typescript-sdk-overview.md) for the components that make up the TypeScript SDK.
 
 ## Additional information
 - ### [TypeScript SDK Reference](https://aptos-labs.github.io/ts-sdk-doc/)
