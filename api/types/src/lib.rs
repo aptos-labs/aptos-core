@@ -35,7 +35,7 @@ pub use move_types::{
     HexEncodedBytes, MoveAbility, MoveFunction, MoveFunctionGenericTypeParam,
     MoveFunctionVisibility, MoveModule, MoveModuleBytecode, MoveModuleId, MoveResource,
     MoveScriptBytecode, MoveStruct, MoveStructField, MoveStructTag, MoveType, MoveValue,
-    MAX_RECURSIVE_TYPES_ALLOWED, U128, U256, U64,
+    ResourceGroup, MAX_RECURSIVE_TYPES_ALLOWED, U128, U256, U64,
 };
 use serde::{Deserialize, Deserializer};
 use std::str::FromStr;
