@@ -92,7 +92,8 @@ def main(gas_per_ns):
     path.write_text('\n'.join(new_lines))
 
 if __name__=='__main__':
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description='Generate gas parameters for algebra module in `aptos-move/aptos-gas/src/aptos_framework.rs`.')
     parser.add_argument('--gas_per_ns', required=True, type=float)
     args = parser.parse_args()
     main(args.gas_per_ns)
