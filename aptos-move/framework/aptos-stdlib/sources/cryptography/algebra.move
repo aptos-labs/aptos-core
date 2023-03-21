@@ -29,7 +29,7 @@
 ///
 /// For 3 groups that form a bilinear map, `pairing()` and `multi_pairing()` may be implemented.
 ///
-/// For a subset/superset relationship between 2 structures, `upcasting()` and `downcasting()` may be implemented.
+/// For a subset/superset relationship between 2 structures, `upcast()` and `downcast()` may be implemented.
 ///
 /// See `algebra_*.move` for currently implemented algebraic structures.
 module aptos_std::algebra {
@@ -59,7 +59,7 @@ module aptos_std::algebra {
         }
     }
 
-    /// Return the 1st identity of a structure `S`.
+    /// Return the additive identity of field `S`, or the identity of group `S`.
     public fun zero<S>(): Element<S> {
         abort_unless_cryptography_algebra_natives_enabled();
         Element<S> {
@@ -67,7 +67,7 @@ module aptos_std::algebra {
         }
     }
 
-    /// Return the 2nd identity of a structure `S`.
+    /// Return the multiplicative identity of field `S`, or a fixed generator of group `S`.
     public fun one<S>(): Element<S> {
         abort_unless_cryptography_algebra_natives_enabled();
         Element<S> {

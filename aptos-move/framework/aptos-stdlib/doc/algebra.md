@@ -34,7 +34,7 @@ A field may also implement the following operations.
 
 For 3 groups that form a bilinear map, <code><a href="algebra.md#0x1_algebra_pairing">pairing</a>()</code> and <code><a href="algebra.md#0x1_algebra_multi_pairing">multi_pairing</a>()</code> may be implemented.
 
-For a subset/superset relationship between 2 structures, <code>upcasting()</code> and <code>downcasting()</code> may be implemented.
+For a subset/superset relationship between 2 structures, <code><a href="algebra.md#0x1_algebra_upcast">upcast</a>()</code> and <code><a href="algebra.md#0x1_algebra_downcast">downcast</a>()</code> may be implemented.
 
 See <code>algebra_*.<b>move</b></code> for currently implemented algebraic structures.
 
@@ -185,7 +185,7 @@ Convert a u64 to an element of a structure <code>S</code>.
 
 ## Function `zero`
 
-Return the 1st identity of a structure <code>S</code>.
+Return the additive identity of field <code>S</code>, or the identity of group <code>S</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_zero">zero</a>&lt;S&gt;(): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;
@@ -213,7 +213,7 @@ Return the 1st identity of a structure <code>S</code>.
 
 ## Function `one`
 
-Return the 2nd identity of a structure <code>S</code>.
+Return the multiplicative identity of field <code>S</code>, or a fixed generator of group <code>S</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_one">one</a>&lt;S&gt;(): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;
