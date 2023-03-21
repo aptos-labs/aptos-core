@@ -1,6 +1,6 @@
 ---
 title: "Your First Multisig"
-slug: "first-multisig"
+slug: "your-first-multisig"
 ---
 
 # Your First Multisig
