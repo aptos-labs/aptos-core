@@ -91,7 +91,7 @@ fn object_args_good() {
         (
             "0xcafe::test::pass_optional_fixedpoint",
             vec![
-                bcs::to_bytes(&OBJECT_ADDRESS).unwrap(),  // Object<T>
+                bcs::to_bytes(&OBJECT_ADDRESS).unwrap(),     // Object<T>
                 bcs::to_bytes(&vec![(1u64 << 32)]).unwrap(), // Option<FixedPoint>
             ],
             "4294967296",
