@@ -30,6 +30,7 @@ pub enum FeatureFlag {
     DelegationPools,
     CryptographyAlgebraNatives,
     Bls12381Structures,
+    Ed25519PubkeyValidateReturnFalseWrongLength,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -134,6 +135,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::CRYPTOGRAPHY_ALGEBRA_NATIVES
             },
             FeatureFlag::Bls12381Structures => AptosFeatureFlag::BLS12_381_STRUCTURES,
+            FeatureFlag::Ed25519PubkeyValidateReturnFalseWrongLength => {
+                AptosFeatureFlag::ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH
+            },
         }
     }
 }
@@ -163,6 +167,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::CryptographyAlgebraNatives
             },
             AptosFeatureFlag::BLS12_381_STRUCTURES => FeatureFlag::Bls12381Structures,
+            AptosFeatureFlag::ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH => {
+                FeatureFlag::Ed25519PubkeyValidateReturnFalseWrongLength
+            },
         }
     }
 }
