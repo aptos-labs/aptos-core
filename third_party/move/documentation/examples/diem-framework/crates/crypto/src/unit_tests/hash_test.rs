@@ -51,14 +51,14 @@ fn test_from_slice() {
     {
         let zero_byte_vec = vec![0; 32];
         assert_eq!(
-            HashValue::from_slice(&zero_byte_vec).unwrap(),
+            HashValue::from_slice(zero_byte_vec).unwrap(),
             HashValue::zero()
         );
     }
     {
         // The length is mismatched.
         let zero_byte_vec = vec![0; 31];
-        assert!(HashValue::from_slice(&zero_byte_vec).is_err());
+        assert!(HashValue::from_slice(zero_byte_vec).is_err());
     }
     {
         let bytes = vec![1; 123];
@@ -194,7 +194,7 @@ proptest! {
     fn test_hashvalue_to_bits_roundtrip(hash in any::<HashValue>()) {
         let bitvec: BitVec<Msb0, u8>  = hash.iter_bits().collect();
         let bytes: Vec<u8> = bitvec.into();
-        let hash2 = HashValue::from_slice(&bytes).unwrap();
+        let hash2 = HashValue::from_slice(bytes).unwrap();
         prop_assert_eq!(hash, hash2);
     }
 
@@ -202,7 +202,7 @@ proptest! {
     fn test_hashvalue_to_bits_inverse_roundtrip(bits in vec(any::<bool>(), HashValue::LENGTH_IN_BITS)) {
         let bitvec: BitVec<Msb0, u8> = bits.iter().cloned().collect();
         let bytes: Vec<u8> = bitvec.into();
-        let hash = HashValue::from_slice(&bytes).unwrap();
+        let hash = HashValue::from_slice(bytes).unwrap();
         let bits2: Vec<bool> = hash.iter_bits().collect();
         prop_assert_eq!(bits, bits2);
     }

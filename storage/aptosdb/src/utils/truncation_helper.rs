@@ -15,7 +15,7 @@ use crate::{
         write_set::WriteSetSchema,
     },
     state_kv_db::StateKvDb,
-    EventStore, TransactionStore,
+    EventStore, TransactionStore, NUM_STATE_SHARDS,
 };
 use anyhow::Result;
 use aptos_jellyfish_merkle::{node_type::NodeKey, StaleNodeIndex};
@@ -101,17 +101,52 @@ pub(crate) fn truncate_state_kv_db(
 
     let mut current_version = current_version;
     while current_version > target_version {
-        let start_version =
-            std::cmp::max(current_version - batch_size as u64 + 1, target_version + 1);
-        let end_version = current_version + 1;
-        let batch = SchemaBatch::new();
-        delete_state_value_and_index(&state_kv_db, start_version, end_version, &batch)?;
-        state_kv_db.commit(start_version - 1, batch)?;
-        current_version = start_version - 1;
+        let target_version_for_this_batch =
+            std::cmp::max(current_version - batch_size as u64, target_version);
+        state_kv_db.write_progress(target_version_for_this_batch)?;
+        truncate_state_kv_db_shards(
+            &state_kv_db,
+            target_version_for_this_batch,
+            Some(current_version),
+        )?;
+        current_version = target_version_for_this_batch;
         status.set_current_version(current_version);
     }
     assert_eq!(current_version, target_version);
     Ok(())
+}
+
+pub(crate) fn truncate_state_kv_db_shards(
+    state_kv_db: &StateKvDb,
+    target_version: Version,
+    expected_current_version: Option<Version>,
+) -> Result<()> {
+    // TODO(grao): Consider do it in parallel.
+    for shard_id in 0..NUM_STATE_SHARDS {
+        truncate_state_kv_db_single_shard(
+            state_kv_db,
+            shard_id as u8,
+            target_version,
+            expected_current_version,
+        )?;
+    }
+    Ok(())
+}
+
+pub(crate) fn truncate_state_kv_db_single_shard(
+    state_kv_db: &StateKvDb,
+    shard_id: u8,
+    target_version: Version,
+    expected_current_version: Option<Version>,
+) -> Result<()> {
+    let batch = SchemaBatch::new();
+    delete_state_value_and_index(
+        state_kv_db.db_shard(shard_id),
+        target_version + 1,
+        expected_current_version,
+        &batch,
+    )?;
+    state_kv_db.commit_single_shard(target_version, shard_id, batch)
 }
 
 pub(crate) fn truncate_state_merkle_db(
@@ -286,20 +321,19 @@ fn delete_per_version_data(
 }
 
 fn delete_state_value_and_index(
-    state_kv_db: &StateKvDb,
+    state_kv_db_shard: &DB,
     start_version: Version,
-    end_version: Version,
+    expected_current_version: Option<Version>,
     batch: &SchemaBatch,
 ) -> Result<()> {
-    // TODO(grao): Support sharding here.
-    let mut iter = state_kv_db
-        .metadata_db()
-        .iter::<StaleStateValueIndexSchema>(ReadOptions::default())?;
+    let mut iter = state_kv_db_shard.iter::<StaleStateValueIndexSchema>(ReadOptions::default())?;
     iter.seek(&start_version)?;
 
     for item in iter {
         let (index, _) = item?;
-        assert_lt!(index.stale_since_version, end_version);
+        if let Some(expected_current_version) = expected_current_version {
+            assert_lt!(index.stale_since_version, expected_current_version);
+        }
         batch.delete::<StaleStateValueIndexSchema>(&index)?;
         batch.delete::<StateValueSchema>(&(index.state_key, index.stale_since_version))?;
     }
