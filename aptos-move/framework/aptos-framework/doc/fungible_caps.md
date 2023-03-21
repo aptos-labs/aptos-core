@@ -41,7 +41,7 @@
 
 ## Struct `MintCap`
 
-Capability to mint fungible assets of the asset at <code>asset_addr</code>.
+Capability to mint fungible asset.
 
 
 <pre><code><b>struct</b> <a href="fungible_caps.md#0x1_fungible_caps_MintCap">MintCap</a> <b>has</b> store
@@ -69,7 +69,7 @@ Capability to mint fungible assets of the asset at <code>asset_addr</code>.
 
 ## Struct `TransferCap`
 
-Capability to transfer fungible assets of <code>asset</code> in any account.
+Capability to control the transfer of fungible asset.
 
 
 <pre><code><b>struct</b> <a href="fungible_caps.md#0x1_fungible_caps_TransferCap">TransferCap</a> <b>has</b> store
@@ -97,7 +97,7 @@ Capability to transfer fungible assets of <code>asset</code> in any account.
 
 ## Struct `BurnCap`
 
-Capability to burn fungible assets of the asset at <code>asset_addr</code>.
+Capability to burn fungible asset.
 
 
 <pre><code><b>struct</b> <a href="fungible_caps.md#0x1_fungible_caps_BurnCap">BurnCap</a> <b>has</b> store
@@ -140,7 +140,7 @@ The transfer cap and the the fungible asset do not match.
 
 ## Function `init_fungible_source_with_caps`
 
-The initialization of an object with <code>FungibleSource</code>.
+The initialization of an object with <code>FungibleSource</code> with capabilities returned.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_caps.md#0x1_fungible_caps_init_fungible_source_with_caps">init_fungible_source_with_caps</a>(constructor_ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>, maximum_supply: u64, name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, symbol: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, decimals: u8): (<a href="fungible_caps.md#0x1_fungible_caps_MintCap">fungible_caps::MintCap</a>, <a href="fungible_caps.md#0x1_fungible_caps_TransferCap">fungible_caps::TransferCap</a>, <a href="fungible_caps.md#0x1_fungible_caps_BurnCap">fungible_caps::BurnCap</a>)
@@ -172,7 +172,7 @@ The initialization of an object with <code>FungibleSource</code>.
 
 ## Function `mint`
 
-Mint the <code>amount</code> of coin with MintCap.
+Mint the <code>amount</code> of fungible asset with <code><a href="fungible_caps.md#0x1_fungible_caps_MintCap">MintCap</a></code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_caps.md#0x1_fungible_caps_mint">mint</a>(cap: &<a href="fungible_caps.md#0x1_fungible_caps_MintCap">fungible_caps::MintCap</a>, amount: u64, <b>to</b>: <b>address</b>)
@@ -198,10 +198,10 @@ Mint the <code>amount</code> of coin with MintCap.
 
 ## Function `set_ungated_transfer`
 
-Transfer the fungible asset account of <code>fungible_asset_owner</code> with TransferCap.
+Enable/disable the direct transfer of fungible asset with <code><a href="fungible_caps.md#0x1_fungible_caps_TransferCap">TransferCap</a></code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_caps.md#0x1_fungible_caps_set_ungated_transfer">set_ungated_transfer</a>(cap: &<a href="fungible_caps.md#0x1_fungible_caps_TransferCap">fungible_caps::TransferCap</a>, fungible_asset_owner: <b>address</b>, allow: bool)
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_caps.md#0x1_fungible_caps_set_ungated_transfer">set_ungated_transfer</a>(cap: &<a href="fungible_caps.md#0x1_fungible_caps_TransferCap">fungible_caps::TransferCap</a>, <a href="account.md#0x1_account">account</a>: <b>address</b>, allow: bool)
 </code></pre>
 
 
@@ -212,10 +212,10 @@ Transfer the fungible asset account of <code>fungible_asset_owner</code> with Tr
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_caps.md#0x1_fungible_caps_set_ungated_transfer">set_ungated_transfer</a>(
     cap: &<a href="fungible_caps.md#0x1_fungible_caps_TransferCap">TransferCap</a>,
-    fungible_asset_owner: <b>address</b>,
+    <a href="account.md#0x1_account">account</a>: <b>address</b>,
     allow: bool,
 ) {
-    <a href="fungible_store.md#0x1_fungible_store_set_ungated_transfer">fungible_store::set_ungated_transfer</a>(fungible_asset_owner, &cap.asset, allow);
+    <a href="fungible_store.md#0x1_fungible_store_set_ungated_transfer">fungible_store::set_ungated_transfer</a>(<a href="account.md#0x1_account">account</a>, &cap.asset, allow);
 }
 </code></pre>
 
@@ -227,10 +227,10 @@ Transfer the fungible asset account of <code>fungible_asset_owner</code> with Tr
 
 ## Function `burn`
 
-Burn the <code>amount</code> of coin with MintCap.
+Burn the <code>amount</code> of fungible asset from <code><a href="account.md#0x1_account">account</a></code> with a <code><a href="fungible_caps.md#0x1_fungible_caps_BurnCap">BurnCap</a></code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_caps.md#0x1_fungible_caps_burn">burn</a>(cap: &<a href="fungible_caps.md#0x1_fungible_caps_BurnCap">fungible_caps::BurnCap</a>, amount: u64, from_account: <b>address</b>)
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_caps.md#0x1_fungible_caps_burn">burn</a>(cap: &<a href="fungible_caps.md#0x1_fungible_caps_BurnCap">fungible_caps::BurnCap</a>, amount: u64, <a href="account.md#0x1_account">account</a>: <b>address</b>)
 </code></pre>
 
 
@@ -239,8 +239,8 @@ Burn the <code>amount</code> of coin with MintCap.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_caps.md#0x1_fungible_caps_burn">burn</a>(cap: &<a href="fungible_caps.md#0x1_fungible_caps_BurnCap">BurnCap</a>, amount: u64, from_account: <b>address</b>) {
-    <b>let</b> fa = <a href="fungible_store.md#0x1_fungible_store_withdraw">fungible_store::withdraw</a>(from_account, &cap.asset, amount);
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_caps.md#0x1_fungible_caps_burn">burn</a>(cap: &<a href="fungible_caps.md#0x1_fungible_caps_BurnCap">BurnCap</a>, amount: u64, <a href="account.md#0x1_account">account</a>: <b>address</b>) {
+    <b>let</b> fa = <a href="fungible_store.md#0x1_fungible_store_withdraw">fungible_store::withdraw</a>(<a href="account.md#0x1_account">account</a>, &cap.asset, amount);
     <a href="fungible_asset.md#0x1_fungible_asset_burn">fungible_asset::burn</a>(fa);
 }
 </code></pre>
@@ -253,10 +253,10 @@ Burn the <code>amount</code> of coin with MintCap.
 
 ## Function `withdraw`
 
-Withdarw <code>amount</code> of fungible assets of <code>asset</code>.
+Withdarw <code>amount</code> of fungible asset from <code><a href="account.md#0x1_account">account</a></code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_caps.md#0x1_fungible_caps_withdraw">withdraw</a>&lt;T: key&gt;(fungible_asset_owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, asset: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, amount: u64): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_caps.md#0x1_fungible_caps_withdraw">withdraw</a>&lt;T: key&gt;(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, asset: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, amount: u64): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>
 </code></pre>
 
 
@@ -265,8 +265,8 @@ Withdarw <code>amount</code> of fungible assets of <code>asset</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_caps.md#0x1_fungible_caps_withdraw">withdraw</a>&lt;T: key&gt;(fungible_asset_owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, asset: &Object&lt;T&gt;, amount: u64): FungibleAsset {
-    <b>let</b> account_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(fungible_asset_owner);
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_caps.md#0x1_fungible_caps_withdraw">withdraw</a>&lt;T: key&gt;(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, asset: &Object&lt;T&gt;, amount: u64): FungibleAsset {
+    <b>let</b> account_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
     <b>let</b> asset = <a href="fungible_source.md#0x1_fungible_source_verify">fungible_source::verify</a>(asset);
     <a href="fungible_store.md#0x1_fungible_store_withdraw">fungible_store::withdraw</a>(account_address, &asset, amount)
 }
@@ -280,6 +280,7 @@ Withdarw <code>amount</code> of fungible assets of <code>asset</code>.
 
 ## Function `withdraw_with_cap`
 
+Withdarw <code>amount</code> of fungible asset from <code><a href="account.md#0x1_account">account</a></code> with <code><a href="fungible_caps.md#0x1_fungible_caps_TransferCap">TransferCap</a></code> even ungated transfer is disabled.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_caps.md#0x1_fungible_caps_withdraw_with_cap">withdraw_with_cap</a>(transfer_cap: &<a href="fungible_caps.md#0x1_fungible_caps_TransferCap">fungible_caps::TransferCap</a>, <a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>
@@ -312,9 +313,10 @@ Withdarw <code>amount</code> of fungible assets of <code>asset</code>.
 
 ## Function `deposit_with_cap`
 
+Deposit fungible asset into <code><a href="account.md#0x1_account">account</a></code> with <code><a href="fungible_caps.md#0x1_fungible_caps_TransferCap">TransferCap</a></code> even ungated transfer is disabled.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_caps.md#0x1_fungible_caps_deposit_with_cap">deposit_with_cap</a>(transfer_cap: &<a href="fungible_caps.md#0x1_fungible_caps_TransferCap">fungible_caps::TransferCap</a>, fa: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>, <b>to</b>: <b>address</b>)
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_caps.md#0x1_fungible_caps_deposit_with_cap">deposit_with_cap</a>(transfer_cap: &<a href="fungible_caps.md#0x1_fungible_caps_TransferCap">fungible_caps::TransferCap</a>, fa: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>, <a href="account.md#0x1_account">account</a>: <b>address</b>)
 </code></pre>
 
 
@@ -323,18 +325,18 @@ Withdarw <code>amount</code> of fungible assets of <code>asset</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_caps.md#0x1_fungible_caps_deposit_with_cap">deposit_with_cap</a>(transfer_cap: &<a href="fungible_caps.md#0x1_fungible_caps_TransferCap">TransferCap</a>, fa: FungibleAsset, <b>to</b>: <b>address</b>) {
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_caps.md#0x1_fungible_caps_deposit_with_cap">deposit_with_cap</a>(transfer_cap: &<a href="fungible_caps.md#0x1_fungible_caps_TransferCap">TransferCap</a>, fa: FungibleAsset, <a href="account.md#0x1_account">account</a>: <b>address</b>) {
     <b>assert</b>!(
         &transfer_cap.asset == &<a href="fungible_asset.md#0x1_fungible_asset_fungible_asset_source">fungible_asset::fungible_asset_source</a>(&fa),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_caps.md#0x1_fungible_caps_ETRANSFER_CAP_AND_FUNGIBLE_ASSET_MISMATCH">ETRANSFER_CAP_AND_FUNGIBLE_ASSET_MISMATCH</a>)
     );
-    <b>let</b> ungated_transfer_allowed = <a href="fungible_store.md#0x1_fungible_store_ungated_transfer_allowed">fungible_store::ungated_transfer_allowed</a>(<b>to</b>, &transfer_cap.asset);
+    <b>let</b> ungated_transfer_allowed = <a href="fungible_store.md#0x1_fungible_store_ungated_transfer_allowed">fungible_store::ungated_transfer_allowed</a>(<a href="account.md#0x1_account">account</a>, &transfer_cap.asset);
     <b>if</b> (!ungated_transfer_allowed) {
-        <a href="fungible_caps.md#0x1_fungible_caps_set_ungated_transfer">set_ungated_transfer</a>(transfer_cap, <b>to</b>, <b>true</b>);
+        <a href="fungible_caps.md#0x1_fungible_caps_set_ungated_transfer">set_ungated_transfer</a>(transfer_cap, <a href="account.md#0x1_account">account</a>, <b>true</b>);
     };
-    <a href="fungible_store.md#0x1_fungible_store_deposit">fungible_store::deposit</a>(fa, <b>to</b>);
+    <a href="fungible_store.md#0x1_fungible_store_deposit">fungible_store::deposit</a>(fa, <a href="account.md#0x1_account">account</a>);
     <b>if</b> (!ungated_transfer_allowed) {
-        <a href="fungible_caps.md#0x1_fungible_caps_set_ungated_transfer">set_ungated_transfer</a>(transfer_cap, <b>to</b>, <b>false</b>);
+        <a href="fungible_caps.md#0x1_fungible_caps_set_ungated_transfer">set_ungated_transfer</a>(transfer_cap, <a href="account.md#0x1_account">account</a>, <b>false</b>);
     };
 }
 </code></pre>
@@ -347,11 +349,11 @@ Withdarw <code>amount</code> of fungible assets of <code>asset</code>.
 
 ## Function `transfer`
 
-Transfer <code>amount</code> of fungible assets of <code>asset</code> to <code>receiver</code>.
+Transfer <code>amount</code> of fungible asset of <code>asset</code> to <code>receiver</code>.
 Note: it does not move the underlying object.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_caps.md#0x1_fungible_caps_transfer">transfer</a>&lt;T: key&gt;(fungible_asset_owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, asset: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, amount: u64, receiver: <b>address</b>)
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_caps.md#0x1_fungible_caps_transfer">transfer</a>&lt;T: key&gt;(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, asset: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, amount: u64, receiver: <b>address</b>)
 </code></pre>
 
 
@@ -361,13 +363,13 @@ Note: it does not move the underlying object.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_caps.md#0x1_fungible_caps_transfer">transfer</a>&lt;T: key&gt;(
-    fungible_asset_owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    <a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     asset: &Object&lt;T&gt;,
     amount: u64,
     receiver: <b>address</b>
 ) {
     <b>let</b> asset = <a href="fungible_source.md#0x1_fungible_source_verify">fungible_source::verify</a>(asset);
-    <b>let</b> fa = <a href="fungible_caps.md#0x1_fungible_caps_withdraw">withdraw</a>(fungible_asset_owner, &asset, amount);
+    <b>let</b> fa = <a href="fungible_caps.md#0x1_fungible_caps_withdraw">withdraw</a>(<a href="account.md#0x1_account">account</a>, &asset, amount);
     <a href="fungible_store.md#0x1_fungible_store_deposit">fungible_store::deposit</a>(fa, receiver);
 }
 </code></pre>
@@ -380,6 +382,7 @@ Note: it does not move the underlying object.
 
 ## Function `transfer_with_cap`
 
+Transfer <code>ammount</code> of  fungible asset with <code><a href="fungible_caps.md#0x1_fungible_caps_TransferCap">TransferCap</a></code> even ungated transfer is disabled.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_caps.md#0x1_fungible_caps_transfer_with_cap">transfer_with_cap</a>(transfer_cap: &<a href="fungible_caps.md#0x1_fungible_caps_TransferCap">fungible_caps::TransferCap</a>, amount: u64, from: <b>address</b>, <b>to</b>: <b>address</b>)
@@ -410,7 +413,7 @@ Note: it does not move the underlying object.
 
 ## Function `destroy_mint_cap`
 
-Self-explanatory.
+Explicitly destory <code><a href="fungible_caps.md#0x1_fungible_caps_MintCap">MintCap</a></code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_caps.md#0x1_fungible_caps_destroy_mint_cap">destroy_mint_cap</a>(cap: <a href="fungible_caps.md#0x1_fungible_caps_MintCap">fungible_caps::MintCap</a>)
@@ -435,7 +438,7 @@ Self-explanatory.
 
 ## Function `destroy_transfer_cap`
 
-Self-explanatory.
+Explicitly destory <code><a href="fungible_caps.md#0x1_fungible_caps_TransferCap">TransferCap</a></code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_caps.md#0x1_fungible_caps_destroy_transfer_cap">destroy_transfer_cap</a>(cap: <a href="fungible_caps.md#0x1_fungible_caps_TransferCap">fungible_caps::TransferCap</a>)
@@ -460,7 +463,7 @@ Self-explanatory.
 
 ## Function `destroy_burn_cap`
 
-Self-explanatory.
+Explicitly destory <code><a href="fungible_caps.md#0x1_fungible_caps_BurnCap">BurnCap</a></code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_caps.md#0x1_fungible_caps_destroy_burn_cap">destroy_burn_cap</a>(cap: <a href="fungible_caps.md#0x1_fungible_caps_BurnCap">fungible_caps::BurnCap</a>)
@@ -485,7 +488,7 @@ Self-explanatory.
 
 ## Function `asset_of_mint_cap`
 
-Self-explanatory.
+Get the underlying asset object from <code><a href="fungible_caps.md#0x1_fungible_caps_MintCap">MintCap</a></code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_caps.md#0x1_fungible_caps_asset_of_mint_cap">asset_of_mint_cap</a>(cap: &<a href="fungible_caps.md#0x1_fungible_caps_MintCap">fungible_caps::MintCap</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_source.md#0x1_fungible_source_FungibleSource">fungible_source::FungibleSource</a>&gt;
@@ -510,7 +513,7 @@ Self-explanatory.
 
 ## Function `asset_of_transfer_cap`
 
-Self-explanatory.
+Get the underlying asset object from <code><a href="fungible_caps.md#0x1_fungible_caps_TransferCap">TransferCap</a></code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_caps.md#0x1_fungible_caps_asset_of_transfer_cap">asset_of_transfer_cap</a>(cap: &<a href="fungible_caps.md#0x1_fungible_caps_TransferCap">fungible_caps::TransferCap</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_source.md#0x1_fungible_source_FungibleSource">fungible_source::FungibleSource</a>&gt;
@@ -535,7 +538,7 @@ Self-explanatory.
 
 ## Function `asset_of_burn_cap`
 
-Self-explanatory.
+Get the underlying asset object from <code><a href="fungible_caps.md#0x1_fungible_caps_BurnCap">BurnCap</a></code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_caps.md#0x1_fungible_caps_asset_of_burn_cap">asset_of_burn_cap</a>(cap: &<a href="fungible_caps.md#0x1_fungible_caps_BurnCap">fungible_caps::BurnCap</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_source.md#0x1_fungible_source_FungibleSource">fungible_source::FungibleSource</a>&gt;

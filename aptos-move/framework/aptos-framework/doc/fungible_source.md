@@ -167,7 +167,7 @@ The initialization of an object with <code><a href="fungible_source.md#0x1_fungi
 
 ## Function `get_current_supply`
 
-Self-explanatory.
+Get current supply of the fungible asset.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_source.md#0x1_fungible_source_get_current_supply">get_current_supply</a>&lt;T: key&gt;(asset: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): u64
@@ -192,7 +192,7 @@ Self-explanatory.
 
 ## Function `get_maximum_supply`
 
-Self-explanatory.
+Get maximum supply of the fungible asset.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_source.md#0x1_fungible_source_get_maximum_supply">get_maximum_supply</a>&lt;T: key&gt;(asset: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
@@ -217,7 +217,7 @@ Self-explanatory.
 
 ## Function `get_name`
 
-Self-explanatory.
+Get the name of the fungible asset that is issued from the fungible source.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_source.md#0x1_fungible_source_get_name">get_name</a>&lt;T: key&gt;(asset: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
@@ -242,7 +242,7 @@ Self-explanatory.
 
 ## Function `get_symbol`
 
-Self-explanatory.
+Get the symbol of the fungible asset that is issued from the fungible source.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_source.md#0x1_fungible_source_get_symbol">get_symbol</a>&lt;T: key&gt;(asset: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
@@ -267,7 +267,7 @@ Self-explanatory.
 
 ## Function `get_decimals`
 
-Self-explanatory.
+Get the decimals of the fungible asset that is issued from the fungible source.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_source.md#0x1_fungible_source_get_decimals">get_decimals</a>&lt;T: key&gt;(asset: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): u8
@@ -323,7 +323,7 @@ Increase the supply of a fungible asset by minting.
 
 ## Function `decrease_supply`
 
-Increase the supply of a fungible asset by burning.
+Decrease the supply of a fungible asset by burning.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_source.md#0x1_fungible_source_decrease_supply">decrease_supply</a>&lt;T: key&gt;(asset: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, amount: u64)

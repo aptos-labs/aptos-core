@@ -172,7 +172,7 @@ The token account is still allow_ungated_transfer so cannot be deleted.
 
 ## Function `fungible_asset_source`
 
-Self-explainatory.
+Return the underlying fungible source.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_fungible_asset_source">fungible_asset_source</a>(fa: &<a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_source.md#0x1_fungible_source_FungibleSource">fungible_source::FungibleSource</a>&gt;
@@ -197,7 +197,7 @@ Self-explainatory.
 
 ## Function `fungible_asset_amount`
 
-Self-explainatory.
+Return the amount.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_fungible_asset_amount">fungible_asset_amount</a>(fa: &<a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>): u64
@@ -293,7 +293,7 @@ Mint fungible asset with <code>amount</code>.
 
 ## Function `destory_account_fungible_asset`
 
-Burn fungible asset.
+Desotry <code><a href="fungible_asset.md#0x1_fungible_asset_AccountFungibleAsset">AccountFungibleAsset</a></code> object.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_destory_account_fungible_asset">destory_account_fungible_asset</a>(afa: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_AccountFungibleAsset">fungible_asset::AccountFungibleAsset</a>&gt;)
@@ -474,7 +474,7 @@ Get the source object of an <code>Object&lt;<a href="fungible_asset.md#0x1_fungi
 
 ## Function `ungated_transfer_allowed`
 
-Whether <code>ungated_transfer</code> is alllowed.
+Return if <code>ungated_transfer</code> is allowed.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_ungated_transfer_allowed">ungated_transfer_allowed</a>(afa: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_AccountFungibleAsset">fungible_asset::AccountFungibleAsset</a>&gt;): bool
@@ -499,7 +499,7 @@ Whether <code>ungated_transfer</code> is alllowed.
 
 ## Function `set_ungated_transfer`
 
-Set <code>ungated_transfer</code> to the passed in <code>allow</code>.
+Set <code>allow_ungated_transfer</code>.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_set_ungated_transfer">set_ungated_transfer</a>(afa: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_AccountFungibleAsset">fungible_asset::AccountFungibleAsset</a>&gt;, allow: bool)

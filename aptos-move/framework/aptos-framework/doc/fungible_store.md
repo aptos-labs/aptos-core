@@ -66,7 +66,7 @@ Represents all the fungible asset objects of an onwer keyed by the address of th
 The account fungible asset object existence error.
 
 
-<pre><code><b>const</b> <a href="fungible_store.md#0x1_fungible_store_EACCOUNT_FUNGIBLE_ASSET_OBJECT">EACCOUNT_FUNGIBLE_ASSET_OBJECT</a>: u64 = 7;
+<pre><code><b>const</b> <a href="fungible_store.md#0x1_fungible_store_EACCOUNT_FUNGIBLE_ASSET_OBJECT">EACCOUNT_FUNGIBLE_ASSET_OBJECT</a>: u64 = 1;
 </code></pre>
 
 
@@ -75,10 +75,10 @@ The account fungible asset object existence error.
 
 ## Function `balance`
 
-Check the amount of an account.
+Check the balance of an <code>AccountFungibleAsset</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_store.md#0x1_fungible_store_balance">balance</a>&lt;T: key&gt;(fungible_asset_owner: <b>address</b>, asset: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): u64
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_store.md#0x1_fungible_store_balance">balance</a>&lt;T: key&gt;(<a href="account.md#0x1_account">account</a>: <b>address</b>, asset: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): u64
 </code></pre>
 
 
@@ -88,12 +88,12 @@ Check the amount of an account.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_store.md#0x1_fungible_store_balance">balance</a>&lt;T: key&gt;(
-    fungible_asset_owner: <b>address</b>,
+    <a href="account.md#0x1_account">account</a>: <b>address</b>,
     asset: &Object&lt;T&gt;
 ): u64 <b>acquires</b> <a href="fungible_store.md#0x1_fungible_store_FungibleAssetStore">FungibleAssetStore</a> {
     <b>let</b> asset = <a href="fungible_source.md#0x1_fungible_source_verify">fungible_source::verify</a>(asset);
     <b>let</b> afa_opt = <a href="fungible_store.md#0x1_fungible_store_get_account_fungible_asset_object">get_account_fungible_asset_object</a>(
-        fungible_asset_owner,
+        <a href="account.md#0x1_account">account</a>,
         &asset,
         <b>false</b>
     );
@@ -113,10 +113,10 @@ Check the amount of an account.
 
 ## Function `ungated_transfer_allowed`
 
-Check the coin account of <code>fungible_asset_owner</code> is frozen or not.
+Check the <code>AccountFungibleAsset</code> of <code><a href="account.md#0x1_account">account</a></code> allows ungated transfer.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_store.md#0x1_fungible_store_ungated_transfer_allowed">ungated_transfer_allowed</a>&lt;T: key&gt;(fungible_asset_owner: <b>address</b>, asset: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_store.md#0x1_fungible_store_ungated_transfer_allowed">ungated_transfer_allowed</a>&lt;T: key&gt;(<a href="account.md#0x1_account">account</a>: <b>address</b>, asset: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool
 </code></pre>
 
 
@@ -126,12 +126,12 @@ Check the coin account of <code>fungible_asset_owner</code> is frozen or not.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_store.md#0x1_fungible_store_ungated_transfer_allowed">ungated_transfer_allowed</a>&lt;T: key&gt;(
-    fungible_asset_owner: <b>address</b>,
+    <a href="account.md#0x1_account">account</a>: <b>address</b>,
     asset: &Object&lt;T&gt;
 ): bool <b>acquires</b> <a href="fungible_store.md#0x1_fungible_store_FungibleAssetStore">FungibleAssetStore</a> {
     <b>let</b> asset = <a href="fungible_source.md#0x1_fungible_source_verify">fungible_source::verify</a>(asset);
     <b>let</b> afa_opt = <a href="fungible_store.md#0x1_fungible_store_get_account_fungible_asset_object">get_account_fungible_asset_object</a>(
-        fungible_asset_owner,
+        <a href="account.md#0x1_account">account</a>,
         &asset,
         <b>false</b>
     );
@@ -151,7 +151,7 @@ Check the coin account of <code>fungible_asset_owner</code> is frozen or not.
 
 ## Function `deposit`
 
-Deposit fungible asset to an account.
+Deposit fungible asset to <code><a href="account.md#0x1_account">account</a></code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_store.md#0x1_fungible_store_deposit">deposit</a>(fa: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>, <b>to</b>: <b>address</b>)
@@ -185,7 +185,7 @@ Deposit fungible asset to an account.
 
 ## Function `set_ungated_transfer`
 
-Freeeze/unfreeze any account of asset address <code>asset_addr</code>.
+Enable/disable the direct transfer of fungible assets.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_store.md#0x1_fungible_store_set_ungated_transfer">set_ungated_transfer</a>&lt;T: key&gt;(<a href="account.md#0x1_account">account</a>: <b>address</b>, asset: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, allow: bool)
@@ -223,7 +223,7 @@ Freeeze/unfreeze any account of asset address <code>asset_addr</code>.
 
 ## Function `withdraw`
 
-Withdraw <code>amount</code> of fungible asset from <code><a href="account.md#0x1_account">account</a></code>.
+Withdraw <code>amount</code> of fungible assets from <code><a href="account.md#0x1_account">account</a></code>.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_store.md#0x1_fungible_store_withdraw">withdraw</a>&lt;T: key&gt;(<a href="account.md#0x1_account">account</a>: <b>address</b>, asset: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, amount: u64): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>
@@ -263,12 +263,12 @@ Withdraw <code>amount</code> of fungible asset from <code><a href="account.md#0x
 
 ## Function `get_account_fungible_asset_object`
 
-Get the <code>PinnedFungibleAsset</code> object of an asset from owner address.
-if <code>create_on_demand</code> is true, an default<code>PinnedFungibleAsset</code> will be created if not exists; otherwise, abort
+Get the <code>AccountFungibleAsset</code> object of <code>asset</code> belonging to <code><a href="account.md#0x1_account">account</a></code>.
+if <code>create_on_demand</code> is true, an default <code>AccountFungibleAsset</code> will be created if not exist; otherwise, abort
 with error.
 
 
-<pre><code><b>fun</b> <a href="fungible_store.md#0x1_fungible_store_get_account_fungible_asset_object">get_account_fungible_asset_object</a>(fungible_asset_owner: <b>address</b>, asset: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_source.md#0x1_fungible_source_FungibleSource">fungible_source::FungibleSource</a>&gt;, create_on_demand: bool): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_AccountFungibleAsset">fungible_asset::AccountFungibleAsset</a>&gt;&gt;
+<pre><code><b>fun</b> <a href="fungible_store.md#0x1_fungible_store_get_account_fungible_asset_object">get_account_fungible_asset_object</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, asset: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_source.md#0x1_fungible_source_FungibleSource">fungible_source::FungibleSource</a>&gt;, create_on_demand: bool): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_AccountFungibleAsset">fungible_asset::AccountFungibleAsset</a>&gt;&gt;
 </code></pre>
 
 
@@ -278,16 +278,16 @@ with error.
 
 
 <pre><code><b>fun</b> <a href="fungible_store.md#0x1_fungible_store_get_account_fungible_asset_object">get_account_fungible_asset_object</a>(
-    fungible_asset_owner: <b>address</b>,
+    <a href="account.md#0x1_account">account</a>: <b>address</b>,
     asset: &Object&lt;FungibleSource&gt;,
     create_on_demand: bool
 ): Option&lt;Object&lt;AccountFungibleAsset&gt;&gt; <b>acquires</b> <a href="fungible_store.md#0x1_fungible_store_FungibleAssetStore">FungibleAssetStore</a> {
-    ensure_fungible_asset_store(fungible_asset_owner);
+    ensure_fungible_asset_store(<a href="account.md#0x1_account">account</a>);
     <b>let</b> asset = <a href="fungible_source.md#0x1_fungible_source_verify">fungible_source::verify</a>(asset);
-    <b>let</b> index_table = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="fungible_store.md#0x1_fungible_store_FungibleAssetStore">FungibleAssetStore</a>&gt;(fungible_asset_owner).index;
+    <b>let</b> index_table = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="fungible_store.md#0x1_fungible_store_FungibleAssetStore">FungibleAssetStore</a>&gt;(<a href="account.md#0x1_account">account</a>).index;
     <b>if</b> (!<a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_contains">smart_table::contains</a>(index_table, <b>copy</b> asset)) {
         <b>if</b> (create_on_demand) {
-            <b>let</b> afa_obj = <a href="fungible_store.md#0x1_fungible_store_create_account_fungible_asset_object">create_account_fungible_asset_object</a>(fungible_asset_owner, &asset);
+            <b>let</b> afa_obj = <a href="fungible_store.md#0x1_fungible_store_create_account_fungible_asset_object">create_account_fungible_asset_object</a>(<a href="account.md#0x1_account">account</a>, &asset);
             <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_add">smart_table::add</a>(index_table, <b>copy</b> asset, afa_obj);
         } <b>else</b> {
             <b>return</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
@@ -306,7 +306,7 @@ with error.
 
 ## Function `create_account_fungible_asset_object`
 
-Create a default <code>PinnedFungibleAsset</code> object with zero balance of the passed-in asset.
+Create a default <code>AccountFungibleAsset</code> object with zero balance of <code>asset</code>.
 
 
 <pre><code><b>fun</b> <a href="fungible_store.md#0x1_fungible_store_create_account_fungible_asset_object">create_account_fungible_asset_object</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, asset: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_source.md#0x1_fungible_source_FungibleSource">fungible_source::FungibleSource</a>&gt;): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_AccountFungibleAsset">fungible_asset::AccountFungibleAsset</a>&gt;
@@ -343,10 +343,10 @@ Create a default <code>PinnedFungibleAsset</code> object with zero balance of th
 
 ## Function `delete_account_fungible_asset_object`
 
-Remove the corresponding <code>PinnedFungibleAsset</code> object from the index of owner.
+Remove the <code>AccountFungibleAsset</code> object of <code>asset</code> from <code><a href="account.md#0x1_account">account</a></code>.
 
 
-<pre><code><b>fun</b> <a href="fungible_store.md#0x1_fungible_store_delete_account_fungible_asset_object">delete_account_fungible_asset_object</a>(fungible_asset_owner: <b>address</b>, asset: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_source.md#0x1_fungible_source_FungibleSource">fungible_source::FungibleSource</a>&gt;)
+<pre><code><b>fun</b> <a href="fungible_store.md#0x1_fungible_store_delete_account_fungible_asset_object">delete_account_fungible_asset_object</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, asset: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_source.md#0x1_fungible_source_FungibleSource">fungible_source::FungibleSource</a>&gt;)
 </code></pre>
 
 
@@ -356,12 +356,12 @@ Remove the corresponding <code>PinnedFungibleAsset</code> object from the index 
 
 
 <pre><code><b>fun</b> <a href="fungible_store.md#0x1_fungible_store_delete_account_fungible_asset_object">delete_account_fungible_asset_object</a>(
-    fungible_asset_owner: <b>address</b>,
+    <a href="account.md#0x1_account">account</a>: <b>address</b>,
     asset: &Object&lt;FungibleSource&gt;
 ) <b>acquires</b> <a href="fungible_store.md#0x1_fungible_store_FungibleAssetStore">FungibleAssetStore</a> {
     // Delete <b>if</b> balance drops <b>to</b> 0 and ungated_transfer is allowed.
-    ensure_fungible_asset_store(fungible_asset_owner);
-    <b>let</b> index_table = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="fungible_store.md#0x1_fungible_store_FungibleAssetStore">FungibleAssetStore</a>&gt;(fungible_asset_owner).index;
+    ensure_fungible_asset_store(<a href="account.md#0x1_account">account</a>);
+    <b>let</b> index_table = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="fungible_store.md#0x1_fungible_store_FungibleAssetStore">FungibleAssetStore</a>&gt;(<a href="account.md#0x1_account">account</a>).index;
     <b>assert</b>!(<a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_contains">smart_table::contains</a>(index_table, *asset), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="fungible_store.md#0x1_fungible_store_EACCOUNT_FUNGIBLE_ASSET_OBJECT">EACCOUNT_FUNGIBLE_ASSET_OBJECT</a>));
     <b>let</b> afa = <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_remove">smart_table::remove</a>(index_table, *asset);
     <a href="fungible_asset.md#0x1_fungible_asset_destory_account_fungible_asset">fungible_asset::destory_account_fungible_asset</a>(afa);
