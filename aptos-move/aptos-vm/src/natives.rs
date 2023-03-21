@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+#[cfg(feature = "testing")]
 use aptos_framework::natives::cryptography::algebra::AlgebraContext;
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 #[cfg(feature = "testing")]

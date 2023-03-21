@@ -220,6 +220,12 @@ impl HashValue {
         (self.hash[pos] >> shift) & 0x0F
     }
 
+    /// Return the `index`-th byte in the bytes.
+    pub fn byte(&self, index: usize) -> u8 {
+        debug_assert!(index < Self::LENGTH); // assumed precondition
+        self.hash[index]
+    }
+
     /// Returns a `HashValueBitIterator` over all the bits that represent this `HashValue`.
     pub fn iter_bits(&self) -> HashValueBitIterator<'_> {
         HashValueBitIterator::new(self)

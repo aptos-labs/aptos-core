@@ -867,8 +867,8 @@ pub fn parse_distribute_staking_rewards_operation(
         ))));
     }
 
-    let operator: AccountAddress = parse_function_arg("distribute_staking_rewards", args, 0)?;
-    let staker: AccountAddress = parse_function_arg("distribute_staking_rewards", args, 1)?;
+    let staker: AccountAddress = parse_function_arg("distribute_staking_rewards", args, 0)?;
+    let operator: AccountAddress = parse_function_arg("distribute_staking_rewards", args, 1)?;
 
     Ok(vec![Operation::distribute_staking_rewards(
         0,

@@ -439,6 +439,7 @@ serde
 serializable
 setAccountHasList
 sft
+sha
 sharded
 sharding
 signAndSubmitTransaction
