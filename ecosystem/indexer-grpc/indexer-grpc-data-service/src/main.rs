@@ -13,7 +13,7 @@ use std::{
     },
 };
 use tonic::{
-    metadata::{Ascii, MetadataValue},
+    metadata::{Ascii, AsciiMetadataValue, MetadataValue},
     transport::Server,
     Request, Status,
 };
@@ -91,7 +91,9 @@ pub fn build_auth_token_set(
         .unwrap_or_default()
         .into_iter()
         .map(|token| {
-            let token: MetadataValue<Ascii> = token.parse().unwrap();
+            let token: MetadataValue<Ascii> = token
+                .parse()
+                .unwrap_or_else(|_| AsciiMetadataValue::from_static(""));
             token
         })
         .collect::<HashSet<_>>()

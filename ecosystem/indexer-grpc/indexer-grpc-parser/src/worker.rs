@@ -424,7 +424,7 @@ pub fn grpc_request_builder(
     grpc_auth_token: String,
 ) -> tonic::Request<RawDatastreamRequest> {
     let mut request = tonic::Request::new(RawDatastreamRequest {
-        starting_version,
+        starting_version: Some(starting_version),
         transactions_count: None,
     });
     request.metadata_mut().insert(

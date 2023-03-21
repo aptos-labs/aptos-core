@@ -84,17 +84,21 @@ impl IndexerStream for DatastreamServer {
         req: Request<RawDatastreamRequest>,
     ) -> Result<Response<Self::RawDatastreamStream>, Status> {
         // Get request identity. The request is already authenticated by the interceptor.
-        let request_token = req
+        let request_token = match req
             .metadata()
             .get(GRPC_AUTH_TOKEN_HEADER)
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string();
+            .map(|token| token.to_str().unwrap_err().to_string())
+        {
+            Some(token) => token,
+            None => return Result::Err(Status::aborted("Request token is not set")),
+        };
         // Response channel to stream the data to the client.
         let (tx, rx) = channel(MAX_RESPONSE_CHANNEL_SIZE);
         let req = req.into_inner();
-        let mut current_version = req.starting_version;
+        let mut current_version = match req.starting_version {
+            Some(version) => version,
+            None => return Result::Err(Status::aborted("Starting version is not set")),
+        };
 
         let file_store_bucket_name = self.server_config.file_store_bucket_name.clone();
         let redis_client = self.redis_client.clone();
