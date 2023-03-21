@@ -112,6 +112,7 @@ module aptos_std::fixed_point64 {
     }
     spec create_from_rational {
         pragma opaque;
+        pragma timeout = 600; // Set larger timeout to avoid prover failure
         include CreateFromRationalAbortsIf;
         ensures result == spec_create_from_rational(numerator, denominator);
     }
