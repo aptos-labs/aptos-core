@@ -33,6 +33,8 @@ the Move stdlib, the Aptos stdlib, and the Aptos framework.
 -  [Function `cryptography_algebra_enabled`](#0x1_features_cryptography_algebra_enabled)
 -  [Function `get_bls12_381_strutures_feature`](#0x1_features_get_bls12_381_strutures_feature)
 -  [Function `bls12_381_structures_enabled`](#0x1_features_bls12_381_structures_enabled)
+-  [Function `get_struct_constructors_feature`](#0x1_features_get_struct_constructors_feature)
+-  [Function `struct_constructors_enabled`](#0x1_features_struct_constructors_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -217,6 +219,18 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_SHA_512_AND_RIPEMD_160_NATIVES">SHA_512_AND_RIPEMD_160_NATIVES</a>: u64 = 3;
+</code></pre>
+
+
+
+<a name="0x1_features_STRUCT_CONSTRUCTORS"></a>
+
+Whether struct constructors are enabled
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_STRUCT_CONSTRUCTORS">STRUCT_CONSTRUCTORS</a>: u64 = 14;
 </code></pre>
 
 
@@ -791,6 +805,52 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_bls12_381_structures_enabled">bls12_381_structures_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_BLS12_381_STRUCTURES">BLS12_381_STRUCTURES</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_get_struct_constructors_feature"></a>
+
+## Function `get_struct_constructors_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_struct_constructors_feature">get_struct_constructors_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_struct_constructors_feature">get_struct_constructors_feature</a>(): u64 { <a href="features.md#0x1_features_STRUCT_CONSTRUCTORS">STRUCT_CONSTRUCTORS</a> }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_struct_constructors_enabled"></a>
+
+## Function `struct_constructors_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_struct_constructors_enabled">struct_constructors_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_struct_constructors_enabled">struct_constructors_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_STRUCT_CONSTRUCTORS">STRUCT_CONSTRUCTORS</a>)
 }
 </code></pre>
 

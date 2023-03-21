@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{assert_success, assert_vm_status, tests::common, MoveHarness};
-use aptos_types::account_address::AccountAddress;
+use aptos_types::{account_address::AccountAddress, on_chain_config::FeatureFlag};
 use move_core_types::{language_storage::TypeTag, parser::parse_struct_tag, vm_status::StatusCode};
 use serde::{Deserialize, Serialize};
 
@@ -22,7 +22,7 @@ fn success(tests: Vec<(&str, Vec<Vec<u8>>, &str)>) {
 }
 
 fn success_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<Vec<u8>>, &str)>) {
-    let mut h = MoveHarness::new();
+    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::STRUCT_CONSTRUCTORS], vec![]);
 
     // Load the code
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
@@ -57,7 +57,7 @@ fn fail(tests: Vec<(&str, Vec<Vec<u8>>, StatusCode)>) {
 }
 
 fn fail_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<Vec<u8>>, StatusCode)>) {
-    let mut h = MoveHarness::new();
+    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::STRUCT_CONSTRUCTORS], vec![]);
 
     // Load the code
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());

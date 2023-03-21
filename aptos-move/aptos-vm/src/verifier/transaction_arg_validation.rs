@@ -11,35 +11,49 @@ use crate::{
     VMStatus,
 };
 use move_binary_format::file_format_common::read_uleb128_as_u64;
-use move_core_types::{account_address::AccountAddress, ident_str, identifier::{IdentStr, Identifier}, language_storage::ModuleId, value::MoveValue, vm_status::StatusCode};
+use move_core_types::{
+    account_address::AccountAddress,
+    ident_str,
+    identifier::{IdentStr, Identifier},
+    language_storage::ModuleId,
+    value::MoveValue,
+    vm_status::StatusCode,
+};
 use move_vm_runtime::session::LoadedFunctionInstantiation;
-use move_vm_types::{gas::GasMeter, loaded_data::runtime_types::Type};
+use move_vm_types::{
+    gas::{GasMeter, UnmeteredGasMeter},
+    loaded_data::runtime_types::Type,
+};
 use once_cell::sync::Lazy;
 use std::{
     collections::BTreeMap,
     io::{Cursor, Read},
 };
-use move_vm_types::gas::UnmeteredGasMeter;
 
 pub(crate) struct FunctionId {
     module_id: ModuleId,
     func_name: &'static IdentStr,
 }
 
-static ALLOWED_STRUCTS: Lazy<BTreeMap<String, FunctionId>> = Lazy::new(|| {
+type ConstructorMap = Lazy<BTreeMap<String, FunctionId>>;
+static OLD_ALLOWED_STRUCTS: ConstructorMap = Lazy::new(|| {
+    [("0x1::string::String", FunctionId {
+        module_id: ModuleId::new(AccountAddress::ONE, Identifier::from(ident_str!("string"))),
+        func_name: ident_str!("utf8"),
+    })]
+    .into_iter()
+    .map(|(s, validator)| (s.to_string(), validator))
+    .collect()
+});
+
+static NEW_ALLOWED_STRUCTS: ConstructorMap = Lazy::new(|| {
     [
         ("0x1::string::String", FunctionId {
-            module_id: ModuleId::new(
-                AccountAddress::ONE,
-                Identifier::from(ident_str!("string")),
-            ),
+            module_id: ModuleId::new(AccountAddress::ONE, Identifier::from(ident_str!("string"))),
             func_name: ident_str!("utf8"),
         }),
         ("0x1::object::Object", FunctionId {
-            module_id: ModuleId::new(
-                AccountAddress::ONE,
-                Identifier::from(ident_str!("object")),
-            ),
+            module_id: ModuleId::new(AccountAddress::ONE, Identifier::from(ident_str!("object"))),
             func_name: ident_str!("address_to_object"),
         }),
     ]
@@ -47,6 +61,14 @@ static ALLOWED_STRUCTS: Lazy<BTreeMap<String, FunctionId>> = Lazy::new(|| {
     .map(|(s, validator)| (s.to_string(), validator))
     .collect()
 });
+
+pub(crate) fn get_allowed_structs(struct_constructors_feature: bool) -> &'static ConstructorMap {
+    if struct_constructors_feature {
+        &NEW_ALLOWED_STRUCTS
+    } else {
+        &OLD_ALLOWED_STRUCTS
+    }
+}
 
 /// Validate and generate args for entry function
 /// validation includes:
@@ -60,6 +82,7 @@ pub(crate) fn validate_combine_signer_and_txn_args<S: MoveResolverExt>(
     senders: Vec<AccountAddress>,
     args: Vec<Vec<u8>>,
     func: &LoadedFunctionInstantiation,
+    struct_constructors_feature: bool,
 ) -> Result<Vec<Vec<u8>>, VMStatus> {
     // entry function should not return
     if !func.return_.is_empty() {
@@ -82,10 +105,11 @@ pub(crate) fn validate_combine_signer_and_txn_args<S: MoveResolverExt>(
         }
     }
 
+    let allowed_structs = get_allowed_structs(struct_constructors_feature);
     // validate all non_signer params
     let mut needs_construction = vec![];
     for (idx, ty) in func.parameters[signer_param_cnt..].iter().enumerate() {
-        let (valid, construction) = is_valid_txn_arg(session, ty);
+        let (valid, construction) = is_valid_txn_arg(session, ty, allowed_structs);
         if !valid {
             return Err(VMStatus::Error(
                 StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
@@ -123,7 +147,13 @@ pub(crate) fn validate_combine_signer_and_txn_args<S: MoveResolverExt>(
             .collect()
     };
     if !needs_construction.is_empty() {
-        construct_args(session, &needs_construction, &mut combined_args, func)?;
+        construct_args(
+            session,
+            &needs_construction,
+            &mut combined_args,
+            func,
+            allowed_structs,
+        )?;
     }
     Ok(combined_args)
 }
@@ -132,16 +162,17 @@ pub(crate) fn validate_combine_signer_and_txn_args<S: MoveResolverExt>(
 pub(crate) fn is_valid_txn_arg<S: MoveResolverExt>(
     session: &SessionExt<S>,
     typ: &Type,
+    allowed_structs: &ConstructorMap,
 ) -> (bool, bool) {
     use move_vm_types::loaded_data::runtime_types::Type::*;
 
     match typ {
         Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => (true, false),
-        Vector(inner) => is_valid_txn_arg(session, inner),
+        Vector(inner) => is_valid_txn_arg(session, inner, allowed_structs),
         Struct(idx) | StructInstantiation(idx, _) => {
             if let Some(st) = session.get_struct_type(*idx) {
                 let full_name = format!("{}::{}", st.module.short_str_lossless(), st.name);
-                (ALLOWED_STRUCTS.contains_key(&full_name), true)
+                (allowed_structs.contains_key(&full_name), true)
             } else {
                 (false, false)
             }
@@ -158,6 +189,7 @@ pub(crate) fn construct_args<S: MoveResolverExt>(
     idxs: &[usize],
     args: &mut [Vec<u8>],
     func: &LoadedFunctionInstantiation,
+    allowed_structs: &ConstructorMap,
 ) -> Result<(), VMStatus> {
     // Perhaps in a future we should do proper gas metering here
     let mut gas_meter = UnmeteredGasMeter;
@@ -168,7 +200,14 @@ pub(crate) fn construct_args<S: MoveResolverExt>(
         let arg = &mut args[idx];
         let mut cursor = Cursor::new(&arg[..]);
         let mut new_arg = vec![];
-        recursively_construct_arg(session, ty, &mut cursor, &mut gas_meter, &mut new_arg)?;
+        recursively_construct_arg(
+            session,
+            ty,
+            allowed_structs,
+            &mut cursor,
+            &mut gas_meter,
+            &mut new_arg,
+        )?;
         // Check cursor has parsed everything
         // Unfortunately, is_empty is only enabled in nightly, so we check this way.
         if cursor.position() != arg.len() as u64 {
@@ -188,6 +227,7 @@ pub(crate) fn construct_args<S: MoveResolverExt>(
 pub(crate) fn recursively_construct_arg<S: MoveResolverExt>(
     session: &mut SessionExt<S>,
     ty: &Type,
+    allowed_structs: &ConstructorMap,
     cursor: &mut Cursor<&[u8]>,
     gas_meter: &mut impl GasMeter,
     arg: &mut Vec<u8>,
@@ -200,7 +240,7 @@ pub(crate) fn recursively_construct_arg<S: MoveResolverExt>(
             let mut len = get_len(cursor)?;
             serialize_uleb128(len, arg);
             while len > 0 {
-                recursively_construct_arg(session, inner, cursor, gas_meter, arg)?;
+                recursively_construct_arg(session, inner, allowed_structs, cursor, gas_meter, arg)?;
                 len -= 1;
             }
         },
@@ -211,7 +251,7 @@ pub(crate) fn recursively_construct_arg<S: MoveResolverExt>(
                 .get_struct_type(*idx)
                 .expect("unreachable, type must exist");
             let full_name = format!("{}::{}", st.module.short_str_lossless(), st.name);
-            let constructor = ALLOWED_STRUCTS
+            let constructor = allowed_structs
                 .get(&full_name)
                 .expect("unreachable: struct must be allowed");
             // By appending the BCS to the output parameter we construct the correct BCS format
@@ -220,6 +260,7 @@ pub(crate) fn recursively_construct_arg<S: MoveResolverExt>(
                 session,
                 ty,
                 constructor,
+                allowed_structs,
                 cursor,
                 gas_meter,
             )?);
@@ -246,6 +287,7 @@ fn validate_and_construct<S: MoveResolverExt>(
     session: &mut SessionExt<S>,
     expected_type: &Type,
     constructor: &FunctionId,
+    allowed_structs: &ConstructorMap,
     cursor: &mut Cursor<&[u8]>,
     gas_meter: &mut impl GasMeter,
 ) -> Result<Vec<u8>, VMStatus> {
@@ -257,7 +299,14 @@ fn validate_and_construct<S: MoveResolverExt>(
     let mut args = vec![];
     for param_type in &instantiation.parameters {
         let mut arg = vec![];
-        recursively_construct_arg(session, param_type, cursor, gas_meter, &mut arg)?;
+        recursively_construct_arg(
+            session,
+            param_type,
+            allowed_structs,
+            cursor,
+            gas_meter,
+            &mut arg,
+        )?;
         args.push(arg);
     }
     let serialized_result = session

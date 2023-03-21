@@ -158,6 +158,15 @@ module std::features {
         is_enabled(BLS12_381_STRUCTURES)
     }
 
+    /// Whether struct constructors are enabled
+    ///
+    /// Lifetime: transient
+    const STRUCT_CONSTRUCTORS: u64 = 14;
+    public fun get_struct_constructors_feature(): u64 { STRUCT_CONSTRUCTORS }
+    public fun struct_constructors_enabled(): bool acquires Features {
+        is_enabled(STRUCT_CONSTRUCTORS)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 
