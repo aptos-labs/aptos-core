@@ -681,12 +681,12 @@ module aptos_framework::delegation_pool {
         let pool_address = get_pool_address(pool);
         let (withdrawal_exists, withdrawal_olc) = pending_withdrawal_exists(pool, delegator_address);
         // exit if no withdrawal or (it is pending and cannot withdraw pending_inactive stake from stake pool)
+        let withdrawing_inactive_stake = withdrawal_olc.index < pool.observed_lockup_cycle.index;
         if (!(
-            withdrawal_exists &&
-                (withdrawal_olc.index < pool.observed_lockup_cycle.index || can_withdraw_pending_inactive(pool_address))
+            withdrawal_exists && (withdrawing_inactive_stake || can_withdraw_pending_inactive(pool_address))
         )) { return };
 
-        if (withdrawal_olc.index == pool.observed_lockup_cycle.index) {
+        if (!withdrawing_inactive_stake) {
             amount = coins_to_redeem_to_ensure_min_stake(
                 pending_inactive_shares_pool(pool),
                 delegator_address,
@@ -702,7 +702,7 @@ module aptos_framework::delegation_pool {
         if (can_withdraw_pending_inactive(pool_address)) {
             // get excess stake before being entirely inactivated
             let (_, _, _, pending_inactive) = stake::get_stake(pool_address);
-            if (withdrawal_olc.index == pool.observed_lockup_cycle.index) {
+            if (!withdrawing_inactive_stake) {
                 // `amount` less excess if withdrawing pending_inactive stake
                 pending_inactive = pending_inactive - amount
             };
@@ -717,10 +717,11 @@ module aptos_framework::delegation_pool {
         };
         coin::transfer<AptosCoin>(stake_pool_owner, delegator_address, amount);
 
-        // commit withdrawal of possibly inactive stake to the `total_coins_inactive`
+        // commit withdrawal of inactive stake to the `total_coins_inactive`
         // known by the delegation pool in order to not mistake it for slashing at next synchronization
-        let (_, inactive, _, _) = stake::get_stake(pool_address);
-        pool.total_coins_inactive = inactive;
+        if (withdrawing_inactive_stake) {
+            pool.total_coins_inactive = pool.total_coins_inactive - amount;
+        };
 
         event::emit_event(
             &mut pool.withdraw_stake_events,
