@@ -60,27 +60,27 @@ module aptos_framework::fungible_source {
         object::object_from_constructor_ref<FungibleSource>(constructor_ref)
     }
 
-    /// Self-explanatory.
+    /// Get current supply of the fungible asset.
     public fun get_current_supply<T: key>(asset: &Object<T>): u64 acquires FungibleSource {
         borrow_fungible_source(asset).current_supply
     }
 
-    /// Self-explanatory.
+    /// Get maximum supply of the fungible asset.
     public fun get_maximum_supply<T: key>(asset: &Object<T>): Option<u64> acquires FungibleSource {
         borrow_fungible_source(asset).maximum_supply
     }
 
-    /// Self-explanatory.
+    /// Get the name of the fungible asset that is issued from the fungible source.
     public fun get_name<T: key>(asset: &Object<T>): String acquires FungibleSource {
         borrow_fungible_source(asset).name
     }
 
-    /// Self-explanatory.
+    /// Get the symbol of the fungible asset that is issued from the fungible source.
     public fun get_symbol<T: key>(asset: &Object<T>): String acquires FungibleSource {
         borrow_fungible_source(asset).symbol
     }
 
-    /// Self-explanatory.
+    /// Get the decimals of the fungible asset that is issued from the fungible source.
     public fun get_decimals<T: key>(asset: &Object<T>): u8 acquires FungibleSource {
         borrow_fungible_source(asset).decimals
     }
@@ -97,7 +97,7 @@ module aptos_framework::fungible_source {
         fungible_source.current_supply = fungible_source.current_supply + amount;
     }
 
-    /// Increase the supply of a fungible asset by burning.
+    /// Decrease the supply of a fungible asset by burning.
     public(friend) fun decrease_supply<T: key>(asset: &Object<T>, amount: u64) acquires FungibleSource {
         assert!(amount != 0, error::invalid_argument(EZERO_AMOUNT));
         let fungible_source = borrow_fungible_source_mut(asset);
@@ -106,13 +106,13 @@ module aptos_framework::fungible_source {
     }
 
 
-    /// Borrow a `&FungibleSource` from an asset.
+    /// Borrow a `&FungibleSource` from `asset`.
     inline fun borrow_fungible_source<T: key>(asset: &Object<T>): &FungibleSource acquires FungibleSource {
         let addr = object::object_address(&verify(asset));
         borrow_global<FungibleSource>(addr)
     }
 
-    /// Borrow a `&mut FungibleSource` from an asset.
+    /// Borrow a `&mut FungibleSource` from `asset`.
     inline fun borrow_fungible_source_mut<T: key>(asset: &Object<T>): &mut FungibleSource acquires FungibleSource {
         let addr = object::object_address(&verify(asset));
         borrow_global_mut<FungibleSource>(addr)

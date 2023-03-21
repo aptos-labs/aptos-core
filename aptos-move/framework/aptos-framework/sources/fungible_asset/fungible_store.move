@@ -10,21 +10,21 @@ module aptos_framework::fungible_store {
     friend aptos_framework::fungible_caps;
 
     /// The account fungible asset object existence error.
-    const EACCOUNT_FUNGIBLE_ASSET_OBJECT: u64 = 7;
+    const EACCOUNT_FUNGIBLE_ASSET_OBJECT: u64 = 1;
 
     /// Represents all the fungible asset objects of an onwer keyed by the address of the base asset object.
     struct FungibleAssetStore has key {
         index: SmartTable<Object<FungibleSource>, Object<AccountFungibleAsset>>
     }
 
-    /// Check the amount of an account.
+    /// Check the balance of an `AccountFungibleAsset`.
     public fun balance<T: key>(
-        fungible_asset_owner: address,
+        account: address,
         asset: &Object<T>
     ): u64 acquires FungibleAssetStore {
         let asset = fungible_source::verify(asset);
         let afa_opt = get_account_fungible_asset_object(
-            fungible_asset_owner,
+            account,
             &asset,
             false
         );
@@ -35,14 +35,14 @@ module aptos_framework::fungible_store {
         fungible_asset::balance(&afa)
     }
 
-    /// Check the coin account of `fungible_asset_owner` is frozen or not.
+    /// Check the `AccountFungibleAsset` of `account` allows ungated transfer.
     public fun ungated_transfer_allowed<T: key>(
-        fungible_asset_owner: address,
+        account: address,
         asset: &Object<T>
     ): bool acquires FungibleAssetStore {
         let asset = fungible_source::verify(asset);
         let afa_opt = get_account_fungible_asset_object(
-            fungible_asset_owner,
+            account,
             &asset,
             false
         );
@@ -53,7 +53,7 @@ module aptos_framework::fungible_store {
         fungible_asset::ungated_transfer_allowed(&afa)
     }
 
-    /// Deposit fungible asset to an account.
+    /// Deposit fungible asset to `account`.
     public fun deposit(
         fa: FungibleAsset,
         to: address
@@ -67,7 +67,7 @@ module aptos_framework::fungible_store {
         fungible_asset::merge(&afa, fa);
     }
 
-    /// Freeeze/unfreeze any account of asset address `asset_addr`.
+    /// Enable/disable the direct transfer of fungible assets.
     public(friend) fun set_ungated_transfer<T: key>(
         account: address,
         asset: &Object<T>,
@@ -85,7 +85,7 @@ module aptos_framework::fungible_store {
         };
     }
 
-    /// Withdraw `amount` of fungible asset from `account`.
+    /// Withdraw `amount` of fungible assets from `account`.
     public(friend) fun withdraw<T: key>(
         account: address,
         asset: &Object<T>,
@@ -105,7 +105,7 @@ module aptos_framework::fungible_store {
         fa
     }
 
-    /// Ensure the coin store exists. If not, create it.
+    /// Ensure fungible asset store exists. If not, create it.
     inline fun ensure_fungible_asset_store(account_address: address) {
         if (!exists<FungibleAssetStore>(account_address)) {
             let account_signer = create_signer::create_signer(account_address);
@@ -115,20 +115,20 @@ module aptos_framework::fungible_store {
         }
     }
 
-    /// Get the `PinnedFungibleAsset` object of an asset from owner address.
-    /// if `create_on_demand` is true, an default`PinnedFungibleAsset` will be created if not exists; otherwise, abort
+    /// Get the `AccountFungibleAsset` object of `asset` belonging to `account`.
+    /// if `create_on_demand` is true, an default `AccountFungibleAsset` will be created if not exist; otherwise, abort
     /// with error.
     fun get_account_fungible_asset_object(
-        fungible_asset_owner: address,
+        account: address,
         asset: &Object<FungibleSource>,
         create_on_demand: bool
     ): Option<Object<AccountFungibleAsset>> acquires FungibleAssetStore {
-        ensure_fungible_asset_store(fungible_asset_owner);
+        ensure_fungible_asset_store(account);
         let asset = fungible_source::verify(asset);
-        let index_table = &mut borrow_global_mut<FungibleAssetStore>(fungible_asset_owner).index;
+        let index_table = &mut borrow_global_mut<FungibleAssetStore>(account).index;
         if (!smart_table::contains(index_table, copy asset)) {
             if (create_on_demand) {
-                let afa_obj = create_account_fungible_asset_object(fungible_asset_owner, &asset);
+                let afa_obj = create_account_fungible_asset_object(account, &asset);
                 smart_table::add(index_table, copy asset, afa_obj);
             } else {
                 return option::none()
@@ -138,17 +138,18 @@ module aptos_framework::fungible_store {
         option::some(afa)
     }
 
+    /// Ensure the existence and return the `AccountFungibleAsset`.
     inline fun ensure_account_fungible_asset_object(
-        fungible_asset_owner: address,
+        account: address,
         asset: &Object<FungibleSource>,
         create_on_demand: bool
     ): Object<AccountFungibleAsset> acquires FungibleAssetStore {
-        let afa_opt = get_account_fungible_asset_object(fungible_asset_owner, asset, create_on_demand);
+        let afa_opt = get_account_fungible_asset_object(account, asset, create_on_demand);
         assert!(option::is_some(&afa_opt), error::not_found(EACCOUNT_FUNGIBLE_ASSET_OBJECT));
         option::destroy_some(afa_opt)
     }
 
-    /// Create a default `PinnedFungibleAsset` object with zero balance of the passed-in asset.
+    /// Create a default `AccountFungibleAsset` object with zero balance of `asset`.
     fun create_account_fungible_asset_object(
         account: address,
         asset: &Object<FungibleSource>
@@ -165,14 +166,14 @@ module aptos_framework::fungible_store {
         afa
     }
 
-    /// Remove the corresponding `PinnedFungibleAsset` object from the index of owner.
+    /// Remove the `AccountFungibleAsset` object of `asset` from `account`.
     fun delete_account_fungible_asset_object(
-        fungible_asset_owner: address,
+        account: address,
         asset: &Object<FungibleSource>
     ) acquires FungibleAssetStore {
         // Delete if balance drops to 0 and ungated_transfer is allowed.
-        ensure_fungible_asset_store(fungible_asset_owner);
-        let index_table = &mut borrow_global_mut<FungibleAssetStore>(fungible_asset_owner).index;
+        ensure_fungible_asset_store(account);
+        let index_table = &mut borrow_global_mut<FungibleAssetStore>(account).index;
         assert!(smart_table::contains(index_table, *asset), error::not_found(EACCOUNT_FUNGIBLE_ASSET_OBJECT));
         let afa = smart_table::remove(index_table, *asset);
         fungible_asset::destory_account_fungible_asset(afa);
@@ -222,7 +223,28 @@ module aptos_framework::fungible_store {
         assert!(option::is_none(&get_account_fungible_asset_object(creator_address, &asset, false)), 3);
         set_ungated_transfer(creator_address, &asset, false);
         assert!(option::is_some(&get_account_fungible_asset_object(creator_address, &asset, false)), 4);
+    }
+
+    #[test(creator = @0xcafe)]
+    fun test_auto_deletion(
+        creator: &signer,
+    ) acquires FungibleAssetStore {
+        let (creator_ref, asset) = fungible_source::create_test_token(creator);
+        fungible_source::init_test_fungible_source(&creator_ref);
+        let asset = fungible_source::verify(&asset);
+        let creator_address = signer::address_of(creator);
+
+        // Mint
+        let fa = fungible_asset::mint(&asset, 100);
+        deposit(fa, creator_address);
+        assert!(balance(creator_address, &asset) == 100, 1);
+        // exist
+        assert!(option::is_some(&get_account_fungible_asset_object(creator_address, &asset, false)), 2);
+        let fa = withdraw(creator_address, &asset, 100);
+        fungible_asset::burn(fa);
+        assert!(balance(creator_address, &asset) == 0, 3);
+        assert!(option::is_none(&get_account_fungible_asset_object(creator_address, &asset, false)), 4);
         set_ungated_transfer(creator_address, &asset, true);
-        assert!(option::is_none(&get_account_fungible_asset_object(creator_address, &asset, false)), 5);
+        assert!(option::is_some(&get_account_fungible_asset_object(creator_address, &asset, false)), 5);
     }
 }

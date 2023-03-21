@@ -10,22 +10,22 @@ module aptos_framework::fungible_caps {
     /// The transfer cap and the the fungible asset do not match.
     const ETRANSFER_CAP_AND_FUNGIBLE_ASSET_MISMATCH: u64 = 1;
 
-    /// Capability to mint fungible assets of the asset at `asset_addr`.
+    /// Capability to mint fungible asset.
     struct MintCap has store {
         asset: Object<FungibleSource>
     }
 
-    /// Capability to transfer fungible assets of `asset` in any account.
+    /// Capability to control the transfer of fungible asset.
     struct TransferCap has store {
         asset: Object<FungibleSource>
     }
 
-    /// Capability to burn fungible assets of the asset at `asset_addr`.
+    /// Capability to burn fungible asset.
     struct BurnCap has store {
         asset: Object<FungibleSource>
     }
 
-    /// The initialization of an object with `FungibleSource`.
+    /// The initialization of an object with `FungibleSource` with capabilities returned.
     public fun init_fungible_source_with_caps(
         constructor_ref: &ConstructorRef,
         maximum_supply: u64,
@@ -37,34 +37,35 @@ module aptos_framework::fungible_caps {
         (MintCap { asset }, TransferCap { asset }, BurnCap { asset })
     }
 
-    /// Mint the `amount` of coin with MintCap.
+    /// Mint the `amount` of fungible asset with `MintCap`.
     public fun mint(cap: &MintCap, amount: u64, to: address) {
         let fa = fungible_asset::mint(&cap.asset, amount);
         fungible_store::deposit(fa, to);
     }
 
-    /// Transfer the fungible asset account of `fungible_asset_owner` with TransferCap.
+    /// Enable/disable the direct transfer of fungible asset with `TransferCap`.
     public fun set_ungated_transfer(
         cap: &TransferCap,
-        fungible_asset_owner: address,
+        account: address,
         allow: bool,
     ) {
-        fungible_store::set_ungated_transfer(fungible_asset_owner, &cap.asset, allow);
+        fungible_store::set_ungated_transfer(account, &cap.asset, allow);
     }
 
-    /// Burn the `amount` of coin with MintCap.
-    public fun burn(cap: &BurnCap, amount: u64, from_account: address) {
-        let fa = fungible_store::withdraw(from_account, &cap.asset, amount);
+    /// Burn the `amount` of fungible asset from `account` with a `BurnCap`.
+    public fun burn(cap: &BurnCap, amount: u64, account: address) {
+        let fa = fungible_store::withdraw(account, &cap.asset, amount);
         fungible_asset::burn(fa);
     }
 
-    /// Withdarw `amount` of fungible assets of `asset`.
-    public fun withdraw<T: key>(fungible_asset_owner: &signer, asset: &Object<T>, amount: u64): FungibleAsset {
-        let account_address = signer::address_of(fungible_asset_owner);
+    /// Withdarw `amount` of fungible asset from `account`.
+    public fun withdraw<T: key>(account: &signer, asset: &Object<T>, amount: u64): FungibleAsset {
+        let account_address = signer::address_of(account);
         let asset = fungible_source::verify(asset);
         fungible_store::withdraw(account_address, &asset, amount)
     }
 
+    /// Withdarw `amount` of fungible asset from `account` with `TransferCap` even ungated transfer is disabled.
     public fun withdraw_with_cap(transfer_cap: &TransferCap, account: address, amount: u64): FungibleAsset {
         let ungated_transfer_allowed = fungible_store::ungated_transfer_allowed(account, &transfer_cap.asset);
         if (!ungated_transfer_allowed) {
@@ -77,34 +78,36 @@ module aptos_framework::fungible_caps {
         fa
     }
 
-    public fun deposit_with_cap(transfer_cap: &TransferCap, fa: FungibleAsset, to: address) {
+    /// Deposit fungible asset into `account` with `TransferCap` even ungated transfer is disabled.
+    public fun deposit_with_cap(transfer_cap: &TransferCap, fa: FungibleAsset, account: address) {
         assert!(
             &transfer_cap.asset == &fungible_asset::fungible_asset_source(&fa),
             error::invalid_argument(ETRANSFER_CAP_AND_FUNGIBLE_ASSET_MISMATCH)
         );
-        let ungated_transfer_allowed = fungible_store::ungated_transfer_allowed(to, &transfer_cap.asset);
+        let ungated_transfer_allowed = fungible_store::ungated_transfer_allowed(account, &transfer_cap.asset);
         if (!ungated_transfer_allowed) {
-            set_ungated_transfer(transfer_cap, to, true);
+            set_ungated_transfer(transfer_cap, account, true);
         };
-        fungible_store::deposit(fa, to);
+        fungible_store::deposit(fa, account);
         if (!ungated_transfer_allowed) {
-            set_ungated_transfer(transfer_cap, to, false);
+            set_ungated_transfer(transfer_cap, account, false);
         };
     }
 
-    /// Transfer `amount` of fungible assets of `asset` to `receiver`.
+    /// Transfer `amount` of fungible asset of `asset` to `receiver`.
     /// Note: it does not move the underlying object.
     public fun transfer<T: key>(
-        fungible_asset_owner: &signer,
+        account: &signer,
         asset: &Object<T>,
         amount: u64,
         receiver: address
     ) {
         let asset = fungible_source::verify(asset);
-        let fa = withdraw(fungible_asset_owner, &asset, amount);
+        let fa = withdraw(account, &asset, amount);
         fungible_store::deposit(fa, receiver);
     }
 
+    /// Transfer `ammount` of  fungible asset with `TransferCap` even ungated transfer is disabled.
     public fun transfer_with_cap(
         transfer_cap: &TransferCap,
         amount: u64,
@@ -115,32 +118,32 @@ module aptos_framework::fungible_caps {
         deposit_with_cap(transfer_cap, fa, to);
     }
 
-    /// Self-explanatory.
+    /// Explicitly destory `MintCap`.
     public fun destroy_mint_cap(cap: MintCap) {
         let MintCap { asset: _ } = cap;
     }
 
-    /// Self-explanatory.
+    /// Explicitly destory `TransferCap`.
     public fun destroy_transfer_cap(cap: TransferCap) {
         let TransferCap { asset: _ } = cap;
     }
 
-    /// Self-explanatory.
+    /// Explicitly destory `BurnCap`.
     public fun destroy_burn_cap(cap: BurnCap) {
         let BurnCap { asset: _ } = cap;
     }
 
-    /// Self-explanatory.
+    /// Get the underlying asset object from `MintCap`.
     public fun asset_of_mint_cap(cap: &MintCap): Object<FungibleSource> {
         cap.asset
     }
 
-    /// Self-explanatory.
+    /// Get the underlying asset object from `TransferCap`.
     public fun asset_of_transfer_cap(cap: &TransferCap): Object<FungibleSource> {
         cap.asset
     }
 
-    /// Self-explanatory.
+    /// Get the underlying asset object from `BurnCap`.
     public fun asset_of_burn_cap(cap: &BurnCap): Object<FungibleSource> {
         cap.asset
     }

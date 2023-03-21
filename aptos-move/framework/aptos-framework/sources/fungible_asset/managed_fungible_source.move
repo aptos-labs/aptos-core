@@ -1,7 +1,7 @@
 /// This module provides an addtional abstraction on top of `FungibleSource` that manages the capabilities of mint, burn
 /// and transfer for the creator in a simple way. It offers creators to destory any capabilities in an on-demand way too.
 /// For more advanced goverance, please build your own module to manage capabilitys extending `FungibleSource`.
-module aptos_framework::managed_fungible_asset {
+module aptos_framework::managed_fungible_source {
     use std::error;
     use std::option::{Self, Option};
     use std::signer;
@@ -54,7 +54,7 @@ module aptos_framework::managed_fungible_asset {
         )
     }
 
-    /// Mint fungible tokens as the owner of the base asset.
+    /// Mint fungible assets as the owner of the base asset.
     public fun mint<T: key>(
         asset_owner: &signer,
         asset: &Object<T>,
@@ -66,7 +66,8 @@ module aptos_framework::managed_fungible_asset {
         fungible_caps::mint(mint_cap, amount, to);
     }
 
-    /// Mint fungible tokens as the owner of the base asset.
+    /// Transfer fungible assets as the owner of the base asset ignoring the `allow_ungated_transfer` field in
+    /// `AccountFungibleAsset`.
     public fun transfer<T: key>(
         asset_owner: &signer,
         asset: &Object<T>,
@@ -79,7 +80,7 @@ module aptos_framework::managed_fungible_asset {
         fungible_caps::transfer_with_cap(transfer_cap, amount, from, to);
     }
 
-    /// Burn fungible tokens as the owner of the base asset.
+    /// Burn fungible assets as the owner of the base asset.
     public fun burn<T: key>(
         asset_owner: &signer,
         asset: &Object<T>,
@@ -91,7 +92,7 @@ module aptos_framework::managed_fungible_asset {
         fungible_caps::burn(burn_cap, amount, from);
     }
 
-    /// Transfer as an owner of fungible asset.
+    /// Set the `allow_ungated_transfer` field in `AccountFungibleAsset` of `asset` belonging to `account`.
     public fun set_ungated_transfer<T: key>(
         asset_owner: &signer,
         asset: &Object<T>,
@@ -103,22 +104,22 @@ module aptos_framework::managed_fungible_asset {
         fungible_caps::set_ungated_transfer(transfer_cap, account, allow);
     }
 
-    /// Self-explanatory.
+    /// Return if the owner has access to `MintCap` of `asset`.
     public fun owner_can_mint<T: key>(asset: &Object<T>): bool acquires ManagingCapabilities {
         option::is_some(&borrow_caps(asset).mint)
     }
 
-    /// Self-explanatory.
+    /// Return if the owner has access to `TransferCap` of `asset`.
     public fun owner_can_transfer<T: key>(asset: &Object<T>): bool acquires ManagingCapabilities {
         option::is_some(&borrow_caps(asset).transfer)
     }
 
-    /// Self-explanatory.
+    /// Return if the owner has access to `BurnCap` of `asset`.
     public fun owner_can_burn<T: key>(asset: &Object<T>): bool acquires ManagingCapabilities {
         option::is_some(&borrow_caps(asset).burn)
     }
 
-    /// Explicitly waive the mint capability.
+    /// Let asset owner to explicitly waive the mint capability.
     public fun waive_mint<T: key>(
         asset_owner: &signer,
         asset: &Object<T>
@@ -128,7 +129,7 @@ module aptos_framework::managed_fungible_asset {
         fungible_caps::destroy_mint_cap(option::extract(mint_cap));
     }
 
-    /// Explicitly wavie the transfer capability.
+    /// Let asset owner to explicitly waive the transfer capability.
     public fun waive_transfer<T: key>(
         asset_owner: &signer,
         asset: &Object<T>
@@ -138,7 +139,7 @@ module aptos_framework::managed_fungible_asset {
         fungible_caps::destroy_transfer_cap(option::extract(transfer_cap));
     }
 
-    /// Explicitly destory the burn capability.
+    /// Let asset owner to explicitly waive the burn capability.
     public fun waive_burn<T: key>(
         asset_owner: &signer,
         asset: &Object<T>
@@ -148,7 +149,7 @@ module aptos_framework::managed_fungible_asset {
         fungible_caps::destroy_burn_cap(option::extract(burn_cap));
     }
 
-    /// Borrow the immutable reference of mint capability from `asset`.
+    /// Borrow the immutable reference of the `MintCap` of `asset`.
     inline fun borrow_mint_from_caps<T: key>(
         asset: &Object<T>,
     ): &MintCap acquires ManagingCapabilities {
@@ -157,7 +158,7 @@ module aptos_framework::managed_fungible_asset {
         option::borrow(mint_cap)
     }
 
-    /// Borrow the immutable reference of transfer capability from `asset`.
+    /// Borrow the immutable reference of the `TransferCap` of `asset`.
     inline fun borrow_transfer_from_caps<T: key>(
         asset: &Object<T>,
     ): &TransferCap acquires ManagingCapabilities {
@@ -166,7 +167,7 @@ module aptos_framework::managed_fungible_asset {
         option::borrow(transfer_cap)
     }
 
-    /// Borrow the immutable reference of burn capability from `asset`.
+    /// Borrow the immutable reference of the `BurnCap` of `asset`.
     inline fun borrow_burn_from_caps<T: key>(
         asset: &Object<T>,
     ): &BurnCap acquires ManagingCapabilities {
@@ -175,14 +176,14 @@ module aptos_framework::managed_fungible_asset {
         option::borrow(burn_cap)
     }
 
-    /// Borrow the immutable reference of capabilities from `asset`.
+    /// Borrow the immutable reference of the capabilities of `asset`.
     inline fun borrow_caps<T: key>(
         asset: &Object<T>,
     ): &ManagingCapabilities acquires ManagingCapabilities {
         borrow_global_mut<ManagingCapabilities>(verify(asset))
     }
 
-    /// Borrow the mutable reference of capabilities from `asset`.
+    /// Borrow the mutable reference of the capabilities of `asset`.
     inline fun borrow_caps_mut<T: key>(
         owner: &signer,
         asset: &Object<T>,
@@ -191,14 +192,14 @@ module aptos_framework::managed_fungible_asset {
         borrow_global_mut<ManagingCapabilities>(verify(asset))
     }
 
-    /// Verify `asset` indeed has `GoveranceCapabilities` resource associated.
+    /// Verify `asset` indeed has `ManagingCapabilities` resource associated.
     inline fun verify<T: key>(asset: &Object<T>): address {
         let asset_addr = object::object_address(asset);
         object::address_to_object<ManagingCapabilities>(asset_addr);
         asset_addr
     }
 
-    /// Assert the owner of `asset` is `owner`.
+    /// Assert the owner of `asset`.
     inline fun assert_owner<T: key>(owner: &signer, asset: &Object<T>) {
         assert!(object::is_owner(*asset, signer::address_of(owner)), error::permission_denied(ENOT_OWNER));
     }
@@ -218,7 +219,7 @@ module aptos_framework::managed_fungible_asset {
             string::utf8(b"USDA"),
             string::utf8(b"$$$"),
             0
-        )
+        );
     }
 
     #[test(creator = @0xcafe)]
@@ -264,6 +265,8 @@ module aptos_framework::managed_fungible_asset {
         init_test_managing_capabilities(&creator_ref);
         let creator_address = signer::address_of(creator);
         assert!(owner_can_mint(&asset), 1);
+        assert!(owner_can_transfer(&asset), 2);
+        assert!(owner_can_burn(&asset), 3);
         mint(aaron, &asset, 100, creator_address);
     }
 }

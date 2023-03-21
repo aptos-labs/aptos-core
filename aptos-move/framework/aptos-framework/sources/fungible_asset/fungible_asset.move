@@ -43,12 +43,12 @@ module aptos_framework::fungible_asset {
         amount: u64,
     }
 
-    /// Self-explainatory.
+    /// Return the underlying fungible source.
     public fun fungible_asset_source(fa: &FungibleAsset): Object<FungibleSource> {
         fa.asset
     }
 
-    /// Self-explainatory.
+    /// Return the amount.
     public fun fungible_asset_amount(fa: &FungibleAsset): u64 {
         fa.amount
     }
@@ -84,7 +84,7 @@ module aptos_framework::fungible_asset {
         }
     }
 
-    /// Burn fungible asset.
+    /// Desotry `AccountFungibleAsset` object.
     public(friend) fun destory_account_fungible_asset(afa: Object<AccountFungibleAsset>) acquires AccountFungibleAsset {
         let AccountFungibleAsset {
             asset: _,
@@ -146,12 +146,12 @@ module aptos_framework::fungible_asset {
         borrow_fungible_asset(afa).asset
     }
 
-    /// Whether `ungated_transfer` is alllowed.
+    /// Return if `ungated_transfer` is allowed.
     public fun ungated_transfer_allowed(afa: &Object<AccountFungibleAsset>): bool acquires AccountFungibleAsset {
         borrow_fungible_asset(afa).allow_ungated_transfer
     }
 
-    /// Set `ungated_transfer` to the passed in `allow`.
+    /// Set `allow_ungated_transfer`.
     public(friend) fun set_ungated_transfer(
         afa: &Object<AccountFungibleAsset>,
         allow: bool
