@@ -9,7 +9,7 @@ use crate::{
         transaction::backup::{TransactionBackupController, TransactionBackupOpt},
     },
     metadata,
-    metadata::cache::MetadataCacheOpt,
+    metadata::{cache::MetadataCacheOpt, Metadata},
     metrics::backup::{
         EPOCH_ENDING_EPOCH, HEARTBEAT_TS, STATE_SNAPSHOT_EPOCH, TRANSACTION_VERSION,
     },
@@ -19,13 +19,13 @@ use crate::{
         GlobalBackupOpt,
     },
 };
-use anyhow::{anyhow, ensure, Result};
+use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_db::backup::backup_handler::DbState;
 use aptos_logger::prelude::*;
 use aptos_types::transaction::Version;
 use clap::Parser;
 use futures::{stream, Future, StreamExt};
-use std::{fmt::Debug, sync::Arc};
+use std::{collections::HashSet, ffi::OsStr, fmt::Debug, path::Path, sync::Arc};
 use tokio::{
     sync::watch,
     time::{interval, Duration},
@@ -325,6 +325,92 @@ impl BackupCoordinator {
                 }
             },
         )
+    }
+}
+
+pub struct BackupCompactor {
+    storage: Arc<dyn BackupStorage>,
+    metadata_cache_opt: MetadataCacheOpt,
+    epoch_ending_file_compact_factor: usize,
+    state_snapshot_file_compact_factor: usize,
+    transaction_file_compact_factor: usize,
+    concurrent_downloads: usize,
+}
+
+impl BackupCompactor {
+    pub fn new(
+        epoch_ending_file_compact_factor: usize,
+        state_snapshot_file_compact_factor: usize,
+        transaction_file_compact_factor: usize,
+        metadata_cache_opt: MetadataCacheOpt,
+        storage: Arc<dyn BackupStorage>,
+        concurrent_downloads: usize,
+    ) -> Self {
+        BackupCompactor {
+            storage,
+            metadata_cache_opt,
+            epoch_ending_file_compact_factor,
+            state_snapshot_file_compact_factor,
+            transaction_file_compact_factor,
+            concurrent_downloads,
+        }
+    }
+
+    pub async fn run(&self) -> Result<()> {
+        info!("Backup compaction started");
+        // sync the metadata from backup storage
+        let mut metaview = metadata::cache::sync_and_load(
+            &self.metadata_cache_opt,
+            Arc::clone(&self.storage),
+            self.concurrent_downloads,
+        )
+        .await?;
+
+        // Get a snapshot of remote metadata files before compaction
+        let files = self.storage.list_metadata_files().await?;
+
+        info!("Start compacting backup metadata files.");
+        // Get all compacted chunks to be written back to storage
+        let mut new_files: HashSet<String> = HashSet::new(); // record overwrite file names
+        for range in metaview.compact_epoch_ending_backups(self.epoch_ending_file_compact_factor)? {
+            let (epoch_range, file_name) =
+                Metadata::compact_epoch_ending_backup_range(range.to_vec())?;
+            self.storage
+                .save_metadata_lines(&file_name, epoch_range.as_slice())
+                .await?;
+            new_files.insert(file_name.to_string());
+        }
+        for range in metaview.compact_transaction_backups(self.transaction_file_compact_factor)? {
+            let (txn_range, file_name) =
+                Metadata::compact_transaction_backup_range(range.to_vec())?;
+            self.storage
+                .save_metadata_lines(&file_name, txn_range.as_slice())
+                .await?;
+            new_files.insert(file_name.to_string());
+        }
+        for range in metaview.compact_state_backups(self.state_snapshot_file_compact_factor)? {
+            let (state_range, file_name) =
+                Metadata::compact_statesnapshot_backup_range(range.to_vec())?;
+            self.storage
+                .save_metadata_lines(&file_name, state_range.as_slice())
+                .await?;
+            new_files.insert(file_name.to_string());
+        }
+
+        // Move the compacted metadata files to the metadata backup folder
+        for file in files {
+            // directly return if any of the backup task fails
+            info!(file = file, "Backup metadata file.");
+            let name = Path::new(&file)
+                .file_name()
+                .and_then(OsStr::to_str)
+                .ok_or_else(|| format_err!("cannot extract filename from {}", file))?;
+            if !new_files.contains(name) {
+                self.storage.backup_metadata_file(&file).await?
+            }
+        }
+
+        Ok(())
     }
 }
 

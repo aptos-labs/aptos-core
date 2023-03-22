@@ -16,5 +16,5 @@ Start here to get into the core concepts of the Aptos blockchain. Then review ou
 - ### [Gas and Transaction Fees](./gas-txn-fee.md)
 - ### [Blocks](./blocks.md)
 - ### [Aptos Blockchain Deep Dive](../guides/basics-life-of-txn.md)
-- ### [Staking](./staking)
-- ### [Governance](./governance)
+- ### [Staking](./staking.md)
+- ### [Governance](./governance.md)

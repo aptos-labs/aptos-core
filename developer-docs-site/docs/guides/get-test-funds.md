@@ -7,7 +7,12 @@ slug: "get-test-funds"
 
 For testing purposes, you will want to create an Aptos account and fund it with testnet tokens. Much of this can be accomplished in the [wallet](https://github.com/aptos-foundation/ecosystem-projects#wallets) of your choice. We use the [Petra Wallet](https://petra.app/docs/use) here in combination with the [Aptos CLI](../cli-tools/aptos-cli-tool/index.md) to show you how they work together.
 
-This document accompanies the command line instructions for the Aptos CLI on [creating](../cli-tools/aptos-cli-tool/use-aptos-cli.md#initialize-local-configuration-and-create-an-account) and [funding](../cli-tools/aptos-cli-tool/use-aptos-cli.md#fund-an-account-with-the-faucet) accounts with the [Aptos Faucet](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos-faucet), focusing upon the testnet network and leveraging a graphical wallet rather than the CLI.
+This document focuses on the **testnet** network and accompanies the command line instructions for the Aptos CLI on [creating](../cli-tools/aptos-cli-tool/use-aptos-cli.md#initialize-local-configuration-and-create-an-account) and [funding](../cli-tools/aptos-cli-tool/use-aptos-cli.md#fund-an-account-with-the-faucet) accounts with the [Aptos Faucet](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos-faucet) by leveraging a graphical wallet rather than the CLI.
+
+Other [Aptos networks](./system-integrators-guide.md#choose-a-network) and methods of interaction:
+  * **Devnet** - To see how to interact with the Aptos Faucet in software, conduct [your first transaction](../tutorials/first-transaction.md) in devnet. 
+  * **Local testnet** - Start a local testnet with a faucet to [develop locally](../nodes/local-testnet/index.md) with your preferred method. 
+  * **Mainnet** - There is no faucet available in mainnet to fund your account, so the method for obtaining the Aptos APT tokens is beyond the scope of this site and entirely up to you. Apart from the difference in the funding process, the rest of your workflow remains the same as in devnet and testnet.
 
 ## Prerequisites
 

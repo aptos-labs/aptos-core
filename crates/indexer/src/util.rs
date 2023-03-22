@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-// use crate::models::property_map::PropertyMap;
 use crate::models::property_map::PropertyMap;
 use aptos_api_types::Address;
 use bigdecimal::{BigDecimal, Signed, ToPrimitive, Zero};

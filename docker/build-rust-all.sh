@@ -14,7 +14,7 @@ echo "FEATURES: $FEATURES"
 cargo build --locked --profile=$PROFILE \
     -p aptos \
     -p aptos-backup-cli \
-    -p aptos-faucet \
+    -p aptos-faucet-service \
     -p aptos-forge-cli \
     -p aptos-fn-check-client \
     -p aptos-node-checker \
@@ -26,6 +26,7 @@ cargo build --locked --profile=$PROFILE \
     -p aptos-indexer-grpc-cache-worker \
     -p aptos-indexer-grpc-file-store \
     -p aptos-indexer-grpc-data-service \
+    -p aptos-indexer-grpc-parser \
     "$@"
 
 # Build aptos-node separately
@@ -42,7 +43,7 @@ fi
 # After building, copy the binaries we need to `dist` since the `target` directory is used as docker cache mount and only available during the RUN step
 BINS=(
     aptos
-    aptos-faucet
+    aptos-faucet-service
     aptos-node
     aptos-node-checker
     aptos-openapi-spec-generator
@@ -50,6 +51,7 @@ BINS=(
     aptos-indexer-grpc-cache-worker
     aptos-indexer-grpc-file-store
     aptos-indexer-grpc-data-service
+    aptos-indexer-grpc-parser
     aptos-fn-check-client
     aptos-db-tool
     aptos-db-bootstrapper

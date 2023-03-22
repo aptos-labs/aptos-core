@@ -179,7 +179,6 @@ fn setup_aptos_data_client(
     let (aptos_data_client, data_summary_poller) = AptosNetDataClient::new(
         node_config.state_sync.aptos_data_client,
         node_config.base.clone(),
-        node_config.state_sync.storage_service,
         TimeService::real(),
         storage_service_client,
         Some(aptos_data_client_runtime.handle().clone()),

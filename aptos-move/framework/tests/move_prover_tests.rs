@@ -21,7 +21,7 @@ pub fn run_prover_for_pkg(path_to_pkg: impl Into<String>) {
     let pkg_path = path_in_crate(path_to_pkg);
     let options = ProverOptions::default_for_test();
     options
-        .prove(pkg_path.as_path(), BTreeMap::default())
+        .prove(pkg_path.as_path(), BTreeMap::default(), None)
         .unwrap()
 }
 

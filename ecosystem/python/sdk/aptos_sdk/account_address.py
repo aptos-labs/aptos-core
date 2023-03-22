@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import hashlib
+from typing import List
 
 from . import ed25519
 from .bcs import Deserializer, Serializer
@@ -48,6 +49,13 @@ class AccountAddress:
         hasher = hashlib.sha3_256()
         hasher.update(key.key.encode() + b"\x00")
         return AccountAddress(hasher.digest())
+
+    @staticmethod
+    def from_multisig_schema(
+        keys: List[ed25519.PublicKey], threshold: int
+    ) -> AccountAddress:
+        multisig_public_key = ed25519.MultiEd25519PublicKey(keys, threshold)
+        return AccountAddress(multisig_public_key.auth_key())
 
     @staticmethod
     def deserialize(deserializer: Deserializer) -> AccountAddress:
