@@ -4,7 +4,6 @@
 
 use crate::{
     data_cache::TransactionDataCache,
-    loader::{Function, Module},
     native_extensions::NativeContextExtensions,
     runtime::VMRuntime,
 };
@@ -27,6 +26,7 @@ use move_vm_types::{
     loaded_data::runtime_types::{CachedStructIndex, StructType, Type},
 };
 use std::{borrow::Borrow, sync::Arc};
+use crate::loader::LoadedFunction;
 
 pub struct Session<'r, 'l, S> {
     pub(crate) runtime: &'l VMRuntime,
@@ -116,14 +116,12 @@ impl<'r, 'l, S: MoveResolver> Session<'r, 'l, S> {
 
     pub fn execute_instantiated_function(
         &mut self,
-        module: Arc<Module>,
-        func: Arc<Function>,
+        func: LoadedFunction,
         instantiation: LoadedFunctionInstantiation,
         args: Vec<impl Borrow<[u8]>>,
         gas_meter: &mut impl GasMeter,
     ) -> VMResult<SerializedReturnValues> {
         self.runtime.execute_function_instantiation(
-            module,
             func,
             instantiation,
             args,
@@ -300,8 +298,8 @@ impl<'r, 'l, S: MoveResolver> Session<'r, 'l, S> {
         module_id: &ModuleId,
         function_name: &IdentStr,
         expected_return_type: &Type,
-    ) -> VMResult<(Arc<Module>, Arc<Function>, LoadedFunctionInstantiation)> {
-        let (module, func, instantiation) = self
+    ) -> VMResult<(LoadedFunction, LoadedFunctionInstantiation)> {
+        let (func, instantiation) = self
             .runtime
             .loader()
             .load_function_with_type_arg_inference(
@@ -310,7 +308,7 @@ impl<'r, 'l, S: MoveResolver> Session<'r, 'l, S> {
                 expected_return_type,
                 &self.data_cache,
             )?;
-        Ok((module, func, instantiation))
+        Ok((func, instantiation))
     }
 
     /// Load a module, a function, and all of its types into cache

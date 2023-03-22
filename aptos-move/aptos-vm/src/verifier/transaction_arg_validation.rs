@@ -127,7 +127,11 @@ pub(crate) fn validate_combine_signer_and_txn_args<S: MoveResolverExt>(
     // validate all non_signer params
     let mut needs_construction = vec![];
     for (idx, ty) in func.parameters[signer_param_cnt..].iter().enumerate() {
-        let (valid, construction) = is_valid_txn_arg(session, &ty.subst(&func.type_arguments).unwrap(), allowed_structs);
+        let (valid, construction) = is_valid_txn_arg(
+            session,
+            &ty.subst(&func.type_arguments).unwrap(),
+            allowed_structs,
+        );
         if !valid {
             return Err(VMStatus::Error(
                 StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
@@ -309,7 +313,7 @@ fn validate_and_construct<S: MoveResolverExt>(
     cursor: &mut Cursor<&[u8]>,
     gas_meter: &mut impl GasMeter,
 ) -> Result<Vec<u8>, VMStatus> {
-    let (module, function, instantiation) = session.load_function_with_type_arg_inference(
+    let (function, instantiation) = session.load_function_with_type_arg_inference(
         &constructor.module_id,
         constructor.func_name,
         expected_type,
@@ -328,7 +332,7 @@ fn validate_and_construct<S: MoveResolverExt>(
         args.push(arg);
     }
     let serialized_result = session
-        .execute_instantiated_function(module, function, instantiation, args, gas_meter)
+        .execute_instantiated_function(function, instantiation, args, gas_meter)
         .map_err(|_| VMStatus::Error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT, None))?;
     let mut ret_vals = serialized_result.return_values;
     // We know ret_vals.len() == 1
@@ -348,6 +352,7 @@ fn get_len(cursor: &mut Cursor<&[u8]>) -> Result<usize, VMStatus> {
 }
 
 fn serialize_uleb128(mut x: usize, dest: &mut Vec<u8>) {
+    // TODO perhaps reuse the code from move_binary_format::file_format_common if it's public
     while x > 128 {
         dest.push((x | 128) as u8);
         x >>= 7;

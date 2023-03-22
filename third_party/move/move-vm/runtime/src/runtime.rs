@@ -6,7 +6,7 @@ use crate::{
     config::VMConfig,
     data_cache::TransactionDataCache,
     interpreter::Interpreter,
-    loader::{Function, Loader, Module},
+    loader::{Function, Loader},
     native_extensions::NativeContextExtensions,
     native_functions::{NativeFunction, NativeFunctions},
     session::{LoadedFunctionInstantiation, SerializedReturnValues, Session},
@@ -35,6 +35,7 @@ use move_vm_types::{
 };
 use std::{borrow::Borrow, collections::BTreeSet, sync::Arc};
 use tracing::warn;
+use crate::loader::LoadedFunction;
 
 /// An instantiation of the MoveVM.
 pub(crate) struct VMRuntime {
@@ -317,7 +318,7 @@ impl VMRuntime {
     }
 
     #[allow(clippy::needless_collect)]
-    pub(crate) fn execute_function_impl(
+    fn execute_function_impl(
         &self,
         func: Arc<Function>,
         ty_args: Vec<Type>,
@@ -395,13 +396,12 @@ impl VMRuntime {
         bypass_declared_entry_check: bool,
     ) -> VMResult<SerializedReturnValues> {
         // load the function
-        let (module, func, instantiation) =
+        let (module, function, instantiation) =
             self.loader
                 .load_function(module, function_name, &ty_args, data_store)?;
 
         self.execute_function_instantiation(
-            module,
-            func,
+            LoadedFunction { module, function } ,
             instantiation,
             serialized_args,
             data_store,
@@ -413,8 +413,7 @@ impl VMRuntime {
 
     pub(crate) fn execute_function_instantiation(
         &self,
-        module: Arc<Module>,
-        function: Arc<Function>,
+        func: LoadedFunction,
         function_instantiation: LoadedFunctionInstantiation,
         serialized_args: Vec<impl Borrow<[u8]>>,
         data_store: &mut impl DataStore,
@@ -449,6 +448,9 @@ impl VMRuntime {
         } else {
             check_is_entry
         };
+
+        let LoadedFunction { module, function } = func;
+
         script_signature::verify_module_function_signature_by_name(
             module.module(),
             IdentStr::new(function.as_ref().name()).expect(""),

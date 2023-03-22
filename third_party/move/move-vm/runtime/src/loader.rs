@@ -41,6 +41,7 @@ use std::{
     hash::Hash,
     sync::Arc,
 };
+use std::collections::btree_map;
 use tracing::error;
 
 type ScriptHash = [u8; 32];
@@ -756,14 +757,14 @@ impl Loader {
         match (returned, expected) {
             // The important case, deduce the type params
             (Type::TyParam(idx), _) => {
-                if let Option::Some(bounded_type) = map.get(idx) {
-                    // The type argument was already bound, so to be consistent they have to equal
-                    *bounded_type == expected
-                } else {
-                    // In order for the returned type to match the expected type this type parameter
-                    // must be expected
-                    map.insert(*idx, expected);
-                    true
+                match map.entry(*idx) {
+                    btree_map::Entry::Vacant(vacant_entry) => {
+                        vacant_entry.insert(expected);
+                        true
+                    },
+                    btree_map::Entry::Occupied(occupied_entry) => {
+                        *occupied_entry.get() == expected
+                    },
                 }
             },
             // Recursive types we need to recurse the matching types
@@ -799,7 +800,7 @@ impl Loader {
         function_name: &IdentStr,
         expected_return_type: &Type,
         data_store: &impl DataStore,
-    ) -> VMResult<(Arc<Module>, Arc<Function>, LoadedFunctionInstantiation)> {
+    ) -> VMResult<(LoadedFunction, LoadedFunctionInstantiation)> {
         let (module, func, parameters, return_vec) =
             self.load_function_without_type_args(module_id, function_name, data_store)?;
 
@@ -843,7 +844,7 @@ impl Loader {
             parameters,
             return_: return_vec,
         };
-        Ok((module, func, loaded))
+        Ok((LoadedFunction {module, function: func}, loaded))
     }
 
     // Entry point for function execution (`MoveVM::execute_function`).
@@ -1805,7 +1806,7 @@ impl<'a> Resolver<'a> {
 // When code executes indexes in instructions are resolved against those runtime structure
 // so that any data needed for execution is immediately available
 #[derive(Debug)]
-pub struct Module {
+pub(crate) struct Module {
     #[allow(dead_code)]
     id: ModuleId,
     // primitive pools
@@ -2307,7 +2308,7 @@ enum Scope {
 // A runtime function
 // #[derive(Debug)]
 // https://github.com/rust-lang/rust/issues/70263
-pub struct Function {
+pub(crate) struct Function {
     #[allow(unused)]
     file_format_version: u32,
     index: FunctionDefinitionIndex,
@@ -2324,6 +2325,11 @@ pub struct Function {
     return_types: Vec<Type>,
     local_types: Vec<Type>,
     parameter_types: Vec<Type>,
+}
+
+pub struct LoadedFunction {
+    pub(crate) module: Arc<Module>,
+    pub(crate) function: Arc<Function>,
 }
 
 impl Function {
