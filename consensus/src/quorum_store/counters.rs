@@ -54,11 +54,22 @@ pub static MAIN_LOOP: Lazy<DurationHistogram> = Lazy::new(|| {
 });
 
 /// Duration of each run of the event loop.
-pub static WRAPPER_MAIN_LOOP: Lazy<DurationHistogram> = Lazy::new(|| {
+pub static PROOF_MANAGER_MAIN_LOOP: Lazy<DurationHistogram> = Lazy::new(|| {
     DurationHistogram::new(
         register_histogram!(
-            "quorum_store_wrapper_main_loop",
-            "Duration of the each run of the event loop"
+            "quorum_store_proof_manager_main_loop",
+            "Duration of the each run of the proof manager event loop"
+        )
+        .unwrap(),
+    )
+});
+
+/// Duration of each run of the event loop.
+pub static BATCH_GENERATOR_MAIN_LOOP: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "quorum_store_batch_generator_main_loop",
+            "Duration of the each run of the batch generator event loop"
         )
         .unwrap(),
     )

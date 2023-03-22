@@ -195,7 +195,7 @@ impl BatchGenerator {
             / 2;
 
         loop {
-            let _timer = counters::WRAPPER_MAIN_LOOP.start_timer();
+            let _timer = counters::BATCH_GENERATOR_MAIN_LOOP.start_timer();
 
             tokio::select! {
                 biased;

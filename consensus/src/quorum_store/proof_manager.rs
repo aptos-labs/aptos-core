@@ -74,7 +74,6 @@ impl ProofManager {
 
     pub(crate) fn handle_proposal_request(&mut self, msg: GetPayloadCommand) {
         match msg {
-            // TODO: check what max_txns consensus is using
             GetPayloadCommand::GetPayloadRequest(
                 max_txns,
                 max_bytes,
@@ -82,7 +81,6 @@ impl ProofManager {
                 filter,
                 callback,
             ) => {
-                // TODO: Pass along to batch_store
                 let excluded_batches: HashSet<_> = match filter {
                     PayloadFilter::Empty => HashSet::new(),
                     PayloadFilter::DirectMempool(_) => {
@@ -138,8 +136,7 @@ impl ProofManager {
         };
 
         loop {
-            // TODO: additional main loop counter
-            let _timer = counters::WRAPPER_MAIN_LOOP.start_timer();
+            let _timer = counters::PROOF_MANAGER_MAIN_LOOP.start_timer();
 
             tokio::select! {
                     Some(msg) = proposal_rx.next() => monitor!("proof_manager_handle_proposal", {
