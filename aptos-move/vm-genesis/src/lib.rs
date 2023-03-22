@@ -418,6 +418,7 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::BLAKE2B_256_NATIVE,
         FeatureFlag::RESOURCE_GROUPS,
         FeatureFlag::MULTISIG_ACCOUNTS,
+        FeatureFlag::DELEGATION_POOLS,
     ]
 }
 
