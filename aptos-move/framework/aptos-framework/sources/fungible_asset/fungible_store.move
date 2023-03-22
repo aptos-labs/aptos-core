@@ -244,7 +244,7 @@ module aptos_framework::fungible_store {
         fungible_asset::burn(fa);
         assert!(balance(creator_address, &asset) == 0, 3);
         assert!(option::is_none(&get_account_fungible_asset_object(creator_address, &asset, false)), 4);
-        set_ungated_transfer(creator_address, &asset, true);
+        set_ungated_transfer(creator_address, &asset, false);
         assert!(option::is_some(&get_account_fungible_asset_object(creator_address, &asset, false)), 5);
     }
 }
