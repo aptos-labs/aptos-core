@@ -141,7 +141,7 @@ impl K8sSwarm {
     ) -> Result<String> {
         let mut network_chaos_specs = vec![];
 
-        for group_network_bandwidth in &swarm_network_bandwidth.group_network_bandwidth {
+        for group_network_bandwidth in &swarm_network_bandwidth.group_network_bandwidths {
             let source_instance_labels = group_network_bandwidth
                 .source_nodes
                 .iter()
