@@ -7,38 +7,35 @@ The Aptos Name Service provides a React UI package that provides developers with
 
 ## Prerequisites
 - [React project](https://create-react-app.dev/docs/getting-started/)
-- Install the initial dependencies using npm or yarn in your React project's root directory: `npm install @emotion/styled @emotion/react`
+- `styled` and `react` dependencies from emotion installed in the root directory of your React project: `npm install @emotion/styled @emotion/react`
 
 ## Use Aptos Name Service Connector
+1. Open a terminal session and navigate to the root directory of your React project.
+1. Install the `aptos-names-connector` component using npm or yarn:  
+    ```
+    npm install "@aptos-labs/aptos-names-connector"
+    ```
+1. Once you have installed the package, you can import the `AptosNamesConnector` component and use it in your React application (by default in `./src/App.js`):
+    ```
+    import { AptosNamesConnector } from "@aptos-labs/aptos-names-connector";
 
-To use the `aptos-names-connector` component, install it using npm or yarn in your React project's root directory:
-```
-npm install "@aptos-labs/aptos-names-connector"
-```
+    function MyComponent() {
+      const handleSignTransaction = async () => {
+        // Handle signing of transaction
+      };
 
+      return (
+        <AptosNamesConnector
+          onSignTransaction={handleSignTransaction}
+          isWalletConnected={true}
+          network="mainnet"
+          buttonLabel="Claim"
+        />
+      );
+    }
+    ```
 
-Once you have installed the package, you can import the `AptosNamesConnector` component and use it in your React application:
-
-```
-import { AptosNamesConnector } from "@aptos-labs/aptos-names-connector";
-
-function MyComponent() {
-  const handleSignTransaction = async () => {
-    // Handle signing of transaction
-  };
-
-  return (
-    <AptosNamesConnector
-      onSignTransaction={handleSignTransaction}
-      isWalletConnected={true}
-      network="mainnet"
-      buttonLabel="Claim"
-    />
-  );
-}
-```
-
-## Use `AptosNamesConnector` properties
+## Configure `AptosNamesConnector` properties
 The `AptosNamesConnector` component accepts the following props:
 
 - `onSignTransaction`: A required callback function that is called when the user clicks the "Mint" button in the modal. This function should handle the signing of the transaction.
