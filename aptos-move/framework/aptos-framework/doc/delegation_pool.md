@@ -2495,26 +2495,21 @@ shares pools, assign commission to operator and eventually prepare delegation po
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>pragma</b> aborts_if_is_partial = <b>true</b>;
-<b>requires</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(11);
-<b>requires</b> <b>exists</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolOwnership">DelegationPoolOwnership</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner));
+<pre><code><b>pragma</b> aborts_if_is_partial = <b>true</b>;
+<b>include</b> <a href="stake.md#0x1_stake_ResourceRequirement">stake::ResourceRequirement</a>;
+<b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_DELEGATION_POOLS">features::DELEGATION_POOLS</a>);
+<b>aborts_if</b> <b>exists</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolOwnership">DelegationPoolOwnership</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner));
 <b>aborts_if</b> operator_commission_percentage &gt; <a href="delegation_pool.md#0x1_delegation_pool_MAX_FEE">MAX_FEE</a>;
 <b>ensures</b> <b>exists</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolOwnership">DelegationPoolOwnership</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner));
-<b>let</b> pool_address = <b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolOwnership">DelegationPoolOwnership</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner)).pool_address;
+<b>let</b> <b>post</b> pool_address = <b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolOwnership">DelegationPoolOwnership</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner)).pool_address;
 <b>ensures</b> <b>exists</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
 <b>ensures</b> <a href="stake.md#0x1_stake_stake_pool_exists">stake::stake_pool_exists</a>(pool_address);
-<b>let</b> pool = <b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
-<b>aborts_if</b> !<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(pool.inactive_shares, pool.observed_lockup_cycle);
-<b>let</b> stake_pool = <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address);
-<b>let</b> active_ =  <a href="coin.md#0x1_coin_value">coin::value</a>(stake_pool.active);
-<b>let</b> inactive_ =  <a href="coin.md#0x1_coin_value">coin::value</a>(stake_pool.inactive);
-<b>let</b> pending_active_ = <a href="coin.md#0x1_coin_value">coin::value</a>(stake_pool.pending_active);
-<b>let</b> pending_inactive_ = <a href="coin.md#0x1_coin_value">coin::value</a>(stake_pool.pending_inactive);
-<b>invariant</b> pool.active_shares.total_coins == active_ + pending_active_;
-<b>let</b> inactive_pool_ = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pool.inactive_shares,pool.observed_lockup_cycle);
-<b>invariant</b> inactive_pool_.total_coins == pending_inactive_;
-<b>invariant</b> pool.total_coins_inactive == inactive_;
+<b>let</b> <b>post</b> pool = <b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
+<b>ensures</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(pool.inactive_shares, pool.observed_lockup_cycle);
+<b>let</b> <b>post</b> stake_pool = <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address);
+<b>ensures</b> pool.active_shares.total_coins == <a href="coin.md#0x1_coin_value">coin::value</a>(stake_pool.active) + <a href="coin.md#0x1_coin_value">coin::value</a>(stake_pool.pending_active);
+<b>ensures</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pool.inactive_shares,pool.observed_lockup_cycle).total_coins == <a href="coin.md#0x1_coin_value">coin::value</a>(stake_pool.pending_inactive);
+<b>ensures</b> pool.total_coins_inactive == <a href="coin.md#0x1_coin_value">coin::value</a>(stake_pool.pending_inactive);
 </code></pre>
 
 

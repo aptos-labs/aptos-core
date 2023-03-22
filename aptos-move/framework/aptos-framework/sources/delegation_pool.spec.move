@@ -57,50 +57,33 @@ spec aptos_framework::delegation_pool {
         operator_commission_percentage: u64,
         delegation_pool_creation_seed: vector<u8>,
     ) {
-        pragma verify = true;
         pragma aborts_if_is_partial = true;
-        //Request 1: asserts_if
-        //ERROR
-        //Prover Can't Resolve features::
-        requires features::spec_is_enabled(11);
-        //Request 2: asserts_if exists<DelegationPoolOwnership>(owner) precondition
-        //OK WITH QUESTION
-        //Why need <DPO> in per-condition? the DP haven't been create yet
-        requires exists<DelegationPoolOwnership>(signer::address_of(owner));
-        //Request 3: asserts_if operator_commission_percentage > MAX_FEE
-        //OK
+        include stake::ResourceRequirement;
+        //Property 1 [OK]: asserts_if !features::delegation_pools_enabled()
+        //TODO: Prover can't resolve features::delegation_pools_enabled(), use magic number instead , may fixed later.
+        aborts_if !features::spec_is_enabled(features::DELEGATION_POOLS);
+        //Property 2 [OK]: asserts_if exists<DelegationPoolOwnership>(owner) precondition
+        aborts_if exists<DelegationPoolOwnership>(signer::address_of(owner));
+        //Property 3 [OK]: Sasserts_if operator_commission_percentage > MAX_FEE
         aborts_if operator_commission_percentage > MAX_FEE;
-        //Request 4: exists<DelegationPoolOwnership>(owner) postcondition
-        //OK
+        //Property 4 [OK]: exists<DelegationPoolOwnership>(owner) postcondition
         ensures exists<DelegationPoolOwnership>(signer::address_of(owner));
-        //Request 5: let pool_address = global<DelegationPoolOwnership>(owner).pool_address;
-        //OK
-        let pool_address = global<DelegationPoolOwnership>(signer::address_of(owner)).pool_address;
-        //Request 6: exists<DelegationPool>(pool_address)
-        //OK
+        //Property 5 [OK]: let pool_address = global<DelegationPoolOwnership>(owner).pool_address;
+        let post pool_address = global<DelegationPoolOwnership>(signer::address_of(owner)).pool_address;
+        //Property 6 [OK]: exists<DelegationPool>(pool_address)
         ensures exists<DelegationPool>(pool_address);
-        //Request 7: exists<StakePool>(pool_address)
-        //OK
+        //Property 7 [OK]: exists<StakePool>(pool_address)
         ensures stake::stake_pool_exists(pool_address);
-        //Request 8: table::contains(pool.inactive_shares, pool.OLC): shares pool of pending_inactive stake always exists (cannot be deleted unless it becomes inactive)
-        //OK
-        let pool = global<DelegationPool>(pool_address);
-        aborts_if !table::spec_contains(pool.inactive_shares, pool.observed_lockup_cycle);
-        //Request 9: total_coins(pool.active_shares) == active + pending_active on StakePool
-        //OK
-        let stake_pool = global<stake::StakePool>(pool_address);
-        let active_ =  coin::value(stake_pool.active);
-        let inactive_ =  coin::value(stake_pool.inactive);
-        let pending_active_ = coin::value(stake_pool.pending_active);
-        let pending_inactive_ = coin::value(stake_pool.pending_inactive);
-        invariant pool.active_shares.total_coins == active_ + pending_active_;
-        //Request 10: total_coins(pool.inactive_shares[pool.OLC]) == pending_inactive
-        //OK
-        let inactive_pool_ = table::spec_get(pool.inactive_shares,pool.observed_lockup_cycle);
-        invariant inactive_pool_.total_coins == pending_inactive_;
-        //Request 11: total_coins_inactive == inactive on StakePool
-        //OK
-        invariant pool.total_coins_inactive == inactive_;
+        //Property 8 [OK]: table::contains(pool.inactive_shares, pool.OLC): shares pool of pending_inactive stake always exists (cannot be deleted unless it becomes inactive)
+        let post pool = global<DelegationPool>(pool_address);
+        ensures table::spec_contains(pool.inactive_shares, pool.observed_lockup_cycle);
+        //Property 9 [OK]:: total_coins(pool.active_shares) == active + pending_active on StakePool
+        let post stake_pool = global<stake::StakePool>(pool_address);
+        ensures pool.active_shares.total_coins == coin::value(stake_pool.active) + coin::value(stake_pool.pending_active);
+        //Property 10 [OK]: total_coins(pool.inactive_shares[pool.OLC]) == pending_inactive
+        ensures table::spec_get(pool.inactive_shares,pool.observed_lockup_cycle).total_coins == coin::value(stake_pool.pending_inactive);
+        //Property 11 [OK]: total_coins_inactive == inactive on StakePool
+        ensures pool.total_coins_inactive == coin::value(stake_pool.pending_inactive);
     }
 
     spec assert_owner_cap_exists(owner: address) {
