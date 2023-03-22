@@ -4,7 +4,6 @@ const { execSync, exec, spawnSync, spawn, stdin, stdout } = require("child_proce
 const ANS_CORE_FOLDER = "/aptos-names-contracts/core";
 const APTOS_INIT_COMMAND = "aptos init --network local";
 const GET_DEFAULT_PROFILE_COMMAND = "aptos config show-profiles --profile default";
-const PUBLISH_MODULE_COMMAND = "aptos move publish --named-addresses aptos_names=";
 
 /**
  * TS SDK supports ANS. Since ANS contract is not part of aptos-framework
@@ -61,7 +60,7 @@ const profiles = exec(
   {
     cwd: __dirname + ANS_CORE_FOLDER,
   },
-  (error: any, stdout: any, stderr: any) => {
+  (error: any, stderr: any) => {
     if (error) {
       console.error(`Error show-profiles: ${error.message}`);
       return;
@@ -73,10 +72,12 @@ const profiles = exec(
   },
 );
 profiles.stdout.on("data", (data: any) => {
+  //console.log("data", data);
   const defaultProfileAddress = JSON.parse(data).Result.default.account;
+  console.log("default profile address", defaultProfileAddress);
   // publish ans contract to local testnet
   execSync(
-    `echo '\n' | ${PUBLISH_MODULE_COMMAND}${defaultProfileAddress}`,
+    `echo 'yes\n' | aptos move publish --named-addresses aptos_names=0x${defaultProfileAddress},aptos_names_admin=0x${defaultProfileAddress},aptos_names_funds=0x${defaultProfileAddress}`,
     {
       stdio: [0, 1, 2], // we need this so node will print the command output
       cwd: __dirname + ANS_CORE_FOLDER,
@@ -90,10 +91,10 @@ profiles.stdout.on("data", (data: any) => {
         console.error(`publish stderr: ${stderr}`);
         return;
       }
+
+      execSync("rm -rf aptos-names-contracts", {
+        cwd: path.resolve(__dirname, ""),
+      });
     },
   );
-});
-
-execSync("rm -rf aptos-names-contracts", {
-  cwd: path.resolve(__dirname, ""),
 });
