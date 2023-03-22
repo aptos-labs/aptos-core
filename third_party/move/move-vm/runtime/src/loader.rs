@@ -746,7 +746,8 @@ impl Loader {
     }
 
     // Matches the actual returned type to the expected type, binding any type args to the
-    // necessary type as stored in the map. Returns true if a successful match is made.
+    // necessary type as stored in the map. The expected type must be a concrete type (no TyParam).
+    // Returns true if a successful match is made.
     fn match_return_type<'a>(
         returned: &Type,
         expected: &'a Type,

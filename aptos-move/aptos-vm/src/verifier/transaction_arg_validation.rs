@@ -127,7 +127,7 @@ pub(crate) fn validate_combine_signer_and_txn_args<S: MoveResolverExt>(
     // validate all non_signer params
     let mut needs_construction = vec![];
     for (idx, ty) in func.parameters[signer_param_cnt..].iter().enumerate() {
-        let (valid, construction) = is_valid_txn_arg(session, ty, allowed_structs);
+        let (valid, construction) = is_valid_txn_arg(session, &ty.subst(&func.type_arguments).unwrap(), allowed_structs);
         if !valid {
             return Err(VMStatus::Error(
                 StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
