@@ -47,13 +47,18 @@ export class BatchTransaction {
     this.timer.start();
     this.batchSize = batchSize;
     this.transactions = transactions;
-    console.log(`submitting ${transactions.length} transactions`);
+
     if (this.transactions.length > this.batchSize) {
       this.currentBuffer = this.transactions.slice(this.currentIndex, this.currentIndex + this.batchSize);
       return this.sendInBatch();
     } else {
-      const txns = await this.createTransactions(transactions);
-      return this.client.submitBatchTransactions(txns);
+      try {
+        const txns = await this.createTransactions(transactions);
+        const result = await this.client.submitBatchTransactions(txns);
+        return result;
+      } catch (error: any) {
+        console.log("error", error);
+      }
     }
   }
 
@@ -69,19 +74,19 @@ export class BatchTransaction {
     return this.client
       .submitBatchTransactions(txns)
       .then(async (data) => {
-        if ((data as any).transaction_failures.length > 0) {
+        if (data.transaction_failures.length > 0) {
           // TODO - this is for the case all transactions are from the same user,
           // to handle different users we would need to process each index in the transaction_failures array
-          const error = (data as any).transaction_failures[0].error;
-          console.log("transaction_failures", JSON.stringify((data as any).transaction_failures, null, " "));
+          const error = data.transaction_failures[0].error;
+          //console.log("transaction_failures", JSON.stringify(data.transaction_failures, null, " "));
           switch (error.error_code) {
             case "mempool_is_full":
-              console.log("sleeps");
+              console.log("mempool_is_full sleeps");
               await this.sleep(10 * 1000); // 10 seconds
               // re-submit current failed buffer
               this.currentBuffer = this.currentBuffer.slice(
-                (data as any).transaction_failures[0].transaction_index,
-                (data as any).transaction_failures[0].transaction_index + this.batchSize,
+                data.transaction_failures[0].transaction_index,
+                data.transaction_failures[0].transaction_index + this.batchSize,
               );
               // re-fetch the account sequence number
               await this.syncSequenceNumber(this.currentBuffer[0].sender);

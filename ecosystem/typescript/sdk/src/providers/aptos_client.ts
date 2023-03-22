@@ -930,6 +930,23 @@ export class AptosClient {
     return this.client.view.view(payload, ledger_version);
   }
 
+  /**
+   * Submits a batch of signed transactions to the endpoint that takes BCS payload
+   *
+   * @param signedTxns BCS transactions representation
+   * @returns TransactionsBatchSubmissionResult
+   */
+  @parseApiError
+  async submitBatchTransactions(signedTxns: Uint8Array): Promise<Gen.TransactionsBatchSubmissionResult> {
+    // Need to construct a customized post request for transactions in BCS payload
+    return this.client.request.request<Gen.TransactionsBatchSubmissionResult>({
+      url: "/transactions/batch",
+      method: "POST",
+      body: signedTxns,
+      mediaType: "application/x.aptos.signed_transaction+bcs",
+    });
+  }
+
   // eslint-disable-next-line class-methods-use-this
   clearCache(tags: string[]) {
     clear(tags);

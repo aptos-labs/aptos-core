@@ -1,16 +1,7 @@
-/* eslint-disable no-console */
-
-import dotenv from "dotenv";
-dotenv.config();
-import { AptosAccount, TxnBuilderTypes, OptionalTransactionArgs, AptosClient, FaucetClient, BCS } from "aptos";
+import { TxnBuilderTypes, BCS, AptosAccount, AptosClient, FaucetClient } from "../../../dist";
 import { exit } from "process";
 import { BatchTransaction } from "./batch_transactions";
-
-export type Transaction = {
-  sender: AptosAccount;
-  payload: TxnBuilderTypes.TransactionPayload;
-  extraArgs?: OptionalTransactionArgs;
-};
+import { Timer } from "timer-node";
 
 async function main() {
   //const faucetClient = new FaucetClient("http://0.0.0.0:8080/v1", "http://0.0.0.0:8081");
@@ -29,21 +20,24 @@ async function main() {
     ),
   );
 
-  console.log("/////submitting batch transactions for account", account1.address().hex());
-
-  const transactions: Transaction[] = [];
-
-  for (let i = 0; i < 50; i++) {
-    transactions.push({
-      sender: account1,
-      payload: entryFunctionPayload,
-      extraArgs: { maxGasAmount: BigInt(200000), gasUnitPrice: BigInt(100) },
-    });
+  console.log("/////submitting transaction with http1 for", account1.address().hex());
+  const batch = new BatchTransaction(account1, entryFunctionPayload, {
+    maxGasAmount: BigInt(200000),
+    gasUnitPrice: BigInt(100),
+  });
+  const timer = new Timer();
+  timer.start();
+  // for (let i = 0; i < 1; i++) {
+  //   const txn = await batch.generateBscTxn();
+  //   await batch.send(txn!);
+  //   //console.log(result);
+  // }
+  for (let i = 0; i < 100; i++) {
+    await batch.get();
+    //console.log(result);
   }
-
-  const batch = new BatchTransaction();
-  const result = await batch.send(transactions);
-  console.log(result);
+  timer.stop();
+  console.log(timer.time());
   exit(0);
 }
 

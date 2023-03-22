@@ -16,8 +16,10 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "aptos": "latest",
-    "dotenv": "16.0.1"
+    "aptos": "../../",
+    "dotenv": "16.0.1",
+    "fetch-h2": "^3.0.2",
+    "timer-node": "^5.0.7"
   },
   "devDependencies": {
     "@types/node": "18.6.2",
