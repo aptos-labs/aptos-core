@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    dag::anchor_election::{AnchorElection, RoundRobinAnchorElection},
+    dag::anchor_election::AnchorElection,
     payload_manager::PayloadManager,
 };
 use aptos_consensus_types::node::{CertifiedNode, CertifiedNodeRequest, NodeMetaData};
@@ -312,7 +312,7 @@ pub(crate) struct Dag {
     // TODO: protect from DDoS - currently validators can add unbounded number of entries
     missing_nodes: HashMap<HashValue, MissingDagNodeStatus>,
     // Arc to something that returns the anchors
-    proposer_election: Box<dyn AnchorElection>,
+    proposer_election: Arc<dyn AnchorElection>,
     bullshark_tx: Sender<CertifiedNode>,
     verifier: ValidatorVerifier,
     payload_manager: Arc<PayloadManager>,
@@ -324,6 +324,7 @@ impl Dag {
         epoch: u64,
         bullshark_tx: Sender<CertifiedNode>,
         verifier: ValidatorVerifier,
+        proposer_election: Arc<dyn AnchorElection>,
         payload_manager: Arc<PayloadManager>,
     ) -> Self {
         let mut dag = Vec::new();
@@ -335,7 +336,7 @@ impl Dag {
             front: WeakLinksCreator::new(&verifier),
             dag,
             missing_nodes: HashMap::new(),
-            proposer_election: Box::new(RoundRobinAnchorElection::new(&verifier)),
+            proposer_election,
             bullshark_tx,
             verifier,
             payload_manager,
@@ -544,7 +545,7 @@ impl Dag {
         }
 
         let wave = self.current_round / 2;
-        let anchor = self.proposer_election.get_next_anchor(wave);
+        let anchor = self.proposer_election.get_round_anchor(wave);
         let maybe_anchor_node_meta_data =
             self.get_node_metadata_from_dag(self.current_round, anchor);
 

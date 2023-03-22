@@ -6,7 +6,7 @@ use aptos_types::{validator_verifier::ValidatorVerifier, PeerId};
 use std::collections::HashMap;
 
 pub trait AnchorElection: Send + Sync {
-    fn get_next_anchor(&self, round: Round) -> PeerId;
+    fn get_round_anchor(&self, round: Round) -> PeerId;
 }
 
 pub struct RoundRobinAnchorElection {
@@ -30,7 +30,7 @@ impl RoundRobinAnchorElection {
 }
 
 impl AnchorElection for RoundRobinAnchorElection {
-    fn get_next_anchor(&self, round: Round) -> PeerId {
+    fn get_round_anchor(&self, round: Round) -> PeerId {
         self.index_to_peer_id
             .get(&(round as usize % self.num_of_validators))
             .unwrap()

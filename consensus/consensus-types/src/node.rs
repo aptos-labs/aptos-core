@@ -205,6 +205,14 @@ impl Node {
         }
     }
 
+    pub fn strong_links(&self) -> HashSet<PeerId> {
+        self.parents
+            .iter()
+            .filter(|n| n.round == self.round() - 1)
+            .map(|n| n.source)
+            .collect()
+    }
+
     pub fn verify_digest(&self) -> bool {
         let digest = compute_node_digest(self.epoch(), self.round(), self.source(), &self.consensus_payload, &self.parents);
         self.digest() == digest
