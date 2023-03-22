@@ -27,7 +27,6 @@ use futures::StreamExt;
 use std::{collections::HashSet, sync::Arc, time::Duration};
 use tokio::{sync::mpsc::Sender, time};
 
-#[allow(dead_code)]
 pub struct DagDriver {
     epoch: u64,
     round: Round,
@@ -42,7 +41,6 @@ pub struct DagDriver {
     network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
 }
 
-#[allow(dead_code)]
 impl DagDriver {
     pub fn new(
         epoch: u64,
@@ -61,7 +59,7 @@ impl DagDriver {
         let (rb_tx, rb_rx) = tokio::sync::mpsc::channel(config.channel_size);
 
         let rb = ReliableBroadcast::new(
-            author,
+            epoch,
             network_sender.clone(),
             verifier.clone(),
             validator_signer,
@@ -108,7 +106,7 @@ impl DagDriver {
     }
 
     async fn create_node(&mut self, parents: HashSet<NodeMetaData>) -> Node {
-        let excluded_payload = Vec::new(); // TODO
+        let excluded_payload = Vec::new(); // TODO: track uncommitted payloads in the the dag.
         let payload_filter = PayloadFilter::from(&excluded_payload);
         let payload = self
             .payload_client
@@ -138,14 +136,13 @@ impl DagDriver {
         self.dag.try_add_node(certified_node).await;
 
         if ack_required {
-            let ack = CertifiedNodeAck::new(digest, self.author);
+            let ack = CertifiedNodeAck::new(self.epoch, digest, self.author);
             self.network_sender
                 .send_certified_node_ack(ack, vec![source])
                 .await
         }
     }
 
-    #[allow(dead_code)]
     pub(crate) async fn start(mut self) {
         let node = self.create_node(HashSet::new()).await;
         self.rb_tx

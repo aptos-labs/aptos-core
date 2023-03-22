@@ -25,7 +25,6 @@ pub(crate) enum ReliableBroadcastCommand {
     BroadcastRequest(Node),
 }
 
-// TODO: traits?
 enum Status {
     NothingToSend,
     SendingNode(Node, IncrementalNodeCertificateState),
@@ -34,9 +33,9 @@ enum Status {
 
 // TODO: should we use the same message for node and certifade node -> create two verified events.
 
-#[allow(dead_code)]
+
 pub struct ReliableBroadcast {
-    my_id: PeerId,
+    epoch: u64,
     status: Status,
     peer_round_signatures: BTreeMap<(Round, PeerId), SignedNodeDigest>,
     // vs BTreeMap<Round, BTreeMap<PeerId, ConsensusMsg>> vs Hashset?
@@ -45,16 +44,16 @@ pub struct ReliableBroadcast {
     validator_signer: Arc<ValidatorSigner>,
 }
 
-#[allow(dead_code)]
+
 impl ReliableBroadcast {
     pub fn new(
-        my_id: PeerId,
+        epoch: u64,
         network_sender: NetworkSender,
         validator_verifier: ValidatorVerifier,
         validator_signer: Arc<ValidatorSigner>,
     ) -> Self {
         Self {
-            my_id,
+            epoch,
             status: Status::NothingToSend, // TODO status should be persisted.
             // TODO: we need to persist the map and rebuild after crash
             // TODO: Do we need to clean memory inside an epoc? We need to DB between epochs.
@@ -79,21 +78,21 @@ impl ReliableBroadcast {
     async fn handle_node_message(&mut self, node: Node) {
         match self
             .peer_round_signatures
-            .get(&(node.round(), *node.source()))
+            .get(&(node.round(), node.source()))
         {
             Some(signed_node_digest) => {
                 self.network_sender
-                    .send_signed_node_digest(signed_node_digest.clone(), vec![*node.source()])
+                    .send_signed_node_digest(signed_node_digest.clone(), vec![node.source()])
                     .await
             },
             None => {
                 let signed_node_digest =
-                    SignedNodeDigest::new(node.digest(), self.validator_signer.clone()).unwrap();
+                    SignedNodeDigest::new(self.epoch,node.digest(), self.validator_signer.clone()).unwrap();
                 self.peer_round_signatures
-                    .insert((node.round(), *node.source()), signed_node_digest.clone());
+                    .insert((node.round(), node.source()), signed_node_digest.clone());
                 // TODO: persist
                 self.network_sender
-                    .send_signed_node_digest(signed_node_digest, vec![*node.source()])
+                    .send_signed_node_digest(signed_node_digest, vec![node.source()])
                     .await;
             },
         }

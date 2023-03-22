@@ -35,9 +35,9 @@ impl SignedNodeDigestInfo {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SignedNodeDigest {
+    epoch: u64,
     signed_node_digest_info: SignedNodeDigestInfo,
     peer_id: PeerId,
     signature: bls12381::Signature,
@@ -45,6 +45,7 @@ pub struct SignedNodeDigest {
 
 impl SignedNodeDigest {
     pub fn new(
+        epoch: u64,
         digest: HashValue,
         validator_signer: Arc<ValidatorSigner>,
     ) -> Result<Self, CryptoMaterialError> {
@@ -52,6 +53,7 @@ impl SignedNodeDigest {
         let signature = validator_signer.sign(&info)?;
 
         Ok(Self {
+            epoch,
             signed_node_digest_info: SignedNodeDigestInfo::new(digest),
             peer_id: validator_signer.author(),
             signature,
@@ -64,6 +66,10 @@ impl SignedNodeDigest {
 
     pub fn digest(&self) -> HashValue {
         self.signed_node_digest_info.digest
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.epoch
     }
 
     pub fn info(&self) -> &SignedNodeDigestInfo {
@@ -79,7 +85,6 @@ impl SignedNodeDigest {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct NodeCertificate {
     signed_node_digest_info: SignedNodeDigestInfo,
@@ -97,14 +102,14 @@ impl NodeCertificate {
         }
     }
 
-    pub fn digest(&self) -> &HashValue {
-        &self.signed_node_digest_info.digest
+    pub fn digest(&self) -> HashValue {
+        self.signed_node_digest_info.digest
     }
 
     pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
         validator
             .verify_multi_signatures(&self.signed_node_digest_info, &self.multi_signature)
-            .context("Failed to verify ProofOfStore")
+            .context("Failed to verify NodeCertificate")
     }
 }
 
@@ -134,7 +139,11 @@ impl NodeMetaData {
         self.round
     }
 
-    pub fn source(&self) -> &PeerId {
+    pub fn source(&self) -> PeerId {
+        self.source
+    }
+
+    pub fn source_ref(&self) -> &PeerId {
         &self.source
     }
 
@@ -143,8 +152,34 @@ impl NodeMetaData {
     }
 }
 
-// TODO: check source in msg.verify()
-#[allow(dead_code)]
+fn compute_node_digest(epoch: u64,
+                       round: u64,
+                       source: PeerId,
+                       payload: &Payload,
+                       parents: &HashSet<NodeMetaData>) -> HashValue {
+    #[derive(Serialize)]
+    struct NodeWithoutDigest<'a> {
+        epoch: u64,
+        round: u64,
+        source: PeerId,
+        payload: &'a Payload,
+        parents: &'a HashSet<NodeMetaData>,
+    }
+
+    let node_without_digest = NodeWithoutDigest {
+        epoch,
+        round,
+        source,
+        payload,
+        parents,
+    };
+
+    let mut hasher = DefaultHasher::new(b"Node");
+    let bytes = bcs::to_bytes(&node_without_digest).unwrap(); // TODO: verify that the data behind the pointer is considered.
+    hasher.update(&bytes);
+    hasher.finish()
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Node {
     metadata: NodeMetaData,
@@ -160,27 +195,8 @@ impl Node {
         payload: Payload,
         parents: HashSet<NodeMetaData>,
     ) -> Self {
-        #[derive(Serialize)]
-        struct NodeWithoutDigest<'a> {
-            epoch: u64,
-            round: u64,
-            source: PeerId,
-            payload: &'a Payload,
-            parents: &'a HashSet<NodeMetaData>,
-        }
-
-        let node_without_digest = NodeWithoutDigest {
-            epoch,
-            round,
-            source,
-            payload: &payload,
-            parents: &parents,
-        };
-
-        let mut hasher = DefaultHasher::new(b"Node");
-        let bytes = bcs::to_bytes(&node_without_digest).unwrap(); // TODO: verify that the data behind the pointer is considered.
-        hasher.update(&bytes);
-        let metadata = NodeMetaData::new(epoch, round, source, hasher.finish());
+        let digest = compute_node_digest(epoch, round, source, &payload, &parents);
+        let metadata = NodeMetaData::new(epoch, round, source, digest);
 
         Self {
             metadata,
@@ -189,26 +205,40 @@ impl Node {
         }
     }
 
+    pub fn verify_digest(&self) -> bool {
+        let digest = compute_node_digest(self.epoch(), self.round(), self.source(), &self.consensus_payload, &self.parents);
+        self.digest() == digest
+    }
+
     pub fn verify(&self, validator: &ValidatorVerifier, peer_id: PeerId) -> anyhow::Result<()> {
 
-        TODO: think about this.
-
+        // Insuring authentication
         if self.source() != peer_id {
-            Err(anyhow::anyhow!(
-                "Sender mismatch: peer_id: {}, source: {}",
+            return Err(anyhow::anyhow!(
+                "Failed to verify Node due to sender mismatch: self: {}, network: {}",
                 self.source(),
                 peer_id
-            ))
+            ));
         }
 
-        if self.round() == 0 {
-            Ok(())
-        } else {
-            let strong_parents_peer_id = self.parents.iter().filter(|md| md.round == self.round() - 1).map(|md| md.source);
-            validator
-                .check_voting_power(strong_parents_peer_id)
-                .context("Failed to verify Node")
+        // Node must point to 2/3 stake in previous round
+        if self.round() > 0 {
+            let strong_parents_peer_id = self.parents.iter().filter(|md| md.round == self.round() - 1).map(|md| &md.source);
+            if validator.check_voting_power(strong_parents_peer_id).is_err() {
+                return Err(anyhow::anyhow!(
+                "Failed to verify Node due to not enough strong links"
+            ));
+            }
         }
+
+        // Digest must match the node
+        if !self.verify_digest() {
+            return Err(anyhow::anyhow!(
+                "Failed to verify Node due to wrong digest"
+            ));
+        }
+
+        Ok(())
     }
 
     pub fn digest(&self) -> HashValue {
@@ -227,20 +257,23 @@ impl Node {
         self.metadata.round
     }
 
-    pub fn source(&self) -> &PeerId {
+    pub fn source(&self) -> PeerId {
         self.metadata.source()
+    }
+
+    pub fn source_ref(&self) -> &PeerId {
+        &self.metadata.source_ref()
     }
 
     pub fn parents(&self) -> &HashSet<NodeMetaData> {
         &self.parents
     }
 
-    pub fn payload(&self) -> Option<&Payload> {
+    pub fn maybe_payload(&self) -> Option<&Payload> {
         Some(&self.consensus_payload)
     }
 }
 
-#[allow(dead_code)]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct CertifiedNode {
     header: Node,
@@ -255,13 +288,27 @@ impl CertifiedNode {
         }
     }
 
+    pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+        if !self.header.verify_digest() {
+            return Err(anyhow::anyhow!(
+                "Failed to verify CertifiedNode due to wrong Node digest"
+            ));
+        }
+
+        if self.header.digest() != self.certificate.digest() {
+            return Err(anyhow::anyhow!(
+                "Failed to verify CertifiedNode due to digest mismatch between node and certificate"
+            ));
+        }
+
+        self.certificate.verify(validator)
+    }
+
     pub fn node(&self) -> &Node {
         &self.header
     }
 
-    pub fn digest(&self) -> HashValue {
-        self.header.digest()
-    }
+    pub fn digest(&self) -> HashValue { self.header.digest() }
 
     pub fn epoch(&self) -> u64 {
         self.header.epoch()
@@ -272,7 +319,7 @@ impl CertifiedNode {
     }
 
     pub fn source(&self) -> PeerId {
-        *self.header.source()
+        self.header.source()
     }
 
     pub fn parents(&self) -> &HashSet<NodeMetaData> {
@@ -284,18 +331,31 @@ impl CertifiedNode {
     }
 }
 
-// TODO: check peer_id in msg.verify()
-#[allow(dead_code)]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct CertifiedNodeAck {
+    epoch: u64,
     digest: HashValue,
     peer_id: PeerId,
 }
 
 impl CertifiedNodeAck {
-    pub fn new(digest: HashValue, peer_id: PeerId) -> Self {
-        Self { digest, peer_id }
+    pub fn verify(&self, peer_id: PeerId) -> anyhow::Result<()> {
+        if peer_id != self.peer_id {
+            return Err(anyhow::anyhow!(
+                "Failed to verify CertifiedNodeAck due to wrong peer_id: self {}, network {}",
+                self.peer_id,
+                peer_id,
+            ));
+        }
+
+        Ok(())
     }
+
+    pub fn new(epoch: u64, digest: HashValue, peer_id: PeerId) -> Self {
+        Self { epoch, digest, peer_id }
+    }
+
+    pub fn epoch(&self) -> u64 { self.epoch }
 
     pub fn digest(&self) -> HashValue {
         self.digest
@@ -306,8 +366,6 @@ impl CertifiedNodeAck {
     }
 }
 
-// TODO: marge with CertifiedNodeAck? Need a good name.
-#[allow(dead_code)]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct CertifiedNodeRequest {
     metadata: NodeMetaData,
@@ -322,6 +380,18 @@ impl CertifiedNodeRequest {
         }
     }
 
+    pub fn verify(&self, peer_id: PeerId) -> anyhow::Result<()> {
+        if peer_id != self.requester {
+            return Err(anyhow::anyhow!(
+                "Failed to verify CertifiedNodeRequest due to wrong peer_id: self {}, network {}",
+                self.requester,
+                peer_id,
+            ));
+        }
+
+        Ok(())
+    }
+
     pub fn digest(&self) -> HashValue {
         self.metadata.digest()
     }
@@ -330,8 +400,12 @@ impl CertifiedNodeRequest {
         self.requester
     }
 
+    pub fn epoch(&self) -> u64 {
+        self.metadata.epoch()
+    }
+
     pub fn source(&self) -> PeerId {
-        *self.metadata.source()
+        self.metadata.source()
     }
 
     pub fn round(&self) -> Round {

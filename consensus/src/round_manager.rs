@@ -93,53 +93,53 @@ impl UnverifiedEvent {
             UnverifiedEvent::ProposalMsg(p) => {
                 p.verify(validator, quorum_store_enabled)?;
                 VerifiedEvent::ProposalMsg(p)
-            },
+            }
             UnverifiedEvent::VoteMsg(v) => {
                 v.verify(validator)?;
                 VerifiedEvent::VoteMsg(v)
-            },
+            }
             // sync info verification is on-demand (verified when it's used)
             UnverifiedEvent::SyncInfo(s) => VerifiedEvent::UnverifiedSyncInfo(s),
             UnverifiedEvent::CommitVote(cv) => {
                 cv.verify(validator)?;
                 VerifiedEvent::CommitVote(cv)
-            },
+            }
             UnverifiedEvent::CommitDecision(cd) => {
                 cd.verify(validator)?;
                 VerifiedEvent::CommitDecision(cd)
-            },
+            }
             UnverifiedEvent::FragmentMsg(f) => {
                 f.verify(peer_id)?;
                 VerifiedEvent::FragmentMsg(f)
-            },
+            }
             UnverifiedEvent::SignedDigestMsg(sd) => {
                 sd.verify(validator)?;
                 VerifiedEvent::SignedDigestMsg(sd)
-            },
+            }
             UnverifiedEvent::ProofOfStoreMsg(p) => {
                 p.verify(validator)?;
                 VerifiedEvent::ProofOfStoreMsg(p)
-            },
+            }
             UnverifiedEvent::NodeMsg(n) => {
                 n.verify(validator, peer_id)?;
                 VerifiedEvent::NodeMsg(n)
-            },
+            }
             UnverifiedEvent::SignedNodeDigestMsg(sd) => {
-                sd.verify(validator)
+                sd.verify(validator)?;
                 VerifiedEvent::SignedNodeDigestMsg(sd)
-            },
+            }
             UnverifiedEvent::CertifiedNodeMsg(cn, b) => {
-                n.verify
+                cn.verify(validator)?;
                 VerifiedEvent::CertifiedNodeMsg(cn, b)
-            },
+            }
             UnverifiedEvent::CertifiedNodeAckMsg(cna) => {
-                n.verify
+                cna.verify(peer_id)?;
                 VerifiedEvent::CertifiedNodeAckMsg(cna)
-            },
+            }
             UnverifiedEvent::CertifiedNodeRequestMsg(cnr) => {
-                n.verify
+                cnr.verify(peer_id)?;
                 VerifiedEvent::CertifiedNodeRequestMsg(cnr)
-            },
+            }
         })
     }
 
@@ -153,6 +153,11 @@ impl UnverifiedEvent {
             UnverifiedEvent::FragmentMsg(f) => f.epoch(),
             UnverifiedEvent::SignedDigestMsg(sd) => sd.epoch(),
             UnverifiedEvent::ProofOfStoreMsg(p) => p.epoch(),
+            UnverifiedEvent::NodeMsg(n) => n.epoch(),
+            UnverifiedEvent::SignedNodeDigestMsg(sd) => sd.epoch(),
+            UnverifiedEvent::CertifiedNodeMsg(cd, _) => cd.epoch(),
+            UnverifiedEvent::CertifiedNodeAckMsg(cna) => cna.epoch(),
+            UnverifiedEvent::CertifiedNodeRequestMsg(cnr) => cnr.epoch(),
         }
     }
 }
@@ -168,6 +173,11 @@ impl From<ConsensusMsg> for UnverifiedEvent {
             ConsensusMsg::FragmentMsg(m) => UnverifiedEvent::FragmentMsg(m),
             ConsensusMsg::SignedDigestMsg(m) => UnverifiedEvent::SignedDigestMsg(m),
             ConsensusMsg::ProofOfStoreMsg(m) => UnverifiedEvent::ProofOfStoreMsg(m),
+            ConsensusMsg::NodeMsg(n) => UnverifiedEvent::NodeMsg(n),
+            ConsensusMsg::SignedNodeDigestMsg(sn) => UnverifiedEvent::SignedNodeDigestMsg(sn),
+            ConsensusMsg::CertifiedNodeMsg(cn, b) => UnverifiedEvent::CertifiedNodeMsg(cn, b),
+            ConsensusMsg::CertifiedNodeAckMsg(cna) => UnverifiedEvent::CertifiedNodeAckMsg(cna),
+            ConsensusMsg::CertifiedNodeRequestMsg(cnr) => UnverifiedEvent::CertifiedNodeRequestMsg(cnr),
             _ => unreachable!("Unexpected conversion"),
         }
     }
@@ -185,7 +195,7 @@ pub enum VerifiedEvent {
     FragmentMsg(Box<Fragment>),
     SignedDigestMsg(Box<SignedDigest>),
     ProofOfStoreMsg(Box<ProofOfStore>),
-    NodeMsg(Box<Node>), // TODO: add these events to the consensus networking flow
+    NodeMsg(Box<Node>),
     SignedNodeDigestMsg(Box<SignedNodeDigest>),
     CertifiedNodeMsg(Box<CertifiedNode>, bool),
     CertifiedNodeAckMsg(Box<CertifiedNodeAck>),
@@ -220,7 +230,7 @@ pub struct RoundManager {
     storage: Arc<dyn PersistentLivenessStorage>,
     onchain_config: OnChainConsensusConfig,
     round_manager_tx:
-        aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
+    aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
     local_config: ConsensusConfig,
 }
 
@@ -301,10 +311,10 @@ impl RoundManager {
         match new_round_event.reason {
             NewRoundReason::QCReady => {
                 counters::QC_ROUNDS_COUNT.inc();
-            },
+            }
             NewRoundReason::Timeout => {
                 counters::TIMEOUT_ROUNDS_COUNT.inc();
-            },
+            }
         };
         info!(
             self.new_log(LogEvent::NewRound),
@@ -320,12 +330,12 @@ impl RoundManager {
             let proposal_msg = self.generate_proposal(new_round_event).await?;
             let mut network = self.network.clone();
             #[cfg(feature = "failpoints")]
-            {
-                if self.check_whether_to_inject_reconfiguration_error() {
-                    self.attempt_to_inject_reconfiguration_error(&proposal_msg)
-                        .await?;
+                {
+                    if self.check_whether_to_inject_reconfiguration_error() {
+                        self.attempt_to_inject_reconfiguration_error(&proposal_msg)
+                            .await?;
+                    }
                 }
-            }
             network.broadcast_proposal(proposal_msg).await;
             counters::PROPOSALS_COUNT.inc();
         }
@@ -411,7 +421,7 @@ impl RoundManager {
         let callback = async move {
             sender.broadcast_sync_info(sync_info).await;
         }
-        .boxed();
+            .boxed();
 
         let proposal = self
             .proposal_generator
@@ -592,7 +602,7 @@ impl RoundManager {
         let (is_nil_vote, mut timeout_vote) = match self.round_state.vote_sent() {
             Some(vote) if vote.vote_data().proposed().round() == round => {
                 (vote.vote_data().is_for_nil(), vote)
-            },
+            }
             _ => {
                 // Didn't vote in this round yet, generate a backup vote
                 let nil_block = self
@@ -605,7 +615,7 @@ impl RoundManager {
                 counters::VOTE_NIL_COUNT.inc();
                 let nil_vote = self.execute_and_vote(nil_block).await?;
                 (true, nil_vote)
-            },
+            }
         };
 
         if !timeout_vote.is_timeout() {
@@ -722,7 +732,7 @@ impl RoundManager {
                 BACK_PRESSURE_POLLING_INTERVAL_MS,
                 self.local_config.round_initial_timeout_ms,
             )
-            .await;
+                .await;
             Ok(())
         } else {
             self.process_verified_proposal(proposal).await
@@ -744,7 +754,7 @@ impl RoundManager {
             while start.elapsed() < Duration::from_millis(timeout_ms) {
                 if !block_store.back_pressure() {
                     if let Err(e) =
-                        self_sender.push((author, discriminant(&event)), (author, event))
+                    self_sender.push((author, discriminant(&event)), (author, event))
                     {
                         error!("Failed to send event to round manager {:?}", e);
                     }
@@ -899,13 +909,13 @@ impl RoundManager {
                     );
                 }
                 self.new_qc_aggregated(qc, vote.author()).await
-            },
+            }
             VoteReceptionResult::New2ChainTimeoutCertificate(tc) => {
                 self.new_2chain_tc_aggregated(tc).await
-            },
+            }
             VoteReceptionResult::EchoTimeout(_) if !self.round_state.is_vote_timeout() => {
                 self.process_local_timeout(round).await
-            },
+            }
             VoteReceptionResult::VoteAdded(_)
             | VoteReceptionResult::EchoTimeout(_)
             | VoteReceptionResult::DuplicateVote => Ok(()),
@@ -1061,9 +1071,9 @@ impl RoundManager {
         let block_data = proposal_msg.proposal().block_data();
         let direct_suffix = block_data.is_reconfiguration_suffix()
             && !block_data
-                .quorum_cert()
-                .parent_block()
-                .has_reconfiguration();
+            .quorum_cert()
+            .parent_block()
+            .has_reconfiguration();
         let continuous_round =
             block_data.round() == block_data.quorum_cert().certified_block().round() + 1;
         let should_inject = direct_suffix && continuous_round;

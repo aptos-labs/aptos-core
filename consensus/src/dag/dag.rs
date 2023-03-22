@@ -15,13 +15,11 @@ use std::{
 };
 use tokio::sync::mpsc::Sender;
 
-#[allow(dead_code)]
 enum PeerStatus {
     Linked(Round),
     NotLinked(NodeMetaData),
 }
 
-#[allow(dead_code)]
 impl PeerStatus {
     pub fn round(&self) -> Round {
         match self {
@@ -55,13 +53,10 @@ impl PeerStatus {
 }
 
 ///keeps track of weak links. None indicates that a (strong or weak) link was already added.
-#[allow(dead_code)]
 pub(crate) struct WeakLinksCreator {
     latest_nodes_metadata: Vec<PeerStatus>,
     address_to_validator_index: HashMap<PeerId, usize>,
 }
-
-#[allow(dead_code)]
 impl WeakLinksCreator {
     pub fn new(verifier: &ValidatorVerifier) -> Self {
         Self {
@@ -106,14 +101,12 @@ impl WeakLinksCreator {
     }
 }
 
-#[allow(dead_code)]
 struct AbsentInfo {
     metadata: NodeMetaData,
     peers_to_request: HashSet<PeerId>,
     immediate_dependencies: HashSet<HashValue>,
 }
 
-#[allow(dead_code)]
 impl AbsentInfo {
     pub fn new(metadata: NodeMetaData) -> Self {
         Self {
@@ -127,21 +120,13 @@ impl AbsentInfo {
         self.metadata.clone()
     }
 
-    pub fn peer_id(&self) -> PeerId {
-        *self.metadata.source()
-    }
-
-    pub fn round(&self) -> Round {
-        self.metadata.round()
-    }
-
     pub fn peers_to_request(&self) -> &HashSet<PeerId> {
         &self.peers_to_request
     }
 
-    pub fn take_immediate_dependencies(self) -> HashSet<HashValue> {
-        self.immediate_dependencies
-    }
+    // pub fn take_immediate_dependencies(self) -> HashSet<HashValue> {
+    //     self.immediate_dependencies
+    // }
 
     pub fn immediate_dependencies(&self) -> &HashSet<HashValue> {
         &self.immediate_dependencies
@@ -156,14 +141,12 @@ impl AbsentInfo {
     }
 }
 
-#[allow(dead_code)]
 struct PendingInfo {
     certified_node: CertifiedNode,
     missing_parents: HashSet<HashValue>,
     immediate_dependencies: HashSet<HashValue>,
 }
 
-#[allow(dead_code)]
 impl PendingInfo {
     pub fn new(
         certified_node: CertifiedNode,
@@ -185,9 +168,9 @@ impl PendingInfo {
         self.certified_node.metadata().clone()
     }
 
-    pub fn immediate_dependencies(&self) -> &HashSet<HashValue> {
-        &self.immediate_dependencies
-    }
+    // pub fn immediate_dependencies(&self) -> &HashSet<HashValue> {
+    //     &self.immediate_dependencies
+    // }
 
     pub fn missing_parents(&self) -> &HashSet<HashValue> {
         &self.missing_parents
@@ -197,9 +180,9 @@ impl PendingInfo {
         (self.certified_node, self.immediate_dependencies)
     }
 
-    pub fn take_immediate_dependencies(self) -> HashSet<HashValue> {
-        self.immediate_dependencies
-    }
+    // pub fn take_immediate_dependencies(self) -> HashSet<HashValue> {
+    //     self.immediate_dependencies
+    // }
 
     pub fn remove_missing_parent(&mut self, digest: HashValue) {
         self.missing_parents.remove(&digest);
@@ -214,13 +197,11 @@ impl PendingInfo {
     }
 }
 
-#[allow(dead_code)]
 enum MissingDagNodeStatus {
     Absent(AbsentInfo),
     Pending(PendingInfo),
 }
 
-#[allow(dead_code)]
 impl MissingDagNodeStatus {
     pub fn update_to_pending(
         &mut self,
@@ -282,12 +263,12 @@ impl MissingDagNodeStatus {
         }
     }
 
-    pub fn take_dependencies(self) -> HashSet<HashValue> {
-        match self {
-            MissingDagNodeStatus::Absent(info) => info.take_immediate_dependencies(),
-            MissingDagNodeStatus::Pending(info) => info.take_immediate_dependencies(),
-        }
-    }
+    // pub fn take_dependencies(self) -> HashSet<HashValue> {
+    //     match self {
+    //         MissingDagNodeStatus::Absent(info) => info.take_immediate_dependencies(),
+    //         MissingDagNodeStatus::Pending(info) => info.take_immediate_dependencies(),
+    //     }
+    // }
 
     pub fn remove_missing_parent(&mut self, digets: HashValue) {
         match self {
@@ -362,7 +343,7 @@ impl Dag {
     }
 
     fn contains(&self, metadata: &NodeMetaData) -> bool {
-        self.in_dag(metadata.round(), *metadata.source()) || self.pending(metadata.digest())
+        self.in_dag(metadata.round(), metadata.source()) || self.pending(metadata.digest())
     }
 
     fn in_dag(&self, round: Round, source: PeerId) -> bool {
@@ -432,7 +413,7 @@ impl Dag {
             .get(self.current_round as usize)
             .unwrap()
             .iter()
-            .map(|(_, certified_node)| certified_node.node().source())
+            .map(|(_, certified_node)| certified_node.node().source_ref())
     }
 
     async fn add_to_dag(&mut self, certified_node: CertifiedNode) {
@@ -442,7 +423,7 @@ impl Dag {
         if self.dag.len() < round {
             self.dag.push(HashMap::new());
         }
-        self.dag[round].insert(*certified_node.node().source(), certified_node.clone());
+        self.dag[round].insert(certified_node.node().source(), certified_node.clone());
         self.front
             .update_peer_latest_node(certified_node.node().metadata().clone());
 
@@ -452,7 +433,7 @@ impl Dag {
             .prefetch_payload_data(
                 self.epoch,
                 self.current_round,
-                certified_node.node().payload(),
+                certified_node.node().maybe_payload(),
             )
             .await;
 
@@ -521,7 +502,7 @@ impl Dag {
         certified_node: CertifiedNode, // assumption that node not pending.
         missing_parents: HashSet<NodeMetaData>,
     ) {
-        let pending_peer_id = *certified_node.node().source();
+        let pending_peer_id = certified_node.node().source();
         let pending_digest = certified_node.node().digest();
         let missing_parents_digest = missing_parents
             .iter()
@@ -582,7 +563,7 @@ impl Dag {
                             .parents()
                             .contains(&anchor_node_meta_data)
                     })
-                    .map(|(_, certified_node)| certified_node.node().source());
+                    .map(|(_, certified_node)| certified_node.node().source_ref());
 
                 self.verifier
                     .check_minority_voting_power(voting_peers)
@@ -623,7 +604,7 @@ impl Dag {
         let missing_parents: HashSet<NodeMetaData> = certified_node
             .parents()
             .iter()
-            .filter(|metadata| !self.in_dag(metadata.round(), *metadata.source()))
+            .filter(|metadata| !self.in_dag(metadata.round(), metadata.source()))
             .cloned()
             .collect();
 
