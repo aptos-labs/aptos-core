@@ -103,7 +103,7 @@ jobs:
 
   rust-images:
     needs: [permission-check, determine-docker-build-metadata]
-    uses: ./.github/workflows/docker-rust-build.yaml
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -113,7 +113,7 @@ jobs:
 
   rust-images-indexer:
     needs: [permission-check, determine-docker-build-metadata]
-    uses: ./.github/workflows/docker-rust-build.yaml
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -124,7 +124,7 @@ jobs:
 
   rust-images-failpoints:
     needs: [permission-check, determine-docker-build-metadata]
-    uses: ./.github/workflows/docker-rust-build.yaml
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -135,7 +135,7 @@ jobs:
 
   rust-images-performance:
     needs: [permission-check, determine-docker-build-metadata]
-    uses: ./.github/workflows/docker-rust-build.yaml
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -148,7 +148,7 @@ jobs:
     if: |
       contains(github.event.pull_request.labels.*.name, 'CICD:build-consensus-only-image') ||
       contains(github.event.pull_request.labels.*.name, 'CICD:run-consensus-only-perf-test')
-    uses: ./.github/workflows/docker-rust-build.yaml
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
