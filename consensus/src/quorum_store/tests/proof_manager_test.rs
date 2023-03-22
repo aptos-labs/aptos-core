@@ -61,7 +61,7 @@ async fn test_block_request() {
     let proof = create_proof(PeerId::random(), 10, 1);
     proof_manager.receive_proof(proof.clone());
 
-    get_proposal_and_assert(&mut proof_manager, 100, &vec![], &vec![proof.clone()]).await;
+    get_proposal_and_assert(&mut proof_manager, 100, &[], &vec![proof.clone()]).await;
 }
 
 #[tokio::test]
@@ -78,10 +78,10 @@ async fn test_block_timestamp_expiration() {
     proof_manager.receive_proof(proof.clone());
 
     proof_manager.handle_commit_notification(1, vec![]);
-    get_proposal_and_assert(&mut proof_manager, 100, &vec![], &vec![proof]).await;
+    get_proposal_and_assert(&mut proof_manager, 100, &[], &vec![proof]).await;
 
     proof_manager.handle_commit_notification(20, vec![]);
-    get_proposal_and_assert(&mut proof_manager, 100, &vec![], &vec![]).await;
+    get_proposal_and_assert(&mut proof_manager, 100, &[], &[]).await;
 }
 
 #[tokio::test]
@@ -101,7 +101,7 @@ async fn test_batch_commit() {
     proof_manager.receive_proof(proof1.clone());
 
     proof_manager.handle_commit_notification(1, vec![proof1.info().clone()]);
-    get_proposal_and_assert(&mut proof_manager, 100, &vec![], &vec![proof0]).await;
+    get_proposal_and_assert(&mut proof_manager, 100, &[], &vec![proof0]).await;
 }
 
 #[tokio::test]
@@ -129,10 +129,10 @@ async fn test_proposal_fairness() {
     // Without filter, and large max size, all proofs are retrieved
     let mut expected = peer0_proofs.clone();
     expected.push(peer1_proof_0.clone());
-    get_proposal_and_assert(&mut proof_manager, 100, &vec![], &expected).await;
+    get_proposal_and_assert(&mut proof_manager, 100, &[], &expected).await;
 
     // The first two proofs are taken fairly from each peer
-    get_proposal_and_assert(&mut proof_manager, 2, &vec![], &vec![
+    get_proposal_and_assert(&mut proof_manager, 2, &[], &vec![
         peer0_proofs[0].clone(),
         peer1_proof_0.clone(),
     ])
@@ -172,21 +172,21 @@ async fn test_duplicate_batches_on_commit() {
     proof_manager.receive_proof(proof1.clone());
 
     // Only one copy of the batch exists
-    get_proposal_and_assert(&mut proof_manager, 10, &vec![], &vec![proof0.clone()]).await;
+    get_proposal_and_assert(&mut proof_manager, 10, &[], &vec![proof0.clone()]).await;
 
     // Nothing goes wrong on commits
     proof_manager.handle_commit_notification(4, vec![batch.clone()]);
-    get_proposal_and_assert(&mut proof_manager, 10, &vec![], &vec![]).await;
+    get_proposal_and_assert(&mut proof_manager, 10, &[], &[]).await;
 
     // Before expiration, still marked as committed
     proof_manager.receive_proof(proof2.clone());
-    get_proposal_and_assert(&mut proof_manager, 10, &vec![], &vec![]).await;
+    get_proposal_and_assert(&mut proof_manager, 10, &[], &[]).await;
 
     // Nothing goes wrong on expiration
     proof_manager.handle_commit_notification(5, vec![]);
-    get_proposal_and_assert(&mut proof_manager, 10, &vec![], &vec![]).await;
+    get_proposal_and_assert(&mut proof_manager, 10, &[], &[]).await;
     proof_manager.handle_commit_notification(12, vec![]);
-    get_proposal_and_assert(&mut proof_manager, 10, &vec![], &vec![]).await;
+    get_proposal_and_assert(&mut proof_manager, 10, &[], &[]).await;
 }
 
 #[tokio::test]
@@ -210,13 +210,13 @@ async fn test_duplicate_batches_on_expiration() {
     proof_manager.receive_proof(proof1.clone());
 
     // Only one copy of the batch exists
-    get_proposal_and_assert(&mut proof_manager, 10, &vec![], &vec![proof0.clone()]).await;
+    get_proposal_and_assert(&mut proof_manager, 10, &[], &vec![proof0.clone()]).await;
 
     // Nothing goes wrong on expiration
     proof_manager.handle_commit_notification(5, vec![]);
-    get_proposal_and_assert(&mut proof_manager, 10, &vec![], &vec![proof0.clone()]).await;
+    get_proposal_and_assert(&mut proof_manager, 10, &[], &vec![proof0.clone()]).await;
     proof_manager.handle_commit_notification(12, vec![]);
-    get_proposal_and_assert(&mut proof_manager, 10, &vec![], &vec![]).await;
+    get_proposal_and_assert(&mut proof_manager, 10, &[], &[]).await;
 }
 
 #[tokio::test]
@@ -238,5 +238,5 @@ async fn test_max_per_author() {
     }
 
     // Max per author restricts to first 10 proofs
-    get_proposal_and_assert(&mut proof_manager, 100, &vec![], &proofs[0..10]).await;
+    get_proposal_and_assert(&mut proof_manager, 100, &[], &proofs[0..10]).await;
 }

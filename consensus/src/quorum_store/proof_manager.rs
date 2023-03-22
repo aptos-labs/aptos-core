@@ -19,7 +19,7 @@ use std::collections::HashSet;
 #[derive(Debug)]
 pub enum ProofManagerCommand {
     ReceiveProof(ProofOfStore),
-    CommitNotification(u64, Vec<ProofOfStore>),
+    CommitNotification(u64, Vec<BatchInfo>),
     Shutdown(tokio::sync::oneshot::Sender<()>),
 }
 
@@ -57,14 +57,14 @@ impl ProofManager {
     pub(crate) fn handle_commit_notification(
         &mut self,
         block_timestamp: u64,
-        batch_infos: Vec<BatchInfo>,
+        batches: Vec<BatchInfo>,
     ) {
         trace!(
             "QS: got clean request from execution at block timestamp {}",
             block_timestamp
         );
 
-        self.proofs_for_consensus.mark_committed(batch_infos);
+        self.proofs_for_consensus.mark_committed(batches);
         self.proofs_for_consensus
             .handle_updated_block_timestamp(block_timestamp);
         (self.remaining_total_txn_num, self.remaining_total_proof_num) = self
@@ -165,10 +165,10 @@ impl ProofManager {
                             ProofManagerCommand::ReceiveProof(proof) => {
                                 self.receive_proof(proof);
                             },
-                            ProofManagerCommand::CommitNotification(block_timestamp, proofs) => {
+                            ProofManagerCommand::CommitNotification(block_timestamp, batches) => {
                                 self.handle_commit_notification(
                                     block_timestamp,
-                                    proofs.iter().map(|proof| proof.info()).cloned().collect(),
+                                    batches,
                                 );
                             },
                         }
