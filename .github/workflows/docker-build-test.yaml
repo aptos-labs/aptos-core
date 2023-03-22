@@ -38,6 +38,8 @@ on: # build on main branch OR when a PR is labeled with `CICD:build-images`
       - performance_benchmark
       - quorum-store
       - preview
+      # CANARY
+      - rustielin/workflow-dispatch-build-canary
 
 # cancel redundant builds
 concurrency:
@@ -103,7 +105,7 @@ jobs:
 
   rust-images:
     needs: [permission-check, determine-docker-build-metadata]
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@rustielin/workflow-dispatch-build
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -113,7 +115,7 @@ jobs:
 
   rust-images-indexer:
     needs: [permission-check, determine-docker-build-metadata]
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@rustielin/workflow-dispatch-build
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -124,7 +126,7 @@ jobs:
 
   rust-images-failpoints:
     needs: [permission-check, determine-docker-build-metadata]
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@rustielin/workflow-dispatch-build
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -135,7 +137,7 @@ jobs:
 
   rust-images-performance:
     needs: [permission-check, determine-docker-build-metadata]
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@rustielin/workflow-dispatch-build
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -148,7 +150,7 @@ jobs:
     if: |
       contains(github.event.pull_request.labels.*.name, 'CICD:build-consensus-only-image') ||
       contains(github.event.pull_request.labels.*.name, 'CICD:run-consensus-only-perf-test')
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@rustielin/workflow-dispatch-build
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
