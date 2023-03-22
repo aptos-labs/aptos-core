@@ -26,8 +26,8 @@ type NetworkWithCustom = Network | "CUSTOM";
  */
 export class Provider {
   aptosClient: AptosClient;
+
   indexerClient: IndexerClient;
-  network: Network | "CUSTOM";
 
   network: NetworkWithCustom;
 
