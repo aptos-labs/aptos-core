@@ -27,4 +27,4 @@ Aptos SDK Release v1.7.2
 
 |Release | Docker Image Tag | Docker SHA-256 | Branch | Commit Hash|
 |---|---|---|---|---|
-|[Aptos Node Hot-fix Release v1.2.6](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.2.6)| `aptos-node-v1.2.6` | `?` | [aptos-node-v1.2.0](https://github.com/aptos-labs/aptos-core/tree/aptos-node-v1.2.0)| `?` |
+|[Aptos Node Release v1.2.7](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.2.7)| [`aptos-node-v1.2.7`](https://hub.docker.com/layers/aptoslabs/validator/aptos-node-v1.2.7/images/sha256-b1c4ff8e15cfdfb140738f80f368068c7d68d97c2a205139d661cc6d82a65ea0?context=explore) | `b1c4ff8e15cfdfb140738f80f368068c7d68d97c2a205139d661cc6d82a65ea0` | [aptos-node-v1.2.7](https://github.com/aptos-labs/aptos-core/tree/aptos-node-v1.2.7)| `cc30c46ad41cd1577935466036eb1903b7cbc973` |
