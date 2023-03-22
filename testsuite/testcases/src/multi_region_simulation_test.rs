@@ -72,7 +72,7 @@ fn create_multi_region_swarm_network_chaos(
             let (from_chunk, (from_region, stats)) = &comb[0];
             let (to_chunk, (to_region, _)) = &comb[1];
 
-            let (_, latency) = stats.get(*to_region).unwrap();
+            let (bandwidth, latency) = stats.get(*to_region).unwrap();
             let delay = GroupNetworkDelay {
                 name: format!("{}-to-{}-delay", from_region.clone(), to_region.clone()),
                 source_nodes: from_chunk.to_vec(),
@@ -87,7 +87,7 @@ fn create_multi_region_swarm_network_chaos(
                 name: format!("{}-to-{}-bandwidth", from_region.clone(), to_region.clone()),
                 source_nodes: from_chunk.to_vec(),
                 target_nodes: to_chunk.to_vec(),
-                rate: 1000 / 8,
+                rate: bandwidth / 8,
                 limit: 20971520,
                 buffer: 10000,
             };
