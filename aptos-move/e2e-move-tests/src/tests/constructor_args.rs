@@ -26,7 +26,7 @@ fn success_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<Vec<u8>>, &str)>
 
     // Load the code
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
-    assert_success!(h.publish_package(&acc, &common::test_dir_path("object_args.data/pack")));
+    assert_success!(h.publish_package(&acc, &common::test_dir_path("constructor_args.data/pack")));
 
     let module_data = parse_struct_tag("0xCAFE::test::ModuleData").unwrap();
 
@@ -61,7 +61,7 @@ fn fail_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<Vec<u8>>, StatusCod
 
     // Load the code
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
-    assert_success!(h.publish_package(&acc, &common::test_dir_path("object_args.data/pack")));
+    assert_success!(h.publish_package(&acc, &common::test_dir_path("constructor_args.data/pack")));
 
     let module_data = parse_struct_tag("0xCAFE::test::ModuleData").unwrap();
 
@@ -76,7 +76,7 @@ fn fail_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<Vec<u8>>, StatusCod
 }
 
 #[test]
-fn object_args_good() {
+fn constructor_args_good() {
     let tests = vec![
         // ensure object exist
         ("0xcafe::test::initialize", vec![], ""),
@@ -89,12 +89,30 @@ fn object_args_good() {
             "hi",
         ),
         (
-            "0xcafe::test::pass_optional_fixedpoint",
+            "0xcafe::test::pass_optional_fixedpoint32",
             vec![
                 bcs::to_bytes(&OBJECT_ADDRESS).unwrap(),     // Object<T>
-                bcs::to_bytes(&vec![(1u64 << 32)]).unwrap(), // Option<FixedPoint>
+                bcs::to_bytes(&vec![(1u64 << 32)]).unwrap(), // Option<FixedPoint32>
             ],
             "4294967296",
+        ),
+        (
+            "0xcafe::test::pass_optional_vector_fixedpoint64",
+            vec![
+                bcs::to_bytes(&OBJECT_ADDRESS).unwrap(), // Object<T>
+                bcs::to_bytes(&vec![vec![(1u128 << 64), (2u128 << 64)]]).unwrap(), // Option<vector<FixedPoint64>>
+                bcs::to_bytes(&1u64).unwrap(),
+            ],
+            "36893488147419103232", // 2 in fixedpoint64
+        ),
+        (
+            "0xcafe::test::pass_optional_vector_optional_string",
+            vec![
+                bcs::to_bytes(&OBJECT_ADDRESS).unwrap(), // Object<T>
+                bcs::to_bytes(&vec![vec![vec!["a"], vec!["b"]]]).unwrap(), // Option<vector<Option<String>>>
+                bcs::to_bytes(&1u64).unwrap(),
+            ],
+            "b", // second element of the vector
         ),
     ];
 
@@ -102,7 +120,10 @@ fn object_args_good() {
 }
 
 #[test]
-fn object_args_bad() {
+fn constructor_args_bad() {
+    let good: &[u8] = "a".as_bytes();
+    let bad: &[u8] = &[0x80u8; 1];
+
     let tests = vec![
         // object doesnt exist
         (
@@ -110,6 +131,15 @@ fn object_args_bad() {
             vec![
                 bcs::to_bytes("hi").unwrap(),
                 bcs::to_bytes(&OBJECT_ADDRESS).unwrap(),
+            ],
+            StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
+        ),
+        (
+            "0xcafe::test::pass_optional_vector_optional_string",
+            vec![
+                bcs::to_bytes(&OBJECT_ADDRESS).unwrap(), // Object<T>
+                bcs::to_bytes(&vec![vec![vec![good], vec![bad]]]).unwrap(), // Option<vector<Option<String>>>
+                bcs::to_bytes(&1u64).unwrap(),
             ],
             StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
         ),
