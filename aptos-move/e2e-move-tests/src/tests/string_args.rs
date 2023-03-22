@@ -10,6 +10,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use serde::{Deserialize, Serialize};
+use aptos_types::on_chain_config::FeatureFlag;
 
 /// Mimics `0xcafe::test::ModuleData`
 #[derive(Serialize, Deserialize)]

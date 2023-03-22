@@ -29,6 +29,7 @@ use std::{
     collections::BTreeMap,
     io::{Cursor, Read},
 };
+use move_binary_format::errors::VMError;
 
 pub(crate) struct FunctionId {
     module_id: ModuleId,
@@ -80,8 +81,8 @@ static NEW_ALLOWED_STRUCTS: ConstructorMap = Lazy::new(|| {
     .collect()
 });
 
-pub(crate) fn get_allowed_structs(struct_constructors_feature: bool) -> &'static ConstructorMap {
-    if struct_constructors_feature {
+pub(crate) fn get_allowed_structs(are_struct_constructors_enabled: bool) -> &'static ConstructorMap {
+    if are_struct_constructors_enabled {
         &NEW_ALLOWED_STRUCTS
     } else {
         &OLD_ALLOWED_STRUCTS
@@ -100,7 +101,7 @@ pub(crate) fn validate_combine_signer_and_txn_args<S: MoveResolverExt>(
     senders: Vec<AccountAddress>,
     args: Vec<Vec<u8>>,
     func: &LoadedFunctionInstantiation,
-    struct_constructors_feature: bool,
+    are_struct_constructors_enabled: bool,
 ) -> Result<Vec<Vec<u8>>, VMStatus> {
     // entry function should not return
     if !func.return_.is_empty() {
@@ -123,7 +124,7 @@ pub(crate) fn validate_combine_signer_and_txn_args<S: MoveResolverExt>(
         }
     }
 
-    let allowed_structs = get_allowed_structs(struct_constructors_feature);
+    let allowed_structs = get_allowed_structs(are_struct_constructors_enabled);
     // validate all non_signer params
     let mut needs_construction = vec![];
     for (idx, ty) in func.parameters[signer_param_cnt..].iter().enumerate() {
@@ -331,12 +332,20 @@ fn validate_and_construct<S: MoveResolverExt>(
         )?;
         args.push(arg);
     }
+    let constructor_error = |e: VMError| {
+        if allowed_structs.contains_key("0x1::object::Object") {
+            e.into_vm_status()
+        } else {
+            VMStatus::Error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT, None)
+        }
+    };
     let serialized_result = session
         .execute_instantiated_function(function, instantiation, args, gas_meter)
-        .map_err(|_| VMStatus::Error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT, None))?;
+        .map_err(constructor_error)?;
     let mut ret_vals = serialized_result.return_values;
     // We know ret_vals.len() == 1
-    Ok(ret_vals.pop().expect("Always a result").0)
+    let deserialize_error = VMStatus::Error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT, None);
+    Ok(ret_vals.pop().ok_or(deserialize_error)?.0)
 }
 
 // String is a vector of bytes, so both string and vector carry a length in the serialized format.
