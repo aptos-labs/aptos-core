@@ -32,17 +32,15 @@ fn get_link_stats_table() -> BTreeMap<String, BTreeMap<String, (u64, f64)>> {
     let mut stats_table = BTreeMap::new();
 
     let mut rdr = Reader::from_reader(include_bytes!(FOUR_REGION_LINK_STATS_CSV!()).as_slice());
-    for result in rdr.deserialize() {
-        if let Ok((from, to, bitrate, latency)) = result {
-            let from: String = from;
-            let to: String = to;
-            stats_table
-                .entry(from)
-                .or_insert_with(BTreeMap::new)
-                .insert(to, (bitrate, latency));
-        }
-    }
-
+    rdr.deserialize()
+        .for_each(|result: Result<(String, String, u64, f64), _>| {
+            if let Ok((from, to, bitrate, latency)) = result {
+                stats_table
+                    .entry(from)
+                    .or_insert_with(BTreeMap::new)
+                    .insert(to, (bitrate, latency));
+            }
+        });
     stats_table
 }
 
@@ -72,7 +70,7 @@ fn create_multi_region_swarm_network_chaos(
 
             let (bandwidth, latency) = stats.get(*to_region).unwrap();
             let delay = GroupNetworkDelay {
-                name: format!("{}-to-{}-delay", from_region.clone(), to_region.clone()),
+                name: format!("{}-to-{}-delay", from_region, to_region),
                 source_nodes: from_chunk.to_vec(),
                 target_nodes: to_chunk.to_vec(),
                 latency_ms: *latency as u64,
@@ -82,7 +80,7 @@ fn create_multi_region_swarm_network_chaos(
             info!("delay {:?}", delay);
 
             let bandwidth = GroupNetworkBandwidth {
-                name: format!("{}-to-{}-bandwidth", from_region.clone(), to_region.clone()),
+                name: format!("{}-to-{}-bandwidth", from_region, to_region),
                 source_nodes: from_chunk.to_vec(),
                 target_nodes: to_chunk.to_vec(),
                 rate: bandwidth / 8,
@@ -99,11 +97,11 @@ fn create_multi_region_swarm_network_chaos(
     let remaining_validators: Vec<PeerId> = validator_chunks
         .skip(number_of_regions)
         .flatten()
-        .chain(remainder.into_iter())
+        .chain(remainder.iter())
         .cloned()
         .collect();
     info!("remaining: {:?}", remaining_validators);
-    if remaining_validators.len() > 0 {
+    if !remaining_validators.is_empty() {
         group_network_delays[0]
             .source_nodes
             .append(remaining_validators.to_vec().as_mut());
