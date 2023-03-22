@@ -66,6 +66,8 @@ pub struct Layout {
     pub employee_vesting_start: Option<u64>,
     /// Duration of each vesting period (in seconds).
     pub employee_vesting_period_duration: Option<u64>,
+
+    pub test_value: Option<u64>,
 }
 
 impl Layout {
@@ -103,6 +105,7 @@ impl Default for Layout {
             total_supply: None,
             employee_vesting_start: Some(1663456089),
             employee_vesting_period_duration: Some(5 * 60), // 5 minutes
+            test_value: Some(100),
         }
     }
 }

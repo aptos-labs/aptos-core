@@ -32,6 +32,8 @@ chain:
   # -- Minimum price per gas unit
   min_price_per_gas_unit: 1
 
+  test_value: 100
+
 # -- Default image tag to use for all tools images
 imageTag: testnet
 
