@@ -167,7 +167,14 @@ impl<'a> ExtendedChecker<'a> {
 
     fn is_allowed_input_struct(&self, qid: QualifiedId<StructId>) -> bool {
         let name = self.env.get_struct(qid).get_full_name_with_address();
-        matches!(name.as_str(), "0x1::string::String" | "0x1::object::Object" | "0x1::option::Option" | "0x1::fixed_point32::FixedPoint32" | "0x1::fixed_point64::FixedPoint64")
+        matches!(
+            name.as_str(),
+            "0x1::string::String"
+                | "0x1::object::Object"
+                | "0x1::option::Option"
+                | "0x1::fixed_point32::FixedPoint32"
+                | "0x1::fixed_point64::FixedPoint64"
+        )
     }
 }
 
