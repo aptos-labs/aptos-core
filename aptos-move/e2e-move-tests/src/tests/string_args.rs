@@ -602,7 +602,7 @@ fn string_args_bad_length() {
 fn string_args_generic_call() {
     let tests = vec![
         (
-            "0xcafe::test::generic_call",
+            "0xcafe::test::non_generic_call",
             vec![(vec![bcs::to_bytes("hi".as_bytes()).unwrap()], "hi")],
         ),
     ];
@@ -615,6 +615,7 @@ fn string_args_generic_call() {
     };
     let string_type = TypeTag::Struct(Box::new(string_struct));
 
+    success_generic(vec![], tests);
     success_generic(vec![string_type], tests);
 }
 

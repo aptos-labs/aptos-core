@@ -66,9 +66,18 @@ module 0xCAFE::test {
         }
     }
 
+    public entry fun non_generic_call(sender: &signer, msg: String) acquires GenericModuleData {
+        let addr = signer::address_of(sender);
+        if (!exists<GenericModuleData<String>>(addr)) {
+            move_to<GenericModuleData<String>>(sender, GenericModuleData { state: msg });
+        } else {
+            borrow_global_mut<GenericModuleData<T>>(addr).state = msg;
+        }
+    }
+
     public entry fun generic_call<T: copy + drop + store>(sender: &signer, msg: T) acquires GenericModuleData {
         let addr = signer::address_of(sender);
-        if (!exists<ModuleData>(addr)) {
+        if (!exists<GenericModuleData<T>>(addr)) {
             move_to<GenericModuleData<T>>(sender, GenericModuleData { state: msg });
         } else {
             borrow_global_mut<GenericModuleData<T>>(addr).state = msg;
