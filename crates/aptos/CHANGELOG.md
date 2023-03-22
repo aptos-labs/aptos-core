@@ -3,6 +3,8 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
+
+## [1.0.8] - 2023/03/16
 ### Added
 * Added an `aptos account derive-resource-account-address` command to add the ability to derive an address easily
 * Added the ability for different input resource account seeds, to allow matching directly with onchain code

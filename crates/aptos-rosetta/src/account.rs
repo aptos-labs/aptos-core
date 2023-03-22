@@ -136,55 +136,53 @@ async fn get_balances(
                     }
 
                     let store: Store = bcs::from_bytes(&bytes)?;
-                    if account.is_total_stake() {
-                        // For total stake, collect all underlying staking contracts and combine
-                        let mut total_stake: Option<u64> = None;
-                        maybe_operators = Some(vec![]);
-                        for (operator, contract) in store.staking_contracts {
-                            // Keep track of operators
-                            maybe_operators.as_mut().unwrap().push(operator);
-                            match get_total_stake(
+                    let mut total_requested_balance: Option<u64> = None;
+                    maybe_operators = Some(vec![]);
+                    for (operator, contract) in store.staking_contracts {
+                        // Keep track of operators
+                        maybe_operators.as_mut().unwrap().push(operator);
+                        match get_stake_balances(
+                            rest_client,
+                            &account,
+                            contract.pool_address,
+                            version,
+                        )
+                        .await
+                        {
+                            Ok(Some(balance)) => {
+                                total_requested_balance = Some(
+                                    total_requested_balance.unwrap_or_default()
+                                        + u64::from_str(&balance.value).unwrap_or_default(),
+                                );
+                            },
+                            result => {
+                                warn!(
+                                    "Failed to retrieve requested balance for account: {}, address: {}: {:?}",
+                                    owner_address, contract.pool_address, result
+                                )
+                            },
+                        }
+                    }
+                    if let Some(balance) = total_requested_balance {
+                        balances.push(Amount {
+                            value: balance.to_string(),
+                            currency: native_coin(),
+                        })
+                    }
+
+                    /* TODO: Right now operator stake is not supported
+                    else if account.is_operator_stake() {
+                        // For operator stake, filter on operator address
+                        let operator_address = account.operator_address()?;
+                        if let Some(contract) = store.staking_contracts.get(&operator_address) {
+                            balances.push(get_total_stake(
                                 rest_client,
                                 &account,
                                 contract.pool_address,
                                 version,
-                            )
-                            .await
-                            {
-                                Ok(Some(balance)) => {
-                                    total_stake = Some(
-                                        total_stake.unwrap_or_default()
-                                            + u64::from_str(&balance.value).unwrap_or_default(),
-                                    );
-                                },
-                                result => {
-                                    warn!(
-                                        "Failed to retrieve stake for {}: {:?}",
-                                        contract.pool_address, result
-                                    )
-                                },
-                            }
+                            ).await?);
                         }
-
-                        if let Some(balance) = total_stake {
-                            balances.push(Amount {
-                                value: balance.to_string(),
-                                currency: native_coin(),
-                            })
-                        }
-                    } /* TODO: Right now operator stake is not supported
-                      else if account.is_operator_stake() {
-                          // For operator stake, filter on operator address
-                          let operator_address = account.operator_address()?;
-                          if let Some(contract) = store.staking_contracts.get(&operator_address) {
-                              balances.push(get_total_stake(
-                                  rest_client,
-                                  &account,
-                                  contract.pool_address,
-                                  version,
-                              ).await?);
-                          }
-                      }*/
+                    }*/
                 },
                 _ => {},
             }

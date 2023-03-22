@@ -101,7 +101,7 @@
 #![allow(clippy::integer_arithmetic)]
 use bytes::Bytes;
 use hex::FromHex;
-use more_asserts::{debug_assert_ge, debug_assert_lt};
+use more_asserts::debug_assert_lt;
 use once_cell::sync::{Lazy, OnceCell};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
@@ -218,6 +218,12 @@ impl HashValue {
         let pos = index / 2;
         let shift = if index % 2 == 0 { 4 } else { 0 };
         (self.hash[pos] >> shift) & 0x0F
+    }
+
+    /// Return the `index`-th byte in the bytes.
+    pub fn byte(&self, index: usize) -> u8 {
+        debug_assert!(index < Self::LENGTH); // assumed precondition
+        self.hash[index]
     }
 
     /// Returns a `HashValueBitIterator` over all the bits that represent this `HashValue`.
@@ -440,8 +446,7 @@ impl<'a> HashValueBitIterator<'a> {
     /// Returns the `index`-th bit in the bytes.
     fn get_bit(&self, index: usize) -> bool {
         debug_assert_eq!(self.hash_bytes.len(), HashValue::LENGTH); // invariant
-        debug_assert_lt!(index, self.hash_bytes.len() * 8); // assumed precondition
-        debug_assert_ge!(index, 0); // assumed precondition
+        debug_assert_lt!(index, HashValue::LENGTH_IN_BITS); // assumed precondition
         let pos = index / 8;
         let bit = 7 - index % 8;
         (self.hash_bytes[pos] >> bit) & 1 != 0

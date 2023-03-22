@@ -16,6 +16,7 @@ feature_flags:
     - resource_groups
     - multisig_accounts
     - delegation_pools
+    - ed25519_pubkey_validate_return_false_wrong_length  
   disabled: []
 is_multi_step: true
 framework_release_at_end: true

@@ -1,0 +1,33 @@
+//# publish
+module 0x42.N {
+    foo() {
+    label b0:
+        return;
+    }
+}
+
+//# publish
+module 0x42.M {
+    friend 0x42.N;
+    public(friend) foo() {
+    label b0:
+        return;
+    }
+}
+
+//# publish
+module 0x42.N {
+    import 0x42.M;
+    foo() {
+    label b0:
+        M.foo();
+        return;
+    }
+}
+
+//# publish
+module 0x42.M {
+    friend 0x42.N;
+    // cannot remove visible function
+}
+// check: BACKWARD_INCOMPATIBLE_MODULE_UPDATE

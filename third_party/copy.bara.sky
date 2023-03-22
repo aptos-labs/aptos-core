@@ -5,23 +5,24 @@ aptosUrl = "https://github.com/aptos-labs/aptos-core.git"
 # which should be further massaged before sending out.
 core.workflow(
     name = "pull_move",
-    origin = git.origin(
+    origin = git.github_origin(
         url = moveUrl,
         ref = "aptos-main",
     ),
     destination = git.github_pr_destination(
-        url = aptosUrl,
-        destination_ref = "main",
-        draft = True,
-        title = "Pull from move-language",
-        pr_branch = "from_move"
+       url = aptosUrl,
+       destination_ref = "main",
+       draft = True,
+       title = "Changes from move-language/aptos-main",
+       pr_branch = "from_move",
+       integrates = []
     ),
-    #origin_files = glob(["language/**"]),
-    origin_files = glob(["language/README.md"]), # During testing use only one file
+    mode = "CHANGE_REQUEST",
+    origin_files = glob(["language/**"]),
     destination_files = glob(["third_party/move/**"]),
     authoring = authoring.pass_thru("Wolfgang <wg@aptoslabs.com>"),
     transformations = [
-        core.move("", "third_party/move"),
+        core.move("language", "third_party/move"),
     ],
 )
 
@@ -34,13 +35,13 @@ core.workflow(
     ),
     destination = git.github_destination(
         url = moveUrl,
-        push = "aptos_main",
+        push = "aptos-main",
     ),
-    #origin_files = glob(["third_party/move/language/**"]),
-    origin_files = glob(["third_party/move/language/README.md"]), # During testing only one file
+    mode = "CHANGE_REQUEST",
+    origin_files = glob(["third_party/move/language/**"]),
     destination_files = glob(["language/**"]),
     authoring = authoring.pass_thru("Wolfgang <wg@aptoslabs.com>"),
     transformations = [
-        core.move("third_party/move", ""),
+        core.move("third_party/move", "language"),
     ],
 )
