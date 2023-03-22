@@ -78,6 +78,18 @@ module 0xCAFE::test {
         borrow_global_mut<ModuleData>(addr).state = s;
     }
 
+    public entry fun pass_vector_optional_object(o: vector<Option<Object<ModuleData>>>, s: String, i: u64) acquires ModuleData {
+        let o = std::vector::borrow_mut(&mut o, i);
+        if (std::option::is_none(o)) {
+            return
+        } else {
+            let o = std::option::extract(o);
+            let addr = aptos_std::object::object_address(&o);
+            // guaranteed to exist
+            borrow_global_mut<ModuleData>(addr).state = s;
+        };
+    }
+
     fun convert(x: u128): String {
         let s = std::vector::empty();
         let ascii0 = 48;

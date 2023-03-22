@@ -114,6 +114,15 @@ fn constructor_args_good() {
             ],
             "b", // second element of the vector
         ),
+        (
+            "0xcafe::test::pass_vector_optional_object",
+            vec![
+                bcs::to_bytes(&vec![vec![OBJECT_ADDRESS], vec![]]).unwrap(), // vector<Option<Object<T>>>
+                bcs::to_bytes(&"pff vectors of optionals").unwrap(),
+                bcs::to_bytes(&0u64).unwrap(),
+            ],
+            "pff vectors of optionals",
+        ),
     ];
 
     success(tests);
