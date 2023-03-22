@@ -599,6 +599,26 @@ fn string_args_bad_length() {
 }
 
 #[test]
+fn string_args_generic_call() {
+    let tests = vec![
+        (
+            "0xcafe::test::generic_call",
+            vec![(vec![bcs::to_bytes("hi".as_bytes()).unwrap()], "hi")],
+        ),
+    ];
+
+    let string_struct = StructTag {
+        address: AccountAddress::from_hex_literal("0x1").expect("valid address"),
+        module: Identifier::new("string").expect("valid identifier"),
+        name: Identifier::new("String").expect("valid identifier"),
+        type_params: vec![],
+    };
+    let string_type = TypeTag::Struct(Box::new(string_struct));
+
+    success_generic(vec![string_type], tests);
+}
+
+#[test]
 fn string_args_generic_instantiation() {
     let mut tests = vec![];
     let long_addr = AccountAddress::from_hex_literal(

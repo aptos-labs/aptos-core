@@ -66,6 +66,15 @@ module 0xCAFE::test {
         }
     }
 
+    public entry fun generic_call<T: copy + drop + store>(sender: &signer, msg: T) acquires GenericModuleData {
+        let addr = signer::address_of(sender);
+        if (!exists<ModuleData>(addr)) {
+            move_to<GenericModuleData<T>>(sender, GenericModuleData { state: msg });
+        } else {
+            borrow_global_mut<GenericModuleData<T>>(addr).state = msg;
+        }
+    }
+
     public entry fun generic_multi_vec<T: copy + drop + store, W: copy + drop + store>(
         sender: &signer,
         w_ies: vector<vector<W>>,
