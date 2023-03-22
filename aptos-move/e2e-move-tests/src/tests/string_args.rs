@@ -28,7 +28,15 @@ fn success_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<(Vec<Vec<u8>>, &
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
     assert_success!(h.publish_package(&acc, &common::test_dir_path("string_args.data/pack")));
 
-    let module_data = parse_struct_tag("0xCAFE::test::ModuleData").unwrap();
+    let mut module_data = parse_struct_tag("0xCAFE::test::ModuleData").unwrap();
+    let string_struct = StructTag {
+        address: AccountAddress::from_hex_literal("0x1").expect("valid address"),
+        module: Identifier::new("string").expect("valid identifier"),
+        name: Identifier::new("String").expect("valid identifier"),
+        type_params: vec![],
+    };
+    let string_type = TypeTag::Struct(Box::new(string_struct));
+    module_data.type_params.push(string_type);
 
     // Check in initial state, resource does not exist.
     assert!(!h.exists_resource(acc.address(), module_data.clone()));
@@ -596,6 +604,35 @@ fn string_args_bad_length() {
     ));
 
     fail(tests);
+}
+
+#[test]
+fn string_args_non_generic_call() {
+    let tests = vec![("0xcafe::test::non_generic_call", vec![(
+        vec![bcs::to_bytes("hi".as_bytes()).unwrap()],
+        "hi",
+    )])];
+
+    success_generic(vec![], tests);
+}
+
+#[ignore]
+#[test]
+fn string_args_generic_call() {
+    let tests = vec![("0xcafe::test::generic_call", vec![(
+        vec![bcs::to_bytes("hi".as_bytes()).unwrap()],
+        "hi",
+    )])];
+
+    let string_struct = StructTag {
+        address: AccountAddress::from_hex_literal("0x1").expect("valid address"),
+        module: Identifier::new("string").expect("valid identifier"),
+        name: Identifier::new("String").expect("valid identifier"),
+        type_params: vec![],
+    };
+    let string_type = TypeTag::Struct(Box::new(string_struct));
+
+    success_generic(vec![string_type], tests);
 }
 
 #[test]
