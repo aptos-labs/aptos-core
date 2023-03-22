@@ -2,7 +2,7 @@ import { AptosAccount, TxnBuilderTypes, OptionalTransactionArgs, AptosClient, BC
 const { connect } = require("http2");
 
 const MAX_GAS_AMOUNT_ALLOWED = BigInt(2000000);
-const URL = "https://fullnode.devnet.aptoslabs.com";
+const URL = "https://fullnode.testnet.aptoslabs.com";
 
 /**
  * This class submits banch transactions.
