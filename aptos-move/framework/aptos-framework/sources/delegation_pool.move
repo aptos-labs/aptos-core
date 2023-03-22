@@ -465,15 +465,20 @@ module aptos_framework::delegation_pool {
         assert!(delegation_pool_exists(pool_address), error::invalid_argument(EDELEGATION_POOL_DOES_NOT_EXIST));
     }
 
-    fun assert_min_active_balance(pool: &DelegationPool, delegator_address: address) {
+    fun assert_min_active_balance(pool: &DelegationPool, delegator_address: address, or_zero_balance: bool) {
+        let shares = pool_u64::shares(&pool.active_shares, delegator_address);
         let balance = pool_u64::balance(&pool.active_shares, delegator_address);
-        assert!(balance >= MIN_COINS_ON_SHARES_POOL, error::invalid_argument(EDELEGATOR_ACTIVE_BALANCE_TOO_LOW));
+        assert!(
+            balance >= MIN_COINS_ON_SHARES_POOL || (or_zero_balance && shares == 0),
+            error::invalid_argument(EDELEGATOR_ACTIVE_BALANCE_TOO_LOW)
+        );
     }
 
-    fun assert_min_pending_inactive_balance(pool: &DelegationPool, delegator_address: address) {
+    fun assert_min_pending_inactive_balance(pool: &DelegationPool, delegator_address: address, or_zero_balance: bool) {
+        let shares = pool_u64::shares(pending_inactive_shares_pool(pool), delegator_address);
         let balance = pool_u64::balance(pending_inactive_shares_pool(pool), delegator_address);
         assert!(
-            balance >= MIN_COINS_ON_SHARES_POOL,
+            balance >= MIN_COINS_ON_SHARES_POOL || (or_zero_balance && shares == 0),
             error::invalid_argument(EDELEGATOR_PENDING_INACTIVE_BALANCE_TOO_LOW)
         );
     }
@@ -574,7 +579,7 @@ module aptos_framework::delegation_pool {
 
         // but buy shares for delegator just for the remaining amount after fee
         pool_u64::buy_in(&mut pool.active_shares, delegator_address, amount - add_stake_fee);
-        assert_min_active_balance(pool, delegator_address);
+        assert_min_active_balance(pool, delegator_address, false);
 
         // grant temporary ownership over `add_stake` fees to a separate shareholder in order to:
         // - not mistake them for rewards to pay the operator from
@@ -616,11 +621,12 @@ module aptos_framework::delegation_pool {
             amount,
         );
         amount = redeem_active_shares(pool, delegator_address, amount);
+        assert_min_active_balance(pool, delegator_address, true);
 
         stake::unlock(&retrieve_stake_pool_owner(pool), amount);
 
         buy_in_pending_inactive_shares(pool, delegator_address, amount);
-        assert_min_pending_inactive_balance(pool, delegator_address);
+        assert_min_pending_inactive_balance(pool, delegator_address, false);
 
         event::emit_event(
             &mut pool.unlock_stake_events,
@@ -650,11 +656,12 @@ module aptos_framework::delegation_pool {
         );
         let observed_lockup_cycle = pool.observed_lockup_cycle;
         amount = redeem_inactive_shares(pool, delegator_address, amount, observed_lockup_cycle);
+        assert_min_pending_inactive_balance(pool, delegator_address, true);
 
         stake::reactivate_stake(&retrieve_stake_pool_owner(pool), amount);
 
         pool_u64::buy_in(&mut pool.active_shares, delegator_address, amount);
-        assert_min_active_balance(pool, delegator_address);
+        assert_min_active_balance(pool, delegator_address, false);
 
         event::emit_event(
             &mut pool.reactivate_stake_events,
@@ -694,6 +701,9 @@ module aptos_framework::delegation_pool {
             )
         };
         amount = redeem_inactive_shares(pool, delegator_address, amount, withdrawal_olc);
+        if (!withdrawing_inactive_stake) {
+            assert_min_pending_inactive_balance(pool, delegator_address, true);
+        };
 
         let stake_pool_owner = &retrieve_stake_pool_owner(pool);
         // stake pool will inactivate entire pending_inactive stake at `stake::withdraw` to make it withdrawable
