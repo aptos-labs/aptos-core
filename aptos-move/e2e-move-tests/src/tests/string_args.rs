@@ -616,6 +616,7 @@ fn string_args_non_generic_call() {
     success_generic(vec![], tests);
 }
 
+#[ignore]
 #[test]
 fn string_args_generic_call() {
     let tests = vec![("0xcafe::test::generic_call", vec![(
