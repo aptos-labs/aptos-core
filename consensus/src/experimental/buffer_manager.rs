@@ -224,14 +224,15 @@ impl BufferManager {
         // Send the randomness shares through the first k proposers,
         // otherwise all blocks are Nil/genesis blocks that do not need randomness
         let rand_shares = RandShares::new(item_hash, self.author, item.epoch(), item.gen_dummy_rand_share_vec(self.author));
-        // for proposer in item.get_first_k_proposers(self.verifier.len() / 5) {
-        //     self.rand_msg_tx
-        //     .send_rand_shares(rand_shares.clone(), proposer)
-        //     .await;
-        // }
-        self.rand_msg_tx
-            .broadcast_rand_shares(rand_shares)
+        for proposer in item.get_first_k_proposers(1) {
+            println!("[rand debug] {} send share {} to leader {}", self.author, rand_shares.item_id(), proposer);
+            self.rand_msg_tx
+            .send_rand_shares(rand_shares.clone(), proposer)
             .await;
+        }
+        // self.rand_msg_tx
+        //     .broadcast_rand_shares(rand_shares)
+        //     .await;
 
         self.buffer.push_back(item);
     }
@@ -246,6 +247,8 @@ impl BufferManager {
             VerifiedEvent::RandShareMsg(rand_shares) => {
                 let item_id = rand_shares.item_id();
                 info!("Receive random shares for item {:?}", item_id);
+
+                println!("[rand debug] {} receive share {} from node {}", self.author, rand_shares.item_id(), rand_shares.author());
 
                 // todo: verify rand message, ignore invalid ones
 
@@ -269,7 +272,7 @@ impl BufferManager {
                             }
                             // if we're one of the proposer for the first k proposal block,
                             // we're responsible to broadcast the randomness decision
-                            if item.get_first_k_proposers(self.verifier.len() / 5).contains(&self.author) {
+                            if item.get_first_k_proposers(1).contains(&self.author) {
                                 self.rand_msg_tx
                                     .broadcast_rand_decisions(rand_decisions)
                                     .await;
