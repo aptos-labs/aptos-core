@@ -7,6 +7,7 @@ import {
   MaybeHexString,
   HexString,
   TransactionBuilderEd25519,
+  Types,
 } from "aptos";
 import { Timer } from "timer-node";
 
@@ -35,6 +36,7 @@ export class BatchTransaction {
   private currentIndex: number = 0;
   private currentBuffer: Transaction[] = [];
   private latestTxnHash: string = "";
+  private hash: string[] = [];
   private lastRefreshed: Date | undefined = undefined;
 
   private chainId: BCS.Uint8;
@@ -55,6 +57,8 @@ export class BatchTransaction {
       try {
         const txns = await this.createTransactions(transactions);
         const result = await this.client.submitBatchTransactions(txns);
+        await this.checkTransactions();
+
         return result;
       } catch (error: any) {
         console.log("error", error);
@@ -161,6 +165,7 @@ export class BatchTransaction {
     this.sequenceNumber!++;
     const bcsTxn = AptosClient.generateBCSTransaction(txn.sender, rawTransaction);
     this.latestTxnHash = this.getSignedTxnHash(rawTransaction, txn.sender);
+    this.hash.push(this.latestTxnHash);
     return bcsTxn;
   }
 
@@ -191,6 +196,29 @@ export class BatchTransaction {
   async syncSequenceNumber(account: AptosAccount) {
     const { sequence_number } = await this.client.getAccount(account.address());
     this.sequenceNumber = BigInt(sequence_number);
+  }
+
+  async checkTransactions() {
+    if (this.hash.length > 0) {
+      const pendingTxnsPromises: Types.Transaction[] = [];
+      for (let i = 0; i < this.hash.length; i++) {
+        const pendingTxn = await this.client.waitForTransactionWithResult(this.hash[i]);
+        pendingTxnsPromises.push(pendingTxn);
+      }
+      //console.log("pendingTxnsPromises", pendingTxnsPromises);
+      await Promise.all(pendingTxnsPromises);
+      for (let i = 0; i < pendingTxnsPromises.length; i++) {
+        try {
+          const pendingTxn = await pendingTxnsPromises[i];
+          //console.log("pendingTxn", pendingTxn);
+          if (!(pendingTxn as any).success) {
+            throw new Error(`transaction with hash ${pendingTxn.hash} cant be submitted`);
+          }
+        } catch (e) {
+          console.error(`wait for txn error. ${e}`);
+        }
+      }
+    }
   }
 
   async sleep(timeMs: number): Promise<null> {

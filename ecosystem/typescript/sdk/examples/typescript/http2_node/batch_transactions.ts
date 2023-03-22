@@ -1,8 +1,8 @@
 import { AptosAccount, TxnBuilderTypes, OptionalTransactionArgs, AptosClient, BCS, MaybeHexString } from "aptos";
+const { connect } = require("http2");
 
 const MAX_GAS_AMOUNT_ALLOWED = BigInt(2000000);
-//const URL = "https://fullnode.devnet.aptoslabs.com";
-const URL = "http://0.0.0.0:8080/v1";
+const URL = "https://fullnode.devnet.aptoslabs.com";
 
 /**
  * This class submits banch transactions.
@@ -15,7 +15,6 @@ const URL = "http://0.0.0.0:8080/v1";
 export class BatchTransaction {
   private transaction: any;
   private sequenceNumber: BCS.Uint64 | undefined = undefined;
-  //client = new AptosClient("http://0.0.0.0:8080/v1");
   private client = new AptosClient(URL);
   private account: AptosAccount | undefined = undefined;
   private lastRefreshed: Date | undefined = undefined;
@@ -24,6 +23,8 @@ export class BatchTransaction {
   private chainId: BCS.Uint8;
   private gasUnitPrice: BCS.Uint64;
   private maxGasAmount: BCS.Uint64;
+
+  private request: any = connect(URL);
 
   constructor(
     account: AptosAccount,
@@ -36,25 +37,99 @@ export class BatchTransaction {
   }
 
   async get(paths: string[]) {
-    const promises = paths.map((path) => fetch(URL + path));
-    const responses = await Promise.all(promises);
-    const data = await Promise.all(responses.map((response) => response.json()));
+    const requests = paths.map((path) => this.request.request({ ":path": path, "content-type": "application/json" }));
+    const promises = requests.map((request) => {
+      return new Promise((resolve, reject) => {
+        request.on("response", (headers: any) => {
+          let chunks = "";
+          request.on("data", (chunk: any) => {
+            chunks += chunk;
+          });
+          request.on("end", () => {
+            const data = JSON.parse(chunks);
+            resolve(data);
+          });
+        });
+        request.on("error", reject);
+        request.end();
+      });
+    });
+    const data = await Promise.all(promises);
+    this.request.close();
     return data;
   }
 
-  async send(transaction: Uint8Array[]) {
-    const promises = transaction.map((transaction) =>
-      fetch(`${URL}/v1/transactions`, {
-        method: "POST",
-        body: Buffer.from(transaction),
-        headers: {
-          "content-type": "application/x.aptos.signed_transaction+bcs",
-        },
-      }),
-    );
+  // async send(transaction: Uint8Array) {
+  //   return new Promise((resolve, reject) => {
+  //     const req = this.request.request({
+  //       ":method": "POST",
+  //       ":path": "/v1/transactions",
+  //       "content-type": "application/x.aptos.signed_transaction+bcs",
+  //       "content-length": Buffer.byteLength(transaction),
+  //     });
+
+  //     let data = "";
+
+  //     req.on("response", (headers: any, flags: any) => {
+  //       //console.log("headers", headers);
+  //     });
+
+  //     req.on("data", (chunk: any) => {
+  //       data += chunk;
+  //     });
+
+  //     req.on("end", () => {
+  //       //console.log(`Request completed`, data);
+  //       resolve(data);
+  //     });
+
+  //     req.on("error", (err: any) => {
+  //       console.error(`Request failed: ${err}`);
+  //       reject(err);
+  //     });
+
+  //     req.write(transaction);
+  //     req.end();
+  //   });
+  // }
+
+  async send(transactions: Uint8Array[]): Promise<any> {
+    const promises = transactions.map(async (transaction) => {
+      // Create a new stream for each request
+      const stream = this.request.request({
+        ":method": "POST",
+        ":path": "/v1/transactions",
+        "content-type": "application/x.aptos.signed_transaction+bcs",
+        "content-length": Buffer.byteLength(transaction),
+      });
+
+      // Write the request body to the stream and end the stream
+      stream.write(transaction);
+      stream.end();
+
+      // Return a promise that resolves when the response is received
+      return new Promise((resolve, reject) => {
+        let data = "";
+        stream.on("response", (headers: any) => {});
+        stream.on("data", (chunk: any) => {
+          data += chunk;
+        });
+        stream.on("end", () => {
+          resolve(data);
+        });
+        stream.on("error", (error: any) => {
+          reject(error);
+        });
+      });
+    });
+
+    // Wait for all promises to complete and collect the responses
     const responses = await Promise.all(promises);
-    const data = await Promise.all(responses.map((response) => response.json()));
-    return data;
+
+    // Close the session
+    this.request.close();
+
+    return responses;
   }
 
   async generateBscTxn(): Promise<Uint8Array | undefined> {

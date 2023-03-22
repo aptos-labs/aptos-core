@@ -4,7 +4,6 @@ import { BatchTransaction } from "./batch_transactions";
 import { Timer } from "timer-node";
 
 async function main() {
-  //const faucetClient = new FaucetClient("http://0.0.0.0:8080/v1", "http://0.0.0.0:8081");
   const faucetClient = new FaucetClient("https://fullnode.devnet.aptoslabs.com", "https://faucet.devnet.aptoslabs.com");
   const account1 = new AptosAccount();
   await faucetClient.fundAccount(account1.address(), 100_000_000);
@@ -26,13 +25,9 @@ async function main() {
   });
   const timer = new Timer();
   timer.start();
-  // for (let i = 0; i < 5; i++) {
-  //   const txn = await batch.generateBscTxn();
-  //   await batch.send(txn!);
-  //   //console.log(result);
-  // }
-  for (let i = 0; i < 1; i++) {
-    await batch.get();
+  for (let i = 0; i < 50; i++) {
+    const txn = await batch.generateBscTxn();
+    const result = await batch.send(txn!);
     //console.log(result);
   }
   timer.stop();

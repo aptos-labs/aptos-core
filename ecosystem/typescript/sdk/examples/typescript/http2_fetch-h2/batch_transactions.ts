@@ -2,6 +2,7 @@ import { AptosAccount, TxnBuilderTypes, OptionalTransactionArgs, AptosClient, BC
 import { context, fetch } from "fetch-h2";
 
 const MAX_GAS_AMOUNT_ALLOWED = BigInt(2000000);
+const URL = "https://fullnode.devnet.aptoslabs.com";
 
 /**
  * This class submits banch transactions.
@@ -14,7 +15,7 @@ const MAX_GAS_AMOUNT_ALLOWED = BigInt(2000000);
 export class BatchTransaction {
   private transaction: any;
   private sequenceNumber: BCS.Uint64 | undefined = undefined;
-  private client = new AptosClient("https://fullnode.devnet.aptoslabs.com");
+  private client = new AptosClient(URL);
   private account: AptosAccount | undefined = undefined;
   private lastRefreshed: Date | undefined = undefined;
   private extraArgs?: OptionalTransactionArgs;
@@ -22,8 +23,6 @@ export class BatchTransaction {
   private chainId: BCS.Uint8;
   private gasUnitPrice: BCS.Uint64;
   private maxGasAmount: BCS.Uint64;
-
-  private context = context();
 
   constructor(
     account: AptosAccount,
@@ -33,20 +32,17 @@ export class BatchTransaction {
     this.transaction = transaction;
     this.account = account;
     this.extraArgs = extraArgs;
-    this.context.setup({ httpProtocol: "http1" });
   }
 
   async send(transaction: Uint8Array) {
-    const response = await this.context.fetch("https://fullnode.devnet.aptoslabs.com/v1/transactions", {
+    const response = await fetch(`${URL}/v1/transactions`, {
       method: "POST",
       body: Buffer.from(transaction),
       headers: {
         "content-type": "application/x.aptos.signed_transaction+bcs",
       },
     });
-    //console.log("response", response);
-    //console.log(`httpVersion: ${response.httpVersion}`);
-    const headers = response.headers;
+    console.log(response.httpVersion);
     return await response.json();
   }
 
@@ -100,12 +96,5 @@ export class BatchTransaction {
   async syncSequenceNumber(account: AptosAccount) {
     const { sequence_number } = await this.client.getAccount(account.address());
     this.sequenceNumber = BigInt(sequence_number);
-  }
-
-  async get() {
-    const response = await this.context.fetch(
-      "https://fullnode.devnet.aptoslabs.com/v1/accounts/0x8d5f30dd93ccaf52c26f3cd12bc5e03c7121b8dca607bf38297d6ab21e5ceb5d",
-    );
-    console.log(response);
   }
 }
