@@ -20,7 +20,7 @@ use aptos_testcases::{
     fullnode_reboot_stress_test::FullNodeRebootStressTest,
     generate_traffic,
     load_vs_perf_benchmark::{LoadVsPerfBenchmark, TransactinWorkload, Workloads},
-    multi_region_simulation_test::MultiRegionSimulationTest,
+    multi_region_simulation_test::MultiRegionMultiCloudSimulationTest,
     network_bandwidth_test::NetworkBandwidthTest,
     network_loss_test::NetworkLossTest,
     network_partition_test::NetworkPartitionTest,
@@ -32,7 +32,7 @@ use aptos_testcases::{
         StateSyncFullnodeFastSyncPerformance, StateSyncFullnodePerformance,
         StateSyncValidatorPerformance,
     },
-    three_region_simulation_test::{ExecutionDelayConfig, ThreeRegionSimulationTest},
+    three_region_simulation_test::{ExecutionDelayConfig, ThreeRegionSameCloudSimulationTest},
     twin_validator_test::TwinValidatorTest,
     two_traffics_test::{ThreeRegionSimulationTwoTrafficsTest, TwoTrafficsTest},
     validator_join_leave_test::ValidatorJoinLeaveTest,
@@ -492,8 +492,8 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             run_consensus_only_three_region_simulation(config)
         },
         "quorum_store_reconfig_enable_test" => quorum_store_reconfig_enable_test(config),
-        "consensus_only_multi_region_simulation_test" => {
-            consensus_only_multi_region_simulation_test(config)
+        "multi_region_multi_cloud_simulation_test" => {
+            multi_region_multi_cloud_simulation_test(config)
         },
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
@@ -508,7 +508,7 @@ fn run_consensus_only_three_region_simulation(config: ForgeConfig) -> ForgeConfi
                 .mode(EmitJobMode::ConstTps { tps: 30000 })
                 .txn_expiration_time_secs(5 * 60),
         )
-        .with_network_tests(vec![&ThreeRegionSimulationTest {
+        .with_network_tests(vec![&ThreeRegionSameCloudSimulationTest {
             add_execution_delay: None,
         }])
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
@@ -857,7 +857,7 @@ fn three_region_sim_graceful_overload(config: ForgeConfig) -> ForgeConfig {
                 avg_tps: 3400,
                 latency_thresholds: &[],
             },
-            three_region_simulation_test: ThreeRegionSimulationTest {
+            three_region_simulation_test: ThreeRegionSameCloudSimulationTest {
                 add_execution_delay: None,
             },
         }])
@@ -1013,7 +1013,7 @@ fn three_region_simulation_with_different_node_speed(config: ForgeConfig) -> For
         .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
         .with_initial_fullnode_count(30)
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
-        .with_network_tests(vec![&ThreeRegionSimulationTest {
+        .with_network_tests(vec![&ThreeRegionSameCloudSimulationTest {
             add_execution_delay: Some(ExecutionDelayConfig {
                 inject_delay_node_fraction: 0.5,
                 inject_delay_max_transaction_percentage: 40,
@@ -1047,7 +1047,7 @@ fn three_region_simulation(config: ForgeConfig) -> ForgeConfig {
         .with_initial_validator_count(NonZeroUsize::new(12).unwrap())
         .with_initial_fullnode_count(12)
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
-        .with_network_tests(vec![&ThreeRegionSimulationTest {
+        .with_network_tests(vec![&ThreeRegionSameCloudSimulationTest {
             add_execution_delay: None,
         }])
         // TODO(rustielin): tune these success criteria after we have a better idea of the test behavior
@@ -1261,7 +1261,7 @@ fn chaos_test_suite(duration: Duration) -> ForgeConfig<'static> {
         .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
         .with_network_tests(vec![
             &NetworkBandwidthTest,
-            &ThreeRegionSimulationTest {
+            &ThreeRegionSameCloudSimulationTest {
                 add_execution_delay: None,
             },
             &NetworkLossTest,
@@ -1447,11 +1447,9 @@ fn quorum_store_reconfig_enable_test(forge_config: ForgeConfig<'static>) -> Forg
         )
 }
 
-fn consensus_only_multi_region_simulation_test(
-    config: ForgeConfig<'static>,
-) -> ForgeConfig<'static> {
+fn multi_region_multi_cloud_simulation_test(config: ForgeConfig<'static>) -> ForgeConfig<'static> {
     config
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
         .with_emit_job(
             EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad {
@@ -1459,31 +1457,10 @@ fn consensus_only_multi_region_simulation_test(
                 })
                 .txn_expiration_time_secs(5 * 60),
         )
-        .with_network_tests(vec![&MultiRegionSimulationTest {
-            add_execution_delay: None,
-        }])
+        .with_network_tests(vec![&MultiRegionMultiCloudSimulationTest {}])
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // no epoch change.
             helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
-        }))
-        .with_node_helm_config_fn(Arc::new(|helm_values| {
-            helm_values["validator"]["config"]["mempool"]["capacity"] = 3_000_000.into();
-            helm_values["validator"]["config"]["mempool"]["capacity_bytes"] =
-                (3_u64 * 1024 * 1024 * 1024).into();
-            helm_values["validator"]["config"]["mempool"]["capacity_per_user"] = 100_000.into();
-            helm_values["validator"]["config"]["mempool"]["system_transaction_timeout_secs"] =
-                (5 * 60 * 60).into();
-            helm_values["validator"]["config"]["mempool"]["system_transaction_gc_interval_ms"] =
-                (5 * 60 * 60_000).into();
-            helm_values["validator"]["config"]["consensus"]["max_sending_block_txns"] = 5000.into();
-            helm_values["validator"]["config"]["consensus"]["max_receiving_block_txns"] =
-                30000.into();
-            helm_values["validator"]["config"]["consensus"]["max_sending_block_bytes"] =
-                (3 * 1024 * 1024).into();
-            helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
-                ["bootstrapping_mode"] = "ExecuteTransactionsFromGenesis".into();
-            helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
-                ["continuous_syncing_mode"] = "ExecuteTransactions".into();
         }))
         // TODO(ibalajiarun): tune these success critiera after we have a better idea of the test behavior
         .with_success_criteria(

@@ -1,18 +1,16 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{three_region_simulation_test::ExecutionDelayConfig, LoadDestination, NetworkLoadTest};
+use crate::{LoadDestination, NetworkLoadTest};
 use aptos_forge::{
     GroupNetworkBandwidth, GroupNetworkDelay, NetworkContext, NetworkTest, Swarm, SwarmChaos,
-    SwarmExt, SwarmNetworkBandwidth, SwarmNetworkDelay, Test,
+    SwarmNetworkBandwidth, SwarmNetworkDelay, Test,
 };
 use aptos_logger::info;
 use aptos_types::PeerId;
 use csv::Reader;
 use itertools::{self, Itertools};
-use rand::Rng;
 use std::collections::BTreeMap;
-use tokio::runtime::Runtime;
 
 macro_rules! FOUR_REGION_LINK_STATS_CSV {
     () => {
@@ -20,20 +18,20 @@ macro_rules! FOUR_REGION_LINK_STATS_CSV {
     };
 }
 
-pub struct MultiRegionSimulationTest {
-    pub add_execution_delay: Option<ExecutionDelayConfig>,
-}
+/// A test to simulate network between multiple regions in different clouds.
+/// It currently supports only 4 regions, due to ChaosMesh limitations.
+pub struct MultiRegionMultiCloudSimulationTest {}
 
-impl Test for MultiRegionSimulationTest {
+impl Test for MultiRegionMultiCloudSimulationTest {
     fn name(&self) -> &'static str {
-        "network::multi-region-simulation"
+        "network::multi-region-multi-cloud-simulation"
     }
 }
 
 fn get_link_stats_table() -> BTreeMap<String, BTreeMap<String, (u64, f64)>> {
     let mut stats_table = BTreeMap::new();
 
-    let mut rdr = Reader::from_reader(include_bytes!(LATENCY_TABLE_CSV!()).as_slice());
+    let mut rdr = Reader::from_reader(include_bytes!(FOUR_REGION_LINK_STATS_CSV!()).as_slice());
     for result in rdr.deserialize() {
         if let Ok((from, to, bitrate, latency)) = result {
             let from: String = from;
@@ -124,71 +122,7 @@ fn create_multi_region_swarm_network_chaos(
     )
 }
 
-fn add_execution_delay(swarm: &mut dyn Swarm, config: &ExecutionDelayConfig) -> anyhow::Result<()> {
-    let runtime = Runtime::new().unwrap();
-    let validators = swarm.get_validator_clients_with_names();
-
-    runtime.block_on(async {
-        let mut rng = rand::thread_rng();
-        for (name, validator) in validators {
-            let sleep_fraction = if rng.gen_bool(config.inject_delay_node_fraction) {
-                rng.gen_range(1_u32, config.inject_delay_max_transaction_percentage)
-            } else {
-                0
-            };
-            let name = name.clone();
-            info!(
-                "Validator {} adding {}% of transactions with 1ms execution delay",
-                name, sleep_fraction
-            );
-            validator
-                .set_failpoint(
-                    "aptos_vm::execution::user_transaction".to_string(),
-                    format!(
-                        "{}%delay({})",
-                        sleep_fraction, config.inject_delay_per_transaction_ms
-                    ),
-                )
-                .await
-                .map_err(|e| {
-                    anyhow::anyhow!(
-                        "set_failpoint to add execution delay on {} failed, {:?}",
-                        name,
-                        e
-                    )
-                })?;
-        }
-        Ok::<(), anyhow::Error>(())
-    })
-}
-
-fn remove_execution_delay(swarm: &mut dyn Swarm) -> anyhow::Result<()> {
-    let runtime = Runtime::new().unwrap();
-    let validators = swarm.get_validator_clients_with_names();
-
-    runtime.block_on(async {
-        for (name, validator) in validators {
-            let name = name.clone();
-
-            validator
-                .set_failpoint(
-                    "aptos_vm::execution::block_metadata".to_string(),
-                    "off".to_string(),
-                )
-                .await
-                .map_err(|e| {
-                    anyhow::anyhow!(
-                        "set_failpoint to remove execution delay on {} failed, {:?}",
-                        name,
-                        e
-                    )
-                })?;
-        }
-        Ok::<(), anyhow::Error>(())
-    })
-}
-
-impl NetworkLoadTest for MultiRegionSimulationTest {
+impl NetworkLoadTest for MultiRegionMultiCloudSimulationTest {
     fn setup(&self, ctx: &mut NetworkContext) -> anyhow::Result<LoadDestination> {
         let all_validators = ctx
             .swarm()
@@ -206,23 +140,15 @@ impl NetworkLoadTest for MultiRegionSimulationTest {
         let chaos = SwarmChaos::Delay(delay);
         ctx.swarm().inject_chaos(chaos)?;
 
-        if let Some(config) = &self.add_execution_delay {
-            add_execution_delay(ctx.swarm(), config)?;
-        }
-
         Ok(LoadDestination::FullnodesOtherwiseValidators)
     }
 
     fn finish(&self, swarm: &mut dyn Swarm) -> anyhow::Result<()> {
-        if self.add_execution_delay.is_some() {
-            remove_execution_delay(swarm)?;
-        }
-
         swarm.remove_all_chaos()
     }
 }
 
-impl NetworkTest for MultiRegionSimulationTest {
+impl NetworkTest for MultiRegionMultiCloudSimulationTest {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> anyhow::Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx)
     }
@@ -236,17 +162,17 @@ mod tests {
     fn test_create_multi_region_swarm_network_chaos() {
         aptos_logger::Logger::new().init();
 
-        let all_validators = (0..14).map(|_| PeerId::random()).collect();
+        let all_validators = (0..8).map(|_| PeerId::random()).collect();
         let (delay, bandwidth) = create_multi_region_swarm_network_chaos(all_validators);
 
-        assert_eq!(delay.group_network_delays.len(), 21);
-        assert_eq!(bandwidth.group_network_bandwidths.len(), 21);
+        assert_eq!(delay.group_network_delays.len(), 6);
+        assert_eq!(bandwidth.group_network_bandwidths.len(), 6);
 
-        let all_validators: Vec<PeerId> = (0..16).map(|_| PeerId::random()).collect();
+        let all_validators: Vec<PeerId> = (0..10).map(|_| PeerId::random()).collect();
         let (delay, bandwidth) = create_multi_region_swarm_network_chaos(all_validators.clone());
 
-        assert_eq!(delay.group_network_delays.len(), 21);
-        assert_eq!(bandwidth.group_network_bandwidths.len(), 21);
+        assert_eq!(delay.group_network_delays.len(), 6);
+        assert_eq!(bandwidth.group_network_bandwidths.len(), 6);
         assert_eq!(delay.group_network_delays[0].source_nodes.len(), 4);
         assert_eq!(delay.group_network_delays[0].target_nodes.len(), 2);
         assert_eq!(bandwidth.group_network_bandwidths[0].source_nodes.len(), 4);
@@ -254,15 +180,15 @@ mod tests {
         assert_eq!(
             bandwidth.group_network_bandwidths[0],
             GroupNetworkBandwidth {
-                name: "aws--ap-northeast-1-to-aws--eu-north-1-delay".to_owned(),
-                rate: 125,
+                name: "aws--ap-northeast-1-to-aws--eu-west-1-bandwidth".to_owned(),
+                rate: 5160960,
                 limit: 20971520,
                 buffer: 10000,
                 source_nodes: vec![
                     all_validators[0],
                     all_validators[1],
-                    all_validators[14],
-                    all_validators[15]
+                    all_validators[8],
+                    all_validators[9]
                 ],
                 target_nodes: vec![all_validators[2], all_validators[3]],
             }

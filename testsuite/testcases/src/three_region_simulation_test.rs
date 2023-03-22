@@ -25,11 +25,12 @@ pub struct ExecutionDelayConfig {
     pub inject_delay_per_transaction_ms: u32,
 }
 
-pub struct ThreeRegionSimulationTest {
+/// Represents a test that simulates a network with 3 regions, all in the same cloud.
+pub struct ThreeRegionSameCloudSimulationTest {
     pub add_execution_delay: Option<ExecutionDelayConfig>,
 }
 
-impl Test for ThreeRegionSimulationTest {
+impl Test for ThreeRegionSameCloudSimulationTest {
     fn name(&self) -> &'static str {
         "network::three-region-simulation"
     }
@@ -109,13 +110,14 @@ fn create_three_region_swarm_network_delay(swarm: &dyn Swarm) -> SwarmNetworkDel
     }
 }
 
-// 1 Gbps
+/// 10 Gbps network bandwidth simulation between all regions within
+/// the same cloud with dedicated backbone like GCP
 fn create_bandwidth_limit(swarm: &dyn Swarm) -> SwarmNetworkBandwidth {
     let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
     SwarmNetworkBandwidth {
         group_network_bandwidths: vec![GroupNetworkBandwidth {
             name: "forge-namespace-1000mbps-bandwidth".to_owned(),
-            rate: 1000 / 8, // 1 Gbps in megabytes per second
+            rate: 10000 / 8, // 1 Gbps in megabytes per second
             limit: 20971520,
             buffer: 10000,
             source_nodes: all_validators.clone(),
@@ -188,7 +190,7 @@ fn remove_execution_delay(swarm: &mut dyn Swarm) -> anyhow::Result<()> {
     })
 }
 
-impl NetworkLoadTest for ThreeRegionSimulationTest {
+impl NetworkLoadTest for ThreeRegionSameCloudSimulationTest {
     fn setup(&self, ctx: &mut NetworkContext) -> anyhow::Result<LoadDestination> {
         // inject network delay
         let delay = create_three_region_swarm_network_delay(ctx.swarm());
@@ -216,7 +218,7 @@ impl NetworkLoadTest for ThreeRegionSimulationTest {
     }
 }
 
-impl NetworkTest for ThreeRegionSimulationTest {
+impl NetworkTest for ThreeRegionSameCloudSimulationTest {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> anyhow::Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx)
     }
