@@ -1,0 +1,10 @@
+[package]
+name = "ParallelAccountsDemo"
+version = "1.0.0"
+
+[dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }
+AptosToken = { local = "../../framework/aptos-token" }
+
+[addresses]
+parallel_accounts = "_"
