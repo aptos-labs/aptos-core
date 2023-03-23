@@ -67,7 +67,7 @@ module aptos_token_objects::aptos_token {
         /// Used to mutate fields
         mutator_ref: Option<token::MutatorRef>,
         /// Used to mutate properties
-        property_mutator_ref: Option<property_map::MutatorRef>,
+        property_mutator_ref: property_map::MutatorRef,
     }
 
     /// Create a new collection
@@ -231,17 +231,11 @@ module aptos_token_objects::aptos_token {
             option::none()
         };
 
-        let property_mutator_ref = if (collection.mutable_token_properties) {
-            option::some(property_map::generate_mutator_ref(&constructor_ref))
-        } else {
-            option::none()
-        };
-
         let aptos_token = AptosToken {
             burn_ref,
             transfer_ref: option::none(),
             mutator_ref,
-            property_mutator_ref,
+            property_mutator_ref: property_map::generate_mutator_ref(&constructor_ref),
         };
         move_to(&object_signer, aptos_token);
 
@@ -262,8 +256,9 @@ module aptos_token_objects::aptos_token {
         borrow_global<AptosToken>(token_address)
     }
 
-    public fun are_properties_mutable<T: key>(token: Object<T>): bool acquires AptosToken {
-        option::is_some(&borrow(&token).property_mutator_ref)
+    public fun are_properties_mutable<T: key>(token: Object<T>): bool acquires AptosCollection {
+        let collection = token::collection_object(token);
+        borrow_collection(&collection).mutable_token_properties
     }
 
     public fun is_burnable<T: key>(token: Object<T>): bool acquires AptosToken {
@@ -314,8 +309,9 @@ module aptos_token_objects::aptos_token {
             burn_ref,
             transfer_ref: _,
             mutator_ref: _,
-            property_mutator_ref: _,
+            property_mutator_ref,
         } = aptos_token;
+        property_map::burn(property_mutator_ref);
         token::burn(option::extract(&mut burn_ref));
     }
 
@@ -382,19 +378,14 @@ module aptos_token_objects::aptos_token {
         key: String,
         type: String,
         value: vector<u8>,
-    ) acquires AptosToken {
+    ) acquires AptosCollection, AptosToken {
         let aptos_token = authorized_borrow(&token, signer::address_of(creator));
         assert!(
-            option::is_some(&aptos_token.property_mutator_ref),
+            are_properties_mutable(token),
             error::permission_denied(EPROPERTIES_NOT_MUTABLE),
         );
 
-        property_map::add(
-            option::borrow(&aptos_token.property_mutator_ref),
-            key,
-            type,
-            value,
-        );
+        property_map::add(&aptos_token.property_mutator_ref, key, type, value);
     }
 
     public fun add_typed_property<T: key, V: drop>(
@@ -402,28 +393,28 @@ module aptos_token_objects::aptos_token {
         token: Object<T>,
         key: String,
         value: V,
-    ) acquires AptosToken {
+    ) acquires AptosCollection, AptosToken {
         let aptos_token = authorized_borrow(&token, signer::address_of(creator));
         assert!(
-            option::is_some(&aptos_token.property_mutator_ref),
+            are_properties_mutable(token),
             error::permission_denied(EPROPERTIES_NOT_MUTABLE),
         );
 
-        property_map::add_typed(
-            option::borrow(&aptos_token.property_mutator_ref),
-            key,
-            value,
-        );
+        property_map::add_typed(&aptos_token.property_mutator_ref, key, value);
     }
 
-    public fun remove_property<T: key>(creator: &signer, token: Object<T>, key: &String) acquires AptosToken {
+    public fun remove_property<T: key>(
+        creator: &signer,
+        token: Object<T>,
+        key: &String,
+    ) acquires AptosCollection, AptosToken {
         let aptos_token = authorized_borrow(&token, signer::address_of(creator));
         assert!(
-            option::is_some(&aptos_token.property_mutator_ref),
+            are_properties_mutable(token),
             error::permission_denied(EPROPERTIES_NOT_MUTABLE),
         );
 
-        property_map::remove(option::borrow(&aptos_token.property_mutator_ref), key);
+        property_map::remove(&aptos_token.property_mutator_ref, key);
     }
 
     public fun update_property<T: key>(
@@ -432,19 +423,14 @@ module aptos_token_objects::aptos_token {
         key: &String,
         type: String,
         value: vector<u8>,
-    ) acquires AptosToken {
+    ) acquires AptosCollection, AptosToken {
         let aptos_token = authorized_borrow(&token, signer::address_of(creator));
         assert!(
-            option::is_some(&aptos_token.property_mutator_ref),
+            are_properties_mutable(token),
             error::permission_denied(EPROPERTIES_NOT_MUTABLE),
         );
 
-        property_map::update(
-            option::borrow(&aptos_token.property_mutator_ref),
-            key,
-            type,
-            value,
-        );
+        property_map::update(&aptos_token.property_mutator_ref, key, type, value);
     }
 
     public fun update_typed_property<T: key, V: drop>(
@@ -452,18 +438,14 @@ module aptos_token_objects::aptos_token {
         token: Object<T>,
         key: &String,
         value: V,
-    ) acquires AptosToken {
+    ) acquires AptosCollection, AptosToken {
         let aptos_token = authorized_borrow(&token, signer::address_of(creator));
         assert!(
-            option::is_some(&aptos_token.property_mutator_ref),
+            are_properties_mutable(token),
             error::permission_denied(EPROPERTIES_NOT_MUTABLE),
         );
 
-        property_map::update_typed(
-            option::borrow(&aptos_token.property_mutator_ref),
-            key,
-            value,
-        );
+        property_map::update_typed(&aptos_token.property_mutator_ref, key, value);
     }
 
     // Token entry functions
@@ -531,7 +513,7 @@ module aptos_token_objects::aptos_token {
         key: String,
         type: String,
         value: vector<u8>,
-    ) acquires AptosToken {
+    ) acquires AptosCollection, AptosToken {
         let token = token_object(creator, &collection, &name);
         add_property(creator, token, key, type, value);
     }
@@ -542,7 +524,7 @@ module aptos_token_objects::aptos_token {
         name: String,
         key: String,
         value: T,
-    ) acquires AptosToken {
+    ) acquires AptosCollection, AptosToken {
         let token = token_object(creator, &collection, &name);
         add_typed_property(creator, token, key, value);
     }
@@ -552,7 +534,7 @@ module aptos_token_objects::aptos_token {
         collection: String,
         name: String,
         key: String,
-    ) acquires AptosToken {
+    ) acquires AptosCollection, AptosToken {
         let token = token_object(creator, &collection, &name);
         remove_property(creator, token, &key);
     }
@@ -564,7 +546,7 @@ module aptos_token_objects::aptos_token {
         key: String,
         type: String,
         value: vector<u8>,
-    ) acquires AptosToken {
+    ) acquires AptosCollection, AptosToken {
         let token = token_object(creator, &collection, &name);
         update_property(creator, token, &key, type, value);
     }
@@ -575,7 +557,7 @@ module aptos_token_objects::aptos_token {
         name: String,
         key: String,
         value: T,
-    ) acquires AptosToken {
+    ) acquires AptosCollection, AptosToken {
         let token = token_object(creator, &collection, &name);
         update_typed_property(creator, token, &key, value);
     }

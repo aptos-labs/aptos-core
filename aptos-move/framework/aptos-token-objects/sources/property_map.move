@@ -49,7 +49,7 @@ module aptos_token_objects::property_map {
     // Structs
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
-    struct PropertyMap has key {
+    struct PropertyMap has drop, key {
         inner: SimpleMap<String, PropertyValue>,
     }
 
@@ -65,6 +65,10 @@ module aptos_token_objects::property_map {
     public fun init(ref: &ConstructorRef, container: PropertyMap) {
         let signer = object::generate_signer(ref);
         move_to(&signer, container);
+    }
+
+    public fun burn(ref: MutatorRef) acquires PropertyMap {
+        move_from<PropertyMap>(ref.self);
     }
 
     /// Helper for external entry functions to produce a valid container for property values.
