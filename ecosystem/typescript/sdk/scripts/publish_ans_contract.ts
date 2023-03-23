@@ -1,5 +1,5 @@
 const path = require("path");
-const { execSync, exec, spawnSync, spawn, stdin, stdout } = require("child_process");
+const { execSync } = require("child_process");
 
 const ANS_CORE_FOLDER = "/aptos-names-contracts/core";
 const APTOS_INIT_COMMAND = "aptos init --network local";
@@ -15,86 +15,39 @@ const GET_DEFAULT_PROFILE_COMMAND = "aptos config show-profiles --profile defaul
  *
  * We run this script whenever we run `pnpm test` in the TS SDK.
  */
+
+// delete aptos-names-contracts folder
 execSync("rm -rf aptos-names-contracts", {
   cwd: path.resolve(__dirname, ""),
 });
-// // clone ans public repo
-execSync(
-  "git clone git@github.com:aptos-labs/aptos-names-contracts.git",
-  {
-    cwd: path.resolve(__dirname, ""), // path to where you want to save the file
-  },
-  (error: any, stdout: any, stderr: any) => {
-    if (error) {
-      console.error(`Error cloning repository: ${error.message}`);
-      return;
-    }
-    if (stderr) {
-      console.error(`cloning repository stderr: ${stderr}`);
-      return;
-    }
-  },
-);
+// 1. Clone ANS repository into the current directory
+execSync("git clone git@github.com:aptos-labs/aptos-names-contracts.git", {
+  cwd: path.resolve(__dirname, ""),
+});
 
-// run aptos init --network local
+// 2. initialize a default profile
+execSync(APTOS_INIT_COMMAND, {
+  cwd: __dirname + ANS_CORE_FOLDER,
+});
+
+// 3. get default profile info
+const data = execSync(GET_DEFAULT_PROFILE_COMMAND, {
+  cwd: __dirname + ANS_CORE_FOLDER,
+})
+  .toString()
+  .trim();
+
+// 4. get default profile account address
+const storedData = JSON.parse(data).Result.default.account;
+// 5. publish ans modules under the default profile
 execSync(
-  `echo '\n' | ${APTOS_INIT_COMMAND}`,
+  `aptos move publish --named-addresses aptos_names=0x${storedData},aptos_names_admin=0x${storedData},aptos_names_funds=0x${storedData} --assume-yes`,
   {
     cwd: __dirname + ANS_CORE_FOLDER,
   },
-  (error: any, stdout: any, stderr: any) => {
-    if (error) {
-      console.error(`Error aptos init: ${error.message}`);
-      return;
-    }
-    if (stderr) {
-      console.error(`aptos init stderr: ${stderr}`);
-      return;
-    }
-  },
 );
 
-// get default profile account address
-const profiles = exec(
-  GET_DEFAULT_PROFILE_COMMAND,
-  {
-    cwd: __dirname + ANS_CORE_FOLDER,
-  },
-  (error: any, stderr: any) => {
-    if (error) {
-      console.error(`Error show-profiles: ${error.message}`);
-      return;
-    }
-    if (stderr) {
-      console.error(`show-profiles stderr: ${stderr}`);
-      return;
-    }
-  },
-);
-profiles.stdout.on("data", (data: any) => {
-  //console.log("data", data);
-  const defaultProfileAddress = JSON.parse(data).Result.default.account;
-  console.log("default profile address", defaultProfileAddress);
-  // publish ans contract to local testnet
-  execSync(
-    `echo 'yes\n' | aptos move publish --named-addresses aptos_names=0x${defaultProfileAddress},aptos_names_admin=0x${defaultProfileAddress},aptos_names_funds=0x${defaultProfileAddress}`,
-    {
-      stdio: [0, 1, 2], // we need this so node will print the command output
-      cwd: __dirname + ANS_CORE_FOLDER,
-    },
-    (error: any, stdout: any, stderr: any) => {
-      if (error) {
-        console.error(`Error publish: ${error.message}`);
-        return;
-      }
-      if (stderr) {
-        console.error(`publish stderr: ${stderr}`);
-        return;
-      }
-
-      execSync("rm -rf aptos-names-contracts", {
-        cwd: path.resolve(__dirname, ""),
-      });
-    },
-  );
+// 6. Delete aptos-names-contracts folder created by the git clone command
+execSync("rm -rf aptos-names-contracts", {
+  cwd: path.resolve(__dirname, ""),
 });
