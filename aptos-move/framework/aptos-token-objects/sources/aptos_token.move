@@ -511,11 +511,11 @@ module aptos_token_objects::aptos_token {
         collection: String,
         name: String,
         key: String,
-        type: String,
+        type_: String,
         value: vector<u8>,
     ) acquires AptosCollection, AptosToken {
         let token = token_object(creator, &collection, &name);
-        add_property(creator, token, key, type, value);
+        add_property(creator, token, key, type_, value);
     }
 
     entry fun add_typed_property_call<T: drop>(
@@ -544,11 +544,11 @@ module aptos_token_objects::aptos_token {
         collection: String,
         name: String,
         key: String,
-        type: String,
+        type_: String,
         value: vector<u8>,
     ) acquires AptosCollection, AptosToken {
         let token = token_object(creator, &collection, &name);
-        update_property(creator, token, &key, type, value);
+        update_property(creator, token, &key, type_, value);
     }
 
     entry fun update_typed_property_call<T: drop>(
