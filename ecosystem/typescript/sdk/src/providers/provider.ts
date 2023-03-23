@@ -25,7 +25,9 @@ import { CustomEndpoints, Network, NetworkToIndexerAPI, NetworkToNodeAPI } from 
  */
 export class Provider {
   aptosClient: AptosClient;
+
   indexerClient: IndexerClient;
+
   network: Network | "CUSTOM";
 
   constructor(
