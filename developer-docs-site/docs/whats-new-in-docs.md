@@ -11,12 +11,6 @@ This page shows the key updates to the developer documentation on this site. Not
 
 - Ported the original Move Tutorial to Aptos tooling as the [Move Primitives Tutorial](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/move-tutorial).
 
-## 19 March 2023
-
-- Published a tutorial on using the Aptos [multi-signature (multisig)](./tutorials/first-multisig.md) feature that introduces assorted [K-of-N multi-signer authentication](./concepts/accounts.md#multi-signer-authentication) operations and employs scripts for the first time in Aptos documentation.
-
-  Find this tutorial - provided by [alnoki](https://github.com/alnoki) - on the [Community Highlights](./community/contributions/index.md) page.
-
 ## 16 March 2023
 
 - Added the ability to use [Bytecode for Dependencies](./guides/move-guides/bytecode-dependencies.md) when compiling Move modules in cases where the Move source code for those dependencies are not available locally.
