@@ -136,6 +136,7 @@ impl TransactionStore {
         sequence_number: u64,
     ) -> Option<(SignedTransaction, u64)> {
         if let Some(txn) = self.get_mempool_txn(address, sequence_number) {
+            txn.trace("Pulled.");
             return Some((txn.txn.clone(), txn.ranking_score));
         }
         None
@@ -168,8 +169,10 @@ impl TransactionStore {
         &self,
         address: &AccountAddress,
         sequence_number: u64,
+        event: &str,
     ) -> Option<u64> {
         if let Some(txn) = self.get_mempool_txn(address, sequence_number) {
+            txn.trace(event);
             return Some(txn.ranking_score);
         }
         None
@@ -540,6 +543,8 @@ impl TransactionStore {
         self.hash_index.remove(&txn.get_committed_hash());
         self.size_bytes -= txn.get_estimated_bytes();
 
+        txn.maybe_print_trace();
+
         // Remove account datastructures if there are no more transactions for the account.
         let address = &txn.get_sender();
         if let Some(txns) = self.transactions.get(address) {
@@ -579,6 +584,9 @@ impl TransactionStore {
                         break; // The batch is full
                     } else {
                         batch.push(txn.txn.clone());
+                        if txn.trace_enabled() {
+                            txn.trace(&format!("In broadcast batch, {timeline_id:?}"));
+                        }
                         batch_total_bytes = batch_total_bytes.saturating_add(transaction_bytes);
                         if let TimelineState::Ready(timeline_id) = txn.timeline_state {
                             last_timeline_id[i] = timeline_id;

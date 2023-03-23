@@ -52,7 +52,10 @@ impl Mempool {
             is_rejected = false
         );
         self.log_latency(*sender, sequence_number, counters::COMMIT_ACCEPTED_LABEL);
-        if let Some(ranking_score) = self.transactions.get_ranking_score(sender, sequence_number) {
+        if let Some(ranking_score) =
+            self.transactions
+                .get_ranking_score(sender, sequence_number, "Committed.")
+        {
             counters::core_mempool_txn_ranking_score(
                 REMOVE_LABEL,
                 counters::COMMIT_ACCEPTED_LABEL,
@@ -76,7 +79,10 @@ impl Mempool {
             is_rejected = true
         );
         self.log_latency(*sender, sequence_number, counters::COMMIT_REJECTED_LABEL);
-        if let Some(ranking_score) = self.transactions.get_ranking_score(sender, sequence_number) {
+        if let Some(ranking_score) =
+            self.transactions
+                .get_ranking_score(sender, sequence_number, "Rejected.")
+        {
             counters::core_mempool_txn_ranking_score(
                 REMOVE_LABEL,
                 counters::COMMIT_REJECTED_LABEL,
@@ -145,6 +151,8 @@ impl Mempool {
             db_sequence_number,
             now,
         );
+
+        txn_info.trace("Added.");
 
         let status = self.transactions.insert(txn_info);
         counters::core_mempool_txn_ranking_score(

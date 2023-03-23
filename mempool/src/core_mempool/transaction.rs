@@ -4,15 +4,47 @@
 
 use crate::core_mempool::TXN_INDEX_ESTIMATED_BYTES;
 use aptos_crypto::HashValue;
+use aptos_infallible::Mutex;
+use aptos_logger::prelude::*;
 use aptos_types::{account_address::AccountAddress, transaction::SignedTransaction};
 use serde::{Deserialize, Serialize};
 use std::{
     mem::size_of,
+    sync::Arc,
     time::{Duration, SystemTime},
 };
 
 /// Estimated per-txn size minus the raw transaction
 pub const TXN_FIXED_ESTIMATED_BYTES: usize = size_of::<MempoolTransaction>();
+
+#[derive(Clone, Debug)]
+pub struct TransactionTracer {
+    sender: AccountAddress,
+    sequence_num: u64,
+    events: Vec<(SystemTime, String)>,
+}
+
+impl TransactionTracer {
+    pub fn new(sender: AccountAddress, sequence_num: u64) -> Arc<Mutex<TransactionTracer>> {
+        Arc::new(Mutex::new(Self {
+            sender,
+            sequence_num,
+            events: Vec::new(),
+        }))
+    }
+
+    pub fn trace(&mut self, event: &str) {
+        self.events.push((SystemTime::now(), event.to_string()));
+    }
+
+    pub fn print_trace(&self) {
+        info!(
+            sender = self.sender,
+            sequence_num = self.sequence_num,
+            events = self.events
+        );
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct MempoolTransaction {
@@ -23,6 +55,7 @@ pub struct MempoolTransaction {
     pub timeline_state: TimelineState,
     pub sequence_info: SequenceInfo,
     pub insertion_time: SystemTime,
+    tracer: Option<Arc<Mutex<TransactionTracer>>>,
 }
 
 impl MempoolTransaction {
@@ -34,6 +67,11 @@ impl MempoolTransaction {
         seqno: u64,
         insertion_time: SystemTime,
     ) -> Self {
+        let tracer = if (txn.sequence_number() & 255) < 100 {
+            Some(TransactionTracer::new(txn.sender(), txn.sequence_number()))
+        } else {
+            None
+        };
         Self {
             sequence_info: SequenceInfo {
                 transaction_sequence_number: txn.sequence_number(),
@@ -44,6 +82,23 @@ impl MempoolTransaction {
             ranking_score,
             timeline_state,
             insertion_time,
+            tracer,
+        }
+    }
+
+    pub(crate) fn trace_enabled(&self) -> bool {
+        self.tracer.is_some()
+    }
+
+    pub(crate) fn trace(&self, event: &str) {
+        if let Some(tracer) = &self.tracer {
+            tracer.lock().trace(event);
+        }
+    }
+
+    pub(crate) fn maybe_print_trace(&self) {
+        if let Some(tracer) = &self.tracer {
+            tracer.lock().print_trace();
         }
     }
 
