@@ -15,6 +15,7 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-bitvec = { workspace = true }
+aptos-bounded-executor = { workspace = true }
 aptos-channels = { workspace = true }
 aptos-config = { workspace = true }
 aptos-consensus-notifications = { workspace = true }
