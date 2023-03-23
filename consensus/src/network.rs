@@ -50,7 +50,7 @@ pub struct IncomingBlockRetrievalRequest {
 /// Just a convenience struct to keep all the network proxy receiving queues in one place.
 /// Will be returned by the NetworkTask upon startup.
 pub struct NetworkReceivers {
-    /// Provide a LIFO buffer for each (Author, MessageType) key
+    /// Provide a FIFO buffer for each (Author, MessageType) key
     pub consensus_messages: aptos_channel::Receiver<
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
@@ -287,11 +287,14 @@ impl NetworkTask {
         network_events: ConsensusNetworkEvents,
         self_receiver: aptos_channels::Receiver<Event<ConsensusMsg>>,
     ) -> (NetworkTask, NetworkReceivers) {
-        let (consensus_messages_tx, consensus_messages) =
-            aptos_channel::new(QueueStyle::LIFO, 1, Some(&counters::CONSENSUS_CHANNEL_MSGS));
+        let (consensus_messages_tx, consensus_messages) = aptos_channel::new(
+            QueueStyle::FIFO,
+            20,
+            Some(&counters::CONSENSUS_CHANNEL_MSGS),
+        );
         let (block_retrieval_tx, block_retrieval) = aptos_channel::new(
-            QueueStyle::LIFO,
-            1,
+            QueueStyle::FIFO,
+            10,
             Some(&counters::BLOCK_RETRIEVAL_CHANNEL_MSGS),
         );
         let all_events = Box::new(select(network_events, self_receiver));

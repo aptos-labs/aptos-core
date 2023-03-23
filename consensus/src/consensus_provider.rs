@@ -11,6 +11,7 @@ use crate::{
     txn_notifier::MempoolNotifier,
     util::time_service::ClockTimeService,
 };
+use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::config::NodeConfig;
 use aptos_consensus_notifications::ConsensusNotificationSender;
 use aptos_event_notifications::ReconfigNotificationListener;
@@ -60,6 +61,7 @@ pub fn start_consensus(
         state_sync_notifier,
         runtime.handle(),
     ));
+    let bounded_executor = BoundedExecutor::new(4, runtime.handle().clone());
 
     let time_service = Arc::new(ClockTimeService::new(runtime.handle().clone()));
 
@@ -78,6 +80,7 @@ pub fn start_consensus(
         state_computer,
         storage,
         reconfig_events,
+        bounded_executor,
     );
 
     let (network_task, network_receiver) = NetworkTask::new(network_events, self_receiver);

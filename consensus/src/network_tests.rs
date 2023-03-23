@@ -103,6 +103,10 @@ impl NetworkPlayground {
         }
     }
 
+    pub fn handle(&self) -> Handle {
+        self.executor.clone()
+    }
+
     /// HashMap of supported protocols to initialize ConsensusNetworkSender.
     pub fn peer_protocols(&self) -> Arc<PeerMetadataStorage> {
         self.peer_metadata_storage.clone()
