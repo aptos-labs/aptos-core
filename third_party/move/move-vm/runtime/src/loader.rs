@@ -2328,6 +2328,8 @@ pub(crate) struct Function {
     parameter_types: Vec<Type>,
 }
 
+// This struct must be treated as an identifier for a function and not somehow relying on
+// the internal implementation.
 pub struct LoadedFunction {
     pub(crate) module: Arc<Module>,
     pub(crate) function: Arc<Function>,
