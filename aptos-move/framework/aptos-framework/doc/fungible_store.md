@@ -3,6 +3,7 @@
 
 # Module `0x1::fungible_store`
 
+This defines a store of <code>FungibleAssetWallet</code> under each account.
 
 
 -  [Resource `FungibleAssetStore`](#0x1_fungible_store_FungibleAssetStore)

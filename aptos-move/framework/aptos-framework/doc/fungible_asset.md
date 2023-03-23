@@ -3,8 +3,8 @@
 
 # Module `0x1::fungible_asset`
 
-This defines the fungible metadata module that can issue fungible assets of any <code>FungibleSource</code> object. The source
-can be a token object or any object that equipped with <code>FungibleSource</code> resource.
+This defines the fungible asset module that can issue fungible asset of any <code><a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a></code> object. The
+metadata object can be any object that equipped with <code><a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a></code> resource.
 
 
 -  [Resource `FungibleAssetMetadata`](#0x1_fungible_asset_FungibleAssetMetadata)
