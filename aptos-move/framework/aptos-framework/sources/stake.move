@@ -33,7 +33,7 @@ module aptos_framework::stake {
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::timestamp;
     use aptos_framework::system_addresses;
-    use aptos_framework::staking_config::{Self, StakingConfig};
+    use aptos_framework::staking_config::{Self, StakingConfig, StakingRewardsConfig};
     use aptos_framework::chain_status;
 
     friend aptos_framework::block;
@@ -1161,8 +1161,11 @@ module aptos_framework::stake {
             assume cur_validator_perf.successful_proposals + cur_validator_perf.failed_proposals <= MAX_U64;
         };
         let num_total_proposals = cur_validator_perf.successful_proposals + cur_validator_perf.failed_proposals;
-
-        let (rewards_rate, rewards_rate_denominator) = staking_config::get_reward_rate(staking_config);
+        let (rewards_rate, rewards_rate_denominator) = if (features::reward_rate_decrease_enabled()) {
+            staking_config::get_epoch_rewards_rate()
+        } else {
+            staking_config::get_reward_rate(staking_config)
+        };
         let rewards_active = distribute_rewards(
             &mut stake_pool.active,
             num_successful_proposals,
@@ -2406,6 +2409,59 @@ module aptos_framework::stake {
         // Validator 1 and 2 received no additional rewards due to failed proposals
         assert_validator_state(validator_1_address, 101, 0, 0, 0, 0);
         assert_validator_state(validator_2_address, 0, 100, 0, 0, 0);
+    }
+
+    #[test(aptos_framework = @aptos_framework, validator_1 = @0x123, validator_2 = @0x234)]
+    public entry fun test_validator_rewards_rate_decrease_over_time(
+        aptos_framework: &signer,
+        validator_1: &signer,
+        validator_2: &signer,
+    ) acquires AllowedValidators, OwnerCapability, StakePool, AptosCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorFees {
+        initialize_for_test(aptos_framework);
+
+        let genesis_time_in_micros = timestamp::now_microseconds();
+
+        let validator_1_address = signer::address_of(validator_1);
+        let validator_2_address = signer::address_of(validator_2);
+
+        // Both validators join the set.
+        let (_sk_1, pk_1, pop_1) = generate_identity();
+        let (_sk_2, pk_2, pop_2) = generate_identity();
+        initialize_test_validator(&pk_1, &pop_1, validator_1, 1000, true, false);
+        initialize_test_validator(&pk_2, &pop_2, validator_2, 10000, true, true);
+
+        // One epoch passed. Validator 1 and validator 2 should receive rewards at rewards rate = 1% every epoch.
+        end_epoch();
+        assert_validator_state(validator_1_address, 1010, 0, 0, 0, 1);
+        assert_validator_state(validator_2_address, 10100, 0, 0, 0, 0);
+
+        // Enable rewards rate decrease. Initially rewards rate is still 1% every epoch. Rewards rate halves every year.
+        let one_year_in_micros: u64 = 31536000000000;
+        staking_config::initialize_rewards(
+            aptos_framework,
+            100,
+            30,
+            10000,
+            one_year_in_micros,
+            genesis_time_in_micros,
+            5000,
+        );
+        features::change_feature_flags(aptos_framework, vector[features::get_reward_rate_decrease_feature()], vector[]);
+
+        // For some reason, this epoch is very long. It has been 1 year since genesis when the epoch ends.
+        timestamp::fast_forward_seconds(one_year_in_micros / 1000000 - EPOCH_DURATION * 3);
+        end_epoch();
+        // Rewards rate has halved. Validator 1 and validator 2 should receive rewards at rewards rate = 0.5% every epoch.
+        assert_validator_state(validator_1_address, 1015, 0, 0, 0, 1);
+        assert_validator_state(validator_2_address, 10150, 0, 0, 0, 0);
+
+        // For some reason, this epoch is also very long. One year passed.
+        timestamp::fast_forward_seconds(one_year_in_micros / 1000000 - EPOCH_DURATION);
+        end_epoch();
+        // Rewards rate has halved but cannot become lower than min_rewards_rate.
+        // Validator 1 and validator 2 should receive rewards at rewards rate = 0.3% every epoch.
+        assert_validator_state(validator_1_address, 1018, 0, 0, 0, 1);
+        assert_validator_state(validator_2_address, 10180, 0, 0, 0, 0);
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
