@@ -35,6 +35,9 @@ variable "PROFILE" {
 variable "FEATURES" {
   // Cargo features to enable, as a comma separated string
 }
+variable "CARGO_TARGET_DIR" {
+  // Cargo target directory
+}
 
 group "all" {
   targets = flatten([
@@ -69,10 +72,7 @@ target "builder-base" {
   args = {
     PROFILE            = "${PROFILE}"
     FEATURES           = "${FEATURES}"
-    GIT_SHA            = "${GIT_SHA}"
-    GIT_BRANCH         = "${GIT_BRANCH}"
-    GIT_TAG            = "${GIT_TAG}"
-    BUILD_DATE         = "${BUILD_DATE}"
+    CARGO_TARGET_DIR   = "${CARGO_TARGET_DIR}"
     BUILT_VIA_BUILDKIT = "true"
   }
 }
@@ -83,15 +83,6 @@ target "aptos-node-builder" {
   contexts = {
     builder-base = "target:builder-base"
   }
-  args = {
-    PROFILE            = "${PROFILE}"
-    FEATURES           = "${FEATURES}"
-    GIT_SHA            = "${GIT_SHA}"
-    GIT_BRANCH         = "${GIT_BRANCH}"
-    GIT_TAG            = "${GIT_TAG}"
-    BUILD_DATE         = "${BUILD_DATE}"
-    BUILT_VIA_BUILDKIT = "true"
-  }
 }
 
 target "tools-builder" {
@@ -100,20 +91,13 @@ target "tools-builder" {
   contexts = {
     builder-base =  "target:builder-base"
   }
-  args = {
-    PROFILE            = "${PROFILE}"
-    GIT_SHA            = "${GIT_SHA}"
-    GIT_BRANCH         = "${GIT_BRANCH}"
-    GIT_TAG            = "${GIT_TAG}"
-    BUILD_DATE         = "${BUILD_DATE}"
-    BUILT_VIA_BUILDKIT = "true"
-  }
 }
 
 target "_common" {
   contexts = {
     debian-base = "target:debian-base"
-    builder = "target:tools-builder"
+    node-builder = "target:aptos-node-builder"
+    tools-builder = "target:tools-builder"
   }
   labels = {
     "org.label-schema.schema-version" = "1.0",
@@ -127,124 +111,79 @@ target "_common" {
     GIT_BRANCH         = "${GIT_BRANCH}"
     GIT_TAG            = "${GIT_TAG}"
     BUILD_DATE         = "${BUILD_DATE}"
-    BUILT_VIA_BUILDKIT = "true"
   }
 }
 
 target "validator-testing" {
+  inherits   = ["_common"]
   dockerfile = "docker/experimental/validator-testing.Dockerfile"
-  target = "validator-testing"
-
-  contexts = {
-    debian-base = "target:debian-base"
-    node-builder = "target:aptos-node-builder"
-    tools-builder = "target:tools-builder"
-  }
-  
-  labels = {
-    "org.label-schema.schema-version" = "1.0",
-    "org.label-schema.build-date"     = "${BUILD_DATE}"
-    "org.label-schema.git-sha"        = "${GIT_SHA}"
-  }
-  
-  args = {
-    PROFILE            = "${PROFILE}"
-    FEATURES           = "${FEATURES}"
-    GIT_SHA            = "${GIT_SHA}"
-    GIT_BRANCH         = "${GIT_BRANCH}"
-    GIT_TAG            = "${GIT_TAG}"
-    BUILD_DATE         = "${BUILD_DATE}"
-    BUILT_VIA_BUILDKIT = "true"
-  }
-
+  target     = "validator-testing"
   cache-from = generate_cache_from("validator-testing") 
-  cache-to = generate_cache_to("validator-testing")
-  tags     = generate_tags("validator-testing")
+  cache-to   = generate_cache_to("validator-testing")
+  tags       = generate_tags("validator-testing")
 }
 
 target "tools" {
-  inherits = ["_common"]
+  inherits   = ["_common"]
   dockerfile = "docker/experimental/tools.Dockerfile"
-  target   = "tools"
+  target     = "tools"
   cache-from = generate_cache_from("tools") 
-  cache-to = generate_cache_to("tools")
-  tags     = generate_tags("tools")
+  cache-to   = generate_cache_to("tools")
+  tags       = generate_tags("tools")
 }
 
 target "forge" {
-  inherits = ["_common"]
+  inherits   = ["_common"]
   dockerfile = "docker/experimental/forge.Dockerfile"
-  target   = "forge"
+  target     = "forge"
   cache-from = generate_cache_from("forge") 
-  cache-to = generate_cache_to("forge")
-  tags     = generate_tags("forge")
+  cache-to   = generate_cache_to("forge")
+  tags       = generate_tags("forge")
 }
 
 target "validator" {
+  inherits   = ["_common"]
   dockerfile = "docker/experimental/validator.Dockerfile"
-  target = "validator"
-
-  contexts = {
-    debian-base = "target:debian-base"
-    node-builder = "target:aptos-node-builder"
-    tools-builder = "target:tools-builder"
-  }
-  
-  labels = {
-    "org.label-schema.schema-version" = "1.0",
-    "org.label-schema.build-date"     = "${BUILD_DATE}"
-    "org.label-schema.git-sha"        = "${GIT_SHA}"
-  }
-  
-  args = {
-    PROFILE            = "${PROFILE}"
-    FEATURES           = "${FEATURES}"
-    GIT_SHA            = "${GIT_SHA}"
-    GIT_BRANCH         = "${GIT_BRANCH}"
-    GIT_TAG            = "${GIT_TAG}"
-    BUILD_DATE         = "${BUILD_DATE}"
-    BUILT_VIA_BUILDKIT = "true"
-  }
-
+  target     = "validator"
   cache-from = generate_cache_from("validator") 
-  cache-to = generate_cache_to("validator")
-  tags     = generate_tags("validator")
+  cache-to   = generate_cache_to("validator")
+  tags       = generate_tags("validator")
 }
 
 target "tools" {
-  inherits = ["_common"]
+  inherits   = ["_common"]
   dockerfile = "docker/experimental/tools.Dockerfile"
-  target   = "tools"
+  target     = "tools"
   cache-from = generate_cache_from("tools") 
-  cache-to = generate_cache_to("tools")
-  tags     = generate_tags("tools")
+  cache-to   = generate_cache_to("tools")
+  tags       = generate_tags("tools")
 }
 
 target "node-checker" {
-  inherits = ["_common"]
+  inherits   = ["_common"]
   dockerfile = "docker/experimental/node-checker.Dockerfile"
-  target   = "node-checker"
+  target     = "node-checker"
   cache-from = generate_cache_from("node-checker") 
-  cache-to = generate_cache_to("node-checker")
-  tags     = generate_tags("node-checker")
+  cache-to   = generate_cache_to("node-checker")
+  tags       = generate_tags("node-checker")
 }
 
 target "faucet" {
-  inherits = ["_common"]
+  inherits   = ["_common"]
   dockerfile = "docker/experimental/faucet.Dockerfile"
-  target   = "faucet"
+  target     = "faucet"
   cache-from = generate_cache_from("faucet") 
-  cache-to = generate_cache_to("faucet")  
-  tags     = generate_tags("faucet")
+  cache-to   = generate_cache_to("faucet")  
+  tags       = generate_tags("faucet")
 }
 
 target "telemetry-service" {
-  inherits = ["_common"]
+  inherits   = ["_common"]
   dockerfile = "docker/experimental/telemetry-service.Dockerfile"
-  target   = "telemetry-service"
+  target     = "telemetry-service"
   cache-from = generate_cache_from("telemetry-service") 
-  cache-to = generate_cache_to("telemetry-service")  
-  tags     = generate_tags("telemetry-service")  
+  cache-to   = generate_cache_to("telemetry-service")  
+  tags       = generate_tags("telemetry-service")  
 }
 
 function "generate_cache_from" {

@@ -32,6 +32,8 @@ ARG PROFILE
 ENV PROFILE ${PROFILE}
 ARG FEATURES
 ENV FEATURES ${FEATURES}
+ARG CARGO_TARGET_DIR
+ENV CARGO_TARGET_DIR ${CARGO_TARGET_DIR}
 
 RUN ARCHITECTURE=$(uname -m | sed -e "s/arm64/arm_64/g" | sed -e "s/aarch64/aarch_64/g") \
     && curl -LOs "https://github.com/protocolbuffers/protobuf/releases/download/v21.5/protoc-21.5-linux-$ARCHITECTURE.zip" \
@@ -44,16 +46,16 @@ COPY --link . /aptos/
 
 FROM builder-base as aptos-node-builder
 
-RUN --mount=type=secret,id=git-credentials,target=/root/.git-credentials \
-    --mount=type=cache,target=/usr/local/cargo/git,id=node-cargo-git-cache \
-    --mount=type=cache,target=/usr/local/cargo/registry,id=node-cargo-registry-cache \
-    --mount=type=cache,target=/aptos/target,id=node-target-cache \
+RUN --mount=type=secret,id=node-builder-git-credentials,target=/root/.git-credentials \
+    --mount=type=cache,target=/usr/local/cargo/git,id=node-builder-cargo-git-cache \
+    --mount=type=cache,target=/usr/local/cargo/registry,id=node-builder-cargo-registry-cache \
+    --mount=type=cache,target=/aptos/target,id=node-builder-target-cache \
         docker/experimental/build-node.sh
 
 FROM builder-base as tools-builder
 
-RUN --mount=type=secret,id=git-credentials,target=/root/.git-credentials \
-    --mount=type=cache,target=/usr/local/cargo/git,id=tools-cargo-git-cache \
-    --mount=type=cache,target=/usr/local/cargo/registry,id=tools-cargo-registry-cache \
-    --mount=type=cache,target=/aptos/target,id=tools-target-cache \
+RUN --mount=type=secret,id=tools-builder-git-credentials,target=/root/.git-credentials \
+    --mount=type=cache,target=/usr/local/cargo/git,id=tools-builder-cargo-git-cache \
+    --mount=type=cache,target=/usr/local/cargo/registry,id=tools-builder-cargo-registry-cache \
+    --mount=type=cache,target=/aptos/target,id=tools-builder-target-cache \
         docker/experimental/build-tools.sh
