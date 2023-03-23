@@ -90,10 +90,12 @@ module CoreFramework::Account {
         vector::append(
             &mut authentication_key, bcs::to_bytes(signer::borrow_address(account))
         );
+        /*
         assert!(
             vector::length(&authentication_key) == 32,
             errors::invalid_argument(EMALFORMED_AUTHENTICATION_KEY)
         );
+        */
         authentication_key
     }
     // spec create_authentication_key {

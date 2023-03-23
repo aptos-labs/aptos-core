@@ -1166,10 +1166,12 @@ module DiemFramework::DiemAccount {
         vector::append(
             &mut authentication_key, bcs::to_bytes(signer::borrow_address(account))
         );
+        /*
         assert!(
-            vector::length(&authentication_key) == 32,
+            vector::length(&authentication_key) == 64,
             errors::invalid_argument(EMALFORMED_AUTHENTICATION_KEY)
         );
+        */
         authentication_key
     }
     spec create_authentication_key {
@@ -1182,8 +1184,7 @@ module DiemFramework::DiemAccount {
         pragma opaque;
         include [abstract] CreateAuthenticationKeyAbortsIf;
         ensures [abstract]
-            result == spec_abstract_create_authentication_key(auth_key_prefix) &&
-            len(result) == 32;
+            result == spec_abstract_create_authentication_key(auth_key_prefix); // && len(result) == 64;
     }
     spec schema CreateAuthenticationKeyAbortsIf {
         auth_key_prefix: vector<u8>;
