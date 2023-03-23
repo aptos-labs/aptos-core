@@ -1217,7 +1217,7 @@ With an existing collection, directly mint a soul bound token into the recipient
 
 
 
-<pre><code>entry <b>fun</b> <a href="aptos_token.md#0x4_aptos_token_add_property_call">add_property_call</a>(creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="collection.md#0x4_collection">collection</a>: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, key: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, type: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, value: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+<pre><code>entry <b>fun</b> <a href="aptos_token.md#0x4_aptos_token_add_property_call">add_property_call</a>(creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="collection.md#0x4_collection">collection</a>: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, key: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, type_: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, value: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
 </code></pre>
 
 
@@ -1231,11 +1231,11 @@ With an existing collection, directly mint a soul bound token into the recipient
     <a href="collection.md#0x4_collection">collection</a>: String,
     name: String,
     key: String,
-    type: String,
+    type_: String,
     value: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
 ) <b>acquires</b> <a href="aptos_token.md#0x4_aptos_token_AptosCollection">AptosCollection</a>, <a href="aptos_token.md#0x4_aptos_token_AptosToken">AptosToken</a> {
     <b>let</b> <a href="token.md#0x4_token">token</a> = token_object(creator, &<a href="collection.md#0x4_collection">collection</a>, &name);
-    <a href="aptos_token.md#0x4_aptos_token_add_property">add_property</a>(creator, <a href="token.md#0x4_token">token</a>, key, type, value);
+    <a href="aptos_token.md#0x4_aptos_token_add_property">add_property</a>(creator, <a href="token.md#0x4_token">token</a>, key, type_, value);
 }
 </code></pre>
 
@@ -1310,7 +1310,7 @@ With an existing collection, directly mint a soul bound token into the recipient
 
 
 
-<pre><code>entry <b>fun</b> <a href="aptos_token.md#0x4_aptos_token_update_property_call">update_property_call</a>(creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="collection.md#0x4_collection">collection</a>: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, key: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, type: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, value: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+<pre><code>entry <b>fun</b> <a href="aptos_token.md#0x4_aptos_token_update_property_call">update_property_call</a>(creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="collection.md#0x4_collection">collection</a>: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, key: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, type_: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, value: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
 </code></pre>
 
 
@@ -1324,11 +1324,11 @@ With an existing collection, directly mint a soul bound token into the recipient
     <a href="collection.md#0x4_collection">collection</a>: String,
     name: String,
     key: String,
-    type: String,
+    type_: String,
     value: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
 ) <b>acquires</b> <a href="aptos_token.md#0x4_aptos_token_AptosCollection">AptosCollection</a>, <a href="aptos_token.md#0x4_aptos_token_AptosToken">AptosToken</a> {
     <b>let</b> <a href="token.md#0x4_token">token</a> = token_object(creator, &<a href="collection.md#0x4_collection">collection</a>, &name);
-    <a href="aptos_token.md#0x4_aptos_token_update_property">update_property</a>(creator, <a href="token.md#0x4_token">token</a>, &key, type, value);
+    <a href="aptos_token.md#0x4_aptos_token_update_property">update_property</a>(creator, <a href="token.md#0x4_token">token</a>, &key, type_, value);
 }
 </code></pre>
 
