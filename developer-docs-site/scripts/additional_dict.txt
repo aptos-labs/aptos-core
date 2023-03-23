@@ -121,6 +121,7 @@ Grafana
 GraphQL
 HSM
 Homebrew
+hippospace
 hotfix
 HotStuff
 IDE
