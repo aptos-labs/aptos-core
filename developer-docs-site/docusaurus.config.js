@@ -284,7 +284,7 @@ const config = {
                 docId: "nodes/validator-node/index",
               },
               {
-                label: "Run a FullNode",
+                label: "Run a Fullnode",
                 type: "doc",
                 docId: "nodes/full-node/index",
               },

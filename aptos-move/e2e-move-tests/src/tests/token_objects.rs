@@ -11,9 +11,8 @@ use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Eq, PartialEq)]
 struct Token {
-    collection: String,
+    collection: AccountAddress,
     collection_id: u64,
-    creator: AccountAddress,
     description: String,
     name: String,
     creation_name: Option<String>,
