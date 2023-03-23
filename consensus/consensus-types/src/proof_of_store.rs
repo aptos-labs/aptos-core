@@ -212,6 +212,10 @@ impl ProofOfStore {
         ret.shuffle(&mut thread_rng());
         ret
     }
+
+    pub fn info(&self) -> &BatchInfo {
+        &self.info
+    }
 }
 
 impl Deref for ProofOfStore {
