@@ -139,10 +139,13 @@ impl LoopAnalysisProcessor {
 
         let back_edge_locs = loop_annotation.back_edges_locations();
         let invariant_locs = loop_annotation.invariants_locations();
-        let mut builder =
-            FunctionDataBuilder::new_with_options(func_env, data, FunctionDataBuilderOptions {
+        let mut builder = FunctionDataBuilder::new_with_options(
+            func_env,
+            data,
+            FunctionDataBuilderOptions {
                 no_fallthrough_jump_removal: true,
-            });
+            },
+        );
         let mut goto_fixes = vec![];
         let code = std::mem::take(&mut builder.data.code);
         for (offset, bytecode) in code.into_iter().enumerate() {
@@ -369,10 +372,144 @@ impl LoopAnalysisProcessor {
         unrolling_mark: &LoopUnrollingMark,
     ) -> FunctionData {
         let options = ProverOptions::get(func_env.module_env.env);
-        let mut builder =
-            FunctionDataBuilder::new_with_options(func_env, data, FunctionDataBuilderOptions {
+        let mut builder = FunctionDataBuilder::new_with_options(
+            func_env,
+            data,
+            FunctionDataBuilderOptions {
                 no_fallthrough_jump_removal: true,
-            });
+            },
+        );
+
+        // collect labels that belongs to this loop
+        let in_loop_labels: BTreeSet<_> = unrolling_mark
+            .loop_body
+            .iter()
+            .flatten()
+            .filter_map(|bc| match bc {
+                Bytecode::Label(_, label) => Some(*label),
+                _ => None,
+            })
+            .collect();
+        assert!(in_loop_labels.contains(loop_header));
+
+        // create the stop block
+        let stop_label = builder.new_label();
+        builder.set_next_debug_comment(format!(
+            "End of bounded loop unrolling for loop: L{}",
+            loop_header.as_usize()
+        ));
+        builder.emit_with(|attr_id| Bytecode::Label(attr_id, stop_label));
+        builder.clear_next_debug_comment();
+
+        builder.emit_with(|attr_id| {
+            if options.for_interpretation {
+                Bytecode::Jump(attr_id, *loop_header)
+            } else {
+                Bytecode::Call(attr_id, vec![], Operation::Stop, vec![], None)
+            }
+        });
+
+        // pre-populate the labels in unrolled iterations
+        let mut label_remapping = BTreeMap::new();
+        for i in 0..unrolling_mark.iter_count {
+            for label in &in_loop_labels {
+                label_remapping.insert((*label, i), builder.new_label());
+            }
+        }
+        // the last back edge points to the stop block
+        label_remapping.insert((*loop_header, unrolling_mark.iter_count), stop_label);
+
+        // pre-populate the bytecode in unrolled iterations
+        for i in 0..unrolling_mark.iter_count {
+            for bc in unrolling_mark.loop_body.iter().flatten() {
+                let mut new_bc = bc.clone();
+                let new_attr_id = builder.new_attr_with_cloned_info(bc.get_attr_id());
+                new_bc.set_attr_id(new_attr_id);
+                // fix the labels
+                match &mut new_bc {
+                    Bytecode::Label(_, label) => {
+                        *label = *label_remapping.get(&(*label, i)).unwrap();
+                    },
+                    Bytecode::Jump(_, label) => {
+                        if in_loop_labels.contains(label) {
+                            if label == loop_header {
+                                *label = *label_remapping.get(&(*label, i + 1)).unwrap();
+                            } else {
+                                *label = *label_remapping.get(&(*label, i)).unwrap();
+                            }
+                        }
+                    },
+                    Bytecode::Branch(_, then_label, else_label, _) => {
+                        if in_loop_labels.contains(then_label) {
+                            if then_label == loop_header {
+                                *then_label = *label_remapping.get(&(*then_label, i + 1)).unwrap();
+                            } else {
+                                *then_label = *label_remapping.get(&(*then_label, i)).unwrap();
+                            }
+                        }
+                        if in_loop_labels.contains(else_label) {
+                            if then_label == loop_header {
+                                *else_label = *label_remapping.get(&(*else_label, i + 1)).unwrap();
+                            } else {
+                                *else_label = *label_remapping.get(&(*else_label, i)).unwrap();
+                            }
+                        }
+                    },
+                    _ => (),
+                }
+                builder.emit(new_bc);
+            }
+        }
+
+        // bridge the back edges into the newly populated code
+        let code = std::mem::take(&mut builder.data.code);
+        for (offset, mut bytecode) in code.into_iter().enumerate() {
+            if unrolling_mark.marker == Some(bytecode.get_attr_id()) {
+                continue;
+            }
+            if unrolling_mark.back_edges.contains(&(offset as CodeOffset)) {
+                match &mut bytecode {
+                    Bytecode::Jump(_, label) => {
+                        assert_eq!(label, loop_header);
+                        *label = *label_remapping.get(&(*label, 0)).unwrap();
+                    },
+                    Bytecode::Branch(_, then_label, else_label, _) => {
+                        if then_label == loop_header {
+                            *then_label = *label_remapping.get(&(*then_label, 0)).unwrap();
+                        } else {
+                            assert_eq!(else_label, loop_header);
+                            *else_label = *label_remapping.get(&(*else_label, 0)).unwrap();
+                        }
+                    },
+                    _ => (),
+                }
+            }
+            builder.emit(bytecode);
+        }
+
+        builder.data
+    }
+
+    /// Perform unrolling on the loop (if explicitly requested).
+    ///
+    /// NOTE: this turns verification into *bounded* verification. All verification conditions post
+    /// loop exit is only conditionally verified, conditioned when loop exits within a pre-defined
+    /// number of iteration. If the loop iterates more than the pre-defined limit, the prover will
+    /// not attempt to prove (or disprove) those verification conditions.
+    fn unroll(
+        func_env: &FunctionEnv<'_>,
+        data: FunctionData,
+        loop_header: &Label,
+        unrolling_mark: &LoopUnrollingMark,
+    ) -> FunctionData {
+        let options = ProverOptions::get(func_env.module_env.env);
+        let mut builder = FunctionDataBuilder::new_with_options(
+            func_env,
+            data,
+            FunctionDataBuilderOptions {
+                no_fallthrough_jump_removal: true,
+            },
+        );
 
         // collect labels that belongs to this loop
         let in_loop_labels: BTreeSet<_> = unrolling_mark
@@ -742,12 +879,15 @@ impl LoopAnalysisProcessor {
                     // loop invariant instrumentation route
                     let (val_targets, mut_targets) =
                         Self::collect_loop_targets(&cfg, &func_target, &sub_loops);
-                    fat_loops_with_invariants.insert(label, FatLoop {
-                        invariants,
-                        val_targets,
-                        mut_targets,
-                        back_edges,
-                    });
+                    fat_loops_with_invariants.insert(
+                        label,
+                        FatLoop {
+                            invariants,
+                            val_targets,
+                            mut_targets,
+                            back_edges,
+                        },
+                    );
                 },
                 Some((attr_id, count)) => {
                     if !invariants.is_empty() {
@@ -762,12 +902,15 @@ impl LoopAnalysisProcessor {
                     }
                     // loop unrolling route
                     let loop_body = Self::collect_loop_body_bytecode(code, &cfg, &sub_loops);
-                    fat_loops_for_unrolling.insert(label, LoopUnrollingMark {
-                        marker: attr_id,
-                        loop_body,
-                        back_edges,
-                        iter_count: count,
-                    });
+                    fat_loops_for_unrolling.insert(
+                        label,
+                        LoopUnrollingMark {
+                            marker: attr_id,
+                            loop_body,
+                            back_edges,
+                            iter_count: count,
+                        },
+                    );
                 },
             }
         }

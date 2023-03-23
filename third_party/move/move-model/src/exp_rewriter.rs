@@ -314,6 +314,41 @@ pub trait ExpRewriterFunctions {
                     exp
                 }
             },
+            Sequence(id, es) => {
+                let (id_changed, new_id) = self.internal_rewrite_id(id);
+                let changed_vec = self.internal_rewrite_vec(es);
+                if id_changed || changed_vec.is_some() {
+                    Sequence(new_id, changed_vec.unwrap_or_else(|| es.clone())).into_exp()
+                } else {
+                    exp
+                }
+            },
+            Loop(id, body) => {
+                let (id_changed, new_id) = self.internal_rewrite_id(id);
+                let (body_changed, new_body) = self.internal_rewrite_exp(body);
+                if id_changed || body_changed {
+                    Loop(new_id, new_body).into_exp()
+                } else {
+                    exp
+                }
+            },
+            LoopCont(id, do_cont) => {
+                let (id_changed, new_id) = self.internal_rewrite_id(id);
+                if id_changed {
+                    LoopCont(new_id, *do_cont).into_exp()
+                } else {
+                    exp
+                }
+            },
+            Return(id, val) => {
+                let (id_changed, new_id) = self.internal_rewrite_id(id);
+                let (val_changed, new_val) = self.internal_rewrite_exp(val);
+                if id_changed || val_changed {
+                    Return(new_id, new_val).into_exp()
+                } else {
+                    exp
+                }
+            },
             // This can happen since we are calling the rewriter during type checking, and
             // we may have encountered an error which is represented as an Invalid expression.
             Invalid(id) => Invalid(*id).into_exp(),
