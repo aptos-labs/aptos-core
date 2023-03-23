@@ -40,6 +40,7 @@ use crate::{
     util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, Context};
+use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::{ConsensusConfig, NodeConfig};
 use aptos_consensus_types::{
@@ -73,6 +74,7 @@ use futures::{
     SinkExt, StreamExt,
 };
 use itertools::Itertools;
+use std::hash::Hash;
 use std::{
     cmp::Ordering,
     collections::HashMap,
@@ -117,9 +119,10 @@ pub struct EpochManager {
         aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
     >,
     round_manager_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
-    epoch_state: Option<EpochState>,
+    epoch_state: Option<Arc<EpochState>>,
     block_retrieval_tx:
         Option<aptos_channel::Sender<AccountAddress, IncomingBlockRetrievalRequest>>,
+    bounded_executor: BoundedExecutor,
 }
 
 impl EpochManager {
@@ -133,6 +136,7 @@ impl EpochManager {
         commit_state_computer: Arc<dyn StateComputer>,
         storage: Arc<dyn PersistentLivenessStorage>,
         reconfig_events: ReconfigNotificationListener,
+        bounded_executor: BoundedExecutor,
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
         let config = node_config.consensus.clone();
@@ -157,6 +161,7 @@ impl EpochManager {
             round_manager_close_tx: None,
             epoch_state: None,
             block_retrieval_tx: None,
+            bounded_executor,
         }
     }
 
@@ -442,7 +447,7 @@ impl EpochManager {
 
     fn spawn_block_retrieval_task(&mut self, epoch: u64, block_store: Arc<BlockStore>) {
         let (request_tx, mut request_rx) = aptos_channel::new(
-            QueueStyle::LIFO,
+            QueueStyle::FIFO,
             1,
             Some(&counters::BLOCK_RETRIEVAL_TASK_MSGS),
         );
@@ -719,7 +724,7 @@ impl EpochManager {
             error!("Failed to read on-chain consensus config {}", error);
         }
 
-        self.epoch_state = Some(epoch_state.clone());
+        self.epoch_state = Some(Arc::new(epoch_state.clone()));
 
         match self.storage.start() {
             LivenessStorageData::FullRecoveryData(initial_data) => {
@@ -757,27 +762,85 @@ impl EpochManager {
 
         if let Some(unverified_event) = maybe_unverified_event {
             // same epoch -> run well-formedness + signature check
-            let verified_event = monitor!(
-                "verify_message",
-                unverified_event
-                    .clone()
-                    .verify(&self.epoch_state().verifier, self.quorum_store_enabled)
-            )
-            .context("[EpochManager] Verify event")
-            .map_err(|err| {
-                error!(
-                    SecurityEvent::ConsensusInvalidMessage,
-                    remote_peer = peer_id,
-                    error = ?err,
-                    unverified_event = unverified_event
-                );
-                err
-            })?;
-
-            // process the verified event
-            self.process_event(peer_id, verified_event)?;
+            let epoch_state = self.epoch_state.clone().unwrap();
+            let quorum_store_enabled = self.quorum_store_enabled;
+            let buffer_manager_msg_tx = self.buffer_manager_msg_tx.clone();
+            let round_manager_tx = self.round_manager_tx.clone();
+            let my_peer_id = self.author;
+            self.bounded_executor
+                .spawn(async move {
+                    match monitor!(
+                        "verify_message",
+                        unverified_event.clone().verify(
+                            &epoch_state.verifier,
+                            quorum_store_enabled,
+                            peer_id == my_peer_id,
+                        )
+                    ) {
+                        Ok(verified_event) => {
+                            Self::forward_event(
+                                buffer_manager_msg_tx,
+                                round_manager_tx,
+                                peer_id,
+                                verified_event,
+                            );
+                        }
+                        Err(e) => {
+                            error!(
+                                SecurityEvent::ConsensusInvalidMessage,
+                                remote_peer = peer_id,
+                                error = ?e,
+                                unverified_event = unverified_event
+                            );
+                        }
+                    }
+                })
+                .await;
         }
         Ok(())
+    }
+
+    fn forward_event_to<K: Eq + Hash + Clone, V>(
+        mut maybe_tx: Option<aptos_channel::Sender<K, V>>,
+        key: K,
+        value: V,
+    ) -> anyhow::Result<()> {
+        if let Some(tx) = &mut maybe_tx {
+            tx.push(key, value)
+        } else {
+            bail!("channel not initialized");
+        }
+    }
+
+    fn forward_event(
+        buffer_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
+        round_manager_tx: Option<
+            aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
+        >,
+        peer_id: AccountAddress,
+        event: VerifiedEvent,
+    ) {
+        if let VerifiedEvent::ProposalMsg(proposal) = &event {
+            observe_block(
+                proposal.proposal().timestamp_usecs(),
+                BlockStage::EPOCH_MANAGER_VERIFIED,
+            );
+        }
+        if let Err(e) = match event {
+            buffer_manager_event @ (VerifiedEvent::CommitVote(_)
+            | VerifiedEvent::CommitDecision(_)) => {
+                Self::forward_event_to(buffer_manager_msg_tx, peer_id, buffer_manager_event)
+                    .context("buffer manager sender")
+            }
+            round_manager_event => Self::forward_event_to(
+                round_manager_tx,
+                (peer_id, discriminant(&round_manager_event)),
+                (peer_id, round_manager_event),
+            )
+            .context("round manager sender"),
+        } {
+            warn!("Failed to forward event: {}", e);
+        }
     }
 
     async fn check_epoch(
@@ -834,33 +897,6 @@ impl EpochManager {
             }
         }
         Ok(None)
-    }
-
-    fn process_event(
-        &mut self,
-        peer_id: AccountAddress,
-        event: VerifiedEvent,
-    ) -> anyhow::Result<()> {
-        if let VerifiedEvent::ProposalMsg(proposal) = &event {
-            observe_block(
-                proposal.proposal().timestamp_usecs(),
-                BlockStage::EPOCH_MANAGER_VERIFIED,
-            );
-        }
-        match event {
-            buffer_manager_event @ (VerifiedEvent::CommitVote(_)
-            | VerifiedEvent::CommitDecision(_)) => {
-                if let Some(sender) = &mut self.buffer_manager_msg_tx {
-                    sender.push(peer_id, buffer_manager_event)?;
-                } else {
-                    bail!("Commit Phase not started but received Commit Message (CommitVote/CommitDecision)");
-                }
-            }
-            round_manager_event => {
-                self.forward_to_round_manager(peer_id, round_manager_event);
-            }
-        }
-        Ok(())
     }
 
     fn forward_to_round_manager(&mut self, peer_id: Author, event: VerifiedEvent) {
