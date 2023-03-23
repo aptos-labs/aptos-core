@@ -8,7 +8,7 @@ from pathlib import Path
 from time import time
 
 def main(datapoints:list):
-    '''Fit a line using minsq for a given dataset.'''
+    '''Least-squares fit a line to a given dataset.'''
     for item in datapoints: assert len(item)==2
     x_values, y_values = zip(*datapoints)
     X = np.array(x_values)
