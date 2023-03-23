@@ -34,7 +34,7 @@ This is the reference documentation of the Aptos framework.
 -  [`0x1::governance_proposal`](governance_proposal.md#0x1_governance_proposal)
 -  [`0x1::guid`](guid.md#0x1_guid)
 -  [`0x1::managed_coin`](managed_coin.md#0x1_managed_coin)
--  [`0x1::managed_fungible_source`](managed_fungible_source.md#0x1_managed_fungible_source)
+-  [`0x1::managed_fungible_metadata`](managed_fungible_metadata.md#0x1_managed_fungible_metadata)
 -  [`0x1::multisig_account`](multisig_account.md#0x1_multisig_account)
 -  [`0x1::object`](object.md#0x1_object)
 -  [`0x1::optional_aggregator`](optional_aggregator.md#0x1_optional_aggregator)

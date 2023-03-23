@@ -1,6 +1,6 @@
 /// This is an example showing how to create a fungible asset and how to use it.
 module fungible_asset::coin {
-    use aptos_framework::managed_fungible_source;
+    use aptos_framework::managed_fungible_metadata;
     use aptos_framework::object;
     use std::string::{Self, String};
 
@@ -14,7 +14,7 @@ module fungible_asset::coin {
     ) {
         // TODO(lightmark): create_named_object vs create_object_from_account, which one to choose here.
         let creator_ref = object::create_named_object(creator, *string::bytes(&name));
-        managed_fungible_source::init_managing_capabilities(&creator_ref, max_supply, name, symbol, decimals);
+        managed_fungible_metadata::init_managing_capabilities(&creator_ref, max_supply, name, symbol, decimals);
     }
 
     #[test_only]
@@ -39,11 +39,11 @@ module fungible_asset::coin {
         let coin_addr = object::create_object_address(&creator_address, *string::bytes(&usda));
         let coin = object::address_to_object<FungibleSource>(coin_addr);
 
-        managed_fungible_source::mint(creator, &coin, 100, aaron_address);
+        managed_fungible_metadata::mint(creator, &coin, 100, aaron_address);
         fungible_caps::transfer(aaron, &coin, 70, creator_address);
-        managed_fungible_source::set_ungated_transfer(creator, &coin, aaron_address, false);
-        managed_fungible_source::transfer(creator, &coin, 10, aaron_address, creator_address);
-        managed_fungible_source::burn(creator, &coin, 20, creator_address);
+        managed_fungible_metadata::set_ungated_transfer(creator, &coin, aaron_address, false);
+        managed_fungible_metadata::transfer(creator, &coin, 10, aaron_address, creator_address);
+        managed_fungible_metadata::burn(creator, &coin, 20, creator_address);
         assert!(fungible_store::balance(creator_address, &coin) == 60, 1);
         assert!(fungible_store::balance(aaron_address, &coin) == 20, 2);
     }

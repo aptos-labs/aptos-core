@@ -1,7 +1,7 @@
 /// This module provides an addtional ready-to-use solution on top of `FungibleAssetMetadata` that manages the refs of
 /// mint, burn and transfer for the creator in a straightforward scheme. It offers creators to destory any refs in an
 /// on-demand manner too.
-module aptos_framework::managed_fungible_source {
+module aptos_framework::managed_fungible_metadata {
     use aptos_framework::fungible_asset::{Self, MintRef, TransferRef, BurnRef, FungibleAsset};
     use aptos_framework::fungible_store;
     use aptos_framework::object::{Self, Object, ConstructorRef};
