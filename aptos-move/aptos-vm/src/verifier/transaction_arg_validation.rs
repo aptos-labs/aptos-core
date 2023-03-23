@@ -334,7 +334,11 @@ fn validate_and_construct<S: MoveResolverExt>(
         args.push(arg);
     }
     let constructor_error = |e: VMError| {
-        if allowed_structs.contains_key("0x1::object::Object") {
+        // A slight hack, to prevent additional piping of the feature flag through all
+        // function calls. We know the feature is active when more struct then only string are
+        // allowed.
+        let are_struct_constructors_enabled = allowed_structs.len() > 1;
+        if are_struct_constructors_enabled {
             e.into_vm_status()
         } else {
             VMStatus::Error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT, None)
