@@ -69,6 +69,8 @@ pub(crate) struct ModuleBuilder<'env, 'translator> {
     pub spec_vars: Vec<SpecVarDecl>,
     /// Translated function specifications.
     pub fun_specs: BTreeMap<Symbol, Spec>,
+    /// Translated function definitions, if we are compiling Move code
+    pub fun_defs: BTreeMap<Symbol, Exp>,
     /// Translated struct specifications.
     pub struct_specs: BTreeMap<Symbol, Spec>,
     /// Translated module spec
@@ -78,6 +80,14 @@ pub(crate) struct ModuleBuilder<'env, 'translator> {
     /// Let bindings for the current spec block, characterized by a boolean indicating whether
     /// post state is active and the node id of the original expression of the let.
     pub spec_block_lets: BTreeMap<Symbol, (bool, NodeId)>,
+}
+
+/// Represents information about a module already compiled into bytecode.
+#[derive(Debug)]
+pub(crate) struct BytecodeModule {
+    pub compiled_module: CompiledModule,
+    pub source_map: SourceMap,
+    pub function_infos: UniqueMap<PA::FunctionName, FunctionInfo>,
 }
 
 /// A value which we pass in to spec block analyzers, describing the resolved target of the spec
@@ -121,6 +131,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             spec_fun_index: 0,
             spec_vars: vec![],
             fun_specs: BTreeMap::new(),
+            fun_defs: BTreeMap::new(),
             struct_specs: BTreeMap::new(),
             module_spec: Spec::default(),
             spec_block_infos: Default::default(),
@@ -149,15 +160,13 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         &mut self,
         loc: Loc,
         module_def: EA::ModuleDefinition,
-        compiled_module: CompiledModule,
-        source_map: SourceMap,
-        function_infos: UniqueMap<PA::FunctionName, FunctionInfo>,
+        compiled_module: BytecodeModule,
     ) {
-        self.decl_ana(&module_def, &compiled_module, &source_map);
-        self.def_ana(&module_def, &function_infos);
+        self.decl_ana(&module_def, &compiled_module);
+        self.def_ana(&module_def, &compiled_module);
         self.collect_spec_block_infos(&module_def);
         let attrs = self.translate_attributes(&module_def.attributes);
-        self.populate_env_from_result(loc, attrs, compiled_module, source_map);
+        self.populate_and_finalize_env_from_compiled_module(loc, attrs, compiled_module);
     }
 }
 
@@ -165,6 +174,15 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     /// Shortcut for accessing the symbol pool.
     pub fn symbol_pool(&self) -> &SymbolPool {
         self.parent.env.symbol_pool()
+    }
+
+    /// Shortcut to check whether we are compiling Move functions (not only specs)
+    pub fn compile_via_model(&self) -> bool {
+        self.parent
+            .env
+            .get_extension::<ModelBuilderOptions>()
+            .expect("options")
+            .compile_via_model
     }
 
     /// Qualifies the given symbol by the current module.
@@ -337,8 +355,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     fn decl_ana(
         &mut self,
         module_def: &EA::ModuleDefinition,
-        compiled_module: &CompiledModule,
-        source_map: &SourceMap,
+        compiled_module_opt: &BytecodeModule,
     ) {
         for (name, struct_def) in module_def.structs.key_cloned_iter() {
             self.decl_ana_struct(&name, struct_def);
@@ -347,7 +364,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             self.decl_ana_fun(&name, fun_def);
         }
         for (name, const_def) in module_def.constants.key_cloned_iter() {
-            self.decl_ana_const(&name, const_def, compiled_module, source_map);
+            self.decl_ana_const(&name, const_def, compiled_module_opt);
         }
         for spec in &module_def.specs {
             self.decl_ana_spec_block(spec);
@@ -358,9 +375,13 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         &mut self,
         name: &PA::ConstantName,
         def: &EA::Constant,
-        compiled_module: &CompiledModule,
-        source_map: &SourceMap,
+        compiled_module: &BytecodeModule,
     ) {
+        let BytecodeModule {
+            compiled_module,
+            source_map,
+            function_infos: _,
+        } = compiled_module;
         let qsym = self.qualified_by_module_from_name(&name.0);
         let name = qsym.symbol;
         let const_name = ConstantName(self.symbol_pool().string(name).to_string().into());
@@ -652,11 +673,9 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 /// # Definition Analysis
 
 impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
-    fn def_ana(
-        &mut self,
-        module_def: &EA::ModuleDefinition,
-        function_infos: &UniqueMap<PA::FunctionName, FunctionInfo>,
-    ) {
+    fn def_ana(&mut self, module_def: &EA::ModuleDefinition, compiled_module: &BytecodeModule) {
+        let compile_move = self.compile_via_model();
+
         // Analyze all structs.
         for (name, def) in module_def.structs.key_cloned_iter() {
             self.def_ana_struct(&name, def);
@@ -664,7 +683,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
         // Analyze all functions.
         for (idx, (name, fun_def)) in module_def.functions.key_cloned_iter().enumerate() {
-            self.def_ana_fun(&name, &fun_def.body, idx);
+            self.def_ana_fun(&name, &fun_def.body, idx, compile_move);
         }
 
         // Propagate the impurity of functions: a Move function which calls an
@@ -783,7 +802,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             }
 
             let fun_name_loc = self.parent.to_loc(&name.loc());
-            let fun_spec_info = &function_infos.get(&name).unwrap().spec_info;
+            let fun_spec_info = &compiled_module.function_infos.get(&name).unwrap().spec_info;
 
             for spec_info in fun_spec_info.values() {
                 // locate the spec block
@@ -943,7 +962,14 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     /// Definition analysis for Move functions.
     /// If the function is pure, we translate its body.
-    fn def_ana_fun(&mut self, name: &PA::FunctionName, body: &EA::FunctionBody, fun_idx: usize) {
+    /// If we are operating as a Move compiler, we also translate its body.
+    fn def_ana_fun(
+        &mut self,
+        name: &PA::FunctionName,
+        body: &EA::FunctionBody,
+        fun_idx: usize,
+        compile_move: bool,
+    ) {
         if let EA::FunctionBody_::Defined(seq) = &body.value {
             let full_name = self.qualified_by_module_from_name(&name.0);
             let entry = self
@@ -954,19 +980,29 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             let type_params = entry.type_params.clone();
             let params = entry.params.clone();
             let result_type = entry.result_type.clone();
+
+            let body_translator = |et: &mut ExpTranslator, as_spec_fun: bool| {
+                if as_spec_fun {
+                    et.translate_fun_as_spec_fun()
+                } else {
+                    et.translate_move_fun()
+                }
+                let loc = et.to_loc(&body.loc);
+                for (n, ty) in &type_params {
+                    et.define_type_param(&loc, *n, ty.clone());
+                }
+                et.enter_scope();
+                for (idx, (n, ty)) in params.iter().enumerate() {
+                    et.define_local(&loc, *n, ty.clone(), None, Some(idx));
+                }
+                let result = et.translate_seq(&loc, seq, &result_type);
+                et.finalize_types();
+                result
+            };
+
+            // Attempt to translate as specification function
             let mut et = ExpTranslator::new(self);
-            et.translate_fun_as_spec_fun();
-            let loc = et.to_loc(&body.loc);
-            for (n, ty) in &type_params {
-                et.define_type_param(&loc, *n, ty.clone());
-            }
-            et.enter_scope();
-            for (idx, (n, ty)) in params.iter().enumerate() {
-                et.define_local(&loc, *n, ty.clone(), None, Some(idx));
-            }
-            let translated = et.translate_seq(&loc, seq, &result_type);
-            et.finalize_types();
-            // If no errors were generated, then the function is considered pure.
+            let translated = body_translator(&mut et, true);
             if !*et.errors_generated.borrow() {
                 // Rewrite all type annotations in expressions to skip references.
                 for node_id in translated.node_ids() {
@@ -981,8 +1017,18 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 });
                 self.spec_funs[self.spec_fun_index].body = Some(translated.into_exp());
             }
+
+            if compile_move {
+                // Also translate as regular Move function
+                let mut et = ExpTranslator::new(self);
+                let translated = body_translator(&mut et, false);
+                assert!(self
+                    .fun_defs
+                    .insert(full_name.symbol, translated.into_exp())
+                    .is_none());
+            }
         }
-        self.spec_fun_index += 1;
+        self.spec_fun_index += 1; // TODO: why is this at the end? Document or move close to use
     }
 
     /// Propagate the impurity of Move functions from callees to callers so
@@ -3221,16 +3267,21 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     }
 }
 
-/// # Environment Population
+/// # Environment Population and finalization
 
 impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
-    fn populate_env_from_result(
+    fn populate_and_finalize_env_from_compiled_module(
         &mut self,
         loc: Loc,
         attributes: Vec<Attribute>,
-        module: CompiledModule,
-        source_map: SourceMap,
+        compiled_module: BytecodeModule,
     ) {
+        let BytecodeModule {
+            compiled_module: module,
+            source_map,
+            function_infos: _,
+        } = compiled_module;
+
         let struct_data: BTreeMap<StructId, StructData> = (0..module.struct_defs().len())
             .filter_map(|idx| {
                 let def_idx = StructDefinitionIndex(idx as u16);
@@ -3284,6 +3335,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     self.symbol_pool().make(name_str)
                 };
                 let fun_spec = self.fun_specs.remove(&name).unwrap_or_default();
+                let fun_def = self.fun_defs.remove(&name);
                 if let Some(entry) = self.parent.fun_table.get(&self.qualified_by_module(name)) {
                     let arg_names = project_1st(&entry.params);
                     let type_arg_names = project_1st(&entry.type_params);
@@ -3296,6 +3348,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                         arg_names,
                         type_arg_names,
                         fun_spec,
+                        fun_def
                     )))
                 } else {
                     let funs = self.parent.fun_table.keys().map(|k| {

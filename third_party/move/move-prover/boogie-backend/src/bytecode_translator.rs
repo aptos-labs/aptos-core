@@ -1372,9 +1372,11 @@ impl<'env> FunctionTranslator<'env> {
                                     fun_name =
                                         boogie_function_bv_name(&callee_env, inst, &[bv_flag]);
                                 } else if module_env.is_table() {
-                                    fun_name = boogie_function_bv_name(&callee_env, inst, &[
-                                        false, bv_flag,
-                                    ]);
+                                    fun_name = boogie_function_bv_name(
+                                        &callee_env,
+                                        inst,
+                                        &[false, bv_flag],
+                                    );
                                 }
                                 emitln!(writer, "call {}({});", fun_name, args_str);
                             } else {
@@ -1383,9 +1385,11 @@ impl<'env> FunctionTranslator<'env> {
                                 // Handle the case where the return value of length is assigned to a bv int because
                                 // length always returns a non-bv result
                                 if module_env.is_std_vector() {
-                                    fun_name = boogie_function_bv_name(&callee_env, inst, &[
-                                        bv_flag || dest_bv_flag,
-                                    ]);
+                                    fun_name = boogie_function_bv_name(
+                                        &callee_env,
+                                        inst,
+                                        &[bv_flag || dest_bv_flag],
+                                    );
                                     // Handle the case where the return value of length is assigned to a bv int because
                                     // length always returns a non-bv result
                                     if callee_name.contains("length") && dest_bv_flag {
@@ -1415,10 +1419,11 @@ impl<'env> FunctionTranslator<'env> {
                                         args_str = args_str_vec.iter().cloned().join(", ");
                                     }
                                 } else if module_env.is_table() {
-                                    fun_name = boogie_function_bv_name(&callee_env, inst, &[
-                                        false,
-                                        bv_flag || dest_bv_flag,
-                                    ]);
+                                    fun_name = boogie_function_bv_name(
+                                        &callee_env,
+                                        inst,
+                                        &[false, bv_flag || dest_bv_flag],
+                                    );
                                     if dest_bv_flag && callee_name.contains("length") {
                                         // Handle the case where the return value of length is assigned to a bv int because
                                         // length always returns a non-bv result
