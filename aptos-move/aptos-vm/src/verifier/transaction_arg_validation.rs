@@ -335,7 +335,7 @@ fn validate_and_construct<S: MoveResolverExt>(
     }
     let constructor_error = |e: VMError| {
         // A slight hack, to prevent additional piping of the feature flag through all
-        // function calls. We know the feature is active when more struct then only string are
+        // function calls. We know the feature is active when more structs then just strings are
         // allowed.
         let are_struct_constructors_enabled = allowed_structs.len() > 1;
         if are_struct_constructors_enabled {
