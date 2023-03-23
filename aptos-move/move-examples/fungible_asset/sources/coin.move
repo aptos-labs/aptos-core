@@ -14,7 +14,7 @@ module fungible_asset::coin {
     ) {
         // TODO(lightmark): create_named_object vs create_object_from_account, which one to choose here.
         let creator_ref = object::create_named_object(creator, *string::bytes(&name));
-        managed_fungible_metadata::init_managing_capabilities(&creator_ref, max_supply, name, symbol, decimals);
+        managed_fungible_metadata::init_managing_refs(&creator_ref, max_supply, name, symbol, decimals);
     }
 
     #[test_only]
@@ -22,11 +22,9 @@ module fungible_asset::coin {
     #[test_only]
     use aptos_framework::account;
     #[test_only]
-    use aptos_framework::fungible_source::FungibleSource;
-    #[test_only]
     use aptos_framework::fungible_store;
     #[test_only]
-    use aptos_framework::fungible_caps;
+    use aptos_framework::fungible_asset::FungibleAssetMetadata;
 
     #[test(creator = @0xcafe, aaron = @0xface)]
     entry fun e2e_test(creator: &signer, aaron: &signer) {
@@ -37,13 +35,13 @@ module fungible_asset::coin {
 
         create_coin(creator, usda, string::utf8(b"$"), 0, 0);
         let coin_addr = object::create_object_address(&creator_address, *string::bytes(&usda));
-        let coin = object::address_to_object<FungibleSource>(coin_addr);
+        let coin = object::address_to_object<FungibleAssetMetadata>(coin_addr);
 
         managed_fungible_metadata::mint(creator, &coin, 100, aaron_address);
-        fungible_caps::transfer(aaron, &coin, 70, creator_address);
+        fungible_store::transfer(aaron, &coin, 70, creator_address);
         managed_fungible_metadata::set_ungated_transfer(creator, &coin, aaron_address, false);
-        managed_fungible_metadata::transfer(creator, &coin, 10, aaron_address, creator_address);
-        managed_fungible_metadata::burn(creator, &coin, 20, creator_address);
+        managed_fungible_metadata::transfer(creator, &coin, aaron_address, creator_address, 10);
+        managed_fungible_metadata::burn(creator, &coin, creator_address, 20);
         assert!(fungible_store::balance(creator_address, &coin) == 60, 1);
         assert!(fungible_store::balance(aaron_address, &coin) == 20, 2);
     }
