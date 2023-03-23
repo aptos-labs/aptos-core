@@ -63,6 +63,7 @@ The appearance of the button in the `AptosNamesConnector` component can be custo
   padding: 12px 16px;
 }
 ```
+To use `ans_connector_button` in your React application, add `import "@aptos-labs/aptos-names-connector/dist/index.css";` to the top of your App.js file and reference it with `<button className="ans_connector_button"></button>`
 
 ## Supported networks
 The `AptosNamesConnector` component supports both mainnet and testnet. To connect to the mainnet, set the network prop to "mainnet". To connect to the testnet, set the network prop to "testnet".
