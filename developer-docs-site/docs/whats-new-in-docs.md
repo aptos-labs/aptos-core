@@ -7,6 +7,10 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site. Note, this site is built from the `main` upstream branch of GitHub and so therefore reflects the latest changes to Aptos. If you have checked out [another branch](https://github.com/aptos-labs/aptos-core/branches) to use a [specific network](guides/system-integrators-guide.md#choose-a-network), the code may not yet have all of the features described here.
 
+## 21 March 2023
+
+- Published beta [Delegation Pool Operations](../../nodes/validator-node/operator/delegation-pool-operations.md) instructions for validator operators, written by [Raluca Popescu (dorinbwr](https://github.com/dorinbwr) ) of [Bware Labs](https://bwarelabs.com/).
+
 ## 16 March 2023
 
 - Added the ability to use [Bytecode for Dependencies](./guides/move-guides/bytecode-dependencies.md) when compiling Move modules in cases where the Move source code for those dependencies are not available locally.
@@ -16,6 +20,7 @@ This page shows the key updates to the developer documentation on this site. Not
 ## 15 March 2023
 
 - Published a [PowerShell script](../../scripts/windows_dev_setup.ps1) to streamline the Aptos [development environment setup](../docs/guides/getting-started.md#set-up-build-dependencies) process on Windows. The script uses WinGet (Microsoft’s official package manager, included in Windows 10 and 11 by default) to install the necessary dependencies and keep them up-to-date.
+
 
 ## 08 March 2023
 
