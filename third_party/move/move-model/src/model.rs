@@ -1184,6 +1184,7 @@ impl GlobalEnv {
         arg_names: Vec<Symbol>,
         type_arg_names: Vec<Symbol>,
         spec: Spec,
+        def: Option<Exp>,
     ) -> FunctionData {
         let handle_idx = module.function_def_at(def_idx).function;
         FunctionData {
@@ -1195,6 +1196,7 @@ impl GlobalEnv {
             arg_names,
             type_arg_names,
             spec: spec.into(),
+            def,
             called_funs: Default::default(),
             calling_funs: Default::default(),
             transitive_closure_of_called_funs: Default::default(),
@@ -1262,11 +1264,14 @@ impl GlobalEnv {
         let field_name = self.symbol_pool.make("v");
         let mut field_data = BTreeMap::new();
         let field_id = FieldId::new(field_name);
-        field_data.insert(field_id, FieldData {
-            name: field_name,
-            offset: 0,
-            info: FieldInfo::Generated { type_: ty },
-        });
+        field_data.insert(
+            field_id,
+            FieldData {
+                name: field_name,
+                offset: 0,
+                info: FieldInfo::Generated { type_: ty },
+            },
+        );
         StructData {
             name: self.ghost_memory_name(var_name),
             loc,
@@ -2987,6 +2992,10 @@ pub struct FunctionData {
     /// Specification associated with this function.
     spec: RefCell<Spec>,
 
+    /// Optional definition associated with this function. The definition is available if
+    /// the model is build with option `ModelBuilderOptions::compile_via_model`.
+    def: Option<Exp>,
+
     /// A cache for the called functions.
     called_funs: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
 
@@ -3012,6 +3021,7 @@ impl FunctionData {
             arg_names: vec![],
             type_arg_names: vec![],
             spec: Spec::default().into(),
+            def: None,
             called_funs: Default::default(),
             calling_funs: Default::default(),
             transitive_closure_of_called_funs: Default::default(),
@@ -3526,6 +3536,12 @@ impl<'env> FunctionEnv<'env> {
     /// Returns associated mutable reference to specification.
     pub fn get_mut_spec(&'env self) -> RefMut<Spec> {
         self.data.spec.borrow_mut()
+    }
+
+    /// Returns associated definition. The definition of the function, in Exp form, is available
+    /// if the model is build with `ModelBuilderOptions::compile_via_model`
+    pub fn get_def(&self) -> &Option<Exp> {
+        &self.data.def
     }
 
     /// Returns the acquired global resource types.
