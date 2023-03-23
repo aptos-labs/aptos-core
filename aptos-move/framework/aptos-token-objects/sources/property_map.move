@@ -247,7 +247,7 @@ module aptos_token_objects::property_map {
         let (type, value) = read(object, key);
         assert!(
             type == type_info::type_name<V>(),
-            error::invalid_argument(ETYPE_INVALID),
+            error::invalid_argument(ETYPE_MISMATCH),
         );
         value
     }
@@ -585,7 +585,7 @@ module aptos_token_objects::property_map {
     }
 
     #[test(creator = @0x123)]
-    #[expected_failure(abort_code = 0x10008, location = Self)]
+    #[expected_failure(abort_code = 0x10005, location = Self)]
     fun test_invalid_read(creator: &signer) acquires PropertyMap {
         let constructor_ref = object::create_named_object(creator, b"");
         let object = object::object_from_constructor_ref<object::ObjectCore>(&constructor_ref);
