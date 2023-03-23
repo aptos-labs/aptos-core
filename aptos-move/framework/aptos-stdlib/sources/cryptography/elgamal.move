@@ -36,15 +36,15 @@ module aptos_std::elgamal {
     /// Returns a ciphertext (val * val_base + r * pub_key, r * val_base) where val_base is the generator.
     public fun new_ciphertext(val: &Scalar, val_base: &RistrettoPoint, rand: &Scalar, pub_key: &PubKey): Ciphertext {
         Ciphertext {
-            left: ristretto255::double_scalar_mul(val, val_base, rand, pub_key.point),
-	    right: ristretto255::scalar_mul(rand, val_base),
+            left: ristretto255::double_scalar_mul(val, val_base, rand, &pub_key.point),
+	    right: ristretto255::point_mul(val_base, rand),
         }
     }
 
     /// Returns a ciphertext (val * basepoint + r * pub_key, rand * basepoint) where `basepoint` is the Ristretto255 basepoint.
     public fun new_commitment_with_basepoint(val: &Scalar, rand: &Scalar, pub_key: &PubKey): Ciphertext {
         Ciphertext {
-            left: ristretto255::basepoint_double_mul(rand, pub_key.point, val),
+            left: ristretto255::basepoint_double_mul(rand, &pub_key.point, val),
 	    right: ristretto255::basepoint_mul(rand),
         }
     }
@@ -111,3 +111,4 @@ module aptos_std::elgamal {
     public fun ciphertext_into_compressed_points(c: Ciphertext): (CompressedRistretto, CompressedRistretto) {
         (point_compress(&c.left), point_compress(&c.right))
     }
+}
