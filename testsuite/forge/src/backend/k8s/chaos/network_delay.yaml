@@ -15,7 +15,7 @@ spec:
     latency: "{latency_ms}ms"
     correlation: "{correlation_percentage}"
     jitter: "{jitter_ms}ms"
-  # Indicates the direction of target packets. Available vaules include:
+  # Indicates the direction of target packets. Available values include:
   # from (the packets from target)
   # to (the packets to target)
   # both ( the packets from or to target)

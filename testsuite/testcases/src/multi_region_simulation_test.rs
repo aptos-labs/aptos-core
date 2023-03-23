@@ -12,6 +12,9 @@ use csv::Reader;
 use itertools::{self, Itertools};
 use std::collections::BTreeMap;
 
+/// The link stats are obtained from https://github.com/doitintl/intercloud-throughput/blob/master/results_202202/results.csv
+/// The four regions were hand-picked from the dataset to simulate a multi-region setup
+/// with high latencies and low bandwidth.
 macro_rules! FOUR_REGION_LINK_STATS_CSV {
     () => {
         "data/four_region_link_stats.csv"
