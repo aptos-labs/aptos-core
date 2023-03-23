@@ -151,14 +151,6 @@ pub static GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_TIME_WHEN_SAVE: Lazy<Histogr
     },
 );
 
-pub static NUM_PROOFS_EXPIRED_WHEN_COMMIT: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!(
-        "quorum_store_num_proofs_expired_when_commit",
-        "Number of proofs that were expired when commit is called"
-    )
-    .unwrap()
-});
-
 pub static NUM_BATCH_EXPIRED_WHEN_SAVE: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "quorum_store_num_batch_expired_when_save",
@@ -167,16 +159,25 @@ pub static NUM_BATCH_EXPIRED_WHEN_SAVE: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Histogram for the gaps between expiration round and the current round when pulling the proofs, and expiration round is lower.
-pub static GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_TIME_WHEN_PULL_PROOFS: Lazy<Histogram> =
-    Lazy::new(|| {
+/// Histogram for the gaps between expiration time and the current block timestamp on commit, and expiration round is lower.
+pub static GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_TIME_WHEN_COMMIT: Lazy<Histogram> = Lazy::new(
+    || {
         register_histogram!(
-        "quorum_store_gap_batch_expiration_and_current_round_when_pull",
-        "Histogram for the gaps between expiration round and the current round when pulling the proofs, and expiration round is lower.",
+        "quorum_store_gap_batch_expiration_and_current_time_when_commit",
+        "Histogram for the gaps between expiration time and the current block timestamp on commit, and expiration round is lower.",
         // exponential_buckets(/*start=*/ 100.0, /*factor=*/ 1.1, /*count=*/ 100).unwrap(),
     )
+            .unwrap()
+    },
+);
+
+pub static NUM_PROOFS_EXPIRED_WHEN_COMMIT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_num_proofs_expired_when_commit",
+        "Number of proofs that were expired when commit is called"
+    )
     .unwrap()
-    });
+});
 
 pub static POS_TO_PULL: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(

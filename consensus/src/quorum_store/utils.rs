@@ -316,7 +316,7 @@ impl ProofQueue {
                     // non-committed proof that is expired
                     num_expired_but_not_committed += 1;
                     if batch.expiration() < block_timestamp {
-                        counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_TIME_WHEN_PULL_PROOFS
+                        counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_TIME_WHEN_COMMIT
                             .observe((block_timestamp - batch.expiration()) as f64);
                     }
                 }
