@@ -11,10 +11,7 @@ use aptos_crypto::ValidCryptoMaterialStringExt;
 use aptos_forge::Swarm;
 use aptos_gas::{AptosGasParameters, GasQuantity, InitialGasSchedule, ToOnChainGasSchedule};
 use aptos_keygen::KeyGen;
-use aptos_release_builder::components::{
-    feature_flags::{FeatureFlag, Features},
-    gas::generate_gas_upgrade_proposal,
-};
+use aptos_release_builder::components::gas::generate_gas_upgrade_proposal;
 use aptos_temppath::TempPath;
 use std::{fs, path::PathBuf, process::Command, sync::Arc, thread, time::Duration};
 
@@ -94,16 +91,7 @@ async fn test_upgrade_flow() {
     let upgrade_scripts_folder = TempPath::new();
     upgrade_scripts_folder.create_as_dir().unwrap();
 
-    let config = aptos_release_builder::ReleaseConfig {
-        feature_flags: Some(Features {
-            enabled: vec![
-                FeatureFlag::CodeDependencyCheck,
-                FeatureFlag::TreatFriendAsPrivate,
-            ],
-            disabled: vec![],
-        }),
-        ..Default::default()
-    };
+    let config = aptos_release_builder::ReleaseConfig::default();
 
     config
         .generate_release_proposal_scripts(upgrade_scripts_folder.path())
@@ -181,13 +169,6 @@ async fn test_upgrade_flow_multi_step() {
     upgrade_scripts_folder.create_as_dir().unwrap();
 
     let config = aptos_release_builder::ReleaseConfig {
-        feature_flags: Some(Features {
-            enabled: vec![
-                FeatureFlag::CodeDependencyCheck,
-                FeatureFlag::TreatFriendAsPrivate,
-            ],
-            disabled: vec![],
-        }),
         is_multi_step: true,
         ..Default::default()
     };

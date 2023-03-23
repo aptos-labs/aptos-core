@@ -41,6 +41,7 @@ spec:
           {{- toYaml .Values.backup.resources | nindent 10 }}
         command: ["/usr/local/bin/aptos-db-tool"]
         args:
+        - "backup"
         - "continuously"
         - "--metadata-cache-dir"
         - "/tmp/aptos-backup-metadata"

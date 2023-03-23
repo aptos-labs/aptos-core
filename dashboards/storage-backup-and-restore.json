@@ -115,7 +115,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "last_over_time(aptos_backup_handler_epoch_ending_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[7d])",
+          "expr": "last_over_time(aptos_db_backup_coordinator_epoch_ending_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[7d])",
           "interval": "",
           "legendFormat": " {{cluster}} {{kubernetes_pod_name}}",
           "range": true,
@@ -181,7 +181,7 @@
           "expr": "aptos_backup_handler_epoch_ending_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
           "hide": false,
           "interval": "",
-          "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}} backed up",
+          "legendFormat": "{{cluster}} {{kubernetes_pod_name}} backed up",
           "range": true,
           "refId": "A"
         },
@@ -191,7 +191,7 @@
           "expr": "aptos_storage_next_block_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} and aptos_backup_handler_epoch_ending_epoch",
           "hide": true,
           "interval": "",
-          "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}} latest",
+          "legendFormat": "{{cluster}} {{kubernetes_pod_name}} latest",
           "range": true,
           "refId": "B"
         },
@@ -246,7 +246,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "last_over_time(aptos_backup_handler_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[7d])",
+          "expr": "last_over_time(aptos_db_backup_coordinator_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[7d])",
           "interval": "",
           "legendFormat": " {{cluster}} {{kubernetes_pod_name}}",
           "range": true,
@@ -423,7 +423,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "max(aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+          "expr": "max(aptos_storage_next_block_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
           "hide": false,
           "legendFormat": "latest",
           "range": true,
@@ -432,7 +432,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "last_over_time(aptos_backup_handler_state_snapshot_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[7d])",
+          "expr": "last_over_time(aptos_db_backup_coordinator_state_snapshot_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[7d])",
           "interval": "",
           "legendFormat": " {{cluster}} {{kubernetes_pod_name}}",
           "range": true,
@@ -493,7 +493,7 @@
           "editorMode": "code",
           "expr": "aptos_backup_handler_state_snapshot_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
           "interval": "",
-          "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}} backed up",
+          "legendFormat": "{{cluster}} {{kubernetes_pod_name}} backed up",
           "range": true,
           "refId": "A"
         },
@@ -503,7 +503,7 @@
           "expr": "aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} and aptos_backup_handler_state_snapshot_version",
           "hide": true,
           "interval": "",
-          "legendFormat": "{{kubernetes_pod_name}} {{kubernetes_pod_name}} latest",
+          "legendFormat": "{{cluster}} {{kubernetes_pod_name}} latest",
           "range": true,
           "refId": "B"
         },
@@ -2313,6 +2313,6 @@
   "timezone": "",
   "title": "Storage (Backup and Restore)",
   "uid": "9oXpx4n4z",
-  "version": 53,
+  "version": 60,
   "weekStart": ""
 }

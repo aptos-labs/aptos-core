@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import time
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import httpx
 
@@ -27,30 +27,44 @@ class ClientConfig:
     gas_unit_price: int = 100
     max_gas_amount: int = 100_000
     transaction_wait_in_seconds: int = 20
+    http2: bool = False
 
 
 class RestClient:
     """A wrapper around the Aptos-core Rest API"""
 
-    chain_id: int
-    client: httpx.Client
+    _chain_id: Optional[int]
+    client: httpx.AsyncClient
     client_config: ClientConfig
     base_url: str
 
     def __init__(self, base_url: str, client_config: ClientConfig = ClientConfig()):
         self.base_url = base_url
-        self.client = httpx.Client()
+        # Default limits
+        limits = httpx.Limits()
+        # Default timeouts but do not set a pool timeout, since the idea is that jobs will wait as
+        # long as progress is being made.
+        timeout = httpx.Timeout(60.0, pool=None)
+        self.client = httpx.AsyncClient(
+            http2=client_config.http2, limits=limits, timeout=timeout
+        )
         self.client_config = client_config
-        self.chain_id = int(self.info()["chain_id"])
+        self._chain_id = None
 
-    def close(self):
-        self.client.close()
+    async def close(self):
+        await self.client.aclose()
+
+    async def chain_id(self):
+        if not self._chain_id:
+            info = await self.info()
+            self._chain_id = int(info["chain_id"])
+        return self._chain_id
 
     #
     # Account accessors
     #
 
-    def account(
+    async def account(
         self, account_address: AccountAddress, ledger_version: int = None
     ) -> Dict[str, str]:
         """Returns the sequence number and authentication key for an account"""
@@ -60,29 +74,29 @@ class RestClient:
         else:
             request = f"{self.base_url}/accounts/{account_address}?ledger_version={ledger_version}"
 
-        response = self.client.get(request)
+        response = await self.client.get(request)
         if response.status_code >= 400:
             raise ApiError(f"{response.text} - {account_address}", response.status_code)
         return response.json()
 
-    def account_balance(
+    async def account_balance(
         self, account_address: AccountAddress, ledger_version: int = None
     ) -> int:
         """Returns the test coin balance associated with the account"""
-        resource = self.account_resource(
+        resource = await self.account_resource(
             account_address,
             "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
             ledger_version,
         )
         return resource["data"]["coin"]["value"]
 
-    def account_sequence_number(
+    async def account_sequence_number(
         self, account_address: AccountAddress, ledger_version: int = None
     ) -> int:
-        account_res = self.account(account_address, ledger_version)
+        account_res = await self.account(account_address, ledger_version)
         return int(account_res["sequence_number"])
 
-    def account_resource(
+    async def account_resource(
         self,
         account_address: AccountAddress,
         resource_type: str,
@@ -95,14 +109,14 @@ class RestClient:
         else:
             request = f"{self.base_url}/accounts/{account_address}/resource/{resource_type}?ledger_version={ledger_version}"
 
-        response = self.client.get(request)
+        response = await self.client.get(request)
         if response.status_code == 404:
             raise ResourceNotFound(resource_type, resource_type)
         if response.status_code >= 400:
             raise ApiError(f"{response.text} - {account_address}", response.status_code)
         return response.json()
 
-    def get_table_item(
+    async def get_table_item(
         self,
         handle: str,
         key_type: str,
@@ -116,7 +130,7 @@ class RestClient:
             request = (
                 f"{self.base_url}/tables/{handle}/item?ledger_version={ledger_version}"
             )
-        response = self.client.post(
+        response = await self.client.post(
             request,
             json={
                 "key_type": key_type,
@@ -128,14 +142,14 @@ class RestClient:
             raise ApiError(response.text, response.status_code)
         return response.json()
 
-    def aggregator_value(
+    async def aggregator_value(
         self,
         account_address: AccountAddress,
         resource_type: str,
         aggregator_path: List[str],
     ) -> int:
-        source_data = self.account_resource(account_address, resource_type)["data"]
-        data = source_data
+        source = await self.account_resource(account_address, resource_type)
+        source_data = data = source["data"]
 
         while len(aggregator_path) > 0:
             key = aggregator_path.pop()
@@ -166,14 +180,14 @@ class RestClient:
             raise ApiError(f"aggregator not found in data: {source_data}", source_data)
         handle = data["handle"]
         key = data["key"]
-        return int(self.get_table_item(handle, "address", "u128", key))
+        return int(await self.get_table_item(handle, "address", "u128", key))
 
     #
     # Ledger accessors
     #
 
-    def info(self) -> Dict[str, str]:
-        response = self.client.get(self.base_url)
+    async def info(self) -> Dict[str, str]:
+        response = await self.client.get(self.base_url)
         if response.status_code >= 400:
             raise ApiError(response.text, response.status_code)
         return response.json()
@@ -182,7 +196,7 @@ class RestClient:
     # Transactions
     #
 
-    def simulate_transaction(
+    async def simulate_transaction(
         self,
         transaction: RawTransaction,
         sender: Account,
@@ -197,7 +211,7 @@ class RestClient:
         signed_transaction = SignedTransaction(transaction, authenticator)
 
         headers = {"Content-Type": "application/x.aptos.signed_transaction+bcs"}
-        response = self.client.post(
+        response = await self.client.post(
             f"{self.base_url}/transactions/simulate",
             headers=headers,
             content=signed_transaction.bytes(),
@@ -207,9 +221,11 @@ class RestClient:
 
         return response.json()
 
-    def submit_bcs_transaction(self, signed_transaction: SignedTransaction) -> str:
+    async def submit_bcs_transaction(
+        self, signed_transaction: SignedTransaction
+    ) -> str:
         headers = {"Content-Type": "application/x.aptos.signed_transaction+bcs"}
-        response = self.client.post(
+        response = await self.client.post(
             f"{self.base_url}/transactions",
             headers=headers,
             content=signed_transaction.bytes(),
@@ -218,7 +234,7 @@ class RestClient:
             raise ApiError(response.text, response.status_code)
         return response.json()["hash"]
 
-    def submit_transaction(self, sender: Account, payload: Dict[str, Any]) -> str:
+    async def submit_transaction(self, sender: Account, payload: Dict[str, Any]) -> str:
         """
         1) Generates a transaction request
         2) submits that to produce a raw transaction
@@ -228,7 +244,9 @@ class RestClient:
 
         txn_request = {
             "sender": f"{sender.address()}",
-            "sequence_number": str(self.account_sequence_number(sender.address())),
+            "sequence_number": str(
+                await self.account_sequence_number(sender.address())
+            ),
             "max_gas_amount": str(self.client_config.max_gas_amount),
             "gas_unit_price": str(self.client_config.gas_unit_price),
             "expiration_timestamp_secs": str(
@@ -237,7 +255,7 @@ class RestClient:
             "payload": payload,
         }
 
-        response = self.client.post(
+        response = await self.client.post(
             f"{self.base_url}/transactions/encode_submission", json=txn_request
         )
         if response.status_code >= 400:
@@ -252,15 +270,17 @@ class RestClient:
         }
 
         headers = {"Content-Type": "application/json"}
-        response = self.client.post(
+        response = await self.client.post(
             f"{self.base_url}/transactions", headers=headers, json=txn_request
         )
         if response.status_code >= 400:
             raise ApiError(response.text, response.status_code)
         return response.json()["hash"]
 
-    def transaction_pending(self, txn_hash: str) -> bool:
-        response = self.client.get(f"{self.base_url}/transactions/by_hash/{txn_hash}")
+    async def transaction_pending(self, txn_hash: str) -> bool:
+        response = await self.client.get(
+            f"{self.base_url}/transactions/by_hash/{txn_hash}"
+        )
         # TODO(@davidiw): consider raising a different error here, since this is an ambiguous state
         if response.status_code == 404:
             return True
@@ -268,20 +288,22 @@ class RestClient:
             raise ApiError(response.text, response.status_code)
         return response.json()["type"] == "pending_transaction"
 
-    def wait_for_transaction(self, txn_hash: str) -> None:
+    async def wait_for_transaction(self, txn_hash: str) -> None:
         """
         Waits up to the duration specified in client_config for a transaction to move past pending
         state.
         """
 
         count = 0
-        while self.transaction_pending(txn_hash):
+        while await self.transaction_pending(txn_hash):
             assert (
                 count < self.client_config.transaction_wait_in_seconds
             ), f"transaction {txn_hash} timed out"
             time.sleep(1)
             count += 1
-        response = self.client.get(f"{self.base_url}/transactions/by_hash/{txn_hash}")
+        response = await self.client.get(
+            f"{self.base_url}/transactions/by_hash/{txn_hash}"
+        )
         assert (
             "success" in response.json() and response.json()["success"]
         ), f"{response.text} - {txn_hash}"
@@ -290,7 +312,7 @@ class RestClient:
     # Transaction helpers
     #
 
-    def create_multi_agent_bcs_transaction(
+    async def create_multi_agent_bcs_transaction(
         self,
         sender: Account,
         secondary_accounts: List[Account],
@@ -299,12 +321,12 @@ class RestClient:
         raw_transaction = MultiAgentRawTransaction(
             RawTransaction(
                 sender.address(),
-                self.account_sequence_number(sender.address()),
+                await self.account_sequence_number(sender.address()),
                 payload,
                 self.client_config.max_gas_amount,
                 self.client_config.gas_unit_price,
                 int(time.time()) + self.client_config.expiration_ttl,
-                self.chain_id,
+                await self.chain_id(),
             ),
             [x.address() for x in secondary_accounts],
         )
@@ -330,23 +352,23 @@ class RestClient:
 
         return SignedTransaction(raw_transaction.inner(), authenticator)
 
-    def create_bcs_transaction(
+    async def create_bcs_transaction(
         self, sender: Account, payload: TransactionPayload
     ) -> RawTransaction:
         return RawTransaction(
             sender.address(),
-            self.account_sequence_number(sender.address()),
+            await self.account_sequence_number(sender.address()),
             payload,
             self.client_config.max_gas_amount,
             self.client_config.gas_unit_price,
             int(time.time()) + self.client_config.expiration_ttl,
-            self.chain_id,
+            await self.chain_id(),
         )
 
-    def create_bcs_signed_transaction(
+    async def create_bcs_signed_transaction(
         self, sender: Account, payload: TransactionPayload
     ) -> SignedTransaction:
-        raw_transaction = self.create_bcs_transaction(sender, payload)
+        raw_transaction = await self.create_bcs_transaction(sender, payload)
         signature = sender.sign(raw_transaction.keyed())
         authenticator = Authenticator(
             Ed25519Authenticator(sender.public_key(), signature)
@@ -357,23 +379,25 @@ class RestClient:
     # Transaction wrappers
     #
 
-    def transfer(self, sender: Account, recipient: AccountAddress, amount: int) -> str:
+    async def transfer(
+        self, sender: Account, recipient: AccountAddress, amount: int
+    ) -> str:
         """Transfer a given coin amount from a given Account to the recipient's account address.
         Returns the sequence number of the transaction used to transfer."""
 
         payload = {
             "type": "entry_function_payload",
-            "function": "0x1::aptos_account::transfer_coins",
+            "function": "0x1::coin::transfer",
             "type_arguments": ["0x1::aptos_coin::AptosCoin"],
             "arguments": [
                 f"{recipient}",
                 str(amount),
             ],
         }
-        return self.submit_transaction(sender, payload)
+        return await self.submit_transaction(sender, payload)
 
     # :!:>bcs_transfer
-    def bcs_transfer(
+    async def bcs_transfer(
         self, sender: Account, recipient: AccountAddress, amount: int
     ) -> str:
         transaction_arguments = [
@@ -382,16 +406,16 @@ class RestClient:
         ]
 
         payload = EntryFunction.natural(
-            "0x1::aptos_account",
-            "transfer_coins",
+            "0x1::coin",
+            "transfer",
             [TypeTag(StructTag.from_str("0x1::aptos_coin::AptosCoin"))],
             transaction_arguments,
         )
 
-        signed_transaction = self.create_bcs_signed_transaction(
+        signed_transaction = await self.create_bcs_signed_transaction(
             sender, TransactionPayload(payload)
         )
-        return self.submit_bcs_transaction(signed_transaction)
+        return await self.submit_bcs_transaction(signed_transaction)
 
     # <:!:bcs_transfer
 
@@ -400,7 +424,7 @@ class RestClient:
     #
 
     # :!:>create_collection
-    def create_collection(
+    async def create_collection(
         self, account: Account, name: str, description: str, uri: str
     ) -> str:  # <:!:create_collection
         """Creates a new collection within the specified account"""
@@ -422,13 +446,13 @@ class RestClient:
             transaction_arguments,
         )
 
-        signed_transaction = self.create_bcs_signed_transaction(
+        signed_transaction = await self.create_bcs_signed_transaction(
             account, TransactionPayload(payload)
         )
-        return self.submit_bcs_transaction(signed_transaction)
+        return await self.submit_bcs_transaction(signed_transaction)
 
     # :!:>create_token
-    def create_token(
+    async def create_token(
         self,
         account: Account,
         collection_name: str,
@@ -466,12 +490,12 @@ class RestClient:
             [],
             transaction_arguments,
         )
-        signed_transaction = self.create_bcs_signed_transaction(
+        signed_transaction = await self.create_bcs_signed_transaction(
             account, TransactionPayload(payload)
         )
-        return self.submit_bcs_transaction(signed_transaction)
+        return await self.submit_bcs_transaction(signed_transaction)
 
-    def offer_token(
+    async def offer_token(
         self,
         account: Account,
         receiver: AccountAddress,
@@ -496,12 +520,12 @@ class RestClient:
             [],
             transaction_arguments,
         )
-        signed_transaction = self.create_bcs_signed_transaction(
+        signed_transaction = await self.create_bcs_signed_transaction(
             account, TransactionPayload(payload)
         )
-        return self.submit_bcs_transaction(signed_transaction)
+        return await self.submit_bcs_transaction(signed_transaction)
 
-    def claim_token(
+    async def claim_token(
         self,
         account: Account,
         sender: AccountAddress,
@@ -524,12 +548,12 @@ class RestClient:
             [],
             transaction_arguments,
         )
-        signed_transaction = self.create_bcs_signed_transaction(
+        signed_transaction = await self.create_bcs_signed_transaction(
             account, TransactionPayload(payload)
         )
-        return self.submit_bcs_transaction(signed_transaction)
+        return await self.submit_bcs_transaction(signed_transaction)
 
-    def direct_transfer_token(
+    async def direct_transfer_token(
         self,
         sender: Account,
         receiver: Account,
@@ -554,18 +578,18 @@ class RestClient:
             transaction_arguments,
         )
 
-        signed_transaction = self.create_multi_agent_bcs_transaction(
+        signed_transaction = await self.create_multi_agent_bcs_transaction(
             sender,
             [receiver],
             TransactionPayload(payload),
         )
-        return self.submit_bcs_transaction(signed_transaction)
+        return await self.submit_bcs_transaction(signed_transaction)
 
     #
     # Token accessors
     #
 
-    def get_token(
+    async def get_token(
         self,
         owner: AccountAddress,
         creator: AccountAddress,
@@ -573,7 +597,7 @@ class RestClient:
         token_name: str,
         property_version: int,
     ) -> Any:
-        resource = self.account_resource(owner, "0x3::token::TokenStore")
+        resource = await self.account_resource(owner, "0x3::token::TokenStore")
         token_store_handle = resource["data"]["tokens"]["handle"]
 
         token_id = {
@@ -586,7 +610,7 @@ class RestClient:
         }
 
         try:
-            return self.get_table_item(
+            return await self.get_table_item(
                 token_store_handle,
                 "0x3::token::TokenId",
                 "0x3::token::Token",
@@ -600,7 +624,7 @@ class RestClient:
                 }
             raise
 
-    def get_token_balance(
+    async def get_token_balance(
         self,
         owner: AccountAddress,
         creator: AccountAddress,
@@ -608,19 +632,20 @@ class RestClient:
         token_name: str,
         property_version: int,
     ) -> str:
-        return self.get_token(
+        info = await self.get_token(
             owner, creator, collection_name, token_name, property_version
-        )["amount"]
+        )
+        return info["amount"]
 
     # :!:>read_token_data_table
-    def get_token_data(
+    async def get_token_data(
         self,
         creator: AccountAddress,
         collection_name: str,
         token_name: str,
         property_version: int,
     ) -> Any:
-        resource = self.account_resource(creator, "0x3::token::Collections")
+        resource = await self.account_resource(creator, "0x3::token::Collections")
         token_data_handle = resource["data"]["token_data"]["handle"]
 
         token_data_id = {
@@ -629,18 +654,20 @@ class RestClient:
             "name": token_name,
         }
 
-        return self.get_table_item(
+        return await self.get_table_item(
             token_data_handle,
             "0x3::token::TokenDataId",
             "0x3::token::TokenData",
             token_data_id,
         )  # <:!:read_token_data_table
 
-    def get_collection(self, creator: AccountAddress, collection_name: str) -> Any:
-        resource = self.account_resource(creator, "0x3::token::Collections")
+    async def get_collection(
+        self, creator: AccountAddress, collection_name: str
+    ) -> Any:
+        resource = await self.account_resource(creator, "0x3::token::Collections")
         token_data = resource["data"]["collection_data"]["handle"]
 
-        return self.get_table_item(
+        return await self.get_table_item(
             token_data,
             "0x1::string::String",
             "0x3::token::CollectionData",
@@ -651,7 +678,7 @@ class RestClient:
     # Package publishing
     #
 
-    def publish_package(
+    async def publish_package(
         self, sender: Account, package_metadata: bytes, modules: List[bytes]
     ) -> str:
         transaction_arguments = [
@@ -668,10 +695,10 @@ class RestClient:
             transaction_arguments,
         )
 
-        signed_transaction = self.create_bcs_signed_transaction(
+        signed_transaction = await self.create_bcs_signed_transaction(
             sender, TransactionPayload(payload)
         )
-        return self.submit_bcs_transaction(signed_transaction)
+        return await self.submit_bcs_transaction(signed_transaction)
 
 
 class FaucetClient:
@@ -684,19 +711,19 @@ class FaucetClient:
         self.base_url = base_url
         self.rest_client = rest_client
 
-    def close(self):
-        self.rest_client.close()
+    async def close(self):
+        await self.rest_client.close()
 
-    def fund_account(self, address: str, amount: int):
+    async def fund_account(self, address: str, amount: int):
         """This creates an account if it does not exist and mints the specified amount of
         coins into that account."""
-        response = self.rest_client.client.post(
+        response = await self.rest_client.client.post(
             f"{self.base_url}/mint?amount={amount}&address={address}"
         )
         if response.status_code >= 400:
             raise ApiError(response.text, response.status_code)
         for txn_hash in response.json():
-            self.rest_client.wait_for_transaction(txn_hash)
+            await self.rest_client.wait_for_transaction(txn_hash)
 
 
 class ApiError(Exception):

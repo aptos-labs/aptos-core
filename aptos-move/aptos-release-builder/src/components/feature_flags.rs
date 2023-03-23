@@ -13,7 +13,7 @@ pub struct Features {
     pub disabled: Vec<FeatureFlag>,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize, Hash)]
 #[allow(non_camel_case_types)]
 #[serde(rename_all = "snake_case")]
 pub enum FeatureFlag {
