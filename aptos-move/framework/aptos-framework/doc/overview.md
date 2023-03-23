@@ -28,8 +28,6 @@ This is the reference documentation of the Aptos framework.
 -  [`0x1::delegation_pool`](delegation_pool.md#0x1_delegation_pool)
 -  [`0x1::event`](event.md#0x1_event)
 -  [`0x1::fungible_asset`](fungible_asset.md#0x1_fungible_asset)
--  [`0x1::fungible_caps`](fungible_caps.md#0x1_fungible_caps)
--  [`0x1::fungible_source`](fungible_source.md#0x1_fungible_source)
 -  [`0x1::fungible_store`](fungible_store.md#0x1_fungible_store)
 -  [`0x1::gas_schedule`](gas_schedule.md#0x1_gas_schedule)
 -  [`0x1::genesis`](genesis.md#0x1_genesis)

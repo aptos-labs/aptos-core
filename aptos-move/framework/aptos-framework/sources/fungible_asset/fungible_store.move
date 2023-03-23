@@ -1,56 +1,92 @@
+/// This defines a store of `FungibleAssetWallet` under each account.
 module aptos_framework::fungible_store {
     use aptos_framework::create_signer;
-    use aptos_framework::fungible_asset::{Self, AccountFungibleAsset, FungibleAsset};
-    use aptos_framework::fungible_source::{Self, FungibleSource};
+    use aptos_framework::fungible_asset::{Self, FungibleAssetWallet, FungibleAsset, FungibleAssetMetadata, TransferRef, metadata_from_wallet, BurnRef};
     use aptos_framework::object::{Self, Object};
     use aptos_std::smart_table::{Self, SmartTable};
-    use std::option::{Self, Option};
     use std::error;
+    use std::option::{Self, Option};
+    use std::signer;
+    #[test_only]
+    use aptos_framework::fungible_asset::verify;
 
-    friend aptos_framework::fungible_caps;
+    /// The fungible asset wallet object existence error.
+    const EFUNGIBLE_ASSET_WALLET_OBJECT: u64 = 1;
 
-    /// The account fungible asset object existence error.
-    const EACCOUNT_FUNGIBLE_ASSET_OBJECT: u64 = 1;
-
-    /// Represents all the fungible asset objects of an onwer keyed by the address of the base asset object.
+    /// Represents all the fungible asset wallet objects of an onwer keyed by the base metadata objects.
     struct FungibleAssetStore has key {
-        index: SmartTable<Object<FungibleSource>, Object<AccountFungibleAsset>>
+        index: SmartTable<Object<FungibleAssetMetadata>, Object<FungibleAssetWallet>>
     }
 
-    /// Check the balance of an `AccountFungibleAsset`.
+    /// Check the balance of an account.
     public fun balance<T: key>(
         account: address,
-        asset: &Object<T>
+        metadata: &Object<T>
     ): u64 acquires FungibleAssetStore {
-        let asset = fungible_source::verify(asset);
+        let metadata = fungible_asset::verify(metadata);
         let afa_opt = get_account_fungible_asset_object(
             account,
-            &asset,
+            &metadata,
             false
         );
         if (option::is_none(&afa_opt)) {
             return 0
         };
-        let afa = option::destroy_some(afa_opt);
-        fungible_asset::balance(&afa)
+        let wallet = option::destroy_some(afa_opt);
+        fungible_asset::balance(&wallet)
     }
 
-    /// Check the `AccountFungibleAsset` of `account` allows ungated transfer.
+    /// Return true if `account` allows ungated transfer.
     public fun ungated_transfer_allowed<T: key>(
         account: address,
-        asset: &Object<T>
+        metadata: &Object<T>
     ): bool acquires FungibleAssetStore {
-        let asset = fungible_source::verify(asset);
+        let metadata = fungible_asset::verify(metadata);
         let afa_opt = get_account_fungible_asset_object(
             account,
-            &asset,
+            &metadata,
             false
         );
         if (option::is_none(&afa_opt)) {
             return true
         };
-        let afa = option::destroy_some(afa_opt);
-        fungible_asset::ungated_transfer_allowed(&afa)
+        let wallet = option::destroy_some(afa_opt);
+        fungible_asset::ungated_transfer_allowed(&wallet)
+    }
+
+    /// Enable/disable the direct transfer.
+    public fun set_ungated_transfer(
+        ref: &TransferRef,
+        account: address,
+        allow: bool
+    ) acquires FungibleAssetStore {
+        let metadata = fungible_asset::verify(&fungible_asset::transfer_ref_metadata(ref));
+        let afa_opt = get_account_fungible_asset_object(account, &metadata, !allow);
+        if (option::is_none(&afa_opt)) {
+            return
+        };
+        let wallet = option::destroy_some(afa_opt);
+        fungible_asset::set_ungated_transfer(ref, &wallet, allow);
+        maybe_delete(wallet);
+    }
+
+    /// Withdraw `amount` of fungible asset from `account`.
+    public fun withdraw<T: key>(
+        account: &signer,
+        metadata: &Object<T>,
+        amount: u64
+    ): FungibleAsset acquires FungibleAssetStore {
+        let metadata = fungible_asset::verify(metadata);
+        let account_address = signer::address_of(account);
+        let wallet = ensure_fungible_asset_wallet(
+            account_address,
+            &metadata,
+            false
+        );
+
+        let fa = fungible_asset::withdraw(account, &wallet, amount);
+        maybe_delete(wallet);
+        fa
     }
 
     /// Deposit fungible asset to `account`.
@@ -58,54 +94,82 @@ module aptos_framework::fungible_store {
         fa: FungibleAsset,
         to: address
     ) acquires FungibleAssetStore {
-        let asset = fungible_asset::fungible_asset_source(&fa);
-        let afa = ensure_account_fungible_asset_object(
+        let metadata = fungible_asset::metadata_from_asset(&fa);
+        let wallet = ensure_fungible_asset_wallet(
             to,
-            &asset,
+            &metadata,
             true
         );
-        fungible_asset::merge(&afa, fa);
+        fungible_asset::deposit(&wallet, fa);
     }
 
-    /// Enable/disable the direct transfer of fungible assets.
-    public(friend) fun set_ungated_transfer<T: key>(
-        account: address,
-        asset: &Object<T>,
-        allow: bool
+    /// Transfer `amount` of fungible asset as the owner.
+    public fun transfer<T: key>(
+        from: &signer,
+        metadata: &Object<T>,
+        amount: u64,
+        to: address
     ) acquires FungibleAssetStore {
-        let asset = fungible_source::verify(asset);
-        let afa_opt = get_account_fungible_asset_object(account, &asset, !allow);
-        if (option::is_none(&afa_opt)) {
-            return
-        };
-        let afa = option::destroy_some(afa_opt);
-        fungible_asset::set_ungated_transfer(&afa, allow);
-        if (fungible_asset::balance(&afa) == 0 && fungible_asset::ungated_transfer_allowed(&afa)) {
-            delete_account_fungible_asset_object(account, &asset);
-        };
+        let fa = withdraw(from, metadata, amount);
+        deposit(fa, to);
     }
 
-    /// Withdraw `amount` of fungible assets from `account`.
-    public(friend) fun withdraw<T: key>(
-        account: address,
-        asset: &Object<T>,
-        amount: u64
-    ): FungibleAsset acquires FungibleAssetStore {
-        let asset = fungible_source::verify(asset);
-        let afa = ensure_account_fungible_asset_object(
-            account,
-            &asset,
+    /// Transfer `ammount` of fungible asset ignoring `allow_ungated_transfer` with `TransferRef`.
+    public fun transfer_with_ref(
+        ref: &TransferRef,
+        from: address,
+        to: address,
+        amount: u64,
+    ) acquires FungibleAssetStore {
+        let sender_wallet = ensure_fungible_asset_wallet(
+            from,
+            &fungible_asset::transfer_ref_metadata(ref),
             false
         );
-
-        let fa = fungible_asset::extract(&afa, amount);
-        if (fungible_asset::balance(&afa) == 0 && fungible_asset::ungated_transfer_allowed(&afa)) {
-            delete_account_fungible_asset_object(account, &asset);
-        };
-        fa
+        let receiver_wallet = ensure_fungible_asset_wallet(
+            to,
+            &fungible_asset::transfer_ref_metadata(ref),
+            true
+        );
+        fungible_asset::transfer_with_ref(ref, &sender_wallet, &receiver_wallet, amount);
     }
 
-    /// Ensure fungible asset store exists. If not, create it.
+    /// Withdraw `ammount` of fungible asset ignoring `allow_ungated_transfer` with `TransferRef`.
+    public fun withdraw_with_ref(
+        ref: &TransferRef,
+        account: address,
+        amount: u64
+    ): FungibleAsset acquires FungibleAssetStore {
+        let wallet = ensure_fungible_asset_wallet(
+            account,
+            &fungible_asset::transfer_ref_metadata(ref),
+            false
+        );
+        fungible_asset::withdraw_with_ref(ref, &wallet, amount)
+    }
+
+    /// Deposit `ammount` of fungible asset ignoring `allow_ungated_transfer` with `TransferRef`.
+    public fun deposit_with_ref(ref: &TransferRef, account: address, fa: FungibleAsset) acquires FungibleAssetStore {
+        let wallet = ensure_fungible_asset_wallet(
+            account,
+            &fungible_asset::transfer_ref_metadata(ref),
+            true
+        );
+        fungible_asset::deposit_with_ref(ref, &wallet, fa);
+    }
+
+    /// Burn the `amount` of fungible asset from `account` with `BurnRef`.
+    public fun burn(ref: &BurnRef, account: address, amount: u64) acquires FungibleAssetStore {
+        let wallet = ensure_fungible_asset_wallet(
+            account,
+            &fungible_asset::burn_ref_metadata(ref),
+            false
+        );
+        fungible_asset::burn(ref, &wallet, amount);
+        maybe_delete(wallet);
+    }
+
+    /// Ensure fungible metadata store exists. If not, create it.
     inline fun ensure_fungible_asset_store(account_address: address) {
         if (!exists<FungibleAssetStore>(account_address)) {
             let account_signer = create_signer::create_signer(account_address);
@@ -115,136 +179,136 @@ module aptos_framework::fungible_store {
         }
     }
 
-    /// Get the `AccountFungibleAsset` object of `asset` belonging to `account`.
-    /// if `create_on_demand` is true, an default `AccountFungibleAsset` will be created if not exist; otherwise, abort
-    /// with error.
+    /// Get the `FungibleAssetWallet` object of `metadata` belonging to `account`.
+    /// if `create_on_demand` is true, an default `FungibleAssetWallet` will be created if not exist; otherwise abort.
     fun get_account_fungible_asset_object(
         account: address,
-        asset: &Object<FungibleSource>,
+        metadata: &Object<FungibleAssetMetadata>,
         create_on_demand: bool
-    ): Option<Object<AccountFungibleAsset>> acquires FungibleAssetStore {
+    ): Option<Object<FungibleAssetWallet>> acquires FungibleAssetStore {
         ensure_fungible_asset_store(account);
-        let asset = fungible_source::verify(asset);
+        let metadata = fungible_asset::verify(metadata);
         let index_table = &mut borrow_global_mut<FungibleAssetStore>(account).index;
-        if (!smart_table::contains(index_table, copy asset)) {
+        if (!smart_table::contains(index_table, copy metadata)) {
             if (create_on_demand) {
-                let afa_obj = create_account_fungible_asset_object(account, &asset);
-                smart_table::add(index_table, copy asset, afa_obj);
+                let afa_obj = create_account_fungible_asset_object(account, &metadata);
+                smart_table::add(index_table, copy metadata, afa_obj);
             } else {
                 return option::none()
             }
         };
-        let afa = *smart_table::borrow(index_table, asset);
-        option::some(afa)
+        let wallet = *smart_table::borrow(index_table, metadata);
+        option::some(wallet)
     }
 
-    /// Ensure the existence and return the `AccountFungibleAsset`.
-    inline fun ensure_account_fungible_asset_object(
+    /// Ensure the existence and return the `FungibleAssetWallet`.
+    inline fun ensure_fungible_asset_wallet(
         account: address,
-        asset: &Object<FungibleSource>,
+        metadata: &Object<FungibleAssetMetadata>,
         create_on_demand: bool
-    ): Object<AccountFungibleAsset> acquires FungibleAssetStore {
-        let afa_opt = get_account_fungible_asset_object(account, asset, create_on_demand);
-        assert!(option::is_some(&afa_opt), error::not_found(EACCOUNT_FUNGIBLE_ASSET_OBJECT));
+    ): Object<FungibleAssetWallet> acquires FungibleAssetStore {
+        let afa_opt = get_account_fungible_asset_object(account, metadata, create_on_demand);
+        assert!(option::is_some(&afa_opt), error::not_found(EFUNGIBLE_ASSET_WALLET_OBJECT));
         option::destroy_some(afa_opt)
     }
 
-    /// Create a default `AccountFungibleAsset` object with zero balance of `asset`.
+    /// Create a default `FungibleAssetWallet` object with zero balance of `metadata`.
     fun create_account_fungible_asset_object(
         account: address,
-        asset: &Object<FungibleSource>
-    ): Object<AccountFungibleAsset> {
+        metadata: &Object<FungibleAssetMetadata>
+    ): Object<FungibleAssetWallet> {
         // Must review carefully here.
-        let asset_signer = create_signer::create_signer(object::object_address(asset));
+        let asset_signer = create_signer::create_signer(object::object_address(metadata));
         let creator_ref = object::create_object_from_object(&asset_signer);
-        let afa = fungible_asset::new(&creator_ref, asset);
+        let wallet = fungible_asset::new_fungible_asset_wallet_object(&creator_ref, metadata);
         // Transfer the owner to `account`.
-        object::transfer(&asset_signer, afa, account);
+        object::transfer(&asset_signer, wallet, account);
         // Disable transfer of coin object so the object itself never gets transfered.
         let transfer_ref = object::generate_transfer_ref(&creator_ref);
         object::disable_ungated_transfer(&transfer_ref);
-        afa
+        wallet
     }
 
-    /// Remove the `AccountFungibleAsset` object of `asset` from `account`.
-    fun delete_account_fungible_asset_object(
-        account: address,
-        asset: &Object<FungibleSource>
-    ) acquires FungibleAssetStore {
-        // Delete if balance drops to 0 and ungated_transfer is allowed.
-        ensure_fungible_asset_store(account);
-        let index_table = &mut borrow_global_mut<FungibleAssetStore>(account).index;
-        assert!(smart_table::contains(index_table, *asset), error::not_found(EACCOUNT_FUNGIBLE_ASSET_OBJECT));
-        let afa = smart_table::remove(index_table, *asset);
-        fungible_asset::destory_account_fungible_asset(afa);
+    /// Remove the `FungibleAssetWallet` object of `metadata` from `account` if balance drops to 0 and
+    /// `allowed_ungated_transfer` is allowed.
+    inline fun maybe_delete(wallet: Object<FungibleAssetWallet>) acquires FungibleAssetStore {
+        if (fungible_asset::balance(&wallet) == 0 && fungible_asset::ungated_transfer_allowed(&wallet)) {
+            let owner = object::owner(wallet);
+            let index_table = &mut borrow_global_mut<FungibleAssetStore>(owner).index;
+            smart_table::remove(index_table, metadata_from_wallet(&wallet));
+            fungible_asset::destory_fungible_asset_wallet(wallet);
+        };
     }
-
-
-    #[test_only]
-    use std::signer;
 
     #[test(creator = @0xcafe, aaron = @0xface)]
     fun test_basic_flow(
         creator: &signer,
         aaron: &signer
     ) acquires FungibleAssetStore {
-        let (creator_ref, asset) = fungible_source::create_test_token(creator);
-        fungible_source::init_test_fungible_source(&creator_ref);
+        let (mint_ref, transfer_ref, burn_ref, metadata) = fungible_asset::generate_refs(creator);
 
         let creator_address = signer::address_of(creator);
         let aaron_address = signer::address_of(aaron);
 
         // Mint
-        let fa = fungible_asset::mint(&asset, 100);
+        let fa = fungible_asset::mint(&mint_ref, 100);
         deposit(fa, creator_address);
-        assert!(balance(creator_address, &asset) == 100, 1);
+        assert!(balance(creator_address, &metadata) == 100, 1);
 
         // Transfer
-        let fa = withdraw(creator_address, &asset, 80);
+        let fa = withdraw(creator, &metadata, 80);
         deposit(fa, aaron_address);
-        assert!(balance(aaron_address, &asset) == 80, 2);
+        assert!(balance(aaron_address, &metadata) == 80, 2);
 
-        assert!(ungated_transfer_allowed(aaron_address, &asset), 3);
-        set_ungated_transfer(aaron_address, &asset, false);
-        assert!(!ungated_transfer_allowed(aaron_address, &asset), 4);
+        assert!(ungated_transfer_allowed(aaron_address, &metadata), 3);
+        set_ungated_transfer(&transfer_ref, aaron_address, false);
+        assert!(!ungated_transfer_allowed(aaron_address, &metadata), 4);
+        let fa = withdraw_with_ref(&transfer_ref, aaron_address, 20);
+        deposit_with_ref(&transfer_ref, aaron_address, fa);
+        transfer_with_ref(&transfer_ref, aaron_address, creator_address, 20);
+        assert!(balance(creator_address, &metadata) == 40, 5);
+
+        // burn
+        burn(&burn_ref, creator_address, 30);
+        assert!(fungible_asset::current_supply(&metadata) == 70, 6);
     }
 
     #[test(creator = @0xcafe)]
     fun test_empty_account_default_behavior_and_creation_on_demand(
         creator: &signer,
     ) acquires FungibleAssetStore {
-        let (creator_ref, asset) = fungible_source::create_test_token(creator);
-        fungible_source::init_test_fungible_source(&creator_ref);
-        let asset = fungible_source::verify(&asset);
+        let (_mint_ref, transfer_ref, _burn_ref, metadata) = fungible_asset::generate_refs(creator);
+        let metadata = verify((&metadata));
         let creator_address = signer::address_of(creator);
 
-        assert!(balance(creator_address, &asset) == 0, 1);
-        assert!(ungated_transfer_allowed(creator_address, &asset), 2);
-        assert!(option::is_none(&get_account_fungible_asset_object(creator_address, &asset, false)), 3);
-        set_ungated_transfer(creator_address, &asset, false);
-        assert!(option::is_some(&get_account_fungible_asset_object(creator_address, &asset, false)), 4);
+        assert!(balance(creator_address, &metadata) == 0, 1);
+        assert!(ungated_transfer_allowed(creator_address, &metadata), 2);
+        assert!(option::is_none(&get_account_fungible_asset_object(creator_address, &metadata, false)), 3);
+        set_ungated_transfer(&transfer_ref, creator_address, false);
+        assert!(option::is_some(&get_account_fungible_asset_object(creator_address, &metadata, false)), 4);
     }
 
     #[test(creator = @0xcafe)]
     fun test_auto_deletion(
         creator: &signer,
     ) acquires FungibleAssetStore {
-        let (creator_ref, asset) = fungible_source::create_test_token(creator);
-        fungible_source::init_test_fungible_source(&creator_ref);
-        let asset = fungible_source::verify(&asset);
+        let (mint_ref, transfer_ref, burn_ref, metadata) = fungible_asset::generate_refs(creator);
+        let metadata = verify((&metadata));
         let creator_address = signer::address_of(creator);
 
         // Mint
-        let fa = fungible_asset::mint(&asset, 100);
+        let fa = fungible_asset::mint(&mint_ref, 100);
         deposit(fa, creator_address);
-        assert!(balance(creator_address, &asset) == 100, 1);
+        assert!(balance(creator_address, &metadata) == 100, 1);
         // exist
-        assert!(option::is_some(&get_account_fungible_asset_object(creator_address, &asset, false)), 2);
-        let fa = withdraw(creator_address, &asset, 100);
-        fungible_asset::burn(fa);
-        assert!(balance(creator_address, &asset) == 0, 3);
-        assert!(option::is_none(&get_account_fungible_asset_object(creator_address, &asset, false)), 4);
-        set_ungated_transfer(creator_address, &asset, false);
-        assert!(option::is_some(&get_account_fungible_asset_object(creator_address, &asset, false)), 5);
+        assert!(option::is_some(&get_account_fungible_asset_object(creator_address, &metadata, false)), 2);
+
+        burn(&burn_ref, creator_address, 100);
+        assert!(balance(creator_address, &metadata) == 0, 3);
+        assert!(option::is_none(&get_account_fungible_asset_object(creator_address, &metadata, false)), 4);
+        set_ungated_transfer(&transfer_ref, creator_address, false);
+        assert!(option::is_some(&get_account_fungible_asset_object(creator_address, &metadata, false)), 5);
+        set_ungated_transfer(&transfer_ref, creator_address, true);
+        assert!(option::is_none(&get_account_fungible_asset_object(creator_address, &metadata, false)), 6);
     }
 }

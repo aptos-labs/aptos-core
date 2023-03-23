@@ -1,258 +1,283 @@
-/// This module provides an addtional abstraction on top of `FungibleSource` that manages the capabilities of mint, burn
-/// and transfer for the creator in a simple way. It offers creators to destory any capabilities in an on-demand way too.
-/// For more advanced goverance, please build your own module to manage capabilitys extending `FungibleSource`.
+/// This module provides an addtional ready-to-use solution on top of `FungibleAssetMetadata` that manages the refs of
+/// mint, burn and transfer for the creator in a straightforward scheme. It offers creators to destory any refs in an
+/// on-demand manner too.
 module aptos_framework::managed_fungible_source {
+    use aptos_framework::fungible_asset::{Self, MintRef, TransferRef, BurnRef, FungibleAsset};
+    use aptos_framework::fungible_store;
+    use aptos_framework::object::{Self, Object, ConstructorRef};
     use std::error;
     use std::option::{Self, Option};
     use std::signer;
     use std::string::String;
-    use aptos_framework::object::{Self, Object, ConstructorRef};
-    use aptos_framework::fungible_caps::{Self, MintCap, TransferCap, BurnCap};
 
-    /// Mint capability exists or does not exist.
-    const EMINT_CAP: u64 = 1;
-    /// Transfer capability exists does not exist.
-    const EFREEZE_CAP: u64 = 2;
-    /// Burn capability exists or does not exist.
-    const EBURN_CAP: u64 = 3;
+    /// MintRef existence error.
+    const EMINT_REF: u64 = 1;
+    /// TransferRef existence error.
+    const ETRANSFER_REF: u64 = 2;
+    /// BurnRef existence error.
+    const EBURN_REF: u64 = 3;
     /// Not the owner.
     const ENOT_OWNER: u64 = 4;
-    /// Caps existence errors.
-    const EMANAGED_FUNGIBLE_ASSET_CAPS: u64 = 5;
+    /// Refs existence errors.
+    const EMANAGED_FUNGIBLE_ASSET_REFS: u64 = 5;
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
-    /// Used to hold capabilities to control the minting, transfer and burning of fungible assets.
-    struct ManagingCapabilities has key {
-        mint: Option<MintCap>,
-        transfer: Option<TransferCap>,
-        burn: Option<BurnCap>,
+    /// Hold refs to control the minting, transfer and burning of fungible assets.
+    struct ManagingRefs has key {
+        mint: Option<MintRef>,
+        transfer: Option<TransferRef>,
+        burn: Option<BurnRef>,
     }
 
-    /// Initialize capabilities of an asset object after initializing `FungibleSource`.
-    public fun init_managing_capabilities(
+    /// Initialize metadata object and store the refs.
+    public fun init_managing_refs(
         constructor_ref: &ConstructorRef,
         maximum_supply: u64,
         name: String,
         symbol: String,
         decimals: u8
     ) {
-        let (mint_cap, transfer_cap, burn_cap) = fungible_caps::init_fungible_source_with_caps(
+        let (mint_ref, transfer_ref, burn_ref) = fungible_asset::init_metadata(
             constructor_ref,
             maximum_supply,
             name,
             symbol,
             decimals
         );
-        let asset_object_signer = object::generate_signer(constructor_ref);
+        let metadata_object_signer = object::generate_signer(constructor_ref);
         move_to(
-            &asset_object_signer,
-            ManagingCapabilities {
-                mint: option::some(mint_cap), transfer: option::some(
-                    transfer_cap
-                ), burn: option::some(burn_cap)
+            &metadata_object_signer,
+            ManagingRefs {
+                mint: option::some(mint_ref), transfer: option::some(transfer_ref), burn: option::some(burn_ref)
             }
         )
     }
 
-    /// Mint fungible assets as the owner of the base asset.
+    /// Mint as the owner of metadata object.
     public fun mint<T: key>(
-        asset_owner: &signer,
-        asset: &Object<T>,
+        metadata_owner: &signer,
+        metadata: &Object<T>,
         amount: u64,
         to: address
-    ) acquires ManagingCapabilities {
-        assert_owner(asset_owner, asset);
-        let mint_cap = borrow_mint_from_caps(asset);
-        fungible_caps::mint(mint_cap, amount, to);
+    ) acquires ManagingRefs {
+        assert_owner(metadata_owner, metadata);
+        let mint_ref = borrow_mint_from_refs(metadata);
+        let fa = fungible_asset::mint(mint_ref, amount);
+        fungible_store::deposit(fa, to);
     }
 
-    /// Transfer fungible assets as the owner of the base asset ignoring the `allow_ungated_transfer` field in
-    /// `AccountFungibleAsset`.
-    public fun transfer<T: key>(
-        asset_owner: &signer,
-        asset: &Object<T>,
+    /// Withdraw as the owner of metadata object ignoring `allow_ungated_transfer` field.
+    public fun withdraw<T: key>(
+        metadata_owner: &signer,
+        metadata: &Object<T>,
         amount: u64,
         from: address,
+    ): FungibleAsset acquires ManagingRefs {
+        assert_owner(metadata_owner, metadata);
+        let transfer_ref = borrow_transfer_from_refs(metadata);
+        fungible_store::withdraw_with_ref(transfer_ref, from, amount)
+    }
+
+    /// Deposit as the owner of metadata object ignoring `allow_ungated_transfer` field.
+    public fun deposit<T: key>(
+        metadata_owner: &signer,
+        metadata: &Object<T>,
         to: address,
-    ) acquires ManagingCapabilities {
-        assert_owner(asset_owner, asset);
-        let transfer_cap = borrow_transfer_from_caps(asset);
-        fungible_caps::transfer_with_cap(transfer_cap, amount, from, to);
+        fa: FungibleAsset
+    ) acquires ManagingRefs {
+        assert_owner(metadata_owner, metadata);
+        let transfer_ref = borrow_transfer_from_refs(metadata);
+        fungible_store::deposit_with_ref(transfer_ref, to, fa);
     }
 
-    /// Burn fungible assets as the owner of the base asset.
-    public fun burn<T: key>(
-        asset_owner: &signer,
-        asset: &Object<T>,
+    /// Transfer as the owner of metadata object ignoring `allow_ungated_transfer` field.
+    public fun transfer<T: key>(
+        metadata_owner: &signer,
+        metadata: &Object<T>,
+        from: address,
+        to: address,
         amount: u64,
-        from: address
-    ) acquires ManagingCapabilities {
-        assert_owner(asset_owner, asset);
-        let burn_cap = borrow_burn_from_caps(asset);
-        fungible_caps::burn(burn_cap, amount, from);
+    ) acquires ManagingRefs {
+        assert_owner(metadata_owner, metadata);
+        let transfer_ref = borrow_transfer_from_refs(metadata);
+        fungible_store::transfer_with_ref(transfer_ref, from, to, amount);
     }
 
-    /// Set the `allow_ungated_transfer` field in `AccountFungibleAsset` of `asset` belonging to `account`.
+    /// Burn fungible assets as the owner of metadata object.
+    public fun burn<T: key>(
+        metadata_owner: &signer,
+        metadata: &Object<T>,
+        from: address,
+        amount: u64
+    ) acquires ManagingRefs {
+        assert_owner(metadata_owner, metadata);
+        let burn_ref = borrow_burn_from_refs(metadata);
+        fungible_store::burn(burn_ref, from, amount);
+    }
+
+    /// Set the `allow_ungated_transfer` field in `AccountFungibleAsset` associated with `metadata` of `account` as the
+    /// owner of metadata object.
     public fun set_ungated_transfer<T: key>(
-        asset_owner: &signer,
-        asset: &Object<T>,
+        metadata_owner: &signer,
+        metadata: &Object<T>,
         account: address,
         allow: bool
-    ) acquires ManagingCapabilities {
-        assert_owner(asset_owner, asset);
-        let transfer_cap = borrow_transfer_from_caps(asset);
-        fungible_caps::set_ungated_transfer(transfer_cap, account, allow);
+    ) acquires ManagingRefs {
+        assert_owner(metadata_owner, metadata);
+        let transfer_ref = borrow_transfer_from_refs(metadata);
+        fungible_store::set_ungated_transfer(transfer_ref, account, allow);
     }
 
-    /// Return if the owner has access to `MintCap` of `asset`.
-    public fun owner_can_mint<T: key>(asset: &Object<T>): bool acquires ManagingCapabilities {
-        option::is_some(&borrow_caps(asset).mint)
+    /// Return if the owner of `metadata` has access to `MintRef`.
+    public fun can_mint<T: key>(metadata: &Object<T>): bool acquires ManagingRefs {
+        option::is_some(&borrow_refs(metadata).mint)
     }
 
-    /// Return if the owner has access to `TransferCap` of `asset`.
-    public fun owner_can_transfer<T: key>(asset: &Object<T>): bool acquires ManagingCapabilities {
-        option::is_some(&borrow_caps(asset).transfer)
+    /// Return if the owner of `metadata` has access to `TransferRef`.
+    public fun can_transfer<T: key>(metadata: &Object<T>): bool acquires ManagingRefs {
+        option::is_some(&borrow_refs(metadata).transfer)
     }
 
-    /// Return if the owner has access to `BurnCap` of `asset`.
-    public fun owner_can_burn<T: key>(asset: &Object<T>): bool acquires ManagingCapabilities {
-        option::is_some(&borrow_caps(asset).burn)
+    /// Return if the owner of `metadata` has access to `BurnRef`.
+    public fun can_burn<T: key>(metadata: &Object<T>): bool acquires ManagingRefs {
+        option::is_some(&borrow_refs(metadata).burn)
     }
 
-    /// Let asset owner to explicitly waive the mint capability.
+    /// Let metadata owner to explicitly waive the mint capability.
     public fun waive_mint<T: key>(
-        asset_owner: &signer,
-        asset: &Object<T>
-    ) acquires ManagingCapabilities {
-        let mint_cap = &mut borrow_caps_mut(asset_owner, asset).mint;
-        assert!(option::is_some(mint_cap), error::not_found(EMINT_CAP));
-        fungible_caps::destroy_mint_cap(option::extract(mint_cap));
+        metadata_owner: &signer,
+        metadata: &Object<T>
+    ) acquires ManagingRefs {
+        let mint_ref = &mut borrow_refs_mut(metadata_owner, metadata).mint;
+        assert!(option::is_some(mint_ref), error::not_found(EMINT_REF));
+        option::extract(mint_ref);
     }
 
-    /// Let asset owner to explicitly waive the transfer capability.
+    /// Let metadata owner to explicitly waive the transfer capability.
     public fun waive_transfer<T: key>(
-        asset_owner: &signer,
-        asset: &Object<T>
-    ) acquires ManagingCapabilities {
-        let transfer_cap = &mut borrow_caps_mut(asset_owner, asset).transfer;
-        assert!(option::is_some(transfer_cap), error::not_found(EFREEZE_CAP));
-        fungible_caps::destroy_transfer_cap(option::extract(transfer_cap));
+        metadata_owner: &signer,
+        metadata: &Object<T>
+    ) acquires ManagingRefs {
+        let transfer_ref = &mut borrow_refs_mut(metadata_owner, metadata).transfer;
+        assert!(option::is_some(transfer_ref), error::not_found(ETRANSFER_REF));
+        option::extract(transfer_ref);
     }
 
-    /// Let asset owner to explicitly waive the burn capability.
+    /// Let metadata owner to explicitly waive the burn capability.
     public fun waive_burn<T: key>(
-        asset_owner: &signer,
-        asset: &Object<T>
-    ) acquires ManagingCapabilities {
-        let burn_cap = &mut borrow_caps_mut(asset_owner, asset).burn;
-        assert!(option::is_some(burn_cap), error::not_found(EFREEZE_CAP));
-        fungible_caps::destroy_burn_cap(option::extract(burn_cap));
+        metadata_owner: &signer,
+        metadata: &Object<T>
+    ) acquires ManagingRefs {
+        let burn_ref = &mut borrow_refs_mut(metadata_owner, metadata).burn;
+        assert!(option::is_some(burn_ref), error::not_found(ETRANSFER_REF));
+        option::extract(burn_ref);
     }
 
-    /// Borrow the immutable reference of the `MintCap` of `asset`.
-    inline fun borrow_mint_from_caps<T: key>(
-        asset: &Object<T>,
-    ): &MintCap acquires ManagingCapabilities {
-        let mint_cap = &borrow_caps(asset).mint;
-        assert!(option::is_some(mint_cap), error::not_found(EMINT_CAP));
-        option::borrow(mint_cap)
+    /// Borrow the immutable reference of the `MintRef` of `metadata`.
+    inline fun borrow_mint_from_refs<T: key>(
+        metadata: &Object<T>,
+    ): &MintRef acquires ManagingRefs {
+        let mint_ref = &borrow_refs(metadata).mint;
+        assert!(option::is_some(mint_ref), error::not_found(EMINT_REF));
+        option::borrow(mint_ref)
     }
 
-    /// Borrow the immutable reference of the `TransferCap` of `asset`.
-    inline fun borrow_transfer_from_caps<T: key>(
-        asset: &Object<T>,
-    ): &TransferCap acquires ManagingCapabilities {
-        let transfer_cap = &borrow_caps(asset).transfer;
-        assert!(option::is_some(transfer_cap), error::not_found(EFREEZE_CAP));
-        option::borrow(transfer_cap)
+    /// Borrow the immutable reference of the `TransferRef` of `metadata`.
+    inline fun borrow_transfer_from_refs<T: key>(
+        metadata: &Object<T>,
+    ): &TransferRef acquires ManagingRefs {
+        let transfer_ref = &borrow_refs(metadata).transfer;
+        assert!(option::is_some(transfer_ref), error::not_found(ETRANSFER_REF));
+        option::borrow(transfer_ref)
     }
 
-    /// Borrow the immutable reference of the `BurnCap` of `asset`.
-    inline fun borrow_burn_from_caps<T: key>(
-        asset: &Object<T>,
-    ): &BurnCap acquires ManagingCapabilities {
-        let burn_cap = &borrow_caps(asset).burn;
-        assert!(option::is_some(burn_cap), error::not_found(EBURN_CAP));
-        option::borrow(burn_cap)
+    /// Borrow the immutable reference of the `BurnRef` of `metadata`.
+    inline fun borrow_burn_from_refs<T: key>(
+        metadata: &Object<T>,
+    ): &BurnRef acquires ManagingRefs {
+        let burn_ref = &borrow_refs(metadata).burn;
+        assert!(option::is_some(burn_ref), error::not_found(EBURN_REF));
+        option::borrow(burn_ref)
     }
 
-    /// Borrow the immutable reference of the capabilities of `asset`.
-    inline fun borrow_caps<T: key>(
-        asset: &Object<T>,
-    ): &ManagingCapabilities acquires ManagingCapabilities {
-        borrow_global_mut<ManagingCapabilities>(verify(asset))
+    /// Borrow the immutable reference of the refs of `metadata`.
+    inline fun borrow_refs<T: key>(
+        metadata: &Object<T>,
+    ): &ManagingRefs acquires ManagingRefs {
+        borrow_global_mut<ManagingRefs>(verify(metadata))
     }
 
-    /// Borrow the mutable reference of the capabilities of `asset`.
-    inline fun borrow_caps_mut<T: key>(
+    /// Borrow the mutable reference of the refs of `metadata`.
+    inline fun borrow_refs_mut<T: key>(
         owner: &signer,
-        asset: &Object<T>,
-    ): &mut ManagingCapabilities acquires ManagingCapabilities {
-        assert_owner(owner, asset);
-        borrow_global_mut<ManagingCapabilities>(verify(asset))
+        metadata: &Object<T>,
+    ): &mut ManagingRefs acquires ManagingRefs {
+        assert_owner(owner, metadata);
+        borrow_global_mut<ManagingRefs>(verify(metadata))
     }
 
-    /// Verify `asset` indeed has `ManagingCapabilities` resource associated.
-    inline fun verify<T: key>(asset: &Object<T>): address {
-        let asset_addr = object::object_address(asset);
-        object::address_to_object<ManagingCapabilities>(asset_addr);
-        asset_addr
+    /// Verify `metadata` indeed has `ManagingRefs` resource associated.
+    inline fun verify<T: key>(metadata: &Object<T>): address {
+        let metadata_addr = object::object_address(metadata);
+        object::address_to_object<ManagingRefs>(metadata_addr);
+        metadata_addr
     }
 
-    /// Assert the owner of `asset`.
-    inline fun assert_owner<T: key>(owner: &signer, asset: &Object<T>) {
-        assert!(object::is_owner(*asset, signer::address_of(owner)), error::permission_denied(ENOT_OWNER));
+    /// Assert the owner of `metadata`.
+    inline fun assert_owner<T: key>(owner: &signer, metadata: &Object<T>) {
+        assert!(object::is_owner(*metadata, signer::address_of(owner)), error::permission_denied(ENOT_OWNER));
     }
 
     #[test_only]
-    use aptos_framework::fungible_source;
+    use aptos_framework::fungible_asset::TestToken;
     #[test_only]
     use aptos_framework::fungible_store::{balance, ungated_transfer_allowed};
     #[test_only]
     use std::string;
 
     #[test_only]
-    public fun init_test_managing_capabilities(creator_ref: &ConstructorRef) {
-        init_managing_capabilities(
-            creator_ref,
+    public fun init_test_managing_refs(creator: &signer): Object<TestToken> {
+        let (creator_ref, metadata) = fungible_asset::create_test_token(creator);
+        init_managing_refs(
+            &creator_ref,
             100 /* max supply */,
             string::utf8(b"USDA"),
             string::utf8(b"$$$"),
             0
         );
+        metadata
     }
 
     #[test(creator = @0xcafe)]
     fun test_basic_flow(
         creator: &signer,
-    ) acquires ManagingCapabilities {
-        let (creator_ref, asset) = fungible_source::create_test_token(creator);
-        init_test_managing_capabilities(&creator_ref);
+    ) acquires ManagingRefs {
+        let metadata = init_test_managing_refs(creator);
         let creator_address = signer::address_of(creator);
         let aaron_address = @0xface;
 
-        assert!(owner_can_mint(&asset), 1);
-        assert!(owner_can_transfer(&asset), 2);
-        assert!(owner_can_burn(&asset), 3);
+        assert!(can_mint(&metadata), 1);
+        assert!(can_transfer(&metadata), 2);
+        assert!(can_burn(&metadata), 3);
 
-        mint(creator, &asset, 100, creator_address);
-        assert!(balance(creator_address, &asset) == 100, 4);
-        set_ungated_transfer(creator, &asset, creator_address, false);
-        assert!(!ungated_transfer_allowed(creator_address, &asset), 5);
-        transfer(creator, &asset, 10, creator_address, aaron_address);
-        assert!(balance(aaron_address, &asset) == 10, 6);
+        mint(creator, &metadata, 100, creator_address);
+        assert!(balance(creator_address, &metadata) == 100, 4);
+        set_ungated_transfer(creator, &metadata, creator_address, false);
+        assert!(!ungated_transfer_allowed(creator_address, &metadata), 5);
+        transfer(creator, &metadata, creator_address, aaron_address, 10);
+        assert!(balance(aaron_address, &metadata) == 10, 6);
 
-        set_ungated_transfer(creator, &asset, creator_address, true);
-        assert!(ungated_transfer_allowed(creator_address, &asset), 7);
-        burn(creator, &asset, 90, creator_address);
+        set_ungated_transfer(creator, &metadata, creator_address, true);
+        assert!(ungated_transfer_allowed(creator_address, &metadata), 7);
+        burn(creator, &metadata, creator_address, 90);
 
-        waive_mint(creator, &asset);
-        waive_transfer(creator, &asset);
-        waive_burn(creator, &asset);
+        waive_mint(creator, &metadata);
+        waive_transfer(creator, &metadata);
+        waive_burn(creator, &metadata);
 
-        assert!(!owner_can_mint(&asset), 8);
-        assert!(!owner_can_transfer(&asset), 9);
-        assert!(!owner_can_burn(&asset), 10);
+        assert!(!can_mint(&metadata), 8);
+        assert!(!can_transfer(&metadata), 9);
+        assert!(!can_burn(&metadata), 10);
     }
 
     #[test(creator = @0xcafe, aaron = @0xface)]
@@ -260,13 +285,10 @@ module aptos_framework::managed_fungible_source {
     fun test_permission_denied(
         creator: &signer,
         aaron: &signer
-    ) acquires ManagingCapabilities {
-        let (creator_ref, asset) = fungible_source::create_test_token(creator);
-        init_test_managing_capabilities(&creator_ref);
+    ) acquires ManagingRefs {
+        let metadata = init_test_managing_refs(creator);
         let creator_address = signer::address_of(creator);
-        assert!(owner_can_mint(&asset), 1);
-        assert!(owner_can_transfer(&asset), 2);
-        assert!(owner_can_burn(&asset), 3);
-        mint(aaron, &asset, 100, creator_address);
+        assert!(can_mint(&metadata), 1);
+        mint(aaron, &metadata, 100, creator_address);
     }
 }
