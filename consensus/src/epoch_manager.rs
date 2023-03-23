@@ -458,7 +458,7 @@ impl EpochManager {
 
     fn spawn_block_retrieval_task(&mut self, epoch: u64, block_store: Arc<BlockStore>) {
         let (request_tx, mut request_rx) = aptos_channel::new(
-            QueueStyle::LIFO,
+            QueueStyle::FIFO,
             1,
             Some(&counters::BLOCK_RETRIEVAL_TASK_MSGS),
         );
@@ -727,8 +727,10 @@ impl EpochManager {
             block_store.clone(),
             Arc::new(payload_client),
             self.time_service.clone(),
-            self.config.max_sending_block_txns,
-            self.config.max_sending_block_bytes,
+            self.config
+                .max_sending_block_txns(self.quorum_store_enabled),
+            self.config
+                .max_sending_block_bytes(self.quorum_store_enabled),
             onchain_consensus_config.max_failed_authors_to_store(),
             chain_health_backoff_config,
             self.quorum_store_enabled,
@@ -810,9 +812,6 @@ impl EpochManager {
                 let consensus_config = onchain_consensus_config.unwrap_or_default();
                 let execution_config = onchain_execution_config.unwrap_or_default();
                 self.quorum_store_enabled = consensus_config.quorum_store_enabled();
-                if self.quorum_store_enabled {
-                    self.config.apply_quorum_store_overrides();
-                }
                 self.start_round_manager(
                     initial_data,
                     epoch_state,
