@@ -382,6 +382,10 @@ fn serialize_uleb128(mut x: usize, dest: &mut Vec<u8>) {
 fn read_n_bytes(n: usize, src: &mut Cursor<&[u8]>, dest: &mut Vec<u8>) -> Result<(), VMStatus> {
     let len = dest.len();
     dest.resize(len + n, 0);
-    src.read_exact(&mut dest[len..])
-        .map_err(|_| VMStatus::Error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT, None))
+    src.read_exact(&mut dest[len..]).map_err(|_| {
+        VMStatus::Error(
+            StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
+            Some(String::from("Couldn't read bytes")),
+        )
+    })
 }
