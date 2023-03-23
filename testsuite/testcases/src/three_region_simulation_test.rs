@@ -3,8 +3,8 @@
 
 use crate::{LoadDestination, NetworkLoadTest};
 use aptos_forge::{
-    GroupNetworkDelay, NetworkContext, NetworkTest, Swarm, SwarmChaos, SwarmExt,
-    SwarmNetworkBandwidth, SwarmNetworkDelay, Test,
+    GroupNetworkBandwidth, GroupNetworkDelay, NetworkContext, NetworkTest, Swarm, SwarmChaos,
+    SwarmExt, SwarmNetworkBandwidth, SwarmNetworkDelay, Test,
 };
 use aptos_logger::info;
 use rand::Rng;
@@ -25,11 +25,12 @@ pub struct ExecutionDelayConfig {
     pub inject_delay_per_transaction_ms: u32,
 }
 
-pub struct ThreeRegionSimulationTest {
+/// Represents a test that simulates a network with 3 regions, all in the same cloud.
+pub struct ThreeRegionSameCloudSimulationTest {
     pub add_execution_delay: Option<ExecutionDelayConfig>,
 }
 
-impl Test for ThreeRegionSimulationTest {
+impl Test for ThreeRegionSameCloudSimulationTest {
     fn name(&self) -> &'static str {
         "network::three-region-simulation"
     }
@@ -59,14 +60,6 @@ fn create_three_region_swarm_network_delay(swarm: &dyn Swarm) -> SwarmNetworkDel
             correlation_percentage: 50,
         },
         GroupNetworkDelay {
-            name: "af-south-to-us-west".to_string(),
-            source_nodes: af_south.clone(),
-            target_nodes: us_west.clone(),
-            latency_ms: 300,
-            jitter_ms: 50,
-            correlation_percentage: 50,
-        },
-        GroupNetworkDelay {
             name: "us-west-to-eu-north".to_string(),
             source_nodes: us_west.clone(),
             target_nodes: eu_north.clone(),
@@ -75,25 +68,9 @@ fn create_three_region_swarm_network_delay(swarm: &dyn Swarm) -> SwarmNetworkDel
             correlation_percentage: 50,
         },
         GroupNetworkDelay {
-            name: "eu-north-to-us-west".to_string(),
-            source_nodes: eu_north.clone(),
-            target_nodes: us_west.clone(),
-            latency_ms: 150,
-            jitter_ms: 50,
-            correlation_percentage: 50,
-        },
-        GroupNetworkDelay {
             name: "eu-north-to-af-south".to_string(),
             source_nodes: eu_north.clone(),
             target_nodes: af_south.clone(),
-            latency_ms: 200,
-            jitter_ms: 50,
-            correlation_percentage: 50,
-        },
-        GroupNetworkDelay {
-            name: "af-south-to-eu-north".to_string(),
-            source_nodes: af_south.clone(),
-            target_nodes: eu_north.clone(),
             latency_ms: 200,
             jitter_ms: 50,
             correlation_percentage: 50,
@@ -109,12 +86,19 @@ fn create_three_region_swarm_network_delay(swarm: &dyn Swarm) -> SwarmNetworkDel
     }
 }
 
-// 1 Gbps
-fn create_bandwidth_limit() -> SwarmNetworkBandwidth {
+/// 10 Gbps network bandwidth simulation between all regions within
+/// the same cloud with dedicated backbone like GCP
+fn create_bandwidth_limit(swarm: &dyn Swarm) -> SwarmNetworkBandwidth {
+    let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
     SwarmNetworkBandwidth {
-        rate: 1000,
-        limit: 20971520,
-        buffer: 10000,
+        group_network_bandwidths: vec![GroupNetworkBandwidth {
+            name: "forge-namespace-10000mbps-bandwidth".to_owned(),
+            rate: 10000 / 8, // 10 Gbps in megabytes per second
+            limit: 20971520,
+            buffer: 10000,
+            source_nodes: all_validators.clone(),
+            target_nodes: all_validators,
+        }],
     }
 }
 
@@ -182,7 +166,7 @@ fn remove_execution_delay(swarm: &mut dyn Swarm) -> anyhow::Result<()> {
     })
 }
 
-impl NetworkLoadTest for ThreeRegionSimulationTest {
+impl NetworkLoadTest for ThreeRegionSameCloudSimulationTest {
     fn setup(&self, ctx: &mut NetworkContext) -> anyhow::Result<LoadDestination> {
         // inject network delay
         let delay = create_three_region_swarm_network_delay(ctx.swarm());
@@ -190,7 +174,7 @@ impl NetworkLoadTest for ThreeRegionSimulationTest {
         ctx.swarm().inject_chaos(chaos)?;
 
         // inject bandwidth limit
-        let bandwidth = create_bandwidth_limit();
+        let bandwidth = create_bandwidth_limit(ctx.swarm());
         let chaos = SwarmChaos::Bandwidth(bandwidth);
         ctx.swarm().inject_chaos(chaos)?;
 
@@ -210,7 +194,7 @@ impl NetworkLoadTest for ThreeRegionSimulationTest {
     }
 }
 
-impl NetworkTest for ThreeRegionSimulationTest {
+impl NetworkTest for ThreeRegionSameCloudSimulationTest {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> anyhow::Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx)
     }
