@@ -12,6 +12,12 @@ module aptos_std::elgamal {
 	right: RistrettoPoint,
     }
 
+    /// A compressed ElGamal ciphertext to some value.
+    struct CompressedCiphertext has store, copy, drop {
+	left: CompressedRistretto,
+	right: CompressedRistretto,
+    }
+
     /// An ElGamal public key.
     struct PubKey has drop {
         point: RistrettoPoint,
@@ -25,12 +31,36 @@ module aptos_std::elgamal {
         }
     }
 
-    /// Deserializes a ciphertext from a compressed Ristretto point.
-    public fun new_ciphertext_from_compressed(left: &CompressedRistretto, right: &CompressedRistretto): Ciphertext {
-        Ciphertext {
-            left: ristretto255::point_decompress(left),
-	    right: ristretto255::point_decompress(right),
+    /// Deserializes a ciphertext from compressed Ristretto points.
+    public fun new_ciphertext_from_compressed(left: CompressedRistretto, right: CompressedRistretto): CompressedCiphertext {
+        CompressedCiphertext {
+            left,
+	    right,
         }
+    }
+
+    /// Creates a new ciphertext (val * basepoint, id) where `basepoint` is the Ristretto255 basepoint and id is the identity point. 
+    public fun new_ciphertext_no_randomness(val: &Scalar): Ciphertext {
+	Ciphertext {
+	    left: ristretto255::basepoint_mul(val),
+	    right: ristretto255::point_identity(),
+        }
+    }
+
+    /// Creates a new compressed ciphertext from a decompressed ciphertext
+    public fun compress_ciphertext(ct: &Ciphertext): CompressedCiphertext {
+	CompressedCiphertext {
+	    left: ristretto255::point_compress(&ct.left),
+	    right: ristretto255::point_compress(&ct.right),
+        }
+    }
+
+    /// Creates a new decompressed ciphertext from a compressed ciphertext
+    public fun decompress_ciphertext(ct: &CompressedCiphertext): Ciphertext {
+	Ciphertext {
+	    left: ristretto255::point_decompress(&ct.left),
+	    right: ristretto255::point_decompress(&ct.right),
+	}
     }
 
     /// Returns a ciphertext (val * val_base + r * pub_key, r * val_base) where val_base is the generator.
@@ -42,7 +72,7 @@ module aptos_std::elgamal {
     }
 
     /// Returns a ciphertext (val * basepoint + r * pub_key, rand * basepoint) where `basepoint` is the Ristretto255 basepoint.
-    public fun new_commitment_with_basepoint(val: &Scalar, rand: &Scalar, pub_key: &PubKey): Ciphertext {
+    public fun new_ciphertext_with_basepoint(val: &Scalar, rand: &Scalar, pub_key: &PubKey): Ciphertext {
         Ciphertext {
             left: ristretto255::basepoint_double_mul(rand, &pub_key.point, val),
 	    right: ristretto255::basepoint_mul(rand),
@@ -110,5 +140,15 @@ module aptos_std::elgamal {
     /// Moves the ciphertext into a pair of CompressedRistretto points.
     public fun ciphertext_into_compressed_points(c: Ciphertext): (CompressedRistretto, CompressedRistretto) {
         (point_compress(&c.left), point_compress(&c.right))
+    }
+
+    /// Returns the RistrettoPoint in the ciphertext which contains the encrypted value in the exponent
+    public fun get_value_component(ct: &Ciphertext): &RistrettoPoint {
+        &ct.left
+    }
+
+    /// Returns the RistrettoPoint in the ciphertext which contains the encrypted value in the exponent
+    public fun get_value_component_compressed(ct: &Ciphertext): &CompressedRistretto {
+        point_compress(ct.left)
     }
 }

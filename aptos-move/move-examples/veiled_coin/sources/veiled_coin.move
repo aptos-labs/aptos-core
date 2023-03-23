@@ -8,11 +8,10 @@
 /// account, which this module can obtain via a `SignerCapability`.
 module veiled_coin::veiled_coin {
     use std::error;
-    use std::features;
     use std::signer;
     use std::vector;
-    use aptos_std::pedersen::{Self, Commitment};
-    use aptos_std::ristretto255::{Self, CompressedRistretto, Scalar, new_scalar_from_u64, new_scalar_from_bytes, scalar_neg, point_equals, point_decompress};
+    use aptos_std::elgamal::{Self, Ciphertext, CompressedCiphertext, PubKey};
+    use aptos_std::ristretto255::{Self, Scalar, new_scalar_from_u64};
 
     use aptos_framework::account;
     use aptos_framework::coin::{Self, Coin};
@@ -55,16 +54,16 @@ module veiled_coin::veiled_coin {
 
     /// Main structure representing a coin in an account's custody.
     struct VeiledCoin<phantom CoinType> {
-        /// Pedersen commitment (under the default Bulletproofs CK) to a number of coins v \in [0, 2^{64}), an invariant
+        /// ElGamal ciphertext (under the default Bulletproofs CK) of a number of coins v \in [0, 2^{64}), an invariant
         /// that is enforced throughout the code
-        private_value: Commitment,
+        private_value: Ciphertext,
     }
 
     /// A holder of a specific coin types and associated event handles.
     /// These are kept in a single resource to ensure locality of data.
     struct VeiledCoinStore<phantom CoinType> has key {
-        /// A Pedersen commitment to a value v \in [0, 2^{64}), an invariant that is enforced throughout the code.
-        private_balance: CompressedRistretto,
+        /// A ElGamal ciphertext of a value v \in [0, 2^{64}), an invariant that is enforced throughout the code.
+        private_balance: CompressedCiphertext,
         deposit_events: EventHandle<DepositEvent>,
         withdraw_events: EventHandle<WithdrawEvent>,
     }
@@ -92,7 +91,7 @@ module veiled_coin::veiled_coin {
     /// Initializes a so-called "resource" account which will maintain a coin::CoinStore<T> resource for all Coin<T>'s
     /// that have been converted into a VeiledCoin<T>.
     fun init_module(deployer: &signer) {
-        assert!(bulletproofs::get_max_range_bits() >= 64, ERANGE_PROOF_SYSTEM_HAS_INSUFFICIENT_RANGE);
+        assert!(bulletproofs::get_max_range_bits() >= 32, ERANGE_PROOF_SYSTEM_HAS_INSUFFICIENT_RANGE);
 
         // Create the resource account. This will allow this module to later obtain a `signer` for this account and
         // transfer Coin<T>'s into its CoinStore<T> before minting a VeiledCoin<T>.
@@ -126,7 +125,7 @@ module veiled_coin::veiled_coin {
     }
 
     /// Returns the commitment to the balance of `owner` for the provided `CoinType`.
-    public entry fun private_balance<CoinType>(owner: address): CompressedRistretto acquires VeiledCoinStore {
+    public entry fun private_balance<CoinType>(owner: address): CompressedCiphertext acquires VeiledCoinStore {
         assert!(
             has_veiled_coin_store<CoinType>(owner),
             error::not_found(EVEILED_COIN_STORE_NOT_PUBLISHED),
@@ -158,22 +157,22 @@ module veiled_coin::veiled_coin {
         exists<VeiledCoinStore<CoinType>>(account_addr)
     }
 
-    /// Returns the commitment to the value of `coin`.
-    public fun private_value<CoinType>(coin: &VeiledCoin<CoinType>): &Commitment {
+    /// Returns the ciphertext of the value of `coin`.
+    public fun private_value<CoinType>(coin: &VeiledCoin<CoinType>): &Ciphertext {
         &coin.private_value
     }
 
     /// Returns true if the balance at address `owner` equals `value`, which should be useful for auditability. Requires
-    /// the Pedersen commitment randomness as an auxiliary input.
-    public fun verify_opened_balance<CoinType>(owner: address, value: u64, randomness: &Scalar): bool acquires VeiledCoinStore {
+    /// the ElGamal ciphertext randomness as an auxiliary input.
+    public fun verify_opened_balance<CoinType>(owner: address, pubkey: &PubKey, value: u64, randomness: &Scalar): bool acquires VeiledCoinStore {
         // compute the expected committed balance
         let value = new_scalar_from_u64(value);
-        let expected_comm = pedersen::new_commitment_for_bulletproof(&value, randomness);
+        let expected_ct = elgamal::new_ciphertext_with_basepoint(&value, randomness, pubkey);
 
         // get the actual committed balance
-        let actual_comm = pedersen::new_commitment_from_compressed(&private_balance<CoinType>(owner));
+        let actual_ct = elgamal::decompress_ciphertext(&private_balance<CoinType>(owner));
 
-        pedersen::commitment_equals(&actual_comm, &expected_comm)
+        elgamal::ciphertext_equals(&actual_ct, &expected_ct)
     }
 
     /// Initializes a veiled coin store for the specified account.
@@ -185,7 +184,7 @@ module veiled_coin::veiled_coin {
         );
 
         let coin_store = VeiledCoinStore<CoinType> {
-            private_balance: ristretto255::point_identity_compressed(),
+            private_balance: elgamal::new_ciphertext_from_compressed(ristretto255::point_identity_compressed(), ristretto255::point_identity_compressed()),
             deposit_events: account::new_event_handle<DepositEvent>(account),
             withdraw_events: account::new_event_handle<WithdrawEvent>(account),
         };
@@ -210,17 +209,17 @@ module veiled_coin::veiled_coin {
         coin::deposit(rsrc_acc_addr, c);
 
         VeiledCoin<CoinType> {
-            private_value: pedersen::new_non_hiding_commitment_for_bulletproof(&value)
+            private_value: elgamal::new_ciphertext_no_randomness(&value)
         }
     }
 
     /// Sends the specified private amount to `recipient` and updates the private balance of `sender`. Requires a range
-    /// proof on the new balance of the sender, to ensure the sender has enough money to send. `private_amount` is a
-    /// Pedersen commitment to the amount being sent.
+    /// proof on the new balance of the sender, to ensure the sender has enough money to send. `private_amount` is an
+    /// ElGamal ciphertext of the amount being sent.
     public fun transfer_privately_to<CoinType>(
         sender: &signer,
         recipient: address,
-        private_amount: Commitment,
+        private_amount: Ciphertext,
         range_proof: &RangeProof)
     acquires VeiledCoinStore {
         let vc = withdraw<CoinType>(sender, private_amount, range_proof);
@@ -236,9 +235,9 @@ module veiled_coin::veiled_coin {
         public_amount: u64,
         range_proof: &RangeProof)
     acquires VeiledCoinStore {
-        let non_hiding_comm = pedersen::new_non_hiding_commitment_for_bulletproof(&new_scalar_from_u64(public_amount));
+        let no_rand_ct = elgamal::new_ciphertext_no_randomness(&new_scalar_from_u64(public_amount));
 
-        let vc = withdraw<CoinType>(sender, non_hiding_comm, range_proof);
+        let vc = withdraw<CoinType>(sender, no_rand_ct, range_proof);
 
         deposit(recipient, vc);
     }
@@ -260,11 +259,11 @@ module veiled_coin::veiled_coin {
             DepositEvent {},
         );
 
-        let private_balance = pedersen::new_commitment_from_compressed(&coin_store.private_balance);
+        let private_balance = elgamal::decompress_ciphertext(&coin_store.private_balance);
 
-        pedersen::commitment_add_assign(&mut private_balance, &coin.private_value);
+        elgamal::ciphertext_add_assign(&mut private_balance, &coin.private_value);
 
-        coin_store.private_balance = pedersen::commitment_as_compressed_point(&private_balance);
+        coin_store.private_balance = elgamal::compress_ciphertext(&private_balance);
 
         drop_veiled_coin(coin);
     }
@@ -272,7 +271,7 @@ module veiled_coin::veiled_coin {
     /// Withdraws the specifed private `amount` of veiled coin `CoinType` from the signing account.
     public fun withdraw<CoinType>(
         account: &signer,
-        private_value: Commitment,
+        private_value: Ciphertext,
         range_proof: &RangeProof,
     ): VeiledCoin<CoinType> acquires VeiledCoinStore {
         let account_addr = signer::address_of(account);
@@ -289,9 +288,9 @@ module veiled_coin::veiled_coin {
         );
 
         // Update the coin store by homomorphically subtracting the committed withdrawn amount from the committed balance.
-        let private_balance = pedersen::new_commitment_from_compressed(&coin_store.private_balance);
+        let private_balance = elgamal::decompress_ciphertext(&coin_store.private_balance);
 
-        pedersen::commitment_sub_assign(&mut private_balance, &private_value);
+        elgamal::ciphertext_sub_assign(&mut private_balance, &private_value);
 
         // TODO: Fix the nonsense below, which does not account for 'new_bal = bal - amount (mod p)' and leads to an attack.
         // Will also need a range proof on the transferred 'amount'.
@@ -300,9 +299,9 @@ module veiled_coin::veiled_coin {
         // = 'bal' - 'amount'. We assume that 'bal' is in [0, 2^{64}). All we have to do to enforce this invariant is to
         // verify a range proof that 'new_bal' is in [0, 2^{64}). Since 'new_bal' = 'bal' - 'amount' this implies that
         // 'bal' - 'amount' >= 0 and therefore that 'bal' >= 'amount'.
-        assert!(bulletproofs::verify_range_proof(&private_balance, range_proof, MAX_BITS_IN_VALUE, VEILED_COIN_DST), ERANGE_PROOF_VERIFICATION_FAILED);
+        assert!(bulletproofs::verify_range_proof(elgamal::get_value_component(&private_balance), range_proof, MAX_BITS_IN_VALUE, VEILED_COIN_DST), ERANGE_PROOF_VERIFICATION_FAILED);
 
-        coin_store.private_balance = pedersen::commitment_as_compressed_point(&private_balance);
+        coin_store.private_balance = elgamal::compress_ciphertext(&private_balance);
 
         // Returns the withdrawn veiled coin
         VeiledCoin<CoinType> {

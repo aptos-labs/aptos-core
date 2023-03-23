@@ -3,7 +3,7 @@
 /// {8, 16, 32, 64}.
 module aptos_std::bulletproofs {
     use std::features;
-    use aptos_std::pedersen;
+    use aptos_std::elgamal;
     use aptos_std::ristretto255::{Self, RistrettoPoint};
 
     //
@@ -63,13 +63,13 @@ module aptos_std::bulletproofs {
     /// Verifies a zero-knowledge range proof that the value `v` committed in `com` (under the default Bulletproofs
     /// commitment; see `pedersen::new_commitment_for_bulletproof`) satisfies $v \in [0, 2^{num_bits})$. Only works
     /// for `num_bits` \in {8, 16, 32, 64}.
-    public fun verify_range_proof(com: &pedersen::Commitment, proof: &RangeProof, num_bits: u64, dst: vector<u8>): bool {
+    public fun verify_range_proof(ct: &elgamal::Ciphertext, proof: &RangeProof, num_bits: u64, dst: vector<u8>): bool {
         if(!features::bulletproofs_enabled()) {
             abort(std::error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE))
         };
 
         verify_range_proof_internal(
-            ristretto255::point_to_bytes(&pedersen::commitment_as_compressed_point(com)),
+            ristretto255::point_to_bytes(&elgamal::get_value_component_compressed(ct)),
             proof.bytes,
             num_bits,
             dst
@@ -79,7 +79,7 @@ module aptos_std::bulletproofs {
     /// Verifies a zero-knowledge range proof that the value `v` committed in `com` (as v * val_base + r * rand_base,
     /// for some randomness `r`) satisfies $v \in [0, 2^{num_bits})$. Only works for `num_bits` \in {8, 16, 32, 64}.
     public fun verify_range_proof_custom_ck(
-        com: &pedersen::Commitment,
+        ct: &elgamal::Ciphertext,
         val_base: &RistrettoPoint, rand_base: &RistrettoPoint,
         proof: &RangeProof, num_bits: u64, dst: vector<u8>): bool
     {
@@ -88,7 +88,7 @@ module aptos_std::bulletproofs {
         };
 
         verify_range_proof_custom_ck_internal(
-            ristretto255::point_to_bytes(&pedersen::commitment_as_compressed_point(com)),
+            ristretto255::point_to_bytes(&elgamal::get_value_component_compressed(ct)),
             val_base, rand_base,
             proof.bytes, num_bits, dst
         )
