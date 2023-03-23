@@ -168,7 +168,10 @@ async fn test_upgrade_flow_multi_step() {
     let upgrade_scripts_folder = TempPath::new();
     upgrade_scripts_folder.create_as_dir().unwrap();
 
-    let config = aptos_release_builder::ReleaseConfig::default();
+    let config = aptos_release_builder::ReleaseConfig {
+        is_multi_step: true,
+        ..Default::default()
+    };
 
     config
         .generate_release_proposal_scripts(upgrade_scripts_folder.path())
