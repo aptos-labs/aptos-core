@@ -341,8 +341,6 @@ impl AptosVM {
             script_fn.function(),
             script_fn.ty_args(),
         )?;
-        // If txn args are not valid, we'd still consider the transaction as executed but
-        // failed. This is primarily because it's unrecoverable at this point.
         let struct_constructors = self
             .0
             .get_features()
@@ -597,6 +595,8 @@ impl AptosVM {
         payload: &EntryFunction,
         new_published_modules_loaded: &mut bool,
     ) -> Result<(), VMStatus> {
+        // If txn args are not valid, we'd still consider the transaction as executed but
+        // failed. This is primarily because it's unrecoverable at this point.
         self.validate_and_execute_entry_function(
             session,
             gas_meter,

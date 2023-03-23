@@ -236,8 +236,10 @@ pub(crate) fn construct_args<S: MoveResolverExt>(
         // Unfortunately, is_empty is only enabled in nightly, so we check this way.
         if cursor.position() != arg.len() as u64 {
             return Err(VMStatus::Error(
-                StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-                None,
+                StatusCode::NUMBER_OF_ARGUMENTS_MISMATCH,
+                Some(String::from(
+                    "The serialized arguments to constructor contained extra data",
+                )),
             ));
         }
         *arg = new_arg;
@@ -349,7 +351,10 @@ fn validate_and_construct<S: MoveResolverExt>(
         .map_err(constructor_error)?;
     let mut ret_vals = serialized_result.return_values;
     // We know ret_vals.len() == 1
-    let deserialize_error = VMStatus::Error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT, None);
+    let deserialize_error = VMStatus::Error(
+        StatusCode::INTERNAL_TYPE_ERROR,
+        Some(String::from("Constructor did not return value")),
+    );
     Ok(ret_vals.pop().ok_or(deserialize_error)?.0)
 }
 
