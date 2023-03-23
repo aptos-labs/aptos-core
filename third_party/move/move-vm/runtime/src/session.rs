@@ -3,9 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    data_cache::TransactionDataCache,
-    native_extensions::NativeContextExtensions,
-    runtime::VMRuntime,
+    data_cache::TransactionDataCache, loader::LoadedFunction,
+    native_extensions::NativeContextExtensions, runtime::VMRuntime,
 };
 use move_binary_format::{
     compatibility::Compatibility,
@@ -26,7 +25,6 @@ use move_vm_types::{
     loaded_data::runtime_types::{CachedStructIndex, StructType, Type},
 };
 use std::{borrow::Borrow, sync::Arc};
-use crate::loader::LoadedFunction;
 
 pub struct Session<'r, 'l, S> {
     pub(crate) runtime: &'l VMRuntime,

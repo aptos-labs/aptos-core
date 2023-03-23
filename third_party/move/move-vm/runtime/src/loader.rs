@@ -36,12 +36,11 @@ use move_vm_types::{
 use parking_lot::RwLock;
 use sha3::{Digest, Sha3_256};
 use std::{
-    collections::{BTreeMap, BTreeSet, HashMap},
+    collections::{btree_map, BTreeMap, BTreeSet, HashMap},
     fmt::Debug,
     hash::Hash,
     sync::Arc,
 };
-use std::collections::btree_map;
 use tracing::error;
 
 type ScriptHash = [u8; 32];
@@ -756,16 +755,12 @@ impl Loader {
     ) -> bool {
         match (returned, expected) {
             // The important case, deduce the type params
-            (Type::TyParam(idx), _) => {
-                match map.entry(*idx) {
-                    btree_map::Entry::Vacant(vacant_entry) => {
-                        vacant_entry.insert(expected);
-                        true
-                    },
-                    btree_map::Entry::Occupied(occupied_entry) => {
-                        *occupied_entry.get() == expected
-                    },
-                }
+            (Type::TyParam(idx), _) => match map.entry(*idx) {
+                btree_map::Entry::Vacant(vacant_entry) => {
+                    vacant_entry.insert(expected);
+                    true
+                },
+                btree_map::Entry::Occupied(occupied_entry) => *occupied_entry.get() == expected,
             },
             // Recursive types we need to recurse the matching types
             (Type::Reference(ret_inner), Type::Reference(expected_inner))
@@ -844,7 +839,13 @@ impl Loader {
             parameters,
             return_: return_vec,
         };
-        Ok((LoadedFunction {module, function: func}, loaded))
+        Ok((
+            LoadedFunction {
+                module,
+                function: func,
+            },
+            loaded,
+        ))
     }
 
     // Entry point for function execution (`MoveVM::execute_function`).

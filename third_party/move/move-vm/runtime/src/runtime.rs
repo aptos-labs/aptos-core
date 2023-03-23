@@ -6,7 +6,7 @@ use crate::{
     config::VMConfig,
     data_cache::TransactionDataCache,
     interpreter::Interpreter,
-    loader::{Function, Loader},
+    loader::{Function, LoadedFunction, Loader},
     native_extensions::NativeContextExtensions,
     native_functions::{NativeFunction, NativeFunctions},
     session::{LoadedFunctionInstantiation, SerializedReturnValues, Session},
@@ -35,7 +35,6 @@ use move_vm_types::{
 };
 use std::{borrow::Borrow, collections::BTreeSet, sync::Arc};
 use tracing::warn;
-use crate::loader::LoadedFunction;
 
 /// An instantiation of the MoveVM.
 pub(crate) struct VMRuntime {
@@ -401,7 +400,7 @@ impl VMRuntime {
                 .load_function(module, function_name, &ty_args, data_store)?;
 
         self.execute_function_instantiation(
-            LoadedFunction { module, function } ,
+            LoadedFunction { module, function },
             instantiation,
             serialized_args,
             data_store,
