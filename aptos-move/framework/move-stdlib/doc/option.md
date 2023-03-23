@@ -892,9 +892,9 @@ because it's 0 for "none" or 1 for "some".
 
 
 
-<pre><code><b>pragma</b> opaque;
-<b>include</b> <a href="option.md#0x1_option_AbortsIfNone">AbortsIfNone</a>&lt;Element&gt;;
+<pre><code><b>include</b> <a href="option.md#0x1_option_AbortsIfNone">AbortsIfNone</a>&lt;Element&gt;;
 <b>ensures</b> result == <a href="option.md#0x1_option_spec_borrow">spec_borrow</a>(t);
+<b>ensures</b> t == <b>old</b>(t);
 </code></pre>
 
 

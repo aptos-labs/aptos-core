@@ -22,6 +22,7 @@ use aptos_types::{
     },
     transaction::Version,
 };
+use arr_macro::arr;
 use proptest::{prelude::*, proptest};
 use std::{collections::HashMap, sync::Arc};
 
@@ -46,20 +47,20 @@ fn put_value_set(
         .unwrap();
 
     let ledger_batch = SchemaBatch::new();
-    let state_kv_batch = SchemaBatch::new();
+    let sharded_state_kv_batches = arr![SchemaBatch::new(); 256];
     state_store
         .put_value_sets(
             vec![&value_set],
             version,
             StateStorageUsage::new_untracked(),
             &ledger_batch,
-            &state_kv_batch,
+            &sharded_state_kv_batches,
         )
         .unwrap();
     state_store.ledger_db.write_schemas(ledger_batch).unwrap();
     state_store
         .state_kv_db
-        .commit(version, state_kv_batch)
+        .commit(version, sharded_state_kv_batches)
         .unwrap();
 
     root
@@ -419,8 +420,7 @@ fn verify_state_value<'a, I: Iterator<Item = (&'a StateKey, &'a (Version, Option
         if pruned {
             assert!(state_store
                 .state_kv_db
-                // TODO(grao): Support sharding here.
-                .metadata_db()
+                .db_shard(k.get_shard_id())
                 .get::<StaleStateValueIndexSchema>(&StaleStateValueIndex {
                     stale_since_version: version,
                     version: *old_version,

@@ -20,6 +20,7 @@ use aptos_executor_types::VerifyExecutionMode;
 use aptos_storage_interface::DbReader;
 use aptos_temppath::TempPath;
 use aptos_types::transaction::Version;
+use itertools::zip_eq;
 use std::{convert::TryInto, mem::size_of, sync::Arc};
 use tokio::time::Duration;
 
@@ -120,19 +121,21 @@ fn end_to_end() {
     let ouptputlist = tgt_db
         .get_transaction_outputs(0, target_version, target_version)
         .unwrap();
-    assert_eq!(
+
+    for (restore_ws, org_ws) in zip_eq(
         ouptputlist
             .transactions_and_outputs
             .iter()
-            .map(|(_, output)| output.write_set().clone())
-            .collect::<Vec<_>>(),
+            .map(|(_, output)| output.write_set().clone()),
         blocks
             .iter()
             .flat_map(|(txns, _li)| txns)
             .take(target_version as usize)
-            .map(|txn_to_commit| txn_to_commit.write_set().clone())
-            .collect::<Vec<_>>()
-    );
+            .map(|txn_to_commit| txn_to_commit.write_set().clone()),
+    ) {
+        assert_eq!(restore_ws, org_ws);
+    }
+
     assert_eq!(
         tgt_db
             .get_latest_transaction_info_option()

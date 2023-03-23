@@ -7,10 +7,14 @@ module token_objects::royalty {
 
     use aptos_framework::object::{Self, ConstructorRef, ExtendRef, Object};
 
+    friend token_objects::token;
+
     // Enforce that the royalty is between 0 and 1
     const EROYALTY_EXCEEDS_MAXIMUM: u64 = 1;
     // Enforce that the denominator of a royalty is not 0
     const EROYALTY_DENOMINATOR_IS_ZERO: u64 = 2;
+    // Royalty does not exist within global storage
+    const EROYALTY_DOES_NOT_EXIST: u64 = 3;
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// The royalty of a token within this collection -- this optional
@@ -52,6 +56,15 @@ module token_objects::royalty {
 
     public fun generate_mutator_ref(ref: ExtendRef): MutatorRef {
         MutatorRef { inner: ref }
+    }
+
+    public fun exists_at(addr: address): bool {
+        exists<Royalty>(addr)
+    }
+
+    public(friend) fun delete(addr: address) acquires Royalty {
+        assert!(exists<Royalty>(addr), error::not_found(EROYALTY_DOES_NOT_EXIST));
+        move_from<Royalty>(addr);
     }
 
     // Accessors
