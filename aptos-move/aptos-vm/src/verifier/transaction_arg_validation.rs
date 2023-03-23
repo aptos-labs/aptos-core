@@ -10,7 +10,7 @@ use crate::{
     move_vm_ext::{MoveResolverExt, SessionExt},
     VMStatus,
 };
-use move_binary_format::file_format_common::read_uleb128_as_u64;
+use move_binary_format::{errors::VMError, file_format_common::read_uleb128_as_u64};
 use move_core_types::{
     account_address::AccountAddress,
     ident_str,
@@ -29,7 +29,6 @@ use std::{
     collections::BTreeMap,
     io::{Cursor, Read},
 };
-use move_binary_format::errors::VMError;
 
 pub(crate) struct FunctionId {
     module_id: ModuleId,
@@ -81,7 +80,9 @@ static NEW_ALLOWED_STRUCTS: ConstructorMap = Lazy::new(|| {
     .collect()
 });
 
-pub(crate) fn get_allowed_structs(are_struct_constructors_enabled: bool) -> &'static ConstructorMap {
+pub(crate) fn get_allowed_structs(
+    are_struct_constructors_enabled: bool,
+) -> &'static ConstructorMap {
     if are_struct_constructors_enabled {
         &NEW_ALLOWED_STRUCTS
     } else {

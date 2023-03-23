@@ -341,6 +341,8 @@ impl AptosVM {
             script_fn.function(),
             script_fn.ty_args(),
         )?;
+        // If txn args are not valid, we'd still consider the transaction as executed but
+        // failed. This is primarily because it's unrecoverable at this point.
         let struct_constructors = self
             .0
             .get_features()

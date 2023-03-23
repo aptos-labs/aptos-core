@@ -2,10 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{assert_success, tests::common, MoveHarness};
-use aptos_types::{account_address::AccountAddress, on_chain_config::FeatureFlag};
+use aptos_types::{
+    account_address::AccountAddress,
+    on_chain_config::FeatureFlag,
+    transaction::{ExecutionStatus, TransactionStatus},
+};
 use move_core_types::{language_storage::TypeTag, parser::parse_struct_tag, vm_status::StatusCode};
 use serde::{Deserialize, Serialize};
-use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
 
 /// Mimics `0xcafe::test::ModuleData`
 #[derive(Serialize, Deserialize)]
@@ -135,7 +138,7 @@ fn constructor_args_bad() {
     let good: &[u8] = "a".as_bytes();
     let bad: &[u8] = &[0x80u8; 1];
 
-    let tests:Vec<(&str, Vec<Vec<u8>>, Closure)> = vec![
+    let tests: Vec<(&str, Vec<Vec<u8>>, Closure)> = vec![
         // object doesnt exist
         (
             "0xcafe::test::object_arg",
@@ -143,7 +146,12 @@ fn constructor_args_bad() {
                 bcs::to_bytes("hi").unwrap(),
                 bcs::to_bytes(&OBJECT_ADDRESS).unwrap(),
             ],
-            Box::new(|e| matches!(e, TransactionStatus::Keep(ExecutionStatus::MoveAbort {..})))
+            Box::new(|e| {
+                matches!(
+                    e,
+                    TransactionStatus::Keep(ExecutionStatus::MoveAbort { .. })
+                )
+            }),
         ),
         (
             "0xcafe::test::pass_optional_vector_optional_string",
@@ -152,7 +160,14 @@ fn constructor_args_bad() {
                 bcs::to_bytes(&vec![vec![vec![good], vec![bad]]]).unwrap(), // Option<vector<Option<String>>>
                 bcs::to_bytes(&1u64).unwrap(),
             ],
-            Box::new(|e| matches!(e, TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT))))),
+            Box::new(|e| {
+                matches!(
+                    e,
+                    TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
+                        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT
+                    )))
+                )
+            }),
         ),
     ];
 
