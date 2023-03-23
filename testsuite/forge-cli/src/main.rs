@@ -804,6 +804,7 @@ fn graceful_overload(config: ForgeConfig) -> ForgeConfig {
             // don't regress, but something to investigate
             avg_tps: 3400,
             latency_thresholds: &[],
+            inner_destination_num_nodes: None,
         }])
         // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
         .with_emit_job(
@@ -852,6 +853,7 @@ fn three_region_sim_graceful_overload(config: ForgeConfig) -> ForgeConfig {
                 // don't regress, but something to investigate
                 avg_tps: 3400,
                 latency_thresholds: &[],
+                inner_destination_num_nodes: Some(10),
             },
             three_region_simulation_test: ThreeRegionSimulationTest {
                 add_execution_delay: None,

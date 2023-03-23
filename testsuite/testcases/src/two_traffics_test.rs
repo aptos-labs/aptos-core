@@ -20,6 +20,7 @@ pub struct TwoTrafficsTest {
     pub inner_tps: usize,
     pub inner_gas_price: u64,
     pub inner_init_gas_price_multiplier: u64,
+    pub inner_destination_num_nodes: Option<usize>,
 
     pub avg_tps: usize,
     pub latency_thresholds: &'static [(f32, LatencyType)],
@@ -38,6 +39,10 @@ impl NetworkLoadTest for TwoTrafficsTest {
             duration.as_secs_f32()
         );
         let nodes_to_send_load_to = LoadDestination::AllFullnodes.get_destination_nodes(swarm);
+        let num_nodes = match self.inner_destination_num_nodes {
+            None => nodes_to_send_load_to.len(),
+            Some(num) => num,
+        };
         let rng = ::rand::rngs::StdRng::from_seed(OsRng.gen());
 
         let (emitter, emit_job_request) = create_emitter_and_request(
@@ -48,7 +53,7 @@ impl NetworkLoadTest for TwoTrafficsTest {
                 })
                 .gas_price(self.inner_gas_price)
                 .init_gas_price_multiplier(self.inner_init_gas_price_multiplier),
-            &nodes_to_send_load_to,
+            &nodes_to_send_load_to[0..num_nodes],
             rng,
         )?;
 
