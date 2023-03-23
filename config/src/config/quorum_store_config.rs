@@ -25,9 +25,9 @@ impl Default for QuorumStoreBackPressureConfig {
             // QS will create batches at the max rate until this number is reached
             backlog_per_validator_batch_limit_count: 4,
             decrease_duration_ms: 1000,
-            increase_duration_ms: 1000,
+            increase_duration_ms: 250,
             decrease_fraction: 0.5,
-            dynamic_min_txn_per_s: 160,
+            dynamic_min_txn_per_s: 40,
             dynamic_max_txn_per_s: 2000,
         }
     }
