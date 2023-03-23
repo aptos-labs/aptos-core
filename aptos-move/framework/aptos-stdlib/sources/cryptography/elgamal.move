@@ -148,7 +148,7 @@ module aptos_std::elgamal {
     }
 
     /// Returns the RistrettoPoint in the ciphertext which contains the encrypted value in the exponent
-    public fun get_value_component_compressed(ct: &Ciphertext): &CompressedRistretto {
-        point_compress(ct.left)
+    public fun get_value_component_compressed(ct: &Ciphertext): CompressedRistretto {
+        point_compress(&ct.left)
     }
 }

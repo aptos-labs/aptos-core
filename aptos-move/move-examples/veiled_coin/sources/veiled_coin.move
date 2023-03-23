@@ -125,7 +125,7 @@ module veiled_coin::veiled_coin {
     }
 
     /// Returns the commitment to the balance of `owner` for the provided `CoinType`.
-    public entry fun private_balance<CoinType>(owner: address): CompressedCiphertext acquires VeiledCoinStore {
+    public fun private_balance<CoinType>(owner: address): CompressedCiphertext acquires VeiledCoinStore {
         assert!(
             has_veiled_coin_store<CoinType>(owner),
             error::not_found(EVEILED_COIN_STORE_NOT_PUBLISHED),
@@ -299,7 +299,7 @@ module veiled_coin::veiled_coin {
         // = 'bal' - 'amount'. We assume that 'bal' is in [0, 2^{64}). All we have to do to enforce this invariant is to
         // verify a range proof that 'new_bal' is in [0, 2^{64}). Since 'new_bal' = 'bal' - 'amount' this implies that
         // 'bal' - 'amount' >= 0 and therefore that 'bal' >= 'amount'.
-        assert!(bulletproofs::verify_range_proof(elgamal::get_value_component(&private_balance), range_proof, MAX_BITS_IN_VALUE, VEILED_COIN_DST), ERANGE_PROOF_VERIFICATION_FAILED);
+        assert!(bulletproofs::verify_range_proof(&private_balance, range_proof, MAX_BITS_IN_VALUE, VEILED_COIN_DST), ERANGE_PROOF_VERIFICATION_FAILED);
 
         coin_store.private_balance = elgamal::compress_ciphertext(&private_balance);
 
