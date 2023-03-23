@@ -5,8 +5,10 @@ import json
 import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
+from time import time
 
 def main(datapoints:list):
+    '''Fit a line using minsq for a given dataset.'''
     for item in datapoints: assert len(item)==2
     x_values, y_values = zip(*datapoints)
     X = np.array(x_values)
@@ -28,10 +30,13 @@ if __name__=='__main__':
     print(jsonstr)
     print()
     dataset_base_path = args.dataset_path.replace('.json', '')
-    out_path = Path(f'{dataset_base_path}.model.json')
-    out_path.write_text(jsonstr)
-    print(f'Saved to {out_path}.')
+    cur_time = int(time())
+    out_path = Path(f'{dataset_base_path}.model.{cur_time}.json')
+    print(f'Saving model to:')
     print()
+    print(f'  {out_path}')
+    print()
+    out_path.write_text(jsonstr)
     if args.plot:
         plt.plot(X, Y, 'o', label='dataset', markersize=2)
         plt.plot(X, k*X+b, 'r', label='fitted')

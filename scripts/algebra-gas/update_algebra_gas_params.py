@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
 
+'''
+This module automated the steps to
+calculate gas parameters for `algebra.move` natives from benchmarking results,
+then update the gas parameter definitions in rust.
+'''
+
 import argparse
 import fit_linear_model
 import load_bench_ns
@@ -10,6 +16,10 @@ from time import time
 
 # This should match `EXECUTION_GAS_MULTIPLIER` defined in `aptos-move/aptos-gas/src/gas_meter.rs`.
 MUL = 20
+
+# Typically you are making a new version of gas schedule,
+# so this should be larger than `LATEST_GAS_FEATURE_VERSION` in `aptos-move/aptos-gas/src/gas_meter.rs`.
+TARGET_GAS_VERSION = 8
 
 def get_bench_ns_linear(bench_path):
     datapoints = load_bench_datapoints.main(bench_path)
@@ -86,16 +96,16 @@ def get_algebra_lines(gas_per_ns):
     _,_,nanoseconds['ark_h2c_bls12381g2_xmd_sha256_sswu_per_msg_byte'],nanoseconds['ark_h2c_bls12381g2_xmd_sha256_sswu_base'] = get_bench_ns_linear('target/criterion/ark_bls12_381/hash_to_g2_proj')
     gas_units = {k:gas_per_ns*v for k,v in nanoseconds.items()}
     gas_over_mul_units = {k:ceil(v/MUL) for k,v in gas_units.items()}
-    lines = [f'    [.algebra.{k}, {{ 8.. => "algebra.{k}" }}, {prettify_number(v)} * MUL],' for k,v in sorted(gas_over_mul_units.items())]
+    lines = [f'    [.algebra.{k}, {{ {TARGET_GAS_VERSION}.. => "algebra.{k}" }}, {prettify_number(v)} * MUL],' for k,v in sorted(gas_over_mul_units.items())]
     return lines
 
 def main(gas_per_ns):
     path = Path('aptos-move/aptos-gas/src/aptos_framework.rs')
     lines = path.read_text().split('\n')
-    lid_begin = lines.index('    // Algebra gas parameters begin.')
-    lid_end = lines.index('    // Algebra gas parameters end.')
+    line_id_begin = lines.index('    // Algebra gas parameters begin.')
+    line_id_end = lines.index('    // Algebra gas parameters end.')
     generator_note_line = f'    // Generated at time {time()} by `scripts/algebra-gas/update_algebra_gas_params.py` with gas_per_ns={gas_per_ns}.'
-    new_lines = lines[:lid_begin+1] + [generator_note_line] + get_algebra_lines(gas_per_ns) + lines[lid_end:]
+    new_lines = lines[:line_id_begin+1] + [generator_note_line] + get_algebra_lines(gas_per_ns) + lines[line_id_end:]
     path.write_text('\n'.join(new_lines))
 
 if __name__=='__main__':

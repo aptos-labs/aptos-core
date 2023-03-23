@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
 import re
+from time import time
 
 def get_datapoint(bench_path):
     items = bench_path.split('/')
@@ -17,6 +18,10 @@ def get_datapoint(bench_path):
     return (arg,ns)
 
 def main(bench_path):
+    '''Parse benchmark results as datapoints.
+
+    Param `bench_path` has to be a serial bench, (e.g. 'target/criterion/hash/SHA2-256').
+    '''
     datapoints = [get_datapoint(sub_bench_path) for sub_bench_path in glob(f'{bench_path}/*')]
     datapoints = [dp for dp in datapoints if dp!=None]
     assert len(datapoints)>=1
@@ -37,10 +42,13 @@ if __name__=='__main__':
     formatted_bench_name = re.sub('[^0-9a-zA-Z]', '_', bench_name)
     x_min = datapoints[0][0]
     x_max = datapoints[-1][0]
-    out_path = Path(f'{formatted_bench_name}.{x_min}-{x_max+1}.json')
-    out_path.write_text(jsonstr)
-    print(f'Saved to {out_path}.')
+    cur_time = int(time())
+    out_path = Path(f'{formatted_bench_name}.{cur_time}.{x_min}-{x_max+1}.json')
+    print(f'Saving dataset to:')
     print()
+    print(f'  {out_path}')
+    print()
+    out_path.write_text(jsonstr)
     if args.plot:
         x_values, y_values = zip(*datapoints)
         X = np.array(x_values)

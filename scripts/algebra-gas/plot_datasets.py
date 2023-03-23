@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+'''
+This module plots an existing dataset.
+'''
+
 import argparse
 import json
 import matplotlib.pyplot as plt
