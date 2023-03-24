@@ -19,8 +19,9 @@ use crate::{
         truncation_helper::{truncate_ledger_db, truncate_state_kv_db},
     },
     version_data::VersionDataSchema,
-    AptosDbError, LedgerStore, StaleNodeIndexCrossEpochSchema, StaleNodeIndexSchema,
-    StateKvPrunerManager, StateMerklePrunerManager, TransactionStore, OTHER_TIMERS_SECONDS,
+    AptosDbError, LedgerStore, ShardedStateKvSchemaBatch, StaleNodeIndexCrossEpochSchema,
+    StaleNodeIndexSchema, StateKvPrunerManager, StateMerklePrunerManager, TransactionStore,
+    OTHER_TIMERS_SECONDS,
 };
 use anyhow::{ensure, format_err, Result};
 use aptos_crypto::{
@@ -345,7 +346,7 @@ impl StateStore {
 
             let state_kv_commit_progress = state_kv_db
                 .metadata_db()
-                .get::<DbMetadataSchema>(&DbMetadataKey::StateKVCommitProgress)
+                .get::<DbMetadataSchema>(&DbMetadataKey::StateKvCommitProgress)
                 .expect("Failed to read state K/V commit progress.")
                 .expect("State K/V commit progress cannot be None.")
                 .expect_version();
@@ -583,7 +584,7 @@ impl StateStore {
         first_version: Version,
         expected_usage: StateStorageUsage,
         ledger_batch: &SchemaBatch,
-        sharded_state_kv_batches: &[SchemaBatch; 256],
+        sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["put_value_sets"])
@@ -636,7 +637,7 @@ impl StateStore {
         first_version: Version,
         expected_usage: StateStorageUsage,
         batch: &SchemaBatch,
-        sharded_state_kv_batches: &[SchemaBatch; 256],
+        sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["put_stats_and_indices"])

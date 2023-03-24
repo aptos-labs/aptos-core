@@ -13,4 +13,6 @@ The source materials for both code and docs live in GitHub. See [Contribute](../
 
 | Contribution | Description | Author | Date added/updated |
 | --- | --- | --- | --- |
-| [How Base Gas Works](../../concepts/base-gas.md) | Aptos transactions by default charge a base gas fee, regardless of market conditions. This document explains that process. | [alnoki](https://github.com/alnoki) | 2022-10-06 |
+| [Delegation Pool Operations](../../nodes/validator-node/operator/delegation-pool-operations.md) | Validator operators should follow these instructions to carry out staking delegation pool operations, written by Raluca Popescu of [Bware Labs](https://bwarelabs.com/).  | [dorinbwr](https://github.com/dorinbwr) | 2023-03-20 |
+| [How Base Gas Works](../../concepts/base-gas.md) | Aptos transactions by default charge a base gas fee, regardless of market conditions. This document explains that process and was contributed by Al Noki of [Econia](https://www.econialabs.com/). | [alnoki](https://github.com/alnoki) | 2022-10-06 |
+
