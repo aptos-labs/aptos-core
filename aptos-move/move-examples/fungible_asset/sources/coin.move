@@ -1,7 +1,7 @@
 /// This is an example showing how to create a fungible asset and how to use it.
 module fungible_asset::coin {
-    use aptos_framework::managed_fungible_metadata;
     use aptos_framework::object;
+    use fungible_asset::managed_fungible_metadata;
     use std::string::{Self, String};
 
     /// Create an coin object with built-in managing capabilities.
@@ -22,9 +22,9 @@ module fungible_asset::coin {
     #[test_only]
     use aptos_framework::account;
     #[test_only]
-    use aptos_framework::fungible_store;
-    #[test_only]
     use aptos_framework::fungible_asset::FungibleAssetMetadata;
+    #[test_only]
+    use aptos_framework::primary_wallet;
 
     #[test(creator = @0xcafe, aaron = @0xface)]
     entry fun e2e_test(creator: &signer, aaron: &signer) {
@@ -37,12 +37,12 @@ module fungible_asset::coin {
         let coin_addr = object::create_object_address(&creator_address, *string::bytes(&usda));
         let coin = object::address_to_object<FungibleAssetMetadata>(coin_addr);
 
-        managed_fungible_metadata::mint(creator, &coin, 100, aaron_address);
-        fungible_store::transfer(aaron, &coin, 70, creator_address);
-        managed_fungible_metadata::set_ungated_transfer(creator, &coin, aaron_address, false);
-        managed_fungible_metadata::transfer(creator, &coin, aaron_address, creator_address, 10);
-        managed_fungible_metadata::burn(creator, &coin, creator_address, 20);
-        assert!(fungible_store::balance(creator_address, &coin) == 60, 1);
-        assert!(fungible_store::balance(aaron_address, &coin) == 20, 2);
+        managed_fungible_metadata::mint(creator, coin, 100, aaron_address);
+        primary_wallet::transfer(aaron, coin, 70, creator_address);
+        managed_fungible_metadata::set_ungated_transfer(creator, coin, aaron_address, false);
+        managed_fungible_metadata::transfer(creator, coin, aaron_address, creator_address, 10);
+        managed_fungible_metadata::burn(creator, coin, creator_address, 20);
+        assert!(primary_wallet::balance(creator_address, coin) == 60, 1);
+        assert!(primary_wallet::balance(aaron_address, coin) == 20, 2);
     }
 }
