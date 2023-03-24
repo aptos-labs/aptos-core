@@ -16,9 +16,9 @@ use crate::{
     monitor,
     network::NetworkSender,
     round_manager::VerifiedEvent,
-    state_replication::StateComputerCommitCallBackType,
+    state_replication::StateComputerCommitCallBackType, logging::{LogEvent, LogSchema},
 };
-use aptos_consensus_types::{common::Author, executed_block::ExecutedBlock, experimental::{rand_decision::RandDecisions, rand_share::RandShares}};
+use aptos_consensus_types::{common::Author, executed_block::ExecutedBlock, experimental::{rand_decision::RandDecisions, rand_share::{RandShares, self}}};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_types::{
@@ -224,15 +224,20 @@ impl BufferManager {
         // Send the randomness shares through the first k proposers,
         // otherwise all blocks are Nil/genesis blocks that do not need randomness
         let rand_shares = RandShares::new(item_hash, self.author, item.epoch(), item.gen_dummy_rand_share_vec(self.author));
-        // for proposer in item.get_first_k_proposers(1) {
-        //     println!("[rand debug] {} send share {} to leader {}", self.author, rand_shares.item_id(), proposer);
-        //     self.rand_msg_tx
-        //     .send_rand_shares(rand_shares.clone(), proposer)
-        //     .await;
-        // }
-        self.rand_msg_tx
-            .broadcast_rand_shares(rand_shares)
+        for proposer in item.get_first_k_proposers(1) {
+            info!(
+                self.new_log(LogEvent::SendRandToLeader)
+                    .remote_peer(proposer),
+                "item id {}, item size {}", item.get_hash(), item.get_blocks().len()
+            );
+            // println!("[rand debug] {} send share {} to leader {}", self.author, rand_shares.item_id(), proposer);
+            self.rand_msg_tx
+            .send_rand_shares(rand_shares.clone(), proposer)
             .await;
+        }
+        // self.rand_msg_tx
+        //     .broadcast_rand_shares(rand_shares)
+        //     .await;
 
         self.buffer.push_back(item);
     }
@@ -248,7 +253,12 @@ impl BufferManager {
                 let item_id = rand_shares.item_id();
                 info!("Receive random shares for item {:?}", item_id);
 
-                println!("[rand debug] {} receive share {} from node {}", self.author, rand_shares.item_id(), rand_shares.author());
+                info!(
+                    self.new_log(LogEvent::LeaderReceiveRand)
+                        .remote_peer(rand_shares.author()),
+                    "item id {}, rand size {}", item_id, rand_shares.shares().len()
+                );
+                // println!("[rand debug] {} receive share {} from node {}", self.author, rand_shares.item_id(), rand_shares.author());
 
                 // todo: verify rand message, ignore invalid ones
 
@@ -270,13 +280,17 @@ impl BufferManager {
                             if item.get_blocks().len() != rand_decisions.decisions().len() {
                                 println!("unequal length on generated rand {} != {}", item.get_blocks().len(), rand_decisions.decisions().len());
                             }
-                            // // if we're one of the proposer for the first k proposal block,
-                            // // we're responsible to broadcast the randomness decision
-                            // if item.get_first_k_proposers(1).contains(&self.author) {
-                            //     self.rand_msg_tx
-                            //         .broadcast_rand_decisions(rand_decisions)
-                            //         .await;
-                            // }
+                            // if we're one of the proposer for the first k proposal block,
+                            // we're responsible to broadcast the randomness decision
+                            if item.get_first_k_proposers(1).contains(&self.author) {
+                                info!(
+                                    self.new_log(LogEvent::LeaderBCastRand),
+                                    "item id {}, item size {}", item_id, item.get_blocks().len()
+                                );
+                                self.rand_msg_tx
+                                    .broadcast_rand_decisions(rand_decisions)
+                                    .await;
+                            }
                             self.buffer.set(&current_cursor, item.try_advance_to_execution_ready());
                             return true;
                         }
@@ -287,6 +301,11 @@ impl BufferManager {
             VerifiedEvent::RandDecisionMsg(rand_decisions) => {
                 let item_id = rand_decisions.item_id();
                 info!("Receive random decision for item {:?}", item_id);
+
+                info!(
+                    self.new_log(LogEvent::ReceiveRand),
+                    "item id {}, item size {}", item_id, rand_decisions.decisions().len()
+                );
 
                 // todo: verify rand message, ignore invalid ones
 
@@ -788,6 +807,10 @@ impl BufferManager {
         counters::NUM_BLOCKS_IN_PIPELINE
             .with_label_values(&["aggregated"])
             .set(pending_aggregated as i64);
+    }
+
+    fn new_log(&self, event: LogEvent) -> LogSchema {
+        LogSchema::new(event)
     }
 
     pub async fn start(mut self) {
