@@ -9,7 +9,7 @@ This page shows the key updates to the developer documentation on this site. Not
 
 ## 21 March 2023
 
-- Published beta [Delegation Pool Operations](../../nodes/validator-node/operator/delegation-pool-operations.md) instructions for validator operators, written by [Raluca Popescu (dorinbwr](https://github.com/dorinbwr) ) of [Bware Labs](https://bwarelabs.com/).
+- Published beta [Delegation Pool Operations](nodes/validator-node/operator/delegation-pool-operations.md) instructions for validator operators, written by [Raluca Popescu (dorinbwr](https://github.com/dorinbwr) ) of [Bware Labs](https://bwarelabs.com/).
 
 ## 16 March 2023
 
@@ -368,7 +368,7 @@ The [hardware requirements](nodes/validator-node/operator/node-requirements.md#h
 
 ## 25 August 2022
 
-- A new guide describing [Move Package Upgrades](/guides/move-guides/book/upgrade-packages.md) is posted.
+- A new guide describing [Move Package Upgrades](/guides/move-guides/book/package-upgrades.md) is posted.
 
 
 ## 24 August 2022

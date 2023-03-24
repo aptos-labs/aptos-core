@@ -203,7 +203,7 @@ const sidebars = {
         "guides/move-guides/book/uses",
         "guides/move-guides/book/friends",
         "guides/move-guides/book/packages",
-        "guides/move-guides/book/upgrade-packages",
+        "guides/move-guides/book/package-upgrades",
         "guides/move-guides/book/unit-testing",
         "guides/move-guides/book/global-storage-structure",
         "guides/move-guides/book/global-storage-operators",
