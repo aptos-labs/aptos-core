@@ -23,10 +23,12 @@
 /// ```
 
 module drand::drand {
-    use std::hash::sha3_256;
-    use std::option::{Self, Option};
+    use std::hash::{sha3_256, sha2_256};
+    use std::option::{Self, Option, extract};
     use std::vector;
     use std::error;
+    use aptos_std::algebra::{eq, pairing, one, deserialize, hash_to, from_u64, serialize};
+    use aptos_std::algebra_bls12381::{G1Affine, G2Affine, Gt, G2AffineFormatCompressed, G1AffineFormatCompressed, H2SSuiteBls12381g1XmdSha256SswuRo, Fr, FrFormatMsb};
 
     /// The `bls-unchained-on-g1` drand beacon produces an output every 3 seconds. (Or goes into catchup mode, if nodes fall behind.)
     const PERIOD_SECS : u64 = 3;
@@ -36,6 +38,8 @@ module drand::drand {
 
     /// The drand beacon's PK, against which any beacon output for a round `i` can be verified.
     const DRAND_PUBKEY : vector<u8> = x"a0b862a7527fee3a731bcb59280ab6abd62d5c0b6ea03dc4ddf6612fdfc9d01f01c31542541771903475eb1ec6615f8d0df0b8b6dce385811d6dcf8cbefb8759e5e616a3dfd054c928940766d9a5b9db91e3b697e5d70a975181e007f87fca5e";
+
+    const DRAND_DST: vector<u8> = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_";
 
     /// Error code for when anyone submits an incorrect randomness in our APIs (e.g., wrong-size).
     const E_INCORRECT_RANDOMNESS: u64 = 1;
@@ -50,10 +54,12 @@ module drand::drand {
 
     /// Checks if the randomness in `bytes` verifies for the specified `round`.
     /// If it verifies, returns the actual randomness, which is a hash function applied over `bytes`.
-    public fun verify_and_extract_randomness(bytes: vector<u8>, _round: u64): Option<vector<u8>> {
+    public fun verify_and_extract_randomness(bytes: vector<u8>, round: u64): Option<vector<u8>> {
         // TODO(Security): We'll want a more type-safe API that wraps the signature bytes inside a `RandomnessProof` and maybe returns a `Randomness` struct that has helper methods like `random(dst, lower, upper)` or `random_bit(dst)`, where `dst` is a domain-separator.
-        // TODO: Implement BLS signature verification as per https://drand.love/docs/specification/#cryptographic-specification
-
+        let pk = extract(&mut deserialize<G2Affine, G2AffineFormatCompressed>(&DRAND_PUBKEY));
+        let sig = extract(&mut deserialize<G1Affine, G1AffineFormatCompressed>(&bytes));
+        let msg_hash = hash_to<G1Affine, H2SSuiteBls12381g1XmdSha256SswuRo>(&DRAND_DST, &unchained_msg_to_sign(round));
+        assert!(eq(&pairing<G1Affine, G2Affine, Gt>(&msg_hash, &pk), &pairing<G1Affine, G2Affine, Gt>(&sig, &one<G2Affine>())), 1);
         option::some(sha3_256(bytes))
     }
 
@@ -116,6 +122,11 @@ module drand::drand {
     fun current_round(unix_time_in_secs: u64): u64 {
         let (next_round, _) = next_round_and_timestamp_after(unix_time_in_secs);
         next_round
+    }
+
+    fun unchained_msg_to_sign(round: u64): vector<u8> {
+        let buf = serialize<Fr, FrFormatMsb>(&from_u64<Fr>(round));
+        sha2_256(std::vector::trim(&mut buf, 24))
     }
 
 }
