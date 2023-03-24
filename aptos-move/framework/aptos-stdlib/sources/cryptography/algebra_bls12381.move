@@ -323,7 +323,7 @@ module aptos_std::algebra_bls12381 {
     const G1AFFINE_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP: vector<u8> = x"1928f3beb93519eecf0145da903b40a4c97dca00b21f12ac0df3be9116ef2ef27b2ae6bcd4c5bc2d54ef5a70627efcb70973642f94c9b055f4e1d20812c1f91329ed2e3d71f635a72d599a679d0cda1320e597b4e1b24f735fed1381d767908f";
 
     #[test(fx = @std)]
-    fun test__g1affine(fx: signer) {
+    fun test_g1affine(fx: signer) {
         enable_cryptography_algebra_natives(&fx);
 
         // Special constants.
