@@ -19,9 +19,7 @@ const GET_DEFAULT_PROFILE_COMMAND = "aptos config show-profiles --profile defaul
 try {
   // delete aptos-names-contracts folder
   console.log("---deleting aptos-names-contracts folder---");
-  execSync("rm -rf aptos-names-contracts", {
-    cwd: path.resolve(__dirname, ""),
-  });
+  deleteAnsFolder();
   // 1. Clone ANS repository into the current directory
   console.log("---clone ANS repository---");
   execSync("git clone git@github.com:aptos-labs/aptos-names-contracts.git", {
@@ -44,12 +42,12 @@ try {
 
   // 4. get default profile account address
   console.log("---get default profile account address---");
-  const storedData = JSON.parse(data).Result.default.account;
+  const profileAccountAddress = JSON.parse(data).Result.default.account;
 
   // 5. publish ans modules under the default profile
   console.log("---publish ans modules---");
   execSync(
-    `aptos move publish --named-addresses aptos_names=0x${storedData},aptos_names_admin=0x${storedData},aptos_names_funds=0x${storedData} --assume-yes`,
+    `aptos move publish --named-addresses aptos_names=0x${profileAccountAddress},aptos_names_admin=0x${profileAccountAddress},aptos_names_funds=0x${profileAccountAddress} --assume-yes`,
     {
       cwd: __dirname + ANS_CORE_FOLDER,
     },
@@ -57,14 +55,16 @@ try {
 
   // 6. Delete aptos-names-contracts folder created by the git clone command
   console.log("---module published, deleting aptos-names-contracts folder---");
-  execSync("rm -rf aptos-names-contracts", {
-    cwd: path.resolve(__dirname, ""),
-  });
+  deleteAnsFolder();
 } catch (error: any) {
   console.error("An error occurred:");
   console.error("error", error);
+  deleteAnsFolder();
+  process.exit(1);
+}
+
+function deleteAnsFolder() {
   execSync("rm -rf aptos-names-contracts", {
     cwd: path.resolve(__dirname, ""),
   });
-  process.exit(1);
 }
