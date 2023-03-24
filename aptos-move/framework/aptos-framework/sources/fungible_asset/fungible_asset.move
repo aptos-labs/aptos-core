@@ -34,9 +34,9 @@ module aptos_framework::fungible_asset {
     /// Define the metadata required of an metadata to be fungible.
     struct FungibleAssetMetadata has key {
         /// The current supply.
-        current_supply: u64,
+        supply: u64,
         /// The maximum supply limit where `option::none()` means no limit.
-        maximum_supply: Option<u64>,
+        maximum: Option<u64>,
         /// Name of the fungible metadata, i.e., "USDT".
         name: String,
         /// Symbol of the fungible metadata, usually a shorter version of the name.
@@ -100,8 +100,8 @@ module aptos_framework::fungible_asset {
         };
         move_to(&metadata_object_signer,
             FungibleAssetMetadata {
-                current_supply: 0,
-                maximum_supply: converted_maximum,
+                supply: 0,
+                maximum: converted_maximum,
                 name,
                 symbol,
                 decimals,
@@ -112,13 +112,13 @@ module aptos_framework::fungible_asset {
     }
 
     /// Get the current supply from `metadata`.
-    public fun current_supply<T: key>(metadata: &Object<T>): u64 acquires FungibleAssetMetadata {
-        borrow_fungible_metadata(metadata).current_supply
+    public fun supply<T: key>(metadata: &Object<T>): u64 acquires FungibleAssetMetadata {
+        borrow_fungible_metadata(metadata).supply
     }
 
     /// Get the maximum supply from `metadata`.
-    public fun maximum_supply<T: key>(metadata: &Object<T>): Option<u64> acquires FungibleAssetMetadata {
-        borrow_fungible_metadata(metadata).maximum_supply
+    public fun maximum<T: key>(metadata: &Object<T>): Option<u64> acquires FungibleAssetMetadata {
+        borrow_fungible_metadata(metadata).maximum
     }
 
     /// Get the name of the fungible asset from `metadata`.
@@ -372,19 +372,19 @@ module aptos_framework::fungible_asset {
     fun increase_supply<T: key>(metadata: &Object<T>, amount: u64) acquires FungibleAssetMetadata {
         assert!(amount != 0, error::invalid_argument(EZERO_AMOUNT));
         let fungible_metadata = borrow_fungible_metadata_mut(metadata);
-        if (option::is_some(&fungible_metadata.maximum_supply)) {
-            let max = *option::borrow(&fungible_metadata.maximum_supply);
-            assert!(max - fungible_metadata.current_supply >= amount, error::invalid_argument(ECURRENT_SUPPLY_OVERFLOW))
+        if (option::is_some(&fungible_metadata.maximum)) {
+            let max = *option::borrow(&fungible_metadata.maximum);
+            assert!(max - fungible_metadata.supply >= amount, error::invalid_argument(ECURRENT_SUPPLY_OVERFLOW))
         };
-        fungible_metadata.current_supply = fungible_metadata.current_supply + amount;
+        fungible_metadata.supply = fungible_metadata.supply + amount;
     }
 
     /// Decrease the supply of a fungible metadata by burning.
     fun decrease_supply<T: key>(metadata: &Object<T>, amount: u64) acquires FungibleAssetMetadata {
         assert!(amount != 0, error::invalid_argument(EZERO_AMOUNT));
         let fungible_metadata = borrow_fungible_metadata_mut(metadata);
-        assert!(fungible_metadata.current_supply >= amount, error::invalid_argument(ECURRENT_SUPPLY_UNDERFLOW));
-        fungible_metadata.current_supply = fungible_metadata.current_supply - amount;
+        assert!(fungible_metadata.supply >= amount, error::invalid_argument(ECURRENT_SUPPLY_UNDERFLOW));
+        fungible_metadata.supply = fungible_metadata.supply - amount;
     }
 
     inline fun borrow_fungible_metadata<T: key>(
@@ -471,16 +471,16 @@ module aptos_framework::fungible_asset {
     fun test_metadata_basic_flow(creator: &signer) acquires FungibleAssetMetadata {
         let (creator_ref, asset) = create_test_token(creator);
         init_test_metadata(&creator_ref);
-        assert!(current_supply(&asset) == 0, 1);
-        assert!(maximum_supply(&asset) == option::some(100), 2);
+        assert!(supply(&asset) == 0, 1);
+        assert!(maximum(&asset) == option::some(100), 2);
         assert!(name(&asset) == string::utf8(b"USDA"), 3);
         assert!(symbol(&asset) == string::utf8(b"$$$"), 4);
         assert!(decimals(&asset) == 0, 5);
 
         increase_supply(&asset, 50);
-        assert!(current_supply(&asset) == 50, 6);
+        assert!(supply(&asset) == 50, 6);
         decrease_supply(&asset, 30);
-        assert!(current_supply(&asset) == 20, 7);
+        assert!(supply(&asset) == 20, 7);
     }
 
     #[test(creator = @0xcafe)]
@@ -509,19 +509,19 @@ module aptos_framework::fungible_asset {
         let creator_wallet = generate_wallet(creator, &metadata);
         let aaron_wallet = generate_wallet(aaron, &metadata);
 
-        assert!(current_supply(&metadata) == 0, 1);
+        assert!(supply(&metadata) == 0, 1);
         // Mint
         let fa = mint(&mint_ref, 100);
-        assert!(current_supply(&metadata) == 100, 2);
+        assert!(supply(&metadata) == 100, 2);
         // Deposit
         deposit(&creator_wallet, fa);
         // Withdraw
         let fa = withdraw(creator, &creator_wallet, 80);
-        assert!(current_supply(&metadata) == 100, 3);
+        assert!(supply(&metadata) == 100, 3);
         deposit(&aaron_wallet, fa);
         // Burn
         burn(&burn_ref, &aaron_wallet, 30);
-        assert!(current_supply(&metadata) == 70, 4);
+        assert!(supply(&metadata) == 70, 4);
         // Transfer
         transfer(creator, 10, &creator_wallet, &aaron_wallet);
         assert!(balance(&creator_wallet) == 10, 5);

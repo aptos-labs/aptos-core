@@ -15,8 +15,8 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Struct `BurnRef`](#0x1_fungible_asset_BurnRef)
 -  [Constants](#@Constants_0)
 -  [Function `init_metadata`](#0x1_fungible_asset_init_metadata)
--  [Function `current_supply`](#0x1_fungible_asset_current_supply)
--  [Function `maximum_supply`](#0x1_fungible_asset_maximum_supply)
+-  [Function `supply`](#0x1_fungible_asset_supply)
+-  [Function `maximum`](#0x1_fungible_asset_maximum)
 -  [Function `name`](#0x1_fungible_asset_name)
 -  [Function `symbol`](#0x1_fungible_asset_symbol)
 -  [Function `decimals`](#0x1_fungible_asset_decimals)
@@ -72,13 +72,13 @@ Define the metadata required of an metadata to be fungible.
 
 <dl>
 <dt>
-<code>current_supply: u64</code>
+<code>supply: u64</code>
 </dt>
 <dd>
  The current supply.
 </dd>
 <dt>
-<code>maximum_supply: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;</code>
+<code>maximum: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;</code>
 </dt>
 <dd>
  The maximum supply limit where <code><a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()</code> means no limit.
@@ -411,8 +411,8 @@ The initialization of an object with <code><a href="fungible_asset.md#0x1_fungib
     };
     <b>move_to</b>(&metadata_object_signer,
         <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a> {
-            current_supply: 0,
-            maximum_supply: converted_maximum,
+            supply: 0,
+            maximum: converted_maximum,
             name,
             symbol,
             decimals,
@@ -427,14 +427,14 @@ The initialization of an object with <code><a href="fungible_asset.md#0x1_fungib
 
 </details>
 
-<a name="0x1_fungible_asset_current_supply"></a>
+<a name="0x1_fungible_asset_supply"></a>
 
-## Function `current_supply`
+## Function `supply`
 
 Get the current supply from <code>metadata</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_current_supply">current_supply</a>&lt;T: key&gt;(metadata: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): u64
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_supply">supply</a>&lt;T: key&gt;(metadata: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): u64
 </code></pre>
 
 
@@ -443,8 +443,8 @@ Get the current supply from <code>metadata</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_current_supply">current_supply</a>&lt;T: key&gt;(metadata: &Object&lt;T&gt;): u64 <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a> {
-    borrow_fungible_metadata(metadata).current_supply
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_supply">supply</a>&lt;T: key&gt;(metadata: &Object&lt;T&gt;): u64 <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a> {
+    borrow_fungible_metadata(metadata).supply
 }
 </code></pre>
 
@@ -452,14 +452,14 @@ Get the current supply from <code>metadata</code>.
 
 </details>
 
-<a name="0x1_fungible_asset_maximum_supply"></a>
+<a name="0x1_fungible_asset_maximum"></a>
 
-## Function `maximum_supply`
+## Function `maximum`
 
 Get the maximum supply from <code>metadata</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_maximum_supply">maximum_supply</a>&lt;T: key&gt;(metadata: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_maximum">maximum</a>&lt;T: key&gt;(metadata: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
 </code></pre>
 
 
@@ -468,8 +468,8 @@ Get the maximum supply from <code>metadata</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_maximum_supply">maximum_supply</a>&lt;T: key&gt;(metadata: &Object&lt;T&gt;): Option&lt;u64&gt; <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a> {
-    borrow_fungible_metadata(metadata).maximum_supply
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_maximum">maximum</a>&lt;T: key&gt;(metadata: &Object&lt;T&gt;): Option&lt;u64&gt; <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a> {
+    borrow_fungible_metadata(metadata).maximum
 }
 </code></pre>
 
@@ -1216,11 +1216,11 @@ Increase the supply of a fungible metadata by minting.
 <pre><code><b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_increase_supply">increase_supply</a>&lt;T: key&gt;(metadata: &Object&lt;T&gt;, amount: u64) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a> {
     <b>assert</b>!(amount != 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_EZERO_AMOUNT">EZERO_AMOUNT</a>));
     <b>let</b> fungible_metadata = borrow_fungible_metadata_mut(metadata);
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&fungible_metadata.maximum_supply)) {
-        <b>let</b> max = *<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&fungible_metadata.maximum_supply);
-        <b>assert</b>!(max - fungible_metadata.current_supply &gt;= amount, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_ECURRENT_SUPPLY_OVERFLOW">ECURRENT_SUPPLY_OVERFLOW</a>))
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&fungible_metadata.maximum)) {
+        <b>let</b> max = *<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&fungible_metadata.maximum);
+        <b>assert</b>!(max - fungible_metadata.supply &gt;= amount, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_ECURRENT_SUPPLY_OVERFLOW">ECURRENT_SUPPLY_OVERFLOW</a>))
     };
-    fungible_metadata.current_supply = fungible_metadata.current_supply + amount;
+    fungible_metadata.supply = fungible_metadata.supply + amount;
 }
 </code></pre>
 
@@ -1247,8 +1247,8 @@ Decrease the supply of a fungible metadata by burning.
 <pre><code><b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_decrease_supply">decrease_supply</a>&lt;T: key&gt;(metadata: &Object&lt;T&gt;, amount: u64) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a> {
     <b>assert</b>!(amount != 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_EZERO_AMOUNT">EZERO_AMOUNT</a>));
     <b>let</b> fungible_metadata = borrow_fungible_metadata_mut(metadata);
-    <b>assert</b>!(fungible_metadata.current_supply &gt;= amount, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_ECURRENT_SUPPLY_UNDERFLOW">ECURRENT_SUPPLY_UNDERFLOW</a>));
-    fungible_metadata.current_supply = fungible_metadata.current_supply - amount;
+    <b>assert</b>!(fungible_metadata.supply &gt;= amount, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_ECURRENT_SUPPLY_UNDERFLOW">ECURRENT_SUPPLY_UNDERFLOW</a>));
+    fungible_metadata.supply = fungible_metadata.supply - amount;
 }
 </code></pre>
 

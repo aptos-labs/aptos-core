@@ -270,7 +270,7 @@ module aptos_framework::fungible_store {
 
         // burn
         burn(&burn_ref, creator_address, 30);
-        assert!(fungible_asset::current_supply(&metadata) == 70, 6);
+        assert!(fungible_asset::supply(&metadata) == 70, 6);
     }
 
     #[test(creator = @0xcafe)]
