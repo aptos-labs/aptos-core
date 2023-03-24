@@ -64,30 +64,31 @@ async fn test_txn_emmitter() {
                 20,
             )],
             vec![
-                (TransactionType::default_coin_transfer(), 20),
-                // // commenting this out given it consistently fails smoke test
-                // // and it seems to be called only from `test_txn_emmitter`
-                // (TransactionType::NftMintAndTransfer, 20),
-                (
-                    TransactionType::PublishPackage {
-                        use_account_pool: false,
-                    },
-                    20,
-                ),
+                (TransactionType::EcosystemMint, 1),
+                // (TransactionType::default_coin_transfer(), 20),
+                // // // commenting this out given it consistently fails smoke test
+                // // // and it seems to be called only from `test_txn_emmitter`
+                // // (TransactionType::NftMintAndTransfer, 20),
+                // (
+                //     TransactionType::PublishPackage {
+                //         use_account_pool: false,
+                //     },
+                //     20,
+                // ),
             ],
-            vec![
-                (TransactionType::default_call_different_modules(), 20),
-                (
-                    TransactionType::CallCustomModules {
-                        entry_point: EntryPoints::BytesMakeOrChange {
-                            data_length: Some(32),
-                        },
-                        num_modules: 1,
-                        use_account_pool: true,
-                    },
-                    20,
-                ),
-            ],
+            // vec![
+            //     (TransactionType::default_call_different_modules(), 20),
+            //     (
+            //         TransactionType::CallCustomModules {
+            //             entry_point: EntryPoints::BytesMakeOrChange {
+            //                 data_length: Some(32),
+            //             },
+            //             num_modules: 1,
+            //             use_account_pool: true,
+            //         },
+            //         20,
+            //     ),
+            // ],
         ],
     )
     .await

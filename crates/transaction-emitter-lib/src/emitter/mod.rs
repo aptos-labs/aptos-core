@@ -15,6 +15,7 @@ use crate::emitter::{
 use again::RetryPolicy;
 use anyhow::{ensure, format_err, Result};
 use aptos_config::config::DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE;
+use aptos_crypto::HashValue;
 use aptos_logger::{debug, error, info, sample, sample::SampleRate, warn};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
@@ -758,7 +759,7 @@ impl TxnEmitter {
 async fn wait_for_accounts_sequence(
     start_time: Instant,
     client: &RestClient,
-    account_seqs: &HashMap<AccountAddress, (u64, u64)>,
+    account_seqs: &HashMap<AccountAddress, (u64, u64, HashValue)>,
     txn_expiration_ts_secs: u64,
     sleep_between_cycles: Duration,
 ) -> (HashMap<AccountAddress, u64>, u128) {
@@ -771,7 +772,7 @@ async fn wait_for_accounts_sequence(
             Ok((sequence_numbers, ledger_timestamp_secs)) => {
                 let millis_elapsed = start_time.elapsed().as_millis();
                 for (address, sequence_number) in sequence_numbers {
-                    let (start_seq_num, end_seq_num) = account_seqs.get(&address).unwrap();
+                    let (start_seq_num, end_seq_num, _last_hash) = account_seqs.get(&address).unwrap();
 
                     let prev_sequence_number = latest_fetched_counts
                         .insert(address, sequence_number)
@@ -793,11 +794,12 @@ async fn wait_for_accounts_sequence(
                     sample!(
                         SampleRate::Duration(Duration::from_secs(60)),
                         warn!(
-                            "[{}] Ledger timestamp {} exceeded txn expiration timestamp {} for {:?}",
+                            "[{}] Ledger timestamp {} exceeded txn expiration timestamp {} for {:?}, hashes: {:?}",
                             client.path_prefix_string(),
                             ledger_timestamp_secs,
                             txn_expiration_ts_secs,
                             pending_addresses,
+                            pending_addresses.iter().map(|address| account_seqs.get(&address).unwrap().2).collect::<Vec<_>>(),
                         )
                     );
                     break;
@@ -836,17 +838,17 @@ async fn wait_for_accounts_sequence(
 
 fn update_seq_num_and_get_num_expired(
     accounts: &mut [LocalAccount],
-    account_to_start_and_end_seq_num: HashMap<AccountAddress, (u64, u64)>,
+    account_to_start_and_end_seq_num: HashMap<AccountAddress, (u64, u64, HashValue)>,
     latest_fetched_counts: HashMap<AccountAddress, u64>,
 ) -> (usize, usize) {
     accounts.iter_mut().for_each(|account| {
         let (start_seq_num, end_seq_num) =
             if let Some(pair) = account_to_start_and_end_seq_num.get(&account.address()) {
-                pair
+                (pair.0, pair.1)
             } else {
                 return;
             };
-        assert!(account.sequence_number() == *end_seq_num);
+        assert!(account.sequence_number() == end_seq_num);
 
         match latest_fetched_counts.get(&account.address()) {
             Some(count) => {
@@ -868,7 +870,7 @@ fn update_seq_num_and_get_num_expired(
                     account.sequence_number(),
                     start_seq_num
                 );
-                *account.sequence_number_mut() = *start_seq_num;
+                *account.sequence_number_mut() = start_seq_num;
             },
         }
     });
@@ -876,7 +878,7 @@ fn update_seq_num_and_get_num_expired(
     account_to_start_and_end_seq_num
         .iter()
         .map(
-            |(address, (start_seq_num, end_seq_num))| match latest_fetched_counts.get(address) {
+            |(address, (start_seq_num, end_seq_num, _last_hash))| match latest_fetched_counts.get(address) {
                 Some(count) => {
                     assert!(*count <= *end_seq_num);
                     assert!(*count >= *start_seq_num);

@@ -107,6 +107,10 @@ impl TransactionFactory {
         }
     }
 
+    pub fn get_chain_id(&self) -> ChainId {
+        self.chain_id
+    }
+
     pub fn with_max_gas_amount(mut self, max_gas_amount: u64) -> Self {
         self.max_gas_amount = max_gas_amount;
         self

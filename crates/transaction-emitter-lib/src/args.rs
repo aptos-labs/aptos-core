@@ -112,6 +112,7 @@ pub enum TransactionTypeArg {
     CustomFunctionLargeModuleWorkingSet,
     CreateNewResource,
     NoOp,
+    EcosystemMint,
 }
 
 impl Default for TransactionTypeArg {

@@ -22,6 +22,7 @@ use std::{
 pub mod account_generator;
 pub mod accounts_pool_wrapper;
 pub mod call_custom_modules;
+pub mod ecosystem_mint;
 pub mod nft_mint_and_transfer;
 pub mod p2p_transaction_generator;
 pub mod publish_modules;
@@ -33,6 +34,7 @@ use self::{
     p2p_transaction_generator::P2PTransactionGeneratorCreator,
     publish_modules::PublishPackageCreator,
     transaction_mix_generator::PhasedTxnMixGeneratorCreator,
+    ecosystem_mint::EcosystemMintGeneratorCreator,
 };
 use crate::accounts_pool_wrapper::AccountsPoolWrapperCreator;
 pub use publishing::module_simple::EntryPoints;
@@ -59,6 +61,7 @@ pub enum TransactionType {
         num_modules: usize,
         use_account_pool: bool,
     },
+    EcosystemMint,
 }
 
 impl TransactionType {
@@ -282,6 +285,14 @@ pub async fn create_txn_generator_creator(
                     *use_account_pool,
                     accounts_pool.clone(),
                 ),
+                TransactionType::EcosystemMint => Box::new(
+                    EcosystemMintGeneratorCreator::new(
+                        txn_factory.clone(),
+                        txn_executor,
+                        accounts_pool.clone(),
+                        true,
+                    ).await
+                )
             };
             txn_generator_creator_mix.push((txn_generator_creator, *weight));
         }

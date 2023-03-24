@@ -97,7 +97,7 @@ pub async fn emit_transactions_with_cluster(
             TransactionTypeArg::AccountGenerationLargePool => TransactionType::AccountGeneration {
                 add_created_accounts_to_pool: true,
                 max_account_working_set: 50_000_000,
-                creation_balance: 200_000_000,
+                creation_balance: 1,
             },
             TransactionTypeArg::NftMintAndTransfer => TransactionType::NftMintAndTransfer,
             TransactionTypeArg::PublishPackage => TransactionType::PublishPackage {
@@ -122,6 +122,7 @@ pub async fn emit_transactions_with_cluster(
                 num_modules: 1,
                 use_account_pool: false,
             },
+            TransactionTypeArg::EcosystemMint => TransactionType::EcosystemMint,
         })
         .collect::<Vec<_>>();
 
