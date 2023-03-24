@@ -19,7 +19,7 @@ pub enum SignedNodeDigestError {
 }
 
 #[derive(
-Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash, PartialEq, Eq, Hash,
+    Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash, PartialEq, Eq, Hash,
 )]
 pub struct SignedNodeDigestInfo {
     digest: HashValue,
@@ -152,11 +152,13 @@ impl NodeMetaData {
     }
 }
 
-fn compute_node_digest(epoch: u64,
-                       round: u64,
-                       source: PeerId,
-                       payload: &Payload,
-                       parents: &HashSet<NodeMetaData>) -> HashValue {
+fn compute_node_digest(
+    epoch: u64,
+    round: u64,
+    source: PeerId,
+    payload: &Payload,
+    parents: &HashSet<NodeMetaData>,
+) -> HashValue {
     #[derive(Serialize)]
     struct NodeWithoutDigest<'a> {
         epoch: u64,
@@ -180,7 +182,7 @@ fn compute_node_digest(epoch: u64,
     hasher.finish()
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 pub struct Node {
     metadata: NodeMetaData,
     consensus_payload: Payload,
@@ -214,12 +216,17 @@ impl Node {
     }
 
     pub fn verify_digest(&self) -> bool {
-        let digest = compute_node_digest(self.epoch(), self.round(), self.source(), &self.consensus_payload, &self.parents);
+        let digest = compute_node_digest(
+            self.epoch(),
+            self.round(),
+            self.source(),
+            &self.consensus_payload,
+            &self.parents,
+        );
         self.digest() == digest
     }
 
     pub fn verify(&self, validator: &ValidatorVerifier, peer_id: PeerId) -> anyhow::Result<()> {
-
         // Insuring authentication
         if self.source() != peer_id {
             return Err(anyhow::anyhow!(
@@ -231,19 +238,24 @@ impl Node {
 
         // Node must point to 2/3 stake in previous round
         if self.round() > 0 {
-            let strong_parents_peer_id = self.parents.iter().filter(|md| md.round == self.round() - 1).map(|md| &md.source);
-            if validator.check_voting_power(strong_parents_peer_id).is_err() {
+            let strong_parents_peer_id = self
+                .parents
+                .iter()
+                .filter(|md| md.round == self.round() - 1)
+                .map(|md| &md.source);
+            if validator
+                .check_voting_power(strong_parents_peer_id)
+                .is_err()
+            {
                 return Err(anyhow::anyhow!(
-                "Failed to verify Node due to not enough strong links"
-            ));
+                    "Failed to verify Node due to not enough strong links"
+                ));
             }
         }
 
         // Digest must match the node
         if !self.verify_digest() {
-            return Err(anyhow::anyhow!(
-                "Failed to verify Node due to wrong digest"
-            ));
+            return Err(anyhow::anyhow!("Failed to verify Node due to wrong digest"));
         }
 
         Ok(())
@@ -316,7 +328,9 @@ impl CertifiedNode {
         &self.header
     }
 
-    pub fn digest(&self) -> HashValue { self.header.digest() }
+    pub fn digest(&self) -> HashValue {
+        self.header.digest()
+    }
 
     pub fn epoch(&self) -> u64 {
         self.header.epoch()
@@ -360,10 +374,16 @@ impl CertifiedNodeAck {
     }
 
     pub fn new(epoch: u64, digest: HashValue, peer_id: PeerId) -> Self {
-        Self { epoch, digest, peer_id }
+        Self {
+            epoch,
+            digest,
+            peer_id,
+        }
     }
 
-    pub fn epoch(&self) -> u64 { self.epoch }
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
 
     pub fn digest(&self) -> HashValue {
         self.digest

@@ -33,7 +33,6 @@ enum Status {
 
 // TODO: should we use the same message for node and certifade node -> create two verified events.
 
-
 pub struct ReliableBroadcast {
     epoch: u64,
     status: Status,
@@ -43,7 +42,6 @@ pub struct ReliableBroadcast {
     validator_verifier: ValidatorVerifier,
     validator_signer: Arc<ValidatorSigner>,
 }
-
 
 impl ReliableBroadcast {
     pub fn new(
@@ -87,7 +85,8 @@ impl ReliableBroadcast {
             },
             None => {
                 let signed_node_digest =
-                    SignedNodeDigest::new(self.epoch,node.digest(), self.validator_signer.clone()).unwrap();
+                    SignedNodeDigest::new(self.epoch, node.digest(), self.validator_signer.clone())
+                        .unwrap();
                 self.peer_round_signatures
                     .insert((node.round(), node.source()), signed_node_digest.clone());
                 // TODO: persist

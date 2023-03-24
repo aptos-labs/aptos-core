@@ -1,10 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    dag::anchor_election::AnchorElection,
-    payload_manager::PayloadManager,
-};
+use crate::{dag::anchor_election::AnchorElection, payload_manager::PayloadManager};
 use aptos_consensus_types::node::{CertifiedNode, CertifiedNodeRequest, NodeMetaData};
 use aptos_crypto::HashValue;
 use aptos_types::{block_info::Round, validator_verifier::ValidatorVerifier, PeerId};
@@ -545,7 +542,7 @@ impl Dag {
         }
 
         let wave = self.current_round / 2;
-        let anchor = self.proposer_election.get_round_anchor(wave);
+        let anchor = self.proposer_election.get_round_anchor_peer_id(wave);
         let maybe_anchor_node_meta_data =
             self.get_node_metadata_from_dag(self.current_round, anchor);
 

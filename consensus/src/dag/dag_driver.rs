@@ -3,6 +3,7 @@
 
 use crate::{
     dag::{
+        anchor_election::RoundRobinAnchorElection,
         bullshark::Bullshark,
         dag::Dag,
         reliable_broadcast::{ReliableBroadcast, ReliableBroadcastCommand},
@@ -26,7 +27,6 @@ use aptos_types::{
 use futures::StreamExt;
 use std::{collections::HashSet, sync::Arc, time::Duration};
 use tokio::{sync::mpsc::Sender, time};
-use crate::dag::anchor_election::RoundRobinAnchorElection;
 
 pub struct DagDriver {
     epoch: u64,
@@ -73,10 +73,6 @@ impl DagDriver {
         spawn_named!("reliable_broadcast", rb.start(rb_network_msg_rx, rb_rx));
         spawn_named!("bullshark", bullshark.start(dag_bullshark_rx));
 
-
-
-
-
         Self {
             epoch,
             round: 0,
@@ -85,7 +81,13 @@ impl DagDriver {
             payload_client,
             timeout: false,
             network_sender,
-            dag: Dag::new(epoch, dag_bullshark_tx, verifier.clone(), proposer_election, payload_manager),
+            dag: Dag::new(
+                epoch,
+                dag_bullshark_tx,
+                verifier.clone(),
+                proposer_election,
+                payload_manager,
+            ),
             rb_tx,
             network_msg_rx,
         }
