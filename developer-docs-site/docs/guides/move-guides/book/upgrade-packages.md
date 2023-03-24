@@ -1,4 +1,4 @@
-# Upgrade Packages
+# Package Upgrades
 
 Move code (e.g., Move modules) on the Aptos blockchain can be upgraded. This
 allows code owners and module developers to update and evolve their contracts
