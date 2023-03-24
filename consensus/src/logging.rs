@@ -6,6 +6,7 @@ use aptos_consensus_types::common::Author;
 use aptos_logger::Schema;
 use aptos_types::block_info::Round;
 use serde::Serialize;
+use aptos_crypto::HashValue;
 
 #[derive(Schema)]
 pub struct LogSchema {
@@ -13,6 +14,7 @@ pub struct LogSchema {
     remote_peer: Option<Author>,
     epoch: Option<u64>,
     round: Option<Round>,
+    item_id: Option<HashValue>,
 }
 
 #[derive(Serialize)]
@@ -49,6 +51,7 @@ impl LogSchema {
             remote_peer: None,
             epoch: None,
             round: None,
+            item_id: None,
         }
     }
 }

@@ -227,7 +227,8 @@ impl BufferManager {
         for proposer in item.get_first_k_proposers(1) {
             info!(
                 self.new_log(LogEvent::SendRandToLeader)
-                    .remote_peer(proposer),
+                    .remote_peer(proposer)
+                    .item_id(item_hash),
                 "item id {}, item size {}", item.get_hash(), item.get_blocks().len()
             );
             // println!("[rand debug] {} send share {} to leader {}", self.author, rand_shares.item_id(), proposer);
@@ -255,7 +256,8 @@ impl BufferManager {
 
                 info!(
                     self.new_log(LogEvent::LeaderReceiveRand)
-                        .remote_peer(rand_shares.author()),
+                        .remote_peer(rand_shares.author())
+                        .item_id(item_id),
                     "item id {}, rand size {}", item_id, rand_shares.shares().len()
                 );
                 // println!("[rand debug] {} receive share {} from node {}", self.author, rand_shares.item_id(), rand_shares.author());
@@ -284,7 +286,7 @@ impl BufferManager {
                             // we're responsible to broadcast the randomness decision
                             if item.get_first_k_proposers(1).contains(&self.author) {
                                 info!(
-                                    self.new_log(LogEvent::LeaderBCastRand),
+                                    self.new_log(LogEvent::LeaderBCastRand).item_id(item_id),
                                     "item id {}, item size {}", item_id, item.get_blocks().len()
                                 );
                                 self.rand_msg_tx
@@ -303,7 +305,7 @@ impl BufferManager {
                 info!("Receive random decision for item {:?}", item_id);
 
                 info!(
-                    self.new_log(LogEvent::ReceiveRand),
+                    self.new_log(LogEvent::ReceiveRand).item_id(item_id),
                     "item id {}, item size {}", item_id, rand_decisions.decisions().len()
                 );
 
