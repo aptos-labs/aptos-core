@@ -432,7 +432,7 @@ impl NetworkTask {
             aptos_channel::new(QueueStyle::LIFO, 1, Some(&counters::CONSENSUS_CHANNEL_MSGS));
         let (buffer_manager_messages_tx, buffer_manager_messages) = aptos_channel::new(
             QueueStyle::FIFO,
-            50,
+            1000,
             Some(&counters::BUFFER_MANAGER_CHANNEL_MSGS),
         );
         let (quorum_store_messages_tx, quorum_store_messages) = aptos_channel::new(
