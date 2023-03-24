@@ -10,7 +10,7 @@ use crate::{
     processors::{
         coin_processor::CoinTransactionProcessor, default_processor::DefaultTransactionProcessor,
         stake_processor::StakeTransactionProcessor, token_processor::TokenTransactionProcessor,
-        Processor,
+        Processor, econia_processor::EconiaTransactionProcessor,
     },
 };
 use aptos_api::context::Context;
@@ -135,6 +135,7 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
         )),
         Processor::CoinProcessor => Arc::new(CoinTransactionProcessor::new(conn_pool.clone())),
         Processor::StakeProcessor => Arc::new(StakeTransactionProcessor::new(conn_pool.clone())),
+        Processor::EconiaProcessor => Arc::new(EconiaTransactionProcessor::new(conn_pool.clone()))
     };
 
     let options =

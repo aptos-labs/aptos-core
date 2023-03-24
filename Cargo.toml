@@ -608,6 +608,9 @@ move-vm-types = { path = "third_party/move/move-vm/types" }
 read-write-set = { path = "third_party/move/tools/read-write-set" }
 read-write-set-dynamic = { path = "third_party/move/tools/read-write-set/dynamic" }
 
+econia_db = { package = "db", path = "../../db" }
+econia_types = { package = "types", path = "../../types" }
+
 [profile.release]
 debug = true
 overflow-checks = true

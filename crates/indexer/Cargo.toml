@@ -46,5 +46,9 @@ sha2 = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
 
+# econia
+econia_db = { workspace = true }
+econia_types = { workspace = true }
+
 [dev-dependencies]
 aptos-api-test-context = { workspace = true }
