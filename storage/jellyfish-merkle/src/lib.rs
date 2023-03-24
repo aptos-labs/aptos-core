@@ -7,7 +7,7 @@
 //! This module implements [`JellyfishMerkleTree`] backed by storage module. The tree itself doesn't
 //! persist anything, but realizes the logic of R/W only. The write path will produce all the
 //! intermediate results in a batch for storage layer to commit and the read path will return
-//! results directly. The public APIs are only [`new`], [`batch_put_value_set`], and
+//! results directly. The public APIs are only [`new`], [`JellyfishMerkleTree::batch_put_value_set`], and
 //! [`get_with_proof`]. After each put with a `value_set` based on a known version, the tree will
 //! return a new root hash with a [`TreeUpdateBatch`] containing all the new nodes and indices of
 //! stale nodes.

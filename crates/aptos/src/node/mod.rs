@@ -986,9 +986,9 @@ impl ValidatorConfig {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct ValidatorConfigSummary {
     pub consensus_public_key: String,
-    /// This is an bcs serialized Vec<NetworkAddress>
+    /// This is an bcs serialized `Vec<NetworkAddress>`
     pub validator_network_addresses: Vec<NetworkAddress>,
-    /// This is an bcs serialized Vec<NetworkAddress>
+    /// This is an bcs serialized `Vec<NetworkAddress>`
     pub fullnode_network_addresses: Vec<NetworkAddress>,
     pub validator_index: u64,
 }

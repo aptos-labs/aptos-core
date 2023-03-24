@@ -1173,7 +1173,7 @@ impl From<&Transaction> for TransactionSummary {
     }
 }
 
-/// A summary of a [`WriteSetChange`] for easy printing
+/// A summary of a `WriteSetChange` for easy printing
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct ChangeSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1195,7 +1195,7 @@ pub struct ChangeSummary {
 
 #[derive(Debug, Default, Parser)]
 pub struct FaucetOptions {
-    /// URL for the faucet endpoint e.g. https://faucet.devnet.aptoslabs.com
+    /// URL for the faucet endpoint e.g. `https://faucet.devnet.aptoslabs.com`
     #[clap(long)]
     faucet_url: Option<reqwest::Url>,
 }

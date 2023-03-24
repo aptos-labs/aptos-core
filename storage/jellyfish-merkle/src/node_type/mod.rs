@@ -224,7 +224,7 @@ pub struct InternalNode {
     leaf_count: usize,
 }
 
-/// Computes the hash of internal node according to [`JellyfishTree`](crate::JellyfishTree)
+/// Computes the hash of internal node according to [`JellyfishMerkleTree`](crate::JellyfishMerkleTree)
 /// data structure in the logical view. `start` and `nibble_height` determine a subtree whose
 /// root hash we want to get. For an internal node with 16 children at the bottom level, we compute
 /// the root hash of it as if a full binary Merkle tree with 16 leaves as below:
