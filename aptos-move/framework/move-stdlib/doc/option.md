@@ -31,6 +31,7 @@ This module defines the Option type and its methods to represent and handle an o
     -  [Struct `Option`](#@Specification_1_Option)
     -  [Function `none`](#@Specification_1_none)
     -  [Function `some`](#@Specification_1_some)
+    -  [Function `from_vec`](#@Specification_1_from_vec)
     -  [Function `is_none`](#@Specification_1_is_none)
     -  [Function `is_some`](#@Specification_1_is_some)
     -  [Function `contains`](#@Specification_1_contains)
@@ -723,6 +724,22 @@ because it's 0 for "none" or 1 for "some".
 <pre><code><b>fun</b> <a href="option.md#0x1_option_spec_some">spec_some</a>&lt;Element&gt;(e: Element): <a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt; {
    <a href="option.md#0x1_option_Option">Option</a>{ vec: vec(e) }
 }
+</code></pre>
+
+
+
+<a name="@Specification_1_from_vec"></a>
+
+### Function `from_vec`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="option.md#0x1_option_from_vec">from_vec</a>&lt;Element&gt;(vec: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;): <a href="option.md#0x1_option_Option">option::Option</a>&lt;Element&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <a href="vector.md#0x1_vector_length">vector::length</a>(vec) &gt; 1;
 </code></pre>
 
 

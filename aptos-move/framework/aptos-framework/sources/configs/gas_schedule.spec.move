@@ -39,7 +39,7 @@ spec aptos_framework::gas_schedule {
         use aptos_framework::aptos_coin::AptosCoin;
         use aptos_framework::transaction_fee;
 
-        pragma timeout = 120;
+        pragma timeout = 60;
 
         requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);

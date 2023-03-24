@@ -53,6 +53,10 @@ module std::option {
         Option { vec }
     }
 
+    spec from_vec {
+        aborts_if vector::length(vec) > 1;
+    }
+
     /// Return true if `t` does not hold a value
     public fun is_none<Element>(t: &Option<Element>): bool {
         vector::is_empty(&t.vec)
