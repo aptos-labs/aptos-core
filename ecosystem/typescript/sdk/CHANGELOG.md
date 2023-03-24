@@ -8,6 +8,7 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 - Introduce `AnsClient` class to support ANS (Aptos Names Service) data fetching queries
 - Add `User-Agent` header to `AptosClient` queries
+- Add Indexer queries to `IndexerClient`
 
 ## 1.7.2 (2023-03-13)
 
