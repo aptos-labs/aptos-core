@@ -446,6 +446,10 @@ const config = {
           },
           {
             to: "/nodes/full-node/public-fullnode",
+            from: "/nodes/full-node/fullnode-for-devnet",
+          },
+          {
+            to: "/nodes/full-node/public-fullnode",
             from: "/tutorials/run-a-fullnode",
           },
           {
