@@ -768,7 +768,9 @@ impl Loader {
             | (Type::Vector(ret_inner), Type::Vector(expected_inner)) => {
                 Self::match_return_type(ret_inner, expected_inner, map)
             },
-            // For struct instantiations we need to match all fields
+            // For structs the both need to be the same struct.
+            (Type::Struct(ret_idx), Type::Struct(expected_idx)) => *ret_idx == *expected_idx,
+            // For struct instantiations we need to additionally match all type arguments
             (
                 Type::StructInstantiation(ret_idx, ret_fields),
                 Type::StructInstantiation(expected_idx, expected_fields),
@@ -780,8 +782,33 @@ impl Loader {
                         .zip(expected_fields.iter())
                         .all(|types| Self::match_return_type(types.0, types.1, map))
             },
-            // For the rest we need to assure the types match
-            _ => std::mem::discriminant(returned) == std::mem::discriminant(expected),
+            // For primitive types we need to assure the types match
+            (Type::U8, Type::U8)
+            | (Type::U16, Type::U16)
+            | (Type::U32, Type::U32)
+            | (Type::U64, Type::U64)
+            | (Type::U128, Type::U128)
+            | (Type::U256, Type::U256)
+            | (Type::Bool, Type::Bool)
+            | (Type::Address, Type::Address)
+            | (Type::Signer, Type::Signer) => true,
+            // Otherwise the types do not match and we can't match return type to the expected type.
+            // Note we don't use the _ pattern but spell out all cases, so that the compiler will
+            // bark when a case is missed upon future updates to the types.
+            (Type::U8, _)
+            | (Type::U16, _)
+            | (Type::U32, _)
+            | (Type::U64, _)
+            | (Type::U128, _)
+            | (Type::U256, _)
+            | (Type::Bool, _)
+            | (Type::Address, _)
+            | (Type::Signer, _)
+            | (Type::Struct(_), _)
+            | (Type::StructInstantiation(_, _), _)
+            | (Type::Vector(_), _)
+            | (Type::MutableReference(_), _)
+            | (Type::Reference(_), _) => false,
         }
     }
 
