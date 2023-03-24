@@ -61,7 +61,7 @@ pub fn start_consensus(
     let (self_sender, self_receiver) = aptos_channels::new(1_024, &counters::PENDING_SELF_MESSAGES);
 
     let consensus_network_client = ConsensusNetworkClient::new(network_client);
-    let bounded_executor = BoundedExecutor::new(4, runtime.handle().clone());
+    let bounded_executor = BoundedExecutor::new(8, runtime.handle().clone());
     let epoch_mgr = EpochManager::new(
         node_config,
         time_service,

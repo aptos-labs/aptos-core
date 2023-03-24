@@ -836,6 +836,7 @@ impl CliTestFramework {
             filter: filter.map(|str| str.to_string()),
             ignore_compile_warnings: false,
             compute_coverage: false,
+            dump_state: false,
         }
         .execute()
         .await
