@@ -58,7 +58,7 @@ export class AnsClient {
    * @param address An account address
    * @returns Account's primary name | null
    */
-  async getPrimaryNamebyAddress(address: string): Promise<string | null> {
+  async getPrimaryNameByAddress(address: string): Promise<string | null> {
     const ansResource: Gen.MoveResource = await this.provider.getAccountResource(
       this.contractAddress,
       `${this.contractAddress}::domains::ReverseLookupRegistryV1`,
@@ -75,7 +75,10 @@ export class AnsClient {
       return item.subdomain_name.vec[0] ? `${item.subdomain_name.vec[0]}.${item.domain_name}` : item.domain_name;
     } catch (error: any) {
       // if item not found, response is 404 error - meaning item not found
-      return null;
+      if (error.status === 404) {
+        return null;
+      }
+      throw new Error(error);
     }
   }
 
@@ -122,7 +125,10 @@ export class AnsClient {
       return item.target_address.vec[0];
     } catch (error: any) {
       // if item not found, response is 404 error - meaning item not found
-      return null;
+      if (error.status === 404) {
+        return null;
+      }
+      throw new Error(error);
     }
   }
 
@@ -160,7 +166,10 @@ export class AnsClient {
       return item.target_address.vec[0];
     } catch (error: any) {
       // if item not found, response is 404 error - meaning item not found
-      return null;
+      if (error.status === 404) {
+        return null;
+      }
+      throw new Error(error);
     }
   }
 }
