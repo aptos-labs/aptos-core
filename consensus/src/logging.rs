@@ -36,6 +36,10 @@ pub enum LogEvent {
     Timeout,
     Vote,
     VoteNIL,
+    SendRandToLeader,
+    LeaderReceiveRand,
+    LeaderBCastRand,
+    ReceiveRand,
 }
 
 impl LogSchema {
