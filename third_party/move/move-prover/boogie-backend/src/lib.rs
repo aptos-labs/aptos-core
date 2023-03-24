@@ -18,7 +18,8 @@ use move_model::{
     model::{GlobalEnv, QualifiedId, StructId},
     pragmas::{
         INTRINSIC_FUN_MAP_ADD_NO_OVERRIDE, INTRINSIC_FUN_MAP_ADD_OVERRIDE_IF_EXISTS,
-        INTRINSIC_FUN_MAP_BORROW, INTRINSIC_FUN_MAP_BORROW_MUT, INTRINSIC_FUN_MAP_DEL_MUST_EXIST,
+        INTRINSIC_FUN_MAP_BORROW, INTRINSIC_FUN_MAP_BORROW_MUT,
+        INTRINSIC_FUN_MAP_BORROW_MUT_WITH_DEFAULT, INTRINSIC_FUN_MAP_DEL_MUST_EXIST,
         INTRINSIC_FUN_MAP_DEL_RETURN_KEY, INTRINSIC_FUN_MAP_DESTROY_EMPTY,
         INTRINSIC_FUN_MAP_HAS_KEY, INTRINSIC_FUN_MAP_IS_EMPTY, INTRINSIC_FUN_MAP_LEN,
         INTRINSIC_FUN_MAP_NEW, INTRINSIC_FUN_MAP_SPEC_DEL, INTRINSIC_FUN_MAP_SPEC_GET,
@@ -84,6 +85,7 @@ struct MapImpl {
     fun_del_return_key: String,
     fun_borrow: String,
     fun_borrow_mut: String,
+    fun_borrow_mut_with_default: String,
     // spec functions
     fun_spec_new: String,
     fun_spec_get: String,
@@ -378,6 +380,9 @@ impl MapImpl {
             ),
             fun_borrow_mut: Self::triple_opt_to_name(
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_BORROW_MUT),
+            ),
+            fun_borrow_mut_with_default: Self::triple_opt_to_name(
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_BORROW_MUT_WITH_DEFAULT),
             ),
             fun_spec_new: Self::triple_opt_to_name(
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_NEW),
