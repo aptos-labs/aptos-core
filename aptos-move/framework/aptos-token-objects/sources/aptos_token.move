@@ -316,20 +316,22 @@ module aptos_token_objects::aptos_token {
     }
 
     public fun freeze_transfer<T: key>(creator: &signer, token: Object<T>) acquires AptosCollection, AptosToken {
+        let aptos_token = authorized_borrow(&token, signer::address_of(creator));
         assert!(
-            are_collection_tokens_freezable(token::collection_object(token)),
+            are_collection_tokens_freezable(token::collection_object(token))
+                && option::is_some(&aptos_token.transfer_ref),
             error::permission_denied(EFIELD_NOT_MUTABLE),
         );
-        let aptos_token = authorized_borrow(&token, signer::address_of(creator));
         object::disable_ungated_transfer(option::borrow(&aptos_token.transfer_ref));
     }
 
     public fun unfreeze_transfer<T: key>(creator: &signer, token: Object<T>) acquires AptosCollection, AptosToken {
+        let aptos_token = authorized_borrow(&token, signer::address_of(creator));
         assert!(
-            are_collection_tokens_freezable(token::collection_object(token)),
+            are_collection_tokens_freezable(token::collection_object(token))
+                && option::is_some(&aptos_token.transfer_ref),
             error::permission_denied(EFIELD_NOT_MUTABLE),
         );
-        let aptos_token = authorized_borrow(&token, signer::address_of(creator));
         object::enable_ungated_transfer(option::borrow(&aptos_token.transfer_ref));
     }
 
