@@ -43,7 +43,7 @@ module veiled_coin::veiled_coin {
     //
 
     /// The maximum number of bits used to represent a coin's value.
-    const MAX_BITS_IN_VALUE : u64 = 64;
+    const MAX_BITS_IN_VALUE : u64 = 32;
 
     /// The domain separation tag (DST) used for the Bulletproofs prover.
     const VEILED_COIN_DST : vector<u8> = b"AptosVeiledCoinExample";
@@ -91,7 +91,7 @@ module veiled_coin::veiled_coin {
     /// Initializes a so-called "resource" account which will maintain a coin::CoinStore<T> resource for all Coin<T>'s
     /// that have been converted into a VeiledCoin<T>.
     fun init_module(deployer: &signer) {
-        assert!(bulletproofs::get_max_range_bits() >= 32, ERANGE_PROOF_SYSTEM_HAS_INSUFFICIENT_RANGE);
+        assert!(bulletproofs::get_max_range_bits() >= MAX_BITS_IN_VALUE, ERANGE_PROOF_SYSTEM_HAS_INSUFFICIENT_RANGE);
 
         // Create the resource account. This will allow this module to later obtain a `signer` for this account and
         // transfer Coin<T>'s into its CoinStore<T> before minting a VeiledCoin<T>.
@@ -121,10 +121,10 @@ module veiled_coin::veiled_coin {
 
         let vc = mint_from_coin(c);
 
-        deposit(recipient, vc)
+        deposit<CoinType>(recipient, vc)
     }
 
-    /// Returns the commitment to the balance of `owner` for the provided `CoinType`.
+    /// Returns the ciphertext of the balance of `owner` for the provided `CoinType`.
     public fun private_balance<CoinType>(owner: address): CompressedCiphertext acquires VeiledCoinStore {
         assert!(
             has_veiled_coin_store<CoinType>(owner),
@@ -214,38 +214,47 @@ module veiled_coin::veiled_coin {
     }
 
     /// Sends the specified private amount to `recipient` and updates the private balance of `sender`. Requires a range
-    /// proof on the new balance of the sender, to ensure the sender has enough money to send. `private_amount` is an
-    /// ElGamal ciphertext of the amount being sent.
+    /// proof on the new balance of the sender, to ensure the sender has enough money to send, in addition to a 
+    /// range proof on the transferred amount. Also requires a sigma protocol to prove that 
+    /// 'private_withdraw_amount' encrypts the same value using the same randomness as 'private_deposit_amount'. 
+    /// This value is the amount being transferred. These two ciphertexts are required as we need to update 
+    /// both the sender's and the recipient's balances, which use different public keys and so must be updated 
+    /// with ciphertexts encrypted with their respective public keys. 
     public fun transfer_privately_to<CoinType>(
         sender: &signer,
         recipient: address,
-        private_amount: Ciphertext,
-        range_proof: &RangeProof)
+        private_withdraw_amount: Ciphertext,
+	private_deposit_amount: Ciphertext,
+        range_proof_updated_balance: &RangeProof,
+	range_proof_transferred_amount: &RangeProof)
     acquires VeiledCoinStore {
-        let vc = withdraw<CoinType>(sender, private_amount, range_proof);
+	// TODO: Insert sigma protocol here which proves 'private_deposit_amount' and 'private_withdraw_amount' encrypt the same values using the same randomness
+        withdraw<CoinType>(sender, private_withdraw_amount, range_proof_updated_balance, range_proof_transferred_amount);
+	let vc = VeiledCoin<CoinType> { private_value: private_deposit_amount };
 
         deposit(recipient, vc);
     }
 
     /// Sends the specified public amount to `recipient` and updates the private balance of `sender`. Requires a range
-    /// proof on the new balance of the sender, to ensure the sender has enough money to send.
-    public fun transfer_publicly_to<CoinType>(
+    /// proof on the new balance of the sender, to ensure the sender has enough money to send, in addition to a range proof on the transferred amount. 
+    // TODO: Work out weird move-isms here
+    /*public fun transfer_publicly_to<CoinType>(
         sender: &signer,
         recipient: address,
         public_amount: u64,
-        range_proof: &RangeProof)
+        range_proof_updated_balance: &RangeProof,
+	range_proof_transferred_amount: &RangeProof)
     acquires VeiledCoinStore {
         let no_rand_ct = elgamal::new_ciphertext_no_randomness(&new_scalar_from_u64(public_amount));
 
-        let vc = withdraw<CoinType>(sender, no_rand_ct, range_proof);
+        withdraw<CoinType>(sender, no_rand_ct, range_proof_updated_balance, range_proof_transferred_amount);
+
+	let vc = VeiledCoin<CoinType> { private_value: no_rand_ct };
 
         deposit(recipient, vc);
-    }
+    }*/
 
     /// Deposits a veiled coin at address `to_addr`.
-    ///
-    /// WARNING: Assumes the owner of `to_addr` somehow obtains the randomness of `coin` out-of-band, so they can
-    /// later spend (part of) their private balance.
     public fun deposit<CoinType>(to_addr: address, coin: VeiledCoin<CoinType>) acquires VeiledCoinStore {
         assert!(
             has_veiled_coin_store<CoinType>(to_addr),
@@ -271,9 +280,10 @@ module veiled_coin::veiled_coin {
     /// Withdraws the specifed private `amount` of veiled coin `CoinType` from the signing account.
     public fun withdraw<CoinType>(
         account: &signer,
-        private_value: Ciphertext,
-        range_proof: &RangeProof,
-    ): VeiledCoin<CoinType> acquires VeiledCoinStore {
+        withdraw_amount: Ciphertext,
+        range_proof_updated_balance: &RangeProof,
+	range_proof_transferred_amount: &RangeProof,
+    ) acquires VeiledCoinStore {
         let account_addr = signer::address_of(account);
         assert!(
             has_veiled_coin_store<CoinType>(account_addr),
@@ -290,23 +300,24 @@ module veiled_coin::veiled_coin {
         // Update the coin store by homomorphically subtracting the committed withdrawn amount from the committed balance.
         let private_balance = elgamal::decompress_ciphertext(&coin_store.private_balance);
 
-        elgamal::ciphertext_sub_assign(&mut private_balance, &private_value);
+        elgamal::ciphertext_sub_assign(&mut private_balance, &withdraw_amount);
 
-        // TODO: Fix the nonsense below, which does not account for 'new_bal = bal - amount (mod p)' and leads to an attack.
-        // Will also need a range proof on the transferred 'amount'.
-        //
         // This function is splitting a commitment 'bal' into a commitment 'amount' and a commitment 'new_bal' =
-        // = 'bal' - 'amount'. We assume that 'bal' is in [0, 2^{64}). All we have to do to enforce this invariant is to
-        // verify a range proof that 'new_bal' is in [0, 2^{64}). Since 'new_bal' = 'bal' - 'amount' this implies that
-        // 'bal' - 'amount' >= 0 and therefore that 'bal' >= 'amount'.
-        assert!(bulletproofs::verify_range_proof(&private_balance, range_proof, MAX_BITS_IN_VALUE, VEILED_COIN_DST), ERANGE_PROOF_VERIFICATION_FAILED);
+        // = 'bal' - 'amount'. We assume that 'bal' is in [0, 2^{32}). To prevent underflow, we need to
+        // verify a range proof that 'new_bal' is in [0, 2^{32}). In addition we need to verify a range proof 
+	// that the transferred amount 'amount' is in [0, 2^{32}). Otherwise, a sender could send 'amount' = p-1
+	// where p is the order of the scalar field, giving an updated balance of 
+	// 'bal' - (p-1) mod p = 'bal' + 1. These checks ensure that 'bal' - 'amount' >= 0 
+	// and therefore that 'bal' >= 'amount'.
+        assert!(bulletproofs::verify_range_proof(&private_balance, range_proof_updated_balance, MAX_BITS_IN_VALUE, VEILED_COIN_DST), ERANGE_PROOF_VERIFICATION_FAILED);
+	assert!(bulletproofs::verify_range_proof(&withdraw_amount, range_proof_transferred_amount, MAX_BITS_IN_VALUE, VEILED_COIN_DST), ERANGE_PROOF_VERIFICATION_FAILED);
 
         coin_store.private_balance = elgamal::compress_ciphertext(&private_balance);
 
         // Returns the withdrawn veiled coin
-        VeiledCoin<CoinType> {
-            private_value
-        }
+        //VeiledCoin<CoinType> {
+        //    private_value
+        //}
     }
 
     //
