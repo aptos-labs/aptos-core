@@ -1,9 +1,9 @@
 ---
-title: "Aptos NameService UI Package"
-id: "aptos-nameservice-ui-package"
+title: "Aptos Names Service UI Package"
+id: "aptos-names-service-package"
 ---
-# Integrate with Aptos Name Service UI Package
-The Aptos Name Service provides a React UI package that provides developers with a customizable button and modal to enable users to search for and mint Aptos names directly from their website.
+# Integrate with Aptos Names Service UI Package
+The Aptos Name Service provides a React UI package that offers developers a customizable button and modal to enable users to search for and mint Aptos names directly from their website.
 
 ## Prerequisites
 - [React project](https://create-react-app.dev/docs/getting-started/)
@@ -11,7 +11,7 @@ The Aptos Name Service provides a React UI package that provides developers with
     - `npm install @emotion/styled @emotion/react`
     - `yarn add @emotion/styled @emotion/react react-copy-to-clipboard`
 
-## Use Aptos Name Service Connector
+## Use Aptos Names Service Connector
 1. Open a terminal session and navigate to the root directory of your React project.
 1. Install the `aptos-names-connector` package using npm or yarn:  
     - `npm install "@aptos-labs/aptos-names-connector"`
