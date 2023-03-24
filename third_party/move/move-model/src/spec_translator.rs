@@ -282,20 +282,17 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
         };
 
         // Handle updating of global spec variables
-        for impl_spec in translator.fun_env.get_spec().on_impl.values() {
-            for cond in &impl_spec.conditions {
-                if cond.exp == prop.clone() && !cond.additional_exps.is_empty() {
-                    translator.in_post_state = false;
-                    let lhs = translator.translate_exp(
-                        &translator.auto_trace(&cond.loc, &cond.additional_exps[0]),
-                        false,
-                    );
-                    let rhs = translator
-                        .translate_exp(&translator.auto_trace(&cond.loc, &cond.exp), false);
-                    translator.result.updates.push((cond.loc.clone(), lhs, rhs));
-                    return (translator.result, cond.clone().exp);
-                }
-            }
+        let binding = translator.fun_env.get_spec();
+        let cond_opt = binding.update_map.get(&prop.node_id());
+        if let Some(cond) = cond_opt {
+            translator.in_post_state = false;
+            let lhs = translator.translate_exp(
+                &translator.auto_trace(&cond.loc, &cond.additional_exps[0]),
+                false,
+            );
+            let rhs = translator.translate_exp(&translator.auto_trace(&cond.loc, &cond.exp), false);
+            translator.result.updates.push((cond.loc.clone(), lhs, rhs));
+            return (translator.result, cond.clone().exp);
         }
 
         let exp = translator.translate_exp(&translator.auto_trace(loc, prop), false);
@@ -347,7 +344,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
         };
 
         // First process `let` so subsequently expressions can refer to them.
-        self.translate_lets(false, spec);
+        self.translate_lets(false, &spec);
 
         // Next process requires
         for cond in spec
@@ -438,7 +435,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
         }
 
         // Now translate `let update` which are evaluated in post state.
-        self.translate_lets(true, spec);
+        self.translate_lets(true, &spec);
 
         // Translate ensures.
         for cond in spec
