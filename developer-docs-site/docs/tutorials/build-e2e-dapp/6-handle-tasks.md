@@ -288,7 +288,7 @@ When someones adds a new task we:
     // hold the latest task.task_id from our local state
     const latestId = tasks.length > 0 ? parseInt(tasks[tasks.length - 1].task_id) + 1 : 1;
 
-    // build a newTaskToPush objct into our local state
+    // build a newTaskToPush object into our local state
     const newTaskToPush = {
       address: account.address,
       completed: false,
