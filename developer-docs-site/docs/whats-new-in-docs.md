@@ -9,7 +9,7 @@ This page shows the key updates to the developer documentation on this site. Not
 
 ## 21 March 2023
 
-- Published beta [Delegation Pool Operations](../../nodes/validator-node/operator/delegation-pool-operations.md) instructions for validator operators, written by [Raluca Popescu (dorinbwr](https://github.com/dorinbwr) ) of [Bware Labs](https://bwarelabs.com/).
+- Published beta [Delegation Pool Operations](./nodes/validator-node/operator/delegation-pool-operations.md) instructions for validator operators, written by [Raluca Popescu (dorinbwr](https://github.com/dorinbwr) ) of [Bware Labs](https://bwarelabs.com/).
 
 ## 20 March 2023
 
