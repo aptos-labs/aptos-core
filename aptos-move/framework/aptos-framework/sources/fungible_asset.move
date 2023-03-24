@@ -1,13 +1,13 @@
 /// This defines the fungible asset module that can issue fungible asset of any `FungibleAssetMetadata` object. The
 /// metadata object can be any object that equipped with `FungibleAssetMetadata` resource.
 module aptos_framework::fungible_asset {
-    use aptos_framework::object::{Self, Object, DeleteRef, ConstructorRef};
+    use aptos_framework::create_signer;
+    use aptos_framework::object::{Self, Object, ConstructorRef, DeriveRef};
+
     use std::error;
     use std::option::{Self, Option};
-    use std::string::String;
     use std::signer;
-
-    friend aptos_framework::fungible_store;
+    use std::string::String;
 
     /// Amount cannot be zero.
     const EAMOUNT_CANNOT_BE_ZERO: u64 = 1;
@@ -27,8 +27,10 @@ module aptos_framework::fungible_asset {
     const ECURRENT_SUPPLY_OVERFLOW: u64 = 8;
     /// Current supply underflow
     const ECURRENT_SUPPLY_UNDERFLOW: u64 = 9;
-    /// Not the owner,
-    const ENOT_OWNER: u64 = 10;
+    /// The signer is not the owner of the wallet.
+    const ENOT_WALLET_OWNER: u64 = 10;
+    /// The mint ref and the the wallet do not match.
+    const EMINT_REF_AND_WALLET_MISMATCH: u64 = 11;
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Define the metadata required of an metadata to be fungible.
@@ -46,6 +48,8 @@ module aptos_framework::fungible_asset {
         /// For example, if `decimals` equals `2`, a balance of `505` coins should
         /// be displayed to a user as `5.05` (`505 / 10 ** 2`).
         decimals: u8,
+        /// The ref used to create wallet objects for users later.
+        derive_ref: DeriveRef,
     }
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
@@ -58,8 +62,6 @@ module aptos_framework::fungible_asset {
         /// Fungible Assets transferring is a common operation, this allows for disabling and enabling
         /// transfers bypassing the use of a TransferRef.
         allow_ungated_transfer: bool,
-        /// The delete_ref of this object, used for cleanup.
-        delete_ref: DeleteRef
     }
 
     /// The transferable version of fungible metadata.
@@ -105,6 +107,7 @@ module aptos_framework::fungible_asset {
                 name,
                 symbol,
                 decimals,
+                derive_ref: object::generate_derive_ref(constructor_ref),
             }
         );
         let metadata = object::object_from_constructor_ref<FungibleAssetMetadata>(constructor_ref);
@@ -136,28 +139,37 @@ module aptos_framework::fungible_asset {
         borrow_fungible_metadata(metadata).decimals
     }
 
-
-    /// Verify any object is equipped with `FungibleAssetMetadata` and return the object.
-    public fun verify<T: key>(metadata: &Object<T>): Object<FungibleAssetMetadata> {
-        let addr = object::object_address(metadata);
-        object::address_to_object<FungibleAssetMetadata>(addr)
+    /// Create a new wallet object to hold fungible asset.
+    public fun create_deterministic_wallet<T: key>(
+        owner_addr: address,
+        metadata: Object<T>,
+    ): Object<FungibleAssetWallet> acquires FungibleAssetMetadata {
+        let owner = &create_signer::create_signer(owner_addr);
+        let derive_ref = &borrow_fungible_metadata(&metadata).derive_ref;
+        let constructor_ref = &object::create_derived_object(owner, derive_ref);
+        initialize_arbitrary_wallet(constructor_ref, metadata)
     }
 
-    /// Create a new wallet object to hold fungible asset.
-    public(friend) fun new_fungible_asset_wallet_object<T: key>(
-        creator_ref: &ConstructorRef,
-        metadata: &Object<T>,
-    ): Object<FungibleAssetWallet> {
-        let wallet_signer = object::generate_signer(creator_ref);
-        let metadata = verify(metadata);
+    public fun deterministic_wallet_address<T: key>(owner: address, metadata: Object<T>): address {
+        let metadata_addr = object::object_address(&metadata);
+        object::create_derived_object_address(owner, metadata_addr)
+    }
 
-        move_to(&wallet_signer, FungibleAssetWallet {
+    /// Allow an object to hold a wallet for fungible assets.
+    /// Applications can use this to create multiple wallets for isolating fungible assets for different purposes.
+    public fun initialize_arbitrary_wallet<T: key>(
+        constructor_ref: &ConstructorRef,
+        metadata: Object<T>,
+    ): Object<FungibleAssetWallet> {
+        let wallet_obj = &object::generate_signer(constructor_ref);
+        let metadata = object::convert<T, FungibleAssetMetadata>(metadata);
+        move_to(wallet_obj, FungibleAssetWallet {
             metadata,
             balance: 0,
             allow_ungated_transfer: true,
-            delete_ref: object::generate_delete_ref(creator_ref)
         });
-        object::object_from_constructor_ref<FungibleAssetWallet>(creator_ref)
+
+        object::object_from_constructor_ref<FungibleAssetWallet>(constructor_ref)
     }
 
     /// Return the underlying metadata object
@@ -166,10 +178,8 @@ module aptos_framework::fungible_asset {
     }
 
     /// Return the underlying metadata object.
-    public fun metadata_from_wallet(
-        wallet: &Object<FungibleAssetWallet>
-    ): Object<FungibleAssetMetadata> acquires FungibleAssetWallet {
-        borrow_fungible_asset(wallet).metadata
+    public fun metadata_from_wallet<T: key>(wallet: &Object<T>): Object<FungibleAssetMetadata> acquires FungibleAssetWallet {
+        borrow_wallet_resource(wallet).metadata
     }
 
     /// Return `amount` inside.
@@ -177,159 +187,138 @@ module aptos_framework::fungible_asset {
         fa.amount
     }
 
-    /// Destroy `wallet` object.
-    public(friend) fun destory_fungible_asset_wallet(
-        wallet: Object<FungibleAssetWallet>
-    ) acquires FungibleAssetWallet {
-        let FungibleAssetWallet {
-            metadata: _,
-            balance: _,
-            allow_ungated_transfer: _,
-            delete_ref
-        } = move_from<FungibleAssetWallet>(object::object_address(&wallet));
-        object::delete(delete_ref);
+    /// Return whether the provided address has a wallet initialized.
+    public fun wallet_exists(wallet: address): bool {
+        exists<FungibleAssetWallet>(wallet)
     }
 
-    /// Get the balance of `wallet`.
-    public fun balance(wallet: &Object<FungibleAssetWallet>): u64 acquires FungibleAssetWallet {
-        borrow_fungible_asset(wallet).balance
+    /// Get the balance of a given wallet.
+    public fun balance<T: key>(wallet: Object<T>): u64 acquires FungibleAssetWallet {
+        if (wallet_exists(object::object_address(&wallet))) {
+            borrow_wallet_resource(&wallet).balance
+        } else {
+            0
+        }
     }
 
-
-    /// Return `allowed_ungated_transfer`.
-    public fun ungated_transfer_allowed(wallet: &Object<FungibleAssetWallet>): bool acquires FungibleAssetWallet {
-        borrow_fungible_asset(wallet).allow_ungated_transfer
+    /// Return whether a wallet can freely send or receive fungible assets.
+    public fun ungated_transfer_allowed<T: key>(wallet: Object<T>): bool acquires FungibleAssetWallet {
+        borrow_wallet_resource(&wallet).allow_ungated_transfer
     }
 
     /// Mint the `amount` of fungible asset.
-    public fun mint(
-        ref: &MintRef,
-        amount: u64,
-    ): FungibleAsset acquires FungibleAssetMetadata {
-        assert!(amount != 0, error::invalid_argument(EAMOUNT_CANNOT_BE_ZERO));
-        let metadata = verify(&ref.metadata);
-        increase_supply(&ref.metadata, amount);
+    public fun mint(ref: &MintRef, amount: u64): FungibleAsset acquires FungibleAssetMetadata {
+        assert!(amount > 0, error::invalid_argument(EAMOUNT_CANNOT_BE_ZERO));
+        let metadata = ref.metadata;
+        increase_supply(&metadata, amount);
         FungibleAsset {
             metadata,
             amount
         }
     }
 
-    /// Enable/disable the direct transfer of fungible asset.
-    public fun set_ungated_transfer(
+    public fun mint_to<T: key>(
+        ref: &MintRef,
+        wallet: Object<T>,
+        amount: u64,
+    ) acquires FungibleAssetMetadata, FungibleAssetWallet {
+        deposit(wallet, mint(ref, amount));
+    }
+
+    /// Enable/disable a wallet's ability to do direct transfers of fungible asset.
+    public fun set_ungated_transfer<T: key>(
         ref: &TransferRef,
-        wallet: &Object<FungibleAssetWallet>,
+        wallet: Object<T>,
         allow: bool,
     ) acquires FungibleAssetWallet {
         assert!(
-            &ref.metadata == &metadata_from_wallet(wallet),
-            error::invalid_argument(ETRANSFER_REF_AND_WALLET_MISMATCH)
+            ref.metadata == metadata_from_wallet(&wallet),
+            error::invalid_argument(ETRANSFER_REF_AND_WALLET_MISMATCH),
         );
-        borrow_fungible_asset_mut(wallet).allow_ungated_transfer = allow;
+        let wallet_addr = object::object_address(&wallet);
+        borrow_global_mut<FungibleAssetWallet>(wallet_addr).allow_ungated_transfer = allow;
     }
 
-    /// Burn the `amount` of fungible metadata from `account`.
-    public fun burn(
+    /// Burn the `amount` of fungible metadata from the given wallet.
+    public fun burn<T: key>(
         ref: &BurnRef,
-        wallet: &Object<FungibleAssetWallet>,
+        wallet: Object<T>,
         amount: u64
     ) acquires FungibleAssetWallet, FungibleAssetMetadata {
-        assert!(
-            &ref.metadata == &metadata_from_wallet(wallet),
-            error::invalid_argument(EBURN_REF_AND_WALLET_MISMATCH)
-        );
+        let metadata = ref.metadata;
+        assert!(metadata == metadata_from_wallet(&wallet), error::invalid_argument(EBURN_REF_AND_WALLET_MISMATCH));
+        let wallet_addr = object::object_address(&wallet);
         let FungibleAsset {
             metadata,
             amount,
-        } = extract(wallet, amount);
+        } = extract(wallet_addr, amount);
         decrease_supply(&metadata, amount);
     }
 
-    /// Withdarw `amount` of fungible asset from `wallet` by the owner.
-    public fun withdraw(
-        account: &signer,
-        wallet: &Object<FungibleAssetWallet>,
-        amount: u64
+    /// Withdraw `amount` of fungible asset from `wallet` by the owner.
+    public fun withdraw<T: key>(
+        owner: &signer,
+        wallet: Object<T>,
+        amount: u64,
     ): FungibleAsset acquires FungibleAssetWallet {
-        assert_owner(account, wallet);
-        extract(wallet, amount)
+        assert!(object::owns(wallet, signer::address_of(owner)), error::permission_denied(ENOT_WALLET_OWNER));
+        assert!(ungated_transfer_allowed(wallet), error::invalid_argument(EUNGATED_TRANSFER_IS_NOT_ALLOWED));
+        extract(object::object_address(&wallet), amount)
     }
 
     /// Deposit `amount` of fungible asset to `wallet`.
-    public fun deposit(
-        wallet: &Object<FungibleAssetWallet>,
-        fa: FungibleAsset,
-    ) acquires FungibleAssetWallet {
-        let FungibleAsset { metadata, amount } = fa;
-        // ensure merging the same coin
-        let wallet = borrow_fungible_asset_mut(wallet);
-        assert!(wallet.allow_ungated_transfer, error::invalid_argument(EUNGATED_TRANSFER_IS_NOT_ALLOWED));
-        assert!(wallet.metadata == metadata, error::invalid_argument(EFUNGIBLE_ASSET_AND_WALLET_MISMATCH));
-        wallet.balance = wallet.balance + amount;
+    public fun deposit<T: key>(wallet: Object<T>, fa: FungibleAsset) acquires FungibleAssetWallet {
+        assert!(ungated_transfer_allowed(wallet), error::invalid_argument(EUNGATED_TRANSFER_IS_NOT_ALLOWED));
+        deposit_internal(wallet, fa);
     }
 
-    /// Transfer `amount` of fungible metadata of `metadata` to `receiver`.
+    /// Transfer `amount` of fungible asset from `from_wallet` which should be owned by `sender` to `to_wallet`.
     /// Note: it does not move the underlying object.
-    public fun transfer(
-        account: &signer,
+    public fun transfer<T: key>(
+        sender: &signer,
+        from_wallet: Object<T>,
         amount: u64,
-        from: &Object<FungibleAssetWallet>,
-        to: &Object<FungibleAssetWallet>,
+        to_wallet: Object<T>,
     ) acquires FungibleAssetWallet {
-        let fa = withdraw(account, from, amount);
-        deposit(to, fa);
+        let fa = withdraw(sender, from_wallet, amount);
+        deposit(to_wallet, fa);
     }
 
-    /// Withdarw `amount` of fungible metadata from `account` ignoring `allow_ungated_transfer`.
-    public fun withdraw_with_ref(
+    /// Withdraw `amount` of fungible metadata from `wallet` ignoring `allow_ungated_transfer`.
+    public fun withdraw_with_ref<T: key>(
         ref: &TransferRef,
-        wallet: &Object<FungibleAssetWallet>,
+        wallet: Object<T>,
         amount: u64
     ): FungibleAsset acquires FungibleAssetWallet {
         assert!(
-            &ref.metadata == &metadata_from_wallet(wallet),
-            error::invalid_argument(ETRANSFER_REF_AND_WALLET_MISMATCH)
+            ref.metadata == metadata_from_wallet(&wallet),
+            error::invalid_argument(ETRANSFER_REF_AND_WALLET_MISMATCH),
         );
-        let ungated_transfer_allowed = ungated_transfer_allowed(wallet);
-        if (!ungated_transfer_allowed) {
-            set_ungated_transfer(ref, wallet, true);
-        };
-        let fa = extract(wallet, amount);
-        if (!ungated_transfer_allowed) {
-            set_ungated_transfer(ref, wallet, false);
-        };
-        fa
+        extract(object::object_address(&wallet), amount)
     }
 
-    /// Deposit fungible asset into `account` ignoring `allow_ungated_transfer`.
-    public fun deposit_with_ref(
+    /// Deposit fungible asset into `wallet` ignoring `allow_ungated_transfer`.
+    public fun deposit_with_ref<T: key>(
         ref: &TransferRef,
-        wallet: &Object<FungibleAssetWallet>,
+        wallet: Object<T>,
         fa: FungibleAsset
     ) acquires FungibleAssetWallet {
         assert!(
-            &ref.metadata == &metadata_from_wallet(wallet),
+            ref.metadata == fa.metadata,
             error::invalid_argument(ETRANSFER_REF_AND_WALLET_MISMATCH)
         );
-        let ungated_transfer_allowed = ungated_transfer_allowed(wallet);
-        if (!ungated_transfer_allowed) {
-            set_ungated_transfer(ref, wallet, true);
-        };
-        deposit(wallet, fa);
-        if (!ungated_transfer_allowed) {
-            set_ungated_transfer(ref, wallet, false);
-        };
+        deposit_internal(wallet, fa);
     }
 
     /// Transfer `ammount` of  fungible metadata with `TransferRef` even ungated transfer is disabled.
-    public fun transfer_with_ref(
+    public fun transfer_with_ref<T: key>(
         transfer_ref: &TransferRef,
-        from: &Object<FungibleAssetWallet>,
-        to: &Object<FungibleAssetWallet>,
+        from_wallet: Object<T>,
         amount: u64,
+        to_wallet: Object<T>,
     ) acquires FungibleAssetWallet {
-        let fa = withdraw_with_ref(transfer_ref, from, amount);
-        deposit_with_ref(transfer_ref, to, fa);
+        let fa = withdraw_with_ref(transfer_ref, from_wallet, amount);
+        deposit_with_ref(transfer_ref, to_wallet, fa);
     }
 
     /// Get the underlying metadata object from `MintRef`.
@@ -347,19 +336,23 @@ module aptos_framework::fungible_asset {
         ref.metadata
     }
 
-    /// Assert the owner of `metadata`.
-    inline fun assert_owner<T: key>(owner: &signer, metadata: &Object<T>) {
-        assert!(object::is_owner(*metadata, signer::address_of(owner)), error::permission_denied(ENOT_OWNER));
+    public fun asset_metadata(fa: &FungibleAsset): Object<FungibleAssetMetadata> {
+        fa.metadata
+    }
+
+    fun deposit_internal<T: key>(wallet: Object<T>, fa: FungibleAsset) acquires FungibleAssetWallet {
+        let FungibleAsset { metadata, amount } = fa;
+        let wallet_metadata = metadata_from_wallet(&wallet);
+        assert!(metadata == wallet_metadata, error::invalid_argument(EFUNGIBLE_ASSET_AND_WALLET_MISMATCH));
+        let wallet_addr = object::object_address(&wallet);
+        let wallet = borrow_global_mut<FungibleAssetWallet>(wallet_addr);
+        wallet.balance = wallet.balance + amount;
     }
 
     /// Extract `amount` of fungible asset from `wallet`.
-    fun extract(
-        wallet: &Object<FungibleAssetWallet>,
-        amount: u64,
-    ): FungibleAsset acquires FungibleAssetWallet {
+    fun extract(wallet_addr: address, amount: u64): FungibleAsset acquires FungibleAssetWallet {
         assert!(amount != 0, error::invalid_argument(EAMOUNT_CANNOT_BE_ZERO));
-        let wallet = borrow_fungible_asset_mut(wallet);
-        assert!(wallet.allow_ungated_transfer, error::invalid_argument(EUNGATED_TRANSFER_IS_NOT_ALLOWED));
+        let wallet = borrow_global_mut<FungibleAssetWallet>(wallet_addr);
         assert!(wallet.balance >= amount, error::invalid_argument(EINSUFFICIENT_BALANCE));
         wallet.balance = wallet.balance - amount;
         FungibleAsset {
@@ -390,35 +383,25 @@ module aptos_framework::fungible_asset {
     inline fun borrow_fungible_metadata<T: key>(
         metadata: &Object<T>
     ): &FungibleAssetMetadata acquires FungibleAssetMetadata {
-        let addr = object::object_address(&verify(metadata));
+        let addr = object::object_address(metadata);
         borrow_global<FungibleAssetMetadata>(addr)
     }
 
     inline fun borrow_fungible_metadata_mut<T: key>(
         metadata: &Object<T>
     ): &mut FungibleAssetMetadata acquires FungibleAssetMetadata {
-        let addr = object::object_address(&verify(metadata));
+        let addr = object::object_address(metadata);
         borrow_global_mut<FungibleAssetMetadata>(addr)
     }
 
-    inline fun borrow_fungible_asset(
-        wallet: &Object<FungibleAssetWallet>,
-    ): &FungibleAssetWallet acquires FungibleAssetWallet {
+    inline fun borrow_wallet_resource<T: key>(wallet: &Object<T>): &FungibleAssetWallet acquires FungibleAssetWallet {
         borrow_global<FungibleAssetWallet>(object::object_address(wallet))
-    }
-
-    inline fun borrow_fungible_asset_mut(
-        wallet: &Object<FungibleAssetWallet>,
-    ): &mut FungibleAssetWallet acquires FungibleAssetWallet {
-        borrow_global_mut<FungibleAssetWallet>(object::object_address(wallet))
     }
 
     #[test_only]
     use std::string;
     #[test_only]
     use aptos_framework::account;
-    #[test_only]
-    use aptos_framework::object::object_address;
 
     #[test_only]
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
@@ -447,24 +430,12 @@ module aptos_framework::fungible_asset {
     }
 
     #[test_only]
-    public fun generate_refs(
+    public fun create_fungible_asset(
         creator: &signer
     ): (MintRef, TransferRef, BurnRef, Object<TestToken>) {
         let (creator_ref, metadata) = create_test_token(creator);
         let (mint, transfer, burn) = init_test_metadata(&creator_ref);
         (mint, transfer, burn, metadata)
-    }
-
-    #[test_only]
-    fun generate_wallet(
-        creator: &signer,
-        metadata: &Object<FungibleAssetMetadata>,
-    ): Object<FungibleAssetWallet> {
-        if (!account::exists_at(signer::address_of(creator))) {
-            account::create_account_for_test(signer::address_of(creator));
-        };
-        let wallet_creator_ref = object::create_object_from_account(creator);
-        new_fungible_asset_wallet_object(&wallet_creator_ref, metadata)
     }
 
     #[test(creator = @0xcafe)]
@@ -504,63 +475,59 @@ module aptos_framework::fungible_asset {
         creator: &signer,
         aaron: &signer,
     ) acquires FungibleAssetWallet, FungibleAssetMetadata {
-        let (mint_ref, transfer_ref, burn_ref, metadata) = generate_refs(creator);
-        let metadata = verify(&metadata);
-        let creator_wallet = generate_wallet(creator, &metadata);
-        let aaron_wallet = generate_wallet(aaron, &metadata);
+        let (mint_ref, transfer_ref, burn_ref, test_token) = create_fungible_asset(creator);
+        let metadata = mint_ref.metadata;
+        let creator_wallet = create_deterministic_wallet(signer::address_of(creator), metadata);
+        let aaron_wallet = create_deterministic_wallet(signer::address_of(aaron), metadata);
 
-        assert!(supply(&metadata) == 0, 1);
+        assert!(supply(&test_token) == 0, 1);
         // Mint
         let fa = mint(&mint_ref, 100);
-        assert!(supply(&metadata) == 100, 2);
+        assert!(supply(&test_token) == 100, 2);
         // Deposit
-        deposit(&creator_wallet, fa);
+        deposit(creator_wallet, fa);
         // Withdraw
-        let fa = withdraw(creator, &creator_wallet, 80);
-        assert!(supply(&metadata) == 100, 3);
-        deposit(&aaron_wallet, fa);
+        let fa = withdraw(creator, creator_wallet, 80);
+        assert!(supply(&test_token) == 100, 3);
+        deposit(aaron_wallet, fa);
         // Burn
-        burn(&burn_ref, &aaron_wallet, 30);
-        assert!(supply(&metadata) == 70, 4);
+        burn(&burn_ref, aaron_wallet, 30);
+        assert!(supply(&test_token) == 70, 4);
         // Transfer
-        transfer(creator, 10, &creator_wallet, &aaron_wallet);
-        assert!(balance(&creator_wallet) == 10, 5);
-        assert!(balance(&aaron_wallet) == 60, 6);
+        transfer(creator, creator_wallet,10, aaron_wallet);
+        assert!(balance(creator_wallet) == 10, 5);
+        assert!(balance(aaron_wallet) == 60, 6);
 
-        set_ungated_transfer(&transfer_ref, &aaron_wallet, false);
-        assert!(!ungated_transfer_allowed(&aaron_wallet), 7);
-
-        destory_fungible_asset_wallet(aaron_wallet);
-        assert!(!exists<FungibleAssetWallet>(object_address(&aaron_wallet)), 8);
+        set_ungated_transfer(&transfer_ref, aaron_wallet, false);
+        assert!(!ungated_transfer_allowed(aaron_wallet), 7);
     }
 
     #[test(creator = @0xcafe)]
     #[expected_failure(abort_code = 0x10004, location = Self)]
     fun test_ungated_transfer(creator: &signer) acquires FungibleAssetMetadata, FungibleAssetWallet {
-        let (mint_ref, transfer_ref, _burn_ref, metadata) = generate_refs(creator);
-        let metadata = verify(&metadata);
-        let creator_wallet = generate_wallet(creator, &metadata);
+        let (mint_ref, transfer_ref, _burn_ref, _) = create_fungible_asset(creator);
 
+        let creator_wallet = create_deterministic_wallet(signer::address_of(creator), mint_ref.metadata);
         let fa = mint(&mint_ref, 100);
-        set_ungated_transfer(&transfer_ref, &creator_wallet, false);
-        deposit(&creator_wallet, fa);
+        set_ungated_transfer(&transfer_ref, creator_wallet, false);
+        deposit(creator_wallet, fa);
     }
 
     #[test(creator = @0xcafe, aaron = @0xface)]
     fun test_transfer_with_ref(creator: &signer, aaron: &signer) acquires FungibleAssetMetadata, FungibleAssetWallet {
-        let (mint_ref, transfer_ref, _burn_ref, metadata) = generate_refs(creator);
-        let metadata = verify(&metadata);
-        let creator_wallet = generate_wallet(creator, &metadata);
-        let aaron_wallet = generate_wallet(aaron, &metadata);
+        let (mint_ref, transfer_ref, _burn_ref, _) = create_fungible_asset(creator);
+        let metadata = mint_ref.metadata;
+        let creator_wallet = create_deterministic_wallet(signer::address_of(creator), metadata);
+        let aaron_wallet = create_deterministic_wallet(signer::address_of(aaron), metadata);
 
         let fa = mint(&mint_ref, 100);
-        set_ungated_transfer(&transfer_ref, &creator_wallet, false);
-        set_ungated_transfer(&transfer_ref, &aaron_wallet, false);
-        deposit_with_ref(&transfer_ref, &creator_wallet, fa);
-        transfer_with_ref(&transfer_ref, &creator_wallet, &aaron_wallet, 80);
-        assert!(balance(&creator_wallet) == 20, 1);
-        assert!(balance(&aaron_wallet) == 80, 2);
-        assert!(!ungated_transfer_allowed(&creator_wallet), 3);
-        assert!(!ungated_transfer_allowed(&aaron_wallet), 4);
+        set_ungated_transfer(&transfer_ref, creator_wallet, false);
+        set_ungated_transfer(&transfer_ref, aaron_wallet, false);
+        deposit_with_ref(&transfer_ref, creator_wallet, fa);
+        transfer_with_ref(&transfer_ref, creator_wallet, 80, aaron_wallet);
+        assert!(balance(creator_wallet) == 20, 1);
+        assert!(balance(aaron_wallet) == 80, 2);
+        assert!(!ungated_transfer_allowed(creator_wallet), 3);
+        assert!(!ungated_transfer_allowed(aaron_wallet), 4);
     }
 }
