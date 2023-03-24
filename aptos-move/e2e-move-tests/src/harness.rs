@@ -607,11 +607,11 @@ macro_rules! assert_abort {
 /// Helper to assert vm status code.
 #[macro_export]
 macro_rules! assert_vm_status {
-    ($s:expr, $c:pat) => {{
+    ($s:expr, $c:expr) => {{
         use aptos_types::transaction::*;
-        assert!(matches!(
+        assert_eq!(
             $s,
             TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some($c)))
-        ));
+        );
     }};
 }

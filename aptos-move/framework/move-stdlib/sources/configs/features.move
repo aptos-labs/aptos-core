@@ -162,6 +162,11 @@ module std::features {
     /// Lifetime: ephemeral
     const ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH: u64 = 14;
 
+    /// Whether struct constructors are enabled
+    ///
+    /// Lifetime: transient
+    const STRUCT_CONSTRUCTORS: u64 = 15;
+
     // ============================================================================================
     // Feature Flag Implementation
 

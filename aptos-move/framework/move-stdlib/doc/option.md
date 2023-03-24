@@ -10,6 +10,7 @@ This module defines the Option type and its methods to represent and handle an o
 -  [Constants](#@Constants_0)
 -  [Function `none`](#0x1_option_none)
 -  [Function `some`](#0x1_option_some)
+-  [Function `from_vec`](#0x1_option_from_vec)
 -  [Function `is_none`](#0x1_option_is_none)
 -  [Function `is_some`](#0x1_option_is_some)
 -  [Function `contains`](#0x1_option_contains)
@@ -108,6 +109,16 @@ The <code><a href="option.md#0x1_option_Option">Option</a></code> is <code>None<
 
 
 
+<a name="0x1_option_EOPTION_VEC_TOO_LONG"></a>
+
+Cannot construct an option from a vector with 2 or more elements.
+
+
+<pre><code><b>const</b> <a href="option.md#0x1_option_EOPTION_VEC_TOO_LONG">EOPTION_VEC_TOO_LONG</a>: u64 = 262146;
+</code></pre>
+
+
+
 <a name="0x1_option_none"></a>
 
 ## Function `none`
@@ -151,6 +162,31 @@ Return an <code><a href="option.md#0x1_option_Option">Option</a></code> containi
 
 <pre><code><b>public</b> <b>fun</b> <a href="option.md#0x1_option_some">some</a>&lt;Element&gt;(e: Element): <a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt; {
     <a href="option.md#0x1_option_Option">Option</a> { vec: <a href="vector.md#0x1_vector_singleton">vector::singleton</a>(e) }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_option_from_vec"></a>
+
+## Function `from_vec`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="option.md#0x1_option_from_vec">from_vec</a>&lt;Element&gt;(vec: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;): <a href="option.md#0x1_option_Option">option::Option</a>&lt;Element&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="option.md#0x1_option_from_vec">from_vec</a>&lt;Element&gt;(vec: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;): <a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt; {
+    <b>assert</b>!(<a href="vector.md#0x1_vector_length">vector::length</a>(&vec) &lt;= 1, <a href="option.md#0x1_option_EOPTION_VEC_TOO_LONG">EOPTION_VEC_TOO_LONG</a>);
+    <a href="option.md#0x1_option_Option">Option</a> { vec }
 }
 </code></pre>
 

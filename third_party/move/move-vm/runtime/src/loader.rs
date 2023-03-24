@@ -36,7 +36,7 @@ use move_vm_types::{
 use parking_lot::RwLock;
 use sha3::{Digest, Sha3_256};
 use std::{
-    collections::{BTreeMap, BTreeSet, HashMap},
+    collections::{btree_map, BTreeMap, BTreeSet, HashMap},
     fmt::Debug,
     hash::Hash,
     sync::Arc,
@@ -703,16 +703,13 @@ impl Loader {
     // Module verification and loading
     //
 
-    // Entry point for function execution (`MoveVM::execute_function`).
     // Loading verifies the module if it was never loaded.
-    // Type parameters are checked as well after every type is loaded.
-    pub(crate) fn load_function(
+    fn load_function_without_type_args(
         &self,
         module_id: &ModuleId,
         function_name: &IdentStr,
-        ty_args: &[TypeTag],
         data_store: &impl DataStore,
-    ) -> VMResult<(Arc<Module>, Arc<Function>, LoadedFunctionInstantiation)> {
+    ) -> VMResult<(Arc<Module>, Arc<Function>, Vec<Type>, Vec<Type>)> {
         let module = self.load_module(module_id, data_store)?;
         let idx = self
             .module_cache
@@ -745,11 +742,131 @@ impl Loader {
             .collect::<PartialVMResult<Vec<_>>>()
             .map_err(|err| err.finish(Location::Undefined))?;
 
-        // verify type arguments
+        Ok((module, func, parameters, return_))
+    }
+
+    // Matches the actual returned type to the expected type, binding any type args to the
+    // necessary type as stored in the map. The expected type must be a concrete type (no TyParam).
+    // Returns true if a successful match is made.
+    fn match_return_type<'a>(
+        returned: &Type,
+        expected: &'a Type,
+        map: &mut BTreeMap<usize, &'a Type>,
+    ) -> bool {
+        match (returned, expected) {
+            // The important case, deduce the type params
+            (Type::TyParam(idx), _) => match map.entry(*idx) {
+                btree_map::Entry::Vacant(vacant_entry) => {
+                    vacant_entry.insert(expected);
+                    true
+                },
+                btree_map::Entry::Occupied(occupied_entry) => *occupied_entry.get() == expected,
+            },
+            // Recursive types we need to recurse the matching types
+            (Type::Reference(ret_inner), Type::Reference(expected_inner))
+            | (Type::MutableReference(ret_inner), Type::MutableReference(expected_inner))
+            | (Type::Vector(ret_inner), Type::Vector(expected_inner)) => {
+                Self::match_return_type(ret_inner, expected_inner, map)
+            },
+            // For struct instantiations we need to match all fields
+            (
+                Type::StructInstantiation(ret_idx, ret_fields),
+                Type::StructInstantiation(expected_idx, expected_fields),
+            ) => {
+                *ret_idx == *expected_idx
+                    && ret_fields.len() == expected_fields.len()
+                    && ret_fields
+                        .iter()
+                        .zip(expected_fields.iter())
+                        .all(|types| Self::match_return_type(types.0, types.1, map))
+            },
+            // For the rest we need to assure the types match
+            _ => std::mem::discriminant(returned) == std::mem::discriminant(expected),
+        }
+    }
+
+    // Loading verifies the module if it was never loaded.
+    // Type parameters are inferred from the expected return type. Returns an error if it's not
+    // possible to infer the type parameters or return type cannot be matched.
+    // The type parameters are verified with capabilities.
+    pub(crate) fn load_function_with_type_arg_inference(
+        &self,
+        module_id: &ModuleId,
+        function_name: &IdentStr,
+        expected_return_type: &Type,
+        data_store: &impl DataStore,
+    ) -> VMResult<(LoadedFunction, LoadedFunctionInstantiation)> {
+        let (module, func, parameters, return_vec) =
+            self.load_function_without_type_args(module_id, function_name, data_store)?;
+
+        if return_vec.len() != 1 {
+            // For functions that are marked constructor this should not happen.
+            return Err(PartialVMError::new(StatusCode::ABORTED).finish(Location::Undefined));
+        }
+        let return_type = &return_vec[0];
+
+        let mut map = BTreeMap::new();
+        if !Self::match_return_type(return_type, expected_return_type, &mut map) {
+            // For functions that are marked constructor this should not happen.
+            return Err(
+                PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
+                    .finish(Location::Undefined),
+            );
+        }
+
+        // Construct the type arguments from the match
+        let mut type_arguments = vec![];
+        let type_param_len = func.type_parameters().len();
+        for i in 0..type_param_len {
+            if let Option::Some(t) = map.get(&i) {
+                type_arguments.push((*t).clone());
+            } else {
+                // Unknown type argument we are not able to infer the type arguments.
+                // For functions that are marked constructor this should not happen.
+                return Err(
+                    PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
+                        .finish(Location::Undefined),
+                );
+            }
+        }
+
+        // verify type arguments for capability constraints
+        self.verify_ty_args(func.type_parameters(), &type_arguments)
+            .map_err(|e| e.finish(Location::Module(module_id.clone())))?;
+
+        let loaded = LoadedFunctionInstantiation {
+            type_arguments,
+            parameters,
+            return_: return_vec,
+        };
+        Ok((
+            LoadedFunction {
+                module,
+                function: func,
+            },
+            loaded,
+        ))
+    }
+
+    // Entry point for function execution (`MoveVM::execute_function`).
+    // Loading verifies the module if it was never loaded.
+    // Type parameters are checked as well after every type is loaded.
+    pub(crate) fn load_function(
+        &self,
+        module_id: &ModuleId,
+        function_name: &IdentStr,
+        ty_args: &[TypeTag],
+        data_store: &impl DataStore,
+    ) -> VMResult<(Arc<Module>, Arc<Function>, LoadedFunctionInstantiation)> {
         let type_arguments = ty_args
             .iter()
             .map(|ty| self.load_type(ty, data_store))
             .collect::<VMResult<Vec<_>>>()?;
+
+        let (module, func, parameters, return_) =
+            self.load_function_without_type_args(module_id, function_name, data_store)?;
+
+        // verify type arguments
         self.verify_ty_args(func.type_parameters(), &type_arguments)
             .map_err(|e| e.finish(Location::Module(module_id.clone())))?;
 
@@ -2209,6 +2326,13 @@ pub(crate) struct Function {
     return_types: Vec<Type>,
     local_types: Vec<Type>,
     parameter_types: Vec<Type>,
+}
+
+// This struct must be treated as an identifier for a function and not somehow relying on
+// the internal implementation.
+pub struct LoadedFunction {
+    pub(crate) module: Arc<Module>,
+    pub(crate) function: Arc<Function>,
 }
 
 impl Function {
