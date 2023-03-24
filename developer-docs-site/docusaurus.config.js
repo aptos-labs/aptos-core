@@ -441,7 +441,7 @@ const config = {
       {
         redirects: [
           {
-            to: "/guides/move-guides/book/upgrade-packages",
+            to: "/guides/move-guides/book/package-upgrades",
             from: "/guides/move-guides/upgrading-move-code",
           },
           {
