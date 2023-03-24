@@ -36,6 +36,26 @@ export class BatchTransaction {
     this.extraArgs = extraArgs;
   }
 
+  async getURL(url: string) {
+    const request = this.request.request({ ":path": url, "content-type": "application/json" });
+    const response = new Promise((resolve, reject) => {
+      request.on("response", (headers: any) => {
+        let chunks = "";
+        request.on("data", (chunk: any) => {
+          chunks += chunk;
+        });
+        request.on("end", () => {
+          const data = JSON.parse(chunks);
+          resolve(data);
+        });
+      });
+      request.on("error", reject);
+      request.end();
+    });
+    this.request.close();
+    return response;
+  }
+
   async get(paths: string[]) {
     const requests = paths.map((path) => this.request.request({ ":path": path, "content-type": "application/json" }));
     const promises = requests.map((request) => {
