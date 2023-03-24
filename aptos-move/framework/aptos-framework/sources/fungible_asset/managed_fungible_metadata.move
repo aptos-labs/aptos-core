@@ -32,17 +32,19 @@ module aptos_framework::managed_fungible_metadata {
     /// Initialize metadata object and store the refs.
     public fun init_managing_refs(
         constructor_ref: &ConstructorRef,
-        maximum_supply: u64,
         name: String,
         symbol: String,
-        decimals: u8
+        decimals: u8,
+        monitoring_supply: bool,
+        maximum_supply: Option<u64>,
     ) {
         let (mint_ref, transfer_ref, burn_ref) = fungible_asset::init_metadata(
             constructor_ref,
-            maximum_supply,
             name,
             symbol,
-            decimals
+            decimals,
+            monitoring_supply,
+            maximum_supply,
         );
         let metadata_object_signer = object::generate_signer(constructor_ref);
         move_to(

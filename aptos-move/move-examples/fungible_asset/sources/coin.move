@@ -9,12 +9,25 @@ module fungible_asset::coin {
         creator: &signer,
         name: String,
         symbol: String,
-        max_supply: u64,
-        decimals: u8
+        decimals: u8,
+        monitoring_supply: bool,
+        maximum: u64,
     ) {
         // TODO(lightmark): create_named_object vs create_object_from_account, which one to choose here.
         let creator_ref = object::create_named_object(creator, *string::bytes(&name));
-        managed_fungible_metadata::init_managing_refs(&creator_ref, max_supply, name, symbol, decimals);
+        let converted_maximum = if (maximum == 0) {
+            option::none()
+        } else {
+            option::some(maximum)
+        };
+        managed_fungible_metadata::init_managing_refs(
+            &creator_ref,
+            name,
+            symbol,
+            decimals,
+            monitoring_supply,
+            converted_maximum
+        );
     }
 
     #[test_only]
@@ -25,6 +38,7 @@ module fungible_asset::coin {
     use aptos_framework::fungible_store;
     #[test_only]
     use aptos_framework::fungible_asset::FungibleAssetMetadata;
+    use std::option;
 
     #[test(creator = @0xcafe, aaron = @0xface)]
     entry fun e2e_test(creator: &signer, aaron: &signer) {
@@ -33,7 +47,7 @@ module fungible_asset::coin {
         account::create_account_for_test(creator_address);
         let aaron_address = signer::address_of(aaron);
 
-        create_coin(creator, usda, string::utf8(b"$"), 0, 0);
+        create_coin(creator, usda, string::utf8(b"$"), 0, true, 0);
         let coin_addr = object::create_object_address(&creator_address, *string::bytes(&usda));
         let coin = object::address_to_object<FungibleAssetMetadata>(coin_addr);
 

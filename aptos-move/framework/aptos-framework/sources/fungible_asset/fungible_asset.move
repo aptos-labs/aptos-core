@@ -29,14 +29,14 @@ module aptos_framework::fungible_asset {
     const ECURRENT_SUPPLY_UNDERFLOW: u64 = 9;
     /// Not the owner,
     const ENOT_OWNER: u64 = 10;
+    /// Set the max supply but disable supply monitoring.
+    const EMAX_SUPPLY_SET_WITHOUT_MONITORING: u64 = 11;
+
+    const MAX_U128: u128 = 340282366920938463463374607431768211455;
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Define the metadata required of an metadata to be fungible.
     struct FungibleAssetMetadata has key {
-        /// The current supply.
-        supply: u64,
-        /// The maximum supply limit where `option::none()` means no limit.
-        maximum: Option<u64>,
         /// Name of the fungible metadata, i.e., "USDT".
         name: String,
         /// Symbol of the fungible metadata, usually a shorter version of the name.
@@ -46,6 +46,10 @@ module aptos_framework::fungible_asset {
         /// For example, if `decimals` equals `2`, a balance of `505` coins should
         /// be displayed to a user as `5.05` (`505 / 10 ** 2`).
         decimals: u8,
+        /// Amount of this fungible asset in existence.
+        supply: Option<OptionalAggregator>,
+        /// The maximum supply limit where `option::none()` means no limit.
+        maximum: Option<u64>,
     }
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
@@ -87,33 +91,45 @@ module aptos_framework::fungible_asset {
     /// The initialization of an object with `FungibleAssetMetadata`.
     public fun init_metadata(
         constructor_ref: &ConstructorRef,
-        maximum_supply: u64,
         name: String,
         symbol: String,
         decimals: u8,
+        monitoring_supply: bool,
+        maximum: Option<u64>,
     ): (MintRef, TransferRef, BurnRef) {
-        let metadata_object_signer = object::generate_signer(constructor_ref);
-        let converted_maximum = if (maximum_supply == 0) {
-            option::none()
-        } else {
-            option::some(maximum_supply)
+        if (option::is_some(&maximum)) {
+            assert!(monitoring_supply, error::invalid_argument(EMAX_SUPPLY_SET_WITHOUT_MONITORING));
         };
+        let metadata_object_signer = object::generate_signer(constructor_ref);
         move_to(&metadata_object_signer,
             FungibleAssetMetadata {
-                supply: 0,
-                maximum: converted_maximum,
                 name,
                 symbol,
                 decimals,
+                supply: if (monitoring_supply) {
+                    option::some(optional_aggregator::new(MAX_U128, false))
+                } else {
+                    option::none()
+                },
+                maximum,
             }
         );
         let metadata = object::object_from_constructor_ref<FungibleAssetMetadata>(constructor_ref);
         (MintRef { metadata }, TransferRef { metadata }, BurnRef { metadata })
     }
 
-    /// Get the current supply from `metadata`.
-    public fun supply<T: key>(metadata: &Object<T>): u64 acquires FungibleAssetMetadata {
-        borrow_fungible_metadata(metadata).supply
+    #[view]
+    /// Returns the amount of fugible asset in existence.
+    public fun supply<T: key>(metadata: &Object<T>): Option<u128> acquires FungibleAssetMetadata {
+        let maybe_supply = &borrow_fungible_metadata(metadata).supply;
+        if (option::is_some(maybe_supply)) {
+            // We do track supply, in this case read from optional aggregator.
+            let supply = option::borrow(maybe_supply);
+            let value = optional_aggregator::read(supply);
+            option::some(value)
+        } else {
+            option::none()
+        }
     }
 
     /// Get the maximum supply from `metadata`.
@@ -371,20 +387,26 @@ module aptos_framework::fungible_asset {
     /// Increase the supply of a fungible metadata by minting.
     fun increase_supply<T: key>(metadata: &Object<T>, amount: u64) acquires FungibleAssetMetadata {
         assert!(amount != 0, error::invalid_argument(EZERO_AMOUNT));
-        let fungible_metadata = borrow_fungible_metadata_mut(metadata);
-        if (option::is_some(&fungible_metadata.maximum)) {
-            let max = *option::borrow(&fungible_metadata.maximum);
-            assert!(max - fungible_metadata.supply >= amount, error::invalid_argument(ECURRENT_SUPPLY_OVERFLOW))
+        let metadata = borrow_fungible_metadata_mut(metadata);
+        if (option::is_some(&metadata.supply)) {
+            if (option::is_some(&metadata.maximum)) {
+                let max = *option::borrow(&metadata.maximum);
+                let current = optional_aggregator::read(option::borrow(&metadata.supply));
+                assert!(max - (current as u64) >= amount, error::invalid_argument(ECURRENT_SUPPLY_OVERFLOW));
+            };
+            optional_aggregator::add(option::borrow_mut(&mut metadata.supply), (amount as u128));
         };
-        fungible_metadata.supply = fungible_metadata.supply + amount;
     }
 
     /// Decrease the supply of a fungible metadata by burning.
     fun decrease_supply<T: key>(metadata: &Object<T>, amount: u64) acquires FungibleAssetMetadata {
         assert!(amount != 0, error::invalid_argument(EZERO_AMOUNT));
-        let fungible_metadata = borrow_fungible_metadata_mut(metadata);
-        assert!(fungible_metadata.supply >= amount, error::invalid_argument(ECURRENT_SUPPLY_UNDERFLOW));
-        fungible_metadata.supply = fungible_metadata.supply - amount;
+        let metadata = borrow_fungible_metadata_mut(metadata);
+        if (option::is_some(&metadata.supply)) {
+            let current = optional_aggregator::read(option::borrow(&metadata.supply));
+            assert!(current >= amount, error::invalid_argument(ECURRENT_SUPPLY_OVERFLOW));
+            optional_aggregator::sub(option::borrow_mut(&mut metadata.supply), (amount as u128));
+        };
     }
 
     inline fun borrow_fungible_metadata<T: key>(
@@ -419,6 +441,9 @@ module aptos_framework::fungible_asset {
     use aptos_framework::account;
     #[test_only]
     use aptos_framework::object::object_address;
+    use aptos_framework::optional_aggregator::OptionalAggregator;
+    use aptos_framework::optional_aggregator;
+    use aptos_framework::aggregator;
 
     #[test_only]
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
