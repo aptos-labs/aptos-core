@@ -20,6 +20,7 @@ cargo build --locked --profile=$PROFILE \
     -p aptos-telemetry-service \
     -p aptos-db-bootstrapper \
     -p aptos-transaction-emitter \
+    -p aptos-db-tool \
     "$@"
 
 # After building, copy the binaries we need to `dist` since the `target` directory is used as docker cache mount and only available during the RUN step
@@ -30,10 +31,8 @@ BINS=(
     aptos-openapi-spec-generator
     aptos-telemetry-service
     aptos-fn-check-client
-    db-backup
-    db-backup-verify
+    aptos-db-tool
     aptos-db-bootstrapper
-    db-restore
     forge
     aptos-transaction-emitter
 )

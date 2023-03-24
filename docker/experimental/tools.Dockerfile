@@ -23,9 +23,7 @@ RUN wget https://storage.googleapis.com/pub/gsutil.tar.gz -O- | tar --gzip --dir
 RUN cd /usr/local/bin && wget "https://storage.googleapis.com/kubernetes-release/release/v1.18.6/bin/linux/amd64/kubectl" -O kubectl && chmod +x kubectl
 
 COPY --link --from=builder /aptos/dist/aptos-db-bootstrapper /usr/local/bin/aptos-db-bootstrapper
-COPY --link --from=builder /aptos/dist/db-backup /usr/local/bin/db-backup
-COPY --link --from=builder /aptos/dist/db-backup-verify /usr/local/bin/db-backup-verify
-COPY --link --from=builder /aptos/dist/db-restore /usr/local/bin/db-restore
+COPY --link --from=builder /aptos/dist/aptos-db-tool /usr/local/bin/aptos-db-tool
 COPY --link --from=builder /aptos/dist/aptos /usr/local/bin/aptos
 COPY --link --from=builder /aptos/dist/aptos-openapi-spec-generator /usr/local/bin/aptos-openapi-spec-generator
 COPY --link --from=builder /aptos/dist/aptos-fn-check-client /usr/local/bin/aptos-fn-check-client
