@@ -3,11 +3,35 @@ import axios from "axios";
 import { AnyNumber } from "../bcs/types";
 import { MaybeHexString } from "../utils";
 import {
+  AccountTokensCountQuery,
+  GetAccountCoinsDataQuery,
   GetAccountCurrentTokensQuery,
+  GetAccountTransactionsCountQuery,
+  GetAccountTransactionsDataQuery,
+  GetDelegatedStakingActivitiesQuery,
   GetIndexerLedgerInfoQuery,
+  GetTokenActivitiesCountQuery,
   GetTokenActivitiesQuery,
+  GetTokenDataQuery,
+  GetTokenOwnersDataQuery,
+  GetTopUserTransactionsQuery,
+  GetUserTransactionsQuery,
 } from "../indexer/generated/operations";
-import { GetAccountCurrentTokens, GetIndexerLedgerInfo, GetTokenActivities } from "../indexer/generated/queries";
+import {
+  AccountTokensCount,
+  GetAccountCoinsData,
+  GetAccountCurrentTokens,
+  GetAccountTransactionsCount,
+  GetAccountTransactionsData,
+  GetDelegatedStakingActivities,
+  GetIndexerLedgerInfo,
+  GetTokenActivities,
+  GetTokenActivitiesCount,
+  GetTokenData,
+  GetTokenOwnersData,
+  GetTopUserTransactions,
+  GetUserTransactions,
+} from "../indexer/generated/queries";
 
 interface PaginationArgs {
   offset?: AnyNumber;
@@ -79,10 +103,157 @@ export class IndexerClient {
    * @param idHash token id hash
    * @returns GetTokenActivitiesQuery response type
    */
-  async getTokenActivities(idHash: string): Promise<GetTokenActivitiesQuery> {
+  async getTokenActivities(idHash: string, options?: PaginationArgs): Promise<GetTokenActivitiesQuery> {
     const graphqlQuery = {
       query: GetTokenActivities,
-      variables: { idHash },
+      variables: { idHash, offset: options?.offset, limit: options?.limit },
+    };
+    return this.queryIndexer(graphqlQuery);
+  }
+
+  /**
+   * Queries an account coin data
+   *
+   * @param ownerAddress Owner address
+   * @returns GetAccountCoinsDataQuery response type
+   */
+  async getAccountCoinsData(ownerAddress: string, options?: PaginationArgs): Promise<GetAccountCoinsDataQuery> {
+    const graphqlQuery = {
+      query: GetAccountCoinsData,
+      variables: { owner_address: ownerAddress, offset: options?.offset, limit: options?.limit },
+    };
+    return this.queryIndexer(graphqlQuery);
+  }
+
+  /**
+   * Queries an account token acount
+   *
+   * @param ownerAddress Owner address
+   * @returns AccountTokensCountQuery response type
+   */
+  async getAccountTokensCount(ownerAddress: string): Promise<AccountTokensCountQuery> {
+    const graphqlQuery = {
+      query: AccountTokensCount,
+      variables: { owner_address: ownerAddress },
+    };
+    return this.queryIndexer(graphqlQuery);
+  }
+
+  /**
+   * Queries an account transactions acount
+   *
+   * @param address Account address
+   * @returns GetAccountTransactionsCountQuery response type
+   */
+  async getAccountTransactionsCount(address: string): Promise<GetAccountTransactionsCountQuery> {
+    const graphqlQuery = {
+      query: GetAccountTransactionsCount,
+      variables: { address },
+    };
+    return this.queryIndexer(graphqlQuery);
+  }
+
+  /**
+   * Queries an account transactions data
+   *
+   * @param address Account address
+   * @returns GetAccountTransactionsDataQuery response type
+   */
+  async getAccountTransactionsData(
+    address: string,
+    options?: PaginationArgs,
+  ): Promise<GetAccountTransactionsDataQuery> {
+    const graphqlQuery = {
+      query: GetAccountTransactionsData,
+      variables: { address, offset: options?.offset, limit: options?.limit },
+    };
+    return this.queryIndexer(graphqlQuery);
+  }
+
+  /**
+   * Queries delegated staking activities
+   *
+   * @param delegatorAddress Delegator address
+   * @param poolAddress Pool address
+   * @returns GetDelegatedStakingActivitiesQuery response type
+   */
+  async getDelegatedStakingActivities(
+    delegatorAddress: string,
+    poolAddress: string,
+  ): Promise<GetDelegatedStakingActivitiesQuery> {
+    const graphqlQuery = {
+      query: GetDelegatedStakingActivities,
+      variables: { delegatorAddress, poolAddress },
+    };
+    return this.queryIndexer(graphqlQuery);
+  }
+
+  /**
+   * Queries token activities count
+   *
+   * @param tokenId Token ID
+   * @returns GetTokenActivitiesCountQuery response type
+   */
+  async getTokenActivitiesCount(tokenId: string): Promise<GetTokenActivitiesCountQuery> {
+    const graphqlQuery = {
+      query: GetTokenActivitiesCount,
+      variables: { token_id: tokenId },
+    };
+    return this.queryIndexer(graphqlQuery);
+  }
+
+  /**
+   * Queries token data
+   *
+   * @param tokenId Token ID
+   * @returns GetTokenDataQuery response type
+   */
+  async getTokenData(tokenId: string): Promise<GetTokenDataQuery> {
+    const graphqlQuery = {
+      query: GetTokenData,
+      variables: { token_id: tokenId },
+    };
+    return this.queryIndexer(graphqlQuery);
+  }
+
+  /**
+   * Queries token owners data
+   *
+   * @param tokenId Token ID
+   * @param propertyVersion Property version
+   * @returns GetTokenOwnersDataQuery response type
+   */
+  async getTokenOwnersData(tokenId: string, propertyVersion: number): Promise<GetTokenOwnersDataQuery> {
+    const graphqlQuery = {
+      query: GetTokenOwnersData,
+      variables: { token_id: tokenId, property_version: propertyVersion },
+    };
+    return this.queryIndexer(graphqlQuery);
+  }
+
+  /**
+   * Queries top user transactions
+   *
+   * @param limit
+   * @returns GetTopUserTransactionsQuery response type
+   */
+  async getTopUserTransactions(limit: number): Promise<GetTopUserTransactionsQuery> {
+    const graphqlQuery = {
+      query: GetTopUserTransactions,
+      variables: { limit },
+    };
+    return this.queryIndexer(graphqlQuery);
+  }
+
+  /**
+   * Queries top user transactions
+   *
+   * @returns GetUserTransactionsQuery response type
+   */
+  async getUserTransactions(startVersion?: number, options?: PaginationArgs): Promise<GetUserTransactionsQuery> {
+    const graphqlQuery = {
+      query: GetUserTransactions,
+      variables: { start_version: startVersion, offset: options?.offset, limit: options?.limit },
     };
     return this.queryIndexer(graphqlQuery);
   }

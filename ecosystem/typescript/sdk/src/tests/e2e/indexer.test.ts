@@ -78,6 +78,98 @@ describe("Indexer", () => {
       longTestTimeout,
     );
 
+    it(
+      "gets account coin data",
+      async () => {
+        const accountCoinData = await indexerClient.getAccountCoinsData(alice.address().hex());
+        expect(accountCoinData.current_coin_balances[0].coin_type).toEqual("0x1::aptos_coin::AptosCoin");
+      },
+      longTestTimeout,
+    );
+
+    it(
+      "gets account token count",
+      async () => {
+        const accountTokenCount = await indexerClient.getAccountTokensCount(alice.address().hex());
+        expect(accountTokenCount.current_token_ownerships_aggregate.aggregate?.count).toEqual(1);
+      },
+      longTestTimeout,
+    );
+
+    it(
+      "gets account transactions count",
+      async () => {
+        const accountTransactionsCount = await indexerClient.getAccountTransactionsCount(alice.address().hex());
+        expect(accountTransactionsCount.move_resources_aggregate.aggregate?.count).toEqual(3);
+      },
+      longTestTimeout,
+    );
+
+    it(
+      "gets account transactions data",
+      async () => {
+        const accountTransactionsData = await indexerClient.getAccountTransactionsData(alice.address().hex());
+        expect(accountTransactionsData.move_resources[0]).toHaveProperty("transaction_version");
+      },
+      longTestTimeout,
+    );
+
+    it(
+      "gets token activities count",
+      async () => {
+        const accountNFTs = await indexerClient.getAccountNFTs(alice.address().hex());
+        const tokenActivitiesCount = await indexerClient.getTokenActivitiesCount(
+          accountNFTs.current_token_ownerships[0].current_token_data!.token_data_id_hash,
+        );
+        expect(tokenActivitiesCount.token_activities_aggregate.aggregate?.count).toBe(2);
+      },
+      longTestTimeout,
+    );
+
+    it(
+      "gets token data",
+      async () => {
+        const accountNFTs = await indexerClient.getAccountNFTs(alice.address().hex());
+        const tokenData = await indexerClient.getTokenData(
+          accountNFTs.current_token_ownerships[0].current_token_data!.token_data_id_hash,
+        );
+        expect(tokenData.current_token_datas[0].name).toEqual("Alice Token");
+      },
+      longTestTimeout,
+    );
+
+    it(
+      "gets token owners data",
+      async () => {
+        const accountNFTs = await indexerClient.getAccountNFTs(alice.address().hex());
+        const tokenOwnersData = await indexerClient.getTokenOwnersData(
+          accountNFTs.current_token_ownerships[0].current_token_data!.token_data_id_hash,
+          0,
+        );
+        expect(tokenOwnersData.current_token_ownerships[0].owner_address).toEqual(alice.address().hex());
+      },
+      longTestTimeout,
+    );
+
+    it(
+      "gets top user transactions",
+      async () => {
+        const topUserTransactions = await indexerClient.getTopUserTransactions(5);
+        expect(topUserTransactions.user_transactions.length).toEqual(5);
+      },
+      longTestTimeout,
+    );
+
+    it(
+      "gets user transactions",
+      async () => {
+        const userTransactions = await indexerClient.getUserTransactions(482294669, { limit: 4 });
+        expect(userTransactions.user_transactions[0].version).toEqual(482294669);
+        expect(userTransactions.user_transactions.length).toEqual(4);
+      },
+      longTestTimeout,
+    );
+
     test("gets indexer ledger info", async () => {
       const ledgerInfo = await indexerClient.getIndexerLedgerInfo();
       expect(ledgerInfo.ledger_infos[0].chain_id).toBeGreaterThan(1);

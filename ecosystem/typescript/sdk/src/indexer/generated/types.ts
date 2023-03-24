@@ -1657,6 +1657,74 @@ export enum Cursor_Ordering {
   Desc = 'DESC'
 }
 
+/** columns and relationships of "delegated_staking_activities" */
+export type Delegated_Staking_Activities = {
+  __typename?: 'delegated_staking_activities';
+  amount: Scalars['numeric'];
+  delegator_address: Scalars['String'];
+  event_index: Scalars['bigint'];
+  event_type: Scalars['String'];
+  pool_address: Scalars['String'];
+  transaction_version: Scalars['bigint'];
+};
+
+/** Boolean expression to filter rows from the table "delegated_staking_activities". All fields are combined with a logical 'AND'. */
+export type Delegated_Staking_Activities_Bool_Exp = {
+  _and?: InputMaybe<Array<Delegated_Staking_Activities_Bool_Exp>>;
+  _not?: InputMaybe<Delegated_Staking_Activities_Bool_Exp>;
+  _or?: InputMaybe<Array<Delegated_Staking_Activities_Bool_Exp>>;
+  amount?: InputMaybe<Numeric_Comparison_Exp>;
+  delegator_address?: InputMaybe<String_Comparison_Exp>;
+  event_index?: InputMaybe<Bigint_Comparison_Exp>;
+  event_type?: InputMaybe<String_Comparison_Exp>;
+  pool_address?: InputMaybe<String_Comparison_Exp>;
+  transaction_version?: InputMaybe<Bigint_Comparison_Exp>;
+};
+
+/** Ordering options when selecting data from "delegated_staking_activities". */
+export type Delegated_Staking_Activities_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  delegator_address?: InputMaybe<Order_By>;
+  event_index?: InputMaybe<Order_By>;
+  event_type?: InputMaybe<Order_By>;
+  pool_address?: InputMaybe<Order_By>;
+  transaction_version?: InputMaybe<Order_By>;
+};
+
+/** select columns of table "delegated_staking_activities" */
+export enum Delegated_Staking_Activities_Select_Column {
+  /** column name */
+  Amount = 'amount',
+  /** column name */
+  DelegatorAddress = 'delegator_address',
+  /** column name */
+  EventIndex = 'event_index',
+  /** column name */
+  EventType = 'event_type',
+  /** column name */
+  PoolAddress = 'pool_address',
+  /** column name */
+  TransactionVersion = 'transaction_version'
+}
+
+/** Streaming cursor of the table "delegated_staking_activities" */
+export type Delegated_Staking_Activities_Stream_Cursor_Input = {
+  /** Stream column input with initial value */
+  initial_value: Delegated_Staking_Activities_Stream_Cursor_Value_Input;
+  /** cursor ordering */
+  ordering?: InputMaybe<Cursor_Ordering>;
+};
+
+/** Initial value of the column from where the streaming should start */
+export type Delegated_Staking_Activities_Stream_Cursor_Value_Input = {
+  amount?: InputMaybe<Scalars['numeric']>;
+  delegator_address?: InputMaybe<Scalars['String']>;
+  event_index?: InputMaybe<Scalars['bigint']>;
+  event_type?: InputMaybe<Scalars['String']>;
+  pool_address?: InputMaybe<Scalars['String']>;
+  transaction_version?: InputMaybe<Scalars['bigint']>;
+};
+
 /** columns and relationships of "events" */
 export type Events = {
   __typename?: 'events';
@@ -2310,6 +2378,10 @@ export type Query_Root = {
   current_token_pending_claims: Array<Current_Token_Pending_Claims>;
   /** fetch data from the table: "current_token_pending_claims" using primary key columns */
   current_token_pending_claims_by_pk?: Maybe<Current_Token_Pending_Claims>;
+  /** fetch data from the table: "delegated_staking_activities" */
+  delegated_staking_activities: Array<Delegated_Staking_Activities>;
+  /** fetch data from the table: "delegated_staking_activities" using primary key columns */
+  delegated_staking_activities_by_pk?: Maybe<Delegated_Staking_Activities>;
   /** fetch data from the table: "events" */
   events: Array<Events>;
   /** fetch data from the table: "events" using primary key columns */
@@ -2581,6 +2653,21 @@ export type Query_RootCurrent_Token_Pending_Claims_By_PkArgs = {
   property_version: Scalars['numeric'];
   to_address: Scalars['String'];
   token_data_id_hash: Scalars['String'];
+};
+
+
+export type Query_RootDelegated_Staking_ActivitiesArgs = {
+  distinct_on?: InputMaybe<Array<Delegated_Staking_Activities_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Delegated_Staking_Activities_Order_By>>;
+  where?: InputMaybe<Delegated_Staking_Activities_Bool_Exp>;
+};
+
+
+export type Query_RootDelegated_Staking_Activities_By_PkArgs = {
+  event_index: Scalars['bigint'];
+  transaction_version: Scalars['bigint'];
 };
 
 
@@ -2887,6 +2974,12 @@ export type Subscription_Root = {
   current_token_pending_claims_by_pk?: Maybe<Current_Token_Pending_Claims>;
   /** fetch data from the table in a streaming manner : "current_token_pending_claims" */
   current_token_pending_claims_stream: Array<Current_Token_Pending_Claims>;
+  /** fetch data from the table: "delegated_staking_activities" */
+  delegated_staking_activities: Array<Delegated_Staking_Activities>;
+  /** fetch data from the table: "delegated_staking_activities" using primary key columns */
+  delegated_staking_activities_by_pk?: Maybe<Delegated_Staking_Activities>;
+  /** fetch data from the table in a streaming manner : "delegated_staking_activities" */
+  delegated_staking_activities_stream: Array<Delegated_Staking_Activities>;
   /** fetch data from the table: "events" */
   events: Array<Events>;
   /** fetch data from the table: "events" using primary key columns */
@@ -3282,6 +3375,28 @@ export type Subscription_RootCurrent_Token_Pending_Claims_StreamArgs = {
   batch_size: Scalars['Int'];
   cursor: Array<InputMaybe<Current_Token_Pending_Claims_Stream_Cursor_Input>>;
   where?: InputMaybe<Current_Token_Pending_Claims_Bool_Exp>;
+};
+
+
+export type Subscription_RootDelegated_Staking_ActivitiesArgs = {
+  distinct_on?: InputMaybe<Array<Delegated_Staking_Activities_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Delegated_Staking_Activities_Order_By>>;
+  where?: InputMaybe<Delegated_Staking_Activities_Bool_Exp>;
+};
+
+
+export type Subscription_RootDelegated_Staking_Activities_By_PkArgs = {
+  event_index: Scalars['bigint'];
+  transaction_version: Scalars['bigint'];
+};
+
+
+export type Subscription_RootDelegated_Staking_Activities_StreamArgs = {
+  batch_size: Scalars['Int'];
+  cursor: Array<InputMaybe<Delegated_Staking_Activities_Stream_Cursor_Input>>;
+  where?: InputMaybe<Delegated_Staking_Activities_Bool_Exp>;
 };
 
 
