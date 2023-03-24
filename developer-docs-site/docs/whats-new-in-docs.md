@@ -363,7 +363,7 @@ The [hardware requirements](nodes/validator-node/operator/node-requirements.md#h
 
 ## 25 August 2022
 
-- A new guide describing [Upgrading the Move Code](/guides/move-guides/book/upgrade-packages.md) is posted.
+- A new guide describing [Move Package Upgrades](/guides/move-guides/book/upgrade-packages.md) is posted.
 
 
 ## 24 August 2022
