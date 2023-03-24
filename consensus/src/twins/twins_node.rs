@@ -13,6 +13,7 @@ use crate::{
     test_utils::{MockStateComputer, MockStorage},
     util::time_service::ClockTimeService,
 };
+use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
     config::{NodeConfig, WaypointConfig},
@@ -136,6 +137,8 @@ impl SMRNode {
         let (self_sender, self_receiver) =
             aptos_channels::new(1_024, &counters::PENDING_SELF_MESSAGES);
 
+        let bounded_executor = BoundedExecutor::new(2, playground.handle());
+
         let epoch_mgr = EpochManager::new(
             &config,
             time_service,
@@ -146,6 +149,7 @@ impl SMRNode {
             state_computer.clone(),
             storage.clone(),
             reconfig_listener,
+            bounded_executor,
         );
         let (network_task, network_receiver) =
             NetworkTask::new(network_service_events, self_receiver);
