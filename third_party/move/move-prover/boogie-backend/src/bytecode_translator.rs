@@ -1948,7 +1948,7 @@ impl<'env> FunctionTranslator<'env> {
                             let src_type = boogie_num_type_base(&self.get_local_type(op2));
                             emitln!(
                                 writer,
-                                "call {} := ${}Bv{}From{}({}, {});",
+                                "call {} := ${}{}From{}({}, {});",
                                 str_local(dest),
                                 sh_oper_str,
                                 target_type,
