@@ -128,18 +128,18 @@ impl From<MarketRegistrationEvent> for NewMarketRegistrationEvent {
     }
 }
 
-impl From<MarketRegistrationEvent> for models::market::MarketRegistrationEvent {
-    fn from(value: MarketRegistrationEvent) -> Self {
+impl From<&MarketRegistrationEvent> for models::market::MarketRegistrationEvent {
+    fn from(value: &MarketRegistrationEvent) -> Self {
         Self {
             market_id: value.market_id.into(),
             time: *CURRENT_BLOCK_TIME.read().unwrap(),
-            base_account_address: Some(value.base_type.account_address),
-            base_module_name: Some(value.base_type.module_name),
-            base_struct_name: Some(value.base_type.struct_name),
-            base_name_generic: Some(value.base_name_generic),
-            quote_account_address: value.quote_type.account_address,
-            quote_module_name: value.quote_type.module_name,
-            quote_struct_name: value.quote_type.struct_name,
+            base_account_address: Some(value.base_type.account_address.clone()),
+            base_module_name: Some(value.base_type.module_name.clone()),
+            base_struct_name: Some(value.base_type.struct_name.clone()),
+            base_name_generic: Some(value.base_name_generic.clone()),
+            quote_account_address: value.quote_type.account_address.clone(),
+            quote_module_name: value.quote_type.module_name.clone(),
+            quote_struct_name: value.quote_type.struct_name.clone(),
             lot_size: value.lot_size.into(),
             tick_size: value.tick_size.into(),
             min_size: value.min_size.into(),
@@ -185,12 +185,31 @@ fn is_event_type_valid(e: &EventModel) -> bool {
     EVENT_TYPES.iter().any(|t| t == &e.type_)
 }
 
+fn fetch_all_markets(
+    conn: &mut PgConnection,
+) -> Result<Vec<models::market::MarketRegistrationEvent>, Error> {
+    use diesel::prelude::*;
+    use econia_db::schema::market_registration_events::dsl::*;
+    market_registration_events.load::<models::market::MarketRegistrationEvent>(conn)
+}
+
 type BaseQuoteKey = (String, String, String, String, String, String);
+
+fn create_base_quote_key(m: &models::market::MarketRegistrationEvent) -> BaseQuoteKey {
+    (
+        m.base_account_address.clone().unwrap_or_default(),
+        m.base_module_name.clone().unwrap_or_default(),
+        m.base_struct_name.clone().unwrap_or_default(),
+        m.quote_account_address.clone(),
+        m.quote_module_name.clone(),
+        m.quote_struct_name.clone(),
+    )
+}
 
 pub struct EconiaTransactionProcessor {
     connection_pool: PgDbPool,
-    markets: HashMap<BigDecimal, models::market::MarketRegistrationEvent>,
-    base_quote_to_market_id: HashMap<BaseQuoteKey, BigDecimal>,
+    markets: RwLock<HashMap<BigDecimal, models::market::MarketRegistrationEvent>>,
+    base_quote_to_market_id: RwLock<HashMap<BaseQuoteKey, BigDecimal>>,
 }
 
 impl EconiaTransactionProcessor {
@@ -198,35 +217,32 @@ impl EconiaTransactionProcessor {
         let mut conn = connection_pool
             .get()
             .expect("failed connecting to db on startup");
-        let mkts = Self::fetch_all_markets(&mut conn).expect("failed loading markets on startup");
+        let mkts = fetch_all_markets(&mut conn).expect("failed loading markets on startup");
         let mut markets = HashMap::new();
         let mut base_quote_to_market_id = HashMap::new();
         for m in mkts.into_iter() {
-            let key = (
-                m.base_account_address.clone().unwrap_or_default(),
-                m.base_module_name.clone().unwrap_or_default(),
-                m.base_struct_name.clone().unwrap_or_default(),
-                m.quote_account_address.clone(),
-                m.quote_module_name.clone(),
-                m.quote_struct_name.clone(),
-            );
+            let key = create_base_quote_key(&m);
             base_quote_to_market_id.insert(key, m.market_id.clone());
             markets.insert(m.market_id.clone(), m);
         }
 
         Self {
             connection_pool,
-            markets,
-            base_quote_to_market_id,
+            markets: RwLock::new(markets),
+            base_quote_to_market_id: RwLock::new(base_quote_to_market_id),
         }
     }
 
-    fn fetch_all_markets(
-        conn: &mut PgConnection,
-    ) -> Result<Vec<models::market::MarketRegistrationEvent>, Error> {
-        use diesel::prelude::*;
-        use econia_db::schema::market_registration_events::dsl::*;
-        market_registration_events.load::<models::market::MarketRegistrationEvent>(conn)
+    fn update_markets_cache(&self, ev: &[MarketRegistrationEvent]) {
+        for e in ev.iter() {
+            let m = models::market::MarketRegistrationEvent::from(e);
+            let key = create_base_quote_key(&m);
+            self.base_quote_to_market_id
+                .write()
+                .unwrap()
+                .insert(key, m.market_id.clone());
+            self.markets.write().unwrap().insert(m.market_id.clone(), m);
+        }
     }
 
     fn insert_to_db(
@@ -278,6 +294,10 @@ impl EconiaTransactionProcessor {
 
         self.insert_maker_events(conn, maker)?;
         self.insert_taker_events(conn, taker)?;
+
+        // update markets cache
+        self.update_markets_cache(&market_registration);
+
         self.insert_market_registration_events(conn, market_registration)?;
         self.insert_recognized_market_events(conn, recognized_market)?;
         Ok(())
@@ -329,7 +349,6 @@ impl EconiaTransactionProcessor {
         Ok(())
     }
 
-    // TODO update cache as these come in
     fn insert_market_registration_events(
         &self,
         conn: &mut PgConnection,
@@ -363,10 +382,8 @@ impl EconiaTransactionProcessor {
         let mut events = vec![];
         for e in ev.into_iter() {
             if let Some(r) = e.recognized_market_info {
-                let mkt = self
-                    .markets
-                    .get(&r.market_id.into())
-                    .ok_or(Error::NotFound)?;
+                let mkt = self.markets.read().unwrap();
+                let mkt = mkt.get(&r.market_id.into()).ok_or(Error::NotFound)?;
                 let new_lot_size = BigDecimal::from(r.lot_size);
                 let new_tick_size = BigDecimal::from(r.tick_size);
                 let new_min_size = BigDecimal::from(r.min_size);
@@ -394,7 +411,8 @@ impl EconiaTransactionProcessor {
                     e.trading_pair.quote_type.module_name,
                     e.trading_pair.quote_type.struct_name,
                 );
-                let mkt_id = self.base_quote_to_market_id.get(&key).unwrap();
+                let mkt_id = self.base_quote_to_market_id.read().unwrap();
+                let mkt_id = mkt_id.get(&key).unwrap();
                 events.push(NewRecognizedMarketEvent {
                     market_id: mkt_id.clone(),
                     time: *CURRENT_BLOCK_TIME.read().unwrap(),
