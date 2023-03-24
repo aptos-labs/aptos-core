@@ -723,11 +723,12 @@ With an existing collection, directly mint a soul bound token into the recipient
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="aptos_token.md#0x4_aptos_token_freeze_transfer">freeze_transfer</a>&lt;T: key&gt;(creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="token.md#0x4_token">token</a>: Object&lt;T&gt;) <b>acquires</b> <a href="aptos_token.md#0x4_aptos_token_AptosCollection">AptosCollection</a>, <a href="aptos_token.md#0x4_aptos_token_AptosToken">AptosToken</a> {
+    <b>let</b> <a href="aptos_token.md#0x4_aptos_token">aptos_token</a> = authorized_borrow(&<a href="token.md#0x4_token">token</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(creator));
     <b>assert</b>!(
-        <a href="aptos_token.md#0x4_aptos_token_are_collection_tokens_freezable">are_collection_tokens_freezable</a>(<a href="token.md#0x4_token_collection_object">token::collection_object</a>(<a href="token.md#0x4_token">token</a>)),
+        <a href="aptos_token.md#0x4_aptos_token_are_collection_tokens_freezable">are_collection_tokens_freezable</a>(<a href="token.md#0x4_token_collection_object">token::collection_object</a>(<a href="token.md#0x4_token">token</a>))
+            && <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&<a href="aptos_token.md#0x4_aptos_token">aptos_token</a>.transfer_ref),
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="aptos_token.md#0x4_aptos_token_EFIELD_NOT_MUTABLE">EFIELD_NOT_MUTABLE</a>),
     );
-    <b>let</b> <a href="aptos_token.md#0x4_aptos_token">aptos_token</a> = authorized_borrow(&<a href="token.md#0x4_token">token</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(creator));
     <a href="../../aptos-framework/doc/object.md#0x1_object_disable_ungated_transfer">object::disable_ungated_transfer</a>(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&<a href="aptos_token.md#0x4_aptos_token">aptos_token</a>.transfer_ref));
 }
 </code></pre>
@@ -752,11 +753,12 @@ With an existing collection, directly mint a soul bound token into the recipient
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="aptos_token.md#0x4_aptos_token_unfreeze_transfer">unfreeze_transfer</a>&lt;T: key&gt;(creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="token.md#0x4_token">token</a>: Object&lt;T&gt;) <b>acquires</b> <a href="aptos_token.md#0x4_aptos_token_AptosCollection">AptosCollection</a>, <a href="aptos_token.md#0x4_aptos_token_AptosToken">AptosToken</a> {
+    <b>let</b> <a href="aptos_token.md#0x4_aptos_token">aptos_token</a> = authorized_borrow(&<a href="token.md#0x4_token">token</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(creator));
     <b>assert</b>!(
-        <a href="aptos_token.md#0x4_aptos_token_are_collection_tokens_freezable">are_collection_tokens_freezable</a>(<a href="token.md#0x4_token_collection_object">token::collection_object</a>(<a href="token.md#0x4_token">token</a>)),
+        <a href="aptos_token.md#0x4_aptos_token_are_collection_tokens_freezable">are_collection_tokens_freezable</a>(<a href="token.md#0x4_token_collection_object">token::collection_object</a>(<a href="token.md#0x4_token">token</a>))
+            && <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&<a href="aptos_token.md#0x4_aptos_token">aptos_token</a>.transfer_ref),
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="aptos_token.md#0x4_aptos_token_EFIELD_NOT_MUTABLE">EFIELD_NOT_MUTABLE</a>),
     );
-    <b>let</b> <a href="aptos_token.md#0x4_aptos_token">aptos_token</a> = authorized_borrow(&<a href="token.md#0x4_token">token</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(creator));
     <a href="../../aptos-framework/doc/object.md#0x1_object_enable_ungated_transfer">object::enable_ungated_transfer</a>(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&<a href="aptos_token.md#0x4_aptos_token">aptos_token</a>.transfer_ref));
 }
 </code></pre>
