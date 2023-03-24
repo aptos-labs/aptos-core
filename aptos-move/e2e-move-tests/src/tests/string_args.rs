@@ -109,6 +109,12 @@ fn string_args_good() {
 
     tests.push(("0xcafe::test::hi", vec![(args, expected_change)]));
 
+    let str128 = std::str::from_utf8(&[97u8; 128] as &[u8]).unwrap();
+    tests.push(("0xcafe::test::hi", vec![(
+        vec![bcs::to_bytes(str128.as_bytes()).unwrap()],
+        str128,
+    )]));
+
     // vector of strings
     let mut in_out = vec![];
 
