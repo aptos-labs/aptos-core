@@ -177,7 +177,7 @@ variable "utility_instance_enable_taint" {
 
 variable "validator_instance_type" {
   description = "Instance type used for validator and fullnodes"
-  default     = "c6i.8xlarge"
+  default     = "c6i.16xlarge"
 }
 
 variable "validator_instance_num" {

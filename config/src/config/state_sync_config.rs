@@ -5,7 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 // The maximum message size per state sync message
-pub const MAX_MESSAGE_SIZE: usize = 4 * 1024 * 1024; /* 4 MiB */
+pub const MAX_MESSAGE_SIZE: usize = 20 * 1024 * 1024; /* 20 MiB */
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -94,7 +94,7 @@ impl Default for StateSyncDriverConfig {
             max_connection_deadline_secs: 10,
             max_consecutive_stream_notifications: 10,
             max_num_stream_timeouts: 12,
-            max_pending_data_chunks: 100,
+            max_pending_data_chunks: 500,
             max_stream_wait_time_ms: 5000,
             num_versions_to_skip_snapshot_sync: 100_000_000, // At 5k TPS, this allows a node to fail for about 6 hours.
         }
@@ -126,8 +126,8 @@ impl Default for StorageServiceConfig {
             max_network_chunk_bytes: MAX_MESSAGE_SIZE as u64,
             max_state_chunk_size: 4000,
             max_subscription_period_ms: 5000,
-            max_transaction_chunk_size: 2000,
-            max_transaction_output_chunk_size: 1000,
+            max_transaction_chunk_size: 5000,
+            max_transaction_output_chunk_size: 5000,
             storage_summary_refresh_interval_ms: 50,
         }
     }
@@ -166,11 +166,11 @@ impl Default for DataStreamingServiceConfig {
     fn default() -> Self {
         Self {
             global_summary_refresh_interval_ms: 50,
-            max_concurrent_requests: 3,
+            max_concurrent_requests: 20,
             max_concurrent_state_requests: 6,
-            max_data_stream_channel_sizes: 300,
+            max_data_stream_channel_sizes: 500,
             max_request_retry: 5,
-            max_notification_id_mappings: 300,
+            max_notification_id_mappings: 500,
             progress_check_interval_ms: 100,
         }
     }
@@ -192,13 +192,13 @@ pub struct AptosDataClientConfig {
 impl Default for AptosDataClientConfig {
     fn default() -> Self {
         Self {
-            max_num_in_flight_priority_polls: 10,
-            max_num_in_flight_regular_polls: 10,
+            max_num_in_flight_priority_polls: 50,
+            max_num_in_flight_regular_polls: 50,
             max_num_output_reductions: 0,
             max_response_timeout_ms: 60000, // 60 seconds
-            response_timeout_ms: 10000,     // 10 seconds
+            response_timeout_ms: 30000,     // 30 seconds
             subscription_timeout_ms: 5000,  // 5 seconds
-            summary_poll_interval_ms: 200,
+            summary_poll_interval_ms: 100,
             use_compression: true,
         }
     }

@@ -158,6 +158,10 @@ impl TTLIndex {
         }
     }
 
+    pub(crate) fn iter(&self) -> Iter<TTLOrderingKey> {
+        self.data.iter()
+    }
+
     pub(crate) fn size(&self) -> usize {
         self.data.len()
     }

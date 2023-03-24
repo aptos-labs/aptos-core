@@ -7,7 +7,7 @@ use crate::{
 use anyhow::Result;
 use aptos_consensus_types::{
     block::block_test_utils::random_payload,
-    common::{Payload, PayloadFilter, Round},
+    common::{Payload, PayloadFilter},
     request_response::GetPayloadCommand,
 };
 use aptos_types::{
@@ -26,7 +26,7 @@ pub struct MockPayloadManager {
 impl MockPayloadManager {
     pub fn new(consensus_to_quorum_store_sender: Option<mpsc::Sender<GetPayloadCommand>>) -> Self {
         let quorum_store_client =
-            consensus_to_quorum_store_sender.map(|s| QuorumStoreClient::new(s, 1, 1));
+            consensus_to_quorum_store_sender.map(|s| QuorumStoreClient::new(s, 1, 1, 1.1, 100));
         Self {
             _quorum_store_client: quorum_store_client,
         }
@@ -52,12 +52,13 @@ impl PayloadClient for MockPayloadManager {
     /// The returned future is fulfilled with the vector of SignedTransactions
     async fn pull_payload(
         &self,
-        _round: Round,
         _max_size: u64,
         _max_bytes: u64,
         _exclude: PayloadFilter,
         _wait_callback: BoxFuture<'static, ()>,
         _pending_ordering: bool,
+        _pending_uncommitted_blocks: usize,
+        _recent_fill_fraction: f32,
     ) -> Result<Payload, QuorumStoreError> {
         // generate 1k txn is too slow with coverage instrumentation
         Ok(random_payload(10))

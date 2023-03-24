@@ -33,7 +33,12 @@ pub fn bootstrap(
     db: Arc<dyn DbReader>,
     mp_sender: MempoolClientSender,
 ) -> anyhow::Result<Runtime> {
-    let runtime = aptos_runtimes::spawn_named_runtime("api".into(), None);
+    // Get the max number of runtime workers, otherwise use 2 * number of CPU cores
+    let max_runtime_workers = config
+        .api
+        .max_runtime_workers
+        .unwrap_or_else(|| num_cpus::get() * config.api.runtime_worker_multiplier);
+    let runtime = aptos_runtimes::spawn_named_runtime("api".into(), Some(max_runtime_workers));
 
     let context = Context::new(chain_id, db, mp_sender, config.clone());
 

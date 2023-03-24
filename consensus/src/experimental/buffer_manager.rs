@@ -797,32 +797,37 @@ impl BufferManager {
             // advancing the root will trigger sending requests to the pipeline
             ::futures::select! {
                 blocks = self.block_rx.select_next_some() => {
+                    monitor!("buffer_manager_process_ordered", {
                     self.process_ordered_blocks(blocks).await;
-                },
+                })},
                 rand_msg = self.rand_msg_rx.select_next_some() => {
                     monitor!("buffer_manager_process_rand", {
                         self.process_rand_message(rand_msg).await;
                         if self.execution_root.is_none() {
                             self.advance_execution_root().await;
-                        }
-                    });
+                        }});
                 },
                 reset_event = self.reset_rx.select_next_some() => {
-                    self.process_reset_request(reset_event).await;
+                    monitor!("buffer_manager_process_reset",
+                    self.process_reset_request(reset_event).await);
                 },
                 response = self.execution_phase_rx.select_next_some() => {
+                    monitor!("buffer_manager_process_execution_response", {
                     self.process_execution_response(response).await;
                     self.advance_execution_root().await;
                     if self.signing_root.is_none() {
                         self.advance_signing_root().await;
-                    }
+                    }});
                 },
                 response = self.signing_phase_rx.select_next_some() => {
+                    monitor!("buffer_manager_process_signing_response", {
                     self.process_signing_response(response).await;
-                    self.advance_signing_root().await;
+                    self.advance_signing_root().await
+                    })
                 },
                 commit_msg = self.commit_msg_rx.select_next_some() => {
                     println!("receive commit msg aggregated head!");
+                    monitor!("buffer_manager_process_commit_message",
                     if let Some(aggregated_block_id) = self.process_commit_message(commit_msg) {
                         self.advance_head(aggregated_block_id).await;
                         if self.execution_root.is_none() {
@@ -831,7 +836,7 @@ impl BufferManager {
                         if self.signing_root.is_none() {
                             self.advance_signing_root().await;
                         }
-                    }
+                    });
                 },
                 _ = interval.tick().fuse() => {
                     // self.print_buffer();

@@ -351,7 +351,7 @@ pub fn setup_environment_and_start_node(
     logger_filter_update_job: Option<LoggerFilterUpdater>,
 ) -> anyhow::Result<AptosHandle> {
     // Log the node config at node startup
-    info!("Using node config {:?}", &node_config);
+    warn!("Using node config {:?}", &node_config);
 
     // Start the node inspection service
     services::start_node_inspection_service(&node_config);

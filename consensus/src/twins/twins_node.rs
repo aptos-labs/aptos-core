@@ -10,9 +10,11 @@ use crate::{
     network_interface::{ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
     payload_manager::PayloadManager,
+    quorum_store::quorum_store_db::MockQuorumStoreDB,
     test_utils::{MockStateComputer, MockStorage},
     util::time_service::ClockTimeService,
 };
+use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
     config::{NodeConfig, WaypointConfig},
@@ -136,6 +138,9 @@ impl SMRNode {
         let (self_sender, self_receiver) =
             aptos_channels::new(1_024, &counters::PENDING_SELF_MESSAGES);
 
+        let quorum_store_storage = Arc::new(MockQuorumStoreDB::new());
+        let bounded_executor = BoundedExecutor::new(2, playground.handle());
+
         let epoch_mgr = EpochManager::new(
             &config,
             time_service,
@@ -145,7 +150,9 @@ impl SMRNode {
             quorum_store_to_mempool_sender,
             state_computer.clone(),
             storage.clone(),
+            quorum_store_storage,
             reconfig_listener,
+            bounded_executor,
         );
         let (network_task, network_receiver) =
             NetworkTask::new(network_service_events, self_receiver);
