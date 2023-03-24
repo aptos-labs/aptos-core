@@ -128,15 +128,11 @@ impl UnverifiedEvent {
                 VerifiedEvent::ProofOfStoreMsg(p)
             },
             UnverifiedEvent::RandShareMsg(rss) => {
-                if !self_message {
-                    rss.verify(validator)?;
-                }
+                rss.verify(validator)?;
                 VerifiedEvent::RandShareMsg(rss)
             },
             UnverifiedEvent::RandDecisionMsg(rds) => {
-                if !self_message {
-                    rds.verify(validator)?;
-                }
+                rds.verify(validator)?;
                 VerifiedEvent::RandDecisionMsg(rds)
             },
         })

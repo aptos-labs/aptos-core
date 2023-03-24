@@ -13,6 +13,7 @@ use crate::{
         pipeline_phase::CountedRequest,
         signing_phase::{SigningRequest, SigningResponse},
     },
+    monitor,
     network::NetworkSender,
     round_manager::VerifiedEvent,
     state_replication::StateComputerCommitCallBackType,
