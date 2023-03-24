@@ -293,6 +293,7 @@ clippy
 cn
 codebase
 config
+customizable
 configs
 const
 copyable
