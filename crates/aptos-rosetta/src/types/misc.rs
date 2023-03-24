@@ -237,7 +237,7 @@ impl Display for OperationStatusType {
     }
 }
 
-pub async fn get_total_stake(
+pub async fn get_stake_balances(
     rest_client: &aptos_rest_client::Client,
     owner_account: &AccountIdentifier,
     pool_address: AccountAddress,
@@ -250,36 +250,46 @@ pub async fn get_total_stake(
     {
         let stake_pool = response.into_inner();
 
-        // Any stake pools that match, retrieve that.  Then update the total
-        let balance = get_stake_balance_from_stake_pool(&stake_pool, owner_account)?;
-        Ok(Some(balance))
+        // Stake isn't allowed for base accounts
+        if owner_account.is_base_account() {
+            return Err(ApiError::InvalidInput(Some(
+                "Stake pool not supported for base account".to_string(),
+            )));
+        }
+
+        // If the operator address is different, skip
+        if owner_account.is_operator_stake()
+            && owner_account.operator_address()? != stake_pool.operator_address
+        {
+            return Err(ApiError::InvalidInput(Some(
+                "Stake pool not for matching operator".to_string(),
+            )));
+        }
+
+        // Any stake pools that match, retrieve that.
+        let mut requested_balance: Option<String> = None;
+
+        if owner_account.is_active_stake() {
+            requested_balance = Some(stake_pool.active.to_string());
+        } else if owner_account.is_pending_active_stake() {
+            requested_balance = Some(stake_pool.pending_active.to_string());
+        } else if owner_account.is_inactive_stake() {
+            requested_balance = Some(stake_pool.inactive.to_string());
+        } else if owner_account.is_pending_inactive_stake() {
+            requested_balance = Some(stake_pool.pending_inactive.to_string());
+        } else if owner_account.is_total_stake() {
+            requested_balance = Some(stake_pool.get_total_staked_amount().to_string());
+        }
+
+        if let Some(balance) = requested_balance {
+            Ok(Some(Amount {
+                value: balance,
+                currency: native_coin(),
+            }))
+        } else {
+            Ok(None)
+        }
     } else {
         Ok(None)
     }
-}
-
-/// Retrieves total stake balances from an individual stake pool
-fn get_stake_balance_from_stake_pool(
-    stake_pool: &StakePool,
-    account: &AccountIdentifier,
-) -> ApiResult<Amount> {
-    // Stake isn't allowed for base accounts
-    if account.is_base_account() {
-        return Err(ApiError::InvalidInput(Some(
-            "Stake pool not supported for base account".to_string(),
-        )));
-    }
-
-    // If the operator address is different, skip
-    if account.is_operator_stake() && account.operator_address()? != stake_pool.operator_address {
-        return Err(ApiError::InvalidInput(Some(
-            "Stake pool not for matching operator".to_string(),
-        )));
-    }
-
-    // TODO: Represent inactive, and pending as separate?
-    Ok(Amount {
-        value: stake_pool.get_total_staked_amount().to_string(),
-        currency: native_coin(),
-    })
 }

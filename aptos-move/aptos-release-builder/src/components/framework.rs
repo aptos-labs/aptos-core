@@ -9,7 +9,7 @@ use aptos_types::account_address::AccountAddress;
 use git2::{Oid, Repository};
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Debug)]
 pub struct FrameworkReleaseConfig {
     /// Move bytecode version the framework release would be compiled to.
     pub bytecode_version: u32,

@@ -121,6 +121,8 @@ Grafana
 GraphQL
 HSM
 Homebrew
+hippospace
+hotfix
 HotStuff
 IDE
 IDEs
@@ -291,6 +293,7 @@ clippy
 cn
 codebase
 config
+customizable
 configs
 const
 copyable
@@ -397,6 +400,7 @@ overline
 parallelizable
 parallelization
 param
+Paymagic
 pdf
 performant
 permissioned
@@ -437,6 +441,7 @@ serde
 serializable
 setAccountHasList
 sft
+sha
 sharded
 sharding
 signAndSubmitTransaction

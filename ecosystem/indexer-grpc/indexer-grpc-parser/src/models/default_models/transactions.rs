@@ -16,7 +16,7 @@ use crate::{
     schema::{block_metadata_transactions, transactions, user_transactions},
     utils::{
         database::PgPoolConnection,
-        util::{standardize_address, u64_to_bigdecimal},
+        util::{get_clean_payload, get_clean_writeset, standardize_address, u64_to_bigdecimal},
     },
 };
 use aptos_protos::transaction::testing1::v1::{
@@ -155,21 +155,19 @@ impl Transaction {
                     version,
                     block_height,
                 );
+                let payload = user_txn
+                    .request
+                    .as_ref()
+                    .expect("Getting user request failed.")
+                    .payload
+                    .as_ref()
+                    .expect("Getting payload failed.");
+                let payload_cleaned = get_clean_payload(payload, version);
+
                 (
                     Self::from_transaction_info(
                         transaction_info,
-                        Some(
-                            serde_json::to_value(
-                                user_txn
-                                    .request
-                                    .as_ref()
-                                    .expect("Getting user request failed.")
-                                    .payload
-                                    .as_ref()
-                                    .expect("Getting payload failed."),
-                            )
-                            .expect("Unable to deserialize transaction payload"),
-                        ),
+                        payload_cleaned,
                         version,
                         transaction_type,
                         user_txn.events.len() as i64,
@@ -188,13 +186,12 @@ impl Transaction {
                     version,
                     block_height,
                 );
+                let payload = genesis_txn.payload.as_ref().unwrap();
+                let payload_cleaned = get_clean_writeset(payload, version);
                 (
                     Self::from_transaction_info(
                         transaction_info,
-                        Some(
-                            serde_json::to_value(&genesis_txn.payload)
-                                .expect("Unable to deserialize Genesis transaction"),
-                        ),
+                        payload_cleaned,
                         version,
                         transaction_type,
                         0,

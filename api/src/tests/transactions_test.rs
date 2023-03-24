@@ -121,54 +121,6 @@ async fn test_get_transactions_output_user_transaction_with_entry_function_paylo
     context.check_golden_output(txns);
 }
 
-// TODO: figure out correct module payload
-#[ignore]
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_transactions_output_user_transaction_with_module_payload() {
-    let mut context = new_test_context(current_function_name!());
-    let code = "a11ceb0b0300000006010002030205050703070a0c0816100c260900000001000100000102084d794d6f64756c650269640000000000000000000000000b1e55ed00010000000231010200";
-    let mut root_account = context.root_account().await;
-    let txn = root_account.sign_with_transaction_builder(
-        context
-            .transaction_factory()
-            .module(hex::decode(code).unwrap()),
-    );
-    context.commit_block(&vec![txn.clone()]).await;
-
-    let txns = context.get("/transactions?start=2").await;
-    assert_eq!(1, txns.as_array().unwrap().len());
-
-    let expected_txns = context.get_transactions(2, 1);
-    assert_eq!(1, expected_txns.len());
-
-    assert_json(
-        txns[0]["payload"].clone(),
-        json!({
-            "type": "module_bundle_payload",
-            "modules": [
-                {
-                    "bytecode": format!("0x{}", code),
-                    "abi": {
-                        "address": "0xb1e55ed",
-                        "name": "MyModule",
-                        "friends": [],
-                        "exposed_functions": [
-                            {
-                                "name": "id",
-                                "visibility": "public",
-                                "generic_type_params": [],
-                                "params": [],
-                                "return": ["u8"]
-                            }
-                        ],
-                        "structs": []
-                    }
-                },
-            ]
-        }),
-    )
-}
-
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_post_bcs_format_transaction() {
     let mut context = new_test_context(current_function_name!());

@@ -1,14 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    monitor,
-    quorum_store::{counters, types::SerializedTransaction},
-};
-use aptos_consensus_types::{
-    common::{Round, TransactionSummary},
-    proof_of_store::{BatchId, LogicalTime, ProofOfStore},
-};
+use crate::{monitor, quorum_store::counters};
+use aptos_consensus_types::{common::TransactionSummary, proof_of_store::ProofOfStore};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
@@ -22,95 +16,9 @@ use std::{
         BinaryHeap, HashMap, HashSet, VecDeque,
     },
     hash::Hash,
-    mem,
     time::{Duration, Instant},
 };
 use tokio::time::timeout;
-
-pub(crate) struct BatchBuilder {
-    id: BatchId,
-    fragment_id: usize,
-    summaries: Vec<TransactionSummary>,
-    data: Vec<SerializedTransaction>,
-    num_txns: usize,
-    num_bytes: usize,
-    // TODO: remove
-    max_bytes: usize,
-}
-
-impl BatchBuilder {
-    pub(crate) fn new(batch_id: BatchId, max_bytes: usize) -> Self {
-        Self {
-            id: batch_id,
-            fragment_id: 0,
-            summaries: Vec::new(),
-            data: Vec::new(),
-            num_txns: 0,
-            num_bytes: 0,
-            max_bytes,
-        }
-    }
-
-    pub(crate) fn append_transactions(
-        &mut self,
-        txns: &[SignedTransaction],
-        max_txns_override: usize,
-    ) -> bool {
-        for txn in txns {
-            let serialized_txn = SerializedTransaction::from_signed_txn(txn);
-
-            if self.num_bytes + serialized_txn.len() <= self.max_bytes
-                && self.num_txns < max_txns_override
-            {
-                self.num_txns += 1;
-                self.num_bytes += serialized_txn.len();
-
-                self.summaries.push(TransactionSummary {
-                    sender: txn.sender(),
-                    sequence_number: txn.sequence_number(),
-                });
-                self.data.push(serialized_txn);
-            } else {
-                return false;
-            }
-        }
-        true
-    }
-
-    pub(crate) fn take_serialized_txns(&mut self) -> Vec<SerializedTransaction> {
-        mem::take(&mut self.data)
-    }
-
-    pub(crate) fn is_empty(&self) -> bool {
-        self.summaries.is_empty()
-    }
-
-    pub(crate) fn batch_id(&self) -> BatchId {
-        self.id
-    }
-
-    pub(crate) fn fetch_and_increment_fragment_id(&mut self) -> usize {
-        let id = self.fragment_id;
-        self.fragment_id += 1;
-        id
-    }
-
-    /// Clears the state, increments (batch) id.
-    pub(crate) fn take_summaries(&mut self) -> Vec<TransactionSummary> {
-        assert!(self.data.is_empty());
-        counters::NUM_FRAGMENT_PER_BATCH.observe((self.fragment_id + 1) as f64);
-
-        self.id.increment();
-        self.fragment_id = 0;
-        self.num_bytes = 0;
-        self.num_txns = 0;
-        mem::take(&mut self.summaries)
-    }
-
-    pub(crate) fn summaries(&self) -> &Vec<TransactionSummary> {
-        &self.summaries
-    }
-}
 
 pub(crate) struct Timeouts<T> {
     timeouts: VecDeque<(i64, T)>,
@@ -148,26 +56,26 @@ impl<T> Timeouts<T> {
     }
 }
 
-pub(crate) struct RoundExpirations<I: Ord> {
-    expiries: BinaryHeap<(Reverse<Round>, I)>,
+pub(crate) struct TimeExpirations<I: Ord> {
+    expiries: BinaryHeap<(Reverse<u64>, I)>,
 }
 
-impl<I: Ord + Hash> RoundExpirations<I> {
+impl<I: Ord + Hash> TimeExpirations<I> {
     pub(crate) fn new() -> Self {
         Self {
             expiries: BinaryHeap::new(),
         }
     }
 
-    pub(crate) fn add_item(&mut self, item: I, expiry_round: Round) {
-        self.expiries.push((Reverse(expiry_round), item));
+    pub(crate) fn add_item(&mut self, item: I, expiry_time: u64) {
+        self.expiries.push((Reverse(expiry_time), item));
     }
 
     /// Expire and return items corresponding to round <= given (expired) round.
-    pub(crate) fn expire(&mut self, round: Round) -> HashSet<I> {
+    pub(crate) fn expire(&mut self, expiry_time: u64) -> HashSet<I> {
         let mut ret = HashSet::new();
-        while let Some((Reverse(r), _)) = self.expiries.peek() {
-            if *r <= round {
+        while let Some((Reverse(t), _)) = self.expiries.peek() {
+            if *t <= expiry_time {
                 let (_, item) = self.expiries.pop().unwrap();
                 ret.insert(item);
             } else {
@@ -234,8 +142,8 @@ impl MempoolProxy {
 
 // TODO: unitest
 pub struct ProofQueue {
-    digest_queue: VecDeque<(HashValue, LogicalTime)>, // queue of all proofs
-    local_digest_queue: VecDeque<(HashValue, LogicalTime)>, // queue of local proofs, to make back pressure update more efficient
+    digest_queue: VecDeque<(HashValue, u64)>, // queue of all proofs
+    local_digest_queue: VecDeque<(HashValue, u64)>, // queue of local proofs, to make back pressure update more efficient
     digest_proof: HashMap<HashValue, Option<ProofOfStore>>, // None means committed
     digest_insertion_time: HashMap<HashValue, Instant>,
 }
@@ -281,7 +189,7 @@ impl ProofQueue {
     pub(crate) fn pull_proofs(
         &mut self,
         excluded_proofs: &HashSet<HashValue>,
-        current_time: LogicalTime,
+        current_block_timestamp: u64,
         max_txns: u64,
         max_bytes: u64,
         return_non_full: bool,
@@ -289,7 +197,7 @@ impl ProofQueue {
         let num_expired = self
             .digest_queue
             .iter()
-            .take_while(|(_, expiration_time)| *expiration_time < current_time)
+            .take_while(|(_, expiration_time)| *expiration_time < current_block_timestamp)
             .count();
         let mut num_expired_but_not_committed = 0;
         for (digest, expiration_time) in self.digest_queue.drain(0..num_expired) {
@@ -301,9 +209,9 @@ impl ProofQueue {
             {
                 // non-committed proof that is expired
                 num_expired_but_not_committed += 1;
-                if expiration_time.round() < current_time.round() {
-                    counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS
-                        .observe((current_time.round() - expiration_time.round()) as f64);
+                if expiration_time < current_block_timestamp {
+                    counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_TIME_WHEN_PULL_PROOFS
+                        .observe((current_block_timestamp - expiration_time) as f64);
                 }
             }
             claims::assert_some!(self.digest_proof.remove(&digest));
@@ -327,10 +235,10 @@ impl ProofQueue {
                 .get(digest)
                 .expect("Entry for unexpired digest must exist")
             {
-                if *expiration >= current_time {
+                if *expiration >= current_block_timestamp {
                     // non-committed proof that has not expired
-                    cur_bytes += proof.info().num_bytes;
-                    cur_txns += proof.info().num_txns;
+                    cur_bytes += proof.num_bytes();
+                    cur_txns += proof.num_txns();
                     if cur_bytes > max_bytes || cur_txns > max_txns {
                         // Exceeded the limit for requested bytes or number of transactions.
                         full = true;
@@ -343,9 +251,9 @@ impl ProofQueue {
                 } else {
                     // non-committed proof that is expired
                     num_expired_but_not_committed += 1;
-                    if expiration.round() < current_time.round() {
-                        counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS
-                            .observe((current_time.round() - expiration.round()) as f64);
+                    if *expiration < current_block_timestamp {
+                        counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_TIME_WHEN_PULL_PROOFS
+                            .observe((current_block_timestamp - expiration) as f64);
                     }
                 }
             }
@@ -374,16 +282,16 @@ impl ProofQueue {
         }
     }
 
-    pub(crate) fn num_total_txns_and_proofs(&mut self, current_time: LogicalTime) -> (u64, u64) {
+    pub(crate) fn num_total_txns_and_proofs(&mut self, current_block_timestamp: u64) -> (u64, u64) {
         let mut remaining_txns = 0;
         let mut remaining_proofs = 0;
         // TODO: if the digest_queue is large, this may be too inefficient
         for (digest, expiration) in self.digest_queue.iter() {
             // Not expired
-            if *expiration >= current_time {
+            if *expiration >= current_block_timestamp {
                 // Not committed
                 if let Some(Some(proof)) = self.digest_proof.get(digest) {
-                    remaining_txns += proof.info().num_txns;
+                    remaining_txns += proof.num_txns();
                     remaining_proofs += 1;
                 }
             }
@@ -395,11 +303,11 @@ impl ProofQueue {
     }
 
     // returns the number of unexpired local proofs
-    pub(crate) fn clean_local_proofs(&mut self, current_time: LogicalTime) -> Option<Round> {
+    pub(crate) fn clean_local_proofs(&mut self, current_block_timestamp: u64) -> Option<u64> {
         let num_expired = self
             .local_digest_queue
             .iter()
-            .take_while(|(_, expiration_time)| *expiration_time < current_time)
+            .take_while(|(_, expiration_time)| *expiration_time < current_block_timestamp)
             .count();
         self.local_digest_queue.drain(0..num_expired);
 
@@ -408,7 +316,7 @@ impl ProofQueue {
         for (digest, expiration) in self.local_digest_queue.iter() {
             // Not expired. It is possible that the proof entry in digest_proof was already removed
             // when draining the digest_queue but local_digest_queue is not drained yet.
-            if *expiration >= current_time {
+            if *expiration >= current_block_timestamp {
                 if let Some(entry) = self.digest_proof.get(digest) {
                     // Not committed
                     if entry.is_some() {
@@ -420,7 +328,7 @@ impl ProofQueue {
         counters::NUM_LOCAL_PROOFS_LEFT_ON_COMMIT.observe(remaining_local_proof_size as f64);
 
         if let Some(&(_, time)) = self.local_digest_queue.iter().next() {
-            Some(time.round())
+            Some(time)
         } else {
             None
         }

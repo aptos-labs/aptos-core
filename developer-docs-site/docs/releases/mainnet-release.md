@@ -11,16 +11,20 @@ See the [Latest Aptos Releases](./index.md) index for how to subscribe to GitHub
 
 ## Aptos Framework
 
-[Aptos Framework Release v1.2.0](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-framework-v1.2.0)
+Aptos Framework Release v1.2.3
+
+## Aptos SDK
+
+Aptos SDK Release v1.7.2
 
 ## Aptos CLI
 
 |Release | Git Tag | Commit Hash|
 |---|---|---|
-|[Aptos CLI Release v1.0.7](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-cli-v1.0.7)| `aptos-cli-v1.0.7` | `eafa8d284fd2e3ea30f5f1345fcf589202eeda4a` |
+|[Aptos CLI Release v1.0.8](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-cli-v1.0.8)| `aptos-cli-v1.0.8` | `8fc6515e8014b0890f62621ed85de932a03a00b6` |
 
 ## Aptos Node
 
 |Release | Docker Image Tag | Docker SHA-256 | Branch | Commit Hash|
 |---|---|---|---|---|
-|[Aptos Node Hot-fix Release v1.2.6](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.2.6)| `aptos-node-v1.2.6` | `?` | [aptos-node-v1.2.0](https://github.com/aptos-labs/aptos-core/tree/aptos-node-v1.2.0)| `?` |
+|[Aptos Node Release v1.2.7](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.2.7)| [`aptos-node-v1.2.7`](https://hub.docker.com/layers/aptoslabs/validator/aptos-node-v1.2.7/images/sha256-b1c4ff8e15cfdfb140738f80f368068c7d68d97c2a205139d661cc6d82a65ea0?context=explore) | `b1c4ff8e15cfdfb140738f80f368068c7d68d97c2a205139d661cc6d82a65ea0` | [aptos-node-v1.2.7](https://github.com/aptos-labs/aptos-core/tree/aptos-node-v1.2.7)| `cc30c46ad41cd1577935466036eb1903b7cbc973` |

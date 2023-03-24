@@ -6,10 +6,10 @@ use crate::{
     executor::BlockExecutor,
     proptest_types::types::{DeltaDataView, ExpectedOutput, KeyType, Task, Transaction, ValueType},
     scheduler::{Scheduler, SchedulerTask},
-    task::ModulePath,
 };
 use aptos_aggregator::delta_change_set::{delta_add, delta_sub, DeltaOp, DeltaUpdate};
-use aptos_types::write_set::TransactionWrite;
+use aptos_mvhashmap::types::TxnIndex;
+use aptos_types::{executable::ModulePath, write_set::TransactionWrite};
 use claims::{assert_matches, assert_some_eq};
 use rand::{prelude::*, random};
 use std::{
@@ -438,7 +438,7 @@ fn scheduler_dependency() {
 
 // Will return a scheduler in a state where all transactions are scheduled for
 // for execution, validation index = num_txns, and wave = 0.
-fn incarnation_one_scheduler(num_txns: usize) -> Scheduler {
+fn incarnation_one_scheduler(num_txns: TxnIndex) -> Scheduler {
     let s = Scheduler::new(num_txns);
 
     for i in 0..num_txns {
@@ -739,7 +739,7 @@ fn no_conflict_task_count() {
     // 2. all incarnations should be 0.
     // 3. current wave should always be 0.
 
-    let num_txns = 1000;
+    let num_txns: TxnIndex = 1000;
     for num_concurrent_tasks in [1, 5, 10, 20] {
         let s = Scheduler::new(num_txns);
 
