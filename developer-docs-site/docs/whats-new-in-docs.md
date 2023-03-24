@@ -7,6 +7,10 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site. Note, this site is built from the `main` upstream branch of GitHub and so therefore reflects the latest changes to Aptos. If you have checked out [another branch](https://github.com/aptos-labs/aptos-core/branches) to use a [specific network](guides/system-integrators-guide.md#choose-a-network), the code may not yet have all of the features described here.
 
+## 21 March 2023
+
+- Published beta [Delegation Pool Operations](../../nodes/validator-node/operator/delegation-pool-operations.md) instructions for validator operators, written by [Raluca Popescu (dorinbwr](https://github.com/dorinbwr) ) of [Bware Labs](https://bwarelabs.com/).
+
 ## 20 March 2023
 
 - Ported the original Move Tutorial to Aptos tooling as the [Move Primitives Tutorial](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/move-tutorial).
@@ -37,7 +41,6 @@ This page shows the key updates to the developer documentation on this site. Not
   - [Aptos Validator/Staking Postman Collection](https://github.com/pakaplace/aptos-validator-staking-postman) - A Postman collection for querying staking pool, staking contract, and account resources/events, by [pakaplace](https://github.com/pakaplace/).
   - [One-stop solution for Aptos node monitoring](https://github.com/LavenderFive/aptos-monitoring) | A monitoring solution for Aptos nodes utilizing Docker containers with Prometheus, Grafana, cAdvisor, NodeExporter, and alerting with AlertManager. by [Lavender.Five Nodes](https://github.com/LavenderFive).
   - [Monitor Your Aptos validator and validator fullnodes with Prometheus and Grafana](https://github.com/RhinoStake/aptos_monitoring) - A full-featured Grafana/Prometheus dashboard to monitor key infrastructure, node, and chain-related metrics and data relationships, by [RHINO](https://rhinostake.com).
-
 
 ## 08 March 2023
 

@@ -145,8 +145,7 @@ impl BlockAptosVM {
         transactions: Vec<Transaction>,
         state_view: &S,
         concurrency_level: usize,
-        check_correctness: bool,
-    ) -> usize {
+    ) -> (usize, usize) {
         // Verify the signatures of all the transactions in parallel.
         // This is time consuming so don't wait and do the checking
         // sequentially while executing the transactions.
@@ -175,27 +174,38 @@ impl BlockAptosVM {
         let executor = BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>, S>::new(
             concurrency_level,
         );
-
+        println!("Parallel execution starts...");
         let timer = Instant::now();
         let ret = executor.execute_block(state_view, signature_verified_block, state_view);
         let exec_t = timer.elapsed();
+        println!(
+            "Parallel execution finishes, TPS = {}",
+            block_size * 1000 / exec_t.as_millis() as usize
+        );
 
         flush_speculative_logs();
 
-        if check_correctness {
-            // sequentially execute the block and check if the results match
-            let seq_executor =
-                BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>, S>::new(1);
-            let seq_ret = seq_executor.execute_block(
-                state_view,
-                signature_verified_block_for_seq,
-                state_view,
-            );
-            assert_eq!(ret, seq_ret);
-            drop(seq_ret);
-        }
-        drop(ret);
+        // sequentially execute the block and check if the results match
+        let seq_executor =
+            BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>, S>::new(1);
+        println!("Sequential execution starts...");
+        let seq_timer = Instant::now();
+        let seq_ret =
+            seq_executor.execute_block(state_view, signature_verified_block_for_seq, state_view);
+        let seq_exec_t = seq_timer.elapsed();
+        println!(
+            "Sequential execution finishes, TPS = {}",
+            block_size * 1000 / seq_exec_t.as_millis() as usize
+        );
 
-        block_size * 1000 / exec_t.as_millis() as usize
+        assert_eq!(ret, seq_ret);
+
+        drop(ret);
+        drop(seq_ret);
+
+        (
+            block_size * 1000 / exec_t.as_millis() as usize,
+            block_size * 1000 / seq_exec_t.as_millis() as usize,
+        )
     }
 }

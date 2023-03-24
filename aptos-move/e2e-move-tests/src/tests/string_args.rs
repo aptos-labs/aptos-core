@@ -28,7 +28,15 @@ fn success_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<(Vec<Vec<u8>>, &
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
     assert_success!(h.publish_package(&acc, &common::test_dir_path("string_args.data/pack")));
 
-    let module_data = parse_struct_tag("0xCAFE::test::ModuleData").unwrap();
+    let mut module_data = parse_struct_tag("0xCAFE::test::ModuleData").unwrap();
+    let string_struct = StructTag {
+        address: AccountAddress::from_hex_literal("0x1").expect("valid address"),
+        module: Identifier::new("string").expect("valid identifier"),
+        name: Identifier::new("String").expect("valid identifier"),
+        type_params: vec![],
+    };
+    let string_type = TypeTag::Struct(Box::new(string_struct));
+    module_data.type_params.push(string_type);
 
     // Check in initial state, resource does not exist.
     assert!(!h.exists_resource(acc.address(), module_data.clone()));
@@ -70,10 +78,10 @@ fn fail_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<Vec<u8>>, StatusCod
     // Check in initial state, resource does not exist.
     assert!(!h.exists_resource(acc.address(), module_data));
 
-    for (entry, args, _err) in tests {
+    for (entry, args, err) in tests {
         // Now send hi transaction, after that resource should exist and carry value
         let status = h.run_entry_function(&acc, str::parse(entry).unwrap(), ty_args.clone(), args);
-        assert_vm_status!(status, _err);
+        assert_vm_status!(status, err);
     }
 }
 
@@ -599,6 +607,34 @@ fn string_args_bad_length() {
 }
 
 #[test]
+fn string_args_non_generic_call() {
+    let tests = vec![("0xcafe::test::non_generic_call", vec![(
+        vec![bcs::to_bytes("hi".as_bytes()).unwrap()],
+        "hi",
+    )])];
+
+    success_generic(vec![], tests);
+}
+
+#[test]
+fn string_args_generic_call() {
+    let tests = vec![("0xcafe::test::generic_call", vec![(
+        vec![bcs::to_bytes("hi".as_bytes()).unwrap()],
+        "hi",
+    )])];
+
+    let string_struct = StructTag {
+        address: AccountAddress::from_hex_literal("0x1").expect("valid address"),
+        module: Identifier::new("string").expect("valid identifier"),
+        name: Identifier::new("String").expect("valid identifier"),
+        type_params: vec![],
+    };
+    let string_type = TypeTag::Struct(Box::new(string_struct));
+
+    success_generic(vec![string_type], tests);
+}
+
+#[test]
 fn string_args_generic_instantiation() {
     let mut tests = vec![];
     let long_addr = AccountAddress::from_hex_literal(
@@ -625,8 +661,8 @@ fn string_args_generic_instantiation() {
     ];
     let u8_vec = vec![0xFFu8; 100];
     let u64_vec = vec![std::u64::MAX, std::u64::MAX, std::u64::MAX];
-    let val1 = "hi there! hello".as_bytes();
-    let val2 = long_addr;
+    let val1 = long_addr;
+    let val2 = "hi there! hello".as_bytes();
     let i = 0u64;
     let j = 0u64;
     let args = vec![
@@ -640,11 +676,10 @@ fn string_args_generic_instantiation() {
         bcs::to_bytes(&j).unwrap(),
     ];
 
-    tests.push((
-        "0xcafe::test::generic_multi_vec",
+    tests.push(("0xcafe::test::generic_multi_vec", vec![(
         args,
-        StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
-    ));
+        "hi there! hello",
+    )]));
 
     let address_type = TypeTag::Address;
     let string_struct = StructTag {
@@ -655,5 +690,5 @@ fn string_args_generic_instantiation() {
     };
     let string_type = TypeTag::Struct(Box::new(string_struct));
 
-    fail_generic(vec![address_type, string_type], tests);
+    success_generic(vec![string_type, address_type], tests);
 }

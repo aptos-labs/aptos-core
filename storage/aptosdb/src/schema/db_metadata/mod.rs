@@ -52,7 +52,7 @@ pub enum DbMetadataKey {
     StateKvPrunerProgress,
     StateSnapshotRestoreProgress(Version),
     LedgerCommitProgress,
-    StateKVCommitProgress,
+    StateKvCommitProgress,
     OverallCommitProgress,
     StateKvShardCommitProgress(ShardId),
 }
