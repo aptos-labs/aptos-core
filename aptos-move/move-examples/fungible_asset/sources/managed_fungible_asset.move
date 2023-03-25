@@ -104,17 +104,26 @@ module fungible_asset::managed_fungible_asset {
         fungible_asset::burn(burn_ref, from_wallet, amount);
     }
 
-    /// Set the `allow_ungated_transfer` field in `AccountFungibleAsset` associated with `metadata` of `account` as the
-    /// owner of metadata object.
-    public fun set_ungated_transfer<T: key>(
+    /// Freeze an account so it cannot transfer or receive fungible assets.
+    public fun freeze_account<T: key>(
         metadata_owner: &signer,
         metadata: Object<T>,
         account: address,
-        allow: bool
     ) acquires ManagedFungibleAsset {
         let transfer_ref = &authorized_borrow_refs<T>(metadata_owner, metadata).transfer_ref;
         let wallet = primary_wallet::ensure_primary_wallet_exists(account, metadata);
-        fungible_asset::set_ungated_transfer(transfer_ref, wallet, allow);
+        fungible_asset::set_ungated_transfer(transfer_ref, wallet, false);
+    }
+
+    /// Unfreeze an account so it can transfer or receive fungible assets.
+    public fun unfreeze_account<T: key>(
+        metadata_owner: &signer,
+        metadata: Object<T>,
+        account: address,
+    ) acquires ManagedFungibleAsset {
+        let transfer_ref = &authorized_borrow_refs<T>(metadata_owner, metadata).transfer_ref;
+        let wallet = primary_wallet::ensure_primary_wallet_exists(account, metadata);
+        fungible_asset::set_ungated_transfer(transfer_ref, wallet, true);
     }
 
     /// Borrow the immutable reference of the refs of `metadata`.
@@ -155,12 +164,12 @@ module fungible_asset::managed_fungible_asset {
 
         mint(creator, metadata, 100, creator_address);
         assert!(primary_wallet::balance(creator_address, metadata) == 100, 4);
-        set_ungated_transfer(creator, metadata, creator_address, false);
+        freeze_account(creator, metadata, creator_address);
         assert!(!primary_wallet::ungated_transfer_allowed(creator_address, metadata), 5);
         transfer(creator, metadata, creator_address, aaron_address, 10);
         assert!(primary_wallet::balance(aaron_address, metadata) == 10, 6);
 
-        set_ungated_transfer(creator, metadata, creator_address, true);
+        unfreeze_account(creator, metadata, creator_address);
         assert!(primary_wallet::ungated_transfer_allowed(creator_address, metadata), 7);
         burn(creator, metadata, creator_address, 90);
     }
