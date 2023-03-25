@@ -121,6 +121,14 @@ jobs:
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
       - run: cargo run -p aptos-rest-client --example account -- --api-url http://127.0.01:8080
 
+      # Clone and publish ANS modules for test
+      - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
+        name: publish-ans-contract
+          with:
+          max_attempts: 3
+          timeout_minutes: 20
+          command: cd ./ecosystem/typescript/sdk && pnpm publish-ans-contract
+
       # Test and build.
       - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
         name: sdk-pnpm-test
