@@ -496,8 +496,7 @@ proc-macro2 = "1.0.38"
 project-root = "0.2.2"
 prometheus = { version = "0.13.0", default-features = false }
 prometheus-http-query = "0.5.2"
-# Necessary until this lands: https://github.com/ccakes/prometheus-parse-rs/pull/6.
-prometheus-parse = { git = "https://github.com/banool/prometheus-parse-rs", rev = "b65a1f20c5c604a9d2d1e545f70ca51ea8da2354" }
+prometheus-parse = "0.2.4"
 proptest = "1.0.0"
 proptest-derive = "0.3.0"
 prost = "0.11.3"
