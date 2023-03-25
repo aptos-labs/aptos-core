@@ -32,6 +32,7 @@ make it so that a reference to a global object can be returned from a function.
 -  [Struct `TransferEvent`](#0x1_object_TransferEvent)
 -  [Constants](#@Constants_0)
 -  [Function `address_to_object`](#0x1_object_address_to_object)
+-  [Function `consume_object`](#0x1_object_consume_object)
 -  [Function `create_object_address`](#0x1_object_create_object_address)
 -  [Function `exists_at`](#0x1_object_exists_at)
 -  [Function `object_address`](#0x1_object_object_address)
@@ -533,6 +534,28 @@ Produces an ObjectId from the given address. This is not verified.
     <b>assert</b>!(<a href="object.md#0x1_object_exists_at">exists_at</a>&lt;T&gt;(<a href="object.md#0x1_object">object</a>), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="object.md#0x1_object_ERESOURCE_DOES_NOT_EXIST">ERESOURCE_DOES_NOT_EXIST</a>));
     <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;{ inner: <a href="object.md#0x1_object">object</a> }
 }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_object_consume_object"></a>
+
+## Function `consume_object`
+
+
+
+<pre><code>entry <b>fun</b> <a href="object.md#0x1_object_consume_object">consume_object</a>(_o: <a href="object.md#0x1_object_Object">object::Object</a>&lt;u64&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>entry <b>fun</b> <a href="object.md#0x1_object_consume_object">consume_object</a>(_o: <a href="object.md#0x1_object_Object">Object</a>&lt;u64&gt;) {}
 </code></pre>
 
 

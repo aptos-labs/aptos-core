@@ -137,6 +137,8 @@ module aptos_framework::object {
         Object<T>{ inner: object }
     }
 
+    entry fun consume_object(_o: Object<u64>) {}
+
     /// Derives an object address from source material: sha3_256([creator address | seed | 0xFE]).
     public fun create_object_address(source: &address, seed: vector<u8>): address {
         let bytes = bcs::to_bytes(source);

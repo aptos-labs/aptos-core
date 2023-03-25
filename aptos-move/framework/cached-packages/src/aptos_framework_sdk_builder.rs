@@ -455,6 +455,10 @@ pub enum EntryFunctionCall {
         approved: bool,
     },
 
+    ObjectConsumeObject {
+        _o: AccountAddress,
+    },
+
     /// Entry function that can be used to transfer, if allow_ungated_transfer is set true.
     ObjectTransferCall {
         object: AccountAddress,
@@ -1016,6 +1020,7 @@ impl EntryFunctionCall {
                 sequence_number,
                 approved,
             } => multisig_account_vote_transanction(multisig_account, sequence_number, approved),
+            ObjectConsumeObject { _o } => object_consume_object(_o),
             ObjectTransferCall { object, to } => object_transfer_call(object, to),
             ResourceAccountCreateResourceAccount {
                 seed,
@@ -2369,6 +2374,21 @@ pub fn multisig_account_vote_transanction(
             bcs::to_bytes(&sequence_number).unwrap(),
             bcs::to_bytes(&approved).unwrap(),
         ],
+    ))
+}
+
+pub fn object_consume_object(_o: AccountAddress) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("object").to_owned(),
+        ),
+        ident_str!("consume_object").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&_o).unwrap()],
     ))
 }
 
@@ -4067,6 +4087,16 @@ mod decoder {
         }
     }
 
+    pub fn object_consume_object(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::ObjectConsumeObject {
+                _o: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn object_transfer_call(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::ObjectTransferCall {
@@ -4905,6 +4935,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "multisig_account_vote_transanction".to_string(),
             Box::new(decoder::multisig_account_vote_transanction),
+        );
+        map.insert(
+            "object_consume_object".to_string(),
+            Box::new(decoder::object_consume_object),
         );
         map.insert(
             "object_transfer_call".to_string(),

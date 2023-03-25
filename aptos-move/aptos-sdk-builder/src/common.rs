@@ -27,10 +27,26 @@ pub(crate) fn prepare_doc_string(doc: &str) -> String {
     doc.replace("\n ", "\n").trim().to_string()
 }
 
+fn quote_struct_type_as_format(s: &StructTag) -> Option<Format> {
+    let fully_qualified_name= format!("{}::{}::{}",s.address,s.module,s.name);
+    if fully_qualified_name == "0000000000000000000000000000000000000000000000000000000000000001::string::String" {
+        Some(Format::Seq(Box::new(Format::U8)))
+    } else if fully_qualified_name == "0000000000000000000000000000000000000000000000000000000000000001::option::Option" {
+        let f = quote_type_as_format(&s.type_params[0]);
+        Some(Format::Seq(Box::new(f)))
+    } else if fully_qualified_name == "0000000000000000000000000000000000000000000000000000000000000001::object::Object" {
+        Some(Format::TypeName("AccountAddress".into()))
+    } else if fully_qualified_name == "0000000000000000000000000000000000000000000000000000000000000001::fixed_point32::FixedPoint32" {
+        Some(Format::U64)
+    } else if fully_qualified_name == "0000000000000000000000000000000000000000000000000000000000000001::fixed_point64::FixedPoint64" {
+        Some(Format::U128)
+    } else {
+        None
+    }
+}
+
 fn quote_type_as_format(type_tag: &TypeTag) -> Format {
     use TypeTag::*;
-    let str_tag: Lazy<StructTag> =
-        Lazy::new(|| StructTag::from_str("0x1::string::String").unwrap());
     match type_tag {
         Bool => Format::Bool,
         U8 => Format::U8,
@@ -41,9 +57,9 @@ fn quote_type_as_format(type_tag: &TypeTag) -> Format {
         U256 => Format::TypeName("U256".into()),
         Address => Format::TypeName("AccountAddress".into()),
         Vector(type_tag) => Format::Seq(Box::new(quote_type_as_format(type_tag))),
-        Struct(tag) => match tag {
-            tag if &**tag == Lazy::force(&str_tag) => Format::Seq(Box::new(Format::U8)),
-            _ => type_not_allowed(type_tag),
+        Struct(tag) => match quote_struct_type_as_format(tag) {
+            Some(f) => f,
+            None => type_not_allowed(type_tag),
         },
         Signer => type_not_allowed(type_tag),
     }

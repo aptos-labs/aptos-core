@@ -855,6 +855,24 @@ fn decode_{}_argument(arg: TransactionArgument) -> Option<{}> {{
             .join(", ")
     }
 
+    fn quote_struct_type(s: &StructTag, local_types: bool) -> Option<String> {
+        let fully_qualified_name= format!("{}::{}::{}",s.address,s.module,s.name);
+        if fully_qualified_name == "0000000000000000000000000000000000000000000000000000000000000001::string::String" {
+            Some("Vec<u8>".into())
+        } else if fully_qualified_name == "0000000000000000000000000000000000000000000000000000000000000001::option::Option" {
+            let f = Self::quote_type(&s.type_params[0], local_types);
+            Some(format!("Option<{}>", f))
+        } else if fully_qualified_name == "0000000000000000000000000000000000000000000000000000000000000001::object::Object" {
+            Some("AccountAddress".into())
+        } else if fully_qualified_name == "0000000000000000000000000000000000000000000000000000000000000001::fixed_point32::FixedPoint32" {
+            Some("u64".into())
+        } else if fully_qualified_name == "0000000000000000000000000000000000000000000000000000000000000001::fixed_point64::FixedPoint64" {
+            Some("u128".into())
+        } else {
+            None
+        }
+    }
+
     // TODO: see if we can avoid passing in local types in this manner
     #[allow(clippy::only_used_in_recursion)]
     fn quote_type(type_tag: &TypeTag, local_types: bool) -> String {
@@ -873,9 +891,9 @@ fn decode_{}_argument(arg: TransactionArgument) -> Option<{}> {{
             Vector(type_tag) => {
                 format!("Vec<{}>", Self::quote_type(type_tag.as_ref(), local_types))
             },
-            Struct(struct_tag) => match struct_tag {
-                tag if &**tag == Lazy::force(&str_tag) => "Vec<u8>".into(),
-                _ => common::type_not_allowed(type_tag),
+            Struct(struct_tag) => match Self::quote_struct_type(struct_tag, local_types) {
+                Some(s) => s,
+                None => common::type_not_allowed(type_tag),
             },
             Signer => common::type_not_allowed(type_tag),
         }
