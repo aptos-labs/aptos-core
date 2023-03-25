@@ -34,19 +34,6 @@ type Bytes = Vec<u8>;
 #[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 #[cfg_attr(feature = "fuzzing", proptest(no_params))]
 pub enum EntryFunctionCall {
-    AptosTokenAddPropertyCall {
-        collection: Vec<u8>,
-        name: Vec<u8>,
-        key: Vec<u8>,
-        type_: Vec<u8>,
-        value: Vec<u8>,
-    },
-
-    AptosTokenBurnCall {
-        collection: Vec<u8>,
-        name: Vec<u8>,
-    },
-
     /// Create a new collection
     AptosTokenCreateCollection {
         description: Vec<u8>,
@@ -64,11 +51,6 @@ pub enum EntryFunctionCall {
         tokens_freezable_by_creator: bool,
         royalty_numerator: u64,
         royalty_denominator: u64,
-    },
-
-    AptosTokenFreezeTransferCall {
-        collection: Vec<u8>,
-        name: Vec<u8>,
     },
 
     /// With an existing collection, directly mint a viable token into the creators account.
@@ -93,60 +75,6 @@ pub enum EntryFunctionCall {
         property_values: Vec<Vec<u8>>,
         soul_bound_to: AccountAddress,
     },
-
-    AptosTokenRemovePropertyCall {
-        collection: Vec<u8>,
-        name: Vec<u8>,
-        key: Vec<u8>,
-    },
-
-    AptosTokenSetCollectionDescriptionCall {
-        collection: Vec<u8>,
-        description: Vec<u8>,
-    },
-
-    AptosTokenSetCollectionRoyaltiesCall {
-        collection: Vec<u8>,
-        royalty_numerator: u64,
-        royalty_denominator: u64,
-        payee_address: AccountAddress,
-    },
-
-    AptosTokenSetCollectionUriCall {
-        collection: Vec<u8>,
-        uri: Vec<u8>,
-    },
-
-    AptosTokenSetDescriptionCall {
-        collection: Vec<u8>,
-        name: Vec<u8>,
-        description: Vec<u8>,
-    },
-
-    AptosTokenSetNameCall {
-        collection: Vec<u8>,
-        original_name: Vec<u8>,
-        new_name: Vec<u8>,
-    },
-
-    AptosTokenSetUriCall {
-        collection: Vec<u8>,
-        name: Vec<u8>,
-        uri: Vec<u8>,
-    },
-
-    AptosTokenUnfreezeTransferCall {
-        collection: Vec<u8>,
-        name: Vec<u8>,
-    },
-
-    AptosTokenUpdatePropertyCall {
-        collection: Vec<u8>,
-        name: Vec<u8>,
-        key: Vec<u8>,
-        type_: Vec<u8>,
-        value: Vec<u8>,
-    },
 }
 
 impl EntryFunctionCall {
@@ -154,14 +82,6 @@ impl EntryFunctionCall {
     pub fn encode(self) -> TransactionPayload {
         use EntryFunctionCall::*;
         match self {
-            AptosTokenAddPropertyCall {
-                collection,
-                name,
-                key,
-                type_,
-                value,
-            } => aptos_token_add_property_call(collection, name, key, type_, value),
-            AptosTokenBurnCall { collection, name } => aptos_token_burn_call(collection, name),
             AptosTokenCreateCollection {
                 description,
                 max_supply,
@@ -195,9 +115,6 @@ impl EntryFunctionCall {
                 royalty_numerator,
                 royalty_denominator,
             ),
-            AptosTokenFreezeTransferCall { collection, name } => {
-                aptos_token_freeze_transfer_call(collection, name)
-            },
             AptosTokenMint {
                 collection,
                 description,
@@ -234,54 +151,6 @@ impl EntryFunctionCall {
                 property_values,
                 soul_bound_to,
             ),
-            AptosTokenRemovePropertyCall {
-                collection,
-                name,
-                key,
-            } => aptos_token_remove_property_call(collection, name, key),
-            AptosTokenSetCollectionDescriptionCall {
-                collection,
-                description,
-            } => aptos_token_set_collection_description_call(collection, description),
-            AptosTokenSetCollectionRoyaltiesCall {
-                collection,
-                royalty_numerator,
-                royalty_denominator,
-                payee_address,
-            } => aptos_token_set_collection_royalties_call(
-                collection,
-                royalty_numerator,
-                royalty_denominator,
-                payee_address,
-            ),
-            AptosTokenSetCollectionUriCall { collection, uri } => {
-                aptos_token_set_collection_uri_call(collection, uri)
-            },
-            AptosTokenSetDescriptionCall {
-                collection,
-                name,
-                description,
-            } => aptos_token_set_description_call(collection, name, description),
-            AptosTokenSetNameCall {
-                collection,
-                original_name,
-                new_name,
-            } => aptos_token_set_name_call(collection, original_name, new_name),
-            AptosTokenSetUriCall {
-                collection,
-                name,
-                uri,
-            } => aptos_token_set_uri_call(collection, name, uri),
-            AptosTokenUnfreezeTransferCall { collection, name } => {
-                aptos_token_unfreeze_transfer_call(collection, name)
-            },
-            AptosTokenUpdatePropertyCall {
-                collection,
-                name,
-                key,
-                type_,
-                value,
-            } => aptos_token_update_property_call(collection, name, key, type_, value),
         }
     }
 
@@ -300,51 +169,6 @@ impl EntryFunctionCall {
             None
         }
     }
-}
-
-pub fn aptos_token_add_property_call(
-    collection: Vec<u8>,
-    name: Vec<u8>,
-    key: Vec<u8>,
-    type_: Vec<u8>,
-    value: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 4,
-            ]),
-            ident_str!("aptos_token").to_owned(),
-        ),
-        ident_str!("add_property_call").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&collection).unwrap(),
-            bcs::to_bytes(&name).unwrap(),
-            bcs::to_bytes(&key).unwrap(),
-            bcs::to_bytes(&type_).unwrap(),
-            bcs::to_bytes(&value).unwrap(),
-        ],
-    ))
-}
-
-pub fn aptos_token_burn_call(collection: Vec<u8>, name: Vec<u8>) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 4,
-            ]),
-            ident_str!("aptos_token").to_owned(),
-        ),
-        ident_str!("burn_call").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&collection).unwrap(),
-            bcs::to_bytes(&name).unwrap(),
-        ],
-    ))
 }
 
 /// Create a new collection
@@ -391,24 +215,6 @@ pub fn aptos_token_create_collection(
             bcs::to_bytes(&tokens_freezable_by_creator).unwrap(),
             bcs::to_bytes(&royalty_numerator).unwrap(),
             bcs::to_bytes(&royalty_denominator).unwrap(),
-        ],
-    ))
-}
-
-pub fn aptos_token_freeze_transfer_call(collection: Vec<u8>, name: Vec<u8>) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 4,
-            ]),
-            ident_str!("aptos_token").to_owned(),
-        ),
-        ident_str!("freeze_transfer_call").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&collection).unwrap(),
-            bcs::to_bytes(&name).unwrap(),
         ],
     ))
 }
@@ -478,242 +284,8 @@ pub fn aptos_token_mint_soul_bound(
         ],
     ))
 }
-
-pub fn aptos_token_remove_property_call(
-    collection: Vec<u8>,
-    name: Vec<u8>,
-    key: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 4,
-            ]),
-            ident_str!("aptos_token").to_owned(),
-        ),
-        ident_str!("remove_property_call").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&collection).unwrap(),
-            bcs::to_bytes(&name).unwrap(),
-            bcs::to_bytes(&key).unwrap(),
-        ],
-    ))
-}
-
-pub fn aptos_token_set_collection_description_call(
-    collection: Vec<u8>,
-    description: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 4,
-            ]),
-            ident_str!("aptos_token").to_owned(),
-        ),
-        ident_str!("set_collection_description_call").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&collection).unwrap(),
-            bcs::to_bytes(&description).unwrap(),
-        ],
-    ))
-}
-
-pub fn aptos_token_set_collection_royalties_call(
-    collection: Vec<u8>,
-    royalty_numerator: u64,
-    royalty_denominator: u64,
-    payee_address: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 4,
-            ]),
-            ident_str!("aptos_token").to_owned(),
-        ),
-        ident_str!("set_collection_royalties_call").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&collection).unwrap(),
-            bcs::to_bytes(&royalty_numerator).unwrap(),
-            bcs::to_bytes(&royalty_denominator).unwrap(),
-            bcs::to_bytes(&payee_address).unwrap(),
-        ],
-    ))
-}
-
-pub fn aptos_token_set_collection_uri_call(
-    collection: Vec<u8>,
-    uri: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 4,
-            ]),
-            ident_str!("aptos_token").to_owned(),
-        ),
-        ident_str!("set_collection_uri_call").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&collection).unwrap(),
-            bcs::to_bytes(&uri).unwrap(),
-        ],
-    ))
-}
-
-pub fn aptos_token_set_description_call(
-    collection: Vec<u8>,
-    name: Vec<u8>,
-    description: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 4,
-            ]),
-            ident_str!("aptos_token").to_owned(),
-        ),
-        ident_str!("set_description_call").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&collection).unwrap(),
-            bcs::to_bytes(&name).unwrap(),
-            bcs::to_bytes(&description).unwrap(),
-        ],
-    ))
-}
-
-pub fn aptos_token_set_name_call(
-    collection: Vec<u8>,
-    original_name: Vec<u8>,
-    new_name: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 4,
-            ]),
-            ident_str!("aptos_token").to_owned(),
-        ),
-        ident_str!("set_name_call").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&collection).unwrap(),
-            bcs::to_bytes(&original_name).unwrap(),
-            bcs::to_bytes(&new_name).unwrap(),
-        ],
-    ))
-}
-
-pub fn aptos_token_set_uri_call(
-    collection: Vec<u8>,
-    name: Vec<u8>,
-    uri: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 4,
-            ]),
-            ident_str!("aptos_token").to_owned(),
-        ),
-        ident_str!("set_uri_call").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&collection).unwrap(),
-            bcs::to_bytes(&name).unwrap(),
-            bcs::to_bytes(&uri).unwrap(),
-        ],
-    ))
-}
-
-pub fn aptos_token_unfreeze_transfer_call(
-    collection: Vec<u8>,
-    name: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 4,
-            ]),
-            ident_str!("aptos_token").to_owned(),
-        ),
-        ident_str!("unfreeze_transfer_call").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&collection).unwrap(),
-            bcs::to_bytes(&name).unwrap(),
-        ],
-    ))
-}
-
-pub fn aptos_token_update_property_call(
-    collection: Vec<u8>,
-    name: Vec<u8>,
-    key: Vec<u8>,
-    type_: Vec<u8>,
-    value: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 4,
-            ]),
-            ident_str!("aptos_token").to_owned(),
-        ),
-        ident_str!("update_property_call").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&collection).unwrap(),
-            bcs::to_bytes(&name).unwrap(),
-            bcs::to_bytes(&key).unwrap(),
-            bcs::to_bytes(&type_).unwrap(),
-            bcs::to_bytes(&value).unwrap(),
-        ],
-    ))
-}
 mod decoder {
     use super::*;
-    pub fn aptos_token_add_property_call(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::AptosTokenAddPropertyCall {
-                collection: bcs::from_bytes(script.args().get(0)?).ok()?,
-                name: bcs::from_bytes(script.args().get(1)?).ok()?,
-                key: bcs::from_bytes(script.args().get(2)?).ok()?,
-                type_: bcs::from_bytes(script.args().get(3)?).ok()?,
-                value: bcs::from_bytes(script.args().get(4)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn aptos_token_burn_call(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::AptosTokenBurnCall {
-                collection: bcs::from_bytes(script.args().get(0)?).ok()?,
-                name: bcs::from_bytes(script.args().get(1)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
     pub fn aptos_token_create_collection(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -734,19 +306,6 @@ mod decoder {
                 tokens_freezable_by_creator: bcs::from_bytes(script.args().get(12)?).ok()?,
                 royalty_numerator: bcs::from_bytes(script.args().get(13)?).ok()?,
                 royalty_denominator: bcs::from_bytes(script.args().get(14)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn aptos_token_freeze_transfer_call(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::AptosTokenFreezeTransferCall {
-                collection: bcs::from_bytes(script.args().get(0)?).ok()?,
-                name: bcs::from_bytes(script.args().get(1)?).ok()?,
             })
         } else {
             None
@@ -785,128 +344,6 @@ mod decoder {
             None
         }
     }
-
-    pub fn aptos_token_remove_property_call(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::AptosTokenRemovePropertyCall {
-                collection: bcs::from_bytes(script.args().get(0)?).ok()?,
-                name: bcs::from_bytes(script.args().get(1)?).ok()?,
-                key: bcs::from_bytes(script.args().get(2)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn aptos_token_set_collection_description_call(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::AptosTokenSetCollectionDescriptionCall {
-                collection: bcs::from_bytes(script.args().get(0)?).ok()?,
-                description: bcs::from_bytes(script.args().get(1)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn aptos_token_set_collection_royalties_call(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::AptosTokenSetCollectionRoyaltiesCall {
-                collection: bcs::from_bytes(script.args().get(0)?).ok()?,
-                royalty_numerator: bcs::from_bytes(script.args().get(1)?).ok()?,
-                royalty_denominator: bcs::from_bytes(script.args().get(2)?).ok()?,
-                payee_address: bcs::from_bytes(script.args().get(3)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn aptos_token_set_collection_uri_call(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::AptosTokenSetCollectionUriCall {
-                collection: bcs::from_bytes(script.args().get(0)?).ok()?,
-                uri: bcs::from_bytes(script.args().get(1)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn aptos_token_set_description_call(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::AptosTokenSetDescriptionCall {
-                collection: bcs::from_bytes(script.args().get(0)?).ok()?,
-                name: bcs::from_bytes(script.args().get(1)?).ok()?,
-                description: bcs::from_bytes(script.args().get(2)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn aptos_token_set_name_call(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::AptosTokenSetNameCall {
-                collection: bcs::from_bytes(script.args().get(0)?).ok()?,
-                original_name: bcs::from_bytes(script.args().get(1)?).ok()?,
-                new_name: bcs::from_bytes(script.args().get(2)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn aptos_token_set_uri_call(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::AptosTokenSetUriCall {
-                collection: bcs::from_bytes(script.args().get(0)?).ok()?,
-                name: bcs::from_bytes(script.args().get(1)?).ok()?,
-                uri: bcs::from_bytes(script.args().get(2)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn aptos_token_unfreeze_transfer_call(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::AptosTokenUnfreezeTransferCall {
-                collection: bcs::from_bytes(script.args().get(0)?).ok()?,
-                name: bcs::from_bytes(script.args().get(1)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn aptos_token_update_property_call(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::AptosTokenUpdatePropertyCall {
-                collection: bcs::from_bytes(script.args().get(0)?).ok()?,
-                name: bcs::from_bytes(script.args().get(1)?).ok()?,
-                key: bcs::from_bytes(script.args().get(2)?).ok()?,
-                type_: bcs::from_bytes(script.args().get(3)?).ok()?,
-                value: bcs::from_bytes(script.args().get(4)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
 }
 
 type EntryFunctionDecoderMap = std::collections::HashMap<
@@ -922,20 +359,8 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
     once_cell::sync::Lazy::new(|| {
         let mut map: EntryFunctionDecoderMap = std::collections::HashMap::new();
         map.insert(
-            "aptos_token_add_property_call".to_string(),
-            Box::new(decoder::aptos_token_add_property_call),
-        );
-        map.insert(
-            "aptos_token_burn_call".to_string(),
-            Box::new(decoder::aptos_token_burn_call),
-        );
-        map.insert(
             "aptos_token_create_collection".to_string(),
             Box::new(decoder::aptos_token_create_collection),
-        );
-        map.insert(
-            "aptos_token_freeze_transfer_call".to_string(),
-            Box::new(decoder::aptos_token_freeze_transfer_call),
         );
         map.insert(
             "aptos_token_mint".to_string(),
@@ -944,42 +369,6 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "aptos_token_mint_soul_bound".to_string(),
             Box::new(decoder::aptos_token_mint_soul_bound),
-        );
-        map.insert(
-            "aptos_token_remove_property_call".to_string(),
-            Box::new(decoder::aptos_token_remove_property_call),
-        );
-        map.insert(
-            "aptos_token_set_collection_description_call".to_string(),
-            Box::new(decoder::aptos_token_set_collection_description_call),
-        );
-        map.insert(
-            "aptos_token_set_collection_royalties_call".to_string(),
-            Box::new(decoder::aptos_token_set_collection_royalties_call),
-        );
-        map.insert(
-            "aptos_token_set_collection_uri_call".to_string(),
-            Box::new(decoder::aptos_token_set_collection_uri_call),
-        );
-        map.insert(
-            "aptos_token_set_description_call".to_string(),
-            Box::new(decoder::aptos_token_set_description_call),
-        );
-        map.insert(
-            "aptos_token_set_name_call".to_string(),
-            Box::new(decoder::aptos_token_set_name_call),
-        );
-        map.insert(
-            "aptos_token_set_uri_call".to_string(),
-            Box::new(decoder::aptos_token_set_uri_call),
-        );
-        map.insert(
-            "aptos_token_unfreeze_transfer_call".to_string(),
-            Box::new(decoder::aptos_token_unfreeze_transfer_call),
-        );
-        map.insert(
-            "aptos_token_update_property_call".to_string(),
-            Box::new(decoder::aptos_token_update_property_call),
         );
         map
     });
