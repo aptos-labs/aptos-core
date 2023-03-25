@@ -28,7 +28,7 @@ module fungible_asset::managed_fungible_asset {
         symbol: String,
         decimals: u8
     ) {
-        let (mint_ref, transfer_ref, burn_ref) = fungible_asset::init_metadata(
+        let (mint_ref, transfer_ref, burn_ref) = fungible_asset::make_object_fungible(
             constructor_ref,
             maximum_supply,
             name,
@@ -52,30 +52,6 @@ module fungible_asset::managed_fungible_asset {
         let mint_ref = &authorized_borrow_refs<T>(metadata_owner, metadata).mint_ref;
         let to_wallet = primary_wallet::ensure_primary_wallet_exists(to, metadata);
         fungible_asset::deposit(to_wallet, fungible_asset::mint(mint_ref, amount));
-    }
-
-    /// Withdraw as the owner of metadata object ignoring `allow_ungated_transfer` field.
-    public fun withdraw<T: key>(
-        metadata_owner: &signer,
-        metadata: Object<T>,
-        amount: u64,
-        from: address,
-    ): FungibleAsset acquires ManagedFungibleAsset {
-        let transfer_ref = &authorized_borrow_refs<T>(metadata_owner, metadata).transfer_ref;
-        let from_wallet = primary_wallet::ensure_primary_wallet_exists(from, metadata);
-        fungible_asset::withdraw_with_ref(transfer_ref, from_wallet, amount)
-    }
-
-    /// Deposit as the owner of metadata object ignoring `allow_ungated_transfer` field.
-    public fun deposit<T: key>(
-        metadata_owner: &signer,
-        metadata: Object<T>,
-        to: address,
-        fa: FungibleAsset
-    ) acquires ManagedFungibleAsset {
-        let transfer_ref = &authorized_borrow_refs<T>(metadata_owner, metadata).transfer_ref;
-        let to_wallet = primary_wallet::ensure_primary_wallet_exists(to, metadata);
-        fungible_asset::deposit_with_ref(transfer_ref, to_wallet, fa);
     }
 
     /// Transfer as the owner of metadata object ignoring `allow_ungated_transfer` field.
@@ -124,6 +100,30 @@ module fungible_asset::managed_fungible_asset {
         let transfer_ref = &authorized_borrow_refs<T>(metadata_owner, metadata).transfer_ref;
         let wallet = primary_wallet::ensure_primary_wallet_exists(account, metadata);
         fungible_asset::set_ungated_transfer(transfer_ref, wallet, true);
+    }
+
+    /// Withdraw as the owner of metadata object ignoring `allow_ungated_transfer` field.
+    public fun withdraw<T: key>(
+        metadata_owner: &signer,
+        metadata: Object<T>,
+        amount: u64,
+        from: address,
+    ): FungibleAsset acquires ManagedFungibleAsset {
+        let transfer_ref = &authorized_borrow_refs<T>(metadata_owner, metadata).transfer_ref;
+        let from_wallet = primary_wallet::ensure_primary_wallet_exists(from, metadata);
+        fungible_asset::withdraw_with_ref(transfer_ref, from_wallet, amount)
+    }
+
+    /// Deposit as the owner of metadata object ignoring `allow_ungated_transfer` field.
+    public fun deposit<T: key>(
+        metadata_owner: &signer,
+        metadata: Object<T>,
+        to: address,
+        fa: FungibleAsset
+    ) acquires ManagedFungibleAsset {
+        let transfer_ref = &authorized_borrow_refs<T>(metadata_owner, metadata).transfer_ref;
+        let to_wallet = primary_wallet::ensure_primary_wallet_exists(to, metadata);
+        fungible_asset::deposit_with_ref(transfer_ref, to_wallet, fa);
     }
 
     /// Borrow the immutable reference of the refs of `metadata`.
