@@ -284,6 +284,13 @@ mod test {
             "{:?}",
             super::create_token_address(address, "bob's collection", "bob's token")
         );
-        // println!("{:?}", create_object_address(address, guid);
+        println!(
+            "{:?}",
+            super::create_collection_address(address, "bob's collection")
+        );
+        println!(
+            "{:?}",
+            super::create_resource_address(address, &[0x0B, 0x00, 0x0B])
+        );
     }
 }
