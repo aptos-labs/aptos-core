@@ -20,6 +20,7 @@ This defines a store of <code>FungibleAssetWallet</code> under each account.
 -  [Function `burn`](#0x1_fungible_store_burn)
 -  [Function `get_account_fungible_asset_object`](#0x1_fungible_store_get_account_fungible_asset_object)
 -  [Function `create_account_fungible_asset_object`](#0x1_fungible_store_create_account_fungible_asset_object)
+-  [Specification](#@Specification_1)
 
 
 <pre><code><b>use</b> <a href="create_signer.md#0x1_create_signer">0x1::create_signer</a>;
@@ -505,6 +506,15 @@ Create a default <code>FungibleAssetWallet</code> object with zero balance of <c
 
 
 </details>
+
+<a name="@Specification_1"></a>
+
+## Specification
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
 
 
 [move-book]: https://move-language.github.io/move/introduction.html
