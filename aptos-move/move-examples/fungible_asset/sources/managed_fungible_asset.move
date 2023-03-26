@@ -65,7 +65,7 @@ module fungible_asset::managed_fungible_asset {
         let transfer_ref = &authorized_borrow_refs<T>(metadata_owner, metadata).transfer_ref;
         let from_wallet = primary_wallet::ensure_primary_wallet_exists(from, metadata);
         let to_wallet = primary_wallet::ensure_primary_wallet_exists(to, metadata);
-        fungible_asset::transfer_with_ref(transfer_ref, from_wallet, amount, to_wallet);
+        fungible_asset::transfer_with_ref(transfer_ref, from_wallet, to_wallet, amount);
     }
 
     /// Burn fungible assets as the owner of metadata object.
