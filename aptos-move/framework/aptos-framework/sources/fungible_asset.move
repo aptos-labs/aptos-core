@@ -31,6 +31,8 @@ module aptos_framework::fungible_asset {
     const EBURN_REF_AND_WALLET_MISMATCH: u64 = 10;
     /// Fungible asset and wallet do not match.
     const EFUNGIBLE_ASSET_AND_WALLET_MISMATCH: u64 = 11;
+    /// Cannot destroy non-empty fungible assets.
+    const EAMOUNT_IS_NOT_ZERO: u64 = 12;
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Define the metadata required of an metadata to be fungible.
@@ -256,7 +258,7 @@ module aptos_framework::fungible_asset {
     ): FungibleAsset acquires FungibleAssetWallet {
         assert!(object::owns(wallet, signer::address_of(owner)), error::permission_denied(ENOT_WALLET_OWNER));
         assert!(ungated_transfer_allowed(wallet), error::invalid_argument(EUNGATED_TRANSFER_IS_NOT_ALLOWED));
-        extract(object::object_address(&wallet), amount)
+        withdraw_internal(object::object_address(&wallet), amount)
     }
 
     /// Deposit `amount` of fungible asset to `wallet`.
@@ -312,7 +314,7 @@ module aptos_framework::fungible_asset {
         let FungibleAsset {
             metadata,
             amount,
-        } = extract(wallet_addr, amount);
+        } = withdraw_internal(wallet_addr, amount);
         decrease_supply(&metadata, amount);
     }
 
@@ -326,7 +328,7 @@ module aptos_framework::fungible_asset {
             ref.metadata == wallet_metadata(wallet),
             error::invalid_argument(ETRANSFER_REF_AND_WALLET_MISMATCH),
         );
-        extract(object::object_address(&wallet), amount)
+        withdraw_internal(object::object_address(&wallet), amount)
     }
 
     /// Deposit fungible asset into `wallet` ignoring `allow_ungated_transfer`.
@@ -353,6 +355,48 @@ module aptos_framework::fungible_asset {
         deposit_with_ref(transfer_ref, to_wallet, fa);
     }
 
+    /// Extract a given amount from the given fungible asset and return a new one.
+    public fun extract(fungible_asset: &mut FungibleAsset, amount: u64): FungibleAsset {
+        assert!(fungible_asset.amount >= amount, error::invalid_argument(EINSUFFICIENT_BALANCE));
+        fungible_asset.amount = fungible_asset.amount - amount;
+        FungibleAsset {
+            metadata: fungible_asset.metadata,
+            amount,
+        }
+    }
+
+    /// Extract everything from the given fungible asset and return a new one.
+    public fun extract_all(fungible_asset: &mut FungibleAsset): FungibleAsset {
+        let amount = fungible_asset.amount;
+        fungible_asset.amount = 0;
+        FungibleAsset {
+            metadata: fungible_asset.metadata,
+            amount,
+        }
+    }
+
+    /// "Merges" the two given fungible assets. The coin passed in as `dst_fungible_asset` will have a value equal
+    /// to the sum of the two (`dst_fungible_asset` and `src_fungible_asset`).
+    public fun merge(dst_fungible_asset: &mut FungibleAsset, src_fungible_asset: FungibleAsset) {
+        let FungibleAsset { metadata: _, amount } = src_fungible_asset;
+        dst_fungible_asset.amount = dst_fungible_asset.amount + amount;
+    }
+
+    /// Create a new fungible asset with a value of 0.
+    public fun zero<T: key>(metadata: Object<T>): FungibleAsset {
+        let metadata = object::object_to_object<T, FungibleAssetMetadata>(metadata);
+        FungibleAsset {
+            amount: 0,
+            metadata,
+        }
+    }
+
+    /// Destroy an empty fungible asset.
+    public fun destroy_zero(fungible_asset: FungibleAsset) {
+        let FungibleAsset { amount, metadata: _ } = fungible_asset;
+        assert!(amount == 0, error::invalid_argument(EAMOUNT_IS_NOT_ZERO));
+    }
+
     fun deposit_internal<T: key>(wallet: Object<T>, fa: FungibleAsset) acquires FungibleAssetWallet {
         let FungibleAsset { metadata, amount } = fa;
         let wallet_metadata = wallet_metadata(wallet);
@@ -363,7 +407,7 @@ module aptos_framework::fungible_asset {
     }
 
     /// Extract `amount` of fungible asset from `wallet`.
-    fun extract(wallet_addr: address, amount: u64): FungibleAsset acquires FungibleAssetWallet {
+    fun withdraw_internal(wallet_addr: address, amount: u64): FungibleAsset acquires FungibleAssetWallet {
         assert!(amount != 0, error::invalid_argument(EAMOUNT_CANNOT_BE_ZERO));
         let wallet = borrow_global_mut<FungibleAssetWallet>(wallet_addr);
         assert!(wallet.balance >= amount, error::invalid_argument(EINSUFFICIENT_BALANCE));
