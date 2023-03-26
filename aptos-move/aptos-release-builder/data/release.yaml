@@ -20,6 +20,7 @@ update_sequence:
         - multisig_accounts
         - delegation_pools
         - ed25519_pubkey_validate_return_false_wrong_length
+        - struct_constructors
       disabled: []
   - Consensus:
       V1:
