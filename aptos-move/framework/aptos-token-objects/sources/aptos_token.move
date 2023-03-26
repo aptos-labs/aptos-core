@@ -256,27 +256,33 @@ module aptos_token_objects::aptos_token {
         borrow_global<AptosToken>(token_address)
     }
 
+    #[view]
     public fun are_properties_mutable<T: key>(token: Object<T>): bool acquires AptosCollection {
         let collection = token::collection_object(token);
         borrow_collection(&collection).mutable_token_properties
     }
 
+    #[view]
     public fun is_burnable<T: key>(token: Object<T>): bool acquires AptosToken {
         option::is_some(&borrow(&token).burn_ref)
     }
 
+    #[view]
     public fun is_freezable_by_creator<T: key>(token: Object<T>): bool acquires AptosCollection {
         are_collection_tokens_freezable(token::collection_object(token))
     }
 
+    #[view]
     public fun is_mutable_description<T: key>(token: Object<T>): bool acquires AptosCollection {
         is_mutable_collection_token_description(token::collection_object(token))
     }
 
+    #[view]
     public fun is_mutable_name<T: key>(token: Object<T>): bool acquires AptosCollection {
         is_mutable_collection_token_name(token::collection_object(token))
     }
 
+    #[view]
     public fun is_mutable_uri<T: key>(token: Object<T>): bool acquires AptosCollection {
         is_mutable_collection_token_uri(token::collection_object(token))
     }
