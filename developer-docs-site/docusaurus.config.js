@@ -210,11 +210,6 @@ const config = {
                 docId: "tutorials/first-move-module",
               },
               {
-                label: "Upgrade Move Code",
-                type: "doc",
-                docId: "guides/move-guides/upgrading-move-code",
-              },
-              {
                 label: "Aptos Move Book",
                 type: "doc",
                 docId: "guides/move-guides/book/SUMMARY",

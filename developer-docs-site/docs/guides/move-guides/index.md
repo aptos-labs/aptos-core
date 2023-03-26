@@ -19,14 +19,13 @@ Start here to learn how the Move language works on the Aptos blockchain.
 
 - ### [Aptos Move Book](book/SUMMARY.md)
 - ### [Move on Aptos](./move-on-aptos.md)
-- ### [Move Tutorial](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/move-tutorial)
+- ### [Move Primitives Tutorial](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/move-tutorial)
 - ### [Use Bytecode for Dependencies](./bytecode-dependencies.md)
 - ### [Gas and Transaction Fees](../../concepts/gas-txn-fee.md)
 - ### [How Base Gas Works](../../concepts/base-gas.md)
 - ### [Interact with the Move VM](../interacting-with-the-blockchain.md)
 - ### [Your First Move module](../../tutorials/first-move-module.md)
 - ### [Mint NFT with Aptos CLI](./mint-nft-cli.md)
-- ### [Upgrading Move Code](upgrading-move-code.md)
 - ### [Aptos Move Examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples)
 - ### [End-to-End Aptos Move Tests](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/e2e-move-tests/src/tests)
 - ### [Move language channel](https://discord.com/channels/945856774056083548/955573698868432896) in [Aptos Discord](https://discord.gg/aptoslabs).

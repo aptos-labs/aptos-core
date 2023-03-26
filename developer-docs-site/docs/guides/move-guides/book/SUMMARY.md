@@ -32,6 +32,7 @@
 - [Uses and Aliases](uses.md)
 - [Friends](friends.md)
 - [Packages](packages.md)
+- [Package Upgrades](package-upgrades.md)
 - [Unit Tests](unit-testing.md)
 
 ## Global Storage

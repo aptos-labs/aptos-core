@@ -23,6 +23,7 @@ on-demand manner too.
 -  [Function `waive_mint`](#0x1_managed_fungible_metadata_waive_mint)
 -  [Function `waive_transfer`](#0x1_managed_fungible_metadata_waive_transfer)
 -  [Function `waive_burn`](#0x1_managed_fungible_metadata_waive_burn)
+-  [Specification](#@Specification_1)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
@@ -534,6 +535,15 @@ Let metadata owner to explicitly waive the burn capability.
 
 
 </details>
+
+<a name="@Specification_1"></a>
+
+## Specification
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
 
 
 [move-book]: https://move-language.github.io/move/introduction.html
