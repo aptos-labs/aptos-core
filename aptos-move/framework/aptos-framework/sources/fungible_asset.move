@@ -164,9 +164,7 @@ module aptos_framework::fungible_asset {
 
     #[view]
     /// Return the underlying metadata object.
-    public fun metadata_from_wallet<T: key>(
-        wallet: Object<T>
-    ): Object<FungibleAssetMetadata> acquires FungibleAssetWallet {
+    public fun wallet_metadata<T: key>(wallet: Object<T>): Object<FungibleAssetMetadata> acquires FungibleAssetWallet {
         borrow_wallet_resource(&wallet).metadata
     }
 
@@ -284,7 +282,7 @@ module aptos_framework::fungible_asset {
         wallet: Object<T>,
         amount: u64,
     ) acquires FungibleAssetMetadata, FungibleAssetWallet {
-        assert!(ref.metadata == metadata_from_wallet(wallet), error::invalid_argument(EMINT_REF_AND_WALLET_MISMATCH));
+        assert!(ref.metadata == wallet_metadata(wallet), error::invalid_argument(EMINT_REF_AND_WALLET_MISMATCH));
         deposit(wallet, mint(ref, amount));
     }
 
@@ -295,7 +293,7 @@ module aptos_framework::fungible_asset {
         allow: bool,
     ) acquires FungibleAssetWallet {
         assert!(
-            ref.metadata == metadata_from_wallet(wallet),
+            ref.metadata == wallet_metadata(wallet),
             error::invalid_argument(ETRANSFER_REF_AND_WALLET_MISMATCH),
         );
         let wallet_addr = object::object_address(&wallet);
@@ -309,7 +307,7 @@ module aptos_framework::fungible_asset {
         amount: u64
     ) acquires FungibleAssetWallet, FungibleAssetMetadata {
         let metadata = ref.metadata;
-        assert!(metadata == metadata_from_wallet(wallet), error::invalid_argument(EBURN_REF_AND_WALLET_MISMATCH));
+        assert!(metadata == wallet_metadata(wallet), error::invalid_argument(EBURN_REF_AND_WALLET_MISMATCH));
         let wallet_addr = object::object_address(&wallet);
         let FungibleAsset {
             metadata,
@@ -325,7 +323,7 @@ module aptos_framework::fungible_asset {
         amount: u64
     ): FungibleAsset acquires FungibleAssetWallet {
         assert!(
-            ref.metadata == metadata_from_wallet(wallet),
+            ref.metadata == wallet_metadata(wallet),
             error::invalid_argument(ETRANSFER_REF_AND_WALLET_MISMATCH),
         );
         extract(object::object_address(&wallet), amount)
@@ -357,7 +355,7 @@ module aptos_framework::fungible_asset {
 
     fun deposit_internal<T: key>(wallet: Object<T>, fa: FungibleAsset) acquires FungibleAssetWallet {
         let FungibleAsset { metadata, amount } = fa;
-        let wallet_metadata = metadata_from_wallet(wallet);
+        let wallet_metadata = wallet_metadata(wallet);
         assert!(metadata == wallet_metadata, error::invalid_argument(EFUNGIBLE_ASSET_AND_WALLET_MISMATCH));
         let wallet_addr = object::object_address(&wallet);
         let wallet = borrow_global_mut<FungibleAssetWallet>(wallet_addr);
