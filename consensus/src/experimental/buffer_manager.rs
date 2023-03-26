@@ -870,13 +870,13 @@ impl BufferManager {
                     monitor!("buffer_manager_process_rebroadcast_commit_vote", {
                     self.rebroadcast_commit_votes_if_needed().await
                     });
-                    // unhappy path, keep broadcasting randomness decisions or randomness shares for non-committed blocks
-                    monitor!("buffer_manager_process_rebroadcast_rand_share", {
-                    self.rebroadcast_rand_share_if_needed().await;
-                    });
-                    monitor!("buffer_manager_process_rebroadcast_rand_decision", {
-                    self.rebroadcast_rand_decision_if_needed().await;
-                    });
+                    // // unhappy path, keep broadcasting randomness decisions or randomness shares for non-committed blocks
+                    // monitor!("buffer_manager_process_rebroadcast_rand_share", {
+                    // self.rebroadcast_rand_share_if_needed().await;
+                    // });
+                    // monitor!("buffer_manager_process_rebroadcast_rand_decision", {
+                    // self.rebroadcast_rand_decision_if_needed().await;
+                    // });
                 },
                 // no else branch here because interval.tick will always be available
             }
