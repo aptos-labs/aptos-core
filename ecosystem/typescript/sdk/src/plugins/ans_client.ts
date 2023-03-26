@@ -48,7 +48,7 @@ export class AnsClient {
   constructor(provider: Provider, contractAddress?: string) {
     this.provider = provider;
     if (!ansContractsMap[this.provider.network] && !contractAddress) {
-      throw new Error("Please provide a valid contract address");
+      throw new Error("Error: For custom providers, you must pass in a contract address");
     }
     this.contractAddress = ansContractsMap[this.provider.network] ?? contractAddress;
   }
@@ -56,7 +56,7 @@ export class AnsClient {
   /**
    * Returns the primary name for the given account address
    * @param address An account address
-   * @returns Account's primary name | null
+   * @returns Account's primary name | null if there is no primary name defined
    */
   async getPrimaryNameByAddress(address: string): Promise<string | null> {
     const ansResource: Gen.MoveResource = await this.provider.getAccountResource(

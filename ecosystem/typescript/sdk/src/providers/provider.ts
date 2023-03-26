@@ -4,6 +4,7 @@ import { IndexerClient } from "./indexer";
 import * as Gen from "../generated/index";
 import { CustomEndpoints, Network, NetworkToIndexerAPI, NetworkToNodeAPI } from "../utils";
 
+type NetworkWithCustom = Network | "CUSTOM";
 /**
  * Builds a Provider class with an aptos client configured to connect to an Aptos node
  * and indexer client configured to connect to Aptos Indexer.
@@ -28,7 +29,7 @@ export class Provider {
 
   indexerClient: IndexerClient;
 
-  network: Network | "CUSTOM";
+  network: NetworkWithCustom;
 
   constructor(
     network: Network | CustomEndpoints,
