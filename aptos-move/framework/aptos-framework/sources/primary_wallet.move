@@ -17,19 +17,23 @@ module aptos_framework::primary_wallet {
         fungible_asset::create_deterministic_wallet(owner, metadata)
     }
 
+    #[view]
     public fun primary_wallet_address<T: key>(owner: address, metadata: Object<T>): address {
         fungible_asset::deterministic_wallet_address(owner, metadata)
     }
 
+    #[view]
     public fun primary_wallet<T: key>(owner: address, metadata: Object<T>): Object<FungibleAssetWallet> {
         let wallet = primary_wallet_address(owner, metadata);
         object::address_to_object<FungibleAssetWallet>(wallet)
     }
 
+    #[view]
     public fun primary_wallet_exists<T: key>(account: address, metadata: Object<T>): bool {
         fungible_asset::wallet_exists(primary_wallet_address(account, metadata))
     }
 
+    #[view]
     /// Get the balance of `account`'s primary wallet.
     public fun balance<T: key>(account: address, metadata: Object<T>): u64 {
         if (primary_wallet_exists(account, metadata)) {
@@ -39,6 +43,7 @@ module aptos_framework::primary_wallet {
         }
     }
 
+    #[view]
     /// Return whether the given account's primary wallet can do direct transfers.
     public fun ungated_transfer_allowed<T: key>(account: address, metadata: Object<T>): bool {
         fungible_asset::ungated_transfer_allowed(primary_wallet(account, metadata))
@@ -58,7 +63,7 @@ module aptos_framework::primary_wallet {
     }
 
     /// Transfer `amount` of fungible asset from sender's primary wallet to receiver's primary wallet.
-    public fun transfer<T: key>(sender: &signer, metadata: Object<T>, amount: u64, recipient: address) {
+    public entry fun transfer<T: key>(sender: &signer, metadata: Object<T>, amount: u64, recipient: address) {
         let sender_wallet = ensure_primary_wallet_exists(signer::address_of(sender), metadata);
         let recipient_wallet = ensure_primary_wallet_exists(recipient, metadata);
         fungible_asset::transfer(sender, sender_wallet, amount, recipient_wallet);

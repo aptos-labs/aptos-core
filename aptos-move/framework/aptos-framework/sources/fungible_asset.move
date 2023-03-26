@@ -115,36 +115,43 @@ module aptos_framework::fungible_asset {
         (MintRef { metadata }, TransferRef { metadata }, BurnRef { metadata })
     }
 
+    #[view]
     /// Get the current supply from `metadata`.
-    public fun supply<T: key>(metadata: &Object<T>): u64 acquires FungibleAssetMetadata {
-        borrow_fungible_metadata(metadata).supply
+    public fun supply<T: key>(metadata: Object<T>): u64 acquires FungibleAssetMetadata {
+        borrow_fungible_metadata(&metadata).supply
     }
 
+    #[view]
     /// Get the maximum supply from `metadata`.
-    public fun maximum<T: key>(metadata: &Object<T>): Option<u64> acquires FungibleAssetMetadata {
-        borrow_fungible_metadata(metadata).maximum
+    public fun maximum<T: key>(metadata: Object<T>): Option<u64> acquires FungibleAssetMetadata {
+        borrow_fungible_metadata(&metadata).maximum
     }
 
+    #[view]
     /// Get the name of the fungible asset from `metadata`.
-    public fun name<T: key>(metadata: &Object<T>): String acquires FungibleAssetMetadata {
-        borrow_fungible_metadata(metadata).name
+    public fun name<T: key>(metadata: Object<T>): String acquires FungibleAssetMetadata {
+        borrow_fungible_metadata(&metadata).name
     }
 
+    #[view]
     /// Get the symbol of the fungible asset from `metadata`.
-    public fun symbol<T: key>(metadata: &Object<T>): String acquires FungibleAssetMetadata {
-        borrow_fungible_metadata(metadata).symbol
+    public fun symbol<T: key>(metadata: Object<T>): String acquires FungibleAssetMetadata {
+        borrow_fungible_metadata(&metadata).symbol
     }
 
+    #[view]
     /// Get the decimals from `metadata`.
-    public fun decimals<T: key>(metadata: &Object<T>): u8 acquires FungibleAssetMetadata {
-        borrow_fungible_metadata(metadata).decimals
+    public fun decimals<T: key>(metadata: Object<T>): u8 acquires FungibleAssetMetadata {
+        borrow_fungible_metadata(&metadata).decimals
     }
 
+    #[view]
     public fun deterministic_wallet_address<T: key>(owner: address, metadata: Object<T>): address {
         let metadata_addr = object::object_address(&metadata);
         object::create_derived_object_address(owner, metadata_addr)
     }
 
+    #[view]
     /// Return whether the provided address has a wallet initialized.
     public fun wallet_exists(wallet: address): bool {
         exists<FungibleAssetWallet>(wallet)
@@ -155,9 +162,12 @@ module aptos_framework::fungible_asset {
         fa.metadata
     }
 
+    #[view]
     /// Return the underlying metadata object.
-    public fun metadata_from_wallet<T: key>(wallet: &Object<T>): Object<FungibleAssetMetadata> acquires FungibleAssetWallet {
-        borrow_wallet_resource(wallet).metadata
+    public fun metadata_from_wallet<T: key>(
+        wallet: Object<T>
+    ): Object<FungibleAssetMetadata> acquires FungibleAssetWallet {
+        borrow_wallet_resource(&wallet).metadata
     }
 
     /// Return `amount` of a given fungible asset.
@@ -165,6 +175,7 @@ module aptos_framework::fungible_asset {
         fa.amount
     }
 
+    #[view]
     /// Get the balance of a given wallet.
     public fun balance<T: key>(wallet: Object<T>): u64 acquires FungibleAssetWallet {
         if (wallet_exists(object::object_address(&wallet))) {
@@ -174,6 +185,7 @@ module aptos_framework::fungible_asset {
         }
     }
 
+    #[view]
     /// Return whether a wallet can freely send or receive fungible assets.
     public fun ungated_transfer_allowed<T: key>(wallet: Object<T>): bool acquires FungibleAssetWallet {
         borrow_wallet_resource(&wallet).allow_ungated_transfer
@@ -200,7 +212,7 @@ module aptos_framework::fungible_asset {
 
     /// Transfer `amount` of fungible asset from `from_wallet`, which should be owned by `sender`, to `receiver`.
     /// Note: it does not move the underlying object.
-    public fun transfer<T: key>(
+    public entry fun transfer<T: key>(
         sender: &signer,
         from_wallet: Object<T>,
         amount: u64,
@@ -282,7 +294,7 @@ module aptos_framework::fungible_asset {
         allow: bool,
     ) acquires FungibleAssetWallet {
         assert!(
-            ref.metadata == metadata_from_wallet(&wallet),
+            ref.metadata == metadata_from_wallet(wallet),
             error::invalid_argument(ETRANSFER_REF_AND_WALLET_MISMATCH),
         );
         let wallet_addr = object::object_address(&wallet);
@@ -296,7 +308,7 @@ module aptos_framework::fungible_asset {
         amount: u64
     ) acquires FungibleAssetWallet, FungibleAssetMetadata {
         let metadata = ref.metadata;
-        assert!(metadata == metadata_from_wallet(&wallet), error::invalid_argument(EBURN_REF_AND_WALLET_MISMATCH));
+        assert!(metadata == metadata_from_wallet(wallet), error::invalid_argument(EBURN_REF_AND_WALLET_MISMATCH));
         let wallet_addr = object::object_address(&wallet);
         let FungibleAsset {
             metadata,
@@ -312,7 +324,7 @@ module aptos_framework::fungible_asset {
         amount: u64
     ): FungibleAsset acquires FungibleAssetWallet {
         assert!(
-            ref.metadata == metadata_from_wallet(&wallet),
+            ref.metadata == metadata_from_wallet(wallet),
             error::invalid_argument(ETRANSFER_REF_AND_WALLET_MISMATCH),
         );
         extract(object::object_address(&wallet), amount)
@@ -344,7 +356,7 @@ module aptos_framework::fungible_asset {
 
     fun deposit_internal<T: key>(wallet: Object<T>, fa: FungibleAsset) acquires FungibleAssetWallet {
         let FungibleAsset { metadata, amount } = fa;
-        let wallet_metadata = metadata_from_wallet(&wallet);
+        let wallet_metadata = metadata_from_wallet(wallet);
         assert!(metadata == wallet_metadata, error::invalid_argument(EFUNGIBLE_ASSET_AND_WALLET_MISMATCH));
         let wallet_addr = object::object_address(&wallet);
         let wallet = borrow_global_mut<FungibleAssetWallet>(wallet_addr);
@@ -444,16 +456,16 @@ module aptos_framework::fungible_asset {
     fun test_metadata_basic_flow(creator: &signer) acquires FungibleAssetMetadata {
         let (creator_ref, asset) = create_test_token(creator);
         init_test_metadata(&creator_ref);
-        assert!(supply(&asset) == 0, 1);
-        assert!(maximum(&asset) == option::some(100), 2);
-        assert!(name(&asset) == string::utf8(b"USDA"), 3);
-        assert!(symbol(&asset) == string::utf8(b"$$$"), 4);
-        assert!(decimals(&asset) == 0, 5);
+        assert!(supply(asset) == 0, 1);
+        assert!(maximum(asset) == option::some(100), 2);
+        assert!(name(asset) == string::utf8(b"USDA"), 3);
+        assert!(symbol(asset) == string::utf8(b"$$$"), 4);
+        assert!(decimals(asset) == 0, 5);
 
         increase_supply(&asset, 50);
-        assert!(supply(&asset) == 50, 6);
+        assert!(supply(asset) == 50, 6);
         decrease_supply(&asset, 30);
-        assert!(supply(&asset) == 20, 7);
+        assert!(supply(asset) == 20, 7);
     }
 
     #[test(creator = @0xcafe)]
@@ -482,19 +494,19 @@ module aptos_framework::fungible_asset {
         let creator_wallet = create_deterministic_wallet(signer::address_of(creator), metadata);
         let aaron_wallet = create_deterministic_wallet(signer::address_of(aaron), metadata);
 
-        assert!(supply(&test_token) == 0, 1);
+        assert!(supply(test_token) == 0, 1);
         // Mint
         let fa = mint(&mint_ref, 100);
-        assert!(supply(&test_token) == 100, 2);
+        assert!(supply(test_token) == 100, 2);
         // Deposit
         deposit(creator_wallet, fa);
         // Withdraw
         let fa = withdraw(creator, creator_wallet, 80);
-        assert!(supply(&test_token) == 100, 3);
+        assert!(supply(test_token) == 100, 3);
         deposit(aaron_wallet, fa);
         // Burn
         burn(&burn_ref, aaron_wallet, 30);
-        assert!(supply(&test_token) == 70, 4);
+        assert!(supply(test_token) == 70, 4);
         // Transfer
         transfer(creator, creator_wallet,10, aaron_wallet);
         assert!(balance(creator_wallet) == 10, 5);

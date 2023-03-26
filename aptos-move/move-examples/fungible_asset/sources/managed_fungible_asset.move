@@ -43,7 +43,7 @@ module fungible_asset::managed_fungible_asset {
     }
 
     /// Mint as the owner of metadata object.
-    public fun mint<T: key>(
+    public entry fun mint<T: key>(
         metadata_owner: &signer,
         metadata: Object<T>,
         amount: u64,
@@ -55,7 +55,7 @@ module fungible_asset::managed_fungible_asset {
     }
 
     /// Transfer as the owner of metadata object ignoring `allow_ungated_transfer` field.
-    public fun transfer<T: key>(
+    public entry fun transfer<T: key>(
         metadata_owner: &signer,
         metadata: Object<T>,
         from: address,
@@ -69,7 +69,7 @@ module fungible_asset::managed_fungible_asset {
     }
 
     /// Burn fungible assets as the owner of metadata object.
-    public fun burn<T: key>(
+    public entry fun burn<T: key>(
         metadata_owner: &signer,
         metadata: Object<T>,
         from: address,
@@ -81,7 +81,7 @@ module fungible_asset::managed_fungible_asset {
     }
 
     /// Freeze an account so it cannot transfer or receive fungible assets.
-    public fun freeze_account<T: key>(
+    public entry fun freeze_account<T: key>(
         metadata_owner: &signer,
         metadata: Object<T>,
         account: address,
@@ -92,7 +92,7 @@ module fungible_asset::managed_fungible_asset {
     }
 
     /// Unfreeze an account so it can transfer or receive fungible assets.
-    public fun unfreeze_account<T: key>(
+    public entry fun unfreeze_account<T: key>(
         metadata_owner: &signer,
         metadata: Object<T>,
         account: address,
