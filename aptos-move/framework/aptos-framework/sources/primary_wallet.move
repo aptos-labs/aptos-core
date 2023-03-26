@@ -63,9 +63,9 @@ module aptos_framework::primary_wallet {
     }
 
     /// Transfer `amount` of fungible asset from sender's primary wallet to receiver's primary wallet.
-    public entry fun transfer<T: key>(sender: &signer, metadata: Object<T>, amount: u64, recipient: address) {
+    public entry fun transfer<T: key>(sender: &signer, metadata: Object<T>, recipient: address, amount: u64) {
         let sender_wallet = ensure_primary_wallet_exists(signer::address_of(sender), metadata);
         let recipient_wallet = ensure_primary_wallet_exists(recipient, metadata);
-        fungible_asset::transfer(sender, sender_wallet, amount, recipient_wallet);
+        fungible_asset::transfer(sender, sender_wallet, recipient_wallet, amount);
     }
 }

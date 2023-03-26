@@ -264,7 +264,7 @@ Deposit <code>amount</code> of fungible asset to the given account's primary wal
 Transfer <code>amount</code> of fungible asset from sender's primary wallet to receiver's primary wallet.
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="primary_wallet.md#0x1_primary_wallet_transfer">transfer</a>&lt;T: key&gt;(sender: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, amount: u64, recipient: <b>address</b>)
+<pre><code><b>public</b> entry <b>fun</b> <a href="primary_wallet.md#0x1_primary_wallet_transfer">transfer</a>&lt;T: key&gt;(sender: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, recipient: <b>address</b>, amount: u64)
 </code></pre>
 
 
@@ -273,10 +273,10 @@ Transfer <code>amount</code> of fungible asset from sender's primary wallet to r
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="primary_wallet.md#0x1_primary_wallet_transfer">transfer</a>&lt;T: key&gt;(sender: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, metadata: Object&lt;T&gt;, amount: u64, recipient: <b>address</b>) {
+<pre><code><b>public</b> entry <b>fun</b> <a href="primary_wallet.md#0x1_primary_wallet_transfer">transfer</a>&lt;T: key&gt;(sender: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, metadata: Object&lt;T&gt;, recipient: <b>address</b>, amount: u64) {
     <b>let</b> sender_wallet = <a href="primary_wallet.md#0x1_primary_wallet_ensure_primary_wallet_exists">ensure_primary_wallet_exists</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender), metadata);
     <b>let</b> recipient_wallet = <a href="primary_wallet.md#0x1_primary_wallet_ensure_primary_wallet_exists">ensure_primary_wallet_exists</a>(recipient, metadata);
-    <a href="fungible_asset.md#0x1_fungible_asset_transfer">fungible_asset::transfer</a>(sender, sender_wallet, amount, recipient_wallet);
+    <a href="fungible_asset.md#0x1_fungible_asset_transfer">fungible_asset::transfer</a>(sender, sender_wallet, recipient_wallet, amount);
 }
 </code></pre>
 
