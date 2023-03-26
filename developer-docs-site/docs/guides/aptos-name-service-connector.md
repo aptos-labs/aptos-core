@@ -70,7 +70,7 @@ The `AptosNamesConnector` component supports both mainnet and testnet. To connec
 
 ## Example
 The following example shows how to use the `AptosNamesConnector` component in a React application:
-<last image>
+<last image />
 
 
 - Add a ‘claim name’ button to any page in your application. This allows your users to directly create an Aptos name, giving them a human-readable .apt name for their Aptos wallet address. You can customize the look of the button to suit your application. Here is an example on the profile page of an NFT marketplace.
