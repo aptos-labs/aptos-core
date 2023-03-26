@@ -2,6 +2,7 @@
 /// metadata object can be any object that equipped with `FungibleAssetMetadata` resource.
 module aptos_framework::fungible_asset {
     use aptos_framework::create_signer;
+    use aptos_framework::event;
     use aptos_framework::object::{Self, Object, ConstructorRef, DeriveRef};
 
     use std::error;
@@ -65,6 +66,13 @@ module aptos_framework::fungible_asset {
         allow_ungated_transfer: bool,
     }
 
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    struct FungibleAssetWalletEvents has key {
+        deposit_events: event::EventHandle<DepositEvent>,
+        withdraw_events: event::EventHandle<WithdrawEvent>,
+        set_ungated_transfer_events: event::EventHandle<SetUngatedTransferEvent>,
+    }
+
     /// FungibleAsset can be passed into function for type safety and to guarantee a specific amount.
     /// FungibleAsset cannot be stored directly and will have to be deposited back into a wallet.
     struct FungibleAsset {
@@ -88,6 +96,31 @@ module aptos_framework::fungible_asset {
         metadata: Object<FungibleAssetMetadata>
     }
 
+    /// Emitted when fungible assets are minted.
+    struct MintEvent has drop, store {
+        amount: u64,
+    }
+
+    /// Emitted when fungible assets are burnt.
+    struct BurnEvent has drop, store {
+        amount: u64,
+    }
+
+    /// Emitted when fungible assets are deposited into a wallet.
+    struct DepositEvent has drop, store {
+        amount: u64,
+    }
+
+    /// Emitted when fungible assets are withdrawn from a wallet.
+    struct WithdrawEvent has drop, store {
+        amount: u64,
+    }
+
+    /// Emitted when a wallet's ungated (owner) transfer permission is updated.
+    struct SetUngatedTransferEvent has drop, store {
+        transfer_allowed: bool,
+    }
+
     /// Make an existing object fungible by adding the FungibleAssetMetadata resource.
     /// This returns the capabilities to mint, burn, and transfer.
     public fun make_object_fungible(
@@ -97,13 +130,13 @@ module aptos_framework::fungible_asset {
         symbol: String,
         decimals: u8,
     ): (MintRef, TransferRef, BurnRef) {
-        let metadata_object_signer = object::generate_signer(constructor_ref);
+        let metadata_object_signer = &object::generate_signer(constructor_ref);
         let converted_maximum = if (maximum_supply == 0) {
             option::none()
         } else {
             option::some(maximum_supply)
         };
-        move_to(&metadata_object_signer,
+        move_to(metadata_object_signer,
             FungibleAssetMetadata {
                 supply: 0,
                 maximum: converted_maximum,
@@ -217,7 +250,7 @@ module aptos_framework::fungible_asset {
         from: Object<T>,
         to: Object<T>,
         amount: u64,
-    ) acquires FungibleAssetWallet {
+    ) acquires FungibleAssetWallet, FungibleAssetWalletEvents {
         let fa = withdraw(sender, from, amount);
         deposit(to, fa);
     }
@@ -246,6 +279,13 @@ module aptos_framework::fungible_asset {
             balance: 0,
             allow_ungated_transfer: true,
         });
+        move_to(wallet_obj,
+            FungibleAssetWalletEvents {
+                deposit_events: object::new_event_handle<DepositEvent>(wallet_obj),
+                withdraw_events: object::new_event_handle<WithdrawEvent>(wallet_obj),
+                set_ungated_transfer_events: object::new_event_handle<SetUngatedTransferEvent>(wallet_obj),
+            }
+        );
 
         object::object_from_constructor_ref<FungibleAssetWallet>(constructor_ref)
     }
@@ -255,23 +295,30 @@ module aptos_framework::fungible_asset {
         owner: &signer,
         wallet: Object<T>,
         amount: u64,
-    ): FungibleAsset acquires FungibleAssetWallet {
+    ): FungibleAsset acquires FungibleAssetWallet, FungibleAssetWalletEvents {
         assert!(object::owns(wallet, signer::address_of(owner)), error::permission_denied(ENOT_WALLET_OWNER));
         assert!(ungated_transfer_allowed(wallet), error::invalid_argument(EUNGATED_TRANSFER_IS_NOT_ALLOWED));
         withdraw_internal(object::object_address(&wallet), amount)
     }
 
     /// Deposit `amount` of fungible asset to `wallet`.
-    public fun deposit<T: key>(wallet: Object<T>, fa: FungibleAsset) acquires FungibleAssetWallet {
+    public fun deposit<T: key>(
+        wallet: Object<T>,
+        fa: FungibleAsset,
+    ) acquires FungibleAssetWallet, FungibleAssetWalletEvents {
         assert!(ungated_transfer_allowed(wallet), error::invalid_argument(EUNGATED_TRANSFER_IS_NOT_ALLOWED));
         deposit_internal(wallet, fa);
     }
 
     /// Mint the specified `amount` of fungible asset.
-    public fun mint(ref: &MintRef, amount: u64): FungibleAsset acquires FungibleAssetMetadata {
+    public fun mint(
+        ref: &MintRef,
+        amount: u64,
+    ): FungibleAsset acquires FungibleAssetMetadata {
         assert!(amount > 0, error::invalid_argument(EAMOUNT_CANNOT_BE_ZERO));
         let metadata = ref.metadata;
         increase_supply(&metadata, amount);
+
         FungibleAsset {
             metadata,
             amount
@@ -283,7 +330,7 @@ module aptos_framework::fungible_asset {
         ref: &MintRef,
         wallet: Object<T>,
         amount: u64,
-    ) acquires FungibleAssetMetadata, FungibleAssetWallet {
+    ) acquires FungibleAssetMetadata, FungibleAssetWallet, FungibleAssetWalletEvents {
         deposit(wallet, mint(ref, amount));
     }
 
@@ -292,13 +339,16 @@ module aptos_framework::fungible_asset {
         ref: &TransferRef,
         wallet: Object<T>,
         allow: bool,
-    ) acquires FungibleAssetWallet {
+    ) acquires FungibleAssetWallet, FungibleAssetWalletEvents {
         assert!(
             ref.metadata == wallet_metadata(wallet),
             error::invalid_argument(ETRANSFER_REF_AND_WALLET_MISMATCH),
         );
         let wallet_addr = object::object_address(&wallet);
         borrow_global_mut<FungibleAssetWallet>(wallet_addr).allow_ungated_transfer = allow;
+
+        let events = borrow_global_mut<FungibleAssetWalletEvents>(wallet_addr);
+        event::emit_event(&mut events.set_ungated_transfer_events, SetUngatedTransferEvent { transfer_allowed: allow });
     }
 
     /// Burn the `amount` of fungible metadata from the given wallet.
@@ -306,7 +356,7 @@ module aptos_framework::fungible_asset {
         ref: &BurnRef,
         wallet: Object<T>,
         amount: u64
-    ) acquires FungibleAssetWallet, FungibleAssetMetadata {
+    ) acquires FungibleAssetMetadata, FungibleAssetWallet, FungibleAssetWalletEvents {
         let metadata = ref.metadata;
         assert!(metadata == wallet_metadata(wallet), error::invalid_argument(EBURN_REF_AND_WALLET_MISMATCH));
         let wallet_addr = object::object_address(&wallet);
@@ -322,7 +372,7 @@ module aptos_framework::fungible_asset {
         ref: &TransferRef,
         wallet: Object<T>,
         amount: u64
-    ): FungibleAsset acquires FungibleAssetWallet {
+    ): FungibleAsset acquires FungibleAssetWallet, FungibleAssetWalletEvents {
         assert!(
             ref.metadata == wallet_metadata(wallet),
             error::invalid_argument(ETRANSFER_REF_AND_WALLET_MISMATCH),
@@ -335,7 +385,7 @@ module aptos_framework::fungible_asset {
         ref: &TransferRef,
         wallet: Object<T>,
         fa: FungibleAsset
-    ) acquires FungibleAssetWallet {
+    ) acquires FungibleAssetWallet, FungibleAssetWalletEvents {
         assert!(
             ref.metadata == fa.metadata,
             error::invalid_argument(ETRANSFER_REF_AND_FUNGIBLE_ASSET_MISMATCH)
@@ -349,7 +399,7 @@ module aptos_framework::fungible_asset {
         from: Object<T>,
         to: Object<T>,
         amount: u64,
-    ) acquires FungibleAssetWallet {
+    ) acquires FungibleAssetWallet, FungibleAssetWalletEvents {
         let fa = withdraw_with_ref(transfer_ref, from, amount);
         deposit_with_ref(transfer_ref, to, fa);
     }
@@ -377,25 +427,36 @@ module aptos_framework::fungible_asset {
         assert!(amount == 0, error::invalid_argument(EAMOUNT_IS_NOT_ZERO));
     }
 
-    fun deposit_internal<T: key>(wallet: Object<T>, fa: FungibleAsset) acquires FungibleAssetWallet {
+    fun deposit_internal<T: key>(
+        wallet: Object<T>,
+        fa: FungibleAsset,
+    ) acquires FungibleAssetWallet, FungibleAssetWalletEvents {
         let FungibleAsset { metadata, amount } = fa;
         let wallet_metadata = wallet_metadata(wallet);
         assert!(metadata == wallet_metadata, error::invalid_argument(EFUNGIBLE_ASSET_AND_WALLET_MISMATCH));
         let wallet_addr = object::object_address(&wallet);
         let wallet = borrow_global_mut<FungibleAssetWallet>(wallet_addr);
         wallet.balance = wallet.balance + amount;
+
+        let events = borrow_global_mut<FungibleAssetWalletEvents>(wallet_addr);
+        event::emit_event(&mut events.deposit_events, DepositEvent { amount });
     }
 
     /// Extract `amount` of fungible asset from `wallet`.
-    fun withdraw_internal(wallet_addr: address, amount: u64): FungibleAsset acquires FungibleAssetWallet {
+    fun withdraw_internal(
+        wallet_addr: address,
+        amount: u64,
+    ): FungibleAsset acquires FungibleAssetWallet, FungibleAssetWalletEvents {
         assert!(amount != 0, error::invalid_argument(EAMOUNT_CANNOT_BE_ZERO));
         let wallet = borrow_global_mut<FungibleAssetWallet>(wallet_addr);
         assert!(wallet.balance >= amount, error::invalid_argument(EINSUFFICIENT_BALANCE));
         wallet.balance = wallet.balance - amount;
-        FungibleAsset {
-            metadata: wallet.metadata,
-            amount
-        }
+
+        let events = borrow_global_mut<FungibleAssetWalletEvents>(wallet_addr);
+        let metadata = wallet.metadata;
+        event::emit_event(&mut events.withdraw_events, WithdrawEvent { amount });
+
+        FungibleAsset { metadata, amount }
     }
 
     /// Increase the supply of a fungible metadata by minting.
@@ -511,7 +572,7 @@ module aptos_framework::fungible_asset {
     fun test_e2e_basic_flow(
         creator: &signer,
         aaron: &signer,
-    ) acquires FungibleAssetWallet, FungibleAssetMetadata {
+    ) acquires FungibleAssetMetadata, FungibleAssetWallet, FungibleAssetWalletEvents {
         let (mint_ref, transfer_ref, burn_ref, test_token) = create_fungible_asset(creator);
         let metadata = mint_ref.metadata;
         let creator_wallet = create_deterministic_wallet(signer::address_of(creator), metadata);
@@ -541,7 +602,9 @@ module aptos_framework::fungible_asset {
 
     #[test(creator = @0xcafe)]
     #[expected_failure(abort_code = 0x10003, location = Self)]
-    fun test_ungated_transfer(creator: &signer) acquires FungibleAssetMetadata, FungibleAssetWallet {
+    fun test_ungated_transfer(
+        creator: &signer
+    ) acquires FungibleAssetMetadata, FungibleAssetWallet, FungibleAssetWalletEvents {
         let (mint_ref, transfer_ref, _burn_ref, _) = create_fungible_asset(creator);
 
         let creator_wallet = create_deterministic_wallet(signer::address_of(creator), mint_ref.metadata);
@@ -551,7 +614,10 @@ module aptos_framework::fungible_asset {
     }
 
     #[test(creator = @0xcafe, aaron = @0xface)]
-    fun test_transfer_with_ref(creator: &signer, aaron: &signer) acquires FungibleAssetMetadata, FungibleAssetWallet {
+    fun test_transfer_with_ref(
+        creator: &signer,
+        aaron: &signer,
+    ) acquires FungibleAssetMetadata, FungibleAssetWallet, FungibleAssetWalletEvents {
         let (mint_ref, transfer_ref, _burn_ref, _) = create_fungible_asset(creator);
         let metadata = mint_ref.metadata;
         let creator_wallet = create_deterministic_wallet(signer::address_of(creator), metadata);
