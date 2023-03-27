@@ -26,7 +26,7 @@ pub fn optimize(
                 | IR::Bytecode_::MutBorrowLoc(sp!(_, v_))
                 | IR::Bytecode_::ImmBorrowLoc(sp!(_, v_)) => {
                     unused.remove(v_);
-                }
+                },
                 _ => (),
             }
         }

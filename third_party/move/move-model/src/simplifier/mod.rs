@@ -58,7 +58,7 @@ impl SpecRewriterPipeline {
             match entry {
                 SimplificationPass::Inline => {
                     result.rewriters.push(Box::new(SpecPassInline::default()))
-                }
+                },
             }
         }
         result

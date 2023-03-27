@@ -99,12 +99,12 @@ impl<'a> TransferFunctions for Optimizer<'a> {
             match oper {
                 WriteRef => {
                     state.unwritten.insert(Reference(srcs[0]));
-                }
+                },
                 WriteBack(Reference(dest), ..) => {
                     if state.unwritten.contains(&Reference(srcs[0])) {
                         state.unwritten.insert(Reference(*dest));
                     }
-                }
+                },
                 Function(mid, fid, _) => {
                     let callee_env = &self
                         .target
@@ -130,8 +130,8 @@ impl<'a> TransferFunctions for Optimizer<'a> {
                             }
                         }
                     }
-                }
-                _ => {}
+                },
+                _ => {},
             }
         }
     }
@@ -178,14 +178,14 @@ impl<'a> Optimizer<'a> {
 
             // Perform peephole optimization
             match (new_instrs.last(), instr) {
-                (None, _) => {}
+                (None, _) => {},
                 (Some(Call(_, _, UnpackRef, srcs1, _)), Call(_, _, PackRef, srcs2, _))
                     if srcs1[0] == srcs2[0] =>
                 {
                     // skip this redundant unpack/pack pair.
                     new_instrs.pop();
                     continue;
-                }
+                },
                 (Some(Call(_, dests, IsParent(..), srcs, _)), Branch(_, _, _, tmp))
                     if dests[0] == *tmp
                         && !is_unwritten(code_offset as CodeOffset, &Reference(srcs[0])) =>
@@ -203,14 +203,14 @@ impl<'a> Optimizer<'a> {
                                 }
                                 // skip redundant write-backs
                                 should_skip.insert(block_cursor);
-                            }
+                            },
                             Call(_, _, TraceLocal(_), _, _) => {
                                 // since the previous write-back is skipped, this trace local is redundant as well
                                 should_skip.insert(block_cursor);
-                            }
+                            },
                             _ => {
                                 break;
-                            }
+                            },
                         }
                         block_cursor += 1;
                     }
@@ -220,8 +220,8 @@ impl<'a> Optimizer<'a> {
                         new_instrs.pop();
                         continue;
                     }
-                }
-                (Some(_), _) => {}
+                },
+                (Some(_), _) => {},
             }
 
             // Do not include this instruction if it is marked as skipped
@@ -236,8 +236,8 @@ impl<'a> Optimizer<'a> {
                     if !is_unwritten(code_offset as CodeOffset, &Reference(srcs[0])) =>
                 {
                     continue;
-                }
-                _ => {}
+                },
+                _ => {},
             }
 
             // This instruction should be included

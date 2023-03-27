@@ -121,12 +121,12 @@ impl MoveyUpload {
                         } else if response.status().is_server_error() {
                             bail!("An unexpected error occurred. Please try again later");
                         }
-                    }
+                    },
                     Err(_) => {
                         bail!("An unexpected error occurred. Please try again later");
-                    }
+                    },
                 }
-            }
+            },
             Err(_) => bail!("An unexpected error occurred. Please try again later"),
         }
         Ok(())

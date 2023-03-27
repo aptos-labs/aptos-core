@@ -65,7 +65,7 @@ fn main() {
         Some(x) => {
             let path = Path::new(x);
             Box::new(File::create(path).unwrap())
-        }
+        },
         None => Box::new(io::stdout()),
     };
 

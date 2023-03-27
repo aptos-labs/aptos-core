@@ -137,7 +137,7 @@ impl<'a> fmt::Display for ExpectedMoveErrorDisplay<'a> {
                 StatusCode::ARITHMETIC_ERROR => write!(f, "to give an arithmetic error")?,
                 StatusCode::VECTOR_OPERATION_ERROR => {
                     write!(f, "to give a vector operation error")?
-                }
+                },
                 StatusCode::OUT_OF_GAS => write!(f, "to run out of gas")?,
                 _ => write!(f, "to give a {status:?} (code {status_val}) error")?,
             };

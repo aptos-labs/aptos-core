@@ -178,13 +178,13 @@ fn filter_definition<T: FilterContext>(
     match def {
         P::Definition::Module(m) => {
             filter_module(context, m, is_source_def).map(P::Definition::Module)
-        }
+        },
         P::Definition::Address(a) => {
             filter_address(context, a, is_source_def).map(P::Definition::Address)
-        }
+        },
         P::Definition::Script(s) => {
             filter_script(context, s, is_source_def).map(P::Definition::Script)
-        }
+        },
     }
 }
 

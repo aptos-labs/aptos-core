@@ -197,10 +197,10 @@ impl Token for ValueToken {
                             .take_while(|c| char::is_ascii_hexdigit(c) || *c == '_')
                             .count();
                         number_maybe_with_suffix(s, len)
-                    }
+                    },
                     _ => bail!("unrecognized token: {}", s),
                 }
-            }
+            },
             'b' if matches!(chars.peek(), Some('"')) => {
                 chars.next().unwrap();
                 // b"
@@ -225,7 +225,7 @@ impl Token for ValueToken {
                     )
                 }
                 (ValueToken::ByteString, len)
-            }
+            },
             'x' if matches!(chars.peek(), Some('"')) => {
                 chars.next().unwrap();
                 //  x"
@@ -252,7 +252,7 @@ impl Token for ValueToken {
                     )
                 }
                 (ValueToken::HexString, len)
-            }
+            },
             '"' => {
                 // there is no need to check if a given char is valid UTF8 as it is already
                 // guaranteed; from the Rust docs
@@ -275,19 +275,19 @@ impl Token for ValueToken {
                     )
                 }
                 (ValueToken::Utf8String, len)
-            }
+            },
             c if c.is_ascii_digit() => {
                 // c + remaining
                 let len = 1 + chars
                     .take_while(|c| char::is_ascii_digit(c) || *c == '_')
                     .count();
                 number_maybe_with_suffix(s, len)
-            }
+            },
             c if c.is_ascii_whitespace() => {
                 // c + remaining
                 let len = 1 + chars.take_while(char::is_ascii_whitespace).count();
                 (Self::Whitespace, len)
-            }
+            },
             c if c.is_ascii_alphabetic() => {
                 // c + remaining
                 // TODO be more permissive
@@ -295,7 +295,7 @@ impl Token for ValueToken {
                     .take_while(|c| identifier::is_valid_identifier_char(*c))
                     .count();
                 (Self::Ident, len)
-            }
+            },
             _ => bail!("unrecognized token: {}", s),
         }))
     }
@@ -316,11 +316,11 @@ impl<Extra: ParsableValue> ParsedValue<Extra> {
             ParsedValue::U64(u) => Extra::move_value_into_concrete(MoveValue::U64(u)),
             ParsedValue::InferredNum(u) if u <= (u64::MAX.into()) => {
                 Extra::move_value_into_concrete(MoveValue::U64(u.try_into()?))
-            }
+            },
             ParsedValue::U128(u) => Extra::move_value_into_concrete(MoveValue::U128(u)),
             ParsedValue::InferredNum(u) | ParsedValue::U256(u) => {
                 Extra::move_value_into_concrete(MoveValue::U256(u))
-            }
+            },
             ParsedValue::Bool(b) => Extra::move_value_into_concrete(MoveValue::Bool(b)),
             ParsedValue::Vector(values) => Extra::concrete_vector(
                 values

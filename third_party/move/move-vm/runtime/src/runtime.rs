@@ -91,7 +91,7 @@ impl VMRuntime {
             Err(err) => {
                 warn!("[VM] module deserialization failed {:?}", err);
                 return Err(err.finish(Location::Undefined));
-            }
+            },
         };
 
         // Make sure all modules' self addresses matches the transaction sender. The self address is
@@ -212,7 +212,7 @@ impl VMRuntime {
                 return Err(PartialVMError::new(
                     StatusCode::INVALID_PARAM_TYPE_FOR_DESERIALIZATION,
                 ));
-            }
+            },
         };
 
         match Value::simple_deserialize(arg.borrow(), &layout) {
@@ -222,7 +222,7 @@ impl VMRuntime {
                 Err(PartialVMError::new(
                     StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
                 ))
-            }
+            },
         }
     }
 
@@ -255,7 +255,7 @@ impl VMRuntime {
                 Type::MutableReference(inner_t) | Type::Reference(inner_t) => {
                     dummy_locals.store_loc(idx, self.deserialize_value(inner_t, arg_bytes)?)?;
                     dummy_locals.borrow_loc(idx)
-                }
+                },
                 _ => self.deserialize_value(&arg_ty, arg_bytes),
             })
             .collect::<PartialVMResult<Vec<_>>>()?;
@@ -276,7 +276,7 @@ impl VMRuntime {
                 })?;
                 let inner_value = ref_value.read_ref()?;
                 (&**inner, inner_value)
-            }
+            },
             _ => (ty, value),
         };
 

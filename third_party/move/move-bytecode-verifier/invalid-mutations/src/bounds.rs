@@ -269,53 +269,53 @@ impl ApplyOutOfBoundsContext {
         match (src_kind, dst_kind) {
             (ModuleHandle, AddressIdentifier) => {
                 self.module.module_handles[src_idx].address = AddressIdentifierIndex(new_idx)
-            }
+            },
             (ModuleHandle, Identifier) => {
                 self.module.module_handles[src_idx].name = IdentifierIndex(new_idx)
-            }
+            },
             (StructHandle, ModuleHandle) => {
                 self.module.struct_handles[src_idx].module = ModuleHandleIndex(new_idx)
-            }
+            },
             (StructHandle, Identifier) => {
                 self.module.struct_handles[src_idx].name = IdentifierIndex(new_idx)
-            }
+            },
             (FunctionHandle, ModuleHandle) => {
                 self.module.function_handles[src_idx].module = ModuleHandleIndex(new_idx)
-            }
+            },
             (FunctionHandle, Identifier) => {
                 self.module.function_handles[src_idx].name = IdentifierIndex(new_idx)
-            }
+            },
             (FunctionHandle, Signature) => {
                 self.module.function_handles[src_idx].parameters = SignatureIndex(new_idx)
-            }
+            },
             (StructDefinition, StructHandle) => {
                 self.module.struct_defs[src_idx].struct_handle = StructHandleIndex(new_idx)
-            }
+            },
             (FunctionDefinition, FunctionHandle) => {
                 self.module.function_defs[src_idx].function = FunctionHandleIndex(new_idx)
-            }
+            },
             (FunctionDefinition, Signature) => {
                 self.module.function_defs[src_idx]
                     .code
                     .as_mut()
                     .unwrap()
                     .locals = SignatureIndex(new_idx)
-            }
+            },
             (Signature, StructHandle) => {
                 let (actual_src_idx, arg_idx) = self.sig_structs[src_idx];
                 src_idx = actual_src_idx.into_index();
                 self.module.signatures[src_idx].0[arg_idx]
                     .debug_set_sh_idx(StructHandleIndex(new_idx));
-            }
+            },
             (FieldHandle, StructDefinition) => {
                 self.module.field_handles[src_idx].owner = StructDefinitionIndex(new_idx)
-            }
+            },
             (FriendDeclaration, AddressIdentifier) => {
                 self.module.friend_decls[src_idx].address = AddressIdentifierIndex(new_idx)
-            }
+            },
             (FriendDeclaration, Identifier) => {
                 self.module.friend_decls[src_idx].name = IdentifierIndex(new_idx)
-            }
+            },
             _ => panic!("Invalid pointer kind: {:?} -> {:?}", src_kind, dst_kind),
         }
 

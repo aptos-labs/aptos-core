@@ -52,7 +52,7 @@ impl Subst {
                     self.subst.insert(idx as usize, tok);
                     true
                 }
-            }
+            },
             // A type parameter on the stack _cannot_ be unified with a non type parameter. But
             // that case has already been taken care of above. This case is added for explicitness,
             // but it could be rolled into the catch-all at the bottom of this match.
@@ -73,7 +73,7 @@ impl Subst {
                     }
                 }
                 true
-            }
+            },
             (x, y) => x == y,
         }
     }
@@ -148,7 +148,7 @@ pub fn stack_top_is_castable_to(state: &AbstractState, typ: SignatureToken) -> b
                     0,
                     Some(AbstractValue::new_primitive(SignatureToken::U64)),
                 )
-            }
+            },
             SignatureToken::U16 => {
                 stack_has(
                     state,
@@ -159,7 +159,7 @@ pub fn stack_top_is_castable_to(state: &AbstractState, typ: SignatureToken) -> b
                     0,
                     Some(AbstractValue::new_primitive(SignatureToken::U16)),
                 )
-            }
+            },
             SignatureToken::U32 => {
                 stack_has(
                     state,
@@ -174,7 +174,7 @@ pub fn stack_top_is_castable_to(state: &AbstractState, typ: SignatureToken) -> b
                     0,
                     Some(AbstractValue::new_primitive(SignatureToken::U32)),
                 )
-            }
+            },
             SignatureToken::U128 => {
                 stack_has(
                     state,
@@ -197,7 +197,7 @@ pub fn stack_top_is_castable_to(state: &AbstractState, typ: SignatureToken) -> b
                     0,
                     Some(AbstractValue::new_primitive(SignatureToken::U128)),
                 )
-            }
+            },
             SignatureToken::U256 => {
                 stack_has(
                     state,
@@ -224,7 +224,7 @@ pub fn stack_top_is_castable_to(state: &AbstractState, typ: SignatureToken) -> b
                     0,
                     Some(AbstractValue::new_primitive(SignatureToken::U256)),
                 )
-            }
+            },
             SignatureToken::Bool
             | SignatureToken::Address
             | SignatureToken::Signer
@@ -244,7 +244,7 @@ pub fn stack_has_ability(state: &AbstractState, index: usize, ability: Ability) 
         match state.stack_peek(index) {
             Some(abstract_value) => {
                 return abstract_value.abilities.has_ability(ability);
-            }
+            },
             None => return false,
         }
     }
@@ -280,7 +280,7 @@ pub fn stack_has(
     match abstract_value {
         Some(abstract_value) => {
             index < state.stack_len() && state.stack_peek(index) == Some(abstract_value)
-        }
+        },
         None => index < state.stack_len(),
     }
 }
@@ -330,7 +330,7 @@ pub fn stack_ref_polymorphic_eq(state: &AbstractState, index1: usize, index2: us
                         abilities: abilities_for_token(state, &token, &state.instantiation[..]),
                     };
                     return Some(abstract_value_inner) == state.stack_peek(index2);
-                }
+                },
                 SignatureToken::Bool
                 | SignatureToken::U8
                 | SignatureToken::U64
@@ -558,7 +558,7 @@ pub fn stack_has_struct(state: &AbstractState, struct_index: StructDefinitionInd
                 | SignatureToken::StructInstantiation(struct_handle, _) => {
                     let struct_def = state.module.module.struct_def_at(struct_index);
                     return struct_handle == struct_def.struct_handle;
-                }
+                },
                 SignatureToken::Bool
                 | SignatureToken::U8
                 | SignatureToken::U64
@@ -652,12 +652,12 @@ pub fn stack_has_reference(state: &AbstractState, index: usize, mutability: Muta
                     if mutability == Mutability::Mutable || mutability == Mutability::Either {
                         return true;
                     }
-                }
+                },
                 SignatureToken::Reference(_) => {
                     if mutability == Mutability::Immutable || mutability == Mutability::Either {
                         return true;
                     }
-                }
+                },
                 SignatureToken::Bool
                 | SignatureToken::U8
                 | SignatureToken::U64
@@ -728,7 +728,7 @@ pub fn create_struct(
         Some(inst) => {
             let ty_instantiation = state.module.instantiantiation_at(inst);
             SignatureToken::StructInstantiation(struct_def.struct_handle, ty_instantiation.clone())
-        }
+        },
     };
     let struct_kind = abilities_for_token(&state, &sig_tok, &state.instantiation);
     let struct_value = AbstractValue::new_struct(sig_tok, struct_kind);
@@ -753,7 +753,7 @@ pub fn stack_unpack_struct_instantiation(
                     Some((idx, _)) => (StructDefinitionIndex(idx as TableIndex), toks),
                     None => panic!("Invalid unpack -- non-struct def value found at top of stack"),
                 }
-            }
+            },
             SignatureToken::Bool
             | SignatureToken::U8
             | SignatureToken::U64
@@ -769,7 +769,7 @@ pub fn stack_unpack_struct_instantiation(
             | SignatureToken::U32
             | SignatureToken::U256 => {
                 panic!("Invalid unpack -- non-struct value found at top of stack")
-            }
+            },
         }
     } else {
         panic!("Invalid unpack -- precondition not satisfied");
@@ -836,11 +836,11 @@ pub fn stack_struct_borrow_field(
     let field_signature = match &struct_def.field_information {
         StructFieldInformation::Native => {
             return Err(VMError::new("Borrow field on a native struct".to_string()));
-        }
+        },
         StructFieldInformation::Declared(fields) => {
             let field_def = &fields[field_handle.field as usize];
             &field_def.signature.0
-        }
+        },
     };
     let reified_field_sig = substitute(field_signature, &typs);
     // NB: We determine the kind on the non-reified_field_sig; we want any local references to
@@ -875,14 +875,14 @@ pub fn register_dereference(state: &AbstractState) -> Result<AbstractState, VMEr
                     abilities: abstract_value.abilities,
                 });
                 Ok(state)
-            }
+            },
             SignatureToken::Reference(token) => {
                 state.register_set(AbstractValue {
                     token: *token,
                     abilities: abstract_value.abilities,
                 });
                 Ok(state)
-            }
+            },
             SignatureToken::Bool
             | SignatureToken::U8
             | SignatureToken::U64
@@ -919,14 +919,14 @@ pub fn stack_push_register_borrow(
                     abilities: abstract_value.abilities,
                 });
                 Ok(state)
-            }
+            },
             Mutability::Immutable => {
                 state.stack_push(AbstractValue {
                     token: SignatureToken::Reference(Box::new(abstract_value.token)),
                     abilities: abstract_value.abilities,
                 });
                 Ok(state)
-            }
+            },
             Mutability::Either => Err(VMError::new("Mutability must be specified".to_string())),
         }
     } else {
@@ -1091,7 +1091,7 @@ pub fn memory_safe(state: &AbstractState, index: Option<usize>) -> bool {
             } else {
                 true
             }
-        }
+        },
         None => ALLOW_MEMORY_UNSAFE,
     }
 }

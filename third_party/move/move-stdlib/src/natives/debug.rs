@@ -219,7 +219,7 @@ mod testing {
                 // We need to escape displayed double quotes " as \" and, as a result, also escape
                 // displayed \ as \\.
                 Ok(str.replace('\\', "\\\\").replace('"', "\\\""))
-            }
+            },
             _ => Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
                 .with_message("Expected a MoveValue::Vector of u8's".to_string())),
         }
@@ -310,7 +310,7 @@ mod testing {
                             print_inner_value,
                             true,
                         )?;
-                    }
+                    },
                     // If the inner type T of this vector<T> is a primitive bool/unsigned integer/address type, we convert the
                     // vector<T> to a MoveValue and print it.
                     _ => {
@@ -324,9 +324,9 @@ mod testing {
                             single_line,
                             include_int_types,
                         )?;
-                    }
+                    },
                 };
-            }
+            },
             // For a struct, we convert it to a MoveValue annotated with its field names and types and print it
             MoveTypeLayout::Struct(_) => {
                 let move_struct = match val.as_move_value(&ty_layout) {
@@ -334,7 +334,7 @@ mod testing {
                     _ => {
                         return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
                             .with_message("Expected MoveValue::MoveStruct".to_string()))
-                    }
+                    },
                 };
 
                 let annotated_struct_layout = get_annotated_struct_layout(context, &ty)?;
@@ -349,7 +349,7 @@ mod testing {
                     single_line,
                     include_int_types,
                 )?;
-            }
+            },
             // For non-structs and non-vectors, convert them to a MoveValue and print them
             _ => {
                 print_move_value(
@@ -361,7 +361,7 @@ mod testing {
                     single_line,
                     include_int_types,
                 )?;
-            }
+            },
         }
 
         Ok(())
@@ -384,44 +384,44 @@ mod testing {
                 if include_int_types {
                     write!(out, "u8").map_err(fmt_error_to_partial_vm_error)?;
                 }
-            }
+            },
             MoveValue::U16(u16) => {
                 write!(out, "{}", u16).map_err(fmt_error_to_partial_vm_error)?;
                 if include_int_types {
                     write!(out, "u16").map_err(fmt_error_to_partial_vm_error)?;
                 }
-            }
+            },
             MoveValue::U32(u32) => {
                 write!(out, "{}", u32).map_err(fmt_error_to_partial_vm_error)?;
                 if include_int_types {
                     write!(out, "u32").map_err(fmt_error_to_partial_vm_error)?;
                 }
-            }
+            },
             MoveValue::U64(u64) => {
                 write!(out, "{}", u64).map_err(fmt_error_to_partial_vm_error)?;
                 if include_int_types {
                     write!(out, "u64").map_err(fmt_error_to_partial_vm_error)?;
                 }
-            }
+            },
             MoveValue::U128(u128) => {
                 write!(out, "{}", u128).map_err(fmt_error_to_partial_vm_error)?;
                 if include_int_types {
                     write!(out, "u128").map_err(fmt_error_to_partial_vm_error)?;
                 }
-            }
+            },
             MoveValue::U256(u256) => {
                 write!(out, "{}", u256).map_err(fmt_error_to_partial_vm_error)?;
                 if include_int_types {
                     write!(out, "u256").map_err(fmt_error_to_partial_vm_error)?;
                 }
-            }
+            },
             MoveValue::Bool(b) => {
                 // Note that when `include_int_types` is enabled, the boolean `true` and `false`
                 // values unambiguously encode their type, since they are different than any integer
                 // type value, address value, signer value, vector value and struct value.
                 write!(out, "{}", if b { "true" } else { "false" })
                     .map_err(fmt_error_to_partial_vm_error)?;
-            }
+            },
             MoveValue::Address(a) => {
                 let str = if canonicalize {
                     a.to_canonical_string()
@@ -429,7 +429,7 @@ mod testing {
                     a.to_hex_literal()
                 };
                 write!(out, "@{}", str).map_err(fmt_error_to_partial_vm_error)?;
-            }
+            },
             MoveValue::Signer(s) => {
                 let str = if canonicalize {
                     s.to_canonical_string()
@@ -437,7 +437,7 @@ mod testing {
                     s.to_hex_literal()
                 };
                 write!(out, "signer({})", str).map_err(fmt_error_to_partial_vm_error)?;
-            }
+            },
             MoveValue::Vector(vec) => {
                 // If this is a vector<u8> we print it in hex (as most users would expect us to)
                 if is_non_empty_vector_u8(&vec) {
@@ -459,7 +459,7 @@ mod testing {
                         is_complex_inner_type,
                     )?;
                 }
-            }
+            },
             MoveValue::Struct(move_struct) => match move_struct {
                 MoveStruct::WithTypes { type_, mut fields } => {
                     let type_tag = TypeTag::from(type_.clone());
@@ -561,11 +561,11 @@ mod testing {
                         }
                         write!(out, "{}", STRUCT_END).map_err(fmt_error_to_partial_vm_error)?;
                     }
-                }
+                },
                 _ => {
                     return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
                         .with_message("Expected MoveStruct::WithTypes".to_string()))
-                }
+                },
             },
         }
 

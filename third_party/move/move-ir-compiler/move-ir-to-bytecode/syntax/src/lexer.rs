@@ -225,7 +225,7 @@ impl<'input> Lexer<'input> {
             Some(next_char) => next_char,
             None => {
                 return Ok((Tok::EOF, 0));
-            }
+            },
         };
         let (tok, len) = match c {
             '0'..='9' => {
@@ -240,7 +240,7 @@ impl<'input> Lexer<'input> {
                 } else {
                     get_decimal_number(text)
                 }
-            }
+            },
             'a'..='z' | 'A'..='Z' | '$' | '_' => {
                 let len = get_name_len(text);
                 let name = &text[..len];
@@ -257,7 +257,7 @@ impl<'input> Lexer<'input> {
                             } else {
                                 (get_name_token(name), len)
                             }
-                        }
+                        },
                         Some('.') => {
                             let len2 = get_name_len(&text[(len + 1)..]);
                             if len2 > 0 {
@@ -265,7 +265,7 @@ impl<'input> Lexer<'input> {
                             } else {
                                 (get_name_token(name), len)
                             }
-                        }
+                        },
                         Some('<') => match name {
                             "vec_len" => (Tok::VecLen, len),
                             "vec_imm_borrow" => (Tok::VecImmBorrow, len),
@@ -293,7 +293,7 @@ impl<'input> Lexer<'input> {
                                 } else {
                                     (Tok::NameBeginTyValue, len + 1)
                                 }
-                            }
+                            },
                         },
                         Some('(') => match name {
                             "assert" => (Tok::Assert, len + 1),
@@ -306,7 +306,7 @@ impl<'input> Lexer<'input> {
                 } else {
                     (get_name_token(name), len) // just return the name in spec_mode
                 }
-            }
+            },
             '&' => {
                 if text.starts_with("&mut ") {
                     (Tok::AmpMut, 5)
@@ -315,14 +315,14 @@ impl<'input> Lexer<'input> {
                 } else {
                     (Tok::Amp, 1)
                 }
-            }
+            },
             '|' => {
                 if text.starts_with("||") {
                     (Tok::PipePipe, 2)
                 } else {
                     (Tok::Pipe, 1)
                 }
-            }
+            },
             '=' => {
                 if text.starts_with("==>") {
                     (Tok::EqualEqualGreater, 3)
@@ -331,14 +331,14 @@ impl<'input> Lexer<'input> {
                 } else {
                     (Tok::Equal, 1)
                 }
-            }
+            },
             '!' => {
                 if text.starts_with("!=") {
                     (Tok::ExclaimEqual, 2)
                 } else {
                     (Tok::Exclaim, 1)
                 }
-            }
+            },
             '<' => {
                 if text.starts_with("<=") {
                     (Tok::LessEqual, 2)
@@ -347,7 +347,7 @@ impl<'input> Lexer<'input> {
                 } else {
                     (Tok::Less, 1)
                 }
-            }
+            },
             '>' => {
                 if text.starts_with(">=") {
                     (Tok::GreaterEqual, 2)
@@ -356,7 +356,7 @@ impl<'input> Lexer<'input> {
                 } else {
                     (Tok::Greater, 1)
                 }
-            }
+            },
             '%' => (Tok::Percent, 1),
             '(' => (Tok::LParen, 1),
             ')' => (Tok::RParen, 1),
@@ -370,7 +370,7 @@ impl<'input> Lexer<'input> {
                 } else {
                     (Tok::Period, 1)
                 }
-            }
+            },
             '/' => (Tok::Slash, 1),
             ':' => {
                 if text.starts_with(":=") {
@@ -378,7 +378,7 @@ impl<'input> Lexer<'input> {
                 } else {
                     (Tok::Colon, 1)
                 }
-            }
+            },
             ';' => (Tok::Semicolon, 1),
             '^' => (Tok::Caret, 1),
             '{' => (Tok::LBrace, 1),
@@ -392,7 +392,7 @@ impl<'input> Lexer<'input> {
                     location,
                     message: format!("unrecognized character for token {:?}", c),
                 });
-            }
+            },
         };
 
         Ok((tok, len))

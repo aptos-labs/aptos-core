@@ -154,10 +154,10 @@ impl<'a, T: MoveResolver + ?Sized> Resolver<'a, T> {
             SignatureToken::Signer => FatType::Signer,
             SignatureToken::Vector(ty) => {
                 FatType::Vector(Box::new(self.resolve_signature(module, ty)?))
-            }
+            },
             SignatureToken::Struct(idx) => {
                 FatType::Struct(Box::new(self.resolve_struct_handle(module, *idx)?))
-            }
+            },
             SignatureToken::StructInstantiation(idx, toks) => {
                 let struct_ty = self.resolve_struct_handle(module.clone(), *idx)?;
                 let args = toks
@@ -169,7 +169,7 @@ impl<'a, T: MoveResolver + ?Sized> Resolver<'a, T> {
                         .subst(&args)
                         .map_err(|status| anyhow!("Substitution failure: {:?}", status))?,
                 ))
-            }
+            },
             SignatureToken::TypeParameter(idx) => FatType::TyParam(*idx as usize),
             SignatureToken::MutableReference(_) => return Err(anyhow!("Unexpected Reference")),
             SignatureToken::Reference(inner) => match **inner {

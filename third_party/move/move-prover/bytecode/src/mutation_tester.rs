@@ -127,7 +127,7 @@ impl FunctionTargetProcessor for MutationTester {
                         ..*m
                     };
                     builder.emit(mutate_arith(call, mv, global_env, mm, bc));
-                }
+                },
                 Call(ref attrid, ref indices, Operation::Sub, ref srcs, ref dests) => {
                     let call = Call(
                         *attrid,
@@ -144,7 +144,7 @@ impl FunctionTargetProcessor for MutationTester {
                         ..*m
                     };
                     builder.emit(mutate_arith(call, mv, global_env, mm, bc));
-                }
+                },
                 Call(ref attrid, ref indices, Operation::Mul, ref srcs, ref dests) => {
                     let call = Call(
                         *attrid,
@@ -161,7 +161,7 @@ impl FunctionTargetProcessor for MutationTester {
                         ..*m
                     };
                     builder.emit(mutate_arith(call, mv, global_env, mm, bc));
-                }
+                },
                 Call(ref attrid, ref indices, Operation::Div, ref srcs, ref dests) => {
                     let call = Call(
                         *attrid,
@@ -177,10 +177,10 @@ impl FunctionTargetProcessor for MutationTester {
                         ..*m
                     };
                     builder.emit(mutate_arith(call, mv, global_env, mm, bc));
-                }
+                },
                 _ => {
                     builder.emit(bc);
-                }
+                },
             }
         }
 

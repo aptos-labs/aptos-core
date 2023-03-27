@@ -144,7 +144,7 @@ impl ConcretizedFormals {
                         bail!("Malformed access path {:?}; expected struct value as prefix to field offset {:?}, but got {:?}",
                                access_path, next_offset, next_value)
                     }
-                }
+                },
                 Offset::Global(g_offset) => {
                     // secondary index. previous offset should have been an address value
                     if let MoveValue::Address(a) = next_value {
@@ -166,7 +166,7 @@ impl ConcretizedFormals {
                             next_value
                         );
                     }
-                }
+                },
                 Offset::VectorIndex => {
                     if let MoveValue::Vector(v_contents) = &next_value {
                         // concretize offsets for each element in the vector
@@ -189,7 +189,7 @@ impl ConcretizedFormals {
                             next_value
                         );
                     }
-                }
+                },
             }
         }
         // Got to the end of the concrete access path. Add it to the accumulator

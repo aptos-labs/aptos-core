@@ -192,7 +192,7 @@ fn parse_file(
             diags.extend(ds);
             files.insert(file_hash, (fname, source_buffer));
             return Ok((vec![], MatchedFileCommentMap::new(), diags, file_hash));
-        }
+        },
         Ok(()) => &source_buffer,
     };
     let (defs, comments) = match parse_file_string(compilation_env, file_hash, buffer) {
@@ -200,7 +200,7 @@ fn parse_file(
         Err(ds) => {
             diags.extend(ds);
             (vec![], MatchedFileCommentMap::new())
-        }
+        },
     };
     files.insert(file_hash, (fname, source_buffer));
     Ok((defs, comments, diags, file_hash))

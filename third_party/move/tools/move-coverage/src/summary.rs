@@ -157,7 +157,7 @@ pub fn summarize_inst_cov_by_module(
                         total: total_number_of_instructions,
                         covered: covered_instructions,
                     }
-                }
+                },
             };
 
             (fn_name, fn_summmary)
@@ -318,17 +318,14 @@ pub fn summarize_path_cov(module: &CompiledModule, trace_map: &TraceMap) -> Modu
                     let fn_name = module
                         .identifier_at(module.function_handle_at(function_def.function).name)
                         .to_owned();
-                    Some((
-                        fn_name.clone(),
-                        FunctionInfo {
-                            fn_name,
-                            fn_entry,
-                            fn_returns,
-                            fn_branches,
-                            fn_num_paths,
-                        },
-                    ))
-                }
+                    Some((fn_name.clone(), FunctionInfo {
+                        fn_name,
+                        fn_entry,
+                        fn_returns,
+                        fn_branches,
+                        fn_num_paths,
+                    }))
+                },
             }
         })
         .collect();

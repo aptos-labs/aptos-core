@@ -31,7 +31,7 @@ impl AbortInfo {
                 .finish(location),
             Self::Internal(status_code, location) => {
                 PartialVMError::new(status_code).finish(location)
-            }
+            },
         }
     }
 
@@ -214,7 +214,7 @@ impl LocalState {
             TerminationStatus::None => {
                 // no prior aborts has been seen, and no abort action attached
                 abort_info
-            }
+            },
             TerminationStatus::PostAbort(original_info) => {
                 // re-abort, make sure we are aborting with the same status code
                 if cfg!(debug_assertions) {
@@ -224,7 +224,7 @@ impl LocalState {
                     );
                 }
                 original_info.clone()
-            }
+            },
             _ => unreachable!(),
         };
         self.termination = TerminationStatus::Abort(info);

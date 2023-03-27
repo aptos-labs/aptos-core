@@ -68,7 +68,7 @@ impl NumberOperationProcessor {
                         }
                         self.analyze_fun(env, target.clone());
                     }
-                }
+                },
                 Either::Right(scc) => {
                     for fid in scc {
                         let func_env = env.get_function(*fid);
@@ -79,7 +79,7 @@ impl NumberOperationProcessor {
                             self.analyze_fun(env, target.clone());
                         }
                     }
-                }
+                },
             }
         }
     }
@@ -218,11 +218,11 @@ impl<'a> NumberOperationAnalysis<'a> {
                         .unwrap_or(&Bottom);
                     // Update num_oper for the node for the temporary variable
                     global_state.update_node_oper(*id, *oper, true);
-                }
+                },
                 ExpData::Block(id, _, exp) => {
                     let exp_oper = global_state.get_node_num_oper(exp.node_id());
                     global_state.update_node_oper(*id, exp_oper, true);
-                }
+                },
                 ExpData::IfElse(id, _, true_exp, false_exp) => {
                     let true_oper = global_state.get_node_num_oper(true_exp.node_id());
                     let false_oper = global_state.get_node_num_oper(false_exp.node_id());
@@ -233,7 +233,7 @@ impl<'a> NumberOperationAnalysis<'a> {
                         );
                     }
                     global_state.update_node_oper(*id, true_oper.merge(&false_oper), true);
-                }
+                },
                 ExpData::Call(id, oper, args) => {
                     let mut arg_oper = vec![];
                     for arg in args {
@@ -251,11 +251,11 @@ impl<'a> NumberOperationAnalysis<'a> {
                                     update_temporary(arg, &merged, global_state, state);
                                 }
                             }
-                        }
+                        },
                         // Update node for index
                         move_model::ast::Operation::Index => {
                             global_state.update_node_oper(*id, arg_oper[0], true);
-                        }
+                        },
                         // Update node for return value
                         move_model::ast::Operation::Result(i) => {
                             let oper = global_state
@@ -265,7 +265,7 @@ impl<'a> NumberOperationAnalysis<'a> {
                                 .get(i)
                                 .unwrap_or(&Bottom);
                             global_state.update_node_oper(*id, *oper, true);
-                        }
+                        },
                         // Update node for field operation
                         move_model::ast::Operation::Select(mid, sid, field_id)
                         | move_model::ast::Operation::UpdateField(mid, sid, field_id) => {
@@ -276,19 +276,19 @@ impl<'a> NumberOperationAnalysis<'a> {
                                 .get(field_id)
                                 .unwrap();
                             global_state.update_node_oper(*id, *field_oper, true);
-                        }
+                        },
                         move_model::ast::Operation::Cast => {
                             // Obtained the updated num_oper of the expression
                             let num_oper = global_state.get_node_num_oper(args[0].node_id());
                             // Update the node of cast
                             global_state.update_node_oper(*id, num_oper, true);
-                        }
+                        },
                         move_model::ast::Operation::Int2Bv => {
                             global_state.update_node_oper(*id, Bitwise, true);
-                        }
+                        },
                         move_model::ast::Operation::Bv2Int => {
                             global_state.update_node_oper(*id, Arithmetic, true);
-                        }
+                        },
                         move_model::ast::Operation::Function(mid, sid, _) => {
                             let module_env = &self.func_target.global_env().get_module(*mid);
                             let callee_name = module_env
@@ -417,10 +417,10 @@ impl<'a> NumberOperationAnalysis<'a> {
                                     );
                                 }
                             }
-                        }
+                        },
                         move_model::ast::Operation::WellFormed => {
                             global_state.update_node_oper(*id, arg_oper[0], true);
-                        }
+                        },
                         _ => {
                             // All args must have compatible number operations
                             // TODO(tengzhang): support converting int to bv
@@ -464,10 +464,10 @@ impl<'a> NumberOperationAnalysis<'a> {
 
                                 global_state.update_node_oper(*id, merged, allow_merge);
                             }
-                        }
+                        },
                     }
-                }
-                _ => {}
+                },
+                _ => {},
             }
         };
         e.visit(visitor);
@@ -658,7 +658,7 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
                     &mut global_state,
                     baseline_flag,
                 );
-            }
+            },
             // Check and update operations of rets in temp_index_operation_map and operations in ret_operation_map
             Ret(id, rets) => {
                 let ret_types = self.func_target.get_return_types();
@@ -694,7 +694,7 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
                             .insert(i, merged);
                     }
                 }
-            }
+            },
             Call(id, dests, oper, srcs, _) => {
                 match oper {
                     BorrowLoc | ReadRef | CastU8 | CastU16 | CastU32 | CastU64 | CastU128
@@ -709,7 +709,7 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
                             &mut global_state,
                             baseline_flag,
                         );
-                    }
+                    },
                     WriteRef | Lt | Le | Gt | Ge | Eq | Neq => {
                         self.check_and_propagate(
                             id,
@@ -721,7 +721,7 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
                             &mut global_state,
                             baseline_flag,
                         );
-                    }
+                    },
                     Add | Sub | Mul | Div | Mod => {
                         let mut num_oper = Arithmetic;
                         if !self.ban_int_2_bv_conversion {
@@ -748,7 +748,7 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
                             &mut global_state,
                             baseline_flag,
                         );
-                    }
+                    },
                     BitOr | BitAnd | Xor => {
                         if self.ban_int_2_bv_conversion {
                             self.check_and_update_oper(
@@ -773,7 +773,7 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
                                 baseline_flag,
                             )
                         }
-                    }
+                    },
                     Shl | Shr => {
                         let op_srcs_0 = global_state
                             .get_temp_index_oper(cur_mid, cur_fid, srcs[0], baseline_flag)
@@ -797,7 +797,7 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
                             &mut global_state,
                             baseline_flag,
                         );
-                    }
+                    },
                     // Checking and operations in the struct_operation_map when packing
                     Pack(msid, sid, _) => {
                         let struct_env = self
@@ -840,7 +840,7 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
                                     .insert(field.get_id(), merged);
                             }
                         }
-                    }
+                    },
                     // Checking and operations in the struct_operation_map when unpacking
                     Unpack(msid, sid, _) => {
                         let struct_env = self
@@ -883,7 +883,7 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
                                     .insert(field.get_id(), merged);
                             }
                         }
-                    }
+                    },
                     GetField(msid, sid, _, offset) | BorrowField(msid, sid, _, offset) => {
                         let dests_oper = global_state
                             .get_temp_index_oper(cur_mid, cur_fid, dests[0], baseline_flag)
@@ -931,7 +931,7 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
                                     merged_oper,
                                 );
                         }
-                    }
+                    },
                     Function(msid, fsid, _) => {
                         let module_env = &self.func_target.global_env().get_module(*msid);
                         // Vector functions are handled separately
@@ -1090,14 +1090,14 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
                                 }
                             } // empty, do nothing
                         }
-                    }
-                    _ => {}
+                    },
+                    _ => {},
                 }
-            }
+            },
             Prop(id, _, exp) => {
                 self.handle_exp(*id, exp, &mut global_state, state);
-            }
-            _ => {}
+            },
+            _ => {},
         }
         self.func_target.global_env().set_extension(global_state);
     }

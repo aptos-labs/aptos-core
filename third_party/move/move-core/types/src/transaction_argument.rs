@@ -31,7 +31,7 @@ impl fmt::Debug for TransactionArgument {
             TransactionArgument::Address(address) => write!(f, "{{ADDRESS: {:?}}}", address),
             TransactionArgument::U8Vector(vector) => {
                 write!(f, "{{U8Vector: 0x{}}}", hex::encode(vector))
-            }
+            },
             TransactionArgument::U16(value) => write!(f, "{{U16: {}}}", value),
             TransactionArgument::U32(value) => write!(f, "{{U32: {}}}", value),
             TransactionArgument::U256(value) => write!(f, "{{U256: {}}}", value),
@@ -78,7 +78,7 @@ impl TryFrom<MoveValue> for TransactionArgument {
             ),
             MoveValue::Signer(_) | MoveValue::Struct(_) => {
                 return Err(anyhow!("invalid transaction argument: {:?}", val))
-            }
+            },
             MoveValue::U16(i) => TransactionArgument::U16(i),
             MoveValue::U32(i) => TransactionArgument::U32(i),
             MoveValue::U256(i) => TransactionArgument::U256(i),

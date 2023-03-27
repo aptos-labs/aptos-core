@@ -48,13 +48,13 @@ fn should_recompile(
                     None => earliest_output_mod_time = Some(mod_time),
                     Some(earliest_mod_time) => *earliest_mod_time = mod_time,
                 }
-            }
+            },
             Err(err) => {
                 if let io::ErrorKind::NotFound = err.kind() {
                     return Ok(true);
                 }
                 return Err(err.into());
-            }
+            },
         }
     }
 
@@ -88,7 +88,7 @@ impl BuildPlan {
             Err(err) => {
                 // Is a DAG after resolution otherwise an error should be raised from that.
                 anyhow::bail!("IPE: Cyclic dependency found after resolution {:?}", err)
-            }
+            },
         };
 
         sorted_deps.reverse();
@@ -123,7 +123,7 @@ impl BuildPlan {
                 Ok((units, warning_diags)) => {
                     report_warnings(&files, warning_diags);
                     Ok((files, units))
-                }
+                },
                 Err(error_diags) => {
                     assert!(!error_diags.is_empty());
                     let diags_buf = report_diagnostics_to_color_buffer(&files, error_diags);
@@ -131,7 +131,7 @@ impl BuildPlan {
                         anyhow::bail!("Cannot output compiler diagnostics: {}", err);
                     }
                     anyhow::bail!("Compilation error");
-                }
+                },
             }
         })
     }
@@ -305,7 +305,7 @@ impl BuildPlan {
                     )?;
 
                     return Err(err.into());
-                }
+                },
             }
         }
         if let Err(err) = std::fs::create_dir_all(&build_root_path) {
@@ -321,18 +321,15 @@ impl BuildPlan {
 
         // TODO: should inherit color settings from current shell
         let mut error_buffer = Buffer::ansi();
-        if let Err(err) = run_to_yul(
-            &mut error_buffer,
-            MoveToYulOptions {
-                dependencies,
-                named_address_mapping,
-                sources,
-                output: yul_output.clone(),
-                abi_output,
+        if let Err(err) = run_to_yul(&mut error_buffer, MoveToYulOptions {
+            dependencies,
+            named_address_mapping,
+            sources,
+            output: yul_output.clone(),
+            abi_output,
 
-                ..MoveToYulOptions::default()
-            },
-        ) {
+            ..MoveToYulOptions::default()
+        }) {
             writeln!(
                 writer,
                 "{} Failed to compile Move into Yul {}",
@@ -368,7 +365,7 @@ impl BuildPlan {
                 )?;
 
                 return Err(err.into());
-            }
+            },
         };
 
         writeln!(
@@ -390,7 +387,7 @@ impl BuildPlan {
                         )?;
 
                         return Err(err.into());
-                    }
+                    },
                 };
 
                 if let Err(err) = bytecode_file.write_all(hex::encode(&bytecode).as_bytes()) {
@@ -403,7 +400,7 @@ impl BuildPlan {
 
                     return Err(err.into());
                 }
-            }
+            },
             Err(err) => {
                 writeln!(
                     writer,
@@ -418,7 +415,7 @@ impl BuildPlan {
                 }
 
                 return Err(err);
-            }
+            },
         }
 
         Ok(())

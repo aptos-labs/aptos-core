@@ -91,7 +91,7 @@ impl<'a> AcquiresVerifier<'a> {
             Bytecode::CallGeneric(idx) => {
                 let fi = self.module.function_instantiation_at(*idx);
                 self.call_acquire(fi.handle, offset)
-            }
+            },
             Bytecode::MoveFrom(idx)
             | Bytecode::MutBorrowGlobal(idx)
             | Bytecode::ImmBorrowGlobal(idx) => self.struct_acquire(*idx, offset),
@@ -100,7 +100,7 @@ impl<'a> AcquiresVerifier<'a> {
             | Bytecode::ImmBorrowGlobalGeneric(idx) => {
                 let si = self.module.struct_instantiation_at(*idx);
                 self.struct_acquire(si.def, offset)
-            }
+            },
 
             Bytecode::Pop
             | Bytecode::BrTrue(_)

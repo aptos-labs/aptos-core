@@ -11,14 +11,13 @@
 extern crate criterion;
 
 use criterion::{Criterion, Throughput};
-use rand::SeedableRng;
-use std::convert::TryFrom as _;
-
 use diem_crypto::{
     noise::{handshake_init_msg_len, handshake_resp_msg_len, NoiseConfig, AES_GCM_TAGLEN},
     test_utils::TEST_SEED,
     x25519, Uniform as _, ValidCryptoMaterial as _,
 };
+use rand::SeedableRng;
+use std::convert::TryFrom as _;
 
 const MSG_SIZE: usize = 4096;
 

@@ -237,7 +237,7 @@ impl<'a, T: MoveResolver + ?Sized> MoveValueAnnotator<'a, T> {
             },
             (MoveValue::Struct(s), FatType::Struct(ty)) => {
                 AnnotatedMoveValue::Struct(self.annotate_struct(s, ty.as_ref())?)
-            }
+            },
             (MoveValue::U8(_), _)
             | (MoveValue::U64(_), _)
             | (MoveValue::U128(_), _)
@@ -254,7 +254,7 @@ impl<'a, T: MoveResolver + ?Sized> MoveValueAnnotator<'a, T> {
                     value,
                     ty
                 ))
-            }
+            },
         })
     }
 }
@@ -293,7 +293,7 @@ fn pretty_print_value(
             }
             write_indent(f, indent)?;
             write!(f, "]")
-        }
+        },
         AnnotatedMoveValue::Bytes(v) => write!(f, "{}", hex::encode(v)),
         AnnotatedMoveValue::Struct(s) => pretty_print_struct(f, s, indent),
     }
@@ -355,7 +355,7 @@ impl serde::Serialize for AnnotatedMoveValue {
                 } else {
                     serializer.serialize_bytes(&n.to_le_bytes())
                 }
-            }
+            },
             U256(n) => {
                 // Copying logic & reasoning from above because if u128 is needs arb precision, u256 should too
                 if let Ok(i) = u64::try_from(*n) {
@@ -363,7 +363,7 @@ impl serde::Serialize for AnnotatedMoveValue {
                 } else {
                     serializer.serialize_bytes(&n.to_le_bytes())
                 }
-            }
+            },
             Bool(b) => serializer.serialize_bool(*b),
             Address(a) => a.short_str_lossless().serialize(serializer),
             Vector(t, vals) => {
@@ -373,7 +373,7 @@ impl serde::Serialize for AnnotatedMoveValue {
                     vec.serialize_element(v)?;
                 }
                 vec.end()
-            }
+            },
             Bytes(v) => {
                 // try to deserialize as utf8, fall back to hex with if we can't
                 let utf8_str = std::str::from_utf8(v);
@@ -387,7 +387,7 @@ impl serde::Serialize for AnnotatedMoveValue {
                 } else {
                     serializer.serialize_str(&hex::encode(v))
                 }
-            }
+            },
             Struct(s) => s.serialize(serializer),
         }
     }

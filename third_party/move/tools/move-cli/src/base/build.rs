@@ -27,7 +27,7 @@ impl Build {
         match architecture {
             Architecture::Move | Architecture::AsyncMove => {
                 config.compile_package(&rerooted_path, &mut std::io::stdout())?;
-            }
+            },
 
             Architecture::Ethereum => {
                 #[cfg(feature = "evm-backend")]
@@ -35,7 +35,7 @@ impl Build {
 
                 #[cfg(not(feature = "evm-backend"))]
                 anyhow::bail!("The Ethereum architecture is not supported because move-cli was not compiled with feature flag `evm-backend`.");
-            }
+            },
         }
         Ok(())
     }

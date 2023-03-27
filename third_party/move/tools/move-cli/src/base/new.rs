@@ -53,7 +53,7 @@ impl New {
             Some(path) => {
                 p = path;
                 &p
-            }
+            },
             None => Path::new(&name),
         };
         create_dir_all(path.join(SourcePackageLayout::Sources.path()))?;

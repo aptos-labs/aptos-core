@@ -88,27 +88,27 @@ impl Token for TypeToken {
                             .take_while(|q| char::is_ascii_hexdigit(q) || *q == '_')
                             .count();
                         (Self::AddressIdent, len)
-                    }
+                    },
                     _ => bail!("unrecognized token: {}", s),
                 }
-            }
+            },
             c if c.is_ascii_digit() => {
                 // c + remaining
                 let len = 1 + chars.take_while(char::is_ascii_digit).count();
                 (Self::AddressIdent, len)
-            }
+            },
             c if c.is_ascii_whitespace() => {
                 // c + remaining
                 let len = 1 + chars.take_while(char::is_ascii_whitespace).count();
                 (Self::Whitespace, len)
-            }
+            },
             c if c.is_ascii_alphabetic() => {
                 // c + remaining
                 let len = 1 + chars
                     .take_while(|c| identifier::is_valid_identifier_char(*c))
                     .count();
                 (Self::Ident, len)
-            }
+            },
             _ => bail!("unrecognized token: {}", s),
         }))
     }

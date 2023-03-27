@@ -25,11 +25,11 @@ pub fn optimize(
                 {
                     changed = true;
                     i += 2
-                }
+                },
                 (instr, _) => {
                     new_block.push(instr.clone());
                     i += 1
-                }
+                },
             }
         }
         *block = new_block;

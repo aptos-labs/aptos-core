@@ -84,14 +84,11 @@ impl<'a> BytecodeViewer<'a> {
             if let Some(cap) = regex.captures(line) {
                 current_fun.map(|fname| {
                     let d = cap.get(1).unwrap().as_str().parse::<u16>().unwrap();
-                    line_map.insert(
-                        i,
-                        BytecodeInfo {
-                            function_name: fname.to_string(),
-                            function_index: current_fdef_idx.unwrap(),
-                            code_offset: d,
-                        },
-                    )
+                    line_map.insert(i, BytecodeInfo {
+                        function_name: fname.to_string(),
+                        function_index: current_fdef_idx.unwrap(),
+                        code_offset: d,
+                    })
                 });
             }
         }

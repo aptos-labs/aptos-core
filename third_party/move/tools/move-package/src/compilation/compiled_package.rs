@@ -249,7 +249,7 @@ impl OnDiskCompiledPackage {
                     source_map,
                 });
                 Ok(CompiledUnitWithSource { unit, source_path })
-            }
+            },
             Err(_) => {
                 let module = CompiledModule::deserialize(&bytecode_bytes)?;
                 let (address_bytes, module_name) = {
@@ -269,7 +269,7 @@ impl OnDiskCompiledPackage {
                     source_map,
                 });
                 Ok(CompiledUnitWithSource { unit, source_path })
-            }
+            },
         }
     }
 

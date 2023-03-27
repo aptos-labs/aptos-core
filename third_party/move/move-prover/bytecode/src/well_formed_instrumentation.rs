@@ -57,11 +57,9 @@ impl FunctionTargetProcessor for WellFormedInstrumentationProcessor {
 
         // Inject well-formedness assumptions for parameters.
         for param in 0..builder.fun_env.get_parameter_count() {
-            let exp = builder.mk_call(
-                &BOOL_TYPE,
-                Operation::WellFormed,
-                vec![builder.mk_temporary(param)],
-            );
+            let exp = builder.mk_call(&BOOL_TYPE, Operation::WellFormed, vec![
+                builder.mk_temporary(param)
+            ]);
             builder.emit_prop(PropKind::Assume, exp);
         }
 

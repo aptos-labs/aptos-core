@@ -126,14 +126,14 @@ impl<'env> Evaluator<'env> {
                 if !val.into_bool() {
                     self.record_checking_failure(exp);
                 }
-            }
+            },
             Err(err) => {
                 // TODO (mengxu) this is just to keep tests happy, to be removed once completed
                 if err == BigInt::zero() {
                     return;
                 }
                 self.record_evaluation_failure(exp, "unexpected error code");
-            }
+            },
         }
     }
 
@@ -153,7 +153,7 @@ impl<'env> Evaluator<'env> {
                     let node_ty = env.get_node_type(*node_id);
                     let local_ty = convert_model_base_type(env, &node_ty, self.ty_args);
                     (*idx, local_ty)
-                }
+                },
                 _ => unreachable!(),
             };
             if cfg!(debug_assertions) {
@@ -203,15 +203,15 @@ impl<'env> Evaluator<'env> {
                 let env = self.target.global_env();
                 self.exp_state
                     .get_var(env.symbol_pool().string(*name).as_str())
-            }
+            },
             ExpData::Call(node_id, op, args) => self.evaluate_operation(*node_id, op, args)?,
             ExpData::IfElse(_, cond, t_exp, f_exp) => {
                 self.evaluate_if_then_else(cond, t_exp, f_exp)?
-            }
+            },
             ExpData::Invoke(_, def, args) => self.evaluate_invocation(def, args)?,
             ExpData::Quant(_, kind, ranges, _triggers, constraint, body) => {
                 self.evaluate_quantifier(*kind, ranges, constraint.as_ref(), body)?
-            }
+            },
             ExpData::Invalid(_) => unreachable!(),
             // should not appear in this context
             ExpData::Lambda(..) | ExpData::Block(..) => unreachable!(),
@@ -243,7 +243,7 @@ impl<'env> Evaluator<'env> {
             Value::Bool(v) => BaseValue::mk_bool(*v),
             Value::ByteArray(v) => {
                 BaseValue::mk_vector(v.iter().map(|e| BaseValue::mk_u8(*e)).collect())
-            }
+            },
             Value::AddressArray(v) => BaseValue::mk_vector(
                 v.iter()
                     .map(|e| {
@@ -270,14 +270,14 @@ impl<'env> Evaluator<'env> {
                 }
                 let arg_vec = self.evaluate(&args[0])?;
                 self.handle_vector_slice(arg_vec, &args[1])?
-            }
+            },
             Operation::InRangeRange => {
                 if cfg!(debug_assertions) {
                     assert_eq!(args.len(), 2);
                 }
                 let arg_idx = self.evaluate(&args[1])?;
                 self.handle_in_range(&args[0], arg_idx)?
-            }
+            },
             Operation::Function(module_id, spec_fun_id, mem_labels_opt) => self.handle_call(
                 node_id,
                 *module_id,
@@ -309,7 +309,7 @@ impl<'env> Evaluator<'env> {
                 let rhs = arg_vals.remove(1);
                 let lhs = arg_vals.remove(0);
                 self.handle_binary_arithmetic(op, lhs, rhs)?
-            }
+            },
             // binary bitwise
             Operation::BitAnd | Operation::BitOr | Operation::Xor => {
                 if cfg!(debug_assertions) {
@@ -318,7 +318,7 @@ impl<'env> Evaluator<'env> {
                 let rhs = arg_vals.remove(1);
                 let lhs = arg_vals.remove(0);
                 self.handle_binary_bitwise(op, lhs, rhs)
-            }
+            },
             // binary bitshift
             Operation::Shl | Operation::Shr => {
                 if cfg!(debug_assertions) {
@@ -327,7 +327,7 @@ impl<'env> Evaluator<'env> {
                 let rhs = arg_vals.remove(1);
                 let lhs = arg_vals.remove(0);
                 self.handle_binary_bitshift(op, lhs, rhs)
-            }
+            },
             // binary comparison
             Operation::Lt | Operation::Le | Operation::Ge | Operation::Gt => {
                 if cfg!(debug_assertions) {
@@ -336,7 +336,7 @@ impl<'env> Evaluator<'env> {
                 let rhs = arg_vals.remove(1);
                 let lhs = arg_vals.remove(0);
                 self.handle_binary_comparison(op, lhs, rhs)
-            }
+            },
             // binary equality
             Operation::Eq | Operation::Neq => {
                 if cfg!(debug_assertions) {
@@ -345,7 +345,7 @@ impl<'env> Evaluator<'env> {
                 let rhs = arg_vals.remove(1);
                 let lhs = arg_vals.remove(0);
                 self.handle_binary_equality(op, lhs, rhs)
-            }
+            },
             // unary boolean
             Operation::Not => {
                 if cfg!(debug_assertions) {
@@ -353,7 +353,7 @@ impl<'env> Evaluator<'env> {
                 }
                 let opv = arg_vals.remove(0);
                 self.handle_unary_boolean(op, opv)
-            }
+            },
             // binary boolean
             Operation::And | Operation::Or | Operation::Implies | Operation::Iff => {
                 if cfg!(debug_assertions) {
@@ -362,7 +362,7 @@ impl<'env> Evaluator<'env> {
                 let rhs = arg_vals.remove(1);
                 let lhs = arg_vals.remove(0);
                 self.handle_binary_boolean(op, lhs, rhs)
-            }
+            },
             // vector operation
             Operation::Len => {
                 if cfg!(debug_assertions) {
@@ -370,19 +370,19 @@ impl<'env> Evaluator<'env> {
                 }
                 let opv = arg_vals.remove(0);
                 BaseValue::mk_num(BigInt::from(opv.into_vector().len()))
-            }
+            },
             Operation::EmptyVec => {
                 if cfg!(debug_assertions) {
                     assert!(arg_vals.is_empty());
                 }
                 BaseValue::mk_vector(vec![])
-            }
+            },
             Operation::SingleVec => {
                 if cfg!(debug_assertions) {
                     assert_eq!(arg_vals.len(), 1);
                 }
                 BaseValue::mk_vector(arg_vals)
-            }
+            },
             Operation::Index => {
                 if cfg!(debug_assertions) {
                     assert_eq!(arg_vals.len(), 2);
@@ -390,7 +390,7 @@ impl<'env> Evaluator<'env> {
                 let idx = arg_vals.remove(1);
                 let vec = arg_vals.remove(0);
                 self.handle_vector_get(vec, idx)?
-            }
+            },
             Operation::UpdateVec => {
                 if cfg!(debug_assertions) {
                     assert_eq!(arg_vals.len(), 3);
@@ -399,7 +399,7 @@ impl<'env> Evaluator<'env> {
                 let idx = arg_vals.remove(1);
                 let vec = arg_vals.remove(0);
                 self.handle_vector_update(vec, idx, elem)?
-            }
+            },
             Operation::ConcatVec => {
                 if cfg!(debug_assertions) {
                     assert_eq!(arg_vals.len(), 2);
@@ -407,7 +407,7 @@ impl<'env> Evaluator<'env> {
                 let rhs = arg_vals.remove(1);
                 let lhs = arg_vals.remove(0);
                 self.handle_vector_concat(lhs, rhs)
-            }
+            },
             Operation::IndexOfVec => {
                 if cfg!(debug_assertions) {
                     assert_eq!(arg_vals.len(), 2);
@@ -415,7 +415,7 @@ impl<'env> Evaluator<'env> {
                 let elem = arg_vals.remove(1);
                 let vec = arg_vals.remove(0);
                 self.handle_vector_index_of(vec, elem)
-            }
+            },
             Operation::ContainsVec => {
                 if cfg!(debug_assertions) {
                     assert_eq!(arg_vals.len(), 2);
@@ -423,7 +423,7 @@ impl<'env> Evaluator<'env> {
                 let elem = arg_vals.remove(1);
                 let vec = arg_vals.remove(0);
                 self.handle_vector_contains(vec, elem)
-            }
+            },
             Operation::InRangeVec => {
                 if cfg!(debug_assertions) {
                     assert_eq!(args.len(), 2);
@@ -431,18 +431,18 @@ impl<'env> Evaluator<'env> {
                 let idx = arg_vals.remove(1);
                 let vec = arg_vals.remove(0);
                 self.handle_vector_in_range(vec, idx)
-            }
+            },
             // struct
             Operation::Pack(module_id, struct_id) => {
                 self.handle_struct_pack(*module_id, *struct_id, arg_vals)
-            }
+            },
             Operation::Select(module_id, struct_id, field_id) => {
                 if cfg!(debug_assertions) {
                     assert_eq!(arg_vals.len(), 1);
                 }
                 let struct_val = arg_vals.remove(0);
                 self.handle_struct_get_field(*module_id, *struct_id, *field_id, struct_val)
-            }
+            },
             Operation::UpdateField(module_id, struct_id, field_id) => {
                 if cfg!(debug_assertions) {
                     assert_eq!(arg_vals.len(), 2);
@@ -452,7 +452,7 @@ impl<'env> Evaluator<'env> {
                 self.handle_struct_update_field(
                     *module_id, *struct_id, *field_id, struct_val, field_val,
                 )
-            }
+            },
             // globals
             Operation::Exists(mem_opt) => {
                 if cfg!(debug_assertions) {
@@ -460,57 +460,57 @@ impl<'env> Evaluator<'env> {
                 }
                 let addr = arg_vals.remove(0);
                 self.handle_global_exists(node_id, mem_opt.as_ref().copied(), addr)
-            }
+            },
             Operation::Global(mem_opt) => {
                 if cfg!(debug_assertions) {
                     assert_eq!(arg_vals.len(), 1);
                 }
                 let addr = arg_vals.remove(0);
                 self.handle_global_get(node_id, mem_opt.as_ref().copied(), addr)?
-            }
+            },
             // constant values
             Operation::MaxU8 => {
                 if cfg!(debug_assertions) {
                     assert!(arg_vals.is_empty());
                 }
                 BaseValue::mk_num(BigInt::from(u8::MAX))
-            }
+            },
             Operation::MaxU16 => {
                 if cfg!(debug_assertions) {
                     assert!(arg_vals.is_empty());
                 }
                 BaseValue::mk_num(BigInt::from(u16::MAX))
-            }
+            },
             Operation::MaxU32 => {
                 if cfg!(debug_assertions) {
                     assert!(arg_vals.is_empty());
                 }
                 BaseValue::mk_num(BigInt::from(u32::MAX))
-            }
+            },
             Operation::MaxU64 => {
                 if cfg!(debug_assertions) {
                     assert!(arg_vals.is_empty());
                 }
                 BaseValue::mk_num(BigInt::from(u64::MAX))
-            }
+            },
             Operation::MaxU128 => {
                 if cfg!(debug_assertions) {
                     assert!(arg_vals.is_empty());
                 }
                 BaseValue::mk_num(BigInt::from(u128::MAX))
-            }
+            },
             Operation::MaxU256 => {
                 if cfg!(debug_assertions) {
                     assert!(arg_vals.is_empty());
                 }
                 BaseValue::mk_num(BigInt::from(&u256::U256::max_value()))
-            }
+            },
             Operation::AbortFlag => {
                 if cfg!(debug_assertions) {
                     assert!(arg_vals.is_empty());
                 }
                 BaseValue::mk_bool(self.local_state.is_post_abort())
-            }
+            },
             // type checking
             Operation::WellFormed => {
                 if cfg!(debug_assertions) {
@@ -520,12 +520,12 @@ impl<'env> Evaluator<'env> {
                 // if we don't, and the value is not actually well-formed, it should panic the
                 // stackless VM later in the execution.
                 BaseValue::mk_bool(true)
-            }
+            },
             // TODO (mengxu) modifies check is not supported now
             Operation::CanModify => {
                 // TODO (to avoid test case failure)
                 return Err(BigInt::zero());
-            }
+            },
             // TODO (mengxu) events are not handled now
             Operation::EmptyEventStore
             | Operation::ExtendEventStore
@@ -533,7 +533,7 @@ impl<'env> Evaluator<'env> {
             | Operation::EventStoreIncludedIn => {
                 // TODO (to avoid test case failure)
                 return Err(BigInt::zero());
-            }
+            },
             // unexpected operations in this context
             Operation::NoOp
             | Operation::Identical
@@ -548,7 +548,7 @@ impl<'env> Evaluator<'env> {
             | Operation::BoxValue
             | Operation::UnboxValue => {
                 unreachable!()
-            }
+            },
             // handled elsewhere, should not be here
             Operation::Function(..)
             | Operation::Slice
@@ -556,11 +556,11 @@ impl<'env> Evaluator<'env> {
             | Operation::RangeVec
             | Operation::InRangeRange => {
                 unreachable!()
-            }
+            },
 
             Operation::Cast | Operation::Bv2Int | Operation::Int2Bv => {
                 unreachable!()
-            }
+            },
         };
         Ok(result)
     }
@@ -628,7 +628,7 @@ impl<'env> Evaluator<'env> {
                     i += 1;
                 }
                 vals
-            }
+            },
             // case: type domain
             ExpData::Call(node_id, Operation::TypeDomain, _) => match env.get_node_type(*node_id) {
                 MTy::Type::TypeDomain(ty) => self.unroll_type_domain(&ty, exp)?,
@@ -642,7 +642,7 @@ impl<'env> Evaluator<'env> {
                             let struct_env = env.get_struct(module_id.qualified(struct_id));
                             let struct_ident = StructIdent::new(&struct_env);
                             self.unroll_resource_domain_by_ident(&struct_ident)
-                        }
+                        },
                         Some(ty_args) => {
                             let struct_inst = convert_model_struct_type(
                                 env,
@@ -652,11 +652,11 @@ impl<'env> Evaluator<'env> {
                                 self.ty_args,
                             );
                             self.unroll_resource_domain_by_inst(&struct_inst)
-                        }
+                        },
                     },
                     _ => unreachable!(),
                 }
-            }
+            },
             // cont.
             _ => match env.get_node_type(exp.node_id()) {
                 // case: vector
@@ -688,7 +688,7 @@ impl<'env> Evaluator<'env> {
             QuantKind::Choose | QuantKind::ChooseMin => {
                 assert_eq!(vals_vec.len(), 1);
                 Some(vals_vec[0].clone())
-            }
+            },
         };
 
         let mut loop_results = vec![];
@@ -726,12 +726,12 @@ impl<'env> Evaluator<'env> {
                 let v = loop_results.into_iter().all(|r| r.into_bool());
                 let quant_result = BaseValue::mk_bool(v);
                 Ok(quant_result)
-            }
+            },
             QuantKind::Exists => {
                 let v = loop_results.into_iter().any(|r| r.into_bool());
                 let quant_result = BaseValue::mk_bool(v);
                 Ok(quant_result)
-            }
+            },
             QuantKind::Choose => {
                 let choose_val_range_vec = choose_val_range.unwrap();
                 let mut v_results: Vec<_> = choose_val_range_vec
@@ -744,10 +744,10 @@ impl<'env> Evaluator<'env> {
                     None => {
                         self.record_evaluation_failure(body, "choose fails to satisfy a predicate");
                         Err(Self::eval_failure_code())
-                    }
+                    },
                     Some(v) => Ok(v),
                 }
-            }
+            },
             QuantKind::ChooseMin => {
                 let choose_val_range_vec = choose_val_range.unwrap();
                 let mut v_results: Vec<_> = choose_val_range_vec
@@ -762,7 +762,7 @@ impl<'env> Evaluator<'env> {
                 } else {
                     Ok(v_results.remove(0))
                 }
-            }
+            },
         }
     }
 
@@ -793,7 +793,7 @@ impl<'env> Evaluator<'env> {
                     self.eval_state.register_memory(label, &mut state);
                 }
                 state
-            }
+            },
         };
 
         let result = if decl.is_move_fun {
@@ -833,7 +833,7 @@ impl<'env> Evaluator<'env> {
                     assert_eq!(arg_vals.len(), 1);
                 }
                 self.native_spec_signer_of(arg_vals.remove(0))
-            }
+            },
             _ => unreachable!(),
         };
         Ok(result)
@@ -935,10 +935,10 @@ impl<'env> Evaluator<'env> {
                     assert_eq!(rets.len(), 1);
                 }
                 rets.into_iter().next().unwrap().decompose().1
-            }
+            },
             Err(_) => {
                 return Err(Self::eval_failure_code());
-            }
+            },
         };
         Ok(return_val)
     }
@@ -960,13 +960,13 @@ impl<'env> Evaluator<'env> {
                     return Err(Self::eval_failure_code());
                 }
                 lval / rval
-            }
+            },
             Operation::Mod => {
                 if rval.is_zero() {
                     return Err(Self::eval_failure_code());
                 }
                 lval % rval
-            }
+            },
             _ => unreachable!(),
         };
 
@@ -1216,14 +1216,14 @@ impl<'env> Evaluator<'env> {
                 {
                     None => {
                         return Err(Self::eval_failure_code());
-                    }
+                    },
                     Some(val) => val.decompose().1,
                 }
-            }
+            },
             Some(mem_label) => match self.eval_state.load_memory(&mem_label, &struct_inst, &addr) {
                 None => {
                     return Err(Self::eval_failure_code());
-                }
+                },
                 Some(val) => val,
             },
         };
@@ -1261,11 +1261,11 @@ impl<'env> Evaluator<'env> {
             match arg_exp.as_ref() {
                 ExpData::Lambda(_, vars, stmt) => {
                     exp_state.add_lambda(name, vars.to_vec(), stmt.clone())
-                }
+                },
                 _ => {
                     let arg_val = self.evaluate(arg_exp)?;
                     exp_state.add_var(name, arg_val);
-                }
+                },
             }
         }
         for var in vars {
@@ -1300,14 +1300,14 @@ impl<'env> Evaluator<'env> {
                 let lhs = self.evaluate(&args[0])?.into_int();
                 let rhs = self.evaluate(&args[1])?.into_int();
                 (lhs, rhs)
-            }
+            },
             ExpData::Call(_, Operation::RangeVec, args) => {
                 if cfg!(debug_assertions) {
                     assert_eq!(args.len(), 1);
                 }
                 let opv = self.evaluate(&args[0])?.into_vector();
                 (BigInt::zero(), BigInt::from(opv.len()))
-            }
+            },
             _ => unreachable!(),
         };
         Ok(range)
@@ -1328,7 +1328,7 @@ impl<'env> Evaluator<'env> {
                     "enumeration of a non-address type domain is not supported",
                 );
                 Err(Self::eval_failure_code())
-            }
+            },
         }
     }
 

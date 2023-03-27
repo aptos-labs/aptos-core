@@ -102,7 +102,7 @@ impl<Interface: TUIInterface> TUI<Interface> {
                 // Exit
                 Key::Esc | Key::Char('q') => {
                     return Ok(true);
-                }
+                },
                 // Update current line number to move the cursor up a line. If the column number is
                 // past the end of the new line we're on, bound the column number so it isn't past
                 // the last character on the new line.
@@ -111,7 +111,7 @@ impl<Interface: TUIInterface> TUI<Interface> {
                     self.current_column = self
                         .interface
                         .bound_column(self.current_line_number, self.current_column);
-                }
+                },
                 // Update current line number to move the cursor down a line. If the column number is
                 // past the end of the new line we're on, bound the column number so it isn't past
                 // the last character on the new line.
@@ -122,7 +122,7 @@ impl<Interface: TUIInterface> TUI<Interface> {
                     self.current_column = self
                         .interface
                         .bound_column(self.current_line_number, self.current_column);
-                }
+                },
                 // Move the cursor to the next character on the current line. Number is bounded by
                 // the length of the current line.
                 Key::Right => {
@@ -130,13 +130,13 @@ impl<Interface: TUIInterface> TUI<Interface> {
                         self.current_line_number,
                         self.current_column.checked_add(1).unwrap(),
                     );
-                }
+                },
                 // Move the cursor to the previous character on the current line. Number is bounded by
                 // the length of the current line.
                 Key::Left => {
                     self.current_column = self.current_column.saturating_sub(1);
-                }
-                _ => {}
+                },
+                _ => {},
             }
         }
         Ok(false)

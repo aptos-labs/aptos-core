@@ -69,11 +69,11 @@ impl StDefnMaterializeState {
             Vector(ty) => {
                 let inner = self.potential_abilities(ty);
                 inner.intersect(AbilitySet::VECTOR)
-            }
+            },
             Struct(idx) => {
                 let sh = &self.struct_handles[idx.0 as usize];
                 sh.abilities
-            }
+            },
             StructInstantiation(idx, type_args) => {
                 let sh = &self.struct_handles[idx.0 as usize];
 
@@ -82,7 +82,7 @@ impl StDefnMaterializeState {
                 type_args_abilities.fold(sh.abilities, |acc, ty_arg_abilities| {
                     acc.intersect(ty_arg_abilities)
                 })
-            }
+            },
         }
     }
 }
@@ -191,7 +191,7 @@ impl StructDefinitionGen {
                         fields.push(field);
                     }
                 }
-            }
+            },
         };
         let abilities = fields
             .iter()
@@ -234,7 +234,7 @@ impl StructDefinitionGen {
                         field_count,
                     )
                 }
-            }
+            },
             None => (None, 0),
         }
     }

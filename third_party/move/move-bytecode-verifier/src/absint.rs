@@ -80,7 +80,7 @@ pub trait AbstractInterpreter: TransferFunctions {
                     // so skip the block and move on to the next one
                     next_block = function_view.cfg().next_block(block_id);
                     continue;
-                }
+                },
             };
 
             let pre_state = &block_invariant.pre;
@@ -101,7 +101,7 @@ pub trait AbstractInterpreter: TransferFunctions {
                             JoinResult::Unchanged => {
                                 // Pre is the same after join. Reanalyzing this block would produce
                                 // the same post
-                            }
+                            },
                             JoinResult::Changed => {
                                 // If the cur->successor is a back edge, jump back to the beginning
                                 // of the loop, instead of the normal next block
@@ -111,19 +111,16 @@ pub trait AbstractInterpreter: TransferFunctions {
                                 {
                                     next_block_candidate = Some(*successor_block_id);
                                 }
-                            }
+                            },
                         }
-                    }
+                    },
                     None => {
                         // Haven't visited the next block yet. Use the post of the current block as
                         // its pre
-                        inv_map.insert(
-                            *successor_block_id,
-                            BlockInvariant {
-                                pre: post_state.clone(),
-                            },
-                        );
-                    }
+                        inv_map.insert(*successor_block_id, BlockInvariant {
+                            pre: post_state.clone(),
+                        });
+                    },
                 }
             }
             next_block = next_block_candidate;

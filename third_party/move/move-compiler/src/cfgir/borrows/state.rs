@@ -375,7 +375,7 @@ impl BorrowState {
             Value::Ref(id) => {
                 self.release(id);
                 Diagnostics::new()
-            }
+            },
             Value::NonRef => {
                 let borrowed_by = self.local_borrowed_by(local);
                 Self::check_use_borrowed_by(
@@ -387,7 +387,7 @@ impl BorrowState {
                     "assignment",
                 )
                 .into()
-            }
+            },
         }
     }
 
@@ -400,7 +400,7 @@ impl BorrowState {
                     loc
                 );
                 return Diagnostics::new();
-            }
+            },
             Value::Ref(id) => id,
         };
 
@@ -479,7 +479,7 @@ impl BorrowState {
                         msg,
                     );
                     diags.add_opt(ds);
-                }
+                },
                 _ => (),
             }
         }
@@ -519,7 +519,7 @@ impl BorrowState {
                         let vstr = match display_var(local.value()) {
                             DisplayVar::Tmp => {
                                 panic!("ICE invalid use tmp local {}", local.value())
-                            }
+                            },
                             DisplayVar::Orig(s) => s,
                         };
                         format!("Ambiguous usage of variable '{}'", vstr)
@@ -529,7 +529,7 @@ impl BorrowState {
                     let vstr = match display_var(local.value()) {
                         DisplayVar::Tmp => {
                             panic!("ICE invalid use tmp local {}", local.value())
-                        }
+                        },
                         DisplayVar::Orig(s) => s,
                     };
                     let tip = format!(
@@ -545,7 +545,7 @@ impl BorrowState {
                     diag.add_note(EXPLANATION);
                 });
                 (diag_opt.into(), Value::NonRef)
-            }
+            },
             Value::NonRef => {
                 let borrowed_by = self.local_borrowed_by(local);
                 let diag_opt = Self::check_use_borrowed_by(
@@ -557,7 +557,7 @@ impl BorrowState {
                     "move",
                 );
                 (diag_opt.into(), Value::NonRef)
-            }
+            },
         }
     }
 
@@ -568,7 +568,7 @@ impl BorrowState {
                 let new_id = self.declare_new_ref(self.borrows.is_mutable(id));
                 self.add_copy(loc, id, new_id);
                 (Diagnostics::new(), Value::Ref(new_id))
-            }
+            },
             Value::NonRef => {
                 let borrowed_by = self.local_borrowed_by(local);
                 let borrows = &self.borrows;
@@ -586,7 +586,7 @@ impl BorrowState {
                     "copy",
                 );
                 (diags.into(), Value::NonRef)
-            }
+            },
         }
     }
 
@@ -631,7 +631,7 @@ impl BorrowState {
                     loc
                 );
                 return (Diagnostics::new(), Value::NonRef);
-            }
+            },
             Value::Ref(id) => id,
         };
 
@@ -657,7 +657,7 @@ impl BorrowState {
                     loc
                 );
                 return (Diagnostics::new(), Value::NonRef);
-            }
+            },
             Value::Ref(id) => id,
         };
 
@@ -687,7 +687,7 @@ impl BorrowState {
                     loc
                 );
                 return (Diagnostics::new(), Value::NonRef);
-            }
+            },
             Value::Ref(id) => id,
         };
 
@@ -877,12 +877,12 @@ impl BorrowState {
                 (Value::Ref(id1), Value::Ref(id2)) => {
                     assert!(id1 == id2);
                     Value::Ref(*id1)
-                }
+                },
                 (Value::NonRef, Value::Ref(released_id))
                 | (Value::Ref(released_id), Value::NonRef) => {
                     released.insert(*released_id);
                     Value::NonRef
-                }
+                },
                 (Value::NonRef, Value::NonRef) => Value::NonRef,
             };
             locals.add(local, joined_value).unwrap();

@@ -68,7 +68,7 @@ fn handle_error<T>(e: syntax::ParseError<Loc, anyhow::Error>, code_str: &str) ->
             .with_message(format!("Invalid Token: {}", message)),
         ParseError::User { error, .. } => {
             Label::primary(id, location.usize_range()).with_message(format!("{}", error))
-        }
+        },
     };
     let message = lbl.message.clone();
     let error = Diagnostic::error()

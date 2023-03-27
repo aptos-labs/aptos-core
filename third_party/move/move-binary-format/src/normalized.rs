@@ -155,7 +155,7 @@ impl Type {
                     name: m.identifier_at(s_handle.name).to_owned(),
                     type_arguments: Vec::new(),
                 }
-            }
+            },
             StructInstantiation(shi, type_actuals) => {
                 let s_handle = m.struct_handle_at(*shi);
                 let m_handle = m.module_handle_at(s_handle.module);
@@ -165,7 +165,7 @@ impl Type {
                     name: m.identifier_at(s_handle.name).to_owned(),
                     type_arguments: type_actuals.iter().map(|t| Type::new(m, t)).collect(),
                 }
-            }
+            },
             Bool => Type::Bool,
             U8 => Type::U8,
             U16 => Type::U16,
@@ -203,45 +203,47 @@ impl Type {
 
     pub fn into_type_tag(self) -> Option<TypeTag> {
         use Type::*;
-        Some(if self.is_closed() {
-            match self {
-                Reference(_) | MutableReference(_) => return None,
-                Bool => TypeTag::Bool,
-                U8 => TypeTag::U8,
-                U16 => TypeTag::U16,
-                U32 => TypeTag::U32,
-                U64 => TypeTag::U64,
-                U128 => TypeTag::U128,
-                U256 => TypeTag::U256,
-                Address => TypeTag::Address,
-                Signer => TypeTag::Signer,
-                Vector(t) => TypeTag::Vector(Box::new(
-                    t.into_type_tag()
-                        .expect("Invariant violation: vector type argument contains reference"),
-                )),
-                Struct {
-                    address,
-                    module,
-                    name,
-                    type_arguments,
-                } => TypeTag::Struct(Box::new(StructTag {
-                    address,
-                    module,
-                    name,
-                    type_params: type_arguments
-                        .into_iter()
-                        .map(|t| {
-                            t.into_type_tag().expect(
-                                "Invariant violation: struct type argument contains reference",
-                            )
-                        })
-                        .collect(),
-                })),
-                TypeParameter(_) => unreachable!(),
-            }
-        } else {
-            return None;
-        })
+        Some(
+            if self.is_closed() {
+                match self {
+                    Reference(_) | MutableReference(_) => return None,
+                    Bool => TypeTag::Bool,
+                    U8 => TypeTag::U8,
+                    U16 => TypeTag::U16,
+                    U32 => TypeTag::U32,
+                    U64 => TypeTag::U64,
+                    U128 => TypeTag::U128,
+                    U256 => TypeTag::U256,
+                    Address => TypeTag::Address,
+                    Signer => TypeTag::Signer,
+                    Vector(t) => TypeTag::Vector(Box::new(
+                        t.into_type_tag()
+                            .expect("Invariant violation: vector type argument contains reference"),
+                    )),
+                    Struct {
+                        address,
+                        module,
+                        name,
+                        type_arguments,
+                    } => TypeTag::Struct(Box::new(StructTag {
+                        address,
+                        module,
+                        name,
+                        type_params: type_arguments
+                            .into_iter()
+                            .map(|t| {
+                                t.into_type_tag().expect(
+                                    "Invariant violation: struct type argument contains reference",
+                                )
+                            })
+                            .collect(),
+                    })),
+                    TypeParameter(_) => unreachable!(),
+                }
+            } else {
+                return None;
+            },
+        )
     }
 
     pub fn into_struct_tag(self) -> Option<StructTag> {
@@ -299,10 +301,10 @@ impl Struct {
             StructFieldInformation::Native => {
                 // Pretend for compatibility checking no fields
                 vec![]
-            }
+            },
             StructFieldInformation::Declared(fields) => {
                 fields.iter().map(|f| Field::new(m, f)).collect()
-            }
+            },
         };
         let name = m.identifier_at(handle.name).to_owned();
         let s = Struct {
@@ -403,7 +405,7 @@ impl std::fmt::Display for Type {
                     write!(f, ">")?;
                 }
                 Ok(())
-            }
+            },
             Type::Vector(ty) => write!(f, "vector<{}>", ty),
             Type::U8 => write!(f, "u8"),
             Type::U16 => write!(f, "u16"),

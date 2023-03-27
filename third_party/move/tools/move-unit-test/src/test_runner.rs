@@ -498,13 +498,13 @@ impl SharedTestingConfig {
                         Some(ExpectedFailure::Expected) => {
                             output.pass(function_name);
                             stats.test_success(test_run_info, test_plan);
-                        }
+                        },
                         Some(ExpectedFailure::ExpectedWithError(expected_err))
                             if expected_err == &actual_err =>
                         {
                             output.pass(function_name);
                             stats.test_success(test_run_info, test_plan);
-                        }
+                        },
                         Some(ExpectedFailure::ExpectedWithCodeDEPRECATED(code))
                             if actual_err.0 == StatusCode::ABORTED
                                 && actual_err.1.is_some()
@@ -512,7 +512,7 @@ impl SharedTestingConfig {
                         {
                             output.pass(function_name);
                             stats.test_success(test_run_info, test_plan);
-                        }
+                        },
                         // incorrect cases
                         Some(ExpectedFailure::ExpectedWithError(expected_err)) => {
                             output.fail(function_name);
@@ -525,7 +525,7 @@ impl SharedTestingConfig {
                                 ),
                                 test_plan,
                             )
-                        }
+                        },
                         Some(ExpectedFailure::ExpectedWithCodeDEPRECATED(expected_code)) => {
                             output.fail(function_name);
                             stats.test_failure(
@@ -540,7 +540,7 @@ impl SharedTestingConfig {
                                 ),
                                 test_plan,
                             )
-                        }
+                        },
                         None if err.major_status() == StatusCode::OUT_OF_GAS => {
                             // Ran out of ticks, report a test timeout and log a test failure
                             output.timeout(function_name);
@@ -553,7 +553,7 @@ impl SharedTestingConfig {
                                 ),
                                 test_plan,
                             )
-                        }
+                        },
                         None => {
                             output.fail(function_name);
                             stats.test_failure(
@@ -565,9 +565,9 @@ impl SharedTestingConfig {
                                 ),
                                 test_plan,
                             )
-                        }
+                        },
                     }
-                }
+                },
                 Ok(_) => {
                     // Expected the test to fail, but it executed
                     if test_info.expected_failure.is_some() {
@@ -586,7 +586,7 @@ impl SharedTestingConfig {
                         output.pass(function_name);
                         stats.test_success(test_run_info, test_plan);
                     }
-                }
+                },
             }
         }
 
@@ -681,7 +681,7 @@ impl SharedTestingConfig {
                         test_plan,
                     );
                     return stats;
-                }
+                },
             };
 
             let (res, duration) = self.execute_via_evm(&yul_code);
@@ -723,7 +723,7 @@ impl SharedTestingConfig {
                         ),
                         test_plan,
                     );
-                }
+                },
 
                 // Test expected to succeed, but aborted.
                 (None, ExitReason::Revert(_)) => {
@@ -741,7 +741,7 @@ impl SharedTestingConfig {
                         ),
                         test_plan,
                     )
-                }
+                },
 
                 // Expect the test to abort with a specific code.
                 (
@@ -774,7 +774,7 @@ impl SharedTestingConfig {
                             test_plan,
                         );
                     }
-                }
+                },
 
                 // Test expected to abort but succeeded.
                 (
@@ -790,18 +790,18 @@ impl SharedTestingConfig {
                         TestFailure::new(FailureReason::no_error(), test_run_info(), None, None),
                         test_plan,
                     )
-                }
+                },
 
                 // Test succeeded or failed as expected.
                 (None, ExitReason::Succeed(_))
                 | (Some(ExpectedFailure::Expected), ExitReason::Revert(_)) => {
                     output.pass(function_name);
                     stats.test_success(test_run_info(), test_plan);
-                }
+                },
 
                 (exp, reason) => {
                     unreachable!("Unexpected (exp, exit reason) pair: ({:?}, {:?}). This should not have happened.", exp, reason)
-                }
+                },
             }
         }
 

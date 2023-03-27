@@ -151,7 +151,7 @@ impl<'env> BoogieWrapper<'env> {
                 } else {
                     panic!("cannot execute boogie `{:?}`: {}", args, err)
                 }
-            }
+            },
             Ok(out) => out,
         };
         if self.options.num_instances > 1 {
@@ -290,7 +290,7 @@ impl<'env> BoogieWrapper<'env> {
                         if loc != &last_loc {
                             print_loc(loc, &mut last_loc, &mut display);
                         }
-                    }
+                    },
                     Temporary(fun, idx, value) if error.model.is_some() => {
                         let fun_env = self.env.get_function(*fun);
                         let fun_target = self
@@ -317,7 +317,7 @@ impl<'env> BoogieWrapper<'env> {
                                 value.pretty_or_raw(self, error.model.as_ref().unwrap(), ty);
                             display.extend(self.make_trace_entry(var_name, pretty));
                         }
-                    }
+                    },
                     Result(fun, idx, value) if error.model.is_some() => {
                         let fun_env = self.env.get_function(*fun);
                         let fun_target = self
@@ -335,11 +335,11 @@ impl<'env> BoogieWrapper<'env> {
                                 value.pretty_or_raw(self, error.model.as_ref().unwrap(), ty);
                             display.extend(self.make_trace_entry(var_name, pretty));
                         }
-                    }
+                    },
                     Abort(_, value) => {
                         display.push("        ABORTED".to_string());
                         abort_in_progress = Some((last_loc.clone(), value));
-                    }
+                    },
                     Exp(node_id, value) => {
                         let loc = self.env.get_node_loc(*node_id);
                         if loc != last_loc {
@@ -349,7 +349,7 @@ impl<'env> BoogieWrapper<'env> {
                         let value = value.pretty_or_raw(self, error.model.as_ref().unwrap(), &ty);
                         let exp_str = self.get_abbreviated_source(*node_id);
                         display.extend(self.make_trace_entry(exp_str, value));
-                    }
+                    },
                     SubExp(node_id, value) => {
                         let exp_loc = self.env.get_node_loc(*node_id);
                         if error.loc.is_enclosing(&exp_loc) {
@@ -363,7 +363,7 @@ impl<'env> BoogieWrapper<'env> {
                             let denotation = self.env.get_source(&loc).unwrap_or("??");
                             subexp_map.insert(denotation.to_string(), (*node_id, value.clone()));
                         }
-                    }
+                    },
                     GlobalMem(node_id, ModelValue::List(elems)) => {
                         // The bytecode track_global_memory takes the form
                         // "($Memory_107864 |T@[Int]Bool!val!2| |T@[Int]$1_DiemTimestamp_CurrentTimeMicroseconds!val!0|)"
@@ -382,12 +382,12 @@ impl<'env> BoogieWrapper<'env> {
                                 );
                             }
                         }
-                    }
+                    },
                     InfoLine(info_line) => {
                         // information that should be displayed to the user
                         display.push(format!("    {}", info_line));
-                    }
-                    _ => {}
+                    },
+                    _ => {},
                 }
             }
             if let Some((abort_loc, value)) = abort_in_progress {
@@ -559,7 +559,7 @@ impl<'env> BoogieWrapper<'env> {
             Err(ModelParseError(s)) => {
                 warn!("[boogie model] {}", s);
                 default
-            }
+            },
         }
     }
 
@@ -577,7 +577,7 @@ impl<'env> BoogieWrapper<'env> {
             let remnant = re.replace(cap.name("mod").unwrap().as_str(), "");
 
             match model.parse(self, remnant.as_ref()) {
-                Ok(_) => {}
+                Ok(_) => {},
                 Err(parse_error) => {
                     let context_module = self
                         .env
@@ -587,7 +587,7 @@ impl<'env> BoogieWrapper<'env> {
                         "[boogie model] failed to parse boogie model (module context `{}`): {}",
                         context_module, parse_error.0
                     );
-                }
+                },
             }
         }
     }
@@ -631,7 +631,7 @@ impl<'env> BoogieWrapper<'env> {
                 match self.extract_augmented_entry(name, args, value) {
                     Ok(entry) => {
                         result.push(entry);
-                    }
+                    },
                     Err(parse_error) => {
                         let context_module = self
                             .env
@@ -641,7 +641,7 @@ impl<'env> BoogieWrapper<'env> {
                             "[boogie model] failed to parse augmented execution trace (module context `{}`): {}",
                             context_module, parse_error.0
                         );
-                    }
+                    },
                 }
             }
         }
@@ -660,32 +660,32 @@ impl<'env> BoogieWrapper<'env> {
                 let (fun, idx) = self.extract_fun_and_index(args)?;
                 let value = self.extract_value(value)?;
                 Ok(TraceEntry::Temporary(fun, idx, value))
-            }
+            },
             "track_return" => {
                 let (fun, idx) = self.extract_fun_and_index(args)?;
                 let value = self.extract_value(value)?;
                 Ok(TraceEntry::Result(fun, idx, value))
-            }
+            },
             "track_abort" => {
                 let fun = self.extract_fun(args)?;
                 let value = self.extract_value(value)?;
                 Ok(TraceEntry::Abort(fun, value))
-            }
+            },
             "track_exp" => {
                 let node_id = self.extract_node_id(args)?;
                 let value = self.extract_value(value)?;
                 Ok(TraceEntry::Exp(node_id, value))
-            }
+            },
             "track_exp_sub" => {
                 let node_id = self.extract_node_id(args)?;
                 let value = self.extract_value(value)?;
                 Ok(TraceEntry::SubExp(node_id, value))
-            }
+            },
             "track_global_mem" => {
                 let node_id = self.extract_node_id(args)?;
                 let value = self.extract_value(value)?;
                 Ok(TraceEntry::GlobalMem(node_id, value))
-            }
+            },
             "info" => match value {
                 Some(info_line) => Ok(TraceEntry::InfoLine(info_line.trim().to_string())),
                 None => Ok(TraceEntry::InfoLine("".to_string())),
@@ -985,7 +985,7 @@ impl Model {
                 ModelValue::Map(vars) => {
                     self.vars.extend(vars);
                     Ok(())
-                }
+                },
                 _ => Err(ModelParseError("expected ModelValue::Map".to_string())),
             })
     }
@@ -1402,7 +1402,7 @@ impl ModelValue {
             Type::Primitive(PrimitiveType::Address) => {
                 let addr = BigInt::parse_bytes(&self.extract_literal()?.clone().into_bytes(), 10)?;
                 Some(PrettyDoc::text(format!("0x{}", &addr.to_str_radix(16))))
-            }
+            },
             Type::Primitive(PrimitiveType::Signer) => {
                 let l = self.extract_list("$signer")?;
                 let addr = BigInt::parse_bytes(&l[0].extract_literal()?.clone().into_bytes(), 10)?;
@@ -1410,7 +1410,7 @@ impl ModelValue {
                     "signer{{0x{}}}",
                     &addr.to_str_radix(16)
                 )))
-            }
+            },
             Type::Vector(param) => self.pretty_vector(wrapper, model, param),
             Type::Struct(module_id, struct_id, params) => {
                 let struct_env = wrapper.env.get_struct_qid(module_id.qualified(*struct_id));
@@ -1419,17 +1419,17 @@ impl ModelValue {
                 } else {
                     self.pretty_struct(wrapper, model, &struct_env, params)
                 }
-            }
+            },
             Type::Reference(_, bt) => {
                 Some(PrettyDoc::text("&").append(self.pretty(wrapper, model, bt)?))
-            }
+            },
             Type::TypeParameter(_) => {
                 // The value of a generic cannot be easily displayed because we do not know the
                 // actual type unless we parse it out from the model (via the type value parameter)
                 // and convert into a Type. However, since the value is parametric and cannot
                 // effect the verification outcome, we may not have much need for seeing it.
                 Some(PrettyDoc::text("<generic>"))
-            }
+            },
             Type::Tuple(_)
             | Type::Primitive(_)
             | Type::Fun(_, _)

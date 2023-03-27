@@ -98,13 +98,13 @@ pub fn run(options: &FlattenOptions) -> Result<()> {
                     // only run on specs for external-facing functions
                     continue;
                 }
-            }
+            },
             Some(target) => {
                 if fun_env.get_simple_name_string().as_ref() != target {
                     // only run on matched function name
                     continue;
                 }
-            }
+            },
         }
 
         // get a copy of the original spec
@@ -128,7 +128,7 @@ pub fn run(options: &FlattenOptions) -> Result<()> {
             let new_spec = match pass {
                 FlattenPass::TrimAbortsIf => {
                     exp_trimming::trim_aborts_ifs(workflow_options, target, old_spec)
-                }
+                },
             }?;
 
             // dump stepwise results if requested

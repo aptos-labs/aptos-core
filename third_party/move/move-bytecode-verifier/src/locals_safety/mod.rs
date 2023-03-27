@@ -43,21 +43,21 @@ fn execute_inner(
                 if !state.local_abilities(*idx).has_drop() =>
             {
                 return Err(state.error(StatusCode::STLOC_UNSAFE_TO_DESTROY_ERROR, offset))
-            }
+            },
             _ => state.set_available(*idx),
         },
 
         Bytecode::MoveLoc(idx) => match state.local_state(*idx) {
             LocalState::MaybeAvailable | LocalState::Unavailable => {
                 return Err(state.error(StatusCode::MOVELOC_UNAVAILABLE_ERROR, offset))
-            }
+            },
             LocalState::Available => state.set_unavailable(*idx),
         },
 
         Bytecode::CopyLoc(idx) => match state.local_state(*idx) {
             LocalState::MaybeAvailable | LocalState::Unavailable => {
                 return Err(state.error(StatusCode::COPYLOC_UNAVAILABLE_ERROR, offset))
-            }
+            },
             LocalState::Available => (),
         },
 
@@ -65,10 +65,10 @@ fn execute_inner(
             match state.local_state(*idx) {
                 LocalState::Unavailable | LocalState::MaybeAvailable => {
                     return Err(state.error(StatusCode::BORROWLOC_UNAVAILABLE_ERROR, offset))
-                }
+                },
                 LocalState::Available => (),
             }
-        }
+        },
 
         Bytecode::Ret => {
             let local_states = state.local_states();
@@ -83,11 +83,11 @@ fn execute_inner(
                         return Err(
                             state.error(StatusCode::UNSAFE_RET_UNUSED_VALUES_WITHOUT_DROP, offset)
                         )
-                    }
+                    },
                     _ => (),
                 }
             }
-        }
+        },
 
         Bytecode::Pop
         | Bytecode::BrTrue(_)
