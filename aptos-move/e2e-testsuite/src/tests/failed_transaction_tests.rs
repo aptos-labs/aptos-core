@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_gas::{
-    AptosGasMeter, AptosGasParameters, StorageGasParameters, LATEST_GAS_FEATURE_VERSION,
+    AptosGasParameters, StandardGasMeter, StorageGasParameters, LATEST_GAS_FEATURE_VERSION,
 };
 use aptos_language_e2e_tests::{common_transactions::peer_to_peer_txn, executor::FakeExecutor};
 use aptos_state_view::TStateView;
@@ -36,7 +36,10 @@ fn failed_transaction_cleanup_test() {
 
     let gas_params = AptosGasParameters::zeros();
     let storage_gas_params = StorageGasParameters::free_and_unlimited();
-    let mut gas_meter = AptosGasMeter::new(
+
+    let change_set_configs = storage_gas_params.change_set_configs.clone();
+
+    let mut gas_meter = StandardGasMeter::new(
         LATEST_GAS_FEATURE_VERSION,
         gas_params,
         storage_gas_params,
@@ -50,6 +53,7 @@ fn failed_transaction_cleanup_test() {
         &txn_data,
         &data_cache,
         &log_context,
+        &change_set_configs,
     );
     assert!(!out1.txn_output().write_set().is_empty());
     assert_eq!(out1.txn_output().gas_used(), 90_000);
@@ -67,6 +71,7 @@ fn failed_transaction_cleanup_test() {
         &txn_data,
         &data_cache,
         &log_context,
+        &change_set_configs,
     );
     assert!(out2.txn_output().write_set().is_empty());
     assert!(out2.txn_output().gas_used() == 0);
