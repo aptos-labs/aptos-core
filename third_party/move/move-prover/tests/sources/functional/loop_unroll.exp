@@ -49,3 +49,42 @@ error: abort not covered by any of the `aborts_if` clauses
     =         i = <redacted>
     =     at tests/sources/functional/loop_unroll.move:97: t6_failure
     =         ABORTED
+
+error: abort not covered by any of the `aborts_if` clauses
+    ┌─ tests/sources/functional/loop_unroll.move:128:5
+    │
+124 │               assert!(i != 5, 0);
+    │               ------------------ abort happened here with code 0x0
+    ·
+128 │ ╭     spec t7_failure {
+129 │ │         pragma unroll = 6;
+130 │ │         // this will not hold when we increase the unroll count
+131 │ │         aborts_if false;
+132 │ │     }
+    │ ╰─────^
+    │
+    =     at tests/sources/functional/loop_unroll.move:120: t7_failure
+    =         n = <redacted>
+    =     at tests/sources/functional/loop_unroll.move:121: t7_failure
+    =         i = <redacted>
+    =     at tests/sources/functional/loop_unroll.move:122: t7_failure
+    =     at tests/sources/functional/loop_unroll.move:123: t7_failure
+    =         i = <redacted>
+    =     at tests/sources/functional/loop_unroll.move:124: t7_failure
+    =     at tests/sources/functional/loop_unroll.move:122: t7_failure
+    =     at tests/sources/functional/loop_unroll.move:123: t7_failure
+    =         i = <redacted>
+    =     at tests/sources/functional/loop_unroll.move:124: t7_failure
+    =     at tests/sources/functional/loop_unroll.move:122: t7_failure
+    =     at tests/sources/functional/loop_unroll.move:123: t7_failure
+    =         i = <redacted>
+    =     at tests/sources/functional/loop_unroll.move:124: t7_failure
+    =     at tests/sources/functional/loop_unroll.move:122: t7_failure
+    =     at tests/sources/functional/loop_unroll.move:123: t7_failure
+    =         i = <redacted>
+    =     at tests/sources/functional/loop_unroll.move:124: t7_failure
+    =     at tests/sources/functional/loop_unroll.move:122: t7_failure
+    =     at tests/sources/functional/loop_unroll.move:123: t7_failure
+    =         i = <redacted>
+    =     at tests/sources/functional/loop_unroll.move:124: t7_failure
+    =         ABORTED

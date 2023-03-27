@@ -76,6 +76,10 @@ pub const DISABLE_INVARIANTS_IN_BODY_PRAGMA: &str = "disable_invariants_in_body"
 /// to this function
 pub const DELEGATE_INVARIANTS_TO_CALLER_PRAGMA: &str = "delegate_invariants_to_caller";
 
+/// Pragma indicating that all loops within the scope of this pragma should be unrolled
+/// to a certain depth *when there are no invariants specified*
+pub const UNROLL_PRAGMA: &str = "unroll";
+
 /// # Pragmas for intrinsic table declaration
 
 /// The intrinsic type for `Map<K, V>`
@@ -197,6 +201,7 @@ pub fn is_pragma_valid_for_block(
                 | ABORTS_IF_IS_STRICT_PRAGMA
                 | ABORTS_IF_IS_PARTIAL_PRAGMA
                 | INTRINSIC_PRAGMA
+                | UNROLL_PRAGMA
         ),
         Function(..) => matches!(
             pragma,
@@ -220,6 +225,7 @@ pub fn is_pragma_valid_for_block(
                 | DELEGATE_INVARIANTS_TO_CALLER_PRAGMA
                 | BV_PARAM_PROP
                 | BV_RET_PROP
+                | UNROLL_PRAGMA
         ),
         Struct(..) => match pragma {
             INTRINSIC_PRAGMA | BV_PARAM_PROP => true,

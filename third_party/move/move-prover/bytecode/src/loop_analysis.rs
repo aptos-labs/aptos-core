@@ -16,6 +16,7 @@ use move_model::{
     ast::{self, TempIndex},
     exp_generator::ExpGenerator,
     model::FunctionEnv,
+    pragmas::UNROLL_PRAGMA,
     ty::{PrimitiveType, Type},
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -66,7 +67,7 @@ impl LoopAnnotation {
 
 #[derive(Debug, Clone)]
 pub struct LoopUnrollingMark {
-    pub marker: AttrId,
+    pub marker: Option<AttrId>,
     pub loop_body: Vec<Vec<Bytecode>>,
     pub back_edges: BTreeSet<CodeOffset>,
     pub iter_count: usize,
@@ -457,7 +458,7 @@ impl LoopAnalysisProcessor {
         // bridge the back edges into the newly populated code
         let code = std::mem::take(&mut builder.data.code);
         for (offset, mut bytecode) in code.into_iter().enumerate() {
-            if bytecode.get_attr_id() == unrolling_mark.marker {
+            if unrolling_mark.marker == Some(bytecode.get_attr_id()) {
                 continue;
             }
             if unrolling_mark.back_edges.contains(&(offset as CodeOffset)) {
@@ -705,6 +706,7 @@ impl LoopAnalysisProcessor {
         let natural_loops = graph.compute_reducible().expect(
             "A well-formed Move function is expected to have a reducible control-flow graph",
         );
+        let unroll_pragma = func_env.get_num_pragma(UNROLL_PRAGMA);
 
         // collect shared headers from loops
         let mut fat_headers = BTreeMap::new();
@@ -729,7 +731,9 @@ impl LoopAnalysisProcessor {
             };
 
             let invariants = Self::collect_loop_invariants(&cfg, &func_target, fat_root);
-            let unrolling_mark = Self::probe_loop_unrolling_mark(&cfg, &func_target, fat_root);
+            let unrolling_mark = Self::probe_loop_unrolling_mark(&cfg, &func_target, fat_root)
+                .map(|(marker, count)| (Some(marker), count))
+                .or_else(|| unroll_pragma.map(|count| (None, count)));
             let back_edges = Self::collect_loop_back_edges(code, &cfg, label, &sub_loops);
 
             // loop invariants and unrolling should be mutual exclusive
@@ -747,8 +751,12 @@ impl LoopAnalysisProcessor {
                 },
                 Some((attr_id, count)) => {
                     if !invariants.is_empty() {
+                        let error_loc = attr_id.map_or_else(
+                            || env.unknown_loc(),
+                            |attr_id| func_target.get_bytecode_loc(attr_id),
+                        );
                         env.error(
-                            &func_target.get_bytecode_loc(attr_id),
+                            &error_loc,
                             "loop invariants and loop unrolling is mutual exclusive",
                         );
                     }
@@ -778,8 +786,10 @@ impl LoopAnalysisProcessor {
         }
 
         // check for redundant loop unrolling marks in the spe
-        let all_unrolling_marks: BTreeSet<_> =
-            fat_loops_for_unrolling.values().map(|l| l.marker).collect();
+        let all_unrolling_marks: BTreeSet<_> = fat_loops_for_unrolling
+            .values()
+            .filter_map(|l| l.marker)
+            .collect();
         let declared_unrolling_marks: BTreeSet<_> = data.loop_unrolling.keys().copied().collect();
         for attr_id in declared_unrolling_marks.difference(&all_unrolling_marks) {
             env.error(

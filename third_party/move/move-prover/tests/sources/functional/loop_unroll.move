@@ -102,4 +102,32 @@ module 0x42::loop_unroll {
         // this will not hold when we increase the unroll count
         aborts_if false;
     }
+
+    fun t7_success(n: u64): u64 {
+        let i = 0;
+        while (i < n) {
+            i = i + 1;
+            assert!(i != 5, 0);
+        };
+        i
+    }
+    spec t7_success {
+        pragma unroll = 3;
+        // this is expected, as we only unroll the loop 3 times
+        aborts_if false;
+    }
+
+    fun t7_failure(n: u64): u64 {
+        let i = 0;
+        while (i < n) {
+            i = i + 1;
+            assert!(i != 5, 0);
+        };
+        i
+    }
+    spec t7_failure {
+        pragma unroll = 6;
+        // this will not hold when we increase the unroll count
+        aborts_if false;
+    }
 }
