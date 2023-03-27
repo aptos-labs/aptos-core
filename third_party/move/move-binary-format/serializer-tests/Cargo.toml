@@ -13,6 +13,7 @@ edition = "2021"
 move-binary-format = { path = "../", features = ["fuzzing"] }
 proptest = "1.0.0"
 proptest-derive = "0.3.0"
+move-core-types= { path = "../../move-core/types" }
 
 [features]
 fuzzing = ["move-binary-format/fuzzing"]

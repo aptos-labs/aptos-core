@@ -2,6 +2,11 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{
+    cell::RefCell,
+    collections::{btree_map, BTreeMap},
+};
+
 use crate::{
     binary_views::BinaryIndexedView,
     errors::{
@@ -11,8 +16,9 @@ use crate::{
     file_format::{
         AbilitySet, Bytecode, CodeOffset, CodeUnit, CompiledModule, CompiledScript, Constant,
         FieldHandle, FieldInstantiation, FunctionDefinition, FunctionDefinitionIndex,
-        FunctionHandle, FunctionInstantiation, LocalIndex, ModuleHandle, Signature, SignatureToken,
-        StructDefInstantiation, StructDefinition, StructFieldInformation, StructHandle, TableIndex,
+        FunctionHandle, FunctionInstantiation, LocalIndex, ModuleHandle, Signature, SignatureIndex,
+        SignatureToken, StructDefInstantiation, StructDefinition, StructFieldInformation,
+        StructHandle, TableIndex, TypeParameterIndex,
     },
     internals::ModuleIndex,
     IndexKind,
@@ -26,7 +32,11 @@ enum BoundsCheckingContext {
 }
 pub struct BoundsChecker<'a> {
     view: BinaryIndexedView<'a>,
+
     context: BoundsCheckingContext,
+
+    // Using the interior mutability pattern to make the borrow checker happy.
+    max_ty_param_ids: RefCell<BTreeMap<SignatureIndex, Option<TypeParameterIndex>>>,
 }
 
 impl<'a> BoundsChecker<'a> {
@@ -34,21 +44,15 @@ impl<'a> BoundsChecker<'a> {
         let mut bounds_check = Self {
             view: BinaryIndexedView::Script(script),
             context: BoundsCheckingContext::Script,
+
+            max_ty_param_ids: RefCell::new(BTreeMap::new()),
         };
         bounds_check.verify_impl()?;
 
         let type_param_count = script.type_parameters.len();
 
         check_bounds_impl(bounds_check.view.signatures(), script.parameters)?;
-        if let Some(sig) = bounds_check
-            .view
-            .signatures()
-            .get(script.parameters.into_index())
-        {
-            for ty in &sig.0 {
-                bounds_check.check_type_parameter(ty, type_param_count)?
-            }
-        }
+        bounds_check.check_type_parameters_in_signature(script.parameters, type_param_count)?;
 
         // The bounds checker has already checked each function definition's code, but a
         // script's code exists outside of any function definition. It gets checked here.
@@ -68,6 +72,8 @@ impl<'a> BoundsChecker<'a> {
         let mut bounds_check = Self {
             view: BinaryIndexedView::Module(module),
             context: BoundsCheckingContext::Module,
+
+            max_ty_param_ids: RefCell::new(BTreeMap::new()),
         };
         if bounds_check.view.module_handles().is_empty() {
             let status =
@@ -204,24 +210,8 @@ impl<'a> BoundsChecker<'a> {
         check_bounds_impl(self.view.signatures(), function_handle.return_)?;
         // function signature type paramters must be in bounds to the function type parameters
         let type_param_count = function_handle.type_parameters.len();
-        if let Some(sig) = self
-            .view
-            .signatures()
-            .get(function_handle.parameters.into_index())
-        {
-            for ty in &sig.0 {
-                self.check_type_parameter(ty, type_param_count)?
-            }
-        }
-        if let Some(sig) = self
-            .view
-            .signatures()
-            .get(function_handle.return_.into_index())
-        {
-            for ty in &sig.0 {
-                self.check_type_parameter(ty, type_param_count)?
-            }
-        }
+        self.check_type_parameters_in_signature(function_handle.parameters, type_param_count)?;
+        self.check_type_parameters_in_signature(function_handle.return_, type_param_count)?;
         Ok(())
     }
 
@@ -300,7 +290,7 @@ impl<'a> BoundsChecker<'a> {
             for field in fields {
                 check_bounds_impl(self.view.identifiers(), field.name)?;
                 self.check_type(&field.signature.0)?;
-                self.check_type_parameter(&field.signature.0, type_param_count)?;
+                self.check_type_parameters_in_ty(&field.signature.0, type_param_count)?;
             }
         }
         Ok(())
@@ -372,9 +362,7 @@ impl<'a> BoundsChecker<'a> {
 
         // if there are locals check that the type parameters in local signature are in bounds.
         let type_param_count = type_parameters.len();
-        for local in locals {
-            self.check_type_parameter(local, type_param_count)?
-        }
+        self.check_type_parameters_in_signature(code_unit.locals, type_param_count)?;
 
         // check bytecodes
         let code_len = code_unit.code.len();
@@ -404,15 +392,10 @@ impl<'a> BoundsChecker<'a> {
                         .field_instantiations()
                         .and_then(|f| f.get(idx.into_index()))
                     {
-                        if let Some(sig) = self
-                            .view
-                            .signatures()
-                            .get(field_inst.type_parameters.into_index())
-                        {
-                            for ty in &sig.0 {
-                                self.check_type_parameter(ty, type_param_count)?
-                            }
-                        }
+                        self.check_type_parameters_in_signature(
+                            field_inst.type_parameters,
+                            type_param_count,
+                        )?;
                     }
                 },
                 Call(idx) => self.check_code_unit_bounds_impl(
@@ -430,15 +413,10 @@ impl<'a> BoundsChecker<'a> {
                     if let Some(func_inst) =
                         self.view.function_instantiations().get(idx.into_index())
                     {
-                        if let Some(sig) = self
-                            .view
-                            .signatures()
-                            .get(func_inst.type_parameters.into_index())
-                        {
-                            for ty in &sig.0 {
-                                self.check_type_parameter(ty, type_param_count)?
-                            }
-                        }
+                        self.check_type_parameters_in_signature(
+                            func_inst.type_parameters,
+                            type_param_count,
+                        )?;
                     }
                 },
                 Pack(idx) | Unpack(idx) | Exists(idx) | ImmBorrowGlobal(idx)
@@ -466,15 +444,10 @@ impl<'a> BoundsChecker<'a> {
                         .struct_instantiations()
                         .and_then(|s| s.get(idx.into_index()))
                     {
-                        if let Some(sig) = self
-                            .view
-                            .signatures()
-                            .get(struct_inst.type_parameters.into_index())
-                        {
-                            for ty in &sig.0 {
-                                self.check_type_parameter(ty, type_param_count)?
-                            }
-                        }
+                        self.check_type_parameters_in_signature(
+                            struct_inst.type_parameters,
+                            type_param_count,
+                        )?;
                     }
                 },
                 // Instructions that refer to this code block.
@@ -519,11 +492,7 @@ impl<'a> BoundsChecker<'a> {
                         *idx,
                         bytecode_offset,
                     )?;
-                    if let Some(sig) = self.view.signatures().get(idx.into_index()) {
-                        for ty in &sig.0 {
-                            self.check_type_parameter(ty, type_param_count)?;
-                        }
-                    }
+                    self.check_type_parameters_in_signature(*idx, type_param_count)?;
                 },
 
                 // List out the other options explicitly so there's a compile error if a new
@@ -579,43 +548,69 @@ impl<'a> BoundsChecker<'a> {
         Ok(())
     }
 
-    fn check_type_parameter(
+    fn check_type_parameters_in_ty(
         &self,
         ty: &SignatureToken,
         type_param_count: usize,
     ) -> PartialVMResult<()> {
-        use self::SignatureToken::*;
-
         for ty in ty.preorder_traversal() {
-            match ty {
-                SignatureToken::TypeParameter(idx) => {
-                    if *idx as usize >= type_param_count {
-                        return Err(bounds_error(
-                            StatusCode::INDEX_OUT_OF_BOUNDS,
-                            IndexKind::TypeParameter,
-                            *idx,
-                            type_param_count,
-                        ));
-                    }
-                },
-
-                Bool
-                | U8
-                | U16
-                | U32
-                | U64
-                | U128
-                | U256
-                | Address
-                | Signer
-                | Struct(_)
-                | Reference(_)
-                | MutableReference(_)
-                | Vector(_)
-                | StructInstantiation(_, _) => (),
+            if let SignatureToken::TypeParameter(idx) = ty {
+                if *idx as usize >= type_param_count {
+                    return Err(bounds_error(
+                        StatusCode::INDEX_OUT_OF_BOUNDS,
+                        IndexKind::TypeParameter,
+                        *idx,
+                        type_param_count,
+                    ));
+                }
             }
         }
+
         Ok(())
+    }
+
+    fn check_type_parameters_in_signature(
+        &self,
+        sig_idx: SignatureIndex,
+        type_param_count: usize,
+    ) -> PartialVMResult<()> {
+        let max_ty_param_idx = match self.max_ty_param_ids.borrow_mut().entry(sig_idx) {
+            btree_map::Entry::Vacant(entry) => {
+                let mut max_idx = None;
+
+                // This can panic but it is fine, since we only allow this function to be called after the signature index
+                // has been verified.
+                let sig = self.view.signature_at(sig_idx);
+
+                for ty in sig.0.iter().flat_map(|ty| ty.preorder_traversal()) {
+                    if let SignatureToken::TypeParameter(idx) = ty {
+                        match &mut max_idx {
+                            Some(max_idx) => *max_idx = u16::max(*max_idx, *idx),
+                            None => max_idx = Some(*idx),
+                        }
+                    }
+                }
+
+                *entry.insert(max_idx)
+            },
+            btree_map::Entry::Occupied(entry) => *entry.get(),
+        };
+
+        match max_ty_param_idx {
+            Some(idx) => {
+                if idx as usize >= type_param_count {
+                    Err(bounds_error(
+                        StatusCode::INDEX_OUT_OF_BOUNDS,
+                        IndexKind::TypeParameter,
+                        idx,
+                        type_param_count,
+                    ))
+                } else {
+                    Ok(())
+                }
+            },
+            None => Ok(()),
+        }
     }
 
     fn check_code_unit_bounds_impl_opt<T, I>(
