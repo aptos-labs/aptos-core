@@ -16,6 +16,8 @@ variable "GIT_BRANCH" {}
 
 variable "GIT_TAG" {}
 
+variable "GIT_CREDENTIALS" {}
+
 variable "BUILT_VIA_BUILDKIT" {}
 
 variable "GCP_DOCKER_ARTIFACT_REPO" {}
@@ -75,6 +77,9 @@ target "builder-base" {
     CARGO_TARGET_DIR   = "${CARGO_TARGET_DIR}"
     BUILT_VIA_BUILDKIT = "true"
   }
+  secret = [
+    "id=GIT_CREDENTIALS"
+  ]
 }
 
 target "aptos-node-builder" {
@@ -83,6 +88,9 @@ target "aptos-node-builder" {
   contexts = {
     builder-base = "target:builder-base"
   }
+  secret = [
+    "id=GIT_CREDENTIALS"
+  ]
 }
 
 target "tools-builder" {
@@ -91,6 +99,9 @@ target "tools-builder" {
   contexts = {
     builder-base =  "target:builder-base"
   }
+  secret = [
+    "id=GIT_CREDENTIALS"
+  ]
 }
 
 target "_common" {

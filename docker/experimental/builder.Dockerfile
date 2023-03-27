@@ -41,12 +41,14 @@ RUN ARCHITECTURE=$(uname -m | sed -e "s/arm64/arm_64/g" | sed -e "s/aarch64/aarc
     && unzip -o "protoc-21.5-linux-$ARCHITECTURE.zip" -d /usr/local 'include/*' \
     && chmod +x "/usr/local/bin/protoc" \
     && rm "protoc-21.5-linux-$ARCHITECTURE.zip"
+RUN --mount=type=secret,id=GIT_CREDENTIALS,target=/root/.git_credentials \
+        git config --global credential.helper store
 
 COPY --link . /aptos/
 
 FROM builder-base as aptos-node-builder
 
-RUN --mount=type=secret,id=node-builder-git-credentials,target=/root/.git-credentials \
+RUN --mount=type=secret,id=GIT_CREDENTIALS,target=/root/.git-credentials \
     --mount=type=cache,target=/usr/local/cargo/git,id=node-builder-cargo-git-cache \
     --mount=type=cache,target=/usr/local/cargo/registry,id=node-builder-cargo-registry-cache \
     --mount=type=cache,target=/aptos/target,id=node-builder-target-cache \
@@ -54,7 +56,7 @@ RUN --mount=type=secret,id=node-builder-git-credentials,target=/root/.git-creden
 
 FROM builder-base as tools-builder
 
-RUN --mount=type=secret,id=tools-builder-git-credentials,target=/root/.git-credentials \
+RUN --mount=type=secret,id=GIT_CREDENTIALS,target=/root/.git-credentials \
     --mount=type=cache,target=/usr/local/cargo/git,id=tools-builder-cargo-git-cache \
     --mount=type=cache,target=/usr/local/cargo/registry,id=tools-builder-cargo-registry-cache \
     --mount=type=cache,target=/aptos/target,id=tools-builder-target-cache \

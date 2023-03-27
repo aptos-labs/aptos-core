@@ -14,7 +14,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         unzip \
         awscli 
 
-RUN mkdir /aptos
+WORKDIR /aptos
 
 # copy helm charts from source
 COPY --link --from=tools-builder /aptos/terraform/helm /aptos/terraform/helm
