@@ -26,7 +26,7 @@ To create a delegation pool and obtain information about it, [connect to the Apt
 You can use the following CLI commands to obtain the delegation pool address depending on where you are in the process:
 - Before you create the delegation pool:  
     ```bash
-    aptos account derive-resource-account-address --address <operator_address> --seed "aptos_framework::delegation_pool<SEED>" --seed-encoding utf8
+    aptos account derive-resource-account-address --address <owner_address> --seed "aptos_framework::delegation_pool<SEED>" --seed-encoding utf8
     ```  
 - After you create the delegation pool: 
     ```bash
