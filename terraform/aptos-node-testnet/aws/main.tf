@@ -23,10 +23,9 @@ module "validator" {
 
   maximize_single_az_capacity = var.maximize_single_az_capacity
 
-  region             = var.region
-  kubernetes_version = var.kubernetes_version
-  iam_path           = var.iam_path
-  zone_id            = var.zone_id
+  region   = var.region
+  iam_path = var.iam_path
+  zone_id  = var.zone_id
   # do not create the main fullnode and validator DNS records
   # instead, rely on external-dns from the testnet-addons
   create_records = false
