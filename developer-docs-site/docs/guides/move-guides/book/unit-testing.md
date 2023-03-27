@@ -115,7 +115,7 @@ Next add the following to the `Move.toml`:
 
 ```
 [dependencies]
-MoveStdlib = { git = "https://github.com/aptos-labs/aptos-core.git", subdir="aptos-move/framework/move-stdlib", rev = "main", addr_subst = { "std" = "0x1" } }
+MoveStdlib = { git = "https://github.com/aptos-labs/aptos-core.git", subdir="aptos-move/framework/move-stdlib", rev = "framework-mainnet", addr_subst = { "std" = "0x1" } }
 ```
 
 Next add the following module under the `sources` directory:
