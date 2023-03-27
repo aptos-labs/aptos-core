@@ -53,10 +53,10 @@ script {
 ";
 
 fn aptos_framework_path() -> PathBuf {
-    Path::join(
-        Path::new(env!("CARGO_MANIFEST_DIR")),
-        "../framework/aptos-framework",
-    )
+    let mut path = Path::new(env!("CARGO_MANIFEST_DIR")).to_path_buf();
+    path.pop();
+    path.push("framework/aptos-framework");
+    path
 }
 
 impl NetworkConfig {
@@ -159,7 +159,7 @@ impl NetworkConfig {
             args.push("--framework-git-rev");
             args.push(rev.as_str());
         } else {
-            args.push("--framework_local_dir");
+            args.push("--framework-local-dir");
             args.push(framework_path.as_os_str().to_str().unwrap());
         };
 
@@ -205,7 +205,7 @@ impl NetworkConfig {
             args.push(rev.as_str());
             SubmitProposal::parse_from(args).execute().await?;
         } else {
-            args.push("--framework_local_dir");
+            args.push("--framework-local-dir");
             args.push(framework_path.as_os_str().to_str().unwrap());
             SubmitProposal::parse_from(args).execute().await?;
         };
@@ -339,7 +339,7 @@ impl NetworkConfig {
             args.push("--framework-git-rev");
             args.push(rev.as_str());
         } else {
-            args.push("--framework_local_dir");
+            args.push("--framework-local-dir");
             args.push(framework_path.as_os_str().to_str().unwrap());
         };
 
@@ -400,7 +400,7 @@ async fn execute_release(
                 args.push("--framework-git-rev");
                 args.push(rev.as_str());
             } else {
-                args.push("--framework_local_dir");
+                args.push("--framework-local-dir");
                 args.push(framework_path.as_os_str().to_str().unwrap());
             };
 
