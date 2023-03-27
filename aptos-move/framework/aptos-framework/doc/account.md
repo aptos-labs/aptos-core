@@ -2794,4 +2794,4 @@ The guid_creation_num of the Account is up to MAX_U64.
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
