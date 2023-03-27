@@ -48,10 +48,10 @@ runs:
         config-inline: |
           [worker.oci]
             gc = true
-            gckeepstorage = 900000000000
+            gckeepstorage = 900000000000 # Use 900GB out of 1TB for builder storage
             [[worker.oci.gcpolicy]]
-              keepBytes = 700000000000
-              keepDuration = 604800
+              keepBytes = 700000000000 # Use 700GB out of 900GB for cache storage
+              keepDuration = 604800 # Keep cache for 7 days
               filters = [ "type==source.local", "type==exec.cachemount", "type==source.git.checkout"]
             [[worker.oci.gcpolicy]]
               all = true
