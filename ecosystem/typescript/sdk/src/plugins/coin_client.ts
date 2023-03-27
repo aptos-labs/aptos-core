@@ -51,6 +51,8 @@ export class CoinClient {
       // This is done by calling `0x1::aptos_account::transfer` instead, which
       // will create the account on-chain first if it doesn't exist before
       // transferring the coins to it.
+      // If this is the first time an account has received the specified coinType,
+      // and this is set to false, the transaction would fail.
       createReceiverIfMissing?: boolean;
     },
   ): Promise<string> {
@@ -59,17 +61,13 @@ export class CoinClient {
 
     // If we should create the receiver account if it doesn't exist on-chain,
     // use the `0x1::aptos_account::transfer` function.
-    const func = extraArgs?.createReceiverIfMissing ? "0x1::aptos_account::transfer" : "0x1::coin::transfer";
-
-    // If we're using the `0x1::aptos_account::transfer` function, we don't
-    // need type args.
-    const typeArgs = extraArgs?.createReceiverIfMissing ? [] : [coinTypeToTransfer];
+    const func = extraArgs?.createReceiverIfMissing ? "0x1::aptos_account::transfer_coins" : "0x1::coin::transfer";
 
     // Get the receiver address from the AptosAccount or MaybeHexString.
     const toAddress = getAddressFromAccountOrAddress(to);
 
     const builder = new TransactionBuilderRemoteABI(this.aptosClient, { sender: from.address(), ...extraArgs });
-    const rawTxn = await builder.build(func, typeArgs, [toAddress, amount]);
+    const rawTxn = await builder.build(func, [coinTypeToTransfer], [toAddress, amount]);
 
     const bcsTxn = AptosClient.generateBCSTransaction(from, rawTxn);
     const pendingTransaction = await this.aptosClient.submitSignedBCSTransaction(bcsTxn);

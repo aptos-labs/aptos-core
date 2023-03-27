@@ -13,6 +13,11 @@ variable "zone" {
   type        = string
 }
 
+variable "kubernetes_version" {
+  description = "Version of Kubernetes to use for GKE clusters"
+  default     = "1.24"
+}
+
 variable "workspace_name_override" {
   description = "If specified, overrides the usage of Terraform workspace for naming purposes"
   default     = ""

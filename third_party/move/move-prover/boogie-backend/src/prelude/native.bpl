@@ -383,6 +383,25 @@ returns (dst: $Mutation ({{V}}), m': $Mutation ({{Self}})) {
 }
 {%- endif %}
 
+{%- if impl.fun_borrow_mut_with_default != "" %}
+procedure {:inline 2} {{impl.fun_borrow_mut_with_default}}{{S}}(m: $Mutation ({{Self}}), k: {{K}}, default: {{V}})
+returns (dst: $Mutation ({{V}}), m': $Mutation ({{Self}})) {
+    var enc_k: int;
+    var t: {{Self}};
+    var t': {{Self}};
+    enc_k := {{ENC}}(k);
+    t := $Dereference(m);
+    if (!ContainsTable(t, enc_k)) {
+        m' := $UpdateMutation(m, AddTable(t, enc_k, default));
+        t' := $Dereference(m');
+        dst := $Mutation(l#$Mutation(m'), ExtendVec(p#$Mutation(m'), enc_k), GetTable(t', enc_k));
+    } else {
+        dst := $Mutation(l#$Mutation(m), ExtendVec(p#$Mutation(m), enc_k), GetTable(t, enc_k));
+        m' := m;
+    }
+}
+{%- endif %}
+
 {%- if impl.fun_spec_len != "" %}
 function {:inline} {{impl.fun_spec_len}}{{S}}(t: ({{Self}})): int {
     LenTable(t)

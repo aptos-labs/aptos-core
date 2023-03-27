@@ -121,6 +121,7 @@ Grafana
 GraphQL
 HSM
 Homebrew
+hippospace
 hotfix
 HotStuff
 IDE
@@ -292,6 +293,7 @@ clippy
 cn
 codebase
 config
+customizable
 configs
 const
 copyable

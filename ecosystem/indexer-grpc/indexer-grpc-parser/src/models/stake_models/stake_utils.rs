@@ -10,7 +10,6 @@ use aptos_protos::transaction::testing1::v1::WriteResource;
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
 
-const DELEGATION_ADDR: &str = "0x1310dc820487f24755e6e06747f6582118597a48868e2a98260fa8c3ee945cbd";
 const STAKE_ADDR: &str = "0x0000000000000000000000000000000000000000000000000000000000000001";
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct StakePoolResource {
@@ -92,7 +91,7 @@ impl StakeResource {
     fn is_resource_supported(data_type: &str) -> bool {
         [
             format!("{}::stake::StakePool", STAKE_ADDR),
-            format!("{}::delegation_pool::DelegationPool", DELEGATION_ADDR),
+            format!("{}::delegation_pool::DelegationPool", STAKE_ADDR),
         ]
         .contains(&data_type.to_string())
     }
@@ -103,7 +102,7 @@ impl StakeResource {
                 serde_json::from_value(data.clone())
                     .map(|inner| Some(StakeResource::StakePool(inner)))
             },
-            x if x == format!("{}::delegation_pool::DelegationPool", DELEGATION_ADDR) => {
+            x if x == format!("{}::delegation_pool::DelegationPool", STAKE_ADDR) => {
                 serde_json::from_value(data.clone())
                     .map(|inner| Some(StakeResource::DelegationPool(inner)))
             },
@@ -159,19 +158,17 @@ impl StakeEvent {
             },
             "0x1::stake::DistributeRewardsEvent" => serde_json::from_str(data)
                 .map(|inner| Some(StakeEvent::DistributeRewardsEvent(inner))),
-            x if x == format!("{}::delegation_pool::AddStakeEvent", DELEGATION_ADDR) => {
+            "0x1::delegation_pool::AddStakeEvent" => {
                 serde_json::from_str(data).map(|inner| Some(StakeEvent::AddStakeEvent(inner)))
             },
-            x if x == format!("{}::delegation_pool::UnlockStakeEvent", DELEGATION_ADDR) => {
+            "0x1::delegation_pool::UnlockStakeEvent" => {
                 serde_json::from_str(data).map(|inner| Some(StakeEvent::UnlockStakeEvent(inner)))
             },
-            x if x == format!("{}::delegation_pool::WithdrawStakeEvent", DELEGATION_ADDR) => {
+            "0x1::delegation_pool::WithdrawStakeEvent" => {
                 serde_json::from_str(data).map(|inner| Some(StakeEvent::WithdrawStakeEvent(inner)))
             },
-            x if x == format!("{}::delegation_pool::ReactivateStakeEvent", DELEGATION_ADDR) => {
-                serde_json::from_str(data)
-                    .map(|inner| Some(StakeEvent::ReactivateStakeEvent(inner)))
-            },
+            "0x1::delegation_pool::ReactivateStakeEvent" => serde_json::from_str(data)
+                .map(|inner| Some(StakeEvent::ReactivateStakeEvent(inner))),
             _ => Ok(None),
         }
         .context(format!(
