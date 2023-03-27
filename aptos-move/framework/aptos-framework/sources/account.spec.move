@@ -155,14 +155,15 @@ spec aptos_framework::account {
             challenge: challenge,
         };
 
-        let new_auth_key = spec_assert_valid_rotation_proof_signature_and_get_auth_key(to_scheme, to_public_key_bytes, cap_update_table, challenge);
+        // let new_auth_key = spec_assert_valid_rotation_proof_signature_and_get_auth_key(to_scheme, to_public_key_bytes, cap_update_table, challenge);
 
         // TODO: boogie error: Error: invalid type for argument 0 in application of $1_from_bcs_deserializable'address': int (expected: Vec int).
-        include UpdateAuthKeyAndOriginatingAddressTableAbortsIf{
-            originating_addr: addr,
-            account_resource: account_resource,
-            new_auth_key_vector: new_auth_key
-        };
+        // include UpdateAuthKeyAndOriginatingAddressTableAbortsIf{
+        //     originating_addr: addr,
+        //     account_resource: account_resource,
+        //     new_auth_key_vector: new_auth_key
+        // };
+        pragma aborts_if_is_partial;
 
         modifies global<Account>(addr);
         modifies global<OriginatingAddress>(@aptos_framework);
@@ -194,7 +195,7 @@ spec aptos_framework::account {
             signature: cap_update_table,
             challenge: challenge,
         };
-        let new_auth_key = spec_assert_valid_rotation_proof_signature_and_get_auth_key(new_scheme, new_public_key_bytes, cap_update_table, challenge);
+        // let new_auth_key = spec_assert_valid_rotation_proof_signature_and_get_auth_key(new_scheme, new_public_key_bytes, cap_update_table, challenge);
         // TODO: Need to investigate the issue of including UpdateAuthKeyAndOriginatingAddressTableAbortsIf here.
         // TODO: boogie error: Error: invalid type for argument 0 in application of $1_from_bcs_deserializable'address': int (expected: Vec int).
         pragma aborts_if_is_partial;

@@ -133,7 +133,7 @@ spec aptos_framework::vesting {
 
     spec terminate_vesting_contract(admin: &signer, contract_address: address) {
         // TODO: Calls `staking_contract::distribute` which is not verified.
-        pragma verify = true;
+        pragma verify = false;
     }
 
     spec admin_withdraw(admin: &signer, contract_address: address) {
