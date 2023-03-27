@@ -20,7 +20,9 @@
     "aptos": "latest",
     "dotenv": "16.0.1",
     "ffi-napi": "^4.0.3",
-    "ref-array-di": "^1.2.2"
+    "ref-array-di": "^1.2.2",
+    "fetch-h2": "^3.0.2",
+    "timer-node": "^5.0.7"
   },
   "devDependencies": {
     "@types/ffi-napi": "^4.0.7",
