@@ -16,11 +16,7 @@ use async_trait::async_trait;
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, Utc};
 use diesel::{result::Error, PgConnection};
-use econia_db::models::{
-    self,
-    events::{NewMakerEvent, NewTakerEvent},
-    market::{MarketEventType, NewMarketRegistrationEvent, NewRecognizedMarketEvent},
-};
+use econia_db::models::{self, market::MarketEventType, IntoInsertable};
 use field_count::FieldCount;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
@@ -53,7 +49,7 @@ struct TakerEvent {
     price: u64,
 }
 
-impl From<TakerEvent> for NewTakerEvent {
+impl From<TakerEvent> for models::events::TakerEvent {
     fn from(e: TakerEvent) -> Self {
         Self {
             market_id: e.market_id.into(),
@@ -80,7 +76,7 @@ struct MakerEvent {
     price: u64,
 }
 
-impl From<MakerEvent> for NewMakerEvent {
+impl From<MakerEvent> for models::events::MakerEvent {
     fn from(e: MakerEvent) -> Self {
         Self {
             market_id: e.market_id.into(),
@@ -96,7 +92,7 @@ impl From<MakerEvent> for NewMakerEvent {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 struct MarketRegistrationEvent {
     market_id: u64,
     base_type: TypeInfo,
@@ -108,7 +104,7 @@ struct MarketRegistrationEvent {
     underwriter_id: u64,
 }
 
-impl From<MarketRegistrationEvent> for NewMarketRegistrationEvent {
+impl From<MarketRegistrationEvent> for models::market::MarketRegistrationEvent {
     fn from(e: MarketRegistrationEvent) -> Self {
         Self {
             market_id: e.market_id.into(),
@@ -124,26 +120,6 @@ impl From<MarketRegistrationEvent> for NewMarketRegistrationEvent {
             tick_size: e.tick_size.into(),
             min_size: e.min_size.into(),
             underwriter_id: e.underwriter_id.into(),
-        }
-    }
-}
-
-impl From<&MarketRegistrationEvent> for models::market::MarketRegistrationEvent {
-    fn from(value: &MarketRegistrationEvent) -> Self {
-        Self {
-            market_id: value.market_id.into(),
-            time: *CURRENT_BLOCK_TIME.read().unwrap(),
-            base_account_address: Some(value.base_type.account_address.clone()),
-            base_module_name: Some(value.base_type.module_name.clone()),
-            base_struct_name: Some(value.base_type.struct_name.clone()),
-            base_name_generic: Some(value.base_name_generic.clone()),
-            quote_account_address: value.quote_type.account_address.clone(),
-            quote_module_name: value.quote_type.module_name.clone(),
-            quote_struct_name: value.quote_type.struct_name.clone(),
-            lot_size: value.lot_size.into(),
-            tick_size: value.tick_size.into(),
-            min_size: value.min_size.into(),
-            underwriter_id: value.underwriter_id.into(),
         }
     }
 }
@@ -234,7 +210,7 @@ impl EconiaTransactionProcessor {
     }
 
     fn update_markets_cache(&self, ev: &[MarketRegistrationEvent]) {
-        for e in ev.iter() {
+        for e in ev.iter().cloned() {
             let m = models::market::MarketRegistrationEvent::from(e);
             let key = create_base_quote_key(&m);
             self.base_quote_to_market_id
@@ -310,15 +286,16 @@ impl EconiaTransactionProcessor {
     ) -> Result<(), Error> {
         let ev = ev
             .into_iter()
-            .map(models::events::NewMakerEvent::from)
+            .map(models::events::MakerEvent::from)
             .collect::<Vec<_>>();
+        let insertable = ev.iter().map(|e| e.into_insertable()).collect::<Vec<_>>();
         let chunks = get_chunks(ev.len(), models::events::NewMakerEvent::field_count());
         let table = econia_db::schema::maker_events::table;
         for (start_ind, end_ind) in chunks {
             execute_with_better_error(
                 conn,
                 diesel::insert_into(table)
-                    .values(&ev[start_ind..end_ind])
+                    .values(&insertable[start_ind..end_ind])
                     .on_conflict_do_nothing(),
                 None,
             )?;
@@ -333,15 +310,16 @@ impl EconiaTransactionProcessor {
     ) -> Result<(), Error> {
         let ev = ev
             .into_iter()
-            .map(models::events::NewTakerEvent::from)
+            .map(models::events::TakerEvent::from)
             .collect::<Vec<_>>();
+        let insertable = ev.iter().map(|e| e.into_insertable()).collect::<Vec<_>>();
         let chunks = get_chunks(ev.len(), models::events::NewTakerEvent::field_count());
         let table = econia_db::schema::taker_events::table;
         for (start_ind, end_ind) in chunks {
             execute_with_better_error(
                 conn,
                 diesel::insert_into(table)
-                    .values(&ev[start_ind..end_ind])
+                    .values(&insertable[start_ind..end_ind])
                     .on_conflict_do_nothing(),
                 None,
             )?;
@@ -356,8 +334,9 @@ impl EconiaTransactionProcessor {
     ) -> Result<(), Error> {
         let ev = ev
             .into_iter()
-            .map(models::market::NewMarketRegistrationEvent::from)
+            .map(models::market::MarketRegistrationEvent::from)
             .collect::<Vec<_>>();
+        let insertable = ev.iter().map(|e| e.into_insertable()).collect::<Vec<_>>();
         let chunks = get_chunks(
             ev.len(),
             models::market::NewMarketRegistrationEvent::field_count(),
@@ -367,7 +346,7 @@ impl EconiaTransactionProcessor {
             execute_with_better_error(
                 conn,
                 diesel::insert_into(table)
-                    .values(&ev[start_ind..end_ind])
+                    .values(&insertable[start_ind..end_ind])
                     .on_conflict_do_nothing(),
                 None,
             )?;
@@ -378,7 +357,7 @@ impl EconiaTransactionProcessor {
     fn convert_recognized_market_events_to_db(
         &self,
         ev: Vec<RecognizedMarketEvent>,
-    ) -> Result<Vec<NewRecognizedMarketEvent>, Error> {
+    ) -> Result<Vec<models::market::RecognizedMarketEvent>, Error> {
         let mut events = vec![];
         for e in ev.into_iter() {
             if let Some(r) = e.recognized_market_info {
@@ -387,7 +366,7 @@ impl EconiaTransactionProcessor {
                 let new_lot_size = BigDecimal::from(r.lot_size);
                 let new_tick_size = BigDecimal::from(r.tick_size);
                 let new_min_size = BigDecimal::from(r.min_size);
-                events.push(NewRecognizedMarketEvent {
+                events.push(models::market::RecognizedMarketEvent {
                     market_id: mkt.market_id.clone(),
                     time: *CURRENT_BLOCK_TIME.read().unwrap(),
                     event_type: if mkt.lot_size == new_lot_size
@@ -413,7 +392,7 @@ impl EconiaTransactionProcessor {
                 );
                 let mkt_id = self.base_quote_to_market_id.read().unwrap();
                 let mkt_id = mkt_id.get(&key).unwrap();
-                events.push(NewRecognizedMarketEvent {
+                events.push(models::market::RecognizedMarketEvent {
                     market_id: mkt_id.clone(),
                     time: *CURRENT_BLOCK_TIME.read().unwrap(),
                     event_type: MarketEventType::Remove,
@@ -431,9 +410,10 @@ impl EconiaTransactionProcessor {
         conn: &mut PgConnection,
         ev: Vec<RecognizedMarketEvent>,
     ) -> Result<(), Error> {
-        let events = self.convert_recognized_market_events_to_db(ev)?;
+        let ev = self.convert_recognized_market_events_to_db(ev)?;
+        let insertable = ev.iter().map(|e| e.into_insertable()).collect::<Vec<_>>();
         let chunks = get_chunks(
-            events.len(),
+            ev.len(),
             models::market::NewRecognizedMarketEvent::field_count(),
         );
         let table = econia_db::schema::recognized_market_events::table;
@@ -441,7 +421,7 @@ impl EconiaTransactionProcessor {
             execute_with_better_error(
                 conn,
                 diesel::insert_into(table)
-                    .values(&events[start_ind..end_ind])
+                    .values(&insertable[start_ind..end_ind])
                     .on_conflict_do_nothing(),
                 None,
             )?;
@@ -467,6 +447,7 @@ impl TransactionProcessor for EconiaTransactionProcessor {
         NAME
     }
 
+    // TODO update current block time
     async fn process_transactions(
         &self,
         transactions: Vec<Transaction>,
