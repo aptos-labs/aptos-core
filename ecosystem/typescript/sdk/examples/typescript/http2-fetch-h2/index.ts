@@ -192,6 +192,12 @@ class AccountSequenceNumbers {
   }
 
   async nextSequenceNumber(): Promise<bigint> {
+    /*
+    `lock` is used to prevent multiple coroutines from accessing a shared resource at the same time, which can result in race conditions and data inconsistency.
+    This implementation is not as robust as using a proper lock implementation 
+    like `async-mutex` because it relies on busy waiting to acquire the lock, 
+    which can be less efficient and may not work well in all scenarios
+    */
     while (this.lock) {
       await sleep(this.sleepTime);
     }
