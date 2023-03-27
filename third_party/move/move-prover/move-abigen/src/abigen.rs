@@ -286,25 +286,27 @@ impl<'env> Abigen<'env> {
                 TypeTag::Vector(Box::new(tag))
             },
             Struct(module_id, struct_id, vec_type) => {
-                let expect_msg = format!("type {:?} is not allowed in scription function", ty0);
                 let struct_module_env = module_env.env.get_module(*module_id);
                 let abilities = struct_module_env.get_struct(*struct_id).get_abilities();
                 if abilities.has_ability(Ability::Copy) && !abilities.has_ability(Ability::Key) {
+                    let mut type_params = vec![];
+                    for e in vec_type {
+                        let type_param = match Self::get_type_tag(e, module_env)? {
+                            Some(type_param) => type_param,
+                            None => return Ok(None),
+                        };
+                        type_params.push(type_param);
+                    }
                     TypeTag::Struct(Box::new(StructTag {
                         address: *struct_module_env.self_address(),
                         module: struct_module_env.get_identifier(),
                         name: struct_module_env
                             .get_struct(*struct_id)
                             .get_identifier()
-                            .unwrap_or_else(|| panic!("{}", expect_msg)),
-                        type_params: vec_type
-                            .iter()
-                            .map(|e| {
-                                Self::get_type_tag(e, module_env)
-                                    .unwrap_or_else(|_| panic!("{}", expect_msg))
-                            })
-                            .map(|e| e.unwrap_or_else(|| panic!("{}", expect_msg)))
-                            .collect(),
+                            .unwrap_or_else(|| {
+                                panic!("type {:?} is not allowed in entry function", ty0)
+                            }),
+                        type_params,
                     }))
                 } else {
                     return Ok(None);
