@@ -5,7 +5,10 @@
 use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::TStateView;
-use aptos_types::{executable::ModulePath, write_set::TransactionWrite};
+use aptos_types::{
+    executable::ModulePath,
+    write_set::{TransactionWrite, WriteOp},
+};
 use std::{fmt::Debug, hash::Hash};
 
 /// The execution result of a transaction
@@ -44,7 +47,7 @@ pub trait ExecutorTask: Sync {
     type Output: TransactionOutput<Txn = Self::Txn> + 'static;
 
     /// Type of error when the executor failed to process a transaction and needs to abort.
-    type Error: Clone + Send + Sync + Eq + 'static;
+    type Error: Debug + Clone + Send + Sync + Eq + 'static;
 
     /// Type to intialize the single thread transaction executor. Copy and Sync are required because
     /// we will create an instance of executor on each individual thread.
@@ -64,7 +67,7 @@ pub trait ExecutorTask: Sync {
 }
 
 /// Trait for execution result of a single transaction.
-pub trait TransactionOutput: Send + Sync {
+pub trait TransactionOutput: Send + Sync + Debug {
     /// Type of transaction and its associated key and value.
     type Txn: Transaction;
 
@@ -81,4 +84,12 @@ pub trait TransactionOutput: Send + Sync {
 
     /// Execution output for transactions that comes after SkipRest signal.
     fn skip_output() -> Self;
+
+    /// In parallel execution, will be called once per transaction when the output is
+    /// ready to be committed. In sequential execution, won't be called (deltas are
+    /// materialized and incorporated during execution).
+    fn incorporate_delta_writes(
+        &self,
+        delta_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
+    );
 }

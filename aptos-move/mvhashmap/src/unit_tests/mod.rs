@@ -15,6 +15,7 @@ use aptos_types::{
     executable::{ExecutableTestType, ModulePath},
     state_store::state_value::StateValue,
 };
+use claims::{assert_err_eq, assert_ok_eq};
 use std::sync::Arc;
 
 mod proptest_types;
@@ -57,23 +58,23 @@ fn u128_for(txn_idx: TxnIndex, incarnation: Incarnation) -> u128 {
         .into()
 }
 
-// Generate determinitc additions.
-fn add_for(txn_idx: TxnIndex, limit: u128) -> DeltaOp {
-    delta_add(txn_idx as u128, limit)
+fn match_unresolved(
+    read_result: anyhow::Result<MVDataOutput<Value>, MVDataError>,
+    update: DeltaUpdate,
+) {
+    match read_result {
+        Err(MVDataError::Unresolved(delta)) => assert_eq!(delta.get_update(), update),
+        _ => unreachable!(),
+    };
 }
 
-// Generate determinitc subtractions.
-fn sub_for(txn_idx: TxnIndex, base: u128) -> DeltaOp {
-    delta_sub(base + (txn_idx as u128), u128::MAX)
-}
-
-#[derive(Clone, Eq, Hash, PartialEq)]
-pub(crate) struct KeyType<K: Hash + Clone + Eq>(
+#[derive(Clone, Eq, Hash, PartialEq, Debug)]
+pub(crate) struct KeyType<K: Hash + Clone + Debug + Eq>(
     /// Wrapping the types used for testing to add ModulePath trait implementation.
     pub K,
 );
 
-impl<K: Hash + Clone + Eq> ModulePath for KeyType<K> {
+impl<K: Hash + Clone + Eq + Debug> ModulePath for KeyType<K> {
     fn module_path(&self) -> Option<AccessPath> {
         None
     }
@@ -109,9 +110,9 @@ fn create_write_read_placeholder_struct() {
     assert_eq!(Ok(Versioned((10, 1), arc_value_for(10, 1))), r_10);
 
     // More deltas.
-    mvtbl.add_delta(&ap1, 11, add_for(11, 1000));
-    mvtbl.add_delta(&ap1, 12, add_for(12, 1000));
-    mvtbl.add_delta(&ap1, 13, sub_for(13, 61));
+    mvtbl.add_delta(&ap1, 11, delta_add(11, u128::MAX));
+    mvtbl.add_delta(&ap1, 12, delta_add(12, u128::MAX));
+    mvtbl.add_delta(&ap1, 13, delta_sub(74, u128::MAX));
 
     // Reads have to go traverse deltas until a write is found.
     let r_sum = mvtbl.fetch_data(&ap1, 14);
@@ -162,11 +163,10 @@ fn create_write_read_placeholder_struct() {
     mvtbl.delete(&ap3, 20);
 
     // Reads from ap1 and ap3 go to db.
-    let r_db = mvtbl.fetch_data(&ap1, 30);
-    match r_db {
-        Err(Unresolved(delta)) => delta.get_update() == DeltaUpdate::Minus((61 + 13) - 11),
-        _ => unreachable!(),
-    };
+    match_unresolved(
+        mvtbl.fetch_data(&ap1, 30),
+        DeltaUpdate::Minus((61 + 13) - 11),
+    );
     let r_db = mvtbl.fetch_data(&ap3, 30);
     assert_eq!(Err(NotFound), r_db);
 
@@ -175,16 +175,95 @@ fn create_write_read_placeholder_struct() {
     assert_eq!(Ok(Versioned((10, 2), arc_value_for(10, 2))), r_10);
 
     // Both delta-write and delta-delta application failures are detected.
-    mvtbl.add_delta(&ap1, 30, add_for(30, 32));
-    mvtbl.add_delta(&ap1, 31, add_for(31, 32));
+    mvtbl.add_delta(&ap1, 30, delta_add(30, 32));
+    mvtbl.add_delta(&ap1, 31, delta_add(31, 32));
     let r_33 = mvtbl.fetch_data(&ap1, 33);
     assert_eq!(Err(DeltaApplicationFailure), r_33);
 
     let val = value_for(10, 3);
-    // sub base sub_for for which should underflow (with txn index)
+    // sub base sub_for for which should underflow.
     let sub_base = AggregatorValue::from_write(&val).unwrap().into();
     mvtbl.write(&ap2, (10, 3), val);
-    mvtbl.add_delta(&ap2, 30, sub_for(30, sub_base));
+    mvtbl.add_delta(&ap2, 30, delta_sub(30 + sub_base, u128::MAX));
     let r_31 = mvtbl.fetch_data(&ap2, 31);
     assert_eq!(Err(DeltaApplicationFailure), r_31);
+}
+
+#[test]
+fn materialize_delta_shortcut() {
+    use MVDataOutput::*;
+
+    let vd: VersionedData<KeyType<Vec<u8>>, Value> = VersionedData::new();
+    let ap = KeyType(b"/foo/b".to_vec());
+    let limit = 10000;
+
+    vd.add_delta(&ap, 5, delta_add(10, limit));
+    vd.add_delta(&ap, 8, delta_add(20, limit));
+    vd.add_delta(&ap, 11, delta_add(30, limit));
+
+    match_unresolved(vd.fetch_data(&ap, 10), DeltaUpdate::Plus(30));
+    assert_err_eq!(
+        vd.materialize_delta(&ap, 8),
+        DeltaOp::new(DeltaUpdate::Plus(30), limit, 30, 0)
+    );
+    vd.set_aggregator_base_value(&ap, 5);
+    // Multiple calls are idempotent.
+    vd.set_aggregator_base_value(&ap, 5);
+
+    // With base set, commit delta should now succeed.
+    assert_ok_eq!(vd.materialize_delta(&ap, 8), 35);
+    assert_eq!(vd.fetch_data(&ap, 10), Ok(Resolved(35)));
+
+    // Make sure shortcut is committed by adding a delta at a lower txn idx
+    // and ensuring tha fetch_data output no longer changes.
+    vd.add_delta(&ap, 6, delta_add(15, limit));
+    assert_eq!(vd.fetch_data(&ap, 10), Ok(Resolved(35)));
+
+    // However, if we add a delta at txn_idx = 9, it should have an effect.
+    vd.add_delta(&ap, 9, delta_add(15, limit));
+    assert_eq!(vd.fetch_data(&ap, 10), Ok(Resolved(50)));
+}
+
+#[test]
+#[should_panic]
+fn aggregator_base_mismatch() {
+    let vd: VersionedData<KeyType<Vec<u8>>, Value> = VersionedData::new();
+    let ap = KeyType(b"/foo/b".to_vec());
+
+    vd.set_aggregator_base_value(&ap, 10);
+    // This call must panic, because it provides a mismatching base value.
+    vd.set_aggregator_base_value(&ap, 11);
+}
+
+#[test]
+#[should_panic]
+fn aggregator_base_without_deltas() {
+    let vd: VersionedData<KeyType<Vec<u8>>, Value> = VersionedData::new();
+    let ap = KeyType(b"/foo/b".to_vec());
+
+    // Must panic as there are no deltas at all.
+    vd.set_aggregator_base_value(&ap, 10);
+}
+
+#[test]
+#[should_panic]
+fn commit_without_deltas() {
+    let vd: VersionedData<KeyType<Vec<u8>>, Value> = VersionedData::new();
+    let ap = KeyType(b"/foo/b".to_vec());
+
+    // Must panic as there are no deltas at all.
+    let _ = vd.materialize_delta(&ap, 10);
+}
+
+#[test]
+#[should_panic]
+fn commit_without_entry() {
+    let vd: VersionedData<KeyType<Vec<u8>>, Value> = VersionedData::new();
+    let ap = KeyType(b"/foo/b".to_vec());
+
+    vd.add_delta(&ap, 8, delta_add(20, 1000));
+    vd.set_aggregator_base_value(&ap, 10);
+
+    // Must panic as there is no delta at provided index.
+    let _ = vd.materialize_delta(&ap, 9);
 }
