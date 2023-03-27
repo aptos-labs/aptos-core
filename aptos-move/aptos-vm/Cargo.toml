@@ -58,3 +58,4 @@ mirai-contracts = []
 fuzzing = ["move-core-types/fuzzing", "move-binary-format/fuzzing", "move-vm-types/fuzzing", "aptos-framework/fuzzing"]
 failpoints = ["fail/failpoints", "move-vm-runtime/failpoints"]
 testing = ["move-unit-test", "aptos-framework/testing"]
+ 
