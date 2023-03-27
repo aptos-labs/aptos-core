@@ -1,0 +1,51 @@
+Move prover returns: exiting with verification errors
+error: abort not covered by any of the `aborts_if` clauses
+    ┌─ tests/sources/functional/loop_unroll.move:101:5
+    │
+ 97 │               assert!(i != 5, 0);
+    │               ------------------ abort happened here with code 0x0
+    ·
+101 │ ╭     spec t6_failure {
+102 │ │         // this will not hold when we increase the unroll count
+103 │ │         aborts_if false;
+104 │ │     }
+    │ ╰─────^
+    │
+    =     at tests/sources/functional/loop_unroll.move:88: t6_failure
+    =         n = <redacted>
+    =     at tests/sources/functional/loop_unroll.move:89: t6_failure
+    =         i = <redacted>
+    =     at tests/sources/functional/loop_unroll.move:91: t6_failure
+    =     at tests/sources/functional/loop_unroll.move:94: t6_failure
+    =     at tests/sources/functional/loop_unroll.move:90: t6_failure
+    =     at tests/sources/functional/loop_unroll.move:96: t6_failure
+    =         i = <redacted>
+    =     at tests/sources/functional/loop_unroll.move:97: t6_failure
+    =     at tests/sources/functional/loop_unroll.move:92: t6_failure
+    =     at tests/sources/functional/loop_unroll.move:94: t6_failure
+    =     at tests/sources/functional/loop_unroll.move:90: t6_failure
+    =     at tests/sources/functional/loop_unroll.move:96: t6_failure
+    =         i = <redacted>
+    =     at tests/sources/functional/loop_unroll.move:97: t6_failure
+    =     at tests/sources/functional/loop_unroll.move:91: t6_failure
+    =     at tests/sources/functional/loop_unroll.move:92: t6_failure
+    =     at tests/sources/functional/loop_unroll.move:94: t6_failure
+    =     at tests/sources/functional/loop_unroll.move:90: t6_failure
+    =     at tests/sources/functional/loop_unroll.move:96: t6_failure
+    =         i = <redacted>
+    =     at tests/sources/functional/loop_unroll.move:97: t6_failure
+    =     at tests/sources/functional/loop_unroll.move:91: t6_failure
+    =     at tests/sources/functional/loop_unroll.move:92: t6_failure
+    =     at tests/sources/functional/loop_unroll.move:94: t6_failure
+    =     at tests/sources/functional/loop_unroll.move:90: t6_failure
+    =     at tests/sources/functional/loop_unroll.move:96: t6_failure
+    =         i = <redacted>
+    =     at tests/sources/functional/loop_unroll.move:97: t6_failure
+    =     at tests/sources/functional/loop_unroll.move:91: t6_failure
+    =     at tests/sources/functional/loop_unroll.move:92: t6_failure
+    =     at tests/sources/functional/loop_unroll.move:94: t6_failure
+    =     at tests/sources/functional/loop_unroll.move:90: t6_failure
+    =     at tests/sources/functional/loop_unroll.move:96: t6_failure
+    =         i = <redacted>
+    =     at tests/sources/functional/loop_unroll.move:97: t6_failure
+    =         ABORTED
