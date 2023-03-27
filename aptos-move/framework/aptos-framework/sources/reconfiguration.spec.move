@@ -64,10 +64,12 @@ spec aptos_framework::reconfiguration {
     spec reconfigure {
         use aptos_framework::coin::CoinInfo;
         use aptos_framework::aptos_coin::AptosCoin;
+        use aptos_framework::transaction_fee;
 
         requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
 
+        include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
         aborts_if false;
     }
 }

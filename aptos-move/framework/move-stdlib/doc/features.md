@@ -166,6 +166,17 @@ Lifetime: transient
 
 
 
+<a name="0x1_features_ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH"></a>
+
+Whether native_public_key_validate aborts when a public key of the wrong length is given
+Lifetime: ephemeral
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH">ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH</a>: u64 = 14;
+</code></pre>
+
+
+
 <a name="0x1_features_EFRAMEWORK_SIGNER_NEEDED"></a>
 
 The provided signer has not a framework address.
@@ -217,6 +228,18 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_SHA_512_AND_RIPEMD_160_NATIVES">SHA_512_AND_RIPEMD_160_NATIVES</a>: u64 = 3;
+</code></pre>
+
+
+
+<a name="0x1_features_STRUCT_CONSTRUCTORS"></a>
+
+Whether struct constructors are enabled
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_STRUCT_CONSTRUCTORS">STRUCT_CONSTRUCTORS</a>: u64 = 15;
 </code></pre>
 
 

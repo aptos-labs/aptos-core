@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    counters,
     network::NetworkSender,
     quorum_store::{
         batch_store::{BatchReader, BatchStore},
@@ -140,6 +141,7 @@ impl PayloadManager {
                 let status = proof_with_data.status.lock().take();
                 match status.expect("Should have been updated before.") {
                     DataStatus::Cached(data) => {
+                        counters::QUORUM_BATCH_READY_COUNT.inc();
                         proof_with_data
                             .status
                             .lock()
@@ -147,6 +149,7 @@ impl PayloadManager {
                         Ok(data)
                     },
                     DataStatus::Requested(receivers) => {
+                        let _timer = counters::BATCH_WAIT_DURATION.start_timer();
                         let mut vec_ret = Vec::new();
                         if !receivers.is_empty() {
                             debug!(

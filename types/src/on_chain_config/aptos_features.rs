@@ -21,6 +21,8 @@ pub enum FeatureFlag {
     DELEGATION_POOLS = 11,
     CRYPTOGRAPHY_ALGEBRA_NATIVES = 12,
     BLS12_381_STRUCTURES = 13,
+    ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH = 14,
+    STRUCT_CONSTRUCTORS = 15,
 }
 
 /// Representation of features on chain as a bitset.
