@@ -9,8 +9,8 @@ license = "Apache-2.0"
 [dependencies]
 move-binary-format = { path = "../../../../../move-binary-format" }
 move-core-types = { path = "../../../../../move-core/types" }
-move-vm-types = { path = "../../../../../move-vm/types" }
 move-vm-runtime = { path = "../../../../../move-vm/runtime" }
+move-vm-types = { path = "../../../../../move-vm/types" }
 
 diem-crypto = { path = "../crypto" }
 
