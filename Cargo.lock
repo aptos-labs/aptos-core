@@ -844,6 +844,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-db",
  "aptos-executor",
+ "aptos-logger",
  "aptos-storage-interface",
  "aptos-temppath",
  "aptos-types",

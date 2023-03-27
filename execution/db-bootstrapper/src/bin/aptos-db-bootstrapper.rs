@@ -9,6 +9,7 @@ use aptos_config::config::{
 };
 use aptos_db::AptosDB;
 use aptos_executor::db_bootstrapper::calculate_genesis;
+use aptos_logger::{Level, Logger};
 use aptos_storage_interface::DbReaderWriter;
 use aptos_types::{transaction::Transaction, waypoint::Waypoint};
 use aptos_vm::AptosVM;
@@ -39,6 +40,7 @@ struct Opt {
 }
 
 fn main() -> Result<()> {
+    Logger::new().level(Level::Info).init();
     let opt = Opt::from_args();
 
     let genesis_txn = load_genesis_txn(&opt.genesis_txn_file)

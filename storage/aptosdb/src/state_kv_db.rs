@@ -47,10 +47,8 @@ impl StateKvDb {
         }
 
         let state_kv_db_config = rocksdb_configs.state_kv_db_config;
-        let state_kv_metadata_db_path = db_root_path
-            .as_ref()
-            .join(STATE_KV_DB_FOLDER_NAME)
-            .join("metadata");
+        let state_kv_metadata_db_path = db_root_path.as_ref().join(STATE_KV_DB_FOLDER_NAME);
+        //.join("metadata");
 
         let state_kv_metadata_db = Arc::new(Self::open_db(
             state_kv_metadata_db_path.clone(),

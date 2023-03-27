@@ -76,10 +76,31 @@ impl Cmd {
         let state_kv_db = Arc::new(state_kv_db);
         let overall_version =
             get_overall_commit_progress(&ledger_db)?.expect("Overall commit progress must exist.");
-        let ledger_db_version = get_ledger_commit_progress(&ledger_db)?
-            .expect("Current version of ledger db must exist.");
-        let state_kv_db_version = get_state_kv_commit_progress(&state_kv_db)?
-            .expect("Current version of state kv db must exist.");
+        let ledger_db_version = get_ledger_commit_progress(&ledger_db)?;
+        if ledger_db_version.is_none() {
+            println!(
+                "HACK HACK HACK: Write overall version as ledger version: {}",
+                overall_version
+            );
+            ledger_db.put::<DbMetadataSchema>(
+                &DbMetadataKey::LedgerCommitProgress,
+                &DbMetadataValue::Version(overall_version),
+            )?;
+        }
+        let state_kv_db_version = get_state_kv_commit_progress(&state_kv_db)?;
+        if state_kv_db_version.is_none() {
+            println!(
+                "HACK HACK HACK: Write overall version as state kv version: {}",
+                overall_version
+            );
+            state_kv_db.metadata_db().put::<DbMetadataSchema>(
+                &DbMetadataKey::StateKvCommitProgress,
+                &DbMetadataValue::Version(overall_version),
+            )?;
+        }
+
+        let ledger_db_version = get_ledger_commit_progress(&ledger_db)?.unwrap();
+        let state_kv_db_version = get_state_kv_commit_progress(&state_kv_db)?.unwrap();
         let state_merkle_db_version = get_current_version_in_state_merkle_db(&state_merkle_db)?
             .expect("Current version of state merkle db must exist.");
 

@@ -1259,10 +1259,18 @@ impl AptosVM {
         if has_new_block_event && has_new_epoch_event {
             Ok(())
         } else {
-            error!(
-                *log_context,
-                "[aptos_vm] waypoint txn needs to emit new epoch and block"
-            );
+            if !has_new_block_event {
+                error!(
+                    *log_context,
+                    "[aptos_vm] waypoint txn needs to emit new block"
+                );
+            }
+            if !has_new_epoch_event {
+                error!(
+                    *log_context,
+                    "[aptos_vm] waypoint txn needs to emit new epoch"
+                );
+            }
             Err(VMStatus::Error(StatusCode::INVALID_WRITE_SET, None))
         }
     }
@@ -1286,6 +1294,8 @@ impl AptosVM {
         };
 
         let (delta_change_set, change_set) = change_set_ext.into_inner();
+
+        info!(*log_context, "[aptos_vm] changeset {:?}", change_set);
         Self::validate_waypoint_change_set(&change_set, log_context)?;
         let (write_set, events) = change_set.into_inner();
         self.read_writeset(storage, &write_set)?;
