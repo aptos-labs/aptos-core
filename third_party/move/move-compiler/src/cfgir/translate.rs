@@ -129,14 +129,14 @@ impl<'env> Context<'env> {
                             G::LoopEnd::Unused => G::LoopEnd::Unused,
                             G::LoopEnd::Target(end) if remapping.contains_key(&end) => {
                                 G::LoopEnd::Target(remapping[&end])
-                            }
+                            },
                             G::LoopEnd::Target(_end) => G::LoopEnd::Unused,
                         };
                         BlockInfo::LoopHead(G::LoopInfo {
                             is_loop_stmt,
                             loop_end,
                         })
-                    }
+                    },
                 };
                 (remapping[&lbl], info)
             })
@@ -195,19 +195,16 @@ fn module(
 
     let constants = hconstants.map(|name, c| constant(context, name, c));
     let functions = hfunctions.map(|name, f| function(context, name, f));
-    (
-        module_ident,
-        G::ModuleDefinition {
-            package_name,
-            attributes,
-            is_source_module,
-            dependency_order,
-            friends,
-            structs,
-            constants,
-            functions,
-        },
-    )
+    (module_ident, G::ModuleDefinition {
+        package_name,
+        attributes,
+        is_source_module,
+        dependency_order,
+        friends,
+        structs,
+        constants,
+        functions,
+    })
 }
 
 fn scripts(
@@ -326,7 +323,7 @@ fn constant_(
                     (*cloc, CANNOT_FOLD)
                 ));
                 continue;
-            }
+            },
         };
         check_constant_value(context, e)
     }
@@ -455,7 +452,7 @@ fn function_body(
                 loop_heads,
                 blocks,
             }
-        }
+        },
     };
     sp(loc, b_)
 }
@@ -484,14 +481,11 @@ fn block(context: &mut Context, mut cur_label: Label, blocks: H::Block) {
 
     match context.next_label {
         Some(next) if !basic_block.back().unwrap().value.is_terminal() => {
-            basic_block.push_back(sp(
-                loc,
-                C::Jump {
-                    target: next,
-                    from_user: false,
-                },
-            ));
-        }
+            basic_block.push_back(sp(loc, C::Jump {
+                target: next,
+                from_user: false,
+            }));
+        },
         _ => (),
     }
     context.insert_block(cur_label, basic_block);
@@ -533,7 +527,7 @@ fn block_(context: &mut Context, cur_label: &mut Label, blocks: H::Block) -> Bas
                 if is_terminal {
                     finish_block!(next_label: context.new_label());
                 }
-            }
+            },
             S::IfElse {
                 cond,
                 if_block,
@@ -557,7 +551,7 @@ fn block_(context: &mut Context, cur_label: &mut Label, blocks: H::Block) -> Bas
                 block(context, if_true, if_block);
                 block(context, if_false, else_block);
                 context.next_label = old_next;
-            }
+            },
             S::While {
                 cond: (hcond_block, cond),
                 block: loop_block,
@@ -566,22 +560,16 @@ fn block_(context: &mut Context, cur_label: &mut Label, blocks: H::Block) -> Bas
                 let loop_body = context.new_label();
                 let loop_end = context.new_label();
 
-                context.loop_bounds.insert(
-                    loop_cond,
-                    LoopInfo {
-                        is_loop_stmt: false,
-                        loop_end: G::LoopEnd::Target(loop_end),
-                    },
-                );
+                context.loop_bounds.insert(loop_cond, LoopInfo {
+                    is_loop_stmt: false,
+                    loop_end: G::LoopEnd::Target(loop_end),
+                });
 
                 // Jump to loop condition
-                basic_block.push_back(sp(
-                    loc,
-                    C::Jump {
-                        target: loop_cond,
-                        from_user: false,
-                    },
-                ));
+                basic_block.push_back(sp(loc, C::Jump {
+                    target: loop_cond,
+                    from_user: false,
+                }));
                 finish_block!(next_label: loop_cond);
 
                 // Loop condition and case to jump into loop or end
@@ -599,7 +587,7 @@ fn block_(context: &mut Context, cur_label: &mut Label, blocks: H::Block) -> Bas
 
                 // Loop body
                 loop_block!(begin: loop_cond, end: loop_end, body: loop_body, loop_block)
-            }
+            },
 
             S::Loop {
                 block: loop_block, ..
@@ -609,27 +597,21 @@ fn block_(context: &mut Context, cur_label: &mut Label, blocks: H::Block) -> Bas
                 assert!(cur_label.0 < loop_body.0);
                 assert!(loop_body.0 < loop_end.0);
 
-                context.loop_bounds.insert(
-                    loop_body,
-                    LoopInfo {
-                        is_loop_stmt: true,
-                        loop_end: G::LoopEnd::Target(loop_end),
-                    },
-                );
+                context.loop_bounds.insert(loop_body, LoopInfo {
+                    is_loop_stmt: true,
+                    loop_end: G::LoopEnd::Target(loop_end),
+                });
 
                 // Jump to loop
-                basic_block.push_back(sp(
-                    loc,
-                    C::Jump {
-                        target: loop_body,
-                        from_user: false,
-                    },
-                ));
+                basic_block.push_back(sp(loc, C::Jump {
+                    target: loop_body,
+                    from_user: false,
+                }));
                 finish_block!(next_label: loop_end);
 
                 // Loop body
                 loop_block!(begin: loop_body, end: loop_end, body: loop_body, loop_block)
-            }
+            },
         }
     }
 
@@ -643,21 +625,21 @@ fn command(context: &Context, sp!(_, hc_): &mut H::Command) {
         | C::Mutate(_, _)
         | C::Abort(_)
         | C::Return { .. }
-        | C::IgnoreAndPop { .. } => {}
+        | C::IgnoreAndPop { .. } => {},
         C::Continue => {
             *hc_ = C::Jump {
                 target: context.loop_begin.unwrap(),
                 from_user: true,
             }
-        }
+        },
         C::Break => {
             *hc_ = C::Jump {
                 target: context.loop_end.unwrap(),
                 from_user: true,
             }
-        }
+        },
         C::Jump { .. } | C::JumpIf { .. } => {
             panic!("ICE unexpected jump before translation to jumps")
-        }
+        },
     }
 }

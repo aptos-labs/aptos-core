@@ -92,19 +92,19 @@ where
                 match (r.as_ref(), op) {
                     (Modify(_) | New(_), New(_)) | (Delete, Delete | Modify(_)) => {
                         bail!("The given change sets cannot be squashed")
-                    }
+                    },
                     (Modify(_), Modify(data)) => *r = Modify(data),
                     (New(_), Modify(data)) => *r = New(data),
                     (Modify(_), Delete) => *r = Delete,
                     (Delete, New(data)) => *r = Modify(data),
                     (New(_), Delete) => {
                         entry.remove();
-                    }
+                    },
                 }
-            }
+            },
             Vacant(entry) => {
                 entry.insert(op);
-            }
+            },
         }
     }
 
@@ -134,7 +134,7 @@ impl AccountChangeSet {
             Occupied(entry) => bail!("Module {} already exists", entry.key()),
             Vacant(entry) => {
                 entry.insert(op);
-            }
+            },
         }
 
         Ok(())
@@ -147,7 +147,7 @@ impl AccountChangeSet {
             Occupied(entry) => bail!("Resource {} already exists", entry.key()),
             Vacant(entry) => {
                 entry.insert(op);
-            }
+            },
         }
 
         Ok(())
@@ -217,7 +217,7 @@ impl ChangeSet {
             ),
             btree_map::Entry::Vacant(entry) => {
                 entry.insert(account_changeset);
-            }
+            },
         }
 
         Ok(())
@@ -258,10 +258,10 @@ impl ChangeSet {
             match self.accounts.entry(addr) {
                 btree_map::Entry::Occupied(mut entry) => {
                     entry.get_mut().squash(other_account_changeset)?;
-                }
+                },
                 btree_map::Entry::Vacant(entry) => {
                     entry.insert(other_account_changeset);
-                }
+                },
             }
         }
         Ok(())

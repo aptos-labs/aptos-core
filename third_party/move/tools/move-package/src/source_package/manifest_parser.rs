@@ -94,14 +94,14 @@ pub fn parse_source_manifest(tval: TV) -> Result<PM::SourceManifest> {
                 dependencies,
                 dev_dependencies,
             })
-        }
+        },
         x => {
             bail!(
                 "Malformed package manifest {}. Expected a table at top level, but encountered a {}",
                 x,
                 x.type_str()
             )
-        }
+        },
     }
 }
 
@@ -147,7 +147,7 @@ pub fn parse_package_info(tval: TV) -> Result<PM::PackageInfo> {
                                 })
                         })
                         .collect::<Result<_>>()?
-                }
+                },
             };
             // Turn the remaining entries into custom properties. For those which are not
             // supported (also in the presence of hooks) we have warned above.
@@ -166,7 +166,7 @@ pub fn parse_package_info(tval: TV) -> Result<PM::PackageInfo> {
                 license,
                 custom_properties,
             })
-        }
+        },
         x => bail!(
             "Malformed section in manifest {}. Expected a table, but encountered a {}",
             x,
@@ -185,7 +185,7 @@ pub fn parse_dependencies(tval: TV) -> Result<PM::Dependencies> {
                 deps.insert(dep_name_ident, dep);
             }
             Ok(deps)
-        }
+        },
         x => bail!(
             "Malformed section in manifest {}. Expected a table, but encountered a {}",
             x,
@@ -205,7 +205,7 @@ pub fn parse_build_info(tval: TV) -> Result<PM::BuildInfo> {
                     .transpose()?,
                 architecture: table.remove("arch").map(parse_architecture).transpose()?,
             })
-        }
+        },
         x => bail!(
             "Malformed section in manifest {}. Expected a table, but encountered a {}",
             x,
@@ -238,7 +238,7 @@ pub fn parse_addresses(tval: TV) -> Result<PM::AddressDeclarations> {
                         {
                             bail!("Duplicate address name '{}' found.", ident);
                         }
-                    }
+                    },
                     None => bail!(
                         "Invalid address name {} encountered. Expected a string but found a {}",
                         entry,
@@ -247,7 +247,7 @@ pub fn parse_addresses(tval: TV) -> Result<PM::AddressDeclarations> {
                 }
             }
             Ok(addresses)
-        }
+        },
         x => bail!(
             "Malformed section in manifest {}. Expected a table, but encountered a {}",
             x,
@@ -279,7 +279,7 @@ pub fn parse_dev_addresses(tval: TV) -> Result<PM::DevAddressDeclarations> {
                         {
                             bail!("Duplicate address name '{}' found.", ident);
                         }
-                    }
+                    },
                     None => bail!(
                         "Invalid address name {} encountered. Expected a string but found a {}",
                         entry,
@@ -288,7 +288,7 @@ pub fn parse_dev_addresses(tval: TV) -> Result<PM::DevAddressDeclarations> {
                 }
             }
             Ok(addresses)
-        }
+        },
         x => bail!(
             "Malformed section in manifest {}. Expected a table, but encountered a {}",
             x,
@@ -353,7 +353,7 @@ fn parse_dependency(dep_name: &str, tval: TV) -> Result<PM::Dependency> {
                         git_info,
                         node_info,
                     })
-                }
+                },
                 (None, Some(git), None) => {
                     let move_home = MOVE_HOME.clone();
                     let rev_name = match table.remove("rev") {
@@ -394,7 +394,7 @@ fn parse_dependency(dep_name: &str, tval: TV) -> Result<PM::Dependency> {
                         git_info,
                         node_info,
                     })
-                }
+                },
                 (None, None, Some(custom_key)) => {
                     let package_name = Symbol::from(dep_name);
                     let address = match table.remove("address") {
@@ -428,7 +428,7 @@ fn parse_dependency(dep_name: &str, tval: TV) -> Result<PM::Dependency> {
                         git_info,
                         node_info,
                     })
-                }
+                },
                 _ => {
                     let mut keys = vec!["local", "git"];
                     if let Some(k) = custom_key_opt {
@@ -442,9 +442,9 @@ fn parse_dependency(dep_name: &str, tval: TV) -> Result<PM::Dependency> {
                         "must provide exactly one of {} for dependency.",
                         keys.join(" or ")
                     )
-                }
+                },
             }
-        }
+        },
         x => bail!("Malformed dependency {}", x),
     }
 }
@@ -479,7 +479,7 @@ fn parse_substitution(tval: TV) -> Result<PM::Substitution> {
                 }
             }
             Ok(subst)
-        }
+        },
         x => bail!(
             "Malformed dependency substitution {}. Expected a table, but encountered a {}",
             x,

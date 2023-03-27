@@ -59,13 +59,9 @@ fn test_two_functions() -> Result<()> {
         .create_contract(H160::zero(), contract_code)
         .expect("failed to create contract");
 
-    let (exit_reason, _buffer) = exec.call_function(
-        H160::zero(),
-        contract_address,
-        0.into(),
-        "do_nothing()",
-        &[],
-    );
+    let (exit_reason, _buffer) =
+        exec.call_function(H160::zero(), contract_address, 0.into(), "do_nothing()", &[
+        ]);
     assert!(matches!(exit_reason, ExitReason::Succeed(_)));
 
     let (exit_reason, _buffer) =

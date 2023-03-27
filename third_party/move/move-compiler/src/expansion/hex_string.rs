@@ -17,7 +17,7 @@ pub fn decode(loc: Loc, s: &str) -> Result<Vec<u8>, Box<Diagnostic>> {
                 Syntax::InvalidHexString,
                 (loc, format!("Invalid hexadecimal character: '{}'", c)),
             )))
-        }
+        },
         Err(hex::FromHexError::OddLength) => Err(Box::new(diag!(
             Syntax::InvalidHexString,
             (

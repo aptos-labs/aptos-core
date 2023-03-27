@@ -537,7 +537,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 } else {
                     Type::Reference(*is_mut, Box::new(ty))
                 }
-            }
+            },
             Base(ty) => self.translate_hlir_base_type(ty),
         }
     }
@@ -552,7 +552,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             }) => {
                 let sym = self.symbol_pool().make(user_specified_name.value.as_str());
                 self.type_params_table[&sym].clone()
-            }
+            },
             Apply(_, type_name, args) => {
                 let loc = self.to_loc(&type_name.loc);
                 match &type_name.value {
@@ -599,9 +599,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         } else {
                             rty
                         }
-                    }
+                    },
                 }
-            }
+            },
             _ => unreachable!(),
         }
     }
@@ -630,27 +630,27 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     match n.value.as_str() {
                         "bool" => {
                             return check_zero_args(self, Type::new_prim(PrimitiveType::Bool));
-                        }
+                        },
                         "u8" => return check_zero_args(self, Type::new_prim(PrimitiveType::U8)),
                         "u16" => return check_zero_args(self, Type::new_prim(PrimitiveType::U16)),
                         "u32" => return check_zero_args(self, Type::new_prim(PrimitiveType::U32)),
                         "u64" => return check_zero_args(self, Type::new_prim(PrimitiveType::U64)),
                         "u128" => {
                             return check_zero_args(self, Type::new_prim(PrimitiveType::U128));
-                        }
+                        },
                         "u256" => {
                             return check_zero_args(self, Type::new_prim(PrimitiveType::U256));
-                        }
+                        },
                         "num" => return check_zero_args(self, Type::new_prim(PrimitiveType::Num)),
                         "range" => {
                             return check_zero_args(self, Type::new_prim(PrimitiveType::Range));
-                        }
+                        },
                         "address" => {
                             return check_zero_args(self, Type::new_prim(PrimitiveType::Address));
-                        }
+                        },
                         "signer" => {
                             return check_zero_args(self, Type::new_prim(PrimitiveType::Signer));
-                        }
+                        },
                         "vector" => {
                             if args.len() != 1 {
                                 self.error(
@@ -661,8 +661,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                             } else {
                                 return Type::Vector(Box::new(self.translate_type(&args[0])));
                             }
-                        }
-                        _ => {}
+                        },
+                        _ => {},
                     }
                     // Attempt to resolve as a type parameter.
                     let sym = self.symbol_pool().make(n.value.as_str());
@@ -687,7 +687,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 } else {
                     rty
                 }
-            }
+            },
             Ref(is_mut, ty) => Type::Reference(*is_mut, Box::new(self.translate_type(ty))),
             Fun(args, result) => Type::Fun(
                 self.translate_types(args),
@@ -725,7 +725,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             _ => {
                 self.error(&loc, "global resource access expected");
                 self.new_error_exp()
-            }
+            },
         }
     }
 
@@ -744,33 +744,33 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 } else {
                     self.new_error_exp()
                 }
-            }
+            },
             EA::Exp_::Name(maccess, type_params) => {
                 self.translate_name(&loc, maccess, type_params.as_deref(), expected_type)
-            }
+            },
             EA::Exp_::Move(var) | EA::Exp_::Copy(var) => {
                 let fake_access = sp(var.loc(), EA::ModuleAccess_::Name(var.0));
                 self.translate_name(&loc, &fake_access, None, expected_type)
-            }
+            },
             EA::Exp_::Call(maccess, _is_macro, type_params, args) => {
                 // Need to make a &[&Exp] out of args.
                 let args = args.value.iter().collect_vec();
                 self.translate_fun_call(expected_type, &loc, maccess, type_params.as_deref(), &args)
-            }
+            },
             EA::Exp_::Pack(maccess, generics, fields) => {
                 self.translate_pack(&loc, maccess, generics, fields, expected_type)
-            }
+            },
             EA::Exp_::IfElse(cond, then, else_) => {
                 let then = self.translate_exp(then, expected_type);
                 let else_ = self.translate_exp(else_, expected_type);
                 let cond = self.translate_exp(cond, &Type::new_prim(PrimitiveType::Bool));
                 let id = self.new_node_id_with_type_loc(expected_type, &loc);
                 ExpData::IfElse(id, cond.into(), then.into_exp(), else_.into_exp())
-            }
+            },
             EA::Exp_::Block(seq) => self.translate_seq(&loc, seq, expected_type),
             EA::Exp_::Lambda(bindings, exp) => {
                 self.translate_lambda(&loc, bindings, exp, expected_type)
-            }
+            },
             EA::Exp_::Quant(kind, ranges, triggers, condition, body) => self.translate_quant(
                 &loc,
                 *kind,
@@ -787,7 +787,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     symbol,
                 } = self.parent.parent.bin_op_symbol(&op.value);
                 self.translate_call(&loc, &Some(module_name), symbol, None, &args, expected_type)
-            }
+            },
             EA::Exp_::UnaryExp(op, exp) => {
                 let args = vec![exp.as_ref()];
                 let QualifiedSymbol {
@@ -795,11 +795,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     symbol,
                 } = self.parent.parent.unary_op_symbol(&op.value);
                 self.translate_call(&loc, &Some(module_name), symbol, None, &args, expected_type)
-            }
+            },
             EA::Exp_::ExpDotted(dotted) => self.translate_dotted(dotted, expected_type),
             EA::Exp_::Index(target, index) => {
                 self.translate_index(&loc, target, index, expected_type)
-            }
+            },
             EA::Exp_::ExpList(exps) => {
                 let mut types = vec![];
                 let exps = exps
@@ -818,7 +818,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 );
                 let id = self.new_node_id_with_type_loc(&ty, &loc);
                 ExpData::Call(id, Operation::Tuple, exps)
-            }
+            },
             EA::Exp_::Unit { .. } => {
                 let ty = self.check_type(
                     &loc,
@@ -828,11 +828,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 );
                 let id = self.new_node_id_with_type_loc(&ty, &loc);
                 ExpData::Call(id, Operation::Tuple, vec![])
-            }
+            },
             EA::Exp_::Assign(..) => {
                 self.error(&loc, "assignment only allowed in spec var updates");
                 self.new_error_exp()
-            }
+            },
             EA::Exp_::Dereference(exp) | EA::Exp_::Borrow(_, exp) => {
                 if self.translating_fun_as_spec_fun {
                     self.translate_exp(exp, expected_type)
@@ -840,7 +840,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     self.error(&loc, "expression construct not supported in specifications");
                     self.new_error_exp()
                 }
-            }
+            },
             EA::Exp_::Cast(exp, typ) => {
                 let ty = self.translate_type(typ);
                 self.check_type(&loc, &ty, expected_type, "in cast expression");
@@ -855,11 +855,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         vec![exp.into_exp()],
                     )
                 }
-            }
+            },
             _ => {
                 self.error(&loc, "expression construct not supported in specifications");
                 self.new_error_exp()
-            }
+            },
         }
     }
 
@@ -870,7 +870,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let addr_bytes = self.parent.parent.resolve_address(&loc, addr);
                 let value = Value::Address(BigUint::from_bytes_be(&addr_bytes.into_bytes()));
                 Some((value, Type::new_prim(PrimitiveType::Address)))
-            }
+            },
             EA::Value_::U8(x) => Some((
                 Value::Number(BigInt::from_u8(*x).unwrap()),
                 Type::new_prim(PrimitiveType::U8),
@@ -899,7 +899,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             EA::Value_::Bytearray(x) => {
                 let ty = Type::Vector(Box::new(Type::new_prim(PrimitiveType::U8)));
                 Some((Value::ByteArray(x.clone()), ty))
-            }
+            },
         }
     }
 
@@ -949,7 +949,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                             ),
                         );
                         return self.new_error_exp();
-                    }
+                    },
                     Some(entries) => {
                         if entries.len() != 1 {
                             self.error(
@@ -963,7 +963,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                             return self.new_error_exp();
                         }
                         entries.last().unwrap().clone()
-                    }
+                    },
                 };
 
                 // the preset arguments always appears in front
@@ -1033,7 +1033,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                                 .add_used_spec_fun(module_id.qualified(*spec_fun_id));
                         }
                         self.called_spec_funs.insert((*module_id, *spec_fun_id));
-                    }
+                    },
                     _ => {
                         self.error(
                             loc,
@@ -1043,7 +1043,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                             ),
                         );
                         return self.new_error_exp();
-                    }
+                    },
                 }
                 let call_exp_id = self.new_node_id_with_type_loc(expected_type, loc);
                 return ExpData::Call(call_exp_id, spec_fun_entry.oper.clone(), full_arg_exprs);
@@ -1067,13 +1067,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             match self.old_status {
                 OldExpStatus::NotSupported => {
                     self.error(loc, "`old(..)` expression not allowed in this context");
-                }
+                },
                 OldExpStatus::InsideOld => {
                     self.error(loc, "`old(..old(..)..)` not allowed");
-                }
+                },
                 OldExpStatus::OutsideOld => {
                     self.old_status = OldExpStatus::InsideOld;
-                }
+                },
             }
         }
         let result = self.translate_call(loc, &module_name, name, generics, args, expected_type);
@@ -1138,26 +1138,26 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                                 name,
                                 binding: Some(e.into_exp()),
                             });
-                        }
+                        },
                         EA::LValue_::Unpack(..) => {
                             self.error(
                                 &bind_loc,
                                 "[current restriction] unpack not supported in let",
                             );
                             return ExpData::Invalid(self.new_node_id());
-                        }
+                        },
                     }
-                }
+                },
                 EA::SequenceItem_::Seq(e) => {
                     let translated = self.translate_exp(e, expected_type);
                     match translated {
-                        ExpData::Call(_, Operation::NoOp, _) => { /* allow assert statement */ }
+                        ExpData::Call(_, Operation::NoOp, _) => { /* allow assert statement */ },
                         _ => self.error(
                             &self.to_loc(&item.loc),
                             "only binding `let p = e; ...` allowed here",
                         ),
                     }
-                }
+                },
                 _ => self.error(
                     &self.to_loc(&item.loc),
                     "only binding `let p = e; ...` allowed here",
@@ -1174,7 +1174,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     "expected an expression as the last element of the block",
                 );
                 self.new_error_exp()
-            }
+            },
         };
 
         // Exit the scopes for variable bindings
@@ -1215,7 +1215,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 }
                 // If not found, treat as global var in this module.
                 self.parent.qualified_by_module(sym)
-            }
+            },
         };
         if let Some(entry) = self.parent.parent.const_table.get(&global_var_sym).cloned() {
             return self.translate_constant(loc, entry, expected_type);
@@ -1253,11 +1253,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             );
             let global_id = self.new_node_id_with_type_loc(&ghost_mem_ty, loc);
             self.set_node_instantiation(global_id, vec![ghost_mem_ty]);
-            let global_access = ExpData::Call(
-                global_id,
-                Operation::Global(None),
-                vec![zero_addr.into_exp()],
-            );
+            let global_access = ExpData::Call(global_id, Operation::Global(None), vec![
+                zero_addr.into_exp()
+            ]);
             let select_id = self.new_node_id_with_type_loc(&ty, loc);
             self.set_node_instantiation(select_id, instantiation);
             return ExpData::Call(
@@ -1387,7 +1385,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 } else {
                     self.new_error_exp()
                 }
-            }
+            },
         }
     }
 
@@ -1624,7 +1622,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     );
                 }
                 self.new_error_exp()
-            }
+            },
             1 => {
                 let (cand, subs, instantiation) = matching.remove(0);
                 // Commit the candidate substitution to this expression build.
@@ -1659,7 +1657,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                             );
                             return self.new_error_exp();
                         }
-                    }
+                    },
                     _ => (),
                 };
 
@@ -1716,7 +1714,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     self.called_spec_funs.insert((module_id, spec_fun_id));
                 }
                 ExpData::Call(id, cand.oper.clone(), translated_args)
-            }
+            },
             _ => {
                 // Only report error if args had no errors.
                 if !args_have_errors {
@@ -1737,7 +1735,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     );
                 }
                 self.new_error_exp()
-            }
+            },
         }
     }
 
@@ -1930,10 +1928,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         name,
                         binding: None,
                     });
-                }
+                },
                 EA::LValue_::Unpack(..) | EA::LValue_::Var(..) => {
                     self.error(&loc, "[current restriction] tuples not supported in lambda")
-                }
+                },
             }
         }
         // Create a fresh type variable for the body and check expected type before analyzing
@@ -1986,7 +1984,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         &Type::Vector(Box::new(ty.clone())),
                         "in quantification over vector",
                     );
-                }
+                },
                 Type::TypeDomain(..) => {
                     self.check_type(
                         &loc,
@@ -1994,7 +1992,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         &Type::TypeDomain(Box::new(ty.clone())),
                         "in quantification over domain",
                     );
-                }
+                },
                 Type::Primitive(PrimitiveType::Range) => {
                     self.check_type(
                         &loc,
@@ -2002,11 +2000,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         &Type::Primitive(PrimitiveType::Num),
                         "in quantification over range",
                     );
-                }
+                },
                 _ => {
                     self.error(&loc, "quantified variables must range over a vector, a type domain, or a number range");
                     return self.new_error_exp();
-                }
+                },
             }
             match &bind.value {
                 EA::LValue_::Var(
@@ -2025,7 +2023,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         binding: None,
                     };
                     rranges.push((rbind, rexp.into_exp()));
-                }
+                },
                 EA::LValue_::Unpack(..) | EA::LValue_::Var(..) => self.error(
                     &loc,
                     "[current restriction] tuples not supported in quantifiers",
@@ -2073,7 +2071,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     ),
                 );
                 Type::Error
-            }
+            },
         };
         self.subs = subs;
         result
@@ -2099,11 +2097,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                             _ => {
                                 self.error(loc, &format!("Expected u8 type, buf found: {:?}", v));
                                 None
-                            }
+                            },
                         })
                         .collect::<Vec<u8>>();
                     Value::ByteArray(b)
-                }
+                },
                 Type::Primitive(PrimitiveType::Address) => {
                     let b = vs
                         .iter()
@@ -2115,18 +2113,18 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                                     &format!("Expected address type, but found: {:?}", v),
                                 );
                                 None
-                            }
+                            },
                         })
                         .collect::<Vec<BigUint>>();
                     Value::AddressArray(b)
-                }
+                },
                 _ => {
                     let b = vs
                         .iter()
                         .map(|v| self.translate_from_move_value(loc, inner, v))
                         .collect::<Vec<Value>>();
                     Value::Vector(b)
-                }
+                },
             },
             (Type::Primitive(_), MoveValue::Vector(_))
             | (Type::Primitive(_), MoveValue::Struct(_))
@@ -2154,7 +2152,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     &format!("Not yet supported constant value: {:?}", value),
                 );
                 Value::Bool(false)
-            }
+            },
         }
     }
 }

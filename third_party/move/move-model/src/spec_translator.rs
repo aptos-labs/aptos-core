@@ -510,20 +510,16 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
                 ExpData::LocalVar(_, sym) => (self.let_locals.contains_key(sym), e),
                 ExpData::Call(id, Operation::Global(None), args) => (
                     true,
-                    ExpData::Call(
-                        *id,
-                        Operation::Global(None),
-                        vec![self.auto_trace_sub(&args[0])],
-                    )
+                    ExpData::Call(*id, Operation::Global(None), vec![
+                        self.auto_trace_sub(&args[0])
+                    ])
                     .into_exp(),
                 ),
                 ExpData::Call(id, Operation::Exists(None), args) => (
                     true,
-                    ExpData::Call(
-                        *id,
-                        Operation::Exists(None),
-                        vec![self.auto_trace_sub(&args[0])],
-                    )
+                    ExpData::Call(*id, Operation::Exists(None), vec![
+                        self.auto_trace_sub(&args[0])
+                    ])
                     .into_exp(),
                 ),
                 _ => (false, e),
@@ -632,7 +628,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, 'b
                         labels,
                     )
                 }
-            }
+            },
             ExpData::Call(id, Operation::Trace(TraceKind::User), args) => {
                 // Generate an error if a TRACE is applied to an expression where it is not
                 // allowed, i.e. if there are free LocalVar terms, excluding locals from lets.
@@ -648,8 +644,8 @@ impl<'a, 'b, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, 'b
                              on quantified variables or spec function parameters",
                     )
                 }
-            }
-            _ => {}
+            },
+            _ => {},
         }
         if is_old {
             self.in_old = true;
@@ -734,12 +730,12 @@ impl<'a, 'b, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, 'b
                     labels.push(self.save_memory(mem));
                 }
                 Some(Call(id, Function(*mid, *fid, Some(labels)), args.to_owned()).into_exp())
-            }
+            },
             Old => Some(args[0].to_owned()),
             Result(n) => {
                 self.builder.set_loc_from_node(id);
                 Some(self.builder.mk_temporary(self.ret_locals[*n]))
-            }
+            },
             Trace(kind) => {
                 let exp = args[0].to_owned();
                 let env = self.builder.global_env();
@@ -749,7 +745,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, 'b
                     .debug_traces
                     .push((trace_id, *kind, exp.clone()));
                 Some(exp)
-            }
+            },
             _ => None,
         }
     }

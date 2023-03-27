@@ -328,7 +328,7 @@ impl BoogieOptions {
                     tool,
                     msg.to_string()
                 ))
-            }
+            },
         };
         if let Some(cap) = Regex::new(regex).unwrap().captures(&out) {
             Ok(cap[1].to_string())

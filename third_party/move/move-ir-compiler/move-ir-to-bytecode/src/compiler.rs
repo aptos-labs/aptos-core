@@ -179,7 +179,7 @@ impl FunctionFrame {
             Vacant(e) => {
                 e.insert(cur_loc_idx);
                 self.local_types.0.push(type_);
-            }
+            },
         }
         Ok(cur_loc_idx)
     }
@@ -242,8 +242,8 @@ fn verify_move_function_body(code: &[Block]) -> Result<()> {
                     if !labels.contains(&label.value) {
                         undeclared.push(&label.value);
                     }
-                }
-                _ => {}
+                },
+                _ => {},
             }
         }
     }
@@ -277,8 +277,8 @@ fn verify_bytecode_function_body(code: &[(BlockLabel_, BytecodeBlock)]) -> Resul
                     if !labels.contains(&label) {
                         undeclared.push(label);
                     }
-                }
-                _ => {}
+                },
+                _ => {},
             }
         }
     }
@@ -672,7 +672,7 @@ fn compile_type(
             } else {
                 SignatureToken::Reference(inner_token)
             }
-        }
+        },
         Type::Struct(ident, tys) => {
             let sh_idx = context.struct_handle_index(ident.clone())?;
 
@@ -682,14 +682,14 @@ fn compile_type(
                 let tokens = compile_types(context, type_parameters, tys)?;
                 SignatureToken::StructInstantiation(sh_idx, tokens)
             }
-        }
+        },
         Type::TypeParameter(ty_var) => {
             let idx = match type_parameters.get(ty_var) {
                 None => bail!("Unbound type parameter {}", ty_var),
                 Some(idx) => *idx,
             };
             SignatureToken::TypeParameter(idx)
-        }
+        },
     })
 }
 
@@ -763,7 +763,7 @@ fn compile_fields(
                 });
             }
             StructFieldInformation::Declared(decl_fields)
-        }
+        },
     })
 }
 
@@ -801,7 +801,7 @@ fn compile_function_body_impl(
                 locals,
                 code,
             )?)
-        }
+        },
         FunctionBody::Bytecode { locals, code } => {
             let m = type_parameter_indexes(
                 ast_function
@@ -817,14 +817,14 @@ fn compile_function_body_impl(
                 locals,
                 code,
             )?)
-        }
+        },
 
         FunctionBody::Native => {
             for (var, _) in ast_function.signature.formals.into_iter() {
                 record_src_loc!(parameter: context, var)
             }
             None
-        }
+        },
     })
 }
 
@@ -961,7 +961,7 @@ fn compile_statement(
             }
             push_instr!(statement.loc, Bytecode::Abort);
             function_frame.pop()?;
-        }
+        },
         Statement_::Assert(cond, err) => {
             // First, compile the bytecode for the assert's condition.
             // The parser implicitly wraps the condition expression in a unary
@@ -986,14 +986,14 @@ fn compile_statement(
 
             // Record the continue block index as coming after the abort.
             label_to_index.insert(cont_label, code.len() as u16);
-        }
+        },
         Statement_::Assign(lvalues, rhs_expressions) => {
             compile_expression(context, function_frame, code, rhs_expressions)?;
             compile_lvalues(context, function_frame, code, lvalues)?;
-        }
+        },
         Statement_::Exp(e) => {
             compile_expression(context, function_frame, code, *e)?;
-        }
+        },
         Statement_::Jump(label) => push_instr!(
             label.loc,
             Bytecode::Branch(context.label_index(label.value)?)
@@ -1002,16 +1002,16 @@ fn compile_statement(
             let loc = cond.loc;
             compile_expression(context, function_frame, code, *cond)?;
             push_instr!(loc, Bytecode::BrTrue(context.label_index(label.value)?));
-        }
+        },
         Statement_::JumpIfFalse(cond, label) => {
             let loc = cond.loc;
             compile_expression(context, function_frame, code, *cond)?;
             push_instr!(loc, Bytecode::BrFalse(context.label_index(label.value)?));
-        }
+        },
         Statement_::Return(exps) => {
             compile_expression(context, function_frame, code, *exps)?;
             push_instr!(statement.loc, Bytecode::Ret);
-        }
+        },
         Statement_::Unpack(name, tys, bindings, e) => {
             let tokens = Signature(compile_types(
                 context,
@@ -1036,7 +1036,7 @@ fn compile_statement(
                 let st_loc = Bytecode::StLoc(loc_idx);
                 push_instr!(field_.loc, st_loc);
             }
-        }
+        },
     }
     Ok(())
 }
@@ -1054,17 +1054,17 @@ fn compile_lvalues(
                 let loc_idx = function_frame.get_local(&v.value)?;
                 push_instr!(lvalue_.loc, Bytecode::StLoc(loc_idx));
                 function_frame.pop()?;
-            }
+            },
             LValue_::Mutate(e) => {
                 compile_expression(context, function_frame, code, e)?;
                 push_instr!(lvalue_.loc, Bytecode::WriteRef);
                 function_frame.pop()?;
                 function_frame.pop()?;
-            }
+            },
             LValue_::Pop => {
                 push_instr!(lvalue_.loc, Bytecode::Pop);
                 function_frame.pop()?;
-            }
+            },
         }
     }
     Ok(())
@@ -1084,13 +1084,13 @@ fn compile_expression(
             let load_loc = Bytecode::MoveLoc(loc_idx);
             push_instr!(exp.loc, load_loc);
             function_frame.push()?;
-        }
+        },
         Exp_::Copy(v) => {
             let loc_idx = function_frame.get_local(&v.value)?;
             let load_loc = Bytecode::CopyLoc(loc_idx);
             push_instr!(exp.loc, load_loc);
             function_frame.push()?;
-        }
+        },
         Exp_::BorrowLocal(is_mutable, v) => {
             let loc_idx = function_frame.get_local(&v.value)?;
             if is_mutable {
@@ -1099,7 +1099,7 @@ fn compile_expression(
                 push_instr!(exp.loc, Bytecode::ImmBorrowLoc(loc_idx));
             }
             function_frame.push()?;
-        }
+        },
         Exp_::Value(cv) => match cv.value {
             CopyableVal_::Address(address) => {
                 let address_value = MoveValue::Address(address);
@@ -1107,31 +1107,31 @@ fn compile_expression(
                 let idx = context.constant_index(constant)?;
                 push_instr!(exp.loc, Bytecode::LdConst(idx));
                 function_frame.push()?;
-            }
+            },
             CopyableVal_::U8(i) => {
                 push_instr!(exp.loc, Bytecode::LdU8(i));
                 function_frame.push()?;
-            }
+            },
             CopyableVal_::U16(i) => {
                 push_instr!(exp.loc, Bytecode::LdU16(i));
                 function_frame.push()?;
-            }
+            },
             CopyableVal_::U32(i) => {
                 push_instr!(exp.loc, Bytecode::LdU32(i));
                 function_frame.push()?;
-            }
+            },
             CopyableVal_::U64(i) => {
                 push_instr!(exp.loc, Bytecode::LdU64(i));
                 function_frame.push()?;
-            }
+            },
             CopyableVal_::U128(i) => {
                 push_instr!(exp.loc, Bytecode::LdU128(i));
                 function_frame.push()?;
-            }
+            },
             CopyableVal_::U256(i) => {
                 push_instr!(exp.loc, Bytecode::LdU256(i));
                 function_frame.push()?;
-            }
+            },
             CopyableVal_::ByteArray(buf) => {
                 let vec_value = MoveValue::vector_u8(buf);
                 let ty = Type::Vector(Box::new(Type::U8));
@@ -1139,7 +1139,7 @@ fn compile_expression(
                 let idx = context.constant_index(constant)?;
                 push_instr!(exp.loc, Bytecode::LdConst(idx));
                 function_frame.push()?;
-            }
+            },
             CopyableVal_::Bool(b) => {
                 push_instr! {exp.loc,
                     if b {
@@ -1149,7 +1149,7 @@ fn compile_expression(
                     }
                 };
                 function_frame.push()?;
-            }
+            },
         },
         Exp_::Pack(name, ast_tys, fields) => {
             let sig_tys = compile_types(context, function_frame.type_parameters(), &ast_tys)?;
@@ -1184,15 +1184,15 @@ fn compile_expression(
                 function_frame.pop()?;
             }
             function_frame.push()?;
-        }
+        },
         Exp_::UnaryExp(op, e) => {
             compile_expression(context, function_frame, code, *e)?;
             match op {
                 UnaryOp::Not => {
                     push_instr!(exp.loc, Bytecode::Not);
-                }
+                },
             }
-        }
+        },
         Exp_::BinopExp(e1, op, e2) => {
             compile_expression(context, function_frame, code, *e1)?;
             compile_expression(context, function_frame, code, *e2)?;
@@ -1201,67 +1201,67 @@ fn compile_expression(
             match op {
                 BinOp::Add => {
                     push_instr!(exp.loc, Bytecode::Add);
-                }
+                },
                 BinOp::Sub => {
                     push_instr!(exp.loc, Bytecode::Sub);
-                }
+                },
                 BinOp::Mul => {
                     push_instr!(exp.loc, Bytecode::Mul);
-                }
+                },
                 BinOp::Mod => {
                     push_instr!(exp.loc, Bytecode::Mod);
-                }
+                },
                 BinOp::Div => {
                     push_instr!(exp.loc, Bytecode::Div);
-                }
+                },
                 BinOp::BitOr => {
                     push_instr!(exp.loc, Bytecode::BitOr);
-                }
+                },
                 BinOp::BitAnd => {
                     push_instr!(exp.loc, Bytecode::BitAnd);
-                }
+                },
                 BinOp::Xor => {
                     push_instr!(exp.loc, Bytecode::Xor);
-                }
+                },
                 BinOp::Shl => {
                     push_instr!(exp.loc, Bytecode::Shl);
-                }
+                },
                 BinOp::Shr => {
                     push_instr!(exp.loc, Bytecode::Shr);
-                }
+                },
                 BinOp::Or => {
                     push_instr!(exp.loc, Bytecode::Or);
-                }
+                },
                 BinOp::And => {
                     push_instr!(exp.loc, Bytecode::And);
-                }
+                },
                 BinOp::Eq => {
                     push_instr!(exp.loc, Bytecode::Eq);
-                }
+                },
                 BinOp::Neq => {
                     push_instr!(exp.loc, Bytecode::Neq);
-                }
+                },
                 BinOp::Lt => {
                     push_instr!(exp.loc, Bytecode::Lt);
-                }
+                },
                 BinOp::Gt => {
                     push_instr!(exp.loc, Bytecode::Gt);
-                }
+                },
                 BinOp::Le => {
                     push_instr!(exp.loc, Bytecode::Le);
-                }
+                },
                 BinOp::Ge => {
                     push_instr!(exp.loc, Bytecode::Ge);
-                }
+                },
                 BinOp::Subrange => {
                     unreachable!("Subrange operators should only appear in specification ASTs.");
-                }
+                },
             }
-        }
+        },
         Exp_::Dereference(e) => {
             compile_expression(context, function_frame, code, *e)?;
             push_instr!(exp.loc, Bytecode::ReadRef);
-        }
+        },
         Exp_::Borrow {
             is_mutable,
             exp: inner_exp,
@@ -1313,16 +1313,16 @@ fn compile_expression(
                 }
             }
             function_frame.push()?;
-        }
+        },
         Exp_::FunctionCall(f, exps) => {
             compile_expression(context, function_frame, code, *exps)?;
             compile_call(context, function_frame, code, f)?
-        }
+        },
         Exp_::ExprList(exps) => {
             for e in exps {
                 compile_expression(context, function_frame, code, e)?;
             }
-        }
+        },
     })
 }
 
@@ -1354,7 +1354,7 @@ fn compile_call(
                     }
                     function_frame.pop()?;
                     function_frame.push()?;
-                }
+                },
                 Builtin::BorrowGlobal(mut_, name, ast_tys) => {
                     let sig_tys =
                         compile_types(context, function_frame.type_parameters(), &ast_tys)?;
@@ -1382,7 +1382,7 @@ fn compile_call(
                     }
                     function_frame.pop()?;
                     function_frame.push()?;
-                }
+                },
                 Builtin::MoveFrom(name, ast_tys) => {
                     let sig_tys =
                         compile_types(context, function_frame.type_parameters(), &ast_tys)?;
@@ -1398,7 +1398,7 @@ fn compile_call(
                     }
                     function_frame.pop()?; // pop the address
                     function_frame.push()?; // push the return value
-                }
+                },
                 Builtin::MoveTo(name, tys) => {
                     let tokens = Signature(compile_types(
                         context,
@@ -1416,7 +1416,7 @@ fn compile_call(
                     }
                     function_frame.pop()?; // pop the address
                     function_frame.pop()?; // pop the value to be moved
-                }
+                },
                 Builtin::VecPack(tys, num) => {
                     let tokens = compile_types(context, function_frame.type_parameters(), &tys)?;
                     let type_actuals_id = context.signature_index(Signature(tokens))?;
@@ -1426,7 +1426,7 @@ fn compile_call(
                         function_frame.pop()?;
                     }
                     function_frame.push()?; // push the return value
-                }
+                },
                 Builtin::VecLen(tys) => {
                     let tokens = compile_types(context, function_frame.type_parameters(), &tys)?;
                     let type_actuals_id = context.signature_index(Signature(tokens))?;
@@ -1434,7 +1434,7 @@ fn compile_call(
 
                     function_frame.pop()?; // pop the vector ref
                     function_frame.push()?; // push the return value
-                }
+                },
                 Builtin::VecImmBorrow(tys) => {
                     let tokens = compile_types(context, function_frame.type_parameters(), &tys)?;
                     let type_actuals_id = context.signature_index(Signature(tokens))?;
@@ -1443,7 +1443,7 @@ fn compile_call(
                     function_frame.pop()?; // pop the vector ref
                     function_frame.pop()?; // pop the index
                     function_frame.push()?; // push the return value
-                }
+                },
                 Builtin::VecMutBorrow(tys) => {
                     let tokens = compile_types(context, function_frame.type_parameters(), &tys)?;
                     let type_actuals_id = context.signature_index(Signature(tokens))?;
@@ -1452,7 +1452,7 @@ fn compile_call(
                     function_frame.pop()?; // pop the vector ref
                     function_frame.pop()?; // pop the index
                     function_frame.push()?; // push the return value
-                }
+                },
                 Builtin::VecPushBack(tys) => {
                     let tokens = compile_types(context, function_frame.type_parameters(), &tys)?;
                     let type_actuals_id = context.signature_index(Signature(tokens))?;
@@ -1460,7 +1460,7 @@ fn compile_call(
 
                     function_frame.pop()?; // pop the vector ref
                     function_frame.pop()?; // pop the value
-                }
+                },
                 Builtin::VecPopBack(tys) => {
                     let tokens = compile_types(context, function_frame.type_parameters(), &tys)?;
                     let type_actuals_id = context.signature_index(Signature(tokens))?;
@@ -1468,7 +1468,7 @@ fn compile_call(
 
                     function_frame.pop()?; // pop the vector ref
                     function_frame.push()?; // push the value
-                }
+                },
                 Builtin::VecUnpack(tys, num) => {
                     let tokens = compile_types(context, function_frame.type_parameters(), &tys)?;
                     let type_actuals_id = context.signature_index(Signature(tokens))?;
@@ -1478,7 +1478,7 @@ fn compile_call(
                     for _ in 0..num {
                         function_frame.push()?;
                     }
-                }
+                },
                 Builtin::VecSwap(tys) => {
                     let tokens = compile_types(context, function_frame.type_parameters(), &tys)?;
                     let type_actuals_id = context.signature_index(Signature(tokens))?;
@@ -1487,44 +1487,44 @@ fn compile_call(
                     function_frame.pop()?; // pop the vector ref
                     function_frame.pop()?; // pop the first index
                     function_frame.pop()?; // pop the second index
-                }
+                },
                 Builtin::Freeze => {
                     push_instr!(call.loc, Bytecode::FreezeRef);
                     function_frame.pop()?; // pop mut ref
                     function_frame.push()?; // push imm ref
-                }
+                },
                 Builtin::ToU8 => {
                     push_instr!(call.loc, Bytecode::CastU8);
                     function_frame.pop()?;
                     function_frame.push()?;
-                }
+                },
                 Builtin::ToU16 => {
                     push_instr!(call.loc, Bytecode::CastU16);
                     function_frame.pop()?;
                     function_frame.push()?;
-                }
+                },
                 Builtin::ToU32 => {
                     push_instr!(call.loc, Bytecode::CastU32);
                     function_frame.pop()?;
                     function_frame.push()?;
-                }
+                },
                 Builtin::ToU64 => {
                     push_instr!(call.loc, Bytecode::CastU64);
                     function_frame.pop()?;
                     function_frame.push()?;
-                }
+                },
                 Builtin::ToU128 => {
                     push_instr!(call.loc, Bytecode::CastU128);
                     function_frame.pop()?;
                     function_frame.push()?;
-                }
+                },
                 Builtin::ToU256 => {
                     push_instr!(call.loc, Bytecode::CastU256);
                     function_frame.pop()?;
                     function_frame.push()?;
-                }
+                },
             }
-        }
+        },
         FunctionCall_::ModuleFunctionCall {
             module,
             name,
@@ -1547,7 +1547,7 @@ fn compile_call(
             }
             // Return value of current function is pushed onto the stack.
             function_frame.push()?;
-        }
+        },
     })
 }
 
@@ -1567,10 +1567,10 @@ fn compile_constant(_context: &mut Context, ty: Type, value: MoveValue) -> Resul
             Type::Reference(_, _) => bail!("References are not supported in constant type layouts"),
             Type::TypeParameter(_) => {
                 bail!("Type parameters are not supported in constant type layouts")
-            }
+            },
             Type::Struct(_ident, _tys) => {
                 bail!("TODO Structs are not *yet* supported in constant type layouts")
-            }
+            },
         })
     }
 
@@ -1646,7 +1646,7 @@ fn compile_bytecode(
         IRBytecode_::Nop(Some(lbl)) => {
             record_nop_label!(lbl);
             Bytecode::Nop
-        }
+        },
         IRBytecode_::BrTrue(lbl) => Bytecode::BrTrue(context.label_index(lbl)?),
         IRBytecode_::BrFalse(lbl) => Bytecode::BrFalse(context.label_index(lbl)?),
         IRBytecode_::Branch(lbl) => Bytecode::Branch(context.label_index(lbl)?),
@@ -1667,7 +1667,7 @@ fn compile_bytecode(
         IRBytecode_::LdConst(ty, v) => {
             let constant = compile_constant(context, ty, v)?;
             Bytecode::LdConst(context.constant_index(constant)?)
-        }
+        },
         IRBytecode_::LdNamedConst(c) => Bytecode::LdConst(context.named_constant_index(&c)?),
         IRBytecode_::CopyLoc(sp!(_, v_)) => Bytecode::CopyLoc(function_frame.get_local(&v_)?),
         IRBytecode_::MoveLoc(sp!(_, v_)) => Bytecode::MoveLoc(function_frame.get_local(&v_)?),
@@ -1686,7 +1686,7 @@ fn compile_bytecode(
                 let fi_idx = context.function_instantiation_index(fh_idx, type_actuals_id)?;
                 Bytecode::CallGeneric(fi_idx)
             }
-        }
+        },
         IRBytecode_::Pack(n, tys) => {
             let tokens = Signature(compile_types(
                 context,
@@ -1701,7 +1701,7 @@ fn compile_bytecode(
                 let si_idx = context.struct_instantiation_index(def_idx, type_actuals_id)?;
                 Bytecode::PackGeneric(si_idx)
             }
-        }
+        },
         IRBytecode_::Unpack(n, tys) => {
             let tokens = Signature(compile_types(
                 context,
@@ -1716,16 +1716,16 @@ fn compile_bytecode(
                 let si_idx = context.struct_instantiation_index(def_idx, type_actuals_id)?;
                 Bytecode::UnpackGeneric(si_idx)
             }
-        }
+        },
         IRBytecode_::ReadRef => Bytecode::ReadRef,
         IRBytecode_::WriteRef => Bytecode::WriteRef,
         IRBytecode_::FreezeRef => Bytecode::FreezeRef,
         IRBytecode_::MutBorrowLoc(sp!(_, v_)) => {
             Bytecode::MutBorrowLoc(function_frame.get_local(&v_)?)
-        }
+        },
         IRBytecode_::ImmBorrowLoc(sp!(_, v_)) => {
             Bytecode::ImmBorrowLoc(function_frame.get_local(&v_)?)
-        }
+        },
         IRBytecode_::MutBorrowField(name, tys, sp!(_, field_)) => {
             let qualified_struct_name = QualifiedStructIdent {
                 module: ModuleName::module_self(),
@@ -1747,7 +1747,7 @@ fn compile_bytecode(
                 let fi_idx = context.field_instantiation_index(fh_idx, type_actuals_id)?;
                 Bytecode::MutBorrowFieldGeneric(fi_idx)
             }
-        }
+        },
         IRBytecode_::ImmBorrowField(name, tys, sp!(_, field_)) => {
             let qualified_struct_name = QualifiedStructIdent {
                 module: ModuleName::module_self(),
@@ -1769,7 +1769,7 @@ fn compile_bytecode(
                 let fi_idx = context.field_instantiation_index(fh_idx, type_actuals_id)?;
                 Bytecode::ImmBorrowFieldGeneric(fi_idx)
             }
-        }
+        },
         IRBytecode_::MutBorrowGlobal(n, tys) => {
             let tokens = Signature(compile_types(
                 context,
@@ -1784,7 +1784,7 @@ fn compile_bytecode(
                 let si_idx = context.struct_instantiation_index(def_idx, type_actuals_id)?;
                 Bytecode::MutBorrowGlobalGeneric(si_idx)
             }
-        }
+        },
         IRBytecode_::ImmBorrowGlobal(n, tys) => {
             let tokens = Signature(compile_types(
                 context,
@@ -1799,7 +1799,7 @@ fn compile_bytecode(
                 let si_idx = context.struct_instantiation_index(def_idx, type_actuals_id)?;
                 Bytecode::ImmBorrowGlobalGeneric(si_idx)
             }
-        }
+        },
         IRBytecode_::Add => Bytecode::Add,
         IRBytecode_::Sub => Bytecode::Sub,
         IRBytecode_::Mul => Bytecode::Mul,
@@ -1832,7 +1832,7 @@ fn compile_bytecode(
                 let si_idx = context.struct_instantiation_index(def_idx, type_actuals_id)?;
                 Bytecode::ExistsGeneric(si_idx)
             }
-        }
+        },
         IRBytecode_::MoveFrom(n, tys) => {
             let tokens = Signature(compile_types(
                 context,
@@ -1847,7 +1847,7 @@ fn compile_bytecode(
                 let si_idx = context.struct_instantiation_index(def_idx, type_actuals_id)?;
                 Bytecode::MoveFromGeneric(si_idx)
             }
-        }
+        },
         IRBytecode_::MoveTo(n, tys) => {
             let tokens = Signature(compile_types(
                 context,
@@ -1862,49 +1862,49 @@ fn compile_bytecode(
                 let si_idx = context.struct_instantiation_index(def_idx, type_actuals_id)?;
                 Bytecode::MoveToGeneric(si_idx)
             }
-        }
+        },
         IRBytecode_::Shl => Bytecode::Shl,
         IRBytecode_::Shr => Bytecode::Shr,
         IRBytecode_::VecPack(ty, n) => {
             let tokens = compile_type(context, function_frame.type_parameters(), &ty)?;
             let sig = Signature(vec![tokens]);
             Bytecode::VecPack(context.signature_index(sig)?, n)
-        }
+        },
         IRBytecode_::VecLen(ty) => {
             let tokens = compile_type(context, function_frame.type_parameters(), &ty)?;
             let sig = Signature(vec![tokens]);
             Bytecode::VecLen(context.signature_index(sig)?)
-        }
+        },
         IRBytecode_::VecImmBorrow(ty) => {
             let tokens = compile_type(context, function_frame.type_parameters(), &ty)?;
             let sig = Signature(vec![tokens]);
             Bytecode::VecImmBorrow(context.signature_index(sig)?)
-        }
+        },
         IRBytecode_::VecMutBorrow(ty) => {
             let tokens = compile_type(context, function_frame.type_parameters(), &ty)?;
             let sig = Signature(vec![tokens]);
             Bytecode::VecMutBorrow(context.signature_index(sig)?)
-        }
+        },
         IRBytecode_::VecPushBack(ty) => {
             let tokens = compile_type(context, function_frame.type_parameters(), &ty)?;
             let sig = Signature(vec![tokens]);
             Bytecode::VecPushBack(context.signature_index(sig)?)
-        }
+        },
         IRBytecode_::VecPopBack(ty) => {
             let tokens = compile_type(context, function_frame.type_parameters(), &ty)?;
             let sig = Signature(vec![tokens]);
             Bytecode::VecPopBack(context.signature_index(sig)?)
-        }
+        },
         IRBytecode_::VecUnpack(ty, n) => {
             let tokens = compile_type(context, function_frame.type_parameters(), &ty)?;
             let sig = Signature(vec![tokens]);
             Bytecode::VecUnpack(context.signature_index(sig)?, n)
-        }
+        },
         IRBytecode_::VecSwap(ty) => {
             let tokens = compile_type(context, function_frame.type_parameters(), &ty)?;
             let sig = Signature(vec![tokens]);
             Bytecode::VecSwap(context.signature_index(sig)?)
-        }
+        },
     };
     push_instr!(loc, ff_instr);
     Ok(())
@@ -1915,7 +1915,7 @@ fn remap_branch_offsets(code: &mut Vec<Bytecode>, fake_to_actual: &HashMap<u16, 
         match instr {
             Bytecode::BrTrue(offset) | Bytecode::BrFalse(offset) | Bytecode::Branch(offset) => {
                 *offset = fake_to_actual[offset]
-            }
+            },
             _ => (),
         }
     }

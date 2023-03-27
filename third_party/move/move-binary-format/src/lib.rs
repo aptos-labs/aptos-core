@@ -153,7 +153,7 @@ macro_rules! safe_unwrap {
                 } else {
                     return Err(err);
                 }
-            }
+            },
         }
     }};
 }
@@ -172,7 +172,7 @@ macro_rules! safe_unwrap_err {
                 } else {
                     return Err(err);
                 }
-            }
+            },
         }
     }};
 }

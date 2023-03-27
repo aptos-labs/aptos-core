@@ -38,7 +38,7 @@ pub fn expect_no_verification_errors(err: VMError) -> VMError {
                 .at_indices(indices)
                 .at_code_offsets(offsets)
                 .finish(location)
-        }
+        },
         _ => err,
     }
 }

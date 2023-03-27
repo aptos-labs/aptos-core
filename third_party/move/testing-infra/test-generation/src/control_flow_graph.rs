@@ -361,10 +361,10 @@ impl CFG {
                 match block.instructions.last() {
                     Some(Bytecode::BrTrue(_)) => {
                         block.instructions[last_instruction_index] = Bytecode::BrTrue(offset);
-                    }
+                    },
                     Some(Bytecode::BrFalse(_)) => {
                         block.instructions[last_instruction_index] = Bytecode::BrFalse(offset);
-                    }
+                    },
                     _ => unreachable!(
                         "Error: unsupported two target jump instruction, {:#?}",
                         block.instructions.last()
@@ -375,7 +375,7 @@ impl CFG {
                 match block.instructions.last() {
                     Some(Bytecode::Branch(_)) => {
                         block.instructions[last_instruction_index] = Bytecode::Branch(offset);
-                    }
+                    },
                     _ => unreachable!(
                         "Error: unsupported one target jump instruction, {:#?}",
                         block.instructions.last()

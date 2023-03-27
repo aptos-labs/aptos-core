@@ -112,15 +112,15 @@ impl<'a> TransferFunctions for PackedTypesAnalysis<'a> {
                         Some(tag) => {
                             // type is closed
                             state.closed_types.insert(tag);
-                        }
+                        },
                         None => {
                             // type is open
                             state
                                 .open_types
                                 .insert(Type::Struct(*mid, *sid, types.clone()));
-                        }
+                        },
                     }
-                }
+                },
                 Function(mid, fid, types) => {
                     if let Some(summary) = self
                         .cache
@@ -145,10 +145,10 @@ impl<'a> TransferFunctions for PackedTypesAnalysis<'a> {
                         }
                     }
                     // TODO(mengxu, sam): fix the recursive function case
-                }
+                },
                 OpaqueCallBegin(_, _, _) | OpaqueCallEnd(_, _, _) => {
                     // skip
-                }
+                },
                 _ => (),
             }
         }

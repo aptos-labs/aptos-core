@@ -192,11 +192,13 @@ fn get_flags_and_baseline(
                 || extract_test_directives(path, "// separate_baseline: ")?.contains(&feature_name);
             (
                 dep_flags,
-                Some(path.with_extension(if separate_baseline {
-                    format!("{}_exp", feature.name)
-                } else {
-                    EXP_EXT.to_string()
-                })),
+                Some(path.with_extension(
+                    if separate_baseline {
+                        format!("{}_exp", feature.name)
+                    } else {
+                        EXP_EXT.to_string()
+                    },
+                )),
             )
         };
     let mut flags = base_flags.iter().map(|s| (*s).to_string()).collect_vec();

@@ -190,13 +190,10 @@ pub fn run_move_prover(
         options.set_quiet();
     }
     let now = Instant::now();
-    let model = config.move_model_for_package(
-        path,
-        ModelConfig {
-            all_files_as_targets: false,
-            target_filter: target_filter.clone(),
-        },
-    )?;
+    let model = config.move_model_for_package(path, ModelConfig {
+        all_files_as_targets: false,
+        target_filter: target_filter.clone(),
+    })?;
     let _temp_dir_holder = if for_test {
         // Need to ensure a distinct output.bpl file for concurrent execution. In non-test
         // mode, we actually want to use the static output.bpl for debugging purposes

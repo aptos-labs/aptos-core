@@ -147,7 +147,7 @@ impl<'a> SignatureChecker<'a> {
                         func_handle.type_parameters.iter().copied(),
                         type_parameters,
                     )
-                }
+                },
                 PackGeneric(idx)
                 | UnpackGeneric(idx)
                 | ExistsGeneric(idx)
@@ -165,7 +165,7 @@ impl<'a> SignatureChecker<'a> {
                         struct_handle.type_param_constraints(),
                         type_parameters,
                     )
-                }
+                },
                 ImmBorrowFieldGeneric(idx) | MutBorrowFieldGeneric(idx) => {
                     let field_inst = self.resolver.field_instantiation_at(*idx)?;
                     let field_handle = self.resolver.field_handle_at(field_inst.handle)?;
@@ -178,7 +178,7 @@ impl<'a> SignatureChecker<'a> {
                         struct_handle.type_param_constraints(),
                         type_parameters,
                     )
-                }
+                },
                 VecPack(idx, _)
                 | VecLen(idx)
                 | VecImmBorrow(idx)
@@ -198,7 +198,7 @@ impl<'a> SignatureChecker<'a> {
                         )));
                     }
                     self.check_signature_tokens(type_arguments)
-                }
+                },
 
                 // List out the other options explicitly so there's a compile error if a new
                 // bytecode gets added.
@@ -236,7 +236,7 @@ impl<'a> SignatureChecker<'a> {
                         type_parameters,
                     )?;
                 }
-            }
+            },
             SignatureToken::TypeParameter(idx) => {
                 if type_parameters[*idx as usize].is_phantom && !is_phantom_pos {
                     return Err(PartialVMError::new(
@@ -246,7 +246,7 @@ impl<'a> SignatureChecker<'a> {
                         "phantom type parameter cannot be used in non-phantom position".to_string(),
                     ));
                 }
-            }
+            },
 
             SignatureToken::Struct(_)
             | SignatureToken::Reference(_)
@@ -259,7 +259,7 @@ impl<'a> SignatureChecker<'a> {
             | SignatureToken::U128
             | SignatureToken::U256
             | SignatureToken::Address
-            | SignatureToken::Signer => {}
+            | SignatureToken::Signer => {},
         }
         Ok(())
     }
@@ -271,7 +271,7 @@ impl<'a> SignatureChecker<'a> {
             match token {
                 SignatureToken::Reference(inner) | SignatureToken::MutableReference(inner) => {
                     self.check_signature_token(inner)?
-                }
+                },
                 _ => self.check_signature_token(token)?,
             }
         }
@@ -299,7 +299,7 @@ impl<'a> SignatureChecker<'a> {
                 // Revisit this once we rework prop tests.
                 Err(PartialVMError::new(StatusCode::INVALID_SIGNATURE_TOKEN)
                     .with_message("reference not allowed".to_string()))
-            }
+            },
             Vector(ty) => self.check_signature_token(ty),
             StructInstantiation(_, type_arguments) => self.check_signature_tokens(type_arguments),
         }
@@ -349,7 +349,7 @@ impl<'a> SignatureChecker<'a> {
                     sh.type_param_constraints(),
                     type_parameters,
                 )
-            }
+            },
             SignatureToken::Reference(_)
             | SignatureToken::MutableReference(_)
             | SignatureToken::Vector(_)

@@ -88,7 +88,7 @@ impl<'v> Executor<'v> {
                 let nonce = account.nonce; // REVIEW: should the nonce be incremented?
 
                 (balance, nonce)
-            }
+            },
             None => (eth_amount, U256::from(0)),
         };
 

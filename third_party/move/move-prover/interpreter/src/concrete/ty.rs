@@ -438,7 +438,7 @@ impl BaseType {
             (BaseType::Primitive(PrimitiveType::Address), Constant::Address(_)) => true,
             (BaseType::Vector(elem_ty), Constant::ByteArray(_)) => {
                 elem_ty.as_ref() == &BaseType::mk_u8()
-            }
+            },
             _ => false,
         }
     }
@@ -537,7 +537,7 @@ macro_rules! gen {
                     if cfg!(debug_assertions) {
                         assert_eq!(self_is_mut, is_mut);
                     }
-                }
+                },
             }
             self_ty.$get_base_p()
         }
@@ -553,7 +553,7 @@ macro_rules! gen {
                     if cfg!(debug_assertions) {
                         assert_eq!(self_is_mut, is_mut);
                     }
-                }
+                },
             }
             self_ty.$into_base_p()
         }
@@ -691,10 +691,10 @@ impl Type {
         match (self, other) {
             (Type::Base(base_ty_1), Type::Base(base_ty_2)) => {
                 base_ty_1.is_compatible_for_assign(base_ty_2)
-            }
+            },
             (Type::Reference(is_mut_1, base_ty_1), Type::Reference(is_mut_2, base_ty_2)) => {
                 is_mut_1 == is_mut_2 && base_ty_1.is_compatible_for_assign(base_ty_2)
-            }
+            },
             _ => false,
         }
     }
@@ -707,7 +707,7 @@ impl Type {
         match (self, lhs, rhs) {
             (Type::Base(self_ty), Type::Base(lhs_ty), Type::Base(rhs_ty)) => {
                 self_ty.is_compatible_for_arithmetic(lhs_ty, rhs_ty)
-            }
+            },
             _ => false,
         }
     }
@@ -716,7 +716,7 @@ impl Type {
         match (self, lhs, rhs) {
             (Type::Base(self_ty), Type::Base(lhs_ty), Type::Base(rhs_ty)) => {
                 self_ty.is_compatible_for_bitwise(lhs_ty, rhs_ty)
-            }
+            },
             _ => false,
         }
     }
@@ -725,7 +725,7 @@ impl Type {
         match (self, other) {
             (Type::Base(self_ty), Type::Base(other_ty)) => {
                 self_ty.is_compatible_for_comparison(other_ty)
-            }
+            },
             _ => false,
         }
     }
@@ -734,7 +734,7 @@ impl Type {
         match (self, other) {
             (Type::Base(self_ty), Type::Base(other_ty)) => {
                 self_ty.is_compatible_for_bitshift(other_ty)
-            }
+            },
             _ => false,
         }
     }
@@ -809,7 +809,7 @@ pub fn convert_model_local_type(env: &GlobalEnv, ty: &MT::Type, subst: &[BaseTyp
         | MT::Type::TypeParameter(..) => Type::Base(convert_model_base_type(env, ty, subst)),
         MT::Type::Reference(is_mut, base_ty) => {
             convert_model_base_type(env, base_ty, subst).into_ref_type(*is_mut)
-        }
+        },
         _ => unreachable!(),
     }
 }
@@ -887,7 +887,7 @@ pub fn convert_model_partial_base_type(env: &GlobalEnv, ty: &MT::Type) -> Partia
         MT::Type::Primitive(MT::PrimitiveType::Signer) => PartialBaseType::mk_signer(),
         MT::Type::Vector(elem) => {
             PartialBaseType::mk_vector(convert_model_partial_base_type(env, elem))
-        }
+        },
         MT::Type::Struct(module_id, struct_id, ty_insts) => PartialBaseType::mk_struct(
             convert_model_partial_struct_type(env, *module_id, *struct_id, ty_insts),
         ),

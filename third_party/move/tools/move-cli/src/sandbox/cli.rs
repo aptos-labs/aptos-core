@@ -228,7 +228,7 @@ impl SandboxCommand {
                     override_ordering.as_ref().map(|o| o.as_slice()),
                     move_args.verbose,
                 )
-            }
+            },
             SandboxCommand::Run {
                 script_file,
                 script_name,
@@ -257,7 +257,7 @@ impl SandboxCommand {
                     *dry_run,
                     move_args.verbose,
                 )
-            }
+            },
             SandboxCommand::Test {
                 use_temp_dir,
                 track_cov,
@@ -274,7 +274,7 @@ impl SandboxCommand {
                 let state = PackageContext::new(&move_args.package_path, &move_args.build_config)?
                     .prepare_state(bytecode_version, storage_dir)?;
                 sandbox::commands::view(&state, file)
-            }
+            },
             SandboxCommand::Clean {} => {
                 // delete storage
                 let storage_dir = Path::new(storage_dir);
@@ -295,17 +295,17 @@ impl SandboxCommand {
                     fs::remove_dir_all(&build_dir)?;
                 }
                 Ok(())
-            }
+            },
             SandboxCommand::Doctor {} => {
                 let state = PackageContext::new(&move_args.package_path, &move_args.build_config)?
                     .prepare_state(bytecode_version, storage_dir)?;
                 sandbox::commands::doctor(&state)
-            }
+            },
             SandboxCommand::Generate { cmd } => {
                 let state = PackageContext::new(&move_args.package_path, &move_args.build_config)?
                     .prepare_state(bytecode_version, storage_dir)?;
                 handle_generate_commands(cmd, &state)
-            }
+            },
         }
     }
 }
@@ -323,6 +323,6 @@ fn handle_generate_commands(cmd: &GenerateCommand, state: &OnDiskStateView) -> R
                 options.shallow,
                 state,
             )
-        }
+        },
     }
 }

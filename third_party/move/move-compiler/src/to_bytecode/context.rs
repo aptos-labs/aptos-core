@@ -96,14 +96,11 @@ impl<'a> Context<'a> {
             let ir_name = Self::ir_module_alias(&module);
             let ir_ident = Self::translate_module_ident(module);
             imports.push(IR::ImportDefinition::new(ir_ident, Some(ir_name)));
-            ordered_dependencies.push((
-                dependency_order,
-                IR::ModuleDependency {
-                    name: ir_name,
-                    structs,
-                    functions,
-                },
-            ));
+            ordered_dependencies.push((dependency_order, IR::ModuleDependency {
+                name: ir_name,
+                structs,
+                functions,
+            }));
         }
         ordered_dependencies.sort_by_key(|(ordering, _)| *ordering);
         let dependencies = ordered_dependencies.into_iter().map(|(_, m)| m).collect();

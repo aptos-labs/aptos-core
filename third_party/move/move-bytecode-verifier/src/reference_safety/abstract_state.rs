@@ -311,10 +311,10 @@ impl AbstractState {
                 let new_id = self.new_ref(self.borrow_graph.is_mutable(id));
                 self.add_copy(id, new_id);
                 Ok(AbstractValue::Reference(new_id))
-            }
+            },
             AbstractValue::NonReference if self.is_local_mutably_borrowed(local) => {
                 Err(self.error(StatusCode::COPYLOC_EXISTS_BORROW_ERROR, offset))
-            }
+            },
             AbstractValue::NonReference => Ok(AbstractValue::NonReference),
         }
     }
@@ -332,7 +332,7 @@ impl AbstractState {
             AbstractValue::Reference(id) => Ok(AbstractValue::Reference(id)),
             AbstractValue::NonReference if self.is_local_borrowed(local) => {
                 Err(self.error(StatusCode::MOVELOC_EXISTS_BORROW_ERROR, offset))
-            }
+            },
             AbstractValue::NonReference => Ok(AbstractValue::NonReference),
         }
     }
@@ -349,10 +349,10 @@ impl AbstractState {
             AbstractValue::Reference(id) => {
                 self.release(id);
                 Ok(())
-            }
+            },
             AbstractValue::NonReference if self.is_local_borrowed(local) => {
                 Err(self.error(StatusCode::STLOC_UNSAFE_TO_DESTROY_ERROR, offset))
-            }
+            },
             AbstractValue::NonReference => Ok(()),
         }
     }
@@ -380,15 +380,15 @@ impl AbstractState {
             {
                 // TODO better error code
                 return Err(self.error(StatusCode::READREF_EXISTS_MUTABLE_BORROW_ERROR, offset));
-            }
+            },
             (AbstractValue::Reference(id1), AbstractValue::Reference(id2)) => {
                 self.release(id1);
                 self.release(id2)
-            }
+            },
             (v1, v2) => {
                 assert!(v1.is_value());
                 assert!(v2.is_value());
-            }
+            },
         }
         Ok(AbstractValue::NonReference)
     }
@@ -563,7 +563,7 @@ impl AbstractState {
                     }
                     returned_refs += 1;
                     AbstractValue::Reference(id)
-                }
+                },
                 SignatureToken::Reference(_) => {
                     let id = self.new_ref(false);
                     for parent in &all_references_to_borrow_from {
@@ -571,7 +571,7 @@ impl AbstractState {
                     }
                     returned_refs += 1;
                     AbstractValue::Reference(id)
-                }
+                },
                 _ => AbstractValue::NonReference,
             })
             .collect();
@@ -637,7 +637,7 @@ impl AbstractState {
                     let new_id = RefID::new(local);
                     id_map.insert(*old_id, new_id);
                     AbstractValue::Reference(new_id)
-                }
+                },
                 AbstractValue::NonReference => AbstractValue::NonReference,
             })
             .collect::<Vec<_>>();
@@ -684,16 +684,16 @@ impl AbstractState {
                     (AbstractValue::Reference(id), AbstractValue::NonReference) => {
                         self_graph.release(*id);
                         AbstractValue::NonReference
-                    }
+                    },
                     (AbstractValue::NonReference, AbstractValue::Reference(id)) => {
                         other_graph.release(*id);
                         AbstractValue::NonReference
-                    }
+                    },
                     // The local has a value on each side, add it to the state
                     (v1, v2) => {
                         assert!(v1 == v2);
                         *v1
-                    }
+                    },
                 }
             })
             .collect();

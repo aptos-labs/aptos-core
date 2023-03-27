@@ -220,14 +220,11 @@ fn invalid_vectors() {
     malformed(tvec(SignatureToken::U16), vec![1, 0]);
     malformed(tvec(SignatureToken::U32), vec![1, 0]);
     malformed(tvec(SignatureToken::U64), vec![1, 0]);
-    malformed(
-        tvec(SignatureToken::Address),
-        vec![
-            1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0,
-        ],
-    );
+    malformed(tvec(SignatureToken::Address), vec![
+        1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0,
+    ]);
     // wrong lens
     malformed(tvec(SignatureToken::U8), vec![0, 0]);
     malformed(tvec(SignatureToken::U8), vec![0, 1]);

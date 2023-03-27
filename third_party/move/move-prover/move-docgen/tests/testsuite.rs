@@ -92,7 +92,7 @@ fn test_docgen(path: &Path, mut options: Options, suffix: &str) -> anyhow::Resul
             let mut file = File::open(temp_path.as_path()).unwrap();
             file.read_to_string(&mut contents).unwrap();
             contents
-        }
+        },
         Err(err) => format!("Move prover docgen returns: {}\n", err),
     };
     output += &String::from_utf8_lossy(&error_writer.into_inner());

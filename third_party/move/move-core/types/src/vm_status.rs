@@ -132,7 +132,7 @@ impl VMStatus {
                 debug_assert!(code != StatusCode::EXECUTED);
                 debug_assert!(code != StatusCode::ABORTED);
                 code
-            }
+            },
         }
     }
 
@@ -217,7 +217,7 @@ impl VMStatus {
                         code_offset: 0,
                     }),
                 }
-            }
+            },
         }
     }
 }
@@ -258,7 +258,7 @@ impl fmt::Display for KeptVMStatus {
             KeptVMStatus::MiscellaneousError => write!(f, "MISCELLANEOUS_ERROR"),
             KeptVMStatus::MoveAbort(location, code) => {
                 write!(f, "ABORTED with code {} in {}", code, location)
-            }
+            },
             KeptVMStatus::ExecutionFailure {
                 location,
                 function,

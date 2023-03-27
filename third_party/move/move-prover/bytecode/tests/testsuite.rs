@@ -43,20 +43,20 @@ fn get_tested_transformation_pipeline(
             let mut pipeline = FunctionTargetPipeline::default();
             pipeline.add_processor(EliminateImmRefsProcessor::new());
             Ok(Some(pipeline))
-        }
+        },
         "mut_ref_instrumentation" => {
             let mut pipeline = FunctionTargetPipeline::default();
             pipeline.add_processor(EliminateImmRefsProcessor::new());
             pipeline.add_processor(MutRefInstrumenter::new());
             Ok(Some(pipeline))
-        }
+        },
         "reaching_def" => {
             let mut pipeline = FunctionTargetPipeline::default();
             pipeline.add_processor(EliminateImmRefsProcessor::new());
             pipeline.add_processor(MutRefInstrumenter::new());
             pipeline.add_processor(ReachingDefProcessor::new());
             Ok(Some(pipeline))
-        }
+        },
         "livevar" => {
             let mut pipeline = FunctionTargetPipeline::default();
             pipeline.add_processor(EliminateImmRefsProcessor::new());
@@ -64,7 +64,7 @@ fn get_tested_transformation_pipeline(
             pipeline.add_processor(ReachingDefProcessor::new());
             pipeline.add_processor(LiveVarAnalysisProcessor::new());
             Ok(Some(pipeline))
-        }
+        },
         "borrow" => {
             let mut pipeline = FunctionTargetPipeline::default();
             pipeline.add_processor(EliminateImmRefsProcessor::new());
@@ -73,7 +73,7 @@ fn get_tested_transformation_pipeline(
             pipeline.add_processor(LiveVarAnalysisProcessor::new());
             pipeline.add_processor(BorrowAnalysisProcessor::new());
             Ok(Some(pipeline))
-        }
+        },
         "borrow_strong" => {
             let mut pipeline = FunctionTargetPipeline::default();
             pipeline.add_processor(EliminateImmRefsProcessor::new());
@@ -82,12 +82,12 @@ fn get_tested_transformation_pipeline(
             pipeline.add_processor(LiveVarAnalysisProcessor::new());
             pipeline.add_processor(BorrowAnalysisProcessor::new());
             Ok(Some(pipeline))
-        }
+        },
         "escape_analysis" => {
             let mut pipeline = FunctionTargetPipeline::default();
             pipeline.add_processor(Box::new(EscapeAnalysisProcessor {}));
             Ok(Some(pipeline))
-        }
+        },
         "memory_instr" => {
             let mut pipeline = FunctionTargetPipeline::default();
             pipeline.add_processor(EliminateImmRefsProcessor::new());
@@ -97,7 +97,7 @@ fn get_tested_transformation_pipeline(
             pipeline.add_processor(BorrowAnalysisProcessor::new());
             pipeline.add_processor(MemoryInstrumentationProcessor::new());
             Ok(Some(pipeline))
-        }
+        },
         "clean_and_optimize" => {
             let mut pipeline = FunctionTargetPipeline::default();
             pipeline.add_processor(EliminateImmRefsProcessor::new());
@@ -108,7 +108,7 @@ fn get_tested_transformation_pipeline(
             pipeline.add_processor(MemoryInstrumentationProcessor::new());
             pipeline.add_processor(CleanAndOptimizeProcessor::new());
             Ok(Some(pipeline))
-        }
+        },
         "verification_analysis" => {
             let mut pipeline = FunctionTargetPipeline::default();
             pipeline.add_processor(EliminateImmRefsProcessor::new());
@@ -121,7 +121,7 @@ fn get_tested_transformation_pipeline(
             pipeline.add_processor(UsageProcessor::new());
             pipeline.add_processor(VerificationAnalysisProcessor::new());
             Ok(Some(pipeline))
-        }
+        },
         "spec_instrumentation" => {
             let mut pipeline = FunctionTargetPipeline::default();
             pipeline.add_processor(EliminateImmRefsProcessor::new());
@@ -135,7 +135,7 @@ fn get_tested_transformation_pipeline(
             pipeline.add_processor(VerificationAnalysisProcessor::new());
             pipeline.add_processor(SpecInstrumentationProcessor::new());
             Ok(Some(pipeline))
-        }
+        },
         "data_invariant_instrumentation" => {
             let mut pipeline = FunctionTargetPipeline::default();
             pipeline.add_processor(EliminateImmRefsProcessor::new());
@@ -152,7 +152,7 @@ fn get_tested_transformation_pipeline(
             pipeline.add_processor(WellFormedInstrumentationProcessor::new());
             pipeline.add_processor(DataInvariantInstrumentationProcessor::new());
             Ok(Some(pipeline))
-        }
+        },
         "global_invariant_analysis" => {
             let mut pipeline = FunctionTargetPipeline::default();
             pipeline.add_processor(EliminateImmRefsProcessor::new());
@@ -167,7 +167,7 @@ fn get_tested_transformation_pipeline(
             pipeline.add_processor(SpecInstrumentationProcessor::new());
             pipeline.add_processor(GlobalInvariantAnalysisProcessor::new());
             Ok(Some(pipeline))
-        }
+        },
         "global_invariant_instrumentation" => {
             let mut pipeline = FunctionTargetPipeline::default();
             pipeline.add_processor(EliminateImmRefsProcessor::new());
@@ -183,12 +183,12 @@ fn get_tested_transformation_pipeline(
             pipeline.add_processor(GlobalInvariantAnalysisProcessor::new());
             pipeline.add_processor(GlobalInvariantInstrumentationProcessor::new());
             Ok(Some(pipeline))
-        }
+        },
         "read_write_set" => {
             let mut pipeline = FunctionTargetPipeline::default();
             pipeline.add_processor(Box::new(ReadWriteSetProcessor {}));
             Ok(Some(pipeline))
-        }
+        },
         "mono_analysis" => {
             let mut pipeline = FunctionTargetPipeline::default();
             pipeline.add_processor(UsageProcessor::new());
@@ -199,12 +199,12 @@ fn get_tested_transformation_pipeline(
             pipeline.add_processor(DataInvariantInstrumentationProcessor::new());
             pipeline.add_processor(MonoAnalysisProcessor::new());
             Ok(Some(pipeline))
-        }
+        },
         "usage_analysis" => {
             let mut pipeline = FunctionTargetPipeline::default();
             pipeline.add_processor(UsageProcessor::new());
             Ok(Some(pipeline))
-        }
+        },
         _ => Err(anyhow!(
             "the sub-directory `{}` has no associated pipeline to test",
             dir_name

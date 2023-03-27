@@ -127,10 +127,10 @@ fn check_has_unit_test_module(compilation_env: &mut CompilationEnv, prog: &P::Pr
                         // TODO: remove once named addresses have landed in the stdlib
                         P::LeadingNameAccess_::Name(name) => {
                             name.value.as_str() == STDLIB_ADDRESS_NAME
-                        }
+                        },
                         P::LeadingNameAccess_::AnonymousAddress(_) => false,
                     }
-            }
+            },
             _ => false,
         });
 

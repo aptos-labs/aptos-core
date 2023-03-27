@@ -96,8 +96,8 @@ fn move_check_testsuite(path: &Path) -> datatest_stable::Result<()> {
                 .to_string_lossy()
                 .to_string();
             flags = flags.set_flavor(flavor)
-        }
-        _ => {}
+        },
+        _ => {},
     };
     run_test(path, &exp_path, &out_path, flags)?;
     Ok(())
@@ -149,14 +149,14 @@ fn run_test(path: &Path, exp_path: &Path, out_path: &Path, flags: Flags) -> anyh
                 rendered_diags
             );
             anyhow::bail!(add_update_baseline_fix(msg))
-        }
+        },
         (false, true) => {
             let msg = format!(
                 "Unexpected success. Expected diagnostics:\n{}",
                 fs::read_to_string(exp_path)?
             );
             anyhow::bail!(add_update_baseline_fix(msg))
-        }
+        },
         (true, true) => {
             let expected_diags = fs::read_to_string(exp_path)?;
             if rendered_diags != expected_diags {
@@ -168,7 +168,7 @@ fn run_test(path: &Path, exp_path: &Path, out_path: &Path, flags: Flags) -> anyh
             } else {
                 Ok(())
             }
-        }
+        },
     }
 }
 

@@ -88,7 +88,7 @@ impl ReadWriteSetState {
                     match v {
                         Addr::Footprint(ap) => {
                             new_accesses.join_access_path(ap.clone(), node.clone());
-                        }
+                        },
                         Addr::Constant(c) => {
                             for (offset, child) in node.children().iter() {
                                 match offset {
@@ -98,11 +98,11 @@ impl ReadWriteSetState {
                                             AccessPath::new_global_constant(c.clone(), g.clone()),
                                             child.clone(),
                                         )
-                                    }
+                                    },
                                     o => panic!("Bad offset type {:?} for address base", o),
                                 }
                             }
-                        }
+                        },
                     }
                 }
             }
@@ -161,7 +161,7 @@ impl ReadWriteSetState {
                     match v {
                         Addr::Footprint(ap) => {
                             self.accesses.join_access_path(ap.clone(), node.clone());
-                        }
+                        },
                         Addr::Constant(c) => {
                             for (offset, child) in node.children().iter() {
                                 match offset {
@@ -171,11 +171,11 @@ impl ReadWriteSetState {
                                             AccessPath::new_global_constant(c.clone(), g.clone()),
                                             child.clone(),
                                         )
-                                    }
+                                    },
                                     o => panic!("Bad offset type {:?} for address base", o),
                                 }
                             }
-                        }
+                        },
                     }
                 }
             }
@@ -438,18 +438,18 @@ impl<'a> TransferFunctions for ReadWriteSetAnalysis<'a> {
                     if state.locals.local_exists(args[0], func_env) {
                         state.assign_offset(rets[0], args[0], Offset::field(*fld), None, func_env);
                     }
-                }
+                },
                 ReadRef => {
                     if state.locals.local_exists(args[0], func_env) {
                         // rets[0] = args[0]
                         state.assign_local(rets[0], args[0], func_env)
                     }
-                }
+                },
                 WriteRef => {
                     state.record_access(args[0], Access::Write, func_env);
                     // *args[0] = args1
                     state.write_ref(args[0], args[1], func_env)
-                }
+                },
                 FreezeRef | BorrowLoc => state.assign_local(rets[0], args[0], func_env),
                 BorrowGlobal(mid, sid, types) => {
                     // borrow_global<T>(a). bind ret to a/T
@@ -467,7 +467,7 @@ impl<'a> TransferFunctions for ReadWriteSetAnalysis<'a> {
                                 extended_ap.add_offset(offset.clone());
                                 extended_aps.insert(Addr::Footprint(extended_ap.clone()));
                                 state.locals.update_access_path(extended_ap.clone(), None);
-                            }
+                            },
                             Addr::Constant(c) => {
                                 let extended_ap = AccessPath::new_address_constant(
                                     c.clone(),
@@ -476,21 +476,21 @@ impl<'a> TransferFunctions for ReadWriteSetAnalysis<'a> {
                                     types.clone(),
                                 );
                                 extended_aps.insert(Addr::footprint(extended_ap));
-                            }
+                            },
                         }
                     }
                     state.locals.bind_local(rets[0], extended_aps, func_env)
-                }
+                },
                 MoveFrom(mid, sid, types) => {
                     state.add_global_access(args[0], mid, *sid, types, Access::Write, func_env);
                     state.remove_global(args[0], mid, *sid, types, func_env)
-                }
+                },
                 MoveTo(mid, sid, types) => {
                     state.add_global_access(args[1], mid, *sid, types, Access::Write, func_env);
-                }
+                },
                 Exists(mid, sid, types) => {
                     state.add_global_access(args[0], mid, *sid, types, Access::Read, func_env)
-                }
+                },
                 Function(mid, fid, types) => {
                     let fun_id = mid.qualified(*fid);
                     let global_env = self.cache.global_env();
@@ -518,13 +518,13 @@ impl<'a> TransferFunctions for ReadWriteSetAnalysis<'a> {
                             func_env,
                         )
                     }
-                }
+                },
                 OpaqueCallBegin(_, _, _) | OpaqueCallEnd(_, _, _) => {
                     // skip
-                }
+                },
                 Uninit => {
                     // do nothing, this marks a reference (args[0]) but the ref is only defined later
-                }
+                },
                 Destroy => state.locals.remove_local(args[0], func_env),
                 Eq | Neq => {
                     // These operations read reference types passed to them. Add Access::Read's for both operands
@@ -534,7 +534,7 @@ impl<'a> TransferFunctions for ReadWriteSetAnalysis<'a> {
                     if state.locals.local_exists(args[1], func_env) {
                         state.record_access(args[1], Access::Read, func_env)
                     }
-                }
+                },
                 Pack(_mid, sid, _types) => {
                     // rets[0] = Pack<mid::sid<types>>(args)
                     for (arg_index, fld) in func_env
@@ -558,7 +558,7 @@ impl<'a> TransferFunctions for ReadWriteSetAnalysis<'a> {
                             }
                         }
                     }
-                }
+                },
                 Unpack(_mid, sid, _types) => {
                     // rets = Unpack<mid::sid<types>>(args[0])
                     if state.locals.local_exists(args[0], func_env) {
@@ -582,11 +582,11 @@ impl<'a> TransferFunctions for ReadWriteSetAnalysis<'a> {
                             }
                         }
                     }
-                }
+                },
                 CastU8 | CastU64 | CastU128 | Not | Add | Sub | Mul | Div | Mod | BitOr
                 | BitAnd | Xor | Shl | Shr | Lt | Gt | Le | Ge | Or | And => {
                     // These operations touch non-reference values; nothing to do
-                }
+                },
                 oper => unimplemented!("unsupported oper {:?}", oper),
             },
             Load(_attr_id, lhs, constant) => {
@@ -595,14 +595,14 @@ impl<'a> TransferFunctions for ReadWriteSetAnalysis<'a> {
                         .locals
                         .bind_local(*lhs, AbsAddr::constant(a.clone()), func_env)
                 }
-            }
+            },
             Assign(_attr_id, lhs, rhs, _assign_kind) => state.assign_local(*lhs, *rhs, func_env),
             Ret(_attr_id, rets) => {
                 for (ret_index, ret_val) in rets.iter().enumerate() {
                     state.assign_root(Root::Return(ret_index), *ret_val, func_env)
                 }
-            }
-            Abort(..) => {}
+            },
+            Abort(..) => {},
             SaveMem(..) | Prop(..) | SaveSpecVar(..) | Branch(..) | Jump(..) | Label(..)
             | Nop(..) => (),
         }
@@ -624,25 +624,25 @@ fn call_native_function(
             if state.locals.local_exists(args[0], func_env) {
                 state.record_access(args[0], Access::Read, func_env)
             }
-        }
+        },
         ("signer", "borrow_address") => {
             if state.locals.local_exists(args[0], func_env) {
                 // treat as identity function
                 state.assign_local(rets[0], args[0], func_env)
             }
-        }
+        },
         ("vector", "borrow_mut") | ("vector", "borrow") => {
             if state.locals.local_exists(args[0], func_env) {
                 // this will look at vector length. record as read of an index
                 state.access_offset(args[0], Offset::VectorIndex, Access::Read, func_env);
                 state.assign_offset(rets[0], args[0], Offset::VectorIndex, None, func_env)
             }
-        }
+        },
         ("vector", "length") | ("vector", "is_empty") => {
             if state.locals.local_exists(args[0], func_env) {
                 state.record_access(args[0], Access::Read, func_env)
             }
-        }
+        },
         ("vector", "pop_back") => {
             if state.locals.local_exists(args[0], func_env) {
                 // this will look at vector length. record as read of an index
@@ -656,7 +656,7 @@ fn call_native_function(
                     func_env,
                 )
             }
-        }
+        },
         ("vector", "push_back") | ("vector", "append") | ("vector", "swap") => {
             if state.locals.local_exists(args[0], func_env) {
                 // this will look at vector length. record as read of an index
@@ -664,26 +664,26 @@ fn call_native_function(
                 // writes an index (or several indexes)
                 state.access_offset(args[0], Offset::VectorIndex, Access::Write, func_env);
             }
-        }
+        },
         ("vector", "contains") => {
             if state.locals.local_exists(args[0], func_env) {
                 state.record_access(args[0], Access::Read, func_env); // reads the length + contents
             }
-        }
+        },
         ("Account", "create_signer") => {
             if state.locals.local_exists(args[0], func_env) {
                 state.record_access(args[0], Access::Read, func_env); // reads the input address
                                                                       // treat as assignment
                 state.assign_local(rets[0], args[0], func_env)
             }
-        }
+        },
         ("DiemAccount", "create_signer") => {
             if state.locals.local_exists(args[0], func_env) {
                 state.record_access(args[0], Access::Read, func_env); // reads the input address
                                                                       // treat as assignment
                 state.assign_local(rets[0], args[0], func_env)
             }
-        }
+        },
         ("vector", "empty") | ("vector", "destroy_empty") | ("vector", "reverse") => (),
         ("string", "internal_check_utf8")
         | ("string", "internal_is_char_boundary")
@@ -694,7 +694,7 @@ fn call_native_function(
         ("Signature", "ed25519_validate_pubkey") | ("Signature", "ed25519_verify") => (),
         (m, f) => {
             panic!("Unsupported native function {:?}::{:?}", m, f)
-        }
+        },
     }
 }
 
@@ -865,7 +865,7 @@ impl AccessPath {
                     root: RWRootAddress::Formal(*idx),
                     type_: access_type,
                 }]
-            }
+            },
             Root::Global(key) => {
                 let access_type = key
                     .struct_type()
@@ -880,7 +880,7 @@ impl AccessPath {
                         type_: access_type.clone(),
                     })
                     .collect()
-            }
+            },
             Root::Local(_) | Root::Return(_) => panic!("Malformed root"),
         };
 

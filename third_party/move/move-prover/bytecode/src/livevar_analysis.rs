@@ -271,12 +271,12 @@ impl<'a> LiveVarAnalysis<'a> {
                     );
                     new_bytecodes.append(&mut bytecodes);
                     transformed_code.push(Bytecode::Branch(attr_id, then_label, else_label, src));
-                }
+                },
                 Bytecode::Load(_, dest, _) | Bytecode::Assign(_, dest, _, _)
                     if !annotation_at.after.contains(&dest) =>
                 {
                     // Drop this load/assign as it is not used.
-                }
+                },
                 Bytecode::Call(attr_id, dests, oper, srcs, aa)
                     if code_offset + 1 < code.len()
                         && dests.len() == 1
@@ -314,10 +314,10 @@ impl<'a> LiveVarAnalysis<'a> {
                     } else {
                         transformed_code.push(Bytecode::Call(attr_id, dests, oper, srcs, aa));
                     }
-                }
+                },
                 _ => {
                     transformed_code.push(bytecode);
-                }
+                },
             }
         }
         transformed_code.append(&mut new_bytecodes);
@@ -390,29 +390,29 @@ impl<'a> TransferFunctions for LiveVarAnalysis<'a> {
                 if state.remove(&[*dst]) {
                     state.insert(&[*src]);
                 }
-            }
+            },
             Load(_, dst, _) => {
                 state.remove(&[*dst]);
-            }
+            },
             Call(_, dsts, _, srcs, on_abort) => {
                 state.remove(dsts);
                 state.insert(srcs);
                 if let Some(AbortAction(_, dst)) = on_abort {
                     state.remove(&[*dst]);
                 }
-            }
+            },
             Ret(_, srcs) => {
                 state.insert(srcs);
-            }
+            },
             Abort(_, src) | Branch(_, _, _, src) => {
                 state.insert(&[*src]);
-            }
+            },
             Prop(_, _, exp) => {
                 for (idx, _) in exp.used_temporaries(self.func_target.global_env()) {
                     state.insert(&[idx]);
                 }
-            }
-            _ => {}
+            },
+            _ => {},
         }
     }
 }

@@ -47,10 +47,9 @@ fn native_sha2_256(
             );
 
     let hash_vec = Sha256::digest(hash_arg.as_slice()).to_vec();
-    Ok(NativeResult::ok(
-        cost,
-        smallvec![Value::vector_u8(hash_vec)],
-    ))
+    Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(
+        hash_vec
+    )]))
 }
 
 pub fn make_native_sha2_256(gas_params: Sha2_256GasParameters) -> NativeFunction {
@@ -94,10 +93,9 @@ fn native_sha3_256(
             );
 
     let hash_vec = Sha3_256::digest(hash_arg.as_slice()).to_vec();
-    Ok(NativeResult::ok(
-        cost,
-        smallvec![Value::vector_u8(hash_vec)],
-    ))
+    Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(
+        hash_vec
+    )]))
 }
 
 pub fn make_native_sha3_256(gas_params: Sha3_256GasParameters) -> NativeFunction {

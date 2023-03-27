@@ -137,7 +137,7 @@ pub fn verify_and_create_named_address_mapping<T: Copy + std::fmt::Display + Eq>
                     .entry(name)
                     .or_insert_with(Vec::new)
                     .push(other_addr);
-            }
+            },
             None | Some(_) => (),
         }
     }

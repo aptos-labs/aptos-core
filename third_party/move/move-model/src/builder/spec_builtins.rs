@@ -63,16 +63,13 @@ pub(crate) fn declare_spec_builtins(trans: &mut ModelBuilder<'_>) {
         // Binary operators.
         let mut declare_bin =
             |op: PA::BinOp_, oper: Operation, param_type: &Type, result_type: &Type| {
-                trans.define_spec_fun(
-                    trans.bin_op_symbol(&op),
-                    SpecFunEntry {
-                        loc: loc.clone(),
-                        oper,
-                        type_params: vec![],
-                        arg_types: vec![param_type.clone(), param_type.clone()],
-                        result_type: result_type.clone(),
-                    },
-                );
+                trans.define_spec_fun(trans.bin_op_symbol(&op), SpecFunEntry {
+                    loc: loc.clone(),
+                    oper,
+                    type_params: vec![],
+                    arg_types: vec![param_type.clone(), param_type.clone()],
+                    result_type: result_type.clone(),
+                });
             };
         use PA::BinOp_::*;
         declare_bin(Add, Operation::Add, num_t, num_t);
@@ -99,40 +96,31 @@ pub(crate) fn declare_spec_builtins(trans: &mut ModelBuilder<'_>) {
         declare_bin(Ge, Operation::Ge, num_t, bool_t);
 
         // Eq and Neq have special treatment because they are generic.
-        trans.define_spec_fun(
-            trans.bin_op_symbol(&PA::BinOp_::Eq),
-            SpecFunEntry {
-                loc: loc.clone(),
-                oper: Operation::Eq,
-                type_params: vec![param_t.clone()],
-                arg_types: vec![param_t.clone(), param_t.clone()],
-                result_type: bool_t.clone(),
-            },
-        );
-        trans.define_spec_fun(
-            trans.bin_op_symbol(&PA::BinOp_::Neq),
-            SpecFunEntry {
-                loc: loc.clone(),
-                oper: Operation::Neq,
-                type_params: vec![param_t.clone()],
-                arg_types: vec![param_t.clone(), param_t.clone()],
-                result_type: bool_t.clone(),
-            },
-        );
+        trans.define_spec_fun(trans.bin_op_symbol(&PA::BinOp_::Eq), SpecFunEntry {
+            loc: loc.clone(),
+            oper: Operation::Eq,
+            type_params: vec![param_t.clone()],
+            arg_types: vec![param_t.clone(), param_t.clone()],
+            result_type: bool_t.clone(),
+        });
+        trans.define_spec_fun(trans.bin_op_symbol(&PA::BinOp_::Neq), SpecFunEntry {
+            loc: loc.clone(),
+            oper: Operation::Neq,
+            type_params: vec![param_t.clone()],
+            arg_types: vec![param_t.clone(), param_t.clone()],
+            result_type: bool_t.clone(),
+        });
     }
 
     {
         // Unary operators.
-        trans.define_spec_fun(
-            trans.unary_op_symbol(&PA::UnaryOp_::Not),
-            SpecFunEntry {
-                loc: loc.clone(),
-                oper: Operation::Not,
-                type_params: vec![],
-                arg_types: vec![bool_t.clone()],
-                result_type: bool_t.clone(),
-            },
-        );
+        trans.define_spec_fun(trans.unary_op_symbol(&PA::UnaryOp_::Not), SpecFunEntry {
+            loc: loc.clone(),
+            oper: Operation::Not,
+            type_params: vec![],
+            arg_types: vec![bool_t.clone()],
+            result_type: bool_t.clone(),
+        });
     }
 
     {
@@ -141,188 +129,137 @@ pub(crate) fn declare_spec_builtins(trans: &mut ModelBuilder<'_>) {
         let domain_t = &Type::TypeDomain(Box::new(param_t.clone()));
 
         // Constants (max_u8(), etc.)
-        trans.define_spec_fun(
-            trans.builtin_qualified_symbol("max_u8"),
-            SpecFunEntry {
-                loc: loc.clone(),
-                oper: Operation::MaxU8,
-                type_params: vec![],
-                arg_types: vec![],
-                result_type: num_t.clone(),
-            },
-        );
+        trans.define_spec_fun(trans.builtin_qualified_symbol("max_u8"), SpecFunEntry {
+            loc: loc.clone(),
+            oper: Operation::MaxU8,
+            type_params: vec![],
+            arg_types: vec![],
+            result_type: num_t.clone(),
+        });
 
         // Constants (max_u16(), etc.)
-        trans.define_spec_fun(
-            trans.builtin_qualified_symbol("max_u16"),
-            SpecFunEntry {
-                loc: loc.clone(),
-                oper: Operation::MaxU16,
-                type_params: vec![],
-                arg_types: vec![],
-                result_type: num_t.clone(),
-            },
-        );
+        trans.define_spec_fun(trans.builtin_qualified_symbol("max_u16"), SpecFunEntry {
+            loc: loc.clone(),
+            oper: Operation::MaxU16,
+            type_params: vec![],
+            arg_types: vec![],
+            result_type: num_t.clone(),
+        });
 
         // Constants (max_u32(), etc.)
-        trans.define_spec_fun(
-            trans.builtin_qualified_symbol("max_u32"),
-            SpecFunEntry {
-                loc: loc.clone(),
-                oper: Operation::MaxU32,
-                type_params: vec![],
-                arg_types: vec![],
-                result_type: num_t.clone(),
-            },
-        );
+        trans.define_spec_fun(trans.builtin_qualified_symbol("max_u32"), SpecFunEntry {
+            loc: loc.clone(),
+            oper: Operation::MaxU32,
+            type_params: vec![],
+            arg_types: vec![],
+            result_type: num_t.clone(),
+        });
 
-        trans.define_spec_fun(
-            trans.builtin_qualified_symbol("max_u64"),
-            SpecFunEntry {
-                loc: loc.clone(),
-                oper: Operation::MaxU64,
-                type_params: vec![],
-                arg_types: vec![],
-                result_type: num_t.clone(),
-            },
-        );
+        trans.define_spec_fun(trans.builtin_qualified_symbol("max_u64"), SpecFunEntry {
+            loc: loc.clone(),
+            oper: Operation::MaxU64,
+            type_params: vec![],
+            arg_types: vec![],
+            result_type: num_t.clone(),
+        });
 
-        trans.define_spec_fun(
-            trans.builtin_qualified_symbol("max_u128"),
-            SpecFunEntry {
-                loc: loc.clone(),
-                oper: Operation::MaxU128,
-                type_params: vec![],
-                arg_types: vec![],
-                result_type: num_t.clone(),
-            },
-        );
+        trans.define_spec_fun(trans.builtin_qualified_symbol("max_u128"), SpecFunEntry {
+            loc: loc.clone(),
+            oper: Operation::MaxU128,
+            type_params: vec![],
+            arg_types: vec![],
+            result_type: num_t.clone(),
+        });
 
         // Constants (max_u256(), etc.)
-        trans.define_spec_fun(
-            trans.builtin_qualified_symbol("max_u256"),
-            SpecFunEntry {
-                loc: loc.clone(),
-                oper: Operation::MaxU256,
-                type_params: vec![],
-                arg_types: vec![],
-                result_type: num_t.clone(),
-            },
-        );
+        trans.define_spec_fun(trans.builtin_qualified_symbol("max_u256"), SpecFunEntry {
+            loc: loc.clone(),
+            oper: Operation::MaxU256,
+            type_params: vec![],
+            arg_types: vec![],
+            result_type: num_t.clone(),
+        });
 
         // Vectors
-        trans.define_spec_fun(
-            trans.builtin_qualified_symbol("len"),
-            SpecFunEntry {
-                loc: loc.clone(),
-                oper: Operation::Len,
-                type_params: vec![param_t.clone()],
-                arg_types: vec![vector_t.clone()],
-                result_type: num_t.clone(),
-            },
-        );
-        trans.define_spec_fun(
-            trans.builtin_qualified_symbol("update"),
-            SpecFunEntry {
-                loc: loc.clone(),
-                oper: Operation::UpdateVec,
-                type_params: vec![param_t.clone()],
-                arg_types: vec![vector_t.clone(), num_t.clone(), param_t.clone()],
-                result_type: vector_t.clone(),
-            },
-        );
-        trans.define_spec_fun(
-            trans.builtin_qualified_symbol("vec"),
-            SpecFunEntry {
-                loc: loc.clone(),
-                oper: Operation::EmptyVec,
-                type_params: vec![param_t.clone()],
-                arg_types: vec![],
-                result_type: vector_t.clone(),
-            },
-        );
-        trans.define_spec_fun(
-            trans.builtin_qualified_symbol("vec"),
-            SpecFunEntry {
-                loc: loc.clone(),
-                oper: Operation::SingleVec,
-                type_params: vec![param_t.clone()],
-                arg_types: vec![param_t.clone()],
-                result_type: vector_t.clone(),
-            },
-        );
-        trans.define_spec_fun(
-            trans.builtin_qualified_symbol("concat"),
-            SpecFunEntry {
-                loc: loc.clone(),
-                oper: Operation::ConcatVec,
-                type_params: vec![param_t.clone()],
-                arg_types: vec![vector_t.clone(), vector_t.clone()],
-                result_type: vector_t.clone(),
-            },
-        );
-        trans.define_spec_fun(
-            trans.builtin_qualified_symbol("contains"),
-            SpecFunEntry {
-                loc: loc.clone(),
-                oper: Operation::ContainsVec,
-                type_params: vec![param_t.clone()],
-                arg_types: vec![vector_t.clone(), param_t.clone()],
-                result_type: bool_t.clone(),
-            },
-        );
-        trans.define_spec_fun(
-            trans.builtin_qualified_symbol("index_of"),
-            SpecFunEntry {
-                loc: loc.clone(),
-                oper: Operation::IndexOfVec,
-                type_params: vec![param_t.clone()],
-                arg_types: vec![vector_t.clone(), param_t.clone()],
-                result_type: num_t.clone(),
-            },
-        );
-        trans.define_spec_fun(
-            trans.builtin_qualified_symbol("in_range"),
-            SpecFunEntry {
-                loc: loc.clone(),
-                oper: Operation::InRangeVec,
-                type_params: vec![param_t.clone()],
-                arg_types: vec![vector_t.clone(), num_t.clone()],
-                result_type: bool_t.clone(),
-            },
-        );
-        trans.define_spec_fun(
-            trans.builtin_qualified_symbol("in_range"),
-            SpecFunEntry {
-                loc: loc.clone(),
-                oper: Operation::InRangeRange,
-                type_params: vec![],
-                arg_types: vec![range_t.clone(), num_t.clone()],
-                result_type: bool_t.clone(),
-            },
-        );
-        trans.define_spec_fun(
-            trans.builtin_qualified_symbol("range"),
-            SpecFunEntry {
-                loc: loc.clone(),
-                oper: Operation::RangeVec,
-                type_params: vec![param_t.clone()],
-                arg_types: vec![vector_t.clone()],
-                result_type: range_t.clone(),
-            },
-        );
+        trans.define_spec_fun(trans.builtin_qualified_symbol("len"), SpecFunEntry {
+            loc: loc.clone(),
+            oper: Operation::Len,
+            type_params: vec![param_t.clone()],
+            arg_types: vec![vector_t.clone()],
+            result_type: num_t.clone(),
+        });
+        trans.define_spec_fun(trans.builtin_qualified_symbol("update"), SpecFunEntry {
+            loc: loc.clone(),
+            oper: Operation::UpdateVec,
+            type_params: vec![param_t.clone()],
+            arg_types: vec![vector_t.clone(), num_t.clone(), param_t.clone()],
+            result_type: vector_t.clone(),
+        });
+        trans.define_spec_fun(trans.builtin_qualified_symbol("vec"), SpecFunEntry {
+            loc: loc.clone(),
+            oper: Operation::EmptyVec,
+            type_params: vec![param_t.clone()],
+            arg_types: vec![],
+            result_type: vector_t.clone(),
+        });
+        trans.define_spec_fun(trans.builtin_qualified_symbol("vec"), SpecFunEntry {
+            loc: loc.clone(),
+            oper: Operation::SingleVec,
+            type_params: vec![param_t.clone()],
+            arg_types: vec![param_t.clone()],
+            result_type: vector_t.clone(),
+        });
+        trans.define_spec_fun(trans.builtin_qualified_symbol("concat"), SpecFunEntry {
+            loc: loc.clone(),
+            oper: Operation::ConcatVec,
+            type_params: vec![param_t.clone()],
+            arg_types: vec![vector_t.clone(), vector_t.clone()],
+            result_type: vector_t.clone(),
+        });
+        trans.define_spec_fun(trans.builtin_qualified_symbol("contains"), SpecFunEntry {
+            loc: loc.clone(),
+            oper: Operation::ContainsVec,
+            type_params: vec![param_t.clone()],
+            arg_types: vec![vector_t.clone(), param_t.clone()],
+            result_type: bool_t.clone(),
+        });
+        trans.define_spec_fun(trans.builtin_qualified_symbol("index_of"), SpecFunEntry {
+            loc: loc.clone(),
+            oper: Operation::IndexOfVec,
+            type_params: vec![param_t.clone()],
+            arg_types: vec![vector_t.clone(), param_t.clone()],
+            result_type: num_t.clone(),
+        });
+        trans.define_spec_fun(trans.builtin_qualified_symbol("in_range"), SpecFunEntry {
+            loc: loc.clone(),
+            oper: Operation::InRangeVec,
+            type_params: vec![param_t.clone()],
+            arg_types: vec![vector_t.clone(), num_t.clone()],
+            result_type: bool_t.clone(),
+        });
+        trans.define_spec_fun(trans.builtin_qualified_symbol("in_range"), SpecFunEntry {
+            loc: loc.clone(),
+            oper: Operation::InRangeRange,
+            type_params: vec![],
+            arg_types: vec![range_t.clone(), num_t.clone()],
+            result_type: bool_t.clone(),
+        });
+        trans.define_spec_fun(trans.builtin_qualified_symbol("range"), SpecFunEntry {
+            loc: loc.clone(),
+            oper: Operation::RangeVec,
+            type_params: vec![param_t.clone()],
+            arg_types: vec![vector_t.clone()],
+            result_type: range_t.clone(),
+        });
 
         // Resources.
-        trans.define_spec_fun(
-            trans.builtin_qualified_symbol("global"),
-            SpecFunEntry {
-                loc: loc.clone(),
-                oper: Operation::Global(None),
-                type_params: vec![param_t.clone()],
-                arg_types: vec![address_t.clone()],
-                result_type: param_t.clone(),
-            },
-        );
+        trans.define_spec_fun(trans.builtin_qualified_symbol("global"), SpecFunEntry {
+            loc: loc.clone(),
+            oper: Operation::Global(None),
+            type_params: vec![param_t.clone()],
+            arg_types: vec![address_t.clone()],
+            result_type: param_t.clone(),
+        });
         // TODO(emmazzz): declaring these as builtins will allow users to
         // use borrow_global and borrow_global_mut in specs. Later we should
         // map them to `global` instead.
@@ -346,16 +283,13 @@ pub(crate) fn declare_spec_builtins(trans: &mut ModelBuilder<'_>) {
                 result_type: param_t.clone(),
             },
         );
-        trans.define_spec_fun(
-            trans.builtin_qualified_symbol("exists"),
-            SpecFunEntry {
-                loc: loc.clone(),
-                oper: Operation::Exists(None),
-                type_params: vec![param_t.clone()],
-                arg_types: vec![address_t.clone()],
-                result_type: bool_t.clone(),
-            },
-        );
+        trans.define_spec_fun(trans.builtin_qualified_symbol("exists"), SpecFunEntry {
+            loc: loc.clone(),
+            oper: Operation::Exists(None),
+            type_params: vec![param_t.clone()],
+            arg_types: vec![address_t.clone()],
+            result_type: bool_t.clone(),
+        });
 
         trans.define_spec_fun(
             trans.builtin_qualified_symbol("$spec_domain"),
@@ -369,51 +303,39 @@ pub(crate) fn declare_spec_builtins(trans: &mut ModelBuilder<'_>) {
         );
 
         // Old
-        trans.define_spec_fun(
-            trans.builtin_qualified_symbol("old"),
-            SpecFunEntry {
-                loc: loc.clone(),
-                oper: Operation::Old,
-                type_params: vec![param_t.clone()],
-                arg_types: vec![param_t.clone()],
-                result_type: param_t.clone(),
-            },
-        );
+        trans.define_spec_fun(trans.builtin_qualified_symbol("old"), SpecFunEntry {
+            loc: loc.clone(),
+            oper: Operation::Old,
+            type_params: vec![param_t.clone()],
+            arg_types: vec![param_t.clone()],
+            result_type: param_t.clone(),
+        });
 
         // Tracing
-        trans.define_spec_fun(
-            trans.builtin_qualified_symbol("TRACE"),
-            SpecFunEntry {
-                loc: loc.clone(),
-                oper: Operation::Trace(TraceKind::User),
-                type_params: vec![param_t.clone()],
-                arg_types: vec![param_t.clone()],
-                result_type: param_t.clone(),
-            },
-        );
+        trans.define_spec_fun(trans.builtin_qualified_symbol("TRACE"), SpecFunEntry {
+            loc: loc.clone(),
+            oper: Operation::Trace(TraceKind::User),
+            type_params: vec![param_t.clone()],
+            arg_types: vec![param_t.clone()],
+            result_type: param_t.clone(),
+        });
 
         // Explicit bv2int
-        trans.define_spec_fun(
-            trans.builtin_qualified_symbol("bv2int"),
-            SpecFunEntry {
-                loc: loc.clone(),
-                oper: Operation::Bv2Int,
-                type_params: vec![param_t.clone()],
-                arg_types: vec![param_t.clone()],
-                result_type: param_t.clone(),
-            },
-        );
+        trans.define_spec_fun(trans.builtin_qualified_symbol("bv2int"), SpecFunEntry {
+            loc: loc.clone(),
+            oper: Operation::Bv2Int,
+            type_params: vec![param_t.clone()],
+            arg_types: vec![param_t.clone()],
+            result_type: param_t.clone(),
+        });
 
         // Explicit int2bv
-        trans.define_spec_fun(
-            trans.builtin_qualified_symbol("int2bv"),
-            SpecFunEntry {
-                loc,
-                oper: Operation::Int2Bv,
-                type_params: vec![param_t.clone()],
-                arg_types: vec![param_t.clone()],
-                result_type: param_t.clone(),
-            },
-        );
+        trans.define_spec_fun(trans.builtin_qualified_symbol("int2bv"), SpecFunEntry {
+            loc,
+            oper: Operation::Int2Bv,
+            type_params: vec![param_t.clone()],
+            arg_types: vec![param_t.clone()],
+            result_type: param_t.clone(),
+        });
     }
 }

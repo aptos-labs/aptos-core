@@ -110,7 +110,7 @@ impl AbstractDomain for LocalStates {
                     result = JoinResult::Changed;
                     let state = other_state.clone();
                     self.set_state(local, state)
-                }
+                },
 
                 // Available in one but not the other, so maybe unavailable
                 (L::Available(available), L::Unavailable(unavailable, reason))
@@ -125,7 +125,7 @@ impl AbstractDomain for LocalStates {
                     };
 
                     self.set_state(local, state)
-                }
+                },
             }
         }
 

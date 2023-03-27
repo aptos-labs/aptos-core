@@ -166,17 +166,14 @@ impl AliasMap {
                 // the alias was defined. The name represents JUST the module name, though, so we do
                 // not change location of the address as we don't have this information.
                 // TODO maybe we should also keep the alias reference (or its location)?
-                let sp!(
-                    _,
-                    ModuleIdent_ {
-                        address,
-                        module: ModuleName(sp!(_, module))
-                    }
-                ) = ident;
+                let sp!(_, ModuleIdent_ {
+                    address,
+                    module: ModuleName(sp!(_, module))
+                }) = ident;
                 let address = *address;
                 let module = ModuleName(sp(n.loc, *module));
                 Some(sp(n.loc, ModuleIdent_ { address, module }))
-            }
+            },
         }
     }
 
@@ -193,7 +190,7 @@ impl AliasMap {
                 // not change location of the module as we don't have this information.
                 // TODO maybe we should also keep the alias reference (or its location)?
                 Some((sp(*mem_mod_loc, *mem_mod), sp(n.loc, *mem_name)))
-            }
+            },
         }
     }
 

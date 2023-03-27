@@ -196,17 +196,17 @@ impl SignatureTokenGen {
                         )
                     }
                 }
-            }
+            },
             Vector(token) => SignatureToken::Vector(Box::new(token.materialize(struct_handles))),
             Reference(token) => {
                 SignatureToken::Reference(Box::new(token.materialize(struct_handles)))
-            }
+            },
             MutableReference(token) => {
                 SignatureToken::MutableReference(Box::new(token.materialize(struct_handles)))
-            }
+            },
             TypeParameter(idx) => {
                 SignatureToken::TypeParameter(idx.index(struct_handles.len()) as TypeParameterIndex)
-            }
+            },
         }
     }
 }

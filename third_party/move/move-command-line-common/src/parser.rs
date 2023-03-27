@@ -148,7 +148,7 @@ impl<'a, I: Iterator<Item = (TypeToken, &'a str)>> Parser<'a, TypeToken, I> {
                 let ty = self.parse_type()?;
                 self.advance(TypeToken::Gt)?;
                 ParsedType::Vector(Box::new(ty))
-            }
+            },
             (TypeToken::Ident, _) | (TypeToken::AddressIdent, _) => {
                 let addr_tok = match tok {
                     TypeToken::Ident => ValueToken::Ident,
@@ -171,7 +171,7 @@ impl<'a, I: Iterator<Item = (TypeToken, &'a str)>> Parser<'a, TypeToken, I> {
                         )?;
                         self.advance(TypeToken::Gt)?;
                         type_args
-                    }
+                    },
                     _ => vec![],
                 };
                 ParsedType::Struct(ParsedStructType {
@@ -180,7 +180,7 @@ impl<'a, I: Iterator<Item = (TypeToken, &'a str)>> Parser<'a, TypeToken, I> {
                     name: struct_contents.to_owned(),
                     type_args,
                 })
-            }
+            },
             _ => bail!("unexpected token {}, expected type", tok),
         })
     }
@@ -196,7 +196,7 @@ impl<'a, I: Iterator<Item = (ValueToken, &'a str)>> Parser<'a, ValueToken, I> {
             ValueToken::Number if !matches!(self.peek_tok(), Some(ValueToken::ColonColon)) => {
                 let (u, _) = parse_u256(contents)?;
                 ParsedValue::InferredNum(u)
-            }
+            },
             ValueToken::NumberTyped => {
                 if let Some(s) = contents.strip_suffix("u8") {
                     let (u, _) = parse_u8(s)?;
@@ -217,7 +217,7 @@ impl<'a, I: Iterator<Item = (ValueToken, &'a str)>> Parser<'a, ValueToken, I> {
                     let (u, _) = parse_u256(contents.strip_suffix("u256").unwrap())?;
                     ParsedValue::U256(u)
                 }
-            }
+            },
             ValueToken::True => ParsedValue::Bool(true),
             ValueToken::False => ParsedValue::Bool(false),
 
@@ -235,7 +235,7 @@ impl<'a, I: Iterator<Item = (ValueToken, &'a str)>> Parser<'a, ValueToken, I> {
                         .map(ParsedValue::U8)
                         .collect(),
                 )
-            }
+            },
             ValueToken::HexString => {
                 let contents = contents
                     .strip_prefix("x\"")
@@ -250,7 +250,7 @@ impl<'a, I: Iterator<Item = (ValueToken, &'a str)>> Parser<'a, ValueToken, I> {
                         .map(ParsedValue::U8)
                         .collect(),
                 )
-            }
+            },
             ValueToken::Utf8String => {
                 let contents = contents
                     .strip_prefix('\"')
@@ -265,7 +265,7 @@ impl<'a, I: Iterator<Item = (ValueToken, &'a str)>> Parser<'a, ValueToken, I> {
                         .map(ParsedValue::U8)
                         .collect(),
                 )
-            }
+            },
 
             ValueToken::AtSign => ParsedValue::Address(self.parse_address()?),
 
@@ -279,7 +279,7 @@ impl<'a, I: Iterator<Item = (ValueToken, &'a str)>> Parser<'a, ValueToken, I> {
                 )?;
                 self.advance(ValueToken::RBracket)?;
                 ParsedValue::Vector(values)
-            }
+            },
 
             ValueToken::Number | ValueToken::Ident => {
                 let addr_ident = parse_address_impl(tok, contents)?;
@@ -308,7 +308,7 @@ impl<'a, I: Iterator<Item = (ValueToken, &'a str)>> Parser<'a, ValueToken, I> {
                     }
                 }
                 ParsedValue::Struct(addr_ident, module_name, struct_name, values)
-            }
+            },
 
             _ => bail!("unexpected token {}, expected type", tok),
         })
@@ -330,7 +330,7 @@ pub fn parse_address_impl(tok: ValueToken, contents: &str) -> Result<ParsedAddre
                     s
                 )
             })?)
-        }
+        },
         ValueToken::Ident => ParsedAddress::Named(contents.to_owned()),
         _ => bail!("unexpected token {}, expected identifier or number", tok),
     })
@@ -409,13 +409,10 @@ pub fn parse_u256(s: &str) -> Result<(U256, NumberFormat), U256FromStrError> {
 // Parse an address from a decimal or hex encoding
 pub fn parse_address_number(s: &str) -> Option<([u8; AccountAddress::LENGTH], NumberFormat)> {
     let (txt, base) = determine_num_text_and_base(s);
-    let parsed = BigUint::parse_bytes(
-        txt.as_bytes(),
-        match base {
-            NumberFormat::Hex => 16,
-            NumberFormat::Decimal => 10,
-        },
-    )?;
+    let parsed = BigUint::parse_bytes(txt.as_bytes(), match base {
+        NumberFormat::Hex => 16,
+        NumberFormat::Decimal => 10,
+    })?;
     let bytes = parsed.to_bytes_be();
     if bytes.len() > AccountAddress::LENGTH {
         return None;

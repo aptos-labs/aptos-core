@@ -38,23 +38,23 @@ pub fn verify(
             let cycle_ident = *cycle_node.node_id();
             let error = cycle_error(&module_neighbors, cycle_ident);
             compilation_env.add_diag(error);
-        }
+        },
         Ok(ordered_ids) => {
             for (order, mident) in ordered_ids.iter().rev().enumerate() {
                 modules.get_mut(mident).unwrap().dependency_order = order;
             }
-        }
+        },
     }
     for (node, neighbors) in neighbors_by_node {
         match node {
             NodeIdent::Module(mident) => {
                 let module = modules.get_mut(&mident).unwrap();
                 module.immediate_neighbors = neighbors;
-            }
+            },
             NodeIdent::Script(sname) => {
                 let script = scripts.get_mut(&sname).unwrap();
                 script.immediate_neighbors = neighbors;
-            }
+            },
         }
     }
     for (node, used_addresses) in addresses_by_node {
@@ -62,11 +62,11 @@ pub fn verify(
             NodeIdent::Module(mident) => {
                 let module = modules.get_mut(&mident).unwrap();
                 module.used_addresses = used_addresses;
-            }
+            },
             NodeIdent::Script(sname) => {
                 let script = scripts.get_mut(&sname).unwrap();
                 script.used_addresses = used_addresses;
-            }
+            },
         }
     }
 }
@@ -157,7 +157,7 @@ impl<'a> Context<'a> {
                     return;
                 }
                 m.insert(dep_type, loc);
-            }
+            },
             NodeIdent::Script(_) => (),
         }
     }
@@ -367,12 +367,12 @@ fn type_(context: &mut Context, sp!(_, ty_): &E::Type) {
         T::Apply(tn, tys) => {
             module_access(context, tn);
             types(context, tys);
-        }
+        },
         T::Multiple(tys) => types(context, tys),
         T::Fun(tys, ret_ty) => {
             types(context, tys);
             type_(context, ret_ty)
-        }
+        },
         T::Ref(_, t) => type_(context, t),
         T::Unit | T::UnresolvedError => (),
     }
@@ -394,11 +394,11 @@ fn sequence(context: &mut Context, sequence: &E::Sequence) {
             SI::Declare(bl, ty_opt) => {
                 lvalues(context, &bl.value);
                 type_opt(context, ty_opt);
-            }
+            },
             SI::Bind(bl, e) => {
                 lvalues(context, &bl.value);
                 exp(context, e)
-            }
+            },
         }
     }
 }
@@ -441,41 +441,41 @@ fn exp(context: &mut Context, sp!(_loc, e_): &E::Exp) {
         E::Name(ma, tys_opt) => {
             module_access(context, ma);
             types_opt(context, tys_opt)
-        }
+        },
         E::Call(ma, _is_macro, tys_opt, sp!(_, args_)) => {
             module_access(context, ma);
             types_opt(context, tys_opt);
             args_.iter().for_each(|e| exp(context, e))
-        }
+        },
         E::Pack(ma, tys_opt, fields) => {
             module_access(context, ma);
             types_opt(context, tys_opt);
             fields.iter().for_each(|(_, _, (_, e))| exp(context, e))
-        }
+        },
         E::Vector(_vec_loc, tys_opt, sp!(_, args_)) => {
             types_opt(context, tys_opt);
             args_.iter().for_each(|e| exp(context, e))
-        }
+        },
 
         E::IfElse(ec, et, ef) => {
             exp(context, ec);
             exp(context, et);
             exp(context, ef)
-        }
+        },
 
         E::BinopExp(e1, _, e2) | E::Mutate(e1, e2) | E::While(e1, e2) | E::Index(e1, e2) => {
             exp(context, e1);
             exp(context, e2)
-        }
+        },
         E::Block(seq) => sequence(context, seq),
         E::Assign(al, e) => {
             lvalues(context, &al.value);
             exp(context, e)
-        }
+        },
         E::FieldMutate(edotted, e) => {
             exp_dotted(context, edotted);
             exp(context, e);
-        }
+        },
 
         E::Loop(e)
         | E::Return(e)
@@ -491,12 +491,12 @@ fn exp(context: &mut Context, sp!(_loc, e_): &E::Exp) {
         E::Cast(e, ty) | E::Annotate(e, ty) => {
             exp(context, e);
             type_(context, ty)
-        }
+        },
 
         E::Lambda(ll, e) => {
             lvalues(context, &ll.value);
             exp(context, e)
-        }
+        },
         E::Quant(_, binds, es_vec, eopt, e) => {
             lvalues_with_range(context, binds);
             es_vec
@@ -504,7 +504,7 @@ fn exp(context: &mut Context, sp!(_loc, e_): &E::Exp) {
                 .for_each(|es| es.iter().for_each(|e| exp(context, e)));
             eopt.iter().for_each(|e| exp(context, e));
             exp(context, e)
-        }
+        },
     }
 }
 
@@ -536,19 +536,19 @@ fn spec_block_member(context: &mut Context, sp!(_, sbm_): &E::SpecBlockMember) {
         } => {
             exp(context, e);
             es.iter().for_each(|e| exp(context, e))
-        }
+        },
         M::Function { body, .. } => {
             if let E::FunctionBody_::Defined(seq) = &body.value {
                 sequence(context, seq)
             }
-        }
+        },
         M::Let { def: e, .. } | M::Include { exp: e, .. } | M::Apply { exp: e, .. } => {
             exp(context, e)
-        }
+        },
         M::Update { lhs, rhs } => {
             exp(context, lhs);
             exp(context, rhs);
-        }
+        },
         // A special treatment to the `pragma friend` declarations.
         //
         // The `pragma friend = <address::module_name::function_name>` notion exists before the
@@ -573,12 +573,12 @@ fn spec_block_member(context: &mut Context, sp!(_, sbm_): &E::SpecBlockMember) {
                             E::ModuleAccess_::Name(_) => (),
                             E::ModuleAccess_::ModuleAccess(mident, _) => {
                                 context.add_friend(*mident, maccess.loc);
-                            }
+                            },
                         },
                     }
                 }
             }
-        }
+        },
         M::Variable { .. } => (),
     }
 }

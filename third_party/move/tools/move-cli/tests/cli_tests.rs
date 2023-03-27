@@ -259,10 +259,10 @@ fn save_credential_works() {
                         MOVEY_URL
                     )));
                     Ok(())
-                }
+                },
                 Err(error) => Err(error),
             }
-        }
+        },
         Err(error) => Err(error),
     }
     .unwrap();
@@ -313,10 +313,10 @@ fn save_credential_fails_if_undeletable_credential_file_exists() {
                     assert!(String::from_utf8_lossy(&output.stderr)
                         .contains("Error: Error reading input: Permission denied (os error 13)"));
                     Ok(())
-                }
+                },
                 Err(error) => Err(error),
             }
-        }
+        },
         Err(error) => Err(error),
     }
     .unwrap();

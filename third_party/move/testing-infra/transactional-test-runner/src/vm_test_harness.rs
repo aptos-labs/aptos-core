@@ -65,7 +65,7 @@ pub fn view_resource_in_move_storage(
         Some(data) => {
             let annotated = MoveValueAnnotator::new(storage).view_resource(&tag, &data)?;
             Ok(format!("{}", annotated))
-        }
+        },
     }
 }
 
@@ -111,7 +111,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         let additional_mapping = match task_opt.map(|t| t.command) {
             Some((InitCommand { named_addresses }, _)) => {
                 verify_and_create_named_address_mapping(named_addresses).unwrap()
-            }
+            },
             None => BTreeMap::new(),
         };
 
@@ -386,7 +386,7 @@ static PRECOMPILED_MOVE_STDLIB: Lazy<FullyCompiledProgram> = Lazy::new(|| {
         Err((files, errors)) => {
             eprintln!("!!!Standard library failed to compile!!!");
             move_compiler::diagnostics::report_diagnostics(&files, errors)
-        }
+        },
     }
 });
 
@@ -402,17 +402,17 @@ static MOVE_STDLIB_COMPILED: Lazy<Vec<CompiledModule>> = Lazy::new(|| {
         Err(diags) => {
             eprintln!("!!!Standard library failed to compile!!!");
             move_compiler::diagnostics::report_diagnostics(&files, diags)
-        }
+        },
         Ok((_, warnings)) if !warnings.is_empty() => {
             eprintln!("!!!Standard library failed to compile!!!");
             move_compiler::diagnostics::report_diagnostics(&files, warnings)
-        }
+        },
         Ok((units, _warnings)) => units
             .into_iter()
             .filter_map(|m| match m {
                 AnnotatedCompiledUnit::Module(annot_module) => {
                     Some(annot_module.named_module.module)
-                }
+                },
                 AnnotatedCompiledUnit::Script(_) => None,
             })
             .collect(),

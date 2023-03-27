@@ -107,33 +107,33 @@ fn command(context: &mut Context, sp!(loc, cmd_): &Command) {
         C::Assign(ls, e) => {
             let values = exp(context, e);
             lvalues(context, ls, values);
-        }
+        },
         C::Mutate(el, er) => {
             let value = assert_single_value(exp(context, er));
             assert!(!value.is_ref());
             let lvalue = assert_single_value(exp(context, el));
             let diags = context.borrow_state.mutate(*loc, lvalue);
             context.add_diags(diags);
-        }
+        },
         C::JumpIf { cond: e, .. } => {
             let value = assert_single_value(exp(context, e));
             assert!(!value.is_ref());
-        }
+        },
         C::IgnoreAndPop { exp: e, .. } => {
             let values = exp(context, e);
             context.borrow_state.release_values(values);
-        }
+        },
 
         C::Return { exp: e, .. } => {
             let values = exp(context, e);
             let diags = context.borrow_state.return_(*loc, values);
             context.add_diags(diags);
-        }
+        },
         C::Abort(e) => {
             let value = assert_single_value(exp(context, e));
             assert!(!value.is_ref());
             context.borrow_state.abort()
-        }
+        },
         C::Jump { .. } => (),
         C::Break | C::Continue => panic!("ICE break/continue not translated to jumps"),
     }
@@ -150,17 +150,17 @@ fn lvalue(context: &mut Context, sp!(loc, l_): &LValue, value: Value) {
     match l_ {
         L::Ignore => {
             context.borrow_state.release_value(value);
-        }
+        },
         L::Var(v, _) => {
             let diags = context.borrow_state.assign_local(*loc, v, value);
             context.add_diags(diags)
-        }
+        },
         L::Unpack(_, _, fields) => {
             assert!(!value.is_ref());
             fields
                 .iter()
                 .for_each(|(_, l)| lvalue(context, l, Value::NonRef))
-        }
+        },
     }
 }
 
@@ -174,36 +174,36 @@ fn exp(context: &mut Context, parent_e: &Exp) -> Values {
             let (diags, value) = context.borrow_state.move_local(*eloc, var, last_usage);
             context.add_diags(diags);
             vec![value]
-        }
+        },
         E::Copy { var, .. } => {
             let (diags, value) = context.borrow_state.copy_local(*eloc, var);
             context.add_diags(diags);
             vec![value]
-        }
+        },
         E::BorrowLocal(mut_, var) => {
             let (diags, value) = context.borrow_state.borrow_local(*eloc, *mut_, var);
             context.add_diags(diags);
             assert!(value.is_ref());
             vec![value]
-        }
+        },
         E::Freeze(e) => {
             let evalue = assert_single_value(exp(context, e));
             let (diags, value) = context.borrow_state.freeze(*eloc, evalue);
             context.add_diags(diags);
             vec![value]
-        }
+        },
         E::Dereference(e) => {
             let evalue = assert_single_value(exp(context, e));
             let (errors, value) = context.borrow_state.dereference(*eloc, evalue);
             context.add_diags(errors);
             vec![value]
-        }
+        },
         E::Borrow(mut_, e, f) => {
             let evalue = assert_single_value(exp(context, e));
             let (diags, value) = context.borrow_state.borrow_field(*eloc, *mut_, evalue, f);
             context.add_diags(diags);
             vec![value]
-        }
+        },
 
         E::Builtin(b, e) => {
             let evalues = exp(context, e);
@@ -214,14 +214,14 @@ fn exp(context: &mut Context, parent_e: &Exp) -> Values {
                     let (diags, value) = context.borrow_state.borrow_global(*eloc, *mut_, t);
                     context.add_diags(diags);
                     vec![value]
-                }
+                },
                 sp!(_, BuiltinFunction_::MoveFrom(t)) => {
                     assert!(!assert_single_value(evalues).is_ref());
                     let (diags, value) = context.borrow_state.move_from(*eloc, t);
                     assert!(!value.is_ref());
                     context.add_diags(diags);
                     vec![value]
-                }
+                },
                 _ => {
                     let ret_ty = &parent_e.ty;
                     let (diags, values) =
@@ -230,16 +230,16 @@ fn exp(context: &mut Context, parent_e: &Exp) -> Values {
                             .call(*eloc, evalues, &BTreeMap::new(), ret_ty);
                     context.add_diags(diags);
                     values
-                }
+                },
             }
-        }
+        },
 
         E::Vector(_, n, _, e) => {
             let evalues = exp(context, e);
             debug_assert_eq!(*n, evalues.len());
             evalues.into_iter().for_each(|v| assert!(!v.is_ref()));
             svalue()
-        }
+        },
 
         E::ModuleCall(mcall) => {
             let evalues = exp(context, &mcall.arguments);
@@ -250,7 +250,7 @@ fn exp(context: &mut Context, parent_e: &Exp) -> Values {
                     .call(*eloc, evalues, &mcall.acquires, ret_ty);
             context.add_diags(diags);
             values
-        }
+        },
 
         E::Unit { .. } => vec![],
         E::Value(_) | E::Constant(_) | E::Spec(_) | E::UnresolvedError => svalue(),
@@ -259,7 +259,7 @@ fn exp(context: &mut Context, parent_e: &Exp) -> Values {
             let v = exp(context, e);
             assert!(!assert_single_value(v).is_ref());
             svalue()
-        }
+        },
         E::BinopExp(e1, sp!(_, BinOp_::Eq), e2) | E::BinopExp(e1, sp!(_, BinOp_::Neq), e2) => {
             let v1 = assert_single_value(exp(context, e1));
             let v2 = assert_single_value(exp(context, e2));
@@ -273,21 +273,21 @@ fn exp(context: &mut Context, parent_e: &Exp) -> Values {
                 assert!(errors.is_empty(), "ICE eq freezing failed");
             }
             svalue()
-        }
+        },
         E::BinopExp(e1, _, e2) => {
             let v1 = assert_single_value(exp(context, e1));
             let v2 = assert_single_value(exp(context, e2));
             assert!(!v1.is_ref());
             assert!(!v2.is_ref());
             svalue()
-        }
+        },
         E::Pack(_, _, fields) => {
             fields.iter().for_each(|(_, _, e)| {
                 let arg = exp(context, e);
                 assert!(!assert_single_value(arg).is_ref());
             });
             svalue()
-        }
+        },
 
         E::ExpList(es) => es
             .iter()

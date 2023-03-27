@@ -112,12 +112,12 @@ impl<'env> FunctionContext<'env> {
         match val {
             BaseValue::Address(v) | BaseValue::Signer(v) => {
                 addresses.push(*v);
-            }
+            },
             BaseValue::Vector(vec) | BaseValue::Struct(vec) => {
                 for (_, val) in vec.iter().enumerate() {
                     Self::collect_addresses(val, addresses);
                 }
-            }
+            },
             BaseValue::Bool(_) => (),
             BaseValue::Int(_) => (),
         }
@@ -188,21 +188,21 @@ impl<'env> FunctionContext<'env> {
                 }
                 let res = self.native_vector_empty();
                 Ok(vec![res])
-            }
+            },
             (DIEM_CORE_ADDR, "vector", "length") => {
                 if cfg!(debug_assertions) {
                     assert_eq!(srcs.len(), 1);
                 }
                 let res = self.native_vector_length(dummy_state.del_value(0));
                 Ok(vec![res])
-            }
+            },
             (DIEM_CORE_ADDR, "vector", "borrow") => {
                 if cfg!(debug_assertions) {
                     assert_eq!(srcs.len(), 2);
                 }
                 self.native_vector_borrow(dummy_state.del_value(0), dummy_state.del_value(1))
                     .map(|res| vec![res])
-            }
+            },
             (DIEM_CORE_ADDR, "vector", "borrow_mut") => {
                 if cfg!(debug_assertions) {
                     assert_eq!(srcs.len(), 2);
@@ -213,7 +213,7 @@ impl<'env> FunctionContext<'env> {
                     dummy_state.del_value(1),
                 )
                 .map(|res| vec![res])
-            }
+            },
             (DIEM_CORE_ADDR, "vector", "push_back") => {
                 if cfg!(debug_assertions) {
                     assert_eq!(srcs.len(), 2);
@@ -222,7 +222,7 @@ impl<'env> FunctionContext<'env> {
                     .native_vector_push_back(dummy_state.del_value(0), dummy_state.del_value(1));
                 local_state.put_value_override(*srcs.first().unwrap(), res);
                 Ok(vec![])
-            }
+            },
             (DIEM_CORE_ADDR, "vector", "pop_back") => {
                 if cfg!(debug_assertions) {
                     assert_eq!(srcs.len(), 1);
@@ -232,10 +232,10 @@ impl<'env> FunctionContext<'env> {
                     Ok((new_vec, elem_val)) => {
                         local_state.put_value_override(*srcs.first().unwrap(), new_vec);
                         Ok(vec![elem_val])
-                    }
+                    },
                     Err(e) => Err(e),
                 }
-            }
+            },
             (DIEM_CORE_ADDR, "vector", "destroy_empty") => {
                 if cfg!(debug_assertions) {
                     assert_eq!(srcs.len(), 1);
@@ -245,10 +245,10 @@ impl<'env> FunctionContext<'env> {
                     Ok(_) => {
                         local_state.del_value(*srcs.first().unwrap());
                         Ok(vec![])
-                    }
+                    },
                     Err(e) => Err(e),
                 }
-            }
+            },
             (DIEM_CORE_ADDR, "vector", "swap") => {
                 if cfg!(debug_assertions) {
                     assert_eq!(srcs.len(), 3);
@@ -262,38 +262,38 @@ impl<'env> FunctionContext<'env> {
                     Ok(new_vec) => {
                         local_state.put_value_override(*srcs.first().unwrap(), new_vec);
                         Ok(vec![])
-                    }
+                    },
                     Err(e) => Err(e),
                 }
-            }
+            },
             (DIEM_CORE_ADDR, "signer", "borrow_address") => {
                 if cfg!(debug_assertions) {
                     assert_eq!(srcs.len(), 1);
                 }
                 let res = self.native_signer_borrow_address(dummy_state.del_value(0));
                 Ok(vec![res])
-            }
+            },
             (DIEM_CORE_ADDR, "hash", "sha2_256") => {
                 if cfg!(debug_assertions) {
                     assert_eq!(srcs.len(), 1);
                 }
                 let res = self.native_hash_sha2_256(dummy_state.del_value(0));
                 Ok(vec![res])
-            }
+            },
             (DIEM_CORE_ADDR, "hash", "sha3_256") => {
                 if cfg!(debug_assertions) {
                     assert_eq!(srcs.len(), 1);
                 }
                 let res = self.native_hash_sha3_256(dummy_state.del_value(0));
                 Ok(vec![res])
-            }
+            },
             (DIEM_CORE_ADDR, "bcs", "to_bytes") => {
                 if cfg!(debug_assertions) {
                     assert_eq!(srcs.len(), 1);
                 }
                 self.native_bcs_to_bytes(dummy_state.del_value(0))
                     .map(|res| vec![res])
-            }
+            },
             (DIEM_CORE_ADDR, "event", "write_to_event_store") => {
                 if cfg!(debug_assertions) {
                     assert_eq!(srcs.len(), 3);
@@ -305,14 +305,14 @@ impl<'env> FunctionContext<'env> {
                     global_state,
                 );
                 Ok(vec![])
-            }
+            },
             (DIEM_CORE_ADDR, "Signature", "ed25519_validate_pubkey") => {
                 if cfg!(debug_assertions) {
                     assert_eq!(srcs.len(), 1);
                 }
                 let res = self.native_signature_ed25519_validate_pubkey(dummy_state.del_value(0));
                 Ok(vec![res])
-            }
+            },
             (DIEM_CORE_ADDR, "Signature", "ed25519_verify") => {
                 if cfg!(debug_assertions) {
                     assert_eq!(srcs.len(), 3);
@@ -323,14 +323,14 @@ impl<'env> FunctionContext<'env> {
                     dummy_state.del_value(2),
                 );
                 Ok(vec![res])
-            }
+            },
             (DIEM_CORE_ADDR, "DiemAccount", "create_signer") => {
                 if cfg!(debug_assertions) {
                     assert_eq!(srcs.len(), 1);
                 }
                 let res = self.native_diem_account_create_signer(dummy_state.del_value(0));
                 Ok(vec![res])
-            }
+            },
             _ => unreachable!(),
         }
     }
@@ -345,7 +345,7 @@ impl<'env> FunctionContext<'env> {
         match bytecode {
             Bytecode::Assign(_, dst, src, kind) => {
                 self.handle_assign(*dst, *src, kind, local_state)
-            }
+            },
             Bytecode::Load(_, dst, constant) => self.handle_load(*dst, constant, local_state),
             Bytecode::Call(_, dsts, op, srcs, on_abort) => self.handle_operation(
                 dsts,
@@ -360,13 +360,13 @@ impl<'env> FunctionContext<'env> {
                 if cfg!(debug_assertions) {
                     self.code_offset_by_label(*label);
                 }
-            }
+            },
             Bytecode::Jump(_, label) => {
                 local_state.set_pc(self.code_offset_by_label(*label));
-            }
+            },
             Bytecode::Branch(_, then_label, else_label, cond) => {
                 self.handle_conditional_branch(*cond, *then_label, *else_label, local_state)
-            }
+            },
             Bytecode::Abort(_, index) => self.handle_abort(*index, local_state),
             Bytecode::Ret(_, rets) => self.handle_return(rets, local_state),
             Bytecode::Nop(_) => (),
@@ -382,14 +382,14 @@ impl<'env> FunctionContext<'env> {
                 if !local_state.is_spec_skipped() {
                     self.handle_prop_assert(exp, eval_state, local_state, global_state)
                 }
-            }
+            },
             Bytecode::Prop(_, PropKind::Assume, exp) => {
                 if !local_state.is_spec_skipped() {
                     self.handle_prop_assume(exp, eval_state, local_state, global_state)?
                 }
-            }
+            },
             // expressions (TODO: not supported yet)
-            Bytecode::Prop(_, PropKind::Modifies, _) => {}
+            Bytecode::Prop(_, PropKind::Modifies, _) => {},
             // not-in-use as of now
             Bytecode::SaveSpecVar(..) => unreachable!(),
         }
@@ -412,11 +412,11 @@ impl<'env> FunctionContext<'env> {
             AssignKind::Move => {
                 let from_val = local_state.del_value(src);
                 from_val.assign_cast(local_state.get_type(dst).clone())
-            }
+            },
             AssignKind::Copy => {
                 let from_val = local_state.get_value(src);
                 from_val.assign_cast(local_state.get_type(dst).clone())
-            }
+            },
             AssignKind::Store => {
                 let from_val = local_state.get_value(src);
                 let into_ty = local_state.get_type(dst).clone();
@@ -425,7 +425,7 @@ impl<'env> FunctionContext<'env> {
                 } else {
                     from_val.assign_cast(into_ty)
                 }
-            }
+            },
         };
         local_state.put_value_override(dst, into_val);
     }
@@ -445,7 +445,7 @@ impl<'env> FunctionContext<'env> {
             Constant::ByteArray(v) => {
                 let elems = v.iter().map(|e| TypedValue::mk_u8(*e)).collect();
                 TypedValue::mk_vector(BaseType::mk_u8(), elems)
-            }
+            },
             Constant::AddressArray(v) => {
                 let elems = v
                     .iter()
@@ -456,7 +456,7 @@ impl<'env> FunctionContext<'env> {
                     })
                     .collect();
                 TypedValue::mk_vector(BaseType::mk_address(), elems)
-            }
+            },
             Constant::Vector(_) => unimplemented!(),
         };
         local_state.put_value_override(dst, val);
@@ -481,7 +481,7 @@ impl<'env> FunctionContext<'env> {
                     assert!(local_state
                         .get_type(action.1)
                         .is_compatible_for_abort_code());
-                }
+                },
             }
         }
 
@@ -494,18 +494,18 @@ impl<'env> FunctionContext<'env> {
                 }
                 self.handle_uninit(srcs[0], local_state);
                 return Ok(());
-            }
+            },
             Operation::Destroy => {
                 if cfg!(debug_assertions) {
                     assert_eq!(srcs.len(), 1);
                 }
                 self.handle_destroy(srcs[0], local_state);
                 return Ok(());
-            }
+            },
             Operation::Stop => {
                 // we should never see the Stop operation in interpreter mode
                 unreachable!()
-            }
+            },
             Operation::Havoc(kind) => {
                 if cfg!(debug_assertions) {
                     assert_eq!(dsts.len(), 1);
@@ -513,14 +513,14 @@ impl<'env> FunctionContext<'env> {
                     match kind {
                         HavocKind::Value => {
                             assert!(target_ty.is_base());
-                        }
+                        },
                         HavocKind::MutationValue | HavocKind::MutationAll => {
                             assert!(target_ty.is_ref(Some(true)));
-                        }
+                        },
                     }
                 }
                 return Ok(());
-            }
+            },
             // debugging
             Operation::TraceLocal(index) => {
                 if cfg!(debug_assertions) {
@@ -528,21 +528,21 @@ impl<'env> FunctionContext<'env> {
                     assert_eq!(local_state.get_type(*index), local_state.get_type(srcs[0]));
                 }
                 return Ok(());
-            }
+            },
             Operation::TraceReturn(num) => {
                 if cfg!(debug_assertions) {
                     assert_eq!(srcs.len(), 1);
                     assert!(*num < self.target.get_return_count());
                 }
                 return Ok(());
-            }
+            },
             Operation::TraceAbort => {
                 if cfg!(debug_assertions) {
                     assert_eq!(srcs.len(), 1);
                     assert!(local_state.get_type(srcs[0]).is_compatible_for_abort_code());
                 }
                 return Ok(());
-            }
+            },
             Operation::TraceExp(_kind, node_id) => {
                 // Perhaps do something with kind?
                 if cfg!(debug_assertions) {
@@ -553,7 +553,7 @@ impl<'env> FunctionContext<'env> {
                     assert_eq!(local_state.get_type(srcs[0]), &node_ty);
                 }
                 return Ok(());
-            }
+            },
             // all others require args to be collected up front
             _ => (),
         }
@@ -588,12 +588,12 @@ impl<'env> FunctionContext<'env> {
             Operation::OpaqueCallEnd(module_id, fun_id, ty_args) => {
                 self.handle_opaque_call_end(*module_id, *fun_id, ty_args, typed_args);
                 Ok(vec![])
-            }
+            },
             // struct
             Operation::Pack(module_id, struct_id, ty_args) => {
                 let packed = self.handle_pack(*module_id, *struct_id, ty_args, typed_args);
                 Ok(vec![packed])
-            }
+            },
             Operation::Unpack(module_id, struct_id, ty_args) => {
                 if cfg!(debug_assertions) {
                     assert_eq!(typed_args.len(), 1);
@@ -601,7 +601,7 @@ impl<'env> FunctionContext<'env> {
                 let unpacked =
                     self.handle_unpack(*module_id, *struct_id, ty_args, typed_args.remove(0));
                 Ok(unpacked)
-            }
+            },
             Operation::GetField(module_id, struct_id, ty_args, field_num) => {
                 if cfg!(debug_assertions) {
                     assert_eq!(typed_args.len(), 1);
@@ -614,7 +614,7 @@ impl<'env> FunctionContext<'env> {
                     typed_args.remove(0),
                 );
                 Ok(vec![field])
-            }
+            },
             Operation::BorrowField(module_id, struct_id, ty_args, field_num) => {
                 if cfg!(debug_assertions) {
                     assert_eq!(typed_args.len(), 1);
@@ -630,7 +630,7 @@ impl<'env> FunctionContext<'env> {
                     typed_args.remove(0),
                 );
                 Ok(vec![field])
-            }
+            },
             Operation::MoveTo(module_id, struct_id, ty_args) => {
                 if cfg!(debug_assertions) {
                     assert_eq!(typed_args.len(), 2);
@@ -644,7 +644,7 @@ impl<'env> FunctionContext<'env> {
                     global_state,
                 )
                 .map(|_| Vec::new())
-            }
+            },
             Operation::MoveFrom(module_id, struct_id, ty_args) => {
                 if cfg!(debug_assertions) {
                     assert_eq!(typed_args.len(), 1);
@@ -657,7 +657,7 @@ impl<'env> FunctionContext<'env> {
                     global_state,
                 )
                 .map(|object| vec![object])
-            }
+            },
             Operation::GetGlobal(module_id, struct_id, ty_args) => {
                 if cfg!(debug_assertions) {
                     assert_eq!(typed_args.len(), 1);
@@ -670,7 +670,7 @@ impl<'env> FunctionContext<'env> {
                     global_state,
                 )
                 .map(|object| vec![object])
-            }
+            },
             Operation::BorrowGlobal(module_id, struct_id, ty_args) => {
                 if cfg!(debug_assertions) {
                     assert_eq!(typed_args.len(), 1);
@@ -685,7 +685,7 @@ impl<'env> FunctionContext<'env> {
                     global_state,
                 )
                 .map(|object| vec![object])
-            }
+            },
             Operation::Exists(module_id, struct_id, ty_args) => {
                 if cfg!(debug_assertions) {
                     assert_eq!(typed_args.len(), 1);
@@ -698,7 +698,7 @@ impl<'env> FunctionContext<'env> {
                     global_state,
                 );
                 Ok(vec![exists])
-            }
+            },
             // scope
             Operation::PackRef
             | Operation::UnpackRef
@@ -710,7 +710,7 @@ impl<'env> FunctionContext<'env> {
                     assert!(arg_ty.is_struct() || arg_ty.is_ref_struct(Some(true)));
                 }
                 Ok(vec![])
-            }
+            },
             // write-back
             Operation::IsParent(BorrowNode::Reference(parent_idx), edge) => {
                 if cfg!(debug_assertions) {
@@ -718,11 +718,11 @@ impl<'env> FunctionContext<'env> {
                 }
                 let result = self.handle_is_parent(*parent_idx, edge, typed_args.remove(0));
                 Ok(vec![result])
-            }
+            },
             Operation::IsParent(_, _) => {
                 // only Reference can appear in BorrowNode
                 unreachable!()
-            }
+            },
             Operation::WriteBack(BorrowNode::GlobalRoot(qid), edge) => {
                 if cfg!(debug_assertions) {
                     assert_eq!(typed_args.len(), 1);
@@ -738,7 +738,7 @@ impl<'env> FunctionContext<'env> {
                     _ => unreachable!(),
                 }
                 Ok(vec![])
-            }
+            },
             Operation::WriteBack(BorrowNode::LocalRoot(idx), edge) => {
                 if cfg!(debug_assertions) {
                     assert_eq!(typed_args.len(), 1);
@@ -746,11 +746,11 @@ impl<'env> FunctionContext<'env> {
                 match edge {
                     BorrowEdge::Direct => {
                         self.handle_write_back_local(*idx, typed_args.remove(0), local_state)
-                    }
+                    },
                     _ => unreachable!(),
                 }
                 Ok(vec![])
-            }
+            },
             Operation::WriteBack(BorrowNode::Reference(idx), edge) => {
                 if cfg!(debug_assertions) {
                     assert_eq!(typed_args.len(), 1);
@@ -758,7 +758,7 @@ impl<'env> FunctionContext<'env> {
                 match edge {
                     BorrowEdge::Direct => {
                         self.handle_write_back_ref_direct(*idx, typed_args.remove(0), local_state)
-                    }
+                    },
                     BorrowEdge::Field(qid, field_num) => self.handle_write_back_ref_field(
                         qid.module_id,
                         qid.id,
@@ -770,7 +770,7 @@ impl<'env> FunctionContext<'env> {
                     ),
                     BorrowEdge::Index(_) => {
                         self.handle_write_back_ref_element(*idx, typed_args.remove(0), local_state)
-                    }
+                    },
                     BorrowEdge::Hyper(hyper) => self.handle_write_back_ref_hyper(
                         hyper,
                         *idx,
@@ -779,11 +779,11 @@ impl<'env> FunctionContext<'env> {
                     ),
                 }
                 Ok(vec![])
-            }
+            },
             Operation::WriteBack(BorrowNode::ReturnPlaceholder(_), ..) => {
                 // this node should never appear in bytecode
                 unreachable!()
-            }
+            },
             // references
             Operation::BorrowLoc => {
                 if cfg!(debug_assertions) {
@@ -792,28 +792,28 @@ impl<'env> FunctionContext<'env> {
                 let (is_mut, _) = local_state.get_type(dsts[0]).get_ref_type();
                 let object = self.handle_borrow_local(is_mut, typed_args.remove(0), srcs[0]);
                 Ok(vec![object])
-            }
+            },
             Operation::ReadRef => {
                 if cfg!(debug_assertions) {
                     assert_eq!(typed_args.len(), 1);
                 }
                 let object = self.handle_read_ref(typed_args.remove(0));
                 Ok(vec![object])
-            }
+            },
             Operation::WriteRef => {
                 if cfg!(debug_assertions) {
                     assert_eq!(typed_args.len(), 2);
                 }
                 self.handle_write_ref(typed_args.remove(1), srcs[0], local_state);
                 Ok(vec![])
-            }
+            },
             Operation::FreezeRef => {
                 if cfg!(debug_assertions) {
                     assert_eq!(typed_args.len(), 1);
                 }
                 let object = self.handle_freeze_ref(typed_args.remove(0));
                 Ok(vec![object])
-            }
+            },
             // cast
             Operation::CastU8
             | Operation::CastU16
@@ -835,7 +835,7 @@ impl<'env> FunctionContext<'env> {
                     _ => unreachable!(),
                 }
                 .map(|casted| vec![casted])
-            }
+            },
             // binary arithmetic
             Operation::Add | Operation::Sub | Operation::Mul | Operation::Div | Operation::Mod => {
                 if cfg!(debug_assertions) {
@@ -845,7 +845,7 @@ impl<'env> FunctionContext<'env> {
                 let lhs = typed_args.remove(0);
                 self.handle_binary_arithmetic(op, lhs, rhs, local_state.get_type(dsts[0]))
                     .map(|calculated| vec![calculated])
-            }
+            },
             // binary bitwise
             Operation::BitAnd | Operation::BitOr | Operation::Xor => {
                 if cfg!(debug_assertions) {
@@ -856,7 +856,7 @@ impl<'env> FunctionContext<'env> {
                 let calculated =
                     self.handle_binary_bitwise(op, lhs, rhs, local_state.get_type(dsts[0]));
                 Ok(vec![calculated])
-            }
+            },
             // binary bitshift
             Operation::Shl | Operation::Shr => {
                 if cfg!(debug_assertions) {
@@ -867,7 +867,7 @@ impl<'env> FunctionContext<'env> {
                 let calculated =
                     self.handle_binary_bitshift(op, lhs, rhs, local_state.get_type(dsts[0]));
                 Ok(vec![calculated])
-            }
+            },
             // binary comparison
             Operation::Lt | Operation::Le | Operation::Ge | Operation::Gt => {
                 if cfg!(debug_assertions) {
@@ -878,7 +878,7 @@ impl<'env> FunctionContext<'env> {
                 let calculated =
                     self.handle_binary_comparison(op, lhs, rhs, local_state.get_type(dsts[0]));
                 Ok(vec![calculated])
-            }
+            },
             // binary equality
             Operation::Eq | Operation::Neq => {
                 if cfg!(debug_assertions) {
@@ -889,7 +889,7 @@ impl<'env> FunctionContext<'env> {
                 let calculated =
                     self.handle_binary_equality(op, lhs, rhs, local_state.get_type(dsts[0]));
                 Ok(vec![calculated])
-            }
+            },
             // unary boolean
             Operation::Not => {
                 if cfg!(debug_assertions) {
@@ -898,7 +898,7 @@ impl<'env> FunctionContext<'env> {
                 let opv = typed_args.remove(0);
                 let calculated = self.handle_unary_boolean(op, opv, local_state.get_type(dsts[0]));
                 Ok(vec![calculated])
-            }
+            },
             // binary boolean
             Operation::And | Operation::Or => {
                 if cfg!(debug_assertions) {
@@ -909,7 +909,7 @@ impl<'env> FunctionContext<'env> {
                 let calculated =
                     self.handle_binary_boolean(op, lhs, rhs, local_state.get_type(dsts[0]));
                 Ok(vec![calculated])
-            }
+            },
             // event (TODO: not supported yet)
             Operation::EmitEvent | Operation::EventStoreDiverge => Ok(vec![]),
             // already handled
@@ -923,7 +923,7 @@ impl<'env> FunctionContext<'env> {
             | Operation::TraceExp(..)
             | Operation::TraceGlobalMem(..) => {
                 unreachable!();
-            }
+            },
         };
 
         // handle result
@@ -935,11 +935,11 @@ impl<'env> FunctionContext<'env> {
                 for (typed_ret, &idx) in typed_rets.into_iter().zip(dsts) {
                     local_state.put_value_override(idx, typed_ret);
                 }
-            }
+            },
             Err(abort_info) => match on_abort {
                 None => {
                     return Err(abort_info);
-                }
+                },
                 Some(action) => {
                     let abort_idx = action.1;
                     let abort_val = if local_state.get_type(abort_idx).is_u64() {
@@ -950,7 +950,7 @@ impl<'env> FunctionContext<'env> {
                     local_state.put_value(abort_idx, abort_val);
                     local_state.set_pc(self.code_offset_by_label(action.0));
                     local_state.transit_to_post_abort(abort_info);
-                }
+                },
             },
         }
         Ok(())
@@ -1215,7 +1215,7 @@ impl<'env> FunctionContext<'env> {
             match (p, e) {
                 (Pointer::RefField(_, p_field_num), BorrowEdge::Field(_, e_field_num)) => {
                     p_field_num == e_field_num
-                }
+                },
                 (Pointer::RefElement(_, _), BorrowEdge::Index(_)) => true,
                 _ => false,
             }
@@ -1249,14 +1249,14 @@ impl<'env> FunctionContext<'env> {
                                     } else {
                                         false
                                     }
-                                }
+                                },
                                 _ => false,
                             }
                         }
                     } else {
                         false
                     }
-                }
+                },
                 _ => unreachable!(),
             },
             Pointer::None | Pointer::Local(_) | Pointer::Global(_) => unreachable!(),
@@ -1304,7 +1304,7 @@ impl<'env> FunctionContext<'env> {
                     assert_eq!(*root_idx, local_root);
                 }
                 local_state.put_value_override(local_root, op_val.read_ref());
-            }
+            },
             _ => unreachable!(),
         }
     }
@@ -1328,7 +1328,7 @@ impl<'env> FunctionContext<'env> {
                     assert_eq!(*parent_idx, local_ref);
                 }
                 old_val.update_ref_direct(op_val)
-            }
+            },
             Pointer::RetRef(trace) => {
                 // check pointer validity
                 if cfg!(debug_assertions) {
@@ -1337,12 +1337,12 @@ impl<'env> FunctionContext<'env> {
                         Pointer::ArgRef(ref_idx, original_ptr) => {
                             assert_eq!(*ref_idx, local_ref);
                             assert_eq!(original_ptr.as_ref(), old_val.get_ptr());
-                        }
+                        },
                         _ => unreachable!(),
                     }
                 }
                 op_val.unbox_from_mut_ref_ret()
-            }
+            },
             _ => unreachable!(),
         };
         local_state.put_value(local_ref, new_val);
@@ -1369,22 +1369,22 @@ impl<'env> FunctionContext<'env> {
                 Pointer::RefField(ref_idx, ref_field) => {
                     assert_eq!(*ref_field, field_num);
                     assert_eq!(*ref_idx, local_ref);
-                }
+                },
                 Pointer::RetRef(trace) => {
                     assert_eq!(trace.len(), 2);
                     match trace.get(1).unwrap() {
                         Pointer::ArgRef(ref_idx, _) => {
                             assert_eq!(*ref_idx, local_ref);
-                        }
+                        },
                         _ => unreachable!(),
                     }
                     match trace.get(0).unwrap() {
                         Pointer::RefField(_, ref_field) => {
                             assert_eq!(*ref_field, field_num);
-                        }
+                        },
                         _ => unreachable!(),
                     }
-                }
+                },
                 _ => unreachable!(),
             };
         }
@@ -1405,20 +1405,20 @@ impl<'env> FunctionContext<'env> {
                     assert_eq!(*ref_idx, local_ref);
                 }
                 elem_num
-            }
+            },
             Pointer::RetRef(trace) => {
                 assert_eq!(trace.len(), 2);
                 match trace.get(1).unwrap() {
                     Pointer::ArgRef(ref_idx, _) => {
                         assert_eq!(*ref_idx, local_ref);
-                    }
+                    },
                     _ => unreachable!(),
                 }
                 match trace.get(0).unwrap() {
                     Pointer::RefElement(_, elem_num) => elem_num,
                     _ => unreachable!(),
                 }
-            }
+            },
             _ => unreachable!(),
         };
         let new_vector = old_vector.update_ref_vector_element(*elem_num, op_val);
@@ -1467,7 +1467,7 @@ impl<'env> FunctionContext<'env> {
                             path.push(cur.clone());
                             // NOTE: the local_idx argument can be any dummy value here
                             cur.borrow_ref_struct_field(*field_num, true, *callee_idx)
-                        }
+                        },
                         (Pointer::RefElement(callee_idx, elem_num), BorrowEdge::Index(_)) => {
                             if cfg!(debug_assertions) {
                                 assert!(cur.get_ty().is_ref_vector(Some(true)));
@@ -1476,7 +1476,7 @@ impl<'env> FunctionContext<'env> {
                             // NOTE: the local_idx argument can be any dummy value here
                             cur.borrow_ref_vector_element(*elem_num, true, *callee_idx)
                                 .unwrap()
-                        }
+                        },
                         _ => unreachable!(),
                     };
                     cur = sub;
@@ -1495,20 +1495,20 @@ impl<'env> FunctionContext<'env> {
                     let sub = match edge {
                         BorrowEdge::Field(_, field_num) => {
                             val.update_ref_struct_field(*field_num, cur)
-                        }
+                        },
                         BorrowEdge::Index(_) => {
                             let elem_num = match ptr {
                                 Pointer::RefElement(_, elem_num) => elem_num,
                                 _ => unreachable!(),
                             };
                             val.update_ref_vector_element(*elem_num, cur)
-                        }
+                        },
                         _ => unreachable!(),
                     };
                     cur = sub;
                 }
                 cur
-            }
+            },
             _ => unreachable!(),
         };
         local_state.put_value(local_ref, new_val);
@@ -1599,7 +1599,7 @@ impl<'env> FunctionContext<'env> {
             match n.to_u8() {
                 None => {
                     return Err(self.sys_abort(StatusCode::ARITHMETIC_ERROR));
-                }
+                },
                 Some(v) => v,
             }
         };
@@ -1635,7 +1635,7 @@ impl<'env> FunctionContext<'env> {
             match n.to_u16() {
                 None => {
                     return Err(self.sys_abort(StatusCode::ARITHMETIC_ERROR));
-                }
+                },
                 Some(v) => v,
             }
         };
@@ -1667,7 +1667,7 @@ impl<'env> FunctionContext<'env> {
             match n.to_u32() {
                 None => {
                     return Err(self.sys_abort(StatusCode::ARITHMETIC_ERROR));
-                }
+                },
                 Some(v) => v,
             }
         };
@@ -1695,7 +1695,7 @@ impl<'env> FunctionContext<'env> {
             match n.to_u64() {
                 None => {
                     return Err(self.sys_abort(StatusCode::ARITHMETIC_ERROR));
-                }
+                },
                 Some(v) => v,
             }
         };
@@ -1719,7 +1719,7 @@ impl<'env> FunctionContext<'env> {
             match n.to_u128() {
                 None => {
                     return Err(self.sys_abort(StatusCode::ARITHMETIC_ERROR));
-                }
+                },
                 Some(v) => v,
             }
         };
@@ -1743,7 +1743,7 @@ impl<'env> FunctionContext<'env> {
             match n.to_u128() {
                 None => {
                     return Err(self.sys_abort(StatusCode::ARITHMETIC_ERROR));
-                }
+                },
                 Some(v) => v,
             }
         };
@@ -1772,13 +1772,13 @@ impl<'env> FunctionContext<'env> {
                     return Err(self.sys_abort(StatusCode::ARITHMETIC_ERROR));
                 }
                 lval / rval
-            }
+            },
             Operation::Mod => {
                 if rval.is_zero() {
                     return Err(self.sys_abort(StatusCode::ARITHMETIC_ERROR));
                 }
                 lval % rval
-            }
+            },
             _ => unreachable!(),
         };
 
@@ -1786,21 +1786,21 @@ impl<'env> FunctionContext<'env> {
             match result.to_u8() {
                 None => {
                     return Err(self.sys_abort(StatusCode::ARITHMETIC_ERROR));
-                }
+                },
                 Some(v) => TypedValue::mk_u8(v),
             }
         } else if res.is_u64() {
             match result.to_u64() {
                 None => {
                     return Err(self.sys_abort(StatusCode::ARITHMETIC_ERROR));
-                }
+                },
                 Some(v) => TypedValue::mk_u64(v),
             }
         } else if res.is_u128() {
             match result.to_u128() {
                 None => {
                     return Err(self.sys_abort(StatusCode::ARITHMETIC_ERROR));
-                }
+                },
                 Some(v) => TypedValue::mk_u128(v),
             }
         } else {
@@ -2065,11 +2065,11 @@ impl<'env> FunctionContext<'env> {
             // handle let-bindings
             Some(Ok((local_idx, local_val))) => {
                 local_state.put_value_override(local_idx, local_val);
-            }
+            },
             Some(Err(_)) => {
                 // unable to find a satisfiable value for a let-binding
                 local_state.skip_specs();
-            }
+            },
         }
         Ok(())
     }
@@ -2305,7 +2305,7 @@ impl<'env> FunctionContext<'env> {
             Ok(sig) => sig,
             Err(_) => {
                 return TypedValue::mk_bool(false);
-            }
+            },
         };
 
         let key_bytes: Vec<_> = key_val
@@ -2317,7 +2317,7 @@ impl<'env> FunctionContext<'env> {
             Ok(key) => key,
             Err(_) => {
                 return TypedValue::mk_bool(false);
-            }
+            },
         };
 
         let msg_bytes: Vec<_> = msg_val

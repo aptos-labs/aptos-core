@@ -162,7 +162,7 @@ impl Analyzer {
                         } else {
                             func_insts.insert(Type::type_param_map_to_inst(fun_arity, subs_fun));
                         }
-                    }
+                    },
                 }
             }
         }
@@ -374,7 +374,7 @@ impl<'a> Instrumenter<'a> {
                     mem,
                     &always_check_invs,
                 );
-            }
+            },
             Call(_, _, MoveTo(mid, sid, inst), ..) | Call(_, _, MoveFrom(mid, sid, inst), ..) => {
                 let mem = mid.qualified_inst(*sid, inst.to_owned());
                 self.emit_invariants_for_bytecode(
@@ -384,7 +384,7 @@ impl<'a> Instrumenter<'a> {
                     &mem,
                     &always_check_invs,
                 );
-            }
+            },
             // Emit assumes before procedure calls.  This also deals with saves for update invariants.
             Call(_, _, OpaqueCallBegin(module_id, id, _), _, _) => {
                 self.assume_invariants_for_opaque_begin(
@@ -394,13 +394,13 @@ impl<'a> Instrumenter<'a> {
                 );
                 // Then emit the call instruction.
                 self.builder.emit(bc);
-            }
+            },
             // Emit asserts after procedure calls
             Call(_, _, OpaqueCallEnd(module_id, id, _), _, _) => {
                 // First, emit the call instruction.
                 self.builder.emit(bc.clone());
                 self.assert_invariants_for_opaque_end(module_id.qualified(*id), inv_ana_data)
-            }
+            },
             // An inline call needs to be treated similarly (but there is just one instruction.
             Call(_, _, Function(module_id, id, _), _, _) => {
                 self.assume_invariants_for_opaque_begin(
@@ -411,7 +411,7 @@ impl<'a> Instrumenter<'a> {
                 // Then emit the call instruction.
                 self.builder.emit(bc.clone());
                 self.assert_invariants_for_opaque_end(module_id.qualified(*id), inv_ana_data)
-            }
+            },
             // When invariants are disabled in the body of this function but not in its
             // callers, assert them just before a return instruction (the caller will be
             // assuming they hold).
@@ -429,7 +429,7 @@ impl<'a> Instrumenter<'a> {
                     );
                 }
                 self.builder.emit(bc);
-            }
+            },
             _ => self.builder.emit(bc),
         }
     }
@@ -721,7 +721,7 @@ impl<'a> Instrumenter<'a> {
         let arity = match &inv.kind {
             ConditionKind::GlobalInvariant(ps) | ConditionKind::GlobalInvariantUpdate(ps) => {
                 ps.len() as u16
-            }
+            },
             _ => 0,
         };
         if arity == 0 {
@@ -761,7 +761,7 @@ impl<'a> Instrumenter<'a> {
                                 .or_insert_with(BTreeSet::new)
                                 .insert(v);
                         }
-                    }
+                    },
                 }
             }
         }

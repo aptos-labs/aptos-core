@@ -141,7 +141,7 @@ fn build_test_info<'func>(
                 ))
             }
             return None;
-        }
+        },
         Some(test_attribute) => test_attribute,
     };
 
@@ -171,7 +171,7 @@ fn build_test_info<'func>(
                     (var.loc(), "Corresponding to this parameter"),
                     (fn_loc, IN_THIS_TEST_MSG),
                 ))
-            }
+            },
         }
     }
 
@@ -205,14 +205,14 @@ fn parse_test_attribute(
                 (*aloc, "Unexpected nested attribute in test declaration"),
             ));
             BTreeMap::new()
-        }
+        },
         EA::Name(nm) => {
             assert!(
                 nm.value.as_str() == TestingAttribute::Test.name() && depth == 0,
                 "ICE: We should only be parsing a raw test attribute"
             );
             BTreeMap::new()
-        }
+        },
         EA::Assigned(nm, attr_value) => {
             if depth != 1 {
                 context.env.add_diag(diag!(
@@ -231,13 +231,13 @@ fn parse_test_attribute(
                         (*aloc, "Assigned in this attribute"),
                     ));
                     return BTreeMap::new();
-                }
+                },
             };
 
             let mut args = BTreeMap::new();
             args.insert(nm.value, value);
             args
-        }
+        },
         EA::Parameterized(nm, attributes) => {
             assert!(
                 nm.value.as_str() == TestingAttribute::Test.name() && depth == 0,
@@ -247,7 +247,7 @@ fn parse_test_attribute(
                 .iter()
                 .flat_map(|(_, _, attr)| parse_test_attribute(context, attr, depth + 1))
                 .collect()
-        }
+        },
     }
 }
 
@@ -266,7 +266,7 @@ fn parse_failure_attribute(
                 "ICE: We should only be parsing a raw expected failure attribute"
             );
             Some(ExpectedFailure::Expected)
-        }
+        },
         EA::Assigned(_, value) => {
             let assign_loc = value.loc;
             let invalid_assignment_msg = "Invalid expected failure code assignment";
@@ -278,7 +278,7 @@ fn parse_failure_attribute(
                 (*aloc, expected_msg),
             ));
             None
-        }
+        },
         EA::Parameterized(sp!(_, nm), attrs) => {
             assert!(
                 nm.as_str() == TestingAttribute::ExpectedFailure.name(),
@@ -342,7 +342,7 @@ fn parse_failure_attribute(
                         return Some(ExpectedFailure::ExpectedWithCodeDEPRECATED(u));
                     };
                     (StatusCode::ABORTED, Some(u), location)
-                }
+                },
                 TestingAttribute::ARITHMETIC_ERROR_NAME => {
                     check_attribute_unassigned(
                         context,
@@ -358,7 +358,7 @@ fn parse_failure_attribute(
                     )?;
                     let location = convert_location(context, location_loc, location_attr)?;
                     (StatusCode::ARITHMETIC_ERROR, None, location)
-                }
+                },
                 TestingAttribute::OUT_OF_GAS_NAME => {
                     check_attribute_unassigned(
                         context,
@@ -374,7 +374,7 @@ fn parse_failure_attribute(
                     )?;
                     let location = convert_location(context, location_loc, location_attr)?;
                     (StatusCode::OUT_OF_GAS, None, location)
-                }
+                },
                 TestingAttribute::VECTOR_ERROR_NAME => {
                     check_attribute_unassigned(
                         context,
@@ -407,7 +407,7 @@ fn parse_failure_attribute(
                     )?;
                     let location = convert_location(context, location_loc, location_attr)?;
                     (StatusCode::VECTOR_OPERATION_ERROR, minor_status, location)
-                }
+                },
                 TestingAttribute::MAJOR_STATUS_NAME => {
                     let (value_name_loc, attr_value) = get_assigned_attribute(
                         context,
@@ -462,7 +462,7 @@ fn parse_failure_attribute(
                     )?;
                     let location = convert_location(context, location_loc, location_attr)?;
                     (major_status, minor_status, location)
-                }
+                },
                 _ => unreachable!(),
             };
             // warn for any remaining attrs
@@ -480,7 +480,7 @@ fn parse_failure_attribute(
                 sub_status_code,
                 move_binary_format::errors::Location::Module(location),
             )))
-        }
+        },
     }
 }
 
@@ -495,7 +495,7 @@ fn check_attribute_unassigned(
         sp!(_, EA::Name(sp!(_, nm))) => {
             assert!(nm.as_str() == kind);
             Some(())
-        }
+        },
         sp!(loc, _) => {
             let msg = format!(
                 "Expected no assigned value, e.g. '{}', for expected failure attribute",
@@ -507,7 +507,7 @@ fn check_attribute_unassigned(
                 (loc, msg)
             ));
             None
-        }
+        },
     }
 }
 
@@ -522,7 +522,7 @@ fn get_assigned_attribute(
         sp!(assign_loc, EA::Assigned(sp!(_, nm), value)) => {
             assert!(nm.as_str() == kind);
             Some((assign_loc, *value))
-        }
+        },
         sp!(loc, _) => {
             let msg = format!(
                 "Expected assigned value, e.g. '{}=...', for expected failure attribute",
@@ -534,7 +534,7 @@ fn get_assigned_attribute(
                 (loc, msg)
             ));
             None
-        }
+        },
     }
 }
 
@@ -551,7 +551,7 @@ fn convert_location(context: &mut Context, attr_loc: Loc, attr: Attribute) -> Op
                 (vloc, "Expected a module identifier, e.g. 'std::vector'")
             ));
             None
-        }
+        },
     }
 }
 
@@ -569,7 +569,7 @@ fn convert_constant_value_u64_constant_or_value(
         _ => {
             let (vloc, u) = convert_attribute_value_u64(context, loc, value)?;
             return Some((vloc, None, u));
-        }
+        },
     };
     let module_id = convert_module_id(context, vloc, module)?;
     let modules_constants = context.constants().get(module).unwrap();
@@ -584,7 +584,7 @@ fn convert_constant_value_u64_constant_or_value(
                 ),
             ));
             return None;
-        }
+        },
         Some(c) => c,
     };
     match constant {
@@ -599,7 +599,7 @@ fn convert_constant_value_u64_constant_or_value(
                 (*cloc, msg),
             ));
             None
-        }
+        },
         (_, Some(u)) => Some((vloc, Some(module_id), *u)),
     }
 }
@@ -623,7 +623,7 @@ fn convert_module_id(context: &mut Context, vloc: Loc, module: &ModuleIdent) -> 
                 (*mloc, format!("Unbound address '{addr}'")),
             ));
             return None;
-        }
+        },
     };
     let mname = move_core_types::identifier::Identifier::new(module.value().to_string()).unwrap();
     let mid = ModuleId::new(addr, mname);
@@ -639,7 +639,7 @@ fn convert_attribute_value_u64(
     match value {
         sp!(vloc, EAV::Value(sp!(_, EV::InferredNum(u)))) if *u <= U256::from(std::u64::MAX) => {
             Some((*vloc, u.down_cast_lossy()))
-        }
+        },
         sp!(vloc, EAV::Value(sp!(_, EV::U64(u)))) => Some((*vloc, *u)),
         sp!(vloc, EAV::Value(sp!(_, EV::U8(_))))
         | sp!(vloc, EAV::Value(sp!(_, EV::U16(_))))
@@ -652,7 +652,7 @@ fn convert_attribute_value_u64(
                 (*vloc, "Annotated non-u64 literals are not permitted"),
             ));
             None
-        }
+        },
         sp!(vloc, _) => {
             context.env.add_diag(diag!(
                 Attributes::InvalidValue,
@@ -660,7 +660,7 @@ fn convert_attribute_value_u64(
                 (*vloc, "Unsupported value in this assignment"),
             ));
             None
-        }
+        },
     }
 }
 

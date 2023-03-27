@@ -62,7 +62,7 @@ impl<R: ModuleResolver> GetModule for ModuleCache<R> {
                     .map_err(|_| anyhow!("Failure deserializing module {:?}", id))?;
                 entry.insert(module.clone());
                 module
-            }
+            },
             Entry::Occupied(entry) => entry.get().clone(),
         }))
     }

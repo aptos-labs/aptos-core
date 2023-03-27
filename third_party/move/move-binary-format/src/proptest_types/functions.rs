@@ -571,7 +571,7 @@ impl BytecodeGen {
                 Bytecode::LdConst(ConstantPoolIndex(
                     idx.index(state.constant_pool_len) as TableIndex
                 ))
-            }
+            },
             BytecodeGen::MutBorrowField((def, field)) => {
                 let sd_idx = def.index(state.struct_defs.len());
                 let field_count = state.struct_def_to_field_count.get(&sd_idx)?;
@@ -598,7 +598,7 @@ impl BytecodeGen {
                         });
                     Bytecode::MutBorrowFieldGeneric(FieldInstantiationIndex(fi_idx))
                 }
-            }
+            },
             BytecodeGen::ImmBorrowField((def, field)) => {
                 let sd_idx = def.index(state.struct_defs.len());
                 let field_count = state.struct_def_to_field_count.get(&sd_idx)?;
@@ -625,7 +625,7 @@ impl BytecodeGen {
                         });
                     Bytecode::ImmBorrowFieldGeneric(FieldInstantiationIndex(fi_idx))
                 }
-            }
+            },
             BytecodeGen::Call(idx) => {
                 let func_handles_len = state.function_handles.len();
                 let fh_idx = idx.index(func_handles_len);
@@ -635,7 +635,7 @@ impl BytecodeGen {
                 } else {
                     Bytecode::CallGeneric(state.get_function_instantiation(fh_idx))
                 }
-            }
+            },
             BytecodeGen::Pack(idx) => {
                 let struct_defs_len = state.struct_defs.len();
                 let sd_idx = idx.index(struct_defs_len);
@@ -649,7 +649,7 @@ impl BytecodeGen {
                 } else {
                     Bytecode::PackGeneric(state.get_type_instantiation(sd_idx))
                 }
-            }
+            },
             BytecodeGen::Unpack(idx) => {
                 let struct_defs_len = state.struct_defs.len();
                 let sd_idx = idx.index(struct_defs_len);
@@ -663,7 +663,7 @@ impl BytecodeGen {
                 } else {
                     Bytecode::UnpackGeneric(state.get_type_instantiation(sd_idx))
                 }
-            }
+            },
             BytecodeGen::Exists(idx) => {
                 let struct_defs_len = state.struct_defs.len();
                 let sd_idx = idx.index(struct_defs_len);
@@ -677,7 +677,7 @@ impl BytecodeGen {
                 } else {
                     Bytecode::ExistsGeneric(state.get_type_instantiation(sd_idx))
                 }
-            }
+            },
             BytecodeGen::ImmBorrowGlobal(idx) => {
                 let struct_defs_len = state.struct_defs.len();
                 let sd_idx = idx.index(struct_defs_len);
@@ -691,7 +691,7 @@ impl BytecodeGen {
                 } else {
                     Bytecode::ImmBorrowGlobalGeneric(state.get_type_instantiation(sd_idx))
                 }
-            }
+            },
             BytecodeGen::MutBorrowGlobal(idx) => {
                 let struct_defs_len = state.struct_defs.len();
                 let sd_idx = idx.index(struct_defs_len);
@@ -705,7 +705,7 @@ impl BytecodeGen {
                 } else {
                     Bytecode::MutBorrowGlobalGeneric(state.get_type_instantiation(sd_idx))
                 }
-            }
+            },
             BytecodeGen::MoveFrom(idx) => {
                 let struct_defs_len = state.struct_defs.len();
                 let sd_idx = idx.index(struct_defs_len);
@@ -719,7 +719,7 @@ impl BytecodeGen {
                 } else {
                     Bytecode::MoveFromGeneric(state.get_type_instantiation(sd_idx))
                 }
-            }
+            },
             BytecodeGen::MoveTo(idx) => {
                 let struct_defs_len = state.struct_defs.len();
                 let sd_idx = idx.index(struct_defs_len);
@@ -733,55 +733,55 @@ impl BytecodeGen {
                 } else {
                     Bytecode::MoveToGeneric(state.get_type_instantiation(sd_idx))
                 }
-            }
+            },
             BytecodeGen::BrTrue(idx) => {
                 if code_len == 0 {
                     return None;
                 }
                 Bytecode::BrTrue(idx.index(code_len) as CodeOffset)
-            }
+            },
             BytecodeGen::BrFalse(idx) => {
                 if code_len == 0 {
                     return None;
                 }
                 Bytecode::BrFalse(idx.index(code_len) as CodeOffset)
-            }
+            },
             BytecodeGen::Branch(idx) => {
                 if code_len == 0 {
                     return None;
                 }
                 Bytecode::Branch(idx.index(code_len) as CodeOffset)
-            }
+            },
             BytecodeGen::CopyLoc(idx) => {
                 if locals_signature.is_empty() {
                     return None;
                 }
                 Bytecode::CopyLoc(idx.index(locals_signature.len()) as LocalIndex)
-            }
+            },
             BytecodeGen::MoveLoc(idx) => {
                 if locals_signature.is_empty() {
                     return None;
                 }
                 Bytecode::MoveLoc(idx.index(locals_signature.len()) as LocalIndex)
-            }
+            },
             BytecodeGen::StLoc(idx) => {
                 if locals_signature.is_empty() {
                     return None;
                 }
                 Bytecode::StLoc(idx.index(locals_signature.len()) as LocalIndex)
-            }
+            },
             BytecodeGen::MutBorrowLoc(idx) => {
                 if locals_signature.is_empty() {
                     return None;
                 }
                 Bytecode::MutBorrowLoc(idx.index(locals_signature.len()) as LocalIndex)
-            }
+            },
             BytecodeGen::ImmBorrowLoc(idx) => {
                 if locals_signature.is_empty() {
                     return None;
                 }
                 Bytecode::ImmBorrowLoc(idx.index(locals_signature.len()) as LocalIndex)
-            }
+            },
             BytecodeGen::VecPack((idx, num)) => {
                 if num > u16::MAX as u64 {
                     return None;
@@ -796,7 +796,7 @@ impl BytecodeGen {
                     return None;
                 }
                 Bytecode::VecPack(SignatureIndex(sig_idx as TableIndex), num)
-            }
+            },
             BytecodeGen::VecLen(idx) => {
                 let sigs_len = state.signatures.signatures.len();
                 if sigs_len == 0 {
@@ -808,7 +808,7 @@ impl BytecodeGen {
                     return None;
                 }
                 Bytecode::VecLen(SignatureIndex(sig_idx as TableIndex))
-            }
+            },
             BytecodeGen::VecImmBorrow(idx) => {
                 let sigs_len = state.signatures.signatures.len();
                 if sigs_len == 0 {
@@ -820,7 +820,7 @@ impl BytecodeGen {
                     return None;
                 }
                 Bytecode::VecImmBorrow(SignatureIndex(sig_idx as TableIndex))
-            }
+            },
             BytecodeGen::VecMutBorrow(idx) => {
                 let sigs_len = state.signatures.signatures.len();
                 if sigs_len == 0 {
@@ -832,7 +832,7 @@ impl BytecodeGen {
                     return None;
                 }
                 Bytecode::VecMutBorrow(SignatureIndex(sig_idx as TableIndex))
-            }
+            },
             BytecodeGen::VecPushBack(idx) => {
                 let sigs_len = state.signatures.signatures.len();
                 if sigs_len == 0 {
@@ -844,7 +844,7 @@ impl BytecodeGen {
                     return None;
                 }
                 Bytecode::VecPushBack(SignatureIndex(sig_idx as TableIndex))
-            }
+            },
             BytecodeGen::VecPopBack(idx) => {
                 let sigs_len = state.signatures.signatures.len();
                 if sigs_len == 0 {
@@ -856,7 +856,7 @@ impl BytecodeGen {
                     return None;
                 }
                 Bytecode::VecPopBack(SignatureIndex(sig_idx as TableIndex))
-            }
+            },
             BytecodeGen::VecUnpack((idx, num)) => {
                 if num > u16::MAX as u64 {
                     return None;
@@ -871,7 +871,7 @@ impl BytecodeGen {
                     return None;
                 }
                 Bytecode::VecUnpack(SignatureIndex(sig_idx as TableIndex), num)
-            }
+            },
             BytecodeGen::VecSwap(idx) => {
                 let sigs_len = state.signatures.signatures.len();
                 if sigs_len == 0 {
@@ -883,7 +883,7 @@ impl BytecodeGen {
                     return None;
                 }
                 Bytecode::VecSwap(SignatureIndex(sig_idx as TableIndex))
-            }
+            },
         };
 
         Some(bytecode)

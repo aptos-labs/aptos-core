@@ -115,14 +115,15 @@ fn nested_typed_struct_deserialization() {
         json!({ "inner": { "f": 7 } })
     );
 
-    let nested_typed_struct = MoveValue::Struct(MoveStruct::with_types(
-        nested_struct_type,
-        vec![(ident_str!("f").to_owned(), MoveValue::U64(7))],
-    ));
-    let typed_value = MoveStruct::with_types(
-        struct_type,
-        vec![(ident_str!("inner").to_owned(), nested_typed_struct)],
-    );
+    let nested_typed_struct =
+        MoveValue::Struct(MoveStruct::with_types(nested_struct_type, vec![(
+            ident_str!("f").to_owned(),
+            MoveValue::U64(7),
+        )]));
+    let typed_value = MoveStruct::with_types(struct_type, vec![(
+        ident_str!("inner").to_owned(),
+        nested_typed_struct,
+    )]);
     assert_eq!(
         serde_json::to_value(&typed_value).unwrap(),
         json!({

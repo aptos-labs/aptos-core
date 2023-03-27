@@ -160,7 +160,7 @@ fn check_state(env: &mut CompilationEnv, mod_def: &ModuleDefinition) -> Option<S
                 if find_attr_slice(&sdef.attributes, STATE_ATTR).is_some() =>
             {
                 Some(sdef)
-            }
+            },
             _ => None,
         })
         .collect::<Vec<_>>();
@@ -195,7 +195,7 @@ fn check_state(env: &mut CompilationEnv, mod_def: &ModuleDefinition) -> Option<S
                 if find_attr_slice(&fun.attributes, INIT_ATTR).is_some() =>
             {
                 Some(fun)
-            }
+            },
             _ => None,
         })
         .collect::<Vec<_>>();
@@ -228,7 +228,7 @@ fn check_state_ref_param(env: &mut CompilationEnv, ty: &Type, struct_name: &Opti
     match &ty.value {
         Type_::Ref(_, state_ty) => {
             check_state_param(env, state_ty, struct_name);
-        }
+        },
         _ => env.add_diag(diag!(
             Derivation::DeriveFailed,
             (ty.loc, "expected a reference type".to_string())
@@ -252,7 +252,7 @@ fn check_state_param(env: &mut CompilationEnv, state_ty: &Type, struct_name: &Op
                             )
                         ));
                         return;
-                    }
+                    },
                 };
                 if given_name.value != expected_name.0.value {
                     env.add_diag(diag!(
@@ -267,7 +267,7 @@ fn check_state_param(env: &mut CompilationEnv, state_ty: &Type, struct_name: &Op
                     ));
                 }
             }
-        }
+        },
         _ => env.add_diag(diag!(
             Derivation::DeriveFailed,
             (state_ty.loc, "expected a struct type".to_string())
@@ -294,7 +294,7 @@ fn message_hash(
                 )
             ));
             return sp(loc, Exp_::UnresolvedError);
-        }
+        },
     };
     let account_addr = match addr {
         LeadingNameAccess_::AnonymousAddress(num) => num.into_inner(),
@@ -308,7 +308,7 @@ fn message_hash(
                 ));
                 AccountAddress::from_hex_literal("0x0").unwrap()
             }
-        }
+        },
     };
     let addr_str = format!("0x{:X}", account_addr);
     let hash_str = format!("{}::{}::{}", addr_str, mod_def.name, fun_def.name);

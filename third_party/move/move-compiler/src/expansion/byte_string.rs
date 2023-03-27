@@ -97,7 +97,7 @@ fn decode_(context: &mut Context, buffer: &mut Vec<u8>, chars: Vec<char>) {
                         hex.push(d0);
                         hex.push(d1);
                         hex
-                    }
+                    },
 
                     // Unexpected end of text
                     (d0_opt @ Some(_), None) | (d0_opt @ None, None) => {
@@ -112,7 +112,7 @@ fn decode_(context: &mut Context, buffer: &mut Vec<u8>, chars: Vec<char>) {
                         );
                         context.error(cur, len, err_text);
                         return;
-                    }
+                    },
 
                     // There was a second digit but no first?
                     (None, Some(_)) => unreachable!(),
@@ -122,13 +122,13 @@ fn decode_(context: &mut Context, buffer: &mut Vec<u8>, chars: Vec<char>) {
                     Err(hex::FromHexError::InvalidHexCharacter { c, index }) => {
                         let err_text = format!("Invalid hexadecimal character: '{}'", c);
                         context.error(cur + 2 + index, cur + 2 + index, err_text);
-                    }
+                    },
                     Err(_) => unreachable!("ICE unexpected error parsing hex byte string value"),
                 }
-            }
+            },
             c => {
                 context.error(cur, cur + 2, format!("Invalid escape sequence: '\\{}'", c));
-            }
+            },
         }
     }
 }

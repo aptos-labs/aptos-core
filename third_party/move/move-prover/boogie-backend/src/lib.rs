@@ -413,7 +413,7 @@ impl MapImpl {
             None => String::new(),
             Some((addr, mod_name, fun_name)) => {
                 format!("${}_{}_{}", addr.to_str_radix(16), mod_name, fun_name)
-            }
+            },
         }
     }
 }

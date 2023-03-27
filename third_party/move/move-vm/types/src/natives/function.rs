@@ -88,10 +88,10 @@ impl NativeResult {
                     cost,
                     abort_code.unwrap_or(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR as u64),
                 )
-            }
+            },
             Err(err) => {
                 return Err(err);
-            }
+            },
         };
         Ok(result)
     }
@@ -109,10 +109,10 @@ impl NativeResult {
                     cost,
                     abort_code.unwrap_or(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR as u64),
                 )
-            }
+            },
             Err(err) => {
                 return Err(err);
-            }
+            },
         };
         Ok(result)
     }
@@ -132,7 +132,7 @@ macro_rules! pop_arg {
                 return Err(PartialVMError::new(
                     StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                 ))
-            }
+            },
             Some(Err(e)) => return Err(e),
             Some(Ok(v)) => v,
         }

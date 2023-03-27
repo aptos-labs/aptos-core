@@ -84,7 +84,7 @@ impl Architecture {
                     supported_architectures.join(", "),
                     be
                 )
-            }
+            },
         })
     }
 }
