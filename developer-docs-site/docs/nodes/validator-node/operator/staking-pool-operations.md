@@ -5,7 +5,7 @@ slug: "staking-pool-operations"
 
 # Staking Pool Operations
 
-This document describes how to perform staking pool operations. Note that you can stake only when you meet the minimal staking requirement. 
+This document describes how to perform [staking](../../../concepts/staking.md) pool operations. Note that you can stake only when you meet the minimal staking requirement. See also the related [Delegation Pool Operations](./delegation-pool-operations.md) instructions.
 
 :::tip Minimum staking requirement
 The current required minimum for staking is 1 million APT tokens.
