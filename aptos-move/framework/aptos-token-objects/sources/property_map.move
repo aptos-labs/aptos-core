@@ -1,7 +1,7 @@
 /// PropertyMap provides generic metadata support for AptosToken. It is a  specialization of
 /// SimpleMap that enforces strict typing with minimal storage use by using constant u64 to
 /// represent types and storing values in bcs format.
-module token_objects::property_map {
+module aptos_token_objects::property_map {
     use std::bcs;
     use std::vector;
     use std::error;
@@ -35,6 +35,7 @@ module token_objects::property_map {
     const MAX_PROPERTY_MAP_SIZE: u64 = 1000;
     const MAX_PROPERTY_NAME_LENGTH: u64 = 128;
 
+    // PropertyValue::type
     const BOOL: u8 = 0;
     const U8: u8 = 1;
     const U16: u8 = 2;
@@ -49,7 +50,7 @@ module token_objects::property_map {
     // Structs
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
-    struct PropertyMap has key {
+    struct PropertyMap has drop, key {
         inner: SimpleMap<String, PropertyValue>,
     }
 
@@ -65,6 +66,10 @@ module token_objects::property_map {
     public fun init(ref: &ConstructorRef, container: PropertyMap) {
         let signer = object::generate_signer(ref);
         move_to(&signer, container);
+    }
+
+    public fun burn(ref: MutatorRef) acquires PropertyMap {
+        move_from<PropertyMap>(ref.self);
     }
 
     /// Helper for external entry functions to produce a valid container for property values.
@@ -242,7 +247,7 @@ module token_objects::property_map {
         let (type, value) = read(object, key);
         assert!(
             type == type_info::type_name<V>(),
-            error::invalid_argument(ETYPE_INVALID),
+            error::invalid_argument(ETYPE_MISMATCH),
         );
         value
     }
@@ -580,7 +585,7 @@ module token_objects::property_map {
     }
 
     #[test(creator = @0x123)]
-    #[expected_failure(abort_code = 0x10008, location = Self)]
+    #[expected_failure(abort_code = 0x10005, location = Self)]
     fun test_invalid_read(creator: &signer) acquires PropertyMap {
         let constructor_ref = object::create_named_object(creator, b"");
         let object = object::object_from_constructor_ref<object::ObjectCore>(&constructor_ref);

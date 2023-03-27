@@ -116,6 +116,23 @@ class RestClient:
             raise ApiError(f"{response.text} - {account_address}", response.status_code)
         return response.json()
 
+    async def account_resources(
+        self,
+        account_address: AccountAddress,
+        ledger_version: int = None,
+    ) -> List[Dict[str, Any]]:
+        if not ledger_version:
+            request = f"{self.base_url}/accounts/{account_address}/resources"
+        else:
+            request = f"{self.base_url}/accounts/{account_address}/resources?ledger_version={ledger_version}"
+
+        response = await self.client.get(request)
+        if response.status_code == 404:
+            raise AccountNotFound(f"{account_address}", account_address)
+        if response.status_code >= 400:
+            raise ApiError(f"{response.text} - {account_address}", response.status_code)
+        return response.json()
+
     async def get_table_item(
         self,
         handle: str,
@@ -729,14 +746,29 @@ class FaucetClient:
 class ApiError(Exception):
     """The API returned a non-success status code, e.g., >= 400"""
 
+    status_code: int
+
     def __init__(self, message: str, status_code: int):
         # Call the base class constructor with the parameters it needs
         super().__init__(message)
         self.status_code = status_code
 
 
+class AccountNotFound(Exception):
+    """The account was not found"""
+
+    account: AccountAddress
+
+    def __init__(self, message: str, account: AccountAddress):
+        # Call the base class constructor with the parameters it needs
+        super().__init__(message)
+        self.account = account
+
+
 class ResourceNotFound(Exception):
     """The underlying resource was not found"""
+
+    resource: str
 
     def __init__(self, message: str, resource: str):
         # Call the base class constructor with the parameters it needs
