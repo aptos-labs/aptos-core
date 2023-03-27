@@ -4,11 +4,21 @@
 use crate::{
     assert_abort, assert_success, get_stake_pool, get_validator_config, get_validator_set,
     initialize_staking, join_validator_set, leave_validator_set, rotate_consensus_key,
-    setup_staking, unlock_stake, withdraw_stake, MoveHarness,
+    setup_staking, tests::common, unlock_stake, withdraw_stake, MoveHarness,
 };
 use aptos_cached_packages::aptos_stdlib;
 use aptos_types::account_address::{default_stake_pool_address, AccountAddress};
 use move_core_types::language_storage::CORE_CODE_ADDRESS;
+use once_cell::sync::Lazy;
+use std::collections::BTreeMap;
+
+pub static PROPOSAL_SCRIPTS: Lazy<BTreeMap<String, Vec<u8>>> = Lazy::new(build_scripts);
+
+fn build_scripts() -> BTreeMap<String, Vec<u8>> {
+    let package_folder = "stake.data";
+    let package_names = vec!["enable_rewards_rate_decrease"];
+    common::build_scripts(package_folder, package_names)
+}
 
 #[test]
 fn test_staking_end_to_end() {
@@ -187,6 +197,75 @@ fn test_staking_rewards() {
     assert_eq!(
         get_stake_pool(&harness, &validator_1_address).active,
         stake_amount_1
+    );
+
+    // Enable rewards rate decrease and change rewards config. In production it requires governance.
+    let core_resources =
+        harness.new_account_at(AccountAddress::from_hex_literal("0xA550C18").unwrap());
+    let script_code = PROPOSAL_SCRIPTS
+        .get("enable_rewards_rate_decrease")
+        .expect("proposal script should be built");
+    let txn = harness.create_script(&core_resources, script_code.clone(), vec![], vec![]);
+    assert_success!(harness.run(txn));
+
+    // Parameters from the proposal.
+    let one_year_in_micros: u64 = 365 * 24 * 60 * 60 * 1_000_000;
+    let one_year_in_secs: u64 = one_year_in_micros / 1_000_000;
+    let mut rewards_rate: u64 = 100;
+    let min_rewards_rate: u64 = 30;
+    let rewards_rate_denominator: u64 = 10000;
+    let rewards_rate_decrease_rate_bps: u64 = 5000;
+    let bps_denominator: u64 = 10000;
+
+    // Both validators propose a block in the current epoch. Both should receive rewards at the
+    // new rewards rate, 1% every epoch.
+    harness.new_block_with_metadata(validator_1_address, vec![]);
+    harness.new_block_with_metadata(validator_2_address, vec![]);
+    harness.new_epoch();
+    stake_amount_1 += stake_amount_1 * rewards_rate / rewards_rate_denominator;
+    stake_amount_2 += stake_amount_2 * rewards_rate / rewards_rate_denominator;
+    assert_eq!(
+        get_stake_pool(&harness, &validator_1_address).active,
+        stake_amount_1
+    );
+    assert_eq!(
+        get_stake_pool(&harness, &validator_2_address).active,
+        stake_amount_2
+    );
+
+    // 1 year passed. Rewards rate halves. New rewards rate is 0.5% every epoch.
+    // Both validators propose a block in the current epoch. Both should receive rewards.
+    harness.new_block_with_metadata(validator_1_address, vec![]);
+    harness.new_block_with_metadata(validator_2_address, vec![]);
+    harness.fast_forward(one_year_in_secs);
+    harness.new_epoch();
+    rewards_rate = rewards_rate * rewards_rate_decrease_rate_bps / bps_denominator;
+    stake_amount_1 += stake_amount_1 * rewards_rate / rewards_rate_denominator;
+    stake_amount_2 += stake_amount_2 * rewards_rate / rewards_rate_denominator;
+    assert_eq!(
+        get_stake_pool(&harness, &validator_1_address).active,
+        stake_amount_1
+    );
+    assert_eq!(
+        get_stake_pool(&harness, &validator_2_address).active,
+        stake_amount_2
+    );
+
+    // Another year passed. Rewards rate halves but it cannot be lower than 0.3%.
+    // New rewards rate is 0.3% every epoch.
+    // Validator 1 misses one proposal but has one successful so they receive half of the rewards.
+    harness.new_block_with_metadata(validator_1_address, vec![index_1]);
+    harness.fast_forward(one_year_in_secs);
+    harness.new_epoch();
+    rewards_rate = min_rewards_rate;
+    stake_amount_1 += stake_amount_1 * rewards_rate / rewards_rate_denominator / 2;
+    assert_eq!(
+        get_stake_pool(&harness, &validator_1_address).active,
+        stake_amount_1
+    );
+    assert_eq!(
+        get_stake_pool(&harness, &validator_2_address).active,
+        stake_amount_2
     );
 }
 
