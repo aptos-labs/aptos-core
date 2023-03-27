@@ -8,7 +8,7 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 # Use Remix IDE Plugin
 
-This tutorial explains how to deploy and run Move modules with the [WELLDONE Code Remix IDE](https://docs.welldonestudio.io/code) plugin. This tool offers a graphical interface for developing Move modules. 
+This tutorial explains how to deploy and run Move modules with the [WELLDONE Code Remix IDE](https://docs.welldonestudio.io/code) plugin. This tool offers a graphical interface for developing Move [modules](../../guides/move-guides/book/modules-and-scripts.md#modules). 
 
 Here are the steps to use the Remix IDE plugin for Move (described in detail below):
 
