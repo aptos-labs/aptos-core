@@ -30,5 +30,5 @@ BINS=(
 mkdir dist
 
 for BIN in "${BINS[@]}"; do
-    cp $CARGO_TARGET_DIR/$BIN dist/$BIN
+    cp $CARGO_TARGET_DIR/$PROFILE/$BIN dist/$BIN
 done
