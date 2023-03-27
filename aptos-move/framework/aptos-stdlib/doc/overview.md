@@ -41,4 +41,4 @@ This is the reference documentation of the Aptos standard library.
 -  [`0x1::type_info`](type_info.md#0x1_type_info)
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
