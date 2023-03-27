@@ -5,12 +5,13 @@ use crate::DBTool;
 use aptos_backup_cli::{
     coordinators::backup::BackupCompactor,
     metadata,
-    metadata::cache::MetadataCacheOpt,
+    metadata::{cache::MetadataCacheOpt, view::MetadataView},
     storage::{local_fs::LocalFs, BackupStorage},
 };
 use aptos_backup_service::start_backup_service;
 use aptos_executor_test_helpers::integration_test_impl::test_execution_with_storage_impl;
 use aptos_temppath::TempPath;
+use aptos_types::transaction::Version;
 use clap::Parser;
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
@@ -73,6 +74,18 @@ fn test_various_cmd_parsing() {
 
 fn run_cmd(args: &[&str]) {
     DBTool::try_parse_from(args).expect("command parse unsuccessful");
+}
+
+fn assert_metadata_view_eq(view1: &MetadataView, view2: &MetadataView) {
+    assert!(
+        view1.select_transaction_backups(0, Version::MAX).unwrap()
+            == view2.select_transaction_backups(0, Version::MAX).unwrap()
+            && view1.select_epoch_ending_backups(Version::MAX).unwrap()
+                == view2.select_epoch_ending_backups(Version::MAX).unwrap()
+            && view1.select_state_snapshot(Version::MAX).unwrap()
+                == view2.select_state_snapshot(Version::MAX).unwrap(),
+        "Metadata views are not equal"
+    );
 }
 
 #[test]
@@ -186,7 +199,6 @@ fn test_backup_compaction() {
         .run(),
     )
     .unwrap();
-
     // assert the metadata views are same before and after compaction
     let metadata_opt = MetadataCacheOpt::new(Some(TempPath::new().path().to_path_buf()));
     let old_metaview = rt
@@ -210,6 +222,6 @@ fn test_backup_compaction() {
         ))
         .unwrap();
 
-    assert_eq!(old_metaview, new_metaview);
+    assert_metadata_view_eq(&old_metaview, &new_metaview);
     rt.shutdown_timeout(Duration::from_secs(1));
 }
