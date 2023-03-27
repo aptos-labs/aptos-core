@@ -7,7 +7,9 @@ use crate::{
         transaction_processor::TransactionProcessor,
     },
     models::{
-        events::EventModel, token_models::token_utils::TypeInfo, transactions::TransactionModel,
+        events::EventModel,
+        token_models::token_utils::TypeInfo,
+        transactions::{TransactionDetail, TransactionModel},
     },
 };
 use aptos_api_types::Transaction;
@@ -226,6 +228,7 @@ impl EconiaTransactionProcessor {
         start_version: u64,
         end_version: u64,
         events: Vec<EventModel>,
+        block_to_time: HashMap<i64, chrono::NaiveDateTime>,
     ) -> Result<ProcessingResult, Error> {
         aptos_logger::trace!(
             name = NAME,
@@ -233,31 +236,53 @@ impl EconiaTransactionProcessor {
             end_version = end_version,
             "Inserting to db",
         );
-        if self.insert_events_transaction(&events).is_err() {
+        if self
+            .insert_events_transaction(&events, &block_to_time)
+            .is_err()
+        {
             let events = clean_data_for_db(events, true);
-            self.insert_events_transaction(&events)?;
+            self.insert_events_transaction(&events, &block_to_time)?;
         }
         Ok(ProcessingResult::new(NAME, start_version, end_version))
     }
 
-    fn insert_events_transaction(&self, events: &[EventModel]) -> Result<(), Error> {
+    fn insert_events_transaction(
+        &self,
+        events: &[EventModel],
+        block_to_time: &HashMap<i64, chrono::NaiveDateTime>,
+    ) -> Result<(), Error> {
         let mut conn = self.get_conn();
         conn.build_transaction()
             .read_write()
             .run::<_, Error, _>(|pg_conn| {
-                self.insert_events(pg_conn, events)?;
+                self.insert_events(pg_conn, events, &block_to_time)?;
                 Ok(())
             })?;
         Ok(())
     }
 
-    fn insert_events(&self, conn: &mut PgConnection, ev: &[EventModel]) -> Result<(), Error> {
+    fn insert_events(
+        &self,
+        conn: &mut PgConnection,
+        ev: &[EventModel],
+        block_to_time: &HashMap<i64, chrono::NaiveDateTime>,
+    ) -> Result<(), Error> {
         let mut maker = vec![];
         let mut taker = vec![];
         let mut market_registration = vec![];
         let mut recognized_market = vec![];
 
         for e in ev.iter() {
+            let current_time = block_to_time
+                .get(&e.transaction_block_height)
+                .expect("block height not found in block_to_time map");
+
+            let utc_time = chrono::TimeZone::from_utc_datetime(&Utc, current_time);
+            if utc_time != *CURRENT_BLOCK_TIME.read().expect("failed to lock") {
+                let mut current_block_time = CURRENT_BLOCK_TIME.write().expect("failed to lock");
+                *current_block_time = utc_time;
+            }
+
             let event_wrapper: EventWrapper = serde_json::from_value(e.data.clone())
                 .map_err(|e| Error::DeserializationError(Box::new(e)))?;
             match event_wrapper {
@@ -441,26 +466,58 @@ impl std::fmt::Debug for EconiaTransactionProcessor {
     }
 }
 
+fn get_next_block_time<'a>(
+    details_iter: &mut impl Iterator<Item = &'a TransactionDetail>,
+) -> (i64, chrono::NaiveDateTime) {
+    if let Some(d) = details_iter.next() {
+        match d {
+            crate::models::transactions::TransactionDetail::User(t, _) => {
+                (t.block_height, t.timestamp)
+            },
+            crate::models::transactions::TransactionDetail::BlockMetadata(t) => {
+                (t.block_height, t.timestamp)
+            },
+        }
+    } else {
+        panic!("Transaction details missing")
+    }
+}
+
 #[async_trait]
 impl TransactionProcessor for EconiaTransactionProcessor {
     fn name(&self) -> &'static str {
         NAME
     }
 
-    // TODO update current block time
     async fn process_transactions(
         &self,
         transactions: Vec<Transaction>,
         start_version: u64,
         end_version: u64,
     ) -> Result<ProcessingResult, TransactionProcessingError> {
-        let (_, _, events, _, _) = TransactionModel::from_transactions(&transactions);
-        let events = events
-            .into_iter()
-            .filter(is_event_type_valid)
-            .collect::<Vec<EventModel>>();
+        let (_, details, events, _, _) = TransactionModel::from_transactions(&transactions);
+        let mut details_iter = details.iter();
+        let (mut cur_block, mut cur_time) = Default::default();
+        let mut block_to_time = HashMap::new();
+        let mut filtered_events = vec![];
 
-        self.insert_to_db(start_version, end_version, events)
+        for e in events.into_iter().filter(is_event_type_valid) {
+            while cur_block < e.transaction_block_height {
+                let (block, time) = get_next_block_time(&mut details_iter);
+                cur_block = block;
+                cur_time = time;
+            }
+
+            if cur_block == e.transaction_block_height {
+                block_to_time.insert(cur_block, cur_time);
+            } else {
+                panic!("Block height mismatch")
+            }
+
+            filtered_events.push(e);
+        }
+
+        self.insert_to_db(start_version, end_version, filtered_events, block_to_time)
             .map_err(|err| {
                 TransactionProcessingError::TransactionCommitError((
                     anyhow::Error::from(err),
