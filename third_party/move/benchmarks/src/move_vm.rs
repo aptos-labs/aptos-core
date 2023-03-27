@@ -50,7 +50,7 @@ fn compile_modules() -> Vec<CompiledModule> {
             AnnotatedCompiledUnit::Module(annot_unit) => annot_unit.named_module.module,
             AnnotatedCompiledUnit::Script(_) => {
                 panic!("Expected a module but received a script")
-            }
+            },
         })
         .collect()
 }
