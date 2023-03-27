@@ -131,7 +131,7 @@ pub(crate) fn validate_combine_signer_and_txn_args<S: MoveResolverExt>(
     for (idx, ty) in func.parameters[signer_param_cnt..].iter().enumerate() {
         let (valid, construction) = is_valid_txn_arg(
             session,
-            ty, //&ty.subst(&func.type_arguments).unwrap(),
+            &ty.subst(&func.type_arguments).unwrap(),
             allowed_structs,
         );
         if !valid {
