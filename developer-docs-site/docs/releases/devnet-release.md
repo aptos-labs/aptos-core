@@ -11,7 +11,7 @@ See the [Latest Aptos Releases](./index.md) index for how to subscribe to GitHub
 
 ## Aptos Framework
 
-Aptos Framework Release commit hash - `1d0dc2c75da1e397effc8bcfa14114652462654d`
+Aptos Framework Release commit hash - `framework-mainnet`
 
 ## Aptos SDK
 
