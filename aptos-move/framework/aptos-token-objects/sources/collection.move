@@ -20,7 +20,7 @@
 /// * Consider supporting changing the aspects of supply with the MutatorRef.
 /// * Add aggregator support when added to framework
 /// * Update Object<T> to be viable input as a transaction arg and then update all readers as view.
-module token_objects::collection {
+module aptos_token_objects::collection {
     use std::error;
     use std::option::{Self, Option};
     use std::signer;
@@ -29,9 +29,9 @@ module token_objects::collection {
     use aptos_framework::event;
     use aptos_framework::object::{Self, ConstructorRef, Object};
 
-    use token_objects::royalty::{Self, Royalty};
+    use aptos_token_objects::royalty::{Self, Royalty};
 
-    friend token_objects::token;
+    friend aptos_token_objects::token;
 
     /// The collections supply is at its maximum amount
     const EEXCEEDS_MAX_SUPPLY: u64 = 1;
@@ -54,15 +54,15 @@ module token_objects::collection {
         mutation_events: event::EventHandle<MutationEvent>,
     }
 
+    /// This enables mutating description and URI by higher level services.
+    struct MutatorRef has drop, store {
+        self: address,
+    }
+
     /// Contains the mutated fields name. This makes the life of indexers easier, so that they can
     /// directly understand the behavior in a writeset.
     struct MutationEvent has drop, store {
         mutated_field_name: String,
-    }
-
-    /// This enables mutating description and URI by higher level services.
-    struct MutatorRef has drop, store {
-        self: address,
     }
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
@@ -151,6 +151,9 @@ module token_objects::collection {
             royalty::init(&constructor_ref, option::extract(&mut royalty))
         };
 
+        let transfer_ref = object::generate_transfer_ref(&constructor_ref);
+        object::disable_ungated_transfer(&transfer_ref);
+
         constructor_ref
     }
 
@@ -190,48 +193,6 @@ module token_objects::collection {
             let supply = borrow_global_mut<FixedSupply>(collection_addr);
             supply.current_supply = supply.current_supply - 1;
         }
-    }
-
-    /// Entry function for creating a collection
-    public entry fun create_collection(
-        creator: &signer,
-        description: String,
-        name: String,
-        uri: String,
-        max_supply: u64,
-        enable_royalty: bool,
-        royalty_numerator: u64,
-        royalty_denominator: u64,
-        royalty_payee_address: address,
-    ) {
-        let royalty = if (enable_royalty) {
-            option::some(royalty::create(
-                royalty_numerator,
-                royalty_denominator,
-                royalty_payee_address,
-            ))
-        } else {
-            option::none()
-        };
-
-        if (max_supply == 0) {
-            create_untracked_collection(
-                creator,
-                description,
-                name,
-                royalty,
-                uri,
-            )
-        } else {
-            create_fixed_collection(
-                creator,
-                description,
-                max_supply,
-                name,
-                royalty,
-                uri,
-            )
-        };
     }
 
     /// Creates a MutatorRef, which gates the ability to mutate any fields that support mutation.
@@ -292,10 +253,7 @@ module token_objects::collection {
         borrow_global_mut<Collection>(mutator_ref.self)
     }
 
-    public fun set_description(
-        mutator_ref: &MutatorRef,
-        description: String,
-    ) acquires Collection {
+    public fun set_description(mutator_ref: &MutatorRef, description: String) acquires Collection {
         let collection = borrow_mut(mutator_ref);
         collection.description = description;
         event::emit_event(
@@ -304,10 +262,7 @@ module token_objects::collection {
         );
     }
 
-    public fun set_uri(
-        mutator_ref: &MutatorRef,
-        uri: String,
-    ) acquires Collection {
+    public fun set_uri(mutator_ref: &MutatorRef, uri: String) acquires Collection {
         let collection = borrow_mut(mutator_ref);
         collection.uri = uri;
         event::emit_event(
@@ -319,6 +274,7 @@ module token_objects::collection {
     // Tests
 
     #[test(creator = @0x123, trader = @0x456)]
+    #[expected_failure(abort_code = 0x50003, location = aptos_framework::object)]
     entry fun test_create_and_transfer(creator: &signer, trader: &signer) {
         let creator_address = signer::address_of(creator);
         let collection_name = string::utf8(b"collection name");
@@ -329,7 +285,6 @@ module token_objects::collection {
         );
         assert!(object::owner(collection) == creator_address, 1);
         object::transfer(creator, collection, signer::address_of(trader));
-        assert!(object::owner(collection) == signer::address_of(trader), 1);
     }
 
     #[test(creator = @0x123)]

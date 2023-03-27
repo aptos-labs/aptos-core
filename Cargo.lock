@@ -9257,9 +9257,9 @@ dependencies = [
 
 [[package]]
 name = "poem"
-version = "1.3.44"
+version = "1.3.55"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a94ff00c513bee5c32ecbbf982f470e7e51e913330737dc40522ddc298954395"
+checksum = "c0608069d4999c3c02d49dff261663f2e73a8f7b00b7cd364fb5e93e419dafa1"
 dependencies = [
  "anyhow",
  "async-trait",

@@ -74,6 +74,8 @@ const SECS_TO_MICROSECS: u64 = 1_000_000;
 /// identify issues with nodes, and show related information.
 #[derive(Parser)]
 pub enum NodeTool {
+    AnalyzeValidatorPerformance(AnalyzeValidatorPerformance),
+    BootstrapDbFromBackup(BootstrapDbFromBackup),
     CheckNetworkConnectivity(CheckNetworkConnectivity),
     GetPerformance(GetPerformance),
     GetStakePool(GetStakePool),
@@ -87,14 +89,14 @@ pub enum NodeTool {
     RunLocalTestnet(RunLocalTestnet),
     UpdateConsensusKey(UpdateConsensusKey),
     UpdateValidatorNetworkAddresses(UpdateValidatorNetworkAddresses),
-    AnalyzeValidatorPerformance(AnalyzeValidatorPerformance),
-    BootstrapDbFromBackup(BootstrapDbFromBackup),
 }
 
 impl NodeTool {
     pub async fn execute(self) -> CliResult {
         use NodeTool::*;
         match self {
+            AnalyzeValidatorPerformance(tool) => tool.execute_serialized().await,
+            BootstrapDbFromBackup(tool) => tool.execute_serialized().await,
             CheckNetworkConnectivity(tool) => tool.execute_serialized().await,
             GetPerformance(tool) => tool.execute_serialized().await,
             GetStakePool(tool) => tool.execute_serialized().await,
@@ -108,8 +110,6 @@ impl NodeTool {
             RunLocalTestnet(tool) => tool.execute_serialized_without_logger().await,
             UpdateConsensusKey(tool) => tool.execute_serialized().await,
             UpdateValidatorNetworkAddresses(tool) => tool.execute_serialized().await,
-            AnalyzeValidatorPerformance(tool) => tool.execute_serialized().await,
-            BootstrapDbFromBackup(tool) => tool.execute_serialized().await,
         }
     }
 }

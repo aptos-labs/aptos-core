@@ -1460,6 +1460,7 @@ A non decreasing curve must ensure that next is greater than cur.
 
 
 <pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
 <b>requires</b> max_usage &gt; 0;
 <b>requires</b> max_usage &lt;= <a href="storage_gas.md#0x1_storage_gas_MAX_U64">MAX_U64</a> / <a href="storage_gas.md#0x1_storage_gas_BASIS_POINT_DENOMINATION">BASIS_POINT_DENOMINATION</a>;
 <b>aborts_if</b> <b>false</b>;

@@ -6,7 +6,7 @@ from aptos_sdk.account_address import AccountAddress
 from aptos_sdk.authenticator import Authenticator, MultiEd25519Authenticator
 from aptos_sdk.bcs import Serializer
 from aptos_sdk.client import FaucetClient, RestClient
-from aptos_sdk.ed25519 import MultiEd25519PublicKey, MultiEd25519Signature
+from aptos_sdk.ed25519 import MultiPublicKey, MultiSignature
 from aptos_sdk.transactions import (EntryFunction, RawTransaction, Script,
                                     ScriptArgument, SignedTransaction,
                                     TransactionArgument, TransactionPayload)
@@ -49,7 +49,7 @@ if __name__ == "__main__":
     # :!:>section_2
     threshold = 2
 
-    multisig_public_key = MultiEd25519PublicKey(
+    multisig_public_key = MultiPublicKey(
         [alice.public_key(), bob.public_key(), chad.public_key()], threshold
     )
 
@@ -129,7 +129,7 @@ if __name__ == "__main__":
         (bob.public_key(), bob_signature),
     ]
 
-    multisig_signature = MultiEd25519Signature(multisig_public_key, sig_map)
+    multisig_signature = MultiSignature(multisig_public_key, sig_map)
 
     authenticator = Authenticator(
         MultiEd25519Authenticator(multisig_public_key, multisig_signature)
@@ -197,7 +197,7 @@ if __name__ == "__main__":
 
     cap_rotate_key = deedee.sign(rotation_proof_challenge_bcs).data()
 
-    cap_update_table = MultiEd25519Signature(
+    cap_update_table = MultiSignature(
         multisig_public_key,
         [
             (bob.public_key(), bob.sign(rotation_proof_challenge_bcs)),
@@ -309,7 +309,7 @@ if __name__ == "__main__":
         (chad.public_key(), chad_signature),
     ]
 
-    multisig_signature = MultiEd25519Signature(multisig_public_key, sig_map)
+    multisig_signature = MultiSignature(multisig_public_key, sig_map)
 
     authenticator = Authenticator(
         MultiEd25519Authenticator(multisig_public_key, multisig_signature)
@@ -392,7 +392,7 @@ if __name__ == "__main__":
         (chad.public_key(), chad_signature),
     ]
 
-    multisig_signature = MultiEd25519Signature(multisig_public_key, sig_map)
+    multisig_signature = MultiSignature(multisig_public_key, sig_map)
 
     authenticator = Authenticator(
         MultiEd25519Authenticator(multisig_public_key, multisig_signature)
@@ -449,7 +449,7 @@ if __name__ == "__main__":
         (bob.public_key(), bob_signature),
     ]
 
-    multisig_signature = MultiEd25519Signature(multisig_public_key, sig_map)
+    multisig_signature = MultiSignature(multisig_public_key, sig_map)
 
     authenticator = Authenticator(
         MultiEd25519Authenticator(multisig_public_key, multisig_signature)
