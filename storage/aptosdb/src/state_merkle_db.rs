@@ -229,12 +229,12 @@ impl StateMerkleDb {
 }
 
 impl TreeReader<StateKey> for StateMerkleDb {
-    fn get_node_option(&self, node_key: &NodeKey) -> Result<Option<Node>> {
+    fn get_node_option(&self, node_key: &NodeKey, tag: &str) -> Result<Option<Node>> {
         let start_time = Instant::now();
         if !self.cache_enabled() {
             let node_opt = self.get::<JellyfishMerkleNodeSchema>(node_key)?;
             NODE_CACHE_SECONDS
-                .with_label_values(&["cache_disabled"])
+                .with_label_values(&[tag, "cache_disabled"])
                 .observe(start_time.elapsed().as_secs_f64());
             return Ok(node_opt);
         }
@@ -242,12 +242,12 @@ impl TreeReader<StateKey> for StateMerkleDb {
         {
             let node = node_cache.get(node_key).cloned();
             NODE_CACHE_SECONDS
-                .with_label_values(&["versioned_cache_hit"])
+                .with_label_values(&[tag, "versioned_cache_hit"])
                 .observe(start_time.elapsed().as_secs_f64());
             node
         } else if let Some(node) = self.lru_cache.get(node_key) {
             NODE_CACHE_SECONDS
-                .with_label_values(&["lru_cache_hit"])
+                .with_label_values(&[tag, "lru_cache_hit"])
                 .observe(start_time.elapsed().as_secs_f64());
             Some(node)
         } else {
@@ -256,7 +256,7 @@ impl TreeReader<StateKey> for StateMerkleDb {
                 self.lru_cache.put(node_key.clone(), node.clone());
             }
             NODE_CACHE_SECONDS
-                .with_label_values(&["cache_miss"])
+                .with_label_values(&[tag, "cache_miss"])
                 .observe(start_time.elapsed().as_secs_f64());
             node_opt
         };
