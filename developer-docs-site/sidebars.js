@@ -173,7 +173,6 @@ const sidebars = {
     "concepts/base-gas",
     "guides/interacting-with-the-blockchain",
     "tutorials/first-move-module",
-    "guides/move-guides/upgrading-move-code",
     {
       type: "category",
       label: "Aptos Move Book",
@@ -204,6 +203,7 @@ const sidebars = {
         "guides/move-guides/book/uses",
         "guides/move-guides/book/friends",
         "guides/move-guides/book/packages",
+        "guides/move-guides/book/package-upgrades",
         "guides/move-guides/book/unit-testing",
         "guides/move-guides/book/global-storage-structure",
         "guides/move-guides/book/global-storage-operators",
@@ -321,6 +321,7 @@ const sidebars = {
             },
             "nodes/validator-node/operator/connect-to-aptos-network",
             "nodes/validator-node/operator/staking-pool-operations",
+            "nodes/validator-node/operator/delegation-pool-operations",
             "nodes/validator-node/operator/shutting-down-nodes",
           ],
         },

@@ -123,6 +123,10 @@ impl StateKey {
     pub fn into_inner(self) -> StateKeyInner {
         self.inner
     }
+
+    pub fn get_shard_id(&self) -> u8 {
+        CryptoHash::hash(self).nibble(0)
+    }
 }
 
 impl StateKeyInner {

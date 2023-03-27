@@ -6,8 +6,8 @@ module token_objects::hero {
 
     use aptos_framework::object::{Self, ConstructorRef, Object};
 
-    use token_objects::collection;
-    use token_objects::token;
+    use aptos_token_objects::collection;
+    use aptos_token_objects::token;
 
     const ENOT_A_HERO: u64 = 1;
     const ENOT_A_WEAPON: u64 = 2;

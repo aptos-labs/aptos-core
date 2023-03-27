@@ -6,7 +6,7 @@
 ///
 /// TODO:
 /// * Update Object<T> to be a viable input as a transaction arg and then update all readers as view.
-module token_objects::token {
+module aptos_token_objects::token {
     use std::error;
     use std::option::{Self, Option};
     use std::string::{Self, String};
@@ -16,8 +16,8 @@ module token_objects::token {
     use aptos_framework::event;
     use aptos_framework::object::{Self, ConstructorRef, Object};
 
-    use token_objects::collection;
-    use token_objects::royalty::{Self, Royalty};
+    use aptos_token_objects::collection::{Self, Collection};
+    use aptos_token_objects::royalty::{Self, Royalty};
 
     // The token does not exist
     const ETOKEN_DOES_NOT_EXIST: u64 = 1;
@@ -29,12 +29,10 @@ module token_objects::token {
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Represents the common fields to all tokens.
     struct Token has key {
-        /// An optional categorization of similar token, there are no constraints on collections.
-        collection: String,
+        /// The collection from which this token resides.
+        collection: Object<Collection>,
         /// Unique identifier within the collection, optional, 0 means unassigned
         collection_id: u64,
-        /// The original creator of this token.
-        creator: address,
         /// A brief description of the token.
         description: String,
         /// The name of the token, which should be unique within the collection; the length of name
@@ -58,36 +56,39 @@ module token_objects::token {
         self: Option<address>,
     }
 
+    /// This enables mutating descritpion and URI by higher level services.
+    struct MutatorRef has drop, store {
+        self: address,
+    }
+
     /// Contains the mutated fields name. This makes the life of indexers easier, so that they can
     /// directly understand the behavior in a writeset.
     struct MutationEvent has drop, store {
         mutated_field_name: String,
     }
 
-    /// This enables mutating descritpion and URI by higher level services.
-    struct MutatorRef has drop, store {
-        self: address,
-    }
-
     /// Creates a new token object and returns the ConstructorRef for additional specialization.
     public fun create(
         creator: &signer,
-        collection: String,
+        collection_name: String,
         description: String,
         name: String,
         royalty: Option<Royalty>,
         uri: String,
     ): ConstructorRef {
         let creator_address = signer::address_of(creator);
-        let seed = create_token_seed(&collection, &name);
+        let seed = create_token_seed(&collection_name, &name);
+
+        let collection_addr = collection::create_collection_address(&creator_address, &collection_name);
+        let collection = object::address_to_object<Collection>(collection_addr);
+        let id = collection::increment_supply(&collection);
+
         let constructor_ref = object::create_named_object(creator, seed);
         let object_signer = object::generate_signer(&constructor_ref);
 
-        let id = collection::increment_supply(&creator_address, &collection);
         let token = Token {
             collection,
             collection_id: option::get_with_default(&mut id, 0),
-            creator: creator_address,
             description,
             name,
             creation_name: option::none(),
@@ -154,10 +155,14 @@ module token_objects::token {
     }
 
     public fun creator<T: key>(token: Object<T>): address acquires Token {
-        borrow(&token).creator
+        collection::creator(borrow(&token).collection)
     }
 
     public fun collection<T: key>(token: Object<T>): String acquires Token {
+        collection::name(borrow(&token).collection)
+    }
+
+    public fun collection_object<T: key>(token: Object<T>): Object<Collection> acquires Token {
         borrow(&token).collection
     }
 
@@ -223,7 +228,6 @@ module token_objects::token {
         let Token {
             collection,
             collection_id: _,
-            creator,
             description: _,
             name: _,
             creation_name: _,
@@ -232,13 +236,10 @@ module token_objects::token {
         } = move_from<Token>(addr);
 
         event::destroy_handle(mutation_events);
-        collection::decrement_supply(&creator, &collection);
+        collection::decrement_supply(&collection);
     }
 
-    public fun set_description(
-        mutator_ref: &MutatorRef,
-        description: String,
-    ) acquires Token {
+    public fun set_description(mutator_ref: &MutatorRef, description: String) acquires Token {
         let token = borrow_mut(mutator_ref);
         token.description = description;
         event::emit_event(
@@ -247,10 +248,7 @@ module token_objects::token {
         );
     }
 
-    public fun set_name(
-        mutator_ref: &MutatorRef,
-        name: String,
-    ) acquires Token {
+    public fun set_name(mutator_ref: &MutatorRef, name: String) acquires Token {
         let token = borrow_mut(mutator_ref);
         if (option::is_none(&token.creation_name)) {
             option::fill(&mut token.creation_name, token.name)
@@ -262,10 +260,7 @@ module token_objects::token {
         );
     }
 
-    public fun set_uri(
-        mutator_ref: &MutatorRef,
-        uri: String,
-    ) acquires Token {
+    public fun set_uri(mutator_ref: &MutatorRef, uri: String) acquires Token {
         let token = borrow_mut(mutator_ref);
         token.uri = uri;
         event::emit_event(
@@ -298,16 +293,15 @@ module token_objects::token {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
-        collection::create_collection(
+        let creator_address = signer::address_of(creator);
+        let expected_royalty = royalty::create(10, 1000, creator_address);
+        collection::create_fixed_collection(
             creator,
             string::utf8(b"collection description"),
-            collection_name,
-            string::utf8(b"collection uri"),
             5,
-            true,
-            10,
-            1000,
-            signer::address_of(creator),
+            collection_name,
+            option::some(expected_royalty),
+            string::utf8(b"collection uri"),
         );
 
         create(
@@ -319,10 +313,8 @@ module token_objects::token {
             string::utf8(b"token uri"),
         );
 
-        let creator_address = signer::address_of(creator);
         let token_addr = create_token_address(&creator_address, &collection_name, &token_name);
         let token = object::address_to_object<Token>(token_addr);
-        let expected_royalty = royalty::create(10, 1000, creator_address);
         assert!(option::some(expected_royalty) == royalty(token), 0);
     }
 
@@ -355,7 +347,7 @@ module token_objects::token {
     }
 
     #[test(creator = @0x123)]
-    #[expected_failure(abort_code = 0x20001, location = token_objects::collection)]
+    #[expected_failure(abort_code = 0x20001, location = aptos_token_objects::collection)]
     fun test_too_many_tokens(creator: &signer) {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
@@ -371,7 +363,7 @@ module token_objects::token {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
-        create_collection_helper(creator, *&collection_name, 1);
+        create_collection_helper(creator, *&collection_name, 2);
         create_token_helper(creator, *&collection_name, *&token_name);
         create_token_helper(creator, collection_name, token_name);
     }
@@ -480,16 +472,13 @@ module token_objects::token {
 
     #[test_only]
     fun create_collection_helper(creator: &signer, collection_name: String, max_supply: u64) {
-        collection::create_collection(
+        collection::create_fixed_collection(
             creator,
             string::utf8(b"collection description"),
-            collection_name,
-            string::utf8(b"collection uri"),
             max_supply,
-            false,
-            0,
-            0,
-            signer::address_of(creator),
+            collection_name,
+            option::none(),
+            string::utf8(b"collection uri"),
         );
     }
 

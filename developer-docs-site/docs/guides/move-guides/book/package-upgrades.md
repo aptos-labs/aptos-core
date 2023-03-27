@@ -1,12 +1,4 @@
----
-title: "Upgrade Move Code"
-slug: "upgrading-move-code"
----
-
-import ThemedImage from '@theme/ThemedImage';
-import useBaseUrl from '@docusaurus/useBaseUrl';
-
-# Upgrade Move code
+# Package Upgrades
 
 Move code (e.g., Move modules) on the Aptos blockchain can be upgraded. This
 allows code owners and module developers to update and evolve their contracts
@@ -16,7 +8,7 @@ the latest version of the code (e.g., the next time they interact with it).
 
 The Aptos blockchain natively supports different _upgrade policies_, which allow
 move developers to explicitly define the constraints around how their move code
-can be upgraded. The default policy is _(backwards) compatible_. This means that
+can be upgraded. The default policy is _backwards compatible_. This means that
 code upgrades are accepted only if they guarantee that no existing resource storage
 or public APIs are broken by the upgrade (including public functions).
 This compatibility checking is possible because of Move's strongly typed bytecode
@@ -31,7 +23,7 @@ for more details.
 
 ## How it works
 
-Move code upgrades on the Aptos blockchain happen at the [Move package](https://move-language.github.io/move/packages.html) 
+Move code upgrades on the Aptos blockchain happen at the [Move package](https://move-language.github.io/move/packages.html)
 granularity. A package specifies an upgrade policy in the `Move.toml` manifest:
 
 ```toml
@@ -50,8 +42,8 @@ Aptos checks compatibility at the time a [Move package](https://move-language.gi
 To upgrade already published Move code, simply attempt to republish the code at
 the same address that it was previously published. This can be done by following the
 instructions for code compilation and publishing using the
-[Aptos CLI](../../cli-tools/aptos-cli-tool/use-aptos-cli.md). For an example,
-see the [Your First Move Module](../../tutorials/first-move-module.md) tutorial.
+[Aptos CLI](../../../cli-tools/aptos-cli-tool/use-aptos-cli.md). For an example,
+see the [Your First Move Module](../../../tutorials/first-move-module.md) tutorial.
 
 ## Upgrade policies
 
@@ -115,7 +107,7 @@ As result, dependencies to upgradeable packages need to be handled with care:
   Decentralized Autonomous Organization (DAO) where no single user can initiate
   an upgrade; a vote or similar has to be taken. This is the case for the Aptos
   framework.
-   
+
 ## Programmatic upgrade
 
 In general, Aptos offers, via the Move module `aptos_framework::code`, 
@@ -126,4 +118,4 @@ only after that transaction ends.
 The Aptos framework itself, including all the on-chain administration logic, is
 an example for programmatic upgrade. The framework is marked as `compatible`.
 Upgrades happen via specific generated governance scripts. For more details,
-see [Aptos Governance](../../concepts/governance.md).
+see [Aptos Governance](../../../concepts/governance.md).
