@@ -125,8 +125,6 @@ If you need to revise the contract and compile again, delete the `out` directo
 
 5. Once you have compiled contract code, the `Deploy` button will be activated.
 
-TODO: We should tell them when to use it.
-
 ## Step 6: Interact with a Move module.
 
 :::info
