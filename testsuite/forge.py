@@ -1152,7 +1152,7 @@ async def run_multiple(
 # cluster auth
 @envoption("CLOUD", "aws")
 @envoption("AWS_REGION", "us-west-2")
-@envoption("GCP_ZONE", "us-central1-c")
+@envoption("GCP_LOCATION", "us-central1")
 # forge test runner customization
 @envoption("FORGE_RUNNER_MODE", "k8s")
 @envoption("FORGE_CLUSTER_NAME")
@@ -1196,7 +1196,7 @@ def test(
     forge_comment: Optional[str],
     cloud: str,
     aws_region: str,
-    gcp_zone: str,
+    gcp_location: str,
     forge_runner_mode: str,
     forge_cluster_name: Optional[str],
     forge_num_validators: Optional[str],
@@ -1320,7 +1320,7 @@ def test(
 
     print(f"Using cluster: {forge_cluster_name} in cloud: {cloud_enum.value}")
     temp = context.filesystem.mkstemp()
-    forge_cluster = ForgeCluster(forge_cluster_name, temp, cloud=cloud_enum)
+    forge_cluster = ForgeCluster(forge_cluster_name, temp, cloud=cloud_enum, gcp_location=gcp_location)
     asyncio.run(forge_cluster.write(context.shell))
 
     # These features and profile flags are set as strings

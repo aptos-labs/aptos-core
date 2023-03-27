@@ -80,7 +80,7 @@ class ForgeCluster:
     kubeconf: str
     cloud: Cloud = Cloud.AWS
     region: Optional[str] = "us-west-2"
-    zone: Optional[str] = None
+    gcp_location: Optional[str] = None
 
     async def write(self, shell: Shell) -> None:
         await self.write_cluster_config(shell, self.name, self.kubeconf)
@@ -187,10 +187,8 @@ class ForgeCluster:
                 "clusters",
                 "get-credentials",
                 cluster_name,
-                "--zone",
-                # The default zone for now.
-                # The project must already be set via: gcloud config set project <project>
-                "us-central1-c",
+                "--region" if self.gcp_location.count("-") > 1 else "--zone",
+                self.gcp_location
             ]
         else:
             raise Exception("Unsupported cloud type")
