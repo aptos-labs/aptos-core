@@ -12,7 +12,7 @@ use aptos_transaction_generator_lib::TransactionExecutor;
 use async_trait::async_trait;
 use futures::future::join_all;
 use rand::{rngs::StdRng, seq::SliceRandom, thread_rng, Rng, SeedableRng};
-use std::{sync::atomic::AtomicUsize, time::Duration};
+use std::{sync::atomic::AtomicUsize, time::{Duration, Instant}};
 
 // Reliable/retrying transaction executor, used for initializing
 pub struct RestApiTransactionExecutor {
@@ -82,6 +82,7 @@ async fn submit_and_check(
     submit_failure_counter: &AtomicUsize,
     wait_failure_counter: &AtomicUsize,
 ) -> Result<()> {
+    let start = Instant::now();
     if let Err(err) = rest_client.submit_bcs(txn).await {
         sample!(
             SampleRate::Duration(Duration::from_secs(60)),
@@ -99,7 +100,7 @@ async fn submit_and_check(
             txn.clone().committed_hash(),
             txn.expiration_timestamp_secs(),
             None,
-            Some(wait_duration),
+            Some(wait_duration.saturating_sub(start.elapsed())),
         )
         .await
     {
