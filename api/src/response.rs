@@ -564,6 +564,13 @@ pub fn api_disabled<S: Display, E: ForbiddenError>(identifier: S) -> E {
     )
 }
 
+pub fn api_forbidden<S: Display, E: ForbiddenError>(identifier: S, extra_help: S) -> E {
+    E::forbidden_with_code_no_info(
+        format!("{} is not allowed. {}", identifier, extra_help),
+        AptosErrorCode::ApiDisabled,
+    )
+}
+
 pub fn version_not_found<E: NotFoundError>(ledger_version: u64, ledger_info: &LedgerInfo) -> E {
     build_not_found(
         "Ledger version",
