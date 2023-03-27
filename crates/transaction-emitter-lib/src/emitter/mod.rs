@@ -41,7 +41,7 @@ use tokio::{runtime::Handle, task::JoinHandle, time};
 // Max is 100k TPS for 3 hours
 const MAX_TXNS: u64 = 1_000_000_000;
 
-const MAX_RETRIES: usize = 8;
+const MAX_RETRIES: usize = 12;
 
 // This retry policy is used for important client calls necessary for setting
 // up the test (e.g. account creation) and collecting its results (e.g. checking
