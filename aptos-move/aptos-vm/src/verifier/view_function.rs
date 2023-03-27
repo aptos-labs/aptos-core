@@ -3,7 +3,7 @@
 
 use crate::{
     move_vm_ext::{MoveResolverExt, SessionExt},
-    verifier::transaction_arg_validation,
+    verifier::{transaction_arg_validation, transaction_arg_validation::get_allowed_structs},
 };
 use aptos_framework::RuntimeModuleMetadataV1;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
@@ -14,11 +14,12 @@ use move_vm_types::loaded_data::runtime_types::Type;
 /// Validate view function call. This checks whether the function is marked as a view
 /// function, and validates the arguments.
 pub(crate) fn validate_view_function<S: MoveResolverExt>(
-    session: &SessionExt<S>,
-    args: Vec<Vec<u8>>,
+    session: &mut SessionExt<S>,
+    mut args: Vec<Vec<u8>>,
     fun_name: &IdentStr,
     fun_inst: &LoadedFunctionInstantiation,
     module_metadata: Option<&RuntimeModuleMetadataV1>,
+    struct_constructors_feature: bool,
 ) -> PartialVMResult<Vec<Vec<u8>>> {
     // Must be marked as view function
     let is_view = if let Some(data) = module_metadata {
@@ -44,35 +45,44 @@ pub(crate) fn validate_view_function<S: MoveResolverExt>(
         );
     }
 
+    let allowed_structs = get_allowed_structs(struct_constructors_feature);
     // Validate arguments. We allow all what transaction allows, in addition, signers can
     // be passed. Some arguments (e.g. utf8 strings) need validation which happens here.
-    let mut needs_validation = vec![];
+    let mut needs_construction = vec![];
     for (idx, ty) in fun_inst.parameters.iter().enumerate() {
         match ty {
             Type::Signer => continue,
             Type::Reference(inner_type) if matches!(&**inner_type, Type::Signer) => continue,
             _ => {
-                let (valid, validation) = transaction_arg_validation::is_valid_txn_arg(session, ty);
+                let (valid, construction) =
+                    transaction_arg_validation::is_valid_txn_arg(session, ty, allowed_structs);
                 if !valid {
                     return Err(
                         PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
                             .with_message("invalid view function argument".to_string()),
                     );
                 }
-                if validation {
-                    needs_validation.push(idx);
+                if construction {
+                    needs_construction.push(idx);
                 }
             },
         }
     }
-    if !needs_validation.is_empty()
-        && transaction_arg_validation::validate_args(session, &needs_validation, &args, fun_inst)
-            .is_err()
+    if !needs_construction.is_empty()
+        && transaction_arg_validation::construct_args(
+            session,
+            &needs_construction,
+            &mut args,
+            fun_inst,
+            allowed_structs,
+        )
+        .is_err()
     {
         return Err(
             PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
                 .with_message("invalid view function argument: failed validation".to_string()),
         );
     }
+
     Ok(args)
 }

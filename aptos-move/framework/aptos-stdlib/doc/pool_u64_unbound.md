@@ -46,6 +46,7 @@
 -  [Function `to_u128`](#0x1_pool_u64_unbound_to_u128)
 -  [Function `to_u256`](#0x1_pool_u64_unbound_to_u256)
 -  [Specification](#@Specification_1)
+    -  [Struct `Pool`](#@Specification_1_Pool)
     -  [Function `contains`](#@Specification_1_contains)
     -  [Function `shares`](#@Specification_1_shares)
     -  [Function `balance`](#@Specification_1_balance)
@@ -886,6 +887,51 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code> wi
 ## Specification
 
 
+<a name="@Specification_1_Pool"></a>
+
+### Struct `Pool`
+
+
+<pre><code><b>struct</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">Pool</a> <b>has</b> store
+</code></pre>
+
+
+
+<dl>
+<dt>
+<code>total_coins: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>total_shares: u128</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>shares: <a href="table_with_length.md#0x1_table_with_length_TableWithLength">table_with_length::TableWithLength</a>&lt;<b>address</b>, u128&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>scaling_factor: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+
+<pre><code><b>invariant</b> <b>forall</b> addr: <b>address</b>:
+    <a href="table.md#0x1_table_spec_contains">table::spec_contains</a>(shares, addr) ==&gt; (<a href="table.md#0x1_table_spec_get">table::spec_get</a>(shares, addr) &gt; 0);
+</code></pre>
+
+
+
 
 <a name="0x1_pool_u64_unbound_spec_contains"></a>
 
@@ -1095,9 +1141,21 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code> wi
 
 
 
-<pre><code><b>pragma</b> aborts_if_is_partial;
+<pre><code><b>aborts_if</b> (shareholder_1 != shareholder_2) && shares_to_transfer &gt; 0 && <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_contains">spec_contains</a>(pool, shareholder_2) &&
+    (<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_shares">spec_shares</a>(pool, shareholder_2) + shares_to_transfer &gt; <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_MAX_U128">MAX_U128</a>);
 <b>aborts_if</b> !<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_contains">spec_contains</a>(pool, shareholder_1);
 <b>aborts_if</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_shares">spec_shares</a>(pool, shareholder_1) &lt; shares_to_transfer;
+<b>ensures</b> shareholder_1 == shareholder_2 ==&gt; <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_shares">spec_shares</a>(<b>old</b>(pool), shareholder_1) == <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_shares">spec_shares</a>(pool, shareholder_1);
+<b>ensures</b> ((shareholder_1 != shareholder_2) && (<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_shares">spec_shares</a>(<b>old</b>(pool), shareholder_1) == shares_to_transfer)) ==&gt;
+    !<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_contains">spec_contains</a>(pool, shareholder_1);
+<b>ensures</b> (shareholder_1 != shareholder_2 && shares_to_transfer &gt; 0) ==&gt;
+    (<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_contains">spec_contains</a>(pool, shareholder_2));
+<b>ensures</b> (shareholder_1 != shareholder_2 && shares_to_transfer &gt; 0 && !<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_contains">spec_contains</a>(<b>old</b>(pool), shareholder_2)) ==&gt;
+    (<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_contains">spec_contains</a>(pool, shareholder_2) && <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_shares">spec_shares</a>(pool, shareholder_2) == shares_to_transfer);
+<b>ensures</b> (shareholder_1 != shareholder_2 && shares_to_transfer &gt; 0 && <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_contains">spec_contains</a>(<b>old</b>(pool), shareholder_2)) ==&gt;
+    (<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_contains">spec_contains</a>(pool, shareholder_2) && <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_shares">spec_shares</a>(pool, shareholder_2) == <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_shares">spec_shares</a>(<b>old</b>(pool), shareholder_2) + shares_to_transfer);
+<b>ensures</b> ((shareholder_1 != shareholder_2) && (<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_shares">spec_shares</a>(<b>old</b>(pool), shareholder_1) &gt; shares_to_transfer)) ==&gt;
+    (<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_contains">spec_contains</a>(pool, shareholder_1) && (<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_shares">spec_shares</a>(pool, shareholder_1) == <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_shares">spec_shares</a>(<b>old</b>(pool), shareholder_1) - shares_to_transfer));
 </code></pre>
 
 

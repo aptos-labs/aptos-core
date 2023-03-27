@@ -57,6 +57,7 @@ use move_core_types::{
     transaction_argument::convert_txn_args,
     value::{serialize_values, MoveValue},
 };
+use move_vm_runtime::session::SerializedReturnValues;
 use move_vm_types::gas::UnmeteredGasMeter;
 use num_cpus;
 use once_cell::sync::OnceCell;
@@ -328,6 +329,40 @@ impl AptosVM {
         ))
     }
 
+    fn validate_and_execute_entry_function<SS: MoveResolverExt>(
+        &self,
+        session: &mut SessionExt<SS>,
+        gas_meter: &mut AptosGasMeter,
+        senders: Vec<AccountAddress>,
+        script_fn: &EntryFunction,
+    ) -> Result<SerializedReturnValues, VMStatus> {
+        let function = session.load_function(
+            script_fn.module(),
+            script_fn.function(),
+            script_fn.ty_args(),
+        )?;
+        let struct_constructors = self
+            .0
+            .get_features()
+            .is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS);
+        let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
+            session,
+            senders,
+            script_fn.args().to_vec(),
+            &function,
+            struct_constructors,
+        )?;
+        session
+            .execute_entry_function(
+                script_fn.module(),
+                script_fn.function(),
+                script_fn.ty_args().to_vec(),
+                args,
+                gas_meter,
+            )
+            .map_err(|e| e.into_vm_status())
+    }
+
     fn execute_script_or_entry_function<S: MoveResolverExt, SS: MoveResolverExt>(
         &self,
         storage: &S,
@@ -359,42 +394,28 @@ impl AptosVM {
                         session.load_script(script.code(), script.ty_args().to_vec())?;
                     let args =
                         verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
-                            &session,
+                            &mut session,
                             senders,
                             convert_txn_args(script.args()),
                             &loaded_func,
+                            self.0
+                                .get_features()
+                                .is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
                         )?;
-                    session.execute_script(
-                        script.code(),
-                        script.ty_args().to_vec(),
-                        args,
-                        gas_meter,
-                    )
+                    session
+                        .execute_script(script.code(), script.ty_args().to_vec(), args, gas_meter)
+                        .map_err(|e| e.into_vm_status())?;
                 },
                 TransactionPayload::EntryFunction(script_fn) => {
                     let mut senders = vec![txn_data.sender()];
 
                     senders.extend(txn_data.secondary_signers());
-
-                    let function = session.load_function(
-                        script_fn.module(),
-                        script_fn.function(),
-                        script_fn.ty_args(),
-                    )?;
-                    let args =
-                        verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
-                            &session,
-                            senders,
-                            script_fn.args().to_vec(),
-                            &function,
-                        )?;
-                    session.execute_entry_function(
-                        script_fn.module(),
-                        script_fn.function(),
-                        script_fn.ty_args().to_vec(),
-                        args,
+                    self.validate_and_execute_entry_function(
+                        &mut session,
                         gas_meter,
-                    )
+                        senders,
+                        script_fn,
+                    )?;
                 },
 
                 // Not reachable as this function should only be invoked for entry or script
@@ -402,8 +423,7 @@ impl AptosVM {
                 _ => {
                     return Err(VMStatus::Error(StatusCode::UNREACHABLE, None));
                 },
-            }
-            .map_err(|e| e.into_vm_status())?;
+            };
 
             self.resolve_pending_code_publish(
                 &mut session,
@@ -575,26 +595,14 @@ impl AptosVM {
         payload: &EntryFunction,
         new_published_modules_loaded: &mut bool,
     ) -> Result<(), VMStatus> {
-        let function =
-            session.load_function(payload.module(), payload.function(), payload.ty_args())?;
-        // This transaction is now being executed as the multisig account.
-        // If txn args are not valid, we'd still consider the multisig transaction as executed but
+        // If txn args are not valid, we'd still consider the transaction as executed but
         // failed. This is primarily because it's unrecoverable at this point.
-        let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
+        self.validate_and_execute_entry_function(
             session,
+            gas_meter,
             vec![multisig_address],
-            payload.args().to_vec(),
-            &function,
+            payload,
         )?;
-        session
-            .execute_entry_function(
-                payload.module(),
-                payload.function(),
-                payload.ty_args().to_vec(),
-                args,
-                gas_meter,
-            )
-            .map_err(|e| e.into_vm_status())?;
 
         // Resolve any pending module publishes in case the multisig transaction is deploying
         // modules.
@@ -1115,10 +1123,13 @@ impl AptosVM {
                     .map_err(|e| Err(e.into_vm_status()))?;
                 let args =
                     verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
-                        &tmp_session,
+                        &mut tmp_session,
                         senders,
                         convert_txn_args(script.args()),
                         &loaded_func,
+                        self.0
+                            .get_features()
+                            .is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
                     )
                     .map_err(Err)?;
 
@@ -1290,11 +1301,13 @@ impl AptosVM {
         let func_inst = session.load_function(&module_id, &func_name, &type_args)?;
         let metadata = vm.0.extract_module_metadata(&module_id);
         let arguments = verifier::view_function::validate_view_function(
-            &session,
+            &mut session,
             arguments,
             func_name.as_ident_str(),
             &func_inst,
             metadata.as_ref(),
+            vm.0.get_features()
+                .is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
         )?;
 
         Ok(session

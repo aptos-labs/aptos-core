@@ -45,7 +45,7 @@ pub(crate) fn get_ledger_commit_progress(ledger_db: &DB) -> Result<Option<Versio
 pub(crate) fn get_state_kv_commit_progress(state_kv_db: &StateKvDb) -> Result<Option<Version>> {
     get_commit_progress(
         state_kv_db.metadata_db(),
-        &DbMetadataKey::StateKVCommitProgress,
+        &DbMetadataKey::StateKvCommitProgress,
     )
 }
 

@@ -125,7 +125,7 @@ impl StateKey {
     }
 
     pub fn get_shard_id(&self) -> u8 {
-        CryptoHash::hash(self).byte(0)
+        CryptoHash::hash(self).nibble(0)
     }
 }
 
