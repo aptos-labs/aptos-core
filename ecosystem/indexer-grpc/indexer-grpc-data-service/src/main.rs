@@ -84,15 +84,14 @@ fn main() {
     }
 }
 
+/// Build a set of whitelisted auth tokens. Invalid tokens are ignored.
 pub fn build_auth_token_set(
     whitelisted_auth_tokens: Option<Vec<String>>,
 ) -> HashSet<MetadataValue<Ascii>> {
     whitelisted_auth_tokens
         .unwrap_or_default()
         .into_iter()
-        .map(|token| {
-            let token: MetadataValue<Ascii> = token.parse().unwrap();
-            token
-        })
+        .map(|token| token.parse::<MetadataValue<Ascii>>())
+        .filter_map(Result::ok)
         .collect::<HashSet<_>>()
 }

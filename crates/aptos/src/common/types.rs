@@ -18,6 +18,8 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
     x25519, PrivateKey, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
 };
+use aptos_debugger::AptosDebugger;
+use aptos_gas_profiling::FrameName;
 use aptos_global_constants::adjust_gas_headroom;
 use aptos_keygen::KeyGen;
 use aptos_rest_client::{
@@ -28,7 +30,9 @@ use aptos_rest_client::{
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_types::{
     chain_id::ChainId,
-    transaction::{authenticator::AuthenticationKey, SignedTransaction, TransactionPayload},
+    transaction::{
+        authenticator::AuthenticationKey, SignedTransaction, TransactionPayload, TransactionStatus,
+    },
 };
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser};
@@ -1288,6 +1292,11 @@ pub struct TransactionOptions {
     pub(crate) gas_options: GasOptions,
     #[clap(flatten)]
     pub(crate) prompt_options: PromptOptions,
+
+    /// If this option is set, simulate the transaction locally using the debugger and generate
+    /// flamegraphs that reflect the gas usage.
+    #[clap(long)]
+    pub(crate) profile_gas: bool,
 }
 
 impl TransactionOptions {
@@ -1440,6 +1449,170 @@ impl TransactionOptions {
             .map_err(|err| CliError::ApiError(err.to_string()))?;
 
         Ok(response.into_inner())
+    }
+
+    /// Simulate the transaction locally using the debugger, with the gas profiler enabled.
+    pub async fn profile_gas(
+        &self,
+        payload: TransactionPayload,
+    ) -> CliTypedResult<TransactionSummary> {
+        println!();
+        println!("Simulating transaction locally with the gas profiler...");
+        println!("This is still experimental so results may be inaccurate.");
+
+        let client = self.rest_client()?;
+
+        // Fetch the chain states required for the simulation
+        // TODO(Gas): get the following from the chain
+        const DEFAULT_GAS_UNIT_PRICE: u64 = 100;
+        const DEFAULT_MAX_GAS: u64 = 2_000_000;
+
+        let (sender_key, sender_address) = self.get_key_and_address()?;
+        let gas_unit_price = self
+            .gas_options
+            .gas_unit_price
+            .unwrap_or(DEFAULT_GAS_UNIT_PRICE);
+        let (account, state) = get_account_with_state(&client, sender_address).await?;
+        let version = state.version;
+        let chain_id = ChainId::new(state.chain_id);
+        let sequence_number = account.sequence_number;
+
+        let balance = client
+            .get_account_balance_at_version(sender_address, version)
+            .await
+            .map_err(|err| CliError::ApiError(err.to_string()))?
+            .into_inner();
+
+        let max_gas = self.gas_options.max_gas.unwrap_or_else(|| {
+            if gas_unit_price == 0 {
+                DEFAULT_MAX_GAS
+            } else {
+                std::cmp::min(balance.coin.value.0 / gas_unit_price, DEFAULT_MAX_GAS)
+            }
+        });
+
+        // Create and sign the transaction
+        let transaction_factory = TransactionFactory::new(chain_id)
+            .with_gas_unit_price(gas_unit_price)
+            .with_max_gas_amount(max_gas)
+            .with_transaction_expiration_time(self.gas_options.expiration_secs);
+        let sender_account = &mut LocalAccount::new(sender_address, sender_key, sequence_number);
+        let transaction =
+            sender_account.sign_with_transaction_builder(transaction_factory.payload(payload));
+        let hash = transaction.clone().committed_hash();
+
+        // Execute the transaction using the debugger
+        let debugger = AptosDebugger::rest_client(client).unwrap();
+        let res = debugger.execute_transaction_at_version_with_gas_profiler(version, transaction);
+        let (vm_status, output, gas_log) = res.map_err(|err| {
+            CliError::UnexpectedError(format!("failed to simulate txn with gas profiler: {}", err))
+        })?;
+
+        // Generate the file name for the flamegraphs
+        let entry_point = gas_log.entry_point();
+
+        let human_readable_name = match entry_point {
+            FrameName::Script => "script".to_string(),
+            FrameName::Function {
+                module_id, name, ..
+            } => {
+                let addr_short = module_id.address().short_str_lossless();
+                let addr_truncated = if addr_short.len() > 4 {
+                    &addr_short[..4]
+                } else {
+                    addr_short.as_str()
+                };
+                format!("0x{}-{}-{}", addr_truncated, module_id.name(), name)
+            },
+        };
+        let raw_file_name = format!("txn-{}-{}", hash, human_readable_name);
+
+        // Create the directory if it does not exist yet.
+        let dir: &Path = Path::new("gas-profiling");
+
+        macro_rules! create_dir {
+            () => {
+                if let Err(err) = std::fs::create_dir(dir) {
+                    if err.kind() != std::io::ErrorKind::AlreadyExists {
+                        return Err(CliError::UnexpectedError(format!(
+                            "failed to create directory {}",
+                            dir.display()
+                        )));
+                    }
+                }
+            };
+        }
+
+        // Generate the execution & IO flamegraph.
+        println!();
+        match gas_log.to_flamegraph(format!("Transaction {} -- Execution & IO", hash))? {
+            Some(graph_bytes) => {
+                create_dir!();
+                let graph_file_path = Path::join(dir, format!("{}.exec_io.svg", raw_file_name));
+                std::fs::write(&graph_file_path, graph_bytes).map_err(|err| {
+                    CliError::UnexpectedError(format!(
+                        "Failed to write flamegraph to file {} : {:?}",
+                        graph_file_path.display(),
+                        err
+                    ))
+                })?;
+                println!(
+                    "Execution & IO Gas flamegraph saved to {}",
+                    graph_file_path.display()
+                );
+            },
+            None => {
+                println!("Skipped generating execution & IO flamegraph");
+            },
+        }
+
+        // Generate the storage fee flamegraph.
+        match gas_log
+            .storage
+            .to_flamegraph(format!("Transaction {} -- Storage Fee", hash))?
+        {
+            Some(graph_bytes) => {
+                create_dir!();
+                let graph_file_path = Path::join(dir, format!("{}.storage.svg", raw_file_name));
+                std::fs::write(&graph_file_path, graph_bytes).map_err(|err| {
+                    CliError::UnexpectedError(format!(
+                        "Failed to write flamegraph to file {} : {:?}",
+                        graph_file_path.display(),
+                        err
+                    ))
+                })?;
+                println!(
+                    "Storage fee flamegraph saved to {}",
+                    graph_file_path.display()
+                );
+            },
+            None => {
+                println!("Skipped generating storage fee flamegraph");
+            },
+        }
+
+        println!();
+
+        // Generate the transaction summary
+
+        // TODO(Gas): double check if this is correct.
+        let success = match output.status() {
+            TransactionStatus::Keep(exec_status) => Some(exec_status.is_success()),
+            TransactionStatus::Discard(_) | TransactionStatus::Retry => None,
+        };
+
+        Ok(TransactionSummary {
+            transaction_hash: hash.into(),
+            gas_used: Some(output.gas_used()),
+            gas_unit_price: Some(gas_unit_price),
+            pending: None,
+            sender: Some(sender_address),
+            sequence_number: None, // The transaction is not comitted so there is no new sequence number.
+            success,
+            timestamp_us: None,
+            version: Some(version), // The transaction is not comitted so there is no new version.
+            vm_status: Some(vm_status.to_string()),
+        })
     }
 
     pub async fn estimate_gas_price(&self) -> CliTypedResult<u64> {

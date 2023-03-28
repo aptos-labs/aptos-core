@@ -76,9 +76,7 @@ impl GasParameters {
                 per_msg_hashing: 0.into(),
                 per_byte_hashing: 0.into(),
             },
-            algebra: cryptography::algebra::gas::GasParameters {
-                placeholder: 0.into(),
-            },
+            algebra: cryptography::algebra::gas::GasParameters {},
             ed25519: ed25519::GasParameters {
                 base: 0.into(),
                 per_pubkey_deserialize: 0.into(),

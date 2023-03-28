@@ -84,29 +84,63 @@ impl IndexerStream for DatastreamServer {
         req: Request<RawDatastreamRequest>,
     ) -> Result<Response<Self::RawDatastreamStream>, Status> {
         // Get request identity. The request is already authenticated by the interceptor.
-        let request_token = req
+        let request_token = match req
             .metadata()
             .get(GRPC_AUTH_TOKEN_HEADER)
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string();
+            .map(|token| token.to_str())
+        {
+            Some(Ok(token)) => token.to_string(),
+            // It's required to have a valid request token.
+            _ => return Result::Err(Status::aborted("Invalid request token")),
+        };
         // Response channel to stream the data to the client.
         let (tx, rx) = channel(MAX_RESPONSE_CHANNEL_SIZE);
-        let req = req.into_inner();
-        let mut current_version = req.starting_version;
+        let mut current_version = match req.into_inner().starting_version {
+            Some(version) => version,
+            None => return Result::Err(Status::aborted("Starting version is not set")),
+        };
 
         let file_store_bucket_name = self.server_config.file_store_bucket_name.clone();
         let redis_client = self.redis_client.clone();
 
         tokio::spawn(async move {
-            let conn = redis_client.get_async_connection().await.unwrap();
+            let conn = match redis_client.get_async_connection().await {
+                Ok(conn) => conn,
+                Err(e) => {
+                    tx.send(Err(Status::unavailable(
+                        "[Indexer Data] Cannot connect to Redis; please retry.",
+                    )))
+                    .await
+                    .unwrap();
+                    error!(
+                        token_id = request_token.as_str(),
+                        error = e.to_string(),
+                        "[Indexer Data] Failed to get redis connection."
+                    );
+                    return;
+                },
+            };
             let mut cache_operator = CacheOperator::new(conn);
             let file_store_operator = FileStoreOperator::new(file_store_bucket_name);
             file_store_operator.verify_storage_bucket_existence().await;
             let request_token = request_token.to_string();
 
-            let chain_id = cache_operator.get_chain_id().await.unwrap();
+            let chain_id = match cache_operator.get_chain_id().await {
+                Ok(chain_id) => chain_id,
+                Err(e) => {
+                    tx.send(Err(Status::unavailable(
+                        "[Indexer Data] Cannot get the chain id; please retry.",
+                    )))
+                    .await
+                    .unwrap();
+                    error!(
+                        token_id = request_token.as_str(),
+                        error = e.to_string(),
+                        "[Indexer Data] Failed to get chain id."
+                    );
+                    return;
+                },
+            };
             // Data service metrics.
             let mut tps_calculator = MovingAverage::new(MOVING_AVERAGE_WINDOW_SIZE);
             // Request metadata.

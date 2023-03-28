@@ -13,11 +13,6 @@ variable "zone" {
   type        = string
 }
 
-variable "kubernetes_version" {
-  description = "Version of Kubernetes to use for GKE clusters"
-  default     = "1.24"
-}
-
 variable "era" {
   description = "Chain era, used to start a clean chain"
   default     = 1
