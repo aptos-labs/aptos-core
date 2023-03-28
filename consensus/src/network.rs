@@ -402,8 +402,11 @@ impl NetworkTask {
         network_service_events: NetworkServiceEvents<ConsensusMsg>,
         self_receiver: aptos_channels::Receiver<Event<ConsensusMsg>>,
     ) -> (NetworkTask, NetworkReceivers) {
-        let (consensus_messages_tx, consensus_messages) =
-            aptos_channel::new(QueueStyle::FIFO, 10, Some(&counters::CONSENSUS_CHANNEL_MSGS));
+        let (consensus_messages_tx, consensus_messages) = aptos_channel::new(
+            QueueStyle::FIFO,
+            10,
+            Some(&counters::CONSENSUS_CHANNEL_MSGS),
+        );
         let (buffer_manager_messages_tx, buffer_manager_messages) = aptos_channel::new(
             QueueStyle::FIFO,
             100,
