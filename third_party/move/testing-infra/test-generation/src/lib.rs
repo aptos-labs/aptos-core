@@ -140,13 +140,13 @@ fn execute_function_in_module(
         ))
         .unwrap();
 
-        let mut change_set = ChangeSet::new();
+        let mut changeset = ChangeSet::new();
         let mut blob = vec![];
         module.serialize(&mut blob).unwrap();
-        change_set
+        changeset
             .add_module_op(module_id.clone(), Op::New(blob))
             .unwrap();
-        let delta_storage = DeltaStorage::new(storage, &change_set);
+        let delta_storage = DeltaStorage::new(storage, &changeset);
         let mut sess = vm.new_session(&delta_storage);
 
         sess.execute_function_bypass_visibility(

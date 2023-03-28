@@ -368,8 +368,8 @@ impl<'a> SimpleVMTestAdapter<'a> {
 
         // save changeset
         // TODO support events
-        let (change_set, _events) = session.pause()?;
-        self.storage.apply(change_set).unwrap();
+        let (changeset, _events) = session.pause()?;
+        self.storage.apply(changeset).unwrap();
         Ok(res)
     }
 }
