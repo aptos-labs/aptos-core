@@ -123,12 +123,12 @@ fn print_resources_and_extensions(
     for (account_addr, account_state) in cs.accounts() {
         writeln!(&mut buf, "0x{}:", account_addr.short_str_lossless())?;
 
-        for (tag, resource_blob_op) in account_state.resources() {
-            if let Op::New(blob) | Op::Modify(blob) = resource_blob_op {
+        for (tag, resource_op) in account_state.resources() {
+            if let Op::New(resource) | Op::Modify(resource) = resource_op {
                 writeln!(
                     &mut buf,
                     "\t{}",
-                    format!("=> {}", annotator.view_resource(tag, blob)?).replace('\n', "\n\t")
+                    format!("=> {}", annotator.view_resource(tag, resource)?).replace('\n', "\n\t")
                 )?;
             }
         }

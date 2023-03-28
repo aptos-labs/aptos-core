@@ -22,8 +22,8 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
 };
-use std::rc::Rc;
 use move_vm_types::resolver::MoveResolver;
+use std::rc::Rc;
 
 pub(crate) struct Resolver<'a, T: ?Sized> {
     pub state: &'a T,

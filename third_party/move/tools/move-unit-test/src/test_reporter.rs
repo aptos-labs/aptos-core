@@ -40,9 +40,9 @@ pub enum FailureReason {
     // The execution results of the Move VM and stackless VM does not match
     Mismatch {
         move_vm_return_values: Box<VMResult<Vec<Vec<u8>>>>,
-        move_vm_blob_change_set: Box<VMResult<BlobChangeSet>>,
+        move_vm_change_set: Box<VMResult<BlobChangeSet>>,
         stackless_vm_return_values: Box<VMResult<Vec<Vec<u8>>>>,
-        stackless_vm_blob_change_set: Box<VMResult<BlobChangeSet>>,
+        stackless_vm_change_set: Box<VMResult<BlobChangeSet>>,
     },
     // Property checking failed
     Property(String),
@@ -121,15 +121,15 @@ impl FailureReason {
 
     pub fn mismatch(
         move_vm_return_values: VMResult<Vec<Vec<u8>>>,
-        move_vm_blob_change_set: VMResult<BlobChangeSet>,
+        move_vm_change_set: VMResult<BlobChangeSet>,
         stackless_vm_return_values: VMResult<Vec<Vec<u8>>>,
-        stackless_vm_blob_change_set: VMResult<BlobChangeSet>,
+        stackless_vm_change_set: VMResult<BlobChangeSet>,
     ) -> Self {
         FailureReason::Mismatch {
             move_vm_return_values: Box::new(move_vm_return_values),
-            move_vm_blob_change_set: Box::new(move_vm_blob_change_set),
+            move_vm_change_set: Box::new(move_vm_change_set),
             stackless_vm_return_values: Box::new(stackless_vm_return_values),
-            stackless_vm_blob_change_set: Box::new(stackless_vm_blob_change_set),
+            stackless_vm_change_set: Box::new(stackless_vm_change_set),
         }
     }
 
@@ -206,9 +206,9 @@ impl TestFailure {
             },
             FailureReason::Mismatch {
                 move_vm_return_values,
-                move_vm_blob_change_set: move_vm_change_set,
+                move_vm_change_set,
                 stackless_vm_return_values,
-                stackless_vm_blob_change_set: stackless_vm_change_set,
+                stackless_vm_change_set,
             } => {
                 format!(
                     "Executions via Move VM [M] and stackless VM [S] yield different results.\n\

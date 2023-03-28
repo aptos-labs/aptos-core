@@ -9968,6 +9968,7 @@ dependencies = [
  "move-bytecode-utils",
  "move-core-types",
  "move-read-write-set-types",
+ "move-vm-types",
 ]
 
 [[package]]
