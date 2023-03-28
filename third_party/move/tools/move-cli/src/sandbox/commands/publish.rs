@@ -150,12 +150,12 @@ pub fn publish(
         }
 
         if !has_error {
-            let (blob_change_set, events) = session.finish().map_err(|e| e.into_vm_status())?;
+            let (changeset, events) = session.finish().map_err(|e| e.into_vm_status())?;
             assert!(events.is_empty());
             if verbose {
-                explain_publish_changeset(&blob_change_set);
+                explain_publish_changeset(&changeset);
             }
-            let modules: Vec<_> = blob_change_set
+            let modules: Vec<_> = changeset
                 .into_modules()
                 .map(|(module_id, blob_opt)| {
                     (module_id, blob_opt.ok().expect("must be non-deletion"))
