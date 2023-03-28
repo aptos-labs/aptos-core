@@ -6,6 +6,10 @@
 module aptos_std::elgamal {
     use aptos_std::ristretto255::{Self, RistrettoPoint, Scalar, CompressedRistretto, point_compress};
     use std::option::Option;
+    use std::vector;
+
+    /// The wrong number of bytes was passed in for deserialization
+    const EWRONG_BYTE_LENGTH: u64 = 1;
 
     /// An ElGamal ciphertext to some value.
     struct Ciphertext has drop {
@@ -25,10 +29,11 @@ module aptos_std::elgamal {
     }
 
     /// Creates a new ciphertext from two serialized Ristrotto points
-    // TODO: Make this so it takes in a single byte vector
-    public fun new_ciphertext_from_bytes(left: vector<u8>, right: vector<u8>): Option<Ciphertext> {
-	let left_point = ristretto255::new_point_from_bytes(left);
-	let right_point = ristretto255::new_point_from_bytes(right);
+    public fun new_ciphertext_from_bytes(bytes: vector<u8>): Option<Ciphertext> {
+	assert!(vector::length<vector<u8>>(bytes) == 64, EWRONG_BYTE_LENGTH);
+	let bytes_right = vector::trim(&mut bytes, 32);
+	let left_point = ristretto255::new_point_from_bytes(bytes);
+	let right_point = ristretto255::new_point_from_bytes(bytes_right);
 	if (std::option::is_some<RistrettoPoint>(&mut left_point) && std::option::is_some<RistrettoPoint>(&mut right_point)) {
 		std::option::some<Ciphertext>(Ciphertext { left: std::option::extract<RistrettoPoint>(&mut left_point), right: std::option::extract<RistrettoPoint>(&mut right_point) })
 	} else {

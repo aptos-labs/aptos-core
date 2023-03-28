@@ -134,20 +134,17 @@ module veiled_coin::veiled_coin {
     /// This value is the amount being transferred. These two ciphertexts are required as we need to update 
     /// both the sender's and the recipient's balances, which use different public keys and so must be updated 
     /// with ciphertexts encrypted with their respective public keys. 
-    // TODO: Make this so ciphertexts are represented by only one vector<u8>
     public entry fun private_transfer_to<CoinType>(
 	sender: &signer, 
 	recipient: address, 
-	left_withdraw_ct: vector<u8>, 
-	right_withdraw_ct: vector<u8>, 
-	left_deposit_ct: vector<u8>, 
-	right_deposit_ct: vector<u8>, 
+	withdraw_ct: vector<u8>, 
+	deposit_ct: vector<u8>, 
 	range_proof_updated_balance: vector<u8>, 
 	range_proof_transferred_amount: vector<u8>) acquires VeiledCoinStore {
 
-	let private_withdraw_amount = elgamal::new_ciphertext_from_bytes(left_withdraw_ct, right_withdraw_ct);
+	let private_withdraw_amount = elgamal::new_ciphertext_from_bytes(withdraw_ct);
 	assert!(std::option::is_some(&private_withdraw_amount), EDESERIALIZATION_FAILED);
-	let private_deposit_amount = elgamal::new_ciphertext_from_bytes(left_deposit_ct, right_deposit_ct);
+	let private_deposit_amount = elgamal::new_ciphertext_from_bytes(deposit_ct);
 	assert!(std::option::is_some(&private_deposit_amount), EDESERIALIZATION_FAILED);
 
 	transfer_privately_to<CoinType>(
