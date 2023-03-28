@@ -19,6 +19,27 @@ pub fn compile_units(s: &str) -> Result<Vec<AnnotatedCompiledUnit>> {
 
     let (_, units) = MoveCompiler::from_files(
         vec![file_path.to_str().unwrap().to_string()],
+        vec![],
+        move_stdlib::move_stdlib_named_addresses(),
+    )
+    .build_and_report()?;
+
+    dir.close()?;
+
+    Ok(units)
+}
+
+pub fn compile_units_with_stdlib(s: &str) -> Result<Vec<AnnotatedCompiledUnit>> {
+    let dir = tempdir()?;
+
+    let file_path = dir.path().join("modules.move");
+    {
+        let mut file = File::create(&file_path)?;
+        writeln!(file, "{}", s)?;
+    }
+
+    let (_, units) = MoveCompiler::from_files(
+        vec![file_path.to_str().unwrap().to_string()],
         move_stdlib::move_stdlib_files(),
         move_stdlib::move_stdlib_named_addresses(),
     )

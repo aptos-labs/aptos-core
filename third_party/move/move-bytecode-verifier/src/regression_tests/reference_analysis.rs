@@ -1,6 +1,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::VerifierConfig;
 use move_binary_format::{
     file_format::{
         empty_module, AbilitySet, AddressIdentifierIndex,
@@ -19,8 +20,6 @@ use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, vm_status::StatusCode,
 };
 use std::str::FromStr;
-
-use crate::VerifierConfig;
 
 #[test]
 fn unbalanced_stack_crash() {

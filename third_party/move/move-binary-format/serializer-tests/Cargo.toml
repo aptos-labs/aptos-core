@@ -11,9 +11,9 @@ edition = "2021"
 
 [dev-dependencies]
 move-binary-format = { path = "../", features = ["fuzzing"] }
+move-core-types = { path = "../../move-core/types" }
 proptest = "1.0.0"
 proptest-derive = "0.3.0"
-move-core-types= { path = "../../move-core/types" }
 
 [features]
 fuzzing = ["move-binary-format/fuzzing"]
