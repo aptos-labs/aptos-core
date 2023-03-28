@@ -220,8 +220,10 @@ module aptos_framework::fungible_asset {
 
     #[view]
     /// Return whether a wallet can freely send or receive fungible assets.
+    /// If the wallet has not been created, we default to returning true as deposits can be sent to it.
     public fun ungated_transfer_allowed<T: key>(wallet: Object<T>): bool acquires FungibleAssetWallet {
-        borrow_wallet_resource(&wallet).allow_ungated_transfer
+        !wallet_exists(object::object_address(&wallet)) ||
+            borrow_wallet_resource(&wallet).allow_ungated_transfer
     }
 
     public fun asset_metadata(fa: &FungibleAsset): Object<FungibleAssetMetadata> {
