@@ -629,7 +629,7 @@ impl Loader {
         if self.vm_config.type_size_limit
             && type_arguments
                 .iter()
-                .map(|loaded_ty| self.count_type_nodes(&loaded_ty))
+                .map(|loaded_ty| self.count_type_nodes(loaded_ty))
                 .sum::<usize>()
                 > MAX_TYPE_INSTANTIATION_NODES
         {
@@ -1416,9 +1416,13 @@ impl Loader {
                     return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
                 }
             },
-            Type::StructInstantiation(_, _) => {
-                if self.count_type_nodes(ty) > MAX_TYPE_INSTANTIATION_NODES {
-                    return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
+            Type::StructInstantiation(_, struct_inst) => {
+                let mut sum_nodes: usize = 1;
+                for ty in ty_args.iter().chain(struct_inst.iter()) {
+                    sum_nodes = sum_nodes.saturating_add(self.count_type_nodes(ty));
+                    if sum_nodes > MAX_TYPE_INSTANTIATION_NODES {
+                        return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
+                    }
                 }
             },
             Type::Address
@@ -1509,11 +1513,11 @@ impl Loader {
                 "Unexpected TyParam type after translating from TypeTag to Type".to_string(),
             )),
 
-            Type::Vector(ty) => AbilitySet::polymorphic_abilities(
-                AbilitySet::VECTOR,
-                vec![false],
-                vec![self.abilities(ty)?],
-            ),
+            Type::Vector(ty) => {
+                AbilitySet::polymorphic_abilities(AbilitySet::VECTOR, vec![false], vec![
+                    self.abilities(ty)?
+                ])
+            },
             Type::Struct(idx) => Ok(self.module_cache.read().struct_at(*idx).abilities),
             Type::StructInstantiation(idx, type_args) => {
                 let struct_type = self.module_cache.read().struct_at(*idx);

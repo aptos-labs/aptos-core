@@ -2,11 +2,6 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{
-    cell::RefCell,
-    collections::{btree_map, BTreeMap},
-};
-
 use crate::{
     binary_views::BinaryIndexedView,
     errors::{
@@ -24,6 +19,10 @@ use crate::{
     IndexKind,
 };
 use move_core_types::vm_status::StatusCode;
+use std::{
+    cell::RefCell,
+    collections::{btree_map, BTreeMap},
+};
 
 enum BoundsCheckingContext {
     Module,
