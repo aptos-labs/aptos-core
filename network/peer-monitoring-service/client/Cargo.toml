@@ -33,8 +33,8 @@ thiserror = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]
-aptos-config = { workspace = true }
 aptos-build-info = { workspace = true }
+aptos-config = { workspace = true }
 aptos-netcore = { workspace = true }
 aptos-network = { workspace = true, features = ["fuzzing"] }
 aptos-peer-monitoring-service-server = { workspace = true }

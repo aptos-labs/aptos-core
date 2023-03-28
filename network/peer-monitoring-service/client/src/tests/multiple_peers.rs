@@ -6,9 +6,11 @@ use crate::{
     tests::{
         mock::MockMonitoringServer,
         utils::{
-            create_connected_peers_map, elapse_latency_update_interval,
-            elapse_metadata_updater_interval, elapse_network_info_update_interval,
-            get_config_without_latency_pings, get_config_without_network_info_requests,
+            config_with_latency_ping_requests, config_with_network_info_requests,
+            config_with_node_info_requests, create_connected_peers_map,
+            create_network_info_response, create_random_node_info_response,
+            elapse_latency_update_interval, elapse_metadata_updater_interval,
+            elapse_network_info_update_interval, elapse_node_info_update_interval,
             get_distance_from_validators, initialize_and_verify_peer_states, spawn_with_timeout,
             start_peer_metadata_updater, start_peer_monitor, update_latency_info_for_peer,
             update_network_info_for_peer, verify_and_handle_latency_ping, verify_empty_peer_states,
@@ -25,7 +27,7 @@ use aptos_config::{
 use aptos_infallible::RwLock;
 use aptos_peer_monitoring_service_types::{
     request::PeerMonitoringServiceRequest,
-    response::{LatencyPingResponse, NetworkInformationResponse, PeerMonitoringServiceResponse},
+    response::{LatencyPingResponse, PeerMonitoringServiceResponse},
 };
 use aptos_time_service::TimeServiceTrait;
 use std::sync::Arc;
@@ -104,13 +106,12 @@ async fn test_peer_updater_loop_multiple_peers() {
         let peer_state = peer_states.get_mut(peer).unwrap();
 
         // Update the network info
-        let connected_peers = create_connected_peers_map();
         let distance_from_validators = get_distance_from_validators(peer);
         update_network_info_for_peer(
             peers_and_metadata.clone(),
             peer,
             peer_state,
-            connected_peers,
+            create_connected_peers_map(),
             distance_from_validators,
             1.0,
         );
@@ -215,8 +216,8 @@ async fn test_latency_ping() {
     let (peer_monitoring_client, mut mock_monitoring_server, peer_monitor_state, time_service) =
         MockMonitoringServer::new(all_network_ids.clone());
 
-    // Create a node config where network info requests don't refresh
-    let node_config = get_config_without_network_info_requests();
+    // Create a node config where only latency pings refresh
+    let node_config = config_with_latency_ping_requests();
 
     // Spawn the peer monitoring client
     start_peer_monitor(
@@ -318,8 +319,8 @@ async fn test_network_info() {
     let (peer_monitoring_client, mut mock_monitoring_server, peer_monitor_state, time_service) =
         MockMonitoringServer::new(all_network_ids.clone());
 
-    // Create a node config where latency pings don't refresh
-    let node_config = get_config_without_latency_pings();
+    // Create a node config where only network infos refresh
+    let node_config = config_with_network_info_requests();
 
     // Spawn the peer monitoring client
     start_peer_monitor(
@@ -388,12 +389,9 @@ async fn test_network_info() {
         let peer_monitor_state = peer_monitor_state.clone();
         let handle_requests = async move {
             // Create a response for the network info requests
-            let connected_peers = create_connected_peers_map();
-            let response =
-                PeerMonitoringServiceResponse::NetworkInformation(NetworkInformationResponse {
-                    connected_peers: connected_peers.clone(),
-                    distance_from_validators: 0,
-                });
+            let response = PeerMonitoringServiceResponse::NetworkInformation(
+                create_network_info_response(&create_connected_peers_map(), 0),
+            );
 
             // Verify that a network info request is received for each peer
             for _ in 0..3 {
@@ -435,14 +433,133 @@ async fn test_network_info() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_node_info() {
+    // Create the peer monitoring client and server
+    let all_network_ids = vec![NetworkId::Validator, NetworkId::Vfn, NetworkId::Public];
+    let (peer_monitoring_client, mut mock_monitoring_server, peer_monitor_state, time_service) =
+        MockMonitoringServer::new(all_network_ids.clone());
+
+    // Create a node config where only node infos refresh
+    let node_config = config_with_node_info_requests();
+
+    // Spawn the peer monitoring client
+    start_peer_monitor(
+        peer_monitoring_client,
+        &peer_monitor_state,
+        &time_service,
+        &node_config,
+    )
+    .await;
+
+    // Add a connected validator peer
+    let validator_peer_1 =
+        mock_monitoring_server.add_new_peer(NetworkId::Validator, PeerRole::Validator);
+
+    // Initialize all the validator states by running the peer monitor once
+    let mock_time = time_service.into_mock();
+    let _ = initialize_and_verify_peer_states(
+        &NetworkId::Validator,
+        &mut mock_monitoring_server,
+        &peer_monitor_state,
+        &node_config,
+        &validator_peer_1,
+        &mock_time,
+    )
+    .await;
+
+    // Add another connected validator peer
+    let validator_peer_2 =
+        mock_monitoring_server.add_new_peer(NetworkId::Validator, PeerRole::Validator);
+
+    // Initialize all the validator states by running the peer monitor once
+    let _ = initialize_and_verify_peer_states(
+        &NetworkId::Validator,
+        &mut mock_monitoring_server,
+        &peer_monitor_state,
+        &node_config,
+        &validator_peer_2,
+        &mock_time,
+    )
+    .await;
+
+    // Add another connected validator peer
+    let validator_peer_3 =
+        mock_monitoring_server.add_new_peer(NetworkId::Validator, PeerRole::Validator);
+
+    // Initialize all the validator states by running the peer monitor once
+    let _ = initialize_and_verify_peer_states(
+        &NetworkId::Validator,
+        &mut mock_monitoring_server,
+        &peer_monitor_state,
+        &node_config,
+        &validator_peer_3,
+        &mock_time,
+    )
+    .await;
+
+    // Handle several node info requests for the validators
+    let mock_monitoring_server = Arc::new(RwLock::new(mock_monitoring_server)).clone();
+    for _ in 0..10 {
+        // Elapse enough time for a node info update
+        let time_before_update = mock_time.now();
+        elapse_node_info_update_interval(node_config.clone(), mock_time.clone()).await;
+
+        // Create a task that waits for the requests and sends responses
+        let mock_monitoring_server = mock_monitoring_server.clone();
+        let peer_monitor_state = peer_monitor_state.clone();
+        let handle_requests = async move {
+            // Create a response for the node info requests
+            let response =
+                PeerMonitoringServiceResponse::NodeInformation(create_random_node_info_response());
+
+            // Verify that a node info request is received for each peer
+            for _ in 0..3 {
+                // Get the node request
+                let network_request = mock_monitoring_server
+                    .write()
+                    .next_request(&NetworkId::Validator)
+                    .await
+                    .unwrap();
+
+                // Verify the request type and respond
+                match network_request.peer_monitoring_service_request {
+                    PeerMonitoringServiceRequest::GetNodeInformation => {
+                        network_request.response_sender.send(Ok(response.clone()));
+                    },
+                    request => panic!("Unexpected monitoring request received: {:?}", request),
+                }
+            }
+
+            // Wait for the peer states to update
+            for peer_network_id in &[validator_peer_1, validator_peer_2, validator_peer_3] {
+                wait_for_peer_state_update(
+                    time_before_update,
+                    &peer_monitor_state,
+                    peer_network_id,
+                    vec![PeerStateKey::NodeInfo],
+                )
+                .await;
+            }
+        };
+
+        // Spawn the task with a timeout
+        spawn_with_timeout(
+            handle_requests,
+            "Timed-out while waiting for the node info requests",
+        )
+        .await;
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_peer_connections() {
     // Create the peer monitoring client and server
     let all_network_ids = vec![NetworkId::Validator, NetworkId::Vfn, NetworkId::Public];
     let (peer_monitoring_client, mut mock_monitoring_server, peer_monitor_state, time_service) =
         MockMonitoringServer::new(all_network_ids.clone());
 
-    // Create a node config where network info requests don't refresh
-    let node_config = get_config_without_network_info_requests();
+    // Create a node config where only latency pings refresh
+    let node_config = config_with_latency_ping_requests();
 
     // Spawn the peer monitoring client
     start_peer_monitor(
