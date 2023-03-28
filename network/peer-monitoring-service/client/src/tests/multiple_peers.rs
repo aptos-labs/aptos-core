@@ -25,8 +25,8 @@ use aptos_config::{
 use aptos_infallible::RwLock;
 use aptos_network::transport::ConnectionMetadata;
 use aptos_peer_monitoring_service_types::{
-    LatencyPingResponse, NetworkInformationResponse, PeerMonitoringServiceRequest,
-    PeerMonitoringServiceResponse,
+    request::PeerMonitoringServiceRequest,
+    response::{LatencyPingResponse, NetworkInformationResponse, PeerMonitoringServiceResponse},
 };
 use aptos_time_service::TimeServiceTrait;
 use aptos_types::PeerId;

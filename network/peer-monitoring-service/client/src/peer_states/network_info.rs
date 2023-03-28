@@ -13,7 +13,8 @@ use aptos_infallible::RwLock;
 use aptos_logger::warn;
 use aptos_network::application::metadata::PeerMetadata;
 use aptos_peer_monitoring_service_types::{
-    NetworkInformationResponse, PeerMonitoringServiceRequest, PeerMonitoringServiceResponse,
+    request::PeerMonitoringServiceRequest,
+    response::{NetworkInformationResponse, PeerMonitoringServiceResponse},
     MAX_DISTANCE_FROM_VALIDATORS,
 };
 use aptos_time_service::TimeService;
@@ -187,7 +188,8 @@ mod test {
         transport::{ConnectionId, ConnectionMetadata},
     };
     use aptos_peer_monitoring_service_types::{
-        NetworkInformationResponse, PeerMonitoringServiceRequest, PeerMonitoringServiceResponse,
+        request::PeerMonitoringServiceRequest,
+        response::{NetworkInformationResponse, PeerMonitoringServiceResponse},
     };
     use aptos_time_service::TimeService;
     use aptos_types::{network_address::NetworkAddress, PeerId};
