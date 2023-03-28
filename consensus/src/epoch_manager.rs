@@ -492,7 +492,7 @@ impl EpochManager {
 
         let (commit_msg_tx, commit_msg_rx) = aptos_channel::new::<AccountAddress, VerifiedEvent>(
             QueueStyle::FIFO,
-            self.config.channel_size,
+            100,
             Some(&counters::BUFFER_MANAGER_MSGS),
         );
 
