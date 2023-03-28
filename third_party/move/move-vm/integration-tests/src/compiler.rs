@@ -19,7 +19,7 @@ pub fn compile_units(s: &str) -> Result<Vec<AnnotatedCompiledUnit>> {
 
     let (_, units) = MoveCompiler::from_files(
         vec![file_path.to_str().unwrap().to_string()],
-        vec![],
+        move_stdlib::move_stdlib_files(),
         move_stdlib::move_stdlib_named_addresses(),
     )
     .build_and_report()?;
