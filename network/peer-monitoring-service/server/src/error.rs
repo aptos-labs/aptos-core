@@ -8,6 +8,8 @@ use thiserror::Error;
 pub enum Error {
     #[error("Invalid request received: {0}")]
     InvalidRequest(String),
+    #[error("Storage error encountered: {0}")]
+    StorageErrorEncountered(String),
     #[error("Unexpected error encountered: {0}")]
     UnexpectedErrorEncountered(String),
 }
@@ -17,6 +19,7 @@ impl Error {
     pub fn get_label(&self) -> &'static str {
         match self {
             Error::InvalidRequest(_) => "invalid_request",
+            Error::StorageErrorEncountered(_) => "storage_error",
             Error::UnexpectedErrorEncountered(_) => "unexpected_error",
         }
     }

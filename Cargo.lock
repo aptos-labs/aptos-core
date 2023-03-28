@@ -1995,6 +1995,7 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-netcore",
  "aptos-num-variants",
+ "aptos-peer-monitoring-service-types",
  "aptos-proptest-helpers",
  "aptos-rate-limiter",
  "aptos-short-hex-str",
@@ -2293,14 +2294,18 @@ dependencies = [
 name = "aptos-peer-monitoring-service-server"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "aptos-bounded-executor",
+ "aptos-build-info",
  "aptos-channels",
  "aptos-config",
+ "aptos-crypto",
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-netcore",
  "aptos-network",
  "aptos-peer-monitoring-service-types",
+ "aptos-storage-interface",
  "aptos-time-service",
  "aptos-types",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
@@ -2308,6 +2313,7 @@ dependencies = [
  "claims",
  "futures",
  "maplit",
+ "mockall",
  "once_cell",
  "rand 0.7.3",
  "serde 1.0.149",
@@ -2320,7 +2326,7 @@ name = "aptos-peer-monitoring-service-types"
 version = "0.1.0"
 dependencies = [
  "aptos-config",
- "aptos-network",
+ "aptos-types",
  "serde 1.0.149",
  "thiserror",
 ]

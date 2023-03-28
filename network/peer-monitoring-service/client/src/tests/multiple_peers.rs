@@ -6,12 +6,12 @@ use crate::{
     tests::{
         mock::MockMonitoringServer,
         utils::{
-            elapse_latency_update_interval, elapse_metadata_updater_interval,
-            elapse_network_info_update_interval, get_config_without_latency_pings,
-            get_config_without_network_info_requests, get_distance_from_validators,
-            initialize_and_verify_peer_states, spawn_with_timeout, start_peer_metadata_updater,
-            start_peer_monitor, update_latency_info_for_peer, update_network_info_for_peer,
-            verify_and_handle_latency_ping, verify_empty_peer_states,
+            create_connected_peers_map, elapse_latency_update_interval,
+            elapse_metadata_updater_interval, elapse_network_info_update_interval,
+            get_config_without_latency_pings, get_config_without_network_info_requests,
+            get_distance_from_validators, initialize_and_verify_peer_states, spawn_with_timeout,
+            start_peer_metadata_updater, start_peer_monitor, update_latency_info_for_peer,
+            update_network_info_for_peer, verify_and_handle_latency_ping, verify_empty_peer_states,
             verify_latency_request_and_respond, wait_for_monitoring_latency_update,
             wait_for_monitoring_network_update, wait_for_peer_state_update,
         },
@@ -20,17 +20,14 @@ use crate::{
 };
 use aptos_config::{
     config::{NodeConfig, PeerRole},
-    network_id::{NetworkId, PeerNetworkId},
+    network_id::NetworkId,
 };
 use aptos_infallible::RwLock;
-use aptos_network::transport::ConnectionMetadata;
 use aptos_peer_monitoring_service_types::{
     request::PeerMonitoringServiceRequest,
     response::{LatencyPingResponse, NetworkInformationResponse, PeerMonitoringServiceResponse},
 };
 use aptos_time_service::TimeServiceTrait;
-use aptos_types::PeerId;
-use maplit::hashmap;
 use std::sync::Arc;
 
 #[tokio::test(flavor = "multi_thread")]
@@ -107,8 +104,7 @@ async fn test_peer_updater_loop_multiple_peers() {
         let peer_state = peer_states.get_mut(peer).unwrap();
 
         // Update the network info
-        let connected_peers =
-            hashmap! { PeerNetworkId::random() => ConnectionMetadata::mock(PeerId::random()) };
+        let connected_peers = create_connected_peers_map();
         let distance_from_validators = get_distance_from_validators(peer);
         update_network_info_for_peer(
             peers_and_metadata.clone(),
@@ -392,8 +388,7 @@ async fn test_network_info() {
         let peer_monitor_state = peer_monitor_state.clone();
         let handle_requests = async move {
             // Create a response for the network info requests
-            let connected_peers =
-                hashmap! { PeerNetworkId::random() => ConnectionMetadata::mock(PeerId::random()) };
+            let connected_peers = create_connected_peers_map();
             let response =
                 PeerMonitoringServiceResponse::NetworkInformation(NetworkInformationResponse {
                     connected_peers: connected_peers.clone(),

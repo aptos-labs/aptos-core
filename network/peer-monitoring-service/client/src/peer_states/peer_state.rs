@@ -156,18 +156,10 @@ impl PeerState {
         let average_latency_ping_secs = latency_info_state.get_average_latency_ping_secs();
         peer_monitoring_metadata.average_ping_latency_secs = average_latency_ping_secs;
 
-        // Get and store the depth from the validators
+        // Get and store the latest network info response
         let network_info_state = self.get_network_info_state()?;
         let network_info_response = network_info_state.get_latest_network_info_response();
-        let distance_from_validators = network_info_response
-            .as_ref()
-            .map(|network_info_response| network_info_response.distance_from_validators);
-        peer_monitoring_metadata.distance_from_validators = distance_from_validators;
-
-        // Get and store the connected peers and connection metadata
-        let connected_peers_and_metadata = network_info_response
-            .map(|network_info_response| network_info_response.connected_peers);
-        peer_monitoring_metadata.connected_peers = connected_peers_and_metadata;
+        peer_monitoring_metadata.latest_network_info_response = network_info_response;
 
         Ok(peer_monitoring_metadata)
     }
