@@ -22,7 +22,7 @@ try {
   deleteAnsFolder();
   // 1. Clone ANS repository into the current directory
   console.log("---clone ANS repository---");
-  execSync("git clone git@github.com:aptos-labs/aptos-names-contracts.git", {
+  execSync("git clone https://github.com/aptos-labs/aptos-names-contracts.git", {
     cwd: path.resolve(__dirname, ""),
   });
 
