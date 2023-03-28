@@ -30,7 +30,7 @@ module aptos_std::elgamal {
 
     /// Creates a new ciphertext from two serialized Ristrotto points
     public fun new_ciphertext_from_bytes(bytes: vector<u8>): Option<Ciphertext> {
-	assert!(vector::length<vector<u8>>(bytes) == 64, EWRONG_BYTE_LENGTH);
+	assert!(vector::length(&bytes) == 64, EWRONG_BYTE_LENGTH);
 	let bytes_right = vector::trim(&mut bytes, 32);
 	let left_point = ristretto255::new_point_from_bytes(bytes);
 	let right_point = ristretto255::new_point_from_bytes(bytes_right);
