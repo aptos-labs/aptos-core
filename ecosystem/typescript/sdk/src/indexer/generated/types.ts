@@ -880,6 +880,182 @@ export type Current_Collection_Ownership_View_Stream_Cursor_Value_Input = {
   owner_address?: InputMaybe<Scalars['String']>;
 };
 
+/** columns and relationships of "current_delegator_balances" */
+export type Current_Delegator_Balances = {
+  __typename?: 'current_delegator_balances';
+  amount: Scalars['numeric'];
+  delegator_address: Scalars['String'];
+  last_transaction_version: Scalars['bigint'];
+  pool_address: Scalars['String'];
+  pool_type: Scalars['String'];
+  table_handle: Scalars['String'];
+};
+
+/** aggregated selection of "current_delegator_balances" */
+export type Current_Delegator_Balances_Aggregate = {
+  __typename?: 'current_delegator_balances_aggregate';
+  aggregate?: Maybe<Current_Delegator_Balances_Aggregate_Fields>;
+  nodes: Array<Current_Delegator_Balances>;
+};
+
+/** aggregate fields of "current_delegator_balances" */
+export type Current_Delegator_Balances_Aggregate_Fields = {
+  __typename?: 'current_delegator_balances_aggregate_fields';
+  avg?: Maybe<Current_Delegator_Balances_Avg_Fields>;
+  count: Scalars['Int'];
+  max?: Maybe<Current_Delegator_Balances_Max_Fields>;
+  min?: Maybe<Current_Delegator_Balances_Min_Fields>;
+  stddev?: Maybe<Current_Delegator_Balances_Stddev_Fields>;
+  stddev_pop?: Maybe<Current_Delegator_Balances_Stddev_Pop_Fields>;
+  stddev_samp?: Maybe<Current_Delegator_Balances_Stddev_Samp_Fields>;
+  sum?: Maybe<Current_Delegator_Balances_Sum_Fields>;
+  var_pop?: Maybe<Current_Delegator_Balances_Var_Pop_Fields>;
+  var_samp?: Maybe<Current_Delegator_Balances_Var_Samp_Fields>;
+  variance?: Maybe<Current_Delegator_Balances_Variance_Fields>;
+};
+
+
+/** aggregate fields of "current_delegator_balances" */
+export type Current_Delegator_Balances_Aggregate_FieldsCountArgs = {
+  columns?: InputMaybe<Array<Current_Delegator_Balances_Select_Column>>;
+  distinct?: InputMaybe<Scalars['Boolean']>;
+};
+
+/** aggregate avg on columns */
+export type Current_Delegator_Balances_Avg_Fields = {
+  __typename?: 'current_delegator_balances_avg_fields';
+  amount?: Maybe<Scalars['Float']>;
+  last_transaction_version?: Maybe<Scalars['Float']>;
+};
+
+/** Boolean expression to filter rows from the table "current_delegator_balances". All fields are combined with a logical 'AND'. */
+export type Current_Delegator_Balances_Bool_Exp = {
+  _and?: InputMaybe<Array<Current_Delegator_Balances_Bool_Exp>>;
+  _not?: InputMaybe<Current_Delegator_Balances_Bool_Exp>;
+  _or?: InputMaybe<Array<Current_Delegator_Balances_Bool_Exp>>;
+  amount?: InputMaybe<Numeric_Comparison_Exp>;
+  delegator_address?: InputMaybe<String_Comparison_Exp>;
+  last_transaction_version?: InputMaybe<Bigint_Comparison_Exp>;
+  pool_address?: InputMaybe<String_Comparison_Exp>;
+  pool_type?: InputMaybe<String_Comparison_Exp>;
+  table_handle?: InputMaybe<String_Comparison_Exp>;
+};
+
+/** aggregate max on columns */
+export type Current_Delegator_Balances_Max_Fields = {
+  __typename?: 'current_delegator_balances_max_fields';
+  amount?: Maybe<Scalars['numeric']>;
+  delegator_address?: Maybe<Scalars['String']>;
+  last_transaction_version?: Maybe<Scalars['bigint']>;
+  pool_address?: Maybe<Scalars['String']>;
+  pool_type?: Maybe<Scalars['String']>;
+  table_handle?: Maybe<Scalars['String']>;
+};
+
+/** aggregate min on columns */
+export type Current_Delegator_Balances_Min_Fields = {
+  __typename?: 'current_delegator_balances_min_fields';
+  amount?: Maybe<Scalars['numeric']>;
+  delegator_address?: Maybe<Scalars['String']>;
+  last_transaction_version?: Maybe<Scalars['bigint']>;
+  pool_address?: Maybe<Scalars['String']>;
+  pool_type?: Maybe<Scalars['String']>;
+  table_handle?: Maybe<Scalars['String']>;
+};
+
+/** Ordering options when selecting data from "current_delegator_balances". */
+export type Current_Delegator_Balances_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  delegator_address?: InputMaybe<Order_By>;
+  last_transaction_version?: InputMaybe<Order_By>;
+  pool_address?: InputMaybe<Order_By>;
+  pool_type?: InputMaybe<Order_By>;
+  table_handle?: InputMaybe<Order_By>;
+};
+
+/** select columns of table "current_delegator_balances" */
+export enum Current_Delegator_Balances_Select_Column {
+  /** column name */
+  Amount = 'amount',
+  /** column name */
+  DelegatorAddress = 'delegator_address',
+  /** column name */
+  LastTransactionVersion = 'last_transaction_version',
+  /** column name */
+  PoolAddress = 'pool_address',
+  /** column name */
+  PoolType = 'pool_type',
+  /** column name */
+  TableHandle = 'table_handle'
+}
+
+/** aggregate stddev on columns */
+export type Current_Delegator_Balances_Stddev_Fields = {
+  __typename?: 'current_delegator_balances_stddev_fields';
+  amount?: Maybe<Scalars['Float']>;
+  last_transaction_version?: Maybe<Scalars['Float']>;
+};
+
+/** aggregate stddev_pop on columns */
+export type Current_Delegator_Balances_Stddev_Pop_Fields = {
+  __typename?: 'current_delegator_balances_stddev_pop_fields';
+  amount?: Maybe<Scalars['Float']>;
+  last_transaction_version?: Maybe<Scalars['Float']>;
+};
+
+/** aggregate stddev_samp on columns */
+export type Current_Delegator_Balances_Stddev_Samp_Fields = {
+  __typename?: 'current_delegator_balances_stddev_samp_fields';
+  amount?: Maybe<Scalars['Float']>;
+  last_transaction_version?: Maybe<Scalars['Float']>;
+};
+
+/** Streaming cursor of the table "current_delegator_balances" */
+export type Current_Delegator_Balances_Stream_Cursor_Input = {
+  /** Stream column input with initial value */
+  initial_value: Current_Delegator_Balances_Stream_Cursor_Value_Input;
+  /** cursor ordering */
+  ordering?: InputMaybe<Cursor_Ordering>;
+};
+
+/** Initial value of the column from where the streaming should start */
+export type Current_Delegator_Balances_Stream_Cursor_Value_Input = {
+  amount?: InputMaybe<Scalars['numeric']>;
+  delegator_address?: InputMaybe<Scalars['String']>;
+  last_transaction_version?: InputMaybe<Scalars['bigint']>;
+  pool_address?: InputMaybe<Scalars['String']>;
+  pool_type?: InputMaybe<Scalars['String']>;
+  table_handle?: InputMaybe<Scalars['String']>;
+};
+
+/** aggregate sum on columns */
+export type Current_Delegator_Balances_Sum_Fields = {
+  __typename?: 'current_delegator_balances_sum_fields';
+  amount?: Maybe<Scalars['numeric']>;
+  last_transaction_version?: Maybe<Scalars['bigint']>;
+};
+
+/** aggregate var_pop on columns */
+export type Current_Delegator_Balances_Var_Pop_Fields = {
+  __typename?: 'current_delegator_balances_var_pop_fields';
+  amount?: Maybe<Scalars['Float']>;
+  last_transaction_version?: Maybe<Scalars['Float']>;
+};
+
+/** aggregate var_samp on columns */
+export type Current_Delegator_Balances_Var_Samp_Fields = {
+  __typename?: 'current_delegator_balances_var_samp_fields';
+  amount?: Maybe<Scalars['Float']>;
+  last_transaction_version?: Maybe<Scalars['Float']>;
+};
+
+/** aggregate variance on columns */
+export type Current_Delegator_Balances_Variance_Fields = {
+  __typename?: 'current_delegator_balances_variance_fields';
+  amount?: Maybe<Scalars['Float']>;
+  last_transaction_version?: Maybe<Scalars['Float']>;
+};
+
 /** columns and relationships of "current_staking_pool_voter" */
 export type Current_Staking_Pool_Voter = {
   __typename?: 'current_staking_pool_voter';
@@ -2356,6 +2532,12 @@ export type Query_Root = {
   current_collection_datas_by_pk?: Maybe<Current_Collection_Datas>;
   /** fetch data from the table: "current_collection_ownership_view" */
   current_collection_ownership_view: Array<Current_Collection_Ownership_View>;
+  /** fetch data from the table: "current_delegator_balances" */
+  current_delegator_balances: Array<Current_Delegator_Balances>;
+  /** fetch aggregated fields from the table: "current_delegator_balances" */
+  current_delegator_balances_aggregate: Current_Delegator_Balances_Aggregate;
+  /** fetch data from the table: "current_delegator_balances" using primary key columns */
+  current_delegator_balances_by_pk?: Maybe<Current_Delegator_Balances>;
   /** fetch data from the table: "current_staking_pool_voter" */
   current_staking_pool_voter: Array<Current_Staking_Pool_Voter>;
   /** fetch data from the table: "current_staking_pool_voter" using primary key columns */
@@ -2568,6 +2750,31 @@ export type Query_RootCurrent_Collection_Ownership_ViewArgs = {
   offset?: InputMaybe<Scalars['Int']>;
   order_by?: InputMaybe<Array<Current_Collection_Ownership_View_Order_By>>;
   where?: InputMaybe<Current_Collection_Ownership_View_Bool_Exp>;
+};
+
+
+export type Query_RootCurrent_Delegator_BalancesArgs = {
+  distinct_on?: InputMaybe<Array<Current_Delegator_Balances_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Current_Delegator_Balances_Order_By>>;
+  where?: InputMaybe<Current_Delegator_Balances_Bool_Exp>;
+};
+
+
+export type Query_RootCurrent_Delegator_Balances_AggregateArgs = {
+  distinct_on?: InputMaybe<Array<Current_Delegator_Balances_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Current_Delegator_Balances_Order_By>>;
+  where?: InputMaybe<Current_Delegator_Balances_Bool_Exp>;
+};
+
+
+export type Query_RootCurrent_Delegator_Balances_By_PkArgs = {
+  delegator_address: Scalars['String'];
+  pool_address: Scalars['String'];
+  pool_type: Scalars['String'];
 };
 
 
@@ -2942,6 +3149,14 @@ export type Subscription_Root = {
   current_collection_ownership_view: Array<Current_Collection_Ownership_View>;
   /** fetch data from the table in a streaming manner : "current_collection_ownership_view" */
   current_collection_ownership_view_stream: Array<Current_Collection_Ownership_View>;
+  /** fetch data from the table: "current_delegator_balances" */
+  current_delegator_balances: Array<Current_Delegator_Balances>;
+  /** fetch aggregated fields from the table: "current_delegator_balances" */
+  current_delegator_balances_aggregate: Current_Delegator_Balances_Aggregate;
+  /** fetch data from the table: "current_delegator_balances" using primary key columns */
+  current_delegator_balances_by_pk?: Maybe<Current_Delegator_Balances>;
+  /** fetch data from the table in a streaming manner : "current_delegator_balances" */
+  current_delegator_balances_stream: Array<Current_Delegator_Balances>;
   /** fetch data from the table: "current_staking_pool_voter" */
   current_staking_pool_voter: Array<Current_Staking_Pool_Voter>;
   /** fetch data from the table: "current_staking_pool_voter" using primary key columns */
@@ -3255,6 +3470,38 @@ export type Subscription_RootCurrent_Collection_Ownership_View_StreamArgs = {
   batch_size: Scalars['Int'];
   cursor: Array<InputMaybe<Current_Collection_Ownership_View_Stream_Cursor_Input>>;
   where?: InputMaybe<Current_Collection_Ownership_View_Bool_Exp>;
+};
+
+
+export type Subscription_RootCurrent_Delegator_BalancesArgs = {
+  distinct_on?: InputMaybe<Array<Current_Delegator_Balances_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Current_Delegator_Balances_Order_By>>;
+  where?: InputMaybe<Current_Delegator_Balances_Bool_Exp>;
+};
+
+
+export type Subscription_RootCurrent_Delegator_Balances_AggregateArgs = {
+  distinct_on?: InputMaybe<Array<Current_Delegator_Balances_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Current_Delegator_Balances_Order_By>>;
+  where?: InputMaybe<Current_Delegator_Balances_Bool_Exp>;
+};
+
+
+export type Subscription_RootCurrent_Delegator_Balances_By_PkArgs = {
+  delegator_address: Scalars['String'];
+  pool_address: Scalars['String'];
+  pool_type: Scalars['String'];
+};
+
+
+export type Subscription_RootCurrent_Delegator_Balances_StreamArgs = {
+  batch_size: Scalars['Int'];
+  cursor: Array<InputMaybe<Current_Delegator_Balances_Stream_Cursor_Input>>;
+  where?: InputMaybe<Current_Delegator_Balances_Bool_Exp>;
 };
 
 

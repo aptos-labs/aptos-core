@@ -45,6 +45,13 @@ export type GetAccountTransactionsDataQueryVariables = Types.Exact<{
 
 export type GetAccountTransactionsDataQuery = { __typename?: 'query_root', move_resources: Array<{ __typename?: 'move_resources', transaction_version: any }> };
 
+export type GetCurrentDelegatorBalancesCountQueryVariables = Types.Exact<{
+  poolAddress?: Types.InputMaybe<Types.Scalars['String']>;
+}>;
+
+
+export type GetCurrentDelegatorBalancesCountQuery = { __typename?: 'query_root', current_delegator_balances_aggregate: { __typename?: 'current_delegator_balances_aggregate', aggregate?: { __typename?: 'current_delegator_balances_aggregate_fields', count: number } | null } };
+
 export type GetDelegatedStakingActivitiesQueryVariables = Types.Exact<{
   delegatorAddress?: Types.InputMaybe<Types.Scalars['String']>;
   poolAddress?: Types.InputMaybe<Types.Scalars['String']>;

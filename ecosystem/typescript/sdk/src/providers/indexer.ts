@@ -8,6 +8,7 @@ import {
   GetAccountCurrentTokensQuery,
   GetAccountTransactionsCountQuery,
   GetAccountTransactionsDataQuery,
+  GetCurrentDelegatorBalancesCountQuery,
   GetDelegatedStakingActivitiesQuery,
   GetIndexerLedgerInfoQuery,
   GetTokenActivitiesCountQuery,
@@ -23,6 +24,7 @@ import {
   GetAccountCurrentTokens,
   GetAccountTransactionsCount,
   GetAccountTransactionsData,
+  GetCurrentDelegatorBalancesCount,
   GetDelegatedStakingActivities,
   GetIndexerLedgerInfo,
   GetTokenActivities,
@@ -254,6 +256,19 @@ export class IndexerClient {
     const graphqlQuery = {
       query: GetUserTransactions,
       variables: { start_version: startVersion, offset: options?.offset, limit: options?.limit },
+    };
+    return this.queryIndexer(graphqlQuery);
+  }
+
+  /**
+   * Queries current delegator balances count
+   *
+   * @returns GetCurrentDelegatorBalancesCountQuery response type
+   */
+  async getCurrentDelegatorBalancesCount(poolAddress: string): Promise<GetCurrentDelegatorBalancesCountQuery> {
+    const graphqlQuery = {
+      query: GetCurrentDelegatorBalancesCount,
+      variables: { poolAddress },
     };
     return this.queryIndexer(graphqlQuery);
   }
