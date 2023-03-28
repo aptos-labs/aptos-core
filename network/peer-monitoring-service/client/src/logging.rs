@@ -43,6 +43,7 @@ pub enum LogEntry {
     LatencyPing,
     MetadataUpdateLoop,
     NetworkInfoRequest,
+    NodeInfoRequest,
     PeerMonitorLoop,
     SendRequest,
 }

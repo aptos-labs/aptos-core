@@ -7,6 +7,7 @@ use crate::{
         key_value::{PeerStateKey, PeerStateValue, StateValueInterface},
         latency_info::LatencyInfoState,
         network_info::NetworkInfoState,
+        node_info::NodeInfoState,
         request_tracker::RequestTracker,
     },
     Error, PeerMonitoringServiceClient,
@@ -161,6 +162,11 @@ impl PeerState {
         let network_info_response = network_info_state.get_latest_network_info_response();
         peer_monitoring_metadata.latest_network_info_response = network_info_response;
 
+        // Get and store the latest node info response
+        let node_info_state = self.get_node_info_state()?;
+        let node_info_response = node_info_state.get_latest_node_info_response();
+        peer_monitoring_metadata.latest_node_info_response = node_info_response;
+
         Ok(peer_monitoring_metadata)
     }
 
@@ -203,6 +209,21 @@ impl PeerState {
             PeerStateValue::NetworkInfoState(network_info_state) => Ok(network_info_state),
             peer_state_value => Err(Error::UnexpectedError(format!(
                 "Invalid peer state value found! Expected network_info_state but got: {:?}",
+                peer_state_value
+            ))),
+        }
+    }
+
+    /// Returns a copy of the node info state
+    pub(crate) fn get_node_info_state(&self) -> Result<NodeInfoState, Error> {
+        let peer_state_value = self
+            .get_peer_state_value(&PeerStateKey::NodeInfo)?
+            .read()
+            .clone();
+        match peer_state_value {
+            PeerStateValue::NodeInfoState(node_info_state) => Ok(node_info_state),
+            peer_state_value => Err(Error::UnexpectedError(format!(
+                "Invalid peer state value found! Expected node_info_state but got: {:?}",
                 peer_state_value
             ))),
         }
