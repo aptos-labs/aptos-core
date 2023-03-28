@@ -1264,14 +1264,11 @@ impl GlobalEnv {
         let field_name = self.symbol_pool.make("v");
         let mut field_data = BTreeMap::new();
         let field_id = FieldId::new(field_name);
-        field_data.insert(
-            field_id,
-            FieldData {
-                name: field_name,
-                offset: 0,
-                info: FieldInfo::Generated { type_: ty },
-            },
-        );
+        field_data.insert(field_id, FieldData {
+            name: field_name,
+            offset: 0,
+            info: FieldInfo::Generated { type_: ty },
+        });
         StructData {
             name: self.ghost_memory_name(var_name),
             loc,

@@ -1,9 +1,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use std::time::Instant;
-
-use crate::compiler::{as_module, as_script, compile_units};
+use crate::compiler::{as_module, as_script, compile_units_with_stdlib};
 use move_binary_format::file_format::{Bytecode, CompiledModule, CompiledScript, SignatureIndex};
 use move_bytecode_verifier::VerifierConfig;
 use move_core_types::{
@@ -15,6 +13,7 @@ use move_core_types::{
 use move_vm_runtime::{config::VMConfig, move_vm::MoveVM};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
+use std::time::Instant;
 
 fn get_nested_struct_type(
     depth: usize,
@@ -41,7 +40,7 @@ fn script_large_ty() {
     script {
         use std::vector;
         use 0x42::pwn::Struct30TyArgs;
-        
+
         use 0x42::pwn::Struct2TyArgs;
         fun f<A:drop> () {
             let v: vector<A> = vector::empty();
@@ -58,7 +57,7 @@ fn script_large_ty() {
     }
     "#;
 
-    let mut units = compile_units(test_str).unwrap();
+    let mut units = compile_units_with_stdlib(test_str).unwrap();
 
     let mut decompiled_script = as_script(units.pop().unwrap());
     let decompiled_module = as_module(units.pop().unwrap());
@@ -108,15 +107,12 @@ fn script_large_ty() {
     CompiledModule::deserialize(&module).unwrap();
 
     let mut storage = InMemoryStorage::new();
-    let move_vm = MoveVM::new_with_config(
-        vec![],
-        VMConfig {
-            verifier: verifier_config,
-            paranoid_type_checks: true,
-            type_size_limit: true,
-            ..Default::default()
-        },
-    )
+    let move_vm = MoveVM::new_with_config(vec![], VMConfig {
+        verifier: verifier_config,
+        paranoid_type_checks: true,
+        type_size_limit: true,
+        ..Default::default()
+    })
     .unwrap();
 
     let module_address = AccountAddress::from_hex_literal("0x42").unwrap();
