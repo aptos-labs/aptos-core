@@ -13,8 +13,6 @@ The source materials for both code and docs live in GitHub. See [Contribute](../
 
 | Contribution | Description | Author | Date added/updated |
 | --- | --- | --- | --- |
-
-| [Your First Multisig](../../tutorials/first-multisig.md) | Use the Aptos [multi-signature (multisig)](../../tutorials/first-multisig.md) feature in this tutorial that introduces assorted [K-of-N multi-signer authentication](../../concepts/accounts.md#multi-signer-authentication) operations and employs scripts for the first time in Aptos documentation. | [alnoki](https://github.com/alnoki) of [Econia Labs](https://www.econialabs.com/) | 2023-03-19 |
 | [Delegation Pool Operations](../../nodes/validator-node/operator/delegation-pool-operations.md) | Validator operators should follow these instructions to carry out staking delegation pool operations, written by Raluca Popescu of [Bware Labs](https://bwarelabs.com/).  | [dorinbwr](https://github.com/dorinbwr) | 2023-03-20 |
-| [How Base Gas Works](../../concepts/base-gas.md) | Aptos transactions by default charge a base gas fee, regardless of market conditions. This document explains that process and was contributed by Al Noki of [Econia](https://www.econialabs.com/). | [alnoki](https://github.com/alnoki) | 2022-10-06 |
-
+| [Your First Multisig](../../tutorials/first-multisig.md) | Use the Aptos [multi-signature (multisig)](../../tutorials/first-multisig.md) feature in this tutorial that introduces assorted [K-of-N multi-signer authentication](../../concepts/accounts.md#multi-signer-authentication) operations and employs scripts for the first time in Aptos documentation. | [alnoki](https://github.com/alnoki) of [Econia Labs](https://www.econialabs.com/) | 2023-03-19 |
+| [How Base Gas Works](../../concepts/base-gas.md) | Aptos transactions by default charge a base gas fee, regardless of market conditions. This document explains that process. | [alnoki](https://github.com/alnoki) of [Econia Labs](https://www.econialabs.com/) | 2022-10-06 |

@@ -33,7 +33,7 @@ spec aptos_framework::code {
     }
 
     spec check_upgradability(old_pack: &PackageMetadata, new_pack: &PackageMetadata, new_modules: &vector<String>) {
-        // TODO: loop too deep.
+        // TODO: Can't `aborts_if` in a loop.
         pragma verify = false;
     }
 

@@ -441,6 +441,10 @@ const config = {
       {
         redirects: [
           {
+            to: "/guides/move-guides/book/package-upgrades",
+            from: "/guides/move-guides/upgrading-move-code",
+          },
+          {
             to: "/nodes/full-node/public-fullnode",
             from: "/nodes/full-node/fullnode-for-devnet",
           },

@@ -78,4 +78,4 @@ NOTE: the same scheme is also used in other implementations (e.g., ark-bls12-381
 </details>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

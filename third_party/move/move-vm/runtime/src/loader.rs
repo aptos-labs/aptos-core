@@ -885,13 +885,13 @@ impl Loader {
         ty_args: &[TypeTag],
         data_store: &impl DataStore,
     ) -> VMResult<(Arc<Module>, Arc<Function>, LoadedFunctionInstantiation)> {
+        let (module, func, parameters, return_) =
+            self.load_function_without_type_args(module_id, function_name, data_store)?;
+
         let type_arguments = ty_args
             .iter()
             .map(|ty| self.load_type(ty, data_store))
             .collect::<VMResult<Vec<_>>>()?;
-
-        let (module, func, parameters, return_) =
-            self.load_function_without_type_args(module_id, function_name, data_store)?;
 
         // verify type arguments
         self.verify_ty_args(func.type_parameters(), &type_arguments)
