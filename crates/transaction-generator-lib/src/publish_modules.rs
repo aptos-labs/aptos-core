@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-use crate::transaction_generator::{
+use crate::{
     publishing::publish_util::PackageHandler, TransactionGenerator, TransactionGeneratorCreator,
 };
 use aptos_infallible::RwLock;

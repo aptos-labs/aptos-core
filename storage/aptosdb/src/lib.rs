@@ -1156,11 +1156,10 @@ impl DbReader for AptosDB {
                 .get_transaction_iter(start_version, limit as usize)?;
             let gas_prices: Vec<_> = txns
                 .filter_map(|txn| {
-                    if let Ok(Transaction::UserTransaction(txn)) = txn {
-                        Some(txn.gas_unit_price())
-                    } else {
-                        None
-                    }
+                    txn.as_ref()
+                        .ok()
+                        .and_then(|t| t.try_as_signed_user_txn())
+                        .map(|t| t.gas_unit_price())
                 })
                 .collect();
 

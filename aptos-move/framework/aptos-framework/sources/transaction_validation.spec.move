@@ -129,7 +129,7 @@ spec aptos_framework::transaction_validation {
         use aptos_framework::coin::{CoinStore};
         use aptos_framework::account::{Account};
         use aptos_framework::aptos_coin::{AptosCoin};
-        // TODO: call burn_fee, complex aborts conditions.
+        // TODO: Can't verify `burn_fee`, complex aborts conditions.
         pragma aborts_if_is_partial;
 
         aborts_if !(txn_max_gas_units >= gas_units_remaining);

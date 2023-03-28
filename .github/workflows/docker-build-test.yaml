@@ -248,7 +248,7 @@ jobs:
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_TEST_SUITE: framework_upgrade
-      IMAGE_TAG: cb4ba0a57c998c60cbab65af31a64875d2588ca5  # This workflow only gets stablized after the 1.2 release because of the multi-step governance proposal.
+      IMAGE_TAG: aptos-node-v1.3.0_3fc3d42b6cfe27460004f9a0326451bcda840a60  # This workflow will test the upgradability from the current tip of the release branch to the current main branch.
       FORGE_RUNNER_DURATION_SECS: 300
       COMMENT_HEADER: forge-framework-upgrade
       # Use the cache ID as the Forge namespace so we can limit Forge test concurrency on k8s, since Forge

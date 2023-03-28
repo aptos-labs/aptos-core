@@ -11,6 +11,16 @@ This page shows the key updates to the developer documentation on this site. Not
 
 - Described how to [Use the Remix IDE Plugin](./community/contributions/remix-ide-plugin.md) to deploy and run Move modules on the Remix IDE, a graphical interface for developing Move modules written by [0xhsy](https://github.com/0xhsy).
 
+## 24 March 2023
+
+- Added instructions to [Integrate with Aptos Names Service UI Package](./guides/aptos-name-service-connector.md) that offers developers a customizable button and modal to enable users to search for and mint Aptos names directly from their website.
+
+## 23 March 2023
+
+- Included an [Aptos Faucet integration](./guides/system-integrators-guide.md#integrating-with-the-faucet) section for SDK and wallet developers in the **Integrate with the Aptos Blockchain** system integrators guide.
+
+- Migrated the [Aptos Move package upgrade](./guides/move-guides/book/package-upgrades.md) documentation to a page in the Aptos Move Book.
+
 ## 21 March 2023
 
 - Published beta [Delegation Pool Operations](./nodes/validator-node/operator/delegation-pool-operations.md) instructions for validator operators, written by [Raluca Popescu (dorinbwr](https://github.com/dorinbwr) ) of [Bware Labs](https://bwarelabs.com/).

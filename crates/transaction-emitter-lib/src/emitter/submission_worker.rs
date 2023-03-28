@@ -6,7 +6,6 @@ use crate::{
         stats::{DynamicStatsTracking, StatsAccumulator},
         update_seq_num_and_get_num_expired, wait_for_accounts_sequence,
     },
-    transaction_generator::TransactionGenerator,
     EmitModeParams,
 };
 use aptos_logger::{sample, sample::SampleRate, warn};
@@ -15,6 +14,7 @@ use aptos_sdk::{
     move_types::account_address::AccountAddress,
     types::{transaction::SignedTransaction, vm_status::StatusCode, LocalAccount},
 };
+use aptos_transaction_generator_lib::TransactionGenerator;
 use core::{
     cmp::{max, min},
     result::Result::{Err, Ok},
