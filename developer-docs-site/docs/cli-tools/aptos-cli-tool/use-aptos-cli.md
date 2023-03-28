@@ -867,7 +867,7 @@ FAILURE proving 1 modules from package `hello_prover` in 0.067s
 ```
 In this case, see [Install the dependencies of Move Prover](install-aptos-cli#step-3-optional-install-the-dependencies-of-move-prover).
 
-### Profile gas use
+### Profiling gas use
 
 This *experimental* feature lets you [profile gas usage](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/aptos-gas-profiling) in the Aptos virtual machine locally rather than [simulating transactions](../../concepts/gas-txn-fee.md#estimating-the-gas-units-via-simulation) at the [fullnode](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/simulate_transaction). You may also use it to visualize the transaction gas log, in the form of a flame graph.
 
@@ -900,9 +900,14 @@ Storage fee flamegraph saved to gas-profiling/txn-69e19ee4-0x1-code-publish_pack
 }
 ```
 
-Find the flame graphs in the newly created `gas-profiling/` directory. To interact with a graph, save it to your local disk and then open the saved copy in your browser.
+Find the flame graphs in the newly created `gas-profiling/` directory. To interact with a graph, open the file in a web browser.
 
-### Debug and print stack trace
+Note these limitations of the experimental gas profiling feature:
+
+  * It may produce results that are different from simulation.
+  * The graphs may contain errors, and the numbers may not add up to the total gas cost as shown in the transaction output.
+
+### Debugging and printing stack trace
 
 In this example, we will use `DebugDemo` in [debug-move-example](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos/debug-move-example).
 
