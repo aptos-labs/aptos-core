@@ -95,8 +95,9 @@ async fn start_peer_monitor_with_state(
     let peers_and_metadata = peer_monitoring_client.get_peers_and_metadata();
 
     // Create an interval ticker for the monitor loop
+    let monitoring_service_config = node_config.peer_monitoring_service.clone();
     let peer_monitor_duration =
-        Duration::from_millis(node_config.peer_monitoring_service.peer_monitor_interval_ms);
+        Duration::from_millis(monitoring_service_config.peer_monitor_interval_ms);
     let peer_monitor_ticker = time_service.interval(peer_monitor_duration);
     futures::pin_mut!(peer_monitor_ticker);
 
@@ -137,6 +138,7 @@ async fn start_peer_monitor_with_state(
 
         // Refresh the peer states
         if let Err(error) = peer_states::refresh_peer_states(
+            &monitoring_service_config,
             peer_monitor_state.clone(),
             peer_monitoring_client.clone(),
             connected_peers_and_metadata,

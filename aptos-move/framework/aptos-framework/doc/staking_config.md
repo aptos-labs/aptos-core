@@ -786,4 +786,4 @@ The maximum_stake must be greater than maximum_stake in the range of Specified s
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

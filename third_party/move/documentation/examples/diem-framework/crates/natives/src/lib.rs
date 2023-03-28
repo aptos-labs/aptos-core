@@ -5,12 +5,11 @@
 pub mod account;
 pub mod signature;
 
-use std::sync::Arc;
-
 use move_core_types::account_address::AccountAddress;
 use move_vm_runtime::native_functions::{
     make_table_from_iter, NativeFunction, NativeFunctionTable,
 };
+use std::sync::Arc;
 
 pub fn all_natives(diem_framework_addr: AccountAddress) -> NativeFunctionTable {
     let natives: [(&str, &str, NativeFunction); 5] = [

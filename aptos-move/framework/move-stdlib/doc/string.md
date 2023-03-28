@@ -549,4 +549,4 @@ Computes the index of the first occurrence of a string. Returns <code><a href="s
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

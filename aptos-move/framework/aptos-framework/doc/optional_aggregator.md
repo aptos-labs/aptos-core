@@ -1028,4 +1028,4 @@ The integer exists and the aggregator does not exist when destroy the integer.
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
