@@ -112,7 +112,7 @@ spec aptos_framework::aptos_governance {
         metadata_hash: vector<u8>,
     ) {
         use aptos_framework::chain_status;
-        // TODO: Too complicated, too many call levels.
+        // TODO: Calls `create_proposal_v2`.
         pragma aborts_if_is_partial;
         requires chain_status::is_operating();
         include CreateProposalAbortsIf;
@@ -127,7 +127,10 @@ spec aptos_framework::aptos_governance {
         is_multi_step_proposal: bool,
     ) {
         use aptos_framework::chain_status;
-        // TODO: Too complicated, too many call levels.
+        // TODO: The variable `stake_balance` is the return value of the function `get_voting_power`.
+        // `get_voting_power` has already stated that it cannot be fully verified,
+        // so the value of `stake_balance` cannot be obtained in the spec,
+        // and the `aborts_if` of `stake_balancede` cannot be written.
         pragma aborts_if_is_partial;
         requires chain_status::is_operating();
         include CreateProposalAbortsIf;
@@ -172,7 +175,10 @@ spec aptos_framework::aptos_governance {
         use aptos_framework::stake;
         use aptos_framework::chain_status;
 
-        // TODO: Too complicated, too many call levels.
+        // TODO: The variable `voting_power` is the return value of the function `get_voting_power`.
+        // `get_voting_power` has already stated that it cannot be completely verified,
+        // so the value of `voting_power` cannot be obtained in the spec,
+        // and the `aborts_if` of `voting_power` cannot be written.
         pragma aborts_if_is_partial;
 
         requires chain_status::is_operating();
@@ -194,7 +200,10 @@ spec aptos_framework::aptos_governance {
 
     spec add_approved_script_hash(proposal_id: u64) {
         use aptos_framework::chain_status;
-        // TODO: Calling `voting::get_proposal_state`
+        // TODO: The variable `proposal_state` is the return value of the function `voting::get_proposal_state`.
+        // The calling level of `voting::get_proposal_state` is very deep,
+        // so the value of `proposal_state` cannot be obtained in the spec,
+        // and the `aborts_if` of `proposal_state` cannot be written.
         // Can't cover all aborts_if conditions
         pragma aborts_if_is_partial;
 
@@ -203,7 +212,7 @@ spec aptos_framework::aptos_governance {
     }
 
     spec add_approved_script_hash_script(proposal_id: u64) {
-        // TODO: Calling `voting::resolve`
+        // TODO: Calls `add_approved_script_hash`.
         // Can't cover all aborts_if conditions
         pragma verify = false;
     }
@@ -211,7 +220,9 @@ spec aptos_framework::aptos_governance {
     /// Address @aptos_framework must exist ApprovedExecutionHashes and GovernanceProposal and GovernanceResponsbility.
     spec resolve(proposal_id: u64, signer_address: address): signer {
         use aptos_framework::chain_status;
-        // TODO: Calling `voting::resolve`
+        // TODO: Executing the prove command gives an error that the target file is in `from_bcs::from_bytes`,
+        // and the call level of the function `resolve` is too deep to obtain the parameter `bytes` of spec `from_bytes`,
+        // so verification cannot be performed.
         // Can't cover all aborts_if conditions
         pragma aborts_if_is_partial;
 
@@ -260,7 +271,10 @@ spec aptos_framework::aptos_governance {
     /// limit addition overflow.
     /// pool_address must exist in StakePool.
     spec get_voting_power(pool_address: address): u64 {
-        // TODO: Too complicated,too many call levels.
+        // TODO: `stake::get_current_epoch_voting_power` is called in the function,
+        // the call level is very deep, and `stake::get_stake` has multiple return values,
+        // and multiple return values cannot be obtained in the spec,
+        // so the overflow aborts_if of active + pending_active + pending_inactive cannot be written.
         pragma aborts_if_is_partial;
 
         let staking_config = global<staking_config::StakingConfig>(@aptos_framework);
@@ -308,13 +322,19 @@ spec aptos_framework::aptos_governance {
     spec resolve_multi_step_proposal(proposal_id: u64, signer_address: address, next_execution_hash: vector<u8>): signer {
         use aptos_framework::chain_status;
 
-        // TODO: Calling `voting::get_proposal_state`
+        // TODO: Executing the prove command gives an error that the target file is in `voting::is_proposal_resolvable`,
+        // the level is too deep, it is difficult to obtain the value of `proposal_state`,
+        // so it cannot be verified.
         // Can't cover all aborts_if conditions
         pragma aborts_if_is_partial;
-
+        let voting_forum = borrow_global<voting::VotingForum<GovernanceProposal>>(@aptos_framework);
+        let proposal = table::spec_get(voting_forum.proposals, proposal_id);
         requires chain_status::is_operating();
         aborts_if !exists<voting::VotingForum<GovernanceProposal>>(@aptos_framework);
         aborts_if !exists<ApprovedExecutionHashes>(@aptos_framework);
+        aborts_if !table::spec_contains(voting_forum.proposals,proposal_id);
+        aborts_if !string::spec_internal_check_utf8(b"IS_MULTI_STEP_PROPOSAL_IN_EXECUTION");
+        aborts_if aptos_framework::transaction_context::spec_get_script_hash() != proposal.execution_hash;
         include GetSignerAbortsIf;
     }
 }
