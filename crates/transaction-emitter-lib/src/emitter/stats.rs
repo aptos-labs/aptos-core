@@ -274,7 +274,7 @@ impl AtomicHistogramSnapshot {
 #[derive(Debug)]
 pub struct DynamicStatsTracking {
     num_phases: usize,
-    cur_phase: AtomicUsize,
+    cur_phase: Arc<AtomicUsize>,
     stats: Vec<StatsAccumulator>,
 }
 
@@ -283,7 +283,7 @@ impl DynamicStatsTracking {
         assert!(num_phases >= 1);
         Self {
             num_phases,
-            cur_phase: AtomicUsize::new(0),
+            cur_phase: Arc::new(AtomicUsize::new(0)),
             stats: (0..num_phases)
                 .map(|_| StatsAccumulator::default())
                 .collect(),
@@ -296,12 +296,16 @@ impl DynamicStatsTracking {
         cur_phase
     }
 
+    pub fn get_cur(&self) -> &StatsAccumulator {
+        self.stats.get(self.get_cur_phase()).unwrap()
+    }
+
     pub fn get_cur_phase(&self) -> usize {
         self.cur_phase.load(Ordering::Relaxed)
     }
 
-    pub fn get_cur(&self) -> &StatsAccumulator {
-        self.stats.get(self.get_cur_phase()).unwrap()
+    pub fn get_cur_phase_obj(&self) -> Arc<AtomicUsize> {
+        self.cur_phase.clone()
     }
 
     pub fn accumulate(&self, phase_starts: &[Instant]) -> Vec<TxnStats> {

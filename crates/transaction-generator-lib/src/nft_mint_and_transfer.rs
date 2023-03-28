@@ -2,14 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::TransactionExecutor;
-use crate::{
-    emitter::account_minter::create_and_fund_account_request,
-    transaction_generator::{TransactionGenerator, TransactionGeneratorCreator},
-};
+use crate::{TransactionGenerator, TransactionGeneratorCreator};
+use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_logger::info;
 use aptos_sdk::{
-    transaction_builder::{aptos_stdlib::aptos_token_stdlib, TransactionFactory},
-    types::{account_address::AccountAddress, transaction::SignedTransaction, LocalAccount},
+    transaction_builder::{aptos_stdlib, aptos_stdlib::aptos_token_stdlib, TransactionFactory},
+    types::{
+        account_address::AccountAddress,
+        transaction::{
+            authenticator::{AuthenticationKey, AuthenticationKeyPreimage},
+            SignedTransaction,
+        },
+        LocalAccount,
+    },
 };
 use async_trait::async_trait;
 use rand::{rngs::StdRng, thread_rng, SeedableRng};
@@ -279,4 +284,17 @@ impl TransactionGeneratorCreator for NFTMintAndTransferGeneratorCreator {
             .await,
         )
     }
+}
+
+fn create_and_fund_account_request(
+    creation_account: &mut LocalAccount,
+    amount: u64,
+    pubkey: &Ed25519PublicKey,
+    txn_factory: &TransactionFactory,
+) -> SignedTransaction {
+    let preimage = AuthenticationKeyPreimage::ed25519(pubkey);
+    let auth_key = AuthenticationKey::from_preimage(&preimage);
+    creation_account.sign_with_transaction_builder(txn_factory.payload(
+        aptos_stdlib::aptos_account_transfer(auth_key.derived_address(), amount),
+    ))
 }
