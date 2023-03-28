@@ -625,6 +625,19 @@ impl Loader {
         for ty in ty_args {
             type_arguments.push(self.load_type(ty, data_store)?);
         }
+
+        if self.vm_config.type_size_limit
+            && type_arguments
+                .iter()
+                .map(|loaded_ty| self.count_type_nodes(&loaded_ty))
+                .sum::<usize>()
+                > MAX_TYPE_INSTANTIATION_NODES
+        {
+            return Err(
+                PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).finish(Location::Script)
+            );
+        };
+
         self.verify_ty_args(main.type_parameters(), &type_arguments)
             .map_err(|e| e.finish(Location::Script))?;
         let instantiation = LoadedFunctionInstantiation {
@@ -1395,15 +1408,31 @@ impl Loader {
         // existing type instantiation.
         // If that number is larger than MAX_TYPE_INSTANTIATION_NODES, refuse to construct this type.
         // This prevents constructing larger and lager types via struct instantiation.
-        if let Type::StructInstantiation(_, struct_inst) = ty {
-            let mut sum_nodes: usize = 1;
-            for ty in ty_args.iter().chain(struct_inst.iter()) {
-                sum_nodes = sum_nodes.saturating_add(self.count_type_nodes(ty));
-                if sum_nodes > MAX_TYPE_INSTANTIATION_NODES {
+        match ty {
+            Type::MutableReference(_) | Type::Reference(_) | Type::Vector(_) => {
+                if self.vm_config.type_size_limit
+                    && self.count_type_nodes(ty) > MAX_TYPE_INSTANTIATION_NODES
+                {
                     return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
                 }
-            }
-        }
+            },
+            Type::StructInstantiation(_, _) => {
+                if self.count_type_nodes(ty) > MAX_TYPE_INSTANTIATION_NODES {
+                    return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
+                }
+            },
+            Type::Address
+            | Type::Bool
+            | Type::Signer
+            | Type::Struct(_)
+            | Type::TyParam(_)
+            | Type::U8
+            | Type::U16
+            | Type::U32
+            | Type::U64
+            | Type::U128
+            | Type::U256 => (),
+        };
         ty.subst(ty_args)
     }
 
@@ -1480,11 +1509,11 @@ impl Loader {
                 "Unexpected TyParam type after translating from TypeTag to Type".to_string(),
             )),
 
-            Type::Vector(ty) => {
-                AbilitySet::polymorphic_abilities(AbilitySet::VECTOR, vec![false], vec![
-                    self.abilities(ty)?
-                ])
-            },
+            Type::Vector(ty) => AbilitySet::polymorphic_abilities(
+                AbilitySet::VECTOR,
+                vec![false],
+                vec![self.abilities(ty)?],
+            ),
             Type::Struct(idx) => Ok(self.module_cache.read().struct_at(*idx).abilities),
             Type::StructInstantiation(idx, type_args) => {
                 let struct_type = self.module_cache.read().struct_at(*idx);
