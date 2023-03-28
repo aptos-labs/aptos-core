@@ -6,29 +6,27 @@ use crate::{
     tests::{
         mock::MockMonitoringServer,
         utils::{
-            elapse_latency_update_interval, elapse_metadata_updater_interval,
-            elapse_network_info_update_interval, get_config_without_latency_pings,
-            get_config_without_network_info_requests, initialize_and_verify_peer_states,
-            start_peer_metadata_updater, start_peer_monitor, update_latency_info_for_peer,
-            update_network_info_for_peer, verify_all_requests_and_respond,
-            verify_and_handle_latency_ping, verify_and_handle_network_info_request,
-            verify_empty_peer_states, verify_latency_request_and_respond,
-            verify_network_info_request_and_respond, verify_peer_latency_state,
-            verify_peer_monitor_state, verify_peer_network_state, wait_for_latency_ping_failure,
-            wait_for_monitoring_latency_update, wait_for_monitoring_network_update,
-            wait_for_network_info_request_failure, wait_for_peer_state_update,
+            create_connected_peers_map, elapse_latency_update_interval,
+            elapse_metadata_updater_interval, elapse_network_info_update_interval,
+            get_config_without_latency_pings, get_config_without_network_info_requests,
+            initialize_and_verify_peer_states, start_peer_metadata_updater, start_peer_monitor,
+            update_latency_info_for_peer, update_network_info_for_peer,
+            verify_all_requests_and_respond, verify_and_handle_latency_ping,
+            verify_and_handle_network_info_request, verify_empty_peer_states,
+            verify_latency_request_and_respond, verify_network_info_request_and_respond,
+            verify_peer_latency_state, verify_peer_monitor_state, verify_peer_network_state,
+            wait_for_latency_ping_failure, wait_for_monitoring_latency_update,
+            wait_for_monitoring_network_update, wait_for_network_info_request_failure,
+            wait_for_peer_state_update,
         },
     },
     PeerState,
 };
 use aptos_config::{
     config::{NodeConfig, PeerRole},
-    network_id::{NetworkId, PeerNetworkId},
+    network_id::NetworkId,
 };
-use aptos_network::transport::ConnectionMetadata;
 use aptos_time_service::TimeServiceTrait;
-use aptos_types::PeerId;
-use maplit::hashmap;
 use std::cmp::min;
 
 #[tokio::test(flavor = "multi_thread")]
@@ -196,8 +194,7 @@ async fn test_basic_peer_updater_loop() {
     // Update the network info for the fullnode several times
     for distance_from_validators in 2..10 {
         // Update the network info for the fullnode
-        let connected_peers =
-            hashmap! { PeerNetworkId::random() => ConnectionMetadata::mock(PeerId::random()) };
+        let connected_peers = create_connected_peers_map();
         update_network_info_for_peer(
             peers_and_metadata.clone(),
             &fullnode_peer,
@@ -450,8 +447,7 @@ async fn test_network_info_requests() {
     // Handle many network info requests and responses
     let distance_from_validators = 0;
     for _ in 0..20 {
-        let connected_peers =
-            hashmap! { PeerNetworkId::random() => ConnectionMetadata::mock(PeerId::random()) };
+        let connected_peers = create_connected_peers_map();
         verify_and_handle_network_info_request(
             &network_id,
             &mut mock_monitoring_server,
@@ -506,8 +502,7 @@ async fn test_network_info_request_failures() {
         elapse_network_info_update_interval(node_config.clone(), mock_time.clone()).await;
 
         // Verify that a single network info request is received and send a bad response
-        let connected_peers =
-            hashmap! { PeerNetworkId::random() => ConnectionMetadata::mock(PeerId::random()) };
+        let connected_peers = create_connected_peers_map();
         verify_network_info_request_and_respond(
             &network_id,
             &mut mock_monitoring_server,
@@ -538,8 +533,7 @@ async fn test_network_info_request_failures() {
         elapse_network_info_update_interval(node_config.clone(), mock_time.clone()).await;
 
         // Verify that a single network info request is received and send an invalid peer depth response
-        let connected_peers =
-            hashmap! { PeerNetworkId::random() => ConnectionMetadata::mock(PeerId::random()) };
+        let connected_peers = create_connected_peers_map();
         verify_network_info_request_and_respond(
             &network_id,
             &mut mock_monitoring_server,
@@ -565,8 +559,7 @@ async fn test_network_info_request_failures() {
     );
 
     // Elapse enough time for a network info request and perform a successful execution
-    let connected_peers =
-        hashmap! { PeerNetworkId::random() => ConnectionMetadata::mock(PeerId::random()) };
+    let connected_peers = create_connected_peers_map();
     verify_and_handle_network_info_request(
         &network_id,
         &mut mock_monitoring_server,
@@ -595,8 +588,7 @@ async fn test_network_info_request_failures() {
         elapse_network_info_update_interval(node_config.clone(), mock_time.clone()).await;
 
         // Verify that a single network info request is received and don't send a response
-        let connected_peers =
-            hashmap! { PeerNetworkId::random() => ConnectionMetadata::mock(PeerId::random()) };
+        let connected_peers = create_connected_peers_map();
         verify_network_info_request_and_respond(
             &network_id,
             &mut mock_monitoring_server,
@@ -622,8 +614,7 @@ async fn test_network_info_request_failures() {
     );
 
     // Elapse enough time for a latency ping and perform a successful execution
-    let connected_peers =
-        hashmap! { PeerNetworkId::random() => ConnectionMetadata::mock(PeerId::random()) };
+    let connected_peers = create_connected_peers_map();
     verify_and_handle_network_info_request(
         &network_id,
         &mut mock_monitoring_server,

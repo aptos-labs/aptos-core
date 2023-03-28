@@ -10,23 +10,21 @@ use crate::{
 use aptos_config::{
     config::{
         LatencyMonitoringConfig, NetworkMonitoringConfig, NodeConfig, PeerMonitoringServiceConfig,
+        PeerRole,
     },
     network_id::{NetworkId, PeerNetworkId},
 };
-use aptos_network::{
-    application::{interface::NetworkClient, storage::PeersAndMetadata},
-    transport::ConnectionMetadata,
-};
+use aptos_network::application::{interface::NetworkClient, storage::PeersAndMetadata};
 use aptos_peer_monitoring_service_types::{
     request::{LatencyPingRequest, PeerMonitoringServiceRequest},
     response::{
-        LatencyPingResponse, NetworkInformationResponse, PeerMonitoringServiceResponse,
-        ServerProtocolVersionResponse,
+        ConnectionMetadata, LatencyPingResponse, NetworkInformationResponse,
+        PeerMonitoringServiceResponse, ServerProtocolVersionResponse,
     },
     PeerMonitoringServiceMessage,
 };
 use aptos_time_service::{MockTimeService, TimeService, TimeServiceTrait};
-use aptos_types::PeerId;
+use aptos_types::{network_address::NetworkAddress, PeerId};
 use maplit::hashmap;
 use std::{
     collections::HashMap,
@@ -43,6 +41,11 @@ use tokio::{
 const PAUSE_FOR_SETUP_SECS: u64 = 1;
 const MAX_WAIT_TIME_SECS: u64 = 10;
 const SLEEP_DURATION_MS: u64 = 500;
+
+/// Returns a simple connected peers map for testing purposes
+pub fn create_connected_peers_map() -> HashMap<PeerNetworkId, ConnectionMetadata> {
+    hashmap! { PeerNetworkId::random() => ConnectionMetadata::new(NetworkAddress::mock(), PeerId::random(), PeerRole::Unknown) }
+}
 
 /// Elapses enough time for a latency update to occur
 pub async fn elapse_latency_update_interval(node_config: NodeConfig, mock_time: MockTimeService) {
@@ -132,8 +135,7 @@ pub async fn initialize_and_verify_peer_states(
     elapse_peer_monitor_interval(node_config.clone(), mock_time.clone()).await;
 
     // Create the test response data
-    let connected_peers =
-        hashmap! { PeerNetworkId::random() => ConnectionMetadata::mock(PeerId::random()) };
+    let connected_peers = create_connected_peers_map();
     let distance_from_validators = get_distance_from_validators(peer_network_id);
 
     // Verify the initial client requests and send responses
@@ -743,10 +745,12 @@ pub async fn wait_for_monitoring_network_update(
             let peer_monitoring_metadata = peer_metadata.get_peer_monitoring_metadata();
 
             // Check if the distance from validators matches the expected value
-            if let Some(distance_from_validators) =
-                peer_monitoring_metadata.distance_from_validators
+            if let Some(latest_network_info_response) =
+                peer_monitoring_metadata.latest_network_info_response
             {
-                if distance_from_validators == expected_distance_from_validators {
+                if latest_network_info_response.distance_from_validators
+                    == expected_distance_from_validators
+                {
                     return; // The average latency info was updated!
                 }
             }
