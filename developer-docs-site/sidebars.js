@@ -120,7 +120,12 @@ const sidebars = {
       link: { type: "doc", id: "guides/index" },
       collapsible: true,
       collapsed: true,
-      items: ["guides/sign-a-transaction", "guides/resource-accounts", "guides/handle-aptos-errors"],
+      items: [
+        "guides/sign-a-transaction",
+        "guides/resource-accounts",
+        "guides/aptos-names-service-package",
+        "guides/handle-aptos-errors",
+      ],
     },
     {
       type: "category",
