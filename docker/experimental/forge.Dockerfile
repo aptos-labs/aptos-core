@@ -26,6 +26,9 @@ ENV PATH "$PATH:/root/bin"
 
 WORKDIR /aptos
 COPY --link --from=tools-builder /aptos/dist/forge /usr/local/bin/forge
+### Get Aptos Framework Release for forge framework upgrade testing
+COPY --link --from=tools-builder /aptos/aptos-move/framework/ /aptos/aptos-move/framework/
+
 ENV RUST_LOG_FORMAT=json
 
 # add build info
