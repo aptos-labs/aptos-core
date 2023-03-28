@@ -5,8 +5,9 @@ set -e
 
 PROFILE=${PROFILE:-release}
 
-echo "Building all rust-based docker images"
+echo "Building tools and services docker images"
 echo "PROFILE: $PROFILE"
+echo "CARGO_TARGET_DIR: $CARGO_TARGET_DIR"
 
 # Build all the rust binaries
 cargo build --locked --profile=$PROFILE \
@@ -40,8 +41,9 @@ BINS=(
 mkdir dist
 
 for BIN in "${BINS[@]}"; do
-    cp target/$PROFILE/$BIN dist/$BIN
+    cp $CARGO_TARGET_DIR/$PROFILE/$BIN dist/$BIN
 done
 
 # Build the Aptos Move framework and place it in dist. It can be found afterwards in the current directory.
+echo "Building the Aptos Move framework..."
 (cd dist && cargo run --locked --profile=$PROFILE --package aptos-framework -- release)
