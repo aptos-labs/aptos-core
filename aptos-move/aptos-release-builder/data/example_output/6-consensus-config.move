@@ -1,10 +1,11 @@
+// Script hash: e973de6d
 // Consensus config upgrade proposal
 
 // config: V1(
 //     ConsensusConfigV1 {
 //         decoupled_execution: true,
 //         back_pressure_limit: 10,
-//         exclude_round: 20,
+//         exclude_round: 40,
 //         proposer_election_type: LeaderReputation(
 //             ProposerAndVoterV2(
 //                 ProposerAndVoterConfig {
@@ -26,19 +27,18 @@
 script {
     use aptos_framework::aptos_governance;
     use aptos_framework::consensus_config;
+    use std::vector;
 
-    fun main(core_resources: &signer) {
-        let core_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
-
-        let framework_signer = &core_signer;
+    fun main(proposal_id: u64) {
+        let framework_signer = aptos_governance::resolve_multi_step_proposal(proposal_id, @0000000000000000000000000000000000000000000000000000000000000001, vector::empty<u8>());
 
         let consensus_blob: vector<u8> = vector[
-            0, 1, 10, 0, 0, 0, 0, 0, 0, 0, 20, 0, 0, 0, 0, 0, 0, 0, 2, 1,
+            0, 1, 10, 0, 0, 0, 0, 0, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 2, 1,
             232, 3, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0,
             0, 0, 0, 0, 10, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0,
             0, 0, 0, 0, 1, 5, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0,
         ];
 
-        consensus_config::set(framework_signer, consensus_blob);
+        consensus_config::set(&framework_signer, consensus_blob);
     }
 }

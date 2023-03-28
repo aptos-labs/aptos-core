@@ -20,12 +20,12 @@ pub mod transfer;
 pub enum AccountTool {
     Create(create::CreateAccount),
     CreateResourceAccount(create_resource_account::CreateResourceAccount),
+    DeriveResourceAccountAddress(derive_resource_account::DeriveResourceAccount),
     FundWithFaucet(fund::FundWithFaucet),
     List(list::ListAccount),
     LookupAddress(key_rotation::LookupAddress),
     RotateKey(key_rotation::RotateKey),
     Transfer(transfer::TransferCoins),
-    DeriveResourceAccountAddress(derive_resource_account::DeriveResourceAccount),
 }
 
 impl AccountTool {

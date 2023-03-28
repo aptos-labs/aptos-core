@@ -430,6 +430,7 @@ async fn test_account_balance() {
         account_2,
         1_000_000,
         10,
+        1,
     )
     .await;
 
@@ -442,6 +443,47 @@ async fn test_account_balance() {
     )
     .await
     .unwrap();
+
+    account_has_balance(
+        &rosetta_client,
+        chain_id,
+        AccountIdentifier::active_stake_account(account_4.address()),
+        1_000_000,
+        1,
+    )
+    .await
+    .unwrap();
+
+    unlock_stake(
+        &swarm.aptos_public_info(),
+        &mut account_4,
+        account_1,
+        1_000,
+        2,
+    )
+    .await;
+
+    // Since unlock_stake was initiated, 1000 APT should be in pending inactive state until lockup ends
+    account_has_balance(
+        &rosetta_client,
+        chain_id,
+        AccountIdentifier::pending_inactive_stake_account(account_4.address()),
+        1_000,
+        2,
+    )
+    .await
+    .unwrap();
+
+    account_has_balance(
+        &rosetta_client,
+        chain_id,
+        AccountIdentifier::inactive_stake_account(account_4.address()),
+        0,
+        2,
+    )
+    .await
+    .unwrap();
+
     /* TODO: Support operator stake account in the future
     account_has_balance(
         &rosetta_client,
@@ -461,6 +503,7 @@ async fn create_staking_contract(
     voter: AccountAddress,
     amount: u64,
     commission_percentage: u64,
+    sequence_number: u64,
 ) -> Response<Transaction> {
     let staking_contract_creation = info
         .transaction_factory()
@@ -471,9 +514,27 @@ async fn create_staking_contract(
             commission_percentage,
             vec![],
         ))
-        .sequence_number(1);
+        .sequence_number(sequence_number);
 
     let txn = account.sign_with_transaction_builder(staking_contract_creation);
+    info.client().submit_and_wait(&txn).await.unwrap()
+}
+
+async fn unlock_stake(
+    info: &AptosPublicInfo<'_>,
+    account: &mut LocalAccount,
+    operator: AccountAddress,
+    amount: u64,
+    sequence_number: u64,
+) -> Response<Transaction> {
+    let unlock_stake = info
+        .transaction_factory()
+        .payload(aptos_stdlib::staking_contract_unlock_stake(
+            operator, amount,
+        ))
+        .sequence_number(sequence_number);
+
+    let txn = account.sign_with_transaction_builder(unlock_stake);
     info.client().submit_and_wait(&txn).await.unwrap()
 }
 
@@ -901,7 +962,7 @@ async fn test_block() {
         &rest_client,
         &network_identifier,
         private_key_2,
-        Some(account_id_2),
+        Some(account_id_3),
         Some(account_id_2),
         Some(100000000000000),
         Some(5),
@@ -921,7 +982,7 @@ async fn test_block() {
         &rest_client,
         &network_identifier,
         private_key_2,
-        Some(account_id_2),
+        Some(account_id_3),
         Duration::from_secs(5),
         None,
         None,
@@ -966,7 +1027,7 @@ async fn test_block() {
         &rest_client,
         &network_identifier,
         private_key_2,
-        Some(account_id_2),
+        Some(account_id_3),
         Some(10),
         Duration::from_secs(5),
         None,
@@ -982,7 +1043,7 @@ async fn test_block() {
         &rest_client,
         &network_identifier,
         private_key_3,
-        account_id_1,
+        account_id_2,
         account_id_3,
         Duration::from_secs(5),
         None,
@@ -997,7 +1058,7 @@ async fn test_block() {
         &rest_client,
         &network_identifier,
         private_key_3,
-        account_id_2,
+        account_id_3,
         account_id_2,
         Duration::from_secs(5),
         None,
@@ -1726,21 +1787,8 @@ async fn parse_operations(
                         ref payload,
                     ) = txn.payload()
                     {
-                        let actual_operator_address: AccountAddress =
-                            bcs::from_bytes(payload.args().first().unwrap()).unwrap();
-                        let operator = operation
-                            .metadata
-                            .as_ref()
-                            .unwrap()
-                            .operator
-                            .as_ref()
-                            .unwrap()
-                            .account_address()
-                            .unwrap();
-                        assert_eq!(actual_operator_address, operator);
-
                         let actual_staker_address: AccountAddress =
-                            bcs::from_bytes(payload.args().get(1).unwrap()).unwrap();
+                            bcs::from_bytes(payload.args().first().unwrap()).unwrap();
                         let staker = operation
                             .metadata
                             .as_ref()
@@ -1751,6 +1799,19 @@ async fn parse_operations(
                             .account_address()
                             .unwrap();
                         assert_eq!(actual_staker_address, staker);
+
+                        let actual_operator_address: AccountAddress =
+                            bcs::from_bytes(payload.args().get(1).unwrap()).unwrap();
+                        let operator = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .operator
+                            .as_ref()
+                            .unwrap()
+                            .account_address()
+                            .unwrap();
+                        assert_eq!(actual_operator_address, operator);
                     } else {
                         panic!("Not an entry function");
                     }

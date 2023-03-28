@@ -216,8 +216,8 @@ impl BatchGenerator {
                             );
                             trace!("QS: dynamic_max_pull_txn_per_s: {}", dynamic_pull_txn_per_s);
                         }
-                        counters::QS_BACKPRESSURE_TXN_COUNT.observe(1);
-                        counters::QS_BACKPRESSURE_DYNAMIC_MAX.observe(dynamic_pull_txn_per_s);
+                        counters::QS_BACKPRESSURE_TXN_COUNT.observe(1.0);
+                        counters::QS_BACKPRESSURE_DYNAMIC_MAX.observe(dynamic_pull_txn_per_s as f64);
                     } else {
                         // additive increase, every second
                         if back_pressure_increase_latest.elapsed() >= back_pressure_increase_duration {
@@ -228,13 +228,13 @@ impl BatchGenerator {
                             );
                             trace!("QS: dynamic_max_pull_txn_per_s: {}", dynamic_pull_txn_per_s);
                         }
-                        counters::QS_BACKPRESSURE_TXN_COUNT.observe(0);
-                        counters::QS_BACKPRESSURE_DYNAMIC_MAX.observe(dynamic_pull_txn_per_s);
+                        counters::QS_BACKPRESSURE_TXN_COUNT.observe(0.0);
+                        counters::QS_BACKPRESSURE_DYNAMIC_MAX.observe(dynamic_pull_txn_per_s as f64);
                     }
                     if self.back_pressure.proof_count {
-                        counters::QS_BACKPRESSURE_PROOF_COUNT.observe(1);
+                        counters::QS_BACKPRESSURE_PROOF_COUNT.observe(1.0);
                     } else {
-                        counters::QS_BACKPRESSURE_PROOF_COUNT.observe(0);
+                        counters::QS_BACKPRESSURE_PROOF_COUNT.observe(0.0);
                     }
                     let since_last_non_empty_pull_ms = std::cmp::min(
                         now.duration_since(last_non_empty_pull).as_millis(),

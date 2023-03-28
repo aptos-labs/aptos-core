@@ -5,7 +5,8 @@ slug: "index"
 
 # Aptos Standards
 
-Standards define a common interoperable interface for all developers to build upon. They consist of rules to ensure compatibility across applications and wallets on the Aptos blockchain.
+Standards define a common interoperable interface for all developers to build upon. They consist of rules to ensure compatibility across applications and wallets on the Aptos blockchain. See a [list of known coin resource addresses](https://github.com/hippospace/aptos-coin-list) in Aptos provided by 
+hippospace.
 
 ## Digital Asset Standards
 ### [Aptos Coin](./aptos-coin.md)

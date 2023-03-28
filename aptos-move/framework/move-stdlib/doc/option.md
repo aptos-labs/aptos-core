@@ -10,6 +10,7 @@ This module defines the Option type and its methods to represent and handle an o
 -  [Constants](#@Constants_0)
 -  [Function `none`](#0x1_option_none)
 -  [Function `some`](#0x1_option_some)
+-  [Function `from_vec`](#0x1_option_from_vec)
 -  [Function `is_none`](#0x1_option_is_none)
 -  [Function `is_some`](#0x1_option_is_some)
 -  [Function `contains`](#0x1_option_contains)
@@ -30,6 +31,7 @@ This module defines the Option type and its methods to represent and handle an o
     -  [Struct `Option`](#@Specification_1_Option)
     -  [Function `none`](#@Specification_1_none)
     -  [Function `some`](#@Specification_1_some)
+    -  [Function `from_vec`](#@Specification_1_from_vec)
     -  [Function `is_none`](#@Specification_1_is_none)
     -  [Function `is_some`](#@Specification_1_is_some)
     -  [Function `contains`](#@Specification_1_contains)
@@ -108,6 +110,16 @@ The <code><a href="option.md#0x1_option_Option">Option</a></code> is <code>None<
 
 
 
+<a name="0x1_option_EOPTION_VEC_TOO_LONG"></a>
+
+Cannot construct an option from a vector with 2 or more elements.
+
+
+<pre><code><b>const</b> <a href="option.md#0x1_option_EOPTION_VEC_TOO_LONG">EOPTION_VEC_TOO_LONG</a>: u64 = 262146;
+</code></pre>
+
+
+
 <a name="0x1_option_none"></a>
 
 ## Function `none`
@@ -151,6 +163,31 @@ Return an <code><a href="option.md#0x1_option_Option">Option</a></code> containi
 
 <pre><code><b>public</b> <b>fun</b> <a href="option.md#0x1_option_some">some</a>&lt;Element&gt;(e: Element): <a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt; {
     <a href="option.md#0x1_option_Option">Option</a> { vec: <a href="vector.md#0x1_vector_singleton">vector::singleton</a>(e) }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_option_from_vec"></a>
+
+## Function `from_vec`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="option.md#0x1_option_from_vec">from_vec</a>&lt;Element&gt;(vec: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;): <a href="option.md#0x1_option_Option">option::Option</a>&lt;Element&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="option.md#0x1_option_from_vec">from_vec</a>&lt;Element&gt;(vec: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;): <a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt; {
+    <b>assert</b>!(<a href="vector.md#0x1_vector_length">vector::length</a>(&vec) &lt;= 1, <a href="option.md#0x1_option_EOPTION_VEC_TOO_LONG">EOPTION_VEC_TOO_LONG</a>);
+    <a href="option.md#0x1_option_Option">Option</a> { vec }
 }
 </code></pre>
 
@@ -691,6 +728,22 @@ because it's 0 for "none" or 1 for "some".
 
 
 
+<a name="@Specification_1_from_vec"></a>
+
+### Function `from_vec`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="option.md#0x1_option_from_vec">from_vec</a>&lt;Element&gt;(vec: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;): <a href="option.md#0x1_option_Option">option::Option</a>&lt;Element&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <a href="vector.md#0x1_vector_length">vector::length</a>(vec) &gt; 1;
+</code></pre>
+
+
+
 <a name="@Specification_1_is_none"></a>
 
 ### Function `is_none`
@@ -892,9 +945,9 @@ because it's 0 for "none" or 1 for "some".
 
 
 
-<pre><code><b>pragma</b> opaque;
-<b>include</b> <a href="option.md#0x1_option_AbortsIfNone">AbortsIfNone</a>&lt;Element&gt;;
+<pre><code><b>include</b> <a href="option.md#0x1_option_AbortsIfNone">AbortsIfNone</a>&lt;Element&gt;;
 <b>ensures</b> result == <a href="option.md#0x1_option_spec_borrow">spec_borrow</a>(t);
+<b>ensures</b> t == <b>old</b>(t);
 </code></pre>
 
 
@@ -1008,4 +1061,4 @@ because it's 0 for "none" or 1 for "some".
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

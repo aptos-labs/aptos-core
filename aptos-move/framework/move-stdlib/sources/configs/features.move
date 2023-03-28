@@ -158,6 +158,15 @@ module std::features {
         is_enabled(BLS12_381_STRUCTURES)
     }
 
+    /// Whether native_public_key_validate aborts when a public key of the wrong length is given
+    /// Lifetime: ephemeral
+    const ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH: u64 = 14;
+
+    /// Whether struct constructors are enabled
+    ///
+    /// Lifetime: transient
+    const STRUCT_CONSTRUCTORS: u64 = 15;
+
     // ============================================================================================
     // Feature Flag Implementation
 

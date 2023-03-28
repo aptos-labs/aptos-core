@@ -29,10 +29,6 @@ pub async fn emit_transactions(
         let start_time = Instant::now();
         let mut i = 0;
         loop {
-            let cluster = Cluster::try_from_cluster_args(cluster_args)
-                .await
-                .context("Failed to build cluster")?;
-
             let cur_emit_args = if i > 0 {
                 let mut cur_emit_args = emit_args.clone();
                 cur_emit_args.coordination_delay_between_instances =
@@ -49,6 +45,11 @@ pub async fn emit_transactions(
             } else {
                 emit_args.clone()
             };
+
+            let cluster = Cluster::try_from_cluster_args(cluster_args)
+                .await
+                .context("Failed to build cluster")?;
+
             let result = emit_transactions_with_cluster(
                 &cluster,
                 &cur_emit_args,
