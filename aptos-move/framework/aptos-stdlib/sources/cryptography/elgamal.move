@@ -5,6 +5,7 @@
 
 module aptos_std::elgamal {
     use aptos_std::ristretto255::{Self, RistrettoPoint, Scalar, CompressedRistretto, point_compress};
+    use std::option::Option;
 
     /// An ElGamal ciphertext to some value.
     struct Ciphertext has drop {
@@ -21,6 +22,18 @@ module aptos_std::elgamal {
     /// An ElGamal public key.
     struct PubKey has drop {
         point: RistrettoPoint,
+    }
+
+    /// Creates a new ciphertext from two serialized Ristrotto points
+    // TODO: Make this so it takes in a single byte vector
+    public fun new_ciphertext_from_bytes(left: vector<u8>, right: vector<u8>): Option<Ciphertext> {
+	let left_point = ristretto255::new_point_from_bytes(left);
+	let right_point = ristretto255::new_point_from_bytes(right);
+	if (std::option::is_some<RistrettoPoint>(&mut left_point) && std::option::is_some<RistrettoPoint>(&mut right_point)) {
+		std::option::some<Ciphertext>(Ciphertext { left: std::option::extract<RistrettoPoint>(&mut left_point), right: std::option::extract<RistrettoPoint>(&mut right_point) })
+	} else {
+		std::option::none<Ciphertext>()
+	}
     }
 
     /// Moves a Ristretto point into an ElGamal ciphertext.

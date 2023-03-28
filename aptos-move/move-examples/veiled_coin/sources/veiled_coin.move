@@ -23,7 +23,7 @@ module veiled_coin::veiled_coin {
     // Errors.
     //
 
-    /// The range proof system needs to support proofs for any number \in [0, 2^{64})
+    /// The range proof system needs to support proofs for any number \in [0, 2^{32})
     const ERANGE_PROOF_SYSTEM_HAS_INSUFFICIENT_RANGE : u64 = 1;
 
     /// A range proof failed to verify.
@@ -37,6 +37,9 @@ module veiled_coin::veiled_coin {
 
     /// Not enough coins to complete transaction
     const EINSUFFICIENT_BALANCE: u64 = 6;
+
+    /// Byte vector failed to deserialize to ciphertexts
+    const EDESERIALIZATION_FAILED: u64 = 7;
 
     //
     // Constants
@@ -54,7 +57,7 @@ module veiled_coin::veiled_coin {
 
     /// Main structure representing a coin in an account's custody.
     struct VeiledCoin<phantom CoinType> {
-        /// ElGamal ciphertext (under the default Bulletproofs CK) of a number of coins v \in [0, 2^{64}), an invariant
+        /// ElGamal ciphertext of a number of coins v \in [0, 2^{32}), an invariant
         /// that is enforced throughout the code
         private_value: Ciphertext,
     }
@@ -62,7 +65,7 @@ module veiled_coin::veiled_coin {
     /// A holder of a specific coin types and associated event handles.
     /// These are kept in a single resource to ensure locality of data.
     struct VeiledCoinStore<phantom CoinType> has key {
-        /// A ElGamal ciphertext of a value v \in [0, 2^{64}), an invariant that is enforced throughout the code.
+        /// A ElGamal ciphertext of a value v \in [0, 2^{32}), an invariant that is enforced throughout the code.
         private_balance: CompressedCiphertext,
         deposit_events: EventHandle<DepositEvent>,
         withdraw_events: EventHandle<WithdrawEvent>,
@@ -122,6 +125,39 @@ module veiled_coin::veiled_coin {
         let vc = mint_from_coin(c);
 
         deposit<CoinType>(recipient, vc)
+    }
+
+    /// Sends the specified private amount to `recipient` and updates the private balance of `sender`. Requires a range
+    /// proof on the new balance of the sender, to ensure the sender has enough money to send, in addition to a 
+    /// range proof on the transferred amount. Also requires a sigma protocol to prove that 
+    /// 'private_withdraw_amount' encrypts the same value using the same randomness as 'private_deposit_amount'. 
+    /// This value is the amount being transferred. These two ciphertexts are required as we need to update 
+    /// both the sender's and the recipient's balances, which use different public keys and so must be updated 
+    /// with ciphertexts encrypted with their respective public keys. 
+    // TODO: Make this so ciphertexts are represented by only one vector<u8>
+    public entry fun private_transfer_to<CoinType>(
+	sender: &signer, 
+	recipient: address, 
+	left_withdraw_ct: vector<u8>, 
+	right_withdraw_ct: vector<u8>, 
+	left_deposit_ct: vector<u8>, 
+	right_deposit_ct: vector<u8>, 
+	range_proof_updated_balance: vector<u8>, 
+	range_proof_transferred_amount: vector<u8>) acquires VeiledCoinStore {
+
+	let private_withdraw_amount = elgamal::new_ciphertext_from_bytes(left_withdraw_ct, right_withdraw_ct);
+	assert!(std::option::is_some(&private_withdraw_amount), EDESERIALIZATION_FAILED);
+	let private_deposit_amount = elgamal::new_ciphertext_from_bytes(left_deposit_ct, right_deposit_ct);
+	assert!(std::option::is_some(&private_deposit_amount), EDESERIALIZATION_FAILED);
+
+	transfer_privately_to<CoinType>(
+		sender,
+		recipient,
+		std::option::extract(&mut private_withdraw_amount),
+		std::option::extract(&mut private_deposit_amount),
+		&bulletproofs::range_proof_from_bytes(range_proof_updated_balance),
+		&bulletproofs::range_proof_from_bytes(range_proof_transferred_amount),
+	)
     }
 
     /// Returns the ciphertext of the balance of `owner` for the provided `CoinType`.
