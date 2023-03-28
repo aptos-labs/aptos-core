@@ -6,18 +6,22 @@ use crate::{
     tests::{
         mock::MockMonitoringServer,
         utils::{
-            create_connected_peers_map, elapse_latency_update_interval,
-            elapse_metadata_updater_interval, elapse_network_info_update_interval,
-            get_config_without_latency_pings, get_config_without_network_info_requests,
+            config_with_latency_ping_requests, config_with_network_info_requests,
+            config_with_node_info_requests, config_without_node_info_requests,
+            create_connected_peers_map, create_network_info_response,
+            create_random_network_info_response, create_random_node_info_response,
+            elapse_latency_update_interval, elapse_metadata_updater_interval,
+            elapse_network_info_update_interval, elapse_node_info_update_interval,
             initialize_and_verify_peer_states, start_peer_metadata_updater, start_peer_monitor,
             update_latency_info_for_peer, update_network_info_for_peer,
             verify_all_requests_and_respond, verify_and_handle_latency_ping,
-            verify_and_handle_network_info_request, verify_empty_peer_states,
-            verify_latency_request_and_respond, verify_network_info_request_and_respond,
-            verify_peer_latency_state, verify_peer_monitor_state, verify_peer_network_state,
+            verify_and_handle_network_info_request, verify_and_handle_node_info_request,
+            verify_empty_peer_states, verify_latency_request_and_respond,
+            verify_network_info_request_and_respond, verify_node_info_request_and_respond,
+            verify_peer_latency_state, verify_peer_network_state, verify_peer_node_state,
             wait_for_latency_ping_failure, wait_for_monitoring_latency_update,
             wait_for_monitoring_network_update, wait_for_network_info_request_failure,
-            wait_for_peer_state_update,
+            wait_for_node_info_request_failure, wait_for_peer_state_update,
         },
     },
     PeerState,
@@ -36,8 +40,10 @@ async fn test_basic_peer_monitor_loop() {
     let (peer_monitoring_client, mut mock_monitoring_server, peer_monitor_state, time_service) =
         MockMonitoringServer::new(vec![network_id]);
 
+    // Create a node config where node info requests don't refresh
+    let node_config = config_without_node_info_requests();
+
     // Spawn the peer monitoring client
-    let node_config = NodeConfig::default();
     start_peer_monitor(
         peer_monitoring_client,
         &peer_monitor_state,
@@ -54,7 +60,7 @@ async fn test_basic_peer_monitor_loop() {
 
     // Initialize all the peer states by running the peer monitor once
     let mock_time = time_service.into_mock();
-    let (connected_peers, distance_from_validators) = initialize_and_verify_peer_states(
+    let (network_info_response, _) = initialize_and_verify_peer_states(
         &network_id,
         &mut mock_monitoring_server,
         &peer_monitor_state,
@@ -86,8 +92,9 @@ async fn test_basic_peer_monitor_loop() {
     verify_all_requests_and_respond(
         &network_id,
         &mut mock_monitoring_server,
-        &connected_peers,
-        distance_from_validators,
+        2,
+        Some(network_info_response.clone()),
+        None,
     )
     .await;
 
@@ -96,17 +103,19 @@ async fn test_basic_peer_monitor_loop() {
         time_before_update,
         &peer_monitor_state,
         &validator_peer,
-        PeerStateKey::get_all_keys(),
+        vec![PeerStateKey::LatencyInfo, PeerStateKey::NetworkInfo],
     )
     .await;
 
-    // Verify the new state of the peer monitor
-    verify_peer_monitor_state(
+    // Verify the latency ping state
+    verify_peer_latency_state(&peer_monitor_state, &validator_peer, 3, 0);
+
+    // Verify the network state
+    verify_peer_network_state(
         &peer_monitor_state,
         &validator_peer,
-        &connected_peers,
-        distance_from_validators,
-        3,
+        network_info_response,
+        0,
     );
 }
 
@@ -194,12 +203,11 @@ async fn test_basic_peer_updater_loop() {
     // Update the network info for the fullnode several times
     for distance_from_validators in 2..10 {
         // Update the network info for the fullnode
-        let connected_peers = create_connected_peers_map();
         update_network_info_for_peer(
             peers_and_metadata.clone(),
             &fullnode_peer,
             &mut peer_state,
-            connected_peers,
+            create_connected_peers_map(),
             distance_from_validators,
             1.0,
         );
@@ -224,8 +232,8 @@ async fn test_latency_pings() {
     let (peer_monitoring_client, mut mock_monitoring_server, peer_monitor_state, time_service) =
         MockMonitoringServer::new(vec![network_id]);
 
-    // Create a node config where network info requests don't refresh
-    let node_config = get_config_without_network_info_requests();
+    // Create a node config where only latency pings refresh
+    let node_config = config_with_latency_ping_requests();
 
     // Spawn the peer monitoring client
     start_peer_monitor(
@@ -279,8 +287,8 @@ async fn test_latency_ping_failures() {
     let (peer_monitoring_client, mut mock_monitoring_server, peer_monitor_state, time_service) =
         MockMonitoringServer::new(vec![network_id]);
 
-    // Create a node config where network info requests don't refresh
-    let node_config = get_config_without_network_info_requests();
+    // Create a node config where only latency pings refresh
+    let node_config = config_with_latency_ping_requests();
 
     // Spawn the peer monitoring client
     start_peer_monitor(
@@ -414,8 +422,8 @@ async fn test_network_info_requests() {
     let (peer_monitoring_client, mut mock_monitoring_server, peer_monitor_state, time_service) =
         MockMonitoringServer::new(vec![network_id]);
 
-    // Create a node config where latency pings don't refresh
-    let node_config = get_config_without_latency_pings();
+    // Create a node config where only network infos refresh
+    let node_config = config_with_network_info_requests();
 
     // Spawn the peer monitoring client
     start_peer_monitor(
@@ -445,9 +453,7 @@ async fn test_network_info_requests() {
     .await;
 
     // Handle many network info requests and responses
-    let distance_from_validators = 0;
     for _ in 0..20 {
-        let connected_peers = create_connected_peers_map();
         verify_and_handle_network_info_request(
             &network_id,
             &mut mock_monitoring_server,
@@ -455,8 +461,7 @@ async fn test_network_info_requests() {
             &node_config,
             &validator_peer,
             &mock_time,
-            &connected_peers,
-            distance_from_validators,
+            create_random_network_info_response(),
         )
         .await;
     }
@@ -469,8 +474,8 @@ async fn test_network_info_request_failures() {
     let (peer_monitoring_client, mut mock_monitoring_server, peer_monitor_state, time_service) =
         MockMonitoringServer::new(vec![network_id]);
 
-    // Create a node config where latency pings don't refresh
-    let node_config = get_config_without_latency_pings();
+    // Create a node config where only network infos refresh
+    let node_config = config_with_network_info_requests();
 
     // Spawn the peer monitoring client
     start_peer_monitor(
@@ -486,7 +491,7 @@ async fn test_network_info_request_failures() {
 
     // Initialize all the peer states by running the peer monitor once
     let mock_time = time_service.into_mock();
-    let (connected_peers, distance_from_validators) = initialize_and_verify_peer_states(
+    let (network_info_response, _) = initialize_and_verify_peer_states(
         &network_id,
         &mut mock_monitoring_server,
         &peer_monitor_state,
@@ -502,12 +507,10 @@ async fn test_network_info_request_failures() {
         elapse_network_info_update_interval(node_config.clone(), mock_time.clone()).await;
 
         // Verify that a single network info request is received and send a bad response
-        let connected_peers = create_connected_peers_map();
         verify_network_info_request_and_respond(
             &network_id,
             &mut mock_monitoring_server,
-            &connected_peers,
-            distance_from_validators,
+            create_random_network_info_response(),
             false,
             true,
             false,
@@ -522,23 +525,20 @@ async fn test_network_info_request_failures() {
     verify_peer_network_state(
         &peer_monitor_state,
         &validator_peer,
-        &connected_peers,
-        distance_from_validators,
+        network_info_response.clone(),
         5,
     );
 
-    // Handle several network info requests with invalid depth responses responses
+    // Handle several network info requests with invalid depth responses
     for i in 5..10 {
         // Elapse enough time for a network info update
         elapse_network_info_update_interval(node_config.clone(), mock_time.clone()).await;
 
         // Verify that a single network info request is received and send an invalid peer depth response
-        let connected_peers = create_connected_peers_map();
         verify_network_info_request_and_respond(
             &network_id,
             &mut mock_monitoring_server,
-            &connected_peers,
-            distance_from_validators,
+            create_random_network_info_response(),
             true,
             false,
             false,
@@ -553,13 +553,16 @@ async fn test_network_info_request_failures() {
     verify_peer_network_state(
         &peer_monitor_state,
         &validator_peer,
-        &connected_peers,
-        distance_from_validators,
+        network_info_response.clone(),
         10,
     );
 
     // Elapse enough time for a network info request and perform a successful execution
     let connected_peers = create_connected_peers_map();
+    let network_info_response = create_network_info_response(
+        &connected_peers,
+        network_info_response.distance_from_validators,
+    );
     verify_and_handle_network_info_request(
         &network_id,
         &mut mock_monitoring_server,
@@ -567,8 +570,7 @@ async fn test_network_info_request_failures() {
         &node_config,
         &validator_peer,
         &mock_time,
-        &connected_peers,
-        distance_from_validators,
+        network_info_response.clone(),
     )
     .await;
 
@@ -577,8 +579,7 @@ async fn test_network_info_request_failures() {
     verify_peer_network_state(
         &peer_monitor_state,
         &validator_peer,
-        &connected_peers,
-        distance_from_validators,
+        network_info_response.clone(),
         0,
     );
 
@@ -588,12 +589,10 @@ async fn test_network_info_request_failures() {
         elapse_network_info_update_interval(node_config.clone(), mock_time.clone()).await;
 
         // Verify that a single network info request is received and don't send a response
-        let connected_peers = create_connected_peers_map();
         verify_network_info_request_and_respond(
             &network_id,
             &mut mock_monitoring_server,
-            &connected_peers,
-            distance_from_validators,
+            create_random_network_info_response(),
             false,
             false,
             true,
@@ -608,13 +607,11 @@ async fn test_network_info_request_failures() {
     verify_peer_network_state(
         &peer_monitor_state,
         &validator_peer,
-        &connected_peers,
-        distance_from_validators,
+        network_info_response.clone(),
         5,
     );
 
-    // Elapse enough time for a latency ping and perform a successful execution
-    let connected_peers = create_connected_peers_map();
+    // Elapse enough time for a network info request and perform a successful execution
     verify_and_handle_network_info_request(
         &network_id,
         &mut mock_monitoring_server,
@@ -622,8 +619,7 @@ async fn test_network_info_request_failures() {
         &node_config,
         &validator_peer,
         &mock_time,
-        &connected_peers,
-        distance_from_validators,
+        network_info_response.clone(),
     )
     .await;
 
@@ -632,8 +628,157 @@ async fn test_network_info_request_failures() {
     verify_peer_network_state(
         &peer_monitor_state,
         &validator_peer,
-        &connected_peers,
-        distance_from_validators,
+        network_info_response,
         0,
     );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_node_info_requests() {
+    // Create the peer monitoring client and server
+    let network_id = NetworkId::Validator;
+    let (peer_monitoring_client, mut mock_monitoring_server, peer_monitor_state, time_service) =
+        MockMonitoringServer::new(vec![network_id]);
+
+    // Create a node config where only node infos refresh
+    let node_config = config_with_node_info_requests();
+
+    // Spawn the peer monitoring client
+    start_peer_monitor(
+        peer_monitoring_client,
+        &peer_monitor_state,
+        &time_service,
+        &node_config,
+    )
+    .await;
+
+    // Verify the initial state of the peer monitor
+    verify_empty_peer_states(&peer_monitor_state);
+
+    // Add a connected validator peer
+    let validator_peer = mock_monitoring_server.add_new_peer(network_id, PeerRole::Validator);
+
+    // Initialize all the peer states by running the peer monitor once
+    let mock_time = time_service.into_mock();
+    let _ = initialize_and_verify_peer_states(
+        &network_id,
+        &mut mock_monitoring_server,
+        &peer_monitor_state,
+        &node_config,
+        &validator_peer,
+        &mock_time,
+    )
+    .await;
+
+    // Handle many node info requests and responses
+    for _ in 0..20 {
+        verify_and_handle_node_info_request(
+            &network_id,
+            &mut mock_monitoring_server,
+            &peer_monitor_state,
+            &node_config,
+            &validator_peer,
+            &mock_time,
+            create_random_node_info_response(),
+        )
+        .await;
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_node_info_request_failures() {
+    // Create the peer monitoring client and server
+    let network_id = NetworkId::Validator;
+    let (peer_monitoring_client, mut mock_monitoring_server, peer_monitor_state, time_service) =
+        MockMonitoringServer::new(vec![network_id]);
+
+    // Create a node config where only node infos refresh
+    let node_config = config_with_node_info_requests();
+
+    // Spawn the peer monitoring client
+    start_peer_monitor(
+        peer_monitoring_client,
+        &peer_monitor_state,
+        &time_service,
+        &node_config,
+    )
+    .await;
+
+    // Add a connected validator peer
+    let validator_peer = mock_monitoring_server.add_new_peer(network_id, PeerRole::Validator);
+
+    // Initialize all the peer states by running the peer monitor once
+    let mock_time = time_service.into_mock();
+    let (_, node_info_response) = initialize_and_verify_peer_states(
+        &network_id,
+        &mut mock_monitoring_server,
+        &peer_monitor_state,
+        &node_config,
+        &validator_peer,
+        &mock_time,
+    )
+    .await;
+
+    // Handle several node info requests with bad responses
+    for i in 0..5 {
+        // Elapse enough time for a node info update
+        elapse_node_info_update_interval(node_config.clone(), mock_time.clone()).await;
+
+        // Verify that a single node info request is received and send a bad response
+        // Create the test data
+        verify_node_info_request_and_respond(
+            &network_id,
+            &mut mock_monitoring_server,
+            create_random_node_info_response(),
+            true,
+            false,
+        )
+        .await;
+
+        // Wait until the node info state is updated with the failure
+        wait_for_node_info_request_failure(&peer_monitor_state, &validator_peer, i + 1).await;
+    }
+
+    // Handle several node info requests without responses
+    for i in 5..10 {
+        // Elapse enough time for a node info update
+        elapse_node_info_update_interval(node_config.clone(), mock_time.clone()).await;
+
+        // Verify that a single node info request is received and don't send a response
+        verify_node_info_request_and_respond(
+            &network_id,
+            &mut mock_monitoring_server,
+            create_random_node_info_response(),
+            false,
+            true,
+        )
+        .await;
+
+        // Wait until the node info state is updated with the failure
+        wait_for_node_info_request_failure(&peer_monitor_state, &validator_peer, i + 1).await;
+    }
+
+    // Verify the new node info state of the peer monitor
+    verify_peer_node_state(
+        &peer_monitor_state,
+        &validator_peer,
+        node_info_response.clone(),
+        10,
+    );
+
+    // Elapse enough time for a node info request and perform a successful execution
+    verify_and_handle_node_info_request(
+        &network_id,
+        &mut mock_monitoring_server,
+        &peer_monitor_state,
+        &node_config,
+        &validator_peer,
+        &mock_time,
+        node_info_response.clone(),
+    )
+    .await;
+
+    // Verify the new node info state of the peer monitor (the number
+    // of failures should have been reset).
+    verify_peer_node_state(&peer_monitor_state, &validator_peer, node_info_response, 0);
 }
