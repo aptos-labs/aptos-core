@@ -18,7 +18,7 @@ use crate::{
     round_manager::VerifiedEvent,
     state_replication::StateComputerCommitCallBackType, logging::{LogEvent, LogSchema},
 };
-use aptos_consensus_types::{common::Author, executed_block::ExecutedBlock, experimental::{rand_decision::RandDecisions, rand_share::{RandShares, self}}};
+use aptos_consensus_types::{common::Author, executed_block::ExecutedBlock, experimental::{rand_decision::RandDecisions, rand_share::RandShares}};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_types::{
@@ -30,14 +30,14 @@ use futures::{
         mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
         oneshot,
     },
-    FutureExt, SinkExt, StreamExt,
+    FutureExt, SinkExt, StreamExt, stream::FuturesUnordered,
 };
 use once_cell::sync::OnceCell;
 use std::{sync::{
     atomic::{AtomicU64, Ordering},
     Arc,
 }, collections::{HashMap, HashSet}};
-use tokio::time::{Duration, Instant};
+use tokio::time::{Duration, Instant, self};
 
 pub const COMMIT_VOTE_REBROADCAST_INTERVAL_MS: u64 = 1500;
 pub const RAND_SHARE_REBROADCAST_INTERVAL_MS: u64 = 3000;
@@ -48,7 +48,7 @@ pub const LOOP_INTERVAL_MS: u64 = 1500;
 
 // Each validator will send a randomness share of size rand_size * rand_num / 100 (assuming 100 validators and even distribution)
 pub const RAND_SIZE: usize = 96;
-pub const RAND_NUM: usize = 10000;
+pub const RAND_NUM: usize = 100;
 pub const SHARE_SIZE: usize = RAND_SIZE * RAND_NUM / 100;
 pub const DECISION_SIZE: usize = RAND_SIZE;
 
@@ -224,21 +224,28 @@ impl BufferManager {
         // Send the randomness shares through the first k proposers,
         // otherwise all blocks are Nil/genesis blocks that do not need randomness
         let rand_shares = RandShares::new(item_hash, self.author, item.epoch(), item.gen_dummy_rand_share_vec(self.author));
-        for proposer in item.get_first_k_proposers(1) {
-            info!(
-                self.new_log(LogEvent::SendRandToLeader)
-                    .remote_peer(proposer)
-                    .item_id(item_hash),
-                "item id {}, item size {}", item.get_hash(), item.get_blocks().len()
-            );
-            // println!("[rand debug] {} send share {} to leader {}", self.author, rand_shares.item_id(), proposer);
-            self.rand_msg_tx
-            .send_rand_shares(rand_shares.clone(), proposer)
-            .await;
+        let leaders = item.get_k_leaders(self.verifier.len(), &self.verifier);
+
+        if leaders.len() == 0 {
+            self.buffer.push_back(item.try_advance_to_execution_ready());
+            return;
+        } else {
+            for leader in leaders {
+                info!(
+                    self.new_log(LogEvent::SendRandToLeader)
+                        .remote_peer(leader)
+                        .item_id(item_hash),
+                    "item id {}, item size {}", item.get_hash(), item.get_blocks().len()
+                );
+                // println!("[rand debug] {} send share {} to leader {}", self.author, rand_shares.item_id(), proposer);
+                self.rand_msg_tx
+                .send_rand_shares(rand_shares.clone(), leader)
+                .await;
+            }
+            // self.rand_msg_tx
+            //     .broadcast_rand_shares(rand_shares)
+            //     .await;
         }
-        // self.rand_msg_tx
-        //     .broadcast_rand_shares(rand_shares)
-        //     .await;
 
         self.buffer.push_back(item);
     }
@@ -284,14 +291,50 @@ impl BufferManager {
                             }
                             // if we're one of the proposer for the first k proposal block,
                             // we're responsible to broadcast the randomness decision
-                            if item.get_first_k_proposers(1).contains(&self.author) {
+                            if item.get_k_leaders(self.verifier.len(), &self.verifier).contains(&self.author) {
                                 info!(
                                     self.new_log(LogEvent::LeaderBCastRand).item_id(item_id),
                                     "item id {}, item size {}", item_id, item.get_blocks().len()
                                 );
-                                self.rand_msg_tx
-                                    .broadcast_rand_decisions(rand_decisions)
-                                    .await;
+                                let peers = self.verifier.get_ordered_account_addresses();
+                                let retry_interval = Duration::from_millis(500 as u64);
+                                let rpc_timeout = Duration::from_millis(1000 as u64);
+                                let rand_msg_tx = self.rand_msg_tx.clone();
+                                let author = self.author;
+
+                                tokio::spawn(async move {
+                                    monitor!("batch_request", {
+                                        let mut interval = time::interval(retry_interval);
+                                        let mut futures = FuturesUnordered::new();
+                                        for peer in peers {
+                                            if peer == author {
+                                                continue;
+                                            }
+                                            info!("leader send {} item to {}", item_id, peer);
+                                            futures.push(rand_msg_tx.rpc_send_rand_decisions(rand_decisions.clone(), peer, rpc_timeout));
+                                        }
+                                        loop {
+                                            tokio::select! {
+                                                _ = interval.tick() => {
+                                                    if futures.is_empty() {
+                                                        // end the loop when the futures are drained
+                                                        break;
+                                                    }
+                                                }
+                                                Some(response) = futures.next() => {
+                                                    if let Err(peer) = response {
+                                                        info!("leader resend {} item to {}", item_id, peer);
+                                                        futures.push(rand_msg_tx.rpc_send_rand_decisions(rand_decisions.clone(), peer, rpc_timeout));
+                                                    }
+                                                },
+                                            }
+                                        }
+                                    })
+                                });
+
+                                // self.rand_msg_tx
+                                //     .broadcast_rand_decisions(rand_decisions)
+                                //     .await;
                             }
                             self.buffer.set(&current_cursor, item.try_advance_to_execution_ready());
                             return true;
@@ -747,7 +790,8 @@ impl BufferManager {
 
         while cursor.is_some() {
             let item = self.buffer.get(&cursor);
-            if item.is_ordered() {
+            // ordered item or NIL blocks
+            if item.is_ordered() || item.get_k_leaders(1, &self.verifier).is_empty() {
                 cursor = self.buffer.get_next(&cursor);
                 continue;
             }
@@ -865,18 +909,18 @@ impl BufferManager {
                     });
                 },
                 _ = interval.tick().fuse() => {
-                    // self.print_buffer();
+                    self.print_buffer();
                     self.update_buffer_manager_metrics();
                     monitor!("buffer_manager_process_rebroadcast_commit_vote", {
                     self.rebroadcast_commit_votes_if_needed().await
                     });
-                    // // unhappy path, keep broadcasting randomness decisions or randomness shares for non-committed blocks
-                    // monitor!("buffer_manager_process_rebroadcast_rand_share", {
-                    // self.rebroadcast_rand_share_if_needed().await;
-                    // });
-                    // monitor!("buffer_manager_process_rebroadcast_rand_decision", {
-                    // self.rebroadcast_rand_decision_if_needed().await;
-                    // });
+                    // unhappy path, keep broadcasting randomness decisions or randomness shares for non-committed blocks
+                    monitor!("buffer_manager_process_rebroadcast_rand_share", {
+                    self.rebroadcast_rand_share_if_needed().await;
+                    });
+                    monitor!("buffer_manager_process_rebroadcast_rand_decision", {
+                    self.rebroadcast_rand_decision_if_needed().await;
+                    });
                 },
                 // no else branch here because interval.tick will always be available
             }

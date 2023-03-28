@@ -8,7 +8,7 @@ use crate::{
     logging::LogEvent,
     monitor,
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
-    quorum_store::types::{Batch, BatchMsg, BatchRequest},
+    quorum_store::types::{Batch, BatchMsg, BatchRequest}, round_manager::VerifiedEvent,
 };
 use anyhow::{anyhow, ensure};
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
@@ -61,9 +61,17 @@ pub struct IncomingBatchRetrievalRequest {
 }
 
 #[derive(Debug)]
+pub struct IncomingRandDecisions {
+    pub req: VerifiedEvent,
+    pub protocol: ProtocolId,
+    pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
+}
+
+#[derive(Debug)]
 pub enum IncomingRpcRequest {
     BlockRetrieval(IncomingBlockRetrievalRequest),
     BatchRetrieval(IncomingBatchRetrievalRequest),
+    RandDecisions(IncomingRandDecisions),
 }
 
 /// Just a convenience struct to keep all the network proxy receiving queues in one place.
@@ -346,6 +354,28 @@ impl NetworkSender {
         let msg = ConsensusMsg::RandDecisionMsg(Box::new(rand_decisions));
         self.broadcast(msg).await
     }
+
+
+    // testing, retry if error
+    pub async fn rpc_send_rand_decisions(
+        &self,
+        rand_decisions: RandDecisions,
+        recipient: Author,
+        timeout: Duration,
+    ) -> Result<(), Author> {
+        let msg = ConsensusMsg::RandDecisionMsg(Box::new(rand_decisions));
+        let response = self
+            .consensus_network_client
+            .send_rpc(recipient, msg, timeout)
+            .await;
+        // println!("rand response {:?}", response);
+        match response {
+            Ok(ConsensusMsg::RandResponse()) => {
+                Ok(())
+            },
+            _ => Err(recipient),
+        }
+    }
 }
 
 #[async_trait::async_trait]
@@ -573,6 +603,17 @@ impl NetworkTask {
                         let req_with_callback =
                             IncomingRpcRequest::BatchRetrieval(IncomingBatchRetrievalRequest {
                                 req: *request,
+                                protocol,
+                                response_sender: callback,
+                            });
+                        if let Err(e) = self.rpc_tx.push(peer_id, (peer_id, req_with_callback)) {
+                            warn!(error = ?e, "aptos channel closed");
+                        }
+                    },
+                    ConsensusMsg::RandDecisionMsg(request) => {
+                        let req_with_callback =
+                            IncomingRpcRequest::RandDecisions(IncomingRandDecisions {
+                                req: VerifiedEvent::RandDecisionMsg(request),
                                 protocol,
                                 response_sender: callback,
                             });

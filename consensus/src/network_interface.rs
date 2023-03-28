@@ -65,6 +65,8 @@ pub enum ConsensusMsg {
     RandShareMsg(Box<RandShares>),
     /// Randomness: send VRF evaluation results (aggregated from 2/3 shares) as the distributed randomness for a given round
     RandDecisionMsg(Box<RandDecisions>),
+    /// Randomness: ack of receiving the randomness decision message
+    RandResponse(),
 }
 
 /// Network type for consensus
@@ -89,6 +91,7 @@ impl ConsensusMsg {
             ConsensusMsg::ProofOfStoreMsg(_) => "ProofOfStoreMsg",
             ConsensusMsg::RandShareMsg(_) => "RandShareMsg",
             ConsensusMsg::RandDecisionMsg(_) => "RandDecisionMsg",
+            ConsensusMsg::RandResponse() => "RandResponse",
         }
     }
 }

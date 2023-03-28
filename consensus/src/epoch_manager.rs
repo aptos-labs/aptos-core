@@ -31,7 +31,7 @@ use crate::{
     monitor,
     network::{
         IncomingBatchRetrievalRequest, IncomingBlockRetrievalRequest, IncomingRpcRequest,
-        NetworkReceivers, NetworkSender,
+        NetworkReceivers, NetworkSender, IncomingRandDecisions,
     },
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
     payload_client::QuorumStoreClient,
@@ -136,6 +136,8 @@ pub struct EpochManager {
     batch_retrieval_tx:
         Option<aptos_channel::Sender<AccountAddress, IncomingBatchRetrievalRequest>>,
     bounded_executor: BoundedExecutor,
+    rand_decisions_tx:
+        Option<aptos_channel::Sender<AccountAddress, IncomingRandDecisions>>,
 }
 
 impl EpochManager {
@@ -182,6 +184,7 @@ impl EpochManager {
             quorum_store_storage,
             batch_retrieval_tx: None,
             bounded_executor,
+            rand_decisions_tx: None,
         }
     }
 
@@ -562,6 +565,7 @@ impl EpochManager {
         // Shutdown the block retrieval task by dropping the sender
         self.block_retrieval_tx = None;
         self.batch_retrieval_tx = None;
+        self.rand_decisions_tx = None;
 
         if let Some(mut quorum_store_coordinator_tx) = self.quorum_store_coordinator_tx.take() {
             let (ack_tx, ack_rx) = oneshot::channel();
@@ -1058,6 +1062,19 @@ impl EpochManager {
                     Err(anyhow::anyhow!("Quorum store not started"))
                 }
             },
+            IncomingRpcRequest::RandDecisions(request) => {
+                if let Some(tx) = &self.buffer_manager_rand_msg_tx {
+                    let response = ConsensusMsg::RandResponse();
+                    let bytes = request
+                        .protocol
+                        .to_bytes(&response)?;
+                    request.response_sender.send(Ok(bytes.into())).map_err(|_| anyhow::anyhow!("Failed to send randomness decision ack"))?;
+
+                    tx.push(peer_id, request.req)
+                } else {
+                    Err(anyhow::anyhow!("Buffer manager not started"))
+                }
+            }
         }
     }
 
