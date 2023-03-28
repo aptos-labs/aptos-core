@@ -324,6 +324,10 @@ impl CertifiedNode {
         self.certificate.verify(validator)
     }
 
+    pub fn take_node(self) -> Node {
+        self.header
+    }
+
     pub fn node(&self) -> &Node {
         &self.header
     }

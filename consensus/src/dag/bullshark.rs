@@ -5,23 +5,25 @@ use crate::{
     dag::anchor_election::AnchorElection,
     experimental::ordering_state_computer::OrderingStateComputer,
 };
-use aptos_consensus_types::node::{CertifiedNode, Node};
+use aptos_consensus_types::node::Node;
 use aptos_types::{validator_verifier::ValidatorVerifier, PeerId};
 use claims::assert_some;
 use itertools::Itertools;
 use std::{collections::HashMap, sync::Arc};
-use tokio::sync::mpsc::Receiver;
+use std::iter::Extend;
+use aptos_consensus_types::common::{Payload, PayloadFilter};
+use aptos_crypto::HashValue;
 
-#[allow(dead_code)]
 pub struct Bullshark {
+    #[allow(dead_code)]
     state_computer: Arc<OrderingStateComputer>,
     dag: Vec<HashMap<PeerId, Node>>,
     lowest_unordered_anchor_wave: u64,
     proposer_election: Arc<dyn AnchorElection>,
     verifier: ValidatorVerifier,
+    pending_payload: HashMap<HashValue, Payload>, // TODO: dont clone. Either deal with life time or use Arc<Payload> in Node and clone the Arc here.
 }
 
-#[allow(dead_code)]
 impl Bullshark {
     pub fn new(
         state_computer: Arc<OrderingStateComputer>,
@@ -34,6 +36,7 @@ impl Bullshark {
             lowest_unordered_anchor_wave: 0,
             proposer_election,
             verifier,
+            pending_payload: HashMap::new(),
         }
     }
 
@@ -60,7 +63,7 @@ impl Bullshark {
         reachable_nodes.keys().contains(&target.digest())
     }
 
-    fn order_anchors(&mut self, anchor: Node) {
+    fn order_anchors(&mut self, anchor: Node) -> Vec<Node> {
         let mut anchor_stack = Vec::new();
         let mut round = anchor.round();
         assert_eq!(round % 2, 0);
@@ -96,17 +99,17 @@ impl Bullshark {
 
         anchor_stack.push(current_anchor);
         self.lowest_unordered_anchor_wave = new_ordered_wave + 1;
-        self.order_history(anchor_stack);
+        anchor_stack
     }
 
-    fn order_history(&mut self, mut anchor_stack: Vec<Node>) {
+    fn order_history(&mut self, mut anchor_stack: Vec<Node>) -> Vec<Node> {
         let mut ordered_history = Vec::new();
 
         while let Some(anchor) = anchor_stack.pop() {
             ordered_history.extend(self.order_anchor_causal_history(anchor));
         }
 
-        // TODO: push to execution
+        ordered_history
     }
 
     fn order_anchor_causal_history(&mut self, anchor: Node) -> Vec<Node> {
@@ -127,6 +130,7 @@ impl Bullshark {
                                 new_reachable_nodes.insert(parent.digest(), parent);
                             }
                         });
+                    self.pending_payload.remove(&node.digest());
                     ordered_history.push(node);
                 });
             reachable_nodes = new_reachable_nodes;
@@ -149,6 +153,7 @@ impl Bullshark {
             self.dag.push(HashMap::new());
         }
 
+        self.pending_payload.insert(node.digest(), node.maybe_payload().unwrap().clone());
         self.dag[round as usize].insert(author, node);
 
         if round % 2 == 0 || wave < self.lowest_unordered_anchor_wave {
@@ -167,19 +172,31 @@ impl Bullshark {
 
         if self.verifier.check_minority_voting_power(voters).is_ok() {
             let anchor = self.dag[round as usize - 1].remove(&anchor_author).unwrap();
-            self.order_anchors(anchor);
+            let order_anchor_stack = self.order_anchors(anchor);
+            let ordered_history = self.order_history(order_anchor_stack);
+            self.push_to_execution(ordered_history);
         }
     }
 
-    pub fn pending_payload(&self) {}
-
-    pub async fn start(self, mut rx: Receiver<CertifiedNode>) {
-        loop {
-            tokio::select! {
-            Some(_) = rx.recv() => {
-
-            }
-                }
-        }
+    fn push_to_execution(&self, _ordered_history: Vec<Node>) {
+        // TODO
     }
+
+    pub fn pending_payload(&self) -> PayloadFilter {
+        let excluded_payload = self.pending_payload
+            .iter()
+            .map(|(_, payload)| payload)
+            .collect();
+        PayloadFilter::from(&excluded_payload)
+    }
+
+    // pub async fn start(self, mut rx: Receiver<CertifiedNode>) {
+    //     loop {
+    //         tokio::select! {
+    //         Some(_) = rx.recv() => {
+    //
+    //         }
+    //             }
+    //     }
+    // }
 }

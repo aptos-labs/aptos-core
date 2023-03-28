@@ -10,7 +10,8 @@ use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
     sync::Arc,
 };
-use tokio::sync::mpsc::Sender;
+use aptos_infallible::Mutex;
+use crate::dag::bullshark::Bullshark;
 
 enum PeerStatus {
     Linked(Round),
@@ -310,7 +311,7 @@ pub(crate) struct Dag {
     missing_nodes: HashMap<HashValue, MissingDagNodeStatus>,
     // Arc to something that returns the anchors
     proposer_election: Arc<dyn AnchorElection>,
-    bullshark_tx: Sender<CertifiedNode>,
+    bullshark: Arc<Mutex<Bullshark>>,
     verifier: ValidatorVerifier,
     payload_manager: Arc<PayloadManager>,
 }
@@ -319,7 +320,7 @@ pub(crate) struct Dag {
 impl Dag {
     pub fn new(
         epoch: u64,
-        bullshark_tx: Sender<CertifiedNode>,
+        bullshark: Arc<Mutex<Bullshark>>,
         verifier: ValidatorVerifier,
         proposer_election: Arc<dyn AnchorElection>,
         payload_manager: Arc<PayloadManager>,
@@ -334,7 +335,7 @@ impl Dag {
             dag,
             missing_nodes: HashMap::new(),
             proposer_election,
-            bullshark_tx,
+            bullshark,
             verifier,
             payload_manager,
         }
@@ -435,10 +436,13 @@ impl Dag {
             )
             .await;
 
-        self.bullshark_tx
-            .send(certified_node)
-            .await
-            .expect("Bullshark receiver not available"); // TODO: send to all subscribed application and make sure shutdown logic is safe with the expect.
+        self.bullshark.lock().try_ordering(certified_node.take_node());
+        // TODO: send/call to all subscribed application and make sure shutdown logic is safe with the expect.
+
+        // self.bullshark_tx
+        //     .send(certified_node)
+        //     .await
+        //     .expect("Bullshark receiver not available");
     }
 
     #[async_recursion]

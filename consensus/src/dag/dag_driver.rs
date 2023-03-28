@@ -17,7 +17,7 @@ use crate::{
 use aptos_channels::aptos_channel;
 use aptos_config::config::DagConfig;
 use aptos_consensus_types::{
-    common::{Author, PayloadFilter, Round},
+    common::{Author, Round},
     node::{CertifiedNode, CertifiedNodeAck, CertifiedNodeRequest, Node, NodeMetaData},
 };
 use aptos_logger::spawn_named;
@@ -27,6 +27,7 @@ use aptos_types::{
 use futures::StreamExt;
 use std::{collections::HashSet, sync::Arc, time::Duration};
 use tokio::{sync::mpsc::Sender, time};
+use aptos_infallible::Mutex;
 
 pub struct DagDriver {
     epoch: u64,
@@ -38,6 +39,7 @@ pub struct DagDriver {
     network_sender: NetworkSender,
     // TODO: Should we clean more often than once an epoch?
     dag: Dag,
+    bullshark: Arc<Mutex<Bullshark>>,
     rb_tx: Sender<ReliableBroadcastCommand>,
     network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
 }
@@ -55,8 +57,9 @@ impl DagDriver {
         network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
         payload_manager: Arc<PayloadManager>,
         state_computer: Arc<OrderingStateComputer>,
+
     ) -> Self {
-        let (dag_bullshark_tx, dag_bullshark_rx) = tokio::sync::mpsc::channel(config.channel_size);
+        // let (dag_bullshark_tx, dag_bullshark_rx) = tokio::sync::mpsc::channel(config.channel_size);
         let (rb_tx, rb_rx) = tokio::sync::mpsc::channel(config.channel_size);
 
         let rb = ReliableBroadcast::new(
@@ -67,11 +70,10 @@ impl DagDriver {
         );
 
         let proposer_election = Arc::new(RoundRobinAnchorElection::new(&verifier));
-
-        let bullshark = Bullshark::new(state_computer, proposer_election.clone(), verifier.clone());
+        let bullshark = Arc::new(Mutex::new(Bullshark::new(state_computer, proposer_election.clone(), verifier.clone())));
 
         spawn_named!("reliable_broadcast", rb.start(rb_network_msg_rx, rb_rx));
-        spawn_named!("bullshark", bullshark.start(dag_bullshark_rx));
+        // spawn_named!("bullshark", bullshark.start(dag_bullshark_rx));
 
         Self {
             epoch,
@@ -83,11 +85,12 @@ impl DagDriver {
             network_sender,
             dag: Dag::new(
                 epoch,
-                dag_bullshark_tx,
+                bullshark.clone(),
                 verifier.clone(),
                 proposer_election,
                 payload_manager,
             ),
+            bullshark,
             rb_tx,
             network_msg_rx,
         }
@@ -115,8 +118,8 @@ impl DagDriver {
     }
 
     async fn create_node(&mut self, parents: HashSet<NodeMetaData>) -> Node {
-        let excluded_payload = Vec::new(); // TODO: track uncommitted payloads in the the dag.
-        let payload_filter = PayloadFilter::from(&excluded_payload);
+
+        let payload_filter = self.bullshark.lock().pending_payload();
         let payload = self
             .payload_client
             .pull_payload_for_dag(
