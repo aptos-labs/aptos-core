@@ -45,6 +45,19 @@ impl<T> Op<T> {
         }
     }
 
+    pub fn and_then<U, E, F>(self, f: F) -> Result<Op<U>, E>
+        where
+            F: FnOnce(T) -> Result<U, E>,
+    {
+        use Op::*;
+
+        match self {
+            New(data) => Ok(New(f(data)?)),
+            Modify(data) => Ok(Modify(f(data)?)),
+            Delete => Ok(Delete),
+        }
+    }
+
     pub fn ok(self) -> Option<T> {
         use Op::*;
 
@@ -55,9 +68,9 @@ impl<T> Op<T> {
     }
 }
 
-/// A collection of resource and module operations on a Move account.
+/// A collection of serialized resource and module operations on a Move account.
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
-pub struct AccountChangeSet {
+pub struct AccountBlobChangeSet {
     modules: BTreeMap<Identifier, Op<Vec<u8>>>,
     resources: BTreeMap<StructTag, Op<Vec<u8>>>,
 }
@@ -111,7 +124,7 @@ where
     Ok(())
 }
 
-impl AccountChangeSet {
+impl AccountBlobChangeSet {
     pub fn from_modules_resources(
         modules: BTreeMap<Identifier, Op<Vec<u8>>>,
         resources: BTreeMap<StructTag, Op<Vec<u8>>>,
@@ -190,14 +203,14 @@ impl AccountChangeSet {
 
 // TODO: ChangeSet does not have a canonical representation so the derived Ord is not sound.
 
-/// A collection of changes to a Move state. Each AccountChangeSet in the domain of `accounts`
-/// is guaranteed to be nonempty
+/// A collection of serialized changes to a Move state. Each AccountBlobChangeSet in the domain of
+///`accounts` is guaranteed to be nonempty.
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
-pub struct ChangeSet {
-    accounts: BTreeMap<AccountAddress, AccountChangeSet>,
+pub struct BlobChangeSet {
+    accounts: BTreeMap<AccountAddress, AccountBlobChangeSet>,
 }
 
-impl ChangeSet {
+impl BlobChangeSet {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
@@ -205,10 +218,10 @@ impl ChangeSet {
         }
     }
 
-    pub fn add_account_changeset(
+    pub fn add_account_blob_change_set(
         &mut self,
         addr: AccountAddress,
-        account_changeset: AccountChangeSet,
+        account_blob_change_set: AccountBlobChangeSet,
     ) -> Result<()> {
         match self.accounts.entry(addr) {
             btree_map::Entry::Occupied(_) => bail!(
@@ -216,30 +229,30 @@ impl ChangeSet {
                 addr
             ),
             btree_map::Entry::Vacant(entry) => {
-                entry.insert(account_changeset);
+                entry.insert(account_blob_change_set);
             },
         }
 
         Ok(())
     }
 
-    pub fn accounts(&self) -> &BTreeMap<AccountAddress, AccountChangeSet> {
+    pub fn accounts(&self) -> &BTreeMap<AccountAddress, AccountBlobChangeSet> {
         &self.accounts
     }
 
-    pub fn into_inner(self) -> BTreeMap<AccountAddress, AccountChangeSet> {
+    pub fn into_inner(self) -> BTreeMap<AccountAddress, AccountBlobChangeSet> {
         self.accounts
     }
 
-    fn get_or_insert_account_changeset(&mut self, addr: AccountAddress) -> &mut AccountChangeSet {
+    fn get_or_insert_account_blob_change_set(&mut self, addr: AccountAddress) -> &mut AccountBlobChangeSet {
         match self.accounts.entry(addr) {
             btree_map::Entry::Occupied(entry) => entry.into_mut(),
-            btree_map::Entry::Vacant(entry) => entry.insert(AccountChangeSet::new()),
+            btree_map::Entry::Vacant(entry) => entry.insert(AccountBlobChangeSet::new()),
         }
     }
 
     pub fn add_module_op(&mut self, module_id: ModuleId, op: Op<Vec<u8>>) -> Result<()> {
-        let account = self.get_or_insert_account_changeset(*module_id.address());
+        let account = self.get_or_insert_account_blob_change_set(*module_id.address());
         account.add_module_op(module_id.name().to_owned(), op)
     }
 
@@ -249,7 +262,7 @@ impl ChangeSet {
         struct_tag: StructTag,
         op: Op<Vec<u8>>,
     ) -> Result<()> {
-        let account = self.get_or_insert_account_changeset(addr);
+        let account = self.get_or_insert_account_blob_change_set(addr);
         account.add_resource_op(struct_tag, op)
     }
 

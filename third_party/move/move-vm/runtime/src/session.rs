@@ -13,10 +13,9 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{ChangeSet, Event},
+    effects::{BlobChangeSet, Event},
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
-    resolver::MoveResolver,
     value::MoveTypeLayout,
 };
 use move_vm_types::{
@@ -25,6 +24,8 @@ use move_vm_types::{
     loaded_data::runtime_types::{CachedStructIndex, StructType, Type},
 };
 use std::{borrow::Borrow, sync::Arc};
+use move_vm_types::effects::ChangeSet;
+use move_vm_types::resolver::MoveResolver;
 
 pub struct Session<'r, 'l, S> {
     pub(crate) runtime: &'l VMRuntime,
@@ -256,7 +257,14 @@ impl<'r, 'l, S: MoveResolver> Session<'r, 'l, S> {
     /// This function should always succeed with no user errors returned, barring invariant violations.
     ///
     /// This MUST NOT be called if there is a previous invocation that failed with an invariant violation.
-    pub fn finish(self) -> VMResult<(ChangeSet, Vec<Event>)> {
+    pub fn finish(self) -> VMResult<(BlobChangeSet, Vec<Event>)> {
+        let (runtime_change_set, events) = self.pause()?;
+        let change_set = runtime_change_set.into_blob_change_set()?;
+        Ok((change_set, events))
+    }
+
+    /// Same as `finish` but avoids deserialization of values.
+    pub fn pause(self) -> VMResult<(ChangeSet, Vec<Event>)> {
         self.data_cache
             .into_effects()
             .map_err(|e| e.finish(Location::Undefined))
@@ -264,6 +272,15 @@ impl<'r, 'l, S: MoveResolver> Session<'r, 'l, S> {
 
     /// Same like `finish`, but also extracts the native context extensions from the session.
     pub fn finish_with_extensions(
+        self,
+    ) -> VMResult<(BlobChangeSet, Vec<Event>, NativeContextExtensions<'r>)> {
+        let (runtime_change_set, events, native_extensions) = self.pause_with_extensions()?;
+        let change_set = runtime_change_set.into_blob_change_set()?;
+        Ok((change_set, events, native_extensions))
+    }
+
+    /// Same as `finish_with_extensions` but avoids deserialization of values.
+    pub fn pause_with_extensions(
         self,
     ) -> VMResult<(ChangeSet, Vec<Event>, NativeContextExtensions<'r>)> {
         let Session {

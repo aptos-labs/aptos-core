@@ -17,7 +17,7 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
-    resolver::{ModuleResolver, ResourceResolver},
+    resolver::{ModuleBlobResolver, ResourceBlobResolver},
     u256::U256,
     value::{serialize_values, MoveValue},
     vm_status::{StatusCode, StatusType},
@@ -247,18 +247,18 @@ impl RemoteStore {
     }
 }
 
-impl ModuleResolver for RemoteStore {
+impl ModuleBlobResolver for RemoteStore {
     type Error = VMError;
 
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
+    fn get_module_blob(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
         Ok(self.modules.get(module_id).cloned())
     }
 }
 
-impl ResourceResolver for RemoteStore {
+impl ResourceBlobResolver for RemoteStore {
     type Error = VMError;
 
-    fn get_resource(
+    fn get_resource_blob(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,

@@ -12,9 +12,10 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
-    metadata::Metadata, resolver::MoveResolver,
+    metadata::Metadata,
 };
 use std::{collections::BTreeSet, sync::Arc};
+use move_vm_types::resolver::MoveResolver;
 
 pub struct MoveVM {
     runtime: VMRuntime,

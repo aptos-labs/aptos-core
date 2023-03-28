@@ -265,7 +265,8 @@ fn deserialize_internal(
     abort_unless_serialization_format_enabled!(context, structure_opt, format_opt);
     let vector_ref = safely_pop_arg!(args, VectorRef);
     let bytes_ref = vector_ref.as_bytes_ref();
-    let bytes = bytes_ref.as_slice();
+    let bytes_ref_locked = bytes_ref.lock().unwrap();
+    let bytes = bytes_ref_locked.as_slice();
     match (structure_opt, format_opt) {
         (Some(Structure::BLS12381Fr), Some(SerializationFormat::BLS12381FrLsb)) => {
             if bytes.len() != 32 {

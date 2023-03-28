@@ -11,7 +11,7 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, ResourceKey, TypeTag},
-    resolver::MoveResolver,
+    resolver::MoveBlobResolver,
 };
 use move_read_write_set_types::ReadWriteSet;
 use std::collections::BTreeMap;
@@ -59,7 +59,7 @@ impl NormalizedReadWriteSetAnalysis {
         signers: &[AccountAddress],
         actuals: &[Vec<u8>],
         type_actuals: &[TypeTag],
-        blockchain_view: &impl MoveResolver,
+        blockchain_view: &impl MoveBlobResolver,
     ) -> Result<Vec<ResourceKey>> {
         self.get_concretized_keys(
             module,
@@ -82,7 +82,7 @@ impl NormalizedReadWriteSetAnalysis {
         signers: &[AccountAddress],
         actuals: &[Vec<u8>],
         type_actuals: &[TypeTag],
-        blockchain_view: &impl MoveResolver,
+        blockchain_view: &impl MoveBlobResolver,
     ) -> Result<Vec<ResourceKey>> {
         self.get_concretized_keys(
             module,
@@ -107,7 +107,7 @@ impl NormalizedReadWriteSetAnalysis {
         signers: &[AccountAddress],
         actuals: &[Vec<u8>],
         type_actuals: &[TypeTag],
-        blockchain_view: &impl MoveResolver,
+        blockchain_view: &impl MoveBlobResolver,
         is_write: bool,
     ) -> Result<Vec<ResourceKey>> {
         if let Some(state) = self.get_summary(module, fun) {
@@ -144,7 +144,7 @@ impl NormalizedReadWriteSetAnalysis {
         signers: &[AccountAddress],
         actuals: &[Vec<u8>],
         type_actuals: &[TypeTag],
-        blockchain_view: &impl MoveResolver,
+        blockchain_view: &impl MoveBlobResolver,
     ) -> Result<ConcretizedSecondaryIndexes> {
         let state = self
             .get_summary(module, fun)

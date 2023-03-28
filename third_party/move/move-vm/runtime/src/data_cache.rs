@@ -6,11 +6,10 @@ use crate::loader::Loader;
 use move_binary_format::errors::*;
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{AccountChangeSet, ChangeSet, Event, Op},
+    effects::{Event, Op},
     gas_algebra::NumBytes,
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
-    resolver::MoveResolver,
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
@@ -20,6 +19,8 @@ use move_vm_types::{
     values::{GlobalValue, Value},
 };
 use std::collections::btree_map::BTreeMap;
+use move_vm_types::effects::{AccountChangeSet, ChangeSet};
+use move_vm_types::resolver::{MoveResolver, Resource};
 
 pub struct AccountDataCache {
     data_map: BTreeMap<Type, (MoveTypeLayout, GlobalValue)>,
@@ -98,16 +99,12 @@ impl<'r, 'l, S: MoveResolver> TransactionDataCache<'r, 'l, S> {
 
                 match op {
                     Op::New(val) => {
-                        let resource_blob = val
-                            .simple_serialize(&layout)
-                            .ok_or_else(|| PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR))?;
-                        resources.insert(struct_tag, Op::New(resource_blob));
+                        let resource = Resource::from_value_layout(val, layout);
+                        resources.insert(struct_tag, Op::New(resource));
                     },
                     Op::Modify(val) => {
-                        let resource_blob = val
-                            .simple_serialize(&layout)
-                            .ok_or_else(|| PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR))?;
-                        resources.insert(struct_tag, Op::Modify(resource_blob));
+                        let resource = Resource::from_value_layout(val, layout);
+                        resources.insert(struct_tag, Op::Modify(resource));
                     },
                     Op::Delete => {
                         resources.insert(struct_tag, Op::Delete);
@@ -188,21 +185,33 @@ impl<'r, 'l, S: MoveResolver> DataStore for TransactionDataCache<'r, 'l, S> {
             let ty_layout = self.loader.type_to_type_layout(ty)?;
 
             let gv = match self.remote.get_resource(&addr, &ty_tag) {
-                Ok(Some(blob)) => {
-                    load_res = Some(Some(NumBytes::new(blob.len() as u64)));
-                    let val = match Value::simple_deserialize(&blob, &ty_layout) {
-                        Some(val) => val,
-                        None => {
-                            let msg =
-                                format!("Failed to deserialize resource {} at {}!", ty_tag, addr);
-                            return Err(PartialVMError::new(
-                                StatusCode::FAILED_TO_DESERIALIZE_RESOURCE,
-                            )
-                            .with_message(msg));
-                        },
-                    };
+                Ok(Some(resource)) => {
 
-                    GlobalValue::cached(val)?
+                    match resource {
+                        Resource::Serialized(blob) => {
+                            load_res = Some(Some(NumBytes::new(blob.len() as u64)));
+                            let val = match Value::simple_deserialize(&blob, &ty_layout) {
+                                Some(val) => val,
+                                None => {
+                                    let msg =
+                                        format!("Failed to deserialize resource {} at {}!", ty_tag, addr);
+                                    return Err(PartialVMError::new(
+                                        StatusCode::FAILED_TO_DESERIALIZE_RESOURCE,
+                                    )
+                                        .with_message(msg));
+                                },
+                            };
+
+                            GlobalValue::cached(val)?
+                        }
+                        Resource::Cached(value_handle, _) => {
+                            // TODO: Data was not serialized and should not be charged for loading?
+                            load_res = Some(None);
+                            let val = value_handle.lock().unwrap();
+                            // TODO: Avoid copy.
+                            GlobalValue::cached(val.copy_value()?)?
+                        }
+                    }
                 },
                 Ok(None) => {
                     load_res = Some(None);
@@ -236,7 +245,7 @@ impl<'r, 'l, S: MoveResolver> DataStore for TransactionDataCache<'r, 'l, S> {
                 return Ok(blob.clone());
             }
         }
-        match self.remote.get_module(module_id) {
+        match self.remote.get_module_blob(module_id) {
             Ok(Some(bytes)) => Ok(bytes),
             Ok(None) => Err(PartialVMError::new(StatusCode::LINKER_ERROR)
                 .with_message(format!("Cannot find {:?} in data cache", module_id))
@@ -278,7 +287,7 @@ impl<'r, 'l, S: MoveResolver> DataStore for TransactionDataCache<'r, 'l, S> {
         }
         Ok(self
             .remote
-            .get_module(module_id)
+            .get_module_blob(module_id)
             .map_err(|_| {
                 PartialVMError::new(StatusCode::STORAGE_ERROR).finish(Location::Undefined)
             })?

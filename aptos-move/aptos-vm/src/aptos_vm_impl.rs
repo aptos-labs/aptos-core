@@ -34,7 +34,7 @@ use move_binary_format::{errors::VMResult, CompiledModule};
 use move_core_types::{
     language_storage::ModuleId,
     move_resource::MoveStructType,
-    resolver::ResourceResolver,
+    resolver::ResourceBlobResolver,
     value::{serialize_values, MoveValue},
 };
 use move_vm_runtime::logging::expect_no_verification_errors;
@@ -181,11 +181,11 @@ impl AptosVMImpl {
     }
 
     // TODO: Move this to an on-chain config once those are a part of the core framework
-    fn get_transaction_validation<S: ResourceResolver>(
+    fn get_transaction_validation<S: ResourceBlobResolver>(
         remote_cache: &S,
     ) -> Option<TransactionValidation> {
         match remote_cache
-            .get_resource(&CORE_CODE_ADDRESS, &TransactionValidation::struct_tag())
+            .get_resource_blob(&CORE_CODE_ADDRESS, &TransactionValidation::struct_tag())
             .ok()?
         {
             Some(blob) => bcs::from_bytes::<TransactionValidation>(&blob).ok(),
@@ -245,7 +245,7 @@ impl AptosVMImpl {
         // The transaction is too large.
         if txn_data.transaction_size > txn_gas_params.max_transaction_size_in_bytes {
             let data =
-                storage.get_resource(&CORE_CODE_ADDRESS, &ApprovedExecutionHashes::struct_tag());
+                storage.get_resource_blob(&CORE_CODE_ADDRESS, &ApprovedExecutionHashes::struct_tag());
 
             let valid = if let Ok(Some(data)) = data {
                 let approved_execution_hashes =

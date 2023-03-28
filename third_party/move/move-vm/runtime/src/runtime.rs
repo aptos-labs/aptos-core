@@ -23,7 +23,6 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, TypeTag},
-    resolver::MoveResolver,
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
@@ -35,6 +34,7 @@ use move_vm_types::{
 };
 use std::{borrow::Borrow, collections::BTreeSet, sync::Arc};
 use tracing::warn;
+use move_vm_types::resolver::MoveResolver;
 
 /// An instantiation of the MoveVM.
 pub(crate) struct VMRuntime {

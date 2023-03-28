@@ -22,7 +22,7 @@ use move_compiler::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{ChangeSet, Op},
+    effects::{BlobChangeSet, Op},
     identifier::IdentStr,
     value::serialize_values,
     vm_status::StatusCode,
@@ -113,7 +113,7 @@ fn setup_test_storage<'a>(
 /// Print the updates to storage represented by `cs` in the context of the starting storage state
 /// `storage`.
 fn print_resources_and_extensions(
-    cs: &ChangeSet,
+    cs: &BlobChangeSet,
     extensions: NativeContextExtensions,
     storage: &InMemoryStorage,
 ) -> Result<String> {
@@ -123,12 +123,12 @@ fn print_resources_and_extensions(
     for (account_addr, account_state) in cs.accounts() {
         writeln!(&mut buf, "0x{}:", account_addr.short_str_lossless())?;
 
-        for (tag, resource_op) in account_state.resources() {
-            if let Op::New(resource) | Op::Modify(resource) = resource_op {
+        for (tag, resource_blob_op) in account_state.resources() {
+            if let Op::New(blob) | Op::Modify(blob) = resource_blob_op {
                 writeln!(
                     &mut buf,
                     "\t{}",
-                    format!("=> {}", annotator.view_resource(tag, resource)?).replace('\n', "\n\t")
+                    format!("=> {}", annotator.view_resource(tag, blob)?).replace('\n', "\n\t")
                 )?;
             }
         }
@@ -278,7 +278,7 @@ impl SharedTestingConfig {
         function_name: &str,
         test_info: &TestCase,
     ) -> (
-        VMResult<ChangeSet>,
+        VMResult<BlobChangeSet>,
         VMResult<NativeContextExtensions>,
         VMResult<Vec<Vec<u8>>>,
         TestRunInfo,
@@ -332,7 +332,7 @@ impl SharedTestingConfig {
         function_name: &str,
         test_info: &TestCase,
     ) -> (
-        VMResult<ChangeSet>,
+        VMResult<BlobChangeSet>,
         VMResult<Vec<Vec<u8>>>,
         TestRunInfo,
         Option<String>,

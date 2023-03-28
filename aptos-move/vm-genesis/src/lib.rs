@@ -35,13 +35,13 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
-    resolver::MoveResolver,
     value::{serialize_values, MoveValue},
 };
 use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
+use move_vm_types::resolver::MoveResolver;
 
 // The seed is arbitrarily picked to produce a consistent key. XXX make this more formal?
 const GENESIS_SEED: [u8; 32] = [42; 32];

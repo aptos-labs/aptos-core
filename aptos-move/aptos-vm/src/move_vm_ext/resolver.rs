@@ -8,11 +8,11 @@ use move_binary_format::errors::{Location, PartialVMError, VMError};
 use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, StructTag},
-    resolver::MoveResolver,
     vm_status::StatusCode,
 };
 use move_table_extension::TableResolver;
 use std::collections::BTreeMap;
+use move_vm_types::resolver::MoveResolver;
 
 pub trait MoveResolverExt:
     MoveResolver<Err = VMError> + TableResolver + StateStorageUsageResolver + ConfigStorage + StateView

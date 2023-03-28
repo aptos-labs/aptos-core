@@ -11,10 +11,10 @@ use crate::{
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMError, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{ChangeSet, Event, Op},
+    effects::{BlobChangeSet, Event, Op},
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
-    resolver::MoveResolver,
+    resolver::MoveBlobResolver,
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
@@ -77,7 +77,7 @@ impl AsyncVM {
     }
 
     /// Creates a new session.
-    pub fn new_session<'r, 'l, S: MoveResolver>(
+    pub fn new_session<'r, 'l, S: MoveBlobResolver>(
         &'l self,
         for_actor: AccountAddress,
         virtual_time: u128,
@@ -92,7 +92,7 @@ impl AsyncVM {
     }
 
     /// Creates a new session.
-    pub fn new_session_with_extensions<'r, 'l, S: MoveResolver>(
+    pub fn new_session_with_extensions<'r, 'l, S: MoveBlobResolver>(
         &'l self,
         for_actor: AccountAddress,
         virtual_time: u128,
@@ -140,7 +140,7 @@ pub type Message = (AccountAddress, u64, Vec<Vec<u8>>);
 
 /// A structure to represent success for the execution of an async session operation.
 pub struct AsyncSuccess<'r> {
-    pub change_set: ChangeSet,
+    pub change_set: BlobChangeSet,
     pub events: Vec<Event>,
     pub messages: Vec<Message>,
     pub gas_used: Gas,
@@ -157,7 +157,7 @@ pub struct AsyncError {
 /// Result type for operations of an AsyncSession.
 pub type AsyncResult<'r> = Result<AsyncSuccess<'r>, AsyncError>;
 
-impl<'r, 'l, S: MoveResolver> AsyncSession<'r, 'l, S> {
+impl<'r, 'l, S: MoveBlobResolver> AsyncSession<'r, 'l, S> {
     /// Get the underlying Move VM session.
     pub fn get_move_session(&mut self) -> &mut Session<'r, 'l, S> {
         &mut self.vm_session
@@ -372,7 +372,7 @@ fn make_extensions(
 }
 
 fn publish_actor_state(
-    change_set: &mut ChangeSet,
+    change_set: &mut BlobChangeSet,
     actor_addr: AccountAddress,
     state_tag: StructTag,
     state: Vec<u8>,

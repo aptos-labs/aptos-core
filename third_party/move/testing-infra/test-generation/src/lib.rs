@@ -28,9 +28,8 @@ use move_bytecode_verifier::verify_module;
 use move_compiler::{compiled_unit::AnnotatedCompiledUnit, Compiler};
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{ChangeSet, Op},
+    effects::{BlobChangeSet, Op},
     language_storage::TypeTag,
-    resolver::MoveResolver,
     value::MoveValue,
     vm_status::{StatusCode, VMStatus},
 };
@@ -41,6 +40,8 @@ use once_cell::sync::Lazy;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::{fs, io::Write, panic, thread};
 use tracing::{debug, error, info};
+use move_vm_types::effects::ChangeSet;
+use move_vm_types::resolver::MoveResolver;
 
 /// This function calls the Bytecode verifier to test it
 fn run_verifier(module: CompiledModule) -> Result<CompiledModule, String> {
@@ -141,13 +142,13 @@ fn execute_function_in_module(
         ))
         .unwrap();
 
-        let mut changeset = ChangeSet::new();
+        let mut change_set = ChangeSet::new();
         let mut blob = vec![];
         module.serialize(&mut blob).unwrap();
-        changeset
+        change_set
             .add_module_op(module_id.clone(), Op::New(blob))
             .unwrap();
-        let delta_storage = DeltaStorage::new(storage, &changeset);
+        let delta_storage = DeltaStorage::new(storage, &change_set);
         let mut sess = vm.new_session(&delta_storage);
 
         sess.execute_function_bypass_visibility(

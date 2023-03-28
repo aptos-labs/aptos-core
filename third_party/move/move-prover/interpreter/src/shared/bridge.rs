@@ -4,8 +4,8 @@
 
 use move_binary_format::errors::{PartialVMError, VMResult};
 use move_core_types::{
-    effects::{AccountChangeSet, ChangeSet, Op},
-    resolver::MoveResolver,
+    effects::{AccountBlobChangeSet, BlobChangeSet, Op},
+    resolver::MoveBlobResolver,
 };
 
 /// The result returned by the stackless VM does not contain code offsets and indices. In order to
@@ -27,18 +27,18 @@ pub fn adapt_move_vm_result<T>(result: VMResult<T>) -> VMResult<T> {
 /// The same guarantee is not provided by the Move VM. In Move VM, we could borrow_global_mut but
 /// write the same value back instead of an updated value. In this case, the Move VM produces an
 /// entry in the change_set.
-pub fn adapt_move_vm_change_set<S: MoveResolver>(
-    change_set_result: VMResult<ChangeSet>,
+pub fn adapt_move_vm_change_set<S: MoveBlobResolver>(
+    change_set_result: VMResult<BlobChangeSet>,
     old_storage: &S,
-) -> VMResult<ChangeSet> {
+) -> VMResult<BlobChangeSet> {
     change_set_result.map(|change_set| adapt_move_vm_change_set_internal(change_set, old_storage))
 }
 
-fn adapt_move_vm_change_set_internal<S: MoveResolver>(
-    change_set: ChangeSet,
+fn adapt_move_vm_change_set_internal<S: MoveBlobResolver>(
+    change_set: BlobChangeSet,
     old_storage: &S,
-) -> ChangeSet {
-    let mut adapted = ChangeSet::new();
+) -> BlobChangeSet {
+    let mut adapted = BlobChangeSet::new();
     for (addr, state) in change_set.into_inner() {
         let (modules, resources) = state.into_inner();
 
@@ -46,7 +46,7 @@ fn adapt_move_vm_change_set_internal<S: MoveResolver>(
             .into_iter()
             .filter(|(tag, op)| match op {
                 Op::New(_) | Op::Delete => true,
-                Op::Modify(new_val) => match old_storage.get_resource(&addr, tag).unwrap() {
+                Op::Modify(new_val) => match old_storage.get_resource_blob(&addr, tag).unwrap() {
                     Some(old_val) => new_val != &old_val,
                     None => true,
                 },
@@ -54,9 +54,9 @@ fn adapt_move_vm_change_set_internal<S: MoveResolver>(
             .collect();
 
         adapted
-            .add_account_changeset(
+            .add_account_blob_change_set(
                 addr,
-                AccountChangeSet::from_modules_resources(modules, resources),
+                AccountBlobChangeSet::from_modules_resources(modules, resources),
             )
             .unwrap();
     }

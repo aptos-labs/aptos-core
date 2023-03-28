@@ -17,12 +17,13 @@ use move_binary_format::{errors::*, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, StructTag},
-    resolver::{ModuleResolver, ResourceResolver},
+    resolver::{ModuleBlobResolver, ResourceBlobResolver},
     vm_status::StatusCode,
 };
 use move_table_extension::{TableHandle, TableResolver};
 use move_vm_runtime::move_vm::MoveVM;
 use std::ops::{Deref, DerefMut};
+use move_vm_types::resolver::{Resource, ResourceResolver};
 
 pub struct MoveResolverWithVMMetadata<'a, 'm, S> {
     move_resolver: &'a S,
@@ -62,11 +63,23 @@ impl<'a, 'm, S: MoveResolverExt> MoveResolverExt for MoveResolverWithVMMetadata<
     }
 }
 
-impl<'a, 'm, S: MoveResolverExt> ModuleResolver for MoveResolverWithVMMetadata<'a, 'm, S> {
+impl<'a, 'm, S: MoveResolverExt> ModuleBlobResolver for MoveResolverWithVMMetadata<'a, 'm, S> {
     type Error = VMError;
 
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
-        self.move_resolver.get_module(module_id)
+    fn get_module_blob(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
+        self.move_resolver.get_module_blob(module_id)
+    }
+}
+
+impl<'a, 'm, S: MoveResolverExt> ResourceBlobResolver for MoveResolverWithVMMetadata<'a, 'm, S> {
+    type Error = VMError;
+
+    fn get_resource_blob(
+        &self,
+        address: &AccountAddress,
+        struct_tag: &StructTag,
+    ) -> Result<Option<Vec<u8>>, Self::Error> {
+        self.get_any_resource(address, struct_tag)
     }
 }
 
@@ -77,8 +90,10 @@ impl<'a, 'm, S: MoveResolverExt> ResourceResolver for MoveResolverWithVMMetadata
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, Self::Error> {
-        self.get_any_resource(address, struct_tag)
+    ) -> Result<Option<Resource>, Self::Error> {
+        // TODO: switch to Move values.
+        let resource_blob = self.get_any_resource(address, struct_tag);
+        resource_blob.map(|opt| opt.map(Resource::from_blob))
     }
 }
 
@@ -131,7 +146,7 @@ impl<'a, S: StateView> StorageAdapter<'a, S> {
 
 impl<'a, S: StateView> MoveResolverExt for StorageAdapter<'a, S> {
     fn get_module_metadata(&self, module_id: ModuleId) -> Option<RuntimeModuleMetadataV1> {
-        let module_bytes = self.get_module(&module_id).ok()??;
+        let module_bytes = self.get_module_blob(&module_id).ok()??;
         let module = CompiledModule::deserialize(&module_bytes).ok()?;
         aptos_framework::get_metadata_from_compiled_module(&module)
     }
@@ -157,13 +172,25 @@ impl<'a, S: StateView> MoveResolverExt for StorageAdapter<'a, S> {
     }
 }
 
-impl<'a, S: StateView> ModuleResolver for StorageAdapter<'a, S> {
+impl<'a, S: StateView> ModuleBlobResolver for StorageAdapter<'a, S> {
     type Error = VMError;
 
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
+    fn get_module_blob(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
         // REVIEW: cache this?
         let ap = AccessPath::from(module_id);
         self.get(ap).map_err(|e| e.finish(Location::Undefined))
+    }
+}
+
+impl<'a, S: StateView> ResourceBlobResolver for StorageAdapter<'a, S> {
+    type Error = VMError;
+
+    fn get_resource_blob(
+        &self,
+        address: &AccountAddress,
+        struct_tag: &StructTag,
+    ) -> Result<Option<Vec<u8>>, Self::Error> {
+        self.get_any_resource(address, struct_tag)
     }
 }
 
@@ -174,8 +201,10 @@ impl<'a, S: StateView> ResourceResolver for StorageAdapter<'a, S> {
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, Self::Error> {
-        self.get_any_resource(address, struct_tag)
+    ) -> Result<Option<Resource>, Self::Error> {
+        // TODO: switch to Move values.
+        let resource_blob = self.get_any_resource(address, struct_tag);
+        resource_blob.map(|opt| opt.map(Resource::from_blob))
     }
 }
 
@@ -238,11 +267,11 @@ impl<S> DerefMut for StorageAdapterOwned<S> {
     }
 }
 
-impl<S: StateView> ModuleResolver for StorageAdapterOwned<S> {
+impl<S: StateView> ModuleBlobResolver for StorageAdapterOwned<S> {
     type Error = VMError;
 
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
-        self.as_move_resolver().get_module(module_id)
+    fn get_module_blob(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
+        self.as_move_resolver().get_module_blob(module_id)
     }
 }
 
@@ -270,6 +299,18 @@ impl<S: StateView> MoveResolverExt for StorageAdapterOwned<S> {
     }
 }
 
+impl<S: StateView> ResourceBlobResolver for StorageAdapterOwned<S> {
+    type Error = VMError;
+
+    fn get_resource_blob(
+        &self,
+        address: &AccountAddress,
+        struct_tag: &StructTag,
+    ) -> Result<Option<Vec<u8>>, Self::Error> {
+        self.as_move_resolver().get_resource_blob(address, struct_tag)
+    }
+}
+
 impl<S: StateView> ResourceResolver for StorageAdapterOwned<S> {
     type Error = VMError;
 
@@ -277,7 +318,7 @@ impl<S: StateView> ResourceResolver for StorageAdapterOwned<S> {
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, Self::Error> {
+    ) -> Result<Option<Resource>, Self::Error> {
         self.as_move_resolver().get_resource(address, struct_tag)
     }
 }

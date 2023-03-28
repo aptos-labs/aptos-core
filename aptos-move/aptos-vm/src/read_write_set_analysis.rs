@@ -17,14 +17,14 @@ use move_core_types::{
     ident_str,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, ResourceKey, StructTag, TypeTag},
-    resolver::ModuleResolver,
+    resolver::ModuleBlobResolver,
     value::{serialize_values, MoveValue},
 };
 use once_cell::sync::Lazy;
 use read_write_set_dynamic::{ConcretizedFormals, NormalizedReadWriteSetAnalysis};
 use std::ops::Deref;
 
-pub struct ReadWriteSetAnalysis<'a, R: ModuleResolver> {
+pub struct ReadWriteSetAnalysis<'a, R: ModuleBlobResolver> {
     normalized_analysis_result: &'a NormalizedReadWriteSetAnalysis,
     module_cache: SyncModuleCache<&'a R>,
     blockchain_view: &'a R,

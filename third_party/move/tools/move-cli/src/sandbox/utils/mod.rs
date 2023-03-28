@@ -21,7 +21,7 @@ use move_compiler::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{ChangeSet, Event, Op},
+    effects::{BlobChangeSet, Event, Op},
     errmap::ErrorMapping,
     language_storage::{ModuleId, TypeTag},
     transaction_argument::TransactionArgument,
@@ -67,12 +67,12 @@ pub(crate) fn module(unit: &CompiledUnit) -> Result<&CompiledModule> {
     }
 }
 
-pub(crate) fn explain_publish_changeset(changeset: &ChangeSet) {
+pub(crate) fn explain_publish_changeset(blob_change_set: &BlobChangeSet) {
     // publish effects should contain no resources
-    assert!(changeset.resources().next().is_none());
+    assert!(blob_change_set.resources().next().is_none());
     // total bytes written across all accounts
     let mut total_bytes_written = 0;
-    for (addr, name, blob_op) in changeset.modules() {
+    for (addr, name, blob_op) in blob_change_set.modules() {
         match blob_op {
             Op::New(module_bytes) => {
                 let bytes_written = addr.len() + name.len() + module_bytes.len();
@@ -150,12 +150,12 @@ fn print_struct_diff_with_indent(
 }
 
 pub(crate) fn explain_execution_effects(
-    changeset: &ChangeSet,
+    blob_change_set: &BlobChangeSet,
     events: &[Event],
     state: &OnDiskStateView,
 ) -> Result<()> {
     // execution effects should contain no modules
-    assert!(changeset.modules().next().is_none());
+    assert!(blob_change_set.modules().next().is_none());
     if !events.is_empty() {
         println!("Emitted {:?} events:", events.len());
         // TODO: better event printing
@@ -166,15 +166,15 @@ pub(crate) fn explain_execution_effects(
             )
         }
     }
-    if !changeset.accounts().is_empty() {
+    if !blob_change_set.accounts().is_empty() {
         println!(
             "Changed resource(s) under {:?} address(es):",
-            changeset.accounts().len()
+            blob_change_set.accounts().len()
         );
     }
     // total bytes written across all accounts
     let mut total_bytes_written = 0;
-    for (addr, account) in changeset.accounts() {
+    for (addr, account) in blob_change_set.accounts() {
         print!("  ");
         if account.resources().is_empty() {
             continue;
@@ -246,14 +246,14 @@ pub(crate) fn explain_execution_effects(
 /// Commit the resources and events modified by a transaction to disk
 pub(crate) fn maybe_commit_effects(
     commit: bool,
-    changeset: ChangeSet,
+    blob_change_set: BlobChangeSet,
     events: Vec<Event>,
     state: &OnDiskStateView,
 ) -> Result<()> {
     // similar to explain effects, all module publishing happens via save_modules(), so effects
     // shouldn't contain modules
     if commit {
-        for (addr, account) in changeset.into_inner() {
+        for (addr, account) in blob_change_set.into_inner() {
             for (struct_tag, blob_op) in account.into_resources() {
                 match blob_op {
                     Op::New(blob) | Op::Modify(blob) => {
@@ -267,7 +267,7 @@ pub(crate) fn maybe_commit_effects(
         for (event_key, event_sequence_number, event_type, event_data) in events {
             state.save_event(&event_key, event_sequence_number, event_type, event_data)?
         }
-    } else if !(changeset.resources().next().is_none() && events.is_empty()) {
+    } else if !(blob_change_set.resources().next().is_none() && events.is_empty()) {
         println!("Discarding changes; re-run without --dry-run if you would like to keep them.")
     }
 

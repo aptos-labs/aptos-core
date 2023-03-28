@@ -6,16 +6,19 @@ use crate::compiler::{as_module, as_script, compile_units};
 use move_binary_format::errors::{Location, PartialVMError, VMError};
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{ChangeSet, Op},
+    effects::Op,
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
-    resolver::{ModuleResolver, ResourceResolver},
+    resolver::ModuleBlobResolver,
     value::{serialize_values, MoveValue},
     vm_status::{StatusCode, StatusType},
 };
+use move_core_types::resolver::ResourceBlobResolver;
 use move_vm_runtime::move_vm::MoveVM;
 use move_vm_test_utils::{DeltaStorage, InMemoryStorage};
+use move_vm_types::effects::ChangeSet;
 use move_vm_types::gas::UnmeteredGasMeter;
+use move_vm_types::resolver::{Resource, ResourceResolver};
 
 const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGTH]);
 
@@ -102,8 +105,8 @@ fn test_malformed_resource() {
     )
     .map(|_| ())
     .unwrap();
-    let (changeset, _) = sess.finish().unwrap();
-    storage.apply(changeset).unwrap();
+    let (change_set, _) = sess.pause().unwrap();
+    storage.apply(change_set).unwrap();
 
     // Execut the second script and make sure it succeeds. This script simply checks
     // that the published resource is what we expect it to be. This inital run is to ensure
@@ -507,10 +510,22 @@ struct BogusStorage {
     bad_status_code: StatusCode,
 }
 
-impl ModuleResolver for BogusStorage {
+impl ModuleBlobResolver for BogusStorage {
     type Error = VMError;
 
-    fn get_module(&self, _module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
+    fn get_module_blob(&self, _module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
+        Err(PartialVMError::new(self.bad_status_code).finish(Location::Undefined))
+    }
+}
+
+impl ResourceBlobResolver for BogusStorage {
+    type Error = VMError;
+
+    fn get_resource_blob(
+        &self,
+        _address: &AccountAddress,
+        _tag: &StructTag,
+    ) -> Result<Option<Vec<u8>>, Self::Error> {
         Err(PartialVMError::new(self.bad_status_code).finish(Location::Undefined))
     }
 }
@@ -522,7 +537,7 @@ impl ResourceResolver for BogusStorage {
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, Self::Error> {
+    ) -> Result<Option<Resource>, Self::Error> {
         Err(PartialVMError::new(self.bad_status_code).finish(Location::Undefined))
     }
 }

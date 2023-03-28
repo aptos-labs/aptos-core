@@ -16,7 +16,7 @@ use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
     parser,
-    resolver::{ModuleResolver, ResourceResolver},
+    resolver::{ModuleBlobResolver, ResourceBlobResolver},
 };
 use move_disassembler::disassembler::Disassembler;
 use move_ir_types::location::Spanned;
@@ -26,6 +26,7 @@ use std::{
     fs,
     path::{Path, PathBuf},
 };
+use move_vm_types::resolver::{Resource, ResourceResolver};
 
 type Event = (Vec<u8>, u64, TypeTag, Vec<u8>);
 
@@ -400,11 +401,23 @@ impl OnDiskStateView {
     }
 }
 
-impl ModuleResolver for OnDiskStateView {
+impl ModuleBlobResolver for OnDiskStateView {
     type Error = anyhow::Error;
 
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
+    fn get_module_blob(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
         self.get_module_bytes(module_id)
+    }
+}
+
+impl ResourceBlobResolver for OnDiskStateView {
+    type Error = anyhow::Error;
+
+    fn get_resource_blob(
+        &self,
+        address: &AccountAddress,
+        struct_tag: &StructTag,
+    ) -> Result<Option<Vec<u8>>, Self::Error> {
+        self.get_resource_bytes(*address, struct_tag.clone())
     }
 }
 
@@ -415,8 +428,11 @@ impl ResourceResolver for OnDiskStateView {
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, Self::Error> {
-        self.get_resource_bytes(*address, struct_tag.clone())
+    ) -> Result<Option<Resource>, Self::Error> {
+        // Simply wrap bytes read in a `Resource`.
+        self.get_resource_bytes(*address, struct_tag.clone()).map(|maybe_bytes| {
+            maybe_bytes.map(Resource::from_blob)
+        })
     }
 }
 
