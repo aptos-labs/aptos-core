@@ -4,6 +4,11 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 ## [Unreleased]
 
+## [1.0.9] - 2023/03/29
+* `aptos move show abi` allows for viewing the ABI of a compiled move package
+* Experimental gas profiler with the `--profile-gas` flag on any transaction submitting CLI command
+* Updates to the prover and framework specs
+
 ## [1.0.8] - 2023/03/16
 ### Added
 * Added an `aptos account derive-resource-account-address` command to add the ability to derive an address easily
