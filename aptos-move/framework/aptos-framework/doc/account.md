@@ -2224,12 +2224,7 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
     signature: cap_update_table,
     challenge: challenge,
 };
-<b>let</b> new_auth_key = <a href="account.md#0x1_account_spec_assert_valid_rotation_proof_signature_and_get_auth_key">spec_assert_valid_rotation_proof_signature_and_get_auth_key</a>(to_scheme, to_public_key_bytes, cap_update_table, challenge);
-<b>include</b> <a href="account.md#0x1_account_UpdateAuthKeyAndOriginatingAddressTableAbortsIf">UpdateAuthKeyAndOriginatingAddressTableAbortsIf</a>{
-    originating_addr: addr,
-    account_resource: account_resource,
-    new_auth_key_vector: new_auth_key
-};
+<b>pragma</b> aborts_if_is_partial;
 <b>modifies</b> <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
 <b>modifies</b> <b>global</b>&lt;<a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a>&gt;(@aptos_framework);
 </code></pre>
@@ -2266,7 +2261,6 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
     signature: cap_update_table,
     challenge: challenge,
 };
-<b>let</b> new_auth_key = <a href="account.md#0x1_account_spec_assert_valid_rotation_proof_signature_and_get_auth_key">spec_assert_valid_rotation_proof_signature_and_get_auth_key</a>(new_scheme, new_public_key_bytes, cap_update_table, challenge);
 <b>pragma</b> aborts_if_is_partial;
 </code></pre>
 
