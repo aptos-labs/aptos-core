@@ -10,7 +10,8 @@ use aptos_infallible::RwLock;
 use aptos_logger::{error, warn};
 use aptos_network::application::metadata::PeerMetadata;
 use aptos_peer_monitoring_service_types::{
-    LatencyPingRequest, PeerMonitoringServiceRequest, PeerMonitoringServiceResponse,
+    request::{LatencyPingRequest, PeerMonitoringServiceRequest},
+    response::PeerMonitoringServiceResponse,
 };
 use aptos_time_service::TimeService;
 use std::{collections::BTreeMap, sync::Arc};
@@ -210,8 +211,8 @@ mod test {
         transport::{ConnectionId, ConnectionMetadata},
     };
     use aptos_peer_monitoring_service_types::{
-        LatencyPingRequest, LatencyPingResponse, PeerMonitoringServiceRequest,
-        PeerMonitoringServiceResponse,
+        request::{LatencyPingRequest, PeerMonitoringServiceRequest},
+        response::{LatencyPingResponse, PeerMonitoringServiceResponse},
     };
     use aptos_time_service::TimeService;
     use aptos_types::{network_address::NetworkAddress, PeerId};

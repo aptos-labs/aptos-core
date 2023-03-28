@@ -18,9 +18,12 @@ use aptos_network::{
     transport::ConnectionMetadata,
 };
 use aptos_peer_monitoring_service_types::{
-    LatencyPingRequest, LatencyPingResponse, NetworkInformationResponse,
-    PeerMonitoringServiceMessage, PeerMonitoringServiceRequest, PeerMonitoringServiceResponse,
-    ServerProtocolVersionResponse,
+    request::{LatencyPingRequest, PeerMonitoringServiceRequest},
+    response::{
+        LatencyPingResponse, NetworkInformationResponse, PeerMonitoringServiceResponse,
+        ServerProtocolVersionResponse,
+    },
+    PeerMonitoringServiceMessage,
 };
 use aptos_time_service::{MockTimeService, TimeService, TimeServiceTrait};
 use aptos_types::PeerId;

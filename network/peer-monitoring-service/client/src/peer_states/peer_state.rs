@@ -17,11 +17,8 @@ use aptos_config::{
 };
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_infallible::RwLock;
-use aptos_network::application::{
-    interface::NetworkClient,
-    metadata::{PeerMetadata, PeerMonitoringMetadata},
-};
-use aptos_peer_monitoring_service_types::PeerMonitoringServiceMessage;
+use aptos_network::application::{interface::NetworkClient, metadata::PeerMetadata};
+use aptos_peer_monitoring_service_types::{PeerMonitoringMetadata, PeerMonitoringServiceMessage};
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use rand::{rngs::OsRng, Rng};
 use std::{collections::HashMap, sync::Arc, time::Duration};

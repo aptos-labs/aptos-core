@@ -11,10 +11,8 @@ use aptos_config::{
 use aptos_id_generator::U64IdGenerator;
 use aptos_infallible::RwLock;
 use aptos_logger::{info, warn};
-use aptos_network::application::{
-    interface::NetworkClient, metadata::PeerMonitoringMetadata, storage::PeersAndMetadata,
-};
-use aptos_peer_monitoring_service_types::PeerMonitoringServiceMessage;
+use aptos_network::application::{interface::NetworkClient, storage::PeersAndMetadata};
+use aptos_peer_monitoring_service_types::{PeerMonitoringMetadata, PeerMonitoringServiceMessage};
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use error::Error;
 use futures::StreamExt;
