@@ -20,7 +20,7 @@ pub trait StorageReaderInterface: Clone + Send + 'static {
 }
 
 /// The underlying implementation of the StorageReaderInterface, used by the
-/// storage server.
+/// peer monitoring server.
 #[derive(Clone)]
 pub struct StorageReader {
     storage: Arc<dyn DbReader>,

@@ -3,7 +3,7 @@
 
 use crate::{
     peer_states::{
-        latency_info::LatencyInfoState, network_info::NetworkInfoState,
+        latency_info::LatencyInfoState, network_info::NetworkInfoState, node_info::NodeInfoState,
         request_tracker::RequestTracker,
     },
     Error,
@@ -25,12 +25,17 @@ use std::sync::Arc;
 pub enum PeerStateKey {
     LatencyInfo,
     NetworkInfo,
+    NodeInfo,
 }
 
 impl PeerStateKey {
     /// A utility function for getting all peer state keys
     pub fn get_all_keys() -> Vec<PeerStateKey> {
-        vec![PeerStateKey::LatencyInfo, PeerStateKey::NetworkInfo]
+        vec![
+            PeerStateKey::LatencyInfo,
+            PeerStateKey::NetworkInfo,
+            PeerStateKey::NodeInfo,
+        ]
     }
 
     // TODO: Can we avoid exposing this label construction here?
@@ -44,6 +49,7 @@ impl PeerStateKey {
             PeerStateKey::NetworkInfo => {
                 PeerMonitoringServiceRequest::GetNetworkInformation.get_label()
             },
+            PeerStateKey::NodeInfo => PeerMonitoringServiceRequest::GetNodeInformation.get_label(),
         }
     }
 }
@@ -85,6 +91,7 @@ pub trait StateValueInterface {
 pub enum PeerStateValue {
     LatencyInfoState,
     NetworkInfoState,
+    NodeInfoState,
 }
 
 impl PeerStateValue {
@@ -100,6 +107,10 @@ impl PeerStateValue {
                 LatencyInfoState::new(latency_monitoring_config, time_service).into()
             },
             PeerStateKey::NetworkInfo => NetworkInfoState::new(node_config, time_service).into(),
+            PeerStateKey::NodeInfo => {
+                let node_monitoring_config = node_config.peer_monitoring_service.node_monitoring;
+                NodeInfoState::new(node_monitoring_config, time_service).into()
+            },
         }
     }
 }
