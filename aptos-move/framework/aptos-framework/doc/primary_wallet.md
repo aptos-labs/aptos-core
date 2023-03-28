@@ -285,4 +285,4 @@ Transfer <code>amount</code> of fungible asset from sender's primary wallet to r
 </details>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
