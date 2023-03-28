@@ -20,12 +20,12 @@ use move_core_types::{
 };
 use move_vm_types::{
     data_store::DataStore,
+    effects::ChangeSet,
     gas::GasMeter,
     loaded_data::runtime_types::{CachedStructIndex, StructType, Type},
+    resolver::MoveResolver,
 };
 use std::{borrow::Borrow, sync::Arc};
-use move_vm_types::effects::ChangeSet;
-use move_vm_types::resolver::MoveResolver;
 
 pub struct Session<'r, 'l, S> {
     pub(crate) runtime: &'l VMRuntime,

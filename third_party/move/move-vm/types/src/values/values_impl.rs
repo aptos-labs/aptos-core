@@ -21,8 +21,8 @@ use move_core_types::{
 use std::{
     fmt::{self, Debug, Display},
     iter,
+    sync::{Arc, Mutex},
 };
-use std::sync::{Arc, Mutex};
 
 /***************************************************************************************
  *
@@ -366,7 +366,8 @@ impl Container {
     fn copy_value(&self) -> PartialVMResult<Self> {
         let copy_rc_ref_vec_val = |r: &Arc<Mutex<Vec<ValueImpl>>>| {
             Ok(Arc::new(Mutex::new(
-                r.lock().unwrap()
+                r.lock()
+                    .unwrap()
                     .iter()
                     .map(|v| v.copy_value())
                     .collect::<PartialVMResult<_>>()?,
@@ -384,7 +385,9 @@ impl Container {
             Self::VecU128(r) => Self::VecU128(Arc::new(Mutex::new(r.lock().unwrap().clone()))),
             Self::VecU256(r) => Self::VecU256(Arc::new(Mutex::new(r.lock().unwrap().clone()))),
             Self::VecBool(r) => Self::VecBool(Arc::new(Mutex::new(r.lock().unwrap().clone()))),
-            Self::VecAddress(r) => Self::VecAddress(Arc::new(Mutex::new(r.lock().unwrap().clone()))),
+            Self::VecAddress(r) => {
+                Self::VecAddress(Arc::new(Mutex::new(r.lock().unwrap().clone())))
+            },
 
             Self::Locals(_) => {
                 return Err(
@@ -570,72 +573,103 @@ impl IndexedRef {
             | (Struct(r1), Locals(r2))
             | (Locals(r1), Vec(r2))
             | (Locals(r1), Struct(r2))
-            | (Locals(r1), Locals(r2)) => r1.lock().unwrap()[self.idx].equals(&r2.lock().unwrap()[other.idx])?,
+            | (Locals(r1), Locals(r2)) => {
+                r1.lock().unwrap()[self.idx].equals(&r2.lock().unwrap()[other.idx])?
+            },
 
             (VecU8(r1), VecU8(r2)) => r1.lock().unwrap()[self.idx] == r2.lock().unwrap()[other.idx],
-            (VecU16(r1), VecU16(r2)) => r1.lock().unwrap()[self.idx] == r2.lock().unwrap()[other.idx],
-            (VecU32(r1), VecU32(r2)) => r1.lock().unwrap()[self.idx] == r2.lock().unwrap()[other.idx],
-            (VecU64(r1), VecU64(r2)) => r1.lock().unwrap()[self.idx] == r2.lock().unwrap()[other.idx],
-            (VecU128(r1), VecU128(r2)) => r1.lock().unwrap()[self.idx] == r2.lock().unwrap()[other.idx],
-            (VecU256(r1), VecU256(r2)) => r1.lock().unwrap()[self.idx] == r2.lock().unwrap()[other.idx],
-            (VecBool(r1), VecBool(r2)) => r1.lock().unwrap()[self.idx] == r2.lock().unwrap()[other.idx],
-            (VecAddress(r1), VecAddress(r2)) => r1.lock().unwrap()[self.idx] == r2.lock().unwrap()[other.idx],
+            (VecU16(r1), VecU16(r2)) => {
+                r1.lock().unwrap()[self.idx] == r2.lock().unwrap()[other.idx]
+            },
+            (VecU32(r1), VecU32(r2)) => {
+                r1.lock().unwrap()[self.idx] == r2.lock().unwrap()[other.idx]
+            },
+            (VecU64(r1), VecU64(r2)) => {
+                r1.lock().unwrap()[self.idx] == r2.lock().unwrap()[other.idx]
+            },
+            (VecU128(r1), VecU128(r2)) => {
+                r1.lock().unwrap()[self.idx] == r2.lock().unwrap()[other.idx]
+            },
+            (VecU256(r1), VecU256(r2)) => {
+                r1.lock().unwrap()[self.idx] == r2.lock().unwrap()[other.idx]
+            },
+            (VecBool(r1), VecBool(r2)) => {
+                r1.lock().unwrap()[self.idx] == r2.lock().unwrap()[other.idx]
+            },
+            (VecAddress(r1), VecAddress(r2)) => {
+                r1.lock().unwrap()[self.idx] == r2.lock().unwrap()[other.idx]
+            },
 
             // Equality between a generic and a specialized container.
             (Locals(r1), VecU8(r2)) | (Struct(r1), VecU8(r2)) => {
                 *r1.lock().unwrap()[self.idx].as_value_ref::<u8>()? == r2.lock().unwrap()[other.idx]
             },
             (VecU8(r1), Locals(r2)) | (VecU8(r1), Struct(r2)) => {
-                r1.lock().unwrap()[self.idx] == *r2.lock().unwrap()[other.idx].as_value_ref::<u8>()?
+                r1.lock().unwrap()[self.idx]
+                    == *r2.lock().unwrap()[other.idx].as_value_ref::<u8>()?
             },
 
             (Locals(r1), VecU16(r2)) | (Struct(r1), VecU16(r2)) => {
-                *r1.lock().unwrap()[self.idx].as_value_ref::<u16>()? == r2.lock().unwrap()[other.idx]
+                *r1.lock().unwrap()[self.idx].as_value_ref::<u16>()?
+                    == r2.lock().unwrap()[other.idx]
             },
             (VecU16(r1), Locals(r2)) | (VecU16(r1), Struct(r2)) => {
-                r1.lock().unwrap()[self.idx] == *r2.lock().unwrap()[other.idx].as_value_ref::<u16>()?
+                r1.lock().unwrap()[self.idx]
+                    == *r2.lock().unwrap()[other.idx].as_value_ref::<u16>()?
             },
 
             (Locals(r1), VecU32(r2)) | (Struct(r1), VecU32(r2)) => {
-                *r1.lock().unwrap()[self.idx].as_value_ref::<u32>()? == r2.lock().unwrap()[other.idx]
+                *r1.lock().unwrap()[self.idx].as_value_ref::<u32>()?
+                    == r2.lock().unwrap()[other.idx]
             },
             (VecU32(r1), Locals(r2)) | (VecU32(r1), Struct(r2)) => {
-                r1.lock().unwrap()[self.idx] == *r2.lock().unwrap()[other.idx].as_value_ref::<u32>()?
+                r1.lock().unwrap()[self.idx]
+                    == *r2.lock().unwrap()[other.idx].as_value_ref::<u32>()?
             },
 
             (Locals(r1), VecU64(r2)) | (Struct(r1), VecU64(r2)) => {
-                *r1.lock().unwrap()[self.idx].as_value_ref::<u64>()? == r2.lock().unwrap()[other.idx]
+                *r1.lock().unwrap()[self.idx].as_value_ref::<u64>()?
+                    == r2.lock().unwrap()[other.idx]
             },
             (VecU64(r1), Locals(r2)) | (VecU64(r1), Struct(r2)) => {
-                r1.lock().unwrap()[self.idx] == *r2.lock().unwrap()[other.idx].as_value_ref::<u64>()?
+                r1.lock().unwrap()[self.idx]
+                    == *r2.lock().unwrap()[other.idx].as_value_ref::<u64>()?
             },
 
             (Locals(r1), VecU128(r2)) | (Struct(r1), VecU128(r2)) => {
-                *r1.lock().unwrap()[self.idx].as_value_ref::<u128>()? == r2.lock().unwrap()[other.idx]
+                *r1.lock().unwrap()[self.idx].as_value_ref::<u128>()?
+                    == r2.lock().unwrap()[other.idx]
             },
             (VecU128(r1), Locals(r2)) | (VecU128(r1), Struct(r2)) => {
-                r1.lock().unwrap()[self.idx] == *r2.lock().unwrap()[other.idx].as_value_ref::<u128>()?
+                r1.lock().unwrap()[self.idx]
+                    == *r2.lock().unwrap()[other.idx].as_value_ref::<u128>()?
             },
 
             (Locals(r1), VecU256(r2)) | (Struct(r1), VecU256(r2)) => {
-                *r1.lock().unwrap()[self.idx].as_value_ref::<u256::U256>()? == r2.lock().unwrap()[other.idx]
+                *r1.lock().unwrap()[self.idx].as_value_ref::<u256::U256>()?
+                    == r2.lock().unwrap()[other.idx]
             },
             (VecU256(r1), Locals(r2)) | (VecU256(r1), Struct(r2)) => {
-                r1.lock().unwrap()[self.idx] == *r2.lock().unwrap()[other.idx].as_value_ref::<u256::U256>()?
+                r1.lock().unwrap()[self.idx]
+                    == *r2.lock().unwrap()[other.idx].as_value_ref::<u256::U256>()?
             },
 
             (Locals(r1), VecBool(r2)) | (Struct(r1), VecBool(r2)) => {
-                *r1.lock().unwrap()[self.idx].as_value_ref::<bool>()? == r2.lock().unwrap()[other.idx]
+                *r1.lock().unwrap()[self.idx].as_value_ref::<bool>()?
+                    == r2.lock().unwrap()[other.idx]
             },
             (VecBool(r1), Locals(r2)) | (VecBool(r1), Struct(r2)) => {
-                r1.lock().unwrap()[self.idx] == *r2.lock().unwrap()[other.idx].as_value_ref::<bool>()?
+                r1.lock().unwrap()[self.idx]
+                    == *r2.lock().unwrap()[other.idx].as_value_ref::<bool>()?
             },
 
             (Locals(r1), VecAddress(r2)) | (Struct(r1), VecAddress(r2)) => {
-                *r1.lock().unwrap()[self.idx].as_value_ref::<AccountAddress>()? == r2.lock().unwrap()[other.idx]
+                *r1.lock().unwrap()[self.idx].as_value_ref::<AccountAddress>()?
+                    == r2.lock().unwrap()[other.idx]
             },
             (VecAddress(r1), Locals(r2)) | (VecAddress(r1), Struct(r2)) => {
-                r1.lock().unwrap()[self.idx] == *r2.lock().unwrap()[other.idx].as_value_ref::<AccountAddress>()?
+                r1.lock().unwrap()[self.idx]
+                    == *r2.lock().unwrap()[other.idx].as_value_ref::<AccountAddress>()?
             },
 
             // All other combinations are illegal.
@@ -1993,24 +2027,15 @@ impl VectorRef {
         check_elem_layout(type_param, c)?;
 
         let len = match c {
-            Container::VecU8(r) => r.lock().unwrap()
-                .len(),
-            Container::VecU16(r) => r.lock().unwrap()
-                .len(),
-            Container::VecU32(r) => r.lock().unwrap()
-                .len(),
-            Container::VecU64(r) => r.lock().unwrap()
-                .len(),
-            Container::VecU128(r) => r.lock().unwrap()
-                .len(),
-            Container::VecU256(r) => r.lock().unwrap()
-                .len(),
-            Container::VecBool(r) => r.lock().unwrap()
-                .len(),
-            Container::VecAddress(r) => r.lock().unwrap()
-                .len(),
-            Container::Vec(r) => r.lock().unwrap()
-                .len(),
+            Container::VecU8(r) => r.lock().unwrap().len(),
+            Container::VecU16(r) => r.lock().unwrap().len(),
+            Container::VecU32(r) => r.lock().unwrap().len(),
+            Container::VecU64(r) => r.lock().unwrap().len(),
+            Container::VecU128(r) => r.lock().unwrap().len(),
+            Container::VecU256(r) => r.lock().unwrap().len(),
+            Container::VecBool(r) => r.lock().unwrap().len(),
+            Container::VecAddress(r) => r.lock().unwrap().len(),
+            Container::Vec(r) => r.lock().unwrap().len(),
             Container::Locals(_) | Container::Struct(_) => unreachable!(),
         };
         Ok(Value::u64(len as u64))
@@ -2309,27 +2334,27 @@ impl Container {
             Self::Locals(r) | Self::Vec(r) | Self::Struct(r) => {
                 Struct::legacy_size_impl(&r.lock().unwrap())
             },
-            Self::VecU8(r) => {
-                AbstractMemorySize::new((r.lock().unwrap().len() * std::mem::size_of::<u8>()) as u64)
-            },
-            Self::VecU16(r) => {
-                AbstractMemorySize::new((r.lock().unwrap().len() * std::mem::size_of::<u16>()) as u64)
-            },
-            Self::VecU32(r) => {
-                AbstractMemorySize::new((r.lock().unwrap().len() * std::mem::size_of::<u32>()) as u64)
-            },
-            Self::VecU64(r) => {
-                AbstractMemorySize::new((r.lock().unwrap().len() * std::mem::size_of::<u64>()) as u64)
-            },
-            Self::VecU128(r) => {
-                AbstractMemorySize::new((r.lock().unwrap().len() * std::mem::size_of::<u128>()) as u64)
-            },
+            Self::VecU8(r) => AbstractMemorySize::new(
+                (r.lock().unwrap().len() * std::mem::size_of::<u8>()) as u64,
+            ),
+            Self::VecU16(r) => AbstractMemorySize::new(
+                (r.lock().unwrap().len() * std::mem::size_of::<u16>()) as u64,
+            ),
+            Self::VecU32(r) => AbstractMemorySize::new(
+                (r.lock().unwrap().len() * std::mem::size_of::<u32>()) as u64,
+            ),
+            Self::VecU64(r) => AbstractMemorySize::new(
+                (r.lock().unwrap().len() * std::mem::size_of::<u64>()) as u64,
+            ),
+            Self::VecU128(r) => AbstractMemorySize::new(
+                (r.lock().unwrap().len() * std::mem::size_of::<u128>()) as u64,
+            ),
             Self::VecU256(r) => AbstractMemorySize::new(
                 (r.lock().unwrap().len() * std::mem::size_of::<u256::U256>()) as u64,
             ),
-            Self::VecBool(r) => {
-                AbstractMemorySize::new((r.lock().unwrap().len() * std::mem::size_of::<bool>()) as u64)
-            },
+            Self::VecBool(r) => AbstractMemorySize::new(
+                (r.lock().unwrap().len() * std::mem::size_of::<bool>()) as u64,
+            ),
             Self::VecAddress(r) => AbstractMemorySize::new(
                 (r.lock().unwrap().len() * std::mem::size_of::<AccountAddress>()) as u64,
             ),
@@ -2715,7 +2740,9 @@ impl Display for Locals {
         write!(
             f,
             "{}",
-            self.0.lock().unwrap()
+            self.0
+                .lock()
+                .unwrap()
                 .iter()
                 .enumerate()
                 .map(|(idx, val)| format!("[{}] {}", idx, val))
@@ -2814,7 +2841,9 @@ pub mod debug {
 
     fn print_container<B: Write>(buf: &mut B, c: &Container) -> PartialVMResult<()> {
         match c {
-            Container::Vec(r) => print_list(buf, "[", r.lock().unwrap().iter(), print_value_impl, "]"),
+            Container::Vec(r) => {
+                print_list(buf, "[", r.lock().unwrap().iter(), print_value_impl, "]")
+            },
 
             Container::Struct(r) => {
                 print_list(buf, "{ ", r.lock().unwrap().iter(), print_value_impl, " }")
@@ -2824,10 +2853,18 @@ pub mod debug {
             Container::VecU16(r) => print_list(buf, "[", r.lock().unwrap().iter(), print_u16, "]"),
             Container::VecU32(r) => print_list(buf, "[", r.lock().unwrap().iter(), print_u32, "]"),
             Container::VecU64(r) => print_list(buf, "[", r.lock().unwrap().iter(), print_u64, "]"),
-            Container::VecU128(r) => print_list(buf, "[", r.lock().unwrap().iter(), print_u128, "]"),
-            Container::VecU256(r) => print_list(buf, "[", r.lock().unwrap().iter(), print_u256, "]"),
-            Container::VecBool(r) => print_list(buf, "[", r.lock().unwrap().iter(), print_bool, "]"),
-            Container::VecAddress(r) => print_list(buf, "[", r.lock().unwrap().iter(), print_address, "]"),
+            Container::VecU128(r) => {
+                print_list(buf, "[", r.lock().unwrap().iter(), print_u128, "]")
+            },
+            Container::VecU256(r) => {
+                print_list(buf, "[", r.lock().unwrap().iter(), print_u256, "]")
+            },
+            Container::VecBool(r) => {
+                print_list(buf, "[", r.lock().unwrap().iter(), print_bool, "]")
+            },
+            Container::VecAddress(r) => {
+                print_list(buf, "[", r.lock().unwrap().iter(), print_address, "]")
+            },
 
             Container::Locals(_) => Err(PartialVMError::new(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -2869,7 +2906,9 @@ pub mod debug {
             Container::VecU128(r) => print_slice_elem(buf, &r.lock().unwrap(), idx, print_u128),
             Container::VecU256(r) => print_slice_elem(buf, &r.lock().unwrap(), idx, print_u256),
             Container::VecBool(r) => print_slice_elem(buf, &r.lock().unwrap(), idx, print_bool),
-            Container::VecAddress(r) => print_slice_elem(buf, &r.lock().unwrap(), idx, print_address),
+            Container::VecAddress(r) => {
+                print_slice_elem(buf, &r.lock().unwrap(), idx, print_address)
+            },
         }
     }
 
@@ -2983,10 +3022,18 @@ impl<'a, 'b> serde::Serialize for AnnotatedValue<'a, 'b, MoveTypeLayout, ValueIm
             (MoveTypeLayout::Vector(layout), ValueImpl::Container(c)) => {
                 let layout = &**layout;
                 match (layout, c) {
-                    (MoveTypeLayout::U8, Container::VecU8(r)) => r.lock().unwrap().serialize(serializer),
-                    (MoveTypeLayout::U16, Container::VecU16(r)) => r.lock().unwrap().serialize(serializer),
-                    (MoveTypeLayout::U32, Container::VecU32(r)) => r.lock().unwrap().serialize(serializer),
-                    (MoveTypeLayout::U64, Container::VecU64(r)) => r.lock().unwrap().serialize(serializer),
+                    (MoveTypeLayout::U8, Container::VecU8(r)) => {
+                        r.lock().unwrap().serialize(serializer)
+                    },
+                    (MoveTypeLayout::U16, Container::VecU16(r)) => {
+                        r.lock().unwrap().serialize(serializer)
+                    },
+                    (MoveTypeLayout::U32, Container::VecU32(r)) => {
+                        r.lock().unwrap().serialize(serializer)
+                    },
+                    (MoveTypeLayout::U64, Container::VecU64(r)) => {
+                        r.lock().unwrap().serialize(serializer)
+                    },
                     (MoveTypeLayout::U128, Container::VecU128(r)) => {
                         r.lock().unwrap().serialize(serializer)
                     },
@@ -3115,9 +3162,9 @@ impl<'d> serde::de::DeserializeSeed<'d> for SeedWrapper<&MoveTypeLayout> {
                     L::Bool => {
                         Container::VecBool(Arc::new(Mutex::new(Vec::deserialize(deserializer)?)))
                     },
-                    L::Address => Container::VecAddress(Arc::new(Mutex::new(Vec::deserialize(
-                        deserializer,
-                    )?))),
+                    L::Address => {
+                        Container::VecAddress(Arc::new(Mutex::new(Vec::deserialize(deserializer)?)))
+                    },
                     layout => {
                         let v = deserializer
                             .deserialize_seq(VectorElementVisitor(SeedWrapper { layout }))?;
@@ -3654,24 +3701,65 @@ impl ValueImpl {
 
             (L::Struct(struct_layout), ValueImpl::Container(Container::Struct(r))) => {
                 let mut fields = vec![];
-                for (v, field_layout) in r.lock().unwrap().iter().zip(struct_layout.fields().iter()) {
+                for (v, field_layout) in r.lock().unwrap().iter().zip(struct_layout.fields().iter())
+                {
                     fields.push(v.as_move_value(field_layout));
                 }
                 MoveValue::Struct(MoveStruct::new(fields))
             },
 
             (L::Vector(inner_layout), ValueImpl::Container(c)) => MoveValue::Vector(match c {
-                Container::VecU8(r) => r.lock().unwrap().iter().map(|u| MoveValue::U8(*u)).collect(),
-                Container::VecU16(r) => r.lock().unwrap().iter().map(|u| MoveValue::U16(*u)).collect(),
-                Container::VecU32(r) => r.lock().unwrap().iter().map(|u| MoveValue::U32(*u)).collect(),
-                Container::VecU64(r) => r.lock().unwrap().iter().map(|u| MoveValue::U64(*u)).collect(),
-                Container::VecU128(r) => r.lock().unwrap().iter().map(|u| MoveValue::U128(*u)).collect(),
-                Container::VecU256(r) => r.lock().unwrap().iter().map(|u| MoveValue::U256(*u)).collect(),
-                Container::VecBool(r) => r.lock().unwrap().iter().map(|u| MoveValue::Bool(*u)).collect(),
-                Container::VecAddress(r) => {
-                    r.lock().unwrap().iter().map(|u| MoveValue::Address(*u)).collect()
-                },
-                Container::Vec(r) => r.lock().unwrap()
+                Container::VecU8(r) => r
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .map(|u| MoveValue::U8(*u))
+                    .collect(),
+                Container::VecU16(r) => r
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .map(|u| MoveValue::U16(*u))
+                    .collect(),
+                Container::VecU32(r) => r
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .map(|u| MoveValue::U32(*u))
+                    .collect(),
+                Container::VecU64(r) => r
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .map(|u| MoveValue::U64(*u))
+                    .collect(),
+                Container::VecU128(r) => r
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .map(|u| MoveValue::U128(*u))
+                    .collect(),
+                Container::VecU256(r) => r
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .map(|u| MoveValue::U256(*u))
+                    .collect(),
+                Container::VecBool(r) => r
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .map(|u| MoveValue::Bool(*u))
+                    .collect(),
+                Container::VecAddress(r) => r
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .map(|u| MoveValue::Address(*u))
+                    .collect(),
+                Container::Vec(r) => r
+                    .lock()
+                    .unwrap()
                     .iter()
                     .map(|v| v.as_move_value(inner_layout.as_ref()))
                     .collect(),

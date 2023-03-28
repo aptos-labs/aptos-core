@@ -5,10 +5,16 @@
 
 use crate::values::Value;
 use move_core_types::{
-    account_address::AccountAddress, language_storage::StructTag, resolver::ModuleBlobResolver, value::MoveTypeLayout,
+    account_address::AccountAddress,
+    language_storage::StructTag,
+    resolver::{ModuleBlobResolver, ResourceBlobResolver},
+    value::MoveTypeLayout,
 };
-use std::{fmt::Debug, ops::Deref, sync::{Arc, Mutex, RwLock}};
-use move_core_types::resolver::ResourceBlobResolver;
+use std::{
+    fmt::Debug,
+    ops::Deref,
+    sync::{Arc, Mutex, RwLock},
+};
 
 /// Encapsulates Move values so that they are thread-safe.
 #[derive(Debug)]
@@ -31,7 +37,9 @@ impl ReadOnlyLayout {
         self.0.read()
     }
 
-    pub fn try_read(&self) -> std::sync::TryLockResult<std::sync::RwLockReadGuard<'_, MoveTypeLayout>> {
+    pub fn try_read(
+        &self,
+    ) -> std::sync::TryLockResult<std::sync::RwLockReadGuard<'_, MoveTypeLayout>> {
         self.0.try_read()
     }
 }
@@ -78,7 +86,7 @@ impl Resource {
                 let value = value_handle.lock().unwrap();
                 let layout = layout.read().unwrap();
                 value.simple_serialize(&layout)
-            }
+            },
         }
     }
 }
@@ -92,7 +100,7 @@ impl Clone for Resource {
                 let value_handle = ValueHandle(Arc::clone(value_handle));
                 let layout = ReadOnlyLayout(Arc::clone(layout));
                 Resource::Cached(value_handle, layout)
-            }
+            },
         }
     }
 }
@@ -120,11 +128,22 @@ pub trait ResourceResolver {
 
 /// A persistent storage implementation that can resolve both resources and
 /// modules at runtime and avoid serialization if necessary.
-pub trait MoveResolver: ModuleBlobResolver<Error = Self::Err> + ResourceBlobResolver<Error = Self::Err> + ResourceResolver<Error = Self::Err> {
+pub trait MoveResolver:
+    ModuleBlobResolver<Error = Self::Err>
+    + ResourceBlobResolver<Error = Self::Err>
+    + ResourceResolver<Error = Self::Err>
+{
     type Err: Debug;
 }
 
-impl<E: Debug, T: ModuleBlobResolver<Error = E> + ResourceBlobResolver<Error = E> + ResourceResolver<Error = E> + ?Sized> MoveResolver for T {
+impl<
+        E: Debug,
+        T: ModuleBlobResolver<Error = E>
+            + ResourceBlobResolver<Error = E>
+            + ResourceResolver<Error = E>
+            + ?Sized,
+    > MoveResolver for T
+{
     type Err = E;
 }
 

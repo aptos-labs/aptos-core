@@ -5,19 +5,15 @@
 
 use crate::resolver::Resource;
 use anyhow::{bail, Result};
-use std::collections::{
-    btree_map::Entry,
-    BTreeMap,
-};
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
-    identifier::Identifier,
     effects::{AccountBlobChangeSet, BlobChangeSet, Op},
-    language_storage::StructTag,
+    identifier::Identifier,
+    language_storage::{ModuleId, StructTag},
     vm_status::StatusCode,
 };
-use move_core_types::language_storage::ModuleId;
+use std::collections::{btree_map::Entry, BTreeMap};
 
 /// A collection of changes to resources and modules for an account (not serialized).
 #[derive(Default, Debug, Clone)]
@@ -50,7 +46,7 @@ impl AccountChangeSet {
             Entry::Occupied(entry) => bail!("Module {} already exists", entry.key()),
             Entry::Vacant(entry) => {
                 entry.insert(op);
-            }
+            },
         }
         Ok(())
     }
@@ -61,7 +57,7 @@ impl AccountChangeSet {
             Entry::Occupied(entry) => bail!("Resource {} already exists", entry.key()),
             Entry::Vacant(entry) => {
                 entry.insert(op);
-            }
+            },
         }
         Ok(())
     }
@@ -97,7 +93,8 @@ impl AccountChangeSet {
         let mut resource_blobs = BTreeMap::new();
         for (struct_tag, op) in resources {
             let new_op = op.and_then(|resource| {
-                resource.serialize()
+                resource
+                    .serialize()
                     .ok_or_else(|| PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR))
             })?;
             resource_blobs.insert(struct_tag, new_op);
@@ -136,7 +133,7 @@ impl ChangeSet {
             ),
             Entry::Vacant(entry) => {
                 entry.insert(account_change_set);
-            }
+            },
         }
         Ok(())
     }

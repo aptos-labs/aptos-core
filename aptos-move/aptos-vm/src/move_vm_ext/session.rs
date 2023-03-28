@@ -28,7 +28,8 @@ use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
     effects::{
-        AccountBlobChangeSet, BlobChangeSet as MoveChangeSet, Event as MoveEvent, Op as MoveStorageOp,
+        AccountBlobChangeSet, BlobChangeSet as MoveChangeSet, Event as MoveEvent,
+        Op as MoveStorageOp,
     },
     language_storage::{ModuleId, StructTag},
     vm_status::{StatusCode, VMStatus},

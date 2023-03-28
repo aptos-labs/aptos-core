@@ -9,16 +9,17 @@ use move_core_types::{
     effects::Op,
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
-    resolver::ModuleBlobResolver,
+    resolver::{ModuleBlobResolver, ResourceBlobResolver},
     value::{serialize_values, MoveValue},
     vm_status::{StatusCode, StatusType},
 };
-use move_core_types::resolver::ResourceBlobResolver;
 use move_vm_runtime::move_vm::MoveVM;
 use move_vm_test_utils::{DeltaStorage, InMemoryStorage};
-use move_vm_types::effects::ChangeSet;
-use move_vm_types::gas::UnmeteredGasMeter;
-use move_vm_types::resolver::{Resource, ResourceResolver};
+use move_vm_types::{
+    effects::ChangeSet,
+    gas::UnmeteredGasMeter,
+    resolver::{Resource, ResourceResolver},
+};
 
 const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGTH]);
 

@@ -49,7 +49,8 @@ fn native_check_utf8(
     let ok = std::str::from_utf8(s_ref_locked.as_slice()).is_ok();
     // TODO: extensible native cost tables
 
-    let cost = gas_params.base + gas_params.per_byte * NumBytes::new(s_ref_locked.as_slice().len() as u64);
+    let cost =
+        gas_params.base + gas_params.per_byte * NumBytes::new(s_ref_locked.as_slice().len() as u64);
 
     NativeResult::map_partial_vm_result_one(cost, Ok(Value::bool(ok)))
 }

@@ -22,8 +22,8 @@ use move_core_types::{
 };
 use move_table_extension::{TableHandle, TableResolver};
 use move_vm_runtime::move_vm::MoveVM;
-use std::ops::{Deref, DerefMut};
 use move_vm_types::resolver::{Resource, ResourceResolver};
+use std::ops::{Deref, DerefMut};
 
 pub struct MoveResolverWithVMMetadata<'a, 'm, S> {
     move_resolver: &'a S,
@@ -307,7 +307,8 @@ impl<S: StateView> ResourceBlobResolver for StorageAdapterOwned<S> {
         address: &AccountAddress,
         struct_tag: &StructTag,
     ) -> Result<Option<Vec<u8>>, Self::Error> {
-        self.as_move_resolver().get_resource_blob(address, struct_tag)
+        self.as_move_resolver()
+            .get_resource_blob(address, struct_tag)
     }
 }
 

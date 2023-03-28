@@ -21,12 +21,12 @@ use move_core_types::{
 use move_disassembler::disassembler::Disassembler;
 use move_ir_types::location::Spanned;
 use move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue, MoveValueAnnotator};
+use move_vm_types::resolver::{Resource, ResourceResolver};
 use std::{
     convert::{TryFrom, TryInto},
     fs,
     path::{Path, PathBuf},
 };
-use move_vm_types::resolver::{Resource, ResourceResolver};
 
 type Event = (Vec<u8>, u64, TypeTag, Vec<u8>);
 
@@ -430,9 +430,8 @@ impl ResourceResolver for OnDiskStateView {
         struct_tag: &StructTag,
     ) -> Result<Option<Resource>, Self::Error> {
         // Simply wrap bytes read in a `Resource`.
-        self.get_resource_bytes(*address, struct_tag.clone()).map(|maybe_bytes| {
-            maybe_bytes.map(Resource::from_blob)
-        })
+        self.get_resource_bytes(*address, struct_tag.clone())
+            .map(|maybe_bytes| maybe_bytes.map(Resource::from_blob))
     }
 }
 

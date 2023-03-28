@@ -8,7 +8,11 @@ use move_core_types::{
     effects::Op,
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
-    resolver::{ModuleBlobResolver},
+    resolver::{ModuleBlobResolver, ResourceBlobResolver},
+};
+use move_vm_types::{
+    effects::{AccountChangeSet, ChangeSet},
+    resolver::{MoveResolver, Resource, ResourceResolver},
 };
 use std::{
     collections::{btree_map, BTreeMap},
@@ -19,9 +23,6 @@ use {
     anyhow::Error,
     move_table_extension::{TableChangeSet, TableHandle, TableResolver},
 };
-use move_core_types::resolver::ResourceBlobResolver;
-use move_vm_types::effects::{AccountChangeSet, ChangeSet};
-use move_vm_types::resolver::{MoveResolver, Resource, ResourceResolver};
 
 /// A dummy storage containing no modules or resources.
 #[derive(Debug, Clone)]
@@ -126,7 +127,10 @@ impl<'a, 'b, S: ResourceBlobResolver> ResourceBlobResolver for DeltaStorage<'a, 
     ) -> Result<Option<Vec<u8>>, S::Error> {
         if let Some(account_storage) = self.delta.accounts().get(address) {
             if let Some(resource_op) = account_storage.resource_ops().get(tag) {
-                return Ok(resource_op.as_ref().ok().map(|r| r.serialize().expect("resource serialization should succeed")))
+                return Ok(resource_op.as_ref().ok().map(|r| {
+                    r.serialize()
+                        .expect("resource serialization should succeed")
+                }));
             }
         }
 
@@ -236,8 +240,7 @@ impl InMemoryStorage {
     pub fn apply_extended(
         &mut self,
         changeset: ChangeSet,
-        #[cfg(feature = "table-extension")]
-        table_changes: TableChangeSet,
+        #[cfg(feature = "table-extension")] table_changes: TableChangeSet,
     ) -> Result<()> {
         for (addr, account_changeset) in changeset.into_inner() {
             match self.accounts.entry(addr) {

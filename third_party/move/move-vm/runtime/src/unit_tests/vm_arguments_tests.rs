@@ -22,9 +22,11 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
     vm_status::{StatusCode, StatusType},
 };
-use move_vm_types::gas::UnmeteredGasMeter;
+use move_vm_types::{
+    gas::UnmeteredGasMeter,
+    resolver::{Resource, ResourceResolver},
+};
 use std::collections::HashMap;
-use move_vm_types::resolver::{Resource, ResourceResolver};
 
 // make a script with a given signature for main.
 fn make_script(parameters: Signature) -> Vec<u8> {

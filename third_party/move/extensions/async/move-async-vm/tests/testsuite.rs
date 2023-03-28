@@ -25,13 +25,13 @@ use move_core_types::{
 };
 use move_prover_test_utils::{baseline_test::verify_or_update_baseline, extract_test_directives};
 use move_vm_test_utils::gas_schedule::GasStatus;
+use move_vm_types::resolver::{Resource, ResourceResolver};
 use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet, VecDeque},
     path::{Path, PathBuf},
     str::FromStr,
 };
-use move_vm_types::resolver::{Resource, ResourceResolver};
 
 const TEST_ADDR: &str = "0x3";
 const SOURCE_DIRS: &[&str] = &[

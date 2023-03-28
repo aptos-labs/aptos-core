@@ -14,8 +14,8 @@ use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
     metadata::Metadata,
 };
-use std::{collections::BTreeSet, sync::Arc};
 use move_vm_types::resolver::MoveResolver;
+use std::{collections::BTreeSet, sync::Arc};
 
 pub struct MoveVM {
     runtime: VMRuntime,

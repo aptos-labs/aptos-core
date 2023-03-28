@@ -11,8 +11,8 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_table_extension::TableResolver;
-use std::collections::BTreeMap;
 use move_vm_types::resolver::MoveResolver;
+use std::collections::BTreeMap;
 
 pub trait MoveResolverExt:
     MoveResolver<Err = VMError> + TableResolver + StateStorageUsageResolver + ConfigStorage + StateView

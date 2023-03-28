@@ -35,9 +35,7 @@ use move_core_types::{
 };
 use move_vm_runtime::move_vm::MoveVM;
 use move_vm_test_utils::{DeltaStorage, InMemoryStorage};
-use move_vm_types::{
-    effects::ChangeSet, gas::UnmeteredGasMeter, resolver::MoveResolver,
-};
+use move_vm_types::{effects::ChangeSet, gas::UnmeteredGasMeter, resolver::MoveResolver};
 use once_cell::sync::Lazy;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::{fs, io::Write, panic, thread};

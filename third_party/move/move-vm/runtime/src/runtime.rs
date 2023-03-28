@@ -30,11 +30,11 @@ use move_vm_types::{
     data_store::DataStore,
     gas::GasMeter,
     loaded_data::runtime_types::Type,
+    resolver::MoveResolver,
     values::{Locals, Reference, VMValueCast, Value},
 };
 use std::{borrow::Borrow, collections::BTreeSet, sync::Arc};
 use tracing::warn;
-use move_vm_types::resolver::MoveResolver;
 
 /// An instantiation of the MoveVM.
 pub(crate) struct VMRuntime {

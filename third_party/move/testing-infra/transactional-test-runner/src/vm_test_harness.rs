@@ -35,9 +35,9 @@ use move_vm_runtime::{
     session::{SerializedReturnValues, Session},
 };
 use move_vm_test_utils::{gas_schedule::GasStatus, InMemoryStorage};
+use move_vm_types::resolver::MoveResolver;
 use once_cell::sync::Lazy;
 use std::{collections::BTreeMap, path::Path};
-use move_vm_types::resolver::MoveResolver;
 
 const STD_ADDR: AccountAddress = AccountAddress::ONE;
 
@@ -64,7 +64,9 @@ pub fn view_resource_in_move_storage(
         None => Ok("[No Resource Exists]".to_owned()),
         Some(resource) => {
             // Serialize value to blob in order to avoid implementing annotator APIs for `Resource`.
-            let blob = resource.serialize().expect("serialization of a resource should succeed");
+            let blob = resource
+                .serialize()
+                .expect("serialization of a resource should succeed");
             let annotated = MoveValueAnnotator::new(storage).view_resource(&tag, &blob)?;
             Ok(format!("{}", annotated))
         },

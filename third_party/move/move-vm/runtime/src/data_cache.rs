@@ -15,12 +15,12 @@ use move_core_types::{
 };
 use move_vm_types::{
     data_store::DataStore,
+    effects::{AccountChangeSet, ChangeSet},
     loaded_data::runtime_types::Type,
+    resolver::{MoveResolver, Resource},
     values::{GlobalValue, Value},
 };
 use std::collections::btree_map::BTreeMap;
-use move_vm_types::effects::{AccountChangeSet, ChangeSet};
-use move_vm_types::resolver::{MoveResolver, Resource};
 
 pub struct AccountDataCache {
     data_map: BTreeMap<Type, (MoveTypeLayout, GlobalValue)>,
@@ -186,31 +186,32 @@ impl<'r, 'l, S: MoveResolver> DataStore for TransactionDataCache<'r, 'l, S> {
 
             let gv = match self.remote.get_resource(&addr, &ty_tag) {
                 Ok(Some(resource)) => {
-
                     match resource {
                         Resource::Serialized(blob) => {
                             load_res = Some(Some(NumBytes::new(blob.len() as u64)));
                             let val = match Value::simple_deserialize(&blob, &ty_layout) {
                                 Some(val) => val,
                                 None => {
-                                    let msg =
-                                        format!("Failed to deserialize resource {} at {}!", ty_tag, addr);
+                                    let msg = format!(
+                                        "Failed to deserialize resource {} at {}!",
+                                        ty_tag, addr
+                                    );
                                     return Err(PartialVMError::new(
                                         StatusCode::FAILED_TO_DESERIALIZE_RESOURCE,
                                     )
-                                        .with_message(msg));
+                                    .with_message(msg));
                                 },
                             };
 
                             GlobalValue::cached(val)?
-                        }
+                        },
                         Resource::Cached(value_handle, _) => {
                             // TODO: Data was not serialized and should not be charged for loading?
                             load_res = Some(None);
                             let val = value_handle.lock().unwrap();
                             // TODO: Avoid copy.
                             GlobalValue::cached(val.copy_value()?)?
-                        }
+                        },
                     }
                 },
                 Ok(None) => {

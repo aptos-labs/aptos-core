@@ -47,11 +47,15 @@ pub trait ResourceBlobResolver {
 
 /// A persistent storage implementation that can resolve both resources and modules, but
 /// only as blobs. For resolver operating on non-blobs see `move-vm/types/resolver.rs`.
-pub trait MoveBlobResolver: ModuleBlobResolver<Error = Self::Err> + ResourceBlobResolver<Error = Self::Err> {
+pub trait MoveBlobResolver:
+    ModuleBlobResolver<Error = Self::Err> + ResourceBlobResolver<Error = Self::Err>
+{
     type Err: Debug;
 }
 
-impl<E: Debug, T: ModuleBlobResolver<Error = E> + ResourceBlobResolver<Error = E> + ?Sized> MoveBlobResolver for T {
+impl<E: Debug, T: ModuleBlobResolver<Error = E> + ResourceBlobResolver<Error = E> + ?Sized>
+    MoveBlobResolver for T
+{
     type Err = E;
 }
 

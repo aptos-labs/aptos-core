@@ -46,8 +46,8 @@ impl<T> Op<T> {
     }
 
     pub fn and_then<U, E, F>(self, f: F) -> Result<Op<U>, E>
-        where
-            F: FnOnce(T) -> Result<U, E>,
+    where
+        F: FnOnce(T) -> Result<U, E>,
     {
         use Op::*;
 
@@ -244,7 +244,10 @@ impl BlobChangeSet {
         self.accounts
     }
 
-    fn get_or_insert_account_blob_change_set(&mut self, addr: AccountAddress) -> &mut AccountBlobChangeSet {
+    fn get_or_insert_account_blob_change_set(
+        &mut self,
+        addr: AccountAddress,
+    ) -> &mut AccountBlobChangeSet {
         match self.accounts.entry(addr) {
             btree_map::Entry::Occupied(entry) => entry.into_mut(),
             btree_map::Entry::Vacant(entry) => entry.insert(AccountBlobChangeSet::new()),

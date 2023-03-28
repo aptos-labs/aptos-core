@@ -244,8 +244,8 @@ impl AptosVMImpl {
         let raw_bytes_len = txn_data.transaction_size;
         // The transaction is too large.
         if txn_data.transaction_size > txn_gas_params.max_transaction_size_in_bytes {
-            let data =
-                storage.get_resource_blob(&CORE_CODE_ADDRESS, &ApprovedExecutionHashes::struct_tag());
+            let data = storage
+                .get_resource_blob(&CORE_CODE_ADDRESS, &ApprovedExecutionHashes::struct_tag());
 
             let valid = if let Ok(Some(data)) = data {
                 let approved_execution_hashes =
