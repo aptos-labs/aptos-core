@@ -22,6 +22,17 @@ error: post-condition does not hold
    =         `invariant forall j in 0..i: v[j] == old(v)[j] + 1;` = <redacted>
    =     at tests/sources/functional/macro_verification.move:26: foreach
    =         `invariant forall j in i..len(v): v[j] == old(v)[j];` = <redacted>
+   =         `invariant forall j in i..len(v): v[j] == old(v)[j];` = <redacted>
+   =         `invariant forall j in i..len(v): v[j] == old(v)[j];` = <redacted>
+   =         `invariant forall j in i..len(v): v[j] == old(v)[j];` = <redacted>
+   =         `invariant forall j in i..len(v): v[j] == old(v)[j];` = <redacted>
+   =         `invariant forall j in i..len(v): v[j] == old(v)[j];` = <redacted>
+   =         `invariant forall j in i..len(v): v[j] == old(v)[j];` = <redacted>
+   =         `invariant forall j in i..len(v): v[j] == old(v)[j];` = <redacted>
+   =         `invariant forall j in i..len(v): v[j] == old(v)[j];` = <redacted>
+   =         `invariant forall j in i..len(v): v[j] == old(v)[j];` = <redacted>
+   =         `invariant forall j in i..len(v): v[j] == old(v)[j];` = <redacted>
+   =         `invariant forall j in i..len(v): v[j] == old(v)[j];` = <redacted>
    =     enter loop, variable(s) v, i havocked and reassigned
    =         v = <redacted>
    =         i = <redacted>
@@ -66,6 +77,14 @@ error: post-condition does not hold
    =     at tests/sources/functional/macro_verification.move:49: reduce
    =         `invariant i >= 0 && i <= len(v);` = <redacted>
    =     at tests/sources/functional/macro_verification.move:50: reduce
+   =         `invariant sum == spec_sum(v, i);` = <redacted>
+   =         `invariant sum == spec_sum(v, i);` = <redacted>
+   =         `invariant sum == spec_sum(v, i);` = <redacted>
+   =         `invariant sum == spec_sum(v, i);` = <redacted>
+   =         `invariant sum == spec_sum(v, i);` = <redacted>
+   =         `invariant sum == spec_sum(v, i);` = <redacted>
+   =         `invariant sum == spec_sum(v, i);` = <redacted>
+   =         `invariant sum == spec_sum(v, i);` = <redacted>
    =         `invariant sum == spec_sum(v, i);` = <redacted>
    =     enter loop, variable(s) i, sum havocked and reassigned
    =         i = <redacted>

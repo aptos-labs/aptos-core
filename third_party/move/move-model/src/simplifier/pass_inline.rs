@@ -29,7 +29,6 @@ impl SpecRewriter for SpecPassInline {
             conditions,
             properties,
             on_impl,
-            update_map,
         } = spec.clone();
 
         // expressions to be substituted when evaluated in a pre-context
@@ -99,7 +98,6 @@ impl SpecRewriter for SpecPassInline {
             conditions: new_conditions,
             properties,
             on_impl,
-            update_map,
         };
         Ok(Some(new_spec))
     }
