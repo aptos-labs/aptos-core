@@ -24,6 +24,7 @@ use move_core_types::{
 };
 use move_vm_types::gas::UnmeteredGasMeter;
 use std::collections::HashMap;
+use move_vm_types::resolver::{Resource, ResourceResolver};
 
 // make a script with a given signature for main.
 fn make_script(parameters: Signature) -> Vec<u8> {
@@ -263,6 +264,18 @@ impl ResourceBlobResolver for RemoteStore {
         _address: &AccountAddress,
         _tag: &StructTag,
     ) -> Result<Option<Vec<u8>>, Self::Error> {
+        Ok(None)
+    }
+}
+
+impl ResourceResolver for RemoteStore {
+    type Error = VMError;
+
+    fn get_resource(
+        &self,
+        _address: &AccountAddress,
+        _tag: &StructTag,
+    ) -> Result<Option<Resource>, Self::Error> {
         Ok(None)
     }
 }

@@ -31,6 +31,7 @@ use std::{
     path::{Path, PathBuf},
     str::FromStr,
 };
+use move_vm_types::resolver::{Resource, ResourceResolver};
 
 const TEST_ADDR: &str = "0x3";
 const SOURCE_DIRS: &[&str] = &[
@@ -402,6 +403,25 @@ impl<'a> ResourceBlobResolver for HarnessProxy<'a> {
             .borrow()
             .get(&(*address, typ.clone()))
             .cloned();
+        Ok(res)
+    }
+}
+
+impl<'a> ResourceResolver for HarnessProxy<'a> {
+    type Error = ();
+
+    fn get_resource(
+        &self,
+        address: &AccountAddress,
+        typ: &StructTag,
+    ) -> Result<Option<Resource>, Self::Error> {
+        let res = self
+            .harness
+            .resource_store
+            .borrow()
+            .get(&(*address, typ.clone()))
+            .cloned()
+            .map(Resource::from_blob);
         Ok(res)
     }
 }

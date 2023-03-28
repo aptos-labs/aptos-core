@@ -14,7 +14,6 @@ use move_core_types::{
     effects::{BlobChangeSet, Event, Op},
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
-    resolver::MoveBlobResolver,
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
@@ -30,6 +29,7 @@ use std::{
     error::Error,
     fmt::{Debug, Display, Formatter},
 };
+use move_vm_types::resolver::MoveResolver;
 
 /// Represents an instance of an async VM.
 pub struct AsyncVM {
@@ -77,7 +77,7 @@ impl AsyncVM {
     }
 
     /// Creates a new session.
-    pub fn new_session<'r, 'l, S: MoveBlobResolver>(
+    pub fn new_session<'r, 'l, S: MoveResolver>(
         &'l self,
         for_actor: AccountAddress,
         virtual_time: u128,
@@ -92,7 +92,7 @@ impl AsyncVM {
     }
 
     /// Creates a new session.
-    pub fn new_session_with_extensions<'r, 'l, S: MoveBlobResolver>(
+    pub fn new_session_with_extensions<'r, 'l, S: MoveResolver>(
         &'l self,
         for_actor: AccountAddress,
         virtual_time: u128,
@@ -157,7 +157,7 @@ pub struct AsyncError {
 /// Result type for operations of an AsyncSession.
 pub type AsyncResult<'r> = Result<AsyncSuccess<'r>, AsyncError>;
 
-impl<'r, 'l, S: MoveBlobResolver> AsyncSession<'r, 'l, S> {
+impl<'r, 'l, S: MoveResolver> AsyncSession<'r, 'l, S> {
     /// Get the underlying Move VM session.
     pub fn get_move_session(&mut self) -> &mut Session<'r, 'l, S> {
         &mut self.vm_session
