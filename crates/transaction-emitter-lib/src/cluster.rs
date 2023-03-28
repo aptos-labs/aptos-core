@@ -14,9 +14,8 @@ use aptos_sdk::types::{
 };
 use futures::{stream::FuturesUnordered, StreamExt};
 use rand::seq::SliceRandom;
-use std::convert::TryFrom;
+use std::{convert::TryFrom, time::Instant};
 use url::Url;
-use std::time::Instant;
 
 #[derive(Debug)]
 pub struct Cluster {
