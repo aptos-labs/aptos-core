@@ -867,6 +867,41 @@ FAILURE proving 1 modules from package `hello_prover` in 0.067s
 ```
 In this case, see [Install the dependencies of Move Prover](install-aptos-cli#step-3-optional-install-the-dependencies-of-move-prover).
 
+### Profile gas use
+
+This *experimental* feature lets you [profile gas usage](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/aptos-gas-profiling) in the Aptos virtual machine locally rather than [simulating transactions](../../concepts/gas-txn-fee.md#estimating-the-gas-units-via-simulation) at the [fullnode](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/simulate_transaction). You may also use it to visualize the transaction gas log, in the form of a flame graph.
+
+Run the gas profiler by appending the `--profile-gas` option to the aptos CLI `move publish`, `move run` or `move run-script` command, for example:
+```bash
+cargo run -p aptos -- move publish --profile-gas
+```
+
+And receive output resembling:
+```bash
+    Finished dev [unoptimized + debuginfo] target(s) in 0.51s
+     Running `/home/vgao/aptos-core/target/debug/aptos move publish --profile-gas`
+Compiling, may take a little while to download git dependencies...
+BUILDING empty_fun
+package size 427 bytes
+Simulating transaction locally with the gas profiler...
+This is still experimental so results may be inaccurate.
+Execution & IO Gas flamegraph saved to gas-profiling/txn-69e19ee4-0x1-code-publish_package_txn.exec_io.svg
+Storage fee flamegraph saved to gas-profiling/txn-69e19ee4-0x1-code-publish_package_txn.storage.svg
+{
+  "Result": {
+    "transaction_hash": "0x69e19ee4cc89cb1f84ee21a46e6b281bd8696115aa332275eca38c4857818dfe",
+    "gas_used": 1007,
+    "gas_unit_price": 100,
+    "sender": "dbcbe741d003a7369d87ec8717afb5df425977106497052f96f4e236372f7dd5",
+    "success": true,
+    "version": 473269362,
+    "vm_status": "status EXECUTED of type Execution"
+  }
+}
+```
+
+Find the flame graphs in the newly created `gas-profiling/` directory. To interact with a graph, save it to your local disk and then open the saved copy in your browser.
+
 ### Debug and print stack trace
 
 In this example, we will use `DebugDemo` in [debug-move-example](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos/debug-move-example).

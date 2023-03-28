@@ -17,6 +17,7 @@ To efficiently write smart contracts in Aptos, we recommend you first:
 
 Start here to learn how the Move language works on the Aptos blockchain. 
 
+- ### [Aptos CLI Move commands](../../cli-tools/aptos-cli-tool/use-aptos-cli.md#move-examples)
 - ### [Aptos Move Book](book/SUMMARY.md)
 - ### [Move on Aptos](./move-on-aptos.md)
 - ### [Move Primitives Tutorial](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/move-tutorial)
