@@ -243,9 +243,7 @@ impl IndexerStreamCoordinator {
             // Do not update block_height if first block is block metadata
             if ind > 0 {
                 // Update the timestamp if the next block occurs
-                if let aptos_types::transaction::Transaction::BlockMetadata(ref txn) =
-                    raw_txn.transaction
-                {
+                if let Some(txn) = raw_txn.transaction.try_as_block_metadata() {
                     timestamp = txn.timestamp_usecs();
                     epoch = txn.epoch();
                     epoch_bcs = aptos_api_types::U64::from(epoch);

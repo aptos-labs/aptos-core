@@ -41,7 +41,7 @@ use aptos_types::{
         state_key_prefix::StateKeyPrefix,
         state_value::StateValue,
     },
-    transaction::{SignedTransaction, Transaction, TransactionWithProof, Version},
+    transaction::{SignedTransaction, TransactionWithProof, Version},
 };
 use aptos_vm::{
     data_cache::{IntoMoveResolver, StorageAdapter, StorageAdapterOwned},
@@ -571,7 +571,7 @@ impl Context {
             .into_iter()
             .map(|t| {
                 // Update the timestamp if the next block occurs
-                if let Transaction::BlockMetadata(ref txn) = t.transaction {
+                if let Some(txn) = t.transaction.try_as_block_metadata() {
                     timestamp = txn.timestamp_usecs();
                 }
                 let txn = converter.try_into_onchain_transaction(timestamp, t)?;
