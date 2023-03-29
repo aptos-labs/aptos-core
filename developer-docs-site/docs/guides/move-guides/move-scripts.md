@@ -25,8 +25,6 @@ script {
         if (balance < desired_balance) {
             aptos_account::transfer(src, dest, desired_balance - balance);
         };
-
-        addr::my_module::do_nothing();
     }
 }
 ```
