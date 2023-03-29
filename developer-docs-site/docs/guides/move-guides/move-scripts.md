@@ -9,11 +9,12 @@ This tutorial explains how to write and execute a Move script. You can use Move 
 
 ## Example use case
 
-The following example calls functions on the [aptos_coin.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/aptos_coin.move) module to top up an account to `desired_balance` if the current balance is less than that. 
+The following example calls functions on the [aptos_coin.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/aptos_coin.move) module to confirm the balance of the destination account is less than `desired_balance`, and if so, tops it up to `desired_balance`.
 
 ```move
 script {
     use std::signer;
+    use aptos_framework::aptos_account;
     use aptos_framework::aptos_coin;
     use aptos_framework::coin;
 
@@ -22,20 +23,20 @@ script {
 
         let balance = coin::balance<aptos_coin::AptosCoin>(src_addr);
         if (balance < desired_balance) {
-            let coins = coin::withdraw<aptos_coin::AptosCoin>(src, desired_balance - balance);
-            coin::deposit(dest, coins);
+            aptos_account::transfer(src, dest, desired_balance - balance);
         };
     }
 }
 ```
 
-This guide answers questions like:
+## Execution
+
+Now that you know what you would like to accomplish, you need to determine:
+
 - Where do I put these files?
 - What do I name them?
 - Do I need a `Move.toml`?
 - How do I run my script with the CLI?
-
-## Execution
 
 Let us run through how to execute a Move script with a step-by-step example using the [Aptos CLI](../../cli-tools/aptos-cli-tool/use-aptos-cli.md).
 
@@ -45,11 +46,13 @@ mkdir testing
 cd testing
 ```
 
-2. Set up the Aptos CLI:
+2. Set up the Aptos CLI and [create an account](../get-test-funds.md#create-an-aptos-account):
 ```sh
 aptos init
 ```
-The CLI will ask you which network you want to work with (e.g. `devnet`, `testnet`, `mainnet`). It will also ask you for your private key (which looks like this: `0xf1adc8d01c1a890f17efc6b08f92179e6008d43026dd56b71e7b0d9b453536be`), or it can generate a new one for you, as part of setting up your account.
+The CLI will ask you which network you want to work with (e.g. `devnet`, `testnet`, `mainnet`). Enter: `devnet`
+
+You may reuse an existing private key (which looks like this: `0xf1adc8d01c1a890f17efc6b08f92179e6008d43026dd56b71e7b0d9b453536be`), or it can generate a new one for you, as part of setting up your account.
 
 3. From this same directory, initialize a new Move project:
 ```sh
@@ -67,7 +70,7 @@ version = '1.0.0'
 
 [dependencies.AptosFramework]
 git = 'https://github.com/aptos-labs/aptos-core.git'
-rev = 'main'
+rev = 'devnet'
 subdir = 'aptos-move/framework/aptos-framework'
 ```
 
