@@ -145,7 +145,7 @@ impl AggregatorChangeSet {
 #[cfg(test)]
 mod test {
     use super::*;
-    use aptos_aggregator::aggregator_extension::aggregator_id;
+    use aptos_aggregator::aggregator_extension::aggregator_id_for_test;
     use claims::assert_matches;
     use move_table_extension::TableHandle;
 
@@ -179,21 +179,21 @@ mod test {
     fn test_set_up(context: &NativeAggregatorContext) {
         let mut aggregator_data = context.aggregator_data.borrow_mut();
 
-        aggregator_data.create_new_aggregator(aggregator_id(100), 100);
-        aggregator_data.create_new_aggregator(aggregator_id(200), 200);
-        aggregator_data.create_new_aggregator(aggregator_id(300), 300);
-        aggregator_data.create_new_aggregator(aggregator_id(400), 400);
+        aggregator_data.create_new_aggregator(aggregator_id_for_test(100), 100);
+        aggregator_data.create_new_aggregator(aggregator_id_for_test(200), 200);
+        aggregator_data.create_new_aggregator(aggregator_id_for_test(300), 300);
+        aggregator_data.create_new_aggregator(aggregator_id_for_test(400), 400);
 
-        aggregator_data.get_aggregator(aggregator_id(100), 100);
-        aggregator_data.get_aggregator(aggregator_id(200), 200);
-        aggregator_data.get_aggregator(aggregator_id(500), 500);
-        aggregator_data.get_aggregator(aggregator_id(600), 600);
-        aggregator_data.get_aggregator(aggregator_id(700), 700);
+        aggregator_data.get_aggregator(aggregator_id_for_test(100), 100);
+        aggregator_data.get_aggregator(aggregator_id_for_test(200), 200);
+        aggregator_data.get_aggregator(aggregator_id_for_test(500), 500);
+        aggregator_data.get_aggregator(aggregator_id_for_test(600), 600);
+        aggregator_data.get_aggregator(aggregator_id_for_test(700), 700);
 
-        aggregator_data.remove_aggregator(aggregator_id(100));
-        aggregator_data.remove_aggregator(aggregator_id(300));
-        aggregator_data.remove_aggregator(aggregator_id(500));
-        aggregator_data.remove_aggregator(aggregator_id(800));
+        aggregator_data.remove_aggregator(aggregator_id_for_test(100));
+        aggregator_data.remove_aggregator(aggregator_id_for_test(300));
+        aggregator_data.remove_aggregator(aggregator_id_for_test(500));
+        aggregator_data.remove_aggregator(aggregator_id_for_test(800));
     }
 
     #[test]
@@ -204,13 +204,13 @@ mod test {
         test_set_up(&context);
         let AggregatorChangeSet { changes } = context.into_change_set();
 
-        assert!(!changes.contains_key(&aggregator_id(100)));
-        assert_matches!(changes.get(&aggregator_id(200)).unwrap(), Write(0));
-        assert!(!changes.contains_key(&aggregator_id(300)));
-        assert_matches!(changes.get(&aggregator_id(400)).unwrap(), Write(0));
-        assert_matches!(changes.get(&aggregator_id(500)).unwrap(), Delete);
-        assert!(changes.contains_key(&aggregator_id(600)));
-        assert!(changes.contains_key(&aggregator_id(700)));
-        assert_matches!(changes.get(&aggregator_id(800)).unwrap(), Delete);
+        assert!(!changes.contains_key(&aggregator_id_for_test(100)));
+        assert_matches!(changes.get(&aggregator_id_for_test(200)).unwrap(), Write(0));
+        assert!(!changes.contains_key(&aggregator_id_for_test(300)));
+        assert_matches!(changes.get(&aggregator_id_for_test(400)).unwrap(), Write(0));
+        assert_matches!(changes.get(&aggregator_id_for_test(500)).unwrap(), Delete);
+        assert!(changes.contains_key(&aggregator_id_for_test(600)));
+        assert!(changes.contains_key(&aggregator_id_for_test(700)));
+        assert_matches!(changes.get(&aggregator_id_for_test(800)).unwrap(), Delete);
     }
 }

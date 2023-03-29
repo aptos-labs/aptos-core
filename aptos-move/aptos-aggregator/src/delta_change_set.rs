@@ -349,7 +349,7 @@ impl ::std::iter::IntoIterator for DeltaChangeSet {
 }
 
 #[cfg(test)]
-mod tests {
+mod test {
     use super::*;
     use aptos_language_e2e_tests::data_store::FakeDataStore;
     use claims::{assert_err, assert_matches, assert_ok, assert_ok_eq};

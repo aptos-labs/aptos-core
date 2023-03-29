@@ -42,7 +42,7 @@ impl AggregatorID {
 }
 
 /// Generates a dummy id for aggregator based on the given key. Only used for testing.
-pub fn aggregator_id(key: u128) -> AggregatorID {
+pub fn aggregator_id_for_test(key: u128) -> AggregatorID {
     let bytes: Vec<u8> = [key.to_le_bytes(), key.to_le_bytes()]
         .iter()
         .flat_map(|b| b.to_vec())
@@ -371,7 +371,7 @@ pub fn extension_error(message: impl ToString) -> PartialVMError {
 // ================================= Tests =================================
 
 #[cfg(test)]
-pub mod test {
+mod test {
     use super::*;
     use aptos_language_e2e_tests::data_store::FakeDataStore;
     use claims::{assert_err, assert_ok};
@@ -384,18 +384,18 @@ pub mod test {
     fn test_materialize_not_in_storage() {
         let mut aggregator_data = AggregatorData::default();
 
-        let aggregator = aggregator_data.get_aggregator(aggregator_id(300), 700);
-        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &aggregator_id(700)));
+        let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(300), 700);
+        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &aggregator_id_for_test(700)));
     }
 
     #[test]
     fn test_materialize_known() {
         let mut aggregator_data = AggregatorData::default();
-        aggregator_data.create_new_aggregator(aggregator_id(200), 200);
+        aggregator_data.create_new_aggregator(aggregator_id_for_test(200), 200);
 
-        let aggregator = aggregator_data.get_aggregator(aggregator_id(200), 200);
+        let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(200), 200);
         assert_ok!(aggregator.add(100));
-        assert_ok!(aggregator.read_and_materialize(&*TEST_RESOLVER, &aggregator_id(200)));
+        assert_ok!(aggregator.read_and_materialize(&*TEST_RESOLVER, &aggregator_id_for_test(200)));
         assert_eq!(aggregator.value, 100);
     }
 
@@ -405,9 +405,9 @@ pub mod test {
 
         // +0 to +400 satisfies <= 600 and is ok, but materialization fails
         // with 300 + 400 > 600!
-        let aggregator = aggregator_data.get_aggregator(aggregator_id(600), 600);
+        let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(600), 600);
         assert_ok!(aggregator.add(400));
-        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &aggregator_id(600)));
+        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &aggregator_id_for_test(600)));
     }
 
     #[test]
@@ -415,9 +415,9 @@ pub mod test {
         let mut aggregator_data = AggregatorData::default();
 
         // +0 to -400 is ok, but materialization fails with 300 - 400 < 0!
-        let aggregator = aggregator_data.get_aggregator(aggregator_id(600), 600);
+        let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(600), 600);
         assert_ok!(aggregator.add(400));
-        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &aggregator_id(600)));
+        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &aggregator_id_for_test(600)));
     }
 
     #[test]
@@ -425,12 +425,12 @@ pub mod test {
         let mut aggregator_data = AggregatorData::default();
 
         // +0 to +400 to +0 is ok, but materialization fails since we had 300 + 400 > 600!
-        let aggregator = aggregator_data.get_aggregator(aggregator_id(600), 600);
+        let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(600), 600);
         assert_ok!(aggregator.add(400));
         assert_ok!(aggregator.sub(300));
         assert_eq!(aggregator.value, 100);
         assert_eq!(aggregator.state, AggregatorState::PositiveDelta);
-        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &aggregator_id(600)));
+        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &aggregator_id_for_test(600)));
     }
 
     #[test]
@@ -438,12 +438,12 @@ pub mod test {
         let mut aggregator_data = AggregatorData::default();
 
         // +0 to -301 to -300 is ok, but materialization fails since we had 300 - 301 < 0!
-        let aggregator = aggregator_data.get_aggregator(aggregator_id(600), 600);
+        let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(600), 600);
         assert_ok!(aggregator.sub(301));
         assert_ok!(aggregator.add(1));
         assert_eq!(aggregator.value, 300);
         assert_eq!(aggregator.state, AggregatorState::NegativeDelta);
-        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &aggregator_id(600)));
+        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &aggregator_id_for_test(600)));
     }
 
     #[test]
@@ -451,25 +451,25 @@ pub mod test {
         let mut aggregator_data = AggregatorData::default();
 
         // +0 to +800 > 600!
-        let aggregator = aggregator_data.get_aggregator(aggregator_id(600), 600);
+        let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(600), 600);
         assert_err!(aggregator.add(800));
 
         // 0 + 300 > 200!
-        let aggregator = aggregator_data.get_aggregator(aggregator_id(200), 200);
+        let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(200), 200);
         assert_err!(aggregator.add(300));
     }
 
     #[test]
     fn test_sub_underflow() {
         let mut aggregator_data = AggregatorData::default();
-        aggregator_data.create_new_aggregator(aggregator_id(200), 200);
+        aggregator_data.create_new_aggregator(aggregator_id_for_test(200), 200);
 
         // +0 to -601 is impossible!
-        let aggregator = aggregator_data.get_aggregator(aggregator_id(600), 600);
+        let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(600), 600);
         assert_err!(aggregator.sub(601));
 
         // Similarly, we cannot subtract anything from 0...
-        let aggregator = aggregator_data.get_aggregator(aggregator_id(200), 200);
+        let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(200), 200);
         assert_err!(aggregator.sub(2));
     }
 
@@ -478,7 +478,7 @@ pub mod test {
         let mut aggregator_data = AggregatorData::default();
 
         // +200 -300 +50 +300 -25 +375 -600.
-        let aggregator = aggregator_data.get_aggregator(aggregator_id(600), 600);
+        let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(600), 600);
         assert_ok!(aggregator.add(200));
         assert_ok!(aggregator.sub(300));
 
