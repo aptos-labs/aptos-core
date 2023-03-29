@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    exponential_buckets, op_counters::DurationHistogram, register_histogram,
-    register_histogram_vec, register_int_counter, register_int_counter_vec, AverageIntCounter,
-    Histogram, HistogramVec, IntCounter, IntCounterVec,
+    exponential_buckets, op_counters::DurationHistogram, register_avg_counter, register_histogram,
+    register_histogram_vec, register_int_counter, register_int_counter_vec, Histogram,
+    HistogramVec, IntCounter, IntCounterVec,
 };
 use once_cell::sync::Lazy;
 use std::time::Duration;
@@ -397,22 +397,22 @@ pub static RECEIVED_BATCH_RESPONSE_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static QS_BACKPRESSURE_TXN_COUNT: Lazy<AverageIntCounter> = Lazy::new(|| {
-    AverageIntCounter::register(
+pub static QS_BACKPRESSURE_TXN_COUNT: Lazy<Histogram> = Lazy::new(|| {
+    register_avg_counter(
         "quorum_store_backpressure_txn_count",
         "Indicator of whether Quorum Store is backpressured due to txn count exceeding threshold.",
     )
 });
 
-pub static QS_BACKPRESSURE_PROOF_COUNT: Lazy<AverageIntCounter> = Lazy::new(|| {
-    AverageIntCounter::register(
+pub static QS_BACKPRESSURE_PROOF_COUNT: Lazy<Histogram> = Lazy::new(|| {
+    register_avg_counter(
         "quorum_store_backpressure_proof_count",
         "Indicator of whether Quorum Store is backpressured due to proof count exceeding threshold."
     )
 });
 
-pub static QS_BACKPRESSURE_DYNAMIC_MAX: Lazy<AverageIntCounter> = Lazy::new(|| {
-    AverageIntCounter::register(
+pub static QS_BACKPRESSURE_DYNAMIC_MAX: Lazy<Histogram> = Lazy::new(|| {
+    register_avg_counter(
         "quorum_store_backpressure_dynamic_max",
         "What the dynamic max is set to",
     )
@@ -456,8 +456,8 @@ pub static BATCH_TO_POS_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
     )
 });
 
-pub static BATCH_SUCCESSFUL_CREATION: Lazy<AverageIntCounter> = Lazy::new(|| {
-    AverageIntCounter::register(
+pub static BATCH_SUCCESSFUL_CREATION: Lazy<Histogram> = Lazy::new(|| {
+    register_avg_counter(
         "quorum_store_batch_successful_creation",
         "Counter for whether we are successfully creating batches",
     )

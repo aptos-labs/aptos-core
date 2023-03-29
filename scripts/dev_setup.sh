@@ -430,7 +430,7 @@ function install_cargo_sort {
 }
 
 function install_cargo_nextest {
-  if ! command -v cargo-nextext &> /dev/null; then
+  if ! command -v cargo-nextest &> /dev/null; then
     cargo install cargo-nextest --locked
   fi
 }

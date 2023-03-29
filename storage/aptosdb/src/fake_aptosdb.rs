@@ -361,7 +361,7 @@ impl DbWriter for FakeAptosDB {
                         .insert(txn_to_commit.transaction().hash(), ver);
 
                     // If it is a user transaction, also update the account sequence number
-                    if let Ok(user_txn) = txn_to_commit.transaction().as_signed_user_txn() {
+                    if let Some(user_txn) = txn_to_commit.transaction().try_as_signed_user_txn() {
                         self.account_seq_num
                             .entry(user_txn.sender())
                             .and_modify(|seq_num| {
@@ -951,7 +951,10 @@ mod tests {
 
             if !txn_to_commit.is_state_checkpoint() {
                 // Fetch and verify transaction itself.
-                let txn = txn_to_commit.transaction().as_signed_user_txn().unwrap();
+                let txn = txn_to_commit
+                    .transaction()
+                    .try_as_signed_user_txn()
+                    .unwrap();
                 let txn_with_proof = db
                     .get_transaction_by_hash(
                         txn_to_commit.transaction().hash(),
@@ -1007,7 +1010,10 @@ mod tests {
         sender: AccountAddress,
         sequence_number: u64,
     ) -> Result<()> {
-        let signed_transaction = transaction_with_proof.transaction.as_signed_user_txn()?;
+        let signed_transaction = transaction_with_proof
+            .transaction
+            .try_as_signed_user_txn()
+            .ok_or("not user transaction")?;
 
         ensure!(
             transaction_with_proof.version == version,

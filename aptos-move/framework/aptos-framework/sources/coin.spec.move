@@ -88,7 +88,8 @@ spec aptos_framework::coin {
     }
 
     spec supply<CoinType>(): Option<u128> {
-        // TODO: complex aborts conditions.
+        // TODO: The error target is in `optional_aggregator::read`,
+        // which cannot be verified because the calling level is too deep.
         pragma aborts_if_is_partial;
         include AbortsIfNotExistCoinInfo<CoinType>;
     }
@@ -98,6 +99,7 @@ spec aptos_framework::coin {
         _cap: &BurnCapability<CoinType>,
     ) {
         let addr =  type_info::type_of<CoinType>().account_address;
+        aborts_if !exists<CoinInfo<CoinType>>(addr);
         modifies global<CoinInfo<CoinType>>(addr);
         include AbortsIfNotExistCoinInfo<CoinType>;
         aborts_if coin.value == 0;
@@ -109,11 +111,14 @@ spec aptos_framework::coin {
         amount: u64,
         burn_cap: &BurnCapability<CoinType>,
     ) {
-        // TODO: complex aborts conditions.
+        // TODO: The target of the error is `coin::burn`,
+        // and I added the verification of the resource `CoinInfo` and it was still wrong.
         pragma aborts_if_is_partial;
         let addr =  type_info::type_of<CoinType>().account_address;
+        let coin_store = global<CoinStore<CoinType>>(account_addr);
         modifies global<CoinInfo<CoinType>>(addr);
         aborts_if amount != 0 && !exists<CoinStore<CoinType>>(account_addr);
+        aborts_if coin_store.coin.value < amount;
     }
 
     /// `account_addr` is not frozen.
@@ -170,7 +175,8 @@ spec aptos_framework::coin {
     /// The creator of `CoinType` must be `@aptos_framework`.
     /// `SupplyConfig` allow upgrade.
     spec upgrade_supply<CoinType>(account: &signer) {
-        // TODO: complex aborts conditions.
+        // TODO: The error target is in `optional_aggregator::read`,
+        // which cannot be verified because the calling level is too deep.
         pragma aborts_if_is_partial;
         let account_addr = signer::address_of(account);
         let coin_address = type_info::type_of<CoinType>().account_address;
@@ -229,7 +235,8 @@ spec aptos_framework::coin {
         monitor_supply: bool,
         parallelizable: bool,
     ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) {
-        // TODO: complex aborts conditions
+        // TODO: The error target is in `aggregator_factory::create_aggregator_internal`.
+        // I added the verification of the resource `AggregatorFactory` and still reported an error.
         pragma aborts_if_is_partial;
         include InitializeInternalSchema<CoinType>{
             name: name.bytes,

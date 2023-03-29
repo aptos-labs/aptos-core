@@ -589,7 +589,7 @@ impl GlobalEnv {
     }
 
     /// Retrieves extension data from the environment. Use as in `env.get_extension::<T>()`.
-    /// An Rc<T> is returned because extension data is stored in a RefCell and we can't use
+    /// An `Rc<T>` is returned because extension data is stored in a RefCell and we can't use
     /// lifetimes (`&'a T`) to control borrowing.
     pub fn get_extension<T: Any>(&self) -> Option<Rc<T>> {
         let id = TypeId::of::<T>();
@@ -3151,28 +3151,17 @@ impl<'env> FunctionEnv<'env> {
         false
     }
 
-    /// Returns whether the value of a numeric pragma is explicitly set for this function.
-    pub fn is_num_pragma_set(&self, name: &str) -> bool {
-        let env = self.module_env.env;
-        env.get_num_property(&self.get_spec().properties, name)
-            .is_some()
-            || env
-                .get_num_property(&self.module_env.get_spec().properties, name)
-                .is_some()
-    }
-
-    /// Returns the value of a numeric pragma for this function. This first looks up a
-    /// pragma in this function, then the enclosing module, and finally uses the provided default.
-    /// value
-    pub fn get_num_pragma(&self, name: &str, default: impl FnOnce() -> usize) -> usize {
+    /// Returns the value of a numeric pragma for this function. This first looks up a pragma in
+    /// this function, then the enclosing module, and finally uses the provided default value.
+    pub fn get_num_pragma(&self, name: &str) -> Option<usize> {
         let env = self.module_env.env;
         if let Some(n) = env.get_num_property(&self.get_spec().properties, name) {
-            return n;
+            return Some(n);
         }
         if let Some(n) = env.get_num_property(&self.module_env.get_spec().properties, name) {
-            return n;
+            return Some(n);
         }
-        default()
+        None
     }
 
     /// Returns the value of a pragma representing an identifier for this function.

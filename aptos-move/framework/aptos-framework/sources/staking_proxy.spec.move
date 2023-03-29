@@ -6,28 +6,28 @@ spec aptos_framework::staking_proxy {
 
     /// Aborts if conditions of SetStakePoolOperator are not met
     spec set_operator(owner: &signer, old_operator: address, new_operator: address) {
-        // TODO: set_vesting_contract_operator and set_staking_contract_operator too complicated.
+        // TODO: Can't verify `set_vesting_contract_operator` and `set_staking_contract_operator`
         pragma aborts_if_is_partial;
         include SetStakePoolOperator;
     }
 
     /// Aborts if conditions of SetStackingContractVoter and SetStackPoolVoterAbortsIf are not met
     spec set_voter(owner: &signer, operator: address, new_voter: address) {
-        // TODO: set_vesting_contract_voter too complicated.
+        // TODO: Can't verify `set_vesting_contract_voter`
         pragma aborts_if_is_partial;
         include SetStakingContractVoter;
         include SetStakePoolVoterAbortsIf;
     }
 
     spec set_vesting_contract_operator(owner: &signer, old_operator: address, new_operator: address) {
-        // TODO: can't verify update_voter in while loop.
+        // TODO: Can't verify `update_voter` in while loop.
         pragma aborts_if_is_partial;
     }
 
     spec set_staking_contract_operator(owner: &signer, old_operator: address, new_operator: address) {
         use aptos_framework::staking_contract::{Store};
         use aptos_framework::simple_map;
-        // TODO: Timeout & staking_contract::switch_operator.
+        // TODO: Verify timeout and can't verify `staking_contract::switch_operator`.
         pragma aborts_if_is_partial;
 
         let owner_address = signer::address_of(owner);
@@ -36,7 +36,7 @@ spec aptos_framework::staking_proxy {
     }
 
     spec set_vesting_contract_voter(owner: &signer, operator: address, new_voter: address) {
-        // TODO: The update_voter function logic is too complicated in the while loop
+        // TODO: Can't verify `update_voter` in while loop.
         pragma aborts_if_is_partial;
     }
 

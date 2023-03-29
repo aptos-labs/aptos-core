@@ -543,7 +543,7 @@ impl DataSummary {
 /// inclusive) where data is complete (i.e. there are no missing pieces of data).
 ///
 /// This is used to provide a summary of the data currently held in storage, e.g.
-/// a CompleteDataRange<Version> of (A,B) means all versions A->B (inclusive).
+/// a `CompleteDataRange<Version>` of (A,B) means all versions A->B (inclusive).
 ///
 /// Note: `CompleteDataRanges` are never degenerate (lowest > highest) and the
 /// range length is always expressible without overflowing. Constructing a

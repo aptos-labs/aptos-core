@@ -517,4 +517,4 @@ Return true if <code>addr</code> is either the VM address or an Aptos Framework 
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

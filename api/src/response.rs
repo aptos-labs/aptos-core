@@ -4,7 +4,7 @@
 //! The Aptos API response / error handling philosophy.
 //!
 //! The return type for every endpoint should be a
-//! poem::Result<MyResponse<T>, MyError> where MyResponse is an instance of
+//! `poem::Result<MyResponse<T>, MyError>` where MyResponse is an instance of
 //! ApiResponse that contains only the status codes that it can actually
 //! return. This will manifest in the OpenAPI spec, making it clear to users
 //! what the API can actually return. The error should operate the same way,
@@ -560,6 +560,13 @@ pub fn bcs_api_disabled<S: Display, E: ForbiddenError>(identifier: S) -> E {
 pub fn api_disabled<S: Display, E: ForbiddenError>(identifier: S) -> E {
     E::forbidden_with_code_no_info(
         format!("{} is disabled on this endpoint", identifier),
+        AptosErrorCode::ApiDisabled,
+    )
+}
+
+pub fn api_forbidden<S: Display, E: ForbiddenError>(identifier: S, extra_help: S) -> E {
+    E::forbidden_with_code_no_info(
+        format!("{} is not allowed. {}", identifier, extra_help),
         AptosErrorCode::ApiDisabled,
     )
 }

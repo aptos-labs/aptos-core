@@ -69,7 +69,7 @@ fn test_basic_token() {
         type_params: vec![],
     };
     let token_obj_tag = StructTag {
-        address: addr,
+        address: AccountAddress::from_hex_literal("0x4").unwrap(),
         module: Identifier::new("token").unwrap(),
         name: Identifier::new("Token").unwrap(),
         type_params: vec![],

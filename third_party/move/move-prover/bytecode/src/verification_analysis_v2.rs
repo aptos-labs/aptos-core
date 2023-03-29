@@ -63,7 +63,7 @@ pub struct InvariantAnalysisData {
     /// Functions that modify some invariant in the target
     /// Does not include update invariants
     pub funs_that_modify_some_inv: BTreeSet<QualifiedId<FunId>>,
-    /// functions that are in non_inv_fun_set and M[I] for some I.
+    /// functions that are in non_inv_fun_set and `M[I]` for some `I`.
     /// We have to verify the callers, which may be in friend modules.
     pub funs_that_delegate_to_caller: BTreeSet<QualifiedId<FunId>>,
     /// Functions that are not in target or deps, but that call a function

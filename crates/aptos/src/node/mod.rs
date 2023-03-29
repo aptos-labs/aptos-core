@@ -74,6 +74,8 @@ const SECS_TO_MICROSECS: u64 = 1_000_000;
 /// identify issues with nodes, and show related information.
 #[derive(Parser)]
 pub enum NodeTool {
+    AnalyzeValidatorPerformance(AnalyzeValidatorPerformance),
+    BootstrapDbFromBackup(BootstrapDbFromBackup),
     CheckNetworkConnectivity(CheckNetworkConnectivity),
     GetPerformance(GetPerformance),
     GetStakePool(GetStakePool),
@@ -87,14 +89,14 @@ pub enum NodeTool {
     RunLocalTestnet(RunLocalTestnet),
     UpdateConsensusKey(UpdateConsensusKey),
     UpdateValidatorNetworkAddresses(UpdateValidatorNetworkAddresses),
-    AnalyzeValidatorPerformance(AnalyzeValidatorPerformance),
-    BootstrapDbFromBackup(BootstrapDbFromBackup),
 }
 
 impl NodeTool {
     pub async fn execute(self) -> CliResult {
         use NodeTool::*;
         match self {
+            AnalyzeValidatorPerformance(tool) => tool.execute_serialized().await,
+            BootstrapDbFromBackup(tool) => tool.execute_serialized().await,
             CheckNetworkConnectivity(tool) => tool.execute_serialized().await,
             GetPerformance(tool) => tool.execute_serialized().await,
             GetStakePool(tool) => tool.execute_serialized().await,
@@ -108,8 +110,6 @@ impl NodeTool {
             RunLocalTestnet(tool) => tool.execute_serialized_without_logger().await,
             UpdateConsensusKey(tool) => tool.execute_serialized().await,
             UpdateValidatorNetworkAddresses(tool) => tool.execute_serialized().await,
-            AnalyzeValidatorPerformance(tool) => tool.execute_serialized().await,
-            BootstrapDbFromBackup(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -986,9 +986,9 @@ impl ValidatorConfig {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct ValidatorConfigSummary {
     pub consensus_public_key: String,
-    /// This is an bcs serialized Vec<NetworkAddress>
+    /// This is an bcs serialized `Vec<NetworkAddress>`
     pub validator_network_addresses: Vec<NetworkAddress>,
-    /// This is an bcs serialized Vec<NetworkAddress>
+    /// This is an bcs serialized `Vec<NetworkAddress>`
     pub fullnode_network_addresses: Vec<NetworkAddress>,
     pub validator_index: u64,
 }
