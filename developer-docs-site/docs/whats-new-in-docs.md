@@ -17,7 +17,7 @@ This page shows the key updates to the developer documentation on this site. Not
 
 ## 24 March 2023
 
-- Added instructions to [Integrate with Aptos Names Service UI Package](./guides/aptos-name-service-connector.md) that offers developers a customizable button and modal to enable users to search for and mint Aptos names directly from their website.
+- Added instructions to [Integrate with Aptos Names Service](./guides/aptos-name-service-connector.md) that offers developers a customizable button and modal to enable users to search for and mint Aptos names directly from their website.
 
 ## 23 March 2023
 
