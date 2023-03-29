@@ -4,27 +4,44 @@
 //! Traits for resolving Move resources from persistent storage at runtime.
 
 use crate::values::Value;
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     account_address::AccountAddress,
     language_storage::StructTag,
     resolver::{ModuleBlobResolver, ResourceBlobResolver},
     value::MoveTypeLayout,
+    vm_status::StatusCode,
 };
 use std::{
     fmt::Debug,
-    ops::Deref,
     sync::{Arc, Mutex, RwLock},
 };
 
 /// Encapsulates Move values so that they are thread-safe.
 #[derive(Debug)]
-pub struct ValueHandle(Arc<Mutex<Value>>);
+pub struct ValueMutex(Arc<Mutex<Value>>);
 
-impl Deref for ValueHandle {
-    type Target = Arc<Mutex<Value>>;
+impl ValueMutex {
+    pub fn new(value: Value) -> Self {
+        Self(Arc::new(Mutex::new(value)))
+    }
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
+    pub fn lock(&self) -> PartialVMResult<std::sync::MutexGuard<'_, Value>> {
+        self.0
+            .lock()
+            .map_err(|_| PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))
+    }
+
+    pub fn try_lock(&self) -> PartialVMResult<std::sync::MutexGuard<'_, Value>> {
+        self.0
+            .try_lock()
+            .map_err(|_| PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))
+    }
+}
+
+impl Clone for ValueMutex {
+    fn clone(&self) -> Self {
+        Self(Arc::clone(&self.0))
     }
 }
 
@@ -33,22 +50,26 @@ impl Deref for ValueHandle {
 pub struct ReadOnlyLayout(Arc<RwLock<MoveTypeLayout>>);
 
 impl ReadOnlyLayout {
-    pub fn read(&self) -> std::sync::LockResult<std::sync::RwLockReadGuard<'_, MoveTypeLayout>> {
-        self.0.read()
+    pub fn new(move_type_layout: MoveTypeLayout) -> Self {
+        Self(Arc::new(RwLock::new(move_type_layout)))
     }
 
-    pub fn try_read(
-        &self,
-    ) -> std::sync::TryLockResult<std::sync::RwLockReadGuard<'_, MoveTypeLayout>> {
-        self.0.try_read()
+    pub fn read(&self) -> PartialVMResult<std::sync::RwLockReadGuard<'_, MoveTypeLayout>> {
+        self.0
+            .read()
+            .map_err(|_| PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))
+    }
+
+    pub fn try_read(&self) -> PartialVMResult<std::sync::RwLockReadGuard<'_, MoveTypeLayout>> {
+        self.0
+            .try_read()
+            .map_err(|_| PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))
     }
 }
 
-impl Deref for ReadOnlyLayout {
-    type Target = Arc<RwLock<MoveTypeLayout>>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
+impl Clone for ReadOnlyLayout {
+    fn clone(&self) -> Self {
+        Self(Arc::clone(&self.0))
     }
 }
 
@@ -59,15 +80,13 @@ pub enum Resource {
     Serialized(Arc<Vec<u8>>),
     // Resource is stored as a Move value and is not serialized yet. This type is
     // useful to cache outputs of VM session and avoid unnecessary deserialization.
-    Cached(ValueHandle, ReadOnlyLayout),
+    Cached(ValueMutex, ReadOnlyLayout),
 }
 
 impl Resource {
     /// Creates a new resource from Move value and its layout.
     pub fn from_value_layout(value: Value, layout: MoveTypeLayout) -> Resource {
-        let value_handle = ValueHandle(Arc::new(Mutex::new(value)));
-        let ro_layout = ReadOnlyLayout(Arc::new(RwLock::new(layout)));
-        Resource::Cached(value_handle, ro_layout)
+        Resource::Cached(ValueMutex::new(value), ReadOnlyLayout::new(layout))
     }
 
     /// Creates a new resource from blob.
@@ -79,28 +98,24 @@ impl Resource {
     ///
     /// This function involves serialization or copying and is therefore expensive to use, and
     /// should be avoided if possible.
-    pub fn serialize(&self) -> Option<Vec<u8>> {
+    pub fn serialize(&self) -> PartialVMResult<Option<Vec<u8>>> {
         match self {
-            Self::Serialized(blob) => Some(blob.as_ref().clone()),
-            Self::Cached(value_handle, layout) => {
-                let value = value_handle.lock().unwrap();
-                let layout = layout.read().unwrap();
-                value.simple_serialize(&layout)
+            Self::Serialized(blob) => Ok(Some(blob.as_ref().clone())),
+            Self::Cached(value, layout) => {
+                let value = value.lock()?;
+                let layout = layout.read()?;
+                Ok(value.simple_serialize(&layout))
             },
         }
     }
 }
 
-// Implement clone to satisfy Clone bounds on `AccountRuntimeChangeSet` and `RuntimeChangeSet`.
+// Implement clone to satisfy Clone bounds on `AccountChangeSet` and `ChangeSet`.
 impl Clone for Resource {
     fn clone(&self) -> Self {
         match self {
             Resource::Serialized(blob) => Resource::Serialized(Arc::clone(blob)),
-            Resource::Cached(value_handle, layout) => {
-                let value_handle = ValueHandle(Arc::clone(value_handle));
-                let layout = ReadOnlyLayout(Arc::clone(layout));
-                Resource::Cached(value_handle, layout)
-            },
+            Resource::Cached(value, layout) => Resource::Cached(value.clone(), layout.clone()),
         }
     }
 }
@@ -147,8 +162,9 @@ impl<
     type Err = E;
 }
 
-// TODO: Replace `ModuleBlobResolver` with `ModuleResolver` and define it here.
-// TODO: Remove `ResourceBlobResolver`.
+// TODO: Currently MoveResolver has `ModuleBlobResolver` and `ResourceBlobResolver`. When
+// we switch to values over blobs `ResourceBlobResolver` bound should be removed. Similarly,
+// when we cache compiled modules we should use `ModuleResolver` over `ModuleBlobResolver`.
 
 impl<T: ResourceResolver + ?Sized> ResourceResolver for &T {
     type Error = T::Error;

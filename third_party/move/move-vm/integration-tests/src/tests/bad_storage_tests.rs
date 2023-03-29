@@ -106,8 +106,8 @@ fn test_malformed_resource() {
     )
     .map(|_| ())
     .unwrap();
-    let (change_set, _) = sess.pause().unwrap();
-    storage.apply(change_set).unwrap();
+    let (changeset, _) = sess.pause().unwrap();
+    storage.apply(changeset).unwrap();
 
     // Execut the second script and make sure it succeeds. This script simply checks
     // that the published resource is what we expect it to be. This inital run is to ensure

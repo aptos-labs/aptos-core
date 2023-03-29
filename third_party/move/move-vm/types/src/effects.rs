@@ -94,7 +94,7 @@ impl AccountChangeSet {
         for (struct_tag, op) in resources {
             let new_op = op.and_then(|resource| {
                 resource
-                    .serialize()
+                    .serialize()?
                     .ok_or_else(|| PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR))
             })?;
             resource_blobs.insert(struct_tag, new_op);

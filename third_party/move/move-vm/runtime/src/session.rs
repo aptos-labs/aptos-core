@@ -258,9 +258,8 @@ impl<'r, 'l, S: MoveResolver> Session<'r, 'l, S> {
     ///
     /// This MUST NOT be called if there is a previous invocation that failed with an invariant violation.
     pub fn finish(self) -> VMResult<(BlobChangeSet, Vec<Event>)> {
-        let (runtime_change_set, events) = self.pause()?;
-        let change_set = runtime_change_set.into_blob_change_set()?;
-        Ok((change_set, events))
+        let (change_set, events) = self.pause()?;
+        Ok((change_set.into_blob_change_set()?, events))
     }
 
     /// Same as `finish` but avoids deserialization of values.
@@ -274,9 +273,12 @@ impl<'r, 'l, S: MoveResolver> Session<'r, 'l, S> {
     pub fn finish_with_extensions(
         self,
     ) -> VMResult<(BlobChangeSet, Vec<Event>, NativeContextExtensions<'r>)> {
-        let (runtime_change_set, events, native_extensions) = self.pause_with_extensions()?;
-        let change_set = runtime_change_set.into_blob_change_set()?;
-        Ok((change_set, events, native_extensions))
+        let (change_set, events, native_extensions) = self.pause_with_extensions()?;
+        Ok((
+            change_set.into_blob_change_set()?,
+            events,
+            native_extensions,
+        ))
     }
 
     /// Same as `finish_with_extensions` but avoids deserialization of values.
