@@ -72,12 +72,12 @@ impl AccountChangeSet {
     }
 
     /// Returns module changes for this account.
-    pub fn module_ops(&self) -> &BTreeMap<Identifier, Op<Vec<u8>>> {
+    pub fn modules(&self) -> &BTreeMap<Identifier, Op<Vec<u8>>> {
         &self.modules
     }
 
     /// Returns resource changes for this account.
-    pub fn resource_ops(&self) -> &BTreeMap<StructTag, Op<Resource>> {
+    pub fn resources(&self) -> &BTreeMap<StructTag, Op<Resource>> {
         &self.resources
     }
 

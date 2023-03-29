@@ -90,7 +90,7 @@ impl<'a, 'b, S: ModuleBlobResolver> ModuleBlobResolver for DeltaStorage<'a, 'b, 
 
     fn get_module_blob(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
         if let Some(account_storage) = self.delta.accounts().get(module_id.address()) {
-            if let Some(blob_opt) = account_storage.module_ops().get(module_id.name()) {
+            if let Some(blob_opt) = account_storage.modules().get(module_id.name()) {
                 return Ok(blob_opt.clone().ok());
             }
         }
@@ -108,7 +108,7 @@ impl<'a, 'b, S: ResourceResolver> ResourceResolver for DeltaStorage<'a, 'b, S> {
         tag: &StructTag,
     ) -> Result<Option<Resource>, S::Error> {
         if let Some(account_storage) = self.delta.accounts().get(address) {
-            if let Some(resource_op) = account_storage.resource_ops().get(tag) {
+            if let Some(resource_op) = account_storage.resources().get(tag) {
                 return Ok(resource_op.as_ref().ok().cloned());
             }
         }
@@ -126,7 +126,7 @@ impl<'a, 'b, S: ResourceBlobResolver> ResourceBlobResolver for DeltaStorage<'a, 
         tag: &StructTag,
     ) -> Result<Option<Vec<u8>>, S::Error> {
         if let Some(account_storage) = self.delta.accounts().get(address) {
-            if let Some(resource_op) = account_storage.resource_ops().get(tag) {
+            if let Some(resource_op) = account_storage.resources().get(tag) {
                 return Ok(resource_op.as_ref().ok().map(|r| {
                     r.serialize()
                         .expect("resource serialization should succeed")
@@ -261,9 +261,9 @@ impl InMemoryStorage {
         Ok(())
     }
 
-    pub fn apply(&mut self, change_set: ChangeSet) -> Result<()> {
+    pub fn apply(&mut self, changeset: ChangeSet) -> Result<()> {
         self.apply_extended(
-            change_set,
+            changeset,
             #[cfg(feature = "table-extension")]
             TableChangeSet::default(),
         )
@@ -316,8 +316,9 @@ impl InMemoryStorage {
         blob: Vec<u8>,
     ) {
         let account = get_or_insert(&mut self.accounts, addr, InMemoryAccountStorage::new);
-        let resource = Resource::from_blob(blob);
-        account.resources.insert(struct_tag, resource);
+        account
+            .resources
+            .insert(struct_tag, Resource::from_blob(blob));
     }
 }
 
