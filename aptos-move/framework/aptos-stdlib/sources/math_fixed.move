@@ -191,7 +191,7 @@ module aptos_std::math_fixed64 {
 
     // Calculate e^x where x and the result are fixed point numbers
     fun exp_raw(x: u256): u256 {
-        // exp(x / 2^32) = 2^(x / (2^32 * ln(2))) = 2^(floor(x / (2^32 * ln(2))) + frac(x / (2^32 * ln(2))))
+        // exp(x / 2^64) = 2^(x / (2^64 * ln(2))) = 2^(floor(x / (2^64 * ln(2))) + frac(x / (2^64 * ln(2))))
         let shift_long = x / LN2;
         assert!(shift_long <= 63, std::error::invalid_state(EOVERFLOW_EXP));
         let shift = (shift_long as u8);
@@ -203,18 +203,21 @@ module aptos_std::math_fixed64 {
         let x = remainder % bigfactor;
         // 2^(remainder / ln2) = (2^(1/580))^exponent * exp(x / 2^64)
         let roottwo = 18468802611690918839;  // fixed point representation of 2^(1/580)
-        // This has an error of 5000 / 4 10^9 roughly 6 digits of precission
+        // 2^(1/580) = roottwo(1 - eps), so the number we seek is roottwo^exponent (1 - eps * exponent)
         let power = pow_raw(roottwo, (exponent as u128));
-        let eps_correction = 219333680610174738;
-        power = power - ((power * eps_correction * exponent) >> 64);
+        let eps_correction = 219071715585908898;
+        std::debug::print(&power);
+        std::debug::print(&exponent);
+        power = power - ((power * eps_correction * exponent) >> 128);
         // x is fixed point number smaller than bigfactor/2^64 < 0.0011 so we need only 5 tayler steps
         // to get the 15 digits of precission
         let taylor1 = (power * x) >> (64 - shift);
         let taylor2 = (taylor1 * x) >> 64;
         let taylor3 = (taylor2 * x) >> 64;
-        let taylor4 = (taylor2 * x) >> 64;
-        let taylor5 = (taylor2 * x) >> 64;
-        (power << shift) + taylor1 + taylor2 / 2 + taylor3 / 6 + taylor4 / 24 + taylor5 / 120
+        let taylor4 = (taylor3 * x) >> 64;
+        let taylor5 = (taylor4 * x) >> 64;
+        let taylor6 = (taylor5 * x) >> 64;
+        (power << shift) + taylor1 + taylor2 / 2 + taylor3 / 6 + taylor4 / 24 + taylor5 / 120 + taylor6 / 720
     }
 
     // Calculate x to the power of n, where x and the result are fixed point numbers.
@@ -229,50 +232,50 @@ module aptos_std::math_fixed64 {
         };
         res
     }
-/*
+
     #[test]
     public entry fun test_sqrt() {
         // Sqrt is based on math128::sqrt and thus most of the testing is done there.
-        let fixed_base = 1 << 32;
-        let result = sqrt(fixed_point32::create_from_u64(1));
-        assert!(fixed_point32::get_raw_value(result) == fixed_base, 0);
+        let fixed_base = 1 << 64;
+        let result = sqrt(fixed_point64::create_from_u128(1));
+        assert!(fixed_point64::get_raw_value(result) == fixed_base, 0);
 
-        let result = sqrt(fixed_point32::create_from_u64(2));
-        assert_approx_the_same((fixed_point32::get_raw_value(result) as u128), 6074001000, 9);
+        let result = sqrt(fixed_point64::create_from_u128(2));
+        assert_approx_the_same((fixed_point64::get_raw_value(result) as u256), 26087635650665564424, 16);
     }
 
     #[test]
     public entry fun test_exp() {
-        let fixed_base = 1 << 32;
+        let fixed_base = 1 << 64;
         let result = exp_raw(0);
         assert!(result == fixed_base, 0);
 
         let result = exp_raw(fixed_base);
-        let e = 11674931554;  // e in 32 bit fixed point
-        assert_approx_the_same(result, e, 9);
+        let e = 50143449209799256682;  // e in 32 bit fixed point
+        assert_approx_the_same(result, e, 16);
 
         let result = exp_raw(10 * fixed_base);
-        let exp10 = 94602950235157;  // e^10 in 32 bit fixed point
-        assert_approx_the_same(result, exp10, 9);
+        let exp10 = 406316577365116946489258;  // e^10 in 32 bit fixed point
+        assert_approx_the_same(result, exp10, 16);
     }
 
     #[test]
     public entry fun test_pow() {
         // We use the case of exp
-        let result = pow_raw(4295562865, 4999);
-        assert_approx_the_same(result,  1 << 33, 6);
+        let result = pow_raw(18468802611690918839, 580);
+        assert_approx_the_same(result,  1 << 65, 16);
     }
 
     #[testonly]
     /// For functions that approximate a value it's useful to test a value is close
     /// to the most correct value up to last digit
-    fun assert_approx_the_same(x: u128, y: u128, precission: u128) {
+    fun assert_approx_the_same(x: u256, y: u256, precission: u128) {
         if (x < y) {
             let tmp = x;
             x = y;
             y = tmp;
         };
-        let mult = math128::pow(10, precission);
+        let mult = (math128::pow(10, precission) as u256);
         assert!((x - y) * mult < x, 0);
-    }*/
+    }
 }

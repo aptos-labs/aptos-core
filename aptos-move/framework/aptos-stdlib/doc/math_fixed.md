@@ -14,9 +14,11 @@
 -  [Function `mul_div`](#0x1_math_fixed64_mul_div)
 -  [Function `exp_raw`](#0x1_math_fixed64_exp_raw)
 -  [Function `pow_raw`](#0x1_math_fixed64_pow_raw)
+-  [Function `assert_approx_the_same`](#0x1_math_fixed64_assert_approx_the_same)
 
 
-<pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<pre><code><b>use</b> <a href="debug.md#0x1_debug">0x1::debug</a>;
+<b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="fixed_point64.md#0x1_fixed_point64">0x1::fixed_point64</a>;
 <b>use</b> <a href="math128.md#0x1_math128">0x1::math128</a>;
 </code></pre>
@@ -225,7 +227,7 @@ Specialized function for x * y / z that omits intermediate shifting
 
 
 <pre><code><b>fun</b> <a href="math_fixed.md#0x1_math_fixed64_exp_raw">exp_raw</a>(x: u256): u256 {
-    // <a href="math_fixed.md#0x1_math_fixed64_exp">exp</a>(x / 2^32) = 2^(x / (2^32 * ln(2))) = 2^(floor(x / (2^32 * ln(2))) + frac(x / (2^32 * ln(2))))
+    // <a href="math_fixed.md#0x1_math_fixed64_exp">exp</a>(x / 2^64) = 2^(x / (2^64 * ln(2))) = 2^(floor(x / (2^64 * ln(2))) + frac(x / (2^64 * ln(2))))
     <b>let</b> shift_long = x / <a href="math_fixed.md#0x1_math_fixed64_LN2">LN2</a>;
     <b>assert</b>!(shift_long &lt;= 63, std::error::invalid_state(<a href="math_fixed.md#0x1_math_fixed64_EOVERFLOW_EXP">EOVERFLOW_EXP</a>));
     <b>let</b> shift = (shift_long <b>as</b> u8);
@@ -237,18 +239,21 @@ Specialized function for x * y / z that omits intermediate shifting
     <b>let</b> x = remainder % bigfactor;
     // 2^(remainder / ln2) = (2^(1/580))^exponent * <a href="math_fixed.md#0x1_math_fixed64_exp">exp</a>(x / 2^64)
     <b>let</b> roottwo = 18468802611690918839;  // fixed point representation of 2^(1/580)
-    // This <b>has</b> an <a href="../../move-stdlib/doc/error.md#0x1_error">error</a> of 5000 / 4 10^9 roughly 6 digits of precission
+    // 2^(1/580) = roottwo(1 - eps), so the number we seek is roottwo^exponent (1 - eps * exponent)
     <b>let</b> power = <a href="math_fixed.md#0x1_math_fixed64_pow_raw">pow_raw</a>(roottwo, (exponent <b>as</b> u128));
-    <b>let</b> eps_correction = 219333680610174738;
-    power = power - ((power * eps_correction * exponent) &gt;&gt; 64);
+    <b>let</b> eps_correction = 219071715585908898;
+    std::debug::print(&power);
+    std::debug::print(&exponent);
+    power = power - ((power * eps_correction * exponent) &gt;&gt; 128);
     // x is fixed point number smaller than bigfactor/2^64 &lt; 0.0011 so we need only 5 tayler steps
     // <b>to</b> get the 15 digits of precission
     <b>let</b> taylor1 = (power * x) &gt;&gt; (64 - shift);
     <b>let</b> taylor2 = (taylor1 * x) &gt;&gt; 64;
     <b>let</b> taylor3 = (taylor2 * x) &gt;&gt; 64;
-    <b>let</b> taylor4 = (taylor2 * x) &gt;&gt; 64;
-    <b>let</b> taylor5 = (taylor2 * x) &gt;&gt; 64;
-    (power &lt;&lt; shift) + taylor1 + taylor2 / 2 + taylor3 / 6 + taylor4 / 24 + taylor5 / 120
+    <b>let</b> taylor4 = (taylor3 * x) &gt;&gt; 64;
+    <b>let</b> taylor5 = (taylor4 * x) &gt;&gt; 64;
+    <b>let</b> taylor6 = (taylor5 * x) &gt;&gt; 64;
+    (power &lt;&lt; shift) + taylor1 + taylor2 / 2 + taylor3 / 6 + taylor4 / 24 + taylor5 / 120 + taylor6 / 720
 }
 </code></pre>
 
@@ -281,6 +286,38 @@ Specialized function for x * y / z that omits intermediate shifting
         x = (x * x) &gt;&gt; 64;
     };
     res
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_math_fixed64_assert_approx_the_same"></a>
+
+## Function `assert_approx_the_same`
+
+For functions that approximate a value it's useful to test a value is close
+to the most correct value up to last digit
+
+
+<pre><code><b>fun</b> <a href="math_fixed.md#0x1_math_fixed64_assert_approx_the_same">assert_approx_the_same</a>(x: u256, y: u256, precission: u128)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="math_fixed.md#0x1_math_fixed64_assert_approx_the_same">assert_approx_the_same</a>(x: u256, y: u256, precission: u128) {
+    <b>if</b> (x &lt; y) {
+        <b>let</b> tmp = x;
+        x = y;
+        y = tmp;
+    };
+    <b>let</b> mult = (<a href="math128.md#0x1_math128_pow">math128::pow</a>(10, precission) <b>as</b> u256);
+    <b>assert</b>!((x - y) * mult &lt; x, 0);
 }
 </code></pre>
 
