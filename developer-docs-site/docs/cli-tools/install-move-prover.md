@@ -5,9 +5,9 @@ id: "install-move-prover"
 
 # Install the Move Prover to Validate Code
 
-We highly recommend you install the Move Prover after [installing the Aptos CLI](./aptos-cli-tool/index.md) to validate your Move code.
+We highly recommend you install the [Move Prover](https://github.com/move-language/move/blob/main/language/move-prover/doc/user/prover-guide.md) after [installing the Aptos CLI](./aptos-cli-tool/index.md) to validate your Move code following the instructions on this page.
 
-For examples, see:
+For Move Prover examples, see:
 https://github.com/Zellic/move-prover-examples
 
 :::tip
