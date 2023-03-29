@@ -3,7 +3,7 @@ title: "Install the Move Prover"
 id: "install-move-prover"
 ---
 
-# Install the Move Prover
+# Install the Move Prover to Validate Code
 
 We highly recommend you install the Move Prover after [installing the Aptos CLI](./aptos-cli-tool/index.md) to validate your Move code.
 
