@@ -724,7 +724,7 @@ struct CheckerVisitor<'l, 'r> {
     seen: BTreeMap<StructName, Loc>,
 }
 
-fn post_inlining_check(inliner: &mut Inliner, _name: &str, fdef: &mut Function) {
+fn post_inlining_check(inliner: &mut Inliner, name: &str, fdef: &mut Function) {
     let mut visitor = CheckerVisitor {
         inliner,
         declared: fdef.acquires.clone(),
@@ -755,10 +755,11 @@ fn post_inlining_check(inliner: &mut Inliner, _name: &str, fdef: &mut Function) 
     for (s, l) in &seen {
         if !declared.contains_key(s) {
             let tmsg = format!(
-                "The call acquires '{}::{}', but the 'acquires' list for the current function does \
+                "The call acquires '{}::{}', but the 'acquires' list for the current function '{}` does \
              not contain this type. It must be present in the calling context's acquires list",
                 current_module,
-                s
+                s,
+                name
             );
             inliner
                 .env
@@ -786,8 +787,8 @@ impl<'l, 'r> Visitor for CheckerVisitor<'l, 'r> {
                     }
                 }
 
-                for (s, l) in &mcall.acquires {
-                    self.seen.insert(*s, *l);
+                for s in mcall.acquires.keys() {
+                    self.seen.insert(*s, ex.exp.loc);
                 }
                 VisitorContinuation::Descend
             },
