@@ -5,7 +5,7 @@ use super::{
     publishing::{module_simple::EntryPoints, publish_util::Package},
     TransactionExecutor,
 };
-use crate::transaction_generator::{
+use crate::{
     publishing::publish_util::PackageHandler, TransactionGenerator, TransactionGeneratorCreator,
 };
 use aptos_logger::info;

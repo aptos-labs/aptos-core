@@ -97,7 +97,7 @@ pub fn convert_txn_args(args: &[TransactionArgument]) -> Vec<Vec<u8>> {
         .collect()
 }
 
-/// Struct for encoding vector<vector<u8>> arguments for script functions
+/// Struct for encoding `vector<vector<u8>>` arguments for script functions
 #[derive(Clone, Hash, Eq, PartialEq, Deserialize)]
 pub struct VecBytes(Vec<serde_bytes::ByteBuf>);
 

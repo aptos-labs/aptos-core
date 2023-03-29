@@ -9,7 +9,11 @@ This page shows the key updates to the developer documentation on this site. Not
 
 ## 28 March 2023
 
-- Offered an experimental feature to [profile gas use locally](./cli-tools/aptos-cli-tool/use-aptos-cli.md#profiling-gas-use) via the Aptos CLI that not only simulates usage but also generates flame graphs for visualizing transaction gas logs.
+- Offered an experimental feature to [profile gas use locally](./cli-tools/aptos-cli-tool/use-aptos-cli.md#profiling-gas-use) via the Aptos CLI that not only simulates usage but also generates flame graphs for visualizing gas use.
+
+## 27 March 2023
+
+- Described how to [Use the Remix IDE Plugin](./community/contributions/remix-ide-plugin.md) to deploy and run Move modules on the Remix IDE, a graphical interface for developing Move modules written by [0xhsy](https://github.com/0xhsy) of [WELLDONE Studio](https://docs.welldonestudio.io/).
 
 ## 24 March 2023
 

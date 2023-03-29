@@ -38,10 +38,10 @@
 //! another example, if we want to execute transaction T_{i+2}, we can use the tree S_{i+1} that
 //! has updated values for both account A and B.
 //!
-//! Each version of the tree holds a strong reference (an Arc<Node>) to its root as well as one to
-//! its base tree (S_i is the base tree of S_{i+1} in the above example). The root node in turn,
+//! Each version of the tree holds a strong reference (an `Arc<Node>`) to its root as well as one to
+//! its base tree (`S_i` is the base tree of `S_{i+1}` in the above example). The root node in turn,
 //! recursively holds all descendant nodes created in the same version, and weak references
-//! (a Weak<Node>) to all descendant nodes that was created from previous versions.
+//! (a `Weak<Node>`) to all descendant nodes that was created from previous versions.
 //! With this construction:
 //!     1. Even if a reference to a specific tree is dropped, the nodes belonging to it won't be
 //! dropped as long as trees depending on it still hold strong references to it via the chain of
