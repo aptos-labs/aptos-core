@@ -20,9 +20,13 @@ assert!(from_bcs::to_address(bcs::to_bytes(&@0xabcdef)) == @0xabcdef, 0);
 -  [Constants](#@Constants_0)
 -  [Function `to_bool`](#0x1_from_bcs_to_bool)
 -  [Function `to_u8`](#0x1_from_bcs_to_u8)
+-  [Function `to_u16`](#0x1_from_bcs_to_u16)
+-  [Function `to_u32`](#0x1_from_bcs_to_u32)
 -  [Function `to_u64`](#0x1_from_bcs_to_u64)
 -  [Function `to_u128`](#0x1_from_bcs_to_u128)
+-  [Function `to_u256`](#0x1_from_bcs_to_u256)
 -  [Function `to_address`](#0x1_from_bcs_to_address)
+-  [Function `to_bytes`](#0x1_from_bcs_to_bytes)
 -  [Function `to_string`](#0x1_from_bcs_to_string)
 -  [Function `from_bytes`](#0x1_from_bcs_from_bytes)
 -  [Specification](#@Specification_1)
@@ -97,6 +101,54 @@ UTF8 check failed in conversion from bytes to string
 
 </details>
 
+<a name="0x1_from_bcs_to_u16"></a>
+
+## Function `to_u16`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_to_u16">to_u16</a>(v: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u16
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_to_u16">to_u16</a>(v: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u16 {
+    <a href="from_bcs.md#0x1_from_bcs_from_bytes">from_bytes</a>&lt;u16&gt;(v)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_from_bcs_to_u32"></a>
+
+## Function `to_u32`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_to_u32">to_u32</a>(v: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u32
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_to_u32">to_u32</a>(v: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u32 {
+    <a href="from_bcs.md#0x1_from_bcs_from_bytes">from_bytes</a>&lt;u32&gt;(v)
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_from_bcs_to_u64"></a>
 
 ## Function `to_u64`
@@ -145,6 +197,30 @@ UTF8 check failed in conversion from bytes to string
 
 </details>
 
+<a name="0x1_from_bcs_to_u256"></a>
+
+## Function `to_u256`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_to_u256">to_u256</a>(v: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u256
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_to_u256">to_u256</a>(v: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u256 {
+    <a href="from_bcs.md#0x1_from_bcs_from_bytes">from_bytes</a>&lt;u256&gt;(v)
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_from_bcs_to_address"></a>
 
 ## Function `to_address`
@@ -162,6 +238,30 @@ UTF8 check failed in conversion from bytes to string
 
 <pre><code><b>public</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_to_address">to_address</a>(v: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <b>address</b> {
     <a href="from_bcs.md#0x1_from_bcs_from_bytes">from_bytes</a>&lt;<b>address</b>&gt;(v)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_from_bcs_to_bytes"></a>
+
+## Function `to_bytes`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_to_bytes">to_bytes</a>(v: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_to_bytes">to_bytes</a>(v: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    <a href="from_bcs.md#0x1_from_bcs_from_bytes">from_bytes</a>&lt;<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;(v)
 }
 </code></pre>
 
@@ -258,4 +358,4 @@ owned.
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

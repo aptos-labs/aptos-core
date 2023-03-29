@@ -4,12 +4,6 @@ base:
   waypoint:
     from_file: "/opt/aptos/genesis/waypoint.txt"
 
-state_sync:
-  data_streaming_service:
-    max_concurrent_requests: 10
-    max_concurrent_state_requests: 20
-    max_request_retry: 10
-
 consensus:
   safety_rules:
     service:

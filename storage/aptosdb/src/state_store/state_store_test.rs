@@ -4,6 +4,7 @@
 
 use super::*;
 use crate::{
+    new_sharded_schema_batch,
     state_restore::StateSnapshotRestore,
     test_helper::{arb_state_kv_sets, update_store},
     AptosDB,
@@ -34,20 +35,20 @@ fn put_value_set(
         .merklize_value_set(jmt_update_refs(&jmt_updates), None, version, base_version)
         .unwrap();
     let ledger_batch = SchemaBatch::new();
-    let state_kv_batch = SchemaBatch::new();
+    let sharded_state_kv_batches = new_sharded_schema_batch();
     state_store
         .put_value_sets(
             vec![&value_set],
             version,
             StateStorageUsage::new_untracked(),
             &ledger_batch,
-            &state_kv_batch,
+            &sharded_state_kv_batches,
         )
         .unwrap();
     state_store.ledger_db.write_schemas(ledger_batch).unwrap();
     state_store
         .state_kv_db
-        .write_schemas(state_kv_batch)
+        .commit(version, sharded_state_kv_batches)
         .unwrap();
     root
 }

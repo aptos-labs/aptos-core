@@ -51,28 +51,28 @@ Either of these methods will expose a [REST API service](./aptos-apis.md) at `ht
   <TabItem value="devnet" label="Devnet">
     <ul>
       <li>REST API: <a href="https://fullnode.devnet.aptoslabs.com">https://fullnode.devnet.aptoslabs.com</a></li>
-      <li><a href="https://fullnode.devnet.aptoslabs.com/v1/spec#/">REST API Spec</a></li>
+      <li>REST API Spec: <a href="https://fullnode.devnet.aptoslabs.com/v1/spec#/">https://fullnode.devnet.aptoslabs.com/v1/spec#/</a></li>
       <li>Indexer API: <a href="https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql">https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql</a></li>
-      <li><a href="https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql">Indexer Graphiql</a></li>
       <li>Faucet API: <a href="https://faucet.devnet.aptoslabs.com">https://faucet.devnet.aptoslabs.com</a></li>
+      <li><a href="https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql">Indexer GraphQL</a></li>
     </ul>
   </TabItem>
   <TabItem value="testnet" label="Testnet">
     <ul>
       <li>REST API: <a href="https://fullnode.testnet.aptoslabs.com">https://fullnode.testnet.aptoslabs.com</a></li>
-      <li><a href="https://fullnode.testnet.aptoslabs.com/v1/spec#/">REST API Spec</a></li>
+      <li>REST API Spec: <a href="https://fullnode.testnet.aptoslabs.com/v1/spec#/">https://fullnode.testnet.aptoslabs.com/v1/spec#/</a></li>
       <li>Indexer API: <a href="https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql">https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql</a></li>
-      <li><a href="https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql">Indexer Graphiql</a></li>
-      <li><a href="https://aptoslabs.com/testnet-faucet">Faucet Site</a></li>
+      <li>Faucet API: <a href="https://faucet.testnet.aptoslabs.com">https://faucet.testnet.aptoslabs.com</a></li>
+      <li><a href="https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql">Indexer GraphQL</a></li>
     </ul>
   </TabItem>
   <TabItem value="mainnet" label="Mainnet">
     <ul>
       <li>REST API: <a href="https://fullnode.mainnet.aptoslabs.com">https://fullnode.mainnet.aptoslabs.com</a></li>
-      <li><a href="https://fullnode.mainnet.aptoslabs.com/v1/spec#/">REST API Spec</a></li>
+      <li>REST API Spec: <a href="https://fullnode.mainnet.aptoslabs.com/v1/spec#/">https://fullnode.mainnet.aptoslabs.com/v1/spec#/</a></li>
       <li>Indexer API: <a href="https://indexer.mainnet.aptoslabs.com/v1/graphql">https://indexer.mainnet.aptoslabs.com/v1/graphql</a></li>
-      <li><a href="https://cloud.hasura.io/public/graphiql?endpoint=https://indexer.mainnet.aptoslabs.com/v1/graphql">Indexer Graphiql</a></li>
       <li>Faucet: N/A</li>
+      <li><a href="https://cloud.hasura.io/public/graphiql?endpoint=https://indexer.mainnet.aptoslabs.com/v1/graphql">Indexer GraphQL</a></li>
     </ul>
   </TabItem>
 </Tabs>
@@ -131,12 +131,12 @@ JSON-encoded transactions allow for rapid development and support seamless ABI c
 
 ### Types of transactions
 
-Within a given transaction, the target of execution can be one of two types: 
+Within a given transaction, the target of execution can be one of two types:
 
 - An entry point (formerly known as script function)
 - A script (payload)
 
-Both [Python](https://github.com/aptos-labs/aptos-core/blob/3973311dac6bb9348bfc81cf983c2a1be11f1b48/ecosystem/python/sdk/aptos_sdk/client.py#L256) and [TypeScript](https://github.com/aptos-labs/aptos-core/blob/3973311dac6bb9348bfc81cf983c2a1be11f1b48/ecosystem/typescript/sdk/src/aptos_client.test.ts#L93) support the generation of transactions that target entry points. This guide points out many of those entry points, such as `aptos_account::transfer` and `aptos_account::create_account`. 
+Both [Python](https://github.com/aptos-labs/aptos-core/blob/3973311dac6bb9348bfc81cf983c2a1be11f1b48/ecosystem/python/sdk/aptos_sdk/client.py#L256) and [TypeScript](https://github.com/aptos-labs/aptos-core/blob/3973311dac6bb9348bfc81cf983c2a1be11f1b48/ecosystem/typescript/sdk/src/aptos_client.test.ts#L93) support the generation of transactions that target entry points. This guide points out many of those entry points, such as `aptos_account::transfer` and `aptos_account::create_account`.
 
 Most basic operations on the Aptos blockchain should be available via entry point calls. While one could submit multiple transactions calling entry points in series, such operations benefit from being called atomically from a single transaction. A script payload transaction can call any public (entry) function defined within any module. Here's an example [Move script](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/scripts/two_by_two_transfer) that uses a MultiAgent transaction to extract funds from two accounts and deposit them into two other accounts. This is a [Python example](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/transfer-two-by-two.py) that uses the bytecode generated by compiling that script. Currently there is limited support for script payloads in TypeScript.
 
@@ -162,12 +162,12 @@ Most integrations into the Aptos blockchain benefit from a holistic and comprehe
 * The state is the representation of all transaction outputs up to a specific version. In other words, a state version is the accumulation of all transactions inclusive of that transaction version.
 * As transactions execute, they may emit events. [Events](../concepts/events.md) are hints about changes in on-chain data.
 
-The storage service on a node employs two forms of pruning that erase data from nodes: 
+The storage service on a node employs two forms of pruning that erase data from nodes:
 
 * state
 * events, transactions, and everything else
 
-While either of these may be disabled, storing the state versions is not particularly sustainable. 
+While either of these may be disabled, storing the state versions is not particularly sustainable.
 
 Events and transactions pruning can be disabled via setting the [`enable_ledger_pruner`](https://github.com/aptos-labs/aptos-core/blob/cf0bc2e4031a843cdc0c04e70b3f7cd92666afcf/config/src/config/storage_config.rs#L141) to `false`. This is default behavior in Mainnet. In the near future, Aptos will provide indexers that mitigate the need to directly query from a node.
 
@@ -179,13 +179,13 @@ The REST API offers querying transactions and events in these ways:
 
 ## Exchanging and tracking coins
 
-Aptos has a standard [Coin type](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move). Different types of coins can be represented in this type through the use of distinct structs that represent the type parameter or generic for `Coin<T>`. 
+Aptos has a standard [Coin type](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move). Different types of coins can be represented in this type through the use of distinct structs that represent the type parameter or generic for `Coin<T>`.
 
 Coins are stored within an account under the resource `CoinStore<T>`. At account creation, each user has the resource `CoinStore<0x1::aptos_coin::AptosCoin>` or `CoinStore<AptosCoin>`, for short. Within this resource is the Aptos coin: `Coin<AptosCoin>`.
 
 ### Transferring coins between users
 
-Coins can be transferred between users via the [`coin::transfer`](https://github.com/aptos-labs/aptos-core/blob/36a7c00b29a457469264187d8e44070b2d5391fe/aptos-move/framework/aptos-framework/sources/coin.move#L307) function for all coins and [`aptos_account::transfer`](https://github.com/aptos-labs/aptos-core/blob/88c9aab3982c246f8aa75eb2caf8c8ab1dcab491/aptos-move/framework/aptos-framework/sources/aptos_account.move#L18) for Aptos coins. The advantage of the latter function is that it creates the destination account if it does not exist. 
+Coins can be transferred between users via the [`coin::transfer`](https://github.com/aptos-labs/aptos-core/blob/36a7c00b29a457469264187d8e44070b2d5391fe/aptos-move/framework/aptos-framework/sources/coin.move#L307) function for all coins and [`aptos_account::transfer`](https://github.com/aptos-labs/aptos-core/blob/88c9aab3982c246f8aa75eb2caf8c8ab1dcab491/aptos-move/framework/aptos-framework/sources/aptos_account.move#L18) for Aptos coins. The advantage of the latter function is that it creates the destination account if it does not exist.
 
 :::caution
 It is important to note that if an account has not registered a `CoinStore<T>` for a given `T`, then any transfer of type `T` to that account will fail.
@@ -499,3 +499,47 @@ By monitoring the events, you will find all balance changes in the `0x1::coin::C
 To create some sample data to explore, conduct ["Your first transaction"](../tutorials/first-transaction.md).
 
 To learn more about coin creation, make ["Your First Coin"](../tutorials/first-coin.md).
+
+## Integrating with the faucet
+
+This tutorial is for SDK and wallet developers who want to integrate with the [Aptos Faucet](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos-faucet). If you are a dapp developer, you should access the faucet through an existing [SDK](../tutorials/first-transaction.md) or [wallet](https://aptos.dev/guides/get-test-funds/) instead.
+
+### Differences between devnet and testnet
+What are the differences between devnet and testnet? Effectively none. In the past, the testnet faucet had a Captcha in front of it, making it unqueryable by normal means. This is no longer true.
+
+The endpoints for each faucet are:
+- Devnet: https://faucet.devnet.aptoslabs.com
+- Testnet: https://faucet.testnet.aptoslabs.com
+
+### Calling the faucet: JavaScript / TypeScript
+If you are building a client in JavaScript or TypeScript, you should make use of the [@aptos-labs/aptos-faucet-client](https://www.npmjs.com/package/@aptos-labs/aptos-faucet-client) package. This client is generated based on the OpenAPI spec published by the faucet service.
+
+Example use:
+```typescript
+import {
+  AptosFaucetClient,
+  FundRequest,
+} from "@aptos-labs/aptos-faucet-client";
+
+async function callFaucet(amount: number, address: string): Promise<string[]> {
+  const faucetClient = new AptosFaucetClient({BASE: "https://faucet.devnet.aptoslabs.com"});
+  const request: FundRequest = {
+    amount,
+    address,
+  };
+  const response = await faucetClient.fund.fund({ requestBody: request });
+  return response.txn_hashes;
+}
+```
+
+### Calling the faucet: Other languages
+If you are trying to call the faucet in other languages, you have two options:
+1. Generate a client from the [OpenAPI spec](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-faucet/doc/spec.yaml).
+2. Call the faucet on your own.
+
+For the latter, you will want to build a query similar to this:
+```
+curl -X POST 'https://faucet.devnet.aptoslabs.com/mint?amount=10000&address=0xd0f523c9e73e6f3d68c16ae883a9febc616e484c4998a72d8899a1009e5a89d6'
+```
+
+This means mint 10000 OCTA to address `0xd0f523c9e73e6f3d68c16ae883a9febc616e484c4998a72d8899a1009e5a89d6`.

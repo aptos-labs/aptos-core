@@ -31,6 +31,7 @@ aptos-sdk = { workspace = true }
 aptos-secure-storage = { workspace = true }
 aptos-state-sync-driver = { workspace = true }
 aptos-transaction-emitter-lib = { workspace = true }
+aptos-transaction-generator-lib = { workspace = true }
 async-trait = { workspace = true }
 chrono = { workspace = true }
 either = { workspace = true }

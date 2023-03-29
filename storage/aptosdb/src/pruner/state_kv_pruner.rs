@@ -10,8 +10,9 @@ use crate::{
     },
     pruner_utils,
     schema::db_metadata::{DbMetadataKey, DbMetadataValue},
+    state_kv_db::StateKvDb,
 };
-use aptos_schemadb::{SchemaBatch, DB};
+use aptos_schemadb::SchemaBatch;
 use aptos_types::transaction::{AtomicVersion, Version};
 use std::sync::{atomic::Ordering, Arc};
 
@@ -19,7 +20,7 @@ pub const STATE_KV_PRUNER_NAME: &str = "state_kv_pruner";
 
 /// Responsible for pruning state kv db.
 pub(crate) struct StateKvPruner {
-    state_kv_db: Arc<DB>,
+    state_kv_db: Arc<StateKvDb>,
     /// Keeps track of the target version that the pruner needs to achieve.
     target_version: AtomicVersion,
     min_readable_version: AtomicVersion,
@@ -39,7 +40,7 @@ impl DBPruner for StateKvPruner {
         let mut db_batch = SchemaBatch::new();
         let current_target_version = self.prune_inner(max_versions, &mut db_batch)?;
         self.save_min_readable_version(current_target_version, &db_batch)?;
-        self.state_kv_db.write_schemas(db_batch)?;
+        self.state_kv_db.commit_raw_batch(db_batch)?;
         self.record_progress(current_target_version);
 
         Ok(current_target_version)
@@ -59,6 +60,7 @@ impl DBPruner for StateKvPruner {
     fn initialize_min_readable_version(&self) -> anyhow::Result<Version> {
         Ok(self
             .state_kv_db
+            .metadata_db()
             .get::<DbMetadataSchema>(&DbMetadataKey::StateKvPrunerProgress)?
             .map_or(0, |v| v.expect_version()))
     }
@@ -90,7 +92,7 @@ impl DBPruner for StateKvPruner {
 }
 
 impl StateKvPruner {
-    pub fn new(state_kv_db: Arc<DB>) -> Self {
+    pub fn new(state_kv_db: Arc<StateKvDb>) -> Self {
         let pruner = StateKvPruner {
             state_kv_db: Arc::clone(&state_kv_db),
             target_version: AtomicVersion::new(0),
@@ -102,7 +104,10 @@ impl StateKvPruner {
     }
 
     /// Prunes the genesis transaction and saves the db alterations to the given change set
-    pub fn prune_genesis(state_kv_db: Arc<DB>, db_batch: &mut SchemaBatch) -> anyhow::Result<()> {
+    pub fn prune_genesis(
+        state_kv_db: Arc<StateKvDb>,
+        db_batch: &mut SchemaBatch,
+    ) -> anyhow::Result<()> {
         let target_version = 1; // The genesis version is 0. Delete [0,1) (exclusive)
         let max_version = 1; // We should only be pruning a single version
 

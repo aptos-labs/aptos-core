@@ -20,7 +20,7 @@ use crate::{
     },
 };
 use anyhow::Context;
-use aptos_indexer_grpc_utils::config::IndexerGrpcProcessorConfig;
+use aptos_indexer_grpc_utils::{config::IndexerGrpcProcessorConfig, constants::BLOB_STORAGE_SIZE};
 use aptos_logger::{error, info};
 use aptos_moving_average::MovingAverage;
 use aptos_protos::{
@@ -138,12 +138,16 @@ impl Worker {
             "[Parser] Making request to GRPC endpoint",
         );
 
-        let request = tonic::Request::new(RawDatastreamRequest {
+        let request = grpc_request_builder(
             starting_version,
-            transactions_count: None,
-        });
-        let response = rpc_client.raw_datastream(request).await.unwrap();
-        let mut resp_stream = response.into_inner();
+            self.config.indexer_grpc_auth_token.clone(),
+        );
+
+        let mut resp_stream = rpc_client
+            .raw_datastream(request)
+            .await
+            .expect("Failed to get grpc response. Is the server running?")
+            .into_inner();
 
         let concurrent_tasks = self.config.number_concurrent_processing_tasks;
         info!(
@@ -189,27 +193,30 @@ impl Worker {
                 panic!();
             },
         }
-
+        let mut batch_start_version = starting_version;
         loop {
             let mut transactions_batches = vec![];
             // Gets a batch of transactions from the stream. Batch size is set in the grpc server.
             // The number of batches depends on our config
             for _ in 0..concurrent_tasks {
-                // TODO(larry): do not block here to wait for consumer items.
                 let next_stream = match resp_stream.next().await {
                     Some(Ok(r)) => r,
-                    Some(Err(e)) => {
-                        // TODO: If the connection is lost, reconnect.
+                    _ => {
                         error!(
                             processor_name = processor_name,
-                            error = ?e,
-                            "[Parser] Error receiving datastream response"
+                            "[Parser] Error receiving datastream response; reconnecting..."
                         );
-                        break;
-                    },
-                    None => {
-                        // If no next stream wait a bit and try again
-                        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                        // If we get an error, we need to reconnect to the stream.
+                        let request = grpc_request_builder(
+                            batch_start_version,
+                            self.config.indexer_grpc_auth_token.clone(),
+                        );
+                        resp_stream = rpc_client
+                            .raw_datastream(request)
+                            .await
+                            .expect("Failed to get grpc response. Is the server running?")
+                            .into_inner();
+                        transactions_batches.clear();
                         continue;
                     },
                 };
@@ -225,20 +232,19 @@ impl Worker {
                 } else {
                     continue;
                 };
-                // If stream is somehow empty wait a bit and try again
-                if !transactions.is_empty() {
-                    transactions_batches.push(transactions);
+                let current_batch_size = transactions.len();
+                if current_batch_size == 0 {
+                    error!(
+                        batch_start_version = batch_start_version,
+                        "[Indexer Parser] Received empty batch from GRPC stream"
+                    );
+                    panic!();
                 }
-            }
-
-            // If stream is somehow empty wait a bit and try again
-            if transactions_batches.is_empty() {
-                info!(
-                    processor_name = processor_name,
-                    "[Parser] Channel is empty now."
-                );
-                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-                continue;
+                transactions_batches.push(transactions);
+                // If it is a partial batch, then skip polling and head to process it first.
+                if current_batch_size < BLOB_STORAGE_SIZE {
+                    break;
+                }
             }
 
             // Process the transactions in parallel
@@ -312,6 +318,7 @@ impl Worker {
             }
             let batch_start = processed_versions_sorted.first().unwrap().0;
             let batch_end = processed_versions_sorted.last().unwrap().1;
+            batch_start_version = batch_end + 1;
 
             LATEST_PROCESSED_VERSION
                 .with_label_values(&[processor_name])
@@ -405,4 +412,19 @@ impl Worker {
             _ => anyhow::bail!("Grpc first response is not a init signal"),
         }
     }
+}
+
+pub fn grpc_request_builder(
+    starting_version: u64,
+    grpc_auth_token: String,
+) -> tonic::Request<RawDatastreamRequest> {
+    let mut request = tonic::Request::new(RawDatastreamRequest {
+        starting_version: Some(starting_version),
+        transactions_count: None,
+    });
+    request.metadata_mut().insert(
+        aptos_indexer_grpc_utils::constants::GRPC_AUTH_TOKEN_HEADER,
+        grpc_auth_token.parse().unwrap(),
+    );
+    request
 }

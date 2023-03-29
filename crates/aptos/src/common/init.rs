@@ -203,17 +203,14 @@ impl CliCommand<()> for InitTool {
                     "Account {} doesn't exist, creating it and funding it with {} Octas",
                     address, NUM_DEFAULT_OCTAS
                 );
-                match fund_account(
+                fund_account(
                     Url::parse(faucet_url)
                         .map_err(|err| CliError::UnableToParse("rest_url", err.to_string()))?,
                     NUM_DEFAULT_OCTAS,
                     address,
                 )
-                .await
-                {
-                    Ok(_) => eprintln!("Account {} funded successfully", address),
-                    Err(err) => eprintln!("Account {} failed to be funded: {:?}", address, err),
-                };
+                .await?;
+                eprintln!("Account {} funded successfully", address);
             }
         } else if account_exists {
             eprintln!("Account {} has been already found onchain", address);

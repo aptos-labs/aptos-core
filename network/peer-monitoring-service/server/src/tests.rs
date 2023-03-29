@@ -17,7 +17,7 @@ use aptos_netcore::transport::ConnectionOrigin;
 use aptos_network::{
     application::{
         interface::NetworkServiceEvents,
-        metadata::{ConnectionState, PeerMetadata, PeerMonitoringMetadata},
+        metadata::{ConnectionState, PeerMonitoringMetadata},
         storage::PeersAndMetadata,
     },
     peer_manager::PeerManagerNotification,
@@ -91,7 +91,7 @@ async fn test_get_network_information_fullnode() {
     // Process a client request to fetch the network information and verify the response
     verify_network_information(
         &mut mock_client,
-        hashmap! {peer_network_id_1 => PeerMetadata::new(connection_metadata_1.clone())},
+        hashmap! {peer_network_id_1 => connection_metadata_1.clone()},
         MAX_DISTANCE_FROM_VALIDATORS,
     )
     .await;
@@ -104,11 +104,9 @@ async fn test_get_network_information_fullnode() {
         .unwrap();
 
     // Process a client request to fetch the network information and verify the response
-    let peer_metadata_1 =
-        PeerMetadata::new_for_test(connection_metadata_1.clone(), peer_monitoring_metadata_1);
     verify_network_information(
         &mut mock_client,
-        hashmap! {peer_network_id_1 => peer_metadata_1.clone()},
+        hashmap! {peer_network_id_1 => connection_metadata_1.clone()},
         MAX_DISTANCE_FROM_VALIDATORS,
     )
     .await;
@@ -125,11 +123,9 @@ async fn test_get_network_information_fullnode() {
         .unwrap();
 
     // Process a client request to fetch the network information and verify the response
-    let peer_metadata_1 =
-        PeerMetadata::new_for_test(connection_metadata_1.clone(), peer_monitoring_metadata_1);
     verify_network_information(
         &mut mock_client,
-        hashmap! {peer_network_id_1 => peer_metadata_1.clone()},
+        hashmap! {peer_network_id_1 => connection_metadata_1.clone()},
         peer_distance_1 + 1,
     )
     .await;
@@ -148,11 +144,9 @@ async fn test_get_network_information_fullnode() {
         .unwrap();
 
     // Process a client request to fetch the network information and verify the response
-    let peer_metadata_2 =
-        PeerMetadata::new_for_test(connection_metadata_2.clone(), peer_monitoring_metadata_2);
     verify_network_information(
         &mut mock_client,
-        hashmap! {peer_network_id_1 => peer_metadata_1.clone(), peer_network_id_2 => peer_metadata_2},
+        hashmap! {peer_network_id_1 => connection_metadata_1.clone(), peer_network_id_2 => connection_metadata_2},
         peer_distance_2 + 1,
     )
     .await;
@@ -165,7 +159,7 @@ async fn test_get_network_information_fullnode() {
     // Process a request to fetch the network information and verify the response
     verify_network_information(
         &mut mock_client,
-        hashmap! {peer_network_id_1 => peer_metadata_1},
+        hashmap! {peer_network_id_1 => connection_metadata_1},
         peer_distance_1 + 1,
     )
     .await;
@@ -196,7 +190,7 @@ async fn test_get_network_information_validator() {
     // Process a client request to fetch the network information and verify the response
     verify_network_information(
         &mut mock_client,
-        hashmap! {peer_network_id_1 => PeerMetadata::new(connection_metadata_1.clone())},
+        hashmap! {peer_network_id_1 => connection_metadata_1.clone()},
         0,
     )
     .await;
@@ -209,11 +203,9 @@ async fn test_get_network_information_validator() {
         .unwrap();
 
     // Process a client request to fetch the network information and verify the response
-    let peer_metadata_1 =
-        PeerMetadata::new_for_test(connection_metadata_1.clone(), peer_monitoring_metadata_1);
     verify_network_information(
         &mut mock_client,
-        hashmap! {peer_network_id_1 => peer_metadata_1.clone()},
+        hashmap! {peer_network_id_1 => connection_metadata_1.clone()},
         0,
     )
     .await;
@@ -232,11 +224,9 @@ async fn test_get_network_information_validator() {
         .unwrap();
 
     // Process a client request to fetch the network information and verify the response
-    let peer_metadata_2 =
-        PeerMetadata::new_for_test(connection_metadata_2.clone(), peer_monitoring_metadata_2);
     verify_network_information(
         &mut mock_client,
-        hashmap! {peer_network_id_1 => peer_metadata_1.clone(), peer_network_id_2 => peer_metadata_2},
+        hashmap! {peer_network_id_1 => connection_metadata_1.clone(), peer_network_id_2 => connection_metadata_2},
         0,
     )
         .await;
@@ -249,7 +239,7 @@ async fn test_get_network_information_validator() {
     // Process a request to fetch the network information and verify the response
     verify_network_information(
         &mut mock_client,
-        hashmap! {peer_network_id_1 => peer_metadata_1},
+        hashmap! {peer_network_id_1 => connection_metadata_1},
         0,
     )
     .await;
@@ -292,7 +282,7 @@ fn create_connection_metadata(peer_id: AccountAddress) -> ConnectionMetadata {
 /// client, and verifies the response is correct.
 async fn verify_network_information(
     client: &mut MockClient,
-    expected_peers_and_metadata: HashMap<PeerNetworkId, PeerMetadata>,
+    expected_peers: HashMap<PeerNetworkId, ConnectionMetadata>,
     expected_distance_from_validators: u64,
 ) {
     // Send a request to fetch the network information
@@ -302,7 +292,7 @@ async fn verify_network_information(
     // Verify the response is correct
     let expected_response =
         PeerMonitoringServiceResponse::NetworkInformation(NetworkInformationResponse {
-            connected_peers_and_metadata: expected_peers_and_metadata,
+            connected_peers: expected_peers,
             distance_from_validators: expected_distance_from_validators,
         });
     assert_eq!(response, expected_response);

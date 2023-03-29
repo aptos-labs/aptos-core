@@ -2682,4 +2682,4 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

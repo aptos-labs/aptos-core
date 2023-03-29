@@ -218,10 +218,6 @@ impl InstructionGasParameters {
             Abort => self.abort,
             Ret => self.ret,
 
-            BrTrue => self.br_true,
-            BrFalse => self.br_false,
-            Branch => self.branch,
-
             LdU8 => self.ld_u8,
             LdU16 => self.ld_u16,
             LdU32 => self.ld_u32,

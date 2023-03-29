@@ -1,0 +1,5 @@
+query getIndexerLedgerInfo {
+  ledger_infos {
+    chain_id
+  }
+}

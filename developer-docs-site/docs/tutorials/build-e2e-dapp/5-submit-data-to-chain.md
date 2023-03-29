@@ -39,7 +39,7 @@ const addNewList = async () => {
     // sign and submit transaction to chain
     const response = await signAndSubmitTransaction(payload);
     // wait for transaction
-    await client.waitForTransaction(response.hash);
+    await provider.waitForTransaction(response.hash);
     setAccountHasList(true);
   } catch (error: any) {
     setAccountHasList(false);
@@ -56,11 +56,10 @@ In our `fetchList` function, find the line:
 const moduleAddress = "0xcbddf398841353776903dbab2fdaefc54f181d07e114ae818b1a67af28d1b018";
 ```
 
-And move it to outside of the main `App` function, right beneath our const `NODE_URL` and const `client` declarations.
+And move it to outside of the main `App` function, right beneath our const `provider` declarations.
 
 ```js
-export const NODE_URL = "https://fullnode.devnet.aptoslabs.com";
-export const client = new AptosClient(NODE_URL);
+export const provider = new Provider(Network.DEVNET);
 // change this to be your module account address
 export const moduleAddress = "0xcbddf398841353776903dbab2fdaefc54f181d07e114ae818b1a67af28d1b018";
 ```
@@ -111,7 +110,7 @@ const addNewList = async () => {
     // sign and submit transaction to chain
     const response = await signAndSubmitTransaction(payload);
     // wait for transaction
-    await client.waitForTransaction(response.hash);
+    await provider.waitForTransaction(response.hash);
     setAccountHasList(true);
   } catch (error: any) {
     setAccountHasList(false);

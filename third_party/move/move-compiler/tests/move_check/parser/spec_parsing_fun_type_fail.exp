@@ -1,0 +1,6 @@
+error[E04024]: invalid usage of function type
+  ┌─ tests/move_check/parser/spec_parsing_fun_type_fail.move:2:29
+  │
+2 │     fun fun_type_in_prog(p: |u64|u64) {
+  │                             ^^^^^^^^ function type only allowed for inline function arguments
+

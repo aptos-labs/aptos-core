@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    create_emitter_and_request, three_region_simulation_test::ThreeRegionSimulationTest,
+    create_emitter_and_request, three_region_simulation_test::ThreeRegionSameCloudSimulationTest,
     traffic_emitter_runtime, LoadDestination, NetworkLoadTest,
 };
 use anyhow::{bail, Ok};
@@ -103,7 +103,7 @@ impl NetworkTest for TwoTrafficsTest {
 
 pub struct ThreeRegionSimulationTwoTrafficsTest {
     pub traffic_test: TwoTrafficsTest,
-    pub three_region_simulation_test: ThreeRegionSimulationTest,
+    pub three_region_simulation_test: ThreeRegionSameCloudSimulationTest,
 }
 
 impl Test for ThreeRegionSimulationTwoTrafficsTest {

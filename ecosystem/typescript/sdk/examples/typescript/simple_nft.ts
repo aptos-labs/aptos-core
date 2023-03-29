@@ -165,6 +165,17 @@ import { NODE_URL, FAUCET_URL } from "./common";
   console.log(`Bob's token balance: ${bobBalance3["amount"]}`);
 
   const provider = new Provider(Network.DEVNET);
+  console.log("\n=== Checking if indexer devnet chainId same as fullnode chainId  ===");
+  const indexerLedgerInfo = await provider.getIndexerLedgerInfo();
+  const fullNodeChainId = await provider.getChainId();
+
+  console.log(`\n fullnode chain id is: ${fullNodeChainId}, indexer chain id is: ${indexerLedgerInfo}`);
+
+  if (indexerLedgerInfo.ledger_infos[0].chain_id !== fullNodeChainId) {
+    console.log(`\n fullnode chain id and indexer chain id are not synced, skipping rest of tests`);
+    return;
+  }
+
   console.log("\n=== Getting Alices's NFTs ===");
   const aliceNfts = await provider.getAccountNFTs(alice.address().hex());
   console.log(`Alice current token ownership: ${aliceNfts.current_token_ownerships[0].amount}. Should be 1`);

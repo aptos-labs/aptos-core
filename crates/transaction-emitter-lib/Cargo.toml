@@ -24,6 +24,7 @@ aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-rest-client = { workspace = true }
 aptos-sdk = { workspace = true }
+aptos-transaction-generator-lib = { workspace = true }
 async-trait = { workspace = true }
 clap = { workspace = true }
 futures = { workspace = true }

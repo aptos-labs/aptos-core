@@ -39,6 +39,17 @@ const aptosCoin = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>";
   accountResource = resources.find((r) => r.type === aptosCoin);
   console.log(`account2 coins: ${accountResource.data.coin.value}. Should be 717!`);
 
+  const provider = new aptos.Provider(aptos.Network.DEVNET);
+  console.log("\n=== Checking if indexer devnet chainId same as fullnode chainId  ===");
+  const indexerLedgerInfo = await provider.getIndexerLedgerInfo();
+  const fullNodeChainId = await provider.getChainId();
+
+  console.log(`\n fullnode chain id is: ${fullNodeChainId}, indexer chain id is: ${indexerLedgerInfo}`);
+  if (indexerLedgerInfo.ledger_infos[0].chain_id !== fullNodeChainId) {
+    console.log(`\n fullnode chain id and indexer chain id are not synced, skipping rest of tests`);
+    return;
+  }
+
   console.log("=== Creating account1's NFT Collection and Token ===");
 
   const collectionName = "Alice's";
@@ -66,7 +77,6 @@ const aptosCoin = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>";
   ); // <:!:section_5
   await client.waitForTransaction(txnHash2, { checkSuccess: true });
 
-  const provider = new aptos.Provider(aptos.Network.DEVNET);
   const nfts = await provider.getAccountNFTs(account1.address().hex());
   console.log(`account1 current token ownership: ${nfts.current_token_ownerships[0].amount}. Should be 1`);
 })();
