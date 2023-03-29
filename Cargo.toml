@@ -58,6 +58,7 @@ members = [
     "crates/aptos-node-identity",
     "crates/aptos-openapi",
     "crates/aptos-proptest-helpers",
+    "crates/aptos-push-metrics",
     "crates/aptos-rate-limiter",
     "crates/aptos-rest-client",
     "crates/aptos-retrier",
