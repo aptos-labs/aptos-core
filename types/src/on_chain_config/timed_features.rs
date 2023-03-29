@@ -15,6 +15,7 @@ pub enum TimedFeatureFlag {
     MultiEd25519NativePublicKeyValidateGasFix,
     Ristretto255NativeFloatingPointFix,
     DisableInvariantViolationCheckInSwapLoc,
+    EntryTypeSizeLimit,
 }
 
 /// Representation of features that are gated by the block timestamps.
@@ -53,6 +54,7 @@ impl TimedFeatureOverride {
                 // Disable invariant violation check in swap_loc
                 DisableInvariantViolationCheckInSwapLoc => true,
                 // Add overrides for replay here.
+                EntryTypeSizeLimit => true,
                 _ => return None,
             },
             Testing => !matches!(flag, VerifierLimitBackEdges), // Activate all flags but not legacy back edges
@@ -89,6 +91,9 @@ impl TimedFeatureFlag {
 
             (DisableInvariantViolationCheckInSwapLoc, TESTNET) => NOT_YET_SPECIFIED,
             (DisableInvariantViolationCheckInSwapLoc, MAINNET) => NOT_YET_SPECIFIED,
+
+            (EntryTypeSizeLimit, TESTNET) => NOT_YET_SPECIFIED,
+            (EntryTypeSizeLimit, MAINNET) => NOT_YET_SPECIFIED,
 
             // If unspecified, a timed feature is considered enabled from the very beginning of time.
             _ => 0,
