@@ -622,6 +622,17 @@ async fn test_peer_connections() {
     mock_monitoring_server.disconnect_peer(vfn_peer);
     mock_monitoring_server.reconnected_peer(validator_peer);
 
+    // Reinitialize the validator states (garbage collection has removed them)
+    let _ = initialize_and_verify_peer_states(
+        &NetworkId::Validator,
+        &mut mock_monitoring_server,
+        &peer_monitor_state,
+        &node_config,
+        &validator_peer,
+        &mock_time,
+    )
+    .await;
+
     // Handle several latency ping requests and responses for the validator peer
     for i in 0..5 {
         verify_and_handle_latency_ping(
@@ -645,21 +656,32 @@ async fn test_peer_connections() {
         .verify_no_pending_requests(&NetworkId::Validator)
         .await;
 
-    // Reconnect the VFN
+    // Reconnect the VFN and reinitialize the VFN peer states
     mock_monitoring_server.reconnected_peer(vfn_peer);
+    let _ = initialize_and_verify_peer_states(
+        &NetworkId::Vfn,
+        &mut mock_monitoring_server,
+        &peer_monitor_state,
+        &node_config,
+        &vfn_peer,
+        &mock_time,
+    )
+    .await;
 
     // Handle several latency ping requests and responses for the peers
-    for i in 5..10 {
+    for i in 0..5 {
         // Elapse enough time for a latency ping update
         let time_before_update = mock_time.now();
         elapse_latency_update_interval(node_config.clone(), mock_time.clone()).await;
 
         // Handle the pings for the peers
-        for peer_network_id in &[validator_peer, vfn_peer] {
+        for (peer_network_id, expected_ping_counter) in
+            &[(validator_peer, i + 6), (vfn_peer, i + 1)]
+        {
             verify_latency_request_and_respond(
                 &peer_network_id.network_id(),
                 &mut mock_monitoring_server,
-                i + 1,
+                *expected_ping_counter,
                 false,
                 false,
                 false,
@@ -675,4 +697,143 @@ async fn test_peer_connections() {
             .await;
         }
     }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_garbage_collection() {
+    // Create the peer monitoring client and server
+    let all_network_ids = vec![NetworkId::Validator, NetworkId::Vfn, NetworkId::Public];
+    let (peer_monitoring_client, mut mock_monitoring_server, peer_monitor_state, time_service) =
+        MockMonitoringServer::new(all_network_ids.clone());
+
+    // Create a node config where only latency pings refresh
+    let node_config = config_with_latency_ping_requests();
+
+    // Spawn the peer monitoring client
+    start_peer_monitor(
+        peer_monitoring_client,
+        &peer_monitor_state,
+        &time_service,
+        &node_config,
+    )
+    .await;
+
+    // Add a connected validator peer
+    let validator_peer =
+        mock_monitoring_server.add_new_peer(NetworkId::Validator, PeerRole::Validator);
+
+    // Initialize all the validator states by running the peer monitor once
+    let mock_time = time_service.into_mock();
+    let _ = initialize_and_verify_peer_states(
+        &NetworkId::Validator,
+        &mut mock_monitoring_server,
+        &peer_monitor_state,
+        &node_config,
+        &validator_peer,
+        &mock_time,
+    )
+    .await;
+
+    // Verify that a peer state exists for the validator peer
+    assert!(peer_monitor_state.get_peer_state(&validator_peer).is_some());
+
+    // Add a connected VFN peer
+    let vfn_peer = mock_monitoring_server.add_new_peer(NetworkId::Vfn, PeerRole::ValidatorFullNode);
+
+    // Initialize all the VFN states by running the peer monitor once
+    let _ = initialize_and_verify_peer_states(
+        &NetworkId::Vfn,
+        &mut mock_monitoring_server,
+        &peer_monitor_state,
+        &node_config,
+        &vfn_peer,
+        &mock_time,
+    )
+    .await;
+
+    // Verify that a peer state exists for both the validator and VFN peers
+    assert!(peer_monitor_state.get_peer_state(&validator_peer).is_some());
+    assert!(peer_monitor_state.get_peer_state(&vfn_peer).is_some());
+
+    // Add a connected fullnode peer
+    let fullnode_peer = mock_monitoring_server.add_new_peer(NetworkId::Public, PeerRole::Unknown);
+
+    // Initialize all the fullnode states by running the peer monitor once
+    let _ = initialize_and_verify_peer_states(
+        &NetworkId::Public,
+        &mut mock_monitoring_server,
+        &peer_monitor_state,
+        &node_config,
+        &fullnode_peer,
+        &mock_time,
+    )
+    .await;
+
+    // Verify that a peer state exists for all peers
+    for peer in &[validator_peer, vfn_peer, fullnode_peer] {
+        assert!(peer_monitor_state.get_peer_state(peer).is_some());
+    }
+
+    // Disconnect the validator and VFN peer
+    mock_monitoring_server.disconnect_peer(validator_peer);
+    mock_monitoring_server.disconnect_peer(vfn_peer);
+
+    // Handle several latency ping requests and responses for the fullnode
+    for i in 0..5 {
+        verify_and_handle_latency_ping(
+            &NetworkId::Public,
+            &mut mock_monitoring_server,
+            &peer_monitor_state,
+            &node_config,
+            &fullnode_peer,
+            &mock_time,
+            i + 1,
+            i + 2,
+        )
+        .await;
+    }
+
+    // Verify that garbage collection has removed only the validator and VFN peer states
+    assert!(peer_monitor_state.get_peer_state(&validator_peer).is_none());
+    assert!(peer_monitor_state.get_peer_state(&vfn_peer).is_none());
+    assert!(peer_monitor_state.get_peer_state(&fullnode_peer).is_some());
+
+    // Reconnect the validator peer
+    mock_monitoring_server.reconnected_peer(validator_peer);
+
+    // Reinitialize all the validator states by running the peer monitor once
+    let _ = initialize_and_verify_peer_states(
+        &NetworkId::Validator,
+        &mut mock_monitoring_server,
+        &peer_monitor_state,
+        &node_config,
+        &validator_peer,
+        &mock_time,
+    )
+    .await;
+
+    // Verify that we now have peer states for only the validator and fullnode peers
+    assert!(peer_monitor_state.get_peer_state(&validator_peer).is_some());
+    assert!(peer_monitor_state.get_peer_state(&vfn_peer).is_none());
+    assert!(peer_monitor_state.get_peer_state(&fullnode_peer).is_some());
+
+    // Reconnect the VFN peer and disconnect the fullnode peer
+    mock_monitoring_server.reconnected_peer(vfn_peer);
+    mock_monitoring_server.disconnect_peer(fullnode_peer);
+
+    // Reinitialize all the VFN states by running the peer monitor once
+    let _ = initialize_and_verify_peer_states(
+        &NetworkId::Vfn,
+        &mut mock_monitoring_server,
+        &peer_monitor_state,
+        &node_config,
+        &vfn_peer,
+        &mock_time,
+    )
+    .await;
+
+    // Verify that we now have peer states for only the validator and VFN peers
+    assert!(peer_monitor_state.get_peer_state(&validator_peer).is_some());
+    assert!(peer_monitor_state.get_peer_state(&vfn_peer).is_some());
+    assert!(peer_monitor_state.get_peer_state(&fullnode_peer).is_none());
 }
