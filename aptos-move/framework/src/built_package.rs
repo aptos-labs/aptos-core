@@ -49,7 +49,7 @@ pub struct BuildOptions {
     pub with_error_map: bool,
     #[clap(long)]
     pub with_docs: bool,
-    /// Installation directory for compiled artifacts. Defaults to <package>/build.
+    /// Installation directory for compiled artifacts. Defaults to `<package>/build`.
     #[clap(long, parse(from_os_str))]
     pub install_dir: Option<PathBuf>,
     #[clap(skip)] // TODO: have a parser for this; there is one in the CLI buts its  downstream

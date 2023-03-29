@@ -7,7 +7,7 @@
 //! This crate provides [`AptosDB`] which represents physical storage of the core Aptos data
 //! structures.
 //!
-//! It relays read/write operations on the physical storage via [`schemadb`] to the underlying
+//! It relays read/write operations on the physical storage via `schemadb` to the underlying
 //! Key-Value storage system, and implements aptos data structures on top of it.
 
 #[cfg(feature = "consensus-only-perf-test")]

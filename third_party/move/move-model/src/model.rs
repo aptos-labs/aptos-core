@@ -589,7 +589,7 @@ impl GlobalEnv {
     }
 
     /// Retrieves extension data from the environment. Use as in `env.get_extension::<T>()`.
-    /// An Rc<T> is returned because extension data is stored in a RefCell and we can't use
+    /// An `Rc<T>` is returned because extension data is stored in a RefCell and we can't use
     /// lifetimes (`&'a T`) to control borrowing.
     pub fn get_extension<T: Any>(&self) -> Option<Rc<T>> {
         let id = TypeId::of::<T>();

@@ -3,7 +3,7 @@
 
 //! This module provides APIs for aggregating and verifying Boneh-Lynn-Shacham (BLS) aggregate
 //! signatures (including individual signatures and multisignatures), implemented on top of
-//! Barreto-Lynn-Scott BLS12-381 elliptic curves (https://github.com/supranational/blst).
+//! Barreto-Lynn-Scott BLS12-381 elliptic curves (<https://github.com/supranational/blst)>.
 //!
 //! The `Signature` struct is used to represent either a:
 //!
