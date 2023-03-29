@@ -64,4 +64,14 @@ impl PayloadClient for MockPayloadManager {
         // generate 1k txn is too slow with coverage instrumentation
         Ok(random_payload(10))
     }
+
+    async fn pull_payload_for_dag(
+        &self,
+        _round: Round,
+        _max_items: u64,
+        _max_bytes: u64,
+        _exclude: PayloadFilter,
+    ) -> Result<Payload, QuorumStoreError> {
+        Ok(random_payload(10))
+    }
 }

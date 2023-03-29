@@ -7,3 +7,6 @@ mod dag;
 pub(crate) mod dag_driver;
 mod reliable_broadcast;
 mod types;
+
+#[cfg(test)]
+mod dag_driver_test;

@@ -3,20 +3,20 @@
 
 use crate::{
     dag::anchor_election::AnchorElection,
-    experimental::ordering_state_computer::OrderingStateComputer,
+    experimental::ordering_state_computer::OrderingStateComputer, state_replication::StateComputer,
 };
-use aptos_consensus_types::node::Node;
+use aptos_consensus_types::{
+    common::{Payload, PayloadFilter},
+    node::Node,
+};
+use aptos_crypto::HashValue;
 use aptos_types::{validator_verifier::ValidatorVerifier, PeerId};
 use claims::assert_some;
 use itertools::Itertools;
-use std::{collections::HashMap, sync::Arc};
-use std::iter::Extend;
-use aptos_consensus_types::common::{Payload, PayloadFilter};
-use aptos_crypto::HashValue;
+use std::{collections::HashMap, iter::Extend, sync::Arc};
 
 pub struct Bullshark {
-    #[allow(dead_code)]
-    state_computer: Arc<OrderingStateComputer>,
+    state_computer: Arc<dyn StateComputer>,
     dag: Vec<HashMap<PeerId, Node>>,
     lowest_unordered_anchor_wave: u64,
     proposer_election: Arc<dyn AnchorElection>,
@@ -26,7 +26,7 @@ pub struct Bullshark {
 
 impl Bullshark {
     pub fn new(
-        state_computer: Arc<OrderingStateComputer>,
+        state_computer: Arc<dyn StateComputer>,
         proposer_election: Arc<dyn AnchorElection>,
         verifier: ValidatorVerifier,
     ) -> Self {
@@ -120,19 +120,17 @@ impl Bullshark {
 
         while !reachable_nodes.is_empty() {
             let mut new_reachable_nodes = HashMap::new();
-            reachable_nodes
-                .into_iter()
-                .for_each(|(_, node)| {
-                    node.parents()
-                        .iter()
-                        .for_each(|metadata| {
-                            if let Some(parent) = self.dag[metadata.round() as usize].remove(&metadata.source()) {
-                                new_reachable_nodes.insert(parent.digest(), parent);
-                            }
-                        });
-                    self.pending_payload.remove(&node.digest());
-                    ordered_history.push(node);
+            reachable_nodes.into_iter().for_each(|(_, node)| {
+                node.parents().iter().for_each(|metadata| {
+                    if let Some(parent) =
+                        self.dag[metadata.round() as usize].remove(&metadata.source())
+                    {
+                        new_reachable_nodes.insert(parent.digest(), parent);
+                    }
                 });
+                self.pending_payload.remove(&node.digest());
+                ordered_history.push(node);
+            });
             reachable_nodes = new_reachable_nodes;
         }
         ordered_history
@@ -153,7 +151,8 @@ impl Bullshark {
             self.dag.push(HashMap::new());
         }
 
-        self.pending_payload.insert(node.digest(), node.maybe_payload().unwrap().clone());
+        self.pending_payload
+            .insert(node.digest(), node.maybe_payload().unwrap().clone());
         self.dag[round as usize].insert(author, node);
 
         if round % 2 == 0 || wave < self.lowest_unordered_anchor_wave {
@@ -183,7 +182,8 @@ impl Bullshark {
     }
 
     pub fn pending_payload(&self) -> PayloadFilter {
-        let excluded_payload = self.pending_payload
+        let excluded_payload = self
+            .pending_payload
             .iter()
             .map(|(_, payload)| payload)
             .collect();

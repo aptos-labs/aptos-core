@@ -8,11 +8,10 @@ use crate::{
         dag::Dag,
         reliable_broadcast::{ReliableBroadcast, ReliableBroadcastCommand},
     },
-    experimental::ordering_state_computer::OrderingStateComputer,
     network::{DagSender, NetworkSender},
     payload_manager::PayloadManager,
     round_manager::VerifiedEvent,
-    state_replication::PayloadClient,
+    state_replication::{PayloadClient, StateComputer},
 };
 use aptos_channels::aptos_channel;
 use aptos_config::config::DagConfig;
@@ -20,6 +19,7 @@ use aptos_consensus_types::{
     common::{Author, Round},
     node::{CertifiedNode, CertifiedNodeAck, CertifiedNodeRequest, Node, NodeMetaData},
 };
+use aptos_infallible::Mutex;
 use aptos_logger::spawn_named;
 use aptos_types::{
     validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier, PeerId,
@@ -27,7 +27,6 @@ use aptos_types::{
 use futures::StreamExt;
 use std::{collections::HashSet, sync::Arc, time::Duration};
 use tokio::{sync::mpsc::Sender, time};
-use aptos_infallible::Mutex;
 
 pub struct DagDriver {
     epoch: u64,
@@ -56,8 +55,7 @@ impl DagDriver {
         rb_network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
         network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
         payload_manager: Arc<PayloadManager>,
-        state_computer: Arc<OrderingStateComputer>,
-
+        state_computer: Arc<dyn StateComputer>,
     ) -> Self {
         // let (dag_bullshark_tx, dag_bullshark_rx) = tokio::sync::mpsc::channel(config.channel_size);
         let (rb_tx, rb_rx) = tokio::sync::mpsc::channel(config.channel_size);
@@ -70,7 +68,11 @@ impl DagDriver {
         );
 
         let proposer_election = Arc::new(RoundRobinAnchorElection::new(&verifier));
-        let bullshark = Arc::new(Mutex::new(Bullshark::new(state_computer, proposer_election.clone(), verifier.clone())));
+        let bullshark = Arc::new(Mutex::new(Bullshark::new(
+            state_computer,
+            proposer_election.clone(),
+            verifier.clone(),
+        )));
 
         spawn_named!("reliable_broadcast", rb.start(rb_network_msg_rx, rb_rx));
         // spawn_named!("bullshark", bullshark.start(dag_bullshark_rx));
@@ -118,7 +120,6 @@ impl DagDriver {
     }
 
     async fn create_node(&mut self, parents: HashSet<NodeMetaData>) -> Node {
-
         let payload_filter = self.bullshark.lock().pending_payload();
         let payload = self
             .payload_client
