@@ -205,11 +205,14 @@ impl<'r, 'l, S: MoveResolver> DataStore for TransactionDataCache<'r, 'l, S> {
 
                             GlobalValue::cached(val)?
                         },
-                        Resource::Cached(value_handle, _) => {
-                            // TODO: Data was not serialized and should not be charged for loading?
+                        Resource::Cached(val, _) => {
+                            // Data was not serialized and should not be charged for loading.
                             load_res = Some(None);
-                            let val = value_handle.lock().unwrap();
-                            // TODO: Avoid copy.
+
+                            // TODO: Here we don't want to copy but instead use some sort of
+                            // CoW mechanism. This requires changes to `GlobalValue` and ideally
+                            // to Move `Value`s as well to make them lighter (easier to copy).
+                            let val = val.lock()?;
                             GlobalValue::cached(val.copy_value()?)?
                         },
                     }

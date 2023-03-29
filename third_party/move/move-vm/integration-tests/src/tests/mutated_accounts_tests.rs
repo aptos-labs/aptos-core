@@ -87,8 +87,8 @@ fn mutated_accounts() {
     .unwrap();
     assert_eq!(sess.num_mutated_accounts(&TEST_ADDR), 2);
 
-    let (changeset, _) = sess.pause().unwrap();
-    storage.apply(changeset).unwrap();
+    let (changes, _) = sess.pause().unwrap();
+    storage.apply(changes).unwrap();
 
     let mut sess = vm.new_session(&storage);
     sess.execute_function_bypass_visibility(

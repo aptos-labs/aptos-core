@@ -21,21 +21,23 @@ use std::{
 #[derive(Debug)]
 pub struct ValueMutex(Arc<Mutex<Value>>);
 
+/// Error to propagate to VM instead of panicking on poisoned lock.
+fn poison_error() -> PartialVMError {
+    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+        .with_message("cannot handle poisoned values: {:?}".to_string())
+}
+
 impl ValueMutex {
     pub fn new(value: Value) -> Self {
         Self(Arc::new(Mutex::new(value)))
     }
 
     pub fn lock(&self) -> PartialVMResult<std::sync::MutexGuard<'_, Value>> {
-        self.0
-            .lock()
-            .map_err(|_| PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))
+        self.0.lock().map_err(|_| poison_error())
     }
 
     pub fn try_lock(&self) -> PartialVMResult<std::sync::MutexGuard<'_, Value>> {
-        self.0
-            .try_lock()
-            .map_err(|_| PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))
+        self.0.try_lock().map_err(|_| poison_error())
     }
 }
 
@@ -162,7 +164,7 @@ impl<
     type Err = E;
 }
 
-// TODO: Currently MoveResolver has `ModuleBlobResolver` and `ResourceBlobResolver`. When
+// TODO: Currently `MoveResolver` has `ModuleBlobResolver` and `ResourceBlobResolver`. When
 // we switch to values over blobs `ResourceBlobResolver` bound should be removed. Similarly,
 // when we cache compiled modules we should use `ModuleResolver` over `ModuleBlobResolver`.
 
