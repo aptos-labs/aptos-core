@@ -265,6 +265,11 @@ module aptos_framework::fungible_asset {
         let owner = &create_signer::create_signer(owner_addr);
         let derive_ref = &borrow_fungible_metadata(&metadata).derive_ref;
         let constructor_ref = &object::create_derived_object(owner, derive_ref);
+
+        // Disable ungated transfer as deterministic wallets shouldn't be transferrable.
+        let transfer_ref = &object::generate_transfer_ref(constructor_ref);
+        object::disable_ungated_transfer(transfer_ref);
+
         initialize_arbitrary_wallet(constructor_ref, metadata)
     }
 
