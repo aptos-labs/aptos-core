@@ -44,7 +44,9 @@ Note that you may create specific account types by passing the `--profile` argum
   ```shell
   Enter your private key as a hex literal (0x...) [Current: None | No input: Generate new key (or keep one if present)]
   ```
-  Hit enter to generate a new key.
+  Either:
+  * Hit enter to generate a new key.
+  * Enter an existing private key, for example [found in your wallet](https://petra.app/docs/use).
 5. Receive output indicating success and resembling:
   ```shell
   No key given, generating key...
