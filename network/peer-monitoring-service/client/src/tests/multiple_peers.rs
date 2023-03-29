@@ -11,11 +11,12 @@ use crate::{
             create_network_info_response, create_random_node_info_response,
             elapse_latency_update_interval, elapse_metadata_updater_interval,
             elapse_network_info_update_interval, elapse_node_info_update_interval,
-            get_distance_from_validators, initialize_and_verify_peer_states, spawn_with_timeout,
-            start_peer_metadata_updater, start_peer_monitor, update_latency_info_for_peer,
-            update_network_info_for_peer, verify_and_handle_latency_ping, verify_empty_peer_states,
-            verify_latency_request_and_respond, wait_for_monitoring_latency_update,
-            wait_for_monitoring_network_update, wait_for_peer_state_update,
+            get_distance_from_validators, handle_several_latency_pings,
+            initialize_and_verify_peer_states, spawn_with_timeout, start_peer_metadata_updater,
+            start_peer_monitor, update_latency_info_for_peer, update_network_info_for_peer,
+            verify_empty_peer_states, verify_latency_request_and_respond,
+            wait_for_monitoring_latency_update, wait_for_monitoring_network_update,
+            wait_for_peer_state_update,
         },
     },
     PeerState,
@@ -604,19 +605,14 @@ async fn test_peer_connections() {
     mock_monitoring_server.disconnect_peer(validator_peer);
 
     // Handle several latency ping requests and responses for the VFN
-    for i in 0..5 {
-        verify_and_handle_latency_ping(
-            &NetworkId::Vfn,
-            &mut mock_monitoring_server,
-            &peer_monitor_state,
-            &node_config,
-            &vfn_peer,
-            &mock_time,
-            i + 1,
-            i + 2,
-        )
-        .await;
-    }
+    handle_several_latency_pings(
+        &mut mock_monitoring_server,
+        &peer_monitor_state,
+        &node_config,
+        &mock_time,
+        &vfn_peer,
+    )
+    .await;
 
     // Disconnect the VFN and reconnect the validator peer
     mock_monitoring_server.disconnect_peer(vfn_peer);
@@ -634,19 +630,14 @@ async fn test_peer_connections() {
     .await;
 
     // Handle several latency ping requests and responses for the validator peer
-    for i in 0..5 {
-        verify_and_handle_latency_ping(
-            &NetworkId::Validator,
-            &mut mock_monitoring_server,
-            &peer_monitor_state,
-            &node_config,
-            &validator_peer,
-            &mock_time,
-            i + 1,
-            i + 2,
-        )
-        .await;
-    }
+    handle_several_latency_pings(
+        &mut mock_monitoring_server,
+        &peer_monitor_state,
+        &node_config,
+        &mock_time,
+        &validator_peer,
+    )
+    .await;
 
     // Elapse enough time for a latency ping update
     elapse_latency_update_interval(node_config.clone(), mock_time.clone()).await;
@@ -674,7 +665,7 @@ async fn test_peer_connections() {
         let time_before_update = mock_time.now();
         elapse_latency_update_interval(node_config.clone(), mock_time.clone()).await;
 
-        // Handle the pings for the peers
+        // Handle the pings for the peers (they will have different ping counters)
         for (peer_network_id, expected_ping_counter) in
             &[(validator_peer, i + 6), (vfn_peer, i + 1)]
         {
@@ -779,19 +770,14 @@ async fn test_garbage_collection() {
     mock_monitoring_server.disconnect_peer(vfn_peer);
 
     // Handle several latency ping requests and responses for the fullnode
-    for i in 0..5 {
-        verify_and_handle_latency_ping(
-            &NetworkId::Public,
-            &mut mock_monitoring_server,
-            &peer_monitor_state,
-            &node_config,
-            &fullnode_peer,
-            &mock_time,
-            i + 1,
-            i + 2,
-        )
-        .await;
-    }
+    handle_several_latency_pings(
+        &mut mock_monitoring_server,
+        &peer_monitor_state,
+        &node_config,
+        &mock_time,
+        &fullnode_peer,
+    )
+    .await;
 
     // Verify that garbage collection has removed only the validator and VFN peer states
     assert!(peer_monitor_state.get_peer_state(&validator_peer).is_none());

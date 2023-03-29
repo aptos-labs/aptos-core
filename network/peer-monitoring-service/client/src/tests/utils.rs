@@ -208,6 +208,29 @@ fn get_random_u64() -> u64 {
     OsRng.gen()
 }
 
+/// Handle several latency ping requests and responses for the given peer
+pub async fn handle_several_latency_pings(
+    mock_monitoring_server: &mut MockMonitoringServer,
+    peer_monitor_state: &PeerMonitorState,
+    node_config: &NodeConfig,
+    mock_time: &MockTimeService,
+    peer_network_id: &PeerNetworkId,
+) {
+    for i in 0..5 {
+        verify_and_handle_latency_ping(
+            &peer_network_id.network_id(),
+            mock_monitoring_server,
+            peer_monitor_state,
+            node_config,
+            peer_network_id,
+            mock_time,
+            i + 1,
+            i + 2,
+        )
+        .await;
+    }
+}
+
 /// Initializes all the peer states by running the peer monitor loop
 /// once and ensuring the correct requests and responses are received.
 /// Returns the network info and node info responses used during execution.
