@@ -6,14 +6,28 @@ use crate::{
     experimental::ordering_state_computer::OrderingStateComputer, state_replication::StateComputer,
 };
 use aptos_consensus_types::{
+    block::Block,
+    block_data::BlockData,
     common::{Payload, PayloadFilter},
+    executed_block::ExecutedBlock,
     node::Node,
+    quorum_cert::QuorumCert,
+    vote::Vote,
+    vote_data::VoteData,
 };
 use aptos_crypto::HashValue;
-use aptos_types::{validator_verifier::ValidatorVerifier, PeerId};
+use aptos_executor_types::StateComputeResult;
+use aptos_types::{
+    aggregate_signature::AggregateSignature,
+    block_info::BlockInfo,
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    validator_signer::ValidatorSigner,
+    validator_verifier::ValidatorVerifier,
+    PeerId,
+};
 use claims::assert_some;
 use itertools::Itertools;
-use std::{collections::HashMap, iter::Extend, sync::Arc};
+use std::{collections::HashMap, hash::Hash, iter::Extend, sync::Arc};
 
 pub struct Bullshark {
     state_computer: Arc<dyn StateComputer>,
@@ -136,7 +150,7 @@ impl Bullshark {
         ordered_history
     }
 
-    pub fn try_ordering(&mut self, node: Node) {
+    pub async fn try_ordering(&mut self, node: Node) {
         let round = node.round();
         let wave = round / 2;
         let author = node.source();
@@ -173,12 +187,47 @@ impl Bullshark {
             let anchor = self.dag[round as usize - 1].remove(&anchor_author).unwrap();
             let order_anchor_stack = self.order_anchors(anchor);
             let ordered_history = self.order_history(order_anchor_stack);
-            self.push_to_execution(ordered_history);
+            self.push_to_execution(ordered_history).await;
         }
     }
 
-    fn push_to_execution(&self, _ordered_history: Vec<Node>) {
-        // TODO
+    async fn push_to_execution(&self, ordered_history: Vec<Node>) {
+        let blocks: Vec<Arc<ExecutedBlock>> = ordered_history
+            .iter()
+            .map(|node| {
+                let block = ExecutedBlock::new(
+                    Block::new_proposal(
+                        node.maybe_payload().unwrap().clone(),
+                        node.round(),
+                        0,
+                        QuorumCert::new(
+                            VoteData::new(BlockInfo::empty(), BlockInfo::empty()),
+                            LedgerInfoWithSignatures::new(
+                                LedgerInfo::new(BlockInfo::empty(), HashValue::zero()),
+                                AggregateSignature::empty(),
+                            ),
+                        ),
+                        &ValidatorSigner::random(None),
+                        Vec::new(),
+                    )
+                    .unwrap(),
+                    StateComputeResult::new_dummy(),
+                );
+                Arc::new(block)
+            })
+            .collect();
+
+        self.state_computer
+            .commit(
+                &blocks,
+                LedgerInfoWithSignatures::new(
+                    LedgerInfo::new(BlockInfo::empty(), HashValue::zero()),
+                    AggregateSignature::empty(),
+                ),
+                Box::new(|_, _| {}),
+            )
+            .await
+            .unwrap();
     }
 
     pub fn pending_payload(&self) -> PayloadFilter {

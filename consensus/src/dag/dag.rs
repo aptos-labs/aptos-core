@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{dag::anchor_election::AnchorElection, payload_manager::PayloadManager};
+use crate::{
+    dag::{anchor_election::AnchorElection, bullshark::Bullshark},
+    payload_manager::PayloadManager,
+};
 use aptos_consensus_types::node::{CertifiedNode, CertifiedNodeRequest, NodeMetaData};
 use aptos_crypto::HashValue;
 use aptos_types::{block_info::Round, validator_verifier::ValidatorVerifier, PeerId};
@@ -10,8 +13,7 @@ use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
     sync::Arc,
 };
-use aptos_infallible::Mutex;
-use crate::dag::bullshark::Bullshark;
+use tokio::sync::Mutex;
 
 enum PeerStatus {
     Linked(Round),
@@ -436,7 +438,9 @@ impl Dag {
             )
             .await;
 
-        self.bullshark.lock().try_ordering(certified_node.take_node());
+        let mut bs = self.bullshark.lock().await;
+
+        bs.try_ordering(certified_node.take_node()).await;
         // TODO: send/call to all subscribed application and make sure shutdown logic is safe with the expect.
 
         // self.bullshark_tx
