@@ -3,6 +3,8 @@ module aptos_std::math128 {
 
     use std::fixed_point32::FixedPoint32;
     use std::fixed_point32;
+    use std::fixed_point64::FixedPoint64;
+    use std::fixed_point64;
 
     /// Abort value when an invalid argument is provided.
     const EINVALID_ARG_FLOOR_LOG2: u64 = 1;
@@ -93,6 +95,27 @@ module aptos_std::math128 {
         fixed_point32::create_from_raw_value (((integer_part as u64) << 32) + frac)
     }
 
+    public fun log2_64(x: u128): FixedPoint64 {
+        let integer_part = floor_log2(x);
+        // Normalize x to [1, 2) in fixed point 63. To ensure x is smaller then 1<<64
+        if (x >= 1 << 63) {
+            x = x >> (integer_part - 63);
+        } else {
+            x = x << (63 - integer_part);
+        };
+        let frac = 0;
+        let delta = 1 << 63;
+        while (delta != 0) {
+            // log x = 1/2 log x^2
+            // x in [1, 2)
+            x = (x * x) >> 63;
+            // x is now in [1, 4)
+            // if x in [2, 4) then log x = 1 + log (x / 2)
+            if (x >= (2 << 63)) { frac = frac + delta; x = x >> 1; };
+            delta = delta >> 1;
+        };
+        fixed_point64::create_from_raw_value (((integer_part as u128) << 64) + frac)
+    }
 
     /// Returns square root of x, precisely floor(sqrt(x))
     public fun sqrt(x: u128): u128 {
