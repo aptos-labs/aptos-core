@@ -1103,6 +1103,11 @@ Create a new wallet object to hold fungible asset.
     <b>let</b> owner = &<a href="create_signer.md#0x1_create_signer_create_signer">create_signer::create_signer</a>(owner_addr);
     <b>let</b> derive_ref = &borrow_fungible_metadata(&metadata).derive_ref;
     <b>let</b> constructor_ref = &<a href="object.md#0x1_object_create_derived_object">object::create_derived_object</a>(owner, derive_ref);
+
+    // Disable ungated transfer <b>as</b> deterministic wallets shouldn't be transferrable.
+    <b>let</b> transfer_ref = &<a href="object.md#0x1_object_generate_transfer_ref">object::generate_transfer_ref</a>(constructor_ref);
+    <a href="object.md#0x1_object_disable_ungated_transfer">object::disable_ungated_transfer</a>(transfer_ref);
+
     <a href="fungible_asset.md#0x1_fungible_asset_initialize_arbitrary_wallet">initialize_arbitrary_wallet</a>(constructor_ref, metadata)
 }
 </code></pre>
