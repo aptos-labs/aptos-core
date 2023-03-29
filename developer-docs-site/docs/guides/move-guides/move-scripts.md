@@ -9,12 +9,11 @@ This tutorial explains how to write and execute a Move script. You can use Move 
 
 ## Example use case
 
-The following example calls functions on the [aptos_coin.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/aptos_coin.move) module to confirm the balance of the destination account is less than `desired_balance`, and if so, tops it up to `desired_balance`.
+The following example calls functions on the [aptos_coin.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/aptos_coin.move) module to top up an account to `desired_balance` if the current balance is less than that. 
 
 ```move
 script {
     use std::signer;
-    use aptos_framework::aptos_account;
     use aptos_framework::aptos_coin;
     use aptos_framework::coin;
 
@@ -23,7 +22,8 @@ script {
 
         let balance = coin::balance<aptos_coin::AptosCoin>(src_addr);
         if (balance < desired_balance) {
-            aptos_account::transfer(src, dest, desired_balance - balance);
+            let coins = coin::withdraw<aptos_coin::AptosCoin>(src, desired_balance - balance);
+            coin::deposit(dest, coins);
         };
     }
 }
