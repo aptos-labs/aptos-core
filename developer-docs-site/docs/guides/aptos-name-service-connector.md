@@ -1,5 +1,5 @@
 ---
-title: "Aptos Names Service UI Package"
+title: "Integrate Aptos Names Service"
 id: "aptos-names-service-package"
 ---
 # Integrate with Aptos Names Service UI Package

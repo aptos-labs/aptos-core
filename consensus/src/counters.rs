@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    exponential_buckets, op_counters::DurationHistogram, register_counter, register_gauge,
-    register_gauge_vec, register_histogram, register_histogram_vec, register_int_counter,
-    register_int_counter_vec, register_int_gauge, register_int_gauge_vec, AverageIntCounter,
+    exponential_buckets, op_counters::DurationHistogram, register_avg_counter, register_counter,
+    register_gauge, register_gauge_vec, register_histogram, register_histogram_vec,
+    register_int_counter, register_int_counter_vec, register_int_gauge, register_int_gauge_vec,
     Counter, Gauge, GaugeVec, Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge,
     IntGaugeVec,
 };
@@ -187,16 +187,16 @@ pub static LEADER_REPUTATION_ROUND_HISTORY_SIZE: Lazy<IntGauge> = Lazy::new(|| {
 });
 
 /// Counts when chain_health backoff is triggered
-pub static CHAIN_HEALTH_BACKOFF_TRIGGERED: Lazy<AverageIntCounter> = Lazy::new(|| {
-    AverageIntCounter::register(
+pub static CHAIN_HEALTH_BACKOFF_TRIGGERED: Lazy<Histogram> = Lazy::new(|| {
+    register_avg_counter(
         "aptos_chain_health_backoff_triggered",
         "Counts when chain_health backoff is triggered",
     )
 });
 
 /// Counts when waiting for full blocks is triggered
-pub static WAIT_FOR_FULL_BLOCKS_TRIGGERED: Lazy<AverageIntCounter> = Lazy::new(|| {
-    AverageIntCounter::register(
+pub static WAIT_FOR_FULL_BLOCKS_TRIGGERED: Lazy<Histogram> = Lazy::new(|| {
+    register_avg_counter(
         "aptos_wait_for_full_blocks_triggered",
         "Counts when waiting for full blocks is triggered",
     )

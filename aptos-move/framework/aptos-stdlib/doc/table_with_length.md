@@ -681,4 +681,4 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

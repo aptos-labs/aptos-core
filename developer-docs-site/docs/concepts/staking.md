@@ -281,6 +281,7 @@ When you leave a validator set, you can rejoin by depositing the minimum require
 
 * [Current on-chain data](https://mainnet.aptoslabs.com/v1/accounts/0x1/resource/0x1::staking_config::StakingConfig)
 * [Staking Pool Operations](../nodes/validator-node/operator/staking-pool-operations.md)
+* [Delegation Pool Operations](../nodes/validator-node/operator/delegation-pool-operations.md)
 * [Configuration file `staking_config.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/configs/staking_config.move)
 * [Contract file `staking_contract.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/staking_contract.move) covering requesting commissions
 * [All staking-related `.move files](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/framework/aptos-framework/sources)

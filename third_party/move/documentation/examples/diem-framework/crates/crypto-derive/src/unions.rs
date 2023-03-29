@@ -121,7 +121,7 @@ pub fn get_type_from_attrs(attrs: &[syn::Attribute], attr_name: &str) -> syn::Re
                             &format!("Could not parse {} attribute", attr_name)[..],
                         ))
                     }
-                }
+                },
                 bad => Err(syn::Error::new_spanned(
                     bad,
                     &format!("Could not parse {} attribute", attr_name)[..],

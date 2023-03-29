@@ -6,14 +6,11 @@ pub mod stats;
 pub mod submission_worker;
 pub mod transaction_executor;
 
-use crate::{
-    emitter::{
-        account_minter::AccountMinter,
-        stats::{DynamicStatsTracking, TxnStats},
-        submission_worker::SubmissionWorker,
-        transaction_executor::RestApiTransactionExecutor,
-    },
-    transaction_generator::{create_txn_generator_creator, EntryPoints},
+use crate::emitter::{
+    account_minter::AccountMinter,
+    stats::{DynamicStatsTracking, TxnStats},
+    submission_worker::SubmissionWorker,
+    transaction_executor::RestApiTransactionExecutor,
 };
 use again::RetryPolicy;
 use anyhow::{ensure, format_err, Result};
@@ -25,6 +22,7 @@ use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{transaction::SignedTransaction, LocalAccount},
 };
+use aptos_transaction_generator_lib::{create_txn_generator_creator, TransactionType};
 use futures::future::{try_join_all, FutureExt};
 use once_cell::sync::Lazy;
 use rand::{rngs::StdRng, seq::IteratorRandom, Rng};
@@ -55,67 +53,6 @@ pub static RETRY_POLICY: Lazy<RetryPolicy> = Lazy::new(|| {
         .with_max_retries(MAX_RETRIES)
         .with_jitter(true)
 });
-
-#[derive(Debug, Copy, Clone)]
-pub enum TransactionType {
-    CoinTransfer {
-        invalid_transaction_ratio: usize,
-        sender_use_account_pool: bool,
-    },
-    AccountGeneration {
-        add_created_accounts_to_pool: bool,
-        max_account_working_set: usize,
-        creation_balance: u64,
-    },
-    NftMintAndTransfer,
-    PublishPackage {
-        use_account_pool: bool,
-    },
-    CallCustomModules {
-        entry_point: EntryPoints,
-        num_modules: usize,
-        use_account_pool: bool,
-    },
-}
-
-impl TransactionType {
-    pub fn default_coin_transfer() -> Self {
-        Self::CoinTransfer {
-            invalid_transaction_ratio: 0,
-            sender_use_account_pool: false,
-        }
-    }
-
-    pub fn default_account_generation() -> Self {
-        Self::AccountGeneration {
-            add_created_accounts_to_pool: true,
-            max_account_working_set: 1_000_000,
-            creation_balance: 0,
-        }
-    }
-
-    pub fn default_call_custom_module() -> Self {
-        Self::CallCustomModules {
-            entry_point: EntryPoints::Nop,
-            num_modules: 1,
-            use_account_pool: false,
-        }
-    }
-
-    pub fn default_call_different_modules() -> Self {
-        Self::CallCustomModules {
-            entry_point: EntryPoints::Nop,
-            num_modules: 100,
-            use_account_pool: false,
-        }
-    }
-}
-
-impl Default for TransactionType {
-    fn default() -> Self {
-        Self::default_coin_transfer()
-    }
-}
 
 #[derive(Clone, Debug)]
 pub struct EmitModeParams {
@@ -628,7 +565,7 @@ impl TxnEmitter {
             &txn_executor,
             &txn_factory,
             &init_txn_factory,
-            stats.clone(),
+            stats.get_cur_phase_obj(),
         )
         .await;
 

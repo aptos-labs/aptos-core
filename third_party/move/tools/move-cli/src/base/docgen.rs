@@ -31,7 +31,7 @@ pub struct Docgen {
     /// Max depth to which sections are displayed in table-of-contents
     #[clap(long = "toc-depth", value_name = "DEPTH")]
     pub toc_depth: Option<usize>,
-    /// Do not use collapsed sections (<details>) for impl and specs
+    /// Do not use collapsed sections (`<details>`) for implementation and specs
     #[clap(long = "no-collapsed-sections")]
     pub no_collapsed_sections: bool,
     /// In which directory to store output
