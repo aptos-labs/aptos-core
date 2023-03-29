@@ -12,12 +12,12 @@ anyhow = "1.0.52"
 clap = { version = "3.1.8", features = ["derive"] }
 
 bcs = "0.1.4"
+move-cli = { path = "../../../../../tools/move-cli" }
+move-core-types = { path = "../../../../../move-core/types" }
 
 move-stdlib = { path = "../../../../../move-stdlib" }
-move-core-types = { path = "../../../../../move-core/types" }
-move-vm-types = { path = "../../../../../move-vm/types" }
-move-cli = { path = "../../../../../tools/move-cli" }
 move-vm-test-utils = { path = "../../../../../move-vm/test-utils" }
+move-vm-types = { path = "../../../../../move-vm/types" }
 
 diem-framework-natives = { path = "../natives" }
 

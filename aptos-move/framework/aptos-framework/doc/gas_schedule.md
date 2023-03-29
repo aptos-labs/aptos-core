@@ -326,4 +326,4 @@ This can be called by on-chain governance to update the gas schedule.
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

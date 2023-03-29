@@ -236,7 +236,7 @@ pub(crate) fn construct_args<S: MoveResolverExt>(
         // Unfortunately, is_empty is only enabled in nightly, so we check this way.
         if cursor.position() != arg.len() as u64 {
             return Err(VMStatus::Error(
-                StatusCode::NUMBER_OF_ARGUMENTS_MISMATCH,
+                StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
                 Some(String::from(
                     "The serialized arguments to constructor contained extra data",
                 )),
@@ -372,7 +372,7 @@ fn get_len(cursor: &mut Cursor<&[u8]>) -> Result<usize, VMStatus> {
 
 fn serialize_uleb128(mut x: usize, dest: &mut Vec<u8>) {
     // TODO perhaps reuse the code from move_binary_format::file_format_common if it's public
-    while x > 128 {
+    while x >= 128 {
         dest.push((x | 128) as u8);
         x >>= 7;
     }

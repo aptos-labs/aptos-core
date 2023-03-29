@@ -5,7 +5,7 @@ slug: "delegation-pool-operations"
 
 # Delegation Pool Operations
 
-> Beta: This documentation is in experimental, beta mode. Supply feedback by [requesting document changes](../../../community/site-updates.md#request-docs-changes).
+> Beta: This documentation is in experimental, beta mode. Supply feedback by [requesting document changes](../../../community/site-updates.md#request-docs-changes). See also the related [Staking Pool Operations](./staking-pool-operations.md) instructions.
 
 Validator operators should follow these instructions to carry out delegation pool operations for [staking](../../../concepts/staking.md). You may delegate as little as 10 APT. Note that your validator will become part of the *Active Validator Set* only when the delegation pool satisfies the minimum cumulative [staking requirement of 1 million APT](./staking-pool-operations.md).
 
@@ -41,12 +41,12 @@ Now initialize a delegation pool by following these steps:
     ```bash
     aptos move run --profile <your-profile> \ 
     --function-id 0x1::delegation_pool::initialize_delegation_pool \
-    --args u64:1000 raw:00
+    --args u64:1000 string:00
     ```
     Where `--args`:
   
     - `u64:1000` represents `operator_commission_percentage` - 1000 is equivalent to 10% and 10000 is 100%.
-    - `raw: 00` represents `delegation_pool_creation_seed` - a number chosen by you to create a resource account associated with your owner address; this account is used to host the delegation pool resource.
+    - `string:00` represents `delegation_pool_creation_seed` - a number chosen by you to create a resource account associated with your owner address; this account is used to host the delegation pool resource.
 
     Note that once `operator_commission_percentage` is set, it cannot be changed.
 

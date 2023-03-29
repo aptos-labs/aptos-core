@@ -4,7 +4,7 @@
 //! The Aptos API response / error handling philosophy.
 //!
 //! The return type for every endpoint should be a
-//! poem::Result<MyResponse<T>, MyError> where MyResponse is an instance of
+//! `poem::Result<MyResponse<T>, MyError>` where MyResponse is an instance of
 //! ApiResponse that contains only the status codes that it can actually
 //! return. This will manifest in the OpenAPI spec, making it clear to users
 //! what the API can actually return. The error should operate the same way,

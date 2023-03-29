@@ -269,4 +269,4 @@ This module turns on <code>aborts_if_is_strict</code>, so need to add spec for t
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

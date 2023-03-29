@@ -22,7 +22,7 @@ pub enum ConnectionState {
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct PeerMonitoringMetadata {
     pub average_ping_latency_secs: Option<f64>, // The average latency ping for the peer
-    pub connected_peers_and_metadata: Option<HashMap<PeerNetworkId, PeerMetadata>>, // Connected peers and metadata
+    pub connected_peers: Option<HashMap<PeerNetworkId, ConnectionMetadata>>, // Connected peers and metadata
     pub distance_from_validators: Option<u64>, // The known distance from the validator set
 }
 
@@ -33,12 +33,12 @@ impl Eq for PeerMonitoringMetadata {}
 impl PeerMonitoringMetadata {
     pub fn new(
         average_ping_latency_secs: Option<f64>,
-        connected_peers_and_metadata: Option<HashMap<PeerNetworkId, PeerMetadata>>,
+        connected_peers: Option<HashMap<PeerNetworkId, ConnectionMetadata>>,
         distance_from_validators: Option<u64>,
     ) -> Self {
         PeerMonitoringMetadata {
             average_ping_latency_secs,
-            connected_peers_and_metadata,
+            connected_peers,
             distance_from_validators,
         }
     }

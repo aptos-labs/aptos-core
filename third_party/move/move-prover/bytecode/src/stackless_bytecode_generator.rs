@@ -23,11 +23,12 @@ use move_core_types::{
     value::MoveValue,
 };
 use move_model::{
-    ast::{ConditionKind, TempIndex},
+    ast::{ConditionKind, ExpData, PropertyValue, TempIndex, Value},
     model::{FunId, FunctionEnv, Loc, ModuleId, StructId},
+    pragmas::CONDITION_UNROLL_PROP,
     ty::{PrimitiveType, Type},
 };
-use num::BigUint;
+use num::{BigUint, ToPrimitive};
 use std::{
     collections::{BTreeMap, BTreeSet},
     convert::TryInto,
@@ -42,6 +43,7 @@ pub struct StacklessBytecodeGenerator<'a> {
     local_types: Vec<Type>,
     code: Vec<Bytecode>,
     location_table: BTreeMap<AttrId, Loc>,
+    loop_unrolling: BTreeMap<AttrId, usize>,
     loop_invariants: BTreeSet<AttrId>,
     fallthrough_labels: BTreeSet<Label>,
 }
@@ -59,6 +61,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
             local_types,
             code: vec![],
             location_table: BTreeMap::new(),
+            loop_unrolling: BTreeMap::new(),
             loop_invariants: BTreeSet::new(),
             fallthrough_labels: BTreeSet::new(),
         }
@@ -114,8 +117,9 @@ impl<'a> StacklessBytecodeGenerator<'a> {
             local_types,
             code,
             location_table,
+            loop_unrolling,
             loop_invariants,
-            ..
+            fallthrough_labels: _,
         } = self;
 
         FunctionData::new(
@@ -125,6 +129,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
             func_env.get_return_types(),
             location_table,
             func_env.get_acquires_global_resources(),
+            loop_unrolling,
             loop_invariants,
         )
     }
@@ -179,8 +184,36 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                     ConditionKind::Assert => PropKind::Assert,
                     ConditionKind::Assume => PropKind::Assume,
                     ConditionKind::LoopInvariant => {
-                        self.loop_invariants.insert(attr_id);
-                        PropKind::Assert
+                        let global_env = self.func_env.module_env.env;
+                        let sym = global_env.symbol_pool().make(CONDITION_UNROLL_PROP);
+                        match cond.properties.get(&sym) {
+                            None => {
+                                self.loop_invariants.insert(attr_id);
+                                PropKind::Assert
+                            },
+                            Some(PropertyValue::Value(Value::Number(count))) => {
+                                // the only allowed loop invariant condition is `True`
+                                match cond.exp.as_ref() {
+                                    ExpData::Value(_, Value::Bool(true)) => (),
+                                    _ => {
+                                        global_env.error(
+                                            &cond.loc,
+                                            "invalid loop unrolling specification",
+                                        );
+                                        continue;
+                                    },
+                                }
+                                self.loop_unrolling.insert(
+                                    attr_id,
+                                    count.to_usize().expect("invalid loop unrolling count"),
+                                );
+                                PropKind::Assume
+                            },
+                            Some(_) => {
+                                global_env.error(&cond.loc, "invalid loop unrolling property");
+                                continue;
+                            },
+                        }
                     },
                     // Updating global spec variables are translated to Assume, which will be replaced when instrumenting the spec
                     ConditionKind::Update => PropKind::Assume,
