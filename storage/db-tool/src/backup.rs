@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::utils::parse_maxable_u64;
 use anyhow::Result;
 use aptos_backup_cli::{
     backup_types::{
@@ -19,6 +20,7 @@ use aptos_backup_cli::{
         ConcurrentDownloadsOpt, GlobalBackupOpt, TrustedWaypointOpt,
     },
 };
+use aptos_types::transaction::Version;
 use clap::{Parser, Subcommand};
 use std::sync::Arc;
 
@@ -129,6 +131,27 @@ pub struct VerifyOpt {
     storage: DBToolStorageOpt,
     #[clap(flatten)]
     concurrent_downloads: ConcurrentDownloadsOpt,
+    #[clap(
+        long,
+        parse(try_from_str = parse_maxable_u64),
+        help = "The first transaction version required to be verified. Pass \"max\" to skip \
+        transaction verification. [Defaults to 0]"
+    )]
+    start_version: Option<Version>,
+    #[clap(
+        long,
+        help = "The last transaction version required to be verified (if present \
+        in the backup). [Defaults to the latest version available]"
+    )]
+    end_version: Option<Version>,
+    #[clap(
+        long,
+        help = "Verify the last state snapshot strictly before this version. Pass 0 to disable \
+        state snapshot verification. [Defaults to the latest snapshot]"
+    )]
+    state_snapshot_before_version: Option<Version>,
+    #[clap(long, help = "Skip verifying epoch ending info.")]
+    skip_epoch_endings: bool,
 }
 
 impl Command {
@@ -206,6 +229,10 @@ impl Command {
                     opt.metadata_cache_opt,
                     opt.trusted_waypoints_opt,
                     opt.concurrent_downloads.get(),
+                    opt.start_version.unwrap_or(0),
+                    opt.end_version.unwrap_or(Version::MAX),
+                    opt.state_snapshot_before_version.unwrap_or(Version::MAX),
+                    opt.skip_epoch_endings,
                 )?
                 .run()
                 .await?

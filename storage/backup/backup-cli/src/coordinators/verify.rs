@@ -27,6 +27,10 @@ pub struct VerifyCoordinator {
     metadata_cache_opt: MetadataCacheOpt,
     trusted_waypoints_opt: TrustedWaypointOpt,
     concurrent_downloads: usize,
+    start_version: Version,
+    end_version: Version,
+    state_snapshot_before_version: Version,
+    skip_epoch_endings: bool,
 }
 
 impl VerifyCoordinator {
@@ -35,12 +39,20 @@ impl VerifyCoordinator {
         metadata_cache_opt: MetadataCacheOpt,
         trusted_waypoints_opt: TrustedWaypointOpt,
         concurrent_downloads: usize,
+        start_version: Version,
+        end_version: Version,
+        state_snapshot_before_version: Version,
+        skip_epoch_endings: bool,
     ) -> Result<Self> {
         Ok(Self {
             storage,
             metadata_cache_opt,
             trusted_waypoints_opt,
             concurrent_downloads,
+            start_version,
+            end_version,
+            state_snapshot_before_version,
+            skip_epoch_endings,
         })
     }
 
@@ -71,8 +83,10 @@ impl VerifyCoordinator {
         )
         .await?;
         let ver_max = Version::max_value();
-        let state_snapshot = metadata_view.select_state_snapshot(ver_max)?;
-        let transactions = metadata_view.select_transaction_backups(0, ver_max)?;
+        let state_snapshot =
+            metadata_view.select_state_snapshot(self.state_snapshot_before_version)?;
+        let transactions =
+            metadata_view.select_transaction_backups(self.start_version, self.end_version)?;
         let epoch_endings = metadata_view.select_epoch_ending_backups(ver_max)?;
 
         let global_opt = GlobalRestoreOptions {
@@ -83,18 +97,22 @@ impl VerifyCoordinator {
             replay_concurrency_level: 0, // won't replay, doesn't matter
         };
 
-        let epoch_history = Arc::new(
-            EpochHistoryRestoreController::new(
-                epoch_endings
-                    .into_iter()
-                    .map(|backup| backup.manifest)
-                    .collect(),
-                global_opt.clone(),
-                self.storage.clone(),
-            )
-            .run()
-            .await?,
-        );
+        let epoch_history = if self.skip_epoch_endings {
+            None
+        } else {
+            Some(Arc::new(
+                EpochHistoryRestoreController::new(
+                    epoch_endings
+                        .into_iter()
+                        .map(|backup| backup.manifest)
+                        .collect(),
+                    global_opt.clone(),
+                    self.storage.clone(),
+                )
+                .run()
+                .await?,
+            ))
+        };
 
         if let Some(backup) = state_snapshot {
             StateSnapshotRestoreController::new(
@@ -105,7 +123,7 @@ impl VerifyCoordinator {
                 },
                 global_opt.clone(),
                 Arc::clone(&self.storage),
-                Some(Arc::clone(&epoch_history)),
+                epoch_history.clone(),
             )
             .run()
             .await?;
@@ -117,7 +135,7 @@ impl VerifyCoordinator {
             self.storage,
             txn_manifests,
             None, /* replay_from_version */
-            Some(epoch_history),
+            epoch_history,
             VerifyExecutionMode::NoVerify,
         )
         .run()
