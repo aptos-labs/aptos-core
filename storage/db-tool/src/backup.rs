@@ -152,6 +152,8 @@ pub struct VerifyOpt {
     state_snapshot_before_version: Option<Version>,
     #[clap(long, help = "Skip verifying epoch ending info.")]
     skip_epoch_endings: bool,
+    #[clap(long, help = "While verifying a snapshot, run module validation.")]
+    validate_modules: bool,
 }
 
 impl Command {
@@ -233,6 +235,7 @@ impl Command {
                     opt.end_version.unwrap_or(Version::MAX),
                     opt.state_snapshot_before_version.unwrap_or(Version::MAX),
                     opt.skip_epoch_endings,
+                    opt.validate_modules,
                 )?
                 .run()
                 .await?

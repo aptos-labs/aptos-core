@@ -31,6 +31,7 @@ pub struct VerifyCoordinator {
     end_version: Version,
     state_snapshot_before_version: Version,
     skip_epoch_endings: bool,
+    validate_modules: bool,
 }
 
 impl VerifyCoordinator {
@@ -43,6 +44,7 @@ impl VerifyCoordinator {
         end_version: Version,
         state_snapshot_before_version: Version,
         skip_epoch_endings: bool,
+        validate_modules: bool,
     ) -> Result<Self> {
         Ok(Self {
             storage,
@@ -53,6 +55,7 @@ impl VerifyCoordinator {
             end_version,
             state_snapshot_before_version,
             skip_epoch_endings,
+            validate_modules,
         })
     }
 
@@ -115,11 +118,16 @@ impl VerifyCoordinator {
         };
 
         if let Some(backup) = state_snapshot {
+            info!(
+                epoch = backup.epoch,
+                version = backup.version,
+                "State snapshot selected for verification."
+            );
             StateSnapshotRestoreController::new(
                 StateSnapshotRestoreOpt {
                     manifest_handle: backup.manifest,
                     version: backup.version,
-                    validate_modules: false,
+                    validate_modules: self.validate_modules,
                 },
                 global_opt.clone(),
                 Arc::clone(&self.storage),
