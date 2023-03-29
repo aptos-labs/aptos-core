@@ -419,9 +419,15 @@ fn scheduler_dependency() {
         SchedulerTask::ValidationTask((0, 0), 0)
     ));
     // Current status of 0 is executed - hence, no dependency added.
-    assert!(s.wait_for_dependency(3, 0).is_none());
+    assert!(matches!(
+        s.wait_for_dependency(3, 0),
+        DependencyResult::Resolved
+    ));
     // Dependency added for transaction 4 on transaction 2.
-    assert!(s.wait_for_dependency(4, 2).is_some());
+    assert!(matches!(
+        s.wait_for_dependency(4, 2),
+        DependencyResult::Dependency(_)
+    ));
 
     assert!(matches!(
         s.finish_execution(2, 0, false),
@@ -468,8 +474,14 @@ fn scheduler_incarnation() {
     let s = incarnation_one_scheduler(5);
 
     // execution/validation index = 5, wave = 0.
-    assert!(s.wait_for_dependency(1, 0).is_some());
-    assert!(s.wait_for_dependency(3, 0).is_some());
+    assert!(matches!(
+        s.wait_for_dependency(1, 0),
+        DependencyResult::Dependency(_)
+    ));
+    assert!(matches!(
+        s.wait_for_dependency(3, 0),
+        DependencyResult::Dependency(_)
+    ));
 
     // Because validation index is higher, return validation task to caller (even with
     // revalidate_suffix = true) - because now we always decrease validation idx to txn_idx + 1

@@ -20,7 +20,7 @@ use std::{
 const TXN_IDX_MASK: u64 = (1 << 32) - 1;
 
 pub type Wave = u32;
-pub type Version = (TxnIndex, Incarnation);
+
 #[derive(Debug)]
 pub enum DependencyStatus {
     // The dependency is not resolved yet.
@@ -552,7 +552,7 @@ impl Scheduler {
     /// Therefore the commit thread needs to wake up all such pending threads, by sending notification to the condition
     /// variable and setting the lock variables properly.
     pub fn resolve_condvar(&self, txn_idx: TxnIndex) {
-        let mut status = self.txn_status[txn_idx].0.write();
+        let mut status = self.txn_status[txn_idx as usize].0.write();
         {
             // Only transactions with status Suspended or ReadyToExecute may have the condition variable of pending threads.
             match &*status {
@@ -783,7 +783,7 @@ impl Scheduler {
         if matches!(*status, ExecutionStatus::ExecutionHalted) {
             return;
         }
-        
+
         // Only makes sense when the current status is 'Executing'.
         debug_assert!(*status == ExecutionStatus::Executing(incarnation));
         *status = ExecutionStatus::Executed(incarnation);
@@ -797,7 +797,7 @@ impl Scheduler {
         if matches!(*status, ExecutionStatus::ExecutionHalted) {
             return;
         }
-        
+
         // Only makes sense when the current status is 'Aborting'.
         debug_assert!(*status == ExecutionStatus::Aborting(incarnation));
         *status = ExecutionStatus::ReadyToExecute(incarnation + 1, None);

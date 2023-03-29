@@ -449,7 +449,10 @@ where
                 let mut reads_result = vec![];
                 for k in reads[read_idx].iter() {
                     // TODO: later test errors as well? (by fixing state_view behavior).
-                    reads_result.push(view.get_state_value_bytes(k).unwrap());
+                    match view.get_state_value_bytes(k) {
+                        Ok(v) => reads_result.push(v),
+                        Err(_) => reads_result.push(None),
+                    }
                 }
                 ExecutionStatus::Success(Output(
                     writes_and_deltas[write_idx].0.clone(),

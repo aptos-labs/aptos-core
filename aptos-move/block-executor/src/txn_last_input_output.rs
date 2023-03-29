@@ -205,10 +205,10 @@ impl<K: ModulePath, T: TransactionOutput, E: Send + Clone> TxnLastInputOutput<K,
                 ));
             }
         }
-        
+
         self.inputs[txn_idx as usize].store(Some(Arc::new(input)));
         self.outputs[txn_idx as usize].store(Some(Arc::new(output)));
-        
+
         Ok(())
     }
 

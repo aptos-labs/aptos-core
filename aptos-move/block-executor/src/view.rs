@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    counters, scheduler::{DependencyResult, DependencyStatus, Scheduler}, task::Transaction, txn_last_input_output::ReadDescriptor,
+    counters,
+    scheduler::{DependencyResult, DependencyStatus, Scheduler},
+    task::Transaction,
+    txn_last_input_output::ReadDescriptor,
 };
 use anyhow::Result;
 use aptos_aggregator::delta_change_set::{deserialize, serialize, DeltaOp};
@@ -256,14 +259,14 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TStateView for LatestView<
                             .map_err(|pe| pe.finish(Location::Undefined).into_vm_status())?;
                         Ok(Some(StateValue::new_legacy(serialize(&result))))
                     },
+                    // ExecutionHalted indicates that the parallel execution is halted.
+                    // The read should return immediately and log the error.
+                    ReadResult::ExecutionHalted => Err(anyhow::Error::new(VMStatus::Error(
+                        StatusCode::STORAGE_ERROR,
+                        Some("Speculative error to halt BlockSTM early.".to_string()),
+                    ))),
                     ReadResult::None => self.get_base_value(state_key),
                 },
-                // ExecutionHalted indicates that the parallel execution is halted.
-                // The read should return immediately and log the error.
-                ReadResult::ExecutionHalted => Err(anyhow::Error::new(VMStatus::Error(
-                    StatusCode::STORAGE_ERROR, Some("Speculative error to halt BlockSTM early.")
-                ))),
-                ReadResult::None => self.get_base_value(state_key),
             },
             ViewMapKind::BTree(map) => map.get(state_key).map_or_else(
                 || self.get_base_value(state_key),
