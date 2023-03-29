@@ -3,11 +3,21 @@ title: "Install the Move Prover"
 id: "install-move-prover"
 ---
 
-# Install the Move Prover to Validate Code
+# Install and Validate with the Move Prover
 
-If you want to use the [Move Prover](https://github.com/move-language/move/blob/main/language/move-prover/doc/user/prover-guide.md) to validate your Move code, install the Move Prover dependencies after [installing the CLI binary](aptos-cli-tool/install-aptos-cli.md).
+We highly recommend you install the Move Prover after [installing the Aptos CLI](./aptos-cli-tool/index.md) to validate your Move code. When running the Move Prover, pass the `–check-inconsistency` and `--unconditional-abort-as-inconsistency` options to find and fix errors in your Move specifications, for example:
+```shell
+move prove -- –check-inconsistency --unconditional-abort-as-inconsistency
+```
 
-For some sweet examples, see:
+Or via the Aptos CLI:
+```shell
+aptos move prove -- –check-inconsistency --unconditional-abort-as-inconsistency
+```
+
+For a deep dive into the use and usefulness of those flags, see the post [The Move Prover: Quality Assurance of Formal Verification](https://www.certik.com/resources/blog/1NygvVeqIwhbUk1U1q3vJF-the-move-prover-quality-assurance-of-formal-verification).
+
+For examples, see:
 https://github.com/Zellic/move-prover-examples
 
 :::tip

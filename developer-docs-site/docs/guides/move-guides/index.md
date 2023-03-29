@@ -55,7 +55,7 @@ Use the [Aptos Simulation API](../../concepts/gas-txn-fee.md#estimating-the-gas-
 
 ### Move Prover
 
-Install the [Move Prover](../../cli-tools/install-move-prover.md) dependencies after installing the Aptos CLI If you want to use the Move Prover to validate your Move code.
+We highly recommend you install the [Move Prover](../../cli-tools/install-move-prover.md) after installing the Aptos CLI to validate your Move code.
 
 ### Move Debugger
 
@@ -79,6 +79,7 @@ Use these external resources to learn about the core Move programming language.
 
 * [Teach yourself Move on Aptos](https://github.com/econia-labs/teach-yourself-move).
 * [Formal Verification, the Move Language, and the Move Prover](https://www.certik.com/resources/blog/2wSOZ3mC55AB6CYol6Q2rP-formal-verification-the-move-language-and-the-move-prover)
+* [The Move Prover: Quality Assurance of Formal Verification](https://www.certik.com/resources/blog/1NygvVeqIwhbUk1U1q3vJF-the-move-prover-quality-assurance-of-formal-verification)
 * [IMCODING Move Tutorials](https://imcoding.online/courses/move-language)
 * [Pontem Move Playground](https://playground.pontem.network/)
 * [Collection of nestable Move resources](https://github.com/taoheorg/taohe)
