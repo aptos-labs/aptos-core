@@ -867,19 +867,17 @@ FAILURE proving 1 modules from package `hello_prover` in 0.067s
 ```
 In this case, see [Install the dependencies of Move Prover](install-aptos-cli#step-3-optional-install-the-dependencies-of-move-prover).
 
-### Profiling gas use
+### Profiling gas usage
 
-This *experimental* feature lets you [profile gas usage](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/aptos-gas-profiling) in the Aptos virtual machine locally rather than [simulating transactions](../../concepts/gas-txn-fee.md#estimating-the-gas-units-via-simulation) at the [fullnode](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/simulate_transaction). You may also use it to visualize the transaction gas log, in the form of a flame graph.
+This *experimental* feature lets you [profile gas usage](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/aptos-gas-profiling) in the Aptos virtual machine locally rather than [simulating transactions](../../concepts/gas-txn-fee.md#estimating-the-gas-units-via-simulation) at the [fullnode](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/simulate_transaction). You may also use it to visualize gas usage in the form of a flame graph.
 
 Run the gas profiler by appending the `--profile-gas` option to the aptos CLI `move publish`, `move run` or `move run-script` command, for example:
 ```bash
-cargo run -p aptos -- move publish --profile-gas
+aptos move publish --profile-gas
 ```
 
 And receive output resembling:
 ```bash
-    Finished dev [unoptimized + debuginfo] target(s) in 0.51s
-     Running `/home/vgao/aptos-core/target/debug/aptos move publish --profile-gas`
 Compiling, may take a little while to download git dependencies...
 BUILDING empty_fun
 package size 427 bytes
