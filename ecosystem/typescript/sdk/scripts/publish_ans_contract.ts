@@ -25,15 +25,17 @@ try {
   console.log("---deleting aptos-names-contracts folder---");
   deleteAnsFolder();
   // 1. Clone ANS repository into the current directory
+  console.log("working directory", __dirname);
+  console.log("ANS_CORE_FOLDER", __dirname + ANS_CORE_FOLDER);
   console.log("---clone ANS repository---");
   execSync("git clone https://github.com/aptos-labs/aptos-names-contracts.git", {
-    cwd: path.resolve(__dirname, ""),
+    cwd: path.resolve(__dirname),
   });
 
   // 2. initialize a default profile
   console.log("---initialize a default profile---");
   execSync(APTOS_INIT_COMMAND, {
-    cwd: __dirname + ANS_CORE_FOLDER,
+    cwd: path.resolve(__dirname + ANS_CORE_FOLDER),
   });
 
   // Sleep for 10 seconds to make sure account has funded
@@ -43,7 +45,7 @@ try {
   // 3. get default profile info
   console.log("---get default profile info---");
   const data = execSync(GET_DEFAULT_PROFILE_COMMAND, {
-    cwd: __dirname + ANS_CORE_FOLDER,
+    cwd: path.resolve(__dirname + ANS_CORE_FOLDER),
   })
     .toString()
     .trim();
@@ -57,7 +59,7 @@ try {
   execSync(
     `${APTOS_INVOCATION} move publish --named-addresses aptos_names=0x${profileAccountAddress},aptos_names_admin=0x${profileAccountAddress},aptos_names_funds=0x${profileAccountAddress} --assume-yes`,
     {
-      cwd: __dirname + ANS_CORE_FOLDER,
+      cwd: path.resolve(__dirname + ANS_CORE_FOLDER),
     },
   );
 
@@ -75,6 +77,6 @@ try {
 
 function deleteAnsFolder() {
   execSync("rm -rf aptos-names-contracts", {
-    cwd: path.resolve(__dirname, ""),
+    cwd: path.resolve(__dirname),
   });
 }
