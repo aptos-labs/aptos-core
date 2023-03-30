@@ -271,9 +271,7 @@ impl<'env> BoogieWrapper<'env> {
                 // avoiding producing them, because of the step of converting locations to line
                 // numbers.
                 let display_str = format!("    {}{}", loc.display_line_only(self.env), info);
-                if (display.is_empty() || display[display.len() - 1] != display_str)
-                    && !display_str.contains("<internal>")
-                {
+                if display.is_empty() || display[display.len() - 1] != display_str {
                     display.push(display_str);
                 }
                 *last_loc = loc.clone();
@@ -446,7 +444,6 @@ impl<'env> BoogieWrapper<'env> {
                 display.append(&mut trace_display)
             }
 
-            display.dedup();
             diag = diag.with_notes(display);
         }
         self.env.add_diag(diag);
