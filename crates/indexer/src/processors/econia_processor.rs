@@ -1,3 +1,5 @@
+#![allow(dead_code, unused_variables)]
+
 use std::{collections::HashMap, sync::RwLock};
 
 use crate::{
@@ -17,6 +19,8 @@ use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, Utc};
+use crossbeam::channel;
+use dashmap::DashMap;
 use diesel::{result::Error, PgConnection};
 use econia_db::models::{self, market::MarketEventType, IntoInsertable};
 use field_count::FieldCount;
@@ -25,22 +29,44 @@ use serde::Deserialize;
 
 pub const NAME: &str = "econia_processor";
 
-static ECONIA_ADDRESS: Lazy<String> =
-    Lazy::new(|| std::env::var("ECONIA_ADDRESS").expect("ECONIA_ADDRESS not set"));
+#[derive(Debug, Deserialize, Clone)]
+struct RedisConfig {
+    url: String,
+    open_orders: String,
+    markets: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct EconiaConfig {
+    redis: RedisConfig,
+    econia_address: String,
+}
+
+static ECONIA_CONFIG: Lazy<EconiaConfig> = Lazy::new(|| {
+    let path = std::env::var("ECONIA_CONFIG_PATH").expect("ECONIA_CONFIG not set");
+    let config_file = std::fs::File::open(path).expect("Failed to open econia config file");
+    serde_json::from_reader(config_file).expect("Failed to parse econia config file")
+});
 
 static EVENT_TYPES: Lazy<Vec<String>> = Lazy::new(|| {
     vec![
-        format!("{}::market::TakerEvent", &*ECONIA_ADDRESS),
-        format!("{}::market::MakerEvent", &*ECONIA_ADDRESS),
-        format!("{}::registry::MarketRegistrationEvent", &*ECONIA_ADDRESS),
-        format!("{}::registry::RecognizedMarketEvent", &*ECONIA_ADDRESS),
+        format!("{}::market::TakerEvent", &ECONIA_CONFIG.econia_address),
+        format!("{}::market::MakerEvent", &ECONIA_CONFIG.econia_address),
+        format!(
+            "{}::registry::MarketRegistrationEvent",
+            &ECONIA_CONFIG.econia_address
+        ),
+        format!(
+            "{}::registry::RecognizedMarketEvent",
+            &ECONIA_CONFIG.econia_address
+        ),
     ]
 });
 
 static CURRENT_BLOCK_TIME: Lazy<RwLock<DateTime<Utc>>> =
     Lazy::new(|| RwLock::new(DateTime::<Utc>::MIN_UTC));
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 struct TakerEvent {
     market_id: u64,
     side: bool,
@@ -66,7 +92,7 @@ impl From<TakerEvent> for models::events::TakerEvent {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 struct MakerEvent {
     market_id: u64,
     side: bool,
@@ -127,7 +153,7 @@ impl From<MarketRegistrationEvent> for models::market::MarketRegistrationEvent {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 struct TradingPair {
     base_type: TypeInfo,
     base_name_generic: String,
@@ -135,7 +161,7 @@ struct TradingPair {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 struct RecognizedMarketInfo {
     market_id: u64,
     lot_size: u64,
@@ -144,13 +170,13 @@ struct RecognizedMarketInfo {
     underwriter_id: u64,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 struct RecognizedMarketEvent {
     trading_pair: TradingPair,
     recognized_market_info: Option<RecognizedMarketInfo>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[serde(untagged)]
 enum EventWrapper {
     Maker(MakerEvent),
@@ -184,10 +210,54 @@ fn create_base_quote_key(m: &models::market::MarketRegistrationEvent) -> BaseQuo
     )
 }
 
+struct OrderBook;
+
+struct EconiaRedisCacher {
+    redis_client: redis::Client,
+    config: RedisConfig,
+    // mkt_id => OrderBook
+    books: HashMap<BigDecimal, OrderBook>,
+    market_remove_rx: channel::Receiver<BigDecimal>,
+    event_rx: channel::Receiver<EventWrapper>,
+}
+
+impl EconiaRedisCacher {
+    fn new(
+        config: RedisConfig,
+        books: HashMap<BigDecimal, OrderBook>,
+        market_remove_rx: channel::Receiver<BigDecimal>,
+        event_rx: channel::Receiver<EventWrapper>,
+    ) -> Self {
+        let redis_client = redis::Client::open(&*config.url).expect("failed to connect to redis");
+        Self {
+            redis_client,
+            config,
+            books,
+            market_remove_rx,
+            event_rx,
+        }
+    }
+
+    fn start(&self) {
+        loop {
+            channel::select! {
+                recv(self.market_remove_rx) -> mkt_id => {
+                    todo!()
+                },
+                recv(self.event_rx) -> event => {
+                    todo!()
+                }
+            }
+        }
+    }
+}
+
 pub struct EconiaTransactionProcessor {
     connection_pool: PgDbPool,
-    markets: RwLock<HashMap<BigDecimal, models::market::MarketRegistrationEvent>>,
-    base_quote_to_market_id: RwLock<HashMap<BaseQuoteKey, BigDecimal>>,
+    markets: DashMap<BigDecimal, models::market::MarketRegistrationEvent>,
+    base_quote_to_market_id: DashMap<BaseQuoteKey, BigDecimal>,
+    market_removal_tx: channel::Sender<BigDecimal>,
+    event_tx: channel::Sender<EventWrapper>,
 }
 
 impl EconiaTransactionProcessor {
@@ -196,31 +266,53 @@ impl EconiaTransactionProcessor {
             .get()
             .expect("failed connecting to db on startup");
         let mkts = fetch_all_markets(&mut conn).expect("failed loading markets on startup");
-        let mut markets = HashMap::new();
-        let mut base_quote_to_market_id = HashMap::new();
+        let markets = DashMap::new();
+        let base_quote_to_market_id = DashMap::new();
         for m in mkts.into_iter() {
             let key = create_base_quote_key(&m);
             base_quote_to_market_id.insert(key, m.market_id.clone());
             markets.insert(m.market_id.clone(), m);
         }
 
+        let (event_tx, event_rx) = channel::unbounded();
+        let (market_removal_tx, market_removal_rx) = channel::unbounded();
+
+        // start redis task
+        let books = HashMap::from_iter(markets.iter().map(|m| (m.key().clone(), OrderBook)));
+        std::thread::spawn(move || {
+            let cacher = EconiaRedisCacher::new(
+                ECONIA_CONFIG.redis.clone(),
+                books,
+                market_removal_rx,
+                event_rx,
+            );
+            cacher.start();
+        });
+
         Self {
             connection_pool,
-            markets: RwLock::new(markets),
-            base_quote_to_market_id: RwLock::new(base_quote_to_market_id),
+            markets,
+            base_quote_to_market_id,
+            market_removal_tx,
+            event_tx,
         }
     }
 
-    fn update_markets_cache(&self, ev: &[MarketRegistrationEvent]) {
+    fn insert_markets_in_cache(&self, ev: &[MarketRegistrationEvent]) {
         for e in ev.iter().cloned() {
             let m = models::market::MarketRegistrationEvent::from(e);
             let key = create_base_quote_key(&m);
             self.base_quote_to_market_id
-                .write()
-                .unwrap()
                 .insert(key, m.market_id.clone());
-            self.markets.write().unwrap().insert(m.market_id.clone(), m);
+            self.markets.insert(m.market_id.clone(), m);
         }
+    }
+
+    fn remove_market_from_cache(&self, market_id: &BigDecimal) {
+        self.market_removal_tx
+            .send(market_id.clone())
+            .expect("market removal tx failed");
+        self.markets.remove(market_id);
     }
 
     fn insert_to_db(
@@ -297,7 +389,7 @@ impl EconiaTransactionProcessor {
         self.insert_taker_events(conn, taker)?;
 
         // update markets cache
-        self.update_markets_cache(&market_registration);
+        self.insert_markets_in_cache(&market_registration);
 
         self.insert_market_registration_events(conn, market_registration)?;
         self.insert_recognized_market_events(conn, recognized_market)?;
@@ -386,8 +478,10 @@ impl EconiaTransactionProcessor {
         let mut events = vec![];
         for e in ev.into_iter() {
             if let Some(r) = e.recognized_market_info {
-                let mkt = self.markets.read().unwrap();
-                let mkt = mkt.get(&r.market_id.into()).ok_or(Error::NotFound)?;
+                let mkt = self
+                    .markets
+                    .get(&r.market_id.into())
+                    .ok_or(Error::NotFound)?;
                 let new_lot_size = BigDecimal::from(r.lot_size);
                 let new_tick_size = BigDecimal::from(r.tick_size);
                 let new_min_size = BigDecimal::from(r.min_size);
@@ -415,8 +509,7 @@ impl EconiaTransactionProcessor {
                     e.trading_pair.quote_type.module_name,
                     e.trading_pair.quote_type.struct_name,
                 );
-                let mkt_id = self.base_quote_to_market_id.read().unwrap();
-                let mkt_id = mkt_id.get(&key).unwrap();
+                let mkt_id = self.base_quote_to_market_id.get(&key).unwrap();
                 events.push(models::market::RecognizedMarketEvent {
                     market_id: mkt_id.clone(),
                     time: *CURRENT_BLOCK_TIME.read().unwrap(),
@@ -424,7 +517,10 @@ impl EconiaTransactionProcessor {
                     lot_size: None,
                     tick_size: None,
                     min_size: None,
-                })
+                });
+
+                // update markets cache
+                self.remove_market_from_cache(&mkt_id);
             }
         }
         Ok(events)
