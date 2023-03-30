@@ -53,13 +53,13 @@ impl TransactionGenerator for CallCustomModulesGenerator {
 
         for account in accounts {
             for _ in 0..transactions_per_account {
-                let (package, publisher) = self.packages.choose(&mut self.rng).unwrap();
+                let (package, _publisher) = self.packages.choose(&mut self.rng).unwrap();
                 let request = package.use_specific_transaction(
                     self.entry_point,
                     account,
                     &self.txn_factory,
                     Some(&mut self.rng),
-                    Some(publisher),
+                    Some(&account.address()), // Some(publisher),
                 );
                 requests.push(request);
             }

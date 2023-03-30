@@ -207,6 +207,12 @@ fn main() -> Result<()> {
     let duration = Duration::from_secs(args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
 
+    let suite_name = if suite_name == "land_blocking" {
+        "inc_global_counter"
+    } else {
+        panic!();
+    };
+
     let runtime = Runtime::new()?;
     match args.cli_cmd {
         // cmd input for test
@@ -468,7 +474,9 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         "validator_reboot_stress_test" => validator_reboot_stress_test(config),
         "fullnode_reboot_stress_test" => fullnode_reboot_stress_test(config),
         "account_creation" | "nft_mint" | "publishing" | "module_loading"
-        | "write_new_resource" => individual_workload_tests(test_name.into(), config),
+        | "write_new_resource" | "inc_global_counter" => {
+            individual_workload_tests(test_name.into(), config)
+        },
         "graceful_overload" => graceful_overload(config),
         "three_region_simulation_graceful_overload" => three_region_sim_graceful_overload(config),
         // not scheduled on continuous
@@ -890,19 +898,23 @@ fn three_region_sim_graceful_overload(config: ForgeConfig) -> ForgeConfig {
 }
 
 fn individual_workload_tests(test_name: String, config: ForgeConfig) -> ForgeConfig {
-    let job = EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
+    let mut job = EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
         mempool_backlog: 30000,
     });
     config
-        .with_network_tests(vec![&PerformanceBenchmarkWithFN])
-        .with_initial_validator_count(NonZeroUsize::new(5).unwrap())
-        .with_initial_fullnode_count(3)
+        .with_network_tests(vec![&ThreeRegionSameCloudSimulationTest {
+            add_execution_delay: None,
+        }])
+        .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
+        // .with_initial_fullnode_count(3)
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = 600.into();
         }))
         .with_node_helm_config_fn(Arc::new(move |helm_values| {
             helm_values["validator"]["config"]["execution"]
                 ["processed_transactions_detailed_counters"] = true.into();
+            // helm_values["validator"]["config"]["execution"]
+            //     ["concurrency_level"] = 1.into();
         }))
         .with_emit_job(
             if test_name == "write_new_resource" {
@@ -927,6 +939,22 @@ fn individual_workload_tests(test_name: String, config: ForgeConfig) -> ForgeCon
                     vec![(write_type, 1)],
                 ])
             } else {
+                if test_name == "publishing" {
+                    job = job
+                        .max_transactions_per_account(1)
+                        .mode(EmitJobMode::MaxLoad {
+                            // 20s of backlog
+                            mempool_backlog: 500,
+                        });
+                }
+                if test_name == "inc_global_counter" {
+                    job = job
+                        .max_transactions_per_account(1)
+                        // .mode(EmitJobMode::MaxLoad {
+                        //     mempool_backlog: 20000,
+                        // })
+                        ;
+                }
                 job.transaction_type(match test_name.as_str() {
                     "account_creation" => TransactionType::default_account_generation(),
                     "nft_mint" => TransactionType::NftMintAndTransfer,
@@ -936,6 +964,11 @@ fn individual_workload_tests(test_name: String, config: ForgeConfig) -> ForgeCon
                     "module_loading" => TransactionType::CallCustomModules {
                         entry_point: EntryPoints::Nop,
                         num_modules: 1000,
+                        use_account_pool: false,
+                    },
+                    "inc_global_counter" => TransactionType::CallCustomModules {
+                        entry_point: EntryPoints::StepDst,
+                        num_modules: 1,
                         use_account_pool: false,
                     },
                     _ => unreachable!("{}", test_name),
@@ -949,6 +982,7 @@ fn individual_workload_tests(test_name: String, config: ForgeConfig) -> ForgeCon
                 "publishing" => 60,
                 "write_new_resource" => 3700,
                 "module_loading" => 1800,
+                "inc_global_counter" => 300,
                 _ => unreachable!("{}", test_name),
             })
             .add_no_restarts()
