@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    access_path_cache::AccessPathCache, data_cache::MoveResolverWithVMMetadata,
-    move_vm_ext::MoveResolverExt, transaction_metadata::TransactionMetadata,
+    access_path_cache::AccessPathCache,
+    data_cache::MoveResolverWithVMMetadata,
+    move_vm_ext::{MoveResolverExt, MoveVmExt},
+    transaction_metadata::TransactionMetadata,
 };
 use aptos_aggregator::{
     aggregator_extension::AggregatorID,
@@ -102,7 +104,7 @@ impl<'r, 'l, S> SessionExt<'r, 'l, S>
 where
     S: MoveResolverExt + 'r,
 {
-    pub fn new(inner: Session<'r, 'l, S>, move_vm: &'l MoveVM, remote: &'r S) -> Self {
+    pub fn new(inner: Session<'r, 'l, S>, move_vm: &'l MoveVmExt, remote: &'r S) -> Self {
         Self {
             inner,
             remote: MoveResolverWithVMMetadata::new(remote, move_vm),

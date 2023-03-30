@@ -5,25 +5,34 @@ use crate::{
     move_vm_ext::{MoveResolverExt, SessionExt, SessionId},
     natives::aptos_natives,
 };
-use aptos_framework::natives::{
-    aggregator_natives::NativeAggregatorContext,
-    code::NativeCodeContext,
-    cryptography::{algebra::AlgebraContext, ristretto255_point::NativeRistrettoPointContext},
-    state_storage::NativeStateStorageContext,
-    transaction_context::NativeTransactionContext,
+use aptos_framework::{
+    natives::{
+        aggregator_natives::NativeAggregatorContext,
+        code::NativeCodeContext,
+        cryptography::{algebra::AlgebraContext, ristretto255_point::NativeRistrettoPointContext},
+        state_storage::NativeStateStorageContext,
+        transaction_context::NativeTransactionContext,
+    },
+    RuntimeModuleMetadataV1,
 };
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
 use aptos_types::on_chain_config::{FeatureFlag, Features, TimedFeatureFlag, TimedFeatures};
 use move_binary_format::errors::VMResult;
 use move_bytecode_verifier::VerifierConfig;
+use move_core_types::language_storage::ModuleId;
 use move_table_extension::NativeTableContext;
 use move_vm_runtime::{
     config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
 };
-use std::{ops::Deref, sync::Arc};
+use std::{
+    collections::HashMap,
+    ops::Deref,
+    sync::{Arc, Mutex, RwLock},
+};
 
 pub struct MoveVmExt {
     inner: MoveVM,
+    cache: RwLock<HashMap<ModuleId, Arc<Option<RuntimeModuleMetadataV1>>>>,
     chain_id: u8,
 }
 
@@ -63,8 +72,24 @@ impl MoveVmExt {
                     paranoid_type_checks: crate::AptosVM::get_paranoid_checks(),
                 },
             )?,
+            cache: RwLock::new(HashMap::new()),
             chain_id,
         })
+    }
+
+    pub fn get_module_metadata(&self, module_id: ModuleId) -> Arc<Option<RuntimeModuleMetadataV1>> {
+        let read = self.cache.read().unwrap();
+        if let Some(ret) = read.get(&module_id) {
+            ret.clone()
+        } else {
+            drop(read);
+            let ret = Arc::new(aptos_framework::get_vm_metadata(
+                &self.inner,
+                module_id.clone(),
+            ));
+            self.cache.write().unwrap().insert(module_id, ret.clone());
+            ret
+        }
     }
 
     pub fn new_session<'r, S: MoveResolverExt>(

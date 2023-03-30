@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //! Scratchpad for on chain values during the execution.
 
-use crate::move_vm_ext::MoveResolverExt;
+use crate::move_vm_ext::{MoveResolverExt, MoveVmExt};
 #[allow(unused_imports)]
 use anyhow::Error;
 use aptos_framework::{natives::state_storage::StateStorageUsageResolver, RuntimeModuleMetadataV1};
@@ -22,15 +22,18 @@ use move_core_types::{
 };
 use move_table_extension::{TableHandle, TableResolver};
 use move_vm_runtime::move_vm::MoveVM;
-use std::ops::{Deref, DerefMut};
+use std::{
+    ops::{Deref, DerefMut},
+    sync::Arc,
+};
 
 pub struct MoveResolverWithVMMetadata<'a, 'm, S> {
     move_resolver: &'a S,
-    move_vm: &'m MoveVM,
+    move_vm: &'m MoveVmExt,
 }
 
 impl<'a, 'm, S: MoveResolverExt> MoveResolverWithVMMetadata<'a, 'm, S> {
-    pub fn new(move_resolver: &'a S, move_vm: &'m MoveVM) -> Self {
+    pub fn new(move_resolver: &'a S, move_vm: &'m MoveVmExt) -> Self {
         Self {
             move_resolver,
             move_vm,
@@ -39,8 +42,8 @@ impl<'a, 'm, S: MoveResolverExt> MoveResolverWithVMMetadata<'a, 'm, S> {
 }
 
 impl<'a, 'm, S: MoveResolverExt> MoveResolverExt for MoveResolverWithVMMetadata<'a, 'm, S> {
-    fn get_module_metadata(&self, module_id: ModuleId) -> Option<RuntimeModuleMetadataV1> {
-        aptos_framework::get_vm_metadata(self.move_vm, module_id)
+    fn get_module_metadata(&self, module_id: ModuleId) -> Arc<Option<RuntimeModuleMetadataV1>> {
+        self.move_vm.get_module_metadata(module_id)
     }
 
     fn get_resource_group_data(
@@ -130,10 +133,14 @@ impl<'a, S: StateView> StorageAdapter<'a, S> {
 }
 
 impl<'a, S: StateView> MoveResolverExt for StorageAdapter<'a, S> {
-    fn get_module_metadata(&self, module_id: ModuleId) -> Option<RuntimeModuleMetadataV1> {
-        let module_bytes = self.get_module(&module_id).ok()??;
-        let module = CompiledModule::deserialize(&module_bytes).ok()?;
-        aptos_framework::get_metadata_from_compiled_module(&module)
+    fn get_module_metadata(&self, module_id: ModuleId) -> Arc<Option<RuntimeModuleMetadataV1>> {
+        Arc::new(
+            self.get_module(&module_id)
+                .ok()
+                .flatten()
+                .and_then(|module_bytes| CompiledModule::deserialize(&module_bytes).ok())
+                .and_then(|module| aptos_framework::get_metadata_from_compiled_module(&module)),
+        )
     }
 
     fn get_resource_group_data(
@@ -247,7 +254,7 @@ impl<S: StateView> ModuleResolver for StorageAdapterOwned<S> {
 }
 
 impl<S: StateView> MoveResolverExt for StorageAdapterOwned<S> {
-    fn get_module_metadata(&self, module_id: ModuleId) -> Option<RuntimeModuleMetadataV1> {
+    fn get_module_metadata(&self, module_id: ModuleId) -> Arc<Option<RuntimeModuleMetadataV1>> {
         self.as_move_resolver().get_module_metadata(module_id)
     }
 
