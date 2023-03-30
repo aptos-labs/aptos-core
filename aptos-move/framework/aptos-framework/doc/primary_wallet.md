@@ -16,6 +16,7 @@ This defines the module for interacting with primary wallets of accounts/objects
 -  [Function `withdraw`](#0x1_primary_wallet_withdraw)
 -  [Function `deposit`](#0x1_primary_wallet_deposit)
 -  [Function `transfer`](#0x1_primary_wallet_transfer)
+-  [Specification](#@Specification_0)
 
 
 <pre><code><b>use</b> <a href="fungible_asset.md#0x1_fungible_asset">0x1::fungible_asset</a>;
@@ -283,6 +284,15 @@ Transfer <code>amount</code> of fungible asset from sender's primary wallet to r
 
 
 </details>
+
+<a name="@Specification_0"></a>
+
+## Specification
+
+
+
+<pre><code><b>pragma</b> verify=<b>false</b>;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
