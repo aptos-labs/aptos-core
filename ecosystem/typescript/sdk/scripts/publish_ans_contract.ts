@@ -3,8 +3,10 @@ const { execSync } = require("child_process");
 
 const ANS_CORE_FOLDER = "/aptos-names-contracts/core";
 const APTOS_INVOCATION = process.env.APTOS_INVOCATION || "aptos";
+const APTOS_NODE_URL = process.env.APTOS_NODE_URL || "http://localhost:8080/v1";
+const APTOS_FAUCET_URL = process.env.APTOS_FAUCET_URL || "http://localhost:8081";
 
-const APTOS_INIT_COMMAND = `${APTOS_INVOCATION} init --network local --assume-yes`;
+const APTOS_INIT_COMMAND = `${APTOS_INVOCATION} init --network custom --rest-url ${APTOS_NODE_URL} --faucet-url ${APTOS_FAUCET_URL} --assume-yes`;
 const GET_DEFAULT_PROFILE_COMMAND = `${APTOS_INVOCATION} config show-profiles --profile default`;
 
 /**
@@ -33,6 +35,9 @@ try {
   execSync(APTOS_INIT_COMMAND, {
     cwd: __dirname + ANS_CORE_FOLDER,
   });
+
+  // Sleep for 10 seconds to make sure account has funded
+  execSync("sleep 10");
 
   // 3. get default profile info
   console.log("---get default profile info---");
