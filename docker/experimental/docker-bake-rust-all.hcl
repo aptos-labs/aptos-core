@@ -49,6 +49,7 @@ group "all" {
     "faucet",
     "forge",
     "telemetry-service",
+    "indexer-grpc",
     "validator-testing",
   ])
 }
@@ -195,6 +196,14 @@ target "telemetry-service" {
   cache-from = generate_cache_from("telemetry-service") 
   cache-to   = generate_cache_to("telemetry-service")  
   tags       = generate_tags("telemetry-service")  
+}
+
+target "indexer-grpc" {
+  inherits = ["_common"]
+  dockerfile = "docker/experimental/indexer-grpc.Dockerfile"
+  target   = "indexer-grpc"
+  cache-to = generate_cache_to("indexer-grpc")
+  tags     = generate_tags("indexer-grpc")
 }
 
 function "generate_cache_from" {

@@ -342,11 +342,11 @@ enum MoveTypes {
   MOVE_TYPES_U256 = 14;
   MOVE_TYPES_ADDRESS = 5;
   MOVE_TYPES_SIGNER = 6;
-  MOVE_TYPES_VECTOR = 7; // { items: Box<MoveType> },
-  MOVE_TYPES_STRUCT = 8; //(MoveStructTag),
-  MOVE_TYPES_GENERIC_TYPE_PARAM = 9; // { index: u16 },
-  MOVE_TYPES_REFERENCE = 10; // { mutable: bool, to: Box<MoveType> },
-  MOVE_TYPES_UNPARSABLE = 11; //(String),
+  MOVE_TYPES_VECTOR = 7; // `{ items: Box<MoveType> }`,
+  MOVE_TYPES_STRUCT = 8; // `(MoveStructTag)`,
+  MOVE_TYPES_GENERIC_TYPE_PARAM = 9; // `{ index: u16 }``,
+  MOVE_TYPES_REFERENCE = 10; // `{ mutable: bool, to: Box<MoveType> }`,
+  MOVE_TYPES_UNPARSABLE = 11; // `(String)`,
 }
 
 message MoveType{

@@ -16,7 +16,7 @@ pub trait PackageHooks {
     fn custom_package_info_fields(&self) -> Vec<String>;
 
     /// Returns a custom key for dependencies, if available. This is the string used
-    /// in dependencies `{ <key> = value, address = addr }.
+    /// in dependencies `{ <key> = value, address = addr }`.
     fn custom_dependency_key(&self) -> Option<String>;
 
     /// A resolver for custom dependencies in the manifest. This is called to download the
