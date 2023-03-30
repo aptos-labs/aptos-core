@@ -9,10 +9,6 @@ The table below contains latest release information for each Aptos component in 
 
 See the [Latest Aptos Releases](./index.md) index for how to subscribe to GitHub notifications and more release-related information.
 
-## Aptos Framework
-
-Aptos Framework Release commit hash - `framework-mainnet`
-
 ## Aptos SDK
 
 Aptos SDK Release v1.7.2
