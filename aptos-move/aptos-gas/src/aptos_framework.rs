@@ -41,7 +41,7 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.ristretto255.basepoint_double_mul, "ristretto255.basepoint_double_mul", 440_000 * MUL],
 
     [.ristretto255.point_add, "ristretto255.point_add", 2_135 * MUL],
-    // TODO: is this the right number to use here? current gas version is 7, so putting 8 here?
+    // Note: Current gas version is 7, so putting 8 here.
     [.ristretto255.point_clone, { 8 => "ristretto255.point_clone" }, 150 * MUL],
     [.ristretto255.point_compress, "ristretto255.point_compress", 40_000 * MUL],
     [.ristretto255.point_decompress, "ristretto255.point_decompress", 40_500 * MUL],
@@ -52,7 +52,6 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.ristretto255.point_neg, "ristretto255.point_neg", 360 * MUL],
     [.ristretto255.point_sub, "ristretto255.point_sub", 2_130 * MUL],
     [.ristretto255.point_parse_arg, "ristretto255.point_parse_arg", 150 * MUL],
-
 
     // TODO(Alin): These SHA512 gas costs could be unified with the costs in our future SHA512 module
     // (assuming same implementation complexity, which might not be the case

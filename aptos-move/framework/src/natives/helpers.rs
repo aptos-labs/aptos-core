@@ -92,7 +92,6 @@ pub fn make_test_only_native_from_func(
     Arc::new(func)
 }
 
-
 /// Used to pass gas parameters into native functions.
 pub fn make_native_from_func<G>(
     gas_params: G,
