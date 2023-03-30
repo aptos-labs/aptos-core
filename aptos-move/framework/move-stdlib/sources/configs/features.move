@@ -18,7 +18,7 @@ module std::features {
     //   is typically associated with the introduction of new native Move functions, and is only used
     //   from Move code. The owner of this feature is obliged to remove it once this can be done.
     //
-    // - an *ephemeral* feature flag is required to stay around forever. Typically, those flags guard
+    // - an *permanent* feature flag is required to stay around forever. Typically, those flags guard
     //   behavior in native code, and the behavior with or without the feature need to be preserved
     //   for playback.
     //
@@ -41,7 +41,7 @@ module std::features {
 
     /// Whether during upgrade compatibility checking, friend functions should be treated similar like
     /// private functions.
-    /// Lifetime: ephemeral
+    /// Lifetime: permanent
     const TREAT_FRIEND_AS_PRIVATE: u64 = 2;
     public fun treat_friend_as_private(): bool acquires Features {
         is_enabled(TREAT_FRIEND_AS_PRIVATE)
@@ -139,6 +139,33 @@ module std::features {
     public fun delegation_pools_enabled(): bool acquires Features {
         is_enabled(DELEGATION_POOLS)
     }
+
+    /// Whether generic algebra basic operation support in `algebra.move` are enabled.
+    ///
+    /// Lifetime: transient
+    const CRYPTOGRAPHY_ALGEBRA_NATIVES: u64 = 12;
+    public fun get_cryptography_algebra_natives_feature(): u64 { CRYPTOGRAPHY_ALGEBRA_NATIVES }
+    public fun cryptography_algebra_enabled(): bool acquires Features {
+        is_enabled(CRYPTOGRAPHY_ALGEBRA_NATIVES)
+    }
+
+    /// Whether the generic algebra implementation for BLS12381 operations are enabled.
+    ///
+    /// Lifetime: transient
+    const BLS12_381_STRUCTURES: u64 = 13;
+    public fun get_bls12_381_strutures_feature(): u64 { BLS12_381_STRUCTURES }
+    public fun bls12_381_structures_enabled(): bool acquires Features {
+        is_enabled(BLS12_381_STRUCTURES)
+    }
+
+    /// Whether native_public_key_validate aborts when a public key of the wrong length is given
+    /// Lifetime: ephemeral
+    const ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH: u64 = 14;
+
+    /// Whether struct constructors are enabled
+    ///
+    /// Lifetime: transient
+    const STRUCT_CONSTRUCTORS: u64 = 15;
 
     // ============================================================================================
     // Feature Flag Implementation

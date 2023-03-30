@@ -3,16 +3,22 @@
 
 use anyhow::{format_err, Result};
 use aptos_gas::{
-    AbstractValueSizeGasParameters, ChangeSetConfigs, NativeGasParameters,
+    AbstractValueSizeGasParameters, ChangeSetConfigs, NativeGasParameters, StandardGasMeter,
     LATEST_GAS_FEATURE_VERSION,
 };
+use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
 use aptos_resource_viewer::{AnnotatedAccountStateBlob, AptosValueAnnotator};
 use aptos_rest_client::Client;
+use aptos_state_view::TStateView;
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
     on_chain_config::{Features, OnChainConfig, TimedFeatures},
-    transaction::{ChangeSet, Transaction, TransactionInfo, TransactionOutput, Version},
+    transaction::{
+        ChangeSet, SignedTransaction, Transaction, TransactionInfo, TransactionOutput,
+        TransactionPayload, Version,
+    },
+    vm_status::VMStatus,
 };
 use aptos_validator_interface::{
     AptosValidatorInterface, DBDebuggerInterface, DebuggerStateView, RestDebuggerInterface,
@@ -22,6 +28,7 @@ use aptos_vm::{
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
     AptosVM, VMExecutor,
 };
+use aptos_vm_logging::log_schema::AdapterLogSchema;
 use move_binary_format::errors::VMResult;
 use std::{path::Path, sync::Arc};
 
@@ -52,6 +59,47 @@ impl AptosDebugger {
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
         AptosVM::execute_block(txns, &state_view)
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
+    }
+
+    pub fn execute_transaction_at_version_with_gas_profiler(
+        &self,
+        version: Version,
+        txn: SignedTransaction,
+    ) -> Result<(VMStatus, TransactionOutput, TransactionGasLog)> {
+        let state_view = DebuggerStateView::new(self.debugger.clone(), version);
+        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+        let txn = txn
+            .check_signature()
+            .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
+
+        let (status, output, gas_profiler) =
+            AptosVM::execute_user_transaction_with_custom_gas_meter(
+                &state_view,
+                &txn,
+                &log_context,
+                |gas_feature_version, gas_params, storage_gas_params, balance| {
+                    let gas_meter = StandardGasMeter::new(
+                        gas_feature_version,
+                        gas_params,
+                        storage_gas_params,
+                        balance,
+                    );
+                    let gas_profiler = match txn.payload() {
+                        TransactionPayload::Script(_) => GasProfiler::new_script(gas_meter),
+                        TransactionPayload::EntryFunction(entry_func) => GasProfiler::new_function(
+                            gas_meter,
+                            entry_func.module().clone(),
+                            entry_func.function().to_owned(),
+                            entry_func.ty_args().to_vec(),
+                        ),
+                        TransactionPayload::ModuleBundle(..) => unreachable!("not supported"),
+                        TransactionPayload::Multisig(..) => unimplemented!("not supported yet"),
+                    };
+                    Ok(gas_profiler)
+                },
+            )?;
+
+        Ok((status, output, gas_profiler.finish()))
     }
 
     pub async fn execute_past_transactions(

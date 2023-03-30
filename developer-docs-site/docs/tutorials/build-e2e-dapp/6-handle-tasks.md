@@ -35,7 +35,7 @@ function App() {
 const fetchList = async () => {
   if (!account) return [];
   try {
-    const TodoListResource = await client.getAccountResource(
+    const TodoListResource = await provider.getAccountResource(
       account?.address,
       `${moduleAddress}::todolist::TodoList`
     );
@@ -53,7 +53,7 @@ const fetchList = async () => {
         value_type: `${moduleAddress}::todolist::Task`,
         key: `${counter}`,
       };
-      const task = await client.getTableItem(tableHandle, tableItem);
+      const task = await provider.getTableItem(tableHandle, tableItem);
       tasks.push(task);
       counter++;
     }
@@ -87,7 +87,7 @@ while (counter <= taskCounter) {
     value_type: `${moduleAddress}::todolist::Task`,
     key: `${counter}`,
   };
-  const task = await client.getTableItem(tableHandle, tableItem);
+  const task = await provider.getTableItem(tableHandle, tableItem);
   tasks.push(task);
   counter++;
 }
@@ -179,7 +179,7 @@ We haven’t added any tasks yet, so we simply see a box of empty data. Let’s 
 
 ## Add task
 
-1. Update our UI with an *add task* input:
+1. Update our UI with an _add task_ input:
 
 ```jsx
 {!accountHasList ? (
@@ -273,7 +273,7 @@ When someones adds a new task we:
 6. Add an `onTaskAdded` function with:
 
 ```jsx
-const onTaskAdded = async () => {
+  const onTaskAdded = async () => {
     // check for connected account
     if (!account) return;
     setTransactionInProgress(true);
@@ -285,32 +285,31 @@ const onTaskAdded = async () => {
       arguments: [newTask],
     };
 
+    // hold the latest task.task_id from our local state
+    const latestId = tasks.length > 0 ? parseInt(tasks[tasks.length - 1].task_id) + 1 : 1;
+
+    // build a newTaskToPush object into our local state
+    const newTaskToPush = {
+      address: account.address,
+      completed: false,
+      content: newTask,
+      task_id: latestId + "",
+    };
+
     try {
       // sign and submit transaction to chain
       const response = await signAndSubmitTransaction(payload);
       // wait for transaction
-      await client.waitForTransaction(response.hash);
-
-			// hold the latest task.task_id from our local state
-      const latestId = tasks.length > 0 ? parseInt(tasks[tasks.length - 1].task_id) + 1 : 1;
-
-      // build a newTaskToPush objct into our local state
-      const newTaskToPush = {
-        address: account.address,
-        completed: false,
-        content: newTask,
-        task_id: latestId + "",
-      };
+      await provider.waitForTransaction(response.hash);
 
       // Create a new array based on current state:
       let newTasks = [...tasks];
 
-      // Add item to it
-      newTasks.unshift(newTaskToPush);
-
+      // Add item to the tasks array
+      newTasks.push(newTaskToPush);
       // Set state
       setTasks(newTasks);
-			// clear input text
+      // clear input text
       setNewTask("");
     } catch (error: any) {
       console.log("error", error);
@@ -381,7 +380,7 @@ const onCheckboxChange = async (
       // sign and submit transaction to chain
       const response = await signAndSubmitTransaction(payload);
       // wait for transaction
-      await client.waitForTransaction(response.hash);
+      await provider.waitForTransaction(response.hash);
 
       setTasks((prevState) => {
         const newState = prevState.map((obj) => {

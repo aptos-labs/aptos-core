@@ -183,7 +183,7 @@ where
     ) -> Result<Self> {
         let tree_reader = Arc::clone(&store);
         let (finished, partial_nodes, previous_leaf) = if let Some(root_node) =
-            tree_reader.get_node_option(&NodeKey::new_empty_path(version))?
+            tree_reader.get_node_option(&NodeKey::new_empty_path(version), "restore")?
         {
             info!("Previous restore is complete, checking root hash.");
             ensure!(
@@ -268,7 +268,7 @@ where
         // is not a partial node. Go to the parent node and repeat until we see a node that does
         // not exist. This node and all its ancestors will be the partial nodes.
         let mut node_key = rightmost_leaf_node_key.gen_parent_node_key();
-        while store.get_node_option(&node_key)?.is_some() {
+        while store.get_node_option(&node_key, "restore")?.is_some() {
             node_key = node_key.gen_parent_node_key();
         }
 
@@ -286,7 +286,7 @@ where
 
             for i in 0..previous_child_index.unwrap_or(16) {
                 let child_node_key = node_key.gen_child_node_key(version, (i as u8).into());
-                if let Some(node) = store.get_node_option(&child_node_key)? {
+                if let Some(node) = store.get_node_option(&child_node_key, "restore")? {
                     let child_info = match node {
                         Node::Internal(internal_node) => ChildInfo::Internal {
                             hash: Some(internal_node.hash()),

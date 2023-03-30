@@ -43,7 +43,6 @@ the return on investment didn't seem worth it for these simple functions.
     -  [Helper Functions](#@Helper_Functions_2)
     -  [Function `singleton`](#@Specification_1_singleton)
     -  [Function `reverse`](#@Specification_1_reverse)
-    -  [Function `reverse_slice`](#@Specification_1_reverse_slice)
     -  [Function `append`](#@Specification_1_append)
     -  [Function `is_empty`](#@Specification_1_is_empty)
     -  [Function `contains`](#@Specification_1_contains)
@@ -829,22 +828,6 @@ Check if <code>v</code> contains <code>e</code>.
 
 
 
-<a name="@Specification_1_reverse_slice"></a>
-
-### Function `reverse_slice`
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_reverse_slice">reverse_slice</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, left: u64, right: u64)
-</code></pre>
-
-
-
-
-<pre><code><b>pragma</b> intrinsic = <b>true</b>;
-</code></pre>
-
-
-
 <a name="@Specification_1_append"></a>
 
 ### Function `append`
@@ -940,4 +923,4 @@ Check if <code>v</code> contains <code>e</code>.
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

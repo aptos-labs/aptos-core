@@ -4,7 +4,7 @@ import { bcsSerializeBool } from "../../bcs";
 import { FaucetClient } from "../../plugins/faucet_client";
 import { IndexerClient } from "../../providers/indexer";
 import { TokenClient } from "../../plugins/token_client";
-import { API_TOKEN, longTestTimeout } from "../unit/test_helper.test";
+import { FAUCET_AUTH_TOKEN, longTestTimeout } from "../unit/test_helper.test";
 import { Network, NetworkToIndexerAPI, NetworkToNodeAPI, sleep } from "../../utils";
 
 describe("Indexer", () => {
@@ -12,7 +12,7 @@ describe("Indexer", () => {
   const faucetClient = new FaucetClient(
     "https://fullnode.testnet.aptoslabs.com",
     "https://faucet.testnet.aptoslabs.com",
-    { TOKEN: API_TOKEN },
+    { TOKEN: FAUCET_AUTH_TOKEN },
   );
   const tokenClient = new TokenClient(aptosClient);
   const alice = new AptosAccount();
@@ -77,5 +77,10 @@ describe("Indexer", () => {
       },
       longTestTimeout,
     );
+
+    test("gets indexer ledger info", async () => {
+      const ledgerInfo = await indexerClient.getIndexerLedgerInfo();
+      expect(ledgerInfo.ledger_infos[0].chain_id).toBeGreaterThan(1);
+    });
   });
 });

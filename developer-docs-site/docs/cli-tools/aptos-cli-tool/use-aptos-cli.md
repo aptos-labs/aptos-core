@@ -1,9 +1,9 @@
 ---
-title: "Using the Aptos CLI"
+title: "Use the Aptos CLI"
 id: "use-aptos-cli"
 ---
 
-# Using the Aptos CLI
+# Use the Aptos CLI
 
 The `aptos` tool is a command line interface (CLI) for developing on the Aptos blockchain, debugging, and for node operations. This document describes how to use the `aptos` CLI tool. To download or build the CLI, follow [Install Aptos CLI](./index.md).
 
@@ -742,6 +742,107 @@ Test result: OK. Total tests: 2; passed: 2; failed: 0
   "Result": "Success"
 }
 ```
+### Generating test coverage details for Move
+The `aptos` CLI can be used to analyze and improve the testing of your Move modules. To use this feature:
+1. In your `aptos-core` source checkout, navigate to the `aptos-move/framework/move-stdlib` directory.
+2. Execute the command:
+   ```bash
+   $ aptos move test --coverage
+   ```
+3. Receive results in standard output containing the result for each test case followed by a basic coverage summary resembling:
+   ```bash
+   BUILDING MoveStdlib
+Running Move unit tests
+[ PASS    ] 0x1::vector_tests::append_empties_is_empty
+[ PASS    ] 0x1::option_tests::borrow_mut_none
+[ PASS    ] 0x1::fixed_point32_tests::ceil_can_round_up_correctly
+[ PASS    ] 0x1::features::test_change_feature_txn
+[ PASS    ] 0x1::bcs_tests::bcs_bool
+[ PASS    ] 0x1::bit_vector_tests::empty_bitvector
+[ PASS    ] 0x1::option_tests::borrow_mut_some
+Test result: OK. Total tests: 149; passed: 149; failed: 0
++-------------------------+
+| Move Coverage Summary   |
++-------------------------+
+Module 0000000000000000000000000000000000000000000000000000000000000001::bcs
+>>> % Module coverage: NaN
+Module 0000000000000000000000000000000000000000000000000000000000000001::fixed_point32
+>>> % Module coverage: 100.00
+Module 0000000000000000000000000000000000000000000000000000000000000001::hash
+>>> % Module coverage: NaN
+Module 0000000000000000000000000000000000000000000000000000000000000001::vector
+>>> % Module coverage: 92.19
+Module 0000000000000000000000000000000000000000000000000000000000000001::error
+>>> % Module coverage: 0.00
+Module 0000000000000000000000000000000000000000000000000000000000000001::acl
+>>> % Module coverage: 0.00
+Module 0000000000000000000000000000000000000000000000000000000000000001::bit_vector
+>>> % Module coverage: 97.32
+Module 0000000000000000000000000000000000000000000000000000000000000001::signer
+>>> % Module coverage: 100.00
+Module 0000000000000000000000000000000000000000000000000000000000000001::features
+>>> % Module coverage: 69.41
+Module 0000000000000000000000000000000000000000000000000000000000000001::option
+>>> % Module coverage: 100.00
+Module 0000000000000000000000000000000000000000000000000000000000000001::string
+>>> % Module coverage: 81.82
++-------------------------+
+| % Move Coverage: 83.50  |
++-------------------------+
+Please use `aptos move coverage -h` for more detailed test coverage of this package
+{
+  "Result": "Success"
+}
+   ```
+
+4. Optionally, narrow down your test runs and results to a specific package name with the `--filter` option, like so:
+   ```bash
+   $ aptos move test --coverage --filter vector
+   ```
+
+   With results like:
+   ```
+   BUILDING MoveStdlib
+   Running Move unit tests
+   [ PASS    ] 0x1::bit_vector_tests::empty_bitvector
+   [ PASS    ] 0x1::vector_tests::append_empties_is_empty
+   [ PASS    ] 0x1::bit_vector_tests::index_bit_out_of_bounds
+   [ PASS    ] 0x1::vector_tests::append_respects_order_empty_lhs
+   ```
+5. Run the `aptos move coverage` command to obtain more detailed coverage information.
+6. Optionally, isolate the results to a module by passing its name to the `--module` option, for example:
+   ```bash
+   $ aptos move coverage source --module signer
+   ```
+
+   With results:
+   ```
+   module std::signer {
+       // Borrows the address of the signer
+       // Conceptually, you can think of the `signer` as being a struct wrapper arround an
+       // address
+       // ```
+       // struct signer has drop { addr: address }
+       // ```
+       // `borrow_address` borrows this inner field
+       native public fun borrow_address(s: &signer): &address;
+
+       // Copies the address of the signer
+       public fun address_of(s: &signer): address {
+           *borrow_address(s)
+       }
+
+    /// Return true only if `s` is a transaction signer. This is a spec function only available in spec.
+    spec native fun is_txn_signer(s: signer): bool;
+
+    /// Return true only if `a` is a transaction signer address. This is a spec function only available in spec.
+    spec native fun is_txn_signer_addr(a: address): bool;
+}
+{
+  "Result": "Success"
+}
+   ```
+6. Find failures and iteratively improve your testing and running these commands to eliminate gaps in your testing coverage.
 
 ### Proving Move
 
@@ -766,13 +867,49 @@ FAILURE proving 1 modules from package `hello_prover` in 0.067s
 ```
 In this case, see [Install the dependencies of Move Prover](install-aptos-cli#step-3-optional-install-the-dependencies-of-move-prover).
 
-### Debug and print stack trace
+### Profiling gas usage
+
+This *experimental* feature lets you [profile gas usage](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/aptos-gas-profiling) in the Aptos virtual machine locally rather than [simulating transactions](../../concepts/gas-txn-fee.md#estimating-the-gas-units-via-simulation) at the [fullnode](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/simulate_transaction). You may also use it to visualize gas usage in the form of a flame graph.
+
+Run the gas profiler by appending the `--profile-gas` option to the Aptos CLI `move publish`, `move run` or `move run-script` command, for example:
+```bash
+aptos move publish --profile-gas
+```
+
+And receive output resembling:
+```bash
+Compiling, may take a little while to download git dependencies...
+BUILDING empty_fun
+package size 427 bytes
+Simulating transaction locally with the gas profiler...
+This is still experimental so results may be inaccurate.
+Execution & IO Gas flamegraph saved to gas-profiling/txn-69e19ee4-0x1-code-publish_package_txn.exec_io.svg
+Storage fee flamegraph saved to gas-profiling/txn-69e19ee4-0x1-code-publish_package_txn.storage.svg
+{
+  "Result": {
+    "transaction_hash": "0x69e19ee4cc89cb1f84ee21a46e6b281bd8696115aa332275eca38c4857818dfe",
+    "gas_used": 1007,
+    "gas_unit_price": 100,
+    "sender": "dbcbe741d003a7369d87ec8717afb5df425977106497052f96f4e236372f7dd5",
+    "success": true,
+    "version": 473269362,
+    "vm_status": "status EXECUTED of type Execution"
+  }
+}
+```
+
+Find the flame graphs in the newly created `gas-profiling/` directory. To interact with a graph, open the file in a web browser.
+
+Note these limitations of the experimental gas profiling feature:
+
+  * It may produce results that are different from the simulation.
+  * The graphs may contain errors, and the numbers may not add up to the total gas cost as shown in the transaction output.
+
+### Debugging and printing stack trace
 
 In this example, we will use `DebugDemo` in [debug-move-example](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos/debug-move-example).
 
-First, you need to include Move nursery in your Move [TOML file](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos/debug-move-example/Move.toml).
-
-Now, you can use `Debug::print` and `Debug::print_stack_trace` in your [DebugDemo Move file](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos/debug-move-example/sources/DebugDemo.move).
+Now, you can use `debug::print` and `debug::print_stack_trace` in your [DebugDemo Move file](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos/debug-move-example/sources/DebugDemo.move).
 
 You can run the following command:
 ```bash

@@ -11,7 +11,6 @@
 use crate::message_queues::{PerKeyQueue, QueueStyle};
 use anyhow::{ensure, Result};
 use aptos_infallible::{Mutex, NonZeroUsize};
-use aptos_logger::debug;
 use aptos_metrics_core::IntCounterVec;
 use futures::{
     channel::oneshot,
@@ -105,7 +104,6 @@ impl<K: Eq + Hash + Clone, M> Sender<K, M> {
         // notify the corresponding status channel if it was registered.
         if let Some((dropped_val, Some(dropped_status_ch))) = dropped {
             // Ignore errors.
-            debug!("QS: dropped message in aptos channel");
             let _err = dropped_status_ch.send(ElementStatus::Dropped(dropped_val));
         }
         if let Some(w) = shared_state.waker.take() {

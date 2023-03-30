@@ -112,7 +112,7 @@ impl VMExecutor for MockVM {
                 read_state_value_from_storage(
                     state_view,
                     &access_path_for_config(ValidatorSet::CONFIG_ID)
-                        .map_err(|_| VMStatus::Error(StatusCode::TOO_MANY_TYPE_NODES))?,
+                        .map_err(|_| VMStatus::Error(StatusCode::TOO_MANY_TYPE_NODES, None))?,
                 );
                 read_state_value_from_storage(
                     state_view,
@@ -134,7 +134,7 @@ impl VMExecutor for MockVM {
                 continue;
             }
 
-            match decode_transaction(txn.as_signed_user_txn().unwrap()) {
+            match decode_transaction(txn.try_as_signed_user_txn().unwrap()) {
                 MockVMTransaction::Mint { sender, amount } => {
                     let old_balance = read_balance(&output_cache, state_view, sender);
                     let new_balance = old_balance + amount;

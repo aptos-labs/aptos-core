@@ -731,6 +731,16 @@ Event emitted when a transaction's metadata is updated.
 ## Constants
 
 
+<a name="0x1_multisig_account_ENOT_OWNER"></a>
+
+Account executing this operation is not an owner of the multisig account.
+
+
+<pre><code><b>const</b> <a href="multisig_account.md#0x1_multisig_account_ENOT_OWNER">ENOT_OWNER</a>: u64 = 2003;
+</code></pre>
+
+
+
 <a name="0x1_multisig_account_DOMAIN_SEPARATOR"></a>
 
 The salt used to create a resource account during multisig account creation.
@@ -839,16 +849,6 @@ Transaction has not received enough rejections to be officially rejected.
 
 
 <pre><code><b>const</b> <a href="multisig_account.md#0x1_multisig_account_ENOT_ENOUGH_REJECTIONS">ENOT_ENOUGH_REJECTIONS</a>: u64 = 10;
-</code></pre>
-
-
-
-<a name="0x1_multisig_account_ENOT_OWNER"></a>
-
-Account executing this operation is not an owner of the multisig account.
-
-
-<pre><code><b>const</b> <a href="multisig_account.md#0x1_multisig_account_ENOT_OWNER">ENOT_OWNER</a>: u64 = 2003;
 </code></pre>
 
 
@@ -2390,4 +2390,4 @@ This function is private so no other code can call this beside the VM itself as 
 </details>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

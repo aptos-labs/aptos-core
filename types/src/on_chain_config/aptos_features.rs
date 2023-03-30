@@ -19,6 +19,10 @@ pub enum FeatureFlag {
     RESOURCE_GROUPS = 9,
     MULTISIG_ACCOUNTS = 10,
     DELEGATION_POOLS = 11,
+    CRYPTOGRAPHY_ALGEBRA_NATIVES = 12,
+    BLS12_381_STRUCTURES = 13,
+    ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH = 14,
+    STRUCT_CONSTRUCTORS = 15,
 }
 
 /// Representation of features on chain as a bitset.
@@ -31,7 +35,7 @@ pub struct Features {
 impl Default for Features {
     fn default() -> Self {
         Features {
-            features: vec![0b00100000],
+            features: vec![0b00100000, 0b00100000],
         }
     }
 }

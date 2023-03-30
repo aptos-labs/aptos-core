@@ -179,7 +179,7 @@ module aptos_framework::coin {
     public(friend) fun drain_aggregatable_coin<CoinType>(coin: &mut AggregatableCoin<CoinType>): Coin<CoinType> {
         spec {
             // TODO: The data invariant is not properly assumed from CollectedFeesPerBlock.
-            assume coin.value.limit == MAX_U64;
+            assume aggregator::spec_get_limit(coin.value) == MAX_U64;
         };
         let amount = aggregator::read(&coin.value);
         assert!(amount <= MAX_U64, error::out_of_range(EAGGREGATABLE_COIN_VALUE_TOO_LARGE));

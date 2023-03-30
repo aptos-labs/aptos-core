@@ -6,9 +6,11 @@ use crate::{
     natives::aptos_natives,
 };
 use aptos_framework::natives::{
-    aggregator_natives::NativeAggregatorContext, code::NativeCodeContext,
-    cryptography::ristretto255_point::NativeRistrettoPointContext,
-    state_storage::NativeStateStorageContext, transaction_context::NativeTransactionContext,
+    aggregator_natives::NativeAggregatorContext,
+    code::NativeCodeContext,
+    cryptography::{algebra::AlgebraContext, ristretto255_point::NativeRistrettoPointContext},
+    state_storage::NativeStateStorageContext,
+    transaction_context::NativeTransactionContext,
 };
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
 use aptos_types::on_chain_config::{FeatureFlag, Features, TimedFeatureFlag, TimedFeatures};
@@ -18,7 +20,7 @@ use move_table_extension::NativeTableContext;
 use move_vm_runtime::{
     config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
 };
-use std::ops::Deref;
+use std::{ops::Deref, sync::Arc};
 
 pub struct MoveVmExt {
     inner: MoveVM,
@@ -44,6 +46,8 @@ impl MoveVmExt {
                 5
             };
 
+        let treat_friend_as_private = features.is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE);
+
         Ok(Self {
             inner: MoveVM::new_with_config(
                 aptos_natives(
@@ -51,12 +55,10 @@ impl MoveVmExt {
                     abs_val_size_gas_params,
                     gas_feature_version,
                     timed_features.clone(),
+                    Arc::new(features),
                 ),
                 VMConfig {
-                    verifier: verifier_config(
-                        features.is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
-                        &timed_features,
-                    ),
+                    verifier: verifier_config(treat_friend_as_private, &timed_features),
                     max_binary_format_version,
                     paranoid_type_checks: crate::AptosVM::get_paranoid_checks(),
                 },
@@ -79,6 +81,7 @@ impl MoveVmExt {
 
         extensions.add(NativeTableContext::new(txn_hash, remote));
         extensions.add(NativeRistrettoPointContext::new());
+        extensions.add(AlgebraContext::new());
         extensions.add(NativeAggregatorContext::new(txn_hash, remote));
 
         let script_hash = match session_id {

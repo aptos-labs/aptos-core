@@ -607,11 +607,26 @@ macro_rules! assert_abort {
 /// Helper to assert vm status code.
 #[macro_export]
 macro_rules! assert_vm_status {
-    ($s:expr, $c:pat) => {{
+    ($s:expr, $c:expr) => {{
         use aptos_types::transaction::*;
-        assert!(matches!(
+        assert_eq!(
             $s,
             TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some($c)))
-        ));
+        );
+    }};
+}
+
+#[macro_export]
+macro_rules! assert_move_abort {
+    ($s:expr, $c:ident) => {{
+        use aptos_types::transaction::*;
+        assert!(match $s {
+            TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+                location: _,
+                code: _,
+                info,
+            }) => info == $c,
+            _ => false,
+        });
     }};
 }

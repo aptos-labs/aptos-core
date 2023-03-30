@@ -13,7 +13,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         netcat \
         libpq-dev
 
-COPY  --link --from=builder /aptos/dist/aptos-node-checker /usr/local/bin/aptos-node-checker
+COPY  --link --from=tools-builder /aptos/dist/aptos-node-checker /usr/local/bin/aptos-node-checker
 
 ENV RUST_LOG_FORMAT=json
 

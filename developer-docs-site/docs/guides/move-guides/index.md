@@ -17,14 +17,17 @@ To efficiently write smart contracts in Aptos, we recommend you first:
 
 Start here to learn how the Move language works on the Aptos blockchain. 
 
+- ### [Aptos CLI Move commands](../../cli-tools/aptos-cli-tool/use-aptos-cli.md#move-examples)
 - ### [Aptos Move Book](book/SUMMARY.md)
 - ### [Move on Aptos](./move-on-aptos.md)
+- ### [Move Primitives Tutorial](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/move-tutorial)
+- ### [Use Bytecode for Dependencies](./bytecode-dependencies.md)
 - ### [Gas and Transaction Fees](../../concepts/gas-txn-fee.md)
 - ### [How Base Gas Works](../../concepts/base-gas.md)
 - ### [Interact with the Move VM](../interacting-with-the-blockchain.md)
 - ### [Your First Move module](../../tutorials/first-move-module.md)
 - ### [Mint NFT with Aptos CLI](./mint-nft-cli.md)
-- ### [Upgrading Move Code](upgrading-move-code.md)
+- ### [Upgrading Move Code](./book/package-upgrades.md)
 - ### [Aptos Move Examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples)
 - ### [End-to-End Aptos Move Tests](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/e2e-move-tests/src/tests)
 - ### [Move language channel](https://discord.com/channels/945856774056083548/955573698868432896) in [Aptos Discord](https://discord.gg/aptoslabs).
@@ -82,8 +85,6 @@ Use these external resources to learn about the core Move programming language.
 * [Pontem Move Playground](https://playground.pontem.network/)
 * [Collection of nestable Move resources](https://github.com/taoheorg/taohe)
 * [Move-Lang tag on Stack Overflow](https://stackoverflow.com/questions/tagged/move-lang)
-* [Move Book](https://move-language.github.io/move/)
-* [Move Tutorial](https://github.com/move-language/move/tree/main/language/documentation/tutorial)
 * [Move language repository](https://github.com/move-language/move)
 * [Move by example](https://move-book.com/)
 * [Awesome Move resources](https://github.com/MystenLabs/awesome-move)

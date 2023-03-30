@@ -1,0 +1,24 @@
+warning[W09002]: unused variable
+   ┌─ tests/move_check/typing/assign_nested.move:10:13
+   │
+10 │         let x: u64;
+   │             ^ Unused local variable 'x'. Consider removing or prefixing with an underscore: '_x'
+
+warning[W09003]: unused assignment
+   ┌─ tests/move_check/typing/assign_nested.move:12:13
+   │
+12 │         let r_ref = &mut r;
+   │             ^^^^^ Unused assignment or binding for local 'r_ref'. Consider removing, replacing with '_', or prefixing with '_' (e.g., '_r_ref')
+
+warning[W09003]: unused assignment
+   ┌─ tests/move_check/typing/assign_nested.move:13:13
+   │
+13 │         let s = S { f: 0 };
+   │             ^ Unused assignment or binding for local 's'. Consider removing, replacing with '_', or prefixing with '_' (e.g., '_s')
+
+error[E01009]: invalid assignment
+   ┌─ tests/move_check/typing/assign_nested.move:14:19
+   │
+14 │         (_, x, _, s.f) = four();
+   │                   ^^^ Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment
+

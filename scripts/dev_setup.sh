@@ -29,6 +29,7 @@ BOOGIE_VERSION=2.15.8
 ALLURE_VERSION=2.15.pr1135
 # this is 3.21.4; the "3" is silent
 PROTOC_VERSION=21.4
+SOLC_VERSION="v0.8.11+commit.d7f03943"
 
 SCRIPT_PATH="$( cd "$( dirname "$0" )" >/dev/null 2>&1 && pwd )"
 cd "$SCRIPT_PATH/.." || exit
@@ -36,17 +37,18 @@ cd "$SCRIPT_PATH/.." || exit
 function usage {
   echo "Usage:"
   echo "Installs or updates necessary dev tools for aptoslabs/aptos-core."
-  echo "-b batch mode, no user interactions and miminal output"
+  echo "-b batch mode, no user interactions and minimal output"
   echo "-p update ${HOME}/.profile"
   echo "-r install protoc and related tools"
   echo "-t install build tools"
   echo "-o install operations tooling as well: helm, terraform, yamllint, vault, docker, kubectl, python3"
-  echo "-y installs or updates Move prover tools: z3, cvc5, dotnet, boogie"
+  echo "-y install or update Move Prover tools: z3, cvc5, dotnet, boogie"
+  echo "-d install tools for the Move documentation generator: graphviz"
   echo "-a install tools for build and test api"
   echo "-v verbose mode"
   echo "-i installs an individual tool by name"
   echo "-n will target the /opt/ dir rather than the $HOME dir.  /opt/bin/, /opt/rustup/, and /opt/dotnet/ rather than $HOME/bin/, $HOME/.rustup/, and $HOME/.dotnet/"
-  echo "If no toolchain component is selected with -t, -o, -y, or -p, the behavior is as if -t had been provided."
+  echo "If no toolchain component is selected with -t, -o, -y, -d, or -p, the behavior is as if -t had been provided."
   echo "This command must be called from the root folder of the Aptos-core project."
 }
 
@@ -92,6 +94,7 @@ function update_path_and_profile {
     add_to_profile "export CVC5_EXE=\"${BIN_DIR}/cvc5\""
     add_to_profile "export BOOGIE_EXE=\"${DOTNET_ROOT}/tools/boogie\""
   fi
+  add_to_profile "export SOLC_EXE=\"${BIN_DIR}/solc\""
 }
 
 function install_build_essentials {
@@ -428,7 +431,7 @@ function install_cargo_sort {
 }
 
 function install_cargo_nextest {
-  if ! command -v cargo-nextext &> /dev/null; then
+  if ! command -v cargo-nextest &> /dev/null; then
     cargo install cargo-nextest --locked
   fi
 }
@@ -629,6 +632,21 @@ function install_nodejs {
     install_pkg npm "$PACKAGE_MANAGER"
 }
 
+function install_solidity {
+  echo "Installing Solidity compiler"
+  # We fetch the binary from  https://binaries.soliditylang.org
+  if [[ "$(uname)" == "Linux" ]]; then
+    SOLC_BIN="linux-amd64/solc-linux-amd64-${SOLC_VERSION}"
+  elif [[ "$(uname)" == "Darwin" ]]; then
+    SOLC_BIN="macosx-amd64/solc-macosx-amd64-${SOLC_VERSION}"
+  else
+    echo "Solidity support not configured for this platform (uname=$(uname))"
+    return
+  fi
+  curl -o "${INSTALL_DIR}solc" "https://binaries.soliditylang.org/${SOLC_BIN}"
+  chmod +x "${INSTALL_DIR}solc"
+}
+
 function install_pnpm {
     curl -fsSL https://get.pnpm.io/install.sh | "${PRE_COMMAND[@]}" env PNPM_VERSION=7.14.2 SHELL="$(which bash)" bash -
 }
@@ -718,6 +736,13 @@ Move prover tools (since -y was provided):
 EOF
   fi
 
+if [[ "$INSTALL_DOC" == "true" ]]; then
+cat <<EOF
+tools for the Move documentation generator (since -d was provided):
+  * graphviz
+EOF
+  fi
+
   if [[ "$INSTALL_PROTOC" == "true" ]]; then
 cat <<EOF
 protoc and related plugins (since -r was provided):
@@ -750,6 +775,7 @@ INSTALL_BUILD_TOOLS=false;
 OPERATIONS=false;
 INSTALL_PROFILE=false;
 INSTALL_PROVER=false;
+INSTALL_DOC=false;
 INSTALL_PROTOC=false;
 INSTALL_API_BUILD_TOOLS=false;
 INSTALL_INDIVIDUAL=false;
@@ -758,7 +784,7 @@ INSTALL_DIR="${HOME}/bin/"
 OPT_DIR="false"
 
 #parse args
-while getopts "btoprvysah:i:n" arg; do
+while getopts "btoprvydsah:i:n" arg; do
   case "$arg" in
     b)
       BATCH_MODE="true"
@@ -780,6 +806,9 @@ while getopts "btoprvysah:i:n" arg; do
       ;;
     y)
       INSTALL_PROVER="true"
+      ;;
+    d)
+      INSTALL_DOC="true"
       ;;
     a)
       INSTALL_API_BUILD_TOOLS="true"
@@ -807,6 +836,7 @@ if [[ "$INSTALL_BUILD_TOOLS" == "false" ]] && \
    [[ "$OPERATIONS" == "false" ]] && \
    [[ "$INSTALL_PROFILE" == "false" ]] && \
    [[ "$INSTALL_PROVER" == "false" ]] && \
+   [[ "$INSTALL_DOC" == "false" ]] && \
    [[ "$INSTALL_API_BUILD_TOOLS" == "false" ]] && \
    [[ "$INSTALL_INDIVIDUAL" == "false" ]]; then
    INSTALL_BUILD_TOOLS="true"
@@ -909,6 +939,7 @@ if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   install_pnpm "$PACKAGE_MANAGER"
   install_pkg unzip "$PACKAGE_MANAGER"
   install_protoc
+  install_solidity
 fi
 
 if [[ "$INSTALL_PROTOC" == "true" ]]; then
@@ -962,6 +993,10 @@ if [[ "$INSTALL_PROVER" == "true" ]]; then
   install_cvc5
   install_dotnet
   install_boogie
+fi
+
+if [[ "$INSTALL_DOC" == "true" ]]; then
+  install_pkg graphviz "$PACKAGE_MANAGER"
 fi
 
 if [[ "$INSTALL_API_BUILD_TOOLS" == "true" ]]; then

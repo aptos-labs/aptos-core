@@ -13,7 +13,7 @@ pub struct Features {
     pub disabled: Vec<FeatureFlag>,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize, Hash)]
 #[allow(non_camel_case_types)]
 #[serde(rename_all = "snake_case")]
 pub enum FeatureFlag {
@@ -28,6 +28,10 @@ pub enum FeatureFlag {
     ResourceGroups,
     MultisigAccounts,
     DelegationPools,
+    CryptographyAlgebraNatives,
+    Bls12381Structures,
+    Ed25519PubkeyValidateReturnFalseWrongLength,
+    StructConstructors,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -128,6 +132,14 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::ResourceGroups => AptosFeatureFlag::RESOURCE_GROUPS,
             FeatureFlag::MultisigAccounts => AptosFeatureFlag::MULTISIG_ACCOUNTS,
             FeatureFlag::DelegationPools => AptosFeatureFlag::DELEGATION_POOLS,
+            FeatureFlag::CryptographyAlgebraNatives => {
+                AptosFeatureFlag::CRYPTOGRAPHY_ALGEBRA_NATIVES
+            },
+            FeatureFlag::Bls12381Structures => AptosFeatureFlag::BLS12_381_STRUCTURES,
+            FeatureFlag::Ed25519PubkeyValidateReturnFalseWrongLength => {
+                AptosFeatureFlag::ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH
+            },
+            FeatureFlag::StructConstructors => AptosFeatureFlag::STRUCT_CONSTRUCTORS,
         }
     }
 }
@@ -153,6 +165,14 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::RESOURCE_GROUPS => FeatureFlag::ResourceGroups,
             AptosFeatureFlag::MULTISIG_ACCOUNTS => FeatureFlag::MultisigAccounts,
             AptosFeatureFlag::DELEGATION_POOLS => FeatureFlag::DelegationPools,
+            AptosFeatureFlag::CRYPTOGRAPHY_ALGEBRA_NATIVES => {
+                FeatureFlag::CryptographyAlgebraNatives
+            },
+            AptosFeatureFlag::BLS12_381_STRUCTURES => FeatureFlag::Bls12381Structures,
+            AptosFeatureFlag::ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH => {
+                FeatureFlag::Ed25519PubkeyValidateReturnFalseWrongLength
+            },
+            AptosFeatureFlag::STRUCT_CONSTRUCTORS => FeatureFlag::StructConstructors,
         }
     }
 }
