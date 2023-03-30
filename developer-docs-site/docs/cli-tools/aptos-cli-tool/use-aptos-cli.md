@@ -871,7 +871,7 @@ In this case, see [Install the dependencies of Move Prover](install-aptos-cli#st
 
 This *experimental* feature lets you [profile gas usage](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/aptos-gas-profiling) in the Aptos virtual machine locally rather than [simulating transactions](../../concepts/gas-txn-fee.md#estimating-the-gas-units-via-simulation) at the [fullnode](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/simulate_transaction). You may also use it to visualize gas usage in the form of a flame graph.
 
-Run the gas profiler by appending the `--profile-gas` option to the aptos CLI `move publish`, `move run` or `move run-script` command, for example:
+Run the gas profiler by appending the `--profile-gas` option to the Aptos CLI `move publish`, `move run` or `move run-script` command, for example:
 ```bash
 aptos move publish --profile-gas
 ```
@@ -902,7 +902,7 @@ Find the flame graphs in the newly created `gas-profiling/` directory. To intera
 
 Note these limitations of the experimental gas profiling feature:
 
-  * It may produce results that are different from simulation.
+  * It may produce results that are different from the simulation.
   * The graphs may contain errors, and the numbers may not add up to the total gas cost as shown in the transaction output.
 
 ### Debugging and printing stack trace
