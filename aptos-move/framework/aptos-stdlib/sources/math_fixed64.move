@@ -69,8 +69,6 @@ module aptos_std::math_fixed64 {
         // 2^(1/580) = roottwo(1 - eps), so the number we seek is roottwo^exponent (1 - eps * exponent)
         let power = pow_raw(roottwo, (exponent as u128));
         let eps_correction = 219071715585908898;
-        std::debug::print(&power);
-        std::debug::print(&exponent);
         power = power - ((power * eps_correction * exponent) >> 128);
         // x is fixed point number smaller than bigfactor/2^64 < 0.0011 so we need only 5 tayler steps
         // to get the 15 digits of precission

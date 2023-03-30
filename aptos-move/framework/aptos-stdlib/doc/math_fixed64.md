@@ -18,8 +18,7 @@ Standard math utilities missing in the Move Language.
 -  [Function `assert_approx_the_same`](#0x1_math_fixed64_assert_approx_the_same)
 
 
-<pre><code><b>use</b> <a href="debug.md#0x1_debug">0x1::debug</a>;
-<b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="fixed_point64.md#0x1_fixed_point64">0x1::fixed_point64</a>;
 <b>use</b> <a href="math128.md#0x1_math128">0x1::math128</a>;
 </code></pre>
@@ -243,8 +242,6 @@ Specialized function for x * y / z that omits intermediate shifting
     // 2^(1/580) = roottwo(1 - eps), so the number we seek is roottwo^exponent (1 - eps * exponent)
     <b>let</b> power = <a href="math_fixed64.md#0x1_math_fixed64_pow_raw">pow_raw</a>(roottwo, (exponent <b>as</b> u128));
     <b>let</b> eps_correction = 219071715585908898;
-    std::debug::print(&power);
-    std::debug::print(&exponent);
     power = power - ((power * eps_correction * exponent) &gt;&gt; 128);
     // x is fixed point number smaller than bigfactor/2^64 &lt; 0.0011 so we need only 5 tayler steps
     // <b>to</b> get the 15 digits of precission

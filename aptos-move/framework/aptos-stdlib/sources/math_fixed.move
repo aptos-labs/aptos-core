@@ -7,6 +7,7 @@ module aptos_std::math_fixed {
 
     /// Abort code on overflow
     const EOVERFLOW_EXP: u64 = 1;
+    const LN2_X_32: u64 = 32 * 2977044472;  // ln(2) in fixed 32 representation
 
     /// Natural log 2 in 32 bit fixed point
     const LN2: u128 = 2977044472;  // ln(2) in fixed 32 representation

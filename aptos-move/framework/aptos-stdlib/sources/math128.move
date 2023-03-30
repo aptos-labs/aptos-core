@@ -95,6 +95,7 @@ module aptos_std::math128 {
         fixed_point32::create_from_raw_value (((integer_part as u64) << 32) + frac)
     }
 
+    // Return log2(x) as FixedPoint64
     public fun log2_64(x: u128): FixedPoint64 {
         let integer_part = floor_log2(x);
         // Normalize x to [1, 2) in fixed point 63. To ensure x is smaller then 1<<64
@@ -241,6 +242,31 @@ module aptos_std::math128 {
             let expected = expected - ((taylor1 + taylor2 / 2 + taylor3 / 3) << 32) / 2977044472;
             // verify it matches to 8 significant digits
             assert_approx_the_same((fixed_point32::get_raw_value(res) as u128), expected, 8);
+            idx = idx + 1;
+        };
+    }
+
+    #[test]
+    public entry fun test_log2_64() {
+        let idx: u8 = 0;
+        while (idx < 128) {
+            let res = log2_64(1<<idx);
+            assert!(fixed_point64::get_raw_value(res) == (idx as u128) << 64, 0);
+            idx = idx + 1;
+        };
+        idx = 10;
+        while (idx <= 128) {
+            let res = log2_64((((1u256<<idx) - 1) as u128));
+            // idx + log2 (1 - 1/2^idx) = idx + ln (1-1/2^idx)/ln2
+            // Use 3rd order taylor to approximate expected result
+            let expected = (idx as u256) << 64;
+            let taylor1 = (1 << 64) / ((1u256<<idx));
+            let taylor2 = (taylor1 * taylor1) >> 64;
+            let taylor3 = (taylor2 * taylor1) >> 64;
+            let taylor4 = (taylor3 * taylor1) >> 64;
+            let expected = expected - ((taylor1 + taylor2 / 2 + taylor3 / 3 + taylor4 / 4) << 64) / 12786308645202655660;
+            // verify it matches to 8 significant digits
+            assert_approx_the_same(fixed_point64::get_raw_value(res), (expected as u128), 14);
             idx = idx + 1;
         };
     }
