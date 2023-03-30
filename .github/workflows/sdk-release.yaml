@@ -38,6 +38,7 @@ jobs:
       APTOS_NODE_URL: http://127.0.0.1:8080/v1
       APTOS_FAUCET_URL: http://127.0.0.1:8081
       FAUCET_AUTH_TOKEN: ${{ secrets.DEVNET_TAP_AUTH_TOKEN }}
+      APTOS_INVOCATION: docker run ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos"
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
         with:
@@ -96,6 +97,7 @@ jobs:
       - run: echo 'APTOS_NODE_URL="http://127.0.0.1:8080/v1"' >> ./ecosystem/typescript/sdk/.env
       - run: echo 'APTOS_FAUCET_URL="http://127.0.0.1:8081"' >> ./ecosystem/typescript/sdk/.env
       - run: echo "FAUCET_AUTH_TOKEN=$FAUCET_AUTH_TOKEN" >> ./ecosystem/typescript/sdk/.env
+      - run: echo "APTOS_INVOCATION=$APTOS_INVOCATION" >> ./ecosystem/typescript/sdk/.env
       - run: cp ./ecosystem/typescript/sdk/.env ./ecosystem/typescript/sdk/examples/typescript/.env
       - run: cp ./ecosystem/typescript/sdk/.env ./ecosystem/typescript/sdk/examples/javascript/.env
 

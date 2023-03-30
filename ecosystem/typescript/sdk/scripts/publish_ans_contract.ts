@@ -2,8 +2,10 @@ const path = require("path");
 const { execSync } = require("child_process");
 
 const ANS_CORE_FOLDER = "/aptos-names-contracts/core";
-const APTOS_INIT_COMMAND = "aptos init --network local";
-const GET_DEFAULT_PROFILE_COMMAND = "aptos config show-profiles --profile default";
+const APTOS_INVOCATION = process.env.APTOS_INVOCATION || "aptos";
+
+const APTOS_INIT_COMMAND = `${APTOS_INVOCATION} init --network local`;
+const GET_DEFAULT_PROFILE_COMMAND = `${APTOS_INVOCATION} config show-profiles --profile default`;
 
 /**
  * TS SDK supports ANS. Since ANS contract is not part of aptos-framework
@@ -47,7 +49,7 @@ try {
   // 5. publish ans modules under the default profile
   console.log("---publish ans modules---");
   execSync(
-    `aptos move publish --named-addresses aptos_names=0x${profileAccountAddress},aptos_names_admin=0x${profileAccountAddress},aptos_names_funds=0x${profileAccountAddress} --assume-yes`,
+    `${APTOS_INVOCATION} move publish --named-addresses aptos_names=0x${profileAccountAddress},aptos_names_admin=0x${profileAccountAddress},aptos_names_funds=0x${profileAccountAddress} --assume-yes`,
     {
       cwd: __dirname + ANS_CORE_FOLDER,
     },
