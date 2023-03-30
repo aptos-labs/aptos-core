@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::module_simple::EntryPoints;
-use crate::transaction_generator::publishing::module_simple;
+use crate::publishing::module_simple;
 use aptos_framework::natives::code::PackageMetadata;
 use aptos_sdk::{
     bcs,
@@ -44,6 +44,12 @@ impl PackageTracker {
 #[derive(Clone, Debug)]
 pub struct PackageHandler {
     packages: Vec<PackageTracker>,
+}
+
+impl Default for PackageHandler {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl PackageHandler {

@@ -615,13 +615,13 @@ fn verify_account_txns(
         .map(|(account, txns_and_events)| {
             let account = *account;
             let first_seq_num = if let Some((txn, _)) = txns_and_events.first() {
-                txn.as_signed_user_txn().unwrap().sequence_number()
+                txn.try_as_signed_user_txn().unwrap().sequence_number()
             } else {
                 return (account, Vec::new());
             };
 
             let last_txn = &txns_and_events.last().unwrap().0;
-            let last_seq_num = last_txn.as_signed_user_txn().unwrap().sequence_number();
+            let last_seq_num = last_txn.try_as_signed_user_txn().unwrap().sequence_number();
             let limit = last_seq_num + 1;
 
             let acct_txns_with_proof = db
@@ -662,7 +662,7 @@ fn group_txns_by_account(
 ) -> HashMap<AccountAddress, Vec<(Transaction, Vec<ContractEvent>)>> {
     let mut account_to_txns = HashMap::new();
     for txn in txns_to_commit {
-        if let Ok(signed_txn) = txn.transaction().as_signed_user_txn() {
+        if let Some(signed_txn) = txn.transaction().try_as_signed_user_txn() {
             let account = signed_txn.sender();
             account_to_txns
                 .entry(account)
@@ -766,7 +766,10 @@ pub fn verify_committed_transactions(
 
         if !txn_to_commit.is_state_checkpoint() {
             // Fetch and verify transaction itself.
-            let txn = txn_to_commit.transaction().as_signed_user_txn().unwrap();
+            let txn = txn_to_commit
+                .transaction()
+                .try_as_signed_user_txn()
+                .unwrap();
             let txn_with_proof = db
                 .get_transaction_by_hash(txn_to_commit.transaction().hash(), ledger_version, true)
                 .unwrap()

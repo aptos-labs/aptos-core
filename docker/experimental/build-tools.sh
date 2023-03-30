@@ -20,8 +20,12 @@ cargo build --locked --profile=$PROFILE \
     -p aptos-openapi-spec-generator \
     -p aptos-telemetry-service \
     -p aptos-db-bootstrapper \
-    -p aptos-transaction-emitter \
     -p aptos-db-tool \
+    -p aptos-transaction-emitter \
+    -p aptos-indexer-grpc-cache-worker \
+    -p aptos-indexer-grpc-file-store \
+    -p aptos-indexer-grpc-data-service \
+    -p aptos-indexer-grpc-parser \
     "$@"
 
 # After building, copy the binaries we need to `dist` since the `target` directory is used as docker cache mount and only available during the RUN step
@@ -36,6 +40,10 @@ BINS=(
     aptos-db-bootstrapper
     forge
     aptos-transaction-emitter
+    aptos-indexer-grpc-cache-worker
+    aptos-indexer-grpc-file-store
+    aptos-indexer-grpc-data-service
+    aptos-indexer-grpc-parser
 )
 
 mkdir dist

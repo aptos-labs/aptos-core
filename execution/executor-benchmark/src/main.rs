@@ -3,8 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_config::config::{
-    EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, StateKvPrunerConfig,
-    StateMerklePrunerConfig,
+    EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, StateMerklePrunerConfig,
 };
 use aptos_executor::block_executor::TransactionBlockExecutor;
 use aptos_executor_benchmark::{
@@ -40,9 +39,6 @@ struct PrunerOpt {
     #[structopt(long)]
     enable_ledger_pruner: bool,
 
-    #[structopt(long)]
-    enable_state_kv_pruner: bool,
-
     #[structopt(long, default_value = "100000")]
     state_prune_window: u64,
 
@@ -52,9 +48,6 @@ struct PrunerOpt {
     #[structopt(long, default_value = "100000")]
     ledger_prune_window: u64,
 
-    #[structopt(long, default_value = "100000")]
-    state_kv_prune_window: u64,
-
     #[structopt(long, default_value = "500")]
     ledger_pruning_batch_size: usize,
 
@@ -63,9 +56,6 @@ struct PrunerOpt {
 
     #[structopt(long, default_value = "500")]
     epoch_snapshot_pruning_batch_size: usize,
-
-    #[structopt(long, default_value = "500")]
-    state_kv_pruning_batch_size: usize,
 }
 
 impl PrunerOpt {
@@ -86,11 +76,6 @@ impl PrunerOpt {
                 prune_window: self.ledger_prune_window,
                 batch_size: self.ledger_pruning_batch_size,
                 user_pruning_window_offset: 0,
-            },
-            state_kv_pruner_config: StateKvPrunerConfig {
-                enable: self.enable_state_kv_pruner,
-                prune_window: self.state_kv_prune_window,
-                batch_size: self.state_kv_pruning_batch_size,
             },
         }
     }

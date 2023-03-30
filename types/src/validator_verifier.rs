@@ -471,7 +471,7 @@ pub fn generate_validator_verifier(validators: &[ValidatorSigner]) -> ValidatorV
 
 /// Helper function to get random validator signers and a corresponding validator verifier for
 /// testing.  If custom_voting_power_quorum is not None, set a custom voting power quorum amount.
-/// With pseudo_random_account_address enabled, logs show 0 -> [0000], 1 -> [1000]
+/// With pseudo_random_account_address enabled, logs show `0 -> [0000]`, `1 -> [1000]`
 #[cfg(any(test, feature = "fuzzing"))]
 pub fn random_validator_verifier(
     count: usize,
