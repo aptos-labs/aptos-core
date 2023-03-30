@@ -1,8 +1,8 @@
 ---
-title: "Integrate Aptos Names Service"
+title: "Integrate with Aptos Names Service"
 id: "aptos-names-service-package"
 ---
-# Integrate with Aptos Names Service UI Package
+# Integrate with Aptos Names Service
 The Aptos Name Service provides a React UI package that offers developers a customizable button and modal to enable users to search for and mint Aptos names directly from their website.
 
 ## Prerequisites

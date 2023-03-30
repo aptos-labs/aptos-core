@@ -190,6 +190,11 @@ const config = {
                 docId: "guides/move-guides/move-structure",
               },
               {
+                label: "Move Scripts",
+                type: "doc",
+                docId: "guides/move-guides/move-scripts",
+              },
+              {
                 label: "Bytecode for Dependencies",
                 type: "doc",
                 docId: "guides/move-guides/bytecode-dependencies",
