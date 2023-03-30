@@ -60,10 +60,6 @@ resource "google_container_cluster" "aptos" {
     provider = "CALICO"
   }
 
-  pod_security_policy_config {
-    enabled = true
-  }
-
   cluster_autoscaling {
     enabled = var.gke_enable_node_autoprovisioning
 

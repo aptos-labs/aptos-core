@@ -327,7 +327,7 @@ pub fn pop_64_byte_slice(arguments: &mut VecDeque<Value>) -> SafeNativeResult<[u
     })
 }
 
-/// Pops a Scalar off the argument stack when the argument was a vector<u8>.
+/// Pops a Scalar off the argument stack when the argument was a `vector<u8>`.
 pub fn pop_scalar_from_bytes(arguments: &mut VecDeque<Value>) -> SafeNativeResult<Scalar> {
     let bytes = safely_pop_arg!(arguments, Vec<u8>);
 

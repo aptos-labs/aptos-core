@@ -13,7 +13,7 @@ use crate::{
 };
 use aptos_config::config::{
     EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, RocksdbConfigs,
-    StateKvPrunerConfig, StateMerklePrunerConfig, BUFFERED_STATE_TARGET_ITEMS,
+    StateMerklePrunerConfig, BUFFERED_STATE_TARGET_ITEMS,
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -196,11 +196,6 @@ pub fn test_state_merkle_pruning_impl(
                 batch_size: 1,
             },
             epoch_snapshot_pruner_config: EpochSnapshotPrunerConfig {
-                enable: true,
-                prune_window: 10,
-                batch_size: 1,
-            },
-            state_kv_pruner_config: StateKvPrunerConfig {
                 enable: true,
                 prune_window: 10,
                 batch_size: 1,

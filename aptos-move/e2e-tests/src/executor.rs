@@ -285,7 +285,7 @@ impl FakeExecutor {
         self.data_store.add_module(module_id, module_blob)
     }
 
-    /// Reads the resource [`Value`] for an account from this executor's data store.
+    /// Reads the resource `Value` for an account from this executor's data store.
     pub fn read_account_resource(&self, account: &Account) -> Option<AccountResource> {
         self.read_account_resource_at_address(account.address())
     }
@@ -300,7 +300,7 @@ impl FakeExecutor {
         bcs::from_bytes(data_blob.as_slice()).ok()
     }
 
-    /// Reads the resource [`Value`] for an account under the given address from
+    /// Reads the resource `Value` for an account under the given address from
     /// this executor's data store.
     pub fn read_account_resource_at_address(
         &self,

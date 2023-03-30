@@ -7,7 +7,7 @@
 //! This crate provides [`AptosDB`] which represents physical storage of the core Aptos data
 //! structures.
 //!
-//! It relays read/write operations on the physical storage via [`schemadb`] to the underlying
+//! It relays read/write operations on the physical storage via `schemadb` to the underlying
 //! Key-Value storage system, and implements aptos data structures on top of it.
 
 #[cfg(feature = "consensus-only-perf-test")]
@@ -305,10 +305,8 @@ impl AptosDB {
             Arc::clone(&arc_state_merkle_rocksdb),
             pruner_config.epoch_snapshot_pruner_config.into(),
         );
-        let state_kv_pruner = StateKvPrunerManager::new(
-            Arc::clone(&state_kv_db),
-            pruner_config.state_kv_pruner_config,
-        );
+        let state_kv_pruner =
+            StateKvPrunerManager::new(Arc::clone(&state_kv_db), pruner_config.ledger_pruner_config);
         let state_store = Arc::new(StateStore::new(
             Arc::clone(&ledger_rocksdb),
             Arc::clone(&arc_state_merkle_rocksdb),
@@ -1156,11 +1154,10 @@ impl DbReader for AptosDB {
                 .get_transaction_iter(start_version, limit as usize)?;
             let gas_prices: Vec<_> = txns
                 .filter_map(|txn| {
-                    if let Ok(Transaction::UserTransaction(txn)) = txn {
-                        Some(txn.gas_unit_price())
-                    } else {
-                        None
-                    }
+                    txn.as_ref()
+                        .ok()
+                        .and_then(|t| t.try_as_signed_user_txn())
+                        .map(|t| t.gas_unit_price())
                 })
                 .collect();
 

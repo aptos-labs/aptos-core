@@ -132,7 +132,7 @@ impl TransactionStore {
         transaction: &Transaction,
         batch: &SchemaBatch,
     ) -> Result<()> {
-        if let Transaction::UserTransaction(txn) = transaction {
+        if let Some(txn) = transaction.try_as_signed_user_txn() {
             batch.put::<TransactionByAccountSchema>(
                 &(txn.sender(), txn.sequence_number()),
                 &version,
@@ -219,7 +219,7 @@ impl TransactionStore {
         db_batch: &SchemaBatch,
     ) -> Result<()> {
         for transaction in transactions {
-            if let Transaction::UserTransaction(txn) = transaction {
+            if let Some(txn) = transaction.try_as_signed_user_txn() {
                 db_batch
                     .delete::<TransactionByAccountSchema>(&(txn.sender(), txn.sequence_number()))?;
             }

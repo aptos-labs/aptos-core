@@ -405,7 +405,7 @@ mod test {
         // Create the service response
         let peer_monitoring_service_response =
             PeerMonitoringServiceResponse::NetworkInformation(NetworkInformationResponse {
-                connected_peers_and_metadata: Default::default(),
+                connected_peers: Default::default(),
                 distance_from_validators,
             });
 

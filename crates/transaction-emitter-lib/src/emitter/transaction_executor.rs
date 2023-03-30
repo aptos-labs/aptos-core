@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::RETRY_POLICY;
-use crate::transaction_generator::TransactionExecutor;
 use anyhow::{Context, Result};
 use aptos_logger::{sample, sample::SampleRate, warn};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     move_types::account_address::AccountAddress, types::transaction::SignedTransaction,
 };
+use aptos_transaction_generator_lib::TransactionExecutor;
 use async_trait::async_trait;
 use futures::future::join_all;
 use rand::{rngs::StdRng, seq::SliceRandom, thread_rng, Rng, SeedableRng};

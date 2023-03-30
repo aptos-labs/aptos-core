@@ -218,7 +218,8 @@ impl ProofCoordinator {
                     .observe(state.aggregated_signature.len() as f64);
                 counters::BATCH_RECEIVED_REPLIES_VOTING_POWER
                     .observe(state.aggregated_voting_power as f64);
-                counters::BATCH_SUCCESSFUL_CREATION.observe(u64::from(state.completed));
+                counters::BATCH_SUCCESSFUL_CREATION
+                    .observe(if state.completed { 1.0 } else { 0.0 });
                 if !state.completed {
                     counters::TIMEOUT_BATCHES_COUNT.inc();
                     batch_ids.push(signed_batch_info_info.batch_id());

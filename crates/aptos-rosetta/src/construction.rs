@@ -391,7 +391,7 @@ async fn simulate_transaction(
         ))));
     }
 
-    if let Ok(user_txn) = simulated_txn.transaction.as_signed_user_txn() {
+    if let Some(user_txn) = simulated_txn.transaction.try_as_signed_user_txn() {
         // This gas price came from the simulation (would be the one from the input if provided)
         let simulated_gas_unit_price = user_txn.gas_unit_price();
 

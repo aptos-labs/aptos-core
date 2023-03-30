@@ -26,6 +26,7 @@ impl TreeReader<StateKey> for DummyReader {
     fn get_node_option(
         &self,
         _node_key: &NodeKey,
+        _tag: &str,
     ) -> anyhow::Result<Option<crate::Node<StateKey>>> {
         unimplemented!()
     }

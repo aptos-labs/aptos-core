@@ -2,6 +2,7 @@
 
 import Levenshtein
 import os
+import re
 import subprocess
 import sys
 
@@ -28,6 +29,7 @@ APTOS_CORE_REPOSITORY_URL = "https://github.com/aptos-labs/aptos-core.git"
 COMMIT_URL_TEMPLATE = "https://github.com/aptos-labs/aptos-core/commit/{commit_hash}"
 EXPECTED_FILE_PATHS_TEMPLATE = ".github/actions/check-branch-commits/{file_name}"
 GIT_CLONE_DIRECTORY_NAME = "aptos_core_clone"
+PR_COMMIT_NUMBER_REGEX = r"\(#\d+\)" # For example: (#7126), (#120), (#10000), etc.
 
 # A simple wrapper to hold all information related to a commit
 class Commit:
@@ -41,6 +43,14 @@ class Commit:
     """Compares this commit against another commit and returns true iff the commits match"""
     return self.hash == another_commit.hash or self.message == another_commit.message
 
+  def matches_commit_with_cherry_pick(self, another_commit):
+    """Compares this commit against another (potential cherry-pick) commit and returns true iff the messages match"""
+    # Strip out the PR numbers from the commit messages (to handle cherry-picks)
+    commit_message = re.sub(PR_COMMIT_NUMBER_REGEX, '', self.message).strip()
+    another_commit_message = re.sub(PR_COMMIT_NUMBER_REGEX, '', another_commit.message).strip()
+
+    # Compare the stripped commit messages
+    return commit_message == another_commit_message
 
   def update_closest_matching_commit(self, another_commit_list):
     """Compares this commit message against a list of commit messages and stores the closest match"""
@@ -151,7 +161,15 @@ def get_commits_in_first_list_not_second(first_commit_list, second_commit_list):
         found = True
         break
 
-    # If the commit wasn't found, add it to the list
+    # If the commit wasn't found, check for cherry-pick matches.
+    # We don't do this automatically because it may be expensive to compute.
+    if not found:
+      for commit_in_second_list in second_commit_list:
+        if commit_in_first_list.matches_commit_with_cherry_pick(commit_in_second_list):
+          found = True
+          break
+
+    # If the commit still wasn't found, add it to the list
     if not found:
       commits_in_first_list_not_second.append(commit_in_first_list)
   return commits_in_first_list_not_second
