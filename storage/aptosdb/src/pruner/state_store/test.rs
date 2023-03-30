@@ -10,7 +10,7 @@ use crate::{
     test_helper::{arb_state_kv_sets, update_store},
     AptosDB, PrunerManager, StateKvPrunerManager, StateMerklePrunerManager,
 };
-use aptos_config::config::{StateKvPrunerConfig, StateMerklePrunerConfig};
+use aptos_config::config::{LedgerPrunerConfig, StateMerklePrunerConfig};
 use aptos_crypto::HashValue;
 use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
 use aptos_storage_interface::{jmt_update_refs, jmt_updates, DbReader};
@@ -379,10 +379,11 @@ fn verify_state_value_pruner(inputs: Vec<Vec<(StateKey, Option<StateValue>)>>) {
 
     let mut version = 0;
     let mut current_state_values = HashMap::new();
-    let pruner = StateKvPrunerManager::new(Arc::clone(&db.state_kv_db), StateKvPrunerConfig {
+    let pruner = StateKvPrunerManager::new(Arc::clone(&db.state_kv_db), LedgerPrunerConfig {
         enable: true,
         prune_window: 0,
         batch_size: 1,
+        user_pruning_window_offset: 0,
     });
     for batch in inputs {
         update_store(store, batch.clone().into_iter(), version);
