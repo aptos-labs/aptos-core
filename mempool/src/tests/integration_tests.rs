@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::tests::{
@@ -6,8 +7,8 @@ use crate::tests::{
     test_framework::{test_transaction, MempoolNode, MempoolTestFrameworkBuilder},
 };
 use aptos_config::network_id::PeerNetworkId;
-use netcore::transport::ConnectionOrigin;
-use network::{
+use aptos_netcore::transport::ConnectionOrigin;
+use aptos_network::{
     testutils::{
         test_framework::TestFramework,
         test_node::{
@@ -167,7 +168,7 @@ async fn test_skip_ack_rebroadcast() {
         .await;
 }
 
-/// Tests when a node gets disconnected.  Node should pick up after the second sending
+/// Tests when a node gets disconnected. Node should pick up after the second sending
 /// TODO: also add an outbound test to ensure it'll broadcast all transactions again
 #[tokio::test]
 async fn test_interrupt_in_sync_inbound() {

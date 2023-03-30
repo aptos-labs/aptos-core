@@ -1,9 +1,11 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::built_package::{BuildOptions, BuiltPackage};
-use crate::path_relative_to_crate;
-use crate::release_bundle::{ReleaseBundle, ReleasePackage};
+use crate::{
+    built_package::{BuildOptions, BuiltPackage},
+    path_relative_to_crate,
+    release_bundle::{ReleaseBundle, ReleasePackage},
+};
 use anyhow::anyhow;
 use aptos_sdk_builder::rust;
 use aptos_types::transaction::EntryABI;
@@ -64,7 +66,7 @@ impl ReleaseOptions {
             source_paths.push(relative_path.display().to_string());
         }
         let bundle = ReleaseBundle::new(released_packages, source_paths);
-        std::fs::create_dir_all(&output.parent().unwrap())?;
+        std::fs::create_dir_all(output.parent().unwrap())?;
         std::fs::write(&output, bcs::to_bytes(&bundle)?)?;
         Ok(())
     }

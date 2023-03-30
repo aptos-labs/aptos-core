@@ -1,20 +1,17 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::HashMap;
-
+use super::fetch_metadata::ValidatorInfo;
 use anyhow::Result;
 use aptos_bitvec::BitVec;
 use aptos_rest_client::VersionedNewBlockEvent;
-use aptos_types::account_address::AccountAddress;
-use aptos_types::account_config::{new_block_event_key, NewBlockEvent};
+use aptos_storage_interface::{DbReader, Order};
+use aptos_types::{
+    account_address::AccountAddress,
+    account_config::{new_block_event_key, NewBlockEvent},
+};
 use itertools::Itertools;
-use std::cmp::Ordering;
-use std::convert::TryFrom;
-use std::ops::Add;
-use storage_interface::{DbReader, Order};
-
-use super::fetch_metadata::ValidatorInfo;
+use std::{cmp::Ordering, collections::HashMap, convert::TryFrom, ops::Add};
 
 /// Single validator stats
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -228,11 +225,11 @@ impl AnalyzeValidators {
                                 version: raw_event.transaction_version,
                                 sequence_number: raw_event.event.sequence_number(),
                             });
-                        }
+                        },
                         Ordering::Greater => {
                             return Ok(result);
-                        }
-                        Ordering::Less => {}
+                        },
+                        Ordering::Less => {},
                     };
                 }
             }
@@ -279,9 +276,8 @@ impl AnalyzeValidators {
             if is_nil {
                 nil_blocks += 1;
             }
-            let expected_round = previous_round
-                + (if is_nil { 0 } else { 1 })
-                + event.failed_proposer_indices().len() as u64;
+            let expected_round =
+                previous_round + u64::from(!is_nil) + event.failed_proposer_indices().len() as u64;
             if event.round() != expected_round {
                 println!(
                     "Missing failed AccountAddresss : {} {:?}",
@@ -348,16 +344,13 @@ impl AnalyzeValidators {
             validator_stats: validators
                 .iter()
                 .map(|validator| {
-                    (
-                        validator.address,
-                        ValidatorStats {
-                            proposal_successes: *successes.get(&validator.address).unwrap_or(&0),
-                            proposal_failures: *failures.get(&validator.address).unwrap_or(&0),
-                            votes: *votes.get(&validator.address).unwrap_or(&0),
-                            transactions: *transactions.get(&validator.address).unwrap_or(&0),
-                            voting_power: validator.voting_power,
-                        },
-                    )
+                    (validator.address, ValidatorStats {
+                        proposal_successes: *successes.get(&validator.address).unwrap_or(&0),
+                        proposal_failures: *failures.get(&validator.address).unwrap_or(&0),
+                        votes: *votes.get(&validator.address).unwrap_or(&0),
+                        transactions: *transactions.get(&validator.address).unwrap_or(&0),
+                        voting_power: validator.voting_power,
+                    })
                 })
                 .collect(),
             total_rounds,

@@ -1,15 +1,19 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use bytes::BytesMut;
 use clap::Parser;
 use event_listener::Event;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Arc;
-use tokio::io;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpStream;
-use tokio::time::Duration;
+use std::sync::{
+    atomic::{AtomicBool, AtomicU64, Ordering},
+    Arc,
+};
+use tokio::{
+    io,
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::TcpStream,
+    time::Duration,
+};
 //use quanta::Clock;
 
 static STOP: AtomicBool = AtomicBool::new(false);

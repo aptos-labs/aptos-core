@@ -19,6 +19,8 @@ module std::option {
     /// The `Option` is in an invalid state for the operation attempted.
     /// The `Option` is `None` while it should be `Some`.
     const EOPTION_NOT_SET: u64 = 0x40001;
+    /// Cannot construct an option from a vector with 2 or more elements.
+    const EOPTION_VEC_TOO_LONG: u64 = 0x40002;
 
     /// Return an empty `Option`
     public fun none<Element>(): Option<Element> {
@@ -46,6 +48,15 @@ module std::option {
         Option{ vec: vec(e) }
     }
 
+    public fun from_vec<Element>(vec: vector<Element>): Option<Element> {
+        assert!(vector::length(&vec) <= 1, EOPTION_VEC_TOO_LONG);
+        Option { vec }
+    }
+
+    spec from_vec {
+        aborts_if vector::length(vec) > 1;
+    }
+
     /// Return true if `t` does not hold a value
     public fun is_none<Element>(t: &Option<Element>): bool {
         vector::is_empty(&t.vec)
@@ -53,7 +64,10 @@ module std::option {
     spec is_none {
         pragma opaque;
         aborts_if false;
-        ensures result == is_none(t);
+        ensures result == spec_is_none(t);
+    }
+    spec fun spec_is_none<Element>(t: Option<Element>): bool {
+        vector::is_empty(t.vec)
     }
 
     /// Return true if `t` holds a value
@@ -63,7 +77,10 @@ module std::option {
     spec is_some {
         pragma opaque;
         aborts_if false;
-        ensures result == is_some(t);
+        ensures result == spec_is_some(t);
+    }
+    spec fun spec_is_some<Element>(t: Option<Element>): bool {
+        !vector::is_empty(t.vec)
     }
 
     /// Return true if the value in `t` is equal to `e_ref`
@@ -89,7 +106,10 @@ module std::option {
     spec borrow {
         pragma opaque;
         include AbortsIfNone<Element>;
-        ensures result == borrow(t);
+        ensures result == spec_borrow(t);
+    }
+    spec fun spec_borrow<Element>(t: Option<Element>): Element {
+        t.vec[0]
     }
 
     /// Return a reference to the value inside `t` if it holds one
@@ -102,7 +122,7 @@ module std::option {
     spec borrow_with_default {
         pragma opaque;
         aborts_if false;
-        ensures result == (if (is_some(t)) borrow(t) else default_ref);
+        ensures result == (if (spec_is_some(t)) spec_borrow(t) else default_ref);
     }
 
     /// Return the value inside `t` if it holds one
@@ -118,7 +138,7 @@ module std::option {
     spec get_with_default {
         pragma opaque;
         aborts_if false;
-        ensures result == (if (is_some(t)) borrow(t) else default);
+        ensures result == (if (spec_is_some(t)) spec_borrow(t) else default);
     }
 
     /// Convert the none option `t` to a some option by adding `e`.
@@ -130,9 +150,9 @@ module std::option {
     }
     spec fill {
         pragma opaque;
-        aborts_if is_some(t) with EOPTION_IS_SET;
-        ensures is_some(t);
-        ensures borrow(t) == e;
+        aborts_if spec_is_some(t) with EOPTION_IS_SET;
+        ensures spec_is_some(t);
+        ensures spec_borrow(t) == e;
     }
 
     /// Convert a `some` option to a `none` by removing and returning the value stored inside `t`
@@ -144,8 +164,8 @@ module std::option {
     spec extract {
         pragma opaque;
         include AbortsIfNone<Element>;
-        ensures result == borrow(old(t));
-        ensures is_none(t);
+        ensures result == spec_borrow(old(t));
+        ensures spec_is_none(t);
     }
 
     /// Return a mutable reference to the value inside `t`
@@ -155,9 +175,9 @@ module std::option {
         vector::borrow_mut(&mut t.vec, 0)
     }
     spec borrow_mut {
-        pragma opaque;
         include AbortsIfNone<Element>;
-        ensures result == borrow(t);
+        ensures result == spec_borrow(t);
+        ensures t == old(t);
     }
 
     /// Swap the old value inside `t` with `e` and return the old value
@@ -172,9 +192,9 @@ module std::option {
     spec swap {
         pragma opaque;
         include AbortsIfNone<Element>;
-        ensures result == borrow(old(t));
-        ensures is_some(t);
-        ensures borrow(t) == e;
+        ensures result == spec_borrow(old(t));
+        ensures spec_is_some(t);
+        ensures spec_borrow(t) == e;
     }
 
     /// Swap the old value inside `t` with `e` and return the old value;
@@ -189,8 +209,9 @@ module std::option {
     }
     spec swap_or_fill {
         pragma opaque;
+        aborts_if false;
         ensures result == old(t);
-        ensures borrow(t) == e;
+        ensures spec_borrow(t) == e;
     }
 
     /// Destroys `t.` If `t` holds a value, return it. Returns `default` otherwise
@@ -202,7 +223,7 @@ module std::option {
     spec destroy_with_default {
         pragma opaque;
         aborts_if false;
-        ensures result == (if (is_some(t)) borrow(t) else default);
+        ensures result == (if (spec_is_some(t)) spec_borrow(t) else default);
     }
 
     /// Unpack `t` and return its contents
@@ -217,7 +238,7 @@ module std::option {
     spec destroy_some {
         pragma opaque;
         include AbortsIfNone<Element>;
-        ensures result == borrow(t);
+        ensures result == spec_borrow(t);
     }
 
     /// Unpack `t`
@@ -229,7 +250,7 @@ module std::option {
     }
     spec destroy_none {
         pragma opaque;
-        aborts_if is_some(t) with EOPTION_IS_SET;
+        aborts_if spec_is_some(t) with EOPTION_IS_SET;
     }
 
     /// Convert `t` into a vector of length 1 if it is `Some`,
@@ -243,6 +264,82 @@ module std::option {
         aborts_if false;
         ensures result == t.vec;
     }
+    /// Apply the function to the optional element, consuming it. Does nothing if no value present.
+    public inline fun for_each<Element>(o: Option<Element>, f: |Element|) {
+        if (is_some(&o)) {
+            f(destroy_some(o))
+        } else {
+            destroy_none(o)
+        }
+    }
+
+    /// Apply the function to the optional element reference. Does nothing if no value present.
+    public inline fun for_each_ref<Element>(o: &Option<Element>, f: |&Element|) {
+        if (is_some(o)) {
+            f(borrow(o))
+        }
+    }
+
+    /// Apply the function to the optional element reference. Does nothing if no value present.
+    public inline fun for_each_mut<Element>(o: &mut Option<Element>, f: |&mut Element|) {
+        if (is_some(o)) {
+            f(borrow_mut(o))
+        }
+    }
+
+    /// Folds the function over the optional element.
+    public inline fun fold<Accumulator, Element>(
+        o: Option<Element>,
+        init: Accumulator,
+        f: |Accumulator,Element|Accumulator
+    ): Accumulator {
+        if (is_some(&o)) {
+            f(init, destroy_some(o))
+        } else {
+            destroy_none(o);
+            init
+        }
+    }
+
+    /// Maps the content of an option.
+    public inline fun map<Element, OtherElement>(o: Option<Element>, f: |Element|OtherElement): Option<OtherElement> {
+        if (is_some(&o)) {
+            some(f(destroy_some(o)))
+        } else {
+            destroy_none(o);
+            none()
+        }
+    }
+
+    /// Maps the content of an option without destroying the original option.
+    public inline fun map_ref<Element, OtherElement>(
+        o: &Option<Element>, f: |&Element|OtherElement): Option<OtherElement> {
+        if (is_some(o)) {
+            some(f(borrow(o)))
+        } else {
+            none()
+        }
+    }
+
+    /// Filters the content of an option
+    public inline fun filter<Element:drop>(o: Option<Element>, f: |&Element|bool): Option<Element> {
+        if (is_some(&o) && f(borrow(&o))) {
+            o
+        } else {
+            none()
+        }
+    }
+
+    /// Returns true if the option contains an element which satisfies predicate.
+    public inline fun any<Element>(o: &Option<Element>, p: |&Element|bool): bool {
+        is_some(o) && p(borrow(o))
+    }
+
+    /// Utility function to destroy an option that is not droppable.
+    public inline fun destroy<Element>(o: Option<Element>, d: |Element|) {
+        let vec = to_vec(o);
+        vector::destroy(vec, |e| d(e));
+    }
 
     spec module {} // switch documentation context back to module level
 
@@ -254,6 +351,6 @@ module std::option {
 
     spec schema AbortsIfNone<Element> {
         t: Option<Element>;
-        aborts_if is_none(t) with EOPTION_NOT_SET;
+        aborts_if spec_is_none(t) with EOPTION_NOT_SET;
     }
 }

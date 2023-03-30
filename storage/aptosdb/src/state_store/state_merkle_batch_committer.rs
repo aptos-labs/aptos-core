@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! This file defines the state merkle snapshot committer running in background thread.
@@ -14,10 +14,10 @@ use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::HashValue;
 use aptos_jellyfish_merkle::node_type::NodeKey;
 use aptos_logger::{info, trace};
+use aptos_schemadb::SchemaBatch;
+use aptos_storage_interface::state_delta::StateDelta;
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
-use schemadb::SchemaBatch;
 use std::sync::{mpsc::Receiver, Arc};
-use storage_interface::state_delta::StateDelta;
 
 pub struct StateMerkleBatch {
     pub batch: SchemaBatch,
@@ -44,16 +44,12 @@ impl StateMerkleBatchCommitter {
     pub fn run(self) {
         while let Ok(msg) = self.state_merkle_batch_receiver.recv() {
             match msg {
-                CommitMessage::Data {
-                    data,
-                    snapshot_ready_sender,
-                    ..
-                } => {
+                CommitMessage::Data(state_merkle_batch) => {
                     let StateMerkleBatch {
                         batch,
                         root_hash,
                         state_delta,
-                    } = data;
+                    } = state_merkle_batch;
                     // commit jellyfish merkle nodes
                     let _timer = OTHER_TIMERS_SECONDS
                         .with_label_values(&["commit_jellyfish_merkle_nodes"])
@@ -68,9 +64,6 @@ impl StateMerkleBatchCommitter {
                             .version_cache()
                             .maybe_evict_version(self.state_db.state_merkle_db.lru_cache());
                     }
-                    // TODO(grao): Consider remove the following sender once we verified the
-                    // version cache correctly cached all nodes we need.
-                    snapshot_ready_sender.send(()).unwrap();
                     info!(
                         version = state_delta.current_version,
                         base_version = state_delta.base_version,
@@ -82,18 +75,18 @@ impl StateMerkleBatchCommitter {
                         .expect("Current version should not be None");
                     LATEST_SNAPSHOT_VERSION.set(current_version as i64);
                     self.state_db
-                        .state_pruner
+                        .state_merkle_pruner
                         .maybe_set_pruner_target_db_version(current_version);
                     self.state_db
                         .epoch_snapshot_pruner
                         .maybe_set_pruner_target_db_version(current_version);
 
                     self.check_usage_consistency(&state_delta).unwrap();
-                }
+                },
                 CommitMessage::Sync(finish_sender) => finish_sender.send(()).unwrap(),
                 CommitMessage::Exit => {
                     break;
-                }
+                },
             }
         }
         trace!("State merkle batch committing thread exit.")

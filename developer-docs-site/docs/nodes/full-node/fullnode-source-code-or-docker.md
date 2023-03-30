@@ -1,16 +1,20 @@
 ---
-title: "Fullnode Using Aptos Source or Docker"
+title: "Run a Fullnode with Source or Docker"
 slug: "fullnode-source-code-or-docker"
 sidebar_position: 10
 ---
 
-# Public Fullnode Using Aptos Source or Docker
+# Run a Public Fullnode with the Aptos Source Code or Docker
 
-You can run your own [public fullnode](/concepts/basics-fullnodes) to synchronize with the state of the Aptos blockchain and stay up-to-date. Public fullnodes replicate the entire state of the blockchain by querying other Aptos fullnodes (public fullnodes or validator fullnodes) or validators.
+You can run your own [public fullnode](../../concepts/fullnodes.md) to synchronize with the state of the Aptos blockchain and stay up-to-date. Public fullnodes replicate the entire state of the blockchain by querying other Aptos fullnodes (public fullnodes or validator fullnodes) or validators.
 
 Alternatively, you can use the public fullnodes provided by Aptos Labs. However, such Aptos Labs-provided public fullnodes have rate limits, which can impede your development. By running your own public fullnode you can directly synchronize with the Aptos blockchain and avoid such rate limits.
 
 Public fullnodes can be run by anyone. This tutorial explains how to configure a public fullnode to connect to an Aptos network.
+
+:::caution Choose a network
+This document describes how to start a public fullnode in the Aptos `mainnet` network yet can easily be used to do the same in the `devnet` and `testnet` networks. To do so, instead check out the desired branch and use the `genesis.blob` and `waypoint.txt` node files for the respective branch: [`mainnet`](../node-files-all-networks/node-files.md), [`devnet`](../node-files-all-networks/node-files-devnet.md), and [`testnet`](../node-files-all-networks/node-files-testnet.md).
+:::
 
 ## Hardware requirements
 
@@ -28,7 +32,7 @@ We recommend the following hardware resources:
 
 ## Storage requirements
 
-The amount of data stored by Aptos depends on the ledger history (length) of the blockchain and the number of on-chain states (e.g., accounts). These values depend on several factors, including: the age of the blockchain, the average transaction rate and the configuration of the ledger pruner. Follow the storage requirements described in [Validator Hardware Requirements](/nodes/validator-node/operator/node-requirements#hardware-requirements). 
+The amount of data stored by Aptos depends on the ledger history (length) of the blockchain and the number of on-chain states (e.g., accounts). These values depend on several factors, including: the age of the blockchain, the average transaction rate and the configuration of the ledger pruner. Follow the storage requirements described in [Validator Hardware Requirements](../validator-node/operator/node-requirements.md#hardware-requirements). 
 
 :::tip Devnet blockchain storage
 The Aptos devnet is currently reset on a weekly basis. Hence we estimate that if you are connecting to the devnet, then the Aptos blockchain will not require more than several GBs of storage. See the `#devnet-release` channel on Aptos Discord.
@@ -71,7 +75,7 @@ This document describes how to configure your public fullnode using both methods
 
 With your development environment ready, now you can start to setup your fullnode.
 
-5. Checkout the `mainnet` branch using `git checkout --track origin/mainnet`.
+5. Check out the `mainnet` branch using `git checkout --track origin/mainnet`; remember, you may instead use `devnet` or `testnet`.
 
 6. Make sure your current working directory is `aptos-core`.
 
@@ -97,8 +101,10 @@ With your development environment ready, now you can start to setup your fullnod
       curl -O https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/mainnet/waypoint.txt
       ```
   
-    :::tip
-    To connect to other networks, you can find genesis and waypoint here ➜ https://github.com/aptos-labs/aptos-networks
+    :::caution Don't want to connect to mainnet?
+    To connect to other networks (e.g., `devnet` and `testnet`), you can find genesis and waypoint here ➜ https://github.com/aptos-labs/aptos-networks.
+    Be sure to download the `genesis.blob` and `waypoint.txt` for those networks, instead of using the genesis
+    and waypoint pointed to by the `curl` commands above.
     :::
 
 8. Edit the `fullnode.yaml` file in your current working directory as follows.
@@ -199,8 +205,10 @@ docker run --pull=always \
 
 **NOTE**: Ensure you have opened the relevant ports: 8080, 9101 and 6180. You may also need to update the 127.0.0.1 with 0.0.0.0 in the `fullnode.yaml` for the fields `listen_address` and `address` field in the `api` list.
 
-:::tip
-To connect to a network other than mainnet, all you need is to download and use the network-specific genesis blob and waypoint files. See here ➜ https://github.com/aptos-labs/aptos-networks.
+:::caution Don't want to connect to mainnet?
+To connect to other networks (e.g., `devnet` and `testnet`), you can find genesis and waypoint here ➜ https://github.com/aptos-labs/aptos-networks.
+Be sure to download the `genesis.blob` and `waypoint.txt` for those networks, instead of using the genesis
+and waypoint pointed to by the `curl` commands above.
 :::
 
 Ensure you have opened the relevant ports: 8080, 9101 and 6180. You may also need to update the 127.0.0.1 with 0.0.0.0 in the `fullnode.yaml` for the fields `listen_address` and `address` field in the `api` list.
@@ -221,12 +229,11 @@ The command will output the current synced version of your node. For example:
 71000
 ```
 
-Compare the synced version returned by this command (e.g., `71000`) with the `Current Version` (latest) shown on the
-[Aptos status page](https://status.devnet.aptos.dev/). If your node is catching up to the current version, it is synchronizing correctly.
+Compare the synced version returned by this command (e.g., `71000`) with the highest version shown on the
+[Aptos explorer page](https://explorer.aptoslabs.com/?network=mainnet). If your node is catching up to the highest version, it is synchronizing correctly.
 
 :::tip
-It is fine if the status page differs by a few versions, as the status
-page does not automatically refresh.
+It is fine if the explorer page differs by a few versions, as the explorer nodes may sync with some variance.
 :::
 
 ### (Optional) Verify outbound network connections
@@ -246,8 +253,8 @@ aptos_connections{direction="outbound",network_id="Public",peer_id="aabd651f",ro
 
 If the number of outbound connections returned is `0`, then it means your node cannot connect to the Aptos blockchain. If this happens to you, follow these steps to resolve the issue:
 
-1. Update your node to the latest release by following the [Update Fullnode With New Devnet Releases](/nodes/full-node/update-fullnode-with-new-devnet-releases).
-2. Remove any `seed` peers you may have added to your `public_full_node.yaml` configuration file. The seeds may be preventing you from connecting to the network. Seed peers are discussed in the [Connecting your fullnode to seed peers](/nodes/full-node/fullnode-network-connections#connecting-your-fullnode-to-seed-peers) section.
+1. Update your node to the latest release by following the [Update Fullnode With New Devnet Releases](./update-fullnode-with-new-releases.md).
+2. Remove any `seed` peers you may have added to your `public_full_node.yaml` configuration file. The seeds may be preventing you from connecting to the network. Seed peers are discussed in the [Connecting your fullnode to seed peers](./fullnode-network-connections.md#connecting-your-fullnode-to-seed-peers section.
 
 ### (Optional) Examine Docker ledger size
 

@@ -1,19 +1,17 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::OptionalPoolAddressArgs;
-use crate::common::utils::read_from_file;
-use crate::genesis::git::FRAMEWORK_NAME;
-use crate::genesis::git::{from_yaml, BALANCES_FILE, EMPLOYEE_VESTING_ACCOUNTS_FILE};
-use crate::genesis::keys::{GenerateLayoutTemplate, PUBLIC_KEYS_FILE};
 use crate::{
     common::{
-        types::{PromptOptions, RngArgs},
-        utils::write_to_file,
+        types::{OptionalPoolAddressArgs, PromptOptions, RngArgs},
+        utils::{read_from_file, write_to_file},
     },
     genesis::{
-        git::{GitOptions, SetupGit},
-        keys::{GenerateKeys, SetValidatorConfiguration},
+        git::{
+            from_yaml, GitOptions, SetupGit, BALANCES_FILE, EMPLOYEE_VESTING_ACCOUNTS_FILE,
+            FRAMEWORK_NAME,
+        },
+        keys::{GenerateKeys, GenerateLayoutTemplate, SetValidatorConfiguration, PUBLIC_KEYS_FILE},
         GenerateGenesis,
     },
     CliCommand,
@@ -22,21 +20,22 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     PrivateKey,
 };
-use aptos_genesis::config::{
-    AccountBalanceMap, EmployeePoolConfig, EmployeePoolMap, HostAndPort, Layout,
-    ValidatorConfiguration,
+use aptos_genesis::{
+    config::{
+        AccountBalanceMap, EmployeePoolConfig, EmployeePoolMap, HostAndPort, Layout,
+        ValidatorConfiguration,
+    },
+    keys::PublicIdentity,
 };
-use aptos_genesis::keys::PublicIdentity;
 use aptos_keygen::KeyGen;
 use aptos_temppath::TempPath;
-use aptos_types::account_address::AccountAddress;
-use aptos_types::chain_id::ChainId;
+use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
+use aptos_vm_genesis::{AccountBalance, TestValidator};
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
     str::FromStr,
 };
-use vm_genesis::{AccountBalance, TestValidator};
 
 const INITIAL_BALANCE: u64 = 100_000_000_000_000;
 
@@ -88,27 +87,24 @@ async fn test_mainnet_genesis_e2e_flow() {
     // Create initial balances and employee vesting account files.
     let git_dir = git_options.local_repository_dir.as_ref().unwrap().as_path();
 
-    create_account_balances_file(
-        PathBuf::from(git_dir),
-        vec![
-            owner_identity1.account_address,
-            owner_identity2.account_address,
-            operator_identity1.account_address,
-            operator_identity2.account_address,
-            voter_identity1.account_address,
-            voter_identity2.account_address,
-            account_1,
-            account_2,
-            employee_1,
-            employee_2,
-            employee_3,
-            employee_4,
-            admin_identity1.account_address,
-            admin_identity2.account_address,
-            employee_operator_identity1.account_address,
-            employee_operator_identity2.account_address,
-        ],
-    )
+    create_account_balances_file(PathBuf::from(git_dir), vec![
+        owner_identity1.account_address,
+        owner_identity2.account_address,
+        operator_identity1.account_address,
+        operator_identity2.account_address,
+        voter_identity1.account_address,
+        voter_identity2.account_address,
+        account_1,
+        account_2,
+        employee_1,
+        employee_2,
+        employee_3,
+        employee_4,
+        admin_identity1.account_address,
+        admin_identity2.account_address,
+        employee_operator_identity1.account_address,
+        employee_operator_identity2.account_address,
+    ])
     .await;
     create_employee_vesting_accounts_file(
         PathBuf::from(git_dir),
@@ -258,7 +254,7 @@ async fn setup_git_dir(
 
 /// Add framework to git directory
 fn add_framework_to_dir(git_dir: &Path) {
-    cached_packages::head_release_bundle()
+    aptos_cached_packages::head_release_bundle()
         .write(git_dir.join(FRAMEWORK_NAME))
         .unwrap()
 }

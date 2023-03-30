@@ -1,8 +1,9 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use super::Test;
 use crate::{CoreContext, Result, TestReport};
+use aptos_cached_packages::aptos_stdlib;
 use aptos_logger::info;
 use aptos_rest_client::{Client as RestClient, PendingTransaction, State, Transaction};
 use aptos_sdk::{
@@ -11,14 +12,18 @@ use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{
         account_address::AccountAddress,
+        account_config::CORE_CODE_ADDRESS,
         chain_id::ChainId,
-        transaction::authenticator::{AuthenticationKey, AuthenticationKeyPreimage},
+        transaction::{
+            authenticator::{AuthenticationKey, AuthenticationKeyPreimage},
+            SignedTransaction,
+        },
         LocalAccount,
     },
 };
-use cached_packages::aptos_stdlib;
 use rand::{rngs::OsRng, Rng, SeedableRng};
 use reqwest::Url;
+use serde::{Deserialize, Serialize};
 
 #[async_trait::async_trait]
 pub trait AptosTest: Test {
@@ -196,6 +201,28 @@ impl<'t> AptosPublicInfo<'t> {
         TransactionFactory::new(self.chain_id).with_gas_unit_price(unit_price)
     }
 
+    pub async fn get_approved_execution_hash_at_aptos_governance(
+        &self,
+        proposal_id: u64,
+    ) -> Vec<u8> {
+        let approved_execution_hashes = self
+            .rest_client
+            .get_account_resource_bcs::<SimpleMap<u64, Vec<u8>>>(
+                CORE_CODE_ADDRESS,
+                "0x1::aptos_governance::ApprovedExecutionHashes",
+            )
+            .await;
+        let hashes = approved_execution_hashes.unwrap().into_inner().data;
+        let mut execution_hash = vec![];
+        for hash in hashes {
+            if hash.key == proposal_id {
+                execution_hash = hash.value;
+                break;
+            }
+        }
+        execution_hash
+    }
+
     pub async fn get_balance(&self, address: AccountAddress) -> Option<u64> {
         let module = Identifier::new("coin".to_string()).unwrap();
         let name = Identifier::new("CoinStore".to_string()).unwrap();
@@ -245,17 +272,22 @@ pub async fn reconfig(
     root_account: &mut LocalAccount,
 ) -> State {
     let aptos_version = client.get_aptos_version().await.unwrap();
-    let (current, state) = aptos_version.into_parts();
+    let current = aptos_version.into_inner();
     let current_version = *current.major.inner();
     let txn = root_account.sign_with_transaction_builder(
         transaction_factory
             .clone()
             .payload(aptos_stdlib::version_set_version(current_version + 1)),
     );
+    submit_and_wait_reconfig(client, txn).await
+}
+
+pub async fn submit_and_wait_reconfig(client: &RestClient, txn: SignedTransaction) -> State {
+    let state = client.get_ledger_information().await.unwrap().into_inner();
     let result = client.submit_and_wait(&txn).await;
     if let Err(e) = result {
         let last_transactions = client
-            .get_account_transactions(root_account.address(), None, None)
+            .get_account_transactions(txn.sender(), None, None)
             .await
             .map(|result| {
                 result
@@ -277,7 +309,7 @@ pub async fn reconfig(
         panic!(
             "Couldn't execute {:?}, for account {:?}, error {:?}, last account transactions: {:?}",
             txn,
-            root_account,
+            txn.sender(),
             e,
             last_transactions.unwrap_or_default()
         )
@@ -291,15 +323,21 @@ pub async fn reconfig(
         .unwrap();
 
     info!(
-        "Changed aptos version from {} (epoch={}, ledger_v={}), to {}, (epoch={}, ledger_v={})",
-        current_version,
-        state.epoch,
-        state.version,
-        current_version + 1,
-        new_state.epoch,
-        new_state.version
+        "Applied reconfig from (epoch={}, ledger_v={}), to (epoch={}, ledger_v={})",
+        state.epoch, state.version, new_state.epoch, new_state.version
     );
     assert_ne!(state.epoch, new_state.epoch);
 
     new_state
+}
+
+#[derive(Serialize, Deserialize)]
+struct SimpleMap<K, V> {
+    data: Vec<Element<K, V>>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct Element<K, V> {
+    key: K,
+    value: V,
 }

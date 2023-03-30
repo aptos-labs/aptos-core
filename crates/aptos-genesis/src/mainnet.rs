@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{builder::GenesisConfiguration, config::ValidatorConfiguration};
@@ -6,13 +6,13 @@ use aptos_config::config::{
     RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
     NO_OP_STORAGE_PRUNER_CONFIG,
 };
+use aptos_db::AptosDB;
+use aptos_framework::ReleaseBundle;
+use aptos_storage_interface::DbReaderWriter;
 use aptos_temppath::TempPath;
 use aptos_types::{chain_id::ChainId, transaction::Transaction, waypoint::Waypoint};
 use aptos_vm::AptosVM;
-use aptosdb::AptosDB;
-use framework::ReleaseBundle;
-use storage_interface::DbReaderWriter;
-use vm_genesis::{AccountBalance, EmployeePool, ValidatorWithCommissionRate};
+use aptos_vm_genesis::{AccountBalance, EmployeePool, ValidatorWithCommissionRate};
 
 /// Holder object for all pieces needed to generate a genesis transaction
 #[derive(Clone)]
@@ -106,13 +106,13 @@ impl MainnetGenesisInfo {
     }
 
     fn generate_genesis_txn(&self) -> Transaction {
-        vm_genesis::encode_aptos_mainnet_genesis_transaction(
+        aptos_vm_genesis::encode_aptos_mainnet_genesis_transaction(
             &self.accounts,
             &self.employee_vesting_accounts,
             &self.validators,
             &self.framework,
             self.chain_id,
-            &vm_genesis::GenesisConfiguration {
+            &aptos_vm_genesis::GenesisConfiguration {
                 allow_new_validators: true,
                 is_test: false,
                 epoch_duration_secs: self.epoch_duration_secs,
@@ -143,6 +143,6 @@ impl MainnetGenesisInfo {
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
         )?;
         let db_rw = DbReaderWriter::new(aptosdb);
-        executor::db_bootstrapper::generate_waypoint::<AptosVM>(&db_rw, genesis)
+        aptos_executor::db_bootstrapper::generate_waypoint::<AptosVM>(&db_rw, genesis)
     }
 }

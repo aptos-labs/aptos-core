@@ -1,22 +1,20 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::event::EventSchema;
-use crate::ledger_info::LedgerInfoSchema;
-use crate::state_value::StateValueSchema;
-use crate::transaction_by_account::TransactionByAccountSchema;
+use crate::{
+    event::EventSchema, ledger_info::LedgerInfoSchema, state_value::StateValueSchema,
+    transaction_by_account::TransactionByAccountSchema,
+};
 use anyhow::{anyhow, ensure, Result};
-use aptos_types::account_address::AccountAddress;
-use aptos_types::contract_event::ContractEvent;
-use aptos_types::ledger_info::LedgerInfoWithSignatures;
-use aptos_types::state_store::state_key::StateKey;
-use aptos_types::state_store::state_key_prefix::StateKeyPrefix;
-use aptos_types::state_store::state_value::StateValue;
-use aptos_types::transaction::Version;
-use schemadb::iterator::SchemaIterator;
-use schemadb::{ReadOptions, DB};
-use std::iter::Peekable;
-use std::marker::PhantomData;
+use aptos_schemadb::{iterator::SchemaIterator, ReadOptions, DB};
+use aptos_types::{
+    account_address::AccountAddress,
+    contract_event::ContractEvent,
+    ledger_info::LedgerInfoWithSignatures,
+    state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix, state_value::StateValue},
+    transaction::Version,
+};
+use std::{iter::Peekable, marker::PhantomData};
 
 pub struct ContinuousVersionIter<I, T> {
     inner: I,
@@ -45,7 +43,7 @@ where
                 );
                 self.expected_next_version += 1;
                 Some(transaction)
-            }
+            },
             None => None,
         };
 
@@ -246,7 +244,7 @@ impl<'a> AccountTransactionVersionIter<'a> {
                 self.expected_next_seq_num = Some(seq_num + 1);
                 self.prev_version = Some(version);
                 Some((seq_num, version))
-            }
+            },
             None => None,
         })
     }
@@ -289,11 +287,16 @@ impl<'a> EpochEndingLedgerInfoIter<'a> {
                 if !li.ledger_info().ends_epoch() {
                     None
                 } else {
-                    ensure!(epoch == self.next_epoch, "Epochs are not consecutive.");
+                    ensure!(
+                        epoch == self.next_epoch,
+                        "Epochs are not consecutive. expecting: {}, got: {}",
+                        self.next_epoch,
+                        epoch,
+                    );
                     self.next_epoch += 1;
                     Some(li)
                 }
-            }
+            },
             _ => None,
         };
 

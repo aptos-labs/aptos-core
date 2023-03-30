@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{LedgerInfo, U64};
@@ -23,6 +23,8 @@ pub struct IndexResponse {
     pub oldest_block_height: U64,
     pub block_height: U64,
     // This must be optional to be backwards compatible
+    /// Git hash of the build of the API endpoint.  Can be used to determine the exact
+    /// software version used by the API endpoint.
     pub git_hash: Option<String>,
 }
 

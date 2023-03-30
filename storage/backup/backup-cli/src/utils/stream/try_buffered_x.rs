@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 ///! This is a copy of `futures::try_stream::try_buffered` from `futures 0.3.16`, except that it uses
@@ -65,7 +66,7 @@ where
         // Attempt to pull the next value from the in_progress_queue
         match this.in_progress_queue.poll_next_unpin(cx) {
             x @ Poll::Pending | x @ Poll::Ready(Some(_)) => return x,
-            Poll::Ready(None) => {}
+            Poll::Ready(None) => {},
         }
 
         // If more values are still coming from the stream, we're not done yet

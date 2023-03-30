@@ -1,15 +1,14 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::thread;
-
+use aptos_forge::{NetworkContext, NetworkTest, Result, Test};
 use aptos_logger::info;
-use forge::{NetworkContext, NetworkTest, Result, Test};
 use rand::{
     rngs::{OsRng, StdRng},
     seq::IteratorRandom,
     Rng, SeedableRng,
 };
+use std::thread;
 use tokio::runtime::Runtime;
 
 const STATE_SYNC_VERSION_COUNTER_NAME: &str = "aptos_state_sync_version";

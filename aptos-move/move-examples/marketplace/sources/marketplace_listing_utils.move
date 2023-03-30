@@ -345,7 +345,7 @@ module marketplace::marketplace_listing_utils {
     }
 
 
-    #[test(owner = @0xAF)]
+    #[test(owner = @marketplace)]
     public fun test_cancel_listing(owner: signer)acquires ListingRecords {
         use aptos_framework::coin;
 

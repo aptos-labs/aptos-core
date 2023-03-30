@@ -1,18 +1,18 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::types::humio::UnstructuredLog;
 use anyhow::anyhow;
 use flate2::{write::GzEncoder, Compression};
 use reqwest::{Client as ReqwestClient, Url};
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
 use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
 
-use crate::types::humio::UnstructuredLog;
-
 pub const PEER_ID_FIELD_NAME: &str = "peer_id";
 pub const EPOCH_FIELD_NAME: &str = "epoch";
 pub const PEER_ROLE_TAG_NAME: &str = "peer_role";
 pub const CHAIN_ID_TAG_NAME: &str = "chain_id";
+pub const RUN_UUID_TAG_NAME: &str = "run_uuid";
 
 #[derive(Clone)]
 pub struct IngestClient {

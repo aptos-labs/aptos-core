@@ -1,11 +1,9 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! Parallel data aggregation uses a `Delta` op. Every delta is is a state key
 //! (for accessing the storage) and an operation: a partial function with a
 //! postcondition.
-
-use std::collections::BTreeMap;
 
 use crate::module::AGGREGATOR_MODULE;
 use aptos_state_view::StateView;
@@ -15,6 +13,7 @@ use aptos_types::{
     write_set::{WriteOp, WriteSetMut},
 };
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult};
+use std::collections::BTreeMap;
 
 /// When `Addition` operation overflows the `limit`.
 const EADD_OVERFLOW: u64 = 0x02_0001;
@@ -126,7 +125,7 @@ impl DeltaOp {
         // In this cases we compute the absolute sum of deltas (A+B) and use plus
         // or minus sign accordingly.
         macro_rules! update_same_sign {
-            ($sign: ident, $a: ident, $b: ident) => {
+            ($sign:ident, $a:ident, $b:ident) => {
                 self.update = $sign(addition($a, $b, self.limit)?)
             };
         }
@@ -135,7 +134,7 @@ impl DeltaOp {
         // as +A-B and -A+B. In these cases we have to check which of A or B is greater
         // and possibly flip a sign.
         macro_rules! update_different_sign {
-            ($a: ident, $b: ident) => {
+            ($a:ident, $b:ident) => {
                 if $a >= $b {
                     self.update = Plus(subtraction($a, $b)?);
                 } else {
@@ -171,8 +170,8 @@ impl DeltaOp {
         state_key: &StateKey,
     ) -> anyhow::Result<WriteOp, VMStatus> {
         state_view
-            .get_state_value(state_key)
-            .map_err(|_| VMStatus::Error(StatusCode::STORAGE_ERROR))
+            .get_state_value_bytes(state_key)
+            .map_err(|_| VMStatus::Error(StatusCode::STORAGE_ERROR, None))
             .and_then(|maybe_bytes| {
                 match maybe_bytes {
                     Some(bytes) => {
@@ -186,10 +185,10 @@ impl DeltaOp {
                                     .into_vm_status()
                             })
                             .map(|result| WriteOp::Modification(serialize(&result)))
-                    }
+                    },
                     // Something is wrong, the value to which we apply delta should
                     // always exist. Guard anyway.
-                    None => Err(VMStatus::Error(StatusCode::STORAGE_ERROR)),
+                    None => Err(VMStatus::Error(StatusCode::STORAGE_ERROR, None)),
                 }
             })
     }
@@ -236,14 +235,14 @@ impl std::fmt::Debug for DeltaOp {
                     "+{} ensures 0 <= result <= {}, range [-{}, {}]",
                     value, self.limit, self.min_negative, self.max_positive
                 )
-            }
+            },
             DeltaUpdate::Minus(value) => {
                 write!(
                     f,
                     "-{} ensures 0 <= result <= {}, range [-{}, {}]",
                     value, self.limit, self.min_negative, self.max_positive
                 )
-            }
+            },
         }
     }
 }
@@ -332,8 +331,8 @@ impl DeltaChangeSet {
 }
 
 impl<'a> IntoIterator for &'a DeltaChangeSet {
-    type Item = (&'a StateKey, &'a DeltaOp);
     type IntoIter = ::std::collections::btree_map::Iter<'a, StateKey, DeltaOp>;
+    type Item = (&'a StateKey, &'a DeltaOp);
 
     fn into_iter(self) -> Self::IntoIter {
         self.delta_change_set.iter()
@@ -341,8 +340,8 @@ impl<'a> IntoIterator for &'a DeltaChangeSet {
 }
 
 impl ::std::iter::IntoIterator for DeltaChangeSet {
-    type Item = (StateKey, DeltaOp);
     type IntoIter = ::std::collections::btree_map::IntoIter<StateKey, DeltaOp>;
+    type Item = (StateKey, DeltaOp);
 
     fn into_iter(self) -> Self::IntoIter {
         self.delta_change_set.into_iter()
@@ -352,7 +351,10 @@ impl ::std::iter::IntoIterator for DeltaChangeSet {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aptos_types::state_store::state_storage_usage::StateStorageUsage;
+    use aptos_state_view::TStateView;
+    use aptos_types::state_store::{
+        state_storage_usage::StateStorageUsage, state_value::StateValue,
+    };
     use claims::{assert_err, assert_matches, assert_ok, assert_ok_eq};
     use once_cell::sync::Lazy;
     use std::collections::HashMap;
@@ -537,9 +539,15 @@ mod tests {
         data: HashMap<StateKey, Vec<u8>>,
     }
 
-    impl StateView for FakeView {
-        fn get_state_value(&self, state_key: &StateKey) -> anyhow::Result<Option<Vec<u8>>> {
-            Ok(self.data.get(state_key).cloned())
+    impl TStateView for FakeView {
+        type Key = StateKey;
+
+        fn get_state_value(&self, state_key: &StateKey) -> anyhow::Result<Option<StateValue>> {
+            Ok(self
+                .data
+                .get(state_key)
+                .cloned()
+                .map(StateValue::new_legacy))
         }
 
         fn is_genesis(&self) -> bool {
@@ -551,15 +559,15 @@ mod tests {
         }
     }
 
-    static KEY: Lazy<StateKey> = Lazy::new(|| StateKey::Raw(String::from("test-key").into_bytes()));
+    static KEY: Lazy<StateKey> = Lazy::new(|| StateKey::raw(String::from("test-key").into_bytes()));
 
     #[test]
     fn test_failed_delta_application() {
         let state_view = FakeView::default();
         let delta_op = delta_add(10, 1000);
         assert_matches!(
-            delta_op.try_into_write_op(&state_view, &*KEY),
-            Err(VMStatus::Error(StatusCode::STORAGE_ERROR))
+            delta_op.try_into_write_op(&state_view, &KEY),
+            Err(VMStatus::Error(StatusCode::STORAGE_ERROR, None))
         );
     }
 
@@ -572,10 +580,10 @@ mod tests {
         let add_op = delta_add(100, 200);
         let sub_op = delta_sub(100, 200);
 
-        let add_result = add_op.try_into_write_op(&state_view, &*KEY);
+        let add_result = add_op.try_into_write_op(&state_view, &KEY);
         assert_ok_eq!(add_result, WriteOp::Modification(serialize(&200)));
 
-        let sub_result = sub_op.try_into_write_op(&state_view, &*KEY);
+        let sub_result = sub_op.try_into_write_op(&state_view, &KEY);
         assert_ok_eq!(sub_result, WriteOp::Modification(serialize(&0)));
     }
 
@@ -589,11 +597,11 @@ mod tests {
         let sub_op = delta_sub(101, 1000);
 
         assert_matches!(
-            add_op.try_into_write_op(&state_view, &*KEY),
+            add_op.try_into_write_op(&state_view, &KEY),
             Err(VMStatus::MoveAbort(_, EADD_OVERFLOW))
         );
         assert_matches!(
-            sub_op.try_into_write_op(&state_view, &*KEY),
+            sub_op.try_into_write_op(&state_view, &KEY),
             Err(VMStatus::MoveAbort(_, ESUB_UNDERFLOW))
         );
     }

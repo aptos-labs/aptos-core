@@ -13,7 +13,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-hex = "0.4.3"
-rand = "0.7.3"
+hex = { workspace = true }
+rand = { workspace = true }
 
 

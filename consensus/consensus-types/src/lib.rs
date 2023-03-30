@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -10,6 +11,7 @@ pub mod common;
 pub mod epoch_retrieval;
 pub mod executed_block;
 pub mod experimental;
+pub mod proof_of_store;
 pub mod proposal_msg;
 pub mod quorum_cert;
 pub mod request_response;

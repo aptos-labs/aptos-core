@@ -1,12 +1,20 @@
 [package]
 name = "sender"
+description = "DDOS sender"
 version = "0.1.0"
-edition = "2021"
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
 
 [dependencies]
-bytes = "1.2.1"
-clap = { version = "3.2.17", features = ["derive"] }
-event-listener = "2.5.3"
-quanta = "0.10.1"
-tokio = { version = "1.18.2", features = ["full"] }
+bytes = { workspace = true }
+clap = { workspace = true }
+event-listener = { workspace = true }
+quanta = { workspace = true }
+tokio = { workspace = true }

@@ -1,12 +1,13 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_language_e2e_tests::executor::FakeExecutor;
 use aptos_types::account_config::CORE_CODE_ADDRESS;
-use language_e2e_tests::executor::FakeExecutor;
-use move_core_types::vm_status::StatusCode;
 use move_core_types::{
     account_address::AccountAddress,
     value::{serialize_values, MoveValue},
+    vm_status::StatusCode,
 };
 
 #[test]

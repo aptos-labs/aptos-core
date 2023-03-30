@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -14,10 +15,10 @@ use crate::{
     round_manager::VerifiedEvent,
     state_replication::StateComputer,
 };
+use aptos_channels::aptos_channel::Receiver;
+use aptos_consensus_types::common::Author;
 use aptos_infallible::Mutex;
 use aptos_types::{account_address::AccountAddress, validator_verifier::ValidatorVerifier};
-use channel::aptos_channel::Receiver;
-use consensus_types::common::Author;
 use futures::channel::mpsc::UnboundedReceiver;
 use std::sync::{atomic::AtomicU64, Arc};
 

@@ -1,26 +1,31 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::{system_metrics::SystemMetricsThreshold, Swarm, SwarmExt};
 use anyhow::{bail, Context};
 use aptos::node::analyze::fetch_metadata::FetchMetadata;
 use aptos_sdk::types::PeerId;
-use serde::Serialize;
+use aptos_transaction_emitter_lib::{TxnStats, TxnStatsRate};
 use std::time::Duration;
-use transaction_emitter_lib::emitter::stats::TxnStats;
 
-use crate::system_metrics::SystemMetricsThreshold;
-use crate::{Swarm, SwarmExt};
-
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug)]
 pub struct StateProgressThreshold {
     pub max_no_progress_secs: f32,
     pub max_round_gap: u64,
 }
 
-#[derive(Default, Clone, Debug, Serialize)]
+#[derive(Clone, Debug)]
+pub enum LatencyType {
+    Average,
+    P50,
+    P90,
+    P99,
+}
+
+#[derive(Default, Clone, Debug)]
 pub struct SuccessCriteria {
     pub avg_tps: usize,
-    pub max_latency_ms: usize,
+    latency_thresholds: Vec<(Duration, LatencyType)>,
     check_no_restarts: bool,
     wait_for_all_nodes_to_catchup: Option<Duration>,
     // Maximum amount of CPU cores and memory bytes used by the nodes.
@@ -29,52 +34,83 @@ pub struct SuccessCriteria {
 }
 
 impl SuccessCriteria {
-    pub fn new(
-        tps: usize,
-        max_latency_ms: usize,
-        check_no_restarts: bool,
-        wait_for_all_nodes_to_catchup: Option<Duration>,
-        system_metrics_threshold: Option<SystemMetricsThreshold>,
-        chain_progress_check: Option<StateProgressThreshold>,
-    ) -> Self {
+    pub fn new(tps: usize) -> Self {
         Self {
             avg_tps: tps,
-            max_latency_ms,
-            check_no_restarts,
-            wait_for_all_nodes_to_catchup,
-            system_metrics_threshold,
-            chain_progress_check,
+            latency_thresholds: Vec::new(),
+            check_no_restarts: false,
+            wait_for_all_nodes_to_catchup: None,
+            system_metrics_threshold: None,
+            chain_progress_check: None,
         }
     }
 
+    pub fn add_no_restarts(mut self) -> Self {
+        self.check_no_restarts = true;
+        self
+    }
+
+    pub fn add_wait_for_catchup_s(mut self, duration_secs: u64) -> Self {
+        self.wait_for_all_nodes_to_catchup = Some(Duration::from_secs(duration_secs));
+        self
+    }
+
+    pub fn add_system_metrics_threshold(mut self, threshold: SystemMetricsThreshold) -> Self {
+        self.system_metrics_threshold = Some(threshold);
+        self
+    }
+
+    pub fn add_chain_progress(mut self, threshold: StateProgressThreshold) -> Self {
+        self.chain_progress_check = Some(threshold);
+        self
+    }
+
+    pub fn add_latency_threshold(mut self, threshold_s: f32, latency_type: LatencyType) -> Self {
+        self.latency_thresholds
+            .push((Duration::from_secs_f32(threshold_s), latency_type));
+        self
+    }
+}
+
+pub struct SuccessCriteriaChecker {}
+
+impl SuccessCriteriaChecker {
     pub async fn check_for_success(
-        &self,
-        stats: &TxnStats,
-        window: &Duration,
+        success_criteria: &SuccessCriteria,
         swarm: &mut dyn Swarm,
+        stats: &TxnStats,
+        window: Duration,
         start_time: i64,
         end_time: i64,
         start_version: u64,
         end_version: u64,
     ) -> anyhow::Result<()> {
+        println!(
+            "End to end duration: {}s, while txn emitter lasted: {}s",
+            window.as_secs(),
+            stats.lasted.as_secs()
+        );
+        let stats_rate = stats.rate();
         // TODO: Add more success criteria like expired transactions, CPU, memory usage etc
-        let avg_tps = stats.committed / window.as_secs();
-        if avg_tps < self.avg_tps as u64 {
+        let avg_tps = stats_rate.committed;
+        if avg_tps < success_criteria.avg_tps as u64 {
             bail!(
                 "TPS requirement failed. Average TPS {}, minimum TPS requirement {}",
                 avg_tps,
-                self.avg_tps,
+                success_criteria.avg_tps,
             )
         }
 
-        if let Some(timeout) = self.wait_for_all_nodes_to_catchup {
+        Self::check_latency(&success_criteria.latency_thresholds, &stats_rate)?;
+
+        if let Some(timeout) = success_criteria.wait_for_all_nodes_to_catchup {
             swarm
                 .wait_for_all_nodes_to_catchup_to_next(timeout)
                 .await
                 .context("Failed waiting for all nodes to catchup to next version")?;
         }
 
-        if self.check_no_restarts {
+        if success_criteria.check_no_restarts {
             swarm
                 .ensure_no_validator_restart()
                 .await
@@ -85,21 +121,17 @@ impl SuccessCriteria {
                 .context("Failed ensuring no fullnode restarted")?;
         }
 
-        // TODO(skedia) Add latency success criteria after we have support for querying prometheus
-        // latency
+        // TODO(skedia) Add end-to-end latency from counters after we have support for querying prometheus
+        // latency (in addition to checking latency from txn-emitter)
 
-        if let Some(system_metrics_threshold) = self.system_metrics_threshold.clone() {
+        if let Some(system_metrics_threshold) = success_criteria.system_metrics_threshold.clone() {
             swarm
-                .ensure_healthy_system_metrics(
-                    start_time as i64,
-                    end_time as i64,
-                    system_metrics_threshold,
-                )
+                .ensure_healthy_system_metrics(start_time, end_time, system_metrics_threshold)
                 .await?;
         }
 
-        if let Some(chain_progress_threshold) = &self.chain_progress_check {
-            self.check_chain_progress(swarm, chain_progress_threshold, start_version, end_version)
+        if let Some(chain_progress_threshold) = &success_criteria.chain_progress_check {
+            Self::check_chain_progress(swarm, chain_progress_threshold, start_version, end_version)
                 .await
                 .context("Failed check chain progress")?;
         }
@@ -108,7 +140,6 @@ impl SuccessCriteria {
     }
 
     async fn check_chain_progress(
-        &self,
         swarm: &mut dyn Swarm,
         chain_progress_threshold: &StateProgressThreshold,
         start_version: u64,
@@ -144,7 +175,7 @@ impl SuccessCriteria {
             let current_gap = if previous_epooch == block.event.epoch() {
                 block.event.round() - previous_round - 1
             } else {
-                (if is_nil { 0 } else { 1 }) + block.event.failed_proposer_indices().len() as u64
+                u64::from(!is_nil) + block.event.failed_proposer_indices().len() as u64
             };
 
             if is_nil {
@@ -182,7 +213,7 @@ impl SuccessCriteria {
 
         let max_time_gap_secs = Duration::from_micros(max_time_gap).as_secs_f32();
         if max_round_gap > chain_progress_threshold.max_round_gap
-            || max_time_gap_secs > chain_progress_threshold.max_no_progress_secs as f32
+            || max_time_gap_secs > chain_progress_threshold.max_no_progress_secs
         {
             bail!(
                 "Failed chain progress check. Max round gap was {} [limit {}] at version {}. Max no progress secs was {} [limit {}] at version {}.",
@@ -206,5 +237,37 @@ impl SuccessCriteria {
         }
 
         Ok(())
+    }
+
+    pub fn check_latency(
+        latency_thresholds: &[(Duration, LatencyType)],
+        stats_rate: &TxnStatsRate,
+    ) -> anyhow::Result<()> {
+        let mut failures = Vec::new();
+        for (latency_threshold, latency_type) in latency_thresholds {
+            let latency = Duration::from_millis(match latency_type {
+                LatencyType::Average => stats_rate.latency,
+                LatencyType::P50 => stats_rate.p50_latency,
+                LatencyType::P90 => stats_rate.p90_latency,
+                LatencyType::P99 => stats_rate.p99_latency,
+            });
+
+            if latency > *latency_threshold {
+                failures.push(
+                    format!(
+                        "{:?} latency is {}s and exceeds limit of {}s",
+                        latency_type,
+                        latency.as_secs_f32(),
+                        latency_threshold.as_secs_f32()
+                    )
+                    .to_string(),
+                );
+            }
+        }
+        if !failures.is_empty() {
+            bail!("Failed latency check, for {:?}", failures);
+        } else {
+            Ok(())
+        }
     }
 }

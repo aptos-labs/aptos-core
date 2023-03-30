@@ -1,17 +1,19 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::accept_type::AcceptType;
-use crate::context::Context;
-use crate::response::InternalError;
-use crate::response::ServiceUnavailableError;
-use crate::{generate_error_response, generate_success_response, ApiTags};
+use crate::{
+    accept_type::AcceptType,
+    context::Context,
+    generate_error_response, generate_success_response,
+    response::{InternalError, ServiceUnavailableError},
+    ApiTags,
+};
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::AptosErrorCode;
 use poem_openapi::{param::Query, payload::Html, Object, OpenApi};
 use serde::{Deserialize, Serialize};
-use std::ops::Sub;
 use std::{
+    ops::Sub,
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };

@@ -152,7 +152,7 @@ module message_board::MessageBoardTests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 1)]
+    #[expected_failure(abort_code = 1, location = message_board::acl_based_mb)]
     public entry fun test_add_new_participant() {
         let (alice, bob) = create_two_signers();
         acl_based_mb::message_board_init(&alice);

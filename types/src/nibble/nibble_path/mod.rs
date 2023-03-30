@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! NibblePath library simplify operations with nibbles in a compact format for modified sparse
@@ -53,10 +54,11 @@ impl FromIterator<Nibble> for NibblePath {
 #[cfg(any(test, feature = "fuzzing"))]
 impl Arbitrary for NibblePath {
     type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
         arb_nibble_path().boxed()
     }
-    type Strategy = BoxedStrategy<Self>;
 }
 
 #[cfg(any(test, feature = "fuzzing"))]
@@ -99,7 +101,7 @@ impl NibblePath {
     pub fn new_odd(bytes: Vec<u8>) -> Self {
         assert!(bytes.len() <= ROOT_NIBBLE_HEIGHT / 2);
         assert_eq!(
-            bytes.last().expect("Should have odd number of nibbles.") & 0x0f,
+            bytes.last().expect("Should have odd number of nibbles.") & 0x0F,
             0,
             "Last nibble must be 0."
         );
@@ -143,8 +145,8 @@ impl NibblePath {
     pub fn pop(&mut self) -> Option<Nibble> {
         let poped_nibble = if self.num_nibbles % 2 == 0 {
             self.bytes.last_mut().map(|last_byte| {
-                let nibble = *last_byte & 0x0f;
-                *last_byte &= 0xf0;
+                let nibble = *last_byte & 0x0F;
+                *last_byte &= 0xF0;
                 Nibble::from(nibble)
             })
         } else {
@@ -160,7 +162,7 @@ impl NibblePath {
     pub fn last(&self) -> Option<Nibble> {
         let last_byte_option = self.bytes.last();
         if self.num_nibbles % 2 == 0 {
-            last_byte_option.map(|last_byte| Nibble::from(*last_byte & 0x0f))
+            last_byte_option.map(|last_byte| Nibble::from(*last_byte & 0x0F))
         } else {
             let last_byte = last_byte_option.expect("Last byte must exist if num_nibbles is odd.");
             Some(Nibble::from(*last_byte >> 4))
@@ -178,7 +180,7 @@ impl NibblePath {
     /// Get the i-th nibble.
     pub fn get_nibble(&self, i: usize) -> Nibble {
         assert!(i < self.num_nibbles);
-        Nibble::from((self.bytes[i / 2] >> (if i % 2 == 1 { 0 } else { 4 })) & 0xf)
+        Nibble::from((self.bytes[i / 2] >> (if i % 2 == 1 { 0 } else { 4 })) & 0xF)
     }
 
     /// Get a bit iterator iterates over the whole nibble path.
@@ -214,7 +216,7 @@ impl NibblePath {
         self.num_nibbles = len;
         self.bytes.truncate((len + 1) / 2);
         if len % 2 != 0 {
-            *self.bytes.last_mut().expect("must exist.") &= 0xf0;
+            *self.bytes.last_mut().expect("must exist.") &= 0xF0;
         }
     }
 }
@@ -244,6 +246,7 @@ impl<'a> Peekable for BitIterator<'a> {
 /// BitIterator spits out a boolean each time. True/false denotes 1/0.
 impl<'a> Iterator for BitIterator<'a> {
     type Item = bool;
+
     fn next(&mut self) -> Option<Self::Item> {
         self.pos.next().map(|i| self.nibble_path.get_bit(i))
     }
@@ -278,6 +281,7 @@ pub struct NibbleIterator<'a> {
 /// NibbleIterator spits out a byte each time. Each byte must be in range [0, 16).
 impl<'a> Iterator for NibbleIterator<'a> {
     type Item = Nibble;
+
     fn next(&mut self) -> Option<Self::Item> {
         self.pos.next().map(|i| self.nibble_path.get_nibble(i))
     }

@@ -1,11 +1,9 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 // This is required because a diesel macro makes clippy sad
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
-
-use std::collections::HashMap;
 
 use crate::{
     schema::current_ans_lookup,
@@ -15,6 +13,7 @@ use aptos_api_types::{deserialize_from_string, MoveType, Transaction as APITrans
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 type Domain = String;
 type Subdomain = String;
@@ -96,11 +95,11 @@ impl CurrentAnsLookup {
                         "domains::SetNameAddressEventV1" => {
                             serde_json::from_value(event.data.clone())
                                 .map(|inner| Some(ANSEvent::SetNameAddressEventV1(inner)))
-                        }
+                        },
                         "domains::RegisterNameEventV1" => {
                             serde_json::from_value(event.data.clone())
                                 .map(|inner| Some(ANSEvent::RegisterNameEventV1(inner)))
-                        }
+                        },
                         _ => Ok(None),
                     }
                     .unwrap_or_else(|e| {
@@ -133,7 +132,7 @@ impl CurrentAnsLookup {
                                     expiration_timestamp,
                                     token_name,
                                 }
-                            }
+                            },
                             ANSEvent::RegisterNameEventV1(inner) => {
                                 let expiration_timestamp = parse_timestamp_secs(
                                     bigdecimal_to_u64(&inner.expiration_time_secs),
@@ -153,7 +152,7 @@ impl CurrentAnsLookup {
                                     expiration_timestamp,
                                     token_name,
                                 }
-                            }
+                            },
                         };
 
                         current_ans_lookups.insert(

@@ -16,6 +16,7 @@ struct itself, while the operations are implemented as native functions. No trav
 -  [Function `new`](#0x1_table_new)
 -  [Function `add`](#0x1_table_add)
 -  [Function `borrow`](#0x1_table_borrow)
+-  [Function `borrow_with_default`](#0x1_table_borrow_with_default)
 -  [Function `borrow_mut`](#0x1_table_borrow_mut)
 -  [Function `borrow_mut_with_default`](#0x1_table_borrow_mut_with_default)
 -  [Function `upsert`](#0x1_table_upsert)
@@ -36,6 +37,7 @@ struct itself, while the operations are implemented as native functions. No trav
     -  [Function `add`](#@Specification_0_add)
     -  [Function `borrow`](#@Specification_0_borrow)
     -  [Function `borrow_mut`](#@Specification_0_borrow_mut)
+    -  [Function `borrow_mut_with_default`](#@Specification_0_borrow_mut_with_default)
     -  [Function `upsert`](#@Specification_0_upsert)
     -  [Function `remove`](#@Specification_0_remove)
     -  [Function `contains`](#@Specification_0_contains)
@@ -175,6 +177,36 @@ Aborts if there is no entry for <code>key</code>.
 
 <pre><code><b>public</b> <b>fun</b> <a href="table.md#0x1_table_borrow">borrow</a>&lt;K: <b>copy</b> + drop, V&gt;(<a href="table.md#0x1_table">table</a>: &<a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, key: K): &V {
     &<a href="table.md#0x1_table_borrow_box">borrow_box</a>&lt;K, V, <a href="table.md#0x1_table_Box">Box</a>&lt;V&gt;&gt;(<a href="table.md#0x1_table">table</a>, key).val
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_table_borrow_with_default"></a>
+
+## Function `borrow_with_default`
+
+Acquire an immutable reference to the value which <code>key</code> maps to.
+Returns specified default value if there is no entry for <code>key</code>.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="table.md#0x1_table_borrow_with_default">borrow_with_default</a>&lt;K: <b>copy</b>, drop, V&gt;(<a href="table.md#0x1_table">table</a>: &<a href="table.md#0x1_table_Table">table::Table</a>&lt;K, V&gt;, key: K, default: &V): &V
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="table.md#0x1_table_borrow_with_default">borrow_with_default</a>&lt;K: <b>copy</b> + drop, V&gt;(<a href="table.md#0x1_table">table</a>: &<a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, key: K, default: &V): &V {
+    <b>if</b> (!<a href="table.md#0x1_table_contains">contains</a>(<a href="table.md#0x1_table">table</a>, <b>copy</b> key)) {
+        default
+    } <b>else</b> {
+        <a href="table.md#0x1_table_borrow">borrow</a>(<a href="table.md#0x1_table">table</a>, <b>copy</b> key)
+    }
 }
 </code></pre>
 
@@ -556,6 +588,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
     map_del_must_exist = remove,
     map_borrow = borrow,
     map_borrow_mut = borrow_mut,
+    map_borrow_mut_with_default = borrow_mut_with_default,
     map_spec_get = spec_get,
     map_spec_set = spec_set,
     map_spec_del = spec_remove,
@@ -618,6 +651,22 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="table.md#0x1_table_borrow_mut">borrow_mut</a>&lt;K: <b>copy</b>, drop, V&gt;(<a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="table.md#0x1_table_Table">table::Table</a>&lt;K, V&gt;, key: K): &<b>mut</b> V
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic;
+</code></pre>
+
+
+
+<a name="@Specification_0_borrow_mut_with_default"></a>
+
+### Function `borrow_mut_with_default`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="table.md#0x1_table_borrow_mut_with_default">borrow_mut_with_default</a>&lt;K: <b>copy</b>, drop, V: drop&gt;(<a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="table.md#0x1_table_Table">table::Table</a>&lt;K, V&gt;, key: K, default: V): &<b>mut</b> V
 </code></pre>
 
 
@@ -727,4 +776,4 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

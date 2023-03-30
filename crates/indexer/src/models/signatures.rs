@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 #![allow(clippy::extra_unused_lifetimes)]
 
@@ -58,7 +58,7 @@ impl Signature {
                     0,
                     None,
                 )])
-            }
+            },
             APITransactionSignature::MultiEd25519Signature(sig) => Ok(Self::parse_multi_signature(
                 sig,
                 sender,
@@ -82,10 +82,10 @@ impl Signature {
             APITransactionSignature::Ed25519Signature(_) => String::from("ed25519_signature"),
             APITransactionSignature::MultiEd25519Signature(_) => {
                 String::from("multi_ed25519_signature")
-            }
+            },
             APITransactionSignature::MultiAgentSignature(_) => {
                 String::from("multi_agent_signature")
-            }
+            },
         }
     }
 
@@ -130,7 +130,7 @@ impl Signature {
         for (index, signature) in s.signatures.iter().enumerate() {
             let public_key = s
                 .public_keys
-                .get(public_key_indices.clone()[index] as usize)
+                .get(public_key_indices.clone()[index])
                 .unwrap()
                 .clone();
             signatures.push(Self {

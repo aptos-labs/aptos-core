@@ -1,8 +1,8 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use std::sync::RwLock as StdRwLock;
-
 pub use std::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 /// A simple wrapper around the lock() function of a std::sync::RwLock

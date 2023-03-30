@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics::{
@@ -62,7 +62,7 @@ pub fn compress(
                 "Failed to compress the data: {}",
                 error
             )));
-        }
+        },
     };
 
     // Ensure that the compressed data size is not greater than the max bytes limit. This can
@@ -112,7 +112,7 @@ pub fn decompress(
                 "Failed to get decompressed size: {}",
                 error
             )));
-        }
+        },
     };
     let mut raw_data = vec![0u8; size];
 

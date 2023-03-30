@@ -1,22 +1,21 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics::{PRUNER_BATCH_SIZE, PRUNER_WINDOW};
-
+use crate::{
+    metrics::{PRUNER_BATCH_SIZE, PRUNER_WINDOW},
+    pruner::{
+        db_pruner::DBPruner, ledger_pruner_worker::LedgerPrunerWorker,
+        ledger_store::ledger_store_pruner::LedgerPruner, pruner_manager::PrunerManager,
+    },
+    pruner_utils,
+};
 use aptos_config::config::LedgerPrunerConfig;
 use aptos_infallible::Mutex;
-
-use crate::pruner::db_pruner::DBPruner;
-use crate::pruner::ledger_pruner_worker::LedgerPrunerWorker;
-use crate::pruner::ledger_store::ledger_store_pruner::LedgerPruner;
-use crate::pruner::pruner_manager::PrunerManager;
-use crate::{pruner_utils, StateStore};
+use aptos_schemadb::DB;
 use aptos_types::transaction::Version;
-use schemadb::DB;
 use std::{sync::Arc, thread::JoinHandle};
 
 /// The `PrunerManager` for `LedgerPruner`.
-#[derive(Debug)]
 pub(crate) struct LedgerPrunerManager {
     pruner_enabled: bool,
     /// DB version window, which dictates how many version of other stores like transaction, ledger
@@ -100,12 +99,8 @@ impl PrunerManager for LedgerPrunerManager {
 
 impl LedgerPrunerManager {
     /// Creates a worker thread that waits on a channel for pruning commands.
-    pub fn new(
-        ledger_rocksdb: Arc<DB>,
-        state_store: Arc<StateStore>,
-        ledger_pruner_config: LedgerPrunerConfig,
-    ) -> Self {
-        let ledger_pruner = pruner_utils::create_ledger_pruner(ledger_rocksdb, state_store);
+    pub fn new(ledger_rocksdb: Arc<DB>, ledger_pruner_config: LedgerPrunerConfig) -> Self {
+        let ledger_pruner = pruner_utils::create_ledger_pruner(ledger_rocksdb);
 
         if ledger_pruner_config.enable {
             PRUNER_WINDOW

@@ -1,7 +1,7 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use framework::natives::code::UpgradePolicy;
+use aptos_framework::natives::code::UpgradePolicy;
 use itertools::Itertools;
 use move_command_line_common::files::MOVE_EXTENSION;
 use move_package::compilation::package_layout::CompiledPackageLayout;

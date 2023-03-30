@@ -1,15 +1,15 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module defines representation of AptosDB indexer data structures at physical level via schemas
-//! that implement [`schemadb::schema::Schema`].
+//! that implement [`aptos_schemadb::schema::Schema`].
 //!
 //! All schemas are `pub(crate)` so not shown in rustdoc, refer to the source code to see details.
 
 pub(crate) mod indexer_metadata;
 pub(crate) mod table_info;
 
-use schemadb::ColumnFamilyName;
+use aptos_schemadb::ColumnFamilyName;
 
 pub const DEFAULT_COLUMN_FAMILY_NAME: ColumnFamilyName = "default";
 pub const INDEXER_METADATA_CF_NAME: ColumnFamilyName = "indexer_metadata";

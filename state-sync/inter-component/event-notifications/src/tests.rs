@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -7,7 +8,10 @@ use crate::{
     Error, EventNotificationListener, EventNotificationSender, EventSubscriptionService,
     ReconfigNotificationListener,
 };
+use aptos_db::AptosDB;
+use aptos_executor_test_helpers::bootstrap_genesis;
 use aptos_infallible::RwLock;
+use aptos_storage_interface::DbReaderWriter;
 use aptos_types::{
     account_address::AccountAddress,
     contract_event::ContractEvent,
@@ -17,14 +21,11 @@ use aptos_types::{
     transaction::{Transaction, Version, WriteSetPayload},
 };
 use aptos_vm::AptosVM;
-use aptosdb::AptosDB;
 use claims::{assert_lt, assert_matches, assert_ok};
-use executor_test_helpers::bootstrap_genesis;
 use futures::{FutureExt, StreamExt};
 use move_core_types::language_storage::TypeTag;
 use serde::{Deserialize, Serialize};
 use std::{convert::TryInto, sync::Arc};
-use storage_interface::DbReaderWriter;
 
 #[test]
 fn test_all_configs_returned() {
@@ -125,17 +126,15 @@ fn test_dynamic_subscribers() {
 
     // Notify the service of several events
     let reconfig_event = create_test_event(reconfig_event_key);
-    notify_events(
-        &mut event_service,
-        0,
-        vec![event_1.clone(), reconfig_event.clone()],
-    );
+    notify_events(&mut event_service, 0, vec![
+        event_1.clone(),
+        reconfig_event.clone(),
+    ]);
     verify_event_notification_received(vec![&mut event_listener_1], 0, vec![event_1.clone()]);
-    verify_event_notification_received(
-        vec![&mut event_listener_2],
-        0,
-        vec![event_1, reconfig_event.clone()],
-    );
+    verify_event_notification_received(vec![&mut event_listener_2], 0, vec![
+        event_1,
+        reconfig_event.clone(),
+    ]);
     verify_reconfig_notifications_received(vec![&mut reconfig_listener_1], 0, 1);
 
     // Add another reconfiguration subscriber
@@ -208,22 +207,21 @@ fn test_event_and_reconfig_subscribers() {
     // Notify the service of a reconfiguration and two other events, and verify notifications
     let event_1 = create_test_event(event_key_1);
     let event_2 = create_test_event(event_key_2);
-    notify_events(
-        &mut event_service,
-        0,
-        vec![event_1.clone(), event_2.clone(), reconfig_event.clone()],
-    );
+    notify_events(&mut event_service, 0, vec![
+        event_1.clone(),
+        event_2.clone(),
+        reconfig_event.clone(),
+    ]);
     verify_reconfig_notifications_received(
         vec![&mut reconfig_listener_1, &mut reconfig_listener_2],
         0,
         1,
     );
     verify_event_notification_received(vec![&mut event_listener_1], 0, vec![event_1.clone()]);
-    verify_event_notification_received(
-        vec![&mut event_listener_2],
-        0,
-        vec![event_1.clone(), event_2],
-    );
+    verify_event_notification_received(vec![&mut event_listener_2], 0, vec![
+        event_1.clone(),
+        event_2,
+    ]);
     verify_event_notification_received(vec![&mut event_listener_3], 0, vec![reconfig_event]);
 
     // Notify the subscription service of one event only (no reconfigurations)
@@ -271,11 +269,10 @@ fn test_event_notification_queuing() {
     let num_events = 50;
     let event_2 = create_test_event(event_key_1);
     for version in 0..num_events {
-        notify_events(
-            &mut event_service,
-            version,
-            vec![event_2.clone(), event_1.clone()],
-        );
+        notify_events(&mut event_service, version, vec![
+            event_2.clone(),
+            event_1.clone(),
+        ]);
     }
 
     // Verify that 50 events were received (i.e., no message dropping occurred).
@@ -322,11 +319,9 @@ fn test_event_subscribers() {
     notify_events(&mut event_service, version, vec![event_1.clone()]);
 
     // Verify listener 1 and 2 receive the event notification
-    verify_event_notification_received(
-        vec![&mut listener_1, &mut listener_2],
-        version,
-        vec![event_1],
-    );
+    verify_event_notification_received(vec![&mut listener_1, &mut listener_2], version, vec![
+        event_1,
+    ]);
 
     // Verify listener 3 doesn't get the event. Also verify that listener 1 and 2 don't get more events.
     verify_no_event_notifications(vec![&mut listener_1, &mut listener_2, &mut listener_3]);
@@ -335,11 +330,10 @@ fn test_event_subscribers() {
     let version = 200;
     let event_2 = create_test_event(event_key_2);
     let event_3 = create_test_event(event_key_3);
-    notify_events(
-        &mut event_service,
-        version,
-        vec![event_2.clone(), event_3.clone()],
-    );
+    notify_events(&mut event_service, version, vec![
+        event_2.clone(),
+        event_3.clone(),
+    ]);
 
     // Verify listener 1 doesn't get any notifications
     verify_no_event_notifications(vec![&mut listener_1]);
@@ -363,11 +357,9 @@ fn test_no_events_no_subscribers() {
     notify_events(&mut event_service, 1, vec![]);
 
     // Verify no subscribers doesn't cause notification errors
-    notify_events(
-        &mut event_service,
-        1,
-        vec![create_test_event(create_random_event_key())],
-    );
+    notify_events(&mut event_service, 1, vec![create_test_event(
+        create_random_event_key(),
+    )]);
 
     // Attempt to subscribe to zero event keys
     assert_matches!(
@@ -544,7 +536,7 @@ fn create_event_subscription_service() -> EventSubscriptionService {
 
 fn create_database() -> Arc<RwLock<DbReaderWriter>> {
     // Generate a genesis change set
-    let (genesis, _) = vm_genesis::test_genesis_change_set_and_validators(Some(1));
+    let (genesis, _) = aptos_vm_genesis::test_genesis_change_set_and_validators(Some(1));
 
     // Create test aptos database
     let db_path = aptos_temppath::TempPath::new();

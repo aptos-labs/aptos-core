@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 // This is required because a diesel macro makes clippy sad
@@ -119,7 +119,7 @@ impl TokenOwnership {
                     table_handle_to_owner
                 );
                 (None, None, None)
-            }
+            },
         };
 
         Ok(Some((

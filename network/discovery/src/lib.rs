@@ -1,18 +1,22 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{counters::DISCOVERY_COUNTS, file::FileStream, validator_set::ValidatorSetStream};
+use crate::{
+    counters::DISCOVERY_COUNTS, file::FileStream, rest::RestStream,
+    validator_set::ValidatorSetStream,
+};
 use aptos_config::{config::PeerSet, network_id::NetworkContext};
 use aptos_crypto::x25519;
+use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_logger::prelude::*;
-use aptos_time_service::TimeService;
-use event_notifications::ReconfigNotificationListener;
-use futures::{Stream, StreamExt};
-use network::{
+use aptos_network::{
     connectivity_manager::{ConnectivityRequest, DiscoverySource},
     counters::inc_by_with_context,
     logging::NetworkSchema,
 };
+use aptos_time_service::TimeService;
+use futures::{Stream, StreamExt};
 use std::{
     path::Path,
     pin::Pin,
@@ -23,25 +27,28 @@ use tokio::runtime::Handle;
 
 mod counters;
 mod file;
+mod rest;
 mod validator_set;
 
 #[derive(Debug)]
 pub enum DiscoveryError {
     IO(std::io::Error),
     Parsing(String),
+    Rest(aptos_rest_client::error::RestError),
 }
 
 /// A union type for all implementations of `DiscoveryChangeListenerTrait`
 pub struct DiscoveryChangeListener {
     discovery_source: DiscoverySource,
     network_context: NetworkContext,
-    update_channel: channel::Sender<ConnectivityRequest>,
+    update_channel: aptos_channels::Sender<ConnectivityRequest>,
     source_stream: DiscoveryChangeStream,
 }
 
 enum DiscoveryChangeStream {
     ValidatorSet(ValidatorSetStream),
     File(FileStream),
+    Rest(RestStream),
 }
 
 impl Stream for DiscoveryChangeStream {
@@ -51,6 +58,7 @@ impl Stream for DiscoveryChangeStream {
         match self.get_mut() {
             Self::ValidatorSet(stream) => Pin::new(stream).poll_next(cx),
             Self::File(stream) => Pin::new(stream).poll_next(cx),
+            Self::Rest(stream) => Pin::new(stream).poll_next(cx),
         }
     }
 }
@@ -58,7 +66,7 @@ impl Stream for DiscoveryChangeStream {
 impl DiscoveryChangeListener {
     pub fn validator_set(
         network_context: NetworkContext,
-        update_channel: channel::Sender<ConnectivityRequest>,
+        update_channel: aptos_channels::Sender<ConnectivityRequest>,
         expected_pubkey: x25519::PublicKey,
         reconfig_events: ReconfigNotificationListener,
     ) -> Self {
@@ -77,7 +85,7 @@ impl DiscoveryChangeListener {
 
     pub fn file(
         network_context: NetworkContext,
-        update_channel: channel::Sender<ConnectivityRequest>,
+        update_channel: aptos_channels::Sender<ConnectivityRequest>,
         file_path: &Path,
         interval_duration: Duration,
         time_service: TimeService,
@@ -89,6 +97,27 @@ impl DiscoveryChangeListener {
         ));
         DiscoveryChangeListener {
             discovery_source: DiscoverySource::File,
+            network_context,
+            update_channel,
+            source_stream,
+        }
+    }
+
+    pub fn rest(
+        network_context: NetworkContext,
+        update_channel: aptos_channels::Sender<ConnectivityRequest>,
+        rest_url: url::Url,
+        interval_duration: Duration,
+        time_service: TimeService,
+    ) -> Self {
+        let source_stream = DiscoveryChangeStream::Rest(RestStream::new(
+            network_context,
+            rest_url,
+            interval_duration,
+            time_service,
+        ));
+        DiscoveryChangeListener {
+            discovery_source: DiscoverySource::Rest,
             network_context,
             update_channel,
             source_stream,

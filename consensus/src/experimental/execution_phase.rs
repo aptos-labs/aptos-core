@@ -1,12 +1,13 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{experimental::pipeline_phase::StatelessPipeline, state_replication::StateComputer};
 use anyhow::Result;
+use aptos_consensus_types::executed_block::ExecutedBlock;
 use aptos_crypto::HashValue;
+use aptos_executor_types::Error as ExecutionError;
 use async_trait::async_trait;
-use consensus_types::executed_block::ExecutedBlock;
-use executor_types::Error as ExecutionError;
 use std::{
     fmt::{Debug, Display, Formatter},
     sync::Arc,
@@ -53,6 +54,7 @@ impl ExecutionPhase {
 impl StatelessPipeline for ExecutionPhase {
     type Request = ExecutionRequest;
     type Response = ExecutionResponse;
+
     async fn process(&self, req: ExecutionRequest) -> ExecutionResponse {
         let ExecutionRequest { ordered_blocks } = req;
 
@@ -71,13 +73,13 @@ impl StatelessPipeline for ExecutionPhase {
             match self.execution_proxy.compute(b.block(), b.parent_id()).await {
                 Ok(compute_result) => {
                     result.push(ExecutedBlock::new(b.block().clone(), compute_result));
-                }
+                },
                 Err(e) => {
                     return ExecutionResponse {
                         block_id,
                         inner: Err(e),
                     }
-                }
+                },
             }
         }
 

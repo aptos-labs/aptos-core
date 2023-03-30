@@ -26,13 +26,55 @@ When `devnet` is wiped and updated with newer versions, you will need to update 
 
 7. Restart the fullnode.
 
-8. See the [Verify initial synchronization](/nodes/full-node/fullnode-source-code-or-docker#verify-initial-synchronization) section for checking if the fullnode is syncing again.
+8. See the [Verify initial synchronization](./fullnode-source-code-or-docker.md#verify-initial-synchronization) section for checking if the fullnode is syncing again.
 
 ## If you run a fullnode via Docker
 
 1. Shutdown your fullnode
 2. Delete the entire directory which holds your fullnode config and data directory.
-3. Rerun the instructions on [Approach #2: Using Docker](fullnode-source-code-or-docker.md#Approach-#2:-Using-Docker)
+3. Rerun the instructions on [Approach #2: Using Docker](./fullnode-source-code-or-docker.md#Approach-#2:-Using-Docker)
+
+## If you run a fullnode on GCP
+
+Aptos devnet releases can be of two types: 
+- One with a data wipe to start over the Aptos blockchain
+- Second type is only a software update without a data wipe
+
+### Upgrade with data wipe
+
+1. You can increase the `era` number in `main.tf` to trigger a new data volume creation, which will start the node on a new DB.
+
+2. Update `image_tag` in `main.tf`.
+
+3. Update Terraform module for fullnode, run this in the same directory of your `main.tf` file:
+
+  ```bash
+  terraform get -update
+  ```
+
+4. Apply Terraform changes:
+
+  ```bash
+  terraform apply
+  ```
+
+### Upgrade without data wipe
+
+1. Update `image_tag` in `main.tf`.
+
+2. Update Terraform module for fullnode, run this in the same directory of your `main.tf` file:
+
+  ```bash
+  terraform get -update
+  ```
+
+3. Apply Terraform changes:
+
+  ```bash
+  terraform apply
+  # if you didn't update the image tag, terraform will show nothing to change, in this case, force helm update
+  terraform apply -var force_helm_update=true
+  ```
 
 [rest_spec]: https://github.com/aptos-labs/aptos-core/tree/main/api
 [devnet_genesis]: https://devnet.aptoslabs.com/genesis.blob

@@ -1,14 +1,14 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     common::types::{CliError, CliTypedResult, PromptOptions},
+    config::GlobalConfig,
     CliResult,
 };
 use aptos_build_info::build_information;
 use aptos_logger::{debug, Level};
-use aptos_rest_client::aptos_api_types::HashValue;
-use aptos_rest_client::{Account, Client};
+use aptos_rest_client::{aptos_api_types::HashValue, Account, Client, State};
 use aptos_telemetry::service::telemetry_is_disabled;
 use aptos_types::{chain_id::ChainId, transaction::authenticator::AuthenticationKey};
 use itertools::Itertools;
@@ -154,10 +154,22 @@ pub fn check_if_file_exists(file: &Path, prompt_options: PromptOptions) -> CliTy
 }
 
 pub fn prompt_yes_with_override(prompt: &str, prompt_options: PromptOptions) -> CliTypedResult<()> {
-    if prompt_options.assume_no || (!prompt_options.assume_yes && !prompt_yes(prompt)) {
-        Err(CliError::AbortedError)
+    if prompt_options.assume_no {
+        return Err(CliError::AbortedError);
+    } else if prompt_options.assume_yes {
+        return Ok(());
+    }
+
+    let is_yes = if let Some(response) = GlobalConfig::load()?.get_default_prompt_response() {
+        response
     } else {
+        prompt_yes(prompt)
+    };
+
+    if is_yes {
         Ok(())
+    } else {
+        Err(CliError::AbortedError)
     }
 }
 
@@ -220,8 +232,19 @@ pub async fn get_account(
         .get_account(address)
         .await
         .map_err(|err| CliError::ApiError(err.to_string()))?;
-    let account = account_response.inner();
-    Ok(account.clone())
+    Ok(account_response.into_inner())
+}
+
+/// Retrieves account resource from the rest client
+pub async fn get_account_with_state(
+    client: &aptos_rest_client::Client,
+    address: AccountAddress,
+) -> CliTypedResult<(Account, State)> {
+    let account_response = client
+        .get_account(address)
+        .await
+        .map_err(|err| CliError::ApiError(err.to_string()))?;
+    Ok(account_response.into_parts())
 }
 
 /// Retrieves sequence number from the rest client
@@ -332,7 +355,9 @@ pub async fn fund_account(
         .body("{}")
         .send()
         .await
-        .map_err(|err| CliError::ApiError(err.to_string()))?;
+        .map_err(|err| {
+            CliError::ApiError(format!("Failed to fund account with faucet: {:#}", err))
+        })?;
     if response.status() == 200 {
         let hashes: Vec<HashValue> = response
             .json()
@@ -349,10 +374,6 @@ pub async fn fund_account(
 
 pub fn start_logger() {
     let mut logger = aptos_logger::Logger::new();
-    logger
-        .channel_size(1000)
-        .is_async(false)
-        .level(Level::Warn)
-        .read_env();
+    logger.channel_size(1000).is_async(false).level(Level::Warn);
     logger.build();
 }

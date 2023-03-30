@@ -1,7 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-
-use std::time::Instant;
 
 use aptos_metrics_core::{exponential_buckets, HistogramVec};
 use once_cell::sync::Lazy;
@@ -10,6 +8,7 @@ use prometheus::{
     histogram_opts,
     proto::MetricFamily,
 };
+use std::time::Instant;
 
 pub const NAMESPACE: &str = "node";
 

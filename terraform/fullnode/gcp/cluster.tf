@@ -67,16 +67,16 @@ resource "google_container_cluster" "aptos" {
   cluster_autoscaling {
     enabled = var.gke_enable_node_autoprovisioning
 
-    resource_limits {
-      resource_type = "cpu"
-      minimum       = 1
-      maximum       = var.gke_node_autoprovisioning_max_cpu
-    }
-
-    resource_limits {
-      resource_type = "memory"
-      minimum       = 1
-      maximum       = var.gke_node_autoprovisioning_max_memory
+    dynamic "resource_limits" {
+      for_each = var.gke_enable_node_autoprovisioning ? {
+        "cpu"    = var.gke_node_autoprovisioning_max_cpu
+        "memory" = var.gke_node_autoprovisioning_max_memory
+      } : {}
+      content {
+        resource_type = resource_limits.key
+        minimum       = 1
+        maximum       = resource_limits.value
+      }
     }
   }
 }
@@ -91,7 +91,7 @@ resource "google_container_node_pool" "fullnodes" {
   node_config {
     machine_type    = var.machine_type
     image_type      = "COS_CONTAINERD"
-    disk_size_gb    = 100
+    disk_size_gb    = var.instance_disk_size_gb
     service_account = google_service_account.gke.email
     tags            = ["fullnodes"]
 

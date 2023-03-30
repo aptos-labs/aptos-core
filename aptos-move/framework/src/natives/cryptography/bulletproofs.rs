@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
@@ -6,27 +8,27 @@ use crate::natives::cryptography::ristretto255::pop_scalar_from_bytes;
 use crate::natives::cryptography::ristretto255_point::{
     get_point_handle, NativeRistrettoPointContext,
 };
-use crate::natives::util::make_native_from_func;
 #[cfg(feature = "testing")]
-use crate::natives::util::make_test_only_native_from_func;
+use crate::natives::helpers::make_test_only_safe_native;
 use aptos_crypto::bulletproofs::MAX_RANGE_BITS;
 use bulletproofs::{BulletproofGens, PedersenGens};
 #[cfg(feature = "testing")]
 use byteorder::{ByteOrder, LittleEndian};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use merlin::Transcript;
-use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::{
     InternalGas, InternalGasPerArg, InternalGasPerByte, NumArgs, NumBytes,
 };
-use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
+use move_vm_runtime::native_functions::{NativeFunction};
 use move_vm_types::loaded_data::runtime_types::Type;
-use move_vm_types::natives::function::NativeResult;
-use move_vm_types::pop_arg;
 use move_vm_types::values::{StructRef, Value};
 use once_cell::sync::Lazy;
-use smallvec::smallvec;
+use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
+use std::sync::Arc;
+use aptos_types::on_chain_config::{Features, TimedFeatures};
+use crate::natives::helpers::{make_safe_native, SafeNativeContext, SafeNativeError, SafeNativeResult};
+use crate::safely_pop_arg;
 
 pub mod abort_codes {
     /// Abort code when deserialization fails (leading 0x01 == INVALID_ARGUMENT)
@@ -57,67 +59,69 @@ static BULLETPROOF_GENERATORS: Lazy<BulletproofGens> =
 
 fn native_verify_range_proof_custom_ck(
     gas_params: &GasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(_ty_args.is_empty());
     debug_assert!(args.len() == 6);
 
-    let point_context = context.extensions().get::<NativeRistrettoPointContext>();
-    let point_data = point_context.point_data.borrow_mut();
-
-    let dst = pop_arg!(args, Vec<u8>);
-    let num_bits = pop_arg!(args, u64) as usize;
-
-    if !is_supported_number_of_bits(num_bits) {
-        return Ok(NativeResult::err(
-            gas_params.base,
-            abort_codes::NFE_RANGE_NOT_SUPPORTED,
-        ));
-    }
-
-    let proof_bytes = pop_arg!(args, Vec<u8>);
-    let rand_base_handle = get_point_handle(&pop_arg!(args, StructRef))?;
-    let val_base_handle = get_point_handle(&pop_arg!(args, StructRef))?;
-    let comm_bytes = pop_arg!(args, Vec<u8>);
+    let dst = safely_pop_arg!(args, Vec<u8>);
+    let num_bits = safely_pop_arg!(args, u64) as usize;
+    let proof_bytes = safely_pop_arg!(args, Vec<u8>);
+    let rand_base_handle = get_point_handle(&safely_pop_arg!(args, StructRef))?;
+    let val_base_handle = get_point_handle(&safely_pop_arg!(args, StructRef))?;
+    let comm_bytes = safely_pop_arg!(args, Vec<u8>);
 
     let comm_point = CompressedRistretto::from_slice(comm_bytes.as_slice());
-    let rand_base = point_data.get_point(&rand_base_handle);
-    let val_base = point_data.get_point(&val_base_handle);
 
-    let pg = PedersenGens {
-        B: *val_base,
-        B_blinding: *rand_base,
+    if !is_supported_number_of_bits(num_bits) {
+        return Err(SafeNativeError::Abort {
+            abort_code: abort_codes::NFE_RANGE_NOT_SUPPORTED,
+        });
+    }
+
+    let pg = {
+        let point_context = context.extensions().get::<NativeRistrettoPointContext>();
+        let point_data = point_context.point_data.borrow_mut();
+
+        let rand_base = point_data.get_point(&rand_base_handle);
+        let val_base = point_data.get_point(&val_base_handle);
+
+        // TODO(Perf): Is there a way to avoid this unnecessary cloning here?
+        PedersenGens {
+            B: *val_base,
+            B_blinding: *rand_base,
+        }
     };
 
-    gas_params.verify_range_proof(&comm_point, &pg, &proof_bytes[..], num_bits, dst)
+    gas_params.verify_range_proof(context, &comm_point, &pg, &proof_bytes[..], num_bits, dst)
 }
 
 fn native_verify_range_proof(
     gas_params: &GasParameters,
-    _context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(_ty_args.is_empty());
     debug_assert!(args.len() == 4);
 
-    let dst = pop_arg!(args, Vec<u8>);
-    let num_bits = pop_arg!(args, u64) as usize;
+    let dst = safely_pop_arg!(args, Vec<u8>);
+    let num_bits = safely_pop_arg!(args, u64) as usize;
 
     if !is_supported_number_of_bits(num_bits) {
-        return Ok(NativeResult::err(
-            gas_params.base,
-            abort_codes::NFE_RANGE_NOT_SUPPORTED,
-        ));
+        return Err(SafeNativeError::Abort {
+            abort_code: abort_codes::NFE_RANGE_NOT_SUPPORTED,
+        });
     }
 
-    let proof_bytes = pop_arg!(args, Vec<u8>);
-    let comm_bytes = pop_arg!(args, Vec<u8>);
+    let proof_bytes = safely_pop_arg!(args, Vec<u8>);
+    let comm_bytes = safely_pop_arg!(args, Vec<u8>);
     let comm_point = CompressedRistretto::from_slice(comm_bytes.as_slice());
 
     gas_params.verify_range_proof(
+        context,
         &comm_point,
         &PEDERSEN_GENERATORS,
         &proof_bytes[..],
@@ -129,33 +133,29 @@ fn native_verify_range_proof(
 #[cfg(feature = "testing")]
 /// This is a test-only native that charges zero gas. It is only exported in testing mode.
 fn native_test_only_prove_range(
-    _context: &mut NativeContext,
+    _context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(_ty_args.is_empty());
     debug_assert!(args.len() == 4);
 
-    let no_cost = InternalGas::zero();
-
-    let dst = pop_arg!(args, Vec<u8>);
-    let num_bits = pop_arg!(args, u64) as usize;
+    let dst = safely_pop_arg!(args, Vec<u8>);
+    let num_bits = safely_pop_arg!(args, u64) as usize;
     let v_blinding = pop_scalar_from_bytes(&mut args)?;
     let v = pop_scalar_from_bytes(&mut args)?;
 
     if !is_supported_number_of_bits(num_bits) {
-        return Ok(NativeResult::err(
-            no_cost,
-            abort_codes::NFE_RANGE_NOT_SUPPORTED,
-        ));
+        return Err(SafeNativeError::Abort {
+            abort_code: abort_codes::NFE_RANGE_NOT_SUPPORTED,
+        });
     }
 
     // Make sure only the first 64 bits are set.
     if !v.as_bytes()[8..].iter().all(|&byte| byte == 0u8) {
-        return Ok(NativeResult::err(
-            no_cost,
-            abort_codes::NFE_VALUE_OUTSIDE_RANGE,
-        ));
+        return Err(SafeNativeError::Abort {
+            abort_code: abort_codes::NFE_VALUE_OUTSIDE_RANGE,
+        });
     }
 
     // Convert Scalar to u64.
@@ -174,13 +174,8 @@ fn native_test_only_prove_range(
     )
     .expect("Bulletproofs prover failed unexpectedly");
 
-    Ok(NativeResult::ok(
-        no_cost,
-        smallvec![
-            Value::vector_u8(proof.to_bytes()),
-            Value::vector_u8(commitment.as_bytes().to_vec())
-        ],
-    ))
+    Ok(smallvec![Value::vector_u8(proof.to_bytes()),
+            Value::vector_u8(commitment.as_bytes().to_vec())])
 }
 
 /***************************************************************************************************
@@ -199,28 +194,28 @@ impl GasParameters {
     /// commitment with `pc_gens` as its commitment key.
     fn verify_range_proof(
         &self,
+        context: &mut SafeNativeContext,
         comm_point: &CompressedRistretto,
         pc_gens: &PedersenGens,
         proof_bytes: &[u8],
         bit_length: usize,
         dst: Vec<u8>,
-    ) -> PartialVMResult<NativeResult> {
-        let mut cost = self.base
-            + self.per_byte_rangeproof_deserialize * NumBytes::new(proof_bytes.len() as u64);
+    ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+        context.charge(self.base)?;
+        context.charge(self.per_byte_rangeproof_deserialize * NumBytes::new(proof_bytes.len() as u64))?;
 
         let range_proof = match bulletproofs::RangeProof::from_bytes(proof_bytes) {
             Ok(proof) => proof,
             Err(_) => {
-                return Ok(NativeResult::err(
-                    cost,
-                    abort_codes::NFE_DESERIALIZE_RANGE_PROOF,
-                ))
+                return Err(SafeNativeError::Abort {
+                    abort_code: abort_codes::NFE_DESERIALIZE_RANGE_PROOF,
+                })
             }
         };
 
         // The (Bullet)proof size is $\log_2(num_bits)$ and its verification time is $O(num_bits)$
         // TODO: But an MSM is used so we should account for that
-        cost += self.per_bit_rangeproof_verify * NumArgs::new(bit_length as u64);
+        context.charge(self.per_bit_rangeproof_verify * NumArgs::new(bit_length as u64))?;
 
         let mut ver_trans = Transcript::new(dst.as_slice());
 
@@ -234,29 +229,29 @@ impl GasParameters {
             )
             .is_ok();
 
-        Ok(NativeResult::ok(cost, smallvec![Value::bool(success)]))
+        Ok(smallvec![Value::bool(success)])
     }
 }
 
-pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {
+pub fn make_all(gas_params: GasParameters, timed_features: TimedFeatures, features: Arc<Features>) -> impl Iterator<Item = (String, NativeFunction)> {
     let mut natives = vec![];
-
-    natives.append(&mut vec![
-        (
-            "verify_range_proof_custom_ck_internal",
-            make_native_from_func(gas_params.clone(), native_verify_range_proof_custom_ck),
-        ),
-        (
-            "verify_range_proof_internal",
-            make_native_from_func(gas_params, native_verify_range_proof),
-        ),
-    ]);
 
     #[cfg(feature = "testing")]
     natives.append(&mut vec![(
         "prove_range_internal",
-        make_test_only_native_from_func(native_test_only_prove_range),
+        make_test_only_safe_native(timed_features.clone(), features.clone(), native_test_only_prove_range),
     )]);
+
+    natives.append(&mut vec![
+        (
+            "verify_range_proof_custom_ck_internal",
+            make_safe_native(gas_params.clone(), timed_features.clone(), features.clone(), native_verify_range_proof_custom_ck),
+        ),
+        (
+            "verify_range_proof_internal",
+            make_safe_native(gas_params, timed_features, features, native_verify_range_proof),
+        ),
+    ]);
 
     crate::natives::helpers::make_module_natives(natives)
 }

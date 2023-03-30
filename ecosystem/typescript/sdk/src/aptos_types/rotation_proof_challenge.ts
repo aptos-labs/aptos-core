@@ -1,8 +1,8 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-import { Serializer } from "../bcs";
 import { AccountAddress } from "./account_address";
+import { Serializer } from "../bcs";
 
 export class RotationProofChallenge {
   constructor(

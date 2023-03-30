@@ -10,7 +10,7 @@ variable "num_azs" {
 
 variable "kubernetes_version" {
   description = "Version of Kubernetes to use for EKS cluster"
-  default     = "1.22"
+  default     = "1.24"
 }
 
 variable "k8s_api_sources" {
@@ -264,4 +264,9 @@ variable "fullnode_storage_class" {
     condition     = contains(["gp3", "io1", "io2"], var.fullnode_storage_class)
     error_message = "Supported storage classes are gp3, io1, io2"
   }
+}
+
+variable "manage_via_tf" {
+  description = "Whether to manage the aptos-node k8s workload via Terraform. If set to false, the helm_release resource will still be created and updated when values change, but it may not be updated on every apply"
+  default     = true
 }

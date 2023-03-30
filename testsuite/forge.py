@@ -4,23 +4,21 @@ import asyncio
 import difflib
 import json
 import os
-from pprint import pprint
-import pwd
 import random
 import re
 import resource
 import sys
 import textwrap
-import time
 from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import Enum
 from typing import (
     Any,
     Callable,
-    Dict,
+    Iterator,
+    Mapping,
     Generator,
     List,
     Optional,
@@ -37,6 +35,19 @@ from forge_wrapper_core.process import Processes, SystemProcesses
 
 from forge_wrapper_core.shell import LocalShell, Shell
 from forge_wrapper_core.time import SystemTime, Time
+from forge_wrapper_core.cluster import Cloud, ForgeCluster, ForgeJob
+
+# map of build variant (e.g. cargo profile and feature flags)
+BUILD_VARIANT_TAG_PREFIX_MAP = {
+    "performance": "performance",
+    "failpoints": "failpoints",
+    "indexer": "indexer",
+    "release": "",  # the default release profile has no tag prefix
+}
+
+VALIDATOR_IMAGE_NAME = "aptos/validator"
+VALIDATOR_TESTING_IMAGE_NAME = "aptos/validator-testing"
+FORGE_IMAGE_NAME = "aptos/forge"
 
 
 @dataclass
@@ -53,10 +64,10 @@ class RunResult:
         return self.exit_code == 0
 
 
-def get_prompt_answer(prompt: str, answer: Optional[str]=None) -> bool:
+def get_prompt_answer(prompt: str, answer: Optional[str] = None) -> bool:
     """Get a yes/no answer from the user, or use the default answer if provided."""
     if not answer and not os.getenv("CI"):
-        answer = input(f"{prompt} (y/n) ").strip().lower() 
+        answer = input(f"{prompt} (y/n) ").strip().lower()
     return answer in ("y", "yes", "yeet", "yessir", "si", "true")
 
 
@@ -84,10 +95,6 @@ except ImportError:
     import psutil
 
 
-def get_current_user() -> str:
-    return pwd.getpwuid(os.getuid())[0]
-
-
 @click.group()
 def main() -> None:
     # Check that the current directory is the root of the repository.
@@ -109,6 +116,7 @@ GRAFANA_BASE_URL = (
     "https://o11y.aptosdev.com/grafana/d/overview/overview?orgId=1&refresh=10s&"
     "var-Datasource=VictoriaMetrics%20Global"
 )
+PYROSCOPE_BASE_URL = "https://pyroscope.o11y.aptosdev.com"
 
 # helm chart default override values
 HELM_CHARTS = ["aptos-node", "aptos-genesis"]
@@ -230,10 +238,6 @@ class ForgeContext:
     forge_namespace: str
     forge_args: Sequence[str]
 
-    # aws related options
-    aws_account_num: Optional[str]
-    aws_region: str
-
     forge_image_tag: str
     image_tag: str
     upgrade_image_tag: str
@@ -243,6 +247,17 @@ class ForgeContext:
 
     github_actions: str
     github_job_url: Optional[str]
+
+    # aws related options
+    aws_account_num: Optional[str]
+    aws_region: Optional[str]
+
+    # gcp related options
+    gcp_project: Optional[str] = None
+    gcp_zone: Optional[str] = None
+
+    # the default cloud is AWS
+    cloud: Cloud = Cloud.AWS
 
     def report(self, result: ForgeResult, outputs: List[ForgeFormatter]) -> None:
         for formatter in outputs:
@@ -325,7 +340,7 @@ def get_dashboard_link(
         raise Exception(f"Invalid refresh argument: {time_filter}")
 
     return (
-        f"{GRAFANA_BASE_URL}&var-namespace={forge_namespace}"
+        f"{GRAFANA_BASE_URL}&var-namespace={forge_namespace}&var-metrics_source=All"
         f"&var-chain_name={forge_chain_name}{grafana_time_filter}"
     )
 
@@ -357,9 +372,9 @@ def milliseconds(timestamp: datetime) -> int:
 
 
 def apply_humio_time_filter(
-    urlparts: Dict[str, Union[str, bool, int]],
+    urlparts: Mapping[str, Union[str, bool, int]],
     time_filter: Union[bool, Tuple[datetime, datetime]],
-) -> Dict:
+) -> Mapping:
     if time_filter is True:
         urlparts = {
             **urlparts,
@@ -384,6 +399,7 @@ def get_humio_forge_link(
     forge_namespace: str,
     time_filter: Union[bool, Tuple[datetime, datetime]],
 ) -> str:
+    """Get a link to the forge test runner logs in humio for a given test run in a given namespace"""
     columns = [
         {
             "type": "field",
@@ -425,7 +441,13 @@ def get_humio_logs_link(
     forge_namespace: str,
     time_filter: Union[bool, Tuple[datetime, datetime]],
 ) -> str:
-    query = f"$forgeLogs(validator_instance=*) | {forge_namespace}"
+    """Get a link to the node logs in humio for a given test run in a given namespace"""
+    query = (
+        f"$forgeLogs(validator_instance=*) |\n"
+        f'    "k8s.namespace" = "{forge_namespace}" // filters on namespace which contains validator logs\n'
+        f"   OR  // remove either side of the OR operator to only display validator or forge-runner logs\n"
+        f'    "k8s.labels.forge-namespace" = "{forge_namespace}" // filters on specific forge-runner pod in default namespace\n'
+    )
     columns = [
         {
             "type": "field",
@@ -468,6 +490,13 @@ def get_humio_logs_link(
     )
 
 
+def get_pyroscope_profiling_link(
+    forge_namespace: str,
+) -> str:
+    """Get a link to the pyroscope profiling for a given test run in a given namespace. Note that there is no time filtering yet"""
+    return f'{PYROSCOPE_BASE_URL}/?query=aptos-node.cpu%7Bnamespace%3D"{forge_namespace}"%7D&from=now-24h'
+
+
 def format_github_info(context: ForgeContext) -> str:
     if not context.github_job_url:
         return ""
@@ -502,6 +531,7 @@ def format_pre_comment(context: ForgeContext) -> str:
         context.forge_namespace,
         True,
     )
+    pyroscope_profiling_link = get_pyroscope_profiling_link(context.forge_namespace)
 
     return (
         textwrap.dedent(
@@ -509,6 +539,7 @@ def format_pre_comment(context: ForgeContext) -> str:
             ### Forge is running suite `{context.forge_test_suite}` on {get_testsuite_images(context)}
             * [Grafana dashboard (auto-refresh)]({dashboard_link})
             * [Humio Logs]({humio_logs_link})
+            * [Pyroscope Profiling]({pyroscope_profiling_link})
             """
         ).lstrip()
         + format_github_info(context)
@@ -525,6 +556,7 @@ def format_comment(context: ForgeContext, result: ForgeResult) -> str:
         context.forge_namespace,
         (result.start_time, result.end_time),
     )
+    pyroscope_profiling_link = get_pyroscope_profiling_link(context.forge_namespace)
 
     if result.state == ForgeState.PASS:
         forge_comment_header = f"### :white_check_mark: Forge suite `{context.forge_test_suite}` success on {get_testsuite_images(context)}"
@@ -548,6 +580,7 @@ def format_comment(context: ForgeContext, result: ForgeResult) -> str:
         ```
         * [Grafana dashboard]({dashboard_link})
         * [Humio Logs]({humio_logs_link})
+        * [Pyroscope Profiling]({pyroscope_profiling_link})
         """
         )
         + format_github_info(context)
@@ -664,16 +697,32 @@ class K8sForgeRunner(ForgeRunner):
 
         assert context.aws_account_num is not None, "AWS account number is required"
 
+        # determine the interal image repos based on the context of where the cluster is located
+        if context.cloud == Cloud.AWS:
+            forge_image_repo = f"{context.aws_account_num}.dkr.ecr.{context.aws_region}.amazonaws.com/aptos/forge"
+            validator_node_selector = "eks.amazonaws.com/nodegroup: validators"
+        elif (
+            context.cloud == Cloud.GCP
+        ):  # the GCP project for images is separate than the cluster
+            forge_image_repo = (
+                f"us-west1-docker.pkg.dev/aptos-global/aptos-internal/forge"
+            )
+            validator_node_selector = ""  # no selector
+            # TODO: also no NAP node selector yet
+            # TODO: also registries need to be set up such that the default compute service account can access it:  $PROJECT_ID-compute@developer.gserviceaccount.com
+        else:
+            raise Exception(f"Unknown cloud: {context.cloud}")
+
         rendered = template.decode().format(
             FORGE_POD_NAME=forge_pod_name,
             FORGE_IMAGE_TAG=context.forge_image_tag,
             IMAGE_TAG=context.image_tag,
             UPGRADE_IMAGE_TAG=context.upgrade_image_tag,
-            AWS_ACCOUNT_NUM=context.aws_account_num,
-            AWS_REGION=context.aws_region,
+            FORGE_IMAGE_REPO=forge_image_repo,
             FORGE_NAMESPACE=context.forge_namespace,
             FORGE_ARGS=" ".join(context.forge_args),
             FORGE_TRIGGERED_BY=forge_triggered_by,
+            VALIDATOR_NODE_SELECTOR=validator_node_selector,
         )
 
         with ForgeResult.with_context(context) as forge_result:
@@ -773,56 +822,12 @@ class K8sForgeRunner(ForgeRunner):
         return forge_result
 
 
-class AwsError(Exception):
-    pass
-
-
 def get_aws_account_num(shell: Shell) -> str:
     caller_id = shell.run(["aws", "sts", "get-caller-identity"])
     return json.loads(caller_id.unwrap()).get("Account")
 
 
-def assert_aws_auth(shell: Shell) -> None:
-    # Simple read command which should fail
-    list_eks_clusters(shell)
-
-
-class ListClusterResult(TypedDict):
-    clusters: List[str]
-
-
-def list_eks_clusters(shell: Shell) -> List[str]:
-    cluster_json = shell.run(["aws", "eks", "list-clusters"]).unwrap()
-    # This type annotation is not enforced, just helpful
-    try:
-        cluster_result: ListClusterResult = json.loads(cluster_json.decode())
-        clusters = []
-        for cluster_name in cluster_result["clusters"]:
-            if cluster_name.startswith("aptos-forge-"):
-                clusters.append(cluster_name)
-        return clusters
-    except Exception as e:
-        raise AwsError("Failed to list eks clusters") from e
-
-
-async def write_cluster_config(
-    shell: Shell, forge_cluster_name: str, temp: str
-) -> None:
-    (
-        await shell.gen_run(
-            [
-                "aws",
-                "eks",
-                "update-kubeconfig",
-                "--name",
-                forge_cluster_name,
-                "--kubeconfig",
-                temp,
-            ]
-        )
-    ).unwrap()
-
-
+# NOTE: this is not used anywhere
 def get_current_cluster_name(shell: Shell) -> str:
     result = shell.run(["kubectl", "config", "current-context"])
     current_context = result.unwrap().decode()
@@ -832,52 +837,64 @@ def get_current_cluster_name(shell: Shell) -> str:
     return matches[0]
 
 
-def assert_provided_image_tags_has_profile_or_features(
+def add_build_variant_prefix(image_tag: str, variant: str) -> str:
+    """Add the necessary image tag prefix to specify the correct image tag for the build variant"""
+    variant_prefix = BUILD_VARIANT_TAG_PREFIX_MAP[variant]
+    if not image_tag.startswith(variant_prefix):
+        return f"{variant_prefix}_{image_tag}"
+    return image_tag
+
+
+def ensure_provided_image_tags_has_profile_or_features(
     image_tag: Optional[str],
     upgrade_image_tag: Optional[str],
-    enable_testing_image: bool,
+    enable_failpoints: bool,
     enable_performance_profile: bool,
-):
+) -> Tuple[str, str]:
+    """
+    Ensure that the build variant specified is reflected in the image tag. If not, then return the image tag
+    with the prefix that is expected
+    """
+    ret = []
     for tag in [image_tag, upgrade_image_tag]:
+        curr_tag = None
         if not tag:
-            continue
-        if (
-            enable_testing_image
-        ):  # testing image requires the tag to be prefixed with failpoints_
-            assert tag.startswith(
-                "failpoints"
-            ), f"Missing failpoints_ feature prefix in {tag}"
-        if enable_performance_profile:
-            assert tag.startswith(
-                "performance"
-            ), f"Missing performance_ profile prefix in {tag}"
+            pass
+        elif enable_failpoints:
+            curr_tag = add_build_variant_prefix(tag, "failpoints")
+        elif enable_performance_profile:
+            curr_tag = add_build_variant_prefix(tag, "performance")
+        else:
+            curr_tag = tag
+        ret.append(curr_tag)
+
+    return tuple(ret)
 
 
 def find_recent_images_by_profile_or_features(
     shell: Shell,
     git: Git,
     num_images: int,
-    enable_testing_image: Optional[bool],
+    enable_failpoints: Optional[bool],
     enable_performance_profile: Optional[bool],
-) -> Generator[str, None, None]:
-    image_name = "aptos/validator"
+) -> Sequence[str]:
     image_tag_prefix = ""
-    if enable_testing_image and enable_performance_profile:
+    if enable_failpoints and enable_performance_profile:
         raise Exception(
             "Cannot yet set both testing (failpoints) image and performance"
         )
 
     if enable_performance_profile:
         image_tag_prefix = "performance_"
-    if enable_testing_image:
+    if enable_failpoints:
         image_tag_prefix = "failpoints_"
 
     return find_recent_images(
         shell,
         git,
         num_images,
-        image_name=image_name,
-        image_tag_prefix=image_tag_prefix,
+        image_name=VALIDATOR_TESTING_IMAGE_NAME,
+        image_tag_prefixes=[image_tag_prefix],
     )
 
 
@@ -886,26 +903,42 @@ def find_recent_images(
     git: Git,
     num_images: int,
     image_name: str,
-    image_tag_prefix: str = "",
+    image_tag_prefixes: Sequence[str] = [""],
     commit_threshold: int = 100,
-) -> Generator[str, None, None]:
+) -> Sequence[str]:
     """
     Find the last `num_images` images built from the current git repo by searching the git commit history
-    For images built with different features or profiles than the default release profile, the image searching logic
-    will be more complicated. We use a combination of image_tag prefixes and different image names to distinguish
+    Also optionally filter by images with the provided prefixes, such as those denoting specific build variants
+    (e.g. cargo profiles and feature flags enabled)
     """
 
-    i = 0
+    # implicitly add the empty prefix, which will get the default release build without a prefix
+    if len(image_tag_prefixes) == 0:
+        image_tag_prefixes.append("")
+
+    # the number of images we need to find is actually the number of unique images
+    # multiplied by the number of image tag prefixes (e.g. variants) we expect to find
+    num_variants = len(image_tag_prefixes)
+    num_images_with_variants = num_images * num_variants
+
+    ret = []  # the list of images we will return
     for revision in git.last(commit_threshold):
-        image_tag = f"{image_tag_prefix}{revision}"
-        exists = image_exists(shell, image_name, image_tag)
-        if exists:
-            i += 1
-            yield image_tag
-        if i >= num_images:
+        temp_ret = []  # count variants for this revision
+        for prefix in image_tag_prefixes:
+            image_tag = f"{prefix}{revision}"
+            exists = image_exists(shell, image_name, image_tag)
+            if exists:
+                temp_ret.append(image_tag)
+            if len(temp_ret) >= num_variants:
+                ret.extend(temp_ret)
+        if len(ret) >= num_images_with_variants:  # we have enough images
             break
-    if i < num_images:
-        raise Exception(f"Could not find {num_images} recent images")
+    if len(ret) < num_images_with_variants:
+        raise Exception(
+            f"Could not find {num_images} recent images with prefixes {image_tag_prefixes}"
+        )
+
+    return ret
 
 
 def image_exists(shell: Shell, image_name: str, image_tag: str) -> bool:
@@ -927,7 +960,7 @@ def sanitize_forge_resource_name(forge_resource: str) -> str:
     """
     Sanitize the intended forge resource name to be a valid k8s resource name
     """
-    max_length = 64
+    max_length = 63
     sanitized_namespace = ""
     for i, c in enumerate(forge_resource):
         if i >= max_length:
@@ -972,7 +1005,7 @@ def create_forge_command(
         forge_args.extend(
             [
                 "-p",
-                "forge-cli",
+                "aptos-forge-cli",
                 "--",
             ]
         )
@@ -1117,7 +1150,9 @@ async def run_multiple(
 @envoption("FORGE_COMMENT")
 @envoption("GITHUB_STEP_SUMMARY")
 # cluster auth
+@envoption("CLOUD", "aws")
 @envoption("AWS_REGION", "us-west-2")
+@envoption("GCP_ZONE", "us-central1-c")
 # forge test runner customization
 @envoption("FORGE_RUNNER_MODE", "k8s")
 @envoption("FORGE_CLUSTER_NAME")
@@ -1127,7 +1162,7 @@ async def run_multiple(
 @envoption("FORGE_NAMESPACE_KEEP")
 @envoption("FORGE_NAMESPACE_REUSE")
 @envoption("FORGE_ENABLE_HAPROXY")
-@envoption("FORGE_ENABLE_TESTING_IMAGE")
+@envoption("FORGE_ENABLE_FAILPOINTS")
 @envoption("FORGE_ENABLE_PERFORMANCE")
 @envoption("FORGE_TEST_SUITE")
 @envoption("FORGE_RUNNER_DURATION_SECS", "300")
@@ -1159,14 +1194,16 @@ def test(
     forge_report: Optional[str],
     forge_pre_comment: Optional[str],
     forge_comment: Optional[str],
+    cloud: str,
     aws_region: str,
+    gcp_zone: str,
     forge_runner_mode: str,
     forge_cluster_name: Optional[str],
     forge_num_validators: Optional[str],
     forge_num_validator_fullnodes: Optional[str],
     forge_namespace_keep: Optional[str],
     forge_namespace_reuse: Optional[str],
-    forge_enable_testing_image: Optional[str],
+    forge_enable_failpoints: Optional[str],
     forge_enable_performance: Optional[str],
     forge_enable_haproxy: Optional[str],
     forge_test_suite: str,
@@ -1189,6 +1226,13 @@ def test(
     test_suites: Tuple[str],
 ) -> None:
     """Run a forge test"""
+
+    ### XXX: hack these arguments to force Forge to run with overrides
+    # cloud = "gcp"
+    # forge_cluster_name = "aptos-forge-0"
+    # forge_enable_performance = "true"
+
+    # Initialize all configs
     shell = LocalShell(verbose == "true")
     git = Git(shell)
     filesystem = LocalFilesystem()
@@ -1197,6 +1241,14 @@ def test(
     context = SystemContext(shell, filesystem, processes, time)
     config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
     config.init()
+
+    # XXX: manual override testing in CI
+    # # for GCP
+    # forge_cluster_name = "aptos-forge-0"
+    # cloud = "gcp"
+
+    # # for performance
+    # forge_enable_performance = "true"
 
     if not forge_namespace:
         forge_namespace = f"forge-{processes.user()}-{time.epoch()}"
@@ -1258,14 +1310,29 @@ def test(
 
     assert forge_cluster_name, "Forge cluster name is required"
 
+    # cloud
+    if cloud.upper() == "AWS":
+        cloud_enum = Cloud.AWS
+    elif cloud.upper() == "GCP":
+        cloud_enum = Cloud.GCP
+    else:
+        raise Exception(f"Unknown cloud: {cloud}")
+
+    print(f"Using cluster: {forge_cluster_name} in cloud: {cloud_enum.value}")
+    temp = context.filesystem.mkstemp()
+    forge_cluster = ForgeCluster(forge_cluster_name, temp, cloud=cloud_enum)
+    asyncio.run(forge_cluster.write(context.shell))
+
     # These features and profile flags are set as strings
-    enable_testing_image = forge_enable_testing_image == "true"
+    enable_failpoints = forge_enable_failpoints == "true"
     enable_performance_profile = forge_enable_performance == "true"
 
-    assert_provided_image_tags_has_profile_or_features(
+    # In the below, assume that the image is pushed to all registries
+    # across all clouds and supported regions
+    image_tag, upgrade_image_tag = ensure_provided_image_tags_has_profile_or_features(
         image_tag,
         upgrade_image_tag,
-        enable_testing_image=enable_testing_image,
+        enable_failpoints=enable_failpoints,
         enable_performance_profile=enable_performance_profile,
     )
 
@@ -1276,7 +1343,7 @@ def test(
                 shell,
                 git,
                 2,
-                enable_testing_image=enable_testing_image,
+                enable_failpoints=enable_failpoints,
                 enable_performance_profile=enable_performance_profile,
             )
         )
@@ -1288,23 +1355,22 @@ def test(
     else:
         # All other tests use just one image tag
         # Only try finding exactly 1 image
-        default_latest_image = next(
-            find_recent_images_by_profile_or_features(
-                shell,
-                git,
-                1,
-                enable_testing_image=enable_testing_image,
-                enable_performance_profile=enable_performance_profile,
-            )
-        )
+        default_latest_image = find_recent_images_by_profile_or_features(
+            shell,
+            git,
+            1,
+            enable_failpoints=enable_failpoints,
+            enable_performance_profile=enable_performance_profile,
+        )[0]
+
         image_tag = image_tag or default_latest_image
         forge_image_tag = forge_image_tag or default_latest_image
         upgrade_image_tag = upgrade_image_tag or default_latest_image
 
-    assert_provided_image_tags_has_profile_or_features(
+    image_tag, upgrade_image_tag = ensure_provided_image_tags_has_profile_or_features(
         image_tag,
         upgrade_image_tag,
-        enable_testing_image=enable_testing_image,
+        enable_failpoints=enable_failpoints,
         enable_performance_profile=enable_performance_profile,
     )
 
@@ -1316,6 +1382,17 @@ def test(
     print("\tforge: ", forge_image_tag)
     print("\tswarm: ", image_tag)
     print("\tswarm upgrade (if applicable): ", upgrade_image_tag)
+
+    # finally, whether we've derived the image tags or used the user-inputted ones, check if they exist
+    assert image_exists(
+        shell, VALIDATOR_TESTING_IMAGE_NAME, image_tag
+    ), f"swarm (validator) image does not exist: {image_tag}"
+    assert image_exists(
+        shell, VALIDATOR_TESTING_IMAGE_NAME, upgrade_image_tag
+    ), f"swarm upgrade (validator) image does not exist: {upgrade_image_tag}"
+    assert image_exists(
+        shell, FORGE_IMAGE_NAME, forge_image_tag
+    ), f"forge (test runner) image does not exist: {forge_image_tag}"
 
     forge_args = create_forge_command(
         forge_runner_mode=forge_runner_mode,
@@ -1334,18 +1411,16 @@ def test(
         test_args=test_args,
     )
 
-    print(f"Using cluster: {forge_cluster_name}")
-    temp = context.filesystem.mkstemp()
-    forge_cluster = ForgeCluster(forge_cluster_name, temp)
-    asyncio.run(forge_cluster.write(context.shell))
-
     forge_context = ForgeContext(
         shell=shell,
         filesystem=filesystem,
         processes=processes,
         time=time,
+        # cluster auth
+        cloud=cloud_enum,
         aws_account_num=aws_account_num,
         aws_region=aws_region,
+        gcp_zone=gcp_zone,
         forge_image_tag=forge_image_tag,
         image_tag=image_tag,
         upgrade_image_tag=upgrade_image_tag,
@@ -1416,84 +1491,6 @@ def test(
         ) from e
 
 
-@dataclass
-class ForgeJob:
-    name: str
-    phase: str
-    cluster: ForgeCluster
-
-    @classmethod
-    def from_pod(cls, cluster: ForgeCluster, pod: GetPodsItem) -> ForgeJob:
-        return cls(
-            name=pod["metadata"]["name"],
-            phase=pod["status"]["phase"],
-            cluster=cluster,
-        )
-
-    def running(self):
-        return self.phase == "Running"
-
-    def succeeded(self):
-        return self.phase == "Succeeded"
-
-    def failed(self):
-        return self.phase == "Failed"
-
-
-class GetPodsItemMetadata(TypedDict):
-    name: str
-
-
-class GetPodsItemStatus(TypedDict):
-    phase: str
-
-
-class GetPodsItem(TypedDict):
-    metadata: GetPodsItemMetadata
-    status: GetPodsItemStatus
-
-
-class GetPodsResult(TypedDict):
-    items: List[GetPodsItem]
-
-
-@dataclass
-class ForgeCluster:
-    name: str
-    kubeconf: str
-
-    async def write(self, shell: Shell) -> None:
-        await write_cluster_config(shell, self.name, self.kubeconf)
-
-    async def get_jobs(self, shell: Shell) -> List[ForgeJob]:
-        pod_result = (
-            (
-                await shell.gen_run(
-                    [
-                        "kubectl",
-                        "get",
-                        "pods",
-                        "-n",
-                        "default",
-                        "--kubeconfig",
-                        self.kubeconf,
-                        "-o",
-                        "json",
-                    ]
-                )
-            )
-            .unwrap()
-            .decode()
-        )
-        pods_result: GetPodsResult = json.loads(pod_result)
-        pods = pods_result["items"]
-        return [
-            ForgeJob.from_pod(self, pod)
-            for pod in pods
-            if pod["metadata"]["name"].startswith("forge-")
-        ]
-
-
 async def get_all_forge_jobs(
     context: SystemContext,
     clusters: List[str],
@@ -1534,7 +1531,7 @@ def list_jobs(
     phase: List[str],
     regex: str,
 ) -> None:
-    """List all available clusters"""
+    """List all running forge jobs"""
     shell = LocalShell()
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
@@ -1561,7 +1558,10 @@ def list_jobs(
         else:
             fg = "white"
 
-        click.secho(f"{job.cluster.name} {job.name} {job.phase}", fg=fg)
+        click.secho(
+            f"{job.cluster.name} {job.name} {job.phase}: (num_fullnodes: {job.num_fullnodes}, num_validators: {job.num_validators})",
+            fg=fg,
+        )
 
 
 @main.command()
@@ -1615,23 +1615,23 @@ class TestConfig(TypedDict):
 
 class TestSuite(TypedDict):
     name: str
-    all_tests: Dict[str, TestConfig]
-    enabled_tests: Dict[str, TestConfig]
+    all_tests: Mapping[str, TestConfig]
+    enabled_tests: Mapping[str, TestConfig]
 
 
 # All changes to this struct must be backwards compatible
 # i.e. its ok to add a new field, but not to remove one
-
-
 class ForgeConfigValue(TypedDict):
     enabled_clusters: List[str]
     all_clusters: List[str]
-    test_suites: Dict[str, TestSuite]
-    default_helm_values: Dict
+    test_suites: Mapping[str, TestSuite]
+    default_helm_values: Mapping
 
 
 def default_forge_config() -> ForgeConfigValue:
-    return {
+    # Return a default config with not all the fields, as they are not mandatory
+    # This ensures we check for backwards compatibility
+    return {  # type: ignore
         "enabled_clusters": [],
         "all_clusters": [],
     }
@@ -1676,7 +1676,12 @@ def ensure_forge_config(value: Any) -> ForgeConfigValue:
         raise Exception("Type had errors:\n" + "\n".join(errors))
     return value
 
-def get_forge_config_diff(old_config: dict, new_config: dict, full_diff: Optional[bool]=False) -> list:
+
+def get_forge_config_diff(
+    old_config: ForgeConfigValue,
+    new_config: ForgeConfigValue,
+    full_diff: Optional[bool] = False,
+) -> Iterator[str]:
     """Returns a list of diffs between the old and new config"""
     config_string = json.dumps(new_config, indent=2)
     old_config_string = json.dumps(old_config, indent=2)
@@ -1687,6 +1692,7 @@ def get_forge_config_diff(old_config: dict, new_config: dict, full_diff: Optiona
         return diff.compare(old_lines, new_lines)
     else:
         return difflib.unified_diff(old_lines, new_lines)
+
 
 class ForgeConfigBackend:
     def create(self) -> None:
@@ -1893,7 +1899,7 @@ def config_edit(ctx: click.Context) -> None:
     shell = LocalShell(True)
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
-    context = SystemContext(shell, filesystem, processes, time)
+    context = SystemContext(shell, filesystem, processes, SystemTime())
     config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
     config.init()
 
@@ -2005,7 +2011,7 @@ def cluster_config_delete(
     shell = LocalShell()
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
-    context = SystemContext(shell, filesystem, processes, time)
+    context = SystemContext(shell, filesystem, processes, SystemTime())
     config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
 
     config.init()
@@ -2182,7 +2188,7 @@ def test_config_add(
         raise Exception(f"Test {test_name} already exists")
 
     if test_name:
-        test_suite["all_tests"][test_name]: TestConfig = {
+        test_suite["all_tests"][test_name] = {
             "name": test_name,
         }
 
@@ -2327,6 +2333,7 @@ def test_config_enable(
     else:
         print("Config not updated")
 
+
 @test_config.command("disable")
 @click.argument("suite_name")
 @click.argument("test_name")
@@ -2366,6 +2373,7 @@ def test_config_disable(
         config.flush()
     else:
         print("Config not updated")
+
 
 if __name__ == "__main__":
     main()

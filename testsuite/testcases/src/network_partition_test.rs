@@ -1,8 +1,8 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{LoadDestination, NetworkLoadTest};
-use forge::{NetworkContext, NetworkTest, Swarm, SwarmChaos, SwarmNetworkPartition, Test};
+use aptos_forge::{NetworkContext, NetworkTest, Swarm, SwarmChaos, SwarmNetworkPartition, Test};
 
 pub struct NetworkPartitionTest;
 

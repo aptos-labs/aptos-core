@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{lru_node_cache::LruNodeCache, state_merkle_db::Node, OTHER_TIMERS_SECONDS};
@@ -13,13 +13,12 @@ use std::{
 
 type NodeCache = HashMap<NodeKey, Node>;
 
-#[derive(Debug)]
 pub(crate) struct VersionedNodeCache {
     inner: RwLock<VecDeque<(Version, Arc<NodeCache>)>>,
 }
 
 impl VersionedNodeCache {
-    const NUM_VERSIONS_TO_CACHE: usize = 2;
+    pub(crate) const NUM_VERSIONS_TO_CACHE: usize = 2;
 
     pub fn new() -> Self {
         Self {

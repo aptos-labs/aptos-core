@@ -1,0 +1,2 @@
+sandbox publish -v
+-d sandbox publish -v

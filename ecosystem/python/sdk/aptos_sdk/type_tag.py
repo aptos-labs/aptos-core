@@ -1,4 +1,4 @@
-# Copyright (c) Aptos
+# Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
 from __future__ import annotations
@@ -21,6 +21,9 @@ class TypeTag:
     SIGNER: int = 5
     VECTOR: int = 6
     STRUCT: int = 7
+    U16: int = 8
+    U32: int = 9
+    U256: int = 10
 
     value: typing.Any
 
@@ -47,10 +50,16 @@ class TypeTag:
             return TypeTag(BoolTag.deserialize(deserializer))
         elif variant == TypeTag.U8:
             return TypeTag(U8Tag.deserialize(deserializer))
+        elif variant == TypeTag.U16:
+            return TypeTag(U16Tag.deserialize(deserializer))
+        elif variant == TypeTag.U32:
+            return TypeTag(U32Tag.deserialize(deserializer))
         elif variant == TypeTag.U64:
             return TypeTag(U64Tag.deserialize(deserializer))
         elif variant == TypeTag.U128:
             return TypeTag(U128Tag.deserialize(deserializer))
+        elif variant == TypeTag.U256:
+            return TypeTag(U256Tag.deserialize(deserializer))
         elif variant == TypeTag.ACCOUNT_ADDRESS:
             return TypeTag(AccountAddressTag.deserialize(deserializer))
         elif variant == TypeTag.SIGNER:
@@ -116,6 +125,56 @@ class U8Tag:
         serializer.u8(self.value)
 
 
+class U16Tag:
+    value: int
+
+    def __init__(self, value: int):
+        self.value = value
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, U16Tag):
+            return NotImplemented
+        return self.value == other.value
+
+    def __str__(self):
+        return self.value.__str__()
+
+    def variant(self):
+        return TypeTag.U16
+
+    @staticmethod
+    def deserialize(deserializer: Deserializer) -> U16Tag:
+        return U16Tag(deserializer.u16())
+
+    def serialize(self, serializer: Serializer):
+        serializer.u16(self.value)
+
+
+class U32Tag:
+    value: int
+
+    def __init__(self, value: int):
+        self.value = value
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, U32Tag):
+            return NotImplemented
+        return self.value == other.value
+
+    def __str__(self):
+        return self.value.__str__()
+
+    def variant(self):
+        return TypeTag.U32
+
+    @staticmethod
+    def deserialize(deserializer: Deserializer) -> U32Tag:
+        return U32Tag(deserializer.u32())
+
+    def serialize(self, serializer: Serializer):
+        serializer.u32(self.value)
+
+
 class U64Tag:
     value: int
 
@@ -164,6 +223,31 @@ class U128Tag:
 
     def serialize(self, serializer: Serializer):
         serializer.u128(self.value)
+
+
+class U256Tag:
+    value: int
+
+    def __init__(self, value: int):
+        self.value = value
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, U256Tag):
+            return NotImplemented
+        return self.value == other.value
+
+    def __str__(self):
+        return self.value.__str__()
+
+    def variant(self):
+        return TypeTag.U256
+
+    @staticmethod
+    def deserialize(deserializer: Deserializer) -> U256Tag:
+        return U256Tag(deserializer.u256())
+
+    def serialize(self, serializer: Serializer):
+        serializer.u256(self.value)
 
 
 class AccountAddressTag:

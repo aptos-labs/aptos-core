@@ -1,11 +1,11 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{tests::common, MoveHarness};
+use aptos_framework::{BuildOptions, BuiltPackage, ReleasePackage};
+use aptos_package_builder::PackageBuilder;
 use aptos_types::account_address::AccountAddress;
-use framework::{BuildOptions, BuiltPackage, ReleasePackage};
 use move_package::compilation::package_layout::CompiledPackageLayout;
-use package_builder::PackageBuilder;
 
 #[test]
 fn generate_upgrade_script() {

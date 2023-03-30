@@ -1,8 +1,9 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_framework::{aptos_coin_transfer, EntryFunctionCall};
 use aptos_types::AccountAddress;
-use framework::{aptos_coin_transfer, EntryFunctionCall};
 
 fn demo_p2p_entry_function() {
     let payee = AccountAddress([

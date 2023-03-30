@@ -1,7 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-
-use std::time::Duration;
 
 use crate::{
     auth::with_auth,
@@ -15,45 +13,25 @@ use crate::{
         telemetry::{BigQueryRow, TelemetryDump},
     },
 };
-
 use anyhow::anyhow;
 use gcp_bigquery_client::model::table_data_insert_all_request::TableDataInsertAllRequest;
 use serde_json::json;
+use std::time::Duration;
 use tokio::time::Instant;
 use warp::{filters::BoxedFilter, hyper::StatusCode, reject, reply, Filter, Rejection, Reply};
-
-/// TODO: Cleanup after v1 API is ramped up
-pub fn custom_event_legacy(context: Context) -> BoxedFilter<(impl Reply,)> {
-    warp::path!("custom_event")
-        .and(warp::post())
-        .and(context.clone().filter())
-        .and(with_auth(
-            context,
-            vec![
-                NodeType::Validator,
-                NodeType::ValidatorFullNode,
-                NodeType::PublicFullNode,
-                NodeType::Unknown,
-            ],
-        ))
-        .and(warp::body::json())
-        .and_then(handle_custom_event)
-        .boxed()
-}
 
 pub fn custom_event_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("ingest" / "custom-event")
         .and(warp::post())
         .and(context.clone().filter())
-        .and(with_auth(
-            context,
-            vec![
-                NodeType::Validator,
-                NodeType::ValidatorFullNode,
-                NodeType::PublicFullNode,
-                NodeType::Unknown,
-            ],
-        ))
+        .and(with_auth(context, vec![
+            NodeType::Validator,
+            NodeType::ValidatorFullNode,
+            NodeType::PublicFullNode,
+            NodeType::Unknown,
+            NodeType::UnknownValidator,
+            NodeType::UnknownFullNode,
+        ]))
         .and(warp::body::json())
         .and_then(handle_custom_event)
         .boxed()

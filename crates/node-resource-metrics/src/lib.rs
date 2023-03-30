@@ -1,6 +1,7 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::collectors::BasicNodeInfoCollector;
 use aptos_infallible::Mutex;
 use cfg_if::cfg_if;
 use collectors::{
@@ -22,17 +23,18 @@ pub fn register_node_metrics_collector() {
         *registered = true;
     }
 
-    prometheus::register(Box::new(CpuMetricsCollector::default())).unwrap();
-    prometheus::register(Box::new(MemoryMetricsCollector::default())).unwrap();
-    prometheus::register(Box::new(DiskMetricsCollector::default())).unwrap();
-    prometheus::register(Box::new(NetworkMetricsCollector::default())).unwrap();
-    prometheus::register(Box::new(LoadAvgCollector::default())).unwrap();
-    prometheus::register(Box::new(ProcessMetricsCollector::default())).unwrap();
+    prometheus::register(Box::<CpuMetricsCollector>::default()).unwrap();
+    prometheus::register(Box::<MemoryMetricsCollector>::default()).unwrap();
+    prometheus::register(Box::<DiskMetricsCollector>::default()).unwrap();
+    prometheus::register(Box::<NetworkMetricsCollector>::default()).unwrap();
+    prometheus::register(Box::<LoadAvgCollector>::default()).unwrap();
+    prometheus::register(Box::<ProcessMetricsCollector>::default()).unwrap();
+    prometheus::register(Box::<BasicNodeInfoCollector>::default()).unwrap();
     cfg_if! {
         if #[cfg(all(target_os="linux"))] {
-            prometheus::register(Box::new(collectors::LinuxCpuMetricsCollector::default())).unwrap();
-            prometheus::register(Box::new(collectors::LinuxDiskMetricsCollector::default())).unwrap();
+            prometheus::register(Box::<collectors::LinuxCpuMetricsCollector>::default()).unwrap();
+            prometheus::register(Box::<collectors::LinuxDiskMetricsCollector>::default()).unwrap();
         }
     }
-    prometheus::register(Box::new(CollectorLatencyCollector::default())).unwrap();
+    prometheus::register(Box::<CollectorLatencyCollector>::default()).unwrap();
 }

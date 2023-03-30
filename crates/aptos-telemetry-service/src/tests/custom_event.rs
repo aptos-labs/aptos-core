@@ -1,13 +1,7 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::BTreeMap;
-
-use aptos_config::config::PeerSet;
-use aptos_types::{chain_id::ChainId, PeerId};
-use chrono::Utc;
-use serde_json::json;
-
+use super::test_context::new_test_context;
 use crate::{
     jwt_auth::create_jwt_token,
     types::{
@@ -15,8 +9,12 @@ use crate::{
         telemetry::{TelemetryDump, TelemetryEvent},
     },
 };
-
-use super::test_context::new_test_context;
+use aptos_config::config::PeerSet;
+use aptos_types::{chain_id::ChainId, PeerId};
+use chrono::Utc;
+use serde_json::json;
+use std::collections::BTreeMap;
+use uuid::Uuid;
 
 #[tokio::test]
 async fn test_custom_event() {
@@ -24,6 +22,7 @@ async fn test_custom_event() {
     let chain_id = ChainId::new(28);
     let peer_id = PeerId::random();
     let node_type = NodeType::Validator;
+    let uuid = Uuid::new_v4();
     let epoch = 10;
 
     test_context
@@ -39,6 +38,7 @@ async fn test_custom_event() {
         peer_id,
         node_type,
         epoch,
+        uuid,
     )
     .unwrap();
 
@@ -54,6 +54,6 @@ async fn test_custom_event() {
     test_context
         .with_bearer_auth(jwt_token)
         .expect_status_code(500)
-        .post("/custom_event", json!(body))
+        .post("/api/v1/ingest/custom-event", json!(body))
         .await;
 }

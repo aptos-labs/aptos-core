@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -12,15 +13,14 @@ use aptos_crypto::{
 use aptos_infallible::RwLock;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_vault_client::Client;
+#[cfg(any(test, feature = "testing"))]
+use aptos_vault_client::ReadResponse;
 use chrono::DateTime;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
     collections::HashMap,
     sync::atomic::{AtomicU64, Ordering},
 };
-
-#[cfg(any(test, feature = "testing"))]
-use aptos_vault_client::ReadResponse;
 
 const TRANSIT_NAMESPACE_SEPARATOR: &str = "__";
 
@@ -261,7 +261,7 @@ impl CryptoStorage for VaultStorage {
                     .ok_or_else(|| Error::KeyVersionNotFound(name, "previous version".into()))?
                     .value
                     .clone())
-            }
+            },
             None => Err(Error::KeyVersionNotFound(name, "previous version".into())),
         }
     }
@@ -388,18 +388,18 @@ pub mod policy {
                         let export_capability = vec![vault::Capability::Read];
                         let export_policy = format!("transit/export/signing-key/{}", key);
                         vault_policy.add_policy(&export_policy, export_capability);
-                    }
+                    },
                     Capability::Read => core_capabilities.push(vault::Capability::Read),
                     Capability::Rotate => {
                         let rotate_capability = vec![vault::Capability::Update];
                         let rotate_policy = format!("transit/keys/{}/rotate", key);
                         vault_policy.add_policy(&rotate_policy, rotate_capability);
-                    }
+                    },
                     Capability::Sign => {
                         let sign_capability = vec![vault::Capability::Update];
                         let sign_policy = format!("transit/sign/{}", key);
                         vault_policy.add_policy(&sign_policy, sign_capability);
-                    }
+                    },
                     Capability::Write => core_capabilities.push(vault::Capability::Update),
                 }
             }
@@ -421,7 +421,7 @@ pub mod policy {
                     Identity::User(id) => self.set_policy(id, engine, name, &perm.capabilities)?,
                     Identity::Anyone => {
                         self.set_policy(APTOS_DEFAULT, engine, name, &perm.capabilities)?
-                    }
+                    },
                     Identity::NoOne => (),
                 };
             }

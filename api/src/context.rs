@@ -1,46 +1,58 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::accept_type::AcceptType;
-use crate::response::{
-    bcs_api_disabled, block_not_found_by_height, block_not_found_by_version,
-    block_pruned_by_height, json_api_disabled, version_not_found, version_pruned, ForbiddenError,
-    InternalError, NotFoundError, ServiceUnavailableError, StdApiError,
+use crate::{
+    accept_type::AcceptType,
+    response::{
+        bcs_api_disabled, block_not_found_by_height, block_not_found_by_version,
+        block_pruned_by_height, json_api_disabled, version_not_found, version_pruned,
+        ForbiddenError, InternalError, NotFoundError, ServiceUnavailableError, StdApiError,
+    },
 };
 use anyhow::{bail, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_api_types::{
-    AptosErrorCode, AsConverter, BcsBlock, GasEstimation, LedgerInfo, TransactionOnChainData,
+    AptosErrorCode, AsConverter, BcsBlock, GasEstimation, LedgerInfo, ResourceGroup,
+    TransactionOnChainData,
 };
 use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::HashValue;
 use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule};
 use aptos_logger::error;
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
-use aptos_state_view::StateView;
-use aptos_types::access_path::{AccessPath, Path};
-use aptos_types::account_config::NewBlockEvent;
-use aptos_types::account_view::AccountView;
-use aptos_types::on_chain_config::{GasSchedule, GasScheduleV2, OnChainConfig};
-use aptos_types::transaction::Transaction;
+use aptos_state_view::TStateView;
+use aptos_storage_interface::{
+    state_view::{DbStateView, DbStateViewAtVersion, LatestDbStateCheckpointView},
+    DbReader, Order, MAX_REQUEST_LIMIT,
+};
 use aptos_types::{
+    access_path::{AccessPath, Path},
     account_address::AccountAddress,
+    account_config::NewBlockEvent,
     account_state::AccountState,
+    account_view::AccountView,
     chain_id::ChainId,
     contract_event::EventWithVersion,
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
-    state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix, state_value::StateValue},
-    transaction::{SignedTransaction, TransactionWithProof, Version},
+    on_chain_config::{GasSchedule, GasScheduleV2, OnChainConfig},
+    state_store::{
+        state_key::{StateKey, StateKeyInner},
+        state_key_prefix::StateKeyPrefix,
+        state_value::StateValue,
+    },
+    transaction::{SignedTransaction, Transaction, TransactionWithProof, Version},
 };
-use aptos_vm::data_cache::{IntoMoveResolver, StorageAdapter, StorageAdapterOwned};
+use aptos_vm::{
+    data_cache::{IntoMoveResolver, StorageAdapter, StorageAdapterOwned},
+    move_vm_ext::MoveResolverExt,
+};
 use futures::{channel::oneshot, SinkExt};
 use itertools::Itertools;
 use move_core_types::language_storage::{ModuleId, StructTag};
-use std::sync::RwLock;
-use std::{collections::HashMap, sync::Arc};
-use storage_interface::{
-    state_view::{DbStateView, DbStateViewAtVersion, LatestDbStateCheckpointView},
-    DbReader, Order, MAX_REQUEST_LIMIT,
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
 };
 
 // Context holds application scope context
@@ -115,6 +127,22 @@ impl Context {
         self.move_resolver()
             .context("Failed to read latest state checkpoint from DB")
             .map_err(|e| E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info))
+    }
+
+    pub fn state_view<E: StdApiError>(
+        &self,
+        requested_ledger_version: Option<u64>,
+    ) -> Result<(LedgerInfo, u64, DbStateView), E> {
+        let (latest_ledger_info, requested_ledger_version) =
+            self.get_latest_ledger_info_and_verify_lookup_version(requested_ledger_version)?;
+
+        let state_view = self
+            .state_view_at_version(requested_ledger_version)
+            .map_err(|err| {
+                E::internal_with_code(err, AptosErrorCode::InternalError, &latest_ledger_info)
+            })?;
+
+        Ok((latest_ledger_info, requested_ledger_version, state_view))
     }
 
     pub fn state_view_at_version(&self, version: Version) -> Result<DbStateView> {
@@ -228,7 +256,7 @@ impl Context {
     pub fn get_state_value(&self, state_key: &StateKey, version: u64) -> Result<Option<Vec<u8>>> {
         self.db
             .state_view_at_version(Some(version))?
-            .get_state_value(state_key)
+            .get_state_value_bytes(state_key)
     }
 
     pub fn get_state_value_poem<E: InternalError>(
@@ -274,12 +302,21 @@ impl Context {
             prev_state_key,
             version,
         )?;
+        // TODO: Consider rewriting this to consider resource groups:
+        // * If a resource group is found, expand
+        // * Return Option<Result<(PathType, StructTag, Vec<u8>)>>
+        // * Count resources and only include a resource group if it can completely fit
+        // * Get next_key as the first struct_tag not included
         let mut resource_iter = account_iter
             .filter_map(|res| match res {
-                Ok((k, v)) => match k {
-                    StateKey::AccessPath(AccessPath { address: _, path }) => {
+                Ok((k, v)) => match k.inner() {
+                    StateKeyInner::AccessPath(AccessPath { address: _, path }) => {
                         match Path::try_from(path.as_slice()) {
                             Ok(Path::Resource(struct_tag)) => {
+                                Some(Ok((struct_tag, v.into_bytes())))
+                            }
+                            // TODO: Consider expanding to Path::Resource
+                            Ok(Path::ResourceGroup(struct_tag)) => {
                                 Some(Ok((struct_tag, v.into_bytes())))
                             }
                             Ok(Path::Code(_)) => None,
@@ -297,13 +334,41 @@ impl Context {
         let kvs = resource_iter
             .by_ref()
             .take(limit as usize)
-            .collect::<Result<_>>()?;
-        let next_key = resource_iter.next().transpose()?.map(|(struct_tag, _v)| {
-            StateKey::AccessPath(AccessPath::new(
+            .collect::<Result<Vec<(StructTag, Vec<u8>)>>>()?;
+
+        // We should be able to do an unwrap here, otherwise the above db read would fail.
+        let resolver = self.state_view_at_version(version)?.into_move_resolver();
+
+        // Extract resources from resource groups and flatten into all resources
+        let kvs = kvs
+            .into_iter()
+            .map(|(key, value)| {
+                if resolver.is_resource_group(&key) {
+                    // An error here means a storage invariant has been violated
+                    bcs::from_bytes::<ResourceGroup>(&value)
+                        .map(|map| {
+                            map.into_iter()
+                                .map(|(key, value)| (key, value))
+                                .collect::<Vec<_>>()
+                        })
+                        .map_err(|e| e.into())
+                } else {
+                    Ok(vec![(key, value)])
+                }
+            })
+            .collect::<Result<Vec<Vec<(StructTag, Vec<u8>)>>>>()?
+            .into_iter()
+            .flatten()
+            .collect();
+
+        let next_key = if let Some((struct_tag, _v)) = resource_iter.next().transpose()? {
+            Some(StateKey::access_path(AccessPath::new(
                 address,
-                AccessPath::resource_path_vec(struct_tag),
-            ))
-        });
+                AccessPath::resource_path_vec(struct_tag)?,
+            )))
+        } else {
+            None
+        };
         Ok((kvs, next_key))
     }
 
@@ -321,11 +386,11 @@ impl Context {
         )?;
         let mut module_iter = account_iter
             .filter_map(|res| match res {
-                Ok((k, v)) => match k {
-                    StateKey::AccessPath(AccessPath { address: _, path }) => {
+                Ok((k, v)) => match k.inner() {
+                    StateKeyInner::AccessPath(AccessPath { address: _, path }) => {
                         match Path::try_from(path.as_slice()) {
                             Ok(Path::Code(module_id)) => Some(Ok((module_id, v.into_bytes()))),
-                            Ok(Path::Resource(_)) => None,
+                            Ok(Path::Resource(_)) | Ok(Path::ResourceGroup(_)) => None,
                             Err(e) => Some(Err(anyhow::Error::from(e))),
                         }
                     }
@@ -342,7 +407,7 @@ impl Context {
             .take(limit as usize)
             .collect::<Result<_>>()?;
         let next_key = module_iter.next().transpose()?.map(|(module_id, _v)| {
-            StateKey::AccessPath(AccessPath::new(
+            StateKey::access_path(AccessPath::new(
                 address,
                 AccessPath::code_path_vec(module_id),
             ))
@@ -912,14 +977,15 @@ impl Context {
 
             let gas_schedule_params =
                 match GasScheduleV2::fetch_config(&storage_adapter).and_then(|gas_schedule| {
+                    let feature_version = gas_schedule.feature_version;
                     let gas_schedule = gas_schedule.to_btree_map();
-                    AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule)
+                    AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule, feature_version)
                 }) {
                     Some(gas_schedule) => Ok(gas_schedule),
                     None => GasSchedule::fetch_config(&storage_adapter)
                         .and_then(|gas_schedule| {
                             let gas_schedule = gas_schedule.to_btree_map();
-                            AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule)
+                            AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule, 0)
                         })
                         .ok_or_else(|| {
                             E::internal_with_code(
@@ -950,12 +1016,12 @@ impl Context {
                 if !self.node_config.api.json_output_enabled {
                     return Err(json_api_disabled(api_name));
                 }
-            }
+            },
             AcceptType::Bcs => {
                 if !self.node_config.api.bcs_output_enabled {
                     return Err(bcs_api_disabled(api_name));
                 }
-            }
+            },
         }
         Ok(())
     }

@@ -1,18 +1,16 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::validatable::Validate;
 use crate::{
     bls12381,
     bls12381::{PrivateKey, ProofOfPossession, PublicKey},
     test_utils::{random_subset, KeyPair, TestAptosCrypto},
-    validatable::Validatable,
+    validatable::{Validatable, Validate},
     Signature, SigningKey, Uniform,
 };
 use rand::{distributions::Alphanumeric, Rng};
 use rand_core::OsRng;
-use std::convert::TryFrom;
-use std::iter::zip;
+use std::{convert::TryFrom, iter::zip};
 
 /// Tests that an individual signature share computed correctly on a message m passes verification on m.
 /// Tests that a signature share computed on a different message m' fails verification on m.
@@ -423,8 +421,8 @@ fn bls12381_sample_signature() {
     let message = b"Hello Aptos!";
     let signature = sk.sign_arbitrary_message(message);
 
-    println!("SK:        {}", hex::encode(&sk.to_bytes()));
-    println!("PK:        {}", hex::encode(&pk.to_bytes()));
+    println!("SK:        {}", hex::encode(sk.to_bytes()));
+    println!("PK:        {}", hex::encode(pk.to_bytes()));
     println!("Message:   {}", std::str::from_utf8(message).unwrap());
     println!("Signature: {}", hex::encode(signature.to_bytes()));
 }

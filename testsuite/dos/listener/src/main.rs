@@ -1,14 +1,16 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use bytes::BytesMut;
 use clap::Parser;
-use std::io;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Arc;
-use tokio::io::AsyncWriteExt;
-use tokio::net::TcpListener;
-use tokio::time::Duration;
+use std::{
+    io,
+    sync::{
+        atomic::{AtomicBool, AtomicU64, Ordering},
+        Arc,
+    },
+};
+use tokio::{io::AsyncWriteExt, net::TcpListener, time::Duration};
 
 static STOP: AtomicBool = AtomicBool::new(false);
 #[cfg(not(target_arch = "x86_64"))]
@@ -69,10 +71,10 @@ async fn main() -> tokio::io::Result<()> {
                     match socket.try_read_buf(&mut buffer) {
                         Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                             tokio::task::yield_now().await;
-                        }
+                        },
                         Err(e) => {
                             return Err(e);
-                        }
+                        },
                         Ok(0) => break,
                         Ok(n) => {
                             if &buffer[..13] == b"Hello World!\n" {
@@ -93,7 +95,7 @@ async fn main() -> tokio::io::Result<()> {
                                     }
                                 }
                             }
-                        }
+                        },
                     }
                 }
 

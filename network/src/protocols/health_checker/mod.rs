@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! Protocol used to ensure peer liveness
@@ -18,37 +19,34 @@
 //! - Use successful inbound pings as a sign of remote note being healthy
 //! - Ping a peer only in periods of no application-level communication with the peer
 use crate::{
-    application::interface::NetworkInterface,
+    application::interface::NetworkClientInterface,
     constants::NETWORK_CHANNEL_SIZE,
     counters,
-    error::NetworkError,
     logging::NetworkSchema,
-    peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{
-        health_checker::interface::{HealthCheckData, HealthCheckNetworkInterface},
+        health_checker::interface::HealthCheckNetworkInterface,
         network::{
-            AppConfig, ApplicationNetworkSender, Event, NetworkEvents, NetworkSender,
-            NewNetworkSender,
+            Event, NetworkApplicationConfig, NetworkClientConfig, NetworkEvents,
+            NetworkServiceConfig,
         },
         rpc::error::RpcError,
     },
     ProtocolId,
 };
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::network_id::{NetworkContext, PeerNetworkId};
 use aptos_logger::prelude::*;
+use aptos_short_hex_str::AsShortHexStr;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::PeerId;
-use async_trait::async_trait;
 use bytes::Bytes;
-use channel::{aptos_channel, message_queues::QueueStyle};
 use futures::{
     channel::oneshot,
     stream::{FuturesUnordered, StreamExt},
 };
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
-use short_hex_str::AsShortHexStr;
-use std::{collections::hash_map::Entry, time::Duration};
+use std::time::Duration;
 
 pub mod builder;
 mod interface;
@@ -63,65 +61,23 @@ mod test;
 /// around an `channel::Receiver<PeerManagerNotification>`.
 pub type HealthCheckerNetworkEvents = NetworkEvents<HealthCheckerMsg>;
 
-/// The interface from HealthChecker to Networking layer.
-///
-/// This is a thin wrapper around a `NetworkSender<HealthCheckerMsg>`, so it is
-/// easy to clone and send off to a separate task. For example, the rpc requests
-/// return Futures that encapsulate the whole flow, from sending the request to
-/// remote, to finally receiving the response and deserializing. It therefore
-/// makes the most sense to make the rpc call on a separate async task, which
-/// requires the `HealthCheckerNetworkSender` to be `Clone` and `Send`.
-#[derive(Clone)]
-pub struct HealthCheckerNetworkSender {
-    inner: NetworkSender<HealthCheckerMsg>,
-}
+/// Returns a network application config for the health check client and service
+pub fn health_checker_network_config() -> NetworkApplicationConfig {
+    let direct_send_protocols = vec![]; // Health checker doesn't use direct send
+    let rpc_protocols = vec![ProtocolId::HealthCheckerRpc];
 
-/// Configuration for the network endpoints to support HealthChecker.
-pub fn network_endpoint_config() -> AppConfig {
-    AppConfig::p2p(
-        [ProtocolId::HealthCheckerRpc],
+    let network_client_config =
+        NetworkClientConfig::new(direct_send_protocols.clone(), rpc_protocols.clone());
+    let network_service_config = NetworkServiceConfig::new(
+        direct_send_protocols,
+        rpc_protocols,
         aptos_channel::Config::new(NETWORK_CHANNEL_SIZE)
             .queue_style(QueueStyle::LIFO)
             .counters(&counters::PENDING_HEALTH_CHECKER_NETWORK_EVENTS),
-    )
+    );
+    NetworkApplicationConfig::new(network_client_config, network_service_config)
 }
 
-impl NewNetworkSender for HealthCheckerNetworkSender {
-    fn new(
-        peer_mgr_reqs_tx: PeerManagerRequestSender,
-        connection_reqs_tx: ConnectionRequestSender,
-    ) -> Self {
-        Self {
-            inner: NetworkSender::new(peer_mgr_reqs_tx, connection_reqs_tx),
-        }
-    }
-}
-
-impl HealthCheckerNetworkSender {
-    pub async fn disconnect_peer(&mut self, peer_id: PeerId) -> Result<(), NetworkError> {
-        self.inner.disconnect_peer(peer_id).await
-    }
-}
-
-#[async_trait]
-impl ApplicationNetworkSender<HealthCheckerMsg> for HealthCheckerNetworkSender {
-    /// Send a HealthChecker Ping RPC request to remote peer `recipient`. Returns
-    /// the remote peer's future `Pong` reply.
-    ///
-    /// The rpc request can be canceled at any point by dropping the returned
-    /// future.
-    async fn send_rpc(
-        &self,
-        recipient: PeerId,
-        req_msg: HealthCheckerMsg,
-        timeout: Duration,
-    ) -> Result<HealthCheckerMsg, RpcError> {
-        let protocol = ProtocolId::HealthCheckerRpc;
-        self.inner
-            .send_rpc(recipient, protocol, req_msg, timeout)
-            .await
-    }
-}
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum HealthCheckerMsg {
     Ping(Ping),
@@ -135,12 +91,12 @@ pub struct Ping(u32);
 pub struct Pong(u32);
 
 /// The actor performing health checks by running the Ping protocol
-pub struct HealthChecker {
+pub struct HealthChecker<NetworkClient> {
     network_context: NetworkContext,
     /// A handle to a time service for easily mocking time-related operations.
     time_service: TimeService,
     /// Network interface to send requests to the Network Layer
-    network_interface: HealthCheckNetworkInterface,
+    network_interface: HealthCheckNetworkInterface<NetworkClient>,
     /// Random-number generator.
     rng: SmallRng,
     /// Time we wait between each set of pings.
@@ -155,12 +111,12 @@ pub struct HealthChecker {
     round: u64,
 }
 
-impl HealthChecker {
+impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChecker<NetworkClient> {
     /// Create new instance of the [`HealthChecker`] actor.
     pub fn new(
         network_context: NetworkContext,
         time_service: TimeService,
-        network_interface: HealthCheckNetworkInterface,
+        network_interface: HealthCheckNetworkInterface<NetworkClient>,
         ping_interval: Duration,
         ping_timeout: Duration,
         ping_failures_tolerated: u64,
@@ -199,13 +155,12 @@ impl HealthChecker {
 
                     match event {
                         Event::NewPeer(metadata) => {
-                            self.network_interface.app_data().insert(
-                                metadata.remote_peer_id,
-                                HealthCheckData::new(self.round)
+                            self.network_interface.create_peer_and_health_data(
+                                metadata.remote_peer_id, self.round
                             );
                         }
                         Event::LostPeer(metadata) => {
-                            self.network_interface.app_data().remove(
+                            self.network_interface.remove_peer_and_health_data(
                                 &metadata.remote_peer_id
                             );
                         }
@@ -266,7 +221,7 @@ impl HealthChecker {
 
                         tick_handlers.push(Self::ping_peer(
                             self.network_context,
-                            self.network_interface.sender(),
+                            self.network_interface.network_client(),
                             peer_id,
                             self.round,
                             nonce,
@@ -302,7 +257,7 @@ impl HealthChecker {
                     "{} Unable to serialize pong response: {}", self.network_context, e
                 );
                 return;
-            }
+            },
         };
         trace!(
             NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
@@ -312,18 +267,7 @@ impl HealthChecker {
             ping.0,
         );
         // Record Ingress HC here and reset failures.
-        let _ = self.network_interface.app_data().write(peer_id, |entry| {
-            match entry {
-                Entry::Vacant(..) => {
-                    // Don't do anything if there isn't an entry
-                }
-                Entry::Occupied(inner) => {
-                    let data = inner.get_mut();
-                    data.failures = 0;
-                }
-            };
-            Ok(())
-        });
+        self.network_interface.reset_peer_failures(peer_id);
 
         let _ = res_tx.send(Ok(message.into()));
     }
@@ -348,22 +292,8 @@ impl HealthChecker {
                     );
                     // Update last successful ping to current round.
                     // If it's not in storage, don't bother updating it
-                    let _ = self.network_interface.app_data().write(peer_id, |entry| {
-                        match entry {
-                            Entry::Vacant(..) => {
-                                // Don't do anything if there isn't an entry
-                            }
-                            Entry::Occupied(inner) => {
-                                let data = inner.get_mut();
-                                // Update state if it's a newer round
-                                if round > data.round {
-                                    data.round = round;
-                                    data.failures = 0;
-                                }
-                            }
-                        };
-                        Ok(())
-                    });
+                    self.network_interface
+                        .reset_peer_round_state(peer_id, round);
                 } else {
                     warn!(
                         SecurityEvent::InvalidHealthCheckerMsg,
@@ -376,7 +306,7 @@ impl HealthChecker {
                     );
                     debug_assert!(false, "Pong nonce doesn't match our challenge Ping nonce");
                 }
-            }
+            },
             Err(err) => {
                 warn!(
                     NetworkSchema::new(&self.network_context)
@@ -389,23 +319,8 @@ impl HealthChecker {
                     round,
                     err
                 );
-                let _ = self.network_interface.app_data().write(peer_id, |entry| {
-                    // Don't add in a default in case it's already disconnected
-                    match entry {
-                        Entry::Vacant(..) => {
-                            // Don't do anything if there isn't an entry
-                        }
-                        Entry::Occupied(inner) => {
-                            // If this is the result of an older ping, we ignore it.
-                            // Increment num of failures.
-                            let data = inner.get_mut();
-                            if data.round <= round {
-                                data.failures += 1;
-                            }
-                        }
-                    }
-                    Ok(())
-                });
+                self.network_interface
+                    .increment_peer_round_failure(peer_id, round);
 
                 // If the ping failures are now more than
                 // `self.ping_failures_tolerated`, we disconnect from the node.
@@ -413,9 +328,7 @@ impl HealthChecker {
                 // ConnectivityManager or the remote peer to re-establish the connection.
                 let failures = self
                     .network_interface
-                    .app_data()
-                    .read(&peer_id)
-                    .map(|data| data.failures)
+                    .get_peer_failures(peer_id)
                     .unwrap_or(0);
                 if failures > self.ping_failures_tolerated {
                     info!(
@@ -442,13 +355,13 @@ impl HealthChecker {
                         );
                     }
                 }
-            }
+            },
         }
     }
 
     async fn ping_peer(
         network_context: NetworkContext,
-        network_tx: HealthCheckerNetworkSender,
+        network_client: NetworkClient, // TODO: we shouldn't need to pass the client directly
         peer_id: PeerId,
         round: u64,
         nonce: u32,
@@ -463,9 +376,15 @@ impl HealthChecker {
             round,
             nonce
         );
-        let res_pong_msg = network_tx
-            .send_rpc(peer_id, HealthCheckerMsg::Ping(Ping(nonce)), ping_timeout)
+        let peer_network_id = PeerNetworkId::new(network_context.network_id(), peer_id);
+        let res_pong_msg = network_client
+            .send_to_peer_rpc(
+                HealthCheckerMsg::Ping(Ping(nonce)),
+                ping_timeout,
+                peer_network_id,
+            )
             .await
+            .map_err(|error| RpcError::Error(error.into()))
             .and_then(|msg| match msg {
                 HealthCheckerMsg::Pong(res) => Ok(res),
                 _ => Err(RpcError::InvalidRpcResponse),

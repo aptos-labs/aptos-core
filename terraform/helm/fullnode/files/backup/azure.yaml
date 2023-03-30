@@ -11,3 +11,5 @@ commands:
   list_metadata_files: |
     (azcopy ls "https://$ACCOUNT.blob.core.windows.net/$CONTAINER/$SUB_DIR/metadata/$SAS" ||:) \
     | sed -ne "s#; .*##;s#INFO: \(.*\.meta\)#metadata/\1#p"
+  backup_metadata_file: |
+    azcopy sync "https://$ACCOUNT.blob.core.windows.net/$CONTAINER/$SUB_DIR/metadata/$FILE_NAME$SAS" "https://$ACCOUNT.blob.core.windows.net/$CONTAINER/$SUB_DIR/metadata_backup/$FILE_NAME$SAS" --move=true

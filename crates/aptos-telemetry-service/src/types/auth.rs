@@ -1,12 +1,12 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::common::NodeType;
 use aptos_config::config::RoleType;
 use aptos_crypto::x25519;
 use aptos_types::{chain_id::ChainId, PeerId};
 use serde::{Deserialize, Serialize};
-
-use super::common::NodeType;
+use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct AuthRequest {
@@ -16,6 +16,8 @@ pub struct AuthRequest {
     pub role_type: RoleType,
     pub server_public_key: x25519::PublicKey,
     pub handshake_msg: Vec<u8>,
+    #[serde(default = "default_uuid")]
+    pub run_uuid: Uuid,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -31,17 +33,21 @@ pub struct Claims {
     pub epoch: u64,
     pub exp: usize,
     pub iat: usize,
+    pub run_uuid: Uuid,
 }
 
 fn default_role_type() -> RoleType {
     RoleType::Validator
 }
 
+fn default_uuid() -> Uuid {
+    Uuid::default()
+}
+
 impl Claims {
     #[cfg(test)]
     pub(crate) fn test() -> Self {
-        use chrono::Duration;
-        use chrono::Utc;
+        use chrono::{Duration, Utc};
 
         Self {
             chain_id: ChainId::test(),
@@ -53,6 +59,7 @@ impl Claims {
                 .checked_add_signed(Duration::seconds(3600))
                 .unwrap()
                 .timestamp() as usize,
+            run_uuid: Uuid::default(),
         }
     }
 }

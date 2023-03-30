@@ -13,40 +13,40 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-anyhow = "1.0.57"
-aptos-crypto = { path = "../../crates/aptos-crypto" }
-aptos-telemetry-service = { path = "../../crates/aptos-telemetry-service" }
-aptos-types = { path = "../../types" }
-flate2 = "1.0"
-futures = "0.3.21"
-once_cell = "1.10.0"
-prometheus = { version = "0.13.1", default-features = false }
-rand = "0.7.3"
-rand_core = "0.5.1"
-reqwest = { version = "0.11.10", features = ["json"] }
-reqwest-middleware = { version = "0.1.6" }
-reqwest-retry = { version = "0.1.5" }
-serde = { version = "1.0.137", features = ["derive"], default-features = false }
-serde_json = "1.0.81"
-sysinfo = "0.24.2"
-thiserror = "1.0.32"
-tokio = { version = "1.21.0" }
-tokio-retry = "0.3"
-tokio-stream = "0.1.8"
-url = "2.2.2"
-uuid = { version = "1.0.0", features = ["v4", "serde"] }
-
-aptos-api = { path = "../../api" }
-aptos-config = { path = "../../config" }
-aptos-infallible = { path = "../../crates/aptos-infallible" }
-aptos-logger = { path = "../../crates/aptos-logger" }
-aptos-mempool = { path = "../../mempool" }
-aptos-metrics-core = { path = "../../crates/aptos-metrics-core" }
-aptosdb = { path = "../../storage/aptosdb" }
-consensus = { path = "../../consensus" }
-network = { path = "../../network" }
-node-resource-metrics = { path = "../../crates/node-resource-metrics" }
-state-sync-driver = { path = "../../state-sync/state-sync-v2/state-sync-driver" }
+anyhow = { workspace = true }
+aptos-api = { workspace = true }
+aptos-config = { workspace = true }
+aptos-consensus = { workspace = true }
+aptos-crypto = { workspace = true }
+aptos-db = { workspace = true }
+aptos-infallible = { workspace = true }
+aptos-logger = { workspace = true }
+aptos-mempool = { workspace = true }
+aptos-metrics-core = { workspace = true }
+aptos-network = { workspace = true }
+aptos-node-resource-metrics = { workspace = true }
+aptos-runtimes = { workspace = true }
+aptos-state-sync-driver = { workspace = true }
+aptos-telemetry-service = { workspace = true }
+aptos-types = { workspace = true }
+flate2 = { workspace = true }
+futures = { workspace = true }
+once_cell = { workspace = true }
+prometheus = { workspace = true }
+rand = { workspace = true }
+rand_core = { workspace = true }
+reqwest = { workspace = true }
+reqwest-middleware = { workspace = true }
+reqwest-retry = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sysinfo = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tokio-retry = { workspace = true }
+tokio-stream = { workspace = true }
+url = { workspace = true }
+uuid = { workspace = true }
 
 [dev-dependencies]
-httpmock = "0.6"
+httpmock = { workspace = true }

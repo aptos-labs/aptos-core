@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! A model to test properties of common Aptos transactions.
@@ -15,11 +16,6 @@ mod bad_transaction;
 mod create_account;
 mod peer_to_peer;
 mod universe;
-pub use bad_transaction::*;
-pub use create_account::*;
-pub use peer_to_peer::*;
-pub use universe::*;
-
 use crate::{
     account::{Account, AccountData},
     executor::FakeExecutor,
@@ -29,9 +25,13 @@ use aptos_types::{
     transaction::{ExecutionStatus, SignedTransaction, TransactionStatus},
     vm_status::{known_locations, StatusCode},
 };
+pub use bad_transaction::*;
+pub use create_account::*;
 use once_cell::sync::Lazy;
+pub use peer_to_peer::*;
 use proptest::{prelude::*, strategy::Union};
 use std::{fmt, sync::Arc};
+pub use universe::*;
 
 static UNIVERSE_SIZE: Lazy<usize> = Lazy::new(|| {
     use std::{env, process::abort};
@@ -44,7 +44,7 @@ static UNIVERSE_SIZE: Lazy<usize> = Lazy::new(|| {
                 // Abort because Lazy with panics causes poisoning and isn't very
                 // helpful overall.
                 abort();
-            }
+            },
         },
         Err(env::VarError::NotPresent) => 20,
         Err(err) => {
@@ -53,7 +53,7 @@ static UNIVERSE_SIZE: Lazy<usize> = Lazy::new(|| {
                 err
             );
             abort();
-        }
+        },
     }
 });
 
@@ -253,7 +253,7 @@ pub fn txn_one_account_result(
             sender.sent_events_count += 1;
             sender.balance -= to_deduct;
             (TransactionStatus::Keep(ExecutionStatus::Success), true)
-        }
+        },
         (true, true, false) => {
             // Enough gas to pass validation and to do the transfer, but not enough to succeed
             // in the epilogue. The transaction will be run and gas will be deducted from the
@@ -268,7 +268,7 @@ pub fn txn_one_account_result(
                 }),
                 false,
             )
-        }
+        },
         (true, false, _) => {
             // Enough gas to pass validation but not enough to succeed. The transaction will
             // be run and gas will be deducted from the sender, but no other changes will
@@ -283,14 +283,14 @@ pub fn txn_one_account_result(
                 }),
                 false,
             )
-        }
+        },
         (false, _, _) => {
             // Not enough gas to pass validation. Nothing will happen.
             (
                 TransactionStatus::Discard(StatusCode::INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE),
                 false,
             )
-        }
+        },
     }
 }
 

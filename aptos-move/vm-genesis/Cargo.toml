@@ -1,5 +1,5 @@
 [package]
-name = "vm-genesis"
+name = "aptos-vm-genesis"
 description = "Aptos vm genesis"
 version = "0.1.0"
 
@@ -13,30 +13,26 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-anyhow = "1.0.57"
-bcs = { git = "https://github.com/aptos-labs/bcs", rev = "2cde3e8446c460cb17b0c1d6bac7e27e964ac169" }
-once_cell = "1.10.0"
-rand = "0.7.3"
-serde = { version = "1.0.137", default-features = false }
-
-aptos-crypto = { path = "../../crates/aptos-crypto" }
-aptos-gas = { path = "../aptos-gas" }
-aptos-state-view = { path = "../../storage/state-view" }
-aptos-types = { path = "../../types" }
-aptos-vm = { path = "../aptos-vm" }
-cached-packages =  { path = "../framework/cached-packages" }
-framework =  { path = "../framework" }
-
+anyhow = { workspace = true }
+aptos-cached-packages =  { workspace = true }
+aptos-crypto = { workspace = true }
+aptos-framework =  { workspace = true }
+aptos-gas = { workspace = true }
+aptos-state-view = { workspace = true }
+aptos-types = { workspace = true }
+aptos-vm = { workspace = true }
+bcs = { workspace = true }
 move-core-types = { workspace = true }
 move-vm-types = { workspace = true }
+once_cell = { workspace = true }
+rand = { workspace = true }
+serde = { workspace = true }
 
 [dev-dependencies]
-proptest = "1.0.0"
-proptest-derive = "0.3.0"
-
-aptos-proptest-helpers = { path = "../../crates/aptos-proptest-helpers" }
-
-move-core-types = { workspace = true, features = ["fuzzing"] }
+aptos-proptest-helpers = { workspace = true }
+move-core-types = { workspace = true }
+proptest = { workspace = true }
+proptest-derive = { workspace = true }
 
 [features]
 default = []

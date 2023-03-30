@@ -1,14 +1,11 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{cell::Cell, sync::Arc};
-
-use aptos_infallible::Mutex;
-use consensus_types::common::{Author, Round};
-
-use crate::liveness::cached_proposer_election::CachedProposerElection;
-
 use super::proposer_election::ProposerElection;
+use crate::liveness::cached_proposer_election::CachedProposerElection;
+use aptos_consensus_types::common::{Author, Round};
+use aptos_infallible::Mutex;
+use std::{cell::Cell, sync::Arc};
 
 struct MockProposerElection {
     proposers: Vec<Author>,
@@ -35,6 +32,7 @@ fn test_get_valid_proposer_caching() {
     let asked = Arc::new(Mutex::new(Cell::new(0)));
     let authors: Vec<Author> = (0..4).map(|_| Author::random()).collect();
     let cpe = CachedProposerElection::new(
+        1,
         Box::new(MockProposerElection::new(authors.clone(), asked.clone())),
         10,
     );

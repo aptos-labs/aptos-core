@@ -1,10 +1,12 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::counters::{APTOS_LOG_INGEST_WRITER_DISCONNECTED, APTOS_LOG_INGEST_WRITER_FULL};
 use futures::channel;
-use std::io::{Error, ErrorKind};
-use std::sync;
+use std::{
+    io::{Error, ErrorKind},
+    sync,
+};
 
 #[derive(Debug)]
 pub enum TelemetryLog {
@@ -36,7 +38,7 @@ impl TelemetryLogWriter {
                     APTOS_LOG_INGEST_WRITER_DISCONNECTED.inc_by(len as u64);
                     Err(Error::new(ErrorKind::ConnectionRefused, "Disconnected"))
                 }
-            }
+            },
         }
     }
 
@@ -51,7 +53,7 @@ impl TelemetryLogWriter {
                 } else {
                     Err(Error::new(ErrorKind::ConnectionRefused, "Disconnected"))
                 }
-            }
+            },
         }
     }
 }

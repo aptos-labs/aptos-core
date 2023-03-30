@@ -1,8 +1,8 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-mod blocking_runner;
+mod sync_runner;
 mod traits;
 
-pub use blocking_runner::{BlockingRunner, BlockingRunnerArgs};
-pub use traits::{Runner, RunnerError};
+pub use sync_runner::{SyncRunner, SyncRunnerConfig};
+pub use traits::Runner;

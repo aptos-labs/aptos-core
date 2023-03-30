@@ -1,54 +1,36 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     auth::with_auth,
-    clients::humio::{CHAIN_ID_TAG_NAME, EPOCH_FIELD_NAME, PEER_ID_FIELD_NAME, PEER_ROLE_TAG_NAME},
+    clients::humio::{
+        CHAIN_ID_TAG_NAME, EPOCH_FIELD_NAME, PEER_ID_FIELD_NAME, PEER_ROLE_TAG_NAME,
+        RUN_UUID_TAG_NAME,
+    },
     constants::MAX_CONTENT_LENGTH,
     context::Context,
+    debug, error,
     errors::{LogIngestError, ServiceError},
     metrics::LOG_INGEST_BACKEND_REQUEST_DURATION,
     types::{auth::Claims, common::NodeType, humio::UnstructuredLog},
 };
-use crate::{debug, error};
 use flate2::bufread::GzDecoder;
 use reqwest::{header::CONTENT_ENCODING, StatusCode};
 use std::collections::HashMap;
 use tokio::time::Instant;
 use warp::{filters::BoxedFilter, reject, reply, Buf, Filter, Rejection, Reply};
 
-/// TODO: Cleanup after v1 API is ramped up
-pub fn log_ingest_legacy(context: Context) -> BoxedFilter<(impl Reply,)> {
-    warp::path!("log_ingest")
-        .and(warp::post())
-        .and(context.clone().filter())
-        .and(with_auth(
-            context,
-            vec![
-                NodeType::Validator,
-                NodeType::ValidatorFullNode,
-                NodeType::PublicFullNode,
-            ],
-        ))
-        .and(warp::header::optional(CONTENT_ENCODING.as_str()))
-        .and(warp::body::content_length_limit(MAX_CONTENT_LENGTH))
-        .and(warp::body::aggregate())
-        .and_then(handle_log_ingest)
-        .boxed()
-}
-
 pub fn log_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("ingest" / "logs")
         .and(warp::post())
         .and(context.clone().filter())
-        .and(with_auth(
-            context,
-            vec![
-                NodeType::Validator,
-                NodeType::ValidatorFullNode,
-                NodeType::PublicFullNode,
-            ],
-        ))
+        .and(with_auth(context, vec![
+            NodeType::Validator,
+            NodeType::ValidatorFullNode,
+            NodeType::PublicFullNode,
+            NodeType::UnknownFullNode,
+            NodeType::UnknownValidator,
+        ]))
         .and(warp::header::optional(CONTENT_ENCODING.as_str()))
         .and(warp::body::content_length_limit(MAX_CONTENT_LENGTH))
         .and(warp::body::aggregate())
@@ -63,6 +45,21 @@ pub async fn handle_log_ingest(
     body: impl Buf,
 ) -> anyhow::Result<impl Reply, Rejection> {
     debug!("handling log ingest");
+
+    if let Some(blacklist) = &context.log_ingest_clients().blacklist {
+        if blacklist.contains(&claims.peer_id) {
+            return Err(reject::custom(ServiceError::forbidden(
+                LogIngestError::Forbidden(claims.peer_id).into(),
+            )));
+        }
+    }
+
+    let client = match claims.node_type {
+        NodeType::Unknown | NodeType::UnknownValidator | NodeType::UnknownFullNode => {
+            &context.log_ingest_clients().unknown_logs_ingest_client
+        },
+        _ => &context.log_ingest_clients().known_logs_ingest_client,
+    };
 
     let log_messages: Vec<String> = if let Some(encoding) = encoding {
         if encoding.eq_ignore_ascii_case("gzip") {
@@ -95,6 +92,7 @@ pub async fn handle_log_ingest(
     };
     tags.insert(CHAIN_ID_TAG_NAME.into(), chain_name);
     tags.insert(PEER_ROLE_TAG_NAME.into(), claims.node_type.to_string());
+    tags.insert(RUN_UUID_TAG_NAME.into(), claims.run_uuid.to_string());
 
     let unstructured_log = UnstructuredLog {
         fields,
@@ -106,10 +104,7 @@ pub async fn handle_log_ingest(
 
     let start_timer = Instant::now();
 
-    let res = context
-        .humio_client()
-        .ingest_unstructured_log(unstructured_log)
-        .await;
+    let res = client.ingest_unstructured_log(unstructured_log).await;
 
     match res {
         Ok(res) => {
@@ -127,7 +122,7 @@ pub async fn handle_log_ingest(
                     LogIngestError::IngestionError.into(),
                 )));
             }
-        }
+        },
         Err(err) => {
             LOG_INGEST_BACKEND_REQUEST_DURATION
                 .with_label_values(&["Unknown"])
@@ -136,7 +131,7 @@ pub async fn handle_log_ingest(
             return Err(reject::custom(ServiceError::bad_request(
                 LogIngestError::IngestionError.into(),
             )));
-        }
+        },
     }
 
     Ok(reply::with_status(reply::reply(), StatusCode::CREATED))

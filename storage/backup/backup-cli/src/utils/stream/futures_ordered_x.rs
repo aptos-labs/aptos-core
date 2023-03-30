@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 /// This is a copy of `futures::stream::futures_ordered` from `futures 0.3.6`, except that it uses
@@ -141,7 +142,7 @@ impl<Fut: Future> Stream for FuturesOrderedX<Fut> {
                     } else {
                         this.queued_outputs.push(output)
                     }
-                }
+                },
                 None => return Poll::Ready(None),
             }
         }

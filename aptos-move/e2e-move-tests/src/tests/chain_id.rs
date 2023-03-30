@@ -1,11 +1,9 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::tests::common;
-use crate::{assert_success, MoveHarness};
-use language_e2e_tests::account::Account;
-use move_core_types::account_address::AccountAddress;
-use move_core_types::parser::parse_struct_tag;
+use crate::{assert_success, tests::common, MoveHarness};
+use aptos_language_e2e_tests::account::Account;
+use move_core_types::{account_address::AccountAddress, parser::parse_struct_tag};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize)]

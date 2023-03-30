@@ -1,52 +1,30 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     auth::with_auth,
     constants::MAX_CONTENT_LENGTH,
     context::Context,
+    debug, error,
     errors::{MetricsIngestError, ServiceError},
     metrics::METRICS_INGEST_BACKEND_REQUEST_DURATION,
     types::{auth::Claims, common::NodeType},
 };
-use crate::{debug, error};
-use aptos_types::chain_id::ChainId;
 use reqwest::{header::CONTENT_ENCODING, StatusCode};
 use tokio::time::Instant;
 use warp::{filters::BoxedFilter, hyper::body::Bytes, reject, reply, Filter, Rejection, Reply};
-
-/// TODO: Cleanup after v1 API is ramped up
-pub fn metrics_ingest_legacy(context: Context) -> BoxedFilter<(impl Reply,)> {
-    warp::path!("push-metrics")
-        .and(warp::post())
-        .and(context.clone().filter())
-        .and(with_auth(
-            context,
-            vec![
-                NodeType::Validator,
-                NodeType::ValidatorFullNode,
-                NodeType::PublicFullNode,
-            ],
-        ))
-        .and(warp::header::optional(CONTENT_ENCODING.as_str()))
-        .and(warp::body::content_length_limit(MAX_CONTENT_LENGTH))
-        .and(warp::body::bytes())
-        .and_then(handle_metrics_ingest)
-        .boxed()
-}
 
 pub fn metrics_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("ingest" / "metrics")
         .and(warp::post())
         .and(context.clone().filter())
-        .and(with_auth(
-            context,
-            vec![
-                NodeType::Validator,
-                NodeType::ValidatorFullNode,
-                NodeType::PublicFullNode,
-            ],
-        ))
+        .and(with_auth(context, vec![
+            NodeType::Validator,
+            NodeType::ValidatorFullNode,
+            NodeType::PublicFullNode,
+            NodeType::UnknownValidator,
+            NodeType::UnknownFullNode,
+        ]))
         .and(warp::header::optional(CONTENT_ENCODING.as_str()))
         .and(warp::body::content_length_limit(MAX_CONTENT_LENGTH))
         .and(warp::body::bytes())
@@ -70,66 +48,61 @@ pub async fn handle_metrics_ingest(
             .and_then(|peers| peers.get(&claims.peer_id)),
     );
 
+    let client = match claims.node_type {
+        NodeType::UnknownValidator | NodeType::UnknownFullNode => {
+            &context.metrics_client().untrusted_ingest_metrics_clients
+        },
+        _ => &context.metrics_client().ingest_metrics_client,
+    };
+
     let start_timer = Instant::now();
 
-    let filtered_clients = context.metrics_client().iter().filter(|(name, _)| {
-        if claims.chain_id.id() == 3 {
-            return true;
-        } else if claims.chain_id == ChainId::mainnet() {
-            return !name.starts_with("default");
-        }
-        name.starts_with("default")
-    });
+    let post_futures = client.iter().map(|(name, client)| async {
+        let result = client
+            .post_prometheus_metrics(
+                metrics_body.clone(),
+                extra_labels.clone(),
+                encoding.clone().unwrap_or_default(),
+            )
+            .await;
 
-    let post_futures = filtered_clients.clone().map(|(_, client)| {
-        client.post_prometheus_metrics(
-            metrics_body.clone(),
-            extra_labels.clone(),
-            encoding.clone().unwrap_or_default(),
-        )
-    });
-
-    let results = futures::future::join_all(post_futures)
-        .await
-        .into_iter()
-        .zip(filtered_clients.map(|(name, _)| name))
-        .map(|(res, name)| {
-            match res {
-                Ok(res) => {
-                    METRICS_INGEST_BACKEND_REQUEST_DURATION
-                        .with_label_values(&[
-                            &claims.peer_id.to_string(),
-                            name,
-                            res.status().as_str(),
-                        ])
-                        .observe(start_timer.elapsed().as_secs_f64());
-                    if res.status().is_success() {
-                        debug!("remote write to victoria metrics succeeded");
-                    } else {
-                        error!(
-                            "remote write failed to victoria_metrics for client {}: {}",
-                            name,
-                            res.error_for_status().err().unwrap()
-                        );
-                        return Err(());
-                    }
-                }
-                Err(err) => {
-                    METRICS_INGEST_BACKEND_REQUEST_DURATION
-                        .with_label_values(&[name, "Unknown"])
-                        .observe(start_timer.elapsed().as_secs_f64());
+        match result {
+            Ok(res) => {
+                METRICS_INGEST_BACKEND_REQUEST_DURATION
+                    .with_label_values(&[&claims.peer_id.to_string(), name, res.status().as_str()])
+                    .observe(start_timer.elapsed().as_secs_f64());
+                if res.status().is_success() {
+                    debug!("remote write to victoria metrics succeeded");
+                } else {
                     error!(
-                        "error sending remote write request for client {}: {}",
-                        name, err
+                        "remote write failed to victoria_metrics for client {}: {}",
+                        name.clone(),
+                        res.error_for_status().err().unwrap()
                     );
                     return Err(());
                 }
-            }
-            Ok(())
-        });
+            },
+            Err(err) => {
+                METRICS_INGEST_BACKEND_REQUEST_DURATION
+                    .with_label_values(&[name, "Unknown"])
+                    .observe(start_timer.elapsed().as_secs_f64());
+                error!(
+                    "error sending remote write request for client {}: {}",
+                    name.clone(),
+                    err
+                );
+                return Err(());
+            },
+        }
+        Ok(())
+    });
 
     #[allow(clippy::unnecessary_fold)]
-    if results.fold(true, |acc, r| acc && r.is_err()) {
+    if futures::future::join_all(post_futures)
+        .await
+        .iter()
+        .all(|result| result.is_err())
+    {
         return Err(reject::custom(ServiceError::internal(
             MetricsIngestError::IngestionError.into(),
         )));
@@ -165,20 +138,19 @@ fn claims_to_extra_labels(claims: &Claims, common_name: Option<&String>) -> Vec<
         chain_name,
         format!("namespace={}", "telemetry-service"),
         pod_name,
+        format!("run_uuid={}", claims.run_uuid),
     ]
 }
 
 #[cfg(test)]
 mod test {
-    use std::str::FromStr;
-
-    use crate::tests::test_context;
-    use crate::MetricsClient;
-
     use super::*;
+    use crate::{tests::test_context, MetricsClient};
     use aptos_types::{chain_id::ChainId, PeerId};
     use httpmock::MockServer;
     use reqwest::Url;
+    use std::str::FromStr;
+    use uuid::Uuid;
 
     #[test]
     fn verify_labels() {
@@ -190,19 +162,20 @@ mod test {
                 epoch: 3,
                 exp: 123,
                 iat: 123,
+                run_uuid: Uuid::default(),
             },
             Some(&String::from("test_name")),
         );
-        assert_eq!(
-            claims,
-            vec![
-                "role=validator",
-                "metrics_source=telemetry-service",
-                "chain_name=25",
-                "namespace=telemetry-service",
-                "kubernetes_pod_name=peer_id:test_name//0x1",
-            ]
-        );
+        assert_eq!(claims, vec![
+            "role=validator",
+            "metrics_source=telemetry-service",
+            "chain_name=25",
+            "namespace=telemetry-service",
+            "kubernetes_pod_name=peer_id:test_name//0x1",
+            &format!("run_uuid={}", Uuid::default()),
+        ]);
+
+        let test_uuid = Uuid::new_v4();
 
         let claims = claims_to_extra_labels(
             &super::Claims {
@@ -212,19 +185,18 @@ mod test {
                 epoch: 3,
                 exp: 123,
                 iat: 123,
+                run_uuid: test_uuid,
             },
             None,
         );
-        assert_eq!(
-            claims,
-            vec![
-                "role=validator",
-                "metrics_source=telemetry-service",
-                "chain_name=25",
-                "namespace=telemetry-service",
-                "kubernetes_pod_name=peer_id:0x1",
-            ]
-        );
+        assert_eq!(claims, vec![
+            "role=validator",
+            "metrics_source=telemetry-service",
+            "chain_name=25",
+            "namespace=telemetry-service",
+            "kubernetes_pod_name=peer_id:0x1",
+            &format!("run_uuid={}", test_uuid),
+        ]);
     }
 
     #[tokio::test]
@@ -246,11 +218,11 @@ mod test {
         });
 
         let clients = test_context.inner.metrics_client_mut();
-        clients.insert(
+        clients.ingest_metrics_client.insert(
             "default1".into(),
             MetricsClient::new(Url::parse(&server1.base_url()).unwrap(), "token1".into()),
         );
-        clients.insert(
+        clients.ingest_metrics_client.insert(
             "default2".into(),
             MetricsClient::new(Url::parse(&server2.base_url()).unwrap(), "token2".into()),
         );
@@ -282,11 +254,11 @@ mod test {
         });
 
         let clients = test_context.inner.metrics_client_mut();
-        clients.insert(
+        clients.ingest_metrics_client.insert(
             "default1".into(),
             MetricsClient::new(Url::parse(&server1.base_url()).unwrap(), "token1".into()),
         );
-        clients.insert(
+        clients.ingest_metrics_client.insert(
             "default2".into(),
             MetricsClient::new(Url::parse(&server2.base_url()).unwrap(), "token2".into()),
         );
@@ -318,11 +290,11 @@ mod test {
         });
 
         let clients = test_context.inner.metrics_client_mut();
-        clients.insert(
+        clients.ingest_metrics_client.insert(
             "default1".into(),
             MetricsClient::new(Url::parse(&server1.base_url()).unwrap(), "token1".into()),
         );
-        clients.insert(
+        clients.ingest_metrics_client.insert(
             "default2".into(),
             MetricsClient::new(Url::parse(&server2.base_url()).unwrap(), "token2".into()),
         );

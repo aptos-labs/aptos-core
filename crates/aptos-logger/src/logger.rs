@@ -1,10 +1,10 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! Global logger definition and functions
 
 use crate::{counters::STRUCT_LOG_COUNT, error, Event, Metadata};
-
 use once_cell::sync::OnceCell;
 use std::sync::Arc;
 use tracing_subscriber::prelude::*;
@@ -64,7 +64,7 @@ pub fn set_global_logger(logger: Arc<dyn Logger>, console_port: Option<u16>) {
             return;
         }
     }
-    if None == console_port {
+    if console_port.is_none() {
         let _ = tracing::subscriber::set_global_default(
             crate::tracing_adapter::TracingToAptosDataLayer
                 .with_subscriber(tracing_subscriber::Registry::default()),

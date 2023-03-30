@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::config::Error;
@@ -31,7 +32,7 @@ impl SecureBackend {
             | SecureBackend::OnDiskStorage(OnDiskStorageConfig { namespace, .. })
             | SecureBackend::RocksDbStorage(RocksDbStorageConfig { namespace, .. }) => {
                 namespace.as_deref()
-            }
+            },
             SecureBackend::InMemoryStorage => None,
         }
     }
@@ -43,8 +44,8 @@ impl SecureBackend {
             | SecureBackend::OnDiskStorage(OnDiskStorageConfig { namespace, .. })
             | SecureBackend::RocksDbStorage(RocksDbStorageConfig { namespace, .. }) => {
                 *namespace = None;
-            }
-            SecureBackend::InMemoryStorage => {}
+            },
+            SecureBackend::InMemoryStorage => {},
         }
     }
 }
@@ -233,7 +234,7 @@ impl From<&SecureBackend> for Storage {
                 } else {
                     storage
                 }
-            }
+            },
             SecureBackend::InMemoryStorage => Storage::from(InMemoryStorage::new()),
             SecureBackend::OnDiskStorage(config) => {
                 let storage = Storage::from(OnDiskStorage::new(config.path()));
@@ -242,7 +243,7 @@ impl From<&SecureBackend> for Storage {
                 } else {
                     storage
                 }
-            }
+            },
             SecureBackend::RocksDbStorage(config) => {
                 let storage = Storage::from(RocksDbStorage::new(config.path()));
                 if let Some(namespace) = &config.namespace {
@@ -250,7 +251,7 @@ impl From<&SecureBackend> for Storage {
                 } else {
                     storage
                 }
-            }
+            },
             SecureBackend::Vault(config) => {
                 let storage = Storage::from(VaultStorage::new(
                     config.server.clone(),
@@ -269,7 +270,7 @@ impl From<&SecureBackend> for Storage {
                 } else {
                     storage
                 }
-            }
+            },
         }
     }
 }

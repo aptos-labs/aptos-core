@@ -1,14 +1,19 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_cached_packages::aptos_stdlib;
+use aptos_forge::{reconfig, LocalSwarm, NodeExt, Swarm};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{transaction::SignedTransaction, LocalAccount},
 };
-use cached_packages::aptos_stdlib;
-use forge::{reconfig, LocalSwarm, NodeExt, Swarm};
 use rand::random;
+
+pub const MAX_CATCH_UP_WAIT_SECS: u64 = 180; // The max time we'll wait for nodes to catch up
+pub const MAX_CONNECTIVITY_WAIT_SECS: u64 = 180; // The max time we'll wait for nodes to gain connectivity
+pub const MAX_HEALTHY_WAIT_SECS: u64 = 120; // The max time we'll wait for nodes to become healthy
 
 pub async fn create_and_fund_account(swarm: &'_ mut dyn Swarm, amount: u64) -> LocalAccount {
     let mut info = swarm.aptos_public_info();
@@ -45,7 +50,7 @@ pub async fn transfer_coins(
     txn
 }
 
-pub async fn transfer_and_reconfig(
+pub async fn transfer_and_maybe_reconfig(
     client: &RestClient,
     transaction_factory: &TransactionFactory,
     root_account: &mut LocalAccount,

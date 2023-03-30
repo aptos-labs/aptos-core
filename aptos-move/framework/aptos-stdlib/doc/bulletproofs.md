@@ -355,4 +355,4 @@ for some randomness <code>r</code>) satisfies $v \in [0, 2^{num_bits})$. Only wo
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

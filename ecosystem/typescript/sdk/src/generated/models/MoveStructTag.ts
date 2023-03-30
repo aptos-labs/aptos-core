@@ -18,7 +18,7 @@
  * 1. Empty chars should be ignored when comparing 2 struct tag ids.
  * 2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
  *
- * See [doc](https://aptos.dev/concepts/basics-accounts) for more details.
+ * See [doc](https://aptos.dev/concepts/accounts) for more details.
  *
  */
 export type MoveStructTag = string;

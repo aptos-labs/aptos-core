@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module defines physical storage schema mapping table handles to its metadata including
@@ -11,11 +11,11 @@
 
 use crate::schema::TABLE_INFO_CF_NAME;
 use anyhow::Result;
-use aptos_types::state_store::table::{TableHandle, TableInfo};
-use schemadb::{
+use aptos_schemadb::{
     define_schema,
     schema::{KeyCodec, ValueCodec},
 };
+use aptos_types::state_store::table::{TableHandle, TableInfo};
 
 define_schema!(TableInfoSchema, TableHandle, TableInfo, TABLE_INFO_CF_NAME);
 

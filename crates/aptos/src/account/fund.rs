@@ -1,7 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-
-use std::time::{Duration, SystemTime};
 
 use crate::{
     account::create::DEFAULT_FUNDED_COINS,
@@ -13,6 +11,7 @@ use crate::{
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
 use clap::Parser;
+use std::time::{Duration, SystemTime};
 
 /// Fund an account with tokens from a faucet
 ///

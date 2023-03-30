@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::response::BadRequestError;
@@ -44,7 +45,7 @@ impl Page {
         let start = self.start.unwrap_or(default);
         if start > max {
             return Err(E::bad_request_with_code(
-                &format!(
+                format!(
                 "Given start value ({}) is higher than the current ledger version, it must be < {}",
                 start, max
             ),
@@ -64,8 +65,8 @@ impl Page {
     pub fn limit<E: BadRequestError>(&self, ledger_info: &LedgerInfo) -> Result<u16, E> {
         determine_limit(
             self.limit,
-            self.max_page_size,
             DEFAULT_PAGE_SIZE,
+            self.max_page_size,
             ledger_info,
         )
     }
@@ -83,7 +84,7 @@ pub fn determine_limit<E: BadRequestError>(
     let limit = requested_limit.unwrap_or(default_limit);
     if limit == 0 {
         return Err(E::bad_request_with_code(
-            &format!("Given limit value ({}) must not be zero", limit),
+            format!("Given limit value ({}) must not be zero", limit),
             AptosErrorCode::InvalidInput,
             ledger_info,
         ));

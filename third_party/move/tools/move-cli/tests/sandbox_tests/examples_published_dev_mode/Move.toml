@@ -1,0 +1,6 @@
+[package]
+name = "examples_published_dev_mode"
+version = "0.0.0"
+
+[addresses]
+Addr = "0x1"

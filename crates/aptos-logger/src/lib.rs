@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! This crates provides an API for logging.
@@ -155,18 +156,16 @@ pub mod telemetry_log_writer;
 pub mod tracing_adapter;
 
 mod security;
-mod struct_log;
 
 pub use crate::aptos_logger::{
     AptosData as Logger, AptosDataBuilder, LoggerFilterUpdater, Writer, CHANNEL_SIZE,
 };
+pub use aptos_log_derive::Schema;
 pub use event::Event;
 pub use filter::{Filter, LevelFilter};
+pub use kv::{Key, KeyValue, Schema, Value, Visitor};
 pub use logger::flush;
 pub use metadata::{Level, Metadata};
-
-pub use aptos_log_derive::Schema;
-pub use kv::{Key, KeyValue, Schema, Value, Visitor};
 pub use security::SecurityEvent;
 
 mod counters;

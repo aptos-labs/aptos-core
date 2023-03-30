@@ -1,6 +1,8 @@
 #!/bin/bash
-# Copyright (c) Aptos
+# Copyright © Aptos Foundation
+# Parts of the project are originally copyright © Meta Platforms, Inc.
 # SPDX-License-Identifier: Apache-2.0
+
 # This script sets up the environment for the build by installing necessary dependencies.
 #
 # Usage ./dev_setup.sh <options>
@@ -27,6 +29,7 @@ BOOGIE_VERSION=2.15.8
 ALLURE_VERSION=2.15.pr1135
 # this is 3.21.4; the "3" is silent
 PROTOC_VERSION=21.4
+SOLC_VERSION="v0.8.11+commit.d7f03943"
 
 SCRIPT_PATH="$( cd "$( dirname "$0" )" >/dev/null 2>&1 && pwd )"
 cd "$SCRIPT_PATH/.." || exit
@@ -90,6 +93,7 @@ function update_path_and_profile {
     add_to_profile "export CVC5_EXE=\"${BIN_DIR}/cvc5\""
     add_to_profile "export BOOGIE_EXE=\"${DOTNET_ROOT}/tools/boogie\""
   fi
+  add_to_profile "export SOLC_EXE=\"${BIN_DIR}/solc\""
 }
 
 function install_build_essentials {
@@ -138,7 +142,7 @@ function install_protoc {
   mkdir -p "$TMPFILE"/
   (
     cd "$TMPFILE" || exit
-    curl -LOs "https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOC_VERSION/$PROTOC_PKG.zip"
+    curl -LOs "https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOC_VERSION/$PROTOC_PKG.zip" --retry 3
     sudo unzip -o "$PROTOC_PKG.zip" -d /usr/local bin/protoc
     sudo unzip -o "$PROTOC_PKG.zip" -d /usr/local 'include/*'
     sudo chmod +x "/usr/local/bin/protoc"
@@ -147,13 +151,13 @@ function install_protoc {
 
   # Install the cargo plugins
   if ! command -v protoc-gen-prost &> /dev/null; then
-    cargo install protoc-gen-prost
+    cargo install protoc-gen-prost --locked
   fi
   if ! command -v protoc-gen-prost-serde &> /dev/null; then
-    cargo install protoc-gen-prost-serde
+    cargo install protoc-gen-prost-serde --locked
   fi
   if ! command -v protoc-gen-prost-crate &> /dev/null; then
-    cargo install protoc-gen-prost-crate
+    cargo install protoc-gen-prost-crate --locked
   fi
 }
 
@@ -407,6 +411,18 @@ function install_toolchain {
   fi
 }
 
+function install_rustup_components_and_nightly {
+    echo "Updating rustup and installing rustfmt & clippy"
+    rustup update
+    rustup component add rustfmt
+    rustup component add clippy
+
+    # We require nightly for strict rust formatting
+    echo "Installing the nightly toolchain and rustfmt nightly"
+    rustup toolchain install nightly
+    rustup component add rustfmt --toolchain nightly
+}
+
 function install_cargo_sort {
   if ! command -v cargo-sort &> /dev/null; then
     cargo install cargo-sort --locked
@@ -414,7 +430,7 @@ function install_cargo_sort {
 }
 
 function install_cargo_nextest {
-  if ! command -v cargo-nextext &> /dev/null; then
+  if ! command -v cargo-nextest &> /dev/null; then
     cargo install cargo-nextest --locked
   fi
 }
@@ -615,8 +631,23 @@ function install_nodejs {
     install_pkg npm "$PACKAGE_MANAGER"
 }
 
+function install_solidity {
+  echo "Installing Solidity compiler"
+  # We fetch the binary from  https://binaries.soliditylang.org
+  if [[ "$(uname)" == "Linux" ]]; then
+    SOLC_BIN="linux-amd64/solc-linux-amd64-${SOLC_VERSION}"
+  elif [[ "$(uname)" == "Darwin" ]]; then
+    SOLC_BIN="macosx-amd64/solc-macosx-amd64-${SOLC_VERSION}"
+  else
+    echo "Solidity support not configured for this platform (uname=$(uname))"
+    return
+  fi
+  curl -o "${INSTALL_DIR}solc" "https://binaries.soliditylang.org/${SOLC_BIN}"
+  chmod +x "${INSTALL_DIR}solc"
+}
+
 function install_pnpm {
-    curl -fsSL https://get.pnpm.io/install.sh | "${PRE_COMMAND[@]}" env PNPM_VERSION=7.14.2 bash -
+    curl -fsSL https://get.pnpm.io/install.sh | "${PRE_COMMAND[@]}" env PNPM_VERSION=7.14.2 SHELL="$(which bash)" bash -
 }
 
 function install_python3 {
@@ -883,9 +914,7 @@ if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
 
   install_rustup "$BATCH_MODE"
   install_toolchain "$(cat ./rust-toolchain)"
-  # Add all the components that we need
-  rustup component add rustfmt
-  rustup component add clippy
+  install_rustup_components_and_nightly
 
   install_cargo_sort
   install_cargo_nextest
@@ -897,6 +926,7 @@ if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   install_pnpm "$PACKAGE_MANAGER"
   install_pkg unzip "$PACKAGE_MANAGER"
   install_protoc
+  install_solidity
 fi
 
 if [[ "$INSTALL_PROTOC" == "true" ]]; then

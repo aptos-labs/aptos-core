@@ -1,15 +1,17 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::core_mempool::{CoreMempool, TimelineState, TxnPointer};
-use crate::network::MempoolSyncMsg;
+use crate::{
+    core_mempool::{CoreMempool, TimelineState, TxnPointer},
+    network::MempoolSyncMsg,
+};
 use anyhow::{format_err, Result};
 use aptos_compression::metrics::CompressionClient;
 use aptos_config::config::{NodeConfig, MAX_APPLICATION_MESSAGE_SIZE};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::AccountSequenceInfo,
     chain_id::ChainId,
     mempool_status::MempoolStatusCode,
     transaction::{RawTransaction, Script, SignedTransaction},
@@ -47,7 +49,7 @@ pub struct TestTransaction {
     pub(crate) address: usize,
     pub(crate) sequence_number: u64,
     pub(crate) gas_price: u64,
-    pub(crate) account_seqno_type: AccountSequenceInfo,
+    pub(crate) account_seqno: u64,
 }
 
 impl TestTransaction {
@@ -56,7 +58,7 @@ impl TestTransaction {
             address,
             sequence_number,
             gas_price,
-            account_seqno_type: AccountSequenceInfo::Sequential(0),
+            account_seqno: 0,
         }
     }
 
@@ -117,7 +119,7 @@ pub(crate) fn add_txns_to_mempool(
         pool.add_txn(
             txn.clone(),
             txn.gas_unit_price(),
-            transaction.account_seqno_type,
+            transaction.account_seqno,
             TimelineState::NotReady,
         );
         transactions.push(txn);
@@ -134,7 +136,7 @@ pub(crate) fn add_signed_txn(pool: &mut CoreMempool, transaction: SignedTransact
         .add_txn(
             transaction.clone(),
             transaction.gas_unit_price(),
-            AccountSequenceInfo::Sequential(0),
+            0,
             TimelineState::NotReady,
         )
         .code
@@ -168,7 +170,7 @@ impl ConsensusMock {
         max_txns: u64,
         max_bytes: u64,
     ) -> Vec<SignedTransaction> {
-        let block = mempool.get_batch(max_txns, max_bytes, self.0.clone());
+        let block = mempool.get_batch(max_txns, max_bytes, true, self.0.clone());
         self.0 = self
             .0
             .union(

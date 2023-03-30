@@ -1,12 +1,13 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_language_e2e_tests::{current_function_name, executor::FakeExecutor};
 use aptos_types::{
     account_address::AccountAddress,
     account_config,
     transaction::{ExecutionStatus, Script, TransactionStatus},
 };
-use language_e2e_tests::{current_function_name, executor::FakeExecutor};
 use move_binary_format::file_format::{
     empty_script, AbilitySet, AddressIdentifierIndex, Bytecode, FunctionHandle,
     FunctionHandleIndex, IdentifierIndex, ModuleHandle, ModuleHandleIndex, SignatureIndex,

@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -286,7 +287,7 @@ mod tests {
     use futures::{executor::block_on, FutureExt, StreamExt};
     use move_core_types::language_storage::TypeTag;
     use std::time::Duration;
-    use tokio::runtime::{Builder, Runtime};
+    use tokio::runtime::Runtime;
 
     const CONSENSUS_NOTIFICATION_TIMEOUT: u64 = 1000;
 
@@ -348,7 +349,7 @@ mod tests {
                         reconfiguration_events,
                         commit_notification.reconfiguration_events
                     );
-                }
+                },
                 result => panic!(
                     "Expected consensus commit notification but got: {:?}",
                     result
@@ -370,7 +371,7 @@ mod tests {
             Some(consensus_notification) => match consensus_notification {
                 ConsensusNotification::SyncToTarget(sync_notification) => {
                     assert_eq!(create_ledger_info(), sync_notification.target);
-                }
+                },
                 result => panic!("Expected consensus sync notification but got: {:?}", result),
             },
             result => panic!("Expected consensus notification but got: {:?}", result),
@@ -393,14 +394,14 @@ mod tests {
                         consensus_listener
                             .respond_to_commit_notification(commit_notification, Ok(())),
                     );
-                }
+                },
                 Some(ConsensusNotification::SyncToTarget(sync_notification)) => {
                     let _result = block_on(consensus_listener.respond_to_sync_notification(
                         sync_notification,
                         Err(Error::UnexpectedErrorEncountered("Oops?".into())),
                     ));
-                }
-                _ => { /* Do nothing */ }
+                },
+                _ => { /* Do nothing */ },
             }
         });
 
@@ -454,10 +455,6 @@ mod tests {
     }
 
     fn create_runtime() -> Runtime {
-        Builder::new_multi_thread()
-            .disable_lifo_slot()
-            .enable_all()
-            .build()
-            .unwrap()
+        aptos_runtimes::spawn_named_runtime("test".into(), None)
     }
 }

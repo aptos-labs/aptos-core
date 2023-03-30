@@ -528,4 +528,4 @@ Returns the randomness base compatible with the Bulletproofs module.
 </details>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

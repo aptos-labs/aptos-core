@@ -1,6 +1,7 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::{wait_for_all_nodes_to_catchup_to_version, Swarm, SwarmExt};
 use anyhow::{bail, Context, Result};
 use aptos_config::config::DEFAULT_MAX_PAGE_SIZE;
 use aptos_rest_client::Client as RestClient;
@@ -9,10 +10,10 @@ use chrono::Utc;
 use core::time;
 use futures::future::join_all;
 use itertools::Itertools;
-use std::time::Duration;
-use std::{collections::HashSet, time::Instant};
-
-use crate::{wait_for_all_nodes_to_catchup_to_version, Swarm, SwarmExt};
+use std::{
+    collections::HashSet,
+    time::{Duration, Instant},
+};
 
 #[derive(Clone, Debug)]
 pub struct NodeState {
@@ -235,6 +236,7 @@ pub struct NoFailureInjection {}
 #[async_trait]
 impl FailureInjection for NoFailureInjection {
     async fn inject(&mut self, _: &[(String, RestClient)], _: usize, _: usize) {}
+
     async fn clear(&mut self, _: &[(String, RestClient)]) {}
 }
 

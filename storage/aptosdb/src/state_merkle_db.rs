@@ -1,12 +1,12 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema;
 use crate::{
     lru_node_cache::LruNodeCache, metrics::NODE_CACHE_SECONDS,
     schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema,
-    stale_node_index::StaleNodeIndexSchema, versioned_node_cache::VersionedNodeCache,
-    OTHER_TIMERS_SECONDS,
+    stale_node_index::StaleNodeIndexSchema,
+    stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
+    versioned_node_cache::VersionedNodeCache, OTHER_TIMERS_SECONDS,
 };
 use anyhow::Result;
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -14,6 +14,7 @@ use aptos_jellyfish_merkle::{
     node_type::{NodeKey, NodeType},
     JellyfishMerkleTree, TreeReader, TreeUpdateBatch, TreeWriter,
 };
+use aptos_schemadb::{SchemaBatch, DB};
 use aptos_types::{
     nibble::{nibble_path::NibblePath, ROOT_NIBBLE_HEIGHT},
     proof::{SparseMerkleProofExt, SparseMerkleRangeProof},
@@ -21,14 +22,12 @@ use aptos_types::{
     transaction::Version,
 };
 use rayon::prelude::*;
-use schemadb::{SchemaBatch, DB};
 use std::{collections::HashMap, ops::Deref, sync::Arc, time::Instant};
 
 pub(crate) type LeafNode = aptos_jellyfish_merkle::node_type::LeafNode<StateKey>;
 pub(crate) type Node = aptos_jellyfish_merkle::node_type::Node<StateKey>;
 type NodeBatch = aptos_jellyfish_merkle::NodeBatch<StateKey>;
 
-#[derive(Debug)]
 pub struct StateMerkleDb {
     pub(crate) db: Arc<DB>,
     enable_cache: bool,
@@ -38,6 +37,7 @@ pub struct StateMerkleDb {
 
 impl Deref for StateMerkleDb {
     type Target = DB;
+
     fn deref(&self) -> &Self::Target {
         &self.db
     }
@@ -219,7 +219,7 @@ impl StateMerkleDb {
                         if leaf_node.account_key() > other.1.account_key() {
                             ret = Some((node_key, leaf_node));
                         }
-                    }
+                    },
                 }
             }
         }
@@ -273,7 +273,7 @@ impl TreeReader<StateKey> for StateMerkleDb {
                 if node.node_type() == NodeType::Null || node_key.version() != version {
                     return Ok(None);
                 }
-            }
+            },
             None => return Ok(None),
         };
 
@@ -315,7 +315,7 @@ impl TreeReader<StateKey> for StateMerkleDb {
                             if leaf_node.account_key() > other.1.account_key() {
                                 ret = Some((node_key, leaf_node));
                             }
-                        }
+                        },
                     }
                 }
             }

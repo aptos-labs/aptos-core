@@ -1,7 +1,8 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::peer_manager::PeerManagerError;
+use crate::{application, peer_manager::PeerManagerError};
 use std::io;
 use thiserror::Error;
 
@@ -66,5 +67,13 @@ impl From<PeerManagerError> for NetworkError {
                 .context(NetworkErrorKind::PeerManagerError)
                 .into(),
         }
+    }
+}
+
+impl From<application::error::Error> for NetworkError {
+    fn from(err: application::error::Error) -> NetworkError {
+        anyhow::Error::new(err)
+            .context(NetworkErrorKind::IoError)
+            .into()
     }
 }

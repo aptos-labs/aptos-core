@@ -1,33 +1,7 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
-
-use aptos_config::config::NodeConfig;
-use aptos_logger::{
-    aptos_logger::RUST_LOG_TELEMETRY, prelude::*, telemetry_log_writer::TelemetryLog,
-    LoggerFilterUpdater,
-};
-use aptos_telemetry_service::types::telemetry::{TelemetryDump, TelemetryEvent};
-use aptos_types::chain_id::{ChainId, NamedChain};
-use futures::channel::mpsc::{self, Receiver};
-use once_cell::sync::Lazy;
-use rand::Rng;
-use rand_core::OsRng;
-use serde::Deserialize;
-use std::{
-    collections::BTreeMap,
-    env,
-    future::Future,
-    sync::atomic::{AtomicUsize, Ordering},
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
-use tokio::{
-    runtime::{Builder, Runtime},
-    task::JoinHandle,
-    time,
-};
-use uuid::Uuid;
 
 use crate::{
     constants::*, core_metrics::create_core_metric_telemetry_event, metrics,
@@ -35,6 +9,27 @@ use crate::{
     system_information::create_system_info_telemetry_event,
     telemetry_log_sender::TelemetryLogSender, utils::create_build_info_telemetry_event,
 };
+use aptos_config::config::NodeConfig;
+use aptos_logger::{
+    aptos_logger::RUST_LOG_TELEMETRY, prelude::*, telemetry_log_writer::TelemetryLog,
+    LoggerFilterUpdater,
+};
+use aptos_telemetry_service::types::telemetry::{TelemetryDump, TelemetryEvent};
+use aptos_types::chain_id::ChainId;
+use futures::channel::mpsc::{self, Receiver};
+use once_cell::sync::Lazy;
+use rand::Rng;
+use rand_core::OsRng;
+use reqwest::Url;
+use serde::Deserialize;
+use std::{
+    collections::BTreeMap,
+    env,
+    future::Future,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
+use tokio::{runtime::Runtime, task::JoinHandle, time};
+use uuid::Uuid;
 
 // The chain ID key
 const CHAIN_ID_KEY: &str = "CHAIN_ID";
@@ -110,7 +105,7 @@ pub fn start_telemetry_service(
     logger_filter_update_job: Option<LoggerFilterUpdater>,
 ) -> Option<Runtime> {
     if enable_prometheus_node_metrics() {
-        node_resource_metrics::register_node_metrics_collector();
+        aptos_node_resource_metrics::register_node_metrics_collector();
     }
 
     // Don't start the service if telemetry has been disabled
@@ -120,17 +115,7 @@ pub fn start_telemetry_service(
     }
 
     // Create the telemetry runtime
-    let telemetry_runtime = Builder::new_multi_thread()
-        .thread_name_fn(|| {
-            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
-            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
-            format!("telemetry-{}", id)
-        })
-        .disable_lifo_slot()
-        .enable_all()
-        .build()
-        .expect("Failed to create the Aptos Telemetry runtime!");
-
+    let telemetry_runtime = aptos_runtimes::spawn_named_runtime("telemetry".into(), None);
     telemetry_runtime.handle().spawn(spawn_telemetry_service(
         node_config,
         chain_id,
@@ -150,14 +135,24 @@ async fn spawn_telemetry_service(
     logger_filter_update_job: Option<LoggerFilterUpdater>,
 ) {
     let telemetry_svc_url = env::var(ENV_TELEMETRY_SERVICE_URL).unwrap_or_else(|_| {
-        if chain_id == ChainId::mainnet() || chain_id == ChainId::new(NamedChain::PREMAINNET.id()) {
+        if chain_id == ChainId::mainnet() {
             MAINNET_TELEMETRY_SERVICE_URL.into()
         } else {
             TELEMETRY_SERVICE_URL.into()
         }
     });
 
-    let telemetry_sender = TelemetrySender::new(telemetry_svc_url, chain_id, &node_config);
+    let base_url = Url::parse(&telemetry_svc_url).unwrap_or_else(|err| {
+        warn!(
+            "Unable to parse telemetry service URL {}. Make sure {} is unset or is set properly: {}. Defaulting to {}.",
+            telemetry_svc_url,
+            ENV_TELEMETRY_SERVICE_URL, err, TELEMETRY_SERVICE_URL
+        );
+            Url::parse(TELEMETRY_SERVICE_URL)
+                .expect("unable to parse telemetry service default URL")
+    });
+
+    let telemetry_sender = TelemetrySender::new(base_url, chain_id, &node_config);
 
     if !force_enable_telemetry() && !telemetry_sender.check_chain_access(chain_id).await {
         warn!(
@@ -536,14 +531,14 @@ fn spawn_telemetry_event_sender(
                     debug!("Failed telemetry response: {:?}", response.text().await);
                     metrics::increment_telemetry_failures(&event_name);
                 }
-            }
+            },
             Err(error) => {
                 debug!(
                     "Failed to send telemetry event: {}. Error: {:?}",
                     event_name, error
                 );
                 metrics::increment_telemetry_failures(&event_name);
-            }
+            },
         }
     })
 }

@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -31,11 +32,11 @@ pub fn transaction_status_eq(t1: &TransactionStatus, t2: &TransactionStatus) -> 
         (TransactionStatus::Discard(s1), TransactionStatus::Discard(s2)) => {
             assert_eq!(s1, s2);
             true
-        }
+        },
         (TransactionStatus::Keep(s1), TransactionStatus::Keep(s2)) => {
             assert_eq!(s1, s2);
             true
-        }
+        },
         _ => false,
     }
 }

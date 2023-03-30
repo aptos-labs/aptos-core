@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -10,7 +11,7 @@ use crate::{
         StreamRequest, StreamRequestMessage, StreamingServiceListener, TerminateStreamRequest,
     },
 };
-use aptos_config::config::DataStreamingServiceConfig;
+use aptos_config::config::{AptosDataClientConfig, DataStreamingServiceConfig};
 use aptos_data_client::{AptosDataClient, GlobalDataSummary, OptimalChunkSizes};
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_logger::prelude::*;
@@ -27,8 +28,11 @@ const TERMINATE_NO_FEEDBACK: &str = "no_feedback";
 
 /// The data streaming service that responds to data stream requests.
 pub struct DataStreamingService<T> {
-    // The configuration for this streaming service.
-    config: DataStreamingServiceConfig,
+    // The configuration for the data client
+    data_client_config: AptosDataClientConfig,
+
+    // The configuration for the streaming service
+    streaming_service_config: DataStreamingServiceConfig,
 
     // The data client through which to fetch data from the Aptos network
     aptos_data_client: T,
@@ -49,12 +53,14 @@ pub struct DataStreamingService<T> {
 
 impl<T: AptosDataClient + Send + Clone + 'static> DataStreamingService<T> {
     pub fn new(
-        config: DataStreamingServiceConfig,
+        data_client_config: AptosDataClientConfig,
+        streaming_service_config: DataStreamingServiceConfig,
         aptos_data_client: T,
         stream_requests: StreamingServiceListener,
     ) -> Self {
         Self {
-            config,
+            data_client_config,
+            streaming_service_config,
             aptos_data_client,
             global_data_summary: GlobalDataSummary::empty(),
             data_streams: HashMap::new(),
@@ -67,11 +73,12 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStreamingService<T> {
     /// Starts the dedicated streaming service
     pub async fn start_service(mut self) {
         let mut data_refresh_interval = IntervalStream::new(interval(Duration::from_millis(
-            self.config.global_summary_refresh_interval_ms,
+            self.streaming_service_config
+                .global_summary_refresh_interval_ms,
         )))
         .fuse();
         let mut progress_check_interval = IntervalStream::new(interval(Duration::from_millis(
-            self.config.progress_check_interval_ms,
+            self.streaming_service_config.progress_check_interval_ms,
         )))
         .fuse();
 
@@ -139,7 +146,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStreamingService<T> {
         let feedback_label = match notification_and_feedback {
             Some(notification_and_feedback) => {
                 notification_and_feedback.notification_feedback.get_label()
-            }
+            },
             None => TERMINATE_NO_FEEDBACK,
         };
         metrics::increment_counter(&metrics::TERMINATE_DATA_STREAM, feedback_label);
@@ -195,7 +202,8 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStreamingService<T> {
         // Create a new data stream
         let stream_id = self.stream_id_generator.next();
         let (data_stream, stream_listener) = DataStream::new(
-            self.config,
+            self.data_client_config,
+            self.streaming_service_config,
             stream_id,
             &request_message.stream_request,
             self.aptos_data_client.clone(),
@@ -208,10 +216,10 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStreamingService<T> {
 
         // Store the data stream internally
         if self.data_streams.insert(stream_id, data_stream).is_some() {
-            panic!(
+            return Err(Error::UnexpectedErrorEncountered(format!(
                 "Duplicate data stream found! This should not occur! ID: {:?}",
                 stream_id,
-            );
+            )));
         }
         info!(LogSchema::new(LogEntry::HandleStreamRequest)
             .stream_id(stream_id)
@@ -294,7 +302,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStreamingService<T> {
         let global_data_summary = self.global_data_summary.clone();
 
         // If there was a send failure, terminate the stream
-        let data_stream = self.get_data_stream(data_stream_id);
+        let data_stream = self.get_data_stream(data_stream_id)?;
         if data_stream.send_failure() {
             info!(
                 (LogSchema::new(LogEntry::TerminateStream)
@@ -341,15 +349,16 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStreamingService<T> {
 
     /// Returns the data stream associated with the given `data_stream_id`.
     /// Note: this method assumes the caller has already verified the stream exists.
-    fn get_data_stream(&mut self, data_stream_id: &DataStreamId) -> &mut DataStream<T> {
-        self.data_streams
-            .get_mut(data_stream_id)
-            .unwrap_or_else(|| {
-                panic!(
-                    "Expected a data stream with ID: {:?}, but found None!",
-                    data_stream_id
-                )
-            })
+    fn get_data_stream(
+        &mut self,
+        data_stream_id: &DataStreamId,
+    ) -> Result<&mut DataStream<T>, Error> {
+        self.data_streams.get_mut(data_stream_id).ok_or_else(|| {
+            Error::UnexpectedErrorEncountered(format!(
+                "Expected a data stream with ID: {:?}, but found None!",
+                data_stream_id
+            ))
+        })
     }
 }
 
@@ -374,20 +383,24 @@ fn verify_optimal_chunk_sizes(optimal_chunk_sizes: &OptimalChunkSizes) -> Result
 /// the internal state of the object.
 #[cfg(test)]
 mod streaming_service_tests {
-    use crate::data_stream::{DataStreamId, DataStreamListener};
-    use crate::error::Error;
-    use crate::streaming_client::{
-        GetAllStatesRequest, NotificationAndFeedback, NotificationFeedback, StreamRequest,
-        StreamRequestMessage, TerminateStreamRequest,
+    use crate::{
+        data_stream::{DataStreamId, DataStreamListener},
+        error::Error,
+        streaming_client::{
+            GetAllStatesRequest, NotificationAndFeedback, NotificationFeedback, StreamRequest,
+            StreamRequestMessage, TerminateStreamRequest,
+        },
+        tests,
+        tests::utils::MIN_ADVERTISED_STATES,
     };
-    use crate::tests;
-    use crate::tests::utils::MIN_ADVERTISED_STATES;
-    use futures::channel::oneshot;
-    use futures::channel::oneshot::Receiver;
-    use futures::FutureExt;
-    use futures::StreamExt;
-    use std::ops::Add;
-    use std::time::{Duration, Instant};
+    use futures::{
+        channel::{oneshot, oneshot::Receiver},
+        FutureExt, StreamExt,
+    };
+    use std::{
+        ops::Add,
+        time::{Duration, Instant},
+    };
     use tokio::time::timeout;
 
     const MAX_STREAM_WAIT_SECS: u64 = 60;

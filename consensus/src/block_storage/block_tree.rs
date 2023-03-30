@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -8,20 +9,20 @@ use crate::{
     persistent_liveness_storage::PersistentLivenessStorage,
 };
 use anyhow::bail;
-use aptos_crypto::HashValue;
-use aptos_logger::prelude::*;
-use aptos_types::{block_info::BlockInfo, ledger_info::LedgerInfoWithSignatures};
-use consensus_types::{
+use aptos_consensus_types::{
     executed_block::ExecutedBlock, quorum_cert::QuorumCert,
     timeout_2chain::TwoChainTimeoutCertificate,
 };
+use aptos_crypto::HashValue;
+use aptos_logger::prelude::*;
+use aptos_types::{block_info::BlockInfo, ledger_info::LedgerInfoWithSignatures};
 use mirai_annotations::{checked_verify_eq, precondition};
 use std::{
     collections::{vec_deque::VecDeque, HashMap, HashSet},
     sync::Arc,
 };
 
-/// This structure is a wrapper of [`ExecutedBlock`](crate::consensus_types::block::ExecutedBlock)
+/// This structure is a wrapper of [`ExecutedBlock`](aptos_consensus_types::executed_block::ExecutedBlock)
 /// that adds `children` field to know the parent-child relationship between blocks.
 struct LinkableBlock {
     /// Executed block that has raw block data and execution output.
@@ -275,7 +276,7 @@ impl BlockTree {
                     self.highest_certified_block_id = block.id();
                     self.highest_quorum_cert = Arc::clone(&qc);
                 }
-            }
+            },
             None => bail!("Block {} not found", block_id),
         }
 
@@ -377,11 +378,11 @@ impl BlockTree {
             match self.get_block(&cur_block_id) {
                 Some(ref block) if block.round() <= root_round => {
                     break;
-                }
+                },
                 Some(block) => {
                     cur_block_id = block.parent_id();
                     res.push(block);
-                }
+                },
                 None => return None,
             }
         }

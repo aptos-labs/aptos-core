@@ -1,12 +1,13 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, Context};
-use codespan_reporting::diagnostic::Severity;
-use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
+use codespan_reporting::{
+    diagnostic::Severity,
+    term::termcolor::{ColorChoice, StandardStream},
+};
 use move_model::model::GlobalEnv;
-use std::path::PathBuf;
-use std::sync::Mutex;
+use std::{path::PathBuf, sync::Mutex};
 
 #[derive(Debug, Clone, clap::Parser, serde::Serialize, serde::Deserialize, Default)]
 pub struct DocgenOptions {
@@ -15,8 +16,8 @@ pub struct DocgenOptions {
     #[clap(long)]
     pub include_impl: bool,
 
-    /// Whether to include specifications in the generated documentation. Defaults to true.
-    #[clap(long, global = true)]
+    /// Whether to include specifications in the generated documentation. Defaults to false.
+    #[clap(long)]
     pub include_specs: bool,
 
     /// Whether specifications should be put side-by-side with declarations or into a separate
@@ -29,8 +30,8 @@ pub struct DocgenOptions {
     pub include_dep_diagram: bool,
 
     /// Whether details should be put into collapsed sections. This is not supported by
-    /// all markdown, but the github dialect. Defaults to true.
-    #[clap(long, global = true)]
+    /// all markdown, but the github dialect. Defaults to false.
+    #[clap(long)]
     pub collapsed_sections: bool,
 
     /// Package-relative path to an optional markdown template which is a used to create a

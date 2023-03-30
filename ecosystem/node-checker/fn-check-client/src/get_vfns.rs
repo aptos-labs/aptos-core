@@ -1,10 +1,18 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! This file contains logic for reading the node information from on-chain and
 //! converting it into the format expected by check.rs
 
+use crate::{
+    check::{
+        CouldNotDeserializeNetworkAddress, IncompleteNetworkAddress, NoVfnRegistered, NodeInfo,
+        SingleCheck, SingleCheckResult,
+    },
+    helpers::extract_network_address,
+};
 use anyhow::{Context, Result};
+use aptos_logger::info;
 use aptos_sdk::{
     rest_client::Client as AptosClient,
     types::{
@@ -13,17 +21,8 @@ use aptos_sdk::{
     },
 };
 use clap::Parser;
-use log::info;
 use reqwest::Url;
 use std::collections::HashMap;
-
-use crate::check::CouldNotDeserializeNetworkAddress;
-use crate::check::IncompleteNetworkAddress;
-use crate::check::NoVfnRegistered;
-use crate::check::NodeInfo;
-use crate::check::SingleCheck;
-use crate::check::SingleCheckResult;
-use crate::helpers::extract_network_address;
 
 #[derive(Debug, Parser)]
 pub struct GetValidatorFullNodes {
@@ -98,7 +97,7 @@ impl GetValidatorFullNodes {
                             None,
                         ));
                     continue;
-                }
+                },
             };
 
             if vfn_addresses.is_empty() {
@@ -128,7 +127,7 @@ impl GetValidatorFullNodes {
                                 None,
                             ));
                         continue;
-                    }
+                    },
                 };
                 node_infos
                     .entry(*account_address)

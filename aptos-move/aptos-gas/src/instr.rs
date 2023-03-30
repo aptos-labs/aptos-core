@@ -1,12 +1,11 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module defines all the gas parameters and formulae for instructions, along with their
 //! initial values in the genesis and a mapping between the Rust representation and the on-chain
 //! gas schedule.
 
-use crate::algebra::InternalGasPerAbstractValueUnit;
-use crate::gas_meter::EXECUTION_GAS_MULTIPLIER as MUL;
+use crate::{algebra::InternalGasPerAbstractValueUnit, gas_meter::EXECUTION_GAS_MULTIPLIER as MUL};
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::{InternalGas, InternalGasPerArg, InternalGasPerByte};
 use move_vm_types::gas::SimpleInstruction;
@@ -30,8 +29,11 @@ crate::params::define_gas_parameters!(
         // stack
         [pop: InternalGas, "pop", 40 * MUL],
         [ld_u8: InternalGas, "ld_u8", 60 * MUL],
+        [ld_u16: InternalGas, { 5.. => "ld_u16" }, 60 * MUL],
+        [ld_u32: InternalGas, { 5.. => "ld_u32" }, 60 * MUL],
         [ld_u64: InternalGas, "ld_u64", 60 * MUL],
         [ld_u128: InternalGas, "ld_u128", 80 * MUL],
+        [ld_u256: InternalGas, { 5.. => "ld_u256" }, 80 * MUL],
         [ld_true: InternalGas, "ld_true", 60 * MUL],
         [ld_false: InternalGas, "ld_false", 60 * MUL],
         [ld_const_base: InternalGas, "ld_const.base", 650 * MUL],
@@ -67,7 +69,7 @@ crate::params::define_gas_parameters!(
         // call
         [call_base: InternalGas, "call.base", 1000 * MUL],
         [call_per_arg: InternalGasPerArg, "call.per_arg", 100 * MUL],
-        [call_per_local: InternalGasPerArg, optional "call.per_local", 100 * MUL],
+        [call_per_local: InternalGasPerArg, { 1.. => "call.per_local" }, 100 * MUL],
         [call_generic_base: InternalGas, "call_generic.base", 1000 * MUL],
         [
             call_generic_per_ty_arg: InternalGasPerArg,
@@ -79,7 +81,7 @@ crate::params::define_gas_parameters!(
             "call_generic.per_arg",
             100 * MUL
         ],
-        [call_generic_per_local: InternalGasPerArg, optional "call_generic.per_local", 100 * MUL],
+        [call_generic_per_local: InternalGasPerArg, { 1.. => "call_generic.per_local" }, 100 * MUL],
         // struct
         [pack_base: InternalGas, "pack.base", 220 * MUL],
         [pack_per_field: InternalGasPerArg, "pack.per_field", 40 * MUL],
@@ -108,8 +110,11 @@ crate::params::define_gas_parameters!(
         [freeze_ref: InternalGas, "freeze_ref", 10 * MUL],
         // casting
         [cast_u8: InternalGas, "cast_u8", 120 * MUL],
+        [cast_u16: InternalGas, { 5.. => "cast_u16" }, 120 * MUL],
+        [cast_u32: InternalGas, { 5.. => "cast_u32" }, 120 * MUL],
         [cast_u64: InternalGas, "cast_u64", 120 * MUL],
         [cast_u128: InternalGas, "cast_u128", 120 * MUL],
+        [cast_u256: InternalGas, { 5.. => "cast_u256" }, 120 * MUL],
         // arithmetic
         [add: InternalGas, "add", 160 * MUL],
         [sub: InternalGas, "sub", 160 * MUL],
@@ -213,13 +218,12 @@ impl InstructionGasParameters {
             Abort => self.abort,
             Ret => self.ret,
 
-            BrTrue => self.br_true,
-            BrFalse => self.br_false,
-            Branch => self.branch,
-
             LdU8 => self.ld_u8,
+            LdU16 => self.ld_u16,
+            LdU32 => self.ld_u32,
             LdU64 => self.ld_u64,
             LdU128 => self.ld_u128,
+            LdU256 => self.ld_u256,
             LdTrue => self.ld_true,
             LdFalse => self.ld_false,
 
@@ -232,8 +236,11 @@ impl InstructionGasParameters {
             FreezeRef => self.freeze_ref,
 
             CastU8 => self.cast_u8,
+            CastU16 => self.cast_u16,
+            CastU32 => self.cast_u32,
             CastU64 => self.cast_u64,
             CastU128 => self.cast_u128,
+            CastU256 => self.cast_u256,
 
             Add => self.add,
             Sub => self.sub,

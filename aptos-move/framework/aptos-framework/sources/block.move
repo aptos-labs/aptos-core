@@ -1,6 +1,7 @@
 /// This module defines a struct storing the metadata of the block and new block events.
 module aptos_framework::block {
     use std::error;
+    use std::features;
     use std::vector;
     use std::option;
 
@@ -11,6 +12,7 @@ module aptos_framework::block {
     use aptos_framework::state_storage;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
+    use aptos_framework::transaction_fee;
 
     friend aptos_framework::genesis;
 
@@ -88,6 +90,7 @@ module aptos_framework::block {
         );
     }
 
+    #[view]
     /// Return epoch interval in seconds.
     public fun get_epoch_interval_secs(): u64 acquires BlockResource {
         borrow_global<BlockResource>(@aptos_framework).epoch_interval / 1000000
@@ -134,6 +137,15 @@ module aptos_framework::block {
         };
         emit_new_block_event(&vm, &mut block_metadata_ref.new_block_events, new_block_event);
 
+        if (features::collect_and_distribute_gas_fees()) {
+            // Assign the fees collected from the previous block to the previous block proposer.
+            // If for any reason the fees cannot be assigned, this function burns the collected coins.
+            transaction_fee::process_collected_fees();
+            // Set the proposer of this block as the receiver of the fees, so that the fees for this
+            // block are assigned to the right account.
+            transaction_fee::register_proposer_for_fee_collection(proposer);
+        };
+
         // Performance scores have to be updated before the epoch transition as the transaction that triggers the
         // transition is the last block in the previous epoch.
         stake::update_performance_statistics(proposer_index, failed_proposer_indices);
@@ -144,6 +156,7 @@ module aptos_framework::block {
         };
     }
 
+    #[view]
     /// Get the current block height
     public fun get_current_block_height(): u64 acquires BlockResource {
         borrow_global<BlockResource>(@aptos_framework).height
@@ -217,7 +230,7 @@ module aptos_framework::block {
     }
 
     #[test(aptos_framework = @aptos_framework, account = @0x123)]
-    #[expected_failure(abort_code = 0x50003)]
+    #[expected_failure(abort_code = 0x50003, location = aptos_framework::system_addresses)]
     public entry fun test_update_epoch_interval_unauthorized_should_fail(
         aptos_framework: signer,
         account: signer,

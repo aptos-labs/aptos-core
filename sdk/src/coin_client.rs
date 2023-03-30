@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -7,11 +7,13 @@ use crate::{
         identifier::Identifier,
         language_storage::{ModuleId, TypeTag},
     },
-    rest_client::PendingTransaction,
+    rest_client::{Client as ApiClient, PendingTransaction},
     transaction_builder::TransactionBuilder,
     types::{
+        account_address::AccountAddress,
         chain_id::ChainId,
         transaction::{EntryFunction, TransactionPayload},
+        LocalAccount,
     },
 };
 use anyhow::{Context, Result};
@@ -19,11 +21,6 @@ use std::{
     str::FromStr,
     time::{SystemTime, UNIX_EPOCH},
 };
-
-use crate::rest_client::Client as ApiClient;
-
-use crate::types::account_address::AccountAddress;
-use crate::types::LocalAccount;
 
 #[derive(Clone, Debug)]
 pub struct CoinClient<'a> {

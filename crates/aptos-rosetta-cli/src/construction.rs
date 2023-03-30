@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::{format_output, NetworkArgs, UrlArgs};
@@ -316,6 +316,9 @@ pub struct CreateStakePoolCommand {
     /// Amount
     #[clap(long)]
     amount: Option<u64>,
+    /// Commission percentage
+    #[clap(long)]
+    commission_percentage: Option<u64>,
 }
 
 impl CreateStakePoolCommand {
@@ -334,6 +337,7 @@ impl CreateStakePoolCommand {
                 self.operator,
                 self.voter,
                 self.amount,
+                self.commission_percentage,
                 self.txn_args.expiry_time()?,
                 self.txn_args.sequence_number,
                 self.txn_args.max_gas,

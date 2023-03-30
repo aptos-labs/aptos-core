@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{epoch_state::EpochState, on_chain_config::ValidatorSet, transaction::Version};
@@ -77,6 +78,19 @@ impl BlockInfo {
     pub fn random(round: Round) -> Self {
         Self {
             epoch: 1,
+            round,
+            id: HashValue::zero(),
+            executed_state_id: HashValue::zero(),
+            version: 0,
+            timestamp_usecs: 0,
+            next_epoch_state: None,
+        }
+    }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn random_with_epoch(epoch: u64, round: Round) -> Self {
+        Self {
+            epoch,
             round,
             id: HashValue::zero(),
             executed_state_id: HashValue::zero(),
@@ -187,7 +201,7 @@ impl BlockInfo {
     /// and it is not empty
     pub fn is_ordered_only(&self) -> bool {
         *self != BlockInfo::empty()
-            && self.next_epoch_state == None
+            && self.next_epoch_state.is_none()
             && self.executed_state_id == *ACCUMULATOR_PLACEHOLDER_HASH
             && self.version == 0
     }

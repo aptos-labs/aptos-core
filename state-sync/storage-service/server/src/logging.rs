@@ -1,10 +1,11 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::Error;
 use aptos_logger::Schema;
+use aptos_storage_service_types::requests::StorageServiceRequest;
 use serde::Serialize;
-use storage_service_types::requests::StorageServiceRequest;
 
 #[derive(Schema)]
 pub struct LogSchema<'a> {
@@ -35,4 +36,5 @@ pub enum LogEntry {
     StorageServiceError,
     StorageSummaryRefresh,
     SubscriptionRefresh,
+    SubscriptionResponse,
 }

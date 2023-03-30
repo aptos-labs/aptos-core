@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::transaction::Version;
@@ -75,14 +76,14 @@ impl From<Canceled> for Error {
     }
 }
 
-impl From<data_streaming_service::error::Error> for Error {
-    fn from(error: data_streaming_service::error::Error) -> Self {
+impl From<aptos_data_streaming_service::error::Error> for Error {
+    fn from(error: aptos_data_streaming_service::error::Error) -> Self {
         Error::UnexpectedError(error.to_string())
     }
 }
 
-impl From<event_notifications::Error> for Error {
-    fn from(error: event_notifications::Error) -> Self {
+impl From<aptos_event_notifications::Error> for Error {
+    fn from(error: aptos_event_notifications::Error) -> Self {
         Error::EventNotificationError(error.to_string())
     }
 }

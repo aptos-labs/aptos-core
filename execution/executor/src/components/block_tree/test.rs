@@ -1,13 +1,14 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::components::block_tree::{epoch_genesis_block_id, BlockLookup, BlockTree};
 use aptos_crypto::{hash::PRE_GENESIS_BLOCK_ID, HashValue};
+use aptos_executor_types::ExecutedChunk;
 use aptos_infallible::Mutex;
+use aptos_storage_interface::ExecutedTrees;
 use aptos_types::{block_info::BlockInfo, epoch_state::EpochState, ledger_info::LedgerInfo};
-use executor_types::ExecutedChunk;
 use std::sync::Arc;
-use storage_interface::ExecutedTrees;
 
 impl BlockTree {
     pub fn new_empty() -> Self {

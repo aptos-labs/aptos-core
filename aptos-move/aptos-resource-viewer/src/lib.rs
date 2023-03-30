@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, Result};
@@ -9,12 +10,11 @@ use aptos_types::{
 use aptos_vm::move_vm_ext::MoveResolverExt;
 use move_core_types::language_storage::StructTag;
 use move_resource_viewer::MoveValueAnnotator;
+pub use move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
 use std::{
     collections::BTreeMap,
     fmt::{Display, Formatter},
 };
-
-pub use move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
 
 pub struct AptosValueAnnotator<'a, T>(MoveValueAnnotator<'a, T>);
 
@@ -54,7 +54,7 @@ impl<'a, T: MoveResolverExt> AptosValueAnnotator<'a, T> {
                 None => {
                     println!("Uncached AccessPath: {:?}", k);
                     continue;
-                }
+                },
             };
             let value = self.view_resource(&tag, v)?;
             output.insert(tag, value);

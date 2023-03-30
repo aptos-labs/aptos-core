@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::utils;
@@ -53,6 +54,9 @@ impl Default for RocksdbConfig {
 pub struct RocksdbConfigs {
     pub ledger_db_config: RocksdbConfig,
     pub state_merkle_db_config: RocksdbConfig,
+    // Note: Not ready for production use yet.
+    pub use_state_kv_db: bool,
+    pub state_kv_db_config: RocksdbConfig,
     pub index_db_config: RocksdbConfig,
 }
 
@@ -61,6 +65,8 @@ impl Default for RocksdbConfigs {
         Self {
             ledger_db_config: RocksdbConfig::default(),
             state_merkle_db_config: RocksdbConfig::default(),
+            use_state_kv_db: false,
+            state_kv_db_config: RocksdbConfig::default(),
             index_db_config: RocksdbConfig {
                 max_open_files: 1000,
                 ..Default::default()
@@ -111,6 +117,11 @@ pub const NO_OP_STORAGE_PRUNER_CONFIG: PrunerConfig = PrunerConfig {
         prune_window: 0,
         batch_size: 0,
     },
+    state_kv_pruner_config: StateKvPrunerConfig {
+        enable: false,
+        prune_window: 0,
+        batch_size: 0,
+    },
 };
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -134,13 +145,12 @@ pub struct LedgerPrunerConfig {
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct StateMerklePrunerConfig {
-    /// Boolean to enable/disable the state store pruner. The state pruner is responsible for
-    /// pruning state tree nodes.
+    /// Boolean to enable/disable the state merkle pruner. The state merkle pruner is responsible
+    /// for pruning state tree nodes.
     pub enable: bool,
-    /// The size of the window should be calculated based on disk space availability and system TPS.
+    /// Window size in versions.
     pub prune_window: u64,
-    /// Similar to the variable above but for state store pruner. It means the number of stale
-    /// nodes to prune a time.
+    /// Number of stale nodes to prune a time.
     pub batch_size: usize,
 }
 
@@ -152,6 +162,19 @@ pub struct EpochSnapshotPrunerConfig {
     /// other snapshots are pruned by the state merkle pruner.
     pub prune_window: u64,
     /// Number of stale nodes to prune a time.
+    pub batch_size: usize,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct StateKvPrunerConfig {
+    /// Boolean to enable/disable the state kv pruner. The state pruner is responsible for
+    /// pruning state tree nodes.
+    pub enable: bool,
+    /// Window size in versions.
+    pub prune_window: u64,
+    /// Similar to the variable above but for state kv pruner. It means the number of versions to
+    /// prune a time.
     pub batch_size: usize,
 }
 
@@ -174,6 +197,7 @@ pub struct PrunerConfig {
     pub ledger_pruner_config: LedgerPrunerConfig,
     pub state_merkle_pruner_config: StateMerklePrunerConfig,
     pub epoch_snapshot_pruner_config: EpochSnapshotPrunerConfig,
+    pub state_kv_pruner_config: StateKvPrunerConfig,
 }
 
 impl Default for LedgerPrunerConfig {
@@ -224,6 +248,17 @@ impl Default for EpochSnapshotPrunerConfig {
     }
 }
 
+impl Default for StateKvPrunerConfig {
+    fn default() -> Self {
+        Self {
+            // TODO(grao): Keep it the same as ledger pruner config for now, will revisit later.
+            enable: true,
+            prune_window: 150_000_000,
+            batch_size: 500,
+        }
+    }
+}
+
 impl Default for StorageConfig {
     fn default() -> StorageConfig {
         StorageConfig {
@@ -269,7 +304,7 @@ mod test {
     use crate::config::PrunerConfig;
 
     #[test]
-    pub fn tset_default_prune_window() {
+    pub fn test_default_prune_window() {
         // Not that these can't be changed, but think twice -- make them safe for mainnet
 
         let config = PrunerConfig::default();

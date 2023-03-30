@@ -1,25 +1,31 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::{
+    context::JsonWebTokenService,
+    tests::test_context::new_test_context,
+    types::{
+        auth::{AuthResponse, Claims},
+        common::NodeType,
+    },
+};
 use aptos_config::config::{Peer, PeerRole, PeerSet, RoleType};
-use aptos_crypto::noise::{InitiatorHandshakeState, NoiseConfig};
-use aptos_crypto::{noise, x25519, Uniform};
-use aptos_types::network_address::Protocol::{Dns, Handshake, NoiseIK, Tcp};
+use aptos_crypto::{
+    noise,
+    noise::{InitiatorHandshakeState, NoiseConfig},
+    x25519, Uniform,
+};
 use aptos_types::{
     account_address,
     chain_id::ChainId,
-    network_address::{DnsName, NetworkAddress},
+    network_address::{
+        DnsName, NetworkAddress,
+        Protocol::{Dns, Handshake, NoiseIK, Tcp},
+    },
     PeerId,
 };
-
 use serde_json::json;
-
-use crate::context::JsonWebTokenService;
-use crate::types::common::NodeType;
-use crate::{
-    tests::test_context::new_test_context,
-    types::auth::{AuthResponse, Claims},
-};
+use uuid::Uuid;
 
 fn init(
     peer_role: PeerRole,
@@ -29,6 +35,7 @@ fn init(
     ChainId,
     PeerId,
     std::collections::HashMap<PeerId, Peer>,
+    Uuid,
 ) {
     let mut rng = rand::thread_rng();
     let initiator_static = x25519::PrivateKey::generate(&mut rng);
@@ -47,7 +54,9 @@ fn init(
     let mut peer_set = PeerSet::new();
     peer_set.insert(peer_id, peer);
 
-    (rng, initiator, chain_id, peer_id, peer_set)
+    let uuid = Uuid::new_v4();
+
+    (rng, initiator, chain_id, peer_id, peer_set, uuid)
 }
 
 fn init_handshake(
@@ -101,11 +110,11 @@ fn finish_handshake(
 }
 
 #[tokio::test]
-async fn test_auth_validator() {
+async fn test_auth_validator_backwards_compat_uuid() {
     let context = new_test_context().await;
     let server_public_key = context.inner.noise_config().public_key();
 
-    let (mut rng, initiator, chain_id, peer_id, peer_set) = init(PeerRole::Validator);
+    let (mut rng, initiator, chain_id, peer_id, peer_set, _) = init(PeerRole::Validator);
 
     context
         .inner
@@ -124,7 +133,7 @@ async fn test_auth_validator() {
         "server_public_key": server_public_key,
         "handshake_msg": &client_noise_msg,
     });
-    let resp = context.post("/auth", req).await;
+    let resp = context.post("/api/v1/auth", req).await;
 
     let decoded = finish_handshake(
         context.inner.jwt_service(),
@@ -133,17 +142,60 @@ async fn test_auth_validator() {
         resp,
     );
 
-    assert_eq!(
-        decoded.claims,
-        Claims {
-            chain_id,
-            peer_id,
-            node_type: NodeType::Validator,
-            epoch: 1,
-            exp: decoded.claims.exp,
-            iat: decoded.claims.iat
-        },
-    )
+    assert_eq!(decoded.claims, Claims {
+        chain_id,
+        peer_id,
+        node_type: NodeType::Validator,
+        epoch: 1,
+        exp: decoded.claims.exp,
+        iat: decoded.claims.iat,
+        run_uuid: Uuid::default(),
+    },)
+}
+
+#[tokio::test]
+async fn test_auth_validator() {
+    let context = new_test_context().await;
+    let server_public_key = context.inner.noise_config().public_key();
+
+    let (mut rng, initiator, chain_id, peer_id, peer_set, run_uuid) = init(PeerRole::Validator);
+
+    context
+        .inner
+        .peers()
+        .validators()
+        .write()
+        .insert(chain_id, (1, peer_set));
+
+    let (initiator_state, client_noise_msg) =
+        init_handshake(&mut rng, chain_id, peer_id, server_public_key, &initiator);
+
+    let req = json!({
+        "chain_id": chain_id,
+        "peer_id": peer_id,
+        "role_type": RoleType::Validator,
+        "server_public_key": server_public_key,
+        "handshake_msg": &client_noise_msg,
+        "run_uuid": run_uuid,
+    });
+    let resp = context.post("/api/v1/auth", req).await;
+
+    let decoded = finish_handshake(
+        context.inner.jwt_service(),
+        &initiator,
+        initiator_state,
+        resp,
+    );
+
+    assert_eq!(decoded.claims, Claims {
+        chain_id,
+        peer_id,
+        node_type: NodeType::Validator,
+        epoch: 1,
+        exp: decoded.claims.exp,
+        iat: decoded.claims.iat,
+        run_uuid,
+    },)
 }
 
 #[tokio::test]
@@ -151,7 +203,8 @@ async fn test_auth_validatorfullnode() {
     let context = new_test_context().await;
     let server_public_key = context.inner.noise_config().public_key();
 
-    let (mut rng, initiator, chain_id, peer_id, peer_set) = init(PeerRole::ValidatorFullNode);
+    let (mut rng, initiator, chain_id, peer_id, peer_set, run_uuid) =
+        init(PeerRole::ValidatorFullNode);
 
     context
         .inner
@@ -169,8 +222,9 @@ async fn test_auth_validatorfullnode() {
         "role_type": RoleType::FullNode,
         "server_public_key": server_public_key,
         "handshake_msg": &client_noise_msg,
+        "run_uuid": run_uuid,
     });
-    let resp = context.post("/auth", req).await;
+    let resp = context.post("/api/v1/auth", req).await;
 
     let decoded = finish_handshake(
         context.inner.jwt_service(),
@@ -179,17 +233,15 @@ async fn test_auth_validatorfullnode() {
         resp,
     );
 
-    assert_eq!(
-        decoded.claims,
-        Claims {
-            chain_id,
-            peer_id,
-            node_type: NodeType::ValidatorFullNode,
-            epoch: 1,
-            exp: decoded.claims.exp,
-            iat: decoded.claims.iat
-        },
-    )
+    assert_eq!(decoded.claims, Claims {
+        chain_id,
+        peer_id,
+        node_type: NodeType::ValidatorFullNode,
+        epoch: 1,
+        exp: decoded.claims.exp,
+        iat: decoded.claims.iat,
+        run_uuid
+    },)
 }
 
 #[tokio::test]
@@ -233,7 +285,7 @@ async fn test_auth_wrong_key() {
         "server_public_key": server_public_key,
         "handshake_msg": client_noise_msg,
     });
-    let resp = context.post("/auth", req).await;
+    let resp = context.post("/api/v1/auth", req).await;
 
     finish_handshake(
         context.inner.jwt_service(),
@@ -245,18 +297,23 @@ async fn test_auth_wrong_key() {
 
 #[tokio::test]
 async fn test_chain_access() {
-    let mut context = new_test_context().await;
+    let context = new_test_context().await;
     let present_chain_id = ChainId::new(24);
     let missing_chain_id = ChainId::new(32);
-    context.inner.chain_set_mut().insert(present_chain_id);
+    context
+        .inner
+        .peers()
+        .validators()
+        .write()
+        .insert(present_chain_id, (1, PeerSet::new()));
 
     let resp = context
-        .get(&format!("/chain-access/{}", present_chain_id))
+        .get(&format!("/api/v1/chain-access/{}", present_chain_id))
         .await;
     assert!(resp.as_bool().unwrap());
 
     let resp = context
-        .get(&format!("/chain-access/{}", missing_chain_id))
+        .get(&format!("/api/v1/chain-access/{}", missing_chain_id))
         .await;
     assert!(!resp.as_bool().unwrap());
 }

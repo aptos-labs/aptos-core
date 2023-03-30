@@ -1,15 +1,14 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::types::{CliCommand, CliTypedResult, TransactionOptions};
-use aptos_rest_client::aptos_api_types::HashValue;
+use aptos_cached_packages::aptos_stdlib;
 use aptos_rest_client::{
-    aptos_api_types::{WriteResource, WriteSetChange},
+    aptos_api_types::{HashValue, WriteResource, WriteSetChange},
     Transaction,
 };
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
-use cached_packages::aptos_stdlib;
 use clap::Parser;
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -64,6 +63,12 @@ pub struct TransferSummary {
     pub transaction_hash: HashValue,
 }
 
+impl TransferSummary {
+    pub fn octa_spent(&self) -> u64 {
+        self.gas_unit_price * self.gas_used
+    }
+}
+
 impl From<Transaction> for TransferSummary {
     fn from(transaction: Transaction) -> Self {
         if let Transaction::UserTransaction(txn) = transaction {
@@ -88,7 +93,7 @@ impl From<Transaction> for TransferSummary {
                         } else {
                             None
                         }
-                    }
+                    },
                     _ => None,
                 })
                 .collect();

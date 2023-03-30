@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -223,10 +224,10 @@ fn test_verify_three_element_sparse_merkle() {
 
     {
         // Construct a proof of key1.
-        let proof = SparseMerkleProof::new(
-            Some(leaf1),
-            vec![internal_b_hash, *SPARSE_MERKLE_PLACEHOLDER_HASH],
-        );
+        let proof = SparseMerkleProof::new(Some(leaf1), vec![
+            internal_b_hash,
+            *SPARSE_MERKLE_PLACEHOLDER_HASH,
+        ]);
 
         // The exact key value exists.
         assert!(proof.verify(root_hash, key1, Some(&blob1)).is_ok());
@@ -348,11 +349,10 @@ fn test_accumulator_extension_proof() {
     assert_eq!(derived_tree.version(), 0);
 
     // Test multiple values
-    let two_tree = AccumulatorExtensionProof::<TestOnlyHasher>::new(
-        vec![HashValue::zero()],
-        1,
-        vec![HashValue::zero()],
-    );
+    let two_tree =
+        AccumulatorExtensionProof::<TestOnlyHasher>::new(vec![HashValue::zero()], 1, vec![
+            HashValue::zero(),
+        ]);
 
     let derived_tree = two_tree.verify(HashValue::zero()).unwrap();
     let two_hash = TestAccumulatorInternalNode::new(HashValue::zero(), HashValue::zero()).hash();

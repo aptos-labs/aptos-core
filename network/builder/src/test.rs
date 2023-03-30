@@ -1,10 +1,11 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! Integration tests for validator_network.
 use crate::dummy::{setup_network, DummyMsg};
+use aptos_network::{application::interface::NetworkClientInterface, protocols::network::Event};
 use futures::{future::join, StreamExt};
-use network::protocols::network::{ApplicationNetworkSender, Event};
 use std::time::Duration;
 
 #[test]
@@ -16,26 +17,26 @@ fn test_network_builder() {
 fn test_direct_send() {
     ::aptos_logger::Logger::init_for_testing();
     let tn = setup_network();
-    let dialer_peer_id = tn.dialer_peer_id;
+    let dialer_peer = tn.dialer_peer;
     let mut dialer_events = tn.dialer_events;
-    let dialer_sender = tn.dialer_sender;
-    let listener_peer_id = tn.listener_peer_id;
+    let dialer_network_client = tn.dialer_network_client;
+    let listener_peer = tn.listener_peer;
     let mut listener_events = tn.listener_events;
-    let listener_sender = tn.listener_sender;
+    let listener_sender = tn.listener_network_client;
 
     let msg = DummyMsg(vec![]);
 
     // The dialer sends a direct send and listener receives
     let msg_clone = msg.clone();
     let f_dialer = async move {
-        dialer_sender
-            .send_to(listener_peer_id, msg_clone.clone())
+        dialer_network_client
+            .send_to_peer(msg_clone.clone(), listener_peer)
             .unwrap();
         match listener_events.next().await.unwrap() {
             Event::Message(peer_id, msg) => {
-                assert_eq!(peer_id, dialer_peer_id);
+                assert_eq!(peer_id, dialer_peer.peer_id());
                 assert_eq!(msg, msg_clone);
-            }
+            },
             event => panic!("Unexpected event {:?}", event),
         }
     };
@@ -43,13 +44,13 @@ fn test_direct_send() {
     // The listener sends a direct send and the dialer receives
     let f_listener = async move {
         listener_sender
-            .send_to(dialer_peer_id, msg.clone())
+            .send_to_peer(msg.clone(), dialer_peer)
             .unwrap();
         match dialer_events.next().await.unwrap() {
             Event::Message(peer_id, incoming_msg) => {
-                assert_eq!(peer_id, listener_peer_id);
+                assert_eq!(peer_id, listener_peer.peer_id());
                 assert_eq!(incoming_msg, msg);
-            }
+            },
             event => panic!("Unexpected event {:?}", event),
         }
     };
@@ -61,26 +62,26 @@ fn test_direct_send() {
 fn test_rpc() {
     ::aptos_logger::Logger::init_for_testing();
     let tn = setup_network();
-    let dialer_peer_id = tn.dialer_peer_id;
+    let dialer_peer = tn.dialer_peer;
     let mut dialer_events = tn.dialer_events;
-    let dialer_sender = tn.dialer_sender;
-    let listener_peer_id = tn.listener_peer_id;
+    let dialer_sender = tn.dialer_network_client;
+    let listener_peer = tn.listener_peer;
     let mut listener_events = tn.listener_events;
-    let listener_sender = tn.listener_sender;
+    let listener_sender = tn.listener_network_client;
 
     let msg = DummyMsg(vec![]);
 
     // Dialer send rpc request and receives rpc response
     let msg_clone = msg.clone();
     let f_send =
-        dialer_sender.send_rpc(listener_peer_id, msg_clone.clone(), Duration::from_secs(10));
+        dialer_sender.send_to_peer_rpc(msg_clone.clone(), Duration::from_secs(10), listener_peer);
     let f_respond = async move {
         match listener_events.next().await.unwrap() {
             Event::RpcRequest(peer_id, msg, _, rs) => {
-                assert_eq!(peer_id, dialer_peer_id);
+                assert_eq!(peer_id, dialer_peer.peer_id());
                 assert_eq!(msg, msg_clone);
                 rs.send(Ok(bcs::to_bytes(&msg).unwrap().into())).unwrap();
-            }
+            },
             event => panic!("Unexpected event: {:?}", event),
         }
     };
@@ -91,14 +92,14 @@ fn test_rpc() {
     // Listener send rpc request and receives rpc response
     let msg_clone = msg.clone();
     let f_send =
-        listener_sender.send_rpc(dialer_peer_id, msg_clone.clone(), Duration::from_secs(10));
+        listener_sender.send_to_peer_rpc(msg_clone.clone(), Duration::from_secs(10), dialer_peer);
     let f_respond = async move {
         match dialer_events.next().await.unwrap() {
             Event::RpcRequest(peer_id, msg, _, rs) => {
-                assert_eq!(peer_id, listener_peer_id);
+                assert_eq!(peer_id, listener_peer.peer_id());
                 assert_eq!(msg, msg_clone);
                 rs.send(Ok(bcs::to_bytes(&msg).unwrap().into())).unwrap();
-            }
+            },
             event => panic!("Unexpected event: {:?}", event),
         }
     };

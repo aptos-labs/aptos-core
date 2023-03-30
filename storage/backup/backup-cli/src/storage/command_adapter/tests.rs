@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
@@ -29,6 +30,7 @@ commands:
   open_for_read: 'cat "$FOLDER/$FILE_HANDLE"'
   save_metadata_line: 'cd "$FOLDER" && mkdir -p metadata && cd metadata && cat > $FILE_NAME'
   list_metadata_files: 'cd "$FOLDER" && (test -d metadata && cd metadata && ls -1 || exec) | while read f; do echo metadata/$f; done'
+  backup_metadata_file: 'cd "$FOLDER" && mkdir -p metadata_backup && mv metadata/$FILE_NAME metadata_backup/$FILE_NAME'
 "#, tmpdir.path().to_str().unwrap()),
     ).unwrap();
 
@@ -67,6 +69,7 @@ fn dummy_store(cmd: &str) -> CommandAdapter {
             open_for_read: cmd.to_string(),
             save_metadata_line: cmd.to_string(),
             list_metadata_files: cmd.to_string(),
+            backup_metadata_file: Some(cmd.to_string()),
         },
         env_vars: Vec::new(),
     })

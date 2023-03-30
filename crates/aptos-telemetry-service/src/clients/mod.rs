@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod humio;
@@ -6,7 +6,6 @@ pub mod humio;
 pub mod victoria_metrics_api {
 
     use anyhow::{anyhow, Result};
-
     use reqwest::{header::CONTENT_ENCODING, Client as ReqwestClient};
     use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
     use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};

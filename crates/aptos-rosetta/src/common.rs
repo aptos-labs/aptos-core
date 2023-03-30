@@ -1,19 +1,21 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::types::{APTOS_COIN_MODULE, APTOS_COIN_RESOURCE};
 use crate::{
     error::{ApiError, ApiResult},
     types::{
         Currency, CurrencyMetadata, MetadataRequest, NetworkIdentifier, PartialBlockIdentifier,
+        APTOS_COIN_MODULE, APTOS_COIN_RESOURCE,
     },
     RosettaContext,
 };
 use aptos_crypto::{ValidCryptoMaterial, ValidCryptoMaterialStringExt};
 use aptos_logger::debug;
 use aptos_rest_client::{Account, Response};
-use aptos_sdk::move_types::ident_str;
-use aptos_sdk::move_types::language_storage::{StructTag, TypeTag};
+use aptos_sdk::move_types::{
+    ident_str,
+    language_storage::{StructTag, TypeTag},
+};
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use futures::future::BoxFuture;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -75,7 +77,7 @@ where
                         warp::reply::json(&response),
                         warp::http::StatusCode::OK,
                     ))
-                }
+                },
                 Err(api_error) => {
                     debug!("Error: {:?}", api_error);
                     let status = api_error.status_code();
@@ -83,7 +85,7 @@ where
                         warp::reply::json(&api_error.into_error()),
                         status,
                     ))
-                }
+                },
             }
         };
         Box::pin(fut)
@@ -193,7 +195,7 @@ pub async fn get_block_index_from_request(
             let state = response.state();
 
             state.block_height
-        }
+        },
     })
 }
 

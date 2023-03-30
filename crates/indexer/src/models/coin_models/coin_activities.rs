@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 // This is required because a diesel macro makes clippy sad
@@ -28,6 +28,7 @@ use std::collections::HashMap;
 const GAS_FEE_EVENT: &str = "0x1::aptos_coin::GasFeeEvent";
 // We will never have a negative number on chain so this will avoid collision in postgres
 const BURN_GAS_EVENT_CREATION_NUM: i64 = -1;
+const BURN_GAS_EVENT_INDEX: i64 = -1;
 const MAX_ENTRY_FUNCTION_LENGTH: usize = 100;
 
 type OwnerAddress = String;
@@ -58,6 +59,7 @@ pub struct CoinActivity {
     pub entry_function_id_str: Option<String>,
     pub block_height: i64,
     pub transaction_timestamp: chrono::NaiveDateTime,
+    pub event_index: Option<i64>,
 }
 
 impl CoinActivity {
@@ -91,7 +93,7 @@ impl CoinActivity {
                 &inner.info.changes,
                 &inner.events,
                 None,
-                chrono::NaiveDateTime::from_timestamp(0, 0),
+                chrono::NaiveDateTime::from_timestamp_opt(0, 0).unwrap(),
             ),
             APITransaction::UserTransaction(inner) => (
                 &inner.info,
@@ -173,10 +175,12 @@ impl CoinActivity {
                 all_coin_supply.push(coin_supply);
             }
         }
-        for event in events {
+        for (index, event) in events.iter().enumerate() {
             let event_type = event.typ.to_string();
-            match CoinEvent::from_event(event_type.as_str(), &event.data, txn_version).unwrap() {
-                Some(parsed_event) => coin_activities.push(Self::from_parsed_event(
+            if let Some(parsed_event) =
+                CoinEvent::from_event(event_type.as_str(), &event.data, txn_version).unwrap()
+            {
+                coin_activities.push(Self::from_parsed_event(
                     &event_type,
                     event,
                     &parsed_event,
@@ -185,8 +189,8 @@ impl CoinActivity {
                     txn_info.block_height.unwrap().0 as i64,
                     &entry_function_id_str,
                     txn_timestamp,
-                )),
-                None => {}
+                    index as i64,
+                ));
             };
         }
         (
@@ -207,6 +211,7 @@ impl CoinActivity {
         block_height: i64,
         entry_function_id_str: &Option<String>,
         transaction_timestamp: chrono::NaiveDateTime,
+        event_index: i64,
     ) -> Self {
         let amount = match coin_event {
             CoinEvent::WithdrawCoinEvent(inner) => inner.amount.clone(),
@@ -240,6 +245,7 @@ impl CoinActivity {
             entry_function_id_str: entry_function_id_str.clone(),
             block_height,
             transaction_timestamp,
+            event_index: Some(event_index),
         }
     }
 
@@ -249,9 +255,8 @@ impl CoinActivity {
         entry_function_id_str: &Option<String>,
         transaction_timestamp: chrono::NaiveDateTime,
     ) -> Self {
-        let aptos_coin_burned = BigDecimal::from(
-            txn_info.gas_used.0 * user_transaction_request.gas_unit_price.0 as u64,
-        );
+        let aptos_coin_burned =
+            BigDecimal::from(txn_info.gas_used.0 * user_transaction_request.gas_unit_price.0);
 
         Self {
             transaction_version: txn_info.version.0 as i64,
@@ -269,6 +274,7 @@ impl CoinActivity {
             entry_function_id_str: entry_function_id_str.clone(),
             block_height: txn_info.block_height.unwrap().0 as i64,
             transaction_timestamp,
+            event_index: Some(BURN_GAS_EVENT_INDEX),
         }
     }
 }

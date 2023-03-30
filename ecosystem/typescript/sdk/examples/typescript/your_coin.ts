@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 import assert from "assert";
@@ -35,6 +35,20 @@ class CoinClient extends AptosClient {
     });
 
     const bcsTxn = await this.signTransaction(coinReceiver, rawTxn);
+    const pendingTxn = await this.submitTransaction(bcsTxn);
+
+    return pendingTxn.hash;
+  }
+
+  /** Mints the newly created coin to a specified receiver address */
+  async transferCoin(sender: AptosAccount, receiverAddress: HexString, amount: number | bigint): Promise<string> {
+    const rawTxn = await this.generateTransaction(sender.address(), {
+      function: "0x1::aptos_account::transfer_coins",
+      type_arguments: [`${sender.address()}::moon_coin::MoonCoin`],
+      arguments: [receiverAddress.hex(), amount],
+    });
+
+    const bcsTxn = await this.signTransaction(sender, rawTxn);
     const pendingTxn = await this.submitTransaction(bcsTxn);
 
     return pendingTxn.hash;
@@ -105,13 +119,15 @@ async function main() {
   ]);
   await client.waitForTransaction(txnHash, { checkSuccess: true }); // <:!:publish
 
-  console.log("Bob registers the newly created coin so he can receive it from Alice");
-  txnHash = await client.registerCoin(alice.address(), bob);
-  await client.waitForTransaction(txnHash, { checkSuccess: true });
   console.log(`Bob's initial MoonCoin balance: ${await client.getBalance(bob.address(), alice.address())}.`);
+  console.log("Alice mints herself some of the new coin.");
+  txnHash = await client.registerCoin(alice.address(), alice);
+  await client.waitForTransaction(txnHash, { checkSuccess: true });
+  txnHash = await client.mintCoin(alice, alice.address(), 100);
+  await client.waitForTransaction(txnHash, { checkSuccess: true });
 
-  console.log("Alice mints Bob some of the new coin.");
-  txnHash = await client.mintCoin(alice, bob.address(), 100);
+  console.log("Alice transfers the newly minted coins to Bob.");
+  txnHash = await client.transferCoin(alice, bob.address(), 100);
   await client.waitForTransaction(txnHash, { checkSuccess: true });
   console.log(`Bob's updated MoonCoin balance: ${await client.getBalance(bob.address(), alice.address())}.`);
 }

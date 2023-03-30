@@ -24,9 +24,9 @@ mv /tmp/generated-ts-docs/* $DOCS_DIR
 # Copy in a basic README
 echo "# TS SDK Docs" > $DOCS_DIR/README.md
 echo "" >> $DOCS_DIR/README.md
-echo 'Generated from `ecosystem/typescript/sdk/` in [aptos-core](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/typescript/sdk). See the README there.' >> $DOCS_DIR/README.md
+echo 'Generated from `ecosystem/typescript/sdk/` in [aptos-core](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/typescript/sdk) using `pnpm generate-ts-docs`.' >> $DOCS_DIR/README.md
 
 # Done!
 echo
 echo "Generated docs to $DOCS_DIR"
-echo "From here, ensure that the changes look good and make a PR if so!"
+echo "From here, ensure that the changes look good. If so, copy the changes into a checkout of the ts-sdk-doc repo and make a PR!"

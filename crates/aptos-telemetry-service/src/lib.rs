@@ -1,24 +1,22 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    clients::humio,
-    clients::{big_query, victoria_metrics_api::Client as MetricsClient},
-    context::{ClientTuple, Context, JsonWebTokenService, PeerStoreTuple},
+    clients::{big_query, humio, victoria_metrics_api::Client as MetricsClient},
+    context::{ClientTuple, Context, JsonWebTokenService, LogIngestClients, PeerStoreTuple},
     index::routes,
     metrics::PrometheusExporter,
     validator_cache::PeerSetCacheUpdater,
 };
-
 use aptos_crypto::{x25519, ValidCryptoMaterialStringExt};
 use aptos_types::{chain_id::ChainId, PeerId};
-
 use clap::Parser;
+use context::GroupedMetricsClients;
 use gcp_bigquery_client::Client as BigQueryClient;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{HashMap, HashSet},
     convert::Infallible,
     env,
     fs::File,
@@ -28,6 +26,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use types::common::ChainCommonName;
 use warp::{Filter, Reply};
 
 mod auth;
@@ -87,39 +86,16 @@ impl AptosTelemetryServiceArgs {
             config.custom_event_config.table_id.clone(),
         );
 
-        let victoria_metrics_secrets: HashMap<String, String> = serde_json::from_str(
-            &env::var("VICTORIA_METRICS_AUTH_TOKEN")
-                .expect("environment variable VICTORIA_METRICS_AUTH_TOKEN must be set"),
-        )
-        .expect("environment variable VICTORIA_METRICS_AUTH_TOKEN must be a map of name to secret");
+        let metrics_clients: GroupedMetricsClients = config.metrics_endpoints_config.clone().into();
 
-        let victoria_metrics_clients: BTreeMap<String, MetricsClient> = config
-            .victoria_metrics_endpoints
-            .iter()
-            .map(|(name, url)| {
-                let secret = victoria_metrics_secrets.get(name).unwrap_or_else(|| {
-                    panic!(
-                        "environment variable VICTORIA_METRICS_AUTH_TOKEN is missing secret for {}",
-                        name
-                    )
-                });
-                (
-                    name.clone(),
-                    MetricsClient::new(
-                        Url::parse(url).unwrap_or_else(|e| {
-                            panic!("invalid metrics ingest endpoint URL for {}: {}", name, e)
-                        }),
-                        secret.clone(),
-                    ),
-                )
-            })
-            .collect();
+        let telemetry_metrics_client = metrics_clients
+            .telemetry_service_metrics_clients
+            .values()
+            .next()
+            .cloned()
+            .unwrap();
 
-        let humio_client = humio::IngestClient::new(
-            Url::parse(&config.humio_url).expect("invalid Humio ingest endpoint URL"),
-            env::var("HUMIO_INGEST_TOKEN")
-                .expect("environment variable HUMIO_INGEST_TOKEN must be set"),
-        );
+        let log_ingest_clients: LogIngestClients = config.humio_ingest_config.clone().into();
 
         let jwt_service = JsonWebTokenService::from_base64_secret(
             env::var("JWT_SIGNING_KEY")
@@ -130,11 +106,6 @@ impl AptosTelemetryServiceArgs {
         let validators = Arc::new(aptos_infallible::RwLock::new(HashMap::new()));
         let validator_fullnodes = Arc::new(aptos_infallible::RwLock::new(HashMap::new()));
         let public_fullnodes = config.pfn_allowlist.clone();
-        let chain_set = config
-            .trusted_full_node_addresses
-            .iter()
-            .map(|pair| pair.0.to_owned())
-            .collect();
 
         let context = Context::new(
             server_private_key,
@@ -145,10 +116,9 @@ impl AptosTelemetryServiceArgs {
             ),
             ClientTuple::new(
                 Some(bigquery_client),
-                Some(victoria_metrics_clients),
-                Some(humio_client),
+                Some(metrics_clients),
+                Some(log_ingest_clients),
             ),
-            chain_set,
             jwt_service,
             config.log_env_map.clone(),
             config.peer_identities.clone(),
@@ -162,14 +132,7 @@ impl AptosTelemetryServiceArgs {
         )
         .run();
 
-        let metrics_exporter_client = MetricsClient::new(
-            Url::parse(&config.metrics_exporter_base_url)
-                .expect("base url must be provided for victoria metrics exporter url"),
-            env::var("METRICS_EXPORTER_AUTH_TOKEN")
-                .expect("environment variable METRICS_EXPORTER_AUTH_TOKEN must be set"),
-        );
-
-        PrometheusExporter::new(metrics_exporter_client).run();
+        PrometheusExporter::new(telemetry_metrics_client).run();
 
         Self::serve(&config, routes(context)).await;
     }
@@ -188,8 +151,133 @@ impl AptosTelemetryServiceArgs {
                     .key_path(config.tls_key_path.as_ref().unwrap())
                     .bind(config.address)
                     .await
-            }
+            },
         };
+    }
+}
+
+/// Per metric endpoint configuration.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct MetricsEndpoint {
+    /// Map of endpoint canonical name to Urls
+    endpoint_urls: HashMap<String, Url>,
+    /// Environment variable that holds the secrets
+    keys_env_var: String,
+}
+
+impl MetricsEndpoint {
+    #[cfg(test)]
+    fn default_for_test() -> Self {
+        Self {
+            endpoint_urls: HashMap::new(),
+            keys_env_var: "".into(),
+        }
+    }
+
+    fn make_client(&self) -> HashMap<String, MetricsClient> {
+        let secrets: HashMap<String, String> =
+            serde_json::from_str(&env::var(&self.keys_env_var).unwrap_or_else(|_| {
+                panic!(
+                    "environment variable {} must be set and be a map of endpoint names to token",
+                    self.keys_env_var.clone()
+                )
+            }))
+            .unwrap_or_else(|_| {
+                panic!(
+                    "environment variable {} must be a map of name to secret",
+                    self.keys_env_var
+                )
+            });
+
+        self.endpoint_urls
+            .iter()
+            .map(|(name, url)| {
+                let secret = secrets.get(name).unwrap_or_else(|| {
+                    panic!(
+                        "environment variable {} is missing secret for {}",
+                        self.keys_env_var.clone(),
+                        name,
+                    )
+                });
+                (
+                    name.clone(),
+                    MetricsClient::new(url.clone(), secret.clone()),
+                )
+            })
+            .collect()
+    }
+}
+
+/// Metrics endpoints configuration for metrics from
+/// different datasources.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct MetricsEndpointsConfig {
+    pub telemetry_service_metrics: MetricsEndpoint,
+    pub ingest_metrics: MetricsEndpoint,
+    pub untrusted_ingest_metrics: MetricsEndpoint,
+}
+
+impl MetricsEndpointsConfig {
+    #[cfg(test)]
+    fn default_for_test() -> Self {
+        Self {
+            telemetry_service_metrics: MetricsEndpoint::default_for_test(),
+            ingest_metrics: MetricsEndpoint::default_for_test(),
+            untrusted_ingest_metrics: MetricsEndpoint::default_for_test(),
+        }
+    }
+}
+
+/// A single log ingest endpoint config
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct LogIngestEndpoint {
+    pub endpoint_url: Url,
+    pub key_env_var: String,
+}
+
+impl LogIngestEndpoint {
+    #[cfg(test)]
+    fn default_for_test() -> Self {
+        Self {
+            endpoint_url: Url::parse("test://test").unwrap(),
+            key_env_var: "".into(),
+        }
+    }
+
+    fn make_client(&self) -> humio::IngestClient {
+        let secret = env::var(&self.key_env_var).unwrap_or_else(|_| {
+            panic!(
+                "environment variable {} must be set.",
+                self.key_env_var.clone()
+            )
+        });
+
+        humio::IngestClient::new(self.endpoint_url.clone(), secret)
+    }
+}
+
+/// Log ingest configuration for different sources
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct LogIngestConfig {
+    // Log endpoint for known nodes (nodes from validator set, whitelist, etc.)
+    pub known_logs_endpoint: LogIngestEndpoint,
+    // Log endpoint for unknown nodes
+    pub unknown_logs_endpoint: LogIngestEndpoint,
+    // Blacklisted peers from log ingestion
+    pub blacklist_peers: Option<HashSet<PeerId>>,
+}
+impl LogIngestConfig {
+    #[cfg(test)]
+    pub(crate) fn default_for_test() -> LogIngestConfig {
+        Self {
+            known_logs_endpoint: LogIngestEndpoint::default_for_test(),
+            unknown_logs_endpoint: LogIngestEndpoint::default_for_test(),
+            blacklist_peers: None,
+        }
     }
 }
 
@@ -202,18 +290,17 @@ pub struct TelemetryServiceConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tls_key_path: Option<String>,
 
-    pub trusted_full_node_addresses: HashMap<ChainId, String>,
+    pub trusted_full_node_addresses: HashMap<ChainCommonName, String>,
     pub update_interval: u64,
     pub pfn_allowlist: HashMap<ChainId, HashMap<PeerId, x25519::PublicKey>>,
 
     pub custom_event_config: CustomEventConfig,
-    pub victoria_metrics_endpoints:
-        HashMap<String /* endpoint name */, String /* endpoint Url */>,
-    pub metrics_exporter_base_url: String,
-    pub humio_url: String,
+    pub humio_ingest_config: LogIngestConfig,
 
     pub log_env_map: HashMap<ChainId, HashMap<PeerId, String>>,
     pub peer_identities: HashMap<ChainId, HashMap<PeerId, String>>,
+
+    pub metrics_endpoints_config: MetricsEndpointsConfig,
 }
 
 impl TelemetryServiceConfig {

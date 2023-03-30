@@ -1,11 +1,12 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::transaction::{Transaction, TransactionStatus, WriteSetPayload};
-use language_e2e_tests::{
+use aptos_language_e2e_tests::{
     common_transactions::peer_to_peer_txn, data_store::GENESIS_CHANGE_SET_HEAD,
     executor::FakeExecutor,
 };
+use aptos_types::transaction::{Transaction, TransactionStatus, WriteSetPayload};
 
 #[test]
 fn no_deletion_in_genesis() {

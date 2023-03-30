@@ -1,11 +1,10 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::{format_output, BlockArgs, NetworkArgs, UrlArgs};
-use aptos_rosetta::types::AccountIdentifier;
 use aptos_rosetta::{
     common::native_coin,
-    types::{AccountBalanceRequest, AccountBalanceResponse},
+    types::{AccountBalanceRequest, AccountBalanceResponse, AccountIdentifier},
 };
 use aptos_types::account_address::AccountAddress;
 use clap::{Parser, Subcommand};

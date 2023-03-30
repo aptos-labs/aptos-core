@@ -1,8 +1,8 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module defines representation of Aptos core data structures at physical level via schemas
-//! that implement [`schemadb::schema::Schema`].
+//! that implement [`aptos_schemadb::schema::Schema`].
 //!
 //! All schemas are `pub(crate)` so not shown in rustdoc, refer to the source code to see details.
 
@@ -27,7 +27,7 @@ pub(crate) mod version_data;
 pub(crate) mod write_set;
 
 use anyhow::{ensure, Result};
-use schemadb::ColumnFamilyName;
+use aptos_schemadb::ColumnFamilyName;
 
 pub const DB_METADATA_CF_NAME: ColumnFamilyName = "db_metadata";
 pub const EPOCH_BY_VERSION_CF_NAME: ColumnFamilyName = "epoch_by_version";
@@ -71,7 +71,7 @@ fn ensure_slice_len_gt(data: &[u8], len: usize) -> Result<()> {
 
 #[cfg(feature = "fuzzing")]
 pub mod fuzzing {
-    use schemadb::schema::fuzzing::assert_no_panic_decoding;
+    use aptos_schemadb::schema::fuzzing::assert_no_panic_decoding;
 
     pub fn fuzz_decode(data: &[u8]) {
         #[allow(unused_must_use)]

@@ -1,5 +1,5 @@
 [package]
-name = "gas-algebra-ext"
+name = "aptos-gas-algebra-ext"
 description = "Gas Algebra Ext"
 version = "0.0.1"
 

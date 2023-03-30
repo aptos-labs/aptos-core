@@ -1,4 +1,4 @@
-# Copyright (c) Aptos
+# Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
 from __future__ import annotations
@@ -56,13 +56,13 @@ class Authenticator:
         variant = deserializer.uleb128()
 
         if variant == Authenticator.ED25519:
-            authenticator = Ed25519Authenticator.deserialize(deserializer)
+            authenticator: typing.Any = Ed25519Authenticator.deserialize(deserializer)
         elif variant == Authenticator.MULTI_ED25519:
             authenticator = MultiEd25519Authenticator.deserialize(deserializer)
         elif variant == Authenticator.MULTI_AGENT:
             authenticator = MultiAgentAuthenticator.deserialize(deserializer)
         else:
-            raise Exception("Invalid type")
+            raise Exception(f"Invalid type: {variant}")
 
         return Authenticator(authenticator)
 
@@ -104,12 +104,12 @@ class Ed25519Authenticator:
 
 class MultiAgentAuthenticator:
     sender: Authenticator
-    secondary_signers: List[(AccountAddress, Authenticator)]
+    secondary_signers: List[typing.Tuple[AccountAddress, Authenticator]]
 
     def __init__(
         self,
         sender: Authenticator,
-        secondary_signers: List[(AccountAddress, Authenticator)],
+        secondary_signers: List[typing.Tuple[AccountAddress, Authenticator]],
     ):
         self.sender = sender
         self.secondary_signers = secondary_signers
@@ -146,8 +146,12 @@ class MultiAgentAuthenticator:
 
 
 class MultiEd25519Authenticator:
-    def __init__(self):
-        raise NotImplementedError
+    public_key: ed25519.MultiPublicKey
+    signature: ed25519.MultiSignature
+
+    def __init__(self, public_key, signature):
+        self.public_key = public_key
+        self.signature = signature
 
     def verify(self, data: bytes) -> bool:
         raise NotImplementedError
@@ -157,4 +161,5 @@ class MultiEd25519Authenticator:
         raise NotImplementedError
 
     def serialize(self, serializer: Serializer):
-        raise NotImplementedError
+        serializer.struct(self.public_key)
+        serializer.struct(self.signature)

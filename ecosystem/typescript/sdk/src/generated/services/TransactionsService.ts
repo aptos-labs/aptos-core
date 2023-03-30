@@ -142,7 +142,7 @@ export class TransactionsService {
      *
      * To retrieve a pending transaction, use /transactions/by_hash.
      * @param address Address of account with or without a `0x` prefix
-     * @param start Ledger version to start list of transactions
+     * @param start Account sequence number to start list of transactions
      *
      * If not provided, defaults to showing the latest transactions
      * @param limit Max number of transactions to retrieve.

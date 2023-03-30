@@ -1,10 +1,11 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
     register_histogram_vec, register_int_counter_vec, HistogramTimer, HistogramVec, IntCounterVec,
 };
-use network::ProtocolId;
+use aptos_network::ProtocolId;
 use once_cell::sync::Lazy;
 
 /// Useful metric constants for the storage service

@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, Result};
@@ -15,7 +15,7 @@ const MAX_FETCH_BATCH_SIZE: u16 = 1000;
 pub struct ValidatorInfo {
     pub address: AccountAddress,
     pub voting_power: u64,
-    pub validator_index: u64,
+    pub validator_index: u16,
 }
 
 pub struct EpochInfo {
@@ -83,7 +83,7 @@ impl FetchMetadata {
         while cursor < last {
             let limit = std::cmp::min(MAX_FETCH_BATCH_SIZE as u64, last - cursor) as u16;
             let mut current = client
-                .get_transactions(Some(cursor), Some(limit as u16))
+                .get_transactions(Some(cursor), Some(limit))
                 .await?
                 .into_inner();
             if current.is_empty() {
