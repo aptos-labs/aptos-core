@@ -439,7 +439,7 @@
           "refId": "A"
         }
       ],
-      "title": "Latest state snapshot (version) backed up",
+      "title": "Latest state snapshot (epoch) backed up",
       "type": "bargauge"
     },
     {
@@ -752,7 +752,7 @@
           "editorMode": "code",
           "expr": "aptos_db_backup_verify_epoch_ending_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} and irate(aptos_db_backup_verify_epoch_ending_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m]) != 0",
           "interval": "",
-          "legendFormat": "{{kubernetes_pod_name}}",
+          "legendFormat": "{{cluster}} {{kubernetes_pod_name}}",
           "range": true,
           "refId": "A"
         }
@@ -806,9 +806,11 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
           "expr": "aptos_db_backup_verify_epoch_ending_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} and irate(aptos_db_backup_verify_epoch_ending_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m]) != 0",
           "interval": "",
-          "legendFormat": "{{kubernetes_pod_name}}",
+          "legendFormat": "{{cluster}} {{kubernetes_pod_name}}",
+          "range": true,
           "refId": "A"
         }
       ],
@@ -912,7 +914,7 @@
           "editorMode": "code",
           "expr": "aptos_db_backup_verify_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} and irate(aptos_db_backup_verify_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m]) != 0",
           "interval": "",
-          "legendFormat": "{{kubernetes_pod_name}}",
+          "legendFormat": "{{cluster}} {{kubernetes_pod_name}}",
           "range": true,
           "refId": "A"
         }
@@ -966,9 +968,11 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
           "expr": "irate(aptos_db_backup_verify_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m]) > 0",
           "interval": "",
-          "legendFormat": "{{kubernetes_pod_name}}",
+          "legendFormat": "{{cluster}} {{kubernetes_pod_name}}",
+          "range": true,
           "refId": "A"
         }
       ],
@@ -1072,7 +1076,7 @@
           "editorMode": "code",
           "expr": "aptos_db_backup_verify_state_snapshot_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} and irate(aptos_db_backup_verify_state_snapshot_leaf_index[1m]) != 0",
           "interval": "",
-          "legendFormat": "{{kubernetes_pod_name}}",
+          "legendFormat": "{{cluster}} {{kubernetes_pod_name}}",
           "range": true,
           "refId": "A"
         }
@@ -1115,13 +1119,7 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
           "unit": "dateTimeAsLocal"
         },
         "overrides": [
@@ -1192,7 +1190,7 @@
           "fieldConfig": { "defaults": { "links": [] }, "overrides": [] },
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 70 },
+          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 3 },
           "hiddenSeries": false,
           "id": 867,
           "legend": {
@@ -1248,7 +1246,7 @@
           "fieldConfig": { "defaults": { "links": [] }, "overrides": [] },
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 77 },
+          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 10 },
           "hiddenSeries": false,
           "id": 326,
           "legend": {
@@ -2313,6 +2311,6 @@
   "timezone": "",
   "title": "Storage (Backup and Restore)",
   "uid": "9oXpx4n4z",
-  "version": 60,
+  "version": 63,
   "weekStart": ""
 }
