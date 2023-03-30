@@ -9,6 +9,14 @@ We welcome your own [contributions](https://github.com/aptos-labs/aptos-core/blo
 
 As always, adhere to the [Aptos Code of Conduct](https://github.com/aptos-labs/aptos-core/blob/main/CODE_OF_CONDUCT.md) when taking part in our ecosystem.
 
+## Why Aptos?
+
+Aptos offers a [reliable, safe, usable, and affordable](https://medium.com/aptoslabs/the-genesis-of-aptos-ff98d86e9445) blockchain for everyone. The Aptos Core team pairs the experience of delivering web2 products at scale with the innovation and decentralization of web3. Aptos was designed with upon these principles: absolute safety, extensible scalability, and credible neutrality.
+
+Aptos operates in an open and truly decentralized environment where validators and node operators have direct connections with the Aptos Core team and are strongly encouraged to [share what they learn](./external-resources.md). Operators, dApp developers, smart contract writers, and token creators can find support in chat, documentation, and events online and in person. Everyone in the Aptos ecosystem has a say in the direction of the blockchain.
+
+We invite you to join us on this journey. Find out how to get involved below.
+
 ## Ask questions and offer answers
 
 Join [Aptos Discord](https://discord.gg/aptoslabs) to speak with developers and hop into the Aptos community. It's the best way to keep up to date with news and developments in the Aptos universe. Be sure to check pinned messages in the channels - this is where we like to post topic-specific links, events, and more.
