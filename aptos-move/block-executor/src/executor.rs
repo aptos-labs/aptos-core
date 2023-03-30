@@ -34,6 +34,9 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
+// todo: add this number to config and think about the number.
+const PER_BLOCK_GAS_LIMIT: u64 = 100000;
+
 pub static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
         .num_threads(num_cpus::get())
@@ -224,6 +227,7 @@ where
 
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
         let mut scheduler_task = SchedulerTask::NoTask;
+        let mut accumulated_gas = 0;
         loop {
             // Only one thread try_commit to avoid contention.
             if committing {
@@ -235,10 +239,25 @@ where
                         break;
                     }
 
-                    // When there is a txn with Abort or SkipRest as the execution output, can early halt the BlockSTM.
+                    // When there is a txn with Abort or SkipRest as the execution output, can early halt BlockSTM.
                     if let ExecutionStatus::Abort(_) | ExecutionStatus::SkipRest(_) =
                         last_input_output.write_set(txn_idx).as_ref()
                     {
+                        scheduler.halt();
+                        break;
+                    }
+
+                    // Calculating the accumulated gas of the committed txns.
+                    let txn_gas = match last_input_output.write_set(txn_idx).as_ref() {
+                        ExecutionStatus::Success(output) => output.gas_used(),
+                        _ => unreachable!(),
+                    };
+                    accumulated_gas += txn_gas;
+
+                    // When the accumulated gas of the committed txns exceeds PER_BLOCK_GAS_LIMIT, early halt BlockSTM.
+                    if accumulated_gas >= PER_BLOCK_GAS_LIMIT {
+                        // Set the execution output status to be SkipRest, to skip the rest of the txns.
+                        last_input_output.update_to_skip_rest(txn_idx);
                         scheduler.halt();
                         break;
                     }

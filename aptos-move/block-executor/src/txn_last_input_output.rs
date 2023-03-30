@@ -226,6 +226,14 @@ impl<K: ModulePath, T: TransactionOutput, E: Send + Clone> TxnLastInputOutput<K,
             .expect("[BlockSTM]: Execution output must be recorded after execution")
     }
 
+    pub fn update_to_skip_rest(&self, txn_idx: TxnIndex) {
+        if let ExecutionStatus::Success(output) = self.take_output(txn_idx) {
+            self.outputs[txn_idx as usize].store(Some(Arc::new(ExecutionStatus::SkipRest(output))));
+        } else {
+            unreachable!();
+        }
+    }
+
     // Extracts a set of paths written or updated during execution from transaction
     // output: (modified by writes, modified by deltas).
     pub fn modified_keys(&self, txn_idx: TxnIndex) -> KeySet<T> {
