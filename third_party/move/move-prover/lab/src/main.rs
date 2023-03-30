@@ -23,11 +23,11 @@ fn main() {
                     println!("prover-lab: error: {}", x);
                     std::process::exit(10);
                 }
-            }
+            },
             _ => {
                 println!("prover-lab: unknown tool `{}`", args[1]);
                 std::process::exit(2);
-            }
+            },
         }
     }
 }

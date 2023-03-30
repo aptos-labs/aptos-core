@@ -244,7 +244,7 @@ impl ProposalGenerator {
                     .max_block_bytes
                     .min(value.max_sending_block_bytes_override);
 
-                CHAIN_HEALTH_BACKOFF_TRIGGERED.observe(1);
+                CHAIN_HEALTH_BACKOFF_TRIGGERED.observe(1.0);
                 warn!(
                     "Generating proposal reducing limits to {} txns and {} bytes, due to chain health backoff",
                     max_block_txns,
@@ -252,7 +252,7 @@ impl ProposalGenerator {
                 );
                 (max_block_txns, max_block_bytes)
             } else {
-                CHAIN_HEALTH_BACKOFF_TRIGGERED.observe(0);
+                CHAIN_HEALTH_BACKOFF_TRIGGERED.observe(0.0);
                 (self.max_block_txns, self.max_block_bytes)
             };
 

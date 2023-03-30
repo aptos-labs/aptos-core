@@ -1,4 +1,4 @@
-name: "Build+Push Rust Docker Images"
+name: "*run Docker rust build reusable workflow"
 
 on:
   workflow_call:
@@ -25,10 +25,30 @@ on:
         required: false
         type: boolean
         description: Whether to build additional testing images. If not specified, only the base release images will be built
+  workflow_dispatch:
+    inputs:
+      GIT_SHA:
+        required: true
+        type: string
+        description: The git SHA1 to build. If not specified, the latest commit on the triggering branch will be built
+      FEATURES:
+        required: false
+        type: string
+        description: The cargo features to build. If not specified, none will be built other than those specified in cargo config
+      PROFILE:
+        default: release
+        required: false
+        type: string
+        description: The cargo profile to build. If not specified, the default release profile will be used
+      BUILD_ADDL_TESTING_IMAGES:
+        default: false
+        required: false
+        type: boolean
+        description: Whether to build additional testing images. If not specified, only the base release images will be built
 
 env:
   GIT_SHA: ${{ inputs.GIT_SHA }}
-  TARGET_CACHE_ID: ${{ inputs.TARGET_CACHE_ID }}
+  TARGET_CACHE_ID: ${{ inputs.TARGET_CACHE_ID || inputs.GIT_SHA }} # on workflow_dispatch, the build is one-off, so use the git sha as the cache id instead of another key
   PROFILE: ${{ inputs.PROFILE }}
   FEATURES: ${{ inputs.FEATURES }}
   BUILD_ADDL_TESTING_IMAGES: ${{ inputs.BUILD_ADDL_TESTING_IMAGES }}

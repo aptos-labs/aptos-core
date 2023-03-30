@@ -1394,4 +1394,4 @@ With an existing collection, directly mint a soul bound token into the recipient
 </details>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

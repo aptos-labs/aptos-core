@@ -497,4 +497,4 @@ Functions to construct a canonical error code of the given category.
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
