@@ -207,6 +207,12 @@ fn main() -> Result<()> {
     let duration = Duration::from_secs(args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
 
+    let suite_name = if suite_name == "land_blocking" {
+        "publishing"
+    } else {
+        panic!();
+    };
+
     let runtime = Runtime::new()?;
     match args.cli_cmd {
         // cmd input for test
@@ -890,13 +896,15 @@ fn three_region_sim_graceful_overload(config: ForgeConfig) -> ForgeConfig {
 }
 
 fn individual_workload_tests(test_name: String, config: ForgeConfig) -> ForgeConfig {
-    let job = EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
+    let mut job = EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
         mempool_backlog: 30000,
     });
     config
-        .with_network_tests(vec![&PerformanceBenchmarkWithFN])
-        .with_initial_validator_count(NonZeroUsize::new(5).unwrap())
-        .with_initial_fullnode_count(3)
+        .with_network_tests(vec![&ThreeRegionSameCloudSimulationTest {
+            add_execution_delay: None,
+        }])
+        .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
+        // .with_initial_fullnode_count(3)
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = 600.into();
         }))
@@ -927,6 +935,14 @@ fn individual_workload_tests(test_name: String, config: ForgeConfig) -> ForgeCon
                     vec![(write_type, 1)],
                 ])
             } else {
+                if test_name == "publishing" {
+                    job = job
+                        .max_transactions_per_account(1)
+                        .mode(EmitJobMode::MaxLoad {
+                        // 20s of backlog
+                        mempool_backlog: 500,
+                    });
+                }
                 job.transaction_type(match test_name.as_str() {
                     "account_creation" => TransactionType::default_account_generation(),
                     "nft_mint" => TransactionType::NftMintAndTransfer,
