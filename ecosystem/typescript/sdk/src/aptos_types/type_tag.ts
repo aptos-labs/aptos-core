@@ -13,6 +13,7 @@ export abstract class TypeTag {
 
   static deserialize(deserializer: Deserializer): TypeTag {
     const index = deserializer.deserializeUleb128AsU32();
+    console.log("index", index);
     switch (index) {
       case 0:
         return TypeTagBool.load(deserializer);
@@ -36,6 +37,8 @@ export abstract class TypeTag {
         return TypeTagU32.load(deserializer);
       case 10:
         return TypeTagU256.load(deserializer);
+      case 11:
+        return TypeTagObject.load(deserializer);
       default:
         throw new Error(`Unknown variant index for TypeTag: ${index}`);
     }
@@ -172,6 +175,16 @@ export class TypeTagStruct extends TypeTag {
       return true;
     }
     return false;
+  }
+}
+
+export class TypeTagObject extends TypeTag {
+  serialize(serializer: Serializer): void {
+    serializer.serializeU32AsUleb128(11);
+  }
+
+  static load(_deserializer: Deserializer): TypeTagObject {
+    return new TypeTagObject();
   }
 }
 
