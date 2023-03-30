@@ -7,6 +7,10 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site. Note, this site is built from the `main` upstream branch of GitHub and so therefore reflects the latest changes to Aptos. If you have checked out [another branch](https://github.com/aptos-labs/aptos-core/branches) to use a [specific network](guides/system-integrators-guide.md#choose-a-network), the code may not yet have all of the features described here.
 
+## 30 March 2023
+
+- Depicted how to employ [Move scripts](guides/move-guides/move-scripts.md) to execute an arbitrary piece of code as the transaction payload in an example workflow.
+
 ## 27 March 2023
 
 - Described how to [Use the Remix IDE Plugin](./community/contributions/remix-ide-plugin.md) to deploy and run Move modules on the Remix IDE, a graphical interface for developing Move modules written by [0xhsy](https://github.com/0xhsy).
