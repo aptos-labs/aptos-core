@@ -56,6 +56,7 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Function `withdraw_internal`](#0x1_fungible_asset_withdraw_internal)
 -  [Function `increase_supply`](#0x1_fungible_asset_increase_supply)
 -  [Function `decrease_supply`](#0x1_fungible_asset_decrease_supply)
+-  [Specification](#@Specification_1)
 
 
 <pre><code><b>use</b> <a href="create_signer.md#0x1_create_signer">0x1::create_signer</a>;
@@ -1667,6 +1668,15 @@ Decrease the supply of a fungible metadata by burning.
 
 
 </details>
+
+<a name="@Specification_1"></a>
+
+## Specification
+
+
+
+<pre><code><b>pragma</b> verify=<b>false</b>;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
