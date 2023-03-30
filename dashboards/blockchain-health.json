@@ -2206,7 +2206,7 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "description": "In the current (halted) round, amount of votes collected for the proposal. Hash_index represents each of the proposals - there should be only one proposal, but malicious actors (or nodes with incorrect event history/leader election) can create multiple proposals",
+      "description": "When chain is halted, in order for chain to continue to the next round, we need to reach 1 for the timeout votes.\n\nWhen there is a fork, looking at per-node chart is more useful.",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -2241,7 +2241,7 @@
         "overrides": []
       },
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 102 },
-      "id": 175,
+      "id": 192,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
         "tooltip": { "mode": "multi", "sort": "none" }
@@ -2250,13 +2250,13 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "100 * sum by (hash_index) (max by (peer_id, hash_index) (aptos_consensus_current_round_voted_power{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=\"validator\"})) / max(aptos_total_voting_power{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=\"validator\"})",
+          "expr": "100 * max by (kubernetes_pod_name) (sum by (kubernetes_pod_name, run_uuid) (aptos_consensus_current_round_timeout_voted_power{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=\"validator\"})) \n\n/ \n\nmax by (kubernetes_pod_name) (aptos_total_voting_power{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=\"validator\"})\n",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "% of voting power voted for (each of) the proposal(s)",
+      "title": "By peer (fork view): % of voting power voted for timeout in the current round ",
       "type": "timeseries"
     },
     {
@@ -2316,6 +2316,61 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "description": "In the current (halted) round, amount of votes collected for the proposal. Hash_index represents each of the proposals - there should be only one proposal, but malicious actors (or nodes with incorrect event history/leader election) can create multiple proposals",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 1,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 110 },
+      "id": 175,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "100 * sum by (hash_index) (max by (peer_id, hash_index) (aptos_consensus_current_round_voted_power{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=\"validator\"})) / max(aptos_total_voting_power{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=\"validator\"})",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "% of voting power voted for (each of) the proposal(s)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "description": "The current round consensus is at, the rate of this is roughly Committed blocks per sec.",
       "fieldConfig": {
         "defaults": {
@@ -2351,7 +2406,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 110 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 110 },
       "id": 178,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -3145,6 +3200,14 @@
         "skipUrlSync": false,
         "sort": 0,
         "type": "interval"
+      },
+      {
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "filters": [],
+        "hide": 0,
+        "name": "Filters",
+        "skipUrlSync": false,
+        "type": "adhoc"
       }
     ]
   },
@@ -3156,6 +3219,6 @@
   "timezone": "browser",
   "title": "Blockchain Health",
   "uid": "JnOvNs4Vk",
-  "version": 58,
+  "version": 62,
   "weekStart": ""
 }
