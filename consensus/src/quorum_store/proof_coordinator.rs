@@ -36,6 +36,7 @@ struct IncrementalProofState {
     info: BatchInfo,
     aggregated_signature: BTreeMap<PeerId, bls12381::Signature>,
     aggregated_voting_power: u128,
+    self_voted: bool,
     completed: bool,
 }
 
@@ -45,6 +46,7 @@ impl IncrementalProofState {
             info,
             aggregated_signature: BTreeMap::new(),
             aggregated_voting_power: 0,
+            self_voted: false,
             completed: false,
         }
     }
@@ -74,6 +76,9 @@ impl IncrementalProofState {
                     .is_none()
                 {
                     self.aggregated_voting_power += voting_power as u128;
+                    if signer == self.info.author() {
+                        self.self_voted = true;
+                    }
                 } else {
                     error!(
                         "Author already in aggregated_signatures right after rechecking: {}",
@@ -214,16 +219,24 @@ impl ProofCoordinator {
         let mut batch_ids = vec![];
         for signed_batch_info_info in self.timeouts.expire() {
             if let Some(state) = self.digest_to_proof.remove(signed_batch_info_info.digest()) {
+                if !state.completed {
+                    batch_ids.push(signed_batch_info_info.batch_id());
+                }
+
+                // We skip metrics if the proof did not complete and did not get a self vote, as it
+                // is considered a proof that was re-inited due to a very late vote.
+                if !state.completed && !state.self_voted {
+                    continue;
+                }
+                if !state.completed {
+                    counters::TIMEOUT_BATCHES_COUNT.inc();
+                }
                 counters::BATCH_RECEIVED_REPLIES_COUNT
                     .observe(state.aggregated_signature.len() as f64);
                 counters::BATCH_RECEIVED_REPLIES_VOTING_POWER
                     .observe(state.aggregated_voting_power as f64);
                 counters::BATCH_SUCCESSFUL_CREATION
                     .observe(if state.completed { 1.0 } else { 0.0 });
-                if !state.completed {
-                    counters::TIMEOUT_BATCHES_COUNT.inc();
-                    batch_ids.push(signed_batch_info_info.batch_id());
-                }
             }
         }
         if self
