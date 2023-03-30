@@ -32,20 +32,30 @@ try {
     cwd: __dirname,
   });
 
+  const output = execSync("ls -al", {
+    cwd: __dirname,
+  }).toString();
+  console.log(output);
+
+  const coreFolderoutput = execSync("ls -al", {
+    cwd: __dirname + ANS_CORE_FOLDER,
+  }).toString();
+  console.log(coreFolderoutput);
+
   // 2. initialize a default profile
   console.log("---initialize a default profile---");
   execSync(APTOS_INIT_COMMAND, {
     cwd: __dirname + ANS_CORE_FOLDER,
   });
 
+  const coreFolderoutput2 = execSync("ls -al", {
+    cwd: __dirname + ANS_CORE_FOLDER,
+  }).toString();
+  console.log(coreFolderoutput2);
+
   // Sleep for 10 seconds to make sure account has funded
   console.log("---sleeps for 10 seconds to make sure account has funded---");
   execSync("sleep 10");
-
-  const output = execSync("ls -al", {
-    cwd: __dirname + ANS_CORE_FOLDER,
-  }).toString();
-  console.log(output);
 
   // 3. get default profile info
   console.log("---get default profile info---");
