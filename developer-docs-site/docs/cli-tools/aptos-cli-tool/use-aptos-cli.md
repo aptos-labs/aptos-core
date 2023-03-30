@@ -909,9 +909,7 @@ Note these limitations of the experimental gas profiling feature:
 
 In this example, we will use `DebugDemo` in [debug-move-example](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos/debug-move-example).
 
-First, you need to include Move nursery in your Move [TOML file](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos/debug-move-example/Move.toml).
-
-Now, you can use `Debug::print` and `Debug::print_stack_trace` in your [DebugDemo Move file](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos/debug-move-example/sources/DebugDemo.move).
+Now, you can use `debug::print` and `debug::print_stack_trace` in your [DebugDemo Move file](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos/debug-move-example/sources/DebugDemo.move).
 
 You can run the following command:
 ```bash
