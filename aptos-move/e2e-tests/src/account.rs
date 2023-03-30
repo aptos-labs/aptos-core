@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! Test infrastructure for modeling Aptos accounts.
@@ -19,11 +20,8 @@ use aptos_types::{
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
-use move_core_types::{
-    language_storage::{ResourceKey, StructTag},
-    move_resource::MoveStructType,
-};
-use vm_genesis::GENESIS_KEYPAIR;
+use aptos_vm_genesis::GENESIS_KEYPAIR;
+use move_core_types::move_resource::MoveStructType;
 
 // TTL is 86400s. Initial time was set to 0.
 pub const DEFAULT_EXPIRATION_TIME: u64 = 4_000_000;
@@ -91,8 +89,8 @@ impl Account {
 
     /// Creates a new account in memory representing an account created in the genesis transaction.
     ///
-    /// The address will be [`address`], which should be an address for a genesis account and
-    /// the account will use [`GENESIS_KEYPAIR`][struct@GENESIS_KEYPAIR] as its keypair.
+    /// The address will be `address`, which should be an address for a genesis account and
+    /// the account will use [`GENESIS_KEYPAIR`][static@@GENESIS_KEYPAIR] as its keypair.
     pub fn new_genesis_account(address: AccountAddress) -> Self {
         Account {
             addr: address,
@@ -104,7 +102,7 @@ impl Account {
     /// Creates a new account representing the aptos root account in memory.
     ///
     /// The address will be [`aptos_test_root_address`][account_config::aptos_test_root_address], and
-    /// the account will use [`GENESIS_KEYPAIR`][struct@GENESIS_KEYPAIR] as its keypair.
+    /// the account will use [`GENESIS_KEYPAIR`][static@GENESIS_KEYPAIR] as its keypair.
     pub fn new_aptos_root() -> Self {
         Self::new_genesis_account(account_config::aptos_test_root_address())
     }
@@ -121,19 +119,16 @@ impl Account {
     ///
     /// Use this to retrieve or publish the Account blob.
     pub fn make_account_access_path(&self) -> AccessPath {
-        self.make_access_path(AccountResource::struct_tag())
+        AccessPath::resource_access_path(self.addr, AccountResource::struct_tag())
+            .expect("access path in test")
     }
 
     /// Returns the AccessPath that describes the Account's CoinStore resource instance.
     ///
     /// Use this to retrieve or publish the Account CoinStore blob.
     pub fn make_coin_store_access_path(&self) -> AccessPath {
-        self.make_access_path(CoinStoreResource::struct_tag())
-    }
-
-    pub fn make_access_path(&self, tag: StructTag) -> AccessPath {
-        let resource_tag = ResourceKey::new(self.addr, tag);
-        AccessPath::resource_access_path(resource_tag)
+        AccessPath::resource_access_path(self.addr, CoinStoreResource::struct_tag())
+            .expect("access path in  test")
     }
 
     /// Changes the keys for this account to the provided ones.
@@ -441,11 +436,11 @@ impl AccountData {
     pub fn to_writeset(&self) -> WriteSet {
         let write_set = vec![
             (
-                StateKey::AccessPath(self.make_account_access_path()),
+                StateKey::access_path(self.make_account_access_path()),
                 WriteOp::Modification(self.to_bytes()),
             ),
             (
-                StateKey::AccessPath(self.make_coin_store_access_path()),
+                StateKey::access_path(self.make_coin_store_access_path()),
                 WriteOp::Modification(self.coin_store.to_bytes()),
             ),
         ];

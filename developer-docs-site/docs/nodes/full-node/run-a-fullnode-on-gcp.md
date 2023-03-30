@@ -8,7 +8,7 @@ slug: "run-a-fullnode-on-gcp"
 This tutorial explains how to configure and deploy a public fullnode to connect to the Aptos devnet using Google Cloud (GCP). Running a public fullnode in the cloud usually provides better stability and availability compared to running it on your laptop. **If you are looking to deploy a production grade public fullnode, we recommend you to deploy it on the cloud.**
 
 :::tip Alternative methods for running a public fullnode
-Read [Public Fullnode](/nodes/full-node/public-fullnode) if you want other alternatives for deployment. Using cloud comes with a cost, and it varies depends on how you configure it.
+Read [Public Fullnode](./index.md) if you want other options for deployment. Using cloud comes with a cost, and it varies depending on how you configure it.
 :::
 
 ## Prerequisites
@@ -19,7 +19,7 @@ The following packages are pre-installed with Cloud Shell. **Make sure to review
 
 However, if you are running the installation from your laptop or another machine, you need to install:
 
-* Terraform 1.1.7: https://www.terraform.io/downloads.html
+* Terraform 1.3.6: https://www.terraform.io/downloads.html
 * Kubernetes cli: https://kubernetes.io/docs/tasks/tools/
 * Google Cloud cli: https://cloud.google.com/sdk/docs/install-sdk
 
@@ -45,7 +45,7 @@ Google Cloud offers a [90 day $300 free trial for every new user](https://cloud.
 
 #### Create a new GCP project
 
-- Create a new project on the GCP Console or using the glcoud command from the Google Cloud CLI. Before you do that, familiarize yourself with the [resource hierarchy on GCP](https://cloud.google.com/resource-manager/docs/cloud-platform-resource-hierarchy).
+- Create a new project on the GCP Console or using the gcloud command from the Google Cloud CLI. Before you do that, familiarize yourself with the [resource hierarchy on GCP](https://cloud.google.com/resource-manager/docs/cloud-platform-resource-hierarchy).
 - [Follow these instructions to setup a new project.](https://cloud.google.com/resource-manager/docs/creating-managing-projects#creating_a_project).
 
 #### Enable billing, upgrade your account
@@ -56,7 +56,7 @@ You will still be able to use the free trial credits, but enabling billing allow
 
 #### Additional GCP resources
 
-This should be enough to get your GCP setup ready to start deploying your fullnod. But if you are brand new to GCP, you may want to check out some of our [quickstart guides](https://cloud.google.com/docs/get-started/quickstarts) and [Google Cloud Skills Boost](https://www.cloudskillsboost.google/catalog).
+This should be enough to get your GCP setup ready to start deploying your fullnode. But if you are brand new to GCP, you may want to check out some of our [quickstart guides](https://cloud.google.com/docs/get-started/quickstarts) and [Google Cloud Skills Boost](https://www.cloudskillsboost.google/catalog).
 
 
 ## Getting started
@@ -93,11 +93,17 @@ You can deploy a public fullnode on GCP by using the Aptos fullnode Terraform mo
   touch main.tf
   ```
 
-4. Modify `main.tf` file to configure Terraform, and create public fullnode from Terraform module. Example content for `main.tf`:
+4. Modify the `main.tf` file to configure Terraform and create a public fullnode from the Terraform module.
+
+**Note:** If you are using a different version of Terraform, you will need to use the `tfenv` command to change the required version. 
+
+You can find the Docker image tag at https://hub.docker.com/r/aptoslabs/validator/tags?page=1&ordering=last_updated&name=devnet
+
+Example content for `main.tf`:
 
   ```rust
   terraform {
-    required_version = "~> 1.2.0"
+    required_version = "~> 1.3.6"
     backend "gcs" {
       bucket = "BUCKET_NAME" # bucket name created in step 2
       prefix = "state/fullnode"
@@ -109,9 +115,10 @@ You can deploy a public fullnode on GCP by using the Aptos fullnode Terraform mo
     source        = "github.com/aptos-labs/aptos-core.git//terraform/fullnode/gcp?ref=main"
     region        = "us-central1"  # Specify the region
     zone          = "c"            # Specify the zone suffix
-    project       = "gcp-fullnode" # Specify your GCP project name
+    project       = "gcp-fullnode" # Specify your GCP project ID
+    fullnode_name = "BUCKET_NAME" #bucket name created in step 2
     era           = 1              # bump era number to wipe the chain
-    image_tag     = "devnet" # Specify the docker image tag to use
+    image_tag     = "devnet" # Specify the docker image tag 
   }
   ```
 
@@ -156,12 +163,24 @@ Once Terraform apply finished, you can follow this section to validate your depl
   ```bash
   kubectl get pods -n aptos
   ```
+You should see this:
+
+```
+NAME                       READY   STATUS    RESTARTS   AGE
+devnet0-aptos-fullnode-0   1/1     Running   0          56s
+```
 
 3. Get your public fullnode IP:
 
   ```bash
   kubectl get svc -o custom-columns=IP:status.loadBalancer.ingress -n aptos
   ```
+  
+  You should see this:
+  
+  ```IP
+[map[ip:104.198.36.142]]
+```
 
 4. Check the REST API, make sure that the ledger version is increasing:
 
@@ -169,8 +188,13 @@ Once Terraform apply finished, you can follow this section to validate your depl
   curl http://<IP>/v1
   # Example command syntax: curl http://104.198.36.142/v1
   ```
+  
+  You should see this:
+  ```
+  {"chain_id":25,"epoch":"22","ledger_version":"9019844","oldest_ledger_version":"0","ledger_timestamp":"1661620200131348","node_role":"full_node","oldest_block_height":"0","block_height":"1825467"}
+```
 
-5. To verify the correctness of your public fullnode, as outlined in the section [Verify the correctness of your FullNode](/nodes/full-node/fullnode-source-code-or-docker#verify-the-correctness-of-your-public-fullnode), you will need to:
+5. To verify the correctness of your public fullnode, as outlined in the section [Verify the correctness of your FullNode](./fullnode-source-code-or-docker.md#verify-the-correctness-of-your-public-fullnode), you will need to:
    - Set up a port-forwarding mechanism directly to the aptos pod in one ssh terminal, and
    - Test it in another ssh terminal. 
    
@@ -194,59 +218,18 @@ Once Terraform apply finished, you can follow this section to validate your depl
 
    * Exit port-forwarding when you are done by entering control-c in the terminal.
 
-## Update public fullnode with new releases
-
-Aptos devnet releases can be of two types: 
-- One with a data wipe to startover the Aptos blockchain
-- Second type is only a software update without a data wipe.
-
-### Upgrade with data wipe
-
-1. You can increase the `era` number in `main.tf` to trigger a new data volume creation, which will start the node on a new DB.
-
-2. Update `image_tag` in `main.tf`.
-
-3. Update Terraform module for fullnode, run this in the same directory of your `main.tf` file:
-
-  ```bash
-  terraform get -update
-  ```
-
-4. Apply Terraform changes:
-
-  ```bash
-  terraform apply
-  ```
-
-### Upgrade without data wipe
-
-1. Update `image_tag` in `main.tf`.
-
-2. Update Terraform module for fullnode, run this in the same directory of your `main.tf` file:
-
-  ```bash
-  terraform get -update
-  ```
-
-3. Apply Terraform changes:
-
-  ```bash
-  terraform apply
-  # if you didn't update the image tag, terraform will show nothing to change, in this case, force helm update
-  terraform apply -var force_helm_update=true
-  ```
 
 ## Configure identity and seed peers
 
 :::tip Errors? 
-See [Issues and Workarounds](/issues-and-workarounds.md) if you get any errors.
+See [Issues and Workarounds](../../issues-and-workarounds.md) if you get any errors.
 :::
 
 ### Static identity
 
-If you want to configure your node with a static identity, first see the [Network Identity For Fullnode](/nodes/full-node/network-identity-fullnode) for how to generate the keys, and then follow the below instructions to configure your Terraform file.
+If you want to configure your node with a static identity, first see the [Network Identity For Fullnode](./network-identity-fullnode.md) for how to generate the keys, and then follow the below instructions to configure your Terraform file.
 
-1. Generate your own private key, and extract peer id, following the guide [Creating a static identity for a fullnode](/nodes/full-node/network-identity-fullnode#creating-a-static-identity-for-a-fullnode).
+1. Generate your own private key, and extract peer id, following the guide [Creating a static identity for a fullnode](./network-identity-fullnode.md#creating-a-static-identity-for-a-fullnode).
 
 2. Modify the `main.tf` to add `fullnode_identity` in `fullnode_helm_values`. This will configure the keys for public fullnode, for example:
 
@@ -284,7 +267,7 @@ If you want to configure your node with a static identity, first see the [Networ
 
 You can add upstream seed peers to allow your node state sync from a specific . This is helpful when the public fullnode is not able to connect to the network due to congestion.
 
-1. Obtain the upstream peer id information. You can either use the one listed in the [Connecting your fullnode to seed peers](/nodes/full-node/fullnode-network-connections#connecting-your-fullnode-to-seed-peers), or grab one from [Aptos Discord](http://discord.gg/aptoslabs), `#advertise-full-node` channel, which are the nodes hosted by our community.
+1. Obtain the upstream peer id information. You can either use the one listed in the [Connecting your fullnode to seed peers](./fullnode-network-connections.md#connecting-your-fullnode-to-seed-peers), or grab one from the [Aptos Discord](http://discord.gg/aptoslabs) [#advertise-full-node](https://discord.com/channels/945856774056083548/956342147546746901) channel; these are the nodes hosted by our community.
 
 2. Modify the `main.tf` to add seeds for devnet in `fullnode_helm_values`. This will configure the upstream seeds for public fullnode. For example:
 

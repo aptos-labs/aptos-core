@@ -1,9 +1,8 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::pruner::db_pruner::DBPruner;
 use aptos_types::transaction::Version;
-use std::fmt::Debug;
 
 /// This module provides `Pruner` which manages a thread pruning old data in the background and is
 /// meant to be triggered by other threads as they commit new data to the DB.
@@ -13,7 +12,7 @@ use std::fmt::Debug;
 ///
 /// It creates a worker thread on construction and joins it on destruction. When destructed, it
 /// quits the worker thread eagerly without waiting for all pending work to be done.
-pub trait PrunerManager: Debug + Sync {
+pub trait PrunerManager: Sync {
     type Pruner: DBPruner;
 
     fn is_pruner_enabled(&self) -> bool;

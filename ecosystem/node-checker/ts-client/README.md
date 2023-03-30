@@ -72,13 +72,11 @@ This project follows [semver](https://semver.org/) as closely as possible.
 To release a new version of the SDK do the following.
 
 1. Regenerate the client:
-
 ```
 pnpm generate-client
 ```
 
 2. Test:
-
 ```
 pnpm test
 ```

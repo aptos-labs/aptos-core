@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 // This is necessary for the derive macros which rely on being used in a
@@ -10,7 +10,6 @@ use crate::{
     test_utils::{random_serializable_struct, uniform_keypair_strategy},
     traits::*,
 };
-
 use aptos_crypto_derive::{
     PrivateKey, PublicKey, Signature, SigningKey, SilentDebug, ValidCryptoMaterial, VerifyingKey,
 };

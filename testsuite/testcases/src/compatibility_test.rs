@@ -1,10 +1,11 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{batch_update, generate_traffic};
 use anyhow::bail;
+use aptos_forge::{NetworkContext, NetworkTest, Result, SwarmExt, Test};
 use aptos_logger::info;
-use forge::{NetworkContext, NetworkTest, Result, SwarmExt, Test};
 use tokio::{runtime::Runtime, time::Duration};
 
 pub struct SimpleValidatorUpgrade;
@@ -59,12 +60,7 @@ impl NetworkTest for SimpleValidatorUpgrade {
         ctx.report.report_text(msg);
 
         // Generate some traffic
-        let txn_stat = generate_traffic(
-            ctx,
-            &all_validators,
-            duration,
-            aptos_global_constants::GAS_UNIT_PRICE,
-        )?;
+        let txn_stat = generate_traffic(ctx, &all_validators, duration)?;
         ctx.report.report_txn_stats(
             format!("{}::liveness-check", self.name()),
             &txn_stat,
@@ -81,12 +77,7 @@ impl NetworkTest for SimpleValidatorUpgrade {
         runtime.block_on(batch_update(ctx, &[first_node], &new_version))?;
 
         // Generate some traffic
-        let txn_stat = generate_traffic(
-            ctx,
-            &[first_node],
-            duration,
-            aptos_global_constants::GAS_UNIT_PRICE,
-        )?;
+        let txn_stat = generate_traffic(ctx, &[first_node], duration)?;
         ctx.report.report_txn_stats(
             format!("{}::single-validator-upgrade", self.name()),
             &txn_stat,
@@ -103,12 +94,7 @@ impl NetworkTest for SimpleValidatorUpgrade {
         runtime.block_on(batch_update(ctx, &first_batch, &new_version))?;
 
         // Generate some traffic
-        let txn_stat = generate_traffic(
-            ctx,
-            &first_batch,
-            duration,
-            aptos_global_constants::GAS_UNIT_PRICE,
-        )?;
+        let txn_stat = generate_traffic(ctx, &first_batch, duration)?;
         ctx.report.report_txn_stats(
             format!("{}::half-validator-upgrade", self.name()),
             &txn_stat,
@@ -124,12 +110,7 @@ impl NetworkTest for SimpleValidatorUpgrade {
         runtime.block_on(batch_update(ctx, &second_batch, &new_version))?;
 
         // Generate some traffic
-        let txn_stat = generate_traffic(
-            ctx,
-            &second_batch,
-            duration,
-            aptos_global_constants::GAS_UNIT_PRICE,
-        )?;
+        let txn_stat = generate_traffic(ctx, &second_batch, duration)?;
         ctx.report.report_txn_stats(
             format!("{}::rest-validator-upgrade", self.name()),
             &txn_stat,

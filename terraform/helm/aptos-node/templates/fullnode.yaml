@@ -24,7 +24,7 @@ spec:
     port: 8080
 
 ---
-
+{{ $fullnode_statefulset := lookup "apps/v1" "StatefulSet" $.Release.Namespace (printf "%s-%d-%s-e%s" (include "aptos-validator.fullname" $) $i .name (toYaml $.Values.chain.era)) }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -54,6 +54,11 @@ spec:
       resources:
         requests:
           storage: {{ $.Values.fullnode.storage.size }}
+      {{- if $.Values.fullnode.storage.labels }}
+      selector:
+        matchLabels:
+          {{- toYaml $.Values.fullnode.storage.labels | nindent 10}}
+      {{- end }}
   template:
     metadata:
       labels:
@@ -70,21 +75,32 @@ spec:
       terminationGracePeriodSeconds: 0
       containers:
       - name: fullnode
+        {{- if and $fullnode_statefulset (not $.Values.manageImages) }} # if the statefulset already exists and we do not want helm to simply overwrite the image, use the existing image
+        image: {{ (first $fullnode_statefulset.spec.template.spec.containers).image }}
+        {{- else }}
         image: {{ $.Values.validator.image.repo }}:{{ $.Values.validator.image.tag | default $.Values.imageTag }}
+        {{- end }}
         imagePullPolicy: {{ $.Values.validator.image.pullPolicy }}
+        {{- if not $.Values.pyroscope.enabled }}
         command: ["/usr/local/bin/aptos-node", "-f", "/opt/aptos/etc/fullnode.yaml"]
+        {{- else }}
+        command: ["/bin/bash", "-c"]
+        args:
+        - |
+          set -e
+          export PYROSCOPE_APPLICATION_NAME="aptos-node{namespace=${KUBERNETES_NAMESPACE},pod_name=${KUBERNETES_POD_NAME},chain_name={{ $.Values.chain.chain_name | default $.Values.chain.name }}}"
+          # to wrap an existing program and profile it
+          # TODO: this does not seem to work yet
+          # pyroscope exec /usr/local/bin/aptos-node -f /opt/aptos/etc/fullnode.yaml
+          # to profile the entire system
+          pyroscope ebpf & /usr/local/bin/aptos-node -f /opt/aptos/etc/fullnode.yaml
+        {{- end }}
       {{- with $.Values.fullnode }}
         resources:
           {{- toYaml .resources | nindent 10 }}
         env:
         - name: RUST_LOG
           value: {{ .rust_log }}
-        - name: RUST_LOG_REMOTE
-          value: {{ .rust_log_remote }}
-        {{- if $.Values.validator.remoteLogAddress }}
-        - name: STRUCT_LOG_TCP_ADDR
-          value: {{ $.Values.validator.remoteLogAddress }}
-        {{- end }}
         {{- if .force_enable_telemetry }}
         - name: APTOS_FORCE_ENABLE_TELEMETRY
           value: "true"
@@ -93,8 +109,33 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        - name: KUBERNETES_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
         - name: RUST_BACKTRACE
           value: "0"
+        {{- if $.Values.pyroscope.enabled }}
+        - name: PYROSCOPE_SERVER_ADDRESS
+          valueFrom:
+            secretKeyRef:
+              name: {{ $.Values.pyroscope.secretName }}
+              key: PYROSCOPE_SERVER_ADDRESS
+        - name: PYROSCOPE_AUTH_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: {{ $.Values.pyroscope.secretName }}
+              key: PYROSCOPE_AUTH_TOKEN
+        - name: PYROSCOPE_SPY_NAME
+          valueFrom:
+            secretKeyRef:
+              name: {{ $.Values.pyroscope.secretName }}
+              key: PYROSCOPE_SPY_NAME
+        - name: PYROSCOPE_SAMPLE_RATE
+          value: "24"
+        - name: PYROSCOPE_LOG_LEVEL
+          value: error
+        {{- end }}
       {{- end }}
         volumeMounts:
         - name: aptos-config

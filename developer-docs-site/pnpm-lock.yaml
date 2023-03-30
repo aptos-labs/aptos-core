@@ -9,6 +9,7 @@ specifiers:
   '@docusaurus/plugin-google-gtag': 2.1.0
   '@docusaurus/preset-classic': 2.1.0
   '@docusaurus/theme-classic': ^2.2.0
+  '@docusaurus/theme-common': ^2.2.0
   '@docusaurus/types': ^2.2.0
   '@mdx-js/react': 1.6.22
   '@stoplight/elements': ^7.7.3
@@ -29,6 +30,7 @@ specifiers:
   react-dom: 17.0.2
   rehype-katex: '5'
   remark-math: '3'
+  shelljs: ^0.8.5
   stream: ^0.0.2
   typescript: 4.8.2
   unist-util-visit: 4.1.0
@@ -44,6 +46,7 @@ dependencies:
   '@docusaurus/plugin-google-gtag': 2.1.0_rw34wyrummvuuuhgiylphbvpae
   '@docusaurus/preset-classic': 2.1.0_3b4xgmyeq7rvk6mk4napgfdceu
   '@docusaurus/theme-classic': 2.2.0_rw34wyrummvuuuhgiylphbvpae
+  '@docusaurus/theme-common': 2.2.0_vwb7acela5jwz6tab56gfkhv7m
   '@docusaurus/types': 2.2.0_sfoxds7t5ydpegc3knd667wn6m
   '@mdx-js/react': 1.6.22_react@17.0.2
   '@stoplight/elements': 7.7.4_7id2ld7otrrg3tr2tfabepoedi
@@ -61,6 +64,7 @@ dependencies:
   react-dom: 17.0.2_react@17.0.2
   rehype-katex: 5.0.0
   remark-math: 3.0.1
+  shelljs: 0.8.5
   stream: 0.0.2
   unist-util-visit: 4.1.0
   unist-util-visit-children: 2.0.0

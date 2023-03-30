@@ -7,7 +7,7 @@ slug: "data-pruning"
 
 When a validator node is running, it participates in consensus to execute
 transactions and commit new data to the blockchain. Similarly, when fullnodes
-are running, they sync the new blockchain data through [state synchronization](/guides/state-sync).
+are running, they sync the new blockchain data through [state synchronization](../guides/state-sync.md).
 As the blockchain grows, storage disk space can be managed by pruning old
 blockchain data. Specifically, by pruning the **ledger history**: which
 contains old transactions. By default, ledger pruning is enabled on all

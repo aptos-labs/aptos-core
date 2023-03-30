@@ -1,11 +1,11 @@
 ---
-title: "Public Fullnode"
+title: "Run a Fullnode"
 slug: "public-fullnode"
 ---
 
-# Public Fullnode
+# Run a Fullnode
 
-This section explains how to install a public fullnode to connect to the Aptos networks. 
+This section explains how to install a public fullnode to connect to the Aptos networks. See also the [external resources](../../community/external-resources.md) offered by your fellow node operators.
 
 :::tip Default connection to devnet
 If you follow the default setup in this document, then your public fullnode will be connected to the Aptos devnet with a REST endpoint accessible on your computer at localhost:8080. 

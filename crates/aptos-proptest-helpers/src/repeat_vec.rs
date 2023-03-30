@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::pick_slice_idxs;
@@ -142,7 +143,7 @@ impl<T> RepeatVec<T> {
             None => {
                 // No indexes to remove, nothing to do.
                 return;
-            }
+            },
         };
         if first >= self.len() {
             // First index is out of bounds, nothing to do.
@@ -153,12 +154,12 @@ impl<T> RepeatVec<T> {
             Ok(exact_idx) => {
                 // Logical copy 0 of the element at this position.
                 exact_idx
-            }
+            },
             Err(start_idx) => {
                 // This is the physical index after the logical item. Start reasoning from the
                 // previous index to match the Ok branch above.
                 start_idx - 1
-            }
+            },
         };
 
         // This serves two purposes -- it represents the number of elements to decrease by and
@@ -215,7 +216,7 @@ impl<T> RepeatVec<T> {
                 let start_val = &self.items[start_idx - 1];
                 let offset = at - start_val.0;
                 Some((&start_val.1, offset))
-            }
+            },
         }
     }
 
@@ -258,10 +259,10 @@ impl<T> RepeatVec<T> {
                     idx < self.len,
                     "length must be greater than last element's start"
                 );
-            }
+            },
             None => {
                 assert_eq!(self.len, 0, "empty RepeatVec");
-            }
+            },
         }
     }
 }

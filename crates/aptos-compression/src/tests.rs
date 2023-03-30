@@ -1,23 +1,22 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::CompressionClient;
-use aptos_crypto::ed25519::Ed25519PrivateKey;
-use aptos_crypto::hash::HashValue;
-use aptos_crypto::{PrivateKey, SigningKey, Uniform};
-use aptos_types::account_address::AccountAddress;
-use aptos_types::aggregate_signature::AggregateSignature;
-use aptos_types::chain_id::ChainId;
-use aptos_types::ledger_info::LedgerInfoWithSignatures;
-use aptos_types::transaction::{
-    ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
-    TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
-    TransactionPayload, TransactionStatus,
+use aptos_crypto::{ed25519::Ed25519PrivateKey, hash::HashValue, PrivateKey, SigningKey, Uniform};
+use aptos_types::{
+    account_address::AccountAddress,
+    aggregate_signature::AggregateSignature,
+    block_info::BlockInfo,
+    chain_id::ChainId,
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    transaction::{
+        ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
+        TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
+        TransactionPayload, TransactionStatus,
+    },
+    write_set::WriteSet,
 };
-use aptos_types::write_set::WriteSet;
-use aptos_types::{block_info::BlockInfo, ledger_info::LedgerInfo};
-use serde::de::DeserializeOwned;
-use serde::Serialize;
+use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
 
 const MAX_COMPRESSION_SIZE: usize = 64 * 1024 * 1024;

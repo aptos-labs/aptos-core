@@ -1,9 +1,9 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module provides APIs for private keys and public keys used in Boneh-Lynn-Shacham (BLS)
 //! aggregate signatures (including individual signatures and multisignatures) implemented on top of
-//! Barreto-Lynn-Scott BLS12-381 elliptic curves (https://github.com/supranational/blst).
+//! Barreto-Lynn-Scott BLS12-381 elliptic curves (<https://github.com/supranational/blst>).
 //!
 //! The `PublicKey` struct is used to represent both the public key of an individual signer
 //! as well as the aggregate public key of several signers. Before passing this struct as an
@@ -106,8 +106,8 @@ impl traits::PrivateKey for PrivateKey {
 }
 
 impl traits::SigningKey for PrivateKey {
-    type VerifyingKeyMaterial = PublicKey;
     type SignatureMaterial = bls12381::Signature;
+    type VerifyingKeyMaterial = PublicKey;
 
     fn sign<T: CryptoHash + Serialize>(
         &self,
@@ -159,7 +159,7 @@ impl Uniform for PrivateKey {
     {
         // CRYPTONOTE(Alin): This "initial key material (IKM)" is the randomness used inside key_gen
         // below to pseudo-randomly derive the secret key via an HKDF
-        // (see https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature#section-2.3)
+        // (see <https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature#section-2.3>)
         let mut ikm = [0u8; 32];
         rng.fill_bytes(&mut ikm);
         let privkey =
@@ -204,8 +204,8 @@ impl traits::PublicKey for PublicKey {
 }
 
 impl VerifyingKey for PublicKey {
-    type SigningKeyMaterial = PrivateKey;
     type SignatureMaterial = bls12381::Signature;
+    type SigningKeyMaterial = PrivateKey;
 }
 
 impl ValidCryptoMaterial for PublicKey {
@@ -231,10 +231,10 @@ impl TryFrom<&[u8]> for PublicKey {
     ///
     /// NOTE: This function will only check that the PK is a point on the curve:
     ///  - `blst::min_pk::PublicKey::from_bytes(bytes)` calls `blst::min_pk::PublicKey::deserialize(bytes)`,
-    ///    which calls `$pk_deser` in https://github.com/supranational/blst/blob/711e1eec747772e8cae15d4a1885dd30a32048a4/bindings/rust/src/lib.rs#L734,
-    ///    which is mapped to `blst_p1_deserialize` in https://github.com/supranational/blst/blob/711e1eec747772e8cae15d4a1885dd30a32048a4/bindings/rust/src/lib.rs#L1652
+    ///    which calls `$pk_deser` in <https://github.com/supranational/blst/blob/711e1eec747772e8cae15d4a1885dd30a32048a4/bindings/rust/src/lib.rs#L734>,
+    ///    which is mapped to `blst_p1_deserialize` in <https://github.com/supranational/blst/blob/711e1eec747772e8cae15d4a1885dd30a32048a4/bindings/rust/src/lib.rs#L1652>
     ///  - `blst_p1_deserialize` eventually calls `POINTonE1_Deserialize_BE`, which checks
-    ///    the point is on the curve: https://github.com/supranational/blst/blob/711e1eec747772e8cae15d4a1885dd30a32048a4/src/e1.c#L296
+    ///    the point is on the curve: <https://github.com/supranational/blst/blob/711e1eec747772e8cae15d4a1885dd30a32048a4/src/e1.c#L296>
     fn try_from(bytes: &[u8]) -> std::result::Result<Self, CryptoMaterialError> {
         Ok(Self {
             pubkey: blst::min_pk::PublicKey::from_bytes(bytes)
@@ -259,13 +259,13 @@ impl PartialEq for PublicKey {
 
 impl fmt::Debug for PublicKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", hex::encode(&self.to_bytes()))
+        write!(f, "{}", hex::encode(self.to_bytes()))
     }
 }
 
 impl fmt::Display for PublicKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", hex::encode(&self.to_bytes()))
+        write!(f, "{}", hex::encode(self.to_bytes()))
     }
 }
 

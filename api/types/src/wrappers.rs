@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! The purpose of this file is to define wrappers that we can use in the
@@ -10,15 +10,13 @@
 //! just strings, using the FromStr impl to parse the path param. They can
 //! then be unpacked to the real type beneath.
 
-use crate::VerifyInput;
+use crate::{Address, VerifyInput, U64};
 use anyhow::{bail, Context};
 use aptos_types::{event::EventKey, state_store::state_key::StateKey};
 use move_core_types::identifier::{IdentStr, Identifier};
 use poem_openapi::Object;
 use serde::{Deserialize, Serialize};
 use std::{convert::From, fmt, ops::Deref, str::FromStr};
-
-use crate::{Address, U64};
 
 /// A wrapper of a Move identifier
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -122,8 +120,7 @@ pub struct StateKeyWrapper(pub StateKey);
 impl fmt::Display for StateKeyWrapper {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let hex_string = hex::encode(
-            &self
-                .0
+            self.0
                 .encode()
                 .context("Failed to encode StateKey")
                 .map_err(|_| fmt::Error)?,

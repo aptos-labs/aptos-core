@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -17,21 +17,23 @@ use crate::{
             create_transaction_info, create_transaction_list_with_proof,
         },
     },
+    utils::OutputFallbackHandler,
 };
 use aptos_config::config::BootstrappingMode;
 use aptos_data_client::GlobalDataSummary;
+use aptos_data_streaming_service::{
+    data_notification::{DataNotification, DataPayload, NotificationId},
+    streaming_client::{NotificationAndFeedback, NotificationFeedback},
+};
+use aptos_time_service::TimeService;
 use aptos_types::{
     transaction::{TransactionOutputListWithProof, Version},
     waypoint::Waypoint,
 };
 use claims::{assert_matches, assert_none, assert_ok};
-use data_streaming_service::{
-    data_notification::{DataNotification, DataPayload},
-    streaming_client::{NotificationAndFeedback, NotificationFeedback},
-};
 use futures::{channel::oneshot, FutureExt, SinkExt};
 use mockall::{predicate::eq, Sequence};
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 #[tokio::test]
 async fn test_bootstrap_genesis_waypoint() {
@@ -42,7 +44,8 @@ async fn test_bootstrap_genesis_waypoint() {
     let mock_streaming_client = create_mock_streaming_client();
 
     // Create the bootstrapper and verify it's not yet bootstrapped
-    let mut bootstrapper = create_bootstrapper(driver_configuration, mock_streaming_client, true);
+    let (mut bootstrapper, _) =
+        create_bootstrapper(driver_configuration, mock_streaming_client, None, true);
     assert!(!bootstrapper.is_bootstrapped());
 
     // Subscribe to a bootstrapped notification
@@ -78,7 +81,8 @@ async fn test_bootstrap_immediate_notification() {
     let mock_streaming_client = create_mock_streaming_client();
 
     // Create the bootstrapper
-    let mut bootstrapper = create_bootstrapper(driver_configuration, mock_streaming_client, true);
+    let (mut bootstrapper, _) =
+        create_bootstrapper(driver_configuration, mock_streaming_client, None, true);
 
     // Create a global data summary where only epoch 0 has ended
     let global_data_summary = create_global_summary(0);
@@ -112,7 +116,8 @@ async fn test_bootstrap_no_notification() {
         .return_once(move |_| Ok(data_stream_listener));
 
     // Create the bootstrapper
-    let mut bootstrapper = create_bootstrapper(driver_configuration, mock_streaming_client, true);
+    let (mut bootstrapper, _) =
+        create_bootstrapper(driver_configuration, mock_streaming_client, None, true);
 
     // Create a global data summary where epoch 0 and 1 have ended
     let global_data_summary = create_global_summary(1);
@@ -138,6 +143,7 @@ async fn test_critical_timeout() {
     // Create a driver configuration with a genesis waypoint and a stream timeout of 1 second
     let mut driver_configuration = create_full_node_driver_configuration();
     driver_configuration.config.max_stream_wait_time_ms = 1000;
+    driver_configuration.config.max_num_stream_timeouts = 6;
 
     // Create the mock streaming client
     let mut mock_streaming_client = create_mock_streaming_client();
@@ -159,7 +165,8 @@ async fn test_critical_timeout() {
         .return_const(Ok(()));
 
     // Create the bootstrapper
-    let mut bootstrapper = create_bootstrapper(driver_configuration, mock_streaming_client, true);
+    let (mut bootstrapper, _) =
+        create_bootstrapper(driver_configuration, mock_streaming_client, None, true);
 
     // Create a global data summary where epoch 0 and 1 have ended
     let global_data_summary = create_global_summary(1);
@@ -236,7 +243,8 @@ async fn test_data_stream_state_values() {
         .return_const(Ok(()));
 
     // Create the bootstrapper
-    let mut bootstrapper = create_bootstrapper(driver_configuration, mock_streaming_client, true);
+    let (mut bootstrapper, _) =
+        create_bootstrapper(driver_configuration, mock_streaming_client, None, true);
 
     // Insert an epoch ending ledger info into the verified states of the bootstrapper
     manipulate_verified_epoch_states(&mut bootstrapper, true, true, Some(highest_version));
@@ -307,7 +315,8 @@ async fn test_data_stream_transactions() {
         .return_const(Ok(()));
 
     // Create the bootstrapper
-    let mut bootstrapper = create_bootstrapper(driver_configuration, mock_streaming_client, true);
+    let (mut bootstrapper, _) =
+        create_bootstrapper(driver_configuration, mock_streaming_client, None, true);
 
     // Insert an epoch ending ledger info into the verified states of the bootstrapper
     manipulate_verified_epoch_states(&mut bootstrapper, true, true, Some(highest_version));
@@ -378,7 +387,8 @@ async fn test_data_stream_transaction_outputs() {
         .return_const(Ok(()));
 
     // Create the bootstrapper
-    let mut bootstrapper = create_bootstrapper(driver_configuration, mock_streaming_client, true);
+    let (mut bootstrapper, _) =
+        create_bootstrapper(driver_configuration, mock_streaming_client, None, true);
 
     // Insert an epoch ending ledger info into the verified states of the bootstrapper
     manipulate_verified_epoch_states(&mut bootstrapper, true, true, Some(highest_version));
@@ -414,6 +424,195 @@ async fn test_data_stream_transaction_outputs() {
 }
 
 #[tokio::test]
+async fn test_data_stream_transactions_or_outputs() {
+    // Create test data
+    let notification_id = 0;
+    let highest_version = 9998765;
+    let highest_ledger_info = create_random_epoch_ending_ledger_info(highest_version, 1);
+
+    // Create a driver configuration with a genesis waypoint and transaction or output syncing
+    let mut driver_configuration = create_full_node_driver_configuration();
+    driver_configuration.config.bootstrapping_mode = BootstrappingMode::ExecuteOrApplyFromGenesis;
+
+    // Create the mock streaming client
+    let mut mock_streaming_client = create_mock_streaming_client();
+    let mut expectation_sequence = Sequence::new();
+    let (mut notification_sender_1, data_stream_listener_1) = create_data_stream_listener();
+    let (_notification_sender_2, data_stream_listener_2) = create_data_stream_listener();
+    let data_stream_id_1 = data_stream_listener_1.data_stream_id;
+    for data_stream_listener in [data_stream_listener_1, data_stream_listener_2] {
+        mock_streaming_client
+            .expect_get_all_transactions_or_outputs()
+            .times(1)
+            .with(eq(1), eq(highest_version), eq(highest_version), eq(false))
+            .return_once(move |_, _, _, _| Ok(data_stream_listener))
+            .in_sequence(&mut expectation_sequence);
+    }
+    mock_streaming_client
+        .expect_terminate_stream_with_feedback()
+        .with(
+            eq(data_stream_id_1),
+            eq(Some(NotificationAndFeedback::new(
+                notification_id,
+                NotificationFeedback::InvalidPayloadData,
+            ))),
+        )
+        .return_const(Ok(()));
+
+    // Create the bootstrapper
+    let (mut bootstrapper, _) =
+        create_bootstrapper(driver_configuration, mock_streaming_client, None, true);
+
+    // Insert an epoch ending ledger info into the verified states of the bootstrapper
+    manipulate_verified_epoch_states(&mut bootstrapper, true, true, Some(highest_version));
+
+    // Create a global data summary
+    let mut global_data_summary = create_global_summary(1);
+    global_data_summary.advertised_data.synced_ledger_infos = vec![highest_ledger_info.clone()];
+
+    // Drive progress to initialize the transaction output stream
+    drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap();
+
+    // Send an invalid output along the stream
+    let data_notification = DataNotification {
+        notification_id,
+        data_payload: DataPayload::EpochEndingLedgerInfos(vec![create_epoch_ending_ledger_info()]),
+    };
+    notification_sender_1.send(data_notification).await.unwrap();
+
+    // Drive progress again and ensure we get an invalid payload error
+    let error = drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap_err();
+    assert_matches!(error, Error::InvalidPayload(_));
+
+    // Drive progress to initialize the transaction output stream
+    drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn test_data_stream_transactions_or_outputs_fallback() {
+    // Create test data
+    let notification_id = 1;
+    let highest_version = 9998765;
+    let highest_ledger_info = create_random_epoch_ending_ledger_info(highest_version, 1);
+
+    // Create a driver configuration with a genesis waypoint and transaction or output syncing
+    let mut driver_configuration = create_full_node_driver_configuration();
+    driver_configuration.config.bootstrapping_mode = BootstrappingMode::ExecuteOrApplyFromGenesis;
+
+    // Create the mock streaming client
+    let mut mock_streaming_client = create_mock_streaming_client();
+
+    // Set expectations for stream creations and terminations
+    let mut expectation_sequence = Sequence::new();
+    let (_notification_sender_1, data_stream_listener_1) = create_data_stream_listener();
+    let data_stream_id_1 = data_stream_listener_1.data_stream_id;
+    let (_notification_sender_2, data_stream_listener_2) = create_data_stream_listener();
+    let data_stream_id_2 = data_stream_listener_2.data_stream_id;
+    let (_notification_sender_3, data_stream_listener_3) = create_data_stream_listener();
+    mock_streaming_client
+        .expect_get_all_transactions_or_outputs()
+        .times(1)
+        .with(eq(1), eq(highest_version), eq(highest_version), eq(false))
+        .return_once(move |_, _, _, _| Ok(data_stream_listener_1))
+        .in_sequence(&mut expectation_sequence);
+    mock_streaming_client
+        .expect_terminate_stream_with_feedback()
+        .times(1)
+        .with(
+            eq(data_stream_id_1),
+            eq(Some(NotificationAndFeedback::new(
+                notification_id,
+                NotificationFeedback::PayloadProofFailed,
+            ))),
+        )
+        .return_const(Ok(()))
+        .in_sequence(&mut expectation_sequence);
+    mock_streaming_client
+        .expect_get_all_transaction_outputs()
+        .times(1)
+        .with(eq(1), eq(highest_version), eq(highest_version))
+        .return_once(move |_, _, _| Ok(data_stream_listener_2));
+    mock_streaming_client
+        .expect_terminate_stream_with_feedback()
+        .times(1)
+        .with(
+            eq(data_stream_id_2),
+            eq(Some(NotificationAndFeedback::new(
+                notification_id,
+                NotificationFeedback::InvalidPayloadData,
+            ))),
+        )
+        .return_const(Ok(()))
+        .in_sequence(&mut expectation_sequence);
+    mock_streaming_client
+        .expect_get_all_transactions_or_outputs()
+        .with(eq(1), eq(highest_version), eq(highest_version), eq(false))
+        .return_once(move |_, _, _, _| Ok(data_stream_listener_3));
+
+    // Create the bootstrapper
+    let time_service = TimeService::mock();
+    let (mut bootstrapper, mut output_fallback_handler) = create_bootstrapper(
+        driver_configuration.clone(),
+        mock_streaming_client,
+        Some(time_service.clone()),
+        true,
+    );
+    assert!(!output_fallback_handler.in_fallback_mode());
+
+    // Insert an epoch ending ledger info into the verified states of the bootstrapper
+    manipulate_verified_epoch_states(&mut bootstrapper, true, true, Some(highest_version));
+
+    // Create a global data summary
+    let mut global_data_summary = create_global_summary(1);
+    global_data_summary.advertised_data.synced_ledger_infos = vec![highest_ledger_info.clone()];
+
+    // Drive progress to initialize the first transaction output stream
+    drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap();
+
+    // Send a storage synchronizer error to the bootstrapper so that it falls back
+    // to output syncing and drive progress for the new stream type.
+    handle_storage_synchronizer_error(
+        &mut bootstrapper,
+        notification_id,
+        NotificationFeedback::PayloadProofFailed,
+    )
+    .await;
+    drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap();
+    assert!(output_fallback_handler.in_fallback_mode());
+
+    // Elapse enough time so that fallback mode is now disabled
+    time_service
+        .into_mock()
+        .advance_async(Duration::from_secs(
+            driver_configuration.config.fallback_to_output_syncing_secs,
+        ))
+        .await;
+
+    // Send another storage synchronizer error to the bootstrapper and drive progress
+    // so that a regular stream is created.
+    handle_storage_synchronizer_error(
+        &mut bootstrapper,
+        notification_id,
+        NotificationFeedback::InvalidPayloadData,
+    )
+    .await;
+    drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap();
+    assert!(!output_fallback_handler.in_fallback_mode());
+}
+
+#[tokio::test]
 async fn test_fetch_epoch_ending_ledger_infos() {
     // Create a driver configuration with a genesis waypoint and a stream timeout of 1 second
     let mut driver_configuration = create_full_node_driver_configuration();
@@ -428,7 +627,8 @@ async fn test_fetch_epoch_ending_ledger_infos() {
         .return_once(move |_| Ok(data_stream_listener));
 
     // Create the bootstrapper
-    let mut bootstrapper = create_bootstrapper(driver_configuration, mock_streaming_client, true);
+    let (mut bootstrapper, _) =
+        create_bootstrapper(driver_configuration, mock_streaming_client, None, true);
 
     // Set the waypoint as already having been verified (but no fetched ledger infos)
     manipulate_verified_epoch_states(&mut bootstrapper, false, true, None);
@@ -846,7 +1046,8 @@ async fn test_waypoint_mismatch() {
         .return_const(Ok(()));
 
     // Create the bootstrapper
-    let mut bootstrapper = create_bootstrapper(driver_configuration, mock_streaming_client, true);
+    let (mut bootstrapper, _) =
+        create_bootstrapper(driver_configuration, mock_streaming_client, None, true);
 
     // Create a global data summary up to the waypoint
     let mut global_data_summary = create_global_summary(waypoint_epoch);
@@ -890,7 +1091,8 @@ async fn test_waypoint_must_be_verified() {
         .return_once(move |_| Ok(data_stream_listener));
 
     // Create the bootstrapper
-    let mut bootstrapper = create_bootstrapper(driver_configuration, mock_streaming_client, true);
+    let (mut bootstrapper, _) =
+        create_bootstrapper(driver_configuration, mock_streaming_client, None, true);
 
     // Set fetched ledger infos to true but the waypoint is still not verified
     manipulate_verified_epoch_states(&mut bootstrapper, true, false, None);
@@ -922,7 +1124,8 @@ async fn test_waypoint_satisfiable() {
     let mock_streaming_client = create_mock_streaming_client();
 
     // Create the bootstrapper
-    let mut bootstrapper = create_bootstrapper(driver_configuration, mock_streaming_client, true);
+    let (mut bootstrapper, _) =
+        create_bootstrapper(driver_configuration, mock_streaming_client, None, true);
 
     // Create an empty global data summary
     let mut global_data_summary = GlobalDataSummary::empty();
@@ -948,8 +1151,12 @@ async fn test_waypoint_satisfiable() {
 fn create_bootstrapper(
     driver_configuration: DriverConfiguration,
     mock_streaming_client: MockStreamingClient,
+    time_service: Option<TimeService>,
     expect_reset_executor: bool,
-) -> Bootstrapper<MockMetadataStorage, MockStorageSynchronizer, MockStreamingClient> {
+) -> (
+    Bootstrapper<MockMetadataStorage, MockStorageSynchronizer, MockStreamingClient>,
+    OutputFallbackHandler,
+) {
     // Initialize the logger for tests
     aptos_logger::Logger::init_for_testing();
 
@@ -974,13 +1181,22 @@ fn create_bootstrapper(
         .expect_get_latest_transaction_info_option()
         .returning(|| Ok(Some((0, create_transaction_info()))));
 
-    Bootstrapper::new(
+    // Create the output fallback handler
+    let time_service = time_service.unwrap_or_else(TimeService::mock);
+    let output_fallback_handler =
+        OutputFallbackHandler::new(driver_configuration.clone(), time_service);
+
+    // Create the bootstrapper
+    let bootstrapper = Bootstrapper::new(
         driver_configuration,
         metadata_storage,
+        output_fallback_handler.clone(),
         mock_streaming_client,
         Arc::new(mock_database_reader),
         mock_storage_synchronizer,
-    )
+    );
+
+    (bootstrapper, output_fallback_handler)
 }
 
 /// Creates a bootstrapper for testing with a mock metadata storage
@@ -1009,9 +1225,14 @@ fn create_bootstrapper_with_storage(
         .expect_get_latest_transaction_info_option()
         .returning(move || Ok(Some((latest_synced_version, create_transaction_info()))));
 
+    // Create the output fallback handler
+    let output_fallback_handler =
+        OutputFallbackHandler::new(driver_configuration.clone(), TimeService::mock());
+
     Bootstrapper::new(
         driver_configuration,
         mock_metadata_storage,
+        output_fallback_handler,
         mock_streaming_client,
         Arc::new(mock_database_reader),
         mock_storage_synchronizer,
@@ -1076,4 +1297,23 @@ fn manipulate_verified_epoch_states(
 /// Verifies that the receiver gets a successful notification
 fn verify_bootstrap_notification(notification_receiver: oneshot::Receiver<Result<(), Error>>) {
     assert_ok!(notification_receiver.now_or_never().unwrap().unwrap());
+}
+
+/// Handles the given storage synchronizer error for the bootstrapper
+async fn handle_storage_synchronizer_error(
+    bootstrapper: &mut Bootstrapper<
+        MockMetadataStorage,
+        MockStorageSynchronizer,
+        MockStreamingClient,
+    >,
+    notification_id: NotificationId,
+    notification_feedback: NotificationFeedback,
+) {
+    bootstrapper
+        .handle_storage_synchronizer_error(NotificationAndFeedback::new(
+            notification_id,
+            notification_feedback,
+        ))
+        .await
+        .unwrap();
 }

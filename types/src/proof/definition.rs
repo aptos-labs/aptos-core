@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module has definition of various proofs.
@@ -12,6 +13,8 @@ use crate::{
     transaction::{TransactionInfo, Version},
 };
 use anyhow::{bail, ensure, format_err, Context, Result};
+#[cfg(any(test, feature = "fuzzing"))]
+use aptos_crypto::hash::TestOnlyHasher;
 use aptos_crypto::{
     hash::{
         CryptoHash, CryptoHasher, EventAccumulatorHasher, TransactionAccumulatorHasher,
@@ -19,13 +22,10 @@ use aptos_crypto::{
     },
     HashValue,
 };
-use serde::{Deserialize, Serialize};
-use std::{any::type_name, marker::PhantomData};
-
-#[cfg(any(test, feature = "fuzzing"))]
-use aptos_crypto::hash::TestOnlyHasher;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
+use serde::{Deserialize, Serialize};
+use std::{any::type_name, marker::PhantomData};
 
 /// A proof that can be used authenticate an element in an accumulator given trusted root hash. For
 /// example, both `LedgerInfoToTransactionInfoProof` and `TransactionInfoToEventProof` can be
@@ -307,13 +307,13 @@ impl SparseMerkleProof {
                     leaf.value_hash,
                     hash
                 );
-            }
+            },
             (Some(hash), None) => {
                 bail!(
                     "Expected inclusion proof, value hash: {:x}. Found non-inclusion proof.",
                     hash
                 )
-            }
+            },
             (None, Some(leaf)) => {
                 // This is a non-inclusion proof. The proof intends to show that if a leaf node
                 // representing `element_key` is inserted, it will break a currently existing leaf
@@ -334,12 +334,12 @@ impl SparseMerkleProof {
                     element_key,
                     leaf.key
                 );
-            }
+            },
             (None, None) => {
                 // This is a non-inclusion proof. The proof intends to show that if a leaf node
                 // representing `element_key` is inserted, it will show up at a currently empty
                 // position. `sibling` should prove the route from this empty position to the root.
-            }
+            },
         }
 
         let current_hash = self

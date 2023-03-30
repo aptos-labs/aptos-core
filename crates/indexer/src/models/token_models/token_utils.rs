@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 // This is required because a diesel macro makes clippy sad
@@ -6,7 +6,7 @@
 
 use crate::util::{
     deserialize_property_map_from_bcs_hexstring, deserialize_string_from_hexstring, hash_str,
-    truncate_str,
+    standardize_address, truncate_str,
 };
 use anyhow::{Context, Result};
 use aptos_api_types::deserialize_from_string;
@@ -52,7 +52,13 @@ impl TokenDataIdType {
 
 impl fmt::Display for TokenDataIdType {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "{}::{}::{}", self.creator, self.collection, self.name)
+        write!(
+            f,
+            "{}::{}::{}",
+            standardize_address(self.creator.as_str()),
+            self.collection,
+            self.name
+        )
     }
 }
 
@@ -66,6 +72,7 @@ impl CollectionDataIdType {
     pub fn new(creator: String, name: String) -> Self {
         Self { creator, name }
     }
+
     pub fn to_hash(&self) -> String {
         hash_str(&self.to_string())
     }
@@ -77,7 +84,12 @@ impl CollectionDataIdType {
 
 impl fmt::Display for CollectionDataIdType {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "{}::{}", self.creator, self.name)
+        write!(
+            f,
+            "{}::{}",
+            standardize_address(self.creator.as_str()),
+            self.name
+        )
     }
 }
 
@@ -303,7 +315,7 @@ impl TokenWriteSet {
                 .map(|inner| Some(TokenWriteSet::TokenData(inner))),
             "0x3::token::Token" => {
                 serde_json::from_value(data.clone()).map(|inner| Some(TokenWriteSet::Token(inner)))
-            }
+            },
             "0x3::token::CollectionData" => serde_json::from_value(data.clone())
                 .map(|inner| Some(TokenWriteSet::CollectionData(inner))),
             "0x3::token_transfers::TokenOfferId" => serde_json::from_value(data.clone())

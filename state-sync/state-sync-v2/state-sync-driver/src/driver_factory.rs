@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -12,21 +13,19 @@ use crate::{
     storage_synchronizer::StorageSynchronizer,
 };
 use aptos_config::config::NodeConfig;
+use aptos_consensus_notifications::ConsensusNotificationListener;
 use aptos_data_client::aptosnet::AptosNetDataClient;
+use aptos_data_streaming_service::streaming_client::StreamingServiceClient;
+use aptos_event_notifications::{EventNotificationSender, EventSubscriptionService};
+use aptos_executor_types::ChunkExecutorTrait;
 use aptos_infallible::Mutex;
+use aptos_mempool_notifications::MempoolNotificationSender;
+use aptos_storage_interface::DbReaderWriter;
+use aptos_time_service::TimeService;
 use aptos_types::{move_resource::MoveStorage, waypoint::Waypoint};
-use consensus_notifications::ConsensusNotificationListener;
-use data_streaming_service::streaming_client::StreamingServiceClient;
-use event_notifications::{EventNotificationSender, EventSubscriptionService};
-use executor_types::ChunkExecutorTrait;
 use futures::{channel::mpsc, executor::block_on};
-use mempool_notifications::MempoolNotificationSender;
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc,
-};
-use storage_interface::DbReaderWriter;
-use tokio::runtime::{Builder, Runtime};
+use std::sync::Arc;
+use tokio::runtime::Runtime;
 
 /// Creates a new state sync driver and client
 pub struct DriverFactory {
@@ -52,6 +51,7 @@ impl DriverFactory {
         mut event_subscription_service: EventSubscriptionService,
         aptos_data_client: AptosNetDataClient,
         streaming_service_client: StreamingServiceClient,
+        time_service: TimeService,
     ) -> Self {
         // Notify subscribers of the initial on-chain config values
         match (&*storage.reader).fetch_latest_state_checkpoint_version() {
@@ -64,7 +64,7 @@ impl DriverFactory {
                         error
                     )
                 }
-            }
+            },
             Err(error) => panic!("Failed to fetch the initial synced version: {:?}", error),
         }
 
@@ -82,18 +82,8 @@ impl DriverFactory {
 
         // Create a new runtime (if required)
         let driver_runtime = if create_runtime {
-            Some(
-                Builder::new_multi_thread()
-                    .thread_name_fn(|| {
-                        static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
-                        let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
-                        format!("sync-driver-{}", id)
-                    })
-                    .disable_lifo_slot()
-                    .enable_all()
-                    .build()
-                    .expect("Failed to create state sync v2 driver runtime!"),
-            )
+            let runtime = aptos_runtimes::spawn_named_runtime("sync-driver".into(), None);
+            Some(runtime)
         } else {
             None
         };
@@ -133,6 +123,7 @@ impl DriverFactory {
             aptos_data_client,
             streaming_service_client,
             storage.reader,
+            time_service,
         );
 
         // Spawn the driver

@@ -14,6 +14,7 @@ module aptos_framework::genesis {
     use aptos_framework::chain_status;
     use aptos_framework::coin;
     use aptos_framework::consensus_config;
+    use aptos_framework::create_signer::create_signer;
     use aptos_framework::gas_schedule;
     use aptos_framework::reconfiguration;
     use aptos_framework::stake;
@@ -97,8 +98,8 @@ module aptos_framework::genesis {
         let framework_reserved_addresses = vector<address>[@0x2, @0x3, @0x4, @0x5, @0x6, @0x7, @0x8, @0x9, @0xa];
         while (!vector::is_empty(&framework_reserved_addresses)) {
             let address = vector::pop_back<address>(&mut framework_reserved_addresses);
-            let (aptos_account, framework_signer_cap) = account::create_framework_reserved_account(address);
-            aptos_governance::store_signer_cap(&aptos_account, address, framework_signer_cap);
+            let (_, framework_signer_cap) = account::create_framework_reserved_account(address);
+            aptos_governance::store_signer_cap(&aptos_framework_account, address, framework_signer_cap);
         };
 
         consensus_config::initialize(&aptos_framework_account, consensus_config);
@@ -390,7 +391,8 @@ module aptos_framework::genesis {
         chain_status::set_genesis_end(aptos_framework);
     }
 
-    native fun create_signer(addr: address): signer;
+    #[verify_only]
+    use std::features;
 
     #[verify_only]
     fun initialize_for_verification(
@@ -407,10 +409,14 @@ module aptos_framework::genesis {
         rewards_rate_denominator: u64,
         voting_power_increase_limit: u64,
         aptos_framework: &signer,
-        validators: vector<ValidatorConfiguration>,
         min_voting_threshold: u128,
         required_proposer_stake: u64,
         voting_duration_secs: u64,
+        accounts: vector<AccountMap>,
+        employee_vesting_start: u64,
+        employee_vesting_period_duration: u64,
+        employees: vector<EmployeeAccountMap>,
+        validators: vector<ValidatorConfigurationWithCommission>
     ) {
         initialize(
             gas_schedule,
@@ -426,17 +432,17 @@ module aptos_framework::genesis {
             rewards_rate_denominator,
             voting_power_increase_limit
         );
-
+        features::change_feature_flags(aptos_framework, vector[1, 2], vector[]);
         initialize_aptos_coin(aptos_framework);
-
         aptos_governance::initialize_for_verification(
             aptos_framework,
             min_voting_threshold,
             required_proposer_stake,
             voting_duration_secs
         );
-
-        create_initialize_validators(aptos_framework, validators);
+        create_accounts(aptos_framework, accounts);
+        create_employee_validators(employee_vesting_start, employee_vesting_period_duration, employees);
+        create_initialize_validators_with_commission(aptos_framework, true, validators);
         set_genesis_end(aptos_framework);
     }
 

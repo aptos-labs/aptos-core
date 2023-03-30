@@ -1,9 +1,9 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module provides APIs for aggregating and verifying Boneh-Lynn-Shacham (BLS) aggregate
 //! signatures (including individual signatures and multisignatures), implemented on top of
-//! Barreto-Lynn-Scott BLS12-381 elliptic curves (https://github.com/supranational/blst).
+//! Barreto-Lynn-Scott BLS12-381 elliptic curves (<https://github.com/supranational/blst)>.
 //!
 //! The `Signature` struct is used to represent either a:
 //!
@@ -29,8 +29,7 @@ use anyhow::{anyhow, Result};
 use aptos_crypto_derive::{DeserializeKey, SerializeKey};
 use blst::BLST_ERROR;
 use serde::Serialize;
-use std::convert::TryFrom;
-use std::fmt;
+use std::{convert::TryFrom, fmt};
 
 #[derive(Clone, Eq, SerializeKey, DeserializeKey)]
 /// Either (1) a BLS signature share from an individual signer, (2) a BLS multisignature or (3) a
@@ -135,8 +134,8 @@ impl Signature {
 // SignatureShare Traits //
 ///////////////////////////
 impl traits::Signature for Signature {
-    type VerifyingKeyMaterial = PublicKey;
     type SigningKeyMaterial = PrivateKey;
+    type VerifyingKeyMaterial = PublicKey;
 
     /// Serializes the message of type `T` to bytes and calls `Signature::verify_arbitrary_msg`.
     fn verify<T: CryptoHash + Serialize>(&self, message: &T, public_key: &PublicKey) -> Result<()> {
@@ -184,13 +183,13 @@ impl Length for Signature {
 
 impl fmt::Debug for Signature {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", hex::encode(&self.to_bytes()))
+        write!(f, "{}", hex::encode(self.to_bytes()))
     }
 }
 
 impl fmt::Display for Signature {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", hex::encode(&self.to_bytes()))
+        write!(f, "{}", hex::encode(self.to_bytes()))
     }
 }
 

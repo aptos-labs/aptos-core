@@ -1,13 +1,14 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::transport::Transport;
+use aptos_memsocket::{MemoryListener, MemorySocket};
 use aptos_types::{
     network_address::{parse_memory, NetworkAddress, Protocol},
     PeerId,
 };
 use futures::{future, stream::Stream};
-use memsocket::{MemoryListener, MemorySocket};
 use std::{
     io,
     pin::Pin,
@@ -19,11 +20,11 @@ use std::{
 pub struct MemoryTransport;
 
 impl Transport for MemoryTransport {
-    type Output = MemorySocket;
     type Error = io::Error;
-    type Listener = Listener;
     type Inbound = future::Ready<Result<Self::Output, Self::Error>>;
+    type Listener = Listener;
     type Outbound = future::Ready<Result<Self::Output, Self::Error>>;
+    type Output = MemorySocket;
 
     fn listen_on(
         &self,
@@ -40,7 +41,7 @@ impl Transport for MemoryTransport {
                         addr
                     ),
                 ))
-            }
+            },
         };
 
         let listener = MemoryListener::bind(port)?;
@@ -90,7 +91,7 @@ impl Stream for Listener {
                 // so use port 0 to ensure they aren't used as an address to dial.
                 let dialer_addr = NetworkAddress::from(Protocol::Memory(0));
                 Poll::Ready(Some(Ok((future::ready(Ok(socket)), dialer_addr))))
-            }
+            },
             Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(e))),
             Poll::Ready(None) => Poll::Ready(None),
             Poll::Pending => Poll::Pending,

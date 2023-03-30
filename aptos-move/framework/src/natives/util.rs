@@ -1,65 +1,27 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use crate::{
+    natives::helpers::{make_safe_native, SafeNativeContext, SafeNativeError, SafeNativeResult},
+    safely_pop_arg,
+};
+use aptos_types::on_chain_config::{Features, TimedFeatures};
+use move_binary_format::errors::PartialVMError;
 use move_core_types::{
     gas_algebra::{InternalGas, InternalGasPerByte, NumBytes},
     vm_status::StatusCode,
 };
-use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
-use move_vm_types::{
-    loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
-};
-use smallvec::smallvec;
+use move_vm_runtime::native_functions::NativeFunction;
+use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
+use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, sync::Arc};
+
+// !!!! NOTE !!!!
+// This file is intended for natives from the util module in the framework.
+// DO NOT PUT HELPER FUNCTIONS HERE!
 
 /// Abort code when from_bytes fails (0x01 == INVALID_ARGUMENT)
 const EFROM_BYTES: u64 = 0x01_0001;
-
-/// Wraps a test-only native function inside an Arc<UnboxedNativeFunction>.
-pub fn make_test_only_native_from_func(
-    func: fn(&mut NativeContext, Vec<Type>, VecDeque<Value>) -> PartialVMResult<NativeResult>,
-) -> NativeFunction {
-    Arc::new(func)
-}
-
-/// Used to pass gas parameters into native functions.
-pub fn make_native_from_func<T: std::marker::Send + std::marker::Sync + 'static>(
-    gas_params: T,
-    func: fn(&T, &mut NativeContext, Vec<Type>, VecDeque<Value>) -> PartialVMResult<NativeResult>,
-) -> NativeFunction {
-    Arc::new(move |context, ty_args, args| func(&gas_params, context, ty_args, args))
-}
-
-/// Used to pop a Vec<Vec<u8>> argument off the stack.
-#[macro_export]
-macro_rules! pop_vec_arg {
-    ($arguments:ident, $t:ty) => {{
-        // Replicating the code from pop_arg! here
-        use move_vm_types::natives::function::{PartialVMError, StatusCode};
-        let value_vec = match $arguments.pop_back().map(|v| v.value_as::<Vec<Value>>()) {
-            None => {
-                return Err(PartialVMError::new(
-                    StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                ))
-            }
-            Some(Err(e)) => return Err(e),
-            Some(Ok(v)) => v,
-        };
-
-        // Pop each Value from the popped Vec<Value>, cast it as a Vec<u8>, and push it to a Vec<Vec<u8>>
-        let mut vec_vec = vec![];
-        for value in value_vec {
-            let vec = match value.value_as::<$t>() {
-                Err(e) => return Err(e),
-                Ok(v) => v,
-            };
-            vec_vec.push(vec);
-        }
-
-        vec_vec
-    }};
-}
 
 /***************************************************************************************************
  * native fun from_bytes
@@ -75,10 +37,10 @@ pub struct FromBytesGasParameters {
 
 fn native_from_bytes(
     gas_params: &FromBytesGasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(ty_args.len(), 1);
     debug_assert_eq!(args.len(), 1);
 
@@ -90,18 +52,18 @@ fn native_from_bytes(
         ))
     })?;
 
-    let bytes = pop_arg!(args, Vec<u8>);
-    let cost = gas_params.base + gas_params.per_byte * NumBytes::new(bytes.len() as u64);
+    let bytes = safely_pop_arg!(args, Vec<u8>);
+    context.charge(gas_params.base + gas_params.per_byte * NumBytes::new(bytes.len() as u64))?;
     let val = match Value::simple_deserialize(&bytes, &layout) {
         Some(val) => val,
-        None => return Ok(NativeResult::err(cost, EFROM_BYTES)),
+        None => {
+            return Err(SafeNativeError::Abort {
+                abort_code: EFROM_BYTES,
+            })
+        },
     };
 
-    Ok(NativeResult::ok(cost, smallvec![val]))
-}
-
-pub fn make_native_from_bytes(gas_params: FromBytesGasParameters) -> NativeFunction {
-    Arc::new(move |context, ty_args, args| native_from_bytes(&gas_params, context, ty_args, args))
+    Ok(smallvec![val])
 }
 
 /***************************************************************************************************
@@ -113,8 +75,20 @@ pub struct GasParameters {
     pub from_bytes: FromBytesGasParameters,
 }
 
-pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {
-    let natives = [("from_bytes", make_native_from_bytes(gas_params.from_bytes))];
+pub fn make_all(
+    gas_params: GasParameters,
+    timed_features: TimedFeatures,
+    features: Arc<Features>,
+) -> impl Iterator<Item = (String, NativeFunction)> {
+    let natives = [(
+        "from_bytes",
+        make_safe_native(
+            gas_params.from_bytes,
+            timed_features,
+            features,
+            native_from_bytes,
+        ),
+    )];
 
     crate::natives::helpers::make_module_natives(natives)
 }

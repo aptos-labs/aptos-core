@@ -10,7 +10,7 @@ module veiled_coin::veiled_coin {
     use std::error;
     use std::signer;
     use std::vector;
-    use aptos_std::elgamal::{Self, Ciphertext, CompressedCiphertext, PubKey};
+    use aptos_std::elgamal::{Self, Ciphertext, CompressedCiphertext, Pubkey};
     use aptos_std::ristretto255::{Self, Scalar, new_scalar_from_u64};
 
     use aptos_framework::account;
@@ -134,9 +134,11 @@ module veiled_coin::veiled_coin {
     /// This value is the amount being transferred. These two ciphertexts are required as we need to update 
     /// both the sender's and the recipient's balances, which use different public keys and so must be updated 
     /// with ciphertexts encrypted with their respective public keys. 
+    // TODO: Handle pubkey storage in move code
     public entry fun private_transfer_to<CoinType>(
 	sender: &signer, 
 	recipient: address, 
+	pubkey: vector<u8>,
 	withdraw_ct: vector<u8>, 
 	deposit_ct: vector<u8>, 
 	range_proof_updated_balance: vector<u8>, 
@@ -146,10 +148,12 @@ module veiled_coin::veiled_coin {
 	assert!(std::option::is_some(&private_withdraw_amount), EDESERIALIZATION_FAILED);
 	let private_deposit_amount = elgamal::new_ciphertext_from_bytes(deposit_ct);
 	assert!(std::option::is_some(&private_deposit_amount), EDESERIALIZATION_FAILED);
+	let pubkey = elgamal::new_pubkey_from_bytes(pubkey);
 
 	transfer_privately_to<CoinType>(
 		sender,
 		recipient,
+		&std::option::extract(&mut pubkey),
 		std::option::extract(&mut private_withdraw_amount),
 		std::option::extract(&mut private_deposit_amount),
 		&bulletproofs::range_proof_from_bytes(range_proof_updated_balance),
@@ -197,7 +201,7 @@ module veiled_coin::veiled_coin {
 
     /// Returns true if the balance at address `owner` equals `value`, which should be useful for auditability. Requires
     /// the ElGamal ciphertext randomness as an auxiliary input.
-    public fun verify_opened_balance<CoinType>(owner: address, pubkey: &PubKey, value: u64, randomness: &Scalar): bool acquires VeiledCoinStore {
+    public fun verify_opened_balance<CoinType>(owner: address, pubkey: &Pubkey, value: u64, randomness: &Scalar): bool acquires VeiledCoinStore {
         // compute the expected committed balance
         let value = new_scalar_from_u64(value);
         let expected_ct = elgamal::new_ciphertext_with_basepoint(&value, randomness, pubkey);
@@ -256,13 +260,14 @@ module veiled_coin::veiled_coin {
     public fun transfer_privately_to<CoinType>(
         sender: &signer,
         recipient: address,
+	pubkey: &Pubkey,
         private_withdraw_amount: Ciphertext,
 	private_deposit_amount: Ciphertext,
         range_proof_updated_balance: &RangeProof,
 	range_proof_transferred_amount: &RangeProof)
     acquires VeiledCoinStore {
 	// TODO: Insert sigma protocol here which proves 'private_deposit_amount' and 'private_withdraw_amount' encrypt the same values using the same randomness
-        withdraw<CoinType>(sender, private_withdraw_amount, range_proof_updated_balance, range_proof_transferred_amount);
+        withdraw<CoinType>(sender, private_withdraw_amount, pubkey, range_proof_updated_balance, range_proof_transferred_amount);
 	let vc = VeiledCoin<CoinType> { private_value: private_deposit_amount };
 
         deposit(recipient, vc);
@@ -314,6 +319,7 @@ module veiled_coin::veiled_coin {
     public fun withdraw<CoinType>(
         account: &signer,
         withdraw_amount: Ciphertext,
+	pubkey: &Pubkey,
         range_proof_updated_balance: &RangeProof,
 	range_proof_transferred_amount: &RangeProof,
     ) acquires VeiledCoinStore {
@@ -342,8 +348,8 @@ module veiled_coin::veiled_coin {
 	// where p is the order of the scalar field, giving an updated balance of 
 	// 'bal' - (p-1) mod p = 'bal' + 1. These checks ensure that 'bal' - 'amount' >= 0 
 	// and therefore that 'bal' >= 'amount'.
-        assert!(bulletproofs::verify_range_proof_elgamal(&private_balance, range_proof_updated_balance, MAX_BITS_IN_VALUE, VEILED_COIN_DST), ERANGE_PROOF_VERIFICATION_FAILED);
-	assert!(bulletproofs::verify_range_proof_elgamal(&withdraw_amount, range_proof_transferred_amount, MAX_BITS_IN_VALUE, VEILED_COIN_DST), ERANGE_PROOF_VERIFICATION_FAILED);
+        assert!(bulletproofs::verify_range_proof_elgamal(&private_balance, range_proof_updated_balance, pubkey, MAX_BITS_IN_VALUE, VEILED_COIN_DST), ERANGE_PROOF_VERIFICATION_FAILED);
+	assert!(bulletproofs::verify_range_proof_elgamal(&withdraw_amount, range_proof_transferred_amount, pubkey, MAX_BITS_IN_VALUE, VEILED_COIN_DST), ERANGE_PROOF_VERIFICATION_FAILED);
 
         coin_store.private_balance = elgamal::compress_ciphertext(&private_balance);
 

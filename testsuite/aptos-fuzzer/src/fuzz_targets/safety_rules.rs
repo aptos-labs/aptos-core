@@ -1,9 +1,10 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{corpus_from_strategy, fuzz_data_to_value, FuzzTargetImpl};
 use aptos_proptest_helpers::ValueGenerator;
-use safety_rules::{
+use aptos_safety_rules::{
     fuzzing::{fuzz_construct_and_sign_vote_two_chain, fuzz_sign_timeout_with_qc},
     fuzzing_utils::{
         arb_block_data, arb_epoch_change_proof, arb_safety_rules_input, arb_timeout,

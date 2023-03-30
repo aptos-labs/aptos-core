@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! This library defines a BitVec struct that represents a bit vector.
@@ -26,7 +27,7 @@ const MAX_BUCKETS: usize = 8192;
 /// 3. Count set bits.
 /// 4. Get the index of the last set bit.
 ///
-/// Internally, it stores a vector of u8's (as Vec<u8>).
+/// Internally, it stores a vector of u8's (as `Vec<u8>`).
 ///
 /// * The first 8 positions of the bit vector are encoded in the first element of the vector, the
 ///   next 8 are encoded in the second element, and so on.

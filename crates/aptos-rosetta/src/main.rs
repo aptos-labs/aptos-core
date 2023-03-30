@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -10,10 +10,10 @@ use aptos_rosetta::bootstrap;
 use aptos_sdk::move_types::account_address::AccountAddress;
 use aptos_types::chain_id::ChainId;
 use clap::Parser;
-use std::fs::read_to_string;
-use std::path::PathBuf;
 use std::{
+    fs::read_to_string,
     net::SocketAddr,
+    path::PathBuf,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -35,10 +35,10 @@ async fn main() {
     match args {
         CommandArgs::OnlineRemote(_) => {
             println!("aptos-rosetta: Starting Rosetta in Online remote (no local full node) mode")
-        }
+        },
         CommandArgs::Online(_) => {
             println!("aptos-rosetta: Starting Rosetta in Online (with local full node) mode")
-        }
+        },
         CommandArgs::Offline(_) => println!("aptos-rosetta: Starting Rosetta in Offline mode"),
     }
 
@@ -59,7 +59,7 @@ async fn main() {
             match client.get_index_bcs().await {
                 Ok(_) => {
                     break;
-                }
+                },
                 Err(err) => {
                     sample!(
                         SampleRate::Duration(Duration::from_millis(LOG_INTERVAL_MS)),
@@ -71,7 +71,7 @@ async fn main() {
                     );
                     tokio::time::sleep(Duration::from_millis(DEFAULT_REST_API_WAIT_INTERVAL_MS))
                         .await;
-                }
+                },
             }
         }
 

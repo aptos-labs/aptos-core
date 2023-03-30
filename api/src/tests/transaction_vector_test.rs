@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 /***************************************************************************************
@@ -15,17 +15,16 @@
 
 use super::new_test_context;
 use aptos_api_test_context::current_function_name;
-use aptos_types::{
-    account_address::AccountAddress,
-    chain_id::ChainId,
-    transaction::{EntryFunction, RawTransaction, Script, SignedTransaction, TransactionArgument},
-};
-
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     SigningKey, Uniform,
 };
 use aptos_proptest_helpers::ValueGenerator;
+use aptos_types::{
+    account_address::AccountAddress,
+    chain_id::ChainId,
+    transaction::{EntryFunction, RawTransaction, Script, SignedTransaction, TransactionArgument},
+};
 use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
@@ -150,7 +149,7 @@ fn bytes_strategy() -> impl Strategy<Value = Vec<u8>> {
     string::string_regex("[a-f0-9]+")
         .unwrap()
         .prop_filter("only even letters count", |s| s.len() % 2 == 0)
-        .prop_map(|s| hex::decode(&s).unwrap())
+        .prop_map(|s| hex::decode(s).unwrap())
 }
 
 #[cfg(test)]
@@ -249,10 +248,12 @@ async fn test_entry_function_payload() {
     // The purpose of patches is to convert bytes arrays to hex-coded strings.
     // Patches the serde_json result is easier comparing to implement a customized serializer.
     fn patch(raw_txn_json: &mut serde_json::Value) {
-        let args = visit_json_field(
-            raw_txn_json,
-            &["raw_txn", "payload", "EntryFunction", "args"],
-        );
+        let args = visit_json_field(raw_txn_json, &[
+            "raw_txn",
+            "payload",
+            "EntryFunction",
+            "args",
+        ]);
 
         let mut hex_args: Vec<serde_json::Value> = vec![];
         for arg in args.as_array_mut().unwrap() {
@@ -296,9 +297,8 @@ async fn test_script_payload() {
         for arg in args.as_array_mut().unwrap() {
             let arg_obj = arg.as_object_mut().unwrap();
 
-            match arg_obj.get_mut("U8Vector") {
-                Some(val) => *val = byte_array_to_hex(val),
-                None => {}
+            if let Some(val) = arg_obj.get_mut("U8Vector") {
+                *val = byte_array_to_hex(val)
             }
         }
     }
@@ -329,10 +329,12 @@ async fn test_script_payload() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_module_payload() {
     fn patch(raw_txn_json: &mut serde_json::Value) {
-        let codes = visit_json_field(
-            raw_txn_json,
-            &["raw_txn", "payload", "ModuleBundle", "codes"],
-        );
+        let codes = visit_json_field(raw_txn_json, &[
+            "raw_txn",
+            "payload",
+            "ModuleBundle",
+            "codes",
+        ]);
 
         for code_element in codes.as_array_mut().unwrap() {
             let code_obj = code_element.as_object_mut().unwrap();

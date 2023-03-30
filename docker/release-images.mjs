@@ -22,7 +22,7 @@
 // 2. docker login - with authorization to push to the `aptoslabs` org
 // 3. gcloud auth configure-docker us-west1-docker.pkg.dev
 // 4. gcloud auth login --update-adc
-// 5. aws-mfa
+// 5. AWS CLI credentials configured
 //
 // Once you have all prerequisites fulfilled, you can run this script via:
 // GIT_SHA=${{ github.sha }} GCP_DOCKER_ARTIFACT_REPO="${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}" AWS_ACCOUNT_ID="${{ secrets.AWS_ECR_ACCOUNT_NUM }}" IMAGE_TAG_PREFIX="${{ inputs.image_tag_prefix }}" ./docker/release_images.sh --wait-for-image-seconds=1800
@@ -31,12 +31,46 @@ const Features = {
   Default: "default",
   Indexer: "indexer",
 };
-
+const TESTING_IMAGES = ["validator-testing"];
 const IMAGES_TO_RELEASE = {
-  validator: [Features.Default, Features.Indexer],
-  forge: [Features.Default],
-  tools: [Features.Default],
-  "node-checker": [Features.Default],
+  validator: {
+    performance: [
+      Features.Default,
+    ],
+    release: [
+      Features.Default,
+      Features.Indexer,
+    ],
+  },
+  "validator-testing": {
+    performance: [
+      Features.Default,
+    ],
+    release: [
+      Features.Default,
+      Features.Indexer,
+    ],
+  },
+  forge: {
+    release: [
+      Features.Default,
+    ],
+  },
+  tools: {
+    release: [
+      Features.Default,
+    ],
+  },
+  "node-checker": {
+    release: [
+      Features.Default,
+    ],
+  },
+  "indexer-grpc": {
+    release: [
+      Features.Default,
+    ],
+  },
 };
 
 import { execSync } from "node:child_process";
@@ -93,29 +127,45 @@ if (process.env.CI === "true") {
   crane = "crane";
 }
 
+const AWS_ECR = `${parsedArgs.AWS_ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com/aptos`;
+const GCP_ARTIFACT_REPO = parsedArgs.GCP_DOCKER_ARTIFACT_REPO;
+const DOCKERHUB = "docker.io/aptoslabs";
+
 const TARGET_REGISTRIES = [
-  parsedArgs.GCP_DOCKER_ARTIFACT_REPO,
-  "docker.io/aptoslabs",
-  `${parsedArgs.AWS_ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com/aptos`,
+  GCP_ARTIFACT_REPO,
+  DOCKERHUB,
+  AWS_ECR,
 ];
+
+const INTERNAL_TARGET_REGISTRIES = [
+  GCP_ARTIFACT_REPO,
+  AWS_ECR,
+];
+
 
 // default 10 seconds
 parsedArgs.WAIT_FOR_IMAGE_SECONDS = parseInt(parsedArgs.WAIT_FOR_IMAGE_SECONDS ?? 10, 10);
 
-for (const [image, features] of Object.entries(IMAGES_TO_RELEASE)) {
-  for (const feature of features) {
-    const featureSuffix = feature === Features.Default ? "" : feature;
+for (const [image, imageConfig] of Object.entries(IMAGES_TO_RELEASE)) {
+  for (const [profile, features] of Object.entries(imageConfig)) {
+    // build profiles that are not the default "release" will have a separate prefix
+    const profilePrefix = profile === "release" ? "" : profile;
+    for (const feature of features) {
+      const featureSuffix = feature === Features.Default ? "" : feature;
+      const targetRegistries = TESTING_IMAGES.includes(image) ? INTERNAL_TARGET_REGISTRIES : TARGET_REGISTRIES;
 
-    for (const targetRegistry of TARGET_REGISTRIES) {
-      const imageSource = `${parsedArgs.GCP_DOCKER_ARTIFACT_REPO}/${image}:${joinTagSegments(
-        featureSuffix,
-        parsedArgs.GIT_SHA,
-      )}`;
-      const imageTarget = `${targetRegistry}/${image}:${joinTagSegments(parsedArgs.IMAGE_TAG_PREFIX, featureSuffix)}`;
-      console.info(chalk.green(`INFO: copying ${imageSource} to ${imageTarget}`));
-      await waitForImageToBecomeAvailable(imageSource, parsedArgs.WAIT_FOR_IMAGE_SECONDS);
-      await $`${crane} copy ${imageSource} ${imageTarget}`;
-      await $`${crane} copy ${imageSource} ${joinTagSegments(imageTarget, parsedArgs.GIT_SHA)}`;
+      for (const targetRegistry of targetRegistries) {
+        const imageSource = `${parsedArgs.GCP_DOCKER_ARTIFACT_REPO}/${image}:${joinTagSegments(
+          profilePrefix,
+          featureSuffix,
+          parsedArgs.GIT_SHA,
+        )}`;
+        const imageTarget = `${targetRegistry}/${image}:${joinTagSegments(parsedArgs.IMAGE_TAG_PREFIX, profilePrefix, featureSuffix)}`;
+        console.info(chalk.green(`INFO: copying ${imageSource} to ${imageTarget}`));
+        await waitForImageToBecomeAvailable(imageSource, parsedArgs.WAIT_FOR_IMAGE_SECONDS);
+        await $`${crane} copy ${imageSource} ${imageTarget}`;
+        await $`${crane} copy ${imageSource} ${joinTagSegments(imageTarget, parsedArgs.GIT_SHA)}`;
+      }
     }
   }
 }
@@ -141,7 +191,7 @@ async function waitForImageToBecomeAvailable(imageToWaitFor, waitForImageSeconds
         console.log(
           chalk.yellow(
             // prettier-ignore
-            `WARN: Image ${imageToWaitFor} not available yet - waiting ${ WAIT_TIME_IN_BETWEEN_ATTEMPTS / 1000 } seconds to try again. Time elapsed: ${timeElapsedSeconds().toFixed( 0, )} seconds. Max wait time: ${waitForImageSeconds} seconds`,
+            `WARN: Image ${imageToWaitFor} not available yet - waiting ${WAIT_TIME_IN_BETWEEN_ATTEMPTS / 1000} seconds to try again. Time elapsed: ${timeElapsedSeconds().toFixed(0,)} seconds. Max wait time: ${waitForImageSeconds} seconds`,
           ),
         );
         await sleep(WAIT_TIME_IN_BETWEEN_ATTEMPTS);

@@ -27,7 +27,7 @@ module aptos_framework::aggregator_tests {
     }
 
     #[test(account = @aptos_framework)]
-    #[expected_failure(abort_code = 0x020001)]
+    #[expected_failure(abort_code = 0x020001, location = aptos_framework::aggregator)]
     fun test_overflow(account: signer) {
         aggregator_factory::initialize_aggregator_factory_for_test(&account);
         let aggregator = aggregator_factory::create_aggregator(&account, 10);
@@ -39,7 +39,7 @@ module aptos_framework::aggregator_tests {
     }
 
     #[test(account = @aptos_framework)]
-    #[expected_failure(abort_code = 0x020002)]
+    #[expected_failure(abort_code = 0x020002, location = aptos_framework::aggregator)]
     fun test_underflow(account: signer) {
         aggregator_factory::initialize_aggregator_factory_for_test(&account);
         let aggregator = aggregator_factory::create_aggregator(&account, 10);

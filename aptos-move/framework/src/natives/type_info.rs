@@ -1,19 +1,20 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use move_binary_format::errors::PartialVMResult;
+use crate::natives::{
+    helpers::{make_safe_native, SafeNativeContext, SafeNativeError, SafeNativeResult},
+    transaction_context::NativeTransactionContext,
+};
+use aptos_types::on_chain_config::{Features, TimedFeatures};
 use move_core_types::{
     gas_algebra::{InternalGas, InternalGasPerByte, NumBytes},
     language_storage::{StructTag, TypeTag},
 };
-use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
+use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
-    natives::function::NativeResult,
     values::{Struct, Value},
 };
-
-use crate::natives::transaction_context::NativeTransactionContext;
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, fmt::Write, sync::Arc};
 
@@ -52,35 +53,31 @@ pub struct TypeOfGasParameters {
 
 fn native_type_of(
     gas_params: &TypeOfGasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     arguments: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.len() == 1);
     debug_assert!(arguments.is_empty());
 
+    context.charge(gas_params.base)?;
+
     let type_tag = context.type_to_type_tag(&ty_args[0])?;
 
-    let mut cost = gas_params.base;
     if gas_params.per_byte_in_str > 0.into() {
-        cost += gas_params.per_byte_in_str * NumBytes::new(type_tag.to_string().len() as u64);
+        let type_tag_str = type_tag.to_string();
+        // Ideally, we would charge *before* the `type_to_type_tag()` and `type_tag.to_string()` calls above.
+        // But there are other limits in place that prevent this native from being called with too much work.
+        context.charge(gas_params.per_byte_in_str * NumBytes::new(type_tag_str.len() as u64))?;
     }
 
     if let TypeTag::Struct(struct_tag) = type_tag {
-        Ok(NativeResult::ok(
-            cost,
-            type_of_internal(&struct_tag).expect("type_of should never fail."),
-        ))
+        Ok(type_of_internal(&struct_tag).expect("type_of should never fail."))
     } else {
-        Ok(NativeResult::err(
-            cost,
-            super::status::NFE_EXPECTED_STRUCT_TYPE_TAG,
-        ))
+        Err(SafeNativeError::Abort {
+            abort_code: super::status::NFE_EXPECTED_STRUCT_TYPE_TAG,
+        })
     }
-}
-
-pub fn make_native_type_of(gas_params: TypeOfGasParameters) -> NativeFunction {
-    Arc::new(move |context, ty_args, args| native_type_of(&gas_params, context, ty_args, args))
 }
 
 /***************************************************************************************************
@@ -99,28 +96,24 @@ pub struct TypeNameGasParameters {
 
 fn native_type_name(
     gas_params: &TypeNameGasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     arguments: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.len() == 1);
     debug_assert!(arguments.is_empty());
+
+    context.charge(gas_params.base)?;
 
     let type_tag = context.type_to_type_tag(&ty_args[0])?;
     let type_name = type_tag.to_string();
 
-    let cost = gas_params.base + gas_params.per_byte_in_str * NumBytes::new(type_name.len() as u64);
+    // TODO: Ideally, we would charge *before* the `type_to_type_tag()` and `type_tag.to_string()` calls above.
+    context.charge(gas_params.per_byte_in_str * NumBytes::new(type_name.len() as u64))?;
 
-    Ok(NativeResult::ok(
-        cost,
-        smallvec![Value::struct_(Struct::pack(vec![Value::vector_u8(
-            type_name.as_bytes().to_vec()
-        )]))],
-    ))
-}
-
-pub fn make_native_type_name(gas_params: TypeNameGasParameters) -> NativeFunction {
-    Arc::new(move |context, ty_args, args| native_type_name(&gas_params, context, ty_args, args))
+    Ok(smallvec![Value::struct_(Struct::pack(vec![
+        Value::vector_u8(type_name.as_bytes().to_vec())
+    ]))])
 }
 
 /***************************************************************************************************
@@ -138,25 +131,21 @@ pub struct ChainIdGasParameters {
 
 fn native_chain_id(
     gas_params: &ChainIdGasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     arguments: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(_ty_args.is_empty());
     debug_assert!(arguments.is_empty());
 
-    let cost = gas_params.base;
+    context.charge(gas_params.base)?;
 
     let chain_id = context
         .extensions()
         .get::<NativeTransactionContext>()
         .chain_id();
 
-    Ok(NativeResult::ok(cost, smallvec![Value::u8(chain_id)]))
-}
-
-fn make_native_chain_id(gas_params: ChainIdGasParameters) -> NativeFunction {
-    Arc::new(move |context, ty_args, args| native_chain_id(&gas_params, context, ty_args, args))
+    Ok(smallvec![Value::u8(chain_id)])
 }
 
 /***************************************************************************************************
@@ -170,13 +159,38 @@ pub struct GasParameters {
     pub chain_id: ChainIdGasParameters,
 }
 
-pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {
+pub fn make_all(
+    gas_params: GasParameters,
+    timed_features: TimedFeatures,
+    features: Arc<Features>,
+) -> impl Iterator<Item = (String, NativeFunction)> {
     let natives = [
-        ("type_of", make_native_type_of(gas_params.type_of)),
-        ("type_name", make_native_type_name(gas_params.type_name)),
+        (
+            "type_of",
+            make_safe_native(
+                gas_params.type_of,
+                timed_features.clone(),
+                features.clone(),
+                native_type_of,
+            ),
+        ),
+        (
+            "type_name",
+            make_safe_native(
+                gas_params.type_name,
+                timed_features.clone(),
+                features.clone(),
+                native_type_name,
+            ),
+        ),
         (
             "chain_id_internal",
-            make_native_chain_id(gas_params.chain_id),
+            make_safe_native(
+                gas_params.chain_id,
+                timed_features,
+                features,
+                native_chain_id,
+            ),
         ),
     ];
 

@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module defines a Poem payload type for BCS. JSON is already natively
@@ -6,8 +6,6 @@
 
 // Previously the Bcs payload type took a T, not Vec<u8>. For more information
 // about that effort, see https://github.com/aptos-labs/aptos-core/issues/2277.
-
-use std::ops::{Deref, DerefMut};
 
 use aptos_api_types::mime_types::BCS;
 use poem::{http::header, FromRequest, IntoResponse, Request, RequestBody, Response, Result};
@@ -18,6 +16,7 @@ use poem_openapi::{
     types::Type,
     ApiResponse,
 };
+use std::ops::{Deref, DerefMut};
 
 /// A wrapper struct for a payload containing BCS encoded bytes
 #[derive(Debug, Clone, Eq, PartialEq)]

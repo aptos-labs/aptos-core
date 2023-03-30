@@ -1,11 +1,42 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    register_histogram, register_int_counter, register_int_counter_vec, Histogram, IntCounter,
-    IntCounterVec,
+    exponential_buckets, register_histogram, register_int_counter, register_int_counter_vec,
+    register_int_gauge, Histogram, IntCounter, IntCounterVec, IntGauge,
 };
 use once_cell::sync::Lazy;
+
+pub static BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "block_executor_execute_block_seconds",
+        // metric description
+        "The time spent in seconds for executing a block in block executor",
+        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+    )
+    .unwrap()
+});
+
+pub static BLOCK_EXECUTOR_CONCURRENCY: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "block_executor_concurrency",
+        "Concurrency level for the block executor"
+    )
+    .unwrap()
+});
+
+pub static BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "block_executor_signature_verification_seconds",
+        // metric description
+        "The time spent in seconds for signature verification of a block in executor",
+        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+    )
+    .unwrap()
+});
 
 /// Count the number of transactions that brake invariants of VM.
 pub static TRANSACTIONS_INVARIANT_VIOLATION: Lazy<IntCounter> = Lazy::new(|| {
@@ -73,10 +104,4 @@ pub static TXN_VALIDATION_SECONDS: Lazy<Histogram> = Lazy::new(|| {
 
 pub static TXN_GAS_USAGE: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!("aptos_vm_txn_gas_usage", "Gas used per transaction").unwrap()
-});
-
-/// Count the number of critical errors. This is not intended for display
-/// on a dashboard but rather for triggering alerts.
-pub static CRITICAL_ERRORS: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!("aptos_vm_critical_errors", "Number of critical errors").unwrap()
 });

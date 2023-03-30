@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -250,11 +251,11 @@ impl PreheatedEpochEndingRestore {
 
                 EPOCH_ENDING_EPOCH.set(last_li.epoch() as i64);
                 EPOCH_ENDING_VERSION.set(last_li.version() as i64);
-            }
+            },
             RestoreRunMode::Verify => {
                 VERIFY_EPOCH_ENDING_EPOCH.set(last_li.epoch() as i64);
                 VERIFY_EPOCH_ENDING_VERSION.set(last_li.version() as i64);
-            }
+            },
         };
 
         Ok(preheat_data

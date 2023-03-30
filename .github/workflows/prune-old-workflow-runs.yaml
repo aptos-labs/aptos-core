@@ -20,7 +20,10 @@ jobs:
       - uses: actions/setup-node@969bd2663942d722d85b6a8626225850c2f7be4b # pin@v3
         with:
           node-version-file: .node-version
-      - run: yarn pruneGithubWorkflowRuns
+      - uses: pnpm/action-setup@537643d491d20c2712d11533497cb47b2d0eb9d5 # pin https://github.com/pnpm/action-setup/releases/tag/v2.2.3
+        with:
+          version: 7.13.4
+      - run: pnpm i && pnpm pruneGithubWorkflowRuns
         env:
           GITHUB_TOKEN: ${{ github.token }}
         working-directory: .github/ts-tasks

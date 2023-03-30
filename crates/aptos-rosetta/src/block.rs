@@ -1,10 +1,10 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::{BlockHash, Y2K_MS};
 use crate::{
     common::{
         check_network, get_block_index_from_request, get_timestamp, handle_request, with_context,
+        BlockHash, Y2K_MS,
     },
     error::ApiResult,
     types::{Block, BlockIdentifier, BlockRequest, BlockResponse, Transaction},
@@ -17,7 +17,7 @@ use warp::Filter;
 
 pub fn block_route(
     server_context: RosettaContext,
-) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
     warp::path!("block")
         .and(warp::post())
         .and(warp::body::json())

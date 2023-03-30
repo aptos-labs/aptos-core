@@ -1,12 +1,12 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
-
-use std::str::FromStr;
 
 use super::new_test_context;
 use aptos_api_test_context::{current_function_name, find_value};
 use aptos_api_types::{MoveModuleBytecode, MoveResource, StateKeyWrapper};
 use serde_json::json;
+use std::str::FromStr;
 
 /* TODO: reactivate once cause of failure for `"8"` vs `8` in the JSON output is known.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -112,12 +112,12 @@ async fn test_account_modules_structs() {
 async fn test_get_account_resources_by_ledger_version() {
     let mut context = new_test_context(current_function_name!());
     let account = context.gen_account();
-    let txn = context.create_user_account(&account);
+    let txn = context.create_user_account(&account).await;
     context.commit_block(&vec![txn.clone()]).await;
 
     let ledger_version_1_resources = context
         .get(&account_resources(
-            &context.root_account().address().to_hex_literal(),
+            &context.root_account().await.address().to_hex_literal(),
         ))
         .await;
     let root_account = find_value(&ledger_version_1_resources, |f| {
@@ -127,7 +127,7 @@ async fn test_get_account_resources_by_ledger_version() {
 
     let ledger_version_0_resources = context
         .get(&account_resources_with_ledger_version(
-            &context.root_account().address().to_hex_literal(),
+            &context.root_account().await.address().to_hex_literal(),
             0,
         ))
         .await;
@@ -143,7 +143,7 @@ async fn test_get_account_resources_by_too_large_ledger_version() {
     let resp = context
         .expect_status_code(404)
         .get(&account_resources_with_ledger_version(
-            &context.root_account().address().to_hex_literal(),
+            &context.root_account().await.address().to_hex_literal(),
             1000000000000000000,
         ))
         .await;
@@ -156,7 +156,7 @@ async fn test_get_account_resources_by_invalid_ledger_version() {
     let resp = context
         .expect_status_code(400)
         .get(&account_resources_with_ledger_version(
-            &context.root_account().address().to_hex_literal(),
+            &context.root_account().await.address().to_hex_literal(),
             -1,
         ))
         .await;
@@ -169,7 +169,7 @@ async fn test_get_account_resources_by_invalid_ledger_version() {
 async fn test_get_account_modules_by_ledger_version() {
     let mut context = new_test_context(current_function_name!());
     let code = "a11ceb0b0300000006010002030205050703070a0c0816100c260900000001000100000102084d794d6f64756c650269640000000000000000000000000b1e55ed00010000000231010200";
-    let mut root_account = context.root_account();
+    let mut root_account = context.root_account().await;
     let txn = root_account.sign_with_transaction_builder(
         context
             .transaction_factory()
@@ -178,7 +178,7 @@ async fn test_get_account_modules_by_ledger_version() {
     context.commit_block(&vec![txn.clone()]).await;
     let modules = context
         .get(&account_modules(
-            &context.root_account().address().to_hex_literal(),
+            &context.root_account().await.address().to_hex_literal(),
         ))
         .await;
 
@@ -186,7 +186,7 @@ async fn test_get_account_modules_by_ledger_version() {
 
     let modules = context
         .get(&account_modules_with_ledger_version(
-            &context.root_account().address().to_hex_literal(),
+            &context.root_account().await.address().to_hex_literal(),
             0,
         ))
         .await;

@@ -13,26 +13,24 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-anyhow = "1.0.57"
-bcs = { git = "https://github.com/aptos-labs/bcs", rev = "2cde3e8446c460cb17b0c1d6bac7e27e964ac169" }
-heck = "0.3.2"
-once_cell = "1.10.0"
-regex = "1.5.5"
-serde-generate = { git = "https://github.com/aptos-labs/serde-reflection", rev = "839aed62a20ddccf043c08961cfe74875741ccba" }
-serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "839aed62a20ddccf043c08961cfe74875741ccba" }
-serde_yaml = "0.8.24"
-structopt = "0.3.21"
-textwrap = "0.15.0"
-
-aptos-types = { path = "../../types" }
-
+anyhow = { workspace = true }
+aptos-types = { workspace = true }
+bcs = { workspace = true }
+heck = { workspace = true }
 move-core-types = { workspace = true }
+once_cell = { workspace = true }
+regex = { workspace = true }
+serde-generate = { workspace = true }
+serde-reflection = { workspace = true }
+serde_yaml = { workspace = true }
+structopt = { workspace = true }
+textwrap = { workspace = true }
 
 [dev-dependencies]
-cached-packages = { path = "../../aptos-move/framework/cached-packages" }
-framework = { path = "../framework" }
-tempfile = "3.3.0"
-which = "4.2.5"
+aptos-cached-packages = { workspace = true }
+aptos-framework = { workspace = true }
+tempfile = { workspace = true }
+which = { workspace = true }
 
 [features]
 default = []

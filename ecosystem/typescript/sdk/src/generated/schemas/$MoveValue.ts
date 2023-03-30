@@ -8,9 +8,17 @@ export const $MoveValue = {
         type: 'number',
         format: 'uint8',
     }, {
+        type: 'number',
+        format: 'uint16',
+    }, {
+        type: 'number',
+        format: 'uint32',
+    }, {
         type: 'U64',
     }, {
         type: 'U128',
+    }, {
+        type: 'U256',
     }, {
         type: 'boolean',
     }, {

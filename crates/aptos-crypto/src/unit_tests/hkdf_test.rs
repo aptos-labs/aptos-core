@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{compat::Sha3_256, hkdf::*};
@@ -10,9 +10,9 @@ use sha2::{Sha256, Sha512};
 fn test_sha256_test_vectors() {
     let tests = test_vectors_sha256();
     for t in tests.iter() {
-        let ikm = hex::decode(&t.ikm).unwrap();
-        let salt = hex::decode(&t.salt).unwrap();
-        let info = hex::decode(&t.info).unwrap();
+        let ikm = hex::decode(t.ikm).unwrap();
+        let salt = hex::decode(t.salt).unwrap();
+        let info = hex::decode(t.info).unwrap();
 
         let hkdf_extract = Hkdf::<Sha256>::extract(Option::from(&salt[..]), &ikm[..]).unwrap();
         let hkdf_expand = Hkdf::<Sha256>::expand(&hkdf_extract, Some(&info[..]), t.length);
@@ -28,9 +28,9 @@ fn test_sha256_test_vectors() {
 fn test_extract_then_expand() {
     let tests = test_vectors_sha256();
     for t in tests.iter() {
-        let ikm = hex::decode(&t.ikm).unwrap();
-        let salt = hex::decode(&t.salt).unwrap();
-        let info = hex::decode(&t.info).unwrap();
+        let ikm = hex::decode(t.ikm).unwrap();
+        let salt = hex::decode(t.salt).unwrap();
+        let info = hex::decode(t.info).unwrap();
 
         let hkdf_full = Hkdf::<Sha256>::extract_then_expand(
             Option::from(&salt[..]),

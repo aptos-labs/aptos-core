@@ -1,20 +1,21 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{consensusdb::ConsensusDB, epoch_manager::LivenessStorageData, error::DbError};
 use anyhow::{format_err, Context, Result};
 use aptos_config::config::NodeConfig;
+use aptos_consensus_types::{
+    block::Block, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote,
+};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
+use aptos_storage_interface::DbReader;
 use aptos_types::{
     block_info::Round, epoch_change::EpochChangeProof, ledger_info::LedgerInfoWithSignatures,
     proof::TransactionAccumulatorSummary, transaction::Version,
 };
-use consensus_types::{
-    block::Block, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote,
-};
 use std::{cmp::max, collections::HashSet, sync::Arc};
-use storage_interface::DbReader;
 
 /// PersistentLivenessStorage is essential for maintaining liveness when a node crashes.  Specifically,
 /// upon a restart, a correct node will recover.  Even if all nodes crash, liveness is
@@ -53,7 +54,12 @@ pub trait PersistentLivenessStorage: Send + Sync {
 }
 
 #[derive(Clone)]
-pub struct RootInfo(pub Block, pub QuorumCert, pub QuorumCert, pub QuorumCert);
+pub struct RootInfo(
+    pub Box<Block>,
+    pub QuorumCert,
+    pub QuorumCert,
+    pub QuorumCert,
+);
 
 /// LedgerRecoveryData is a subset of RecoveryData that we can get solely from ledger info.
 #[derive(Clone)]
@@ -131,7 +137,7 @@ impl LedgerRecoveryData {
             .expect("Inconsistent commit proof and evaluation decision, cannot commit block");
 
         Ok(RootInfo(
-            root_block,
+            Box::new(root_block),
             root_quorum_cert,
             root_ordered_cert,
             root_commit_cert,
@@ -409,11 +415,11 @@ impl PersistentLivenessStorage for StorageWriteProxy {
                 );
 
                 LivenessStorageData::FullRecoveryData(initial_data)
-            }
+            },
             Err(e) => {
                 error!(error = ?e, "Failed to construct recovery data");
                 LivenessStorageData::PartialRecoveryData(ledger_recovery_data)
-            }
+            },
         }
     }
 

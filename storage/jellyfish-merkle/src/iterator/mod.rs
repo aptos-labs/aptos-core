@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module implements `JellyfishMerkleIterator`. Initialized with a version and a key, the
@@ -140,7 +141,7 @@ where
                     ));
                     current_node_key =
                         current_node_key.gen_child_node_key(child.version, child_index);
-                }
+                },
                 None => {
                     let (bitmap, _) = internal_node.generate_bitmaps();
                     if u32::from(u8::from(child_index)) < 15 - bitmap.leading_zeros() {
@@ -163,7 +164,7 @@ where
                         done,
                         phantom_value: PhantomData,
                     });
-                }
+                },
             }
         }
 
@@ -176,10 +177,10 @@ where
                         done = true;
                     }
                 }
-            }
+            },
             Node::Null => {
                 done = true;
-            }
+            },
         }
 
         Ok(Self {
@@ -234,7 +235,7 @@ where
                         done: false,
                         phantom_value: PhantomData,
                     });
-                }
+                },
                 Node::Internal(internal_node) => {
                     let (nibble, child) =
                         Self::skip_leaves(&internal_node, &mut leaves_skipped, start_idx)?;
@@ -245,7 +246,7 @@ where
                         nibble,
                     ));
                     current_node_key = next_node_key;
-                }
+                },
                 Node::Null => unreachable!("Null node has leaf count 0 so here is unreachable"),
             };
             current_node = reader.get_node(&current_node_key)?;
@@ -298,15 +299,15 @@ where
                         leaf_node.account_key(),
                         leaf_node.value_index().clone(),
                     )));
-                }
+                },
                 Ok(Node::Internal(_)) => {
                     // This means `starting_key` is bigger than every key in this tree, or we have
                     // iterated past the last key.
                     return None;
-                }
+                },
                 Ok(Node::Null) => {
                     unreachable!("When tree is empty, done should be already set to true")
-                }
+                },
                 Err(err) => return Some(Err(err)),
             }
         }
@@ -330,15 +331,15 @@ where
                 Ok(Node::Internal(internal_node)) => {
                     let visit_info = NodeVisitInfo::new(node_key, internal_node);
                     self.parent_stack.push(visit_info);
-                }
+                },
                 Ok(Node::Leaf(leaf_node)) => {
                     let ret = (leaf_node.account_key(), leaf_node.value_index().clone());
                     Self::cleanup_stack(&mut self.parent_stack);
                     return Some(Ok(ret));
-                }
+                },
                 Ok(Node::Null) => {
                     unreachable!("When tree is empty, done should be already set to true")
-                }
+                },
                 Err(err) => return Some(Err(err)),
             }
         }

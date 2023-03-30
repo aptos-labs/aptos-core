@@ -1,14 +1,16 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     smoke_test_environment::new_local_swarm_with_aptos,
     test_utils::{
         assert_balance, check_create_mint_transfer, create_and_fund_account, transfer_coins,
+        MAX_HEALTHY_WAIT_SECS,
     },
 };
-use cached_packages::aptos_stdlib;
-use forge::{NodeExt, Swarm};
+use aptos_cached_packages::aptos_stdlib;
+use aptos_forge::{NodeExt, Swarm};
 use std::time::{Duration, Instant};
 
 #[tokio::test]
@@ -64,7 +66,7 @@ async fn test_basic_restartability() {
     let validator = swarm.validators_mut().next().unwrap();
     validator.restart().await.unwrap();
     validator
-        .wait_until_healthy(Instant::now() + Duration::from_secs(10))
+        .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_HEALTHY_WAIT_SECS))
         .await
         .unwrap();
 

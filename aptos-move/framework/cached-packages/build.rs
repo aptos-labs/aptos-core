@@ -1,9 +1,8 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use framework::ReleaseTarget;
-use std::env::current_dir;
-use std::path::PathBuf;
+use aptos_framework::ReleaseTarget;
+use std::{env::current_dir, path::PathBuf};
 
 fn main() {
     // Set the below variable to skip the building step. This might be useful if the build

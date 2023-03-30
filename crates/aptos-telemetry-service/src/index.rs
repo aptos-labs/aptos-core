@@ -1,12 +1,11 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::debug;
 use crate::{
     auth,
     constants::GCP_CLOUD_TRACE_CONTEXT_HEADER,
     context::Context,
-    custom_event,
+    custom_event, debug,
     errors::ServiceError,
     log_ingest,
     metrics::SERVICE_ERROR_COUNTS,
@@ -24,7 +23,9 @@ use warp::{
     reply, Filter, Rejection, Reply,
 };
 
-pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Infallible> + Clone {
+pub fn routes(
+    context: Context,
+) -> impl Filter<Extract = (impl Reply,), Error = Infallible> + Clone {
     let v1_api_prefix = warp::path!("api" / "v1" / ..);
 
     let v1_api = v1_api_prefix.and(
@@ -34,20 +35,10 @@ pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Inf
             .or(custom_event::custom_event_ingest(context.clone()))
             .or(prometheus_push_metrics::metrics_ingest(context.clone()))
             .or(log_ingest::log_ingest(context.clone()))
-            .or(remote_config::telemetry_log_env(context.clone())),
+            .or(remote_config::telemetry_log_env(context)),
     );
 
-    let legacy_api = index_legacy(context.clone())
-        .or(auth::check_chain_access(context.clone()))
-        .or(auth::auth(context.clone()))
-        .or(custom_event::custom_event_legacy(context.clone()))
-        .or(prometheus_push_metrics::metrics_ingest_legacy(
-            context.clone(),
-        ))
-        .or(log_ingest::log_ingest_legacy(context));
-
-    legacy_api
-        .or(v1_api)
+    v1_api
         .recover(handle_rejection)
         .with(warp::trace::trace(|info| {
             let trace_id = info.request_headers()
@@ -59,26 +50,12 @@ pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Inf
         }))
 }
 
-/// TODO: Cleanup after v1 API is ramped up
-fn index_legacy(context: Context) -> BoxedFilter<(impl Reply,)> {
-    warp::path::end()
-        .and(warp::get())
-        .and(context.filter())
-        .and_then(handle_index_legacy)
-        .boxed()
-}
-
 fn index(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path::end()
         .and(warp::get())
         .and(context.filter())
         .and_then(handle_index)
         .boxed()
-}
-
-async fn handle_index_legacy(context: Context) -> anyhow::Result<impl Reply, Rejection> {
-    let resp = reply::json(&context.noise_config().public_key());
-    Ok(resp)
 }
 
 async fn handle_index(context: Context) -> anyhow::Result<impl Reply, Rejection> {

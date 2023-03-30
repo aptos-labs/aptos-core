@@ -13,16 +13,16 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-proptest = { version = "1.0.0", default-features = true, optional = true }
-proptest-derive = { version = "0.3.0", optional = true }
-serde = { version = "1.0.137", features = ["derive"] }
-serde_bytes = "0.11.6"
+proptest = { workspace = true, optional = true }
+proptest-derive = { workspace = true, optional = true }
+serde = { workspace = true }
+serde_bytes = { workspace = true }
 
 [dev-dependencies]
-bcs = { git = "https://github.com/aptos-labs/bcs", rev = "2cde3e8446c460cb17b0c1d6bac7e27e964ac169" }
-proptest = { version = "1.0.0", default-features = true }
-proptest-derive = { version = "0.3.0" }
-serde_json = "1.0.83"
+bcs = { workspace = true }
+proptest = { workspace = true }
+proptest-derive = { workspace = true }
+serde_json = { workspace = true }
 
 [features]
 fuzzing = ["proptest-derive", "proptest"]

@@ -1,24 +1,24 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::{ConfigSearchMode, DEFAULT_PROFILE};
 use crate::common::{
     types::{
         account_address_from_public_key, CliCommand, CliConfig, CliError, CliTypedResult,
-        EncodingOptions, PrivateKeyInputOptions, ProfileConfig, ProfileOptions, PromptOptions,
-        RngArgs,
+        ConfigSearchMode, EncodingOptions, PrivateKeyInputOptions, ProfileConfig, ProfileOptions,
+        PromptOptions, RngArgs, DEFAULT_PROFILE,
     },
     utils::{fund_account, prompt_yes_with_override, read_line},
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, ValidCryptoMaterialStringExt};
-use aptos_rest_client::aptos_api_types::{AptosError, AptosErrorCode};
-use aptos_rest_client::error::{AptosErrorResponse, RestError};
+use aptos_rest_client::{
+    aptos_api_types::{AptosError, AptosErrorCode},
+    error::{AptosErrorResponse, RestError},
+};
 use async_trait::async_trait;
 use clap::Parser;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use std::str::FromStr;
+use std::{collections::BTreeMap, str::FromStr};
 
 /// 1 APT (might not actually get that much, depending on the faucet)
 const NUM_DEFAULT_OCTAS: u64 = 100000000;
@@ -109,20 +109,21 @@ impl CliCommand<()> for InitTool {
                 profile_config.rest_url =
                     Some("https://fullnode.mainnet.aptoslabs.com".to_string());
                 profile_config.faucet_url = None;
-            }
+            },
             Network::Testnet => {
                 profile_config.rest_url =
                     Some("https://fullnode.testnet.aptoslabs.com".to_string());
-                profile_config.faucet_url = None;
-            }
+                profile_config.faucet_url =
+                    Some("https://faucet.testnet.aptoslabs.com".to_string());
+            },
             Network::Devnet => {
                 profile_config.rest_url = Some("https://fullnode.devnet.aptoslabs.com".to_string());
                 profile_config.faucet_url = Some("https://faucet.devnet.aptoslabs.com".to_string());
-            }
+            },
             Network::Local => {
                 profile_config.rest_url = Some("http://localhost:8080".to_string());
                 profile_config.faucet_url = Some("http://localhost:8081".to_string());
-            }
+            },
             Network::Custom => self.custom_network(&mut profile_config)?,
         }
 
@@ -192,7 +193,7 @@ impl CliCommand<()> for InitTool {
                         err
                     )));
                 }
-            }
+            },
         };
         if let Some(ref faucet_url) = profile_config.faucet_url {
             if account_exists {
@@ -202,22 +203,17 @@ impl CliCommand<()> for InitTool {
                     "Account {} doesn't exist, creating it and funding it with {} Octas",
                     address, NUM_DEFAULT_OCTAS
                 );
-                match fund_account(
+                fund_account(
                     Url::parse(faucet_url)
                         .map_err(|err| CliError::UnableToParse("rest_url", err.to_string()))?,
                     NUM_DEFAULT_OCTAS,
                     address,
                 )
-                .await
-                {
-                    Ok(_) => eprintln!("Account {} funded successfully", address),
-                    Err(err) => eprintln!("Account {} failed to be funded: {:?}", address, err),
-                };
+                .await?;
+                eprintln!("Account {} funded successfully", address);
             }
         } else if account_exists {
             eprintln!("Account {} has been already found onchain", address);
-        } else if network == Network::Testnet {
-            eprintln!("Account {} does not exist, you will need to create and fund the account through a community faucet e.g. https://aptoslabs.com/testnet-faucet, or by transferring funds from another account", address);
         } else if network == Network::Mainnet {
             eprintln!("Account {} does not exist, you will need to create and fund the account through a faucet or by transferring funds from another account", address);
         } else {
@@ -338,7 +334,7 @@ impl FromStr for Network {
                     "Invalid network {}.  Must be one of [devnet, testnet, mainnet, local, custom]",
                     str
                 )))
-            }
+            },
         })
     }
 }

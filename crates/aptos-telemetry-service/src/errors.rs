@@ -1,7 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-
-use std::fmt::{self, Debug};
 
 use aptos_crypto::noise::NoiseError;
 use aptos_rest_client::error::RestError;
@@ -11,6 +9,7 @@ use gcp_bigquery_client::{
     error::BQError,
     model::table_data_insert_all_response_insert_errors::TableDataInsertAllResponseInsertErrors,
 };
+use std::fmt::{self, Debug};
 use thiserror::Error as ThisError;
 use warp::{http::StatusCode, reject::Reject};
 
@@ -98,6 +97,8 @@ pub(crate) enum LogIngestError {
     UnexpectedContentEncoding,
     #[error("unable to ingest logs")]
     IngestionError,
+    #[error("peer id forbidden from posting logs")]
+    Forbidden(PeerId),
 }
 
 #[derive(Debug, ThisError)]
@@ -112,8 +113,6 @@ pub(crate) enum ValidatorCacheUpdateError {
     InvalidUrl,
     #[error("request error")]
     RestError(#[source] RestError),
-    #[error("chain id mismatch")]
-    ChainIdMismatch,
     #[error("both peer set empty")]
     BothPeerSetEmpty,
     #[error("validator set empty")]

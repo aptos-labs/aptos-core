@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -24,20 +25,20 @@ use crate::{
         APTOS_SCHEMADB_BATCH_PUT_LATENCY_SECONDS, APTOS_SCHEMADB_DELETES, APTOS_SCHEMADB_GET_BYTES,
         APTOS_SCHEMADB_GET_LATENCY_SECONDS, APTOS_SCHEMADB_ITER_BYTES,
         APTOS_SCHEMADB_ITER_LATENCY_SECONDS, APTOS_SCHEMADB_PUT_BYTES,
+        APTOS_SCHEMADB_SEEK_LATENCY_SECONDS,
     },
     schema::{KeyCodec, Schema, SeekKeyCodec, ValueCodec},
 };
 use anyhow::{format_err, Result};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
-use std::{collections::HashMap, iter::Iterator, path::Path};
-
 use iterator::{ScanDirection, SchemaIterator};
 /// Type alias to `rocksdb::ReadOptions`. See [`rocksdb doc`](https://github.com/pingcap/rust-rocksdb/blob/master/src/rocksdb_options.rs)
 pub use rocksdb::{
     BlockBasedOptions, Cache, ColumnFamilyDescriptor, DBCompressionType, Options, ReadOptions,
     SliceTransform, DEFAULT_COLUMN_FAMILY_NAME,
 };
+use std::{collections::HashMap, iter::Iterator, path::Path};
 
 pub type ColumnFamilyName = &'static str;
 
@@ -101,14 +102,14 @@ impl SchemaBatch {
 /// [`Schema`]s.
 #[derive(Debug)]
 pub struct DB {
-    name: &'static str, // for logging
+    name: String, // for logging
     inner: rocksdb::DB,
 }
 
 impl DB {
     pub fn open(
         path: impl AsRef<Path>,
-        name: &'static str,
+        name: &str,
         column_families: Vec<ColumnFamilyName>,
         db_opts: &rocksdb::Options,
     ) -> Result<Self> {
@@ -131,7 +132,7 @@ impl DB {
     pub fn open_cf(
         db_opts: &rocksdb::Options,
         path: impl AsRef<Path>,
-        name: &'static str,
+        name: &str,
         cfds: Vec<rocksdb::ColumnFamilyDescriptor>,
     ) -> Result<DB> {
         let inner = rocksdb::DB::open_cf_descriptors(db_opts, path, cfds)?;
@@ -144,11 +145,11 @@ impl DB {
     pub fn open_cf_readonly(
         opts: &rocksdb::Options,
         path: impl AsRef<Path>,
-        name: &'static str,
+        name: &str,
         cfs: Vec<ColumnFamilyName>,
     ) -> Result<DB> {
         let error_if_log_file_exists = false;
-        let inner = rocksdb::DB::open_cf_for_read_only(opts, path, &cfs, error_if_log_file_exists)?;
+        let inner = rocksdb::DB::open_cf_for_read_only(opts, path, cfs, error_if_log_file_exists)?;
 
         Ok(Self::log_construct(name, inner))
     }
@@ -157,16 +158,19 @@ impl DB {
         opts: &rocksdb::Options,
         primary_path: P,
         secondary_path: P,
-        name: &'static str,
+        name: &str,
         cfs: Vec<ColumnFamilyName>,
     ) -> Result<DB> {
-        let inner = rocksdb::DB::open_cf_as_secondary(opts, primary_path, secondary_path, &cfs)?;
+        let inner = rocksdb::DB::open_cf_as_secondary(opts, primary_path, secondary_path, cfs)?;
         Ok(Self::log_construct(name, inner))
     }
 
-    fn log_construct(name: &'static str, inner: rocksdb::DB) -> DB {
+    fn log_construct(name: &str, inner: rocksdb::DB) -> DB {
         info!(rocksdb_name = name, "Opened RocksDB.");
-        DB { name, inner }
+        DB {
+            name: name.to_string(),
+            inner,
+        }
     }
 
     /// Reads single record by key.
@@ -178,7 +182,7 @@ impl DB {
         let k = <S::Key as KeyCodec<S>>::encode_key(schema_key)?;
         let cf_handle = self.get_cf_handle(S::COLUMN_FAMILY_NAME)?;
 
-        let result = self.inner.get_cf(cf_handle, &k)?;
+        let result = self.inner.get_cf(cf_handle, k)?;
         APTOS_SCHEMADB_GET_BYTES
             .with_label_values(&[S::COLUMN_FAMILY_NAME])
             .observe(result.as_ref().map_or(0.0, |v| v.len() as f64));
@@ -191,7 +195,6 @@ impl DB {
     /// Writes single record.
     pub fn put<S: Schema>(&self, key: &S::Key, value: &S::Value) -> Result<()> {
         // Not necessary to use a batch, but we'd like a central place to bump counters.
-        // Used in tests only anyway.
         let batch = SchemaBatch::new();
         batch.put::<S>(key, value)?;
         self.write_schemas(batch)
@@ -222,7 +225,7 @@ impl DB {
     /// Writes a group of records wrapped in a [`SchemaBatch`].
     pub fn write_schemas(&self, batch: SchemaBatch) -> Result<()> {
         let _timer = APTOS_SCHEMADB_BATCH_COMMIT_LATENCY_SECONDS
-            .with_label_values(&[self.name])
+            .with_label_values(&[&self.name])
             .start_timer();
         let rows_locked = batch.rows.lock();
 
@@ -248,15 +251,15 @@ impl DB {
                         APTOS_SCHEMADB_PUT_BYTES
                             .with_label_values(&[cf_name])
                             .observe((key.len() + value.len()) as f64);
-                    }
+                    },
                     WriteOp::Deletion { key: _ } => {
                         APTOS_SCHEMADB_DELETES.with_label_values(&[cf_name]).inc();
-                    }
+                    },
                 }
             }
         }
         APTOS_SCHEMADB_BATCH_COMMIT_BYTES
-            .with_label_values(&[self.name])
+            .with_label_values(&[&self.name])
             .observe(serialized_size as f64);
 
         Ok(())

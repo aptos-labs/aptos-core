@@ -1,15 +1,16 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::bail;
+use aptos_framework::{
+    natives::code::{ModuleMetadata, PackageMetadata, PackageRegistry, UpgradePolicy},
+    unzip_metadata_str,
+};
 use aptos_rest_client::Client;
 use aptos_types::account_address::AccountAddress;
-use framework::natives::code::{ModuleMetadata, PackageMetadata, PackageRegistry, UpgradePolicy};
-use framework::unzip_metadata_str;
 use move_package::compilation::package_layout::CompiledPackageLayout;
 use reqwest::Url;
-use std::fs;
-use std::path::Path;
+use std::{fs, path::Path};
 
 // TODO: this is a first naive implementation of the package registry. Before mainnet
 // we need to use tables for the package registry.
@@ -133,7 +134,7 @@ impl<'a> CachedPackageMetadata<'a> {
                 true => {
                     println!("module without code: {}", module.name);
                     "".into()
-                }
+                },
                 false => unzip_metadata_str(&module.source)?,
             };
             fs::write(sources_dir.join(format!("{}.move", module.name)), source)?;

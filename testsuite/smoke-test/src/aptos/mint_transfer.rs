@@ -1,11 +1,11 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::smoke_test_environment::new_local_swarm_with_aptos;
+use aptos_cached_packages::aptos_stdlib;
 use aptos_debugger::AptosDebugger;
+use aptos_forge::Swarm;
 use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
-use cached_packages::aptos_stdlib;
-use forge::Swarm;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn test_mint_transfer() {
@@ -25,7 +25,9 @@ async fn test_mint_transfer() {
     //            test to pass.
     //            Is this caused by us increasing the default max gas amount in
     //            testsuite/forge/src/interface/aptos.rs?
-    info.mint(account1.address(), 100_000_000).await.unwrap();
+    info.mint(account1.address(), 100_000_000_000)
+        .await
+        .unwrap();
 
     let transfer_txn = account1.sign_with_transaction_builder(
         info.transaction_factory()

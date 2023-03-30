@@ -1,17 +1,8 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 #[macro_use]
 extern crate criterion;
-
-use criterion::{
-    measurement::Measurement, AxisScale, BatchSize, BenchmarkGroup, BenchmarkId, Criterion,
-    PlotConfiguration, Throughput,
-};
-use rand::{distributions, rngs::ThreadRng, thread_rng, Rng};
-
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use serde::{Deserialize, Serialize};
 
 use aptos_crypto::{
     bls12381,
@@ -20,6 +11,13 @@ use aptos_crypto::{
     traits::{Signature, SigningKey, Uniform},
     PrivateKey,
 };
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use criterion::{
+    measurement::Measurement, AxisScale, BatchSize, BenchmarkGroup, BenchmarkId, Criterion,
+    PlotConfiguration, Throughput,
+};
+use rand::{distributions, rngs::ThreadRng, thread_rng, Rng};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, CryptoHasher, BCSCryptoHash, Serialize, Deserialize)]
 struct TestAptosCrypto(String);

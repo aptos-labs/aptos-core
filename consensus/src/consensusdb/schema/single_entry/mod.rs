@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module defines physical storage schema for any single-entry data.
@@ -14,13 +15,13 @@
 
 use super::{ensure_slice_len_eq, SINGLE_ENTRY_CF_NAME};
 use anyhow::{format_err, Result};
-use byteorder::ReadBytesExt;
-use num_derive::{FromPrimitive, ToPrimitive};
-use num_traits::{FromPrimitive, ToPrimitive};
-use schemadb::{
+use aptos_schemadb::{
     define_schema,
     schema::{KeyCodec, ValueCodec},
 };
+use byteorder::ReadBytesExt;
+use num_derive::{FromPrimitive, ToPrimitive};
+use num_traits::{FromPrimitive, ToPrimitive};
 use std::mem::size_of;
 
 define_schema!(

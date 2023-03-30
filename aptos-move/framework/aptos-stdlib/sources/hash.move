@@ -21,10 +21,10 @@ module aptos_std::aptos_hash {
     // Functions
     //
 
-    /// Returns the (non-cryptographic) SipHash of `bytes`. See https://en.wikipedia.org/wiki/SipHash.
+    /// Returns the (non-cryptographic) SipHash of `bytes`. See https://en.wikipedia.org/wiki/SipHash
     native public fun sip_hash(bytes: vector<u8>): u64;
 
-    /// Returns the (non-cryptographic) SipHash of the BCS serialization of `v`. See https://en.wikipedia.org/wiki/SipHash.
+    /// Returns the (non-cryptographic) SipHash of the BCS serialization of `v`. See https://en.wikipedia.org/wiki/SipHash
     public fun sip_hash_from_value<MoveValue>(v: &MoveValue): u64 {
         let bytes = bcs::to_bytes(v);
 
@@ -65,6 +65,15 @@ module aptos_std::aptos_hash {
         ripemd160_internal(bytes)
     }
 
+    /// Returns the BLAKE2B-256 hash of `bytes`.
+    public fun blake2b_256(bytes: vector<u8>): vector<u8> {
+        if(!features::blake2b_256_enabled()) {
+            abort(std::error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE))
+        };
+
+        blake2b_256_internal(bytes)
+    }
+
     //
     // Private native functions
     //
@@ -81,6 +90,9 @@ module aptos_std::aptos_hash {
     /// WARNING: Only 80-bit security is provided by this function. This means an adversary who can compute roughly 2^80
     /// hashes will, with high probability, find a collision x_1 != x_2 such that RIPEMD-160(x_1) = RIPEMD-160(x_2).
     native fun ripemd160_internal(bytes: vector<u8>): vector<u8>;
+
+    /// Returns the BLAKE2B-256 hash of `bytes`.
+    native fun blake2b_256_internal(bytes: vector<u8>): vector<u8>;
 
     //
     // Testing
@@ -185,6 +197,53 @@ module aptos_std::aptos_hash {
             let input = *std::vector::borrow(&inputs, i);
             let hash_expected = *std::vector::borrow(&outputs, i);
             let hash = ripemd160(input);
+
+            assert!(hash_expected == hash, 1);
+
+            i = i + 1;
+        };
+    }
+
+    #[test(fx = @aptos_std)]
+    #[expected_failure(abort_code = 196609, location = Self)]
+    fun blake2b_256_aborts(fx: signer) {
+        // We disable the feature to make sure the `blake2b_256` call aborts
+        features::change_feature_flags(&fx, vector[], vector[features::get_blake2b_256_feature()]);
+
+        blake2b_256(b"This will abort");
+    }
+
+    #[test(fx = @aptos_std)]
+    fun blake2b_256_test(fx: signer) {
+        // We need to enable the feature in order for the native call to be allowed.
+        features::change_feature_flags(&fx, vector[features::get_blake2b_256_feature()], vector[]);
+        let inputs = vector[
+        b"",
+        b"testing",
+        b"testing again", // empty message doesn't yield an output on the online generator
+        ];
+
+        // From https://www.toolkitbay.com/tkb/tool/BLAKE2b_256
+        //
+        // For computing the hash of an empty string, we use the following Python3 script:
+        // ```
+        //   #!/usr/bin/python3
+        //
+        //   import hashlib
+        //
+        //   print(hashlib.blake2b(b'', digest_size=32).hexdigest());
+        // ```
+        let outputs = vector[
+        x"0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
+        x"99397ff32ae348b8b6536d5c213f343d7e9fdeaa10e8a23a9f90ab21a1658565",
+        x"1deab5a4eb7481453ca9b29e1f7c4be8ba44de4faeeafdf173b310cbaecfc84c",
+        ];
+
+        let i = 0;
+        while (i < std::vector::length(&inputs)) {
+            let input = *std::vector::borrow(&inputs, i);
+            let hash_expected = *std::vector::borrow(&outputs, i);
+            let hash = blake2b_256(input);
 
             assert!(hash_expected == hash, 1);
 

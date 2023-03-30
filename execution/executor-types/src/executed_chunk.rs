@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -6,6 +7,7 @@
 use crate::{StateComputeResult, TransactionData};
 use anyhow::{bail, ensure, Result};
 use aptos_crypto::hash::{CryptoHash, TransactionAccumulatorHasher};
+use aptos_storage_interface::ExecutedTrees;
 use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
@@ -14,7 +16,6 @@ use aptos_types::{
     transaction::{Transaction, TransactionInfo, TransactionStatus, TransactionToCommit},
 };
 use std::sync::Arc;
-use storage_interface::ExecutedTrees;
 
 #[derive(Default)]
 pub struct ExecutedChunk {
@@ -181,19 +182,12 @@ impl ExecutedChunk {
         }
     }
 
-    pub fn combine(self, rhs: Self) -> Result<Self> {
-        let mut to_commit = self.to_commit;
-        to_commit.extend(rhs.to_commit.into_iter());
-        let mut status = self.status;
-        status.extend(rhs.status.into_iter());
-
-        Ok(Self {
-            status,
-            to_commit,
-            result_view: rhs.result_view,
-            next_epoch_state: rhs.next_epoch_state,
-            ledger_info: rhs.ledger_info,
-        })
+    pub fn combine(&mut self, rhs: Self) {
+        self.to_commit.extend(rhs.to_commit.into_iter());
+        self.status.extend(rhs.status.into_iter());
+        self.result_view = rhs.result_view;
+        self.next_epoch_state = rhs.next_epoch_state;
+        self.ledger_info = rhs.ledger_info;
     }
 
     pub fn as_state_compute_result(

@@ -1,10 +1,12 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
 
 use aptos_logger::prelude::*;
 use backtrace::Backtrace;
+use move_core_types::state::{self, VMState};
 use serde::Serialize;
 use std::{
     panic::{self, PanicInfo},
@@ -43,6 +45,14 @@ fn handle_panic(panic_info: &PanicInfo<'_>) {
 
     // Wait till the logs have been flushed
     aptos_logger::flush();
+
+    // Do not kill the process if the panics happened at move-bytecode-verifier.
+    // This is safe because the `state::get_state()` uses a thread_local for storing states. Thus the state can only be mutated to VERIFIER by the thread that's running the bytecode verifier.
+    //
+    // TODO: once `can_unwind` is stable, we should assert it. See https://github.com/rust-lang/rust/issues/92988.
+    if state::get_state() == VMState::VERIFIER || state::get_state() == VMState::DESERIALIZER {
+        return;
+    }
 
     // Kill the process
     process::exit(12);

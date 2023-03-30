@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 // This is required because a diesel macro makes clippy sad
@@ -34,8 +34,10 @@ impl ProposalVote {
             for event in &user_txn.events {
                 let txn_version = user_txn.info.version.0 as i64;
                 let event_type = event.typ.to_string();
-                match StakeEvent::from_event(event_type.as_str(), &event.data, txn_version)? {
-                    Some(StakeEvent::GovernanceVoteEvent(ev)) => proposal_votes.push(Self {
+                if let Some(StakeEvent::GovernanceVoteEvent(ev)) =
+                    StakeEvent::from_event(event_type.as_str(), &event.data, txn_version)?
+                {
+                    proposal_votes.push(Self {
                         transaction_version: txn_version,
                         proposal_id: ev.proposal_id as i64,
                         voter_address: standardize_address(&ev.voter),
@@ -43,9 +45,8 @@ impl ProposalVote {
                         num_votes: ev.num_votes.clone(),
                         should_pass: ev.should_pass,
                         transaction_timestamp: parse_timestamp(user_txn.timestamp.0, txn_version),
-                    }),
-                    None => {}
-                };
+                    });
+                }
             }
         }
         Ok(proposal_votes)

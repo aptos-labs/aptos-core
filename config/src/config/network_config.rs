@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -9,6 +10,7 @@ use crate::{
 };
 use aptos_crypto::{x25519, Uniform};
 use aptos_secure_storage::{CryptoStorage, KVStorage, Storage};
+use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::{
     account_address::from_identity_public_key, network_address::NetworkAddress,
     transaction::authenticator::AuthenticationKey, PeerId,
@@ -18,20 +20,18 @@ use rand::{
     Rng, SeedableRng,
 };
 use serde::{Deserialize, Serialize};
-use short_hex_str::AsShortHexStr;
 use std::{
     collections::{HashMap, HashSet},
     convert::TryFrom,
     fmt,
     path::PathBuf,
     string::ToString,
-    time::Duration,
 };
 
 // TODO: We could possibly move these constants somewhere else, but since they are defaults for the
 //   configurations of the system, we'll leave it here for now.
 /// Current supported protocol negotiation handshake version. See
-/// [`network::protocols::wire::v1`](../../network/protocols/wire/handshake/v1/index.html).
+/// [`aptos_network::protocols::wire::v1`](../../network/protocols/wire/handshake/v1/index.html).
 pub const HANDSHAKE_VERSION: u8 = 0;
 pub const NETWORK_CHANNEL_SIZE: usize = 1024;
 pub const PING_INTERVAL_MS: u64 = 10_000;
@@ -171,11 +171,11 @@ impl NetworkConfig {
                 let key = x25519::PrivateKey::from_ed25519_private_bytes(&key.to_bytes())
                     .expect("Unable to convert key");
                 Some(key)
-            }
+            },
             Identity::FromFile(config) => {
                 let identity_blob: IdentityBlob = IdentityBlob::from_file(&config.path).unwrap();
                 Some(identity_blob.network_private_key)
-            }
+            },
             Identity::None => None,
         };
         key.expect("identity key should be present")
@@ -239,7 +239,7 @@ impl NetworkConfig {
                     .expect("Unable to read peer id")
                     .value;
                 Some(peer_id)
-            }
+            },
             Identity::FromFile(config) => {
                 let identity_blob: IdentityBlob = IdentityBlob::from_file(&config.path).unwrap();
 
@@ -251,7 +251,7 @@ impl NetworkConfig {
                         identity_blob.network_private_key.public_key(),
                     ))
                 }
-            }
+            },
             Identity::None => None,
         }
         .expect("peer id should be present")
@@ -263,17 +263,14 @@ impl NetworkConfig {
             Identity::None => {
                 let mut rng = StdRng::from_seed(OsRng.gen());
                 let key = x25519::PrivateKey::generate(&mut rng);
-                let peer_id =
-                    aptos_types::account_address::from_identity_public_key(key.public_key());
+                let peer_id = from_identity_public_key(key.public_key());
                 self.identity = Identity::from_config(key, peer_id);
-            }
+            },
             Identity::FromConfig(config) => {
-                let peer_id =
-                    aptos_types::account_address::from_identity_public_key(config.key.public_key());
                 if config.peer_id == PeerId::ZERO {
-                    config.peer_id = peer_id;
+                    config.peer_id = from_identity_public_key(config.key.public_key());
                 }
-            }
+            },
             Identity::FromFile(_) => (),
         };
     }
@@ -331,15 +328,63 @@ impl NetworkConfig {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct PeerMonitoringServiceConfig {
+    pub enable_peer_monitoring_client: bool, // Whether or not to spawn the monitoring client
+    pub latency_monitoring: LatencyMonitoringConfig,
     pub max_concurrent_requests: u64, // Max num of concurrent server tasks
     pub max_network_channel_size: u64, // Max num of pending network messages
+    pub max_request_jitter_ms: u64, // Max amount of jitter (ms) that a request will be delayed for
+    pub metadata_update_interval_ms: u64, // The interval (ms) between metadata updates
+    pub network_monitoring: NetworkMonitoringConfig,
+    pub peer_monitor_interval_ms: u64, // The interval (ms) between peer monitor executions
 }
 
 impl Default for PeerMonitoringServiceConfig {
     fn default() -> Self {
         Self {
+            enable_peer_monitoring_client: false,
+            latency_monitoring: LatencyMonitoringConfig::default(),
             max_concurrent_requests: 1000,
             max_network_channel_size: 1000,
+            max_request_jitter_ms: 1000, // Monitoring requests are very infrequent
+            metadata_update_interval_ms: 5000,
+            network_monitoring: NetworkMonitoringConfig::default(),
+            peer_monitor_interval_ms: 1000,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct LatencyMonitoringConfig {
+    pub latency_ping_interval_ms: u64, // The interval (ms) between latency pings for each peer
+    pub latency_ping_timeout_ms: u64,  // The timeout (ms) for each latency ping
+    pub max_latency_ping_failures: u64, // Max ping failures before the peer connection fails
+    pub max_num_latency_pings_to_retain: usize, // The max latency pings to retain per peer
+}
+
+impl Default for LatencyMonitoringConfig {
+    fn default() -> Self {
+        Self {
+            latency_ping_interval_ms: 30_000, // 30 seconds
+            latency_ping_timeout_ms: 20_000,  // 20 seconds
+            max_latency_ping_failures: 3,
+            max_num_latency_pings_to_retain: 10,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct NetworkMonitoringConfig {
+    pub network_info_request_interval_ms: u64, // The interval (ms) between network info requests
+    pub network_info_request_timeout_ms: u64,  // The timeout (ms) for each network info request
+}
+
+impl Default for NetworkMonitoringConfig {
+    fn default() -> Self {
+        Self {
+            network_info_request_interval_ms: 60_000, // 1 minute
+            network_info_request_timeout_ms: 10_000,  // 10 seconds
         }
     }
 }
@@ -348,8 +393,23 @@ impl Default for PeerMonitoringServiceConfig {
 #[serde(rename_all = "snake_case")]
 pub enum DiscoveryMethod {
     Onchain,
-    File(PathBuf, Duration),
+    File(FileDiscovery),
+    Rest(RestDiscovery),
     None,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub struct FileDiscovery {
+    pub path: PathBuf,
+    pub interval_secs: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub struct RestDiscovery {
+    pub url: url::Url,
+    pub interval_secs: u64,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -455,6 +515,14 @@ pub enum PeerRole {
 }
 
 impl PeerRole {
+    pub fn is_validator(self) -> bool {
+        self == PeerRole::Validator
+    }
+
+    pub fn is_vfn(self) -> bool {
+        self == PeerRole::ValidatorFullNode
+    }
+
     pub fn as_str(self) -> &'static str {
         match self {
             PeerRole::Validator => "validator",

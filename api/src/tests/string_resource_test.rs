@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use super::new_test_context;
@@ -7,7 +8,6 @@ use aptos_api_types::Address;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_sdk::types::LocalAccount;
 use serde_json::json;
-
 use std::convert::TryInto;
 
 #[tokio::test]
@@ -15,7 +15,7 @@ use std::convert::TryInto;
 async fn test_renders_move_acsii_string_into_utf8_string() {
     let mut context = new_test_context(current_function_name!());
     let mut account = init_test_account();
-    let txn = context.create_user_account(&account);
+    let txn = context.create_user_account(&account).await;
     context.commit_block(&vec![txn]).await;
 
     // module 0x87342d91af60c3a883a2812c9294c2f8::Message {
@@ -38,7 +38,6 @@ async fn test_renders_move_acsii_string_into_utf8_string() {
     context
         .api_execute_entry_function(
             &mut account,
-            "Message",
             "set_message",
             json!([]),
             json!([hex::encode(b"hello world")]),
@@ -47,7 +46,7 @@ async fn test_renders_move_acsii_string_into_utf8_string() {
 
     let message = context
         .api_get_account_resource(
-            &account,
+            account.address(),
             &account.address().to_hex_literal(),
             "Message",
             "MessageHolder",

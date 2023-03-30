@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! How and where to record the Serde format of interesting Aptos types.
@@ -57,7 +58,7 @@ impl Corpus {
             Ok(registry) => registry,
             Err(error) => {
                 panic!("{}:{}", error, error.explanation());
-            }
+            },
         }
     }
 

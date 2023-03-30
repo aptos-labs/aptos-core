@@ -1,12 +1,9 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics::increment_log_ingest_too_large_by;
-use crate::sender::TelemetrySender;
-use aptos_logger::prelude::*;
-use aptos_logger::telemetry_log_writer::TelemetryLog;
-use futures::channel::mpsc;
-use futures::StreamExt;
+use crate::{metrics::increment_log_ingest_too_large_by, sender::TelemetrySender};
+use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog};
+use futures::{channel::mpsc, StreamExt};
 use std::time::Duration;
 use tokio::time::interval;
 use tokio_stream::wrappers::IntervalStream;
@@ -61,11 +58,11 @@ impl TelemetryLogSender {
                 if let Some(batch) = self.add_to_batch(log) {
                     self.sender.try_send_logs(batch).await;
                 }
-            }
+            },
             TelemetryLog::Flush(tx) => {
                 self.flush_batch().await;
                 let _ = tx.send(());
-            }
+            },
         }
     }
 
@@ -95,15 +92,21 @@ impl TelemetryLogSender {
 
 #[cfg(test)]
 mod tests {
-    use crate::sender::TelemetrySender;
-    use crate::telemetry_log_sender::{TelemetryLogSender, MAX_BYTES};
+    use crate::{
+        sender::TelemetrySender,
+        telemetry_log_sender::{TelemetryLogSender, MAX_BYTES},
+    };
     use aptos_config::config::NodeConfig;
     use aptos_types::chain_id::ChainId;
+    use reqwest::Url;
 
     #[tokio::test]
     async fn test_add_to_batch() {
-        let telemetry_sender =
-            TelemetrySender::new("test".to_string(), ChainId::test(), &NodeConfig::default());
+        let telemetry_sender = TelemetrySender::new(
+            Url::parse("https://telemetry.svc").expect("unable to parse url"),
+            ChainId::test(),
+            &NodeConfig::default(),
+        );
         let mut sender = TelemetryLogSender::new(telemetry_sender);
 
         for _i in 0..2 {
@@ -121,12 +124,10 @@ mod tests {
 
             // Create batch that reaches max bytes
             let bytes_per_string = 11;
-            let num_strings = (MAX_BYTES + 1) / bytes_per_string
-                + if (MAX_BYTES + 1) % bytes_per_string == 0 {
-                    0
-                } else {
-                    1
-                };
+            let mut num_strings = (MAX_BYTES + 1) / bytes_per_string;
+            if (MAX_BYTES + 1) % bytes_per_string != 0 {
+                num_strings += 1;
+            }
             let to_send: Vec<_> = (0..num_strings).map(|i| format!("{:11}", i)).collect();
             to_send.iter().enumerate().for_each(|(i, s)| {
                 // Large batch should not be allowed

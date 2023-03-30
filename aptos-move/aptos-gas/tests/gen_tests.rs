@@ -1,8 +1,8 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_gas::gen::{generate_update_proposal, GenArgs};
-use framework::{BuildOptions, BuiltPackage};
 
 #[test]
 fn can_generate_and_build_update_proposal() {

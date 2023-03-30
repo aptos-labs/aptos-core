@@ -12,7 +12,7 @@ The original intent behind this tool is to confirm operators are running quality
 ## Local development
 Run a local network with both a validator and VFNs:
 ```
-cargo run -p forge-cli -- --suite "run_forever" --num-validators 4 --num-validator-fullnodes 2 --mempool-backlog 5000 test local-swarm
+cargo run -p aptos-forge-cli -- --suite "run_forever" --num-validators 4 --num-validator-fullnodes 2 --mempool-backlog 5000 test local-swarm
 ```
 
 Run local NHC:

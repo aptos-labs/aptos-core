@@ -1,23 +1,26 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::OptionalPoolAddressArgs;
-use crate::common::utils::{create_dir_if_not_exist, current_dir, dir_default_to_current};
-use crate::genesis::git::{LAYOUT_FILE, OPERATOR_FILE, OWNER_FILE};
-use crate::governance::CompileScriptFunction;
 use crate::{
     common::{
-        types::{CliError, CliTypedResult, PromptOptions, RngArgs},
-        utils::{check_if_file_exists, read_from_file, write_to_user_only_file},
+        types::{CliError, CliTypedResult, OptionalPoolAddressArgs, PromptOptions, RngArgs},
+        utils::{
+            check_if_file_exists, create_dir_if_not_exist, current_dir, dir_default_to_current,
+            read_from_file, write_to_user_only_file,
+        },
     },
-    genesis::git::{from_yaml, to_yaml, GitOptions},
+    genesis::git::{from_yaml, to_yaml, GitOptions, LAYOUT_FILE, OPERATOR_FILE, OWNER_FILE},
+    governance::CompileScriptFunction,
     CliCommand,
 };
-use aptos_genesis::config::{Layout, OperatorConfiguration, OwnerConfiguration};
-use aptos_genesis::keys::PublicIdentity;
-use aptos_genesis::{config::HostAndPort, keys::generate_key_objects};
-use aptos_types::account_address::AccountAddress;
-use aptos_types::transaction::{Script, Transaction, WriteSetPayload};
+use aptos_genesis::{
+    config::{HostAndPort, Layout, OperatorConfiguration, OwnerConfiguration},
+    keys::{generate_key_objects, PublicIdentity},
+};
+use aptos_types::{
+    account_address::AccountAddress,
+    transaction::{Script, Transaction, WriteSetPayload},
+};
 use async_trait::async_trait;
 use clap::Parser;
 use std::path::{Path, PathBuf};
@@ -27,8 +30,9 @@ pub const PUBLIC_KEYS_FILE: &str = "public-keys.yaml";
 const VALIDATOR_FILE: &str = "validator-identity.yaml";
 const VFN_FILE: &str = "validator-full-node-identity.yaml";
 
-/// Generate account key, consensus key, and network key for a validator
+/// Generate keys for a new validator
 ///
+/// Generates account key, consensus key, and network key for a validator
 /// These keys are used for running a validator or operator in a network
 #[derive(Parser)]
 pub struct GenerateKeys {
@@ -100,7 +104,10 @@ impl CliCommand<Vec<PathBuf>> for GenerateKeys {
     }
 }
 
-/// Set validator configuration for a single validator in the git repository
+/// Set validator configuration for a single validator
+///
+/// This will set the validator configuration for a single validator in the git repository.
+/// It will have to be run for each validator expected at genesis.
 #[derive(Parser)]
 pub struct SetValidatorConfiguration {
     /// Name of the validator
@@ -259,7 +266,7 @@ pub fn read_public_identity_file(public_identity_file: &Path) -> CliTypedResult<
     from_yaml(&String::from_utf8(bytes).map_err(CliError::from)?)
 }
 
-/// Generate a Layout template file with empty values
+/// Generate a Layout template file
 ///
 /// This will generate a layout template file for genesis with some default values.  To start a
 /// new chain, these defaults should be carefully thought through and chosen.
@@ -291,7 +298,7 @@ impl CliCommand<()> for GenerateLayoutTemplate {
     }
 }
 
-/// Generate a WriteSet genesis compiled from a script file.
+/// Generate a WriteSet genesis
 ///
 /// This will compile a Move script and generate a writeset from that script.
 #[derive(Parser)]

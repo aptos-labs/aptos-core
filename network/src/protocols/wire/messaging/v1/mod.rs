@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module defines the AptosNet v1 message types, how they are
@@ -208,9 +209,9 @@ impl<TReadSocket: AsyncRead + Unpin> Stream for MultiplexMessageStream<TReadSock
                         frame.truncate(8);
                         let err = ReadError::DeserializeError(err, frame_len, frame);
                         Poll::Ready(Some(Err(err)))
-                    }
+                    },
                 }
-            }
+            },
             Poll::Ready(Some(Err(err))) => Poll::Ready(Some(Err(ReadError::IoError(err)))),
             Poll::Ready(None) => Poll::Ready(None),
             Poll::Pending => Poll::Pending,

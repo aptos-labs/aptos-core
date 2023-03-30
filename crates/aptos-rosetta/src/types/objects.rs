@@ -1,41 +1,44 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! Objects of the Rosetta spec
 //!
 //! [Spec](https://www.rosetta-api.org/docs/api_objects.html)
 
-use crate::common::native_coin_tag;
-use crate::construction::{parse_set_operator_operation, parse_set_voter_operation};
-use crate::types::move_types::*;
 use crate::{
-    common::{is_native_coin, native_coin},
+    common::{is_native_coin, native_coin, native_coin_tag},
+    construction::{
+        parse_create_stake_pool_operation, parse_distribute_staking_rewards_operation,
+        parse_reset_lockup_operation, parse_set_operator_operation, parse_set_voter_operation,
+        parse_unlock_stake_operation,
+    },
     error::ApiResult,
     types::{
-        AccountIdentifier, BlockIdentifier, Error, OperationIdentifier, OperationStatus,
-        OperationStatusType, OperationType, TransactionIdentifier,
+        move_types::*, AccountIdentifier, BlockIdentifier, Error, OperationIdentifier,
+        OperationStatus, OperationStatusType, OperationType, TransactionIdentifier,
     },
     ApiError, RosettaContext,
 };
 use anyhow::anyhow;
+use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{ed25519::Ed25519PublicKey, ValidCryptoMaterialStringExt};
 use aptos_logger::warn;
-use aptos_rest_client::aptos_api_types::TransactionOnChainData;
-use aptos_rest_client::aptos_api_types::U64;
-use aptos_types::account_config::{AccountResource, CoinStoreResource, WithdrawEvent};
-use aptos_types::contract_event::ContractEvent;
-use aptos_types::stake_pool::{SetOperatorEvent, StakePool};
-use aptos_types::state_store::state_key::StateKey;
-use aptos_types::transaction::{EntryFunction, TransactionPayload};
-use aptos_types::write_set::{WriteOp, WriteSet};
-use aptos_types::{account_address::AccountAddress, event::EventKey};
-use cached_packages::aptos_stdlib;
+use aptos_rest_client::aptos_api_types::{TransactionOnChainData, U64};
+use aptos_types::{
+    account_address::AccountAddress,
+    account_config::{AccountResource, CoinStoreResource, WithdrawEvent},
+    contract_event::ContractEvent,
+    event::EventKey,
+    stake_pool::{SetOperatorEvent, StakePool},
+    state_store::state_key::{StateKey, StateKeyInner},
+    transaction::{EntryFunction, TransactionPayload},
+    write_set::{WriteOp, WriteSet},
+};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use std::cmp::Ordering;
-use std::collections::BTreeMap;
 use std::{
-    collections::HashMap,
+    cmp::Ordering,
+    collections::{BTreeMap, HashMap},
     convert::TryFrom,
     fmt::{Display, Formatter},
     hash::Hash,
@@ -195,7 +198,6 @@ impl Operation {
         }
     }
 
-    /// TODO: This is experimental and should not be used outside of testing
     pub fn create_stake_pool(
         operation_index: u64,
         status: Option<OperationStatusType>,
@@ -203,6 +205,7 @@ impl Operation {
         operator: Option<AccountAddress>,
         voter: Option<AccountAddress>,
         staked_balance: Option<u64>,
+        commission_percentage: Option<u64>,
     ) -> Operation {
         Operation::new(
             OperationType::InitializeStakePool,
@@ -214,6 +217,7 @@ impl Operation {
                 operator.map(AccountIdentifier::base_account),
                 voter.map(AccountIdentifier::base_account),
                 staked_balance,
+                commission_percentage,
             )),
         )
     }
@@ -351,6 +355,58 @@ impl Operation {
             Some(OperationMetadata::set_voter(operator, new_voter)),
         )
     }
+
+    pub fn reset_lockup(
+        operation_index: u64,
+        status: Option<OperationStatusType>,
+        owner: AccountAddress,
+        operator: Option<AccountIdentifier>,
+    ) -> Operation {
+        Operation::new(
+            OperationType::ResetLockup,
+            operation_index,
+            status,
+            AccountIdentifier::base_account(owner),
+            None,
+            Some(OperationMetadata::reset_lockup(operator)),
+        )
+    }
+
+    pub fn unlock_stake(
+        operation_index: u64,
+        status: Option<OperationStatusType>,
+        owner: AccountAddress,
+        operator: Option<AccountIdentifier>,
+        amount: Option<u64>,
+    ) -> Operation {
+        Operation::new(
+            OperationType::UnlockStake,
+            operation_index,
+            status,
+            AccountIdentifier::base_account(owner),
+            None,
+            Some(OperationMetadata::unlock_stake(operator, amount)),
+        )
+    }
+
+    pub fn distribute_staking_rewards(
+        operation_index: u64,
+        status: Option<OperationStatusType>,
+        account: AccountAddress,
+        operator: AccountIdentifier,
+        staker: AccountIdentifier,
+    ) -> Operation {
+        Operation::new(
+            OperationType::DistributeStakingRewards,
+            operation_index,
+            status,
+            AccountIdentifier::base_account(account),
+            None,
+            Some(OperationMetadata::distribute_staking_rewards(
+                operator, staker,
+            )),
+        )
+    }
 }
 
 impl std::cmp::PartialOrd for Operation {
@@ -373,7 +429,7 @@ impl std::cmp::Ord for Operation {
                         .cmp(&other.operation_identifier.index),
                     order => order,
                 }
-            }
+            },
             (Some(_), None) => Ordering::Less,
             (None, Some(_)) => Ordering::Greater,
             (None, None) => Ordering::Equal,
@@ -397,6 +453,12 @@ pub struct OperationMetadata {
     pub new_voter: Option<AccountIdentifier>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub staked_balance: Option<U64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub commission_percentage: Option<U64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub amount: Option<U64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub staker: Option<AccountIdentifier>,
 }
 
 impl OperationMetadata {
@@ -432,11 +494,39 @@ impl OperationMetadata {
         new_operator: Option<AccountIdentifier>,
         new_voter: Option<AccountIdentifier>,
         staked_balance: Option<u64>,
+        commission_percentage: Option<u64>,
     ) -> Self {
         OperationMetadata {
             new_operator,
             new_voter,
             staked_balance: staked_balance.map(U64::from),
+            commission_percentage: commission_percentage.map(U64::from),
+            ..Default::default()
+        }
+    }
+
+    pub fn reset_lockup(operator: Option<AccountIdentifier>) -> Self {
+        OperationMetadata {
+            operator,
+            ..Default::default()
+        }
+    }
+
+    pub fn unlock_stake(operator: Option<AccountIdentifier>, amount: Option<u64>) -> Self {
+        OperationMetadata {
+            operator,
+            amount: amount.map(U64::from),
+            ..Default::default()
+        }
+    }
+
+    pub fn distribute_staking_rewards(
+        operator: AccountIdentifier,
+        staker: AccountIdentifier,
+    ) -> Self {
+        OperationMetadata {
+            operator: Some(operator),
+            staker: Some(staker),
             ..Default::default()
         }
     }
@@ -566,7 +656,7 @@ impl Transaction {
         let (txn_type, maybe_user_txn, txn_info, events) = match &txn.transaction {
             UserTransaction(user_txn) => {
                 (TransactionType::User, Some(user_txn), txn.info, txn.events)
-            }
+            },
             GenesisTransaction(_) => (TransactionType::Genesis, None, txn.info, txn.events),
             BlockMetadata(_) => (TransactionType::BlockMetadata, None, txn.info, txn.events),
             StateCheckpoint(_) => (TransactionType::StateCheckpoint, None, txn.info, vec![]),
@@ -669,12 +759,12 @@ fn parse_failed_operations_from_txn_payload(
                         )
                     }
                 }
-            }
+            },
             (AccountAddress::ONE, APTOS_ACCOUNT_MODULE, TRANSFER_FUNCTION) => {
                 // We could add a create here as well, but we don't know if it will actually happen
                 operations =
                     parse_transfer_from_txn_payload(inner, native_coin(), sender, operation_index)
-            }
+            },
             (AccountAddress::ONE, ACCOUNT_MODULE, CREATE_ACCOUNT_FUNCTION) => {
                 if let Some(Ok(address)) = inner
                     .args()
@@ -690,7 +780,7 @@ fn parse_failed_operations_from_txn_payload(
                 } else {
                     warn!("Failed to parse create account {:?}", inner);
                 }
-            }
+            },
             (
                 AccountAddress::ONE,
                 STAKING_CONTRACT_MODULE,
@@ -699,27 +789,73 @@ fn parse_failed_operations_from_txn_payload(
                 if let Ok(mut ops) =
                     parse_set_operator_operation(sender, inner.ty_args(), inner.args())
                 {
-                    let mut operation = ops.remove(0);
-                    operation.status = Some(OperationStatusType::Failure.to_string());
-                    operations.push(operation);
+                    if let Some(operation) = ops.get_mut(0) {
+                        operation.status = Some(OperationStatusType::Failure.to_string());
+                    }
                 } else {
                     warn!("Failed to parse set operator {:?}", inner);
                 }
-            }
+            },
             (AccountAddress::ONE, STAKING_CONTRACT_MODULE, UPDATE_VOTER_FUNCTION) => {
                 if let Ok(mut ops) =
                     parse_set_voter_operation(sender, inner.ty_args(), inner.args())
                 {
-                    let mut operation = ops.remove(0);
-                    operation.status = Some(OperationStatusType::Failure.to_string());
-                    operations.push(operation);
+                    if let Some(operation) = ops.get_mut(0) {
+                        operation.status = Some(OperationStatusType::Failure.to_string());
+                    }
                 } else {
                     warn!("Failed to parse set voter {:?}", inner);
                 }
-            }
+            },
+            (AccountAddress::ONE, STAKING_CONTRACT_MODULE, RESET_LOCKUP_FUNCTION) => {
+                if let Ok(mut ops) =
+                    parse_reset_lockup_operation(sender, inner.ty_args(), inner.args())
+                {
+                    if let Some(operation) = ops.get_mut(0) {
+                        operation.status = Some(OperationStatusType::Failure.to_string());
+                    }
+                } else {
+                    warn!("Failed to parse reset lockup {:?}", inner);
+                }
+            },
+            (AccountAddress::ONE, STAKING_CONTRACT_MODULE, CREATE_STAKING_CONTRACT_FUNCTION) => {
+                if let Ok(mut ops) =
+                    parse_create_stake_pool_operation(sender, inner.ty_args(), inner.args())
+                {
+                    if let Some(operation) = ops.get_mut(0) {
+                        operation.status = Some(OperationStatusType::Failure.to_string());
+                    }
+                } else {
+                    warn!("Failed to parse create staking pool {:?}", inner);
+                }
+            },
+            (AccountAddress::ONE, STAKING_CONTRACT_MODULE, UNLOCK_STAKE_FUNCTION) => {
+                if let Ok(mut ops) =
+                    parse_unlock_stake_operation(sender, inner.ty_args(), inner.args())
+                {
+                    if let Some(operation) = ops.get_mut(0) {
+                        operation.status = Some(OperationStatusType::Failure.to_string());
+                    }
+                } else {
+                    warn!("Failed to parse unlock stake {:?}", inner);
+                }
+            },
+            (AccountAddress::ONE, STAKING_CONTRACT_MODULE, DISTRIBUTE_STAKING_REWARDS_FUNCTION) => {
+                if let Ok(mut ops) = parse_distribute_staking_rewards_operation(
+                    sender,
+                    inner.ty_args(),
+                    inner.args(),
+                ) {
+                    if let Some(operation) = ops.get_mut(0) {
+                        operation.status = Some(OperationStatusType::Failure.to_string());
+                    }
+                } else {
+                    warn!("Failed to parse distribute staking rewards {:?}", inner);
+                }
+            },
             _ => {
                 // If we don't recognize the transaction payload, then we can't parse operations
-            }
+            },
         }
     }
     operations
@@ -779,24 +915,23 @@ async fn parse_operations_from_write_set(
     operation_index: u64,
     changes: &WriteSet,
 ) -> ApiResult<Vec<Operation>> {
-    let (struct_tag, address) = match state_key {
-        StateKey::AccessPath(path) => {
+    let (struct_tag, address) = match state_key.inner() {
+        StateKeyInner::AccessPath(path) => {
             if let Some(struct_tag) = path.get_struct_tag() {
                 (struct_tag, path.address)
             } else {
                 return Ok(vec![]);
             }
-        }
+        },
         _ => {
             // Ignore all but access path
             return Ok(vec![]);
-        }
+        },
     };
 
-    let data = match write_op {
-        WriteOp::Creation(inner) => inner,
-        WriteOp::Modification(inner) => inner,
-        WriteOp::Deletion => return Ok(vec![]),
+    let data = match write_op.bytes() {
+        Some(bytes) => bytes,
+        None => return Ok(vec![]),
     };
 
     // Determine operation
@@ -808,7 +943,7 @@ async fn parse_operations_from_write_set(
     ) {
         (AccountAddress::ONE, ACCOUNT_MODULE, ACCOUNT_RESOURCE, 0) => {
             parse_account_resource_changes(version, address, data, maybe_sender, operation_index)
-        }
+        },
         (AccountAddress::ONE, STAKE_MODULE, STAKE_POOL_RESOURCE, 0) => {
             parse_stake_pool_resource_changes(
                 server_context,
@@ -818,11 +953,11 @@ async fn parse_operations_from_write_set(
                 events,
                 operation_index,
             )
-        }
+        },
         (AccountAddress::ONE, STAKING_CONTRACT_MODULE, STORE_RESOURCE, 0) => {
             parse_staking_contract_resource_changes(address, data, events, operation_index, changes)
                 .await
-        }
+        },
         (AccountAddress::ONE, COIN_MODULE, COIN_STORE_RESOURCE, 1) => {
             if let Some(type_tag) = struct_tag.type_params.first() {
                 // TODO: This will need to be updated to support more coins
@@ -846,11 +981,11 @@ async fn parse_operations_from_write_set(
                 );
                 Ok(vec![])
             }
-        }
+        },
         _ => {
             // Any unknown type will just skip the operations
             Ok(vec![])
-        }
+        },
     }
 }
 
@@ -1106,14 +1241,10 @@ async fn parse_staking_contract_resource_changes(
         let stake_pools: BTreeMap<AccountAddress, StakePool> = changes
             .iter()
             .filter_map(|(state_key, write_op)| {
-                let data = match write_op {
-                    WriteOp::Creation(data) => Some(data),
-                    WriteOp::Modification(data) => Some(data),
-                    WriteOp::Deletion => None,
-                };
+                let data = write_op.bytes();
 
                 let mut ret = None;
-                if let (StateKey::AccessPath(path), Some(data)) = (state_key, data) {
+                if let (StateKeyInner::AccessPath(path), Some(data)) = (state_key.inner(), data) {
                     if let Some(struct_tag) = path.get_struct_tag() {
                         if let (AccountAddress::ONE, STAKE_MODULE, STAKE_POOL_RESOURCE) = (
                             struct_tag.address,
@@ -1212,6 +1343,34 @@ async fn parse_staking_contract_resource_changes(
                 inner.staked_balance = Some(total_stake.into())
             }
             operations.push(operation);
+        }
+
+        // Handle distribute events, there are no events on the stake pool
+        let distribute_staking_rewards_events =
+            filter_events(events, store.distribute_events.key(), |event_key, event| {
+                if let Ok(event) = bcs::from_bytes::<DistributeEvent>(event.event_data()) {
+                    Some(event)
+                } else {
+                    // If we can't parse the withdraw event, then there's nothing
+                    warn!(
+                        "Failed to parse distribute event!  Skipping for {}:{}",
+                        event_key.get_creator_address(),
+                        event_key.get_creation_number()
+                    );
+                    None
+                }
+            });
+
+        // For every distribute events, add staking reward operation
+        for event in distribute_staking_rewards_events {
+            operations.push(Operation::staking_reward(
+                operation_index,
+                Some(OperationStatusType::Success),
+                AccountIdentifier::base_account(event.recipient),
+                native_coin(),
+                event.amount,
+            ));
+            operation_index += 1;
         }
     }
 
@@ -1313,6 +1472,9 @@ pub enum InternalOperation {
     SetOperator(SetOperator),
     SetVoter(SetVoter),
     InitializeStakePool(InitializeStakePool),
+    ResetLockup(ResetLockup),
+    UnlockStake(UnlockStake),
+    DistributeStakingRewards(DistributeStakingRewards),
 }
 
 impl InternalOperation {
@@ -1328,6 +1490,7 @@ impl InternalOperation {
                                     new_operator,
                                     new_voter,
                                     staked_balance,
+                                    commission_percentage,
                                     ..
                                 }),
                                 Some(account),
@@ -1350,11 +1513,13 @@ impl InternalOperation {
                                     operator: operator_address,
                                     voter: voter_address,
                                     amount: staked_balance.map(u64::from).unwrap_or_default(),
-                                    commission_percentage: 0,
+                                    commission_percentage: commission_percentage
+                                        .map(u64::from)
+                                        .unwrap_or_default(),
                                     seed: vec![],
                                 }));
                             }
-                        }
+                        },
                         Ok(OperationType::CreateAccount) => {
                             if let (
                                 Some(OperationMetadata {
@@ -1369,7 +1534,7 @@ impl InternalOperation {
                                     new_account: account.account_address()?,
                                 }));
                             }
-                        }
+                        },
                         Ok(OperationType::SetOperator) => {
                             if let (
                                 Some(OperationMetadata {
@@ -1392,7 +1557,7 @@ impl InternalOperation {
                                     new_operator: new_operator.account_address()?,
                                 }));
                             }
-                        }
+                        },
                         Ok(OperationType::SetVoter) => {
                             if let (
                                 Some(OperationMetadata {
@@ -1414,8 +1579,66 @@ impl InternalOperation {
                                     new_voter: new_voter.account_address()?,
                                 }));
                             }
-                        }
-                        _ => {}
+                        },
+                        Ok(OperationType::ResetLockup) => {
+                            if let (Some(OperationMetadata { operator, .. }), Some(account)) =
+                                (&operation.metadata, &operation.account)
+                            {
+                                let operator = if let Some(operator) = operator {
+                                    operator.account_address()?
+                                } else {
+                                    return Err(ApiError::InvalidInput(Some(
+                                        "Reset lockup missing operator field".to_string(),
+                                    )));
+                                };
+                                return Ok(Self::ResetLockup(ResetLockup {
+                                    owner: account.account_address()?,
+                                    operator,
+                                }));
+                            }
+                        },
+                        Ok(OperationType::UnlockStake) => {
+                            if let (
+                                Some(OperationMetadata {
+                                    operator, amount, ..
+                                }),
+                                Some(account),
+                            ) = (&operation.metadata, &operation.account)
+                            {
+                                let operator = if let Some(operator) = operator {
+                                    operator.account_address()?
+                                } else {
+                                    return Err(ApiError::InvalidInput(Some(
+                                        "Unlock Stake missing operator field".to_string(),
+                                    )));
+                                };
+                                return Ok(Self::UnlockStake(UnlockStake {
+                                    owner: account.account_address()?,
+                                    operator,
+                                    amount: amount.map(u64::from).unwrap_or_default(),
+                                }));
+                            }
+                        },
+                        Ok(OperationType::DistributeStakingRewards) => {
+                            if let (
+                                Some(OperationMetadata {
+                                    operator: Some(operator),
+                                    staker: Some(staker),
+                                    ..
+                                }),
+                                Some(account),
+                            ) = (&operation.metadata, &operation.account)
+                            {
+                                return Ok(Self::DistributeStakingRewards(
+                                    DistributeStakingRewards {
+                                        sender: account.account_address()?,
+                                        operator: operator.account_address()?,
+                                        staker: staker.account_address()?,
+                                    },
+                                ));
+                            }
+                        },
+                        _ => {},
                     }
                 }
 
@@ -1424,7 +1647,7 @@ impl InternalOperation {
                     "Unrecognized single operation {:?}",
                     operations
                 ))))
-            }
+            },
             2 => Ok(Self::Transfer(Transfer::extract_transfer(operations)?)),
             _ => Err(ApiError::InvalidOperations(Some(format!(
                 "Unrecognized operation combination {:?}",
@@ -1441,6 +1664,9 @@ impl InternalOperation {
             Self::SetOperator(inner) => inner.owner,
             Self::SetVoter(inner) => inner.owner,
             Self::InitializeStakePool(inner) => inner.owner,
+            Self::ResetLockup(inner) => inner.owner,
+            Self::UnlockStake(inner) => inner.owner,
+            Self::DistributeStakingRewards(inner) => inner.sender,
         }
     }
 
@@ -1458,7 +1684,7 @@ impl InternalOperation {
                     aptos_stdlib::aptos_account_transfer(transfer.receiver, transfer.amount.0),
                     transfer.sender,
                 )
-            }
+            },
             InternalOperation::SetOperator(set_operator) => {
                 if set_operator.old_operator.is_none() {
                     return Err(ApiError::InvalidInput(Some(
@@ -1472,7 +1698,7 @@ impl InternalOperation {
                     ),
                     set_operator.owner,
                 )
-            }
+            },
             InternalOperation::SetVoter(set_voter) => {
                 if set_voter.operator.is_none() {
                     return Err(ApiError::InvalidInput(Some(
@@ -1486,7 +1712,7 @@ impl InternalOperation {
                     ),
                     set_voter.owner,
                 )
-            }
+            },
             InternalOperation::InitializeStakePool(init_stake_pool) => (
                 aptos_stdlib::staking_contract_create_staking_contract(
                     init_stake_pool.operator,
@@ -1496,6 +1722,24 @@ impl InternalOperation {
                     init_stake_pool.seed.clone(),
                 ),
                 init_stake_pool.owner,
+            ),
+            InternalOperation::ResetLockup(reset_lockup) => (
+                aptos_stdlib::staking_contract_reset_lockup(reset_lockup.operator),
+                reset_lockup.owner,
+            ),
+            InternalOperation::UnlockStake(unlock_stake) => (
+                aptos_stdlib::staking_contract_unlock_stake(
+                    unlock_stake.operator,
+                    unlock_stake.amount,
+                ),
+                unlock_stake.owner,
+            ),
+            InternalOperation::DistributeStakingRewards(distribute_staking_rewards) => (
+                aptos_stdlib::staking_contract_distribute(
+                    distribute_staking_rewards.staker,
+                    distribute_staking_rewards.operator,
+                ),
+                distribute_staking_rewards.sender,
             ),
         })
     }
@@ -1648,4 +1892,24 @@ pub struct InitializeStakePool {
     pub amount: u64,
     pub commission_percentage: u64,
     pub seed: Vec<u8>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ResetLockup {
+    pub owner: AccountAddress,
+    pub operator: AccountAddress,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct UnlockStake {
+    pub owner: AccountAddress,
+    pub operator: AccountAddress,
+    pub amount: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct DistributeStakingRewards {
+    pub sender: AccountAddress,
+    pub operator: AccountAddress,
+    pub staker: AccountAddress,
 }

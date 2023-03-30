@@ -1,9 +1,9 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 /* eslint-disable @typescript-eslint/naming-convention */
-import { Serializer, Deserializer, Seq, deserializeVector, serializeVector } from "../bcs";
 import { AccountAddress } from "./account_address";
+import { Serializer, Deserializer, Seq, deserializeVector, serializeVector } from "../bcs";
 import { Ed25519PublicKey, Ed25519Signature } from "./ed25519";
 import { MultiEd25519PublicKey, MultiEd25519Signature } from "./multi_ed25519";
 

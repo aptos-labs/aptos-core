@@ -6,7 +6,41 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
-N/A
+- Introduce `AnsClient` class to support ANS (Aptos Names Service) data fetching queries
+
+## 1.7.2 (2023-03-13)
+
+- `CoinClient` and `TokenClient` to use remote ABI instead of local ABIs
+- Reorganize SDK files structure for a better readability and maintainability
+- Add `getIndexerLedgerInfo` query to `IndexerClient`
+
+## 1.7.1 (2023-03-02)
+
+- Fix IndexerClient error parsing using JSON.stringify() to display the error message correctly on the console
+
+## 1.7.0 (2023-03-01)
+
+- Add Indexer support. We introduce a new class `IndexerClient` that queries our Indexer to support data shaping fetching and providing users with a seamless experience.
+- Introduces a `Provider` class we can initialize and query our blockchain by hiding the underlying implementation (fullnode vs indexer)
+
+## 1.6.0 (2023-01-20)
+
+- Add support to Move view functions
+
+## 1.5.0 (2023-01-05)
+
+- Export classes from property_map_serde
+- User can specify token string property type using "string", "String" or "0x1::string::String" to serde the string token property on-chain
+- Use `getAccountResource` to replace `getAccountResources` in `CoinClient#checkBalance`, which can reduce network load.
+
+## 1.4.0 (2022-11-30)
+
+- Add missing fields to TokenData class
+- Add PropertyMap and PropertyValue type to match on-chain data
+- Support token property map deseralizer to read the property map in the original data format.
+- Allow `checkBalance` in `CoinClient` to take in a `MaybeHexString` as well as `AptosAccount`, since users might want to check the balance of accounts they don't own (which is generally how you use `AptosAccount`).
+- Similar to `checkBalance`, allow `transfer` in `CoinClient` to take in a `MaybeHexString` for the `receiver` argument.
+- Add a new `createReceiverIfMissing` argument to `transfer` in `CoinClient`. If set, the `0x1::aptos_account::transfer` function will be called instead of `0x1::coin::transfer`, which will create the account on chain if it doesn't exist instead of failing.
 
 ## 1.3.17 (2022-11-08)
 

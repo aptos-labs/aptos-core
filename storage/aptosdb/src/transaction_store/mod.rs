@@ -1,28 +1,28 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! This file defines transaction store APIs that are related to committed signed transactions.
 
-use crate::transaction_accumulator::TransactionAccumulatorSchema;
-use crate::utils::iterators::AccountTransactionVersionIter;
-use crate::utils::iterators::ExpectContinuousVersions;
 use crate::{
     errors::AptosDbError,
     schema::{
         transaction::TransactionSchema, transaction_by_account::TransactionByAccountSchema,
         transaction_by_hash::TransactionByHashSchema, write_set::WriteSetSchema,
     },
+    transaction_accumulator::TransactionAccumulatorSchema,
     transaction_info::TransactionInfoSchema,
+    utils::iterators::{AccountTransactionVersionIter, ExpectContinuousVersions},
 };
 use anyhow::{ensure, format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
 use aptos_types::{
     account_address::AccountAddress,
     proof::position::Position,
     transaction::{Transaction, Version},
     write_set::WriteSet,
 };
-use schemadb::{ReadOptions, SchemaBatch, DB};
 use std::sync::Arc;
 
 #[cfg(test)]
@@ -130,9 +130,9 @@ impl TransactionStore {
         &self,
         version: Version,
         transaction: &Transaction,
-        batch: &mut SchemaBatch,
+        batch: &SchemaBatch,
     ) -> Result<()> {
-        if let Transaction::UserTransaction(txn) = transaction {
+        if let Some(txn) = transaction.try_as_signed_user_txn() {
             batch.put::<TransactionByAccountSchema>(
                 &(txn.sender(), txn.sequence_number()),
                 &version,
@@ -195,7 +195,7 @@ impl TransactionStore {
         &self,
         version: Version,
         write_set: &WriteSet,
-        batch: &mut SchemaBatch,
+        batch: &SchemaBatch,
     ) -> Result<()> {
         batch.put::<WriteSetSchema>(&version, write_set)
     }
@@ -204,7 +204,7 @@ impl TransactionStore {
     pub fn prune_transaction_by_hash(
         &self,
         transactions: &[Transaction],
-        db_batch: &mut SchemaBatch,
+        db_batch: &SchemaBatch,
     ) -> Result<()> {
         for transaction in transactions {
             db_batch.delete::<TransactionByHashSchema>(&transaction.hash())?;
@@ -216,10 +216,10 @@ impl TransactionStore {
     pub fn prune_transaction_by_account(
         &self,
         transactions: &[Transaction],
-        db_batch: &mut SchemaBatch,
+        db_batch: &SchemaBatch,
     ) -> Result<()> {
         for transaction in transactions {
-            if let Transaction::UserTransaction(txn) = transaction {
+            if let Some(txn) = transaction.try_as_signed_user_txn() {
                 db_batch
                     .delete::<TransactionByAccountSchema>(&(txn.sender(), txn.sequence_number()))?;
             }
@@ -232,7 +232,7 @@ impl TransactionStore {
         &self,
         begin: Version,
         end: Version,
-        db_batch: &mut SchemaBatch,
+        db_batch: &SchemaBatch,
     ) -> Result<()> {
         for version in begin..end {
             db_batch.delete::<TransactionSchema>(&version)?;
@@ -245,7 +245,7 @@ impl TransactionStore {
         &self,
         begin: Version,
         end: Version,
-        db_batch: &mut SchemaBatch,
+        db_batch: &SchemaBatch,
     ) -> Result<()> {
         for version in begin..end {
             db_batch.delete::<TransactionInfoSchema>(&version)?;
@@ -267,7 +267,7 @@ impl TransactionStore {
         &self,
         begin: Version,
         end: Version,
-        db_batch: &mut SchemaBatch,
+        db_batch: &SchemaBatch,
     ) -> Result<()> {
         for version_to_delete in begin..end {
             // The even version will be pruned in the iteration of version + 1.
@@ -317,7 +317,7 @@ impl TransactionStore {
         &self,
         begin: Version,
         end: Version,
-        db_batch: &mut SchemaBatch,
+        db_batch: &SchemaBatch,
     ) -> Result<()> {
         for version in begin..end {
             db_batch.delete::<WriteSetSchema>(&version)?;

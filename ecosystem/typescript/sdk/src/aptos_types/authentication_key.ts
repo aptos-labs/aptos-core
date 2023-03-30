@@ -1,8 +1,8 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 import { sha3_256 as sha3Hash } from "@noble/hashes/sha3";
-import { HexString } from "../hex_string";
+import { HexString } from "../utils";
 import { Bytes } from "../bcs";
 import { MultiEd25519PublicKey } from "./multi_ed25519";
 import { Ed25519PublicKey } from "./ed25519";
@@ -10,7 +10,7 @@ import { Ed25519PublicKey } from "./ed25519";
 /**
  * Each account stores an authentication key. Authentication key enables account owners to rotate
  * their private key(s) associated with the account without changing the address that hosts their account.
- * @see {@link * https://aptos.dev/basics/basics-accounts | Account Basics}
+ * @see {@link * https://aptos.dev/concepts/accounts | Account Basics}
  *
  * Account addresses can be derived from AuthenticationKey
  */

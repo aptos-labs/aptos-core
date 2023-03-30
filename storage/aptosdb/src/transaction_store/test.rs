@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
@@ -30,9 +31,9 @@ proptest! {
         let txns = init_store(universe, gens, store);
 
         // write sets
-        let mut batch = SchemaBatch::new();
+        let batch = SchemaBatch::new();
         for (ver, ws) in write_sets.iter().enumerate() {
-            store.put_write_set(ver as Version, ws, &mut batch).unwrap();
+            store.put_write_set(ver as Version, ws, &batch).unwrap();
         }
         store.db.write_schemas(batch).unwrap();
         assert_eq!(store.get_write_sets(0, write_sets.len() as Version).unwrap(), write_sets);
@@ -41,7 +42,7 @@ proptest! {
         for (ver, (txn, write_set)) in itertools::zip_eq(txns.iter(), write_sets.iter()).enumerate() {
             prop_assert_eq!(store.get_transaction(ver as Version).unwrap(), txn.clone());
             let user_txn = txn
-                .as_signed_user_txn()
+                .try_as_signed_user_txn()
                 .expect("All should be user transactions here.");
             prop_assert_eq!(
                 store
@@ -106,7 +107,7 @@ proptest! {
                 actual,
                 txns
                     .into_iter()
-                    .take(total_num_txns as usize - 1)
+                    .take(total_num_txns - 1)
                     .collect::<Vec<_>>()
             );
         }
@@ -133,7 +134,7 @@ proptest! {
         let txns = txns
             .iter()
             .enumerate()
-            .map(|(version, txn)| (version as u64, txn.as_signed_user_txn().unwrap()))
+            .map(|(version, txn)| (version as u64, txn.try_as_signed_user_txn().unwrap()))
             .collect::<Vec<_>>();
 
         // can we just get all the account transaction versions individually
@@ -212,11 +213,9 @@ fn init_store(
 
     assert!(store.get_transaction(0).is_err());
 
-    let mut batch = SchemaBatch::new();
+    let batch = SchemaBatch::new();
     for (ver, txn) in txns.iter().enumerate() {
-        store
-            .put_transaction(ver as Version, txn, &mut batch)
-            .unwrap();
+        store.put_transaction(ver as Version, txn, &batch).unwrap();
     }
     store.db.write_schemas(batch).unwrap();
 

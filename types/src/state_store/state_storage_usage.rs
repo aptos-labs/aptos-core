@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use serde::{Deserialize, Serialize};
@@ -49,7 +49,7 @@ impl StateStorageUsage {
             } => {
                 *items += 1;
                 *bytes += bytes_delta;
-            }
+            },
             Self::Untracked => (),
         }
     }
@@ -62,7 +62,7 @@ impl StateStorageUsage {
             } => {
                 *items -= 1;
                 *bytes -= bytes_delta;
-            }
+            },
             Self::Untracked => (),
         }
     }

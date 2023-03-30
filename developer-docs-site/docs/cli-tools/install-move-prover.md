@@ -1,11 +1,14 @@
 ---
-title: "Installing Move Prover"
+title: "Install the Move Prover"
 id: "install-move-prover"
 ---
 
-# (Optional) Install the Move Prover
+# Install the Move Prover to Validate Code
 
 If you want to use the [Move Prover](https://github.com/move-language/move/blob/main/language/move-prover/doc/user/prover-guide.md) to validate your Move code, install the Move Prover dependencies after [installing the CLI binary](aptos-cli-tool/install-aptos-cli.md).
+
+For some sweet examples, see:
+https://github.com/Zellic/move-prover-examples
 
 :::tip
 Currently, Windows is not supported by the Move Prover.
@@ -36,7 +39,7 @@ These instructions have been tested on macOS Monterey (12.6)
     ```bash
     aptos move prove --package-dir aptos-move/move-examples/hello_prover/
     ```
-   
+
 </details>
 
 <details>
@@ -44,7 +47,7 @@ These instructions have been tested on macOS Monterey (12.6)
 
 ### Linux
 
-:::tip 
+:::tip
 Some Linux distributions are not supported. Currently, OpenSUSE and Amazon Linux do not support the automatic installation via the `dev_setup.sh` script.
 :::
 

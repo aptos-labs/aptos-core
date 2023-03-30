@@ -13,6 +13,5 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-aptos-config = { path = "../../config" }
-
-rocksdb = { version = "0.19.0", default-features = false, features = ["lz4"] }
+aptos-config = { workspace = true }
+rocksdb = { workspace = true }

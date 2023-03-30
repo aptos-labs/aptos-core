@@ -1,12 +1,13 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! DO NOT USE OUTSIDE OF SMOKE_TEST CRATE
 //!
 //! This utility is to only be used inside of smoke test.
 
+use aptos_forge::cargo_build_common_args;
 use aptos_logger::prelude::*;
-use forge::cargo_build_common_args;
 use once_cell::sync::Lazy;
 use std::{env, path::PathBuf, process::Command};
 

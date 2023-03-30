@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! In order to use a type with poem-openapi, it must implement a certain set
@@ -17,7 +17,7 @@
 //!     values) or enums (variants without values).
 //!   - We would prefer to serialize the data differently than its standard
 //!     representation. HexEncodedBytes is a good example of this. Internally,
-//!     this is a Vec<u8>, but we know it is hex and prefer to represent it as
+//!     this is a `Vec<u8>`, but we know it is hex and prefer to represent it as
 //!     a 0x string.
 //!
 //! For those cases, we have these macros. We can use these to implement the
@@ -56,7 +56,7 @@
 ///
 /// To see what different metadata you can apply to the generated type in the
 /// spec, take a look at MetaSchema here:
-/// https://github.com/poem-web/poem/blob/master/poem-openapi/src/registry/mod.rs
+/// <https://github.com/poem-web/poem/blob/master/poem-openapi/src/registry/mod.rs>
 #[macro_export]
 macro_rules! impl_poem_type {
     ($ty:ty, $spec_type:literal, ($($key:ident = $value:expr),*)) => {
@@ -140,7 +140,7 @@ macro_rules! impl_poem_type {
 }
 
 /// This macro implements the traits necessary for using a type as a parameter
-/// in a poem-openapi endpoint handler, specifically as an argument like Path<T>.
+/// in a poem-openapi endpoint handler, specifically as an argument like `Path<T>`.
 /// A type must impl FromStr for this to work, hence why it is a seperate macro.
 #[macro_export]
 macro_rules! impl_poem_parameter {

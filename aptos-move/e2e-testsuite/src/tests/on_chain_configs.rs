@@ -1,12 +1,13 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_cached_packages::aptos_stdlib;
+use aptos_language_e2e_tests::{common_transactions::peer_to_peer_txn, executor::FakeExecutor};
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS, on_chain_config::Version, transaction::TransactionStatus,
 };
 use aptos_vm::AptosVM;
-use cached_packages::aptos_stdlib;
-use language_e2e_tests::{common_transactions::peer_to_peer_txn, executor::FakeExecutor};
 
 #[test]
 fn initial_aptos_version() {
@@ -26,12 +27,9 @@ fn initial_aptos_version() {
     executor.execute_and_apply(txn);
 
     let new_vm = AptosVM::new(executor.get_state_view());
-    assert_eq!(
-        new_vm.internals().version().unwrap(),
-        Version {
-            major: version.major + 1
-        }
-    );
+    assert_eq!(new_vm.internals().version().unwrap(), Version {
+        major: version.major + 1
+    });
 }
 
 #[test]

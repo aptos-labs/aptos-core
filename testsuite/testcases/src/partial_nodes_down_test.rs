@@ -1,8 +1,9 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::generate_traffic;
-use forge::{NetworkContext, NetworkTest, Result, Test};
+use aptos_forge::{NetworkContext, NetworkTest, Result, Test};
 use std::thread;
 use tokio::{runtime::Runtime, time::Duration};
 
@@ -33,12 +34,7 @@ impl NetworkTest for PartialNodesDown {
         thread::sleep(Duration::from_secs(5));
 
         // Generate some traffic
-        let txn_stat = generate_traffic(
-            ctx,
-            &up_nodes,
-            duration,
-            aptos_global_constants::GAS_UNIT_PRICE,
-        )?;
+        let txn_stat = generate_traffic(ctx, &up_nodes, duration)?;
         ctx.report
             .report_txn_stats(self.name().to_string(), &txn_stat, duration);
         for n in &down_nodes {

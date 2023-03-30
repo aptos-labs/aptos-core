@@ -211,55 +211,55 @@ module aptos_framework::staking_config {
     }
 
     #[test(account = @0x123)]
-    #[expected_failure(abort_code = 0x50003)]
+    #[expected_failure(abort_code = 0x50003, location = aptos_framework::system_addresses)]
     public entry fun test_update_required_stake_unauthorized_should_fail(account: signer) acquires StakingConfig {
         update_required_stake(&account, 1, 2);
     }
 
     #[test(account = @0x123)]
-    #[expected_failure(abort_code = 0x50003)]
+    #[expected_failure(abort_code = 0x50003, location = aptos_framework::system_addresses)]
     public entry fun test_update_required_lockup_unauthorized_should_fail(account: signer) acquires StakingConfig {
         update_recurring_lockup_duration_secs(&account, 1);
     }
 
     #[test(account = @0x123)]
-    #[expected_failure(abort_code = 0x50003)]
+    #[expected_failure(abort_code = 0x50003, location = aptos_framework::system_addresses)]
     public entry fun test_update_rewards_unauthorized_should_fail(account: signer) acquires StakingConfig {
         update_rewards_rate(&account, 1, 10);
     }
 
     #[test(account = @0x123)]
-    #[expected_failure(abort_code = 0x50003)]
+    #[expected_failure(abort_code = 0x50003, location = aptos_framework::system_addresses)]
     public entry fun test_update_voting_power_increase_limit_unauthorized_should_fail(account: signer) acquires StakingConfig {
         update_voting_power_increase_limit(&account, 10);
     }
 
     #[test(aptos_framework = @aptos_framework)]
-    #[expected_failure(abort_code = 0x10003)]
+    #[expected_failure(abort_code = 0x10003, location = Self)]
     public entry fun test_update_required_stake_invalid_range_should_fail(aptos_framework: signer) acquires StakingConfig {
         update_required_stake(&aptos_framework, 10, 5);
     }
 
     #[test(aptos_framework = @aptos_framework)]
-    #[expected_failure(abort_code = 0x10003)]
+    #[expected_failure(abort_code = 0x10003, location = Self)]
     public entry fun test_update_required_stake_zero_max_stake_should_fail(aptos_framework: signer) acquires StakingConfig {
         update_required_stake(&aptos_framework, 0, 0);
     }
 
     #[test(aptos_framework = @aptos_framework)]
-    #[expected_failure(abort_code = 0x10001)]
+    #[expected_failure(abort_code = 0x10001, location = Self)]
     public entry fun test_update_required_lockup_to_zero_should_fail(aptos_framework: signer) acquires StakingConfig {
         update_recurring_lockup_duration_secs(&aptos_framework, 0);
     }
 
     #[test(aptos_framework = @aptos_framework)]
-    #[expected_failure(abort_code = 0x10002)]
+    #[expected_failure(abort_code = 0x10002, location = Self)]
     public entry fun test_update_rewards_invalid_denominator_should_fail(aptos_framework: signer) acquires StakingConfig {
         update_rewards_rate(&aptos_framework, 1, 0);
     }
 
     #[test(aptos_framework = @aptos_framework)]
-    #[expected_failure(abort_code = 0x10004)]
+    #[expected_failure(abort_code = 0x10004, location = Self)]
     public entry fun test_update_voting_power_increase_limit_to_zero_should_fail(
         aptos_framework: signer
     ) acquires StakingConfig {
@@ -267,7 +267,7 @@ module aptos_framework::staking_config {
     }
 
     #[test(aptos_framework = @aptos_framework)]
-    #[expected_failure(abort_code = 0x10004)]
+    #[expected_failure(abort_code = 0x10004, location = aptos_framework::staking_config)]
     public entry fun test_update_voting_power_increase_limit_to_more_than_upper_bound_should_fail(
         aptos_framework: signer
     ) acquires StakingConfig {

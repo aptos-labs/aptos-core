@@ -1,10 +1,17 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use serde::{Deserialize, Serialize};
 
 // The maximum message size per state sync message
-pub const MAX_MESSAGE_SIZE: usize = 4 * 1024 * 1024; /* 4 MiB */
+const MAX_MESSAGE_SIZE: usize = 4 * 1024 * 1024; /* 4 MiB */
+
+// The maximum chunk sizes for data client requests and response
+const MAX_EPOCH_CHUNK_SIZE: u64 = 200;
+const MAX_STATE_CHUNK_SIZE: u64 = 4000;
+const MAX_TRANSACTION_CHUNK_SIZE: u64 = 2000;
+const MAX_TRANSACTION_OUTPUT_CHUNK_SIZE: u64 = 1000;
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -22,6 +29,7 @@ pub enum BootstrappingMode {
     ApplyTransactionOutputsFromGenesis, // Applies transaction outputs (starting at genesis)
     DownloadLatestStates, // Downloads the state keys and values (at the latest version)
     ExecuteTransactionsFromGenesis, // Executes transactions (starting at genesis)
+    ExecuteOrApplyFromGenesis, // Executes transactions or applies outputs from genesis (whichever is faster)
 }
 
 impl BootstrappingMode {
@@ -29,11 +37,12 @@ impl BootstrappingMode {
         match self {
             BootstrappingMode::ApplyTransactionOutputsFromGenesis => {
                 "apply_transaction_outputs_from_genesis"
-            }
+            },
             BootstrappingMode::DownloadLatestStates => "download_latest_states",
             BootstrappingMode::ExecuteTransactionsFromGenesis => {
                 "execute_transactions_from_genesis"
-            }
+            },
+            BootstrappingMode::ExecuteOrApplyFromGenesis => "execute_or_apply_from_genesis",
         }
     }
 }
@@ -45,6 +54,7 @@ impl BootstrappingMode {
 pub enum ContinuousSyncingMode {
     ApplyTransactionOutputs, // Applies transaction outputs to stay up-to-date
     ExecuteTransactions,     // Executes transactions to stay up-to-date
+    ExecuteTransactionsOrApplyOutputs, // Executes transactions or applies outputs to stay up-to-date (whichever is faster)
 }
 
 impl ContinuousSyncingMode {
@@ -52,6 +62,9 @@ impl ContinuousSyncingMode {
         match self {
             ContinuousSyncingMode::ApplyTransactionOutputs => "apply_transaction_outputs",
             ContinuousSyncingMode::ExecuteTransactions => "execute_transactions",
+            ContinuousSyncingMode::ExecuteTransactionsOrApplyOutputs => {
+                "execute_transactions_or_apply_outputs"
+            },
         }
     }
 }
@@ -62,8 +75,10 @@ pub struct StateSyncDriverConfig {
     pub bootstrapping_mode: BootstrappingMode, // The mode by which to bootstrap
     pub commit_notification_timeout_ms: u64, // The max time taken to process a commit notification
     pub continuous_syncing_mode: ContinuousSyncingMode, // The mode by which to sync after bootstrapping
+    pub enable_auto_bootstrapping: bool, // Enable auto-bootstrapping if no peers are found after `max_connection_deadline_secs`
+    pub fallback_to_output_syncing_secs: u64, // The duration to fallback to output syncing after an execution failure
     pub progress_check_interval_ms: u64, // The interval (ms) at which to check state sync progress
-    pub max_connection_deadline_secs: u64, // The max time (secs) to wait for connections from peers
+    pub max_connection_deadline_secs: u64, // The max time (secs) to wait for connections from peers before auto-bootstrapping
     pub max_consecutive_stream_notifications: u64, // The max number of notifications to process per driver loop
     pub max_num_stream_timeouts: u64, // The max number of stream timeouts allowed before termination
     pub max_pending_data_chunks: u64, // The max number of data chunks pending execution or commit
@@ -76,13 +91,15 @@ pub struct StateSyncDriverConfig {
 impl Default for StateSyncDriverConfig {
     fn default() -> Self {
         Self {
-            bootstrapping_mode: BootstrappingMode::ExecuteTransactionsFromGenesis,
+            bootstrapping_mode: BootstrappingMode::ApplyTransactionOutputsFromGenesis,
             commit_notification_timeout_ms: 5000,
-            continuous_syncing_mode: ContinuousSyncingMode::ExecuteTransactions,
+            continuous_syncing_mode: ContinuousSyncingMode::ApplyTransactionOutputs,
+            enable_auto_bootstrapping: false,
+            fallback_to_output_syncing_secs: 180, // 3 minutes
             progress_check_interval_ms: 100,
             max_connection_deadline_secs: 10,
             max_consecutive_stream_notifications: 10,
-            max_num_stream_timeouts: 6,
+            max_num_stream_timeouts: 12,
             max_pending_data_chunks: 100,
             max_stream_wait_time_ms: 5000,
             num_versions_to_skip_snapshot_sync: 100_000_000, // At 5k TPS, this allows a node to fail for about 6 hours.
@@ -109,14 +126,14 @@ impl Default for StorageServiceConfig {
     fn default() -> Self {
         Self {
             max_concurrent_requests: 4000,
-            max_epoch_chunk_size: 100,
+            max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
             max_lru_cache_size: 500, // At ~0.6MiB per chunk, this should take no more than 0.5GiB
             max_network_channel_size: 4000,
             max_network_chunk_bytes: MAX_MESSAGE_SIZE as u64,
-            max_state_chunk_size: 2000,
+            max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
             max_subscription_period_ms: 5000,
-            max_transaction_chunk_size: 2000,
-            max_transaction_output_chunk_size: 2000,
+            max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
+            max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
             storage_summary_refresh_interval_ms: 50,
         }
     }
@@ -168,19 +185,33 @@ impl Default for DataStreamingServiceConfig {
 #[derive(Copy, Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct AptosDataClientConfig {
+    pub max_epoch_chunk_size: u64, // Max num of epoch ending ledger infos per chunk
     pub max_num_in_flight_priority_polls: u64, // Max num of in-flight polls for priority peers
-    pub max_num_in_flight_regular_polls: u64,  // Max num of in-flight polls for regular peers
-    pub response_timeout_ms: u64, // Timeout (in milliseconds) when waiting for a response
-    pub summary_poll_interval_ms: u64, // Interval (in milliseconds) between data summary polls
-    pub use_compression: bool,    // Whether or not to request compression for incoming data
+    pub max_num_in_flight_regular_polls: u64, // Max num of in-flight polls for regular peers
+    pub max_num_output_reductions: u64, // The max num of output reductions before transactions are returned
+    pub max_response_timeout_ms: u64, // Max timeout (in ms) when waiting for a response (after exponential increases)
+    pub max_state_chunk_size: u64,    // Max num of state keys and values per chunk
+    pub max_transaction_chunk_size: u64, // Max num of transactions per chunk
+    pub max_transaction_output_chunk_size: u64, // Max num of transaction outputs per chunk
+    pub response_timeout_ms: u64,     // First timeout (in ms) when waiting for a response
+    pub subscription_timeout_ms: u64, // Timeout (in ms) when waiting for a subscription response
+    pub summary_poll_interval_ms: u64, // Interval (in ms) between data summary polls
+    pub use_compression: bool,        // Whether or not to request compression for incoming data
 }
 
 impl Default for AptosDataClientConfig {
     fn default() -> Self {
         Self {
+            max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
             max_num_in_flight_priority_polls: 10,
             max_num_in_flight_regular_polls: 10,
-            response_timeout_ms: 20000, // 20 seconds
+            max_num_output_reductions: 0,
+            max_response_timeout_ms: 60000, // 60 seconds
+            max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
+            max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
+            max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
+            response_timeout_ms: 10000,    // 10 seconds
+            subscription_timeout_ms: 5000, // 5 seconds
             summary_poll_interval_ms: 200,
             use_compression: true,
         }

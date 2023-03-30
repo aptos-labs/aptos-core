@@ -1,13 +1,13 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::load_account_arg;
-use crate::move_tool::CachedPackageRegistry;
-use framework::UPGRADE_POLICY_CUSTOM_FIELD;
+use crate::{common::types::load_account_arg, move_tool::CachedPackageRegistry};
+use aptos_framework::UPGRADE_POLICY_CUSTOM_FIELD;
 use futures::executor::block_on;
-use move_package::compilation::package_layout::CompiledPackageLayout;
-use move_package::package_hooks::PackageHooks;
-use move_package::source_package::parsed_manifest::CustomDepInfo;
+use move_package::{
+    compilation::package_layout::CompiledPackageLayout, package_hooks::PackageHooks,
+    source_package::parsed_manifest::CustomDepInfo,
+};
 use move_symbol_pool::Symbol;
 use reqwest::Url;
 

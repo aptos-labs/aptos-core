@@ -10,11 +10,13 @@
     "deploy": "docusaurus deploy",
     "clear": "docusaurus clear",
     "serve": "docusaurus serve",
+    "spellcheck": "./scripts/spellcheck.sh",
     "write-translations": "docusaurus write-translations",
     "write-heading-ids": "docusaurus write-heading-ids",
     "typecheck": "tsc",
     "fmt": "prettier --write '**/*.(tsx|ts|js)'",
-    "lint": "pnpm install --frozen-lockfile --silent && prettier --check '**/*.(tsx|ts|js)'"
+    "lint": "pnpm install --frozen-lockfile --silent && prettier --check '**/*.(tsx|ts|js)'",
+    "contributors": "scripts/contributors.js"
   },
   "dependencies": {
     "@algolia/client-search": "^4.14.2",
@@ -24,6 +26,7 @@
     "@docusaurus/plugin-google-gtag": "2.1.0",
     "@docusaurus/preset-classic": "2.1.0",
     "@docusaurus/theme-classic": "^2.2.0",
+    "@docusaurus/theme-common": "^2.2.0",
     "@docusaurus/types": "^2.2.0",
     "@mdx-js/react": "1.6.22",
     "@stoplight/elements": "^7.7.3",
@@ -41,6 +44,7 @@
     "react-dom": "17.0.2",
     "rehype-katex": "5",
     "remark-math": "3",
+    "shelljs": "^0.8.5",
     "stream": "^0.0.2",
     "unist-util-visit": "4.1.0",
     "unist-util-visit-children": "2.0.0",

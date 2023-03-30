@@ -1,5 +1,5 @@
 [package]
-name = "short-hex-str"
+name = "aptos-short-hex-str"
 description = "Short hex string encoding"
 version = "0.1.0"
 
@@ -13,11 +13,11 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-mirai-annotations = "1.12.0"
-serde = { version = "1.0.137", default-features = false }
-static_assertions = "1.1.0"
-thiserror = "1.0.31"
+mirai-annotations = { workspace = true }
+serde = { workspace = true }
+static_assertions = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
-hex = "0.4.3"
-proptest = "1.0.0"
+hex = { workspace = true }
+proptest = { workspace = true }

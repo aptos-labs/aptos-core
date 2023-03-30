@@ -1,24 +1,23 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{env, io::Write, time::Duration};
-
-use crate::{constants::GCP_CLOUD_RUN_INSTANCE_ID_ENV, debug, error};
+use crate::{
+    clients::victoria_metrics_api,
+    constants::{
+        GCP_CLOUD_RUN_INSTANCE_ID_ENV, GCP_CLOUD_RUN_REVISION_ENV, GCP_CLOUD_RUN_SERVICE_ENV,
+        GCP_SERVICE_PROJECT_ID_ENV,
+    },
+    debug, error,
+};
 use anyhow::anyhow;
 use aptos_metrics_core::{
     register_histogram_vec, register_int_counter_vec, HistogramVec, IntCounterVec,
 };
 use flate2::{write::GzEncoder, Compression};
 use once_cell::sync::Lazy;
+use std::{env, io::Write, time::Duration};
 use tokio::time::{self, Instant};
 use warp::hyper::body::Bytes;
-
-use crate::{
-    clients::victoria_metrics_api,
-    constants::{
-        GCP_CLOUD_RUN_REVISION_ENV, GCP_CLOUD_RUN_SERVICE_ENV, GCP_SERVICE_PROJECT_ID_ENV,
-    },
-};
 
 const METRICS_EXPORT_FREQUENCY: Duration = Duration::from_secs(15);
 
@@ -160,13 +159,13 @@ impl PrometheusExporter {
                         res.error_for_status().err().unwrap()
                     ));
                 }
-            }
+            },
             Err(err) => {
                 METRICS_EXPORT_DURATION
                     .with_label_values(&["Unknown"])
                     .observe(start_timer.elapsed().as_millis() as f64);
                 return Err(anyhow!("error sending remote write request: {}", err));
-            }
+            },
         }
 
         Ok(())

@@ -1,16 +1,17 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{FullNode, HealthCheckError, LocalVersion, Node, NodeExt, Validator, Version};
 use anyhow::{anyhow, ensure, Context, Result};
 use aptos_config::{config::NodeConfig, keys::ConfigKey};
+use aptos_db::{LEDGER_DB_NAME, STATE_MERKLE_DB_NAME};
 use aptos_logger::{debug, info};
 use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
     types::{account_address::AccountAddress, PeerId},
 };
-use aptosdb::{LEDGER_DB_NAME, STATE_MERKLE_DB_NAME};
-use state_sync_driver::metadata_storage::STATE_SYNC_DB_NAME;
+use aptos_state_sync_driver::metadata_storage::STATE_SYNC_DB_NAME;
 use std::{
     env,
     fs::{self, OpenOptions},
@@ -29,13 +30,13 @@ impl Drop for Process {
         // check if the process has already been terminated
         match self.0.try_wait() {
             // The child process has already terminated, perhaps due to a crash
-            Ok(Some(_)) => {}
+            Ok(Some(_)) => {},
 
             // The process is still running so we need to attempt to kill it
             _ => {
                 self.0.kill().expect("Process wasn't running");
                 self.0.wait().unwrap();
-            }
+            },
         }
     }
 }
@@ -129,10 +130,11 @@ impl LocalNode {
 
         // We print out the commands and PIDs for debugging of local swarms
         info!(
-            "Started node {} (PID: {}) with command: {:?}",
+            "Started node {} (PID: {}) with command: {:?}, log_path: {:?}",
             self.name,
             process.id(),
-            node_command
+            node_command,
+            self.log_path(),
         );
 
         // We print out the API endpoints of each node for local debugging
@@ -195,15 +197,15 @@ impl LocalNode {
                 Ok(Some(status)) => {
                     let error = format!("Node '{}' crashed with: {}", self.name, status);
                     return Err(HealthCheckError::NotRunning(error));
-                }
+                },
 
                 // This is the case where the node is still running
-                Ok(None) => {}
+                Ok(None) => {},
 
                 // Some other unknown error
                 Err(e) => {
                     return Err(HealthCheckError::Unknown(e.into()));
-                }
+                },
             }
         } else {
             let error = format!("Node '{}' is stopped", self.name);
@@ -282,7 +284,7 @@ impl Node for LocalNode {
         let node_config = self.config();
         let ledger_db_path = node_config.storage.dir().join(LEDGER_DB_NAME);
         let state_db_path = node_config.storage.dir().join(STATE_MERKLE_DB_NAME);
-        let secure_storage_path = node_config.base.data_dir.join("secure_storage.json");
+        let secure_storage_path = node_config.working_dir().join("secure_storage.json");
         let state_sync_db_path = node_config.storage.dir().join(STATE_SYNC_DB_NAME);
 
         debug!(

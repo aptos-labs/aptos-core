@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, Result};
@@ -11,7 +11,7 @@ use prometheus::{
 /// package will not have much use for it in regular operations. However, when
 /// implementing custom Collectors, it is useful as a throw-away metric that is
 /// generated on the fly to send it to Prometheus in the Collect method.
-/// Reference: https://github.com/prometheus/client_golang/blob/main/prometheus/value.go#L106
+/// Reference: <https://github.com/prometheus/client_golang/blob/main/prometheus/value.go#L106>
 #[derive(Debug)]
 pub struct ConstMetric {
     desc: Desc,
@@ -117,10 +117,9 @@ fn label_pairs(desc: &Desc, label_values: &[String]) -> Vec<LabelPair> {
 
 #[cfg(test)]
 mod tests {
+    use super::ConstMetric;
     use claims::{assert_err, assert_ok};
     use prometheus::{core::Describer, Opts};
-
-    use super::ConstMetric;
 
     #[test]
     fn test_const_metric_invalid_label_values() {

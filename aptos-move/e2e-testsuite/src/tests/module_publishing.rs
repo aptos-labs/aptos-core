@@ -1,11 +1,12 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
-use language_e2e_tests::{
+use aptos_language_e2e_tests::{
     account::Account, compile::compile_module, current_function_name, executor::FakeExecutor,
     transaction_status_eq,
 };
+use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
 use move_core_types::vm_status::StatusCode;
 
 // TODO: ignoring most tests for now as bundle publishing is no longer available. Want to resurrect
@@ -60,7 +61,7 @@ fn bad_module_address() {
                     ))
             );
             // assert!(status.status_code() == StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER);
-        }
+        },
         vm_status => panic!("Unexpected verification status: {:?}", vm_status),
     };
 }

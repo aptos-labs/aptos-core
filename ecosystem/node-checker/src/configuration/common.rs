@@ -1,8 +1,7 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::types::NodeConfiguration;
-use crate::evaluators::build_evaluators;
+use super::types::BaselineConfiguration;
 use anyhow::{anyhow, Context, Result};
 use std::{
     convert::{TryFrom, TryInto},
@@ -36,37 +35,28 @@ impl TryFrom<PathBuf> for FileType {
     }
 }
 
-impl TryInto<NodeConfiguration> for FileType {
+impl TryInto<BaselineConfiguration> for FileType {
     type Error = anyhow::Error;
 
-    fn try_into(self) -> Result<NodeConfiguration> {
+    fn try_into(self) -> Result<BaselineConfiguration> {
         match self {
             FileType::Yaml(path) => {
                 let file = File::open(&path)?;
-                let node_configuration: NodeConfiguration = serde_yaml::from_reader(file)
+                let node_configuration: BaselineConfiguration = serde_yaml::from_reader(file)
                     .with_context(|| format!("{} was not valid YAML", path.display()))?;
                 Ok(node_configuration)
-            }
+            },
             FileType::Json(path) => {
                 let file = File::open(&path)?;
-                let node_configuration: NodeConfiguration = serde_json::from_reader(file)
+                let node_configuration: BaselineConfiguration = serde_json::from_reader(file)
                     .with_context(|| format!("{} was not valid JSON", path.display()))?;
                 Ok(node_configuration)
-            }
+            },
         }
     }
 }
 
-pub fn read_configuration_from_file(path: PathBuf) -> Result<NodeConfiguration> {
+pub fn read_configuration_from_file(path: PathBuf) -> Result<BaselineConfiguration> {
     let file_type = FileType::try_from(path)?;
     file_type.try_into()
-}
-
-pub fn validate_configuration(node_configuration: &NodeConfiguration) -> Result<()> {
-    build_evaluators(
-        &node_configuration.evaluators,
-        &node_configuration.evaluator_args,
-    )
-    .context("Failed to build evaluators")?;
-    Ok(())
 }

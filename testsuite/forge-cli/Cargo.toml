@@ -1,5 +1,5 @@
 [package]
-name = "forge-cli"
+name = "aptos-forge-cli"
 description = "Aptos end to end test framework CLI"
 version = "0.0.0"
 
@@ -13,24 +13,24 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-anyhow = "1.0.57"
-async-trait = "0.1.53"
-structopt = "0.3.21"
-tokio = { version = "1.21.0", features = ["full"] }
-url = "2.2.2"
-
-aptos-global-constants = { path = "../../config/global-constants" }
-aptos-logger = { path = "../../crates/aptos-logger" }
-aptos-rest-client = { path = "../../crates/aptos-rest-client" }
-aptos-sdk = { path = "../../sdk" }
-cached-packages = { path = "../../aptos-move/framework/cached-packages" }
-forge = { path = "../forge" }
-framework = { path = "../../aptos-move/framework" }
-serde_yaml = "0.8.24"
-testcases = { path = "../testcases" }
+anyhow = { workspace = true }
+aptos-cached-packages = { workspace = true }
+aptos-config = { workspace = true }
+aptos-forge = { workspace = true }
+aptos-framework = { workspace = true }
+aptos-global-constants = { workspace = true }
+aptos-logger = { workspace = true }
+aptos-rest-client = { workspace = true }
+aptos-sdk = { workspace = true }
+aptos-testcases = { workspace = true }
+async-trait = { workspace = true }
+serde_yaml = { workspace = true }
+structopt = { workspace = true }
+tokio = { workspace = true }
+url = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
-jemallocator = { version = "0.3.2", features = ["profiling", "unprefixed_malloc_on_supported_platforms"] }
+jemallocator = { workspace = true }
 
 [[bin]]
 name = "forge"

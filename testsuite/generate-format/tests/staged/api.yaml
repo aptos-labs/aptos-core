@@ -160,6 +160,19 @@ MultiEd25519PublicKey:
   NEWTYPESTRUCT: BYTES
 MultiEd25519Signature:
   NEWTYPESTRUCT: BYTES
+Multisig:
+  STRUCT:
+    - multisig_address:
+        TYPENAME: AccountAddress
+    - transaction_payload:
+        OPTION:
+          TYPENAME: MultisigTransactionPayload
+MultisigTransactionPayload:
+  ENUM:
+    0:
+      EntryFunction:
+        NEWTYPE:
+          TYPENAME: EntryFunction
 Path:
   ENUM:
     0:
@@ -168,6 +181,10 @@ Path:
           TYPENAME: ModuleId
     1:
       Resource:
+        NEWTYPE:
+          TYPENAME: StructTag
+    2:
+      ResourceGroup:
         NEWTYPE:
           TYPENAME: StructTag
 RawTransaction:
@@ -212,6 +229,15 @@ StateKey:
     2:
       Raw:
         NEWTYPE: BYTES
+StateValueMetadata:
+  ENUM:
+    0:
+      V0:
+        STRUCT:
+          - payer:
+              TYPENAME: AccountAddress
+          - deposit: U64
+          - creation_time_usecs: U64
 StructTag:
   STRUCT:
     - address:
@@ -265,6 +291,18 @@ TransactionArgument:
     5:
       Bool:
         NEWTYPE: BOOL
+    6:
+      U16:
+        NEWTYPE: U16
+    7:
+      U32:
+        NEWTYPE: U32
+    8:
+      U256:
+        NEWTYPE:
+          TUPLEARRAY:
+            CONTENT: U8
+            SIZE: 32
 TransactionAuthenticator:
   ENUM:
     0:
@@ -353,6 +391,10 @@ TransactionPayload:
       EntryFunction:
         NEWTYPE:
           TYPENAME: EntryFunction
+    3:
+      Multisig:
+        NEWTYPE:
+          TYPENAME: Multisig
 TypeTag:
   ENUM:
     0:
@@ -375,6 +417,12 @@ TypeTag:
       struct:
         NEWTYPE:
           TYPENAME: StructTag
+    8:
+      u16: UNIT
+    9:
+      u32: UNIT
+    10:
+      u256: UNIT
 WithdrawEvent:
   STRUCT:
     - amount: U64
@@ -388,6 +436,23 @@ WriteOp:
         NEWTYPE: BYTES
     2:
       Deletion: UNIT
+    3:
+      CreationWithMetadata:
+        STRUCT:
+          - data: BYTES
+          - metadata:
+              TYPENAME: StateValueMetadata
+    4:
+      ModificationWithMetadata:
+        STRUCT:
+          - data: BYTES
+          - metadata:
+              TYPENAME: StateValueMetadata
+    5:
+      DeletionWithMetadata:
+        STRUCT:
+          - metadata:
+              TYPENAME: StateValueMetadata
 WriteSet:
   ENUM:
     0:

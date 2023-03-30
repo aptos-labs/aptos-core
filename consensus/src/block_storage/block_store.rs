@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -8,30 +9,30 @@ use crate::{
         BlockReader,
     },
     counters,
+    payload_manager::PayloadManager,
     persistent_liveness_storage::{
         PersistentLivenessStorage, RecoveryData, RootInfo, RootMetadata,
     },
+    quorum_store,
     state_replication::StateComputer,
     util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, format_err, Context};
-
-use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
-use aptos_infallible::RwLock;
-use aptos_logger::prelude::*;
-use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::TransactionStatus};
-use consensus_types::{
+use aptos_consensus_types::{
     block::Block, common::Round, executed_block::ExecutedBlock, quorum_cert::QuorumCert,
     sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate,
 };
-use executor_types::{Error, StateComputeResult};
+use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
+use aptos_executor_types::{Error, StateComputeResult};
+use aptos_infallible::RwLock;
+use aptos_logger::prelude::*;
+use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::TransactionStatus};
 use futures::executor::block_on;
-use std::{sync::Arc, time::Duration};
-
 #[cfg(test)]
 use std::collections::VecDeque;
 #[cfg(any(test, feature = "fuzzing"))]
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::{sync::Arc, time::Duration};
 
 #[cfg(test)]
 #[path = "block_store_test.rs"]
@@ -55,23 +56,26 @@ pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<ExecutedBloc
         counters::LAST_COMMITTED_ROUND.set(block.round() as i64);
         counters::LAST_COMMITTED_VERSION.set(block.compute_result().num_leaves() as i64);
 
+        // Quorum store metrics
+        quorum_store::counters::NUM_BATCH_PER_BLOCK.observe(block.block().payload_size() as f64);
+
         for status in txn_status.iter() {
             match status {
                 TransactionStatus::Keep(_) => {
                     counters::COMMITTED_TXNS_COUNT
                         .with_label_values(&["success"])
                         .inc();
-                }
+                },
                 TransactionStatus::Discard(_) => {
                     counters::COMMITTED_TXNS_COUNT
                         .with_label_values(&["failed"])
                         .inc();
-                }
+                },
                 TransactionStatus::Retry => {
                     counters::COMMITTED_TXNS_COUNT
                         .with_label_values(&["retry"])
                         .inc();
-                }
+                },
             }
         }
     }
@@ -103,6 +107,7 @@ pub struct BlockStore {
     time_service: Arc<dyn TimeService>,
     // consistent with round type
     back_pressure_limit: Round,
+    payload_manager: Arc<PayloadManager>,
     #[cfg(any(test, feature = "fuzzing"))]
     back_pressure_for_test: AtomicBool,
 }
@@ -115,6 +120,7 @@ impl BlockStore {
         max_pruned_blocks_in_mem: usize,
         time_service: Arc<dyn TimeService>,
         back_pressure_limit: Round,
+        payload_manager: Arc<PayloadManager>,
     ) -> Self {
         let highest_2chain_tc = initial_data.highest_2chain_timeout_certificate();
         let (root, root_metadata, blocks, quorum_certs) = initial_data.take();
@@ -129,6 +135,7 @@ impl BlockStore {
             max_pruned_blocks_in_mem,
             time_service,
             back_pressure_limit,
+            payload_manager,
         ));
         block_on(block_store.try_commit());
         block_store
@@ -166,6 +173,7 @@ impl BlockStore {
         max_pruned_blocks_in_mem: usize,
         time_service: Arc<dyn TimeService>,
         back_pressure_limit: Round,
+        payload_manager: Arc<PayloadManager>,
     ) -> Self {
         let RootInfo(root_block, root_qc, root_ordered_cert, root_commit_cert) = root;
 
@@ -200,7 +208,7 @@ impl BlockStore {
         );
 
         let executed_root_block = ExecutedBlock::new(
-            root_block,
+            *root_block,
             // Create a dummy state_compute_result with necessary fields filled in.
             result,
         );
@@ -220,6 +228,7 @@ impl BlockStore {
             storage,
             time_service,
             back_pressure_limit,
+            payload_manager,
             #[cfg(any(test, feature = "fuzzing"))]
             back_pressure_for_test: AtomicBool::new(false),
         };
@@ -316,6 +325,7 @@ impl BlockStore {
             max_pruned_blocks_in_mem,
             Arc::clone(&self.time_service),
             self.back_pressure_limit,
+            self.payload_manager.clone(),
         )
         .await;
 
@@ -358,7 +368,7 @@ impl BlockStore {
                     self.execute_block(block.block().clone()).await?;
                 }
                 self.execute_block(block).await
-            }
+            },
             err => err,
         }?;
 
@@ -375,6 +385,9 @@ impl BlockStore {
             }
             self.time_service.wait_until(block_time).await;
         }
+        self.payload_manager
+            .prefetch_payload_data(executed_block.block())
+            .await;
         self.storage
             .save_tree(vec![executed_block.block().clone()], vec![])
             .context("Insert block failed when saving block")?;
@@ -415,7 +428,7 @@ impl BlockStore {
                     executed_block.block().timestamp_usecs(),
                     BlockStage::QC_ADDED,
                 );
-            }
+            },
             None => bail!("Insert {} without having the block in store first", qc),
         };
 
@@ -555,6 +568,10 @@ impl BlockReader for BlockStore {
             self.highest_2chain_timeout_cert()
                 .map(|tc| tc.as_ref().clone()),
         )
+    }
+
+    fn back_pressure(&self) -> bool {
+        self.back_pressure()
     }
 }
 

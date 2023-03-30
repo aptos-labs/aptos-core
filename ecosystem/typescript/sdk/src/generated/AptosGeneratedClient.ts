@@ -11,6 +11,7 @@ import { EventsService } from './services/EventsService';
 import { GeneralService } from './services/GeneralService';
 import { TablesService } from './services/TablesService';
 import { TransactionsService } from './services/TransactionsService';
+import { ViewService } from './services/ViewService';
 
 type HttpRequestConstructor = new (config: OpenAPIConfig) => BaseHttpRequest;
 
@@ -22,6 +23,7 @@ export class AptosGeneratedClient {
     public readonly general: GeneralService;
     public readonly tables: TablesService;
     public readonly transactions: TransactionsService;
+    public readonly view: ViewService;
 
     public readonly request: BaseHttpRequest;
 
@@ -44,6 +46,7 @@ export class AptosGeneratedClient {
         this.general = new GeneralService(this.request);
         this.tables = new TablesService(this.request);
         this.transactions = new TransactionsService(this.request);
+        this.view = new ViewService(this.request);
     }
 }
 

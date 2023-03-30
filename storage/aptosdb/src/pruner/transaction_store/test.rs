@@ -1,27 +1,25 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{AptosDB, LedgerPrunerManager, LedgerStore, PrunerManager, TransactionStore};
+use crate::{
+    schema::version_data::VersionDataSchema, AptosDB, LedgerPrunerManager, LedgerStore,
+    PrunerManager, TransactionStore,
+};
+use aptos_accumulator::HashReader;
+use aptos_config::config::LedgerPrunerConfig;
+use aptos_schemadb::SchemaBatch;
+use aptos_storage_interface::DbReader;
 use aptos_temppath::TempPath;
-use proptest::proptest;
-use std::sync::Arc;
-
 use aptos_types::{
     account_address::AccountAddress,
     block_metadata::BlockMetadata,
-    transaction::{SignedTransaction, Transaction},
-};
-
-use accumulator::HashReader;
-use aptos_config::config::LedgerPrunerConfig;
-use aptos_types::{
     proof::position::Position,
-    transaction::{TransactionInfo, Version},
+    state_store::state_storage_usage::StateStorageUsage,
+    transaction::{SignedTransaction, Transaction, TransactionInfo, Version},
     write_set::WriteSet,
 };
-use proptest::{collection::vec, prelude::*};
-use schemadb::SchemaBatch;
-use storage_interface::DbReader;
+use proptest::{collection::vec, prelude::*, proptest};
+use std::sync::Arc;
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
@@ -52,22 +50,18 @@ fn verify_write_set_pruner(write_sets: Vec<WriteSet>) {
     let transaction_store = &aptos_db.transaction_store;
     let num_write_sets = write_sets.len();
 
-    let pruner = LedgerPrunerManager::new(
-        Arc::clone(&aptos_db.ledger_db),
-        Arc::clone(&aptos_db.state_store),
-        LedgerPrunerConfig {
-            enable: true,
-            prune_window: 0,
-            batch_size: 1,
-            user_pruning_window_offset: 0,
-        },
-    );
+    let pruner = LedgerPrunerManager::new(Arc::clone(&aptos_db.ledger_db), LedgerPrunerConfig {
+        enable: true,
+        prune_window: 0,
+        batch_size: 1,
+        user_pruning_window_offset: 0,
+    });
 
     // write sets
-    let mut batch = SchemaBatch::new();
+    let batch = SchemaBatch::new();
     for (ver, ws) in write_sets.iter().enumerate() {
         transaction_store
-            .put_write_set(ver as Version, ws, &mut batch)
+            .put_write_set(ver as Version, ws, &batch)
             .unwrap();
     }
     aptos_db.ledger_db.write_schemas(batch).unwrap();
@@ -108,21 +102,25 @@ fn verify_txn_store_pruner(
         &txns,
     );
 
+    let batch = SchemaBatch::new();
+    for i in 0..=num_transaction as u64 {
+        let usage = StateStorageUsage::zero();
+        batch.put::<VersionDataSchema>(&i, &usage.into()).unwrap();
+    }
+    aptos_db.ledger_db.write_schemas(batch).unwrap();
+
     // start pruning transactions batches of size step_size and verify transactions have been pruned
     // from DB
     for i in (0..=num_transaction).step_by(step_size) {
         // Initialize a pruner in every iteration to test the min_readable_version initialization
         // logic.
-        let pruner = LedgerPrunerManager::new(
-            Arc::clone(&aptos_db.ledger_db),
-            Arc::clone(&aptos_db.state_store),
-            LedgerPrunerConfig {
+        let pruner =
+            LedgerPrunerManager::new(Arc::clone(&aptos_db.ledger_db), LedgerPrunerConfig {
                 enable: true,
                 prune_window: 0,
                 batch_size: 1,
                 user_pruning_window_offset: 0,
-            },
-        );
+            });
         pruner
             .wake_and_wait_pruner(i as u64 /* latest_version */)
             .unwrap();
@@ -143,6 +141,7 @@ fn verify_txn_store_pruner(
                     .get_transaction_proof(j as u64, ledger_version)
                     .is_err());
             }
+            assert!(aptos_db.state_store.get_usage(Some(j as u64)).is_err());
         }
         // ensure all other are valid in DB
         for j in i..num_transaction {
@@ -154,6 +153,7 @@ fn verify_txn_store_pruner(
                 ledger_version,
             );
             aptos_db.get_accumulator_summary(j as Version).unwrap();
+            assert!(aptos_db.state_store.get_usage(Some(j as u64)).is_ok());
         }
         verify_transaction_accumulator_pruned(&ledger_store, i as u64);
     }
@@ -168,7 +168,7 @@ fn verify_txn_not_in_store(
     // Ensure that all transaction from transaction schema store has been pruned
     assert!(transaction_store.get_transaction(index).is_err());
     // Ensure that transaction by account store has been pruned
-    if let Transaction::UserTransaction(txn) = txns.get(index as usize).unwrap() {
+    if let Some(txn) = txns.get(index as usize).unwrap().try_as_signed_user_txn() {
         assert!(transaction_store
             .get_account_transaction_version(txn.sender(), txn.sequence_number(), ledger_version,)
             .unwrap()
@@ -186,12 +186,12 @@ fn verify_txn_in_store(
     verify_transaction_in_transaction_store(
         transaction_store,
         txns.get(index as usize).unwrap(),
-        index as u64,
+        index,
     );
-    if let Transaction::UserTransaction(txn) = txns.get(index as usize).unwrap() {
+    if let Some(txn) = txns.get(index as usize).unwrap().try_as_signed_user_txn() {
         verify_transaction_in_account_txn_by_version_index(
             transaction_store,
-            index as u64,
+            index,
             txn.sender(),
             txn.sequence_number(),
             ledger_version,
@@ -230,14 +230,14 @@ fn put_txn_in_store(
     txn_infos: &[TransactionInfo],
     txns: &[Transaction],
 ) {
-    let mut batch = SchemaBatch::new();
+    let batch = SchemaBatch::new();
     for i in 0..txns.len() {
         transaction_store
-            .put_transaction(i as u64, txns.get(i).unwrap(), &mut batch)
+            .put_transaction(i as u64, txns.get(i).unwrap(), &batch)
             .unwrap();
     }
     ledger_store
-        .put_transaction_infos(0, txn_infos, &mut batch)
+        .put_transaction_infos(0, txn_infos, &batch)
         .unwrap();
     aptos_db.ledger_db.write_schemas(batch).unwrap();
 }

@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::transport::Transport;
@@ -66,11 +67,11 @@ impl<O, E> Transport for BoxedTransport<O, E>
 where
     E: ::std::error::Error + Send + Sync + 'static,
 {
-    type Output = O;
     type Error = E;
-    type Listener = Listener<O, E>;
     type Inbound = Inbound<O, E>;
+    type Listener = Listener<O, E>;
     type Outbound = Outbound<O, E>;
+    type Output = O;
 
     fn listen_on(
         &self,

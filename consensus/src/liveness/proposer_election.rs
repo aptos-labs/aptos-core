@@ -1,11 +1,11 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::cmp::Ordering;
-
-use consensus_types::common::{Author, Round};
-use fallible::copy_from_slice::copy_slice_to_vec;
+use aptos_consensus_types::common::{Author, Round};
+use aptos_fallible::copy_from_slice::copy_slice_to_vec;
 use num_traits::CheckedAdd;
+use std::cmp::Ordering;
 
 /// ProposerElection incorporates the logic of choosing a leader among multiple candidates.
 pub trait ProposerElection {
@@ -19,6 +19,21 @@ pub trait ProposerElection {
     /// Return the valid proposer for a given round (this information can be
     /// used by e.g., voters for choosing the destinations for sending their votes to).
     fn get_valid_proposer(&self, round: Round) -> Author;
+
+    /// Return the chain health: a ratio of voting power participating in the consensus.
+    fn get_voting_power_participation_ratio(&self, _round: Round) -> f64 {
+        1.0
+    }
+
+    fn get_valid_proposer_and_voting_power_participation_ratio(
+        &self,
+        round: Round,
+    ) -> (Author, f64) {
+        (
+            self.get_valid_proposer(round),
+            self.get_voting_power_participation_ratio(round),
+        )
+    }
 }
 
 // next consumes seed and returns random deterministic u64 value in [0, max) range
@@ -60,8 +75,9 @@ fn test_bounds() {
     let mut selected = [0, 0];
     let weights = [u64::MAX as u128 * 1000, u64::MAX as u128 * 1000].to_vec();
     // 10 is enough to get one of each.
-    for i in 0..10 {
-        selected[choose_index(weights.clone(), (i as i32).to_le_bytes().to_vec())] += 1;
+    for i in 0i32..10 {
+        let state = i.to_le_bytes().to_vec();
+        selected[choose_index(weights.clone(), state)] += 1;
     }
 
     assert!(selected[0] >= 1);

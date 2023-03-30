@@ -13,8 +13,8 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-crossbeam = "0.8.1"
-proptest = "1.0.0"
-proptest-derive = "0.3.0"
+crossbeam = { workspace = true }
+proptest = { workspace = true }
+proptest-derive = { workspace = true }
 
 

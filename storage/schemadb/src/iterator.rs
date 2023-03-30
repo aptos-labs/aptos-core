@@ -1,9 +1,9 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     KeyCodec, Schema, SeekKeyCodec, ValueCodec, APTOS_SCHEMADB_ITER_BYTES,
-    APTOS_SCHEMADB_ITER_LATENCY_SECONDS,
+    APTOS_SCHEMADB_ITER_LATENCY_SECONDS, APTOS_SCHEMADB_SEEK_LATENCY_SECONDS,
 };
 use anyhow::Result;
 use std::marker::PhantomData;
@@ -35,11 +35,17 @@ where
 
     /// Seeks to the first key.
     pub fn seek_to_first(&mut self) {
+        let _timer = APTOS_SCHEMADB_SEEK_LATENCY_SECONDS
+            .with_label_values(&[S::COLUMN_FAMILY_NAME, "seek_to_first"])
+            .start_timer();
         self.db_iter.seek_to_first();
     }
 
     /// Seeks to the last key.
     pub fn seek_to_last(&mut self) {
+        let _timer = APTOS_SCHEMADB_SEEK_LATENCY_SECONDS
+            .with_label_values(&[S::COLUMN_FAMILY_NAME, "seek_to_last"])
+            .start_timer();
         self.db_iter.seek_to_last();
     }
 
@@ -49,6 +55,9 @@ where
     where
         SK: SeekKeyCodec<S>,
     {
+        let _timer = APTOS_SCHEMADB_SEEK_LATENCY_SECONDS
+            .with_label_values(&[S::COLUMN_FAMILY_NAME, "seek"])
+            .start_timer();
         let key = <SK as SeekKeyCodec<S>>::encode_seek_key(seek_key)?;
         self.db_iter.seek(&key);
         Ok(())
@@ -62,6 +71,9 @@ where
     where
         SK: SeekKeyCodec<S>,
     {
+        let _timer = APTOS_SCHEMADB_SEEK_LATENCY_SECONDS
+            .with_label_values(&[S::COLUMN_FAMILY_NAME, "seek_for_prev"])
+            .start_timer();
         let key = <SK as SeekKeyCodec<S>>::encode_seek_key(seek_key)?;
         self.db_iter.seek_for_prev(&key);
         Ok(())

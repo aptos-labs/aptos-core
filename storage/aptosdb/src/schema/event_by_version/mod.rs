@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module defines physical storage schema for an event index via which a ContractEvent (
@@ -12,12 +13,12 @@
 
 use crate::schema::{ensure_slice_len_eq, EVENT_BY_VERSION_CF_NAME};
 use anyhow::Result;
-use aptos_types::{event::EventKey, transaction::Version};
-use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use schemadb::{
+use aptos_schemadb::{
     define_schema,
     schema::{KeyCodec, ValueCodec},
 };
+use aptos_types::{event::EventKey, transaction::Version};
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use std::mem::size_of;
 
 define_schema!(EventByVersionSchema, Key, Value, EVENT_BY_VERSION_CF_NAME);

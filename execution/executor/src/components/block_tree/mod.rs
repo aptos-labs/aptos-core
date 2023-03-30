@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -8,17 +9,17 @@ mod test;
 
 use crate::logging::{LogEntry, LogSchema};
 use anyhow::{anyhow, ensure, Result};
+use aptos_consensus_types::block::Block as ConsensusBlock;
 use aptos_crypto::HashValue;
+use aptos_executor_types::{Error, ExecutedChunk};
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, info};
+use aptos_storage_interface::DbReader;
 use aptos_types::{ledger_info::LedgerInfo, proof::definition::LeafCount};
-use consensus_types::block::Block as ConsensusBlock;
-use executor_types::{Error, ExecutedChunk};
 use std::{
     collections::{hash_map::Entry, HashMap},
     sync::{Arc, Weak},
 };
-use storage_interface::DbReader;
 
 pub struct Block {
     pub id: HashValue,
@@ -113,7 +114,7 @@ impl BlockLookupInner {
                     id,
                 );
                 Ok((existing, true, parent_block))
-            }
+            },
             Entry::Vacant(entry) => {
                 let block = Arc::new(Block {
                     id,
@@ -123,7 +124,7 @@ impl BlockLookupInner {
                 });
                 entry.insert(Arc::downgrade(&block));
                 Ok((block, false, parent_block))
-            }
+            },
         }
     }
 }

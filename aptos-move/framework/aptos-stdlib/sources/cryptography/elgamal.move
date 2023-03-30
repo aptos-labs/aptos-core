@@ -24,13 +24,27 @@ module aptos_std::elgamal {
     }
 
     /// An ElGamal public key.
-    struct PubKey has drop {
-        point: RistrettoPoint,
+    struct Pubkey has drop {
+        point: CompressedRistretto,
     }
 
     /// Given a public key, returns the underlying RistrettoPoint representing that key
     public fun get_point_from_pubkey(pubkey: &Pubkey): RistrettoPoint {
-	pubkey.point
+	ristretto255::point_decompress(&pubkey.point)
+    }
+
+    /// Creates a new public key from a serialized RistrettoPoint
+    public fun new_pubkey_from_bytes(bytes: vector<u8>): Option<Pubkey> {
+	assert!(vector::length(&bytes) == 32, EWRONG_BYTE_LENGTH);
+	let point = ristretto255::new_compressed_point_from_bytes(bytes);
+	if (std::option::is_some(&mut point)) {
+	    let pk = Pubkey {
+	        point: std::option::extract(&mut point)
+	    };
+	    std::option::some(pk)
+	} else {
+	    std::option::none<Pubkey>()
+	}
     }
 
     /// Creates a new ciphertext from two serialized Ristrotto points
@@ -87,17 +101,17 @@ module aptos_std::elgamal {
     }
 
     /// Returns a ciphertext (val * val_base + r * pub_key, r * val_base) where val_base is the generator.
-    public fun new_ciphertext(val: &Scalar, val_base: &RistrettoPoint, rand: &Scalar, pub_key: &PubKey): Ciphertext {
+    public fun new_ciphertext(val: &Scalar, val_base: &RistrettoPoint, rand: &Scalar, pub_key: &Pubkey): Ciphertext {
         Ciphertext {
-            left: ristretto255::double_scalar_mul(val, val_base, rand, &pub_key.point),
+            left: ristretto255::double_scalar_mul(val, val_base, rand, &get_point_from_pubkey(pub_key)),
 	    right: ristretto255::point_mul(val_base, rand),
         }
     }
 
     /// Returns a ciphertext (val * basepoint + r * pub_key, rand * basepoint) where `basepoint` is the Ristretto255 basepoint.
-    public fun new_ciphertext_with_basepoint(val: &Scalar, rand: &Scalar, pub_key: &PubKey): Ciphertext {
+    public fun new_ciphertext_with_basepoint(val: &Scalar, rand: &Scalar, pub_key: &Pubkey): Ciphertext {
         Ciphertext {
-            left: ristretto255::basepoint_double_mul(rand, &pub_key.point, val),
+            left: ristretto255::basepoint_double_mul(rand, &get_point_from_pubkey(pub_key), val),
 	    right: ristretto255::basepoint_mul(rand),
         }
     }

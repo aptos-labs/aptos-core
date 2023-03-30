@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::network_address::NetworkAddress;
@@ -35,9 +36,9 @@ impl MoveResource for ValidatorOperatorConfigResource {}
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct ValidatorConfig {
     pub consensus_public_key: bls12381::PublicKey,
-    /// This is an bcs serialized Vec<NetworkAddress>
+    /// This is an bcs serialized `Vec<NetworkAddress>`
     pub validator_network_addresses: Vec<u8>,
-    /// This is an bcs serialized Vec<NetworkAddress>
+    /// This is an bcs serialized `Vec<NetworkAddress>`
     pub fullnode_network_addresses: Vec<u8>,
     pub validator_index: u64,
 }

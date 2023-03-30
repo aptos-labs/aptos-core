@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! aptos_channel provides an mpsc channel which has two ends `aptos_channel::Receiver`
@@ -164,6 +165,7 @@ impl<K: Eq + Hash + Clone, M> Drop for Receiver<K, M> {
 
 impl<K: Eq + Hash + Clone, M> Stream for Receiver<K, M> {
     type Item = M;
+
     /// poll_next checks whether there is something ready for consumption from the internal
     /// queue. If there is, then it returns immediately. If the internal_queue is empty,
     /// it sets the waker passed to it by the scheduler/executor and returns Pending
@@ -246,10 +248,7 @@ pub fn new<K: Eq + Hash + Clone, M>(
         stream_terminated: false,
     }));
     let shared_state_clone = Arc::clone(&shared_state);
-    (
-        Sender { shared_state },
-        Receiver {
-            shared_state: shared_state_clone,
-        },
-    )
+    (Sender { shared_state }, Receiver {
+        shared_state: shared_state_clone,
+    })
 }

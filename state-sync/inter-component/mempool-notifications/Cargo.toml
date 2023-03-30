@@ -1,5 +1,5 @@
 [package]
-name = "mempool-notifications"
+name = "aptos-mempool-notifications"
 description = "The notification interface between state sync and mempool"
 version = "0.1.0"
 
@@ -13,15 +13,14 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-async-trait = "0.1.53"
-futures = "0.3.21"
-serde = { version = "1.0.137", default-features = false }
-thiserror = "1.0.31"
-tokio = { version = "1.21.0" }
-
-aptos-types = { path = "../../../types" }
+aptos-runtimes = { workspace = true }
+aptos-types = { workspace = true }
+async-trait = { workspace = true }
+futures = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
 
 [dev-dependencies]
-claims = "0.7"
-
-aptos-crypto = { path = "../../../crates/aptos-crypto" }
+aptos-crypto = { workspace = true }
+claims = { workspace = true }

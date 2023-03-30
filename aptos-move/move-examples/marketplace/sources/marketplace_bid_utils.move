@@ -582,8 +582,8 @@ module marketplace::marketplace_bid_utils {
         assert!(coin::balance<coin::FakeMoney>(lister) == 9, 1);
     }
 
-    #[test(owner = @0xAF, bidder_a = @0xBB, aptos_framework = @aptos_framework)]
-    #[expected_failure(abort_code = 1)]
+    #[test(owner = @marketplace, bidder_a = @0xBB, aptos_framework = @aptos_framework)]
+    #[expected_failure(abort_code = 1, location = marketplace::marketplace_bid_utils)]
     public fun test_wrong_coin_amount(
         owner: signer,
         bidder_a: signer,
@@ -600,8 +600,8 @@ module marketplace::marketplace_bid_utils {
         execute_listing_bid(bid_id,  entry, @aptos_framework, 0, 1);
     }
 
-    #[test(owner = @0xAF, bidder_a = @0xBB, aptos_framework = @aptos_framework)]
-    #[expected_failure(abort_code = 5)]
+    #[test(owner = @marketplace, bidder_a = @0xBB, aptos_framework = @aptos_framework)]
+    #[expected_failure(abort_code = 5, location = marketplace::marketplace_bid_utils)]
     public fun test_wrong_token_amount(
         owner: signer,
         bidder_a: signer,
@@ -618,7 +618,7 @@ module marketplace::marketplace_bid_utils {
         execute_listing_bid(bid_id, entry, @aptos_framework, 0, 1);
     }
 
-    #[test(owner = @0xAF, bidder_a = @0xBB, aptos_framework = @aptos_framework)]
+    #[test(owner = @marketplace, bidder_a = @0xBB, aptos_framework = @aptos_framework)]
     public fun test_increase_bid(
         owner: signer,
         bidder_a: signer,
@@ -685,7 +685,7 @@ module marketplace::marketplace_bid_utils {
         (entry, token_id)
     }
 
-    #[test(owner = @0xAF, buyer = @0xBB, framework = @aptos_framework, market = @0x33)]
+    #[test(owner = @marketplace, buyer = @0xBB, framework = @aptos_framework, market = @0x33)]
     fun test_buy_successful(
         owner: &signer,
         buyer: &signer,
@@ -717,7 +717,7 @@ module marketplace::marketplace_bid_utils {
     }
 
     #[test(owner = @0x12, buyer = @0x34, framework = @aptos_framework)]
-    #[expected_failure(abort_code = 65538)]
+    #[expected_failure(abort_code = 65538, location = aptos_framework::timestamp)]
     fun test_buy_before_start(
         owner: &signer,
         buyer: &signer,
@@ -736,7 +736,7 @@ module marketplace::marketplace_bid_utils {
     }
 
     #[test(owner = @0x12, buyer = @0x34, framework = @aptos_framework)]
-    #[expected_failure(abort_code = 65547)]
+    #[expected_failure(abort_code = 65547, location = marketplace::marketplace_bid_utils)]
     fun test_buy_after_expire(
         owner: &signer,
         buyer: &signer,
@@ -754,8 +754,8 @@ module marketplace::marketplace_bid_utils {
         );
     }
 
-    #[test(owner = @0xAF, bidder_a = @0xBB, framework = @aptos_framework, buyer = @0xee)]
-    #[expected_failure(abort_code = 65546)]
+    #[test(owner = @marketplace, bidder_a = @0xBB, framework = @aptos_framework, buyer = @0xee)]
+    #[expected_failure(abort_code = 65546, location = marketplace::marketplace_bid_utils)]
     fun test_buy_from_auction_listing(
         owner: &signer,
         bidder_a: &signer,

@@ -1,5 +1,5 @@
 ---
-title: "Your First NFT"
+title: "Mint NFTs with the SDKs"
 slug: "your-first-nft"
 ---
 
@@ -8,7 +8,7 @@ import TabItem from '@theme/TabItem';
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Your First NFT
+# Mint NFTs with the Aptos SDKs
 
 This tutorial describes how to create and transfer NFTs on the Aptos blockchain. The Aptos implementation for core NFTs can be found in the [token.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move) Move module.
 
@@ -242,7 +242,7 @@ By default, the URLs for both the services point to Aptos devnet services. Howev
 
 ### Step 4.2: Creating local accounts
 
-The next step is to create two accounts locally. [Accounts](../concepts/basics-accounts.md) represent both on and off-chain state. Off-chain state consists of an address and the public/private key pair used to authenticate ownership. This step demonstrates how to generate that off-chain state.
+The next step is to create two accounts locally. [Accounts](../concepts/accounts.md) represent both on and off-chain state. Off-chain state consists of an address and the public/private key pair used to authenticate ownership. This step demonstrates how to generate that off-chain state.
 
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
@@ -311,7 +311,7 @@ Your application will call `createCollection`:
 
 The is the function signature of `createCollection`. It returns a transaction hash:
 ```ts
-:!: static/sdks/typescript/src/token_client.ts createCollection
+:!: static/sdks/typescript/src/plugins/token_client.ts createCollection
 ```
   </TabItem>
   <TabItem value="python" label="Python">
@@ -348,7 +348,7 @@ Your application will call `createToken`:
 
 The is the function signature of `createToken`. It returns a transaction hash:
 ```ts
-:!: static/sdks/typescript/src/token_client.ts createToken
+:!: static/sdks/typescript/src/plugins/token_client.ts createToken
 ```
   </TabItem>
   <TabItem value="python" label="Python">
@@ -390,7 +390,7 @@ To read a token's metadata:
 
 Here's how `getTokenData` queries the token metadata:
 ```ts
-:!: static/sdks/typescript/src/token_client.ts getTokenData
+:!: static/sdks/typescript/src/plugins/token_client.ts getTokenData
 ```
 
   </TabItem>
@@ -520,8 +520,8 @@ Coming soon.
 
 ## Supporting documentation
 
-* [Account basics](../concepts/basics-accounts.md)
+* [Account basics](../concepts/accounts.md)
 * [TypeScript SDK](../sdks/ts-sdk/index.md)
 * [Python SDK](../sdks/python-sdk.md)
 * [Rust SDK](../sdks/rust-sdk.md)
-* [REST API specification](https://fullnode.devnet.aptoslabs.com/v1/spec#/)
+* [REST API specification](https://aptos.dev/nodes/aptos-api-spec#/)

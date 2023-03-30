@@ -1,13 +1,12 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 mod golden_output;
 mod test_context;
 
 pub use golden_output::*;
-pub use test_context::*;
-
 use serde_json::Value;
+pub use test_context::*;
 
 pub fn find_value(val: &Value, filter: for<'r> fn(&'r &Value) -> bool) -> Value {
     let resources = val
@@ -21,10 +20,10 @@ pub fn find_value(val: &Value, filter: for<'r> fn(&'r &Value) -> bool) -> Value 
                 panic!("found multiple items by the filter: {}", pretty(val));
             }
             resource.clone()
-        }
+        },
         None => {
             panic!("\ncould not find item in {}", pretty(val))
-        }
+        },
     }
 }
 

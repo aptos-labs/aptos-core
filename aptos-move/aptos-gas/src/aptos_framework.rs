@@ -1,8 +1,8 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::gas_meter::EXECUTION_GAS_MULTIPLIER as MUL;
-use framework::natives::GasParameters;
+use aptos_framework::natives::GasParameters;
 
 crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framework", [
     [.account.create_address.base, "account.create_address.base", 300 * MUL],
@@ -41,7 +41,8 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.ristretto255.basepoint_double_mul, "ristretto255.basepoint_double_mul", 440_000 * MUL],
 
     [.ristretto255.point_add, "ristretto255.point_add", 2_135 * MUL],
-    [.ristretto255.point_clone, optional "ristretto255.point_clone", 150 * MUL],
+    // Note: Current gas version is 7, so putting 8 here.
+    [.ristretto255.point_clone, { 8 => "ristretto255.point_clone" }, 150 * MUL],
     [.ristretto255.point_compress, "ristretto255.point_compress", 40_000 * MUL],
     [.ristretto255.point_decompress, "ristretto255.point_decompress", 40_500 * MUL],
     [.ristretto255.point_equals, "ristretto255.point_equals", 2_300 * MUL],
@@ -52,14 +53,10 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.ristretto255.point_sub, "ristretto255.point_sub", 2_130 * MUL],
     [.ristretto255.point_parse_arg, "ristretto255.point_parse_arg", 150 * MUL],
 
-
     // TODO(Alin): These SHA512 gas costs could be unified with the costs in our future SHA512 module
     // (assuming same implementation complexity, which might not be the case
     [.ristretto255.sha512_per_byte, "ristretto255.scalar_sha512_per_byte", 60 * MUL],
     [.ristretto255.sha512_per_hash, "ristretto255.scalar_sha512_per_hash", 3_240 * MUL],
-
-    [.ristretto255.sha2_512_per_byte, optional "ristretto255.sha2_512_per_byte", 60 * MUL],
-    [.ristretto255.sha2_512_per_hash, optional "ristretto255.sha2_512_per_hash", 3_240 * MUL],
 
     [.ristretto255.scalar_add, "ristretto255.scalar_add", 770 * MUL],
     [.ristretto255.scalar_reduced_from_32_bytes, "ristretto255.scalar_reduced_from_32_bytes", 710 * MUL],
@@ -76,13 +73,12 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.hash.sip_hash.base, "hash.sip_hash.base", 1000 * MUL],
     [.hash.sip_hash.per_byte, "hash.sip_hash.per_byte", 20 * MUL],
 
-    [.hash.keccak256.base, optional "hash.keccak256.base", 4000 * MUL],
-    [.hash.keccak256.per_byte, optional "hash.keccak256.per_byte", 45 * MUL],
+    [.hash.keccak256.base, { 1.. => "hash.keccak256.base" }, 4000 * MUL],
+    [.hash.keccak256.per_byte, { 1.. => "hash.keccak256.per_byte" }, 45 * MUL],
 
-    [.bulletproofs.base, optional "bulletproofs.base", 10_000 * MUL],
-    [.bulletproofs.per_byte_rangeproof_deserialize, optional "bulletproofs.per_byte_rangeproof_deserialize", 150 * MUL],
-    [.bulletproofs.per_bit_rangeproof_verify, optional "bulletproofs.per_bit_rangeproof_verify", 128_000 * MUL],
-
+    [.bulletproofs.base, { 8 => "bulletproofs.base" }, 10_000 * MUL],
+    [.bulletproofs.per_byte_rangeproof_deserialize, { 8 => "bulletproofs.per_byte_rangeproof_deserialize" }, 150 * MUL],
+    [.bulletproofs.per_bit_rangeproof_verify, { 8 => "bulletproofs.per_bit_rangeproof_verify" }, 128_000 * MUL],
 
     [.type_info.type_of.base, "type_info.type_of.base", 300 * MUL],
     // TODO(Gas): the on-chain name is wrong...
@@ -90,17 +86,19 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.type_info.type_name.base, "type_info.type_name.base", 300 * MUL],
     // TODO(Gas): the on-chain name is wrong...
     [.type_info.type_name.per_byte_in_str, "type_info.type_name.per_abstract_memory_unit", 5 * MUL],
-    [.type_info.chain_id.base, optional "type_info.chain_id.base", 150 * MUL],
+    [.type_info.chain_id.base, { 4.. => "type_info.chain_id.base" }, 150 * MUL],
 
     // Reusing SHA2-512's cost from Ristretto
-    [.hash.sha2_512.base, optional "hash.sha2_512.base", 3_240],
-    [.hash.sha2_512.per_byte, optional "hash.sha2_512.per_byte", 60],
+    [.hash.sha2_512.base, { 4.. => "hash.sha2_512.base" }, 3_240],
+    [.hash.sha2_512.per_byte, { 4.. => "hash.sha2_512.per_byte" }, 60],
     // Back-of-the-envelop approximation from SHA3-256's (4000 base, 45 per-byte) costs
-    [.hash.sha3_512.base, optional "hash.sha3_512.base", 4_500],
-    [.hash.sha3_512.per_byte, optional "hash.sha3_512.per_byte", 50],
+    [.hash.sha3_512.base, { 4.. => "hash.sha3_512.base" }, 4_500],
+    [.hash.sha3_512.per_byte, { 4.. => "hash.sha3_512.per_byte" }, 50],
     // Using SHA2-256's cost
-    [.hash.ripemd160.base, optional "hash.ripemd160.base", 3000],
-    [.hash.ripemd160.per_byte, optional "hash.ripemd160.per_byte", 50],
+    [.hash.ripemd160.base, { 4.. => "hash.ripemd160.base" }, 3000],
+    [.hash.ripemd160.per_byte, { 4.. => "hash.ripemd160.per_byte" }, 50],
+    [.hash.blake2b_256.base, { 6.. => "hash.blake2b_256.base" }, 1750],
+    [.hash.blake2b_256.per_byte, { 6.. => "hash.blake2b_256.per_byte" }, 15],
 
     [.util.from_bytes.base, "util.from_bytes.base", 300 * MUL],
     [.util.from_bytes.per_byte, "util.from_bytes.per_byte", 5 * MUL],
@@ -111,7 +109,7 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.code.request_publish.per_byte, "code.request_publish.per_byte", 2 * MUL],
 
     // Note(Gas): These are storage operations so the values should not be multiplied.
-    [.event.write_to_event_store.base, "event.write_to_event_store.base", 500_000],
+    [.event.write_to_event_store.base, "event.write_to_event_store.base", 300_000],
     // TODO(Gas): the on-chain name is wrong...
     [.event.write_to_event_store.per_abstract_value_unit, "event.write_to_event_store.per_abstract_memory_unit", 5_000],
 
@@ -121,5 +119,10 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.aggregator.read.base, "aggregator.read.base", 300 * MUL],
     [.aggregator.sub.base, "aggregator.sub.base", 300 * MUL],
     [.aggregator.destroy.base, "aggregator.destroy.base", 500 * MUL],
-    [.aggregator_factory.new_aggregator.base, "aggregator_factory.new_aggregator.base", 500 * MUL]
+    [.aggregator_factory.new_aggregator.base, "aggregator_factory.new_aggregator.base", 500 * MUL],
+
+    [.object.exists_at.base, { 7.. => "object.exists_at.base" }, 250 * MUL],
+    // These are dummy value, they copied from storage gas in aptos-core/aptos-vm/src/aptos_vm_impl.rs
+    [.object.exists_at.per_byte_loaded, { 7.. => "object.exists_at.per_byte_loaded" }, 1000],
+    [.object.exists_at.per_item_loaded, { 7.. => "object.exists_at.per_item_loaded" }, 8000]
 ]);

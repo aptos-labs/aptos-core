@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -8,19 +9,19 @@ use crate::{
     },
 };
 use anyhow::Result;
+use aptos_consensus_types::{
+    block::Block, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote,
+};
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
+use aptos_storage_interface::DbReader;
 use aptos_types::{
     aggregate_signature::AggregateSignature,
     epoch_change::EpochChangeProof,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::ValidatorSet,
 };
-use consensus_types::{
-    block::Block, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote,
-};
 use std::{collections::HashMap, sync::Arc};
-use storage_interface::DbReader;
 
 pub struct MockSharedStorage {
     // Safety state
@@ -106,16 +107,14 @@ impl MockStorage {
             .block
             .lock()
             .clone()
-            .into_iter()
-            .map(|(_, v)| v)
+            .into_values()
             .collect();
         let quorum_certs = self
             .shared_storage
             .qc
             .lock()
             .clone()
-            .into_iter()
-            .map(|(_, v)| v)
+            .into_values()
             .collect();
         blocks.sort_by_key(Block::round);
         let last_vote = self.shared_storage.last_vote.lock().clone();
@@ -287,7 +286,7 @@ impl PersistentLivenessStorage for EmptyStorage {
             Err(e) => {
                 eprintln!("{}", e);
                 panic!("Construct recovery data during genesis should never fail");
-            }
+            },
         }
     }
 

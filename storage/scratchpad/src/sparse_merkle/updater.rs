@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -13,8 +14,7 @@ use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
-use aptos_types::proof::definition::NodeInProof;
-use aptos_types::proof::{SparseMerkleLeafNode, SparseMerkleProofExt};
+use aptos_types::proof::{definition::NodeInProof, SparseMerkleLeafNode, SparseMerkleProofExt};
 use std::cmp::Ordering;
 
 type Result<T> = std::result::Result<T, UpdateError>;
@@ -127,7 +127,7 @@ impl<'a, V: Clone + CryptoHash> SubTreeInfo<'a, V> {
                 } else {
                     Self::Persisted(PersistedSubTreeInfo::ProofSibling { hash: *hash })
                 }
-            }
+            },
         }
     }
 
@@ -170,7 +170,7 @@ impl<'a, V: Clone + CryptoHash> SubTreeInfo<'a, V> {
                             node: internal_node.clone(),
                             subtree: subtree.weak(),
                         })
-                    }
+                    },
                     NodeInner::Leaf(leaf_node) => {
                         // Create a new leaf node with the data pointing to previous version via
                         // weak ref (if exists). This is only necessary when this leaf node is "split"
@@ -191,7 +191,7 @@ impl<'a, V: Clone + CryptoHash> SubTreeInfo<'a, V> {
                             key: leaf_node.key,
                             subtree,
                         })
-                    }
+                    },
                 },
                 None => SubTreeInfo::InMem(InMemSubTreeInfo::Unknown {
                     subtree: subtree.weak(),
@@ -227,7 +227,7 @@ impl<'a, V: Clone + CryptoHash> SubTreeInfo<'a, V> {
                 InMemSubTreeInfo::Leaf { key, .. } => {
                     let key = *key;
                     swap_if(myself, SubTreeInfo::new_empty(), key.bit(depth))
-                }
+                },
                 InMemSubTreeInfo::Internal { node, .. } => (
                     // n.b. When we recurse into either side, the updates can be empty, where the
                     // specific type of the in-mem node is irrelevant, so the parsing of it can be
@@ -241,7 +241,7 @@ impl<'a, V: Clone + CryptoHash> SubTreeInfo<'a, V> {
                 PersistedSubTreeInfo::Leaf { leaf } => {
                     let key = leaf.key();
                     swap_if(myself, SubTreeInfo::new_empty(), key.bit(depth))
-                }
+                },
                 PersistedSubTreeInfo::ProofPathInternal { proof } => {
                     let siblings = proof.siblings();
                     assert!(siblings.len() > depth);
@@ -249,7 +249,7 @@ impl<'a, V: Clone + CryptoHash> SubTreeInfo<'a, V> {
                         SubTreeInfo::new_proof_sibling(&siblings[siblings.len() - depth - 1]);
                     let on_path_child = SubTreeInfo::new_on_proof_path(proof, depth + 1);
                     swap_if(on_path_child, sibling_child, a_descendent_key.bit(depth))
-                }
+                },
                 PersistedSubTreeInfo::ProofSibling { .. } => unreachable!(),
             },
         })
@@ -261,13 +261,13 @@ impl<'a, V: Clone + CryptoHash> SubTreeInfo<'a, V> {
             Self::Persisted(info) => match info {
                 PersistedSubTreeInfo::Leaf { leaf } => {
                     InMemSubTreeInfo::create_leaf_with_proof(&leaf, generation)
-                }
+                },
                 PersistedSubTreeInfo::ProofSibling { hash } => {
                     InMemSubTreeInfo::create_unknown(hash)
-                }
+                },
                 PersistedSubTreeInfo::ProofPathInternal { .. } => {
                     unreachable!()
-                }
+                },
             },
         }
     }
@@ -318,7 +318,7 @@ impl<'a, V: Send + Sync + Clone + CryptoHash> SubTreeUpdater<'a, V> {
                 };
 
                 Ok(InMemSubTreeInfo::combine(left_ret?, right_ret?, generation))
-            }
+            },
         }
     }
 
@@ -335,7 +335,7 @@ impl<'a, V: Send + Sync + Clone + CryptoHash> SubTreeUpdater<'a, V> {
                                     (*key_to_update, value),
                                     self.generation,
                                 ))
-                            }
+                            },
                             None => MaybeEndRecursion::End(self.info.materialize(self.generation)),
                         },
                         InMemSubTreeInfo::Leaf { key, .. } => match update {
@@ -353,7 +353,7 @@ impl<'a, V: Send + Sync + Clone + CryptoHash> SubTreeUpdater<'a, V> {
                                 } else {
                                     MaybeEndRecursion::End(self.info.materialize(self.generation))
                                 }
-                            }
+                            },
                         },
                         _ => MaybeEndRecursion::Continue(self),
                     },
@@ -372,11 +372,11 @@ impl<'a, V: Send + Sync + Clone + CryptoHash> SubTreeUpdater<'a, V> {
                             } else {
                                 MaybeEndRecursion::End(self.info.materialize(self.generation))
                             }
-                        }
+                        },
                     },
                     _ => MaybeEndRecursion::Continue(self),
                 }
-            }
+            },
             _ => MaybeEndRecursion::Continue(self),
         })
     }

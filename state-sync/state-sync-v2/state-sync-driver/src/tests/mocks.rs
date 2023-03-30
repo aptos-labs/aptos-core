@@ -1,18 +1,31 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::tests::utils::{create_empty_epoch_state, create_epoch_ending_ledger_info};
 use crate::{
-    error::Error, metadata_storage::MetadataStorageInterface,
-    storage_synchronizer::StorageSynchronizerInterface, tests::utils::create_transaction_info,
+    error::Error,
+    metadata_storage::MetadataStorageInterface,
+    storage_synchronizer::StorageSynchronizerInterface,
+    tests::utils::{
+        create_empty_epoch_state, create_epoch_ending_ledger_info, create_transaction_info,
+    },
 };
 use anyhow::Result;
 use aptos_crypto::HashValue;
-use aptos_types::epoch_state::EpochState;
+use aptos_data_streaming_service::{
+    data_notification::NotificationId,
+    data_stream::{DataStreamId, DataStreamListener},
+    streaming_client::{DataStreamingClient, Epoch, NotificationAndFeedback},
+};
+use aptos_executor_types::{ChunkCommitNotification, ChunkExecutorTrait};
+use aptos_storage_interface::{
+    state_delta::StateDelta, DbReader, DbReaderWriter, DbWriter, ExecutedTrees, Order,
+    StateSnapshotReceiver,
+};
 use aptos_types::{
     account_address::AccountAddress,
     contract_event::EventWithVersion,
     epoch_change::EpochChangeProof,
+    epoch_state::EpochState,
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
     proof::{
@@ -30,20 +43,8 @@ use aptos_types::{
     },
 };
 use async_trait::async_trait;
-use data_streaming_service::data_stream::DataStreamId;
-use data_streaming_service::streaming_client::NotificationAndFeedback;
-use data_streaming_service::{
-    data_notification::NotificationId,
-    data_stream::DataStreamListener,
-    streaming_client::{DataStreamingClient, Epoch},
-};
-use executor_types::{ChunkCommitNotification, ChunkExecutorTrait};
 use mockall::mock;
 use std::sync::Arc;
-use storage_interface::{
-    state_delta::StateDelta, DbReader, DbReaderWriter, DbWriter, ExecutedTrees, Order,
-    StateSnapshotReceiver,
-};
 use tokio::task::JoinHandle;
 
 // TODO(joshlind): if we see these as generally useful, we should
@@ -355,19 +356,19 @@ mock! {
             &self,
             version: Version,
             start_index: Option<u64>,
-        ) -> Result<DataStreamListener, data_streaming_service::error::Error>;
+        ) -> Result<DataStreamListener, aptos_data_streaming_service::error::Error>;
 
         async fn get_all_epoch_ending_ledger_infos(
             &self,
             start_epoch: Epoch,
-        ) -> Result<DataStreamListener, data_streaming_service::error::Error>;
+        ) -> Result<DataStreamListener, aptos_data_streaming_service::error::Error>;
 
         async fn get_all_transaction_outputs(
             &self,
             start_version: Version,
             end_version: Version,
             proof_version: Version,
-        ) -> Result<DataStreamListener, data_streaming_service::error::Error>;
+        ) -> Result<DataStreamListener, aptos_data_streaming_service::error::Error>;
 
         async fn get_all_transactions(
             &self,
@@ -375,14 +376,22 @@ mock! {
             end_version: Version,
             proof_version: Version,
             include_events: bool,
-        ) -> Result<DataStreamListener, data_streaming_service::error::Error>;
+        ) -> Result<DataStreamListener, aptos_data_streaming_service::error::Error>;
+
+        async fn get_all_transactions_or_outputs(
+            &self,
+            start_version: Version,
+            end_version: Version,
+            proof_version: Version,
+            include_events: bool,
+        ) -> Result<DataStreamListener, aptos_data_streaming_service::error::Error>;
 
         async fn continuously_stream_transaction_outputs(
             &self,
             start_version: Version,
             start_epoch: Epoch,
             target: Option<LedgerInfoWithSignatures>,
-        ) -> Result<DataStreamListener, data_streaming_service::error::Error>;
+        ) -> Result<DataStreamListener, aptos_data_streaming_service::error::Error>;
 
         async fn continuously_stream_transactions(
             &self,
@@ -390,13 +399,21 @@ mock! {
             start_epoch: Epoch,
             include_events: bool,
             target: Option<LedgerInfoWithSignatures>,
-        ) -> Result<DataStreamListener, data_streaming_service::error::Error>;
+        ) -> Result<DataStreamListener, aptos_data_streaming_service::error::Error>;
+
+        async fn continuously_stream_transactions_or_outputs(
+            &self,
+            start_version: Version,
+            start_epoch: Epoch,
+            include_events: bool,
+            target: Option<LedgerInfoWithSignatures>,
+        ) -> Result<DataStreamListener, aptos_data_streaming_service::error::Error>;
 
         async fn terminate_stream_with_feedback(
             &self,
             data_stream_id: DataStreamId,
             notification_and_feedback: Option<NotificationAndFeedback>,
-        ) -> Result<(), data_streaming_service::error::Error>;
+        ) -> Result<(), aptos_data_streaming_service::error::Error>;
     }
     impl Clone for StreamingClient {
         fn clone(&self) -> Self;
