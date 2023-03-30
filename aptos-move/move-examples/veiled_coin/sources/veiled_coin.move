@@ -342,8 +342,8 @@ module veiled_coin::veiled_coin {
 	// where p is the order of the scalar field, giving an updated balance of 
 	// 'bal' - (p-1) mod p = 'bal' + 1. These checks ensure that 'bal' - 'amount' >= 0 
 	// and therefore that 'bal' >= 'amount'.
-        assert!(bulletproofs::verify_range_proof(&private_balance, range_proof_updated_balance, MAX_BITS_IN_VALUE, VEILED_COIN_DST), ERANGE_PROOF_VERIFICATION_FAILED);
-	assert!(bulletproofs::verify_range_proof(&withdraw_amount, range_proof_transferred_amount, MAX_BITS_IN_VALUE, VEILED_COIN_DST), ERANGE_PROOF_VERIFICATION_FAILED);
+        assert!(bulletproofs::verify_range_proof_elgamal(&private_balance, range_proof_updated_balance, MAX_BITS_IN_VALUE, VEILED_COIN_DST), ERANGE_PROOF_VERIFICATION_FAILED);
+	assert!(bulletproofs::verify_range_proof_elgamal(&withdraw_amount, range_proof_transferred_amount, MAX_BITS_IN_VALUE, VEILED_COIN_DST), ERANGE_PROOF_VERIFICATION_FAILED);
 
         coin_store.private_balance = elgamal::compress_ciphertext(&private_balance);
 

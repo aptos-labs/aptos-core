@@ -28,6 +28,11 @@ module aptos_std::elgamal {
         point: RistrettoPoint,
     }
 
+    /// Given a public key, returns the underlying RistrettoPoint representing that key
+    public fun get_point_from_pubkey(pubkey: &Pubkey): RistrettoPoint {
+	pubkey.point
+    }
+
     /// Creates a new ciphertext from two serialized Ristrotto points
     public fun new_ciphertext_from_bytes(bytes: vector<u8>): Option<Ciphertext> {
 	assert!(vector::length(&bytes) == 64, EWRONG_BYTE_LENGTH);
