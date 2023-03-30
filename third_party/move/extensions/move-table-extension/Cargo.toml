@@ -26,6 +26,6 @@ bcs = { workspace = true }
 #file_diff = "1.0.0"
 move-cli = { path = "../../tools/move-cli" }
 move-package = { path = "../../tools/move-package" }
-move-stdlib = { path = "../../move-stdlib", features = ["testing"] }
+move-stdlib = { path = "../../../../aptos-move/framework/move-stdlib", features = ["testing"] }
 move-unit-test = { path = "../../tools/move-unit-test", features = ["table-extension"] }
 tempfile = "3.2.0"

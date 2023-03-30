@@ -48,7 +48,7 @@ datatest-stable = "0.1.1"
 evm = "0.33.1"
 evm-exec-utils = { path = "../exec-utils" }
 move-prover-test-utils = { path = "../../move-prover/test-utils" }
-move-stdlib = { path = "../../move-stdlib" }
+move-stdlib = { path = "../../../../aptos-move/framework/move-stdlib" }
 primitive-types = "0.10.1"
 tempfile = "3.2.0"
 walkdir = "2.3.1"

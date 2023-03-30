@@ -36,7 +36,7 @@ serde = { version = "1.0.124", features = ["derive"] }
 anyhow = "1.0.52"
 datatest-stable = "0.1.1"
 move-prover-test-utils = { path = "../test-utils" }
-move-stdlib = { path = "../../move-stdlib" }
+move-stdlib = { path = "../../../../aptos-move/framework/move-stdlib" }
 
 [[test]]
 name = "testsuite"
