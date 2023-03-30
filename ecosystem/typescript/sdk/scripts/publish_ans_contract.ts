@@ -42,6 +42,11 @@ try {
   console.log("---sleeps for 10 seconds to make sure account has funded---");
   execSync("sleep 10");
 
+  const output = execSync("ls -al", {
+    cwd: path.resolve(__dirname + ANS_CORE_FOLDER),
+  }).toString();
+  console.log(output);
+
   // 3. get default profile info
   console.log("---get default profile info---");
   const data = execSync(GET_DEFAULT_PROFILE_COMMAND, {
