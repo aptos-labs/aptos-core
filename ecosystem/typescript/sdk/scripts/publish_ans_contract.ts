@@ -37,6 +37,7 @@ try {
   });
 
   // Sleep for 10 seconds to make sure account has funded
+  console.log("---sleeps for 10 seconds to make sure account has funded---");
   execSync("sleep 10");
 
   // 3. get default profile info
