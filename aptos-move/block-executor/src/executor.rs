@@ -145,9 +145,8 @@ where
             .record(idx_to_execute, speculative_view.take_reads(), result)
             .is_err()
         {
-            // Optimization for module publishing fallback.
-            // When there is module r/w intersection, can halt parallel execution
-            // and fallback to sequential execution immediately.
+            // When there is module publishing r/w intersection, can early halt BlockSTM to
+            // fallback to sequential execution.
             scheduler.halt();
             return SchedulerTask::NoTask;
         }
@@ -169,7 +168,7 @@ where
         let (idx_to_validate, incarnation) = version_to_validate;
         let read_set = last_input_output
             .read_set(idx_to_validate)
-            .expect("Prior read-set must be recorded");
+            .expect("[BlockSTM]: Prior read-set must be recorded");
 
         let valid = read_set.iter().all(|r| {
             match versioned_cache.fetch_data(r.path(), idx_to_validate) {
@@ -230,11 +229,27 @@ where
             if committing {
                 // Keep committing txns until there is no more that can be committed now.
                 while let Some(txn_idx) = scheduler.try_commit() {
+                    // Committed the last transaction, BlockSTM finishes execution.
                     if txn_idx as usize + 1 == block.len() {
-                        // Committed the last transaction / everything.
                         scheduler_task = SchedulerTask::Done;
                         break;
                     }
+
+                    // When there is a txn with Abort or SkipRest as the execution output, can early halt the BlockSTM.
+                    if let ExecutionStatus::Abort(_) | ExecutionStatus::SkipRest(_) =
+                        last_input_output.write_set(txn_idx).as_ref()
+                    {
+                        scheduler.halt();
+                        break;
+                    }
+
+                    // Remark: When early halting the BlockSTM, we have to make sure the current / new tasks
+                    // will be properly handled by the threads. For instance, it is possible that the committing
+                    // thread holds an execution task from the last iteration, and then early halts the BlockSTM
+                    // due to a txn execution abort. In this case, we cannot reset the scheduler_task of the
+                    // committing thread (to be Done), otherwise some other pending thread waiting for the execution
+                    // will be pending on read forever (since the halt logic let the execution task to wake up such
+                    // pending task).
                 }
             }
             scheduler_task = match scheduler_task {

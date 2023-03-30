@@ -534,8 +534,17 @@ impl Scheduler {
         SchedulerTask::NoTask
     }
 
-    /// Set the done_marker to be true, return the previous value of the done_marker.
-    /// Should only be called when there is a module r/w intersection.
+    /// This function can halt the BlockSTM early, even if there are unfinished tasks.
+    /// It will set the done_marker to be true, resolve all pending dependencies, and return the previous value of the done_marker.
+    ///
+    /// Currently there are 4 scenarios to early halt the BlockSTM execution.
+    /// 1. There is a module publishing txn that has read/write intersection with any txns even during speculative execution.
+    /// 2. There is a txn with VM execution status Abort.
+    /// 3. There is a txn with VM execution status SkipRest.
+    /// 4. The committed txns have exceeds the PER_BLOCK_GAS_LIMIT.
+    ///
+    /// For scenarios 1 and 2, only the error will be returned as the output of the block execution.
+    /// For scenarios 3 and 4, the execution outputs of the committed txn prefix will be returned.
     pub fn halt(&self) {
         // The first thread that sets done_marker to be true will be reponsible for
         // resolving the conditional variables, to help other theads that may be pending
@@ -547,7 +556,7 @@ impl Scheduler {
         }
     }
 
-    /// When the parallel execution encountered a module r/w intersection and can abort earlier, some of the threads
+    /// When early halt the BlockSTM, some of the threads
     /// may still be working on execution, and waiting for dependency (indicated by the condition variable `condvar`).
     /// Therefore the commit thread needs to wake up all such pending threads, by sending notification to the condition
     /// variable and setting the lock variables properly.

@@ -201,7 +201,7 @@ impl<K: ModulePath, T: TransactionOutput, E: Send + Clone> TxnLastInputOutput<K,
                 self.module_read_write_intersection
                     .store(true, Ordering::Release);
                 return Err(anyhow!(
-                    "Parallel execution detects module r/w intersection!"
+                    "[BlockSTM]: Detect module r/w intersection, will fallback to sequential execution"
                 ));
             }
         }
@@ -218,6 +218,12 @@ impl<K: ModulePath, T: TransactionOutput, E: Send + Clone> TxnLastInputOutput<K,
 
     pub fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<Vec<ReadDescriptor<K>>>> {
         self.inputs[txn_idx as usize].load_full()
+    }
+
+    pub fn write_set(&self, txn_idx: TxnIndex) -> Arc<ExecutionStatus<T, Error<E>>> {
+        self.outputs[txn_idx as usize]
+            .load_full()
+            .expect("[BlockSTM]: Execution output must be recorded after execution")
     }
 
     // Extracts a set of paths written or updated during execution from transaction
@@ -242,12 +248,12 @@ impl<K: ModulePath, T: TransactionOutput, E: Send + Clone> TxnLastInputOutput<K,
     pub fn take_output(&self, txn_idx: TxnIndex) -> ExecutionStatus<T, Error<E>> {
         let owning_ptr = self.outputs[txn_idx as usize]
             .swap(None)
-            .expect("Output must be recorded after execution");
+            .expect("[BlockSTM]: Output must be recorded after execution");
 
         if let Ok(output) = Arc::try_unwrap(owning_ptr) {
             output
         } else {
-            unreachable!("Output should be uniquely owned after execution");
+            unreachable!("[BlockSTM]: Output should be uniquely owned after execution");
         }
     }
 }
