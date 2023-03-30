@@ -4,7 +4,7 @@ const { execSync } = require("child_process");
 const ANS_CORE_FOLDER = "/aptos-names-contracts/core";
 const APTOS_INVOCATION = process.env.APTOS_INVOCATION || "aptos";
 
-const APTOS_INIT_COMMAND = `${APTOS_INVOCATION} init --network local`;
+const APTOS_INIT_COMMAND = `${APTOS_INVOCATION} init --network local --assume-yes`;
 const GET_DEFAULT_PROFILE_COMMAND = `${APTOS_INVOCATION} config show-profiles --profile default`;
 
 /**
@@ -60,7 +60,9 @@ try {
   deleteAnsFolder();
 } catch (error: any) {
   console.error("An error occurred:");
-  console.error("error", error);
+  //console.error("error", error);
+  console.error("parsed stdout", error.stdout.toString("utf8"));
+  console.error("parsed stderr", error.stderr.toString("utf8"));
   deleteAnsFolder();
   process.exit(1);
 }
