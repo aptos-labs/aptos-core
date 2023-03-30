@@ -34,8 +34,9 @@ bulletproofs = { workspace = true }
 byteorder = { workspace = true }
 clap = { workspace = true }
 codespan-reporting = { workspace = true }
-# TODO: Explain why we need a different package here instead of the normal `curve25519-dalek`. IIRC, it was due to some
-# rand_core incompatibilities.
+# We need `zkcrypto/curve25519-dalek-ng` here instead of the normal `dalek-cryptography/curve25519-dalek` package. This
+# is because the `dalek-cryptography/bulletproofs` works with version 2 of `dalek-cryptography/curve25519-dalek` and
+# we work with version 3. Instead, we use `zkcrypto/bulleproofs` which relies on `zkcrypto/curve25519-dalek-ng`.
 curve25519-dalek = { package = "curve25519-dalek-ng" }
 flate2 = { workspace = true }
 hex = { workspace = true }

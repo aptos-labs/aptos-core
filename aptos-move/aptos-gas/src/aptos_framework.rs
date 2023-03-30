@@ -80,7 +80,6 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.bulletproofs.per_byte_rangeproof_deserialize, { 8 => "bulletproofs.per_byte_rangeproof_deserialize" }, 150 * MUL],
     [.bulletproofs.per_bit_rangeproof_verify, { 8 => "bulletproofs.per_bit_rangeproof_verify" }, 128_000 * MUL],
 
-
     [.type_info.type_of.base, "type_info.type_of.base", 300 * MUL],
     // TODO(Gas): the on-chain name is wrong...
     [.type_info.type_of.per_byte_in_str, "type_info.type_of.per_abstract_memory_unit", 5 * MUL],
