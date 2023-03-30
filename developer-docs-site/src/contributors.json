@@ -14,6 +14,11 @@
       "name": "David Wolinsky",
       "email": "isaac.wolinsky@gmail.com",
       "username": "davidiw"
+    },
+    {
+      "name": "Junkil Park",
+      "email": "jpark@aptoslabs.com",
+      "username": null
     }
   ],
   "/aptos-white-paper/aptos-white-paper-index": [
@@ -231,6 +236,11 @@
       "username": "clay-aptos"
     },
     {
+      "name": "Christian Sahar",
+      "email": "125399153+saharct@users.noreply.github.com",
+      "username": "saharct"
+    },
+    {
       "name": "Parker Place",
       "email": "pleeplace@gmail.com",
       "username": null
@@ -241,6 +251,11 @@
       "name": "0xhsy",
       "email": "102006034+0xhsy@users.noreply.github.com",
       "username": "0xhsy"
+    },
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
     }
   ],
   "/community/external-resources": [
@@ -707,6 +722,16 @@
       "name": "Angie Huang",
       "email": "123419931+angieyth@users.noreply.github.com",
       "username": "angieyth"
+    },
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    },
+    {
+      "name": "David Wolinsky",
+      "email": "isaac.wolinsky@gmail.com",
+      "username": "davidiw"
     }
   ],
   "/guides/basics-life-of-txn": [
@@ -1347,6 +1372,13 @@
       "name": "xander988",
       "email": "90599152+xander988@users.noreply.github.com",
       "username": "xander988"
+    }
+  ],
+  "/guides/move-guides/move-scripts": [
+    {
+      "name": "Daniel Porteous",
+      "email": "danielporteous1@gmail.com",
+      "username": "banool"
     }
   ],
   "/guides/move-guides/move-structure": [
@@ -2089,6 +2121,16 @@
     }
   ],
   "/nodes/validator-node/operator/delegation-pool-operations": [
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    },
+    {
+      "name": "Kevin",
+      "email": "105028215+movekevin@users.noreply.github.com",
+      "username": "movekevin"
+    },
     {
       "name": "dorinbwr",
       "email": "98946433+dorinbwr@users.noreply.github.com",
