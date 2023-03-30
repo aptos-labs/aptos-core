@@ -401,6 +401,7 @@ where
         let mut data_map = BTreeMap::new();
 
         let mut ret = Vec::with_capacity(num_txns);
+        let mut accumulated_gas = 0;
         for (idx, txn) in signature_verified_block.iter().enumerate() {
             let res = executor.execute_transaction(
                 &LatestView::<T, S>::new_btree_view(base_view, &data_map, idx as TxnIndex),
@@ -410,7 +411,7 @@ where
             );
 
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
-
+            let txn_gas;
             match res {
                 ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
                     assert_eq!(
@@ -422,6 +423,7 @@ where
                     for (ap, write_op) in output.get_writes().into_iter() {
                         data_map.insert(ap, write_op);
                     }
+                    txn_gas = output.gas_used();
                     ret.push(output);
                 },
                 ExecutionStatus::Abort(err) => {
@@ -431,6 +433,14 @@ where
             }
 
             if must_skip {
+                break;
+            }
+
+            // Calculating the accumulated gas of the committed txns.
+            accumulated_gas += txn_gas;
+
+            // When the accumulated gas of the committed txns exceeds PER_BLOCK_GAS_LIMIT, halt sequential execution.
+            if accumulated_gas >= PER_BLOCK_GAS_LIMIT {
                 break;
             }
         }
