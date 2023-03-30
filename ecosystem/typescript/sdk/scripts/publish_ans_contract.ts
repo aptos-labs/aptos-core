@@ -1,4 +1,3 @@
-const path = require("path");
 const { execSync } = require("child_process");
 
 const ANS_CORE_FOLDER = "/aptos-names-contracts/core";
@@ -27,15 +26,16 @@ try {
   // 1. Clone ANS repository into the current directory
   console.log("working directory", __dirname);
   console.log("ANS_CORE_FOLDER", __dirname + ANS_CORE_FOLDER);
+
   console.log("---clone ANS repository---");
   execSync("git clone https://github.com/aptos-labs/aptos-names-contracts.git", {
-    cwd: path.resolve(__dirname),
+    cwd: __dirname,
   });
 
   // 2. initialize a default profile
   console.log("---initialize a default profile---");
   execSync(APTOS_INIT_COMMAND, {
-    cwd: path.resolve(__dirname + ANS_CORE_FOLDER),
+    cwd: __dirname + ANS_CORE_FOLDER,
   });
 
   // Sleep for 10 seconds to make sure account has funded
@@ -43,14 +43,14 @@ try {
   execSync("sleep 10");
 
   const output = execSync("ls -al", {
-    cwd: path.resolve(__dirname + ANS_CORE_FOLDER),
+    cwd: __dirname + ANS_CORE_FOLDER,
   }).toString();
   console.log(output);
 
   // 3. get default profile info
   console.log("---get default profile info---");
   const data = execSync(GET_DEFAULT_PROFILE_COMMAND, {
-    cwd: path.resolve(__dirname + ANS_CORE_FOLDER),
+    cwd: __dirname + ANS_CORE_FOLDER,
   })
     .toString()
     .trim();
@@ -64,7 +64,7 @@ try {
   execSync(
     `${APTOS_INVOCATION} move publish --named-addresses aptos_names=0x${profileAccountAddress},aptos_names_admin=0x${profileAccountAddress},aptos_names_funds=0x${profileAccountAddress} --assume-yes`,
     {
-      cwd: path.resolve(__dirname + ANS_CORE_FOLDER),
+      cwd: __dirname + ANS_CORE_FOLDER,
     },
   );
 
@@ -73,7 +73,6 @@ try {
   deleteAnsFolder();
 } catch (error: any) {
   console.error("An error occurred:");
-  //console.error("error", error);
   console.error("parsed stdout", error.stdout.toString("utf8"));
   console.error("parsed stderr", error.stderr.toString("utf8"));
   deleteAnsFolder();
@@ -82,6 +81,6 @@ try {
 
 function deleteAnsFolder() {
   execSync("rm -rf aptos-names-contracts", {
-    cwd: path.resolve(__dirname),
+    cwd: __dirname,
   });
 }
