@@ -1462,6 +1462,7 @@ dependencies = [
  "hex",
  "once_cell",
  "redis",
+ "redis-test",
  "regex",
  "reqwest",
  "reqwest-middleware",

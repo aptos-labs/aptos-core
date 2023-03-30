@@ -55,3 +55,4 @@ redis = { workspace = true }
 
 [dev-dependencies]
 aptos-api-test-context = { workspace = true }
+redis-test = "0.1.1"
