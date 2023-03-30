@@ -50,6 +50,15 @@ Natural log 2 in 32 bit fixed point
 
 
 
+<a name="0x1_math_fixed_LN2_X_32"></a>
+
+
+
+<pre><code><b>const</b> <a href="math_fixed.md#0x1_math_fixed_LN2_X_32">LN2_X_32</a>: u64 = 95265423104;
+</code></pre>
+
+
+
 <a name="0x1_math_fixed_sqrt"></a>
 
 ## Function `sqrt`
