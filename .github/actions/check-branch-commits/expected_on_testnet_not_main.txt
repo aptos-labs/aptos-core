@@ -1,6 +1,0 @@
-# This file contains a list of commit hashes that are expected to
-# be on the testnet branch, but not on the main branch. Each commit
-# hash should be on a new line, with a comment explaining why it is
-# not on the main branch.
-
-c9a622ec93871baf3a0a07b077f3a370dbef852e # Temporary override to revert faucet changes

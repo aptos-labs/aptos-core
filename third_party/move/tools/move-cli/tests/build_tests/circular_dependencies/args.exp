@@ -1,9 +1,0 @@
-Command `build -v`:
-Error: Unable to resolve packages for package 'Foo'
-
-Caused by:
-    0: While resolving dependency 'Bar' in package 'Foo'
-    1: Unable to resolve package dependency 'Bar'
-    2: While resolving dependency 'Foo' in package 'Bar'
-    3: Unable to resolve package dependency 'Foo'
-    4: Found cycle between packages: Foo -> Bar -> Foo
