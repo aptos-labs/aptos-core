@@ -328,6 +328,9 @@ impl NetworkConfig {
         if let Some(rev) = &rev {
             args.push("--framework-git-rev");
             args.push(rev.as_str());
+        } else {
+            args.push("--framework-local-dir");
+            args.push("/Users/kevin/aptos-core/aptos-move/framework/aptos-framework");
         };
 
         ExecuteProposal::parse_from(args).execute().await?;
