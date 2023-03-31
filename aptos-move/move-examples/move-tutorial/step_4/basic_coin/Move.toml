@@ -7,5 +7,5 @@ named_addr = "0xCAFE"
 
 [dependencies.AptosStdlib]
 git = 'https://github.com/aptos-labs/aptos-core.git'
-rev = 'main'
+rev = 'mainnet'
 subdir = 'aptos-move/framework/aptos-stdlib'

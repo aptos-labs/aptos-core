@@ -1,11 +1,10 @@
 [package]
-name = "MarketPlace"
-version = "0.0.1"
+name = "MarketplaceExample"
+version = "1.0.0"
 
 [dependencies]
-AptosFramework = { local = "../../framework/aptos-framework" }
-AptosToken = { local = "../../framework/aptos-token" }
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-framework/", rev = "mainnet" }
+AptosToken = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-token/", rev = "mainnet" }
 
 [addresses]
-std = "0x1"
 marketplace = "_"

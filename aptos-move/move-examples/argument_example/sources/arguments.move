@@ -1,4 +1,5 @@
-module deploy_address::number {
+/// Provides an example for inputs and outputs of all number types
+module argument_example::number {
     use std::error;
     use std::signer;
 

@@ -3,7 +3,7 @@ name = "DataStructure"
 version = "0.0.1"
 
 [dependencies]
-AptosStdlib = { local = "../../framework/aptos-stdlib" }
+AptosStdLib = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-stdlib/", rev = "mainnet" }
 
 [addresses]
 std = "0x1"

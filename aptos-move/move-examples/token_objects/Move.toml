@@ -1,10 +1,10 @@
 [package]
-name = "TokenObjects"
-version = "0.0.0"
+name = "TokenObjectsExample"
+version = "1.0.0"
 
 [addresses]
 token_objects = "_"
 
 [dependencies]
-AptosFramework = { local = "../../framework/aptos-framework" }
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-framework/", rev = "mainnet" }
 AptosTokenObjects = { local = "../../framework/aptos-token-objects" }
