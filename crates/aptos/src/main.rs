@@ -54,7 +54,7 @@ pub async fn check_for_update() {
                 .await
                 {
                     if update_info.update_required {
-                        eprintln!("==UPDATE NOTICE==\n A new version of the Aptos CLI is out {}, please run `aptos update` to update\n", update_info.latest_version);
+                        eprintln!("== UPDATE NOTICE ==\nA new version of the Aptos CLI is out {}, please run `aptos update` to update\n", update_info.latest_version);
                     }
                 }
 
