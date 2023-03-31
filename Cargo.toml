@@ -568,6 +568,7 @@ tonic = { version = "0.8.3", features = [
     "gzip",
     "codegen",
 ] }
+tonic-reflection = "0.6.0"
 ureq = { version = "1.5.4", features = [
     "json",
     "native-tls",
