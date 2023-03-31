@@ -1,5 +1,6 @@
 #![allow(dead_code, unused_variables)]
 
+use anyhow::Context;
 use std::{collections::HashMap, sync::RwLock};
 
 use crate::{
@@ -210,6 +211,12 @@ fn create_base_quote_key(m: &models::market::MarketRegistrationEvent) -> BaseQuo
     )
 }
 
+#[derive(Debug, Clone)]
+enum MarketAction {
+    Add(BigDecimal),
+    Remove(BigDecimal),
+}
+
 struct OrderBook;
 
 struct EconiaRedisCacher {
@@ -217,7 +224,7 @@ struct EconiaRedisCacher {
     config: RedisConfig,
     // mkt_id => OrderBook
     books: HashMap<BigDecimal, OrderBook>,
-    market_remove_rx: channel::Receiver<BigDecimal>,
+    market_rx: channel::Receiver<MarketAction>,
     event_rx: channel::Receiver<EventWrapper>,
 }
 
@@ -225,7 +232,7 @@ impl EconiaRedisCacher {
     fn new(
         config: RedisConfig,
         books: HashMap<BigDecimal, OrderBook>,
-        market_remove_rx: channel::Receiver<BigDecimal>,
+        market_rx: channel::Receiver<MarketAction>,
         event_rx: channel::Receiver<EventWrapper>,
     ) -> Self {
         let redis_client = redis::Client::open(&*config.url).expect("failed to connect to redis");
@@ -233,21 +240,89 @@ impl EconiaRedisCacher {
             redis_client,
             config,
             books,
-            market_remove_rx,
+            market_rx,
             event_rx,
         }
     }
 
-    fn start(&self) {
+    fn initialise_market(
+        &mut self,
+        conn: &mut redis::Connection,
+        mkt_id: BigDecimal,
+    ) -> anyhow::Result<()> {
+        let mut cmd = redis::cmd("HSET");
+        cmd.arg(&self.config.markets).arg(mkt_id.to_string()).arg(1);
+        cmd.query::<usize>(conn)?;
+
+        if self.books.get(&mkt_id).is_none() {
+            self.books.insert(mkt_id, OrderBook);
+        }
+
+        Ok(())
+    }
+
+    fn remove_market(
+        &mut self,
+        conn: &mut redis::Connection,
+        mkt_id: &BigDecimal,
+    ) -> anyhow::Result<()> {
+        let mut cmd = redis::cmd("HDEL");
+        cmd.arg(&self.config.markets).arg(mkt_id.to_string());
+        cmd.query::<usize>(conn)?;
+        self.books.remove(mkt_id);
+        Ok(())
+    }
+
+    fn initialise_markets(&mut self) -> anyhow::Result<()> {
+        let mut conn = self
+            .redis_client
+            .get_connection()
+            .context("failed to connect to redis")?;
+        let init_books = self.books.keys().cloned().collect::<Vec<BigDecimal>>();
+        for mkt_id in init_books.into_iter() {
+            self.initialise_market(&mut conn, mkt_id)?;
+        }
+        Ok(())
+    }
+
+    fn handle_maker_event(
+        &mut self,
+        conn: &mut redis::Connection,
+        e: MakerEvent,
+    ) -> anyhow::Result<()> {
+        todo!()
+    }
+
+    fn handle_taker_event(
+        &mut self,
+        conn: &mut redis::Connection,
+        e: TakerEvent,
+    ) -> anyhow::Result<()> {
+        todo!()
+    }
+
+    fn start(&mut self) {
+        // initialise markets
+        self.initialise_markets()
+            .expect("failed to initialise markets");
+
+        let mut conn = self
+            .redis_client
+            .get_connection()
+            .expect("failed to connect to redis");
+
         loop {
             channel::select! {
-                recv(self.market_remove_rx) -> mkt_id => {
-                    todo!()
+                recv(self.market_rx) -> mkt => match mkt.unwrap() {
+                    MarketAction::Add(m) => self.initialise_market(&mut conn, m).expect("failed to initialise market"),
+                    MarketAction::Remove(m) => self.remove_market(&mut conn, &m).expect("failed to remove market"),
                 },
-                recv(self.event_rx) -> event => {
-                    todo!()
+                recv(self.event_rx) -> event => match event.unwrap() {
+                    EventWrapper::Maker(e) => self.handle_maker_event(&mut conn, e).expect("failed to handle maker event"),
+                    EventWrapper::Taker(e) => self.handle_taker_event(&mut conn, e).expect("failed to handle taker event"),
+                    _ => panic!("received incorrect event in redis handler")
                 }
-            }
+            };
         }
     }
 }
@@ -256,7 +331,7 @@ pub struct EconiaTransactionProcessor {
     connection_pool: PgDbPool,
     markets: DashMap<BigDecimal, models::market::MarketRegistrationEvent>,
     base_quote_to_market_id: DashMap<BaseQuoteKey, BigDecimal>,
-    market_removal_tx: channel::Sender<BigDecimal>,
+    market_tx: channel::Sender<MarketAction>,
     event_tx: channel::Sender<EventWrapper>,
 }
 
@@ -275,17 +350,13 @@ impl EconiaTransactionProcessor {
         }
 
         let (event_tx, event_rx) = channel::unbounded();
-        let (market_removal_tx, market_removal_rx) = channel::unbounded();
+        let (market_tx, market_rx) = channel::unbounded();
 
         // start redis task
         let books = HashMap::from_iter(markets.iter().map(|m| (m.key().clone(), OrderBook)));
         std::thread::spawn(move || {
-            let cacher = EconiaRedisCacher::new(
-                ECONIA_CONFIG.redis.clone(),
-                books,
-                market_removal_rx,
-                event_rx,
-            );
+            let mut cacher =
+                EconiaRedisCacher::new(ECONIA_CONFIG.redis.clone(), books, market_rx, event_rx);
             cacher.start();
         });
 
@@ -293,7 +364,7 @@ impl EconiaTransactionProcessor {
             connection_pool,
             markets,
             base_quote_to_market_id,
-            market_removal_tx,
+            market_tx,
             event_tx,
         }
     }
@@ -302,6 +373,9 @@ impl EconiaTransactionProcessor {
         for e in ev.iter().cloned() {
             let m = models::market::MarketRegistrationEvent::from(e);
             let key = create_base_quote_key(&m);
+            self.market_tx
+                .send(MarketAction::Add(m.market_id.clone()))
+                .expect("market add tx failed");
             self.base_quote_to_market_id
                 .insert(key, m.market_id.clone());
             self.markets.insert(m.market_id.clone(), m);
@@ -309,8 +383,8 @@ impl EconiaTransactionProcessor {
     }
 
     fn remove_market_from_cache(&self, market_id: &BigDecimal) {
-        self.market_removal_tx
-            .send(market_id.clone())
+        self.market_tx
+            .send(MarketAction::Remove(market_id.clone()))
             .expect("market removal tx failed");
         self.markets.remove(market_id);
     }
@@ -377,9 +451,20 @@ impl EconiaTransactionProcessor {
 
             let event_wrapper: EventWrapper = serde_json::from_value(e.data.clone())
                 .map_err(|e| Error::DeserializationError(Box::new(e)))?;
+
             match event_wrapper {
-                EventWrapper::Maker(e) => maker.push(e),
-                EventWrapper::Taker(e) => taker.push(e),
+                EventWrapper::Maker(e) => {
+                    self.event_tx
+                        .send(EventWrapper::Maker(e.clone()))
+                        .expect("maker event tx failed");
+                    maker.push(e);
+                },
+                EventWrapper::Taker(e) => {
+                    self.event_tx
+                        .send(EventWrapper::Taker(e.clone()))
+                        .expect("taker event tx failed");
+                    taker.push(e);
+                },
                 EventWrapper::MarketRegistration(e) => market_registration.push(e),
                 EventWrapper::RecognizedMarket(e) => recognized_market.push(e),
             }
@@ -631,20 +716,35 @@ impl TransactionProcessor for EconiaTransactionProcessor {
 
 #[cfg(test)]
 mod tests {
-    use redis::{ConnectionLike, RedisError};
-    use redis_test::{MockCmd, MockRedisConnection};
+    use std::collections::HashMap;
 
-    fn my_exists<C: ConnectionLike>(conn: &mut C, key: &str) -> Result<bool, RedisError> {
-        let exists: bool = redis::cmd("EXISTS").arg(key).query(conn)?;
-        Ok(exists)
-    }
+    use super::{EconiaRedisCacher, OrderBook, RedisConfig};
+    use bigdecimal::BigDecimal;
+    use crossbeam::channel;
 
     #[test]
-    fn test_exists() {
-        let mut mock_connection =
-            MockRedisConnection::new(vec![MockCmd::new(redis::cmd("EXISTS").arg("foo"), Ok("1"))]);
+    fn test_initialise_remove_markets() {
+        let config = RedisConfig {
+            url: "redis://localhost:6379".to_string(),
+            open_orders: "open_orders".to_string(),
+            markets: "markets".to_string(),
+        };
+        let mut books = HashMap::new();
+        books.insert(BigDecimal::from(10), OrderBook);
+        let (_, a_rx) = channel::unbounded();
+        let (_, b_rx) = channel::unbounded();
+        let mut cacher = EconiaRedisCacher::new(config, books, a_rx, b_rx);
+        cacher.initialise_markets().unwrap();
+        let mut conn = cacher.redis_client.get_connection().unwrap();
+        let mut cmd = redis::cmd("HGET");
+        cmd.arg("markets").arg("10");
+        let res = cmd.query::<u64>(&mut conn).unwrap();
+        assert_eq!(res, 1);
 
-        let result = my_exists(&mut mock_connection, "foo").unwrap();
-        assert_eq!(result, true);
+        cacher
+            .remove_market(&mut conn, &BigDecimal::from(10))
+            .unwrap();
+        let res = cmd.query::<u64>(&mut conn);
+        assert!(res.is_err());
     }
 }
