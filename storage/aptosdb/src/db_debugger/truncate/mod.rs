@@ -7,6 +7,7 @@ use crate::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         epoch_by_version::EpochByVersionSchema,
     },
+    state_merkle_db::StateMerkleDb,
     utils::truncation_helper::{
         find_closest_node_version_at_or_before, get_current_version_in_state_merkle_db,
         get_ledger_commit_progress, get_overall_commit_progress, get_state_kv_commit_progress,
@@ -69,10 +70,15 @@ impl Cmd {
             use_state_kv_db: self.use_state_kv_db,
             ..Default::default()
         };
-        let (ledger_db, state_merkle_db, state_kv_db) =
-            AptosDB::open_dbs(&self.db_dir, rocksdb_config, /*readonly=*/ false)?;
+        let (ledger_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
+            &self.db_dir,
+            rocksdb_config,
+            /*readonly=*/ false,
+            /*max_num_nodes_per_lru_cache_shard=*/ 0,
+        )?;
 
         let ledger_db = Arc::new(ledger_db);
+        let state_merkle_db = Arc::new(state_merkle_db);
         let state_kv_db = Arc::new(state_kv_db);
         let overall_version =
             get_overall_commit_progress(&ledger_db)?.expect("Overall commit progress must exist.");
@@ -137,7 +143,7 @@ impl Cmd {
                 );
                 let version = StateStore::catch_up_state_merkle_db(
                     Arc::clone(&ledger_db),
-                    state_merkle_db,
+                    Arc::clone(&state_merkle_db),
                     Arc::clone(&state_kv_db),
                 )?;
                 println!("Done! current_version: {:?}", version);
@@ -149,7 +155,7 @@ impl Cmd {
 
     fn find_tree_root_at_or_before(
         ledger_db: &DB,
-        state_merkle_db: &DB,
+        state_merkle_db: &StateMerkleDb,
         version: Version,
     ) -> Result<Option<Version>> {
         match find_closest_node_version_at_or_before(state_merkle_db, version)? {
@@ -174,8 +180,9 @@ impl Cmd {
         }
     }
 
-    fn root_exists_at_version(state_merkle_db: &DB, version: Version) -> Result<bool> {
+    fn root_exists_at_version(state_merkle_db: &StateMerkleDb, version: Version) -> Result<bool> {
         Ok(state_merkle_db
+            .metadata_db()
             .get::<JellyfishMerkleNodeSchema>(&NodeKey::new_empty_path(version))?
             .is_some())
     }
@@ -260,6 +267,7 @@ mod test {
                 tmp_dir.path().to_path_buf(),
                 RocksdbConfigs::default(),
                 /*readonly=*/ false,
+                /*max_num_nodes_per_lru_cache_shard=*/ 0,
             ).unwrap();
 
             let num_frozen_nodes = num_frozen_nodes_in_accumulator(target_version + 1);
@@ -307,21 +315,24 @@ mod test {
                 prop_assert!(version <= target_version);
             }
 
-            let mut iter = state_merkle_db.iter::<StaleNodeIndexSchema>(ReadOptions::default()).unwrap();
+            // TODO(grao): Support sharding here.
+            let mut iter = state_merkle_db.metadata_db().iter::<StaleNodeIndexSchema>(ReadOptions::default()).unwrap();
             iter.seek_to_first();
             for item in iter {
                 let version = item.unwrap().0.stale_since_version;
                 prop_assert!(version <= target_version);
             }
 
-            let mut iter = state_merkle_db.iter::<StaleNodeIndexCrossEpochSchema>(ReadOptions::default()).unwrap();
+            // TODO(grao): Support sharding here.
+            let mut iter = state_merkle_db.metadata_db().iter::<StaleNodeIndexCrossEpochSchema>(ReadOptions::default()).unwrap();
             iter.seek_to_first();
             for item in iter {
                 let version = item.unwrap().0.stale_since_version;
                 prop_assert!(version <= target_version);
             }
 
-            let mut iter = state_merkle_db.iter::<JellyfishMerkleNodeSchema>(ReadOptions::default()).unwrap();
+            // TODO(grao): Support sharding here.
+            let mut iter = state_merkle_db.metadata_db().iter::<JellyfishMerkleNodeSchema>(ReadOptions::default()).unwrap();
             iter.seek_to_first();
             for item in iter {
                 let version = item.unwrap().0.version();
