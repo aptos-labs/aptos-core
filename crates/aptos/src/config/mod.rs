@@ -183,6 +183,12 @@ pub struct GlobalConfig {
     /// Prompt response type
     #[serde(default)]
     pub default_prompt_response: PromptResponseType,
+    /// Set to true to skip checking for updates
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub skip_update_check: Option<bool>,
+    /// Last time updates were checked for
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_update_check_time: Option<u64>,
 }
 
 impl GlobalConfig {
@@ -222,7 +228,8 @@ impl GlobalConfig {
         }
     }
 
-    fn save(&self) -> CliTypedResult<()> {
+    /// Save the global config
+    pub fn save(&self) -> CliTypedResult<()> {
         let global_folder = global_folder()?;
         create_dir_if_not_exist(global_folder.as_path())?;
 
