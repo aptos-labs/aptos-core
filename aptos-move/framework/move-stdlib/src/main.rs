@@ -20,7 +20,9 @@ fn main() {
 
         time_it("Generating error explanations", || {
             std::fs::remove_file(aptos_move_stdlib::move_stdlib_errmap_full_path()).unwrap_or(());
-            aptos_move_stdlib::build_error_code_map(&aptos_move_stdlib::move_stdlib_errmap_full_path());
+            aptos_move_stdlib::build_error_code_map(
+                &aptos_move_stdlib::move_stdlib_errmap_full_path(),
+            );
         });
     }
 }
