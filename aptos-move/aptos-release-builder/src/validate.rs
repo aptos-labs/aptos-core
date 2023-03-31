@@ -150,7 +150,10 @@ impl NetworkConfig {
         if let Some(rev) = &rev {
             args.push("--framework-git-rev");
             args.push(rev.as_str());
-        };
+        } else {
+            args.push("--framework-local-dir");
+            args.push("/Users/kevin/aptos-core/aptos-move/framework/aptos-framework");
+        }
 
         RunScript::parse_from(args).execute().await?;
         Ok(())
@@ -193,6 +196,8 @@ impl NetworkConfig {
             args.push(rev.as_str());
             SubmitProposal::parse_from(args).execute().await?;
         } else {
+            args.push("--framework-local-dir");
+            args.push("/Users/kevin/aptos-core/aptos-move/framework/aptos-framework");
             SubmitProposal::parse_from(args).execute().await?;
         };
 
@@ -380,7 +385,9 @@ async fn execute_release(
             if let Some(rev) = &rev {
                 args.push("--framework-git-rev");
                 args.push(rev.as_str());
-            };
+            } else {
+                args.push("--skip-fetch-latest-git-deps");
+            }
 
             RunScript::parse_from(args).execute().await?;
         }
