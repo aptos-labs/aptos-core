@@ -14,6 +14,7 @@ For on overview of the Move language, see the [Move Book][move-book].
 
 
 -  [`0x1::acl`](acl.md#0x1_acl)
+-  [`0x1::ascii`](ascii.md#0x1_ascii)
 -  [`0x1::bcs`](bcs.md#0x1_bcs)
 -  [`0x1::bit_vector`](bit_vector.md#0x1_bit_vector)
 -  [`0x1::error`](error.md#0x1_error)
