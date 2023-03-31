@@ -31,7 +31,7 @@ regex = "1.1.9"
 tempfile = "3.2.0"
 
 move-stackless-bytecode-interpreter = { path = "../../move-prover/interpreter" }
-move-stdlib = { path = "../../../../aptos-move/framework/move-stdlib", features = ["testing"] }
+move-stdlib = { path = "../../move-stdlib", features = ["testing"] }
 move-symbol-pool = { path = "../../move-symbol-pool" }
 move-vm-runtime = { path = "../../move-vm/runtime" }
 move-vm-test-utils = { path = "../../move-vm/test-utils" }

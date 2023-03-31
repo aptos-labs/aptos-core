@@ -35,7 +35,7 @@ move-symbol-pool = { path = "../move-symbol-pool" }
 
 [dev-dependencies]
 datatest-stable = "0.1.1"
-move-stdlib = { path = "../../../aptos-move/framework/move-stdlib" }
+move-stdlib = { path = "../move-stdlib" }
 
 [[test]]
 name = "move_check_testsuite"

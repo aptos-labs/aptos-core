@@ -28,7 +28,7 @@ bcs = { workspace = true }
 [dev-dependencies]
 datatest-stable = "0.1.1"
 move-prover-test-utils = { path = "../../../move-prover/test-utils" }
-move-stdlib = { path = "../../../../../aptos-move/framework/move-stdlib", features = ["testing"] }
+move-stdlib = { path = "../../../move-stdlib", features = ["testing"] }
 
 [[test]]
 name = "testsuite"

@@ -12,7 +12,7 @@ move-prover-test-utils = { path = "../test-utils" }
 
 # diem dependencies
 move-stackless-bytecode-interpreter = { path = "../interpreter" }
-move-stdlib = { path = "../../../../aptos-move/framework/move-stdlib" }
+move-stdlib = { path = "../../move-stdlib" }
 move-unit-test = { path = "../../tools/move-unit-test" }
 
 # external dependencies
