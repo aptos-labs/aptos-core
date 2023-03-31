@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::gas_meter::EXECUTION_GAS_MULTIPLIER as MUL;
-use move_stdlib::natives::GasParameters;
+use aptos_move_stdlib::natives::GasParameters;
 
 #[cfg(all(test, not(feature = "testing")))]
 const UNIT_TEST_ENTRIES: usize = 0;
