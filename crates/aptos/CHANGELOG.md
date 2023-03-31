@@ -5,6 +5,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 ## [Unreleased]
 ### Fixed
 * If `aptos init` is run with a faucet URL specified (which happens by default when using the local, devnet, or testnet network options) and funding the account fails, the account creation is considered a failure and nothing is persisted. Previously it would report success despite the account not being created on chain.
+* Default `aptos move init` branch is now `mainnet` and not `main`, which caused more variability in the compilation.
 
 ## [1.0.8] - 2023/03/16
 ### Added
