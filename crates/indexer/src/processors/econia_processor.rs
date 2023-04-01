@@ -1,7 +1,11 @@
 #![allow(dead_code, unused_variables)]
 
 use anyhow::Context;
-use std::{collections::HashMap, sync::RwLock};
+use econia_types::order::Order;
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::RwLock,
+};
 
 use crate::{
     database::{clean_data_for_db, execute_with_better_error, get_chunks, PgDbPool},
@@ -217,7 +221,19 @@ enum MarketAction {
     Remove(BigDecimal),
 }
 
-struct OrderBook;
+struct OrderBook {
+    asks: BTreeMap<BigDecimal, Order>,
+    bids: BTreeMap<BigDecimal, Order>,
+}
+
+impl OrderBook {
+    fn new() -> Self {
+        Self {
+            asks: BTreeMap::new(),
+            bids: BTreeMap::new(),
+        }
+    }
+}
 
 struct EconiaRedisCacher {
     redis_client: redis::Client,
@@ -231,7 +247,6 @@ struct EconiaRedisCacher {
 impl EconiaRedisCacher {
     fn new(
         config: RedisConfig,
-        books: HashMap<BigDecimal, OrderBook>,
         market_rx: channel::Receiver<MarketAction>,
         event_rx: channel::Receiver<EventWrapper>,
     ) -> Self {
@@ -239,7 +254,7 @@ impl EconiaRedisCacher {
         Self {
             redis_client,
             config,
-            books,
+            books: HashMap::new(),
             market_rx,
             event_rx,
         }
@@ -255,7 +270,7 @@ impl EconiaRedisCacher {
         cmd.query::<usize>(conn)?;
 
         if self.books.get(&mkt_id).is_none() {
-            self.books.insert(mkt_id, OrderBook);
+            self.books.insert(mkt_id, OrderBook::new());
         }
 
         Ok(())
@@ -273,13 +288,12 @@ impl EconiaRedisCacher {
         Ok(())
     }
 
-    fn initialise_markets(&mut self) -> anyhow::Result<()> {
+    fn initialise_markets(&mut self, books: Vec<BigDecimal>) -> anyhow::Result<()> {
         let mut conn = self
             .redis_client
             .get_connection()
             .context("failed to connect to redis")?;
-        let init_books = self.books.keys().cloned().collect::<Vec<BigDecimal>>();
-        for mkt_id in init_books.into_iter() {
+        for mkt_id in books.into_iter() {
             self.initialise_market(&mut conn, mkt_id)?;
         }
         Ok(())
@@ -301,9 +315,9 @@ impl EconiaRedisCacher {
         todo!()
     }
 
-    fn start(&mut self) {
+    fn start(&mut self, books: Vec<BigDecimal>) {
         // initialise markets
-        self.initialise_markets()
+        self.initialise_markets(books)
             .expect("failed to initialise markets");
 
         let mut conn = self
@@ -353,11 +367,14 @@ impl EconiaTransactionProcessor {
         let (market_tx, market_rx) = channel::unbounded();
 
         // start redis task
-        let books = HashMap::from_iter(markets.iter().map(|m| (m.key().clone(), OrderBook)));
+        let books = markets
+            .iter()
+            .map(|m| m.key().clone())
+            .collect::<Vec<BigDecimal>>();
         std::thread::spawn(move || {
             let mut cacher =
-                EconiaRedisCacher::new(ECONIA_CONFIG.redis.clone(), books, market_rx, event_rx);
-            cacher.start();
+                EconiaRedisCacher::new(ECONIA_CONFIG.redis.clone(), market_rx, event_rx);
+            cacher.start(books);
         });
 
         Self {
@@ -716,9 +733,7 @@ impl TransactionProcessor for EconiaTransactionProcessor {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-
-    use super::{EconiaRedisCacher, OrderBook, RedisConfig};
+    use super::{EconiaRedisCacher, RedisConfig};
     use bigdecimal::BigDecimal;
     use crossbeam::channel;
 
@@ -729,12 +744,11 @@ mod tests {
             open_orders: "open_orders".to_string(),
             markets: "markets".to_string(),
         };
-        let mut books = HashMap::new();
-        books.insert(BigDecimal::from(10), OrderBook);
+        let books = vec![BigDecimal::from(10)];
         let (_, a_rx) = channel::unbounded();
         let (_, b_rx) = channel::unbounded();
-        let mut cacher = EconiaRedisCacher::new(config, books, a_rx, b_rx);
-        cacher.initialise_markets().unwrap();
+        let mut cacher = EconiaRedisCacher::new(config, a_rx, b_rx);
+        cacher.initialise_markets(books).unwrap();
         let mut conn = cacher.redis_client.get_connection().unwrap();
         let mut cmd = redis::cmd("HGET");
         cmd.arg("markets").arg("10");
