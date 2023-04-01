@@ -86,7 +86,7 @@ export class AptosClient {
     } else {
       conf.WITH_CREDENTIALS = true;
     }
-    conf.HEADERS = { ...conf.HEADERS, "User-Agent": `aptos-ts-sdk / ${VERSION}` };
+    conf.HEADERS = { ...conf.HEADERS, "User-Agent": `aptos-ts-sdk/${VERSION}` };
 
     this.client = new Gen.AptosGeneratedClient(conf);
   }
