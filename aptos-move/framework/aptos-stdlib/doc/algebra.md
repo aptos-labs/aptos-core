@@ -92,7 +92,26 @@ See <code>algebra_*.<b>move</b></code> for currently implemented algebraic struc
 -  [Specification](#@Specification_0)
     -  [Function `add_internal`](#@Specification_0_add_internal)
     -  [Function `deserialize_internal`](#@Specification_0_deserialize_internal)
+    -  [Function `div_internal`](#@Specification_0_div_internal)
+    -  [Function `double_internal`](#@Specification_0_double_internal)
+    -  [Function `downcast_internal`](#@Specification_0_downcast_internal)
+    -  [Function `from_u64_internal`](#@Specification_0_from_u64_internal)
+    -  [Function `eq_internal`](#@Specification_0_eq_internal)
+    -  [Function `hash_to_internal`](#@Specification_0_hash_to_internal)
+    -  [Function `inv_internal`](#@Specification_0_inv_internal)
+    -  [Function `mul_internal`](#@Specification_0_mul_internal)
+    -  [Function `multi_pairing_internal`](#@Specification_0_multi_pairing_internal)
+    -  [Function `multi_scalar_mul_internal`](#@Specification_0_multi_scalar_mul_internal)
+    -  [Function `neg_internal`](#@Specification_0_neg_internal)
+    -  [Function `one_internal`](#@Specification_0_one_internal)
+    -  [Function `order_internal`](#@Specification_0_order_internal)
+    -  [Function `pairing_internal`](#@Specification_0_pairing_internal)
+    -  [Function `scalar_mul_internal`](#@Specification_0_scalar_mul_internal)
     -  [Function `serialize_internal`](#@Specification_0_serialize_internal)
+    -  [Function `sqr_internal`](#@Specification_0_sqr_internal)
+    -  [Function `sub_internal`](#@Specification_0_sub_internal)
+    -  [Function `upcast_internal`](#@Specification_0_upcast_internal)
+    -  [Function `zero_internal`](#@Specification_0_zero_internal)
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
@@ -1352,12 +1371,316 @@ Abort if <code>dst</code> is too long.
 
 
 
+<a name="@Specification_0_div_internal"></a>
+
+### Function `div_internal`
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_div_internal">div_internal</a>&lt;F&gt;(handle_1: u64, handle_2: u64): (bool, u64)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a name="@Specification_0_double_internal"></a>
+
+### Function `double_internal`
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_double_internal">double_internal</a>&lt;G&gt;(element_handle: u64): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a name="@Specification_0_downcast_internal"></a>
+
+### Function `downcast_internal`
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_downcast_internal">downcast_internal</a>&lt;L, S&gt;(handle: u64): (bool, u64)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a name="@Specification_0_from_u64_internal"></a>
+
+### Function `from_u64_internal`
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_from_u64_internal">from_u64_internal</a>&lt;S&gt;(value: u64): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a name="@Specification_0_eq_internal"></a>
+
+### Function `eq_internal`
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_eq_internal">eq_internal</a>&lt;S&gt;(handle_1: u64, handle_2: u64): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a name="@Specification_0_hash_to_internal"></a>
+
+### Function `hash_to_internal`
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_hash_to_internal">hash_to_internal</a>&lt;St, Su&gt;(dst: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a name="@Specification_0_inv_internal"></a>
+
+### Function `inv_internal`
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_inv_internal">inv_internal</a>&lt;F&gt;(handle: u64): (bool, u64)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a name="@Specification_0_mul_internal"></a>
+
+### Function `mul_internal`
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_mul_internal">mul_internal</a>&lt;F&gt;(handle_1: u64, handle_2: u64): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a name="@Specification_0_multi_pairing_internal"></a>
+
+### Function `multi_pairing_internal`
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_multi_pairing_internal">multi_pairing_internal</a>&lt;G1, G2, Gt&gt;(g1_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, g2_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a name="@Specification_0_multi_scalar_mul_internal"></a>
+
+### Function `multi_scalar_mul_internal`
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_multi_scalar_mul_internal">multi_scalar_mul_internal</a>&lt;G, S&gt;(element_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, scalar_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a name="@Specification_0_neg_internal"></a>
+
+### Function `neg_internal`
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_neg_internal">neg_internal</a>&lt;F&gt;(handle: u64): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a name="@Specification_0_one_internal"></a>
+
+### Function `one_internal`
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_one_internal">one_internal</a>&lt;S&gt;(): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a name="@Specification_0_order_internal"></a>
+
+### Function `order_internal`
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_order_internal">order_internal</a>&lt;G&gt;(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a name="@Specification_0_pairing_internal"></a>
+
+### Function `pairing_internal`
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_pairing_internal">pairing_internal</a>&lt;G1, G2, Gt&gt;(g1_handle: u64, g2_handle: u64): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a name="@Specification_0_scalar_mul_internal"></a>
+
+### Function `scalar_mul_internal`
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_scalar_mul_internal">scalar_mul_internal</a>&lt;G, S&gt;(element_handle: u64, scalar_handle: u64): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
 <a name="@Specification_0_serialize_internal"></a>
 
 ### Function `serialize_internal`
 
 
 <pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_serialize_internal">serialize_internal</a>&lt;S, F&gt;(handle: u64): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a name="@Specification_0_sqr_internal"></a>
+
+### Function `sqr_internal`
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_sqr_internal">sqr_internal</a>&lt;G&gt;(handle: u64): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a name="@Specification_0_sub_internal"></a>
+
+### Function `sub_internal`
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_sub_internal">sub_internal</a>&lt;G&gt;(handle_1: u64, handle_2: u64): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a name="@Specification_0_upcast_internal"></a>
+
+### Function `upcast_internal`
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_upcast_internal">upcast_internal</a>&lt;S, L&gt;(handle: u64): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a name="@Specification_0_zero_internal"></a>
+
+### Function `zero_internal`
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_zero_internal">zero_internal</a>&lt;S&gt;(): u64
 </code></pre>
 
 
