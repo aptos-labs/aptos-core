@@ -423,7 +423,7 @@ impl BufferItem {
         self.get_blocks().last().and_then(|block| block.block().author()).map(|proposer| {
             let validators = validators.get_ordered_account_addresses();
             let pos = validators.iter().position(|&addr| addr == proposer).unwrap();
-            validators.iter().cycle().skip(pos + 1).take(validators.len() / 5).copied().collect_vec()
+            validators.iter().cycle().skip(pos + 1).take(validators.len()).copied().collect_vec()
         }).unwrap_or_default()
     }
 
