@@ -419,11 +419,19 @@ impl BufferItem {
         }
     }
 
-    pub fn get_first_k_proposers(&self, k: usize) -> Vec<Author> {
-        self.get_blocks().iter()
-            .filter_map(|block| block.block().author())
-            .take(k)
-            .collect_vec()
+    // pub fn get_first_k_proposers(&self, k: usize) -> Vec<Author> {
+    //     self.get_blocks().iter()
+    //         .filter_map(|block| block.block().author())
+    //         .take(k)
+    //         .collect_vec()
+    // }
+
+    pub fn get_k_leaders(&self, _k: usize, validators: &ValidatorVerifier) -> Vec<Author> {
+        self.get_blocks().last().and_then(|block| block.block().author()).map(|proposer| {
+            let validators = validators.get_ordered_account_addresses();
+            let pos = validators.iter().position(|&addr| addr == proposer).unwrap();
+            validators.iter().cycle().skip(pos + 1).take(validators.len() / 10).copied().collect_vec()  // go through 10 leaders
+        }).unwrap_or_default()
     }
 
     pub fn gen_dummy_rand_share_vec(&self, author: Author) -> Vec<Option<RandShare>> {

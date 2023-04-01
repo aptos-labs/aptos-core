@@ -48,7 +48,7 @@ pub const LOOP_INTERVAL_MS: u64 = 1500;
 
 // Each validator will send a randomness share of size rand_size * rand_num / 100 (assuming 100 validators and even distribution)
 pub const RAND_SIZE: usize = 96;
-pub const RAND_NUM: usize = 10000;
+pub const RAND_NUM: usize = 100;
 pub const SHARE_SIZE: usize = RAND_SIZE * RAND_NUM / 100;
 pub const DECISION_SIZE: usize = RAND_SIZE;
 
@@ -224,7 +224,7 @@ impl BufferManager {
         // Send the randomness shares through the first k proposers,
         // otherwise all blocks are Nil/genesis blocks that do not need randomness
         let rand_shares = RandShares::new(item_hash, self.author, item.epoch(), item.gen_dummy_rand_share_vec(self.author));
-        for proposer in item.get_first_k_proposers(1) {
+        for proposer in item.get_k_leaders(1, &self.verifier) {
             info!(
                 self.new_log(LogEvent::SendRandToLeader)
                     .remote_peer(proposer),
@@ -282,7 +282,7 @@ impl BufferManager {
                             }
                             // if we're one of the proposer for the first k proposal block,
                             // we're responsible to broadcast the randomness decision
-                            if item.get_first_k_proposers(1).contains(&self.author) {
+                            if item.get_k_leaders(1, &self.verifier).contains(&self.author) {
                                 info!(
                                     self.new_log(LogEvent::LeaderBCastRand),
                                     "item id {}, item size {}", item_id, item.get_blocks().len()
