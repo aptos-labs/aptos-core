@@ -56,7 +56,7 @@ module aptos_std::string_utils {
     #[test]
     #[expected_failure(abort_code = EARGS_MISMATCH)]
     fun test_format_list_not_valid_nil() {
-        let l = cons(1, cons(2, 3));
+        let l = cons(1, cons(2, cons(3, 4)));
         let s = format_list(&std::string::utf8(b"a = {} b = {} c = {}"), &l);
         assert!(s == std::string::utf8(b"a = 1 b = 2 c = 3"), 1);
     }

@@ -10,16 +10,12 @@ use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, sync::Arc};
-use std::any::Any;
 use std::ops::Deref;
 use std::fmt::Write;
-use move_binary_format::errors::PartialVMError;
 use move_core_types::u256;
 use move_core_types::{value::{MoveStructLayout, MoveTypeLayout}, gas_algebra::InternalGas};
 use move_core_types::account_address::AccountAddress;
 use move_core_types::language_storage::TypeTag;
-use move_core_types::vm_status::StatusCode;
-use move_vm_types::loaded_data::runtime_types::StructType;
 use move_vm_types::values::{Reference, Struct};
 use crate::natives::helpers::SafeNativeError;
 
@@ -161,40 +157,42 @@ pub fn native_format_list(
             in_escape = true;
             continue;
         } else if !in_escape && c == '{' {
-            if (in_braces) {
+            if in_braces {
                 return Err(SafeNativeError::Abort { abort_code: invalid_fmt });
             }
             in_braces = true;
         } else if !in_escape && c == '}' {
-            if (!in_braces) {
+            if !in_braces {
                 return Err(SafeNativeError::Abort { abort_code: invalid_fmt });
             }
             in_braces = false;
-            if let Type::StructInstantiation(idx, ty_args) = list_ty {
-                // verify`that the type is a list
-                if let TypeTag::Struct(struct_tag) = context.type_to_type_tag(list_ty).map_err(|e| SafeNativeError::InvariantViolation(e))? {
-                    if !(struct_tag.address == AccountAddress::ONE && struct_tag.module.as_str() == "string_utils" && struct_tag.name.as_str() == "List") {
-                        return Err(SafeNativeError::Abort { abort_code: arg_mismatch });
-                    }
-                } else {
+            // verify`that the type is a list
+            if let TypeTag::Struct(struct_tag) = context.type_to_type_tag(list_ty).map_err(|e| SafeNativeError::InvariantViolation(e))? {
+                if !(struct_tag.address == AccountAddress::ONE && struct_tag.module.as_str() == "string_utils" && struct_tag.name.as_str() == "List") {
                     return Err(SafeNativeError::Abort { abort_code: arg_mismatch });
                 }
-                let mut it = val.value_as::<Struct>()?.unpack()?;
-                let car = it.next().unwrap();
-                val = it.next().unwrap();
-                list_ty = &ty_args[1];
-
-                let ty = context.deref().type_to_fully_annotated_layout(&ty_args[0])?.unwrap();
-                native_format_impl(context, &ty, car, &mut out)?;
             } else {
                 return Err(SafeNativeError::Abort { abort_code: arg_mismatch });
             }
+            // We know that the type is a list, so we can safely unwrap
+            let ty_args = if let Type::StructInstantiation(_, ty_args) = list_ty {
+                ty_args
+            } else {
+                unreachable!()
+            };
+            let mut it = val.value_as::<Struct>()?.unpack()?;
+            let car = it.next().unwrap();
+            val = it.next().unwrap();
+            list_ty = &ty_args[1];
+
+            let ty = context.deref().type_to_fully_annotated_layout(&ty_args[0])?.unwrap();
+            native_format_impl(context, &ty, car, &mut out)?;
         } else if !in_braces {
             out.push(c);
         }
         in_escape = false;
     }
-    if (in_escape || in_braces) {
+    if in_escape || in_braces {
         return Err(SafeNativeError::Abort { abort_code: invalid_fmt });
     }
     if let TypeTag::Struct(struct_tag) = context.type_to_type_tag(list_ty).map_err(|e| SafeNativeError::InvariantViolation(e))? {
