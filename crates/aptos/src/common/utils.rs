@@ -333,7 +333,7 @@ pub fn generate_vanity_account_ed25519(
     };
     hex::decode(to_check_if_is_hex).  // Check that the vanity prefix can be decoded into hex.
         map_err(|error| CliError::CommandArgumentError(format!(
-            "The vanity prefix could not be decoded to hex: {}", error.to_string())))?;
+            "The vanity prefix could not be decoded to hex: {}", error)))?;
     // Create a random key generator based on OS random number generator.
     let mut key_generator = KeyGen::from_os_rng();
     // Randomly generate a new Ed25519 private key.

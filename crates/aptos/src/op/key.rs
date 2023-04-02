@@ -213,7 +213,7 @@ impl CliCommand<HashMap<&'static str, PathBuf>> for GenerateKey {
                 } else {
                     // If a vanity prefix is specified, generate vanity Ed25519 account from it.
                     generate_vanity_account_ed25519(
-                        &self.vanity_prefix.vanity_prefix.as_ref().unwrap().as_str(),
+                        self.vanity_prefix.vanity_prefix.clone().unwrap().as_str(),
                     )?
                 };
                 // Store CLI result map from key save operation, to append vanity address if needed.
