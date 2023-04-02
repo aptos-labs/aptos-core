@@ -921,15 +921,11 @@ impl CliTestFramework {
         index: usize,
         script_contents: &str,
     ) -> CliTypedResult<TransactionSummary> {
-        self.run_script_with_framework_package(
-            index,
-            script_contents,
-            FrameworkPackageArgs {
-                framework_git_rev: None,
-                framework_local_dir: Some(Self::aptos_framework_dir()),
-                skip_fetch_latest_git_deps: false,
-            },
-        )
+        self.run_script_with_framework_package(index, script_contents, FrameworkPackageArgs {
+            framework_git_rev: None,
+            framework_local_dir: Some(Self::aptos_framework_dir()),
+            skip_fetch_latest_git_deps: false,
+        })
         .await
     }
 
@@ -939,15 +935,11 @@ impl CliTestFramework {
         index: usize,
         script_contents: &str,
     ) -> CliTypedResult<TransactionSummary> {
-        self.run_script_with_framework_package(
-            index,
-            script_contents,
-            FrameworkPackageArgs {
-                framework_git_rev: None,
-                framework_local_dir: None,
-                skip_fetch_latest_git_deps: false,
-            },
-        )
+        self.run_script_with_framework_package(index, script_contents, FrameworkPackageArgs {
+            framework_git_rev: None,
+            framework_local_dir: None,
+            skip_fetch_latest_git_deps: false,
+        })
         .await
     }
 
