@@ -20,7 +20,6 @@ use move_vm_types::values::{Reference, Struct};
 use crate::natives::helpers::SafeNativeError;
 
 pub fn native_format_impl(
-    context: &mut SafeNativeContext,
     ty: &MoveTypeLayout,
     val: Value,
     out: &mut String
@@ -69,7 +68,7 @@ pub fn native_format_impl(
                 if i > 0 {
                     out.push_str(", ");
                 }
-                native_format_impl(context, ty.as_ref(), x, out)?;
+                native_format_impl(ty.as_ref(), x, out)?;
             }
             out.push(']');
         }
@@ -82,7 +81,7 @@ pub fn native_format_impl(
                     out.push_str(", ");
                 }
                 write!(out, "{}: ", ty.name).unwrap();
-                native_format_impl(context, &ty.layout, x, out)?;
+                native_format_impl(&ty.layout, x, out)?;
             }
             out.push('}');
         }
@@ -94,7 +93,7 @@ pub fn native_format_impl(
                     out.push_str(", ");
                 }
                 write!(out, "{}: ", ty.name).unwrap();
-                native_format_impl(context, &ty.layout, x, out)?;
+                native_format_impl(&ty.layout, x, out)?;
             }
             out.push('}');
         }
@@ -105,7 +104,7 @@ pub fn native_format_impl(
                 if i > 0 {
                     out.push_str(", ");
                 }
-                native_format_impl(context, ty, x, out)?;
+                native_format_impl(ty, x, out)?;
             }
             out.push(')');
         }
@@ -122,9 +121,9 @@ pub fn native_format(
     debug_assert!(ty_args.len() == 1);
     let ty = context.deref().type_to_fully_annotated_layout(&ty_args[0])?.unwrap();
     let x = safely_pop_arg!(arguments, Reference);
-    let v = x.read_ref().map_err(|e| SafeNativeError::InvariantViolation(e))?;
+    let v = x.read_ref().map_err(SafeNativeError::InvariantViolation)?;
     let mut out = String::new();
-    native_format_impl(context, &ty, v, &mut out)?;
+    native_format_impl(&ty, v, &mut out)?;
     let move_str = Value::struct_(Struct::pack(vec![Value::vector_u8(out.into_bytes())]));
     Ok(smallvec![move_str])
 }
@@ -139,10 +138,10 @@ pub fn native_format_list(
     let mut list_ty = &ty_args[0];
 
     let val = safely_pop_arg!(arguments, Reference);
-    let mut val = val.read_ref().map_err(|e| SafeNativeError::InvariantViolation(e))?;
+    let mut val = val.read_ref().map_err(SafeNativeError::InvariantViolation)?;
 
     let fmt = safely_pop_arg!(arguments, Reference);
-    let fmt = fmt.read_ref().map_err(|e| SafeNativeError::InvariantViolation(e))?;
+    let fmt = fmt.read_ref().map_err(SafeNativeError::InvariantViolation)?;
     let fmt = fmt.value_as::<Struct>()?.unpack()?.next().unwrap().value_as::<Vec<u8>>()?;
     let fmt = std::str::from_utf8(&fmt).unwrap();
 
@@ -150,13 +149,13 @@ pub fn native_format_list(
     let invalid_fmt = 2;
 
     let match_list_ty = |context:&mut SafeNativeContext, name| {
-        if let TypeTag::Struct(struct_tag) = context.type_to_type_tag(list_ty).map_err(|e| SafeNativeError::InvariantViolation(e))? {
+        if let TypeTag::Struct(struct_tag) = context.type_to_type_tag(list_ty).map_err(SafeNativeError::InvariantViolation)? {
             if !(struct_tag.address == AccountAddress::ONE && struct_tag.module.as_str() == "string_utils" && struct_tag.name.as_str() == name) {
                 return Err(SafeNativeError::Abort { abort_code: arg_mismatch });
             }
             Ok(())
         } else {
-            return Err(SafeNativeError::Abort { abort_code: arg_mismatch });
+            Err(SafeNativeError::Abort { abort_code: arg_mismatch })
         }
     };
 
@@ -192,7 +191,7 @@ pub fn native_format_list(
             list_ty = &ty_args[1];
 
             let ty = context.deref().type_to_fully_annotated_layout(&ty_args[0])?.unwrap();
-            native_format_impl(context, &ty, car, &mut out)?;
+            native_format_impl(&ty, car, &mut out)?;
         } else if !in_braces {
             out.push(c);
         }
