@@ -16,6 +16,7 @@ pub mod state_storage;
 pub mod transaction_context;
 pub mod type_info;
 pub mod util;
+pub mod string_utils;
 
 use crate::natives::cryptography::multi_ed25519;
 use aggregator_natives::{aggregator, aggregator_factory};
@@ -356,7 +357,11 @@ pub fn all_natives(
     );
     add_natives_from_module!(
         "object",
-        object::make_all(gas_params.object, timed_features, features)
+        object::make_all(gas_params.object, timed_features.clone(), features.clone())
+    );
+    add_natives_from_module!(
+        "string_utils",
+        string_utils::make_all(string_utils::FormatGasParams {}, timed_features, features)
     );
 
     make_table_from_iter(framework_addr, natives)
