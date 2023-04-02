@@ -16,7 +16,7 @@ use crate::{
             EncodingOptions, FaucetOptions, GasOptions, KeyType, MoveManifestAccountWrapper,
             MovePackageDir, OptionalPoolAddressArgs, PoolAddressArgs, PrivateKeyInputOptions,
             PromptOptions, PublicKeyInputOptions, RestOptions, RngArgs, SaveFile,
-            TransactionOptions, TransactionSummary,
+            TransactionOptions, TransactionSummary, VanityPrefix,
         },
         utils::write_to_file,
     },
@@ -720,6 +720,9 @@ impl CliTestFramework {
                 },
                 encoding_options: Default::default(),
             },
+            vanity_prefix: VanityPrefix {
+                vanity_prefix: None,
+            },
         }
         .execute()
         .await
@@ -918,11 +921,15 @@ impl CliTestFramework {
         index: usize,
         script_contents: &str,
     ) -> CliTypedResult<TransactionSummary> {
-        self.run_script_with_framework_package(index, script_contents, FrameworkPackageArgs {
-            framework_git_rev: None,
-            framework_local_dir: Some(Self::aptos_framework_dir()),
-            skip_fetch_latest_git_deps: false,
-        })
+        self.run_script_with_framework_package(
+            index,
+            script_contents,
+            FrameworkPackageArgs {
+                framework_git_rev: None,
+                framework_local_dir: Some(Self::aptos_framework_dir()),
+                skip_fetch_latest_git_deps: false,
+            },
+        )
         .await
     }
 
@@ -932,11 +939,15 @@ impl CliTestFramework {
         index: usize,
         script_contents: &str,
     ) -> CliTypedResult<TransactionSummary> {
-        self.run_script_with_framework_package(index, script_contents, FrameworkPackageArgs {
-            framework_git_rev: None,
-            framework_local_dir: None,
-            skip_fetch_latest_git_deps: false,
-        })
+        self.run_script_with_framework_package(
+            index,
+            script_contents,
+            FrameworkPackageArgs {
+                framework_git_rev: None,
+                framework_local_dir: None,
+                skip_fetch_latest_git_deps: false,
+            },
+        )
         .await
     }
 
