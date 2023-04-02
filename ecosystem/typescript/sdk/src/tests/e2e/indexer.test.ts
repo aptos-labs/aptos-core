@@ -7,18 +7,35 @@ import { TokenClient } from "../../plugins/token_client";
 import { FAUCET_AUTH_TOKEN, longTestTimeout } from "../unit/test_helper.test";
 import { Network, NetworkToIndexerAPI, NetworkToNodeAPI, sleep } from "../../utils";
 
+const aptosClient = new AptosClient(NetworkToNodeAPI[Network.TESTNET]);
+const faucetClient = new FaucetClient(
+  "https://fullnode.testnet.aptoslabs.com",
+  "https://faucet.testnet.aptoslabs.com",
+  { TOKEN: FAUCET_AUTH_TOKEN },
+);
+const tokenClient = new TokenClient(aptosClient);
+const alice = new AptosAccount();
+const collectionName = "AliceCollection";
+const tokenName = "Alice Token";
+const indexerClient = new IndexerClient(NetworkToIndexerAPI[Network.TESTNET]);
+
 describe("Indexer", () => {
-  const aptosClient = new AptosClient(NetworkToNodeAPI[Network.TESTNET]);
-  const faucetClient = new FaucetClient(
-    "https://fullnode.testnet.aptoslabs.com",
-    "https://faucet.testnet.aptoslabs.com",
-    { TOKEN: FAUCET_AUTH_TOKEN },
-  );
-  const tokenClient = new TokenClient(aptosClient);
-  const alice = new AptosAccount();
-  const collectionName = "AliceCollection";
-  const tokenName = "Alice Token";
-  const indexerClient = new IndexerClient(NetworkToIndexerAPI[Network.TESTNET]);
+  it("should throw an error when account address is not valid", async () => {
+    expect(async () => {
+      await indexerClient.getAccountNFTs("702ca08576f66393140967fef983bb6bf160dafeb73de9c4ddac4d2dc");
+    }).rejects.toThrow("Address needs to be 66 chars long.");
+
+    expect(async () => {
+      await indexerClient.getAccountNFTs("0x702ca08576f66393140967fef983bb6bf160dafeb73de9c4ddac4d2dc");
+    }).rejects.toThrow("Address needs to be 66 chars long.");
+  });
+
+  it("should not throw an error when account address is missing 0x", async () => {
+    expect(async () => {
+      await indexerClient.getAccountNFTs("790a34c702ca08576f66393140967fef983bb6bf160dafeb73de9c4ddac4d2dc");
+    }).not.toThrow("Address needs to be 66 chars long.");
+  });
+
   beforeAll(async () => {
     await faucetClient.fundAccount(alice.address(), 100000000);
     // Create collection and token on Alice's account

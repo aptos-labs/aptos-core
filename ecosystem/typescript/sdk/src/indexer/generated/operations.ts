@@ -22,12 +22,12 @@ export type TokenDataFieldsFragment = { __typename?: 'current_token_datas', crea
 
 export type CollectionDataFieldsFragment = { __typename?: 'current_collection_datas', metadata_uri: string, supply: any, description: string, collection_name: string, collection_data_id_hash: string, table_handle: string, creator_address: string };
 
-export type AccountTokensCountQueryVariables = Types.Exact<{
+export type GetAccountTokensCountQueryVariables = Types.Exact<{
   owner_address?: Types.InputMaybe<Types.Scalars['String']>;
 }>;
 
 
-export type AccountTokensCountQuery = { __typename?: 'query_root', current_token_ownerships_aggregate: { __typename?: 'current_token_ownerships_aggregate', aggregate?: { __typename?: 'current_token_ownerships_aggregate_fields', count: number } | null } };
+export type GetAccountTokensCountQuery = { __typename?: 'query_root', current_token_ownerships_aggregate: { __typename?: 'current_token_ownerships_aggregate', aggregate?: { __typename?: 'current_token_ownerships_aggregate_fields', count: number } | null } };
 
 export type GetAccountTransactionsCountQueryVariables = Types.Exact<{
   address?: Types.InputMaybe<Types.Scalars['String']>;

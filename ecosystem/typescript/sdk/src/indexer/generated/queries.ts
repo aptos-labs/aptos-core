@@ -62,8 +62,8 @@ export const GetAccountCurrentTokens = `
 }
     ${TokenDataFieldsFragmentDoc}
 ${CollectionDataFieldsFragmentDoc}`;
-export const AccountTokensCount = `
-    query AccountTokensCount($owner_address: String) {
+export const GetAccountTokensCount = `
+    query getAccountTokensCount($owner_address: String) {
   current_token_ownerships_aggregate(
     where: {owner_address: {_eq: $owner_address}, amount: {_gt: "0"}}
   ) {
@@ -224,8 +224,8 @@ export function getSdk(client: GraphQLClient, withWrapper: SdkFunctionWrapper = 
     getAccountCurrentTokens(variables: Types.GetAccountCurrentTokensQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetAccountCurrentTokensQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetAccountCurrentTokensQuery>(GetAccountCurrentTokens, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getAccountCurrentTokens', 'query');
     },
-    AccountTokensCount(variables?: Types.AccountTokensCountQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.AccountTokensCountQuery> {
-      return withWrapper((wrappedRequestHeaders) => client.request<Types.AccountTokensCountQuery>(AccountTokensCount, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'AccountTokensCount', 'query');
+    getAccountTokensCount(variables?: Types.GetAccountTokensCountQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetAccountTokensCountQuery> {
+      return withWrapper((wrappedRequestHeaders) => client.request<Types.GetAccountTokensCountQuery>(GetAccountTokensCount, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getAccountTokensCount', 'query');
     },
     getAccountTransactionsCount(variables?: Types.GetAccountTransactionsCountQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetAccountTransactionsCountQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetAccountTransactionsCountQuery>(GetAccountTransactionsCount, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getAccountTransactionsCount', 'query');

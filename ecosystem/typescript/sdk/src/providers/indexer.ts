@@ -1,9 +1,9 @@
 import axios from "axios";
 
 import { AnyNumber } from "../bcs/types";
-import { MaybeHexString } from "../utils";
+import { HexString, MaybeHexString } from "../utils";
 import {
-  AccountTokensCountQuery,
+  GetAccountTokensCountQuery,
   GetAccountCoinsDataQuery,
   GetAccountCurrentTokensQuery,
   GetAccountTransactionsCountQuery,
@@ -19,7 +19,7 @@ import {
   GetUserTransactionsQuery,
 } from "../indexer/generated/operations";
 import {
-  AccountTokensCount,
+  GetAccountTokensCount,
   GetAccountCoinsData,
   GetAccountCurrentTokens,
   GetAccountTransactionsCount,
@@ -35,6 +35,14 @@ import {
   GetUserTransactions,
 } from "../indexer/generated/queries";
 
+/**
+ * Controls the number of results that are returned and the starting position of those results.
+ * limit specifies the maximum number of items or records to return in a query result.
+ * offset parameter specifies the starting position of the query result within the set of data.
+ * For example, if you want to retrieve records 11-20,
+ * you would set the offset parameter to 10 (i.e., the index of the first record to retrieve is 10)
+ * and the limit parameter to 10 (i.e., the number of records to retrieve is 10))
+ */
 interface PaginationArgs {
   offset?: AnyNumber;
   limit?: number;
@@ -60,11 +68,22 @@ export class IndexerClient {
   }
 
   /**
+   * Indexer only accepts address in the long format, i.e a 66 chars long -> 0x<64 chars>
+   * This method makes sure address is 66 chars long.
+   * @param address
+   */
+  validateAddress(address: string): void {
+    if (address.length < 66) {
+      throw new Error("Address needs to be 66 chars long.");
+    }
+  }
+
+  /**
    * Builds a axios client call to fetch data from Aptos Indexer.
    *
    * @param graphqlQuery A GraphQL query to pass in the `data` axios call.
    */
-  private async queryIndexer<T>(graphqlQuery: GraphqlQuery): Promise<T> {
+  async queryIndexer<T>(graphqlQuery: GraphqlQuery): Promise<T> {
     const { data } = await axios.post(this.endpoint, graphqlQuery);
     if (data.errors) {
       throw new Error(`Indexer data error ${JSON.stringify(data.errors, null, " ")}`);
@@ -85,12 +104,14 @@ export class IndexerClient {
   }
 
   /**
-   * Queries an Aptos account's NFTs by address
+   * Queries an Aptos account's NFTs by owner address
    *
-   * @param accountAddress Hex-encoded 32 byte Aptos account address
+   * @param ownerAddress Hex-encoded 32 byte Aptos account address
    * @returns GetAccountCurrentTokensQuery response type
    */
   async getAccountNFTs(ownerAddress: MaybeHexString, options?: PaginationArgs): Promise<GetAccountCurrentTokensQuery> {
+    ownerAddress = HexString.ensure(ownerAddress).hex();
+    this.validateAddress(ownerAddress);
     const graphqlQuery = {
       query: GetAccountCurrentTokens,
       variables: { address: ownerAddress, offset: options?.offset, limit: options?.limit },
@@ -119,10 +140,12 @@ export class IndexerClient {
    * @param ownerAddress Owner address
    * @returns GetAccountCoinsDataQuery response type
    */
-  async getAccountCoinsData(ownerAddress: string, options?: PaginationArgs): Promise<GetAccountCoinsDataQuery> {
+  async getAccountCoinsData(ownerAddress: MaybeHexString, options?: PaginationArgs): Promise<GetAccountCoinsDataQuery> {
+    const owner_address = HexString.ensure(ownerAddress).hex();
+    this.validateAddress(owner_address);
     const graphqlQuery = {
       query: GetAccountCoinsData,
-      variables: { owner_address: ownerAddress, offset: options?.offset, limit: options?.limit },
+      variables: { owner_address, offset: options?.offset, limit: options?.limit },
     };
     return this.queryIndexer(graphqlQuery);
   }
@@ -133,10 +156,12 @@ export class IndexerClient {
    * @param ownerAddress Owner address
    * @returns AccountTokensCountQuery response type
    */
-  async getAccountTokensCount(ownerAddress: string): Promise<AccountTokensCountQuery> {
+  async getAccountTokensCount(ownerAddress: MaybeHexString): Promise<GetAccountTokensCountQuery> {
+    const owner_address = HexString.ensure(ownerAddress).hex();
+    this.validateAddress(owner_address);
     const graphqlQuery = {
-      query: AccountTokensCount,
-      variables: { owner_address: ownerAddress },
+      query: GetAccountTokensCount,
+      variables: { owner_address },
     };
     return this.queryIndexer(graphqlQuery);
   }
@@ -147,7 +172,9 @@ export class IndexerClient {
    * @param address Account address
    * @returns GetAccountTransactionsCountQuery response type
    */
-  async getAccountTransactionsCount(address: string): Promise<GetAccountTransactionsCountQuery> {
+  async getAccountTransactionsCount(address: MaybeHexString): Promise<GetAccountTransactionsCountQuery> {
+    address = HexString.ensure(address).hex();
+    this.validateAddress(address);
     const graphqlQuery = {
       query: GetAccountTransactionsCount,
       variables: { address },
@@ -162,9 +189,11 @@ export class IndexerClient {
    * @returns GetAccountTransactionsDataQuery response type
    */
   async getAccountTransactionsData(
-    address: string,
+    address: MaybeHexString,
     options?: PaginationArgs,
   ): Promise<GetAccountTransactionsDataQuery> {
+    address = HexString.ensure(address).hex();
+    this.validateAddress(address);
     const graphqlQuery = {
       query: GetAccountTransactionsData,
       variables: { address, offset: options?.offset, limit: options?.limit },
@@ -180,12 +209,19 @@ export class IndexerClient {
    * @returns GetDelegatedStakingActivitiesQuery response type
    */
   async getDelegatedStakingActivities(
-    delegatorAddress: string,
-    poolAddress: string,
+    delegatorAddress: MaybeHexString,
+    poolAddress: MaybeHexString,
   ): Promise<GetDelegatedStakingActivitiesQuery> {
+    delegatorAddress = HexString.ensure(delegatorAddress).hex();
+    poolAddress = HexString.ensure(poolAddress).hex();
+    this.validateAddress(delegatorAddress);
+    this.validateAddress(poolAddress);
     const graphqlQuery = {
       query: GetDelegatedStakingActivities,
-      variables: { delegatorAddress, poolAddress },
+      variables: {
+        delegatorAddress,
+        poolAddress,
+      },
     };
     return this.queryIndexer(graphqlQuery);
   }
@@ -265,7 +301,9 @@ export class IndexerClient {
    *
    * @returns GetCurrentDelegatorBalancesCountQuery response type
    */
-  async getCurrentDelegatorBalancesCount(poolAddress: string): Promise<GetCurrentDelegatorBalancesCountQuery> {
+  async getCurrentDelegatorBalancesCount(poolAddress: MaybeHexString): Promise<GetCurrentDelegatorBalancesCountQuery> {
+    poolAddress = HexString.ensure(poolAddress).hex();
+    this.validateAddress(poolAddress);
     const graphqlQuery = {
       query: GetCurrentDelegatorBalancesCount,
       variables: { poolAddress },

@@ -1,4 +1,4 @@
-query AccountTokensCount($owner_address: String) {
+query getAccountTokensCount($owner_address: String) {
   current_token_ownerships_aggregate(where: { owner_address: { _eq: $owner_address }, amount: { _gt: "0" } }) {
     aggregate {
       count

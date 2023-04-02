@@ -75,6 +75,83 @@ export type String_Comparison_Exp = {
   _similar?: InputMaybe<Scalars['String']>;
 };
 
+/** columns and relationships of "address_version_from_events" */
+export type Address_Version_From_Events = {
+  __typename?: 'address_version_from_events';
+  account_address?: Maybe<Scalars['String']>;
+  coin_activities: Array<Coin_Activities>;
+  token_activities: Array<Token_Activities>;
+  token_activities_aggregate: Token_Activities_Aggregate;
+  transaction_version?: Maybe<Scalars['bigint']>;
+};
+
+
+/** columns and relationships of "address_version_from_events" */
+export type Address_Version_From_EventsCoin_ActivitiesArgs = {
+  distinct_on?: InputMaybe<Array<Coin_Activities_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Coin_Activities_Order_By>>;
+  where?: InputMaybe<Coin_Activities_Bool_Exp>;
+};
+
+
+/** columns and relationships of "address_version_from_events" */
+export type Address_Version_From_EventsToken_ActivitiesArgs = {
+  distinct_on?: InputMaybe<Array<Token_Activities_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Token_Activities_Order_By>>;
+  where?: InputMaybe<Token_Activities_Bool_Exp>;
+};
+
+
+/** columns and relationships of "address_version_from_events" */
+export type Address_Version_From_EventsToken_Activities_AggregateArgs = {
+  distinct_on?: InputMaybe<Array<Token_Activities_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Token_Activities_Order_By>>;
+  where?: InputMaybe<Token_Activities_Bool_Exp>;
+};
+
+/** Boolean expression to filter rows from the table "address_version_from_events". All fields are combined with a logical 'AND'. */
+export type Address_Version_From_Events_Bool_Exp = {
+  _and?: InputMaybe<Array<Address_Version_From_Events_Bool_Exp>>;
+  _not?: InputMaybe<Address_Version_From_Events_Bool_Exp>;
+  _or?: InputMaybe<Array<Address_Version_From_Events_Bool_Exp>>;
+  account_address?: InputMaybe<String_Comparison_Exp>;
+  transaction_version?: InputMaybe<Bigint_Comparison_Exp>;
+};
+
+/** Ordering options when selecting data from "address_version_from_events". */
+export type Address_Version_From_Events_Order_By = {
+  account_address?: InputMaybe<Order_By>;
+  transaction_version?: InputMaybe<Order_By>;
+};
+
+/** select columns of table "address_version_from_events" */
+export enum Address_Version_From_Events_Select_Column {
+  /** column name */
+  AccountAddress = 'account_address',
+  /** column name */
+  TransactionVersion = 'transaction_version'
+}
+
+/** Streaming cursor of the table "address_version_from_events" */
+export type Address_Version_From_Events_Stream_Cursor_Input = {
+  /** Stream column input with initial value */
+  initial_value: Address_Version_From_Events_Stream_Cursor_Value_Input;
+  /** cursor ordering */
+  ordering?: InputMaybe<Cursor_Ordering>;
+};
+
+/** Initial value of the column from where the streaming should start */
+export type Address_Version_From_Events_Stream_Cursor_Value_Input = {
+  account_address?: InputMaybe<Scalars['String']>;
+  transaction_version?: InputMaybe<Scalars['bigint']>;
+};
+
 /** Boolean expression to compare columns of type "bigint". All fields are combined with logical 'AND'. */
 export type Bigint_Comparison_Exp = {
   _eq?: InputMaybe<Scalars['bigint']>;
@@ -2498,7 +2575,8 @@ export type Proposal_Votes_Variance_Fields = {
 
 export type Query_Root = {
   __typename?: 'query_root';
-  /** fetch data from the table: "coin_activities" */
+  /** fetch data from the table: "address_version_from_events" */
+  address_version_from_events: Array<Address_Version_From_Events>;
   coin_activities: Array<Coin_Activities>;
   /** fetch data from the table: "coin_activities" using primary key columns */
   coin_activities_by_pk?: Maybe<Coin_Activities>;
@@ -2598,9 +2676,7 @@ export type Query_Root = {
   table_metadatas: Array<Table_Metadatas>;
   /** fetch data from the table: "table_metadatas" using primary key columns */
   table_metadatas_by_pk?: Maybe<Table_Metadatas>;
-  /** fetch data from the table: "token_activities" */
   token_activities: Array<Token_Activities>;
-  /** fetch aggregated fields from the table: "token_activities" */
   token_activities_aggregate: Token_Activities_Aggregate;
   /** fetch data from the table: "token_activities" using primary key columns */
   token_activities_by_pk?: Maybe<Token_Activities>;
@@ -2620,6 +2696,15 @@ export type Query_Root = {
   user_transactions: Array<User_Transactions>;
   /** fetch data from the table: "user_transactions" using primary key columns */
   user_transactions_by_pk?: Maybe<User_Transactions>;
+};
+
+
+export type Query_RootAddress_Version_From_EventsArgs = {
+  distinct_on?: InputMaybe<Array<Address_Version_From_Events_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Address_Version_From_Events_Order_By>>;
+  where?: InputMaybe<Address_Version_From_Events_Bool_Exp>;
 };
 
 
@@ -3097,7 +3182,10 @@ export type Query_RootUser_Transactions_By_PkArgs = {
 
 export type Subscription_Root = {
   __typename?: 'subscription_root';
-  /** fetch data from the table: "coin_activities" */
+  /** fetch data from the table: "address_version_from_events" */
+  address_version_from_events: Array<Address_Version_From_Events>;
+  /** fetch data from the table in a streaming manner : "address_version_from_events" */
+  address_version_from_events_stream: Array<Address_Version_From_Events>;
   coin_activities: Array<Coin_Activities>;
   /** fetch data from the table: "coin_activities" using primary key columns */
   coin_activities_by_pk?: Maybe<Coin_Activities>;
@@ -3245,9 +3333,7 @@ export type Subscription_Root = {
   table_metadatas_by_pk?: Maybe<Table_Metadatas>;
   /** fetch data from the table in a streaming manner : "table_metadatas" */
   table_metadatas_stream: Array<Table_Metadatas>;
-  /** fetch data from the table: "token_activities" */
   token_activities: Array<Token_Activities>;
-  /** fetch aggregated fields from the table: "token_activities" */
   token_activities_aggregate: Token_Activities_Aggregate;
   /** fetch data from the table: "token_activities" using primary key columns */
   token_activities_by_pk?: Maybe<Token_Activities>;
@@ -3277,6 +3363,22 @@ export type Subscription_Root = {
   user_transactions_by_pk?: Maybe<User_Transactions>;
   /** fetch data from the table in a streaming manner : "user_transactions" */
   user_transactions_stream: Array<User_Transactions>;
+};
+
+
+export type Subscription_RootAddress_Version_From_EventsArgs = {
+  distinct_on?: InputMaybe<Array<Address_Version_From_Events_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Address_Version_From_Events_Order_By>>;
+  where?: InputMaybe<Address_Version_From_Events_Bool_Exp>;
+};
+
+
+export type Subscription_RootAddress_Version_From_Events_StreamArgs = {
+  batch_size: Scalars['Int'];
+  cursor: Array<InputMaybe<Address_Version_From_Events_Stream_Cursor_Input>>;
+  where?: InputMaybe<Address_Version_From_Events_Bool_Exp>;
 };
 
 
@@ -4106,6 +4208,8 @@ export type Token_Activities = {
   collection_data_id_hash: Scalars['String'];
   collection_name: Scalars['String'];
   creator_address: Scalars['String'];
+  /** An object relationship */
+  current_token_data?: Maybe<Current_Token_Datas>;
   event_account_address: Scalars['String'];
   event_creation_number: Scalars['bigint'];
   event_index?: Maybe<Scalars['bigint']>;
@@ -4173,6 +4277,7 @@ export type Token_Activities_Bool_Exp = {
   collection_data_id_hash?: InputMaybe<String_Comparison_Exp>;
   collection_name?: InputMaybe<String_Comparison_Exp>;
   creator_address?: InputMaybe<String_Comparison_Exp>;
+  current_token_data?: InputMaybe<Current_Token_Datas_Bool_Exp>;
   event_account_address?: InputMaybe<String_Comparison_Exp>;
   event_creation_number?: InputMaybe<Bigint_Comparison_Exp>;
   event_index?: InputMaybe<Bigint_Comparison_Exp>;
@@ -4241,6 +4346,7 @@ export type Token_Activities_Order_By = {
   collection_data_id_hash?: InputMaybe<Order_By>;
   collection_name?: InputMaybe<Order_By>;
   creator_address?: InputMaybe<Order_By>;
+  current_token_data?: InputMaybe<Current_Token_Datas_Order_By>;
   event_account_address?: InputMaybe<Order_By>;
   event_creation_number?: InputMaybe<Order_By>;
   event_index?: InputMaybe<Order_By>;
