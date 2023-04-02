@@ -4,22 +4,28 @@ module aptos_std::string_utils {
     const EARGS_MISMATCH: u64 = 1;
     const EINVALID_FORMAT: u64 = 2;
 
-    struct List<T, N> has copy, drop, store {
+    struct Cons<T, N> has copy, drop, store {
         car: T,
         cdr: N,
     }
 
     struct NIL has copy, drop, store {}
 
-    public fun cons<T, N>(car: T, cdr: N): List<T, N> {
-        List { car, cdr }
+    // Create a pair of values.
+    public fun cons<T, N>(car: T, cdr: N): Cons<T, N> {
+        Cons { car, cdr }
     }
 
+    // Create a nil value.
     public fun nil(): NIL { NIL {} }
 
-    native fun format<T>(s: &T): String;
+    // Format a move value as a human readable string.
+    // eg. format(&1u64) == "1", format(&false) == "false" and format(&cons(1,2)) == "List {car: 1, cdr: 2}"
+    public native fun format<T>(s: &T): String;
 
-    native fun format_list<T>(fmt: &String, val: &T): String;
+    // Format a list of move values as a human readable string.
+    // eg. format_list(&std::string::utf8(b"a = {} b = {} c = {}"), &cons(1, cons(2, cons(3, nil())))) == "a = 1 b = 2 c = 3"
+    public native fun format_list<T>(fmt: &String, val: &T): String;
 
     #[test]
     fun test_format() {
@@ -62,7 +68,7 @@ module aptos_std::string_utils {
     }
 
     #[testonly]
-    struct FakeList<T, N> has copy, drop, store {
+    struct FakeCons<T, N> has copy, drop, store {
         car: T,
         cdr: N,
     }
@@ -70,7 +76,7 @@ module aptos_std::string_utils {
     #[test]
     #[expected_failure(abort_code = EARGS_MISMATCH)]
     fun test_format_list_not_valid_list() {
-        let l = cons(1, FakeList { car: 2, cdr: cons(3, nil())});
+        let l = cons(1, FakeCons { car: 2, cdr: cons(3, nil())});
         let s = format_list(&std::string::utf8(b"a = {} b = {} c = {}"), &l);
         assert!(s == std::string::utf8(b"a = 1 b = 2 c = 3"), 1);
     }

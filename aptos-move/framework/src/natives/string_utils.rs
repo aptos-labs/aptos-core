@@ -146,12 +146,23 @@ pub fn native_format_list(
     let fmt = fmt.value_as::<Struct>()?.unpack()?.next().unwrap().value_as::<Vec<u8>>()?;
     let fmt = std::str::from_utf8(&fmt).unwrap();
 
+    let arg_mismatch = 1;
+    let invalid_fmt = 2;
+
+    let match_list_ty = |context:&mut SafeNativeContext, name| {
+        if let TypeTag::Struct(struct_tag) = context.type_to_type_tag(list_ty).map_err(|e| SafeNativeError::InvariantViolation(e))? {
+            if !(struct_tag.address == AccountAddress::ONE && struct_tag.module.as_str() == "string_utils" && struct_tag.name.as_str() == name) {
+                return Err(SafeNativeError::Abort { abort_code: arg_mismatch });
+            }
+            Ok(())
+        } else {
+            return Err(SafeNativeError::Abort { abort_code: arg_mismatch });
+        }
+    };
 
     let mut out = String::new();
     let mut in_braces = false;
     let mut in_escape = false;
-    let arg_mismatch = 1;
-    let invalid_fmt = 2;
     for c in fmt.chars() {
         if !in_escape && c == '\\' {
             in_escape = true;
@@ -167,13 +178,8 @@ pub fn native_format_list(
             }
             in_braces = false;
             // verify`that the type is a list
-            if let TypeTag::Struct(struct_tag) = context.type_to_type_tag(list_ty).map_err(|e| SafeNativeError::InvariantViolation(e))? {
-                if !(struct_tag.address == AccountAddress::ONE && struct_tag.module.as_str() == "string_utils" && struct_tag.name.as_str() == "List") {
-                    return Err(SafeNativeError::Abort { abort_code: arg_mismatch });
-                }
-            } else {
-                return Err(SafeNativeError::Abort { abort_code: arg_mismatch });
-            }
+            match_list_ty(context, "Cons")?;
+
             // We know that the type is a list, so we can safely unwrap
             let ty_args = if let Type::StructInstantiation(_, ty_args) = list_ty {
                 ty_args
@@ -195,13 +201,8 @@ pub fn native_format_list(
     if in_escape || in_braces {
         return Err(SafeNativeError::Abort { abort_code: invalid_fmt });
     }
-    if let TypeTag::Struct(struct_tag) = context.type_to_type_tag(list_ty).map_err(|e| SafeNativeError::InvariantViolation(e))? {
-        if !(struct_tag.address == AccountAddress::ONE && struct_tag.module.as_str() == "string_utils" && struct_tag.name.as_str() == "NIL") {
-            return Err(SafeNativeError::Abort { abort_code: arg_mismatch });
-        }
-    } else {
-        return Err(SafeNativeError::Abort { abort_code: arg_mismatch });
-    }
+    match_list_ty(context, "NIL")?;
+
     let move_str = Value::struct_(Struct::pack(vec![Value::vector_u8(out.into_bytes())]));
     Ok(smallvec![move_str])
 }

@@ -5,9 +5,9 @@
 
 
 
--  [Struct `List`](#0x1_string_utils_List)
+-  [Struct `Cons`](#0x1_string_utils_Cons)
 -  [Struct `NIL`](#0x1_string_utils_NIL)
--  [Struct `FakeList`](#0x1_string_utils_FakeList)
+-  [Struct `FakeCons`](#0x1_string_utils_FakeCons)
 -  [Constants](#@Constants_0)
 -  [Function `cons`](#0x1_string_utils_cons)
 -  [Function `nil`](#0x1_string_utils_nil)
@@ -20,13 +20,13 @@
 
 
 
-<a name="0x1_string_utils_List"></a>
+<a name="0x1_string_utils_Cons"></a>
 
-## Struct `List`
+## Struct `Cons`
 
 
 
-<pre><code><b>struct</b> <a href="string_utils.md#0x1_string_utils_List">List</a>&lt;T, N&gt; <b>has</b> <b>copy</b>, drop, store
+<pre><code><b>struct</b> <a href="string_utils.md#0x1_string_utils_Cons">Cons</a>&lt;T, N&gt; <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
 
@@ -80,13 +80,13 @@
 
 </details>
 
-<a name="0x1_string_utils_FakeList"></a>
+<a name="0x1_string_utils_FakeCons"></a>
 
-## Struct `FakeList`
+## Struct `FakeCons`
 
 
 
-<pre><code><b>struct</b> <a href="string_utils.md#0x1_string_utils_FakeList">FakeList</a>&lt;T, N&gt; <b>has</b> <b>copy</b>, drop, store
+<pre><code><b>struct</b> <a href="string_utils.md#0x1_string_utils_FakeCons">FakeCons</a>&lt;T, N&gt; <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
 
@@ -142,7 +142,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_cons">cons</a>&lt;T, N&gt;(car: T, cdr: N): <a href="string_utils.md#0x1_string_utils_List">string_utils::List</a>&lt;T, N&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_cons">cons</a>&lt;T, N&gt;(car: T, cdr: N): <a href="string_utils.md#0x1_string_utils_Cons">string_utils::Cons</a>&lt;T, N&gt;
 </code></pre>
 
 
@@ -151,8 +151,8 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_cons">cons</a>&lt;T, N&gt;(car: T, cdr: N): <a href="string_utils.md#0x1_string_utils_List">List</a>&lt;T, N&gt; {
-    <a href="string_utils.md#0x1_string_utils_List">List</a> { car, cdr }
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_cons">cons</a>&lt;T, N&gt;(car: T, cdr: N): <a href="string_utils.md#0x1_string_utils_Cons">Cons</a>&lt;T, N&gt; {
+    <a href="string_utils.md#0x1_string_utils_Cons">Cons</a> { car, cdr }
 }
 </code></pre>
 
@@ -188,7 +188,7 @@
 
 
 
-<pre><code><b>fun</b> <a href="string_utils.md#0x1_string_utils_format">format</a>&lt;T&gt;(s: &T): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_format">format</a>&lt;T&gt;(s: &T): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
@@ -197,7 +197,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_format">format</a>&lt;T&gt;(s: &T): String;
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_format">format</a>&lt;T&gt;(s: &T): String;
 </code></pre>
 
 
@@ -210,7 +210,7 @@
 
 
 
-<pre><code><b>fun</b> <a href="string_utils.md#0x1_string_utils_format_list">format_list</a>&lt;T&gt;(fmt: &<a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, val: &T): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_format_list">format_list</a>&lt;T&gt;(fmt: &<a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, val: &T): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
@@ -219,7 +219,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_format_list">format_list</a>&lt;T&gt;(fmt: &String, val: &T): String;
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_format_list">format_list</a>&lt;T&gt;(fmt: &String, val: &T): String;
 </code></pre>
 
 
