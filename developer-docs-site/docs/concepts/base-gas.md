@@ -51,6 +51,9 @@ Basic instruction gas parameters are defined at [`instr.rs`] and include the fol
 | `ld_false`          | Load a `false`                   |
 | `ld_const_base`     | Base cost to load a constant     |
 | `ld_const_per_byte` | Per-byte cost to load a constant |
+| `ld_u16`            | Load a `u16`                     |
+| `ld_u32`            | Load a `u32`                     |
+| `ld_256`            | Load a `u256`                    |
 
 ### Local scope
 
@@ -69,13 +72,15 @@ Basic instruction gas parameters are defined at [`instr.rs`] and include the fol
 
 ### Calling
 
-| Parameter                 | Meaning                       |
-|---------------------------|-------------------------------|
-| `call_base`               | Base cost for a function call |
-| `call_per_arg`            | Cost per function argument    |
-| `call_generic_base`       |                               |
-| `call_generic_per_ty_arg` | Cost per type argument        |
-| `call_generic_per_arg`    |                               |
+| Parameter                 | Meaning                         |
+|---------------------------|---------------------------------|
+| `call_base`               | Base cost for a function call   |
+| `call_per_arg`            | Cost per function argument      |
+| `call_per_local`          | Cost per local argument         |
+| `call_generic_base`       |                                 |
+| `call_generic_per_ty_arg` | Cost per type argument          |
+| `call_generic_per_arg`    |                                 |
+| `call_generic_per_local`  | Cost generic per local argument |
 
 ### Structs
 
@@ -106,6 +111,9 @@ Basic instruction gas parameters are defined at [`instr.rs`] and include the fol
 | `cast_u8`   | Cast to a `u8`   |
 | `cast_u64`  | Cast to a `u64`  |
 | `cast_u128` | Cast to a `u128` |
+| `cast_u16`  | Cast to a `u16`  |
+| `cast_u32`  | Cast to a `u32`  |
+| `cast_u256` | Cast to a `u256` |
 
 ### Arithmetic
 
