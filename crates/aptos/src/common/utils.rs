@@ -310,11 +310,14 @@ where
 
 /// Generate a vanity account for Ed25519 single signer scheme.
 ///
-/// The authentication key for an Ed25519 account is the same as the account address. Hence this
-/// function generates Ed25519 private keys until finding one that has an authentication key with
-/// the given vanity prefix. Note that while a hex string must have an even number of characters, a
-/// vanity prefix can theoretically have an odd number ("0xaceface") due to human-readable account
-/// addresses.
+/// The default authentication key for an Ed25519 account is the same as the account address. Hence
+/// this function generates Ed25519 private keys until finding one that has an authentication key
+/// that begins with the given vanity prefix. Note that while a valid hex string must have an even
+/// number of characters, a vanity prefix can have an odd number of characters since
+/// account addresses are human-readable.
+///
+/// `vanity_prefix_ref` is a reference to a hex string vanity prefix, optionally prefixed with "0x".
+/// For example "0xaceface" or "d00d".
 pub fn generate_vanity_account_ed25519(
     vanity_prefix_ref: &str,
 ) -> CliTypedResult<Ed25519PrivateKey> {
@@ -324,12 +327,13 @@ pub fn generate_vanity_account_ed25519(
         .unwrap_or(vanity_prefix_ref);
     // Get string instance to check if vanity prefix is valid hex (may need to add a 0 at end).
     let mut to_check_if_is_hex = String::from(vanity_prefix_ref);
-    // If an odd number of characters append a 0 for checking if is valid hex prefix.
+    // If an odd number of characters append a 0 for verifying that prefix contains valid hex.
     if to_check_if_is_hex.len() % 2 != 0 {
         to_check_if_is_hex += "0"
     };
     hex::decode(to_check_if_is_hex).  // Check that the vanity prefix can be decoded into hex.
-        map_err(|error| CliError::CommandArgumentError(error.to_string()))?;
+        map_err(|error| CliError::CommandArgumentError(format!(
+            "The vanity prefix could not be decoded to hex: {}", error.to_string())))?;
     // Create a random key generator based on OS random number generator.
     let mut key_generator = KeyGen::from_os_rng();
     // Randomly generate a new Ed25519 private key.

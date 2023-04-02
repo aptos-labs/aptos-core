@@ -663,6 +663,23 @@ $ aptos key generate --key-type ed25519 --output-file output.key
 }
 ```
 
+If you are generating an `ed25519` key, you can optionally supply a vanity prefix for the corresponding account address.
+
+```bash
+$ aptos key generate --output-file starts_with_ace.key --vanity-prefix 0xace
+{
+  "Result": {
+    "PrivateKey Path": "starts_with_ace.key",
+    "PublicKey Path": "starts_with_ace.key.pub",
+    "Account Address:": "0xaceffa015e51dcd32c34794c143e19185b3f1be5464dd6184239a37e57e72ea3"
+  }
+}
+```
+
+:::tip
+The more characters you specify, the longer it will take to generate a vanity account.
+:::
+
 ### Generating a peer config
 
 To allow others to connect to your node, you need to generate a peer configuration. Below command shows how you can use
