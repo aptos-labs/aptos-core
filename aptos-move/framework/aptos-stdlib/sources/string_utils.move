@@ -126,6 +126,4 @@ module aptos_std::string_utils {
         let s = format_list(&std::string::utf8(b"\\{a = {} b = {} c = {}\\}"), &l);
         assert!(s == std::string::utf8(b"{a = 1 b = 2 c = 3}"), 1);
     }
-
-    // native fun format_data(unix_time_in_ms: u64): String;
 }
