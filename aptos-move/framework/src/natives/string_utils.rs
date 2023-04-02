@@ -155,13 +155,20 @@ pub fn native_format_list(
     let mut in_braces = false;
     let mut in_escape = false;
     let arg_mismatch = 1;
+    let invalid_fmt = 2;
     for c in fmt.chars() {
         if !in_escape && c == '\\' {
             in_escape = true;
             continue;
         } else if !in_escape && c == '{' {
+            if (in_braces) {
+                return Err(SafeNativeError::Abort { abort_code: invalid_fmt });
+            }
             in_braces = true;
         } else if !in_escape && c == '}' {
+            if (!in_braces) {
+                return Err(SafeNativeError::Abort { abort_code: invalid_fmt });
+            }
             in_braces = false;
             if let Type::StructInstantiation(idx, ty_args) = list_ty {
                 // verify`that the type is a list
@@ -186,6 +193,9 @@ pub fn native_format_list(
             out.push(c);
         }
         in_escape = false;
+    }
+    if (in_escape || in_braces) {
+        return Err(SafeNativeError::Abort { abort_code: invalid_fmt });
     }
     if let TypeTag::Struct(struct_tag) = context.type_to_type_tag(list_ty).map_err(|e| SafeNativeError::InvariantViolation(e))? {
         if !(struct_tag.address == AccountAddress::ONE && struct_tag.module.as_str() == "string_utils" && struct_tag.name.as_str() == "NIL") {

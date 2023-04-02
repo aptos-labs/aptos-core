@@ -118,11 +118,20 @@
 ## Constants
 
 
-<a name="0x1_string_utils_ARGS_MISMATCH"></a>
+<a name="0x1_string_utils_EARGS_MISMATCH"></a>
 
 
 
-<pre><code><b>const</b> <a href="string_utils.md#0x1_string_utils_ARGS_MISMATCH">ARGS_MISMATCH</a>: u64 = 1;
+<pre><code><b>const</b> <a href="string_utils.md#0x1_string_utils_EARGS_MISMATCH">EARGS_MISMATCH</a>: u64 = 1;
+</code></pre>
+
+
+
+<a name="0x1_string_utils_EINVALID_FORMAT"></a>
+
+
+
+<pre><code><b>const</b> <a href="string_utils.md#0x1_string_utils_EINVALID_FORMAT">EINVALID_FORMAT</a>: u64 = 2;
 </code></pre>
 
 

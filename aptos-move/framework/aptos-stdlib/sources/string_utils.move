@@ -1,7 +1,8 @@
 module aptos_std::string_utils {
     use std::string::String;
 
-    const ARGS_MISMATCH: u64 = 1;
+    const EARGS_MISMATCH: u64 = 1;
+    const EINVALID_FORMAT: u64 = 2;
 
     struct List<T, N> has copy, drop, store {
         car: T,
@@ -37,7 +38,7 @@ module aptos_std::string_utils {
     }
 
     #[test]
-    #[expected_failure(abort_code = ARGS_MISMATCH)]
+    #[expected_failure(abort_code = EARGS_MISMATCH)]
     fun test_format_list_to_many_vals() {
         let l = cons(1, cons(2, cons(3, cons(4, nil()))));
         let s = format_list(&std::string::utf8(b"a = {} b = {} c = {}"), &l);
@@ -45,7 +46,7 @@ module aptos_std::string_utils {
     }
 
     #[test]
-    #[expected_failure(abort_code = ARGS_MISMATCH)]
+    #[expected_failure(abort_code = EARGS_MISMATCH)]
     fun test_format_list_not_enough_vals() {
         let l = cons(1, cons(2, nil()));
         let s = format_list(&std::string::utf8(b"a = {} b = {} c = {}"), &l);
@@ -53,7 +54,7 @@ module aptos_std::string_utils {
     }
 
     #[test]
-    #[expected_failure(abort_code = ARGS_MISMATCH)]
+    #[expected_failure(abort_code = EARGS_MISMATCH)]
     fun test_format_list_not_valid_nil() {
         let l = cons(1, cons(2, 3));
         let s = format_list(&std::string::utf8(b"a = {} b = {} c = {}"), &l);
@@ -67,11 +68,57 @@ module aptos_std::string_utils {
     }
 
     #[test]
-    #[expected_failure(abort_code = ARGS_MISMATCH)]
+    #[expected_failure(abort_code = EARGS_MISMATCH)]
     fun test_format_list_not_valid_list() {
         let l = cons(1, FakeList { car: 2, cdr: cons(3, nil())});
         let s = format_list(&std::string::utf8(b"a = {} b = {} c = {}"), &l);
         assert!(s == std::string::utf8(b"a = 1 b = 2 c = 3"), 1);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = EINVALID_FORMAT)]
+    fun test_format_trailing_escape() {
+        let l = cons(1, cons(2, cons(3, nil())));
+        let s = format_list(&std::string::utf8(b"a = {} b = {} c = {}\\"), &l);
+        assert!(s == std::string::utf8(b"a = 1 b = 2 c = 3"), 1);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = EINVALID_FORMAT)]
+    fun test_format_unclosed_braces() {
+        let l = cons(1, cons(2, cons(3, nil())));
+        let s = format_list(&std::string::utf8(b"a = {} b = {} c = {"), &l);
+        assert!(s == std::string::utf8(b"a = 1 b = 2 c = 3"), 1);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = EINVALID_FORMAT)]
+    fun test_format_unclosed_braces_2() {
+        let l = cons(1, cons(2, cons(3, nil())));
+        let s = format_list(&std::string::utf8(b"a = {} b = { c = {}"), &l);
+        assert!(s == std::string::utf8(b"a = 1 b = 2 c = 3"), 1);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = EINVALID_FORMAT)]
+    fun test_format_unopened_braces() {
+        let l = cons(1, cons(2, cons(3, nil())));
+        let s = format_list(&std::string::utf8(b"a = } b = {} c = {}"), &l);
+        assert!(s == std::string::utf8(b"a = 1 b = 2 c = 3"), 1);
+    }
+
+    #[test]
+    fun test_format_escape_escape_works() {
+        let l = cons(1, cons(2, cons(3, nil())));
+        let s = format_list(&std::string::utf8(b"a = {} \\\\ b = {} c = {}"), &l);
+        assert!(s == std::string::utf8(b"a = 1 \\ b = 2 c = 3"), 1);
+    }
+
+    #[test]
+    fun test_format_escape_braces_works() {
+        let l = cons(1, cons(2, cons(3, nil())));
+        let s = format_list(&std::string::utf8(b"\\{a = {} b = {} c = {}\\}"), &l);
+        assert!(s == std::string::utf8(b"{a = 1 b = 2 c = 3}"), 1);
     }
 
     // native fun format_data(unix_time_in_ms: u64): String;
