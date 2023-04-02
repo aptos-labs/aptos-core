@@ -32,7 +32,7 @@ test("node url empty", () => {
 test("call should include user-agent header", async () => {
   const client = new AptosClient(NODE_URL, { HEADERS: { my: "header" } });
   const heders = client.client.request.config.HEADERS;
-  expect(heders).toHaveProperty("User-Agent", `aptos-ts-sdk / ${VERSION}`);
+  expect(heders).toHaveProperty("User-Agent", `aptos-ts-sdk/${VERSION}`);
   expect(heders).toHaveProperty("my", "header");
 });
 
