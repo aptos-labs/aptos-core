@@ -33,7 +33,7 @@ module aptos_std::string_utils {
         assert!(format(&false) == std::string::utf8(b"false"), 2);
         assert!(format(&1u256) == std::string::utf8(b"1"), 3);
         std::debug::print(&format(&cons(1,2)));
-        assert!(format(&cons(1,2)) == std::string::utf8(b"List {car: 1, cdr: 2}"), 4);
+        assert!(format(&cons(1,2)) == std::string::utf8(b"Cons {car: 1, cdr: 2}"), 4);
     }
 
     #[test]

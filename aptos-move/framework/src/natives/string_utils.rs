@@ -167,7 +167,7 @@ pub fn native_format_list(
     let arg_mismatch = 1;
     let invalid_fmt = 2;
 
-    let match_list_ty = |context: &mut SafeNativeContext, name| {
+    let match_list_ty = |context: &mut SafeNativeContext, list_ty, name| {
         if let TypeTag::Struct(struct_tag) = context
             .type_to_type_tag(list_ty)
             .map_err(SafeNativeError::InvariantViolation)?
@@ -210,9 +210,10 @@ pub fn native_format_list(
             }
             in_braces = false;
             // verify`that the type is a list
-            match_list_ty(context, "Cons")?;
+            match_list_ty(context, list_ty, "Cons")?;
 
             // We know that the type is a list, so we can safely unwrap
+            println!("list_ty: {:?}", list_ty);
             let ty_args = if let Type::StructInstantiation(_, ty_args) = list_ty {
                 ty_args
             } else {
@@ -238,7 +239,7 @@ pub fn native_format_list(
             abort_code: invalid_fmt,
         });
     }
-    match_list_ty(context, "NIL")?;
+    match_list_ty(context, list_ty, "NIL")?;
 
     let move_str = Value::struct_(Struct::pack(vec![Value::vector_u8(out.into_bytes())]));
     Ok(smallvec![move_str])
