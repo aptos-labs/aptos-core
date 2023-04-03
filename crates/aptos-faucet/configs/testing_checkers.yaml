@@ -9,6 +9,8 @@ checker_configs:
     file: "/tmp/auth_tokens.txt"
   - type: "IpBlocklist"
     file: "/tmp/ip_blocklist.txt"
+  - type: "RefererBlocklist"
+    file: "/tmp/referer_blocklist.txt"
   - type: "MagicHeader"
     magic_header_key: "what_wallet_my_guy"
     magic_header_value: "the_wallet_that_rocks"

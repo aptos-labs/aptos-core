@@ -253,4 +253,7 @@ pub enum RejectionReasonCode {
 
     /// Auth token was not given, is invalid, or is not allowed by the server.
     AuthTokenInvalid = 107,
+
+    /// Referer was in the blocklist.
+    RefererBlocklisted = 108,
 }
