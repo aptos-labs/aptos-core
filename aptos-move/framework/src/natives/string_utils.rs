@@ -15,15 +15,19 @@ use std::fmt::Write;
 use move_core_types::u256;
 use move_core_types::{value::{MoveStructLayout, MoveTypeLayout}, gas_algebra::InternalGas};
 use move_core_types::account_address::AccountAddress;
+use move_core_types::gas_algebra::GasQuantity;
 use move_core_types::language_storage::TypeTag;
 use move_vm_types::values::{Reference, Struct};
 use crate::natives::helpers::SafeNativeError;
 
 pub fn native_format_impl(
+    context: &mut SafeNativeContext,
+    base_gas: InternalGas,
     ty: &MoveTypeLayout,
     val: Value,
     out: &mut String
 ) -> SafeNativeResult<()> {
+    context.charge(base_gas)?;
     match ty {
         MoveTypeLayout::Bool => {
             let b = val.value_as::<bool>()?;
@@ -68,7 +72,7 @@ pub fn native_format_impl(
                 if i > 0 {
                     out.push_str(", ");
                 }
-                native_format_impl(ty.as_ref(), x, out)?;
+                native_format_impl(context, base_gas, ty.as_ref(), x, out)?;
             }
             out.push(']');
         }
@@ -81,7 +85,7 @@ pub fn native_format_impl(
                     out.push_str(", ");
                 }
                 write!(out, "{}: ", ty.name).unwrap();
-                native_format_impl(&ty.layout, x, out)?;
+                native_format_impl(context, base_gas, &ty.layout, x, out)?;
             }
             out.push('}');
         }
@@ -93,7 +97,7 @@ pub fn native_format_impl(
                     out.push_str(", ");
                 }
                 write!(out, "{}: ", ty.name).unwrap();
-                native_format_impl(&ty.layout, x, out)?;
+                native_format_impl(context, base_gas, &ty.layout, x, out)?;
             }
             out.push('}');
         }
@@ -104,7 +108,7 @@ pub fn native_format_impl(
                 if i > 0 {
                     out.push_str(", ");
                 }
-                native_format_impl(ty, x, out)?;
+                native_format_impl(context, base_gas, ty, x, out)?;
             }
             out.push(')');
         }
@@ -113,7 +117,7 @@ pub fn native_format_impl(
 }
 
 pub fn native_format(
-    _gas_params: &FormatGasParams,
+    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
@@ -123,13 +127,13 @@ pub fn native_format(
     let x = safely_pop_arg!(arguments, Reference);
     let v = x.read_ref().map_err(SafeNativeError::InvariantViolation)?;
     let mut out = String::new();
-    native_format_impl(&ty, v, &mut out)?;
+    native_format_impl(context, gas_params.base, &ty, v, &mut out)?;
     let move_str = Value::struct_(Struct::pack(vec![Value::vector_u8(out.into_bytes())]));
     Ok(smallvec![move_str])
 }
 
 pub fn native_format_list(
-    _gas_params: &FormatGasParams,
+    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
@@ -144,6 +148,8 @@ pub fn native_format_list(
     let fmt = fmt.read_ref().map_err(SafeNativeError::InvariantViolation)?;
     let fmt = fmt.value_as::<Struct>()?.unpack()?.next().unwrap().value_as::<Vec<u8>>()?;
     let fmt = std::str::from_utf8(&fmt).unwrap();
+
+    context.charge(gas_params.per_byte * GasQuantity::from(fmt.len() as u64))?;
 
     let arg_mismatch = 1;
     let invalid_fmt = 2;
@@ -191,7 +197,7 @@ pub fn native_format_list(
             list_ty = &ty_args[1];
 
             let ty = context.deref().type_to_fully_annotated_layout(&ty_args[0])?.unwrap();
-            native_format_impl(&ty, car, &mut out)?;
+            native_format_impl(context, gas_params.base, &ty, car, &mut out)?;
         } else if !in_braces {
             out.push(c);
         }
@@ -207,12 +213,13 @@ pub fn native_format_list(
 }
 
 #[derive(Debug, Clone)]
-pub struct FormatGasParams {
-    //pub base: InternalGas,
+pub struct GasParameters {
+    pub base: InternalGas,
+    pub per_byte: InternalGas,
 }
 
 pub fn make_all(
-    gas_param: FormatGasParams,
+    gas_param: GasParameters,
     timed_features: TimedFeatures,
     features: Arc<Features>,
 ) -> impl Iterator<Item = (String, NativeFunction)> {
