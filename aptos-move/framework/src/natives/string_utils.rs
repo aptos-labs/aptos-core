@@ -11,16 +11,15 @@ use move_core_types::{
     gas_algebra::{GasQuantity, InternalGas},
     language_storage::TypeTag,
     u256,
-    value::{MoveStructLayout, MoveTypeLayout},
+    value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
 };
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
-    values::{Reference, Struct, Value},
+    values::{Reference, Struct, Value, Vector},
 };
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, fmt::Write, ops::Deref, sync::Arc};
-use move_core_types::value::MoveFieldLayout;
 
 pub fn format_vector(
     context: &mut SafeNativeContext,
@@ -33,7 +32,7 @@ pub fn format_vector(
             out.push_str(", ");
         }
         native_format_impl(context, base_gas, ty, val, out)?;
-    };
+    }
     Ok(())
 }
 
@@ -100,26 +99,49 @@ pub fn native_format_impl(
             write!(out, "{}", signer).unwrap();
         },
         MoveTypeLayout::Vector(ty) => {
-            let v = val.value_as::<Vec<Value>>()?;
+            let v = val.value_as::<Vector>()?.unpack_unchecked()?;
             out.push('[');
-            format_vector(context, base_gas, v.into_iter().map(|x| (ty.as_ref(), x)).collect(), out)?;
+            format_vector(
+                context,
+                base_gas,
+                v.into_iter().map(|x| (ty.as_ref(), x)).collect(),
+                out,
+            )?;
             out.push(']');
         },
         MoveTypeLayout::Struct(MoveStructLayout::WithTypes { type_, fields, .. }) => {
+            let strct = val.value_as::<Struct>()?;
             if type_.name.as_str() == "String"
                 && type_.module.as_str() == "string"
                 && type_.address == AccountAddress::ONE
             {
-                let v = val
-                    .value_as::<Struct>()?
+                let v = strct.unpack()?.next().unwrap().value_as::<Vec<u8>>()?;
+                write!(out, "\"{}\"", std::str::from_utf8(&v).unwrap()).unwrap();
+                return Ok(());
+            } else if type_.name.as_str() == "Option"
+                && type_.module.as_str() == "option"
+                && type_.address == AccountAddress::ONE
+            {
+                let mut v = strct
                     .unpack()?
                     .next()
                     .unwrap()
-                    .value_as::<Vec<u8>>()?;
-                write!(out, "\"{}\"", std::str::from_utf8(&v).unwrap()).unwrap();
+                    .value_as::<Vector>()?
+                    .unpack_unchecked()?;
+                if v.is_empty() {
+                    out.push_str("None");
+                } else {
+                    out.push_str("Some(");
+                    let inner_ty = if let MoveTypeLayout::Vector(inner_ty) = &fields[0].layout {
+                        inner_ty.deref()
+                    } else {
+                        unreachable!()
+                    };
+                    native_format_impl(context, base_gas, &inner_ty, v.pop().unwrap(), out)?;
+                    out.push(')');
+                }
                 return Ok(());
             }
-            let strct = val.value_as::<Struct>()?;
             write!(out, "{} {{", type_.name.as_str()).unwrap();
             format_vector_with_fields(context, base_gas, &fields, strct, out)?;
             out.push('}');
@@ -133,7 +155,12 @@ pub fn native_format_impl(
         MoveTypeLayout::Struct(MoveStructLayout::Runtime(fields)) => {
             let strct = val.value_as::<Struct>()?;
             out.push('{');
-            format_vector(context, base_gas, fields.iter().zip(strct.unpack()?).collect(), out)?;
+            format_vector(
+                context,
+                base_gas,
+                fields.iter().zip(strct.unpack()?).collect(),
+                out,
+            )?;
             out.push('}');
         },
     };
