@@ -27,7 +27,6 @@ import {
   TransactionArgumentAddress,
   TransactionArgumentU8,
   TransactionArgumentU8Vector,
-  TypeTagObject,
 } from "../aptos_types";
 import { Serializer } from "../bcs";
 
@@ -214,10 +213,6 @@ export class TypeTagParser {
         bail("Invalid type tag.");
       }
 
-      if (module === "object" && name === "Object") {
-        return new TypeTagObject();
-      }
-
       let tyTags: TypeTag[] = [];
       // Check if the struct has ty args
       if (this.tokens.length > 0 && this.tokens[0][1] === "<") {
@@ -301,18 +296,6 @@ export function serializeArg(argVal: any, argType: TypeTag, serializer: Serializ
   }
   if (argType instanceof TypeTagU256) {
     serializer.serializeU256(ensureBigInt(argVal));
-    return;
-  }
-  if (argType instanceof TypeTagObject) {
-    let addr: AccountAddress;
-    if (typeof argVal === "string" || argVal instanceof HexString) {
-      addr = AccountAddress.fromHex(argVal);
-    } else if (argVal instanceof AccountAddress) {
-      addr = argVal;
-    } else {
-      throw new Error("Invalid account address.");
-    }
-    addr.serialize(serializer);
     return;
   }
   if (argType instanceof TypeTagAddress) {

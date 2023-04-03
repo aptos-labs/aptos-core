@@ -4,28 +4,26 @@
 /* eslint-disable max-len */
 
 import { AptosAccount } from "../account/aptos_account";
-import { sha3_256 as sha3Hash } from "@noble/hashes/sha3";
-import { AnyNumber, bcsToBytes } from "../bcs";
+import { AnyNumber } from "../bcs";
 import { MAX_U64_BIG_INT } from "../bcs/consts";
+import { Provider } from "../providers";
 import { AptosClient, OptionalTransactionArgs } from "../providers/aptos_client";
 import { TransactionBuilderRemoteABI } from "../transaction_builder";
 import { getPropertyValueRaw } from "../utils/property_map_serde";
-import { HexString } from "../utils";
-import { AccountAddress } from "../aptos_types";
 
 /**
- * Class for creating, minting and managing minting NFT collections and tokens
+ * Class for managing aptos_token
  */
-export class TokenV2Client {
-  aptosClient: AptosClient;
+export class AptosToken {
+  provider: Provider;
 
   /**
-   * Creates new TokenClient instance
+   * Creates new AptosToken instance
    *
-   * @param aptosClient AptosClient instance
+   * @param provider Provider instance
    */
-  constructor(aptosClient: AptosClient) {
-    this.aptosClient = aptosClient;
+  constructor(provider: Provider) {
+    this.provider = provider;
   }
 
   /**
@@ -48,10 +46,12 @@ export class TokenV2Client {
     mutableTokenURI: boolean = true,
     tokensBurnableByCreator: boolean = true,
     tokensFreezableByCreator: boolean = true,
-
     extraArgs?: OptionalTransactionArgs,
   ) {
-    const builder = new TransactionBuilderRemoteABI(this.aptosClient, { sender: account.address(), ...extraArgs });
+    const builder = new TransactionBuilderRemoteABI(this.provider.aptosClient, {
+      sender: account.address(),
+      ...extraArgs,
+    });
     const rawTxn = await builder.build(
       "0x4::aptos_token::create_collection",
       [],
@@ -74,7 +74,7 @@ export class TokenV2Client {
       ],
     );
     const bcsTxn = AptosClient.generateBCSTransaction(account, rawTxn);
-    const pendingTransaction = await this.aptosClient.submitSignedBCSTransaction(bcsTxn);
+    const pendingTransaction = await this.provider.aptosClient.submitSignedBCSTransaction(bcsTxn);
     return pendingTransaction.hash;
   }
 
@@ -92,7 +92,10 @@ export class TokenV2Client {
     propertyValues: Array<string> = [],
     extraArgs?: OptionalTransactionArgs,
   ) {
-    const builder = new TransactionBuilderRemoteABI(this.aptosClient, { sender: account.address(), ...extraArgs });
+    const builder = new TransactionBuilderRemoteABI(this.provider.aptosClient, {
+      sender: account.address(),
+      ...extraArgs,
+    });
     const rawTxn = await builder.build(
       "0x4::aptos_token::mint",
       [],
@@ -107,7 +110,7 @@ export class TokenV2Client {
       ],
     );
     const bcsTxn = AptosClient.generateBCSTransaction(account, rawTxn);
-    const pendingTransaction = await this.aptosClient.submitSignedBCSTransaction(bcsTxn);
+    const pendingTransaction = await this.provider.aptosClient.submitSignedBCSTransaction(bcsTxn);
     return pendingTransaction.hash;
   }
 
@@ -123,7 +126,10 @@ export class TokenV2Client {
     soulBoundTo: AptosAccount,
     extraArgs?: OptionalTransactionArgs,
   ) {
-    const builder = new TransactionBuilderRemoteABI(this.aptosClient, { sender: account.address(), ...extraArgs });
+    const builder = new TransactionBuilderRemoteABI(this.provider.aptosClient, {
+      sender: account.address(),
+      ...extraArgs,
+    });
     const rawTxn = await builder.build(
       "0x4::aptos_token::mint_soul_bound",
       [],
@@ -139,56 +145,7 @@ export class TokenV2Client {
       ],
     );
     const bcsTxn = AptosClient.generateBCSTransaction(account, rawTxn);
-    const pendingTransaction = await this.aptosClient.submitSignedBCSTransaction(bcsTxn);
+    const pendingTransaction = await this.provider.aptosClient.submitSignedBCSTransaction(bcsTxn);
     return pendingTransaction.hash;
-  }
-
-  /**
-   *
-   */
-  async burn(account: AptosAccount, token: string, extraArgs?: OptionalTransactionArgs) {
-    const builder = new TransactionBuilderRemoteABI(this.aptosClient, { sender: account.address(), ...extraArgs });
-    const rawTxn = await builder.build("0x4::aptos_token::burn", ["0x4::token::Token"], [token]);
-    const bcsTxn = AptosClient.generateBCSTransaction(account, rawTxn);
-    const pendingTransaction = await this.aptosClient.submitSignedBCSTransaction(bcsTxn);
-    return pendingTransaction.hash;
-  }
-
-  /**
-   * In token v2:
-   * Collection object addresses are generated as sha256 hash of (creator address + collection_name)
-   */
-
-  collectionObjectAddress(creator: AptosAccount, collectionName: string): HexString {
-    const source = bcsToBytes(AccountAddress.fromHex(creator.address()));
-    const seed = new TextEncoder().encode(collectionName);
-
-    const bytes = new Uint8Array([...source, ...seed, 254]);
-
-    const hash = sha3Hash.create();
-    hash.update(bytes);
-
-    return HexString.fromUint8Array(hash.digest());
-  }
-
-  /**
-   * Token object addresses are generated as sha256 hash of (creator address + collection's name + :: + token name)
-   */
-  tokenObjectAddress(creator: AptosAccount, collectionName: string, tokenName: string): HexString {
-    const source = bcsToBytes(AccountAddress.fromHex(creator.address()));
-    const collectionBytes = new TextEncoder().encode(collectionName);
-    const tokenBytes = new TextEncoder().encode(tokenName);
-
-    const seed = new Uint8Array(collectionBytes.length + tokenBytes.length + 2);
-    seed.set(collectionBytes);
-    seed.set([58, 58], collectionBytes.length);
-    seed.set(tokenBytes, collectionBytes.length + 2);
-
-    const bytes = new Uint8Array([...source, ...seed, 254]);
-
-    const hash = sha3Hash.create();
-    hash.update(bytes);
-
-    return HexString.fromUint8Array(hash.digest());
   }
 }
