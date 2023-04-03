@@ -4,7 +4,7 @@
 use crate::{LoadDestination, NetworkLoadTest};
 use aptos_forge::{
     GroupNetworkBandwidth, GroupNetworkDelay, NetworkContext, NetworkTest, Swarm, SwarmChaos,
-    SwarmNetworkBandwidth, SwarmNetworkDelay, Test,
+    SwarmNetworkBandwidth, SwarmNetworkDelay, Test, GroupNetEm, SwarmNetEm,
 };
 use aptos_logger::info;
 use aptos_types::PeerId;
@@ -50,7 +50,7 @@ fn get_link_stats_table() -> BTreeMap<String, BTreeMap<String, (u64, f64)>> {
 /// Creates a SwarmNetworkDelay
 fn create_multi_region_swarm_network_chaos(
     all_validators: Vec<PeerId>,
-) -> (SwarmNetworkDelay, SwarmNetworkBandwidth) {
+) -> (SwarmNetEm, SwarmNetworkBandwidth) {
     let link_stats_table = get_link_stats_table();
 
     assert!(all_validators.len() >= link_stats_table.len());
@@ -60,8 +60,8 @@ fn create_multi_region_swarm_network_chaos(
 
     let validator_chunks = all_validators.chunks_exact(approx_validators_per_region);
 
-    let (mut group_network_delays, group_network_bandwidths): (
-        Vec<GroupNetworkDelay>,
+    let (mut group_netems, mut group_network_bandwidths): (
+        Vec<GroupNetEm>,
         Vec<GroupNetworkBandwidth>,
     ) = validator_chunks
         .clone()
@@ -72,15 +72,16 @@ fn create_multi_region_swarm_network_chaos(
             let (to_chunk, (to_region, _)) = &comb[1];
 
             let (bandwidth, latency) = stats.get(*to_region).unwrap();
-            let delay = GroupNetworkDelay {
+            let netem = GroupNetEm {
                 name: format!("{}-to-{}-delay", from_region, to_region),
                 source_nodes: from_chunk.to_vec(),
                 target_nodes: to_chunk.to_vec(),
                 latency_ms: *latency as u64,
                 jitter_ms: 5,
                 correlation_percentage: 50,
+                loss_percentage: 1,
             };
-            info!("delay {:?}", delay);
+            info!("netem {:?}", netem);
 
             let bandwidth = GroupNetworkBandwidth {
                 name: format!("{}-to-{}-bandwidth", from_region, to_region),
@@ -92,7 +93,7 @@ fn create_multi_region_swarm_network_chaos(
             };
             info!("bandwidth {:?}", bandwidth);
 
-            (delay, bandwidth)
+            (netem, bandwidth)
         })
         .unzip();
 
@@ -105,14 +106,14 @@ fn create_multi_region_swarm_network_chaos(
         .collect();
     info!("remaining: {:?}", remaining_validators);
     if !remaining_validators.is_empty() {
-        group_network_delays[0]
+        group_netems[0]
             .source_nodes
             .append(remaining_validators.to_vec().as_mut());
     }
 
     (
-        SwarmNetworkDelay {
-            group_network_delays,
+        SwarmNetEm {
+            group_netems,
         },
         SwarmNetworkBandwidth {
             group_network_bandwidths,
@@ -128,14 +129,14 @@ impl NetworkLoadTest for MultiRegionMultiCloudSimulationTest {
             .map(|v| v.peer_id())
             .collect::<Vec<_>>();
 
-        let (delay, bandwidth) = create_multi_region_swarm_network_chaos(all_validators);
+        let (netem, bandwidth) = create_multi_region_swarm_network_chaos(all_validators);
 
         // inject bandwidth limit
         let chaos = SwarmChaos::Bandwidth(bandwidth);
         ctx.swarm().inject_chaos(chaos)?;
 
         // inject network delay
-        let chaos = SwarmChaos::Delay(delay);
+        let chaos = SwarmChaos::NetEm(netem);
         ctx.swarm().inject_chaos(chaos)?;
 
         Ok(LoadDestination::FullnodesOtherwiseValidators)
