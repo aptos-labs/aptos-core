@@ -6,7 +6,11 @@ module aptos_framework::staking_config {
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
 
-    use aptos_std::math64;
+    use aptos_std::fixed_point64::{FixedPoint64, less_or_equal};
+    use aptos_std::fixed_point64;
+    use aptos_std::math_fixed64;
+    #[test_only]
+    use aptos_std::fixed_point64::{equal, create_from_rational};
 
     friend aptos_framework::genesis;
 
@@ -37,8 +41,8 @@ module aptos_framework::staking_config {
     const MAX_REWARDS_RATE: u64 = 1000000;
     /// Denominator of number in basis points. 1 bps(basis points) = 0.01%.
     const BPS_DENOMINATOR: u64 = 10000;
-    /// 1 year => 365 * 24 * 60 * 60 * 1000000
-    const ONE_YEAR_IN_MICROS: u64 = 31536000000000;
+    /// 1 year => 365 * 24 * 60 * 60
+    const ONE_YEAR_IN_SECS: u64 = 31536000;
 
 
     /// Validator set configurations that will be stored with the @aptos_framework account.
@@ -71,18 +75,18 @@ module aptos_framework::staking_config {
     struct StakingRewardsConfig has copy, drop, key {
         // The target rewards rate given out every epoch. This will be divided by the rewards rate denominator.
         // For example, 0.001% (0.00001) can be represented as 10 / 1000000.
-        rewards_rate: u64,
+        rewards_rate: FixedPoint64,
         // The minimum threshold for rewards_rate. rewards_rate won't be lower than this.
         // This will be divided by the rewards rate denominator.
-        min_rewards_rate: u64,
-        rewards_rate_denominator: u64,
-        // Reward rate decreases every rewards_rate_period_in_micros microseconds.
-        // Currently it can only equal to 1 year. Keep this field in case we need to change the interval.
-        rewards_rate_period_in_micros: u64,
+        min_rewards_rate: FixedPoint64,
+        // Reward rate decreases every rewards_rate_period_in_secs seconds.
+        // Currently it can only equal to 1 year. Keep this field as a plceholder so we can change the reward period
+        // without adding new struct.
+        rewards_rate_period_in_secs: u64,
         // Timestamp of start of last rewards period.
-        last_rewards_rate_period_start_in_micros: u64,
+        last_rewards_rate_period_start_in_secs: u64,
         // Rate of reward rate decrease in BPS. 1 bps(basis points) = 0.01%.
-        rewards_rate_decrease_rate_bps: u64,
+        rewards_rate_decrease_rate: FixedPoint64,
     }
 
     /// Only called during genesis.
@@ -134,35 +138,32 @@ module aptos_framework::staking_config {
     /// Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
     public fun initialize_rewards(
         aptos_framework: &signer,
-        rewards_rate: u64,
-        min_rewards_rate: u64,
-        rewards_rate_denominator: u64,
-        rewards_rate_period_in_micros: u64,
-        last_rewards_rate_period_start_in_micros: u64,
-        rewards_rate_decrease_rate_bps: u64,
+        rewards_rate: FixedPoint64,
+        min_rewards_rate: FixedPoint64,
+        rewards_rate_period_in_secs: u64,
+        last_rewards_rate_period_start_in_secs: u64,
+        rewards_rate_decrease_rate: FixedPoint64,
     ) {
         system_addresses::assert_aptos_framework(aptos_framework);
 
         validate_rewards_config(
             rewards_rate,
             min_rewards_rate,
-            rewards_rate_denominator,
-            rewards_rate_period_in_micros,
-            rewards_rate_decrease_rate_bps,
+            rewards_rate_period_in_secs,
+            rewards_rate_decrease_rate,
         );
-        // TODO: we need last_rewards_rate_period_start_in_micros because genesis time is not available on chain.
+        // TODO: we need last_rewards_rate_period_start_in_secs because genesis time is not available on chain.
         assert!(
-            timestamp::now_microseconds() >= last_rewards_rate_period_start_in_micros,
+            timestamp::now_seconds() >= last_rewards_rate_period_start_in_secs,
             error::invalid_argument(EINVALID_LAST_REWARDS_RATE_PERIOD_START)
         );
 
         move_to(aptos_framework, StakingRewardsConfig {
             rewards_rate,
             min_rewards_rate,
-            rewards_rate_denominator,
-            rewards_rate_period_in_micros,
-            last_rewards_rate_period_start_in_micros,
-            rewards_rate_decrease_rate_bps,
+            rewards_rate_period_in_secs,
+            last_rewards_rate_period_start_in_secs,
+            rewards_rate_decrease_rate,
         });
     }
 
@@ -199,39 +200,42 @@ module aptos_framework::staking_config {
     }
 
     /// Return the rewards rate of a epoch in the format of (nominator, denominator).
-    public fun get_epoch_rewards_rate(): (u64, u64) acquires StakingRewardsConfig {
-        assert!(features::reward_rate_decrease_enabled(), EDISABLED_FUNCTION);
-        let staking_rewards_config = get_staking_rewards_config();
-        (staking_rewards_config.rewards_rate, staking_rewards_config.rewards_rate_denominator)
+    public fun calculate_and_save_latest_epoch_rewards_rate(): FixedPoint64 acquires StakingRewardsConfig {
+        assert!(features::reward_rate_decrease_enabled(), error::invalid_state(EDISABLED_FUNCTION));
+        let staking_rewards_config = calculate_and_save_latest_rewards_config();
+        staking_rewards_config.rewards_rate
     }
 
-    /// Return the up-to-date StakingRewardsConfig.
-    public fun get_staking_rewards_config(): StakingRewardsConfig acquires StakingRewardsConfig {
+    /// Calculate and return the up-to-date StakingRewardsConfig.
+    public fun calculate_and_save_latest_rewards_config(): StakingRewardsConfig acquires StakingRewardsConfig {
         let staking_rewards_config = borrow_global_mut<StakingRewardsConfig>(@aptos_framework);
-        let current_time_in_micros = timestamp::now_microseconds();
+        let current_time_in_secs = timestamp::now_seconds();
         assert!(
-            current_time_in_micros >= staking_rewards_config.last_rewards_rate_period_start_in_micros,
+            current_time_in_secs >= staking_rewards_config.last_rewards_rate_period_start_in_secs,
             error::invalid_argument(EINVALID_LAST_REWARDS_RATE_PERIOD_START)
         );
-        if (current_time_in_micros - staking_rewards_config.last_rewards_rate_period_start_in_micros < staking_rewards_config.rewards_rate_period_in_micros) {
+        if (current_time_in_secs - staking_rewards_config.last_rewards_rate_period_start_in_secs < staking_rewards_config.rewards_rate_period_in_secs) {
             return *staking_rewards_config
         };
         // Rewards rate decrease rate cannot be greater than 100%. Otherwise rewards rate will be negative.
         assert!(
-            staking_rewards_config.rewards_rate_decrease_rate_bps <= BPS_DENOMINATOR,
+            fixed_point64::ceil(staking_rewards_config.rewards_rate_decrease_rate) <= 1,
             error::invalid_argument(EINVALID_REWARDS_RATE_DECREASE_RATE)
         );
-        let new_rate = math64::mul_div(
+        let new_rate = math_fixed64::mul_div(
             staking_rewards_config.rewards_rate,
-            BPS_DENOMINATOR - staking_rewards_config.rewards_rate_decrease_rate_bps,
-            BPS_DENOMINATOR,
+            fixed_point64::sub(
+                fixed_point64::create_from_u128(1),
+                staking_rewards_config.rewards_rate_decrease_rate,
+            ),
+            fixed_point64::create_from_u128(1),
         );
-        new_rate = math64::max(new_rate, staking_rewards_config.min_rewards_rate);
+        new_rate = fixed_point64::max(new_rate, staking_rewards_config.min_rewards_rate);
 
         staking_rewards_config.rewards_rate = new_rate;
-        staking_rewards_config.last_rewards_rate_period_start_in_micros =
-            staking_rewards_config.last_rewards_rate_period_start_in_micros +
-            staking_rewards_config.rewards_rate_period_in_micros;
+        staking_rewards_config.last_rewards_rate_period_start_in_secs =
+            staking_rewards_config.last_rewards_rate_period_start_in_secs +
+            staking_rewards_config.rewards_rate_period_in_secs;
         return *staking_rewards_config
     }
 
@@ -271,7 +275,7 @@ module aptos_framework::staking_config {
         new_rewards_rate: u64,
         new_rewards_rate_denominator: u64,
     ) acquires StakingConfig {
-        assert!(!features::reward_rate_decrease_enabled(), EDEPRECATED_FUNCTION);
+        assert!(!features::reward_rate_decrease_enabled(), error::invalid_state(EDEPRECATED_FUNCTION));
         system_addresses::assert_aptos_framework(aptos_framework);
         assert!(
             new_rewards_rate_denominator > 0,
@@ -292,30 +296,26 @@ module aptos_framework::staking_config {
 
     public fun update_rewards_config(
         aptos_framework: &signer,
-        rewards_rate: u64,
-        min_rewards_rate: u64,
-        rewards_rate_denominator: u64,
-        rewards_rate_period_in_micros: u64,
-        rewards_rate_decrease_rate_bps: u64,
+        rewards_rate: FixedPoint64,
+        min_rewards_rate: FixedPoint64,
+        rewards_rate_period_in_secs: u64,
+        rewards_rate_decrease_rate: FixedPoint64,
     ) acquires StakingRewardsConfig {
-        assert!(features::reward_rate_decrease_enabled(), EDISABLED_FUNCTION);
+        assert!(features::reward_rate_decrease_enabled(), error::invalid_state(EDISABLED_FUNCTION));
         system_addresses::assert_aptos_framework(aptos_framework);
 
         validate_rewards_config(
             rewards_rate,
             min_rewards_rate,
-            rewards_rate_denominator,
-            rewards_rate_period_in_micros,
-            rewards_rate_decrease_rate_bps,
+            rewards_rate_period_in_secs,
+            rewards_rate_decrease_rate,
         );
 
         let staking_rewards_config = borrow_global_mut<StakingRewardsConfig>(@aptos_framework);
-
         staking_rewards_config.rewards_rate = rewards_rate;
         staking_rewards_config.min_rewards_rate = min_rewards_rate;
-        staking_rewards_config.rewards_rate_denominator = rewards_rate_denominator;
-        staking_rewards_config.rewards_rate_period_in_micros = rewards_rate_period_in_micros;
-        staking_rewards_config.rewards_rate_decrease_rate_bps = rewards_rate_decrease_rate_bps;
+        staking_rewards_config.rewards_rate_period_in_secs = rewards_rate_period_in_secs;
+        staking_rewards_config.rewards_rate_decrease_rate = rewards_rate_decrease_rate;
     }
 
     /// Update the joining limit %.
@@ -339,41 +339,30 @@ module aptos_framework::staking_config {
     }
 
     fun validate_rewards_config(
-        rewards_rate: u64,
-        min_rewards_rate: u64,
-        rewards_rate_denominator: u64,
-        rewards_rate_period_in_micros: u64,
-        rewards_rate_decrease_rate_bps: u64,
+        rewards_rate: FixedPoint64,
+        min_rewards_rate: FixedPoint64,
+        rewards_rate_period_in_secs: u64,
+        rewards_rate_decrease_rate: FixedPoint64,
     ) {
+        // Bound rewards rate to avoid arithmetic overflow.
         assert!(
-            rewards_rate_denominator > 0,
-            error::invalid_argument(EZERO_REWARDS_RATE_DENOMINATOR),
+            less_or_equal(rewards_rate, fixed_point64::create_from_u128((1u128))),
+            error::invalid_argument(EINVALID_REWARDS_RATE)
         );
-
-        // `rewards_rate` and `min_rewards_rate` which are the numerator are limited to
-        // be `<= MAX_REWARDS_RATE` in order to avoid the arithmetic overflow in the rewards calculation.
-        // `rewards_rate_denominator` can be adjusted to get the desired rewards rate
-        // (i.e., rewards_rate / rewards_rate_denominator).
-        assert!(rewards_rate <= MAX_REWARDS_RATE, error::invalid_argument(EINVALID_REWARDS_RATE));
-        assert!(min_rewards_rate <= MAX_REWARDS_RATE, error::invalid_argument(EINVALID_REWARDS_RATE));
-
         assert!(
-            min_rewards_rate <= rewards_rate,
+            less_or_equal(min_rewards_rate, rewards_rate),
             error::invalid_argument(EINVALID_MIN_REWARDS_RATE)
         );
-
-        // We assert that (rewards_rate / rewards_rate_denominator <= 1).
-        assert!(rewards_rate <= rewards_rate_denominator, error::invalid_argument(EINVALID_REWARDS_RATE));
-
         // Rewards rate decrease rate cannot be greater than 100%. Otherwise rewards rate will be negative.
         assert!(
-            rewards_rate_decrease_rate_bps <= BPS_DENOMINATOR,
+            fixed_point64::ceil(rewards_rate_decrease_rate) <= 1,
             error::invalid_argument(EINVALID_REWARDS_RATE_DECREASE_RATE)
         );
-
-        // Now rewards rate decrease interval must be 1 year.
+        // This field, rewards_rate_period_in_secs is added as a placeholder. In case we want to change
+        // the reward period, we don't have to add a new struct.
+        // To avoid complex logic, now rewards rate decrease interval must be 1 year.
         assert!(
-            rewards_rate_period_in_micros == ONE_YEAR_IN_MICROS,
+            rewards_rate_period_in_secs == ONE_YEAR_IN_SECS,
             error::invalid_argument(EINVALID_REWARDS_RATE_PERIOD),
         );
     }
@@ -398,69 +387,80 @@ module aptos_framework::staking_config {
 
     #[test(aptos_framework = @aptos_framework)]
     public entry fun test_staking_rewards_rate_decrease_over_time(aptos_framework: signer) acquires StakingRewardsConfig {
-        let start_time_in_micros: u64 = 100001000000;
+        let start_time_in_secs: u64 = 100001000000;
         initialize_rewards_for_test(
             &aptos_framework,
-            100,
-            30,
-            10000,
-            ONE_YEAR_IN_MICROS,
-            start_time_in_micros,
-            5000
+            create_from_rational(1, 100),
+            create_from_rational(3, 1000),
+            ONE_YEAR_IN_SECS,
+            start_time_in_secs,
+            create_from_rational(50, 100)
         );
 
-        let (epoch_reward_rate, epoch_rewards_rate_denominator) = get_epoch_rewards_rate();
-        assert!(epoch_reward_rate == 100, 0);
-        assert!(epoch_rewards_rate_denominator == 10000, 1);
+        let epoch_reward_rate = calculate_and_save_latest_epoch_rewards_rate();
+        assert!(equal(epoch_reward_rate, create_from_rational(1, 100)), 0);
         // Rewards rate should not change until the current reward rate period ends.
-        timestamp::fast_forward_seconds(ONE_YEAR_IN_MICROS / 1000000 / 2);
-        (epoch_reward_rate, epoch_rewards_rate_denominator) = get_epoch_rewards_rate();
-        assert!(epoch_reward_rate == 100, 3);
-        assert!(epoch_rewards_rate_denominator == 10000, 4);
+        timestamp::fast_forward_seconds(ONE_YEAR_IN_SECS / 2);
+        epoch_reward_rate = calculate_and_save_latest_epoch_rewards_rate();
+        assert!(equal(epoch_reward_rate, create_from_rational(1, 100)), 1);
 
-        // Rewards rate decreases to 100 * 5000 / 10000 = 50.
-        timestamp::fast_forward_seconds(ONE_YEAR_IN_MICROS / 1000000 / 2);
-        (epoch_reward_rate, epoch_rewards_rate_denominator) = get_epoch_rewards_rate();
-        assert!(epoch_reward_rate == 50, 5);
-        assert!(epoch_rewards_rate_denominator == 10000, 6);
+        // Rewards rate decreases to 1 / 100 * 5000 / 10000 = 5 / 1000.
+        timestamp::fast_forward_seconds(ONE_YEAR_IN_SECS / 2);
+        epoch_reward_rate = calculate_and_save_latest_epoch_rewards_rate();
+        assert!(equal(epoch_reward_rate, create_from_rational(5, 1000)), 2);
 
-        // Rewards rate decreases to 50 * 5000 / 10000 = 25.
-        // But rewards_rate cannot be lower than min_rewards_rate = 30.
-        timestamp::fast_forward_seconds(ONE_YEAR_IN_MICROS / 1000000);
-        (epoch_reward_rate, epoch_rewards_rate_denominator) = get_epoch_rewards_rate();
-        assert!(epoch_reward_rate == 30, 7);
-        assert!(epoch_rewards_rate_denominator == 10000, 8);
+        // Rewards rate decreases to 5 / 1000 * 5000 / 10000 = 2.5 / 1000.
+        // But rewards_rate cannot be lower than min_rewards_rate = 3 / 1000.
+        timestamp::fast_forward_seconds(ONE_YEAR_IN_SECS);
+        epoch_reward_rate = calculate_and_save_latest_epoch_rewards_rate();
+        assert!(equal(epoch_reward_rate, create_from_rational(3, 1000)), 3);
+
+        // Test when rewards_rate_decrease_rate is very small
+        update_rewards_config(
+            &aptos_framework,
+            epoch_reward_rate,
+            create_from_rational(0, 1000),
+            ONE_YEAR_IN_SECS,
+            create_from_rational(15, 1000),
+        );
+        // Rewards rate decreases to 3 / 1000 * 985 / 1000 = 2955 / 1000000.
+        timestamp::fast_forward_seconds(ONE_YEAR_IN_SECS);
+        epoch_reward_rate = calculate_and_save_latest_epoch_rewards_rate();
+        assert!(
+            fixed_point64::almost_equal(
+                epoch_reward_rate,
+                create_from_rational(2955, 1000000),
+                create_from_rational(1, 100000000)
+            ),
+            4);
     }
 
     #[test(aptos_framework = @aptos_framework)]
     public entry fun test_change_staking_rewards_configs(aptos_framework: signer) acquires StakingRewardsConfig {
-        let start_time_in_micros: u64 = 100001000000;
+        let start_time_in_secs: u64 = 100001000000;
         initialize_rewards_for_test(
             &aptos_framework,
-            100,
-            30,
-            10000,
-            ONE_YEAR_IN_MICROS,
-            start_time_in_micros,
-            5000
+            create_from_rational(1, 100),
+            create_from_rational(3, 1000),
+            ONE_YEAR_IN_SECS,
+            start_time_in_secs,
+            create_from_rational(50, 100),
         );
 
         update_rewards_config(
             &aptos_framework,
-            200,
-            60,
-            20000,
-            ONE_YEAR_IN_MICROS,
-            2500
+            create_from_rational(2, 100),
+            create_from_rational(6, 1000),
+            ONE_YEAR_IN_SECS,
+            create_from_rational(25, 100),
         );
 
         let config = borrow_global<StakingRewardsConfig>(@aptos_framework);
-        assert!(config.rewards_rate == 200, 0);
-        assert!(config.min_rewards_rate == 60, 1);
-        assert!(config.rewards_rate_denominator == 20000, 3);
-        assert!(config.rewards_rate_period_in_micros == ONE_YEAR_IN_MICROS, 4);
-        assert!(config.last_rewards_rate_period_start_in_micros == start_time_in_micros, 4);
-        assert!(config.rewards_rate_decrease_rate_bps == 2500, 5);
+        assert!(equal(config.rewards_rate, create_from_rational(2, 100)), 0);
+        assert!(equal(config.min_rewards_rate, create_from_rational(6, 1000)), 1);
+        assert!(config.rewards_rate_period_in_secs == ONE_YEAR_IN_SECS, 4);
+        assert!(config.last_rewards_rate_period_start_in_secs == start_time_in_secs, 4);
+        assert!(equal(config.rewards_rate_decrease_rate, create_from_rational(25, 100)), 5);
     }
 
     #[test(account = @0x123)]
@@ -491,7 +491,13 @@ module aptos_framework::staking_config {
     #[expected_failure(abort_code = 0x50003, location = aptos_framework::system_addresses)]
     public entry fun test_update_rewards_config_unauthorized_should_fail(account: signer, aptos_framework: signer) acquires StakingRewardsConfig {
         features::change_feature_flags(&aptos_framework, vector[features::get_reward_rate_decrease_feature()], vector[]);
-        update_rewards_config(&account, 1, 1, 1, ONE_YEAR_IN_MICROS, 1);
+        update_rewards_config(
+            &account,
+            create_from_rational(1, 100),
+            create_from_rational(1, 100),
+            ONE_YEAR_IN_SECS,
+            create_from_rational(1, 100),
+        );
     }
 
     #[test(aptos_framework = @aptos_framework)]
@@ -519,88 +525,65 @@ module aptos_framework::staking_config {
     }
 
     #[test(aptos_framework = @aptos_framework)]
-    #[expected_failure(abort_code = EDISABLED_FUNCTION, location = Self)]
+    #[expected_failure(abort_code = 0x3000B, location = Self)]
     public entry fun test_feature_flag_disabled_update_rewards_config_should_fail(aptos_framework: signer) acquires StakingRewardsConfig {
         features::change_feature_flags(&aptos_framework, vector[], vector[features::get_reward_rate_decrease_feature()]);
-        update_rewards_config(&aptos_framework, 1, 1, 0, ONE_YEAR_IN_MICROS, 1);
-    }
-
-    #[test(aptos_framework = @aptos_framework)]
-    #[expected_failure(abort_code = 0x10002, location = Self)]
-    public entry fun test_update_rewards_config_invalid_denominator_should_fail(aptos_framework: signer) acquires StakingRewardsConfig {
-        features::change_feature_flags(&aptos_framework, vector[features::get_reward_rate_decrease_feature()], vector[]);
-        update_rewards_config(&aptos_framework, 1, 1, 0, ONE_YEAR_IN_MICROS, 1);
+        update_rewards_config(
+            &aptos_framework,
+            create_from_rational(1, 100),
+            create_from_rational(1, 100),
+            ONE_YEAR_IN_SECS,
+            create_from_rational(1, 100),
+        );
     }
 
     #[test(aptos_framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x10005, location = Self)]
-    public entry fun test_update_rewards_config_rewards_rate_greater_than_1000000_should_fail(aptos_framework: signer) acquires StakingRewardsConfig {
-        let start_time_in_micros: u64 = 100001000000;
+    public entry fun test_update_rewards_config_rewards_rate_greater_than_1_should_fail(aptos_framework: signer) acquires StakingRewardsConfig {
+        let start_time_in_secs: u64 = 100001000000;
         initialize_rewards_for_test(
             &aptos_framework,
-            15981,
-            7991,
-            1000000000,
-            ONE_YEAR_IN_MICROS,
-            start_time_in_micros,
-            150,
+            create_from_rational(15981, 1000000000),
+            create_from_rational(7991, 1000000000),
+            ONE_YEAR_IN_SECS,
+            start_time_in_secs,
+            create_from_rational(15, 1000),
         );
-        update_rewards_config(&aptos_framework, 1000001, 1, 10000000, ONE_YEAR_IN_MICROS, 1);
-    }
-
-    #[test(aptos_framework = @aptos_framework)]
-    #[expected_failure(abort_code = 0x10005, location = Self)]
-    public entry fun test_update_rewards_config_rewards_rate_greater_than_denominator_should_fail(aptos_framework: signer) acquires StakingRewardsConfig {
-        let start_time_in_micros: u64 = 100001000000;
-        initialize_rewards_for_test(
+        update_rewards_config(
             &aptos_framework,
-            15981,
-            7991,
-            1000000000,
-            ONE_YEAR_IN_MICROS,
-            start_time_in_micros,
-            150,
+            create_from_rational(101, 100),
+            create_from_rational(1, 100),
+            ONE_YEAR_IN_SECS,
+            create_from_rational(1, 100),
         );
-        update_rewards_config(&aptos_framework, 10001, 1, 10000, ONE_YEAR_IN_MICROS, 1);
-    }
-
-    #[test(aptos_framework = @aptos_framework)]
-    #[expected_failure(abort_code = 0x10009, location = Self)]
-    public entry fun test_update_rewards_config_invalid_rewards_rate_period_should_fail(aptos_framework: signer) acquires StakingRewardsConfig {
-        let start_time_in_micros: u64 = 100001000000;
-        initialize_rewards_for_test(
-            &aptos_framework,
-            15981,
-            7991,
-            1000000000,
-            ONE_YEAR_IN_MICROS,
-            start_time_in_micros,
-            150,
-        );
-        update_rewards_config(&aptos_framework, 1001, 1, 10000, 100, 1);
     }
 
     #[test(aptos_framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x10008, location = Self)]
     public entry fun test_update_rewards_config_invalid_rewards_rate_decrease_rate_should_fail(aptos_framework: signer) acquires StakingRewardsConfig {
-        let start_time_in_micros: u64 = 100001000000;
+        let start_time_in_secs: u64 = 100001000000;
         initialize_rewards_for_test(
             &aptos_framework,
-            15981,
-            7991,
-            1000000000,
-            ONE_YEAR_IN_MICROS,
-            start_time_in_micros,
-            150,
+            create_from_rational(15981, 1000000000),
+            create_from_rational(7991, 1000000000),
+            ONE_YEAR_IN_SECS,
+            start_time_in_secs,
+            create_from_rational(15, 1000),
         );
-        update_rewards_config(&aptos_framework, 1001, 1, 10000, ONE_YEAR_IN_MICROS, 10001);
+        update_rewards_config(
+            &aptos_framework,
+            create_from_rational(1, 100),
+            create_from_rational(1, 100),
+            ONE_YEAR_IN_SECS,
+            create_from_rational(101, 100),
+        );
     }
 
     #[test(aptos_framework = @aptos_framework)]
-    #[expected_failure(abort_code = EDISABLED_FUNCTION, location = Self)]
+    #[expected_failure(abort_code = 0x3000B, location = Self)]
     public entry fun test_feature_flag_disabled_get_epoch_rewards_rate_should_fail(aptos_framework: signer) acquires StakingRewardsConfig {
         features::change_feature_flags(&aptos_framework, vector[], vector[features::get_reward_rate_decrease_feature()]);
-        get_epoch_rewards_rate();
+        calculate_and_save_latest_epoch_rewards_rate();
     }
 
     #[test(aptos_framework = @aptos_framework)]
@@ -648,24 +631,22 @@ module aptos_framework::staking_config {
     #[test_only]
     public fun initialize_rewards_for_test(
         aptos_framework: &signer,
-        rewards_rate: u64,
-        min_rewards_rate: u64,
-        rewards_rate_denominator: u64,
+        rewards_rate: FixedPoint64,
+        min_rewards_rate: FixedPoint64,
         rewards_rate_period_in_micros: u64,
-        last_rewards_rate_period_start_in_micros: u64,
-        rewards_rate_decrease_rate_bps: u64,
+        last_rewards_rate_period_start_in_secs: u64,
+        rewards_rate_decrease_rate: FixedPoint64,
     ) {
         features::change_feature_flags(aptos_framework, vector[features::get_reward_rate_decrease_feature()], vector[]);
         timestamp::set_time_has_started_for_testing(aptos_framework);
-        timestamp::update_global_time_for_test(last_rewards_rate_period_start_in_micros);
+        timestamp::update_global_time_for_test_secs(last_rewards_rate_period_start_in_secs);
         initialize_rewards(
             aptos_framework,
             rewards_rate,
             min_rewards_rate,
-            rewards_rate_denominator,
             rewards_rate_period_in_micros,
-            last_rewards_rate_period_start_in_micros,
-            rewards_rate_decrease_rate_bps,
+            last_rewards_rate_period_start_in_secs,
+            rewards_rate_decrease_rate,
         );
     }
 }

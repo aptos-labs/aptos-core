@@ -16,12 +16,12 @@ spec aptos_framework::staking_config {
     }
 
     spec StakingRewardsConfig {
-        invariant rewards_rate <= MAX_REWARDS_RATE;
-        invariant rewards_rate_denominator > 0;
-        invariant rewards_rate <= rewards_rate_denominator;
-        invariant min_rewards_rate <= rewards_rate;
-        invariant rewards_rate_period_in_micros == ONE_YEAR_IN_MICROS;
-        invariant rewards_rate_decrease_rate_bps <= BPS_DENOMINATOR;
+        invariant fixed_point64::spec_less_or_equal(
+            rewards_rate,
+            fixed_point64::spec_create_from_u128((1u128)));
+        invariant fixed_point64::spec_less_or_equal(min_rewards_rate, rewards_rate);
+        invariant rewards_rate_period_in_secs == ONE_YEAR_IN_SECS;
+        invariant fixed_point64::spec_ceil(rewards_rate_decrease_rate) <= 1;
     }
 
     /// Caller must be @aptos_framework.
@@ -54,23 +54,22 @@ spec aptos_framework::staking_config {
     }
 
     /// Caller must be @aptos_framework.
-    /// last_rewards_rate_period_start_in_micros cannot be later than now.
+    /// last_rewards_rate_period_start_in_secs cannot be later than now.
     /// Abort at any condition in StakingRewardsConfigValidationAborts.
     /// StakingRewardsConfig does not exist under the aptos_framework before creating it.
     spec initialize_rewards(
         aptos_framework: &signer,
-        rewards_rate: u64,
-        min_rewards_rate: u64,
-        rewards_rate_denominator: u64,
-        rewards_rate_period_in_micros: u64,
-        last_rewards_rate_period_start_in_micros: u64,
-        rewards_rate_decrease_rate_bps: u64,
+        rewards_rate: FixedPoint64,
+        min_rewards_rate: FixedPoint64,
+        rewards_rate_period_in_secs: u64,
+        last_rewards_rate_period_start_in_secs: u64,
+        rewards_rate_decrease_rate: FixedPoint64,
     ) {
         use std::signer;
         requires exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
         let addr = signer::address_of(aptos_framework);
         aborts_if addr != @aptos_framework;
-        aborts_if last_rewards_rate_period_start_in_micros > timestamp::spec_now_microseconds();
+        aborts_if last_rewards_rate_period_start_in_secs > timestamp::spec_now_seconds();
         include StakingRewardsConfigValidationAbortsIf;
         aborts_if exists<StakingRewardsConfig>(addr);
     }
@@ -83,13 +82,13 @@ spec aptos_framework::staking_config {
         aborts_if features::spec_reward_rate_decrease_enabled();
     }
 
-    spec get_epoch_rewards_rate(): (u64, u64) {
+    spec calculate_and_save_latest_epoch_rewards_rate(): FixedPoint64 {
         aborts_if !exists<StakingRewardsConfig>(@aptos_framework);
         aborts_if !features::spec_reward_rate_decrease_enabled();
         include StakingRewardsConfigRequirement;
     }
 
-    spec get_staking_rewards_config(): StakingRewardsConfig {
+    spec calculate_and_save_latest_rewards_config(): StakingRewardsConfig {
         requires features::spec_reward_rate_decrease_enabled();
         include StakingRewardsConfigRequirement;
         aborts_if !exists<StakingRewardsConfig>(@aptos_framework);
@@ -148,11 +147,10 @@ spec aptos_framework::staking_config {
     /// StakingRewardsConfig is under the @aptos_framework.
     spec update_rewards_config(
         aptos_framework: &signer,
-        rewards_rate: u64,
-        min_rewards_rate: u64,
-        rewards_rate_denominator: u64,
-        rewards_rate_period_in_micros: u64,
-        rewards_rate_decrease_rate_bps: u64,
+        rewards_rate: FixedPoint64,
+        min_rewards_rate: FixedPoint64,
+        rewards_rate_period_in_secs: u64,
+        rewards_rate_decrease_rate: FixedPoint64,
     ) {
         use std::signer;
         aborts_if !features::spec_reward_rate_decrease_enabled();
@@ -184,34 +182,30 @@ spec aptos_framework::staking_config {
 
     /// Abort at any condition in StakingRewardsConfigValidationAborts.
     spec validate_rewards_config(
-        rewards_rate: u64,
-        min_rewards_rate: u64,
-        rewards_rate_denominator: u64,
-        rewards_rate_period_in_micros: u64,
-        rewards_rate_decrease_rate_bps: u64,
+        rewards_rate: FixedPoint64,
+        min_rewards_rate: FixedPoint64,
+        rewards_rate_period_in_secs: u64,
+        rewards_rate_decrease_rate: FixedPoint64,
     ) {
         include StakingRewardsConfigValidationAbortsIf;
     }
 
-    /// rewards_rate must be within [0, MAX_REWARDS_RATE] in order to avoid the arithmetic overflow.
+    /// rewards_rate must be within [0, 1].
     /// min_rewards_rate must be not greater than rewards_rate.
-    /// rewards_rate_denominator must be greater than 0.
-    /// rewards_rate / rewards_rate_denominator <= 1.
-    /// rewards_rate_period_in_micros must equal to 1 year.
-    /// rewards_rate_decrease_rate_bps / BPS_DENOMINATOR must be within [0,1].
+    /// rewards_rate_period_in_secs must equal to 1 year.
+    /// rewards_rate_decrease_rate must be within [0,1].
     spec schema StakingRewardsConfigValidationAbortsIf {
-        rewards_rate: u64;
-        min_rewards_rate: u64;
-        rewards_rate_denominator: u64;
-        rewards_rate_period_in_micros: u64;
-        rewards_rate_decrease_rate_bps: u64;
+        rewards_rate: FixedPoint64;
+        min_rewards_rate: FixedPoint64;
+        rewards_rate_period_in_secs: u64;
+        rewards_rate_decrease_rate: FixedPoint64;
 
-        aborts_if rewards_rate < 0 || rewards_rate > MAX_REWARDS_RATE;
-        aborts_if min_rewards_rate > rewards_rate;
-        aborts_if rewards_rate_denominator <= 0;
-        aborts_if rewards_rate > rewards_rate_denominator;
-        aborts_if rewards_rate_period_in_micros != ONE_YEAR_IN_MICROS;
-        aborts_if rewards_rate_decrease_rate_bps < 0 || rewards_rate_decrease_rate_bps > BPS_DENOMINATOR;
+        aborts_if fixed_point64::spec_greater(
+            rewards_rate,
+            fixed_point64::spec_create_from_u128((1u128)));
+        aborts_if fixed_point64::spec_greater(min_rewards_rate, rewards_rate);
+        aborts_if rewards_rate_period_in_secs != ONE_YEAR_IN_SECS;
+        aborts_if fixed_point64::spec_ceil(rewards_rate_decrease_rate) > 1;
     }
 
     spec schema StakingRewardsConfigRequirement {
@@ -224,17 +218,16 @@ spec aptos_framework::staking_config {
         let staking_rewards_config = global<StakingRewardsConfig>(@aptos_framework);
         let rewards_rate = staking_rewards_config.rewards_rate;
         let min_rewards_rate = staking_rewards_config.min_rewards_rate;
-        let rewards_rate_denominator = staking_rewards_config.rewards_rate_denominator;
-        let rewards_rate_period_in_micros = staking_rewards_config.rewards_rate_period_in_micros;
-        let last_rewards_rate_period_start_in_micros = staking_rewards_config.last_rewards_rate_period_start_in_micros;
-        let rewards_rate_decrease_rate_bps = staking_rewards_config.rewards_rate_decrease_rate_bps;
+        let rewards_rate_period_in_secs = staking_rewards_config.rewards_rate_period_in_secs;
+        let last_rewards_rate_period_start_in_secs = staking_rewards_config.last_rewards_rate_period_start_in_secs;
+        let rewards_rate_decrease_rate = staking_rewards_config.rewards_rate_decrease_rate;
 
-        requires 0 <= rewards_rate && rewards_rate <= MAX_REWARDS_RATE;
-        requires min_rewards_rate <= rewards_rate;
-        requires rewards_rate_denominator > 0;
-        requires rewards_rate <= rewards_rate_denominator;
-        requires rewards_rate_period_in_micros == ONE_YEAR_IN_MICROS;
-        requires last_rewards_rate_period_start_in_micros <= timestamp::spec_now_microseconds();
-        requires 0 <= rewards_rate_decrease_rate_bps && rewards_rate_decrease_rate_bps <= BPS_DENOMINATOR;
+        requires fixed_point64::spec_less_or_equal(
+            rewards_rate,
+            fixed_point64::spec_create_from_u128((1u128)));
+        requires fixed_point64::spec_less_or_equal(min_rewards_rate, rewards_rate);
+        requires rewards_rate_period_in_secs == ONE_YEAR_IN_SECS;
+        requires last_rewards_rate_period_start_in_secs <= timestamp::spec_now_seconds();
+        requires fixed_point64::spec_ceil(rewards_rate_decrease_rate) <= 1;
     }
 }
