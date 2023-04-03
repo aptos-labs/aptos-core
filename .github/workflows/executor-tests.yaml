@@ -1,0 +1,29 @@
+name: "Executor Specific Tests"
+on:
+  pull_request:
+    paths:
+      - 'path-to-parallel-executor'
+
+jobs:
+  executor-tests:
+    # The biggest machine, you can try some other like ubuntu-latest
+    runs-on: high-perf-docker
+    if: |
+      contains(github.event.pull_request.labels.*.name, 'CICD:your-label-here')
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
+      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+      - uses: taiki-e/install-action@v1.5.6
+        with:
+          tool: nextest
+      # Run your actually test command
+      # REPLACE
+      # If you have anything other than a single command here, please write a python script and call it here
+      - run: cargo nextest run --locked --workspace --exclude smoke-test --exclude aptos-testcases --exclude aptos-api --exclude aptos-executor-benchmark --exclude aptos-backup-cli --retries 3 --no-fail-fast -F consensus-only-perf-test
+        env:
+          # define env variables
+          RUST_MIN_STACK: 4297152
