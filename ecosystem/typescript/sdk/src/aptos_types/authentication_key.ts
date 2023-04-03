@@ -21,7 +21,11 @@ export class AuthenticationKey {
 
   static readonly ED25519_SCHEME: number = 0;
 
+  static readonly DERIVE_COLLECTION_OBJECT_ACCOUNT_SCHEME: number = 254;
+
   static readonly DERIVE_RESOURCE_ACCOUNT_SCHEME: number = 255;
+
+  static readonly COLON: number = 58;
 
   readonly bytes: Bytes;
 
