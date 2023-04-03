@@ -129,7 +129,7 @@ module aptos_framework::fungible_asset {
         name: String,
         symbol: String,
         decimals: u8,
-    ): (MintRef, TransferRef, BurnRef) {
+    ): Object<FungibleAssetMetadata> {
         let metadata_object_signer = &object::generate_signer(constructor_ref);
         let converted_maximum = if (maximum_supply == 0) {
             option::none()
@@ -146,8 +146,29 @@ module aptos_framework::fungible_asset {
                 derive_ref: object::generate_derive_ref(constructor_ref),
             }
         );
+        object::object_from_constructor_ref<FungibleAssetMetadata>(constructor_ref)
+    }
+
+    /// Creates a mint ref that can be used to mint fungible assets from the given fungible object's constructor ref.
+    /// This can only be called at object creation time as constructor_ref is only available then.
+    public fun generate_mint_ref(constructor_ref: &ConstructorRef): MintRef {
         let metadata = object::object_from_constructor_ref<FungibleAssetMetadata>(constructor_ref);
-        (MintRef { metadata }, TransferRef { metadata }, BurnRef { metadata })
+        MintRef { metadata }
+    }
+
+    /// Creates a burn ref that can be used to burn fungible assets from the given fungible object's constructor ref.
+    /// This can only be called at object creation time as constructor_ref is only available then.
+    public fun generate_burn_ref(constructor_ref: &ConstructorRef): BurnRef {
+        let metadata = object::object_from_constructor_ref<FungibleAssetMetadata>(constructor_ref);
+        BurnRef { metadata }
+    }
+
+    /// Creates a transfer ref that can be used to freeze/unfreeze/transfer fungible assets from the given fungible
+    /// object's constructor ref.
+    /// This can only be called at object creation time as constructor_ref is only available then.
+    public fun generate_transfer_ref(constructor_ref: &ConstructorRef): TransferRef {
+        let metadata = object::object_from_constructor_ref<FungibleAssetMetadata>(constructor_ref);
+        TransferRef { metadata }
     }
 
     #[view]
@@ -531,7 +552,11 @@ module aptos_framework::fungible_asset {
             string::utf8(b"USDA"),
             string::utf8(b"$$$"),
             0
-        )
+        );
+        let mint_ref = generate_mint_ref(constructor_ref);
+        let burn_ref = generate_burn_ref(constructor_ref);
+        let transfer_ref = generate_transfer_ref(constructor_ref);
+        (mint_ref, transfer_ref, burn_ref)
     }
 
     #[test_only]

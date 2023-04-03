@@ -21,6 +21,9 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Struct `SetUngatedTransferEvent`](#0x1_fungible_asset_SetUngatedTransferEvent)
 -  [Constants](#@Constants_0)
 -  [Function `make_object_fungible`](#0x1_fungible_asset_make_object_fungible)
+-  [Function `generate_mint_ref`](#0x1_fungible_asset_generate_mint_ref)
+-  [Function `generate_burn_ref`](#0x1_fungible_asset_generate_burn_ref)
+-  [Function `generate_transfer_ref`](#0x1_fungible_asset_generate_transfer_ref)
 -  [Function `supply`](#0x1_fungible_asset_supply)
 -  [Function `maximum`](#0x1_fungible_asset_maximum)
 -  [Function `name`](#0x1_fungible_asset_name)
@@ -603,7 +606,7 @@ Make an existing object fungible by adding the FungibleAssetMetadata resource.
 This returns the capabilities to mint, burn, and transfer.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_make_object_fungible">make_object_fungible</a>(constructor_ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>, maximum_supply: u64, name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, symbol: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, decimals: u8): (<a href="fungible_asset.md#0x1_fungible_asset_MintRef">fungible_asset::MintRef</a>, <a href="fungible_asset.md#0x1_fungible_asset_TransferRef">fungible_asset::TransferRef</a>, <a href="fungible_asset.md#0x1_fungible_asset_BurnRef">fungible_asset::BurnRef</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_make_object_fungible">make_object_fungible</a>(constructor_ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>, maximum_supply: u64, name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, symbol: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, decimals: u8): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">fungible_asset::FungibleAssetMetadata</a>&gt;
 </code></pre>
 
 
@@ -618,7 +621,7 @@ This returns the capabilities to mint, burn, and transfer.
     name: String,
     symbol: String,
     decimals: u8,
-): (<a href="fungible_asset.md#0x1_fungible_asset_MintRef">MintRef</a>, <a href="fungible_asset.md#0x1_fungible_asset_TransferRef">TransferRef</a>, <a href="fungible_asset.md#0x1_fungible_asset_BurnRef">BurnRef</a>) {
+): Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a>&gt; {
     <b>let</b> metadata_object_signer = &<a href="object.md#0x1_object_generate_signer">object::generate_signer</a>(constructor_ref);
     <b>let</b> converted_maximum = <b>if</b> (maximum_supply == 0) {
         <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
@@ -635,8 +638,89 @@ This returns the capabilities to mint, burn, and transfer.
             derive_ref: <a href="object.md#0x1_object_generate_derive_ref">object::generate_derive_ref</a>(constructor_ref),
         }
     );
+    <a href="object.md#0x1_object_object_from_constructor_ref">object::object_from_constructor_ref</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a>&gt;(constructor_ref)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_fungible_asset_generate_mint_ref"></a>
+
+## Function `generate_mint_ref`
+
+Creates a mint ref that can be used to mint fungible assets from the given fungible object's constructor ref.
+This can only be called at object creation time as constructor_ref is only available then.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_generate_mint_ref">generate_mint_ref</a>(constructor_ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <a href="fungible_asset.md#0x1_fungible_asset_MintRef">fungible_asset::MintRef</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_generate_mint_ref">generate_mint_ref</a>(constructor_ref: &ConstructorRef): <a href="fungible_asset.md#0x1_fungible_asset_MintRef">MintRef</a> {
     <b>let</b> metadata = <a href="object.md#0x1_object_object_from_constructor_ref">object::object_from_constructor_ref</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a>&gt;(constructor_ref);
-    (<a href="fungible_asset.md#0x1_fungible_asset_MintRef">MintRef</a> { metadata }, <a href="fungible_asset.md#0x1_fungible_asset_TransferRef">TransferRef</a> { metadata }, <a href="fungible_asset.md#0x1_fungible_asset_BurnRef">BurnRef</a> { metadata })
+    <a href="fungible_asset.md#0x1_fungible_asset_MintRef">MintRef</a> { metadata }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_fungible_asset_generate_burn_ref"></a>
+
+## Function `generate_burn_ref`
+
+Creates a burn ref that can be used to burn fungible assets from the given fungible object's constructor ref.
+This can only be called at object creation time as constructor_ref is only available then.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_generate_burn_ref">generate_burn_ref</a>(constructor_ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <a href="fungible_asset.md#0x1_fungible_asset_BurnRef">fungible_asset::BurnRef</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_generate_burn_ref">generate_burn_ref</a>(constructor_ref: &ConstructorRef): <a href="fungible_asset.md#0x1_fungible_asset_BurnRef">BurnRef</a> {
+    <b>let</b> metadata = <a href="object.md#0x1_object_object_from_constructor_ref">object::object_from_constructor_ref</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a>&gt;(constructor_ref);
+    <a href="fungible_asset.md#0x1_fungible_asset_BurnRef">BurnRef</a> { metadata }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_fungible_asset_generate_transfer_ref"></a>
+
+## Function `generate_transfer_ref`
+
+Creates a transfer ref that can be used to freeze/unfreeze/transfer fungible assets from the given fungible
+object's constructor ref.
+This can only be called at object creation time as constructor_ref is only available then.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_generate_transfer_ref">generate_transfer_ref</a>(constructor_ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <a href="fungible_asset.md#0x1_fungible_asset_TransferRef">fungible_asset::TransferRef</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_generate_transfer_ref">generate_transfer_ref</a>(constructor_ref: &ConstructorRef): <a href="fungible_asset.md#0x1_fungible_asset_TransferRef">TransferRef</a> {
+    <b>let</b> metadata = <a href="object.md#0x1_object_object_from_constructor_ref">object::object_from_constructor_ref</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a>&gt;(constructor_ref);
+    <a href="fungible_asset.md#0x1_fungible_asset_TransferRef">TransferRef</a> { metadata }
 }
 </code></pre>
 
