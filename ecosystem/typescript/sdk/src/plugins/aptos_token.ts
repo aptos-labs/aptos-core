@@ -9,7 +9,6 @@ import { MAX_U64_BIG_INT } from "../bcs/consts";
 import { Provider } from "../providers";
 import { AptosClient, OptionalTransactionArgs } from "../providers/aptos_client";
 import { TransactionBuilderRemoteABI } from "../transaction_builder";
-<<<<<<< HEAD
 import { HexString, MaybeHexString } from "../utils";
 import { getPropertyValueRaw, getSinglePropertyValueRaw } from "../utils/property_map_serde";
 
@@ -41,21 +40,14 @@ const PropertyTypeMap = {
 };
 
 export type PropertyType = keyof typeof PropertyTypeMap;
-=======
-import { getPropertyValueRaw } from "../utils/property_map_serde";
->>>>>>> 7d60beacab (support aptos token)
 
 /**
  * Class for managing aptos_token
  */
 export class AptosToken {
-<<<<<<< HEAD
   readonly provider: Provider;
 
   private readonly tokenType: string = "0x4::token::Token";
-=======
-  provider: Provider;
->>>>>>> 7d60beacab (support aptos token)
 
   /**
    * Creates new AptosToken instance
@@ -66,7 +58,6 @@ export class AptosToken {
     this.provider = provider;
   }
 
-<<<<<<< HEAD
   private async submitTransaction(
     account: AptosAccount,
     funcName: string,
@@ -106,43 +97,12 @@ export class AptosToken {
     return this.submitTransaction(
       creator,
       "create_collection",
-=======
-  /**
-   *
-   */
-  async createCollection(
-    account: AptosAccount,
-    description: string,
-    maxSupply: AnyNumber = MAX_U64_BIG_INT,
-    name: string,
-    uri: string,
-    royaltyNumerator: number = 0,
-    royaltyDenominator: number = 0,
-    mutableDescription: boolean = true,
-    mutableRoyalty: boolean = true,
-    mutableURI: boolean = true,
-    mutableTokenDescription: boolean = true,
-    mutableTokenName: boolean = true,
-    mutableTokenProperties: boolean = true,
-    mutableTokenURI: boolean = true,
-    tokensBurnableByCreator: boolean = true,
-    tokensFreezableByCreator: boolean = true,
-    extraArgs?: OptionalTransactionArgs,
-  ) {
-    const builder = new TransactionBuilderRemoteABI(this.provider.aptosClient, {
-      sender: account.address(),
-      ...extraArgs,
-    });
-    const rawTxn = await builder.build(
-      "0x4::aptos_token::create_collection",
->>>>>>> 7d60beacab (support aptos token)
       [],
       [
         description,
         maxSupply,
         name,
         uri,
-<<<<<<< HEAD
         options?.mutableDescription ?? true,
         options?.mutableRoyalty ?? true,
         options?.mutableURI ?? true,
@@ -171,28 +131,6 @@ export class AptosToken {
    * @param propertyTypes the type of property values
    * @param propertyValues the property values to be stored on-chain
    * @returns The hash of the transaction submitted to the API
-=======
-        mutableDescription,
-        mutableRoyalty,
-        mutableURI,
-        mutableTokenDescription,
-        mutableTokenName,
-        mutableTokenProperties,
-        mutableTokenURI,
-        tokensBurnableByCreator,
-        tokensFreezableByCreator,
-        royaltyNumerator,
-        royaltyDenominator,
-      ],
-    );
-    const bcsTxn = AptosClient.generateBCSTransaction(account, rawTxn);
-    const pendingTransaction = await this.provider.aptosClient.submitSignedBCSTransaction(bcsTxn);
-    return pendingTransaction.hash;
-  }
-
-  /**
-   *
->>>>>>> 7d60beacab (support aptos token)
    */
   async mint(
     account: AptosAccount,
@@ -204,20 +142,10 @@ export class AptosToken {
     propertyTypes: Array<string> = [],
     propertyValues: Array<string> = [],
     extraArgs?: OptionalTransactionArgs,
-<<<<<<< HEAD
   ): Promise<string> {
     return this.submitTransaction(
       account,
       "mint",
-=======
-  ) {
-    const builder = new TransactionBuilderRemoteABI(this.provider.aptosClient, {
-      sender: account.address(),
-      ...extraArgs,
-    });
-    const rawTxn = await builder.build(
-      "0x4::aptos_token::mint",
->>>>>>> 7d60beacab (support aptos token)
       [],
       [
         collection,
@@ -228,7 +156,6 @@ export class AptosToken {
         propertyTypes,
         getPropertyValueRaw(propertyValues, propertyTypes),
       ],
-<<<<<<< HEAD
       extraArgs,
     );
   }
@@ -247,21 +174,12 @@ export class AptosToken {
    * @param propertyValues the property values to be stored on-chain
    * @returns The hash of the transaction submitted to the API
    */
-=======
-    );
-    const bcsTxn = AptosClient.generateBCSTransaction(account, rawTxn);
-    const pendingTransaction = await this.provider.aptosClient.submitSignedBCSTransaction(bcsTxn);
-    return pendingTransaction.hash;
-  }
-
->>>>>>> 7d60beacab (support aptos token)
   async mintSoulBound(
     account: AptosAccount,
     collection: string,
     description: string,
     name: string,
     uri: string,
-<<<<<<< HEAD
     recipient: AptosAccount,
     propertyKeys: Array<string> = [],
     propertyTypes: Array<string> = [],
@@ -271,20 +189,6 @@ export class AptosToken {
     return this.submitTransaction(
       account,
       "mint_soul_bound",
-=======
-    propertyKeys: Array<string>,
-    propertyTypes: Array<string>,
-    propertyValues: Array<string>,
-    soulBoundTo: AptosAccount,
-    extraArgs?: OptionalTransactionArgs,
-  ) {
-    const builder = new TransactionBuilderRemoteABI(this.provider.aptosClient, {
-      sender: account.address(),
-      ...extraArgs,
-    });
-    const rawTxn = await builder.build(
-      "0x4::aptos_token::mint_soul_bound",
->>>>>>> 7d60beacab (support aptos token)
       [],
       [
         collection,
@@ -294,7 +198,6 @@ export class AptosToken {
         propertyKeys,
         propertyTypes,
         getPropertyValueRaw(propertyValues, propertyTypes),
-<<<<<<< HEAD
         recipient.address().hex(),
       ],
       extraArgs,
@@ -581,12 +484,6 @@ export class AptosToken {
       [HexString.ensure(token).hex(), HexString.ensure(recipient).hex()],
     );
     const bcsTxn = AptosClient.generateBCSTransaction(owner, rawTxn);
-=======
-        soulBoundTo.address().hex(),
-      ],
-    );
-    const bcsTxn = AptosClient.generateBCSTransaction(account, rawTxn);
->>>>>>> 7d60beacab (support aptos token)
     const pendingTransaction = await this.provider.aptosClient.submitSignedBCSTransaction(bcsTxn);
     return pendingTransaction.hash;
   }
