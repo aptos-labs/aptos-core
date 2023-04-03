@@ -27,9 +27,9 @@ describe("token objects", () => {
         await aptosToken.createCollection(
           alice,
           "Alice's simple collection",
-          5,
           collectionName,
           "https://aptos.dev",
+          5,
           10,
           10,
         ),
@@ -69,10 +69,10 @@ describe("token objects", () => {
           "Alice's simple soul bound token",
           "Alice's soul bound token",
           "https://aptos.dev/img/nyan.jpeg",
+          bob,
           ["key"],
           ["bool"],
           ["true"],
-          bob,
         ),
         { checkSuccess: true },
       );
