@@ -182,7 +182,7 @@ impl EpochManager {
             quorum_store_storage,
             batch_retrieval_tx: None,
             bounded_executor,
-            recovery_mode: false
+            recovery_mode: false,
         }
     }
 
@@ -594,7 +594,7 @@ impl EpochManager {
             self.storage.clone(),
             self.commit_state_computer.clone(),
             ledger_data.committed_round(),
-            );
+        );
         self.recovery_mode = true;
         tokio::spawn(recovery_manager.start(recovery_manager_rx, close_rx));
     }
