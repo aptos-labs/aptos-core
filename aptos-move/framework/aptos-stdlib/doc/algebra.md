@@ -43,6 +43,7 @@ See <code>algebra_*.<b>move</b></code> for currently implemented algebraic struc
 
 
 -  [Struct `Element`](#0x1_algebra_Element)
+-  [Constants](#@Constants_0)
 -  [Function `eq`](#0x1_algebra_eq)
 -  [Function `from_u64`](#0x1_algebra_from_u64)
 -  [Function `zero`](#0x1_algebra_zero)
@@ -89,29 +90,29 @@ See <code>algebra_*.<b>move</b></code> for currently implemented algebraic struc
 -  [Function `sub_internal`](#0x1_algebra_sub_internal)
 -  [Function `upcast_internal`](#0x1_algebra_upcast_internal)
 -  [Function `zero_internal`](#0x1_algebra_zero_internal)
--  [Specification](#@Specification_0)
-    -  [Function `add_internal`](#@Specification_0_add_internal)
-    -  [Function `deserialize_internal`](#@Specification_0_deserialize_internal)
-    -  [Function `div_internal`](#@Specification_0_div_internal)
-    -  [Function `double_internal`](#@Specification_0_double_internal)
-    -  [Function `downcast_internal`](#@Specification_0_downcast_internal)
-    -  [Function `from_u64_internal`](#@Specification_0_from_u64_internal)
-    -  [Function `eq_internal`](#@Specification_0_eq_internal)
-    -  [Function `hash_to_internal`](#@Specification_0_hash_to_internal)
-    -  [Function `inv_internal`](#@Specification_0_inv_internal)
-    -  [Function `mul_internal`](#@Specification_0_mul_internal)
-    -  [Function `multi_pairing_internal`](#@Specification_0_multi_pairing_internal)
-    -  [Function `multi_scalar_mul_internal`](#@Specification_0_multi_scalar_mul_internal)
-    -  [Function `neg_internal`](#@Specification_0_neg_internal)
-    -  [Function `one_internal`](#@Specification_0_one_internal)
-    -  [Function `order_internal`](#@Specification_0_order_internal)
-    -  [Function `pairing_internal`](#@Specification_0_pairing_internal)
-    -  [Function `scalar_mul_internal`](#@Specification_0_scalar_mul_internal)
-    -  [Function `serialize_internal`](#@Specification_0_serialize_internal)
-    -  [Function `sqr_internal`](#@Specification_0_sqr_internal)
-    -  [Function `sub_internal`](#@Specification_0_sub_internal)
-    -  [Function `upcast_internal`](#@Specification_0_upcast_internal)
-    -  [Function `zero_internal`](#@Specification_0_zero_internal)
+-  [Specification](#@Specification_1)
+    -  [Function `add_internal`](#@Specification_1_add_internal)
+    -  [Function `deserialize_internal`](#@Specification_1_deserialize_internal)
+    -  [Function `div_internal`](#@Specification_1_div_internal)
+    -  [Function `double_internal`](#@Specification_1_double_internal)
+    -  [Function `downcast_internal`](#@Specification_1_downcast_internal)
+    -  [Function `from_u64_internal`](#@Specification_1_from_u64_internal)
+    -  [Function `eq_internal`](#@Specification_1_eq_internal)
+    -  [Function `hash_to_internal`](#@Specification_1_hash_to_internal)
+    -  [Function `inv_internal`](#@Specification_1_inv_internal)
+    -  [Function `mul_internal`](#@Specification_1_mul_internal)
+    -  [Function `multi_pairing_internal`](#@Specification_1_multi_pairing_internal)
+    -  [Function `multi_scalar_mul_internal`](#@Specification_1_multi_scalar_mul_internal)
+    -  [Function `neg_internal`](#@Specification_1_neg_internal)
+    -  [Function `one_internal`](#@Specification_1_one_internal)
+    -  [Function `order_internal`](#@Specification_1_order_internal)
+    -  [Function `pairing_internal`](#@Specification_1_pairing_internal)
+    -  [Function `scalar_mul_internal`](#@Specification_1_scalar_mul_internal)
+    -  [Function `serialize_internal`](#@Specification_1_serialize_internal)
+    -  [Function `sqr_internal`](#@Specification_1_sqr_internal)
+    -  [Function `sub_internal`](#@Specification_1_sub_internal)
+    -  [Function `upcast_internal`](#@Specification_1_upcast_internal)
+    -  [Function `zero_internal`](#@Specification_1_zero_internal)
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
@@ -148,6 +149,29 @@ This struct represents an element of a structure <code>S</code>.
 
 
 </details>
+
+<a name="@Constants_0"></a>
+
+## Constants
+
+
+<a name="0x1_algebra_E_NON_EQUAL_LENGTHS"></a>
+
+
+
+<pre><code><b>const</b> <a href="algebra.md#0x1_algebra_E_NON_EQUAL_LENGTHS">E_NON_EQUAL_LENGTHS</a>: u64 = 2;
+</code></pre>
+
+
+
+<a name="0x1_algebra_E_NOT_IMPLEMENTED"></a>
+
+
+
+<pre><code><b>const</b> <a href="algebra.md#0x1_algebra_E_NOT_IMPLEMENTED">E_NOT_IMPLEMENTED</a>: u64 = 1;
+</code></pre>
+
+
 
 <a name="0x1_algebra_eq"></a>
 
@@ -376,7 +400,8 @@ Compute <code>x * y</code> for elements <code>x</code> and <code>y</code> of a s
 ## Function `div`
 
 Try computing <code>x / y</code> for elements <code>x</code> and <code>y</code> of a structure <code>S</code>.
-Return none if y equals to <code><a href="algebra.md#0x1_algebra_zero">zero</a>&lt;S&gt;()</code>.
+Return none if <code>y</code> does not have a multiplicative inverse in the structure <code>S</code>
+(e.g., when <code>S</code> is a field, and <code>y</code> is zero).
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_div">div</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;&gt;
@@ -436,7 +461,8 @@ Compute <code>x^2</code> for an element <code>x</code> of a structure <code>S</c
 ## Function `inv`
 
 Try computing <code>x^(-1)</code> for an element <code>x</code> of a structure <code>S</code>.
-Return none if <code>x</code> equals to <code><a href="algebra.md#0x1_algebra_zero">zero</a>&lt;S&gt;()</code>.
+Return none if <code>x</code> does not have a multiplicative inverse in the structure <code>S</code>
+(e.g., when <code>S</code> is a field, and <code>x</code> is zero).
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_inv">inv</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;&gt;
@@ -468,7 +494,7 @@ Return none if <code>x</code> equals to <code><a href="algebra.md#0x1_algebra_ze
 
 ## Function `double`
 
-Compute <code>2*P</code> for an element <code>P</code> of a structure <code>S</code>. Faster and cheaper than <code>P + P</code>.
+Compute <code>2*P</code> for an element <code>P</code> of a structure <code>S</code>. Faster and cheaper than <code><a href="algebra.md#0x1_algebra_add">add</a>(P, P)</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_double">double</a>&lt;S&gt;(element_p: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;
@@ -500,7 +526,7 @@ Compute <code>k[0]*P[0]+...+k[n-1]*P[n-1]</code>, where
 <code>P[]</code> are <code>n</code> elements of group <code>G</code> represented by parameter <code>elements</code>, and
 <code>k[]</code> are <code>n</code> elements of the scalarfield <code>S</code> of group <code>G</code> represented by parameter <code>scalars</code>.
 
-Abort with code 0x010000 if the sizes of <code>elements</code> and <code>scalars</code> do not match.
+Abort with <code>std::error::invalid_argument(<a href="algebra.md#0x1_algebra_E_NON_EQUAL_LENGTHS">E_NON_EQUAL_LENGTHS</a>)</code> if the sizes of <code>elements</code> and <code>scalars</code> do not match.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_multi_scalar_mul">multi_scalar_mul</a>&lt;G, S&gt;(elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;&gt;, scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;
@@ -529,7 +555,7 @@ Abort with code 0x010000 if the sizes of <code>elements</code> and <code>scalars
 
 ## Function `scalar_mul`
 
-Compute <code>k*P</code>, where <code>P</code> is an element of a group <code>G</code> and <code>k</code> is an element of the scalar field <code>S</code> of a structure <code>G</code>.
+Compute <code>k*P</code>, where <code>P</code> is an element of a group <code>G</code> and <code>k</code> is an element of the scalar field <code>S</code> associated to the group <code>G</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_scalar_mul">scalar_mul</a>&lt;G, S&gt;(element_p: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;, scalar_k: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;
@@ -558,11 +584,14 @@ Compute <code>k*P</code>, where <code>P</code> is an element of a group <code>G<
 ## Function `multi_pairing`
 
 Efficiently compute <code>e(P[0],Q[0])+...+e(P[n-1],Q[n-1])</code>,
-where <code>e: (G1,G2) -&gt; (Gt)</code> is a pre-compiled pairing function from groups <code>(G1,G2)</code> to group <code>Gt</code>,
+where <code>e: (G1,G2) -&gt; (Gt)</code> is the pairing function from groups <code>(G1,G2)</code> to group <code>Gt</code>,
 <code>P[]</code> are <code>n</code> elements of group <code>G1</code> represented by parameter <code>g1_elements</code>, and
 <code>Q[]</code> are <code>n</code> elements of group <code>G2</code> represented by parameter <code>g2_elements</code>.
 
 Abort with code 0x010000 if the sizes of <code>g1_elements</code> and <code>g2_elements</code> do not match.
+
+NOTE: we are viewing the target group <code>Gt</code> of the pairing as an additive group,
+rather than a multiplicative one (which is typically the case).
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_multi_pairing">multi_pairing</a>&lt;G1, G2, Gt&gt;(g1_elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G1&gt;&gt;, g2_elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G2&gt;&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;Gt&gt;
@@ -592,7 +621,7 @@ Abort with code 0x010000 if the sizes of <code>g1_elements</code> and <code>g2_e
 
 ## Function `pairing`
 
-Compute a pre-compiled pairing function (a.k.a., bilinear map) on <code>element_1</code> and <code>element_2</code>.
+Compute the pairing function (a.k.a., bilinear map) on a <code>G1</code> element and a <code>G2</code> element.
 Return an element in the target group <code>Gt</code>.
 
 
@@ -679,7 +708,7 @@ Serialize an element of an algebraic structure <code>S</code> to a byte array us
 
 ## Function `order`
 
-Get the order of group <code>G</code>, a big integer little-endian encoded as a byte array.
+Get the order of structure <code>S</code>, a big integer little-endian encoded as a byte array.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_order">order</a>&lt;S&gt;(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
@@ -736,7 +765,7 @@ Cast an element of a structure <code>S</code> to a parent structure <code>L</cod
 Try casting an element <code>x</code> of a structure <code>L</code> to a sub-structure <code>S</code>.
 Return none if <code>x</code> is not a member of <code>S</code>.
 
-NOTE: Membership check is performed inside, which can be expensive, depending on the structures <code>L</code> and <code>S</code>.
+NOTE: Membership check in <code>S</code> is performed inside, which can be expensive, depending on the structures <code>L</code> and <code>S</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_downcast">downcast</a>&lt;L, S&gt;(element_x: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;L&gt;): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;&gt;
@@ -767,13 +796,12 @@ NOTE: Membership check is performed inside, which can be expensive, depending on
 
 ## Function `hash_to`
 
-Hash an arbitrary-length byte array <code>msg</code> into structure <code>S</code> using the given <code>suite</code>.
-A unique domain separation tag <code>dst</code> of size 255 bytes or shorter is required
+Hash an arbitrary-length byte array <code>msg</code> into structure <code>S</code> using the given hash suite <code>H</code>.
+A unique domain separation tag <code>dst</code> is required
 for each independent collision-resistent mapping involved in the protocol built atop.
-Abort if <code>dst</code> is too long.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_hash_to">hash_to</a>&lt;St, Su&gt;(dst: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, msg: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;St&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_hash_to">hash_to</a>&lt;S, H&gt;(dst: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, msg: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;
 </code></pre>
 
 
@@ -782,10 +810,10 @@ Abort if <code>dst</code> is too long.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_hash_to">hash_to</a>&lt;St, Su&gt;(dst: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, msg: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;St&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_hash_to">hash_to</a>&lt;S, H&gt;(dst: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, msg: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
     <a href="algebra.md#0x1_algebra_abort_unless_cryptography_algebra_natives_enabled">abort_unless_cryptography_algebra_natives_enabled</a>();
     <a href="algebra.md#0x1_algebra_Element">Element</a> {
-        handle: <a href="algebra.md#0x1_algebra_hash_to_internal">hash_to_internal</a>&lt;St, Su&gt;(dst, msg)
+        handle: <a href="algebra.md#0x1_algebra_hash_to_internal">hash_to_internal</a>&lt;S, H&gt;(dst, msg)
     }
 }
 </code></pre>
@@ -1010,7 +1038,7 @@ Abort if <code>dst</code> is too long.
 
 
 
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_hash_to_internal">hash_to_internal</a>&lt;St, Su&gt;(dst: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_hash_to_internal">hash_to_internal</a>&lt;S, H&gt;(dst: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64
 </code></pre>
 
 
@@ -1019,7 +1047,7 @@ Abort if <code>dst</code> is too long.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_hash_to_internal">hash_to_internal</a>&lt;St, Su&gt;(dst: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64;
+<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_hash_to_internal">hash_to_internal</a>&lt;S, H&gt;(dst: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64;
 </code></pre>
 
 
@@ -1334,12 +1362,12 @@ Abort if <code>dst</code> is too long.
 
 </details>
 
-<a name="@Specification_0"></a>
+<a name="@Specification_1"></a>
 
 ## Specification
 
 
-<a name="@Specification_0_add_internal"></a>
+<a name="@Specification_1_add_internal"></a>
 
 ### Function `add_internal`
 
@@ -1355,7 +1383,7 @@ Abort if <code>dst</code> is too long.
 
 
 
-<a name="@Specification_0_deserialize_internal"></a>
+<a name="@Specification_1_deserialize_internal"></a>
 
 ### Function `deserialize_internal`
 
@@ -1371,7 +1399,7 @@ Abort if <code>dst</code> is too long.
 
 
 
-<a name="@Specification_0_div_internal"></a>
+<a name="@Specification_1_div_internal"></a>
 
 ### Function `div_internal`
 
@@ -1387,7 +1415,7 @@ Abort if <code>dst</code> is too long.
 
 
 
-<a name="@Specification_0_double_internal"></a>
+<a name="@Specification_1_double_internal"></a>
 
 ### Function `double_internal`
 
@@ -1403,7 +1431,7 @@ Abort if <code>dst</code> is too long.
 
 
 
-<a name="@Specification_0_downcast_internal"></a>
+<a name="@Specification_1_downcast_internal"></a>
 
 ### Function `downcast_internal`
 
@@ -1419,7 +1447,7 @@ Abort if <code>dst</code> is too long.
 
 
 
-<a name="@Specification_0_from_u64_internal"></a>
+<a name="@Specification_1_from_u64_internal"></a>
 
 ### Function `from_u64_internal`
 
@@ -1435,7 +1463,7 @@ Abort if <code>dst</code> is too long.
 
 
 
-<a name="@Specification_0_eq_internal"></a>
+<a name="@Specification_1_eq_internal"></a>
 
 ### Function `eq_internal`
 
@@ -1451,12 +1479,12 @@ Abort if <code>dst</code> is too long.
 
 
 
-<a name="@Specification_0_hash_to_internal"></a>
+<a name="@Specification_1_hash_to_internal"></a>
 
 ### Function `hash_to_internal`
 
 
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_hash_to_internal">hash_to_internal</a>&lt;St, Su&gt;(dst: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_hash_to_internal">hash_to_internal</a>&lt;S, H&gt;(dst: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64
 </code></pre>
 
 
@@ -1467,7 +1495,7 @@ Abort if <code>dst</code> is too long.
 
 
 
-<a name="@Specification_0_inv_internal"></a>
+<a name="@Specification_1_inv_internal"></a>
 
 ### Function `inv_internal`
 
@@ -1483,7 +1511,7 @@ Abort if <code>dst</code> is too long.
 
 
 
-<a name="@Specification_0_mul_internal"></a>
+<a name="@Specification_1_mul_internal"></a>
 
 ### Function `mul_internal`
 
@@ -1499,7 +1527,7 @@ Abort if <code>dst</code> is too long.
 
 
 
-<a name="@Specification_0_multi_pairing_internal"></a>
+<a name="@Specification_1_multi_pairing_internal"></a>
 
 ### Function `multi_pairing_internal`
 
@@ -1515,7 +1543,7 @@ Abort if <code>dst</code> is too long.
 
 
 
-<a name="@Specification_0_multi_scalar_mul_internal"></a>
+<a name="@Specification_1_multi_scalar_mul_internal"></a>
 
 ### Function `multi_scalar_mul_internal`
 
@@ -1531,7 +1559,7 @@ Abort if <code>dst</code> is too long.
 
 
 
-<a name="@Specification_0_neg_internal"></a>
+<a name="@Specification_1_neg_internal"></a>
 
 ### Function `neg_internal`
 
@@ -1547,7 +1575,7 @@ Abort if <code>dst</code> is too long.
 
 
 
-<a name="@Specification_0_one_internal"></a>
+<a name="@Specification_1_one_internal"></a>
 
 ### Function `one_internal`
 
@@ -1563,7 +1591,7 @@ Abort if <code>dst</code> is too long.
 
 
 
-<a name="@Specification_0_order_internal"></a>
+<a name="@Specification_1_order_internal"></a>
 
 ### Function `order_internal`
 
@@ -1579,7 +1607,7 @@ Abort if <code>dst</code> is too long.
 
 
 
-<a name="@Specification_0_pairing_internal"></a>
+<a name="@Specification_1_pairing_internal"></a>
 
 ### Function `pairing_internal`
 
@@ -1595,7 +1623,7 @@ Abort if <code>dst</code> is too long.
 
 
 
-<a name="@Specification_0_scalar_mul_internal"></a>
+<a name="@Specification_1_scalar_mul_internal"></a>
 
 ### Function `scalar_mul_internal`
 
@@ -1611,7 +1639,7 @@ Abort if <code>dst</code> is too long.
 
 
 
-<a name="@Specification_0_serialize_internal"></a>
+<a name="@Specification_1_serialize_internal"></a>
 
 ### Function `serialize_internal`
 
@@ -1627,7 +1655,7 @@ Abort if <code>dst</code> is too long.
 
 
 
-<a name="@Specification_0_sqr_internal"></a>
+<a name="@Specification_1_sqr_internal"></a>
 
 ### Function `sqr_internal`
 
@@ -1643,7 +1671,7 @@ Abort if <code>dst</code> is too long.
 
 
 
-<a name="@Specification_0_sub_internal"></a>
+<a name="@Specification_1_sub_internal"></a>
 
 ### Function `sub_internal`
 
@@ -1659,7 +1687,7 @@ Abort if <code>dst</code> is too long.
 
 
 
-<a name="@Specification_0_upcast_internal"></a>
+<a name="@Specification_1_upcast_internal"></a>
 
 ### Function `upcast_internal`
 
@@ -1675,7 +1703,7 @@ Abort if <code>dst</code> is too long.
 
 
 
-<a name="@Specification_0_zero_internal"></a>
+<a name="@Specification_1_zero_internal"></a>
 
 ### Function `zero_internal`
 

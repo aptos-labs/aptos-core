@@ -54,42 +54,6 @@ macro_rules! format_from_ty_arg {
     }};
 }
 
-/// Macros that implements `serialize_internal()` using arkworks libraries.
-macro_rules! ark_serialize_internal {
-    ($context:expr, $args:ident, $ark_type:ty, $ark_ser_func:ident, $gas:expr) => {{
-        let handle = safely_pop_arg!($args, u64) as usize;
-        safe_borrow_element!($context, handle, $ark_type, element_ptr, element);
-        let mut buf = vec![];
-        $context.charge($gas)?;
-        match element.$ark_ser_func(&mut buf) {
-            Ok(_) => {},
-            _ => {
-                abort_invariant_violated();
-                unreachable!()
-            },
-        }
-        buf
-    }};
-}
-
-macro_rules! ark_ec_point_serialize_internal {
-    ($context:expr, $args:ident, $ark_type:ty, $ark_ser_func:ident, $gas:expr) => {{
-        let handle = safely_pop_arg!($args, u64) as usize;
-        safe_borrow_element!($context, handle, $ark_type, element_ptr, element);
-        let element_affine = element.into_affine();
-        let mut buf = Vec::new();
-        $context.charge($gas)?;
-        match element_affine.$ark_ser_func(&mut buf) {
-            Ok(_) => {},
-            _ => {
-                abort_invariant_violated();
-                unreachable!()
-            },
-        }
-        buf
-    }};
-}
-
 pub fn serialize_internal(
     gas_params: &GasParameters,
     context: &mut SafeNativeContext,
@@ -102,96 +66,124 @@ pub fn serialize_internal(
     abort_unless_serialization_format_enabled!(context, format_opt);
     match (structure_opt, format_opt) {
         (Some(Structure::BLS12381Fr), Some(SerializationFormat::BLS12381FrLsb)) => {
-            let buf = ark_serialize_internal!(
-                context,
-                args,
-                ark_bls12_381::Fr,
-                serialize_uncompressed,
-                gas_params.ark_bls12_381_fr_serialize * NumArgs::one()
-            );
+            let handle = safely_pop_arg!(args, u64) as usize;
+            safe_borrow_element!(context, handle, ark_bls12_381::Fr, element_ptr, element);
+            let mut buf = vec![];
+            context.charge(gas_params.ark_bls12_381_fr_serialize * NumArgs::one())?;
+            element
+                .serialize_uncompressed(&mut buf)
+                .map_err(|_e| abort_invariant_violated())?;
             Ok(smallvec![Value::vector_u8(buf)])
         },
         (Some(Structure::BLS12381Fr), Some(SerializationFormat::BLS12381FrMsb)) => {
-            let mut buf = ark_serialize_internal!(
-                context,
-                args,
-                ark_bls12_381::Fr,
-                serialize_uncompressed,
-                gas_params.ark_bls12_381_fr_serialize * NumArgs::one()
-            );
+            let handle = safely_pop_arg!(args, u64) as usize;
+            safe_borrow_element!(context, handle, ark_bls12_381::Fr, element_ptr, element);
+            let mut buf = vec![];
+            context.charge(gas_params.ark_bls12_381_fr_serialize * NumArgs::one())?;
+            element
+                .serialize_uncompressed(&mut buf)
+                .map_err(|_e| abort_invariant_violated())?;
             buf.reverse();
             Ok(smallvec![Value::vector_u8(buf)])
         },
         (Some(Structure::BLS12381Fq12), Some(SerializationFormat::BLS12381Fq12LscLsb)) => {
-            let buf = ark_serialize_internal!(
-                context,
-                args,
-                ark_bls12_381::Fq12,
-                serialize_uncompressed,
-                gas_params.ark_bls12_381_fq12_serialize * NumArgs::one()
-            );
+            let handle = safely_pop_arg!(args, u64) as usize;
+            safe_borrow_element!(context, handle, ark_bls12_381::Fq12, element_ptr, element);
+            let mut buf = vec![];
+            context.charge(gas_params.ark_bls12_381_fq12_serialize * NumArgs::one())?;
+            element
+                .serialize_uncompressed(&mut buf)
+                .map_err(|_e| abort_invariant_violated())?;
             Ok(smallvec![Value::vector_u8(buf)])
         },
         (
             Some(Structure::BLS12381G1Affine),
             Some(SerializationFormat::BLS12381G1AffineUncompressed),
         ) => {
-            let buf = ark_ec_point_serialize_internal!(
+            let handle = safely_pop_arg!(args, u64) as usize;
+            safe_borrow_element!(
                 context,
-                args,
+                handle,
                 ark_bls12_381::G1Projective,
-                serialize_uncompressed,
-                gas_params.ark_bls12_381_g1_affine_serialize_uncomp * NumArgs::one()
+                element_ptr,
+                element
             );
+            let element_affine = element.into_affine();
+            let mut buf = Vec::new();
+            context.charge(gas_params.ark_bls12_381_g1_affine_serialize_uncomp * NumArgs::one())?;
+            element_affine
+                .serialize_uncompressed(&mut buf)
+                .map_err(|_e| abort_invariant_violated())?;
             Ok(smallvec![Value::vector_u8(buf)])
         },
         (
             Some(Structure::BLS12381G1Affine),
             Some(SerializationFormat::BLS12381G1AffineCompressed),
         ) => {
-            let buf = ark_ec_point_serialize_internal!(
+            let handle = safely_pop_arg!(args, u64) as usize;
+            safe_borrow_element!(
                 context,
-                args,
+                handle,
                 ark_bls12_381::G1Projective,
-                serialize_compressed,
-                gas_params.ark_bls12_381_g1_affine_serialize_comp * NumArgs::one()
+                element_ptr,
+                element
             );
+            let element_affine = element.into_affine();
+            let mut buf = Vec::new();
+            context.charge(gas_params.ark_bls12_381_g1_affine_serialize_comp * NumArgs::one())?;
+            element_affine
+                .serialize_compressed(&mut buf)
+                .map_err(|_e| abort_invariant_violated())?;
             Ok(smallvec![Value::vector_u8(buf)])
         },
         (
             Some(Structure::BLS12381G2Affine),
             Some(SerializationFormat::BLS12381G2AffineUncompressed),
         ) => {
-            let buf = ark_ec_point_serialize_internal!(
+            let handle = safely_pop_arg!(args, u64) as usize;
+            safe_borrow_element!(
                 context,
-                args,
+                handle,
                 ark_bls12_381::G2Projective,
-                serialize_uncompressed,
-                gas_params.ark_bls12_381_g2_affine_serialize_uncomp * NumArgs::one()
+                element_ptr,
+                element
             );
+            let element_affine = element.into_affine();
+            let mut buf = Vec::new();
+            context.charge(gas_params.ark_bls12_381_g2_affine_serialize_uncomp * NumArgs::one())?;
+            element_affine
+                .serialize_uncompressed(&mut buf)
+                .map_err(|_e| abort_invariant_violated())?;
             Ok(smallvec![Value::vector_u8(buf)])
         },
         (
             Some(Structure::BLS12381G2Affine),
             Some(SerializationFormat::BLS12381G2AffineCompressed),
         ) => {
-            let buf = ark_ec_point_serialize_internal!(
+            let handle = safely_pop_arg!(args, u64) as usize;
+            safe_borrow_element!(
                 context,
-                args,
+                handle,
                 ark_bls12_381::G2Projective,
-                serialize_compressed,
-                gas_params.ark_bls12_381_g2_affine_serialize_comp * NumArgs::one()
+                element_ptr,
+                element
             );
+            let element_affine = element.into_affine();
+            let mut buf = Vec::new();
+            context.charge(gas_params.ark_bls12_381_g2_affine_serialize_comp * NumArgs::one())?;
+            element_affine
+                .serialize_compressed(&mut buf)
+                .map_err(|_e| abort_invariant_violated())?;
             Ok(smallvec![Value::vector_u8(buf)])
         },
         (Some(Structure::BLS12381Gt), Some(SerializationFormat::BLS12381Gt)) => {
-            let buf = ark_serialize_internal!(
-                context,
-                args,
-                ark_bls12_381::Fq12,
-                serialize_uncompressed,
-                gas_params.ark_bls12_381_fq12_serialize * NumArgs::one()
-            );
+            let handle = safely_pop_arg!(args, u64) as usize;
+            safe_borrow_element!(context, handle, ark_bls12_381::Fq12, element_ptr, element);
+            let mut buf = vec![];
+            context.charge(gas_params.ark_bls12_381_fq12_serialize * NumArgs::one())?;
+            element
+                .serialize_uncompressed(&mut buf)
+                .map_err(|_e| abort_invariant_violated())?;
             Ok(smallvec![Value::vector_u8(buf)])
         },
         _ => Err(SafeNativeError::Abort {
@@ -213,10 +205,9 @@ macro_rules! ark_deserialize_internal {
             | Err(ark_serialize::SerializationError::UnexpectedFlags) => {
                 Ok(smallvec![Value::bool(false), Value::u64(0)])
             },
-            _ => {
-                abort_invariant_violated();
-                unreachable!()
-            },
+            _ => Err(SafeNativeError::InvariantViolation(
+                abort_invariant_violated(),
+            )),
         }
     }};
 }
@@ -234,10 +225,9 @@ macro_rules! ark_ec_point_deserialize_internal {
             | Err(ark_serialize::SerializationError::UnexpectedFlags) => {
                 Ok(smallvec![Value::bool(false), Value::u64(0)])
             },
-            _ => {
-                abort_invariant_violated();
-                unreachable!()
-            },
+            _ => Err(SafeNativeError::InvariantViolation(
+                abort_invariant_violated(),
+            )),
         }
     }};
 }
@@ -259,7 +249,7 @@ pub fn deserialize_internal(
         (Some(Structure::BLS12381Fr), Some(SerializationFormat::BLS12381FrLsb)) => {
             // Valid BLS12381FrLsb serialization should be 32-byte.
             // NOTE: Arkworks deserialization cost grows as the input size grows.
-            // So exit early if the size is incorrect, for gas safety. (Also applied to other cases.)
+            // So exit early if the size is incorrect, for gas safety. (Also applied to other cases across this file.)
             if bytes.len() != 32 {
                 return Ok(smallvec![Value::bool(false), Value::u64(0)]);
             }

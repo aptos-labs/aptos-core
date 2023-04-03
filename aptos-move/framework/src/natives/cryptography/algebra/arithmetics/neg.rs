@@ -60,13 +60,7 @@ pub fn neg_internal(
             let handle = safely_pop_arg!(args, u64) as usize;
             safe_borrow_element!(context, handle, ark_bls12_381::Fq12, element_ptr, element);
             context.charge(gas_params.ark_bls12_381_fq12_inv * NumArgs::one())?;
-            let new_element = match element.inverse() {
-                Some(e) => e,
-                None => {
-                    abort_invariant_violated();
-                    unreachable!()
-                },
-            };
+            let new_element = element.inverse().ok_or_else(abort_invariant_violated)?;
             let new_handle = store_element!(context, new_element);
             Ok(smallvec![Value::u64(new_handle as u64)])
         },

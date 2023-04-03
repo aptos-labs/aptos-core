@@ -3,22 +3,17 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::natives::cryptography::algebra::{HashToStructureSuite, Structure};
+use crate::natives::{
+    cryptography::algebra::{HashToStructureSuite, Structure},
+    helpers::log2_ceil,
+};
 use move_core_types::gas_algebra::{InternalGas, InternalGasPerArg, NumArgs};
-
-fn log2_floor(n: usize) -> usize {
-    (0_usize.leading_zeros() - n.leading_zeros()) as usize
-}
-
-fn log2_ceil(n: usize) -> usize {
-    log2_floor(n - 1) + 1
-}
 
 fn ark_msm_window_size(num_entries: usize) -> usize {
     if num_entries < 32 {
         3
     } else {
-        (log2_ceil(num_entries) * 69 / 100) + 2
+        (log2_ceil(num_entries).unwrap() * 69 / 100) + 2
     }
 }
 

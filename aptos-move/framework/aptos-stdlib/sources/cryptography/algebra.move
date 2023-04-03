@@ -39,6 +39,9 @@ module aptos_std::algebra {
     use std::option::{Option, some, none};
     use std::features;
 
+    const E_NOT_IMPLEMENTED: u64 = 1;
+    const E_NON_EQUAL_LENGTHS: u64 = 2;
+
     /// This struct represents an element of a structure `S`.
     struct Element<phantom S> has copy, drop {
         handle: u64
@@ -111,7 +114,8 @@ module aptos_std::algebra {
     }
 
     /// Try computing `x / y` for elements `x` and `y` of a structure `S`.
-    /// Return none if y equals to `zero<S>()`.
+    /// Return none if `y` does not have a multiplicative inverse in the structure `S`
+    /// (e.g., when `S` is a field, and `y` is zero).
     public fun div<S>(x: &Element<S>, y: &Element<S>): Option<Element<S>> {
         abort_unless_cryptography_algebra_natives_enabled();
         let (succ, handle) = div_internal<S>(x.handle, y.handle);
@@ -131,7 +135,8 @@ module aptos_std::algebra {
     }
 
     /// Try computing `x^(-1)` for an element `x` of a structure `S`.
-    /// Return none if `x` equals to `zero<S>()`.
+    /// Return none if `x` does not have a multiplicative inverse in the structure `S`
+    /// (e.g., when `S` is a field, and `x` is zero).
     public fun inv<S>(x: &Element<S>): Option<Element<S>> {
         abort_unless_cryptography_algebra_natives_enabled();
         let (succeeded, handle) = inv_internal<S>(x.handle);
@@ -143,7 +148,7 @@ module aptos_std::algebra {
         }
     }
 
-    /// Compute `2*P` for an element `P` of a structure `S`. Faster and cheaper than `P + P`.
+    /// Compute `2*P` for an element `P` of a structure `S`. Faster and cheaper than `add(P, P)`.
     public fun double<S>(element_p: &Element<S>): Element<S> {
         abort_unless_cryptography_algebra_natives_enabled();
         Element<S> {
@@ -155,7 +160,7 @@ module aptos_std::algebra {
     /// `P[]` are `n` elements of group `G` represented by parameter `elements`, and
     /// `k[]` are `n` elements of the scalarfield `S` of group `G` represented by parameter `scalars`.
     ///
-    /// Abort with code 0x010000 if the sizes of `elements` and `scalars` do not match.
+    /// Abort with `std::error::invalid_argument(E_NON_EQUAL_LENGTHS)` if the sizes of `elements` and `scalars` do not match.
     public fun multi_scalar_mul<G, S>(elements: &vector<Element<G>>, scalars: &vector<Element<S>>): Element<G> {
         let element_handles = handles_from_elements(elements);
         let scalar_handles = handles_from_elements(scalars);
@@ -164,7 +169,7 @@ module aptos_std::algebra {
         }
     }
 
-    /// Compute `k*P`, where `P` is an element of a group `G` and `k` is an element of the scalar field `S` of a structure `G`.
+    /// Compute `k*P`, where `P` is an element of a group `G` and `k` is an element of the scalar field `S` associated to the group `G`.
     public fun scalar_mul<G, S>(element_p: &Element<G>, scalar_k: &Element<S>): Element<G> {
         abort_unless_cryptography_algebra_natives_enabled();
         Element<G> {
@@ -173,11 +178,14 @@ module aptos_std::algebra {
     }
 
     /// Efficiently compute `e(P[0],Q[0])+...+e(P[n-1],Q[n-1])`,
-    /// where `e: (G1,G2) -> (Gt)` is a pre-compiled pairing function from groups `(G1,G2)` to group `Gt`,
+    /// where `e: (G1,G2) -> (Gt)` is the pairing function from groups `(G1,G2)` to group `Gt`,
     /// `P[]` are `n` elements of group `G1` represented by parameter `g1_elements`, and
     /// `Q[]` are `n` elements of group `G2` represented by parameter `g2_elements`.
     ///
     /// Abort with code 0x010000 if the sizes of `g1_elements` and `g2_elements` do not match.
+    ///
+    /// NOTE: we are viewing the target group `Gt` of the pairing as an additive group,
+    /// rather than a multiplicative one (which is typically the case).
     public fun multi_pairing<G1,G2,Gt>(g1_elements: &vector<Element<G1>>, g2_elements: &vector<Element<G2>>): Element<Gt> {
         abort_unless_cryptography_algebra_natives_enabled();
         let g1_handles = handles_from_elements(g1_elements);
@@ -187,7 +195,7 @@ module aptos_std::algebra {
         }
     }
 
-    /// Compute a pre-compiled pairing function (a.k.a., bilinear map) on `element_1` and `element_2`.
+    /// Compute the pairing function (a.k.a., bilinear map) on a `G1` element and a `G2` element.
     /// Return an element in the target group `Gt`.
     public fun pairing<G1,G2,Gt>(element_1: &Element<G1>, element_2: &Element<G2>): Element<Gt> {
         abort_unless_cryptography_algebra_natives_enabled();
@@ -214,7 +222,7 @@ module aptos_std::algebra {
         serialize_internal<S, F>(element.handle)
     }
 
-    /// Get the order of group `G`, a big integer little-endian encoded as a byte array.
+    /// Get the order of structure `S`, a big integer little-endian encoded as a byte array.
     public fun order<S>(): vector<u8> {
         abort_unless_cryptography_algebra_natives_enabled();
         order_internal<S>()
@@ -231,7 +239,7 @@ module aptos_std::algebra {
     /// Try casting an element `x` of a structure `L` to a sub-structure `S`.
     /// Return none if `x` is not a member of `S`.
     ///
-    /// NOTE: Membership check is performed inside, which can be expensive, depending on the structures `L` and `S`.
+    /// NOTE: Membership check in `S` is performed inside, which can be expensive, depending on the structures `L` and `S`.
     public fun downcast<L,S>(element_x: &Element<L>): Option<Element<S>> {
         abort_unless_cryptography_algebra_natives_enabled();
         let (succ, new_handle) = downcast_internal<L,S>(element_x.handle);
@@ -242,14 +250,13 @@ module aptos_std::algebra {
         }
     }
 
-    /// Hash an arbitrary-length byte array `msg` into structure `S` using the given `suite`.
-    /// A unique domain separation tag `dst` of size 255 bytes or shorter is required
+    /// Hash an arbitrary-length byte array `msg` into structure `S` using the given hash suite `H`.
+    /// A unique domain separation tag `dst` is required
     /// for each independent collision-resistent mapping involved in the protocol built atop.
-    /// Abort if `dst` is too long.
-    public fun hash_to<St, Su>(dst: &vector<u8>, msg: &vector<u8>): Element<St> {
+    public fun hash_to<S, H>(dst: &vector<u8>, msg: &vector<u8>): Element<S> {
         abort_unless_cryptography_algebra_natives_enabled();
         Element {
-            handle: hash_to_internal<St, Su>(dst, msg)
+            handle: hash_to_internal<S, H>(dst, msg)
         }
     }
 
@@ -300,7 +307,7 @@ module aptos_std::algebra {
     native fun downcast_internal<L,S>(handle: u64): (bool, u64);
     native fun from_u64_internal<S>(value: u64): u64;
     native fun eq_internal<S>(handle_1: u64, handle_2: u64): bool;
-    native fun hash_to_internal<St, Su>(dst: &vector<u8>, bytes: &vector<u8>): u64;
+    native fun hash_to_internal<S, H>(dst: &vector<u8>, bytes: &vector<u8>): u64;
     native fun inv_internal<F>(handle: u64): (bool, u64);
     #[test_only]
     native fun rand_insecure_internal<S>(): u64;
@@ -327,7 +334,7 @@ module aptos_std::algebra {
     struct MysteriousGroup {}
 
     #[test(fx = @std)]
-    #[expected_failure(abort_code = 0x0c0000, location = Self)]
+    #[expected_failure(abort_code = 0x0c0001, location = Self)]
     fun test_generic_operation_should_abort_with_unsupported_structures(fx: signer) {
         enable_cryptography_algebra_natives(&fx);
         let _ = order<MysteriousGroup>();

@@ -5,7 +5,8 @@ use crate::{
     natives::{
         cryptography::algebra::{
             feature_flag_from_structure, gas::GasParameters, AlgebraContext, Structure,
-            BLS12381_GT_GENERATOR, BLS12381_R_LENDIAN, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+            BLS12381_GT_GENERATOR, BLS12381_Q12_LENDIAN, BLS12381_R_LENDIAN,
+            MOVE_ABORT_CODE_NOT_IMPLEMENTED,
         },
         helpers::{SafeNativeContext, SafeNativeError, SafeNativeResult},
     },
@@ -128,10 +129,14 @@ pub fn order_internal(
     let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
     abort_unless_arithmetics_enabled_for_structure!(context, structure_opt);
     match structure_opt {
-        Some(Structure::BLS12381G1Affine)
+        Some(Structure::BLS12381Fr)
+        | Some(Structure::BLS12381G1Affine)
         | Some(Structure::BLS12381G2Affine)
         | Some(Structure::BLS12381Gt) => {
             Ok(smallvec![Value::vector_u8(BLS12381_R_LENDIAN.clone())])
+        },
+        Some(Structure::BLS12381Fq12) => {
+            Ok(smallvec![Value::vector_u8(BLS12381_Q12_LENDIAN.clone())])
         },
         _ => Err(SafeNativeError::Abort {
             abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,

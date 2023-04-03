@@ -27,7 +27,7 @@ spec aptos_std::algebra {
         pragma opaque;
     }
 
-    spec hash_to_internal<St, Su>(dst: &vector<u8>, bytes: &vector<u8>): u64 {
+    spec hash_to_internal<S, H>(dst: &vector<u8>, bytes: &vector<u8>): u64 {
         pragma opaque;
     }
 

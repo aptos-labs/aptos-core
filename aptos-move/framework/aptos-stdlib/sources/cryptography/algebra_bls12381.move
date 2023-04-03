@@ -1,5 +1,5 @@
 /// This module defines marker types, constants and test cases for working with BLS12-381 curves
-/// using generic API defined in `algebra.move`.
+/// using the generic API defined in `algebra.move`.
 ///
 /// See https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-pairing-friendly-curves-11#name-bls-curves-for-the-128-bit-
 /// for the full specification of BLS12-381 curves.
@@ -79,7 +79,7 @@ module aptos_std::algebra_bls12381 {
     /// `b[0..288]` is $c_0$ serialized using `Fq6FormatLscLsb`.
     /// `b[288..576]` is $c_1$ serialized using `Fq6FormatLscLsb`.
     ///
-    /// NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.4.0).
+    /// NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
     struct Fq12FormatLscLsb {}
 
     /// A group constructed by the points on the BLS12-381 curve $E(F_q): y^2=x^3+4$ and the point at infinity,
@@ -90,55 +90,63 @@ module aptos_std::algebra_bls12381 {
     /// NOTE: currently information-only and no operations are implemented for this structure.
     struct G1AffineParent {}
 
-    /// A serialization scheme for `G1AffineParent` elements,
-    /// where an element is represented by a byte array `b[]` of size 96,
-    /// with the following rules described from the perspective of deserialization.
-    /// 1. Read `b[0] & 0x80` as the compression flag. Abort if it is 1.
-    /// 1. Read `b[0] & 0x40` as the infinity flag.
-    /// 1. Read `b[0] & 0x20` as the lexicographical flag. This is ignored.
-    /// 1. If the infinity flag is 1, return the point at infinity.
-    /// 1. Deserialize $x$ from `[b[0] & 0x1f, ..., b[47]]` using `FqFormatMsb`. Abort if this failed.
-    /// 1. Deserialize $y$ from `[b[48], ..., b[95]]` using `FqFormatMsb`. Abort if this failed.
-    /// 1. Abort if point $(x,y)$ is not on curve $E(F_q)$.
-    /// 1. Return $(x,y)$.
-    ///
-    /// NOTE: currently information-only, not implemented.
-    struct G1AffineParentFormatUncompressed {}
-
-    /// A serialization scheme for `G1AffineParent` elements,
-    /// where an element is represented by a byte array `b[]` of size 48,
-    /// with the following rules described from the perspective of deserialization.
-    /// 1. Read `b[0] & 0x80` as the compression flag. Abort if it is 0.
-    /// 1. Read `b[0] & 0x40` as the infinity flag.
-    /// 1. Read `b[0] & 0x20` as the lexicographical flag.
-    /// 1. If the infinity flag is 1, return the point at infinity.
-    /// 1. Deserialize $x$ from `[b[0] & 0x1f, ..., b[47]]` using `FqFormatMsb`. Abort if this failed.
-    /// 1. Try computing $y$ such that point $(x,y)$ is on the curve $E(F_q)$. Abort if there is no such $y$.
-    /// 1. Let $\overline{y}=-y$.
-    /// 1. Set $y$ as $\min(y,\overline{y})$ if the the lexicographical flag is 0, or $\max(y,\overline{y})$ otherwise.
-    /// 1. Return $(x,y)$.
-    ///
-    /// NOTE: currently information-only, not implemented.
-    struct G1AffineParentFormatCompressed {}
-
     /// The group $G_1$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow G_t$.
     /// It is subgroup of `G1AffineParent`.
     /// It has a prime order $r$ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
     /// (so `Fr` is the scalar field).
     struct G1Affine {}
 
-    /// A serialization format for `G1Affine` elements,
-    /// essentially the format represented by `G1AffineParentFormatUncompressed`
-    /// but only applicable to `G1Affine` elements.
+    /// A serialization scheme for `G1Affine` elements derived from
+    /// https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-11.html#name-zcash-serialization-format-.
     ///
-    /// NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.4.0).
+    /// Below is the serialization procedure that takes a `G1Affine` element `p` and outputs a byte array of size 96.
+    /// 1. Let `(x,y)` be the coordinates of `p` if `p` is on the curve, or `(0,0)` otherwise.
+    /// 1. Serialize `x` into `b_x[]` using `FqFormatMsb`.
+    /// 1. Serialize `y` into `b_y[]` using `FqFormatMsb`.
+    /// 1. Concatenate `b_x[]` and `b_y[]` into `b[]`.
+    /// 1. If `p` is the point at infinity, set the infinity bit: `b[0]: = b[0] | 0x40`.
+    /// 1. Return `b[]`.
+    ///
+    /// Below is the deserialization procedure that takes a byte array `b[]` and outputs either a `G1Affine` element or none.
+    /// 1. If the size of `b[]` is not 96, return none.
+    /// 1. Compute the compression flag as `b[0] & 0x80 != 0`.
+    /// 1. If the compression flag is true, return none.
+    /// 1. Compute the infinity flag as `b[0] & 0x40 != 0`.
+    /// 1. If the infinity flag is set, return the point at infinity.
+    /// 1. Deserialize `[b[0] & 0x1f, b[1], ..., b[47]]` to `x` using `FqFormatMsb`. If `x` is none, return none.
+    /// 1. Deserialize `[b[48], ..., b[95]]` to `y` using `FqFormatMsb`. If `y` is none, return none.
+    /// 1. Check if `(x,y)` is on curve `E`. If not, return none.
+    /// 1. Check if `(x,y)` is in the subgroup of order `r`. If not, return none.
+    /// 1. Return `(x,y)`.
+    ///
+    /// NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
     struct G1AffineFormatUncompressed {}
 
-    /// A serialization format for `G1Affine` elements,
-    /// essentially the format represented by `G1AffineParentFormatCompressed`
-    /// but only applicable to `G1Affine` elements.
+    /// A serialization scheme for `G1Affine` elements derived from
+    /// https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-11.html#name-zcash-serialization-format-.
     ///
-    /// NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.4.0).
+    /// Below is the serialization procedure that takes a `G1Affine` element `p` and outputs a byte array of size 48.
+    /// 1. Let `(x,y)` be the coordinates of `p` if `p` is on the curve, or `(0,0)` otherwise.
+    /// 1. Serialize `x` into `b[]` using `FqFormatMsb`.
+    /// 1. Set the compression bit: `b[0] := b[0] | 0x80`.
+    /// 1. If `p` is the point at infinity, set the infinity bit: `b[0]: = b[0] | 0x40`.
+    /// 1. If `y > -y`, set the lexicographical flag: `b[0] := b[0] | 0x20`.
+    /// 1. Return `b[]`.
+    ///
+    /// Below is the deserialization procedure that takes a byte array `b[]` and outputs either a `G1Affine` element or none.
+    /// 1. If the size of `b[]` is not 48, return none.
+    /// 1. Compute the compression flag as `b[0] & 0x80 != 0`.
+    /// 1. If the compression flag is false, return none.
+    /// 1. Compute the infinity flag as `b[0] & 0x40 != 0`.
+    /// 1. If the infinity flag is set, return the point at infinity.
+    /// 1. Compute the lexicographical flag as `b[0] & 0x20 != 0`.
+    /// 1. Deserialize `[b[0] & 0x1f, b[1], ..., b[47]]` to `x` using `FqFormatMsb`. If `x` is none, return none.
+    /// 1. Solve the curve equation with `x` for `y`. If no such `y` exists, return none.
+    /// 1. Let `y'` be `max(y,-y)` if the lexicographical flag is set, or `min(y,-y)` otherwise.
+    /// 1. Check if `(x,y')` is in the subgroup of order `r`. If not, return none.
+    /// 1. Return `(x,y')`.
+    ///
+    /// NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
     struct G1AffineFormatCompressed {}
 
     /// A group constructed by the points on a curve $E'(F_{q^2})$ and the point at infinity under the elliptic curve point addition.
@@ -148,53 +156,63 @@ module aptos_std::algebra_bls12381 {
     /// NOTE: currently information-only and no operations are implemented for this structure.
     struct G2AffineParent {}
 
-    /// A serialization scheme for `G2AffineParent` elements.
-    /// where an element is represented by a byte array `b[]` of size 192,
-    /// with the following rules described from the perspective of deserialization.
-    /// 1. Read `b[0] & 0x80` as the compression flag. Abort if it is 1.
-    /// 1. Read `b[0] & 0x40` as the infinity flag.
-    /// 1. Read `b[0] & 0x20` as the lexicographical flag. This is ignored.
-    /// 1. If the infinity flag is 1, return the point at infinity.
-    /// 1. Deserialize $x$ from `[b[0] & 0x1f, ..., b[95]]` using `Fq2FormatMscMsb`. Abort if this failed.
-    /// 1. Deserialize $y$ from `[b[96], ..., b[191]]` using `Fq2FormatMscMsb`. Abort if this failed.
-    /// 1. Abort if point $(x,y)$ is not on curve $E'(F_{q^2})$.
-    /// 1. Return $(x,y)$.
-    ///
-    /// NOTE: currently information-only, not implemented.
-    struct G2AffineParentFormatUncompressed {}
-
-    /// A serialization scheme for `G1AffineParent` elements,
-    /// where an element is represented by a byte array `b[]` of size 96,
-    /// with the following rules described from the perspective of deserialization.
-    /// 1. Read `b[0] & 0x80` as the compression flag. Abort if it is 0.
-    /// 1. Read `b[0] & 0x40` as the infinity flag.
-    /// 1. Read `b[0] & 0x20` as the lexicographical flag.
-    /// 1. If the infinity flag is 1, return the point at infinity.
-    /// 1. Deserialize $x$ from `[b[0] & 0x1f, ..., b[96]]` using `Fq2FormatMscMsb`. Abort if this failed.
-    /// 1. Try computing $y$ such that point $(x,y)$ is on the curve $E(F_{q^2})$. Abort if there is no such $y$.
-    /// 1. Let $\overline{y}=-y$.
-    /// 1. Set $y$ as $\min(y,\overline{y})$ if the the lexicographical flag is 0, or $\max(y,\overline{y})$ otherwise.
-    /// 1. Return $(x,y)$.
-    ///
-    /// NOTE: currently information-only, not implemented.
-    struct G2AffineParentFormatCompressed {}
-
     /// The group $G_2$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow G_t$.
     /// It is a subgroup of `G2AffineParent`.
     /// It has a prime order $r$ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
     /// (so `Fr` is the scalar field).
     struct G2Affine {}
 
-    /// A serialization scheme for `G2Affine` elements,
-    /// essentially `G2AffineParentFormatUncompressed` but only applicable to `G2Affine` elements.
+    /// A serialization scheme for `G2Affine` elements derived from
+    /// https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-11.html#name-zcash-serialization-format-.
     ///
-    /// NOTE: currently information-only, not implemented.
+    /// Below is the serialization procedure that takes a `G2Affine` element `p` and outputs a byte array of size 192.
+    /// 1. Let `(x,y)` be the coordinates of `p` if `p` is on the curve, or `(0,0)` otherwise.
+    /// 1. Serialize `x` into `b_x[]` using `Fq2FormatMscMsb`.
+    /// 1. Serialize `y` into `b_y[]` using `Fq2FormatMscMsb`.
+    /// 1. Concatenate `b_x[]` and `b_y[]` into `b[]`.
+    /// 1. If `p` is the point at infinity, set the infinity bit in `b[]`: `b[0]: = b[0] | 0x40`.
+    /// 1. Return `b[]`.
+    ///
+    /// Below is the deserialization procedure that takes a byte array `b[]` and outputs either a `G2Affine` element or none.
+    /// 1. If the size of `b[]` is not 192, return none.
+    /// 1. Compute the compression flag as `b[0] & 0x80 != 0`.
+    /// 1. If the compression flag is true, return none.
+    /// 1. Compute the infinity flag as `b[0] & 0x40 != 0`.
+    /// 1. If the infinity flag is set, return the point at infinity.
+    /// 1. Deserialize `[b[0] & 0x1f, ..., b[95]]` to `x` using `Fq2FormatMscMsb`. If `x` is none, return none.
+    /// 1. Deserialize `[b[96], ..., b[191]]` to `y` using `Fq2FormatMscMsb`. If `y` is none, return none.
+    /// 1. Check if `(x,y)` is on the curve `E'`. If not, return none.
+    /// 1. Check if `(x,y)` is in the subgroup of order `r`. If not, return none.
+    /// 1. Return `(x,y)`.
+    ///
+    /// NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
     struct G2AffineFormatUncompressed {}
 
-    /// A serialization scheme for `G2Affine` elements,
-    /// essentially `G2AffineParentFormatCompressed` but only applicable to `G2Affine` elements.
+    /// A serialization scheme for `G2Affine` elements derived from
+    /// https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-11.html#name-zcash-serialization-format-.
     ///
-    /// NOTE: currently information-only, not implemented.
+    /// Below is the serialization procedure that takes a `G2Affine` element `p` and outputs a byte array of size 96.
+    /// 1. Let `(x,y)` be the coordinates of `p` if `p` is on the curve, or `(0,0)` otherwise.
+    /// 1. Serialize `x` into `b[]` using `Fq2FormatMscMsb`.
+    /// 1. Set the compression bit: `b[0] := b[0] | 0x80`.
+    /// 1. If `p` is the point at infinity, set the infinity bit: `b[0]: = b[0] | 0x40`.
+    /// 1. If `y > -y`, set the lexicographical flag: `b[0] := b[0] | 0x20`.
+    /// 1. Return `b[]`.
+    ///
+    /// Below is the deserialization procedure that takes a byte array `b[]` and outputs either a `G2Affine` element or none.
+    /// 1. If the size of `b[]` is not 96, return none.
+    /// 1. Compute the compression flag as `b[0] & 0x80 != 0`.
+    /// 1. If the compression flag is false, return none.
+    /// 1. Compute the infinity flag as `b[0] & 0x40 != 0`.
+    /// 1. If the infinity flag is set, return the point at infinity.
+    /// 1. Compute the lexicographical flag as `b[0] & 0x20 != 0`.
+    /// 1. Deserialize `[b[0] & 0x1f, b[1], ..., b[95]]` to `x` using `Fq2FormatMscMsb`. If `x` is none, return none.
+    /// 1. Solve the curve equation with `x` for `y`. If no such `y` exists, return none.
+    /// 1. Let `y'` be `max(y,-y)` if the lexicographical flag is set, or `min(y,-y)` otherwise.
+    /// 1. Check if `(x,y')` is in the subgroup of order `r`. If not, return none.
+    /// 1. Return `(x,y')`.
+    ///
+    /// NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
     struct G2AffineFormatCompressed {}
 
     /// The group $G_t$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow G_t$.
@@ -207,7 +225,7 @@ module aptos_std::algebra_bls12381 {
     /// A serialization scheme for `Gt` elements,
     /// essentially `Fq12FormatLscLsb` but only applicable to `Gt` elements.
     ///
-    /// NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.4.0).
+    /// NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
     struct GtFormat {}
 
     /// The finite field $F_r$ that can be used as the scalar fields
@@ -217,13 +235,13 @@ module aptos_std::algebra_bls12381 {
     /// A serialization format for `Fr` elements,
     /// where an element is represented by a byte array `b[]` of size 32 with the least significant byte coming first.
     ///
-    /// NOTE: the same scheme is also used in other implementations (e.g., ark-bls12-381-0.4.0, blst-0.3.7).
+    /// NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0, blst-0.3.7.
     struct FrFormatLsb {}
 
     /// A serialization scheme for `Fr` elements,
     /// where an element is represented by a byte array `b[]` of size 32 with the most significant byte coming first.
     ///
-    /// NOTE: the same scheme is also used in other implementations (e.g., ark-bls12-381-0.4.0, blst-0.3.7).
+    /// NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0, blst-0.3.7.
     struct FrFormatMsb {}
 
     //
@@ -234,12 +252,12 @@ module aptos_std::algebra_bls12381 {
     /// The hash-to-curve suite `BLS12381G1_XMD:SHA-256_SSWU_RO_` that hashes a byte array into `G1Affine` elements.
     ///
     /// Full specification is defined in https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-16#name-bls12-381-g1.
-    struct H2SSuiteBls12381g1XmdSha256SswuRo {}
+    struct HashG1XmdSha256SswuRo {}
 
     /// The hash-to-curve suite `BLS12381G2_XMD:SHA-256_SSWU_RO_` that hashes a byte array into `G1Affine` elements.
     ///
     /// Full specification is defined in https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-16#name-bls12-381-g2.
-    struct H2SSuiteBls12381g2XmdSha256SswuRo {}
+    struct HashG2XmdSha256SswuRo {}
 
     //
     // (Hash-to-structure suites end here.)
@@ -254,10 +272,25 @@ module aptos_std::algebra_bls12381 {
     const FQ12_VAL_7_SERIALIZED: vector<u8> = x"070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
     #[test_only]
     const FQ12_VAL_7_NEG_SERIALIZED: vector<u8> = x"a4aafffffffffeb9ffff53b1feffab1e24f6b0f6a0d23067bf1285f3844b7764d7ac4b43b6a71b4b9ae67f39ea11011a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+    #[test_only]
+    const Q12_SERIALIZED: vector<u8> = x"1175f55da544c7625f8ccb1360e2b1d3ca40747811c8f5ed04440afe232b476c0215676aec05f2a44ac2da6b6d1b7cff075e7b2a587e0aab601a8d3db4f0d29906e5e4d0d78119f396d5a59f0f8d1ca8bca62540be6ab9c12d0ca00de1f311f106278d000e55a393c9766a74e0d08a298450f60d7e666575e3354bf14b8731f4e721c0c180a5ed55c2f8f51f815baecbf96b5fc717eb58ac161a27d1d5f2bdc1a079609b9d6449165b2466b32a01eac7992a1ea0cac2f223cde1d56f9bbccc67afe44621daf858df3fc0eb837818f3e42ab3e131ce4e492efa63c108e6ef91c29ed63b3045baebcb0ab8d203c7f558beaffccba31b12aca7f54b58d0c28340e4fdb3c7c94fe9c4fef9d640ff2fcff02f1748416cbed0981fbff49f0e39eaf8a30273e67ed851944d33d6a593ef5ddcd62da84568822a6045b633bf6a513b3cfe8f9de13e76f8dcbd915980dec205eab6a5c0c72dcebd9afff1d25509ddbf33f8e24131fbd74cda93336514340cf8036b66b09ed9e6a6ac37e22fb3ac407e321beae8cd9fe74c8aaeb4edaa9a7272848fc623f6fe835a2e647379f547fc5ec6371318a85bfa60009cb20ccbb8a467492988a87633c14c0324ba0d0c3e1798ed29c8494cea35023746da05e35d184b4a301d5b2238d665495c6318b5af8653758008952d06cb9e62487b196d64383c73c06d6e1cccdf9b3ce8f95679e7050d949004a55f4ccf95b2552880ae36d1f7e09504d2338316d87d14a064511a295d768113e301bdf9d4383a8be32192d3f2f3b2de14181c73839a7cb4af5301";
+
+    #[test_only]
+    fun rand_vector<S>(num: u64): vector<Element<S>> {
+        let elements = vector[];
+        while (num > 0) {
+            std::vector::push_back(&mut elements, rand_insecure<S>());
+            num = num - 1;
+        };
+        elements
+    }
 
     #[test(fx = @std)]
     fun test_fq12(fx: signer) {
         enable_cryptography_algebra_natives(&fx);
+
+        // Constants.
+        assert!(Q12_SERIALIZED == order<Fq12>(), 1);
 
         // Serialization/deserialization.
         let val_0 = zero<Fq12>();
@@ -326,7 +359,7 @@ module aptos_std::algebra_bls12381 {
     fun test_g1affine(fx: signer) {
         enable_cryptography_algebra_natives(&fx);
 
-        // Special constants.
+        // Constants.
         assert!(R_SERIALIZED == order<G1Affine>(), 1);
         let point_at_infinity = zero<G1Affine>();
         let generator = one<G1Affine>();
@@ -382,20 +415,25 @@ module aptos_std::algebra_bls12381 {
         assert!(G1AFFINE_GENERATOR_MUL_BY_7_SERIALIZED_COMP == serialize<G1Affine, G1AffineFormatCompressed>( &point_7g_calc), 1);
 
         // Multi-scalar multiplication.
-        let scalar_a = from_u64<Fr>(0x0300);
-        let scalar_b = from_u64<Fr>(0x0401);
-        let scalar_c = from_u64<Fr>(0x0502);
-        let point_p = rand_insecure<G1Affine>();
-        let point_q = rand_insecure<G1Affine>();
-        let point_r = rand_insecure<G1Affine>();
-        let expected = zero<G1Affine>();
-        let expected = add(&expected, &scalar_mul(&point_p, &scalar_a));
-        let expected = add(&expected, &scalar_mul(&point_q, &scalar_b));
-        let expected = add(&expected, &scalar_mul(&point_r, &scalar_c));
-        let points = vector[point_p, point_q, point_r];
-        let scalars = vector[scalar_a, scalar_b, scalar_c];
-        let actual = multi_scalar_mul(&points, &scalars);
-        assert!(eq(&expected, &actual), 1);
+        let num_entries = 1;
+        while (num_entries < 10) {
+            let scalars = rand_vector<Fr>(num_entries);
+            let elements = rand_vector<G1Affine>(num_entries);
+
+            let expected = zero<G1Affine>();
+            let i = 0;
+            while (i < num_entries) {
+                let element = std::vector::borrow(&elements, i);
+                let scalar = std::vector::borrow(&scalars, i);
+                expected = add(&expected, &scalar_mul(element, scalar));
+                i = i + 1;
+            };
+
+            let actual = multi_scalar_mul(&elements, &scalars);
+            assert!(eq(&expected, &actual), 1);
+
+            num_entries = num_entries + 1;
+        };
 
         // Doubling.
         let scalar_2 = from_u64<Fr>(2);
@@ -420,10 +458,10 @@ module aptos_std::algebra_bls12381 {
 
         // Hash-to-group using suite `BLS12381G1_XMD:SHA-256_SSWU_RO_`.
         // Test vectors source: https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-bls12381g1_xmdsha-256_sswu_
-        let actual = hash_to<G1Affine, H2SSuiteBls12381g1XmdSha256SswuRo>(&b"QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_", &b"");
+        let actual = hash_to<G1Affine, HashG1XmdSha256SswuRo>(&b"QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_", &b"");
         let expected = std::option::extract(&mut deserialize<G1Affine, G1AffineFormatUncompressed>(&x"052926add2207b76ca4fa57a8734416c8dc95e24501772c814278700eed6d1e4e8cf62d9c09db0fac349612b759e79a108ba738453bfed09cb546dbb0783dbb3a5f1f566ed67bb6be0e8c67e2e81a4cc68ee29813bb7994998f3eae0c9c6a265"));
         assert!(eq(&expected, &actual), 1);
-        let actual = hash_to<G1Affine, H2SSuiteBls12381g1XmdSha256SswuRo>(&b"QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_", &b"abcdef0123456789");
+        let actual = hash_to<G1Affine, HashG1XmdSha256SswuRo>(&b"QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_", &b"abcdef0123456789");
         let expected = std::option::extract(&mut deserialize<G1Affine, G1AffineFormatUncompressed>(&x"11e0b079dea29a68f0383ee94fed1b940995272407e3bb916bbf268c263ddd57a6a27200a784cbc248e84f357ce82d9803a87ae2caf14e8ee52e51fa2ed8eefe80f02457004ba4d486d6aa1f517c0889501dc7413753f9599b099ebcbbd2d709"));
         assert!(eq(&expected, &actual), 1);
     }
@@ -494,20 +532,25 @@ module aptos_std::algebra_bls12381 {
         assert!(G2AFFINE_GENERATOR_MUL_BY_7_SERIALIZED_COMP == serialize<G2Affine, G2AffineFormatCompressed>(&point_7g_calc), 1);
 
         // Multi-scalar multiplication.
-        let scalar_a = from_u64<Fr>(0x0300);
-        let scalar_b = from_u64<Fr>(0x0401);
-        let scalar_c = from_u64<Fr>(0x0502);
-        let point_p = rand_insecure<G2Affine>();
-        let point_q = rand_insecure<G2Affine>();
-        let point_r = rand_insecure<G2Affine>();
-        let expected = zero<G2Affine>();
-        let expected = add(&expected, &scalar_mul(&point_p, &scalar_a));
-        let expected = add(&expected, &scalar_mul(&point_q, &scalar_b));
-        let expected = add(&expected, &scalar_mul(&point_r, &scalar_c));
-        let points = vector[point_p, point_q, point_r];
-        let scalars = vector[scalar_a, scalar_b, scalar_c];
-        let actual = multi_scalar_mul(&points, &scalars);
-        assert!(eq(&expected, &actual), 1);
+        let num_entries = 1;
+        while (num_entries < 10) {
+            let scalars = rand_vector<Fr>(num_entries);
+            let elements = rand_vector<G2Affine>(num_entries);
+
+            let expected = zero<G2Affine>();
+            let i = 0;
+            while (i < num_entries) {
+                let element = std::vector::borrow(&elements, i);
+                let scalar = std::vector::borrow(&scalars, i);
+                expected = add(&expected, &scalar_mul(element, scalar));
+                i = i + 1;
+            };
+
+            let actual = multi_scalar_mul(&elements, &scalars);
+            assert!(eq(&expected, &actual), 1);
+
+            num_entries = num_entries + 1;
+        };
 
         // Doubling.
         let scalar_2 = from_u64<Fr>(2);
@@ -532,10 +575,10 @@ module aptos_std::algebra_bls12381 {
 
         // Hash-to-group using suite `BLS12381G2_XMD:SHA-256_SSWU_RO_`.
         // Test vectors source: https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-bls12381g2_xmdsha-256_sswu_
-        let actual = hash_to<G2Affine, H2SSuiteBls12381g2XmdSha256SswuRo>(&b"QUUX-V01-CS02-with-BLS12381G2_XMD:SHA-256_SSWU_RO_", &b"");
+        let actual = hash_to<G2Affine, HashG2XmdSha256SswuRo>(&b"QUUX-V01-CS02-with-BLS12381G2_XMD:SHA-256_SSWU_RO_", &b"");
         let expected = std::option::extract(&mut deserialize<G2Affine, G2AffineFormatUncompressed>(&x"05cb8437535e20ecffaef7752baddf98034139c38452458baeefab379ba13dff5bf5dd71b72418717047f5b0f37da03d0141ebfbdca40eb85b87142e130ab689c673cf60f1a3e98d69335266f30d9b8d4ac44c1038e9dcdd5393faf5c41fb78a12424ac32561493f3fe3c260708a12b7c620e7be00099a974e259ddc7d1f6395c3c811cdd19f1e8dbf3e9ecfdcbab8d60503921d7f6a12805e72940b963c0cf3471c7b2a524950ca195d11062ee75ec076daf2d4bc358c4b190c0c98064fdd92"));
         assert!(eq(&expected, &actual), 1);
-        let actual = hash_to<G2Affine, H2SSuiteBls12381g2XmdSha256SswuRo>(&b"QUUX-V01-CS02-with-BLS12381G2_XMD:SHA-256_SSWU_RO_", &b"abcdef0123456789");
+        let actual = hash_to<G2Affine, HashG2XmdSha256SswuRo>(&b"QUUX-V01-CS02-with-BLS12381G2_XMD:SHA-256_SSWU_RO_", &b"abcdef0123456789");
         let expected = std::option::extract(&mut deserialize<G2Affine, G2AffineFormatUncompressed>(&x"190d119345b94fbd15497bcba94ecf7db2cbfd1e1fe7da034d26cbba169fb3968288b3fafb265f9ebd380512a71c3f2c121982811d2491fde9ba7ed31ef9ca474f0e1501297f68c298e9f4c0028add35aea8bb83d53c08cfc007c1e005723cd00bb5e7572275c567462d91807de765611490205a941a5a6af3b1691bfe596c31225d3aabdf15faff860cb4ef17c7c3be05571a0f8d3c08d094576981f4a3b8eda0a8e771fcdcc8ecceaf1356a6acf17574518acb506e435b639353c2e14827c8"));
         assert!(eq(&expected, &actual), 1);
     }
@@ -601,7 +644,7 @@ module aptos_std::algebra_bls12381 {
     }
 
     #[test_only]
-    use aptos_std::algebra::{zero, one, from_u64, eq, deserialize, serialize, neg, add, sub, mul, div, inv, rand_insecure, sqr, order, scalar_mul, multi_scalar_mul, double, hash_to, upcast, enable_cryptography_algebra_natives, pairing, multi_pairing, downcast};
+    use aptos_std::algebra::{zero, one, from_u64, eq, deserialize, serialize, neg, add, sub, mul, div, inv, rand_insecure, sqr, order, scalar_mul, multi_scalar_mul, double, hash_to, upcast, enable_cryptography_algebra_natives, pairing, multi_pairing, downcast, Element};
 
     #[test_only]
     const FR_VAL_0_SERIALIZED_LSB: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000000";
@@ -617,6 +660,9 @@ module aptos_std::algebra_bls12381 {
     #[test(fx = @std)]
     fun test_fr(fx: signer) {
         enable_cryptography_algebra_natives(&fx);
+
+        // Constants.
+        assert!(R_SERIALIZED == order<Fr>(), 1);
 
         // Serialization/deserialization.
         let val_0 = zero<Fr>();
@@ -724,7 +770,7 @@ module aptos_std::algebra_bls12381 {
     }
 
     #[test(fx = @std)]
-    #[expected_failure(abort_code = 0x010000, location = aptos_std::algebra)]
+    #[expected_failure(abort_code = 0x010002, location = aptos_std::algebra)]
     fun test_multi_pairing_should_abort_when_sizes_mismatch(fx: signer) {
         enable_cryptography_algebra_natives(&fx);
         let g1_elements = vector[rand_insecure<G1Affine>()];
@@ -733,7 +779,7 @@ module aptos_std::algebra_bls12381 {
     }
 
     #[test(fx = @std)]
-    #[expected_failure(abort_code = 0x010000, location = aptos_std::algebra)]
+    #[expected_failure(abort_code = 0x010002, location = aptos_std::algebra)]
     fun test_multi_scalar_mul_should_abort_when_sizes_mismatch(fx: signer) {
         enable_cryptography_algebra_natives(&fx);
         let elements = vector[rand_insecure<G1Affine>()];

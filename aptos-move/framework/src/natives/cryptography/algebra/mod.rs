@@ -51,10 +51,10 @@ pub mod rand;
 pub mod serialization;
 
 /// Equivalent to `std::error::invalid_argument(0)` in Move.
-const MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING: u64 = 0x01_0000;
+const MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING: u64 = 0x01_0002;
 
 /// Equivalent to `std::error::not_implemented(0)` in Move.
-const MOVE_ABORT_CODE_NOT_IMPLEMENTED: u64 = 0x0C_0000;
+const MOVE_ABORT_CODE_NOT_IMPLEMENTED: u64 = 0x0C_0001;
 
 /// This encodes an algebraic structure defined in `algebra_*.move`.
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
@@ -142,10 +142,10 @@ impl TryFrom<TypeTag> for HashToStructureSuite {
 
     fn try_from(value: TypeTag) -> Result<Self, Self::Error> {
         match value.to_string().as_str() {
-            "0x1::algebra_bls12381::H2SSuiteBls12381g1XmdSha256SswuRo" => {
+            "0x1::algebra_bls12381::HashG1XmdSha256SswuRo" => {
                 Ok(HashToStructureSuite::Bls12381g1XmdSha256SswuRo)
             },
-            "0x1::algebra_bls12381::H2SSuiteBls12381g2XmdSha256SswuRo" => {
+            "0x1::algebra_bls12381::HashG2XmdSha256SswuRo" => {
                 Ok(HashToStructureSuite::Bls12381g2XmdSha256SswuRo)
             },
             _ => Err(()),
@@ -243,6 +243,10 @@ static BLS12381_R_LENDIAN: Lazy<Vec<u8>> = Lazy::new(|| {
 
 static BLS12381_R_SCALAR: Lazy<ark_ff::BigInteger256> = Lazy::new(|| {
     ark_ff::BigInteger256::deserialize_uncompressed(BLS12381_R_LENDIAN.as_slice()).unwrap()
+});
+
+static BLS12381_Q12_LENDIAN: Lazy<Vec<u8>> = Lazy::new(|| {
+    hex::decode("1175f55da544c7625f8ccb1360e2b1d3ca40747811c8f5ed04440afe232b476c0215676aec05f2a44ac2da6b6d1b7cff075e7b2a587e0aab601a8d3db4f0d29906e5e4d0d78119f396d5a59f0f8d1ca8bca62540be6ab9c12d0ca00de1f311f106278d000e55a393c9766a74e0d08a298450f60d7e666575e3354bf14b8731f4e721c0c180a5ed55c2f8f51f815baecbf96b5fc717eb58ac161a27d1d5f2bdc1a079609b9d6449165b2466b32a01eac7992a1ea0cac2f223cde1d56f9bbccc67afe44621daf858df3fc0eb837818f3e42ab3e131ce4e492efa63c108e6ef91c29ed63b3045baebcb0ab8d203c7f558beaffccba31b12aca7f54b58d0c28340e4fdb3c7c94fe9c4fef9d640ff2fcff02f1748416cbed0981fbff49f0e39eaf8a30273e67ed851944d33d6a593ef5ddcd62da84568822a6045b633bf6a513b3cfe8f9de13e76f8dcbd915980dec205eab6a5c0c72dcebd9afff1d25509ddbf33f8e24131fbd74cda93336514340cf8036b66b09ed9e6a6ac37e22fb3ac407e321beae8cd9fe74c8aaeb4edaa9a7272848fc623f6fe835a2e647379f547fc5ec6371318a85bfa60009cb20ccbb8a467492988a87633c14c0324ba0d0c3e1798ed29c8494cea35023746da05e35d184b4a301d5b2238d665495c6318b5af8653758008952d06cb9e62487b196d64383c73c06d6e1cccdf9b3ce8f95679e7050d949004a55f4ccf95b2552880ae36d1f7e09504d2338316d87d14a064511a295d768113e301bdf9d4383a8be32192d3f2f3b2de14181c73839a7cb4af5301").unwrap()
 });
 
 pub fn make_all(
