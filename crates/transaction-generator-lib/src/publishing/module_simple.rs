@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #![allow(unused)]
 
-use crate::transaction_generator::publishing::raw_module_data;
+use crate::publishing::raw_module_data;
 use aptos_framework::natives::code::PackageMetadata;
 use aptos_sdk::{
     bcs,

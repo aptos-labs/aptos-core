@@ -309,14 +309,16 @@ See [`table.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move
 - A signed transaction is a raw transaction with the digital signature.
 - An executed transaction changes the state of the Aptos blockchain.
 
-### Transaction Script
+### Transaction (or Move) Script
 
 - Each transaction submitted by a user includes a **transaction script**.
-- It represents the operation a client submits to a validator.
-- The operation could be a request to move coins from user A to user B, or it could involve interactions with published [Move modules](#move-modules)/smart contracts.
+- These transactions, also know as Move scripts, represent the operations a client submits to a validator.
+- The operation could be a request to move coins from user A to user B, or it could involve interactions with published [Move modules](#move-module) (smart contracts).
 - The transaction script is an arbitrary program that interacts with resources published in the global storage of the Aptos blockchain by calling the procedures of a module. It encodes the logic for a transaction.
 - A single transaction script can send funds to multiple recipients and invoke procedures from several different modules.
 - A transaction script **is not** stored in the global state and cannot be invoked by other transaction scripts. It is a single-use program.
+
+To see example uses of transaction scripts, follow [Move scripts](../guides/move-guides/move-scripts.md) and the [Your First Multisig](../tutorials/first-multisig.md) tutorial.
 
 ## V
 

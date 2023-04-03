@@ -17,6 +17,11 @@ module abi::test {
         move_to(s, State { value });
     }
 
+    #[view]
+    public fun view_function(value: u64): u64 {
+        value + 42
+    }
+
     fun private_function(s: &signer, value: u64) {
         move_to(s, State { value });
     }

@@ -224,7 +224,7 @@ pub struct InternalNode {
     leaf_count: usize,
 }
 
-/// Computes the hash of internal node according to [`JellyfishTree`](crate::JellyfishTree)
+/// Computes the hash of internal node according to [`JellyfishMerkleTree`](crate::JellyfishMerkleTree)
 /// data structure in the logical view. `start` and `nibble_height` determine a subtree whose
 /// root hash we want to get. For an internal node with 16 children at the bottom level, we compute
 /// the root hash of it as if a full binary Merkle tree with 16 leaves as below:
@@ -519,7 +519,7 @@ impl InternalNode {
             if matches!(only_child.node_type, NodeType::Leaf) {
                 let only_child_node_key =
                     node_key.gen_child_node_key(only_child.version, only_child_index);
-                match tree_reader.get_node(&only_child_node_key)? {
+                match tree_reader.get_node_with_tag(&only_child_node_key, "get_proof")? {
                     Node::Internal(_) => unreachable!(
                         "Corrupted internal node: in-memory leaf child is internal node on disk"
                     ),

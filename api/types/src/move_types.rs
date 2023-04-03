@@ -960,6 +960,8 @@ pub struct MoveFunction {
     pub visibility: MoveFunctionVisibility,
     /// Whether the function can be called as an entry function directly in a transaction
     pub is_entry: bool,
+    /// Whether the function is a view function or not
+    pub is_view: bool,
     /// Generic type params associated with the Move function
     pub generic_type_params: Vec<MoveFunctionGenericTypeParam>,
     /// Parameters associated with the move function
@@ -976,6 +978,7 @@ impl From<&CompiledScript> for MoveFunction {
             name: Identifier::new("main").unwrap().into(),
             visibility: MoveFunctionVisibility::Public,
             is_entry: true,
+            is_view: false,
             generic_type_params: script
                 .type_parameters
                 .iter()

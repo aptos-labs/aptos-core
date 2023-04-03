@@ -1,27 +1,27 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-use crate::{
-    emitter::stats::DynamicStatsTracking,
-    transaction_generator::{TransactionGenerator, TransactionGeneratorCreator},
-};
+use crate::{TransactionGenerator, TransactionGeneratorCreator};
 use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
 use async_trait::async_trait;
 use rand::{rngs::StdRng, Rng, SeedableRng};
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
+};
 
 pub struct PhasedTxnMixGenerator {
     rng: StdRng,
     // for each phase, list of transaction mixes.
     txn_mix_per_phase: Vec<Vec<(Box<dyn TransactionGenerator>, usize)>>,
     total_weight_per_phase: Vec<usize>,
-    phase: Arc<DynamicStatsTracking>,
+    phase: Arc<AtomicUsize>,
 }
 
 impl PhasedTxnMixGenerator {
     pub fn new(
         rng: StdRng,
         txn_mix_per_phase: Vec<Vec<(Box<dyn TransactionGenerator>, usize)>>,
-        phase: Arc<DynamicStatsTracking>,
+        phase: Arc<AtomicUsize>,
     ) -> Self {
         let total_weight_per_phase = txn_mix_per_phase
             .iter()
@@ -46,7 +46,7 @@ impl TransactionGenerator for PhasedTxnMixGenerator {
             // when only single txn_mix is passed, use it for all phases, for simplicity
             0
         } else {
-            self.phase.get_cur_phase()
+            self.phase.load(Ordering::Relaxed)
         };
 
         let mut picked = self.rng.gen_range(0, self.total_weight_per_phase[phase]);
@@ -65,13 +65,13 @@ impl TransactionGenerator for PhasedTxnMixGenerator {
 
 pub struct PhasedTxnMixGeneratorCreator {
     txn_mix_per_phase_creators: Vec<Vec<(Box<dyn TransactionGeneratorCreator>, usize)>>,
-    phase: Arc<DynamicStatsTracking>,
+    phase: Arc<AtomicUsize>,
 }
 
 impl PhasedTxnMixGeneratorCreator {
     pub fn new(
         txn_mix_per_phase_creators: Vec<Vec<(Box<dyn TransactionGeneratorCreator>, usize)>>,
-        phase: Arc<DynamicStatsTracking>,
+        phase: Arc<AtomicUsize>,
     ) -> Self {
         Self {
             txn_mix_per_phase_creators,

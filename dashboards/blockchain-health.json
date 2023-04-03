@@ -975,6 +975,15 @@
           "legendFormat": "quorum_store_backpressure_proof_count",
           "range": true,
           "refId": "D"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "avg(rate(aptos_consensus_backpressure_on_proposal_triggered_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval]) / rate(aptos_consensus_backpressure_on_proposal_triggered_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval]))",
+          "hide": false,
+          "legendFormat": "aptos_consensus_backpressure_on_proposal_triggered",
+          "range": true,
+          "refId": "E"
         }
       ],
       "title": "Backpressures triggered",
@@ -1439,13 +1448,7 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          }
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
         },
         "overrides": []
       },
@@ -1494,13 +1497,7 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          }
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
         },
         "overrides": []
       },
@@ -1549,13 +1546,7 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          }
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
         },
         "overrides": []
       },
@@ -1604,13 +1595,7 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          }
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
         },
         "overrides": []
       },
@@ -1659,13 +1644,7 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          }
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
         },
         "overrides": []
       },
@@ -1714,13 +1693,7 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          }
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
         },
         "overrides": []
       },
@@ -1772,7 +1745,7 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "transparent", "value": null },
+              { "color": "transparent" },
               { "color": "red", "value": 60 },
               { "color": "orange", "value": 72 },
               { "color": "yellow", "value": 80 },
@@ -1857,7 +1830,7 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "transparent", "value": null },
+              { "color": "transparent" },
               { "color": "red", "value": 60 },
               { "color": "orange", "value": 72 },
               { "color": "yellow", "value": 80 },
@@ -1921,13 +1894,7 @@
           "color": { "mode": "thresholds" },
           "custom": { "align": "auto", "displayMode": "auto", "filterable": false, "inspect": false },
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          }
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
         },
         "overrides": []
       },
@@ -1978,7 +1945,7 @@
           "color": { "mode": "thresholds" },
           "custom": { "align": "auto", "displayMode": "auto", "inspect": false },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] }
         },
         "overrides": []
       },
@@ -2054,7 +2021,7 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "transparent", "value": null },
+              { "color": "transparent" },
               { "color": "red", "value": 60 },
               { "color": "orange", "value": 72 },
               { "color": "yellow", "value": 80 },
@@ -2112,7 +2079,7 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "transparent", "value": null },
+              { "color": "transparent" },
               { "color": "red", "value": 60 },
               { "color": "orange", "value": 72 },
               { "color": "yellow", "value": 80 },
@@ -2175,13 +2142,7 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          }
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
         },
         "overrides": []
       },
@@ -2206,7 +2167,7 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "description": "In the current (halted) round, amount of votes collected for the proposal. Hash_index represents each of the proposals - there should be only one proposal, but malicious actors (or nodes with incorrect event history/leader election) can create multiple proposals",
+      "description": "When chain is halted, in order for chain to continue to the next round, we need to reach 1 for the timeout votes.\n\nWhen there is a fork, looking at per-node chart is more useful.",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -2230,18 +2191,12 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          }
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
         },
         "overrides": []
       },
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 102 },
-      "id": 175,
+      "id": 192,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
         "tooltip": { "mode": "multi", "sort": "none" }
@@ -2250,13 +2205,13 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "100 * sum by (hash_index) (max by (peer_id, hash_index) (aptos_consensus_current_round_voted_power{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=\"validator\"})) / max(aptos_total_voting_power{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=\"validator\"})",
+          "expr": "100 * max by (kubernetes_pod_name) (sum by (kubernetes_pod_name, run_uuid) (aptos_consensus_current_round_timeout_voted_power{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=\"validator\"})) \n\n/ \n\nmax by (kubernetes_pod_name) (aptos_total_voting_power{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=\"validator\"})\n",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "% of voting power voted for (each of) the proposal(s)",
+      "title": "By peer (fork view): % of voting power voted for timeout in the current round ",
       "type": "timeseries"
     },
     {
@@ -2285,13 +2240,7 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          }
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
         },
         "overrides": []
       },
@@ -2312,6 +2261,55 @@
         }
       ],
       "title": "(current round - last voted round), for each node",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "description": "In the current (halted) round, amount of votes collected for the proposal. Hash_index represents each of the proposals - there should be only one proposal, but malicious actors (or nodes with incorrect event history/leader election) can create multiple proposals",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 1,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 110 },
+      "id": 175,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "100 * sum by (hash_index) (max by (peer_id, hash_index) (aptos_consensus_current_round_voted_power{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=\"validator\"})) / max(aptos_total_voting_power{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=\"validator\"})",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "% of voting power voted for (each of) the proposal(s)",
       "type": "timeseries"
     },
     {
@@ -2340,18 +2338,12 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
           "unit": "short"
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 110 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 110 },
       "id": 178,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -3145,6 +3137,14 @@
         "skipUrlSync": false,
         "sort": 0,
         "type": "interval"
+      },
+      {
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "filters": [],
+        "hide": 0,
+        "name": "Filters",
+        "skipUrlSync": false,
+        "type": "adhoc"
       }
     ]
   },
@@ -3156,6 +3156,6 @@
   "timezone": "browser",
   "title": "Blockchain Health",
   "uid": "JnOvNs4Vk",
-  "version": 58,
+  "version": 63,
   "weekStart": ""
 }

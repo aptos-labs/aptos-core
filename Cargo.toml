@@ -58,6 +58,7 @@ members = [
     "crates/aptos-node-identity",
     "crates/aptos-openapi",
     "crates/aptos-proptest-helpers",
+    "crates/aptos-push-metrics",
     "crates/aptos-rate-limiter",
     "crates/aptos-rest-client",
     "crates/aptos-retrier",
@@ -83,6 +84,7 @@ members = [
     "crates/short-hex-str",
     "crates/transaction-emitter",
     "crates/transaction-emitter-lib",
+    "crates/transaction-generator-lib",
     "ecosystem/indexer-grpc/indexer-grpc-cache-worker",
     "ecosystem/indexer-grpc/indexer-grpc-data-service",
     "ecosystem/indexer-grpc/indexer-grpc-file-store",
@@ -359,6 +361,7 @@ aptos-time-service = { path = "crates/aptos-time-service", features = [
     "async",
 ] }
 aptos-transaction-emitter-lib = { path = "crates/transaction-emitter-lib" }
+aptos-transaction-generator-lib = { path = "crates/transaction-generator-lib" }
 aptos-transactional-test-harness = { path = "aptos-move/aptos-transactional-test-harness" }
 aptos-types = { path = "types" }
 aptos-validator-interface = { path = "aptos-move/aptos-validator-interface" }
@@ -566,6 +569,7 @@ tonic = { version = "0.8.3", features = [
     "gzip",
     "codegen",
 ] }
+tonic-reflection = "0.6.0"
 ureq = { version = "1.5.4", features = [
     "json",
     "native-tls",
