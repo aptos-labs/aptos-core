@@ -1,0 +1,16 @@
+query getTokenData($token_id: String) {
+  current_token_datas(where: { token_data_id_hash: { _eq: $token_id } }) {
+    token_data_id_hash
+    name
+    collection_name
+    creator_address
+    default_properties
+    largest_property_version
+    maximum
+    metadata_uri
+    payee_address
+    royalty_points_denominator
+    royalty_points_numerator
+    supply
+  }
+}

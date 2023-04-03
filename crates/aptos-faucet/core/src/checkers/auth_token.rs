@@ -3,7 +3,7 @@
 
 use super::{CheckerData, CheckerTrait};
 use crate::{
-    common::{AuthTokenManager, AuthTokenManagerConfig},
+    common::{ListManager, ListManagerConfig},
     endpoints::{AptosTapError, RejectionReason, RejectionReasonCode},
 };
 use anyhow::Result;
@@ -12,15 +12,15 @@ use async_trait::async_trait;
 use poem::http::header::AUTHORIZATION;
 
 pub struct AuthTokenChecker {
-    pub manager: AuthTokenManager,
+    pub manager: ListManager,
 }
 
 impl AuthTokenChecker {
-    pub fn new(config: AuthTokenManagerConfig) -> Result<Self> {
-        let manager = AuthTokenManager::new(config)?;
+    pub fn new(config: ListManagerConfig) -> Result<Self> {
+        let manager = ListManager::new(config)?;
         info!(
             "Loaded {} auth tokens into AuthTokenChecker",
-            manager.num_auth_tokens()
+            manager.num_items()
         );
         Ok(Self { manager })
     }
@@ -45,7 +45,7 @@ impl CheckerTrait for AuthTokenChecker {
                 RejectionReasonCode::AuthTokenInvalid,
             )]),
         };
-        if self.manager.contains_auth_token(auth_token) {
+        if self.manager.contains(auth_token) {
             Ok(vec![])
         } else {
             Ok(vec![RejectionReason::new(
