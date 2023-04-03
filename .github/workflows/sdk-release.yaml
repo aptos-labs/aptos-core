@@ -39,6 +39,8 @@ jobs:
       APTOS_FAUCET_URL: http://127.0.0.1:8081
       FAUCET_AUTH_TOKEN: ${{ secrets.DEVNET_TAP_AUTH_TOKEN }}
       APTOS_INVOCATION: docker run --network host ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos
+      ANS_TEST_ACCOUNT_PRIVATE_KEY: 0xe088222c239e2411a3e7f02b987c1888678f47c3cd3194066490aace3d24831d
+      ANS_TEST_ACCOUNT_ADDRESS: 4da2990cfc273a7ad15c7ad5b5b1148a6107dc341d3739cd492576de732cede5
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
         with:
@@ -98,6 +100,8 @@ jobs:
       - run: echo 'APTOS_FAUCET_URL="http://127.0.0.1:8081"' >> ./ecosystem/typescript/sdk/.env
       - run: echo "FAUCET_AUTH_TOKEN=$FAUCET_AUTH_TOKEN" >> ./ecosystem/typescript/sdk/.env
       - run: echo "APTOS_INVOCATION=$APTOS_INVOCATION" >> ./ecosystem/typescript/sdk/.env
+      - run: echo "ANS_TEST_ACCOUNT_PRIVATE_KEY=$ANS_TEST_ACCOUNT_PRIVATE_KEY" >> ./ecosystem/typescript/sdk/.env
+      - run: echo "ANS_TEST_ACCOUNT_ADDRESS=$ANS_TEST_ACCOUNT_ADDRESS" >> ./ecosystem/typescript/sdk/.env
       - run: cp ./ecosystem/typescript/sdk/.env ./ecosystem/typescript/sdk/examples/typescript/.env
       - run: cp ./ecosystem/typescript/sdk/.env ./ecosystem/typescript/sdk/examples/javascript/.env
 
@@ -123,20 +127,12 @@ jobs:
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
       - run: cargo run -p aptos-rest-client --example account -- --api-url http://127.0.01:8080
 
-      # Clone and publish ANS modules for test
-      - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
-        name: publish-ans-contract
-        with:
-          max_attempts: 3
-          timeout_minutes: 20
-          command: cd ./ecosystem/typescript/sdk && pnpm publish-ans-contract
-
       # Test and build.
       - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
         name: sdk-pnpm-test
         with:
           max_attempts: 3
-          timeout_minutes: 15
+          timeout_minutes: 20
           command: cd ./ecosystem/typescript/sdk && pnpm test
       - run: cd ./ecosystem/typescript/sdk && pnpm build
 
