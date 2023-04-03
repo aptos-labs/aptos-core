@@ -7,18 +7,17 @@ use crate::{
             abort_invariant_violated, gas::GasParameters, AlgebraContext, Structure,
             MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
         },
-        helpers::{SafeNativeContext, SafeNativeError, SafeNativeResult},
+        helpers::{log2_ceil, SafeNativeContext, SafeNativeError, SafeNativeResult},
     },
     safe_borrow_element, safely_pop_arg, store_element, structure_from_ty_arg,
 };
 use aptos_types::on_chain_config::FeatureFlag;
 use ark_ec::{CurveGroup, Group};
 use ark_ff::Field;
-use move_core_types::gas_algebra::NumArgs;
+use move_core_types::gas_algebra::{InternalGas, InternalGasPerArg, NumArgs};
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, rc::Rc};
-use crate::natives::cryptography::algebra::gas::ark_msm_bigint_wnaf_cost;
 
 fn feature_flag_of_group_scalar_mul(
     group_opt: Option<Structure>,
@@ -53,6 +52,27 @@ macro_rules! ark_scalar_mul_internal {
         let new_handle = store_element!($context, new_element);
         Ok(smallvec![Value::u64(new_handle as u64)])
     }};
+}
+
+fn ark_msm_window_size(num_entries: usize) -> usize {
+    if num_entries < 32 {
+        3
+    } else {
+        (log2_ceil(num_entries).unwrap() * 69 / 100) + 2
+    }
+}
+
+/// The approximate cost model of https://github.com/arkworks-rs/algebra/blob/v0.4.0/ec/src/scalar_mul/variable_base/mod.rs#L89.
+pub fn ark_msm_bigint_wnaf_cost(
+    cost_add: InternalGasPerArg,
+    cost_double: InternalGasPerArg,
+    num_entries: usize,
+) -> InternalGas {
+    let window_size = ark_msm_window_size(num_entries);
+    let num_windows = (255 + window_size - 1) / window_size;
+    let num_buckets = 1_usize << window_size;
+    cost_add * NumArgs::from(((num_entries + num_buckets + 1) * num_windows) as u64)
+        + cost_double * NumArgs::from((num_buckets * num_windows) as u64)
 }
 
 pub fn scalar_mul_internal(
@@ -119,9 +139,9 @@ macro_rules! ark_msm_internal {
     (
         $context:expr,
         $args:ident,
-        $proj_to_affine_cost: expr,
-        $proj_add_cost: expr,
-        $proj_double_cost: expr,
+        $proj_to_affine_cost:expr,
+        $proj_add_cost:expr,
+        $proj_double_cost:expr,
         $element_typ:ty,
         $scalar_typ:ty
     ) => {{
@@ -151,7 +171,11 @@ macro_rules! ark_msm_internal {
             safe_borrow_element!($context, handle as usize, $scalar_typ, scalar_ptr, scalar);
             scalars.push(scalar.clone());
         }
-        $context.charge(ark_msm_bigint_wnaf_cost($proj_add_cost, $proj_double_cost, num_elements))?;
+        $context.charge(ark_msm_bigint_wnaf_cost(
+            $proj_add_cost,
+            $proj_double_cost,
+            num_elements,
+        ))?;
         let new_element: $element_typ =
             ark_ec::VariableBaseMSM::msm(bases.as_slice(), scalars.as_slice()).unwrap();
         let new_handle = store_element!($context, new_element);

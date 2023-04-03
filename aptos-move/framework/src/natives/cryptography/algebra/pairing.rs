@@ -13,6 +13,7 @@ use crate::{
 };
 use aptos_types::on_chain_config::FeatureFlag;
 use ark_ec::{pairing::Pairing, CurveGroup};
+use move_core_types::gas_algebra::NumArgs;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, rc::Rc};
@@ -64,12 +65,10 @@ pub fn multi_pairing_internal(
                     abort_code: MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING,
                 });
             }
-            context.charge(gas_params.multi_pairing(
-                Structure::BLS12381G1Affine,
-                Structure::BLS12381G2Affine,
-                Structure::BLS12381Gt,
-                g1_element_handles.len(),
-            ))?;
+
+            context.charge(
+                gas_params.ark_bls12_381_g1_proj_to_affine * NumArgs::from(num_entries as u64),
+            )?;
             let mut g1_elements_affine = Vec::with_capacity(num_entries);
             for handle in g1_element_handles {
                 safe_borrow_element!(
@@ -81,6 +80,10 @@ pub fn multi_pairing_internal(
                 );
                 g1_elements_affine.push(element.into_affine());
             }
+
+            context.charge(
+                gas_params.ark_bls12_381_g2_proj_to_affine * NumArgs::from(num_entries as u64),
+            )?;
             let mut g2_elements_affine = Vec::with_capacity(num_entries);
             for handle in g2_element_handles {
                 safe_borrow_element!(
@@ -92,6 +95,12 @@ pub fn multi_pairing_internal(
                 );
                 g2_elements_affine.push(element.into_affine());
             }
+
+            context.charge(
+                gas_params.ark_bls12_381_multi_pairing_base * NumArgs::one()
+                    + gas_params.ark_bls12_381_multi_pairing_per_pair
+                        * NumArgs::from(num_entries as u64),
+            )?;
             let new_element =
                 ark_bls12_381::Bls12_381::multi_pairing(g1_elements_affine, g2_elements_affine).0;
             let new_handle = store_element!(context, new_element);
@@ -129,6 +138,7 @@ pub fn pairing_internal(
                 g1_element_ptr,
                 g1_element
             );
+            context.charge(gas_params.ark_bls12_381_g1_proj_to_affine * NumArgs::one())?;
             let g1_element_affine = g1_element.into_affine();
             safe_borrow_element!(
                 context,
@@ -137,12 +147,9 @@ pub fn pairing_internal(
                 g2_element_ptr,
                 g2_element
             );
+            context.charge(gas_params.ark_bls12_381_g2_proj_to_affine * NumArgs::one())?;
             let g2_element_affine = g2_element.into_affine();
-            context.charge(gas_params.pairing(
-                Structure::BLS12381G1Affine,
-                Structure::BLS12381G2Affine,
-                Structure::BLS12381Gt,
-            ))?;
+            context.charge(gas_params.ark_bls12_381_pairing * NumArgs::one())?;
             let new_element =
                 ark_bls12_381::Bls12_381::pairing(g1_element_affine, g2_element_affine).0;
             let new_handle = store_element!(context, new_element);

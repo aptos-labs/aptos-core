@@ -13,6 +13,7 @@ use crate::{
 };
 use aptos_types::on_chain_config::FeatureFlag;
 use ark_ec::hashing::HashToCurve;
+use move_core_types::gas_algebra::{InternalGas, InternalGasPerArg, NumArgs};
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{Value, VectorRef},
@@ -51,27 +52,29 @@ macro_rules! suite_from_ty_arg {
     }};
 }
 
-macro_rules! ark_bls12381gx_xmd_sha_256_sswu_ro_internal {
-    (
-        $gas_params:expr,
-        $context:expr,
-        $dst:expr,
-        $msg:expr,
-        $h2s_suite:expr,
-        $target_type:ty,
-        $config_type:ty
-    ) => {{
-        $context.charge($gas_params.hash_to($h2s_suite, $dst.len(), $msg.len()))?;
-        let mapper = ark_ec::hashing::map_to_curve_hasher::MapToCurveBasedHasher::<
-            ark_ec::models::short_weierstrass::Projective<$config_type>,
-            ark_ff::fields::field_hashers::DefaultFieldHasher<sha2_0_10_6::Sha256, 128>,
-            ark_ec::hashing::curve_maps::wb::WBMap<$config_type>,
-        >::new($dst)
-        .unwrap();
-        let new_element = <$target_type>::from(mapper.hash($msg).unwrap());
-        let new_handle = store_element!($context, new_element);
-        Ok(smallvec![Value::u64(new_handle as u64)])
-    }};
+/// SHA2-256 cost as defined in `aptos-move/aptos-gas/src/move_stdlib.rs`.
+fn sha256_cost(input_len: usize) -> InternalGas {
+    InternalGas::from((60000 + 1000 * input_len) as u64)
+}
+
+fn hash_to_bls12381gx_cost(
+    dst_len: usize,
+    msg_len: usize,
+    mapping_base_cost: InternalGasPerArg,
+    per_msg_byte_cost: InternalGasPerArg,
+) -> InternalGas {
+    // DST shortening as defined in https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-using-dsts-longer-than-255-.
+    let dst_shortening_cost = if dst_len <= 255 {
+        InternalGas::zero()
+    } else {
+        sha256_cost(17 + dst_len)
+    };
+
+    // Mapping cost. The gas formula is simplified by assuming the DST length is fixed at 256.
+    let mapping_cost =
+        mapping_base_cost * NumArgs::one() + per_msg_byte_cost * NumArgs::from(msg_len as u64);
+
+    dst_shortening_cost + mapping_cost
 }
 
 pub fn hash_to_internal(
@@ -94,27 +97,43 @@ pub fn hash_to_internal(
         (
             Some(Structure::BLS12381G1Affine),
             Some(HashToStructureSuite::Bls12381g1XmdSha256SswuRo),
-        ) => ark_bls12381gx_xmd_sha_256_sswu_ro_internal!(
-            gas_params,
-            context,
-            dst,
-            msg,
-            HashToStructureSuite::Bls12381g1XmdSha256SswuRo,
-            ark_bls12_381::G1Projective,
-            ark_bls12_381::g1::Config
-        ),
+        ) => {
+            context.charge(hash_to_bls12381gx_cost(
+                dst.len(),
+                msg.len(),
+                gas_params.ark_h2c_bls12381g1_xmd_sha256_sswu_base,
+                gas_params.ark_h2c_bls12381g1_xmd_sha256_sswu_per_msg_byte,
+            ))?;
+            let mapper = ark_ec::hashing::map_to_curve_hasher::MapToCurveBasedHasher::<
+                ark_ec::models::short_weierstrass::Projective<ark_bls12_381::g1::Config>,
+                ark_ff::fields::field_hashers::DefaultFieldHasher<sha2_0_10_6::Sha256, 128>,
+                ark_ec::hashing::curve_maps::wb::WBMap<ark_bls12_381::g1::Config>,
+            >::new(dst)
+            .unwrap();
+            let new_element = <ark_bls12_381::G1Projective>::from(mapper.hash(msg).unwrap());
+            let new_handle = store_element!(context, new_element);
+            Ok(smallvec![Value::u64(new_handle as u64)])
+        },
         (
             Some(Structure::BLS12381G2Affine),
             Some(HashToStructureSuite::Bls12381g2XmdSha256SswuRo),
-        ) => ark_bls12381gx_xmd_sha_256_sswu_ro_internal!(
-            gas_params,
-            context,
-            dst,
-            msg,
-            HashToStructureSuite::Bls12381g2XmdSha256SswuRo,
-            ark_bls12_381::G2Projective,
-            ark_bls12_381::g2::Config
-        ),
+        ) => {
+            context.charge(hash_to_bls12381gx_cost(
+                dst.len(),
+                msg.len(),
+                gas_params.ark_h2c_bls12381g2_xmd_sha256_sswu_base,
+                gas_params.ark_h2c_bls12381g2_xmd_sha256_sswu_per_msg_byte,
+            ))?;
+            let mapper = ark_ec::hashing::map_to_curve_hasher::MapToCurveBasedHasher::<
+                ark_ec::models::short_weierstrass::Projective<ark_bls12_381::g2::Config>,
+                ark_ff::fields::field_hashers::DefaultFieldHasher<sha2_0_10_6::Sha256, 128>,
+                ark_ec::hashing::curve_maps::wb::WBMap<ark_bls12_381::g2::Config>,
+            >::new(dst)
+            .unwrap();
+            let new_element = <ark_bls12_381::G2Projective>::from(mapper.hash(msg).unwrap());
+            let new_handle = store_element!(context, new_element);
+            Ok(smallvec![Value::u64(new_handle as u64)])
+        },
         _ => Err(SafeNativeError::Abort {
             abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
         }),
