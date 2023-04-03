@@ -160,7 +160,7 @@ module aptos_std::algebra {
     /// `P[]` are `n` elements of group `G` represented by parameter `elements`, and
     /// `k[]` are `n` elements of the scalarfield `S` of group `G` represented by parameter `scalars`.
     ///
-    /// Abort with `std::error::invalid_argument(E_NON_EQUAL_LENGTHS)` if the sizes of `elements` and `scalars` do not match.
+    /// Abort with code `std::error::invalid_argument(E_NON_EQUAL_LENGTHS)` if the sizes of `elements` and `scalars` do not match.
     public fun multi_scalar_mul<G, S>(elements: &vector<Element<G>>, scalars: &vector<Element<S>>): Element<G> {
         let element_handles = handles_from_elements(elements);
         let scalar_handles = handles_from_elements(scalars);
@@ -182,7 +182,7 @@ module aptos_std::algebra {
     /// `P[]` are `n` elements of group `G1` represented by parameter `g1_elements`, and
     /// `Q[]` are `n` elements of group `G2` represented by parameter `g2_elements`.
     ///
-    /// Abort with code 0x010000 if the sizes of `g1_elements` and `g2_elements` do not match.
+    /// Abort with code `std::error::invalid_argument(E_NON_EQUAL_LENGTHS)` if the sizes of `g1_elements` and `g2_elements` do not match.
     ///
     /// NOTE: we are viewing the target group `Gt` of the pairing as an additive group,
     /// rather than a multiplicative one (which is typically the case).

@@ -526,7 +526,7 @@ Compute <code>k[0]*P[0]+...+k[n-1]*P[n-1]</code>, where
 <code>P[]</code> are <code>n</code> elements of group <code>G</code> represented by parameter <code>elements</code>, and
 <code>k[]</code> are <code>n</code> elements of the scalarfield <code>S</code> of group <code>G</code> represented by parameter <code>scalars</code>.
 
-Abort with <code>std::error::invalid_argument(<a href="algebra.md#0x1_algebra_E_NON_EQUAL_LENGTHS">E_NON_EQUAL_LENGTHS</a>)</code> if the sizes of <code>elements</code> and <code>scalars</code> do not match.
+Abort with code <code>std::error::invalid_argument(<a href="algebra.md#0x1_algebra_E_NON_EQUAL_LENGTHS">E_NON_EQUAL_LENGTHS</a>)</code> if the sizes of <code>elements</code> and <code>scalars</code> do not match.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_multi_scalar_mul">multi_scalar_mul</a>&lt;G, S&gt;(elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;&gt;, scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;
@@ -588,7 +588,7 @@ where <code>e: (G1,G2) -&gt; (Gt)</code> is the pairing function from groups <co
 <code>P[]</code> are <code>n</code> elements of group <code>G1</code> represented by parameter <code>g1_elements</code>, and
 <code>Q[]</code> are <code>n</code> elements of group <code>G2</code> represented by parameter <code>g2_elements</code>.
 
-Abort with code 0x010000 if the sizes of <code>g1_elements</code> and <code>g2_elements</code> do not match.
+Abort with code <code>std::error::invalid_argument(<a href="algebra.md#0x1_algebra_E_NON_EQUAL_LENGTHS">E_NON_EQUAL_LENGTHS</a>)</code> if the sizes of <code>g1_elements</code> and <code>g2_elements</code> do not match.
 
 NOTE: we are viewing the target group <code>Gt</code> of the pairing as an additive group,
 rather than a multiplicative one (which is typically the case).
