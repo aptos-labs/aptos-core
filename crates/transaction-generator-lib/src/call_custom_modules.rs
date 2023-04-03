@@ -10,6 +10,7 @@ use crate::{
 };
 use aptos_logger::info;
 use aptos_sdk::{
+    move_types::account_address::AccountAddress,
     transaction_builder::TransactionFactory,
     types::{transaction::SignedTransaction, LocalAccount},
 };
@@ -20,7 +21,7 @@ use std::sync::Arc;
 pub struct CallCustomModulesGenerator {
     rng: StdRng,
     txn_factory: TransactionFactory,
-    packages: Arc<Vec<Package>>,
+    packages: Arc<Vec<(Package, AccountAddress)>>,
     entry_point: EntryPoints,
 }
 
@@ -28,7 +29,7 @@ impl CallCustomModulesGenerator {
     pub fn new(
         rng: StdRng,
         txn_factory: TransactionFactory,
-        packages: Arc<Vec<Package>>,
+        packages: Arc<Vec<(Package, AccountAddress)>>,
         entry_point: EntryPoints,
     ) -> Self {
         Self {
@@ -52,17 +53,14 @@ impl TransactionGenerator for CallCustomModulesGenerator {
 
         for account in accounts {
             for _ in 0..transactions_per_account {
-                let request = self
-                    .packages
-                    .choose(&mut self.rng)
-                    .unwrap()
-                    .use_specific_transaction(
-                        self.entry_point,
-                        account,
-                        &self.txn_factory,
-                        Some(&mut self.rng),
-                        None,
-                    );
+                let (package, publisher) = self.packages.choose(&mut self.rng).unwrap();
+                let request = package.use_specific_transaction(
+                    self.entry_point,
+                    account,
+                    &self.txn_factory,
+                    Some(&mut self.rng),
+                    Some(publisher),
+                );
                 requests.push(request);
             }
         }
@@ -72,7 +70,7 @@ impl TransactionGenerator for CallCustomModulesGenerator {
 
 pub struct CallCustomModulesCreator {
     txn_factory: TransactionFactory,
-    packages: Arc<Vec<Package>>,
+    packages: Arc<Vec<(Package, AccountAddress)>>,
     entry_point: EntryPoints,
 }
 
@@ -94,7 +92,7 @@ impl CallCustomModulesCreator {
             let package = package_handler.pick_package(&mut rng, account);
             let txn = package.publish_transaction(account, &init_txn_factory);
             requests.push(txn);
-            packages.push(package);
+            packages.push((package, account.address()));
         }
         info!("Publishing {} packages", requests.len());
         txn_executor.execute_transactions(&requests).await.unwrap();

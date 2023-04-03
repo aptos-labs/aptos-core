@@ -34,6 +34,8 @@ pub async fn generate_traffic(
     emit_job_request = emit_job_request
         .rest_clients(validator_clients)
         .gas_price(gas_price)
+        .expected_gas_per_txn(1000000)
+        .max_gas_per_txn(2000000)
         .coordination_delay_between_instances(Duration::from_secs(1))
         .transaction_mix_per_phase(transaction_mix_per_phase)
         .mode(EmitJobMode::ConstTps { tps: 20 });
@@ -79,11 +81,12 @@ async fn test_txn_emmitter() {
                 (TransactionType::default_call_different_modules(), 20),
                 (
                     TransactionType::CallCustomModules {
-                        entry_point: EntryPoints::BytesMakeOrChange {
-                            data_length: Some(32),
-                        },
+                        entry_point: EntryPoints::StepDst,
+                        // entry_point: EntryPoints::BytesMakeOrChange {
+                        //     data_length: Some(32),
+                        // },
                         num_modules: 1,
-                        use_account_pool: true,
+                        use_account_pool: false,
                     },
                     20,
                 ),
