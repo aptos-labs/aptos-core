@@ -1,15 +1,14 @@
-name: "Executor Specific Tests"
+name: "sequential-execution-performance"
 on:
   pull_request:
     paths:
-      - 'path-to-parallel-executor'
+      - 'aptos-move/'
+      - 'third_party/move/'
 
 jobs:
   executor-tests:
     # The biggest machine, you can try some other like ubuntu-latest
     runs-on: high-perf-docker
-    if: |
-      contains(github.event.pull_request.labels.*.name, 'CICD:your-label-here')
     steps:
       - uses: actions/checkout@v3
         with:
@@ -23,7 +22,30 @@ jobs:
       # Run your actually test command
       # REPLACE
       # If you have anything other than a single command here, please write a python script and call it here
-      - run: cargo nextest run --locked --workspace --exclude smoke-test --exclude aptos-testcases --exclude aptos-api --exclude aptos-executor-benchmark --exclude aptos-backup-cli --retries 3 --no-fail-fast -F consensus-only-perf-test
+      - run: |
+          # Set the tps threshold for block size 1k and 10k
+          THRESHOLD_1k = 10000
+          THRESHOLD_10k = 12000
+
+          # Run the sequential execution with performance optimizations enabled
+          output=$(cargo run --profile performance main false true)
+
+          # Parse the numbers from the output using grep and awk
+          tps_1k=$(echo "$output" | grep -o 'Avg Sequential TPS = [0-9]*' | awk '{print $NF}' | sed -n '1p')
+          tps_10k=$(echo "$output" | grep -o 'Avg Sequential TPS = [0-9]*' | awk '{print $NF}' | sed -n '2p')
+
+          echo "Average Sequential TPS for 1k block: $tps_1k, Threshold TPS: $THRESHOLD_1k"
+          echo "Average Sequential TPS for 10k block: $tps_10k, Threshold TPS: $THRESHOLD_10k"
+
+          # Check if any threshold is not met
+          if [[ "$tps_1k" -lt "$THRESHOLD_1k" ]] || [[ "$tps_10k" -lt "$THRESHOLD_10k" ]]; then
+            echo "Sequential TPS below the threshold"
+            exit 1
+          else
+            echo "Sequential TPS above the threshold"
+            exit 0
+          fi
+
         env:
           # define env variables
           RUST_MIN_STACK: 4297152
