@@ -7,6 +7,7 @@
 
 -  [Struct `Cons`](#0x1_string_utils_Cons)
 -  [Struct `NIL`](#0x1_string_utils_NIL)
+-  [Struct `FakeCons`](#0x1_string_utils_FakeCons)
 -  [Constants](#@Constants_0)
 -  [Function `cons`](#0x1_string_utils_cons)
 -  [Function `nil`](#0x1_string_utils_nil)
@@ -75,6 +76,39 @@
 <dl>
 <dt>
 <code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_string_utils_FakeCons"></a>
+
+## Struct `FakeCons`
+
+
+
+<pre><code><b>struct</b> <a href="string_utils.md#0x1_string_utils_FakeCons">FakeCons</a>&lt;T, N&gt; <b>has</b> <b>copy</b>, drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>car: T</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>cdr: N</code>
 </dt>
 <dd>
 

@@ -137,19 +137,19 @@ pub fn native_format_impl(
                     } else {
                         unreachable!()
                     };
-                    native_format_impl(context, base_gas, &inner_ty, v.pop().unwrap(), out)?;
+                    native_format_impl(context, base_gas, inner_ty, v.pop().unwrap(), out)?;
                     out.push(')');
                 }
                 return Ok(());
             }
             write!(out, "{} {{", type_.name.as_str()).unwrap();
-            format_vector_with_fields(context, base_gas, &fields, strct, out)?;
+            format_vector_with_fields(context, base_gas, fields, strct, out)?;
             out.push('}');
         },
         MoveTypeLayout::Struct(MoveStructLayout::WithFields(fields)) => {
             let strct = val.value_as::<Struct>()?;
             out.push('{');
-            format_vector_with_fields(context, base_gas, &fields, strct, out)?;
+            format_vector_with_fields(context, base_gas, fields, strct, out)?;
             out.push('}');
         },
         MoveTypeLayout::Struct(MoveStructLayout::Runtime(fields)) => {
