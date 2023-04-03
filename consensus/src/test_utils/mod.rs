@@ -13,7 +13,7 @@ use aptos_consensus_types::{
 use aptos_crypto::HashValue;
 use aptos_logger::Level;
 use aptos_types::{ledger_info::LedgerInfo, validator_signer::ValidatorSigner};
-use std::{future::Future, sync::Arc, time::Duration};
+use std::{future::Future, sync::{Arc, atomic::{AtomicU32, Ordering}}, time::Duration};
 use tokio::{runtime, time::timeout};
 
 #[cfg(any(test, feature = "fuzzing"))]
@@ -201,7 +201,9 @@ pub fn consensus_runtime() -> runtime::Runtime {
         ::aptos_logger::Logger::new().level(Level::Debug).init();
     }
 
-    aptos_runtimes::spawn_named_runtime("consensus".into(), None)
+    static ATOMIC_ID: AtomicU32 = AtomicU32::new(0);
+    let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+    aptos_runtimes::spawn_named_runtime(format!("consensus-peer{}", id), None)
 }
 
 pub fn timed_block_on<F>(runtime: &runtime::Runtime, f: F) -> <F as Future>::Output
