@@ -39,8 +39,8 @@ jobs:
       APTOS_FAUCET_URL: http://127.0.0.1:8081
       FAUCET_AUTH_TOKEN: ${{ secrets.DEVNET_TAP_AUTH_TOKEN }}
       APTOS_INVOCATION: docker run --network host ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos
-      ANS_TEST_ACCOUNT_PRIVATE_KEY: 0xe088222c239e2411a3e7f02b987c1888678f47c3cd3194066490aace3d24831d
-      ANS_TEST_ACCOUNT_ADDRESS: 4da2990cfc273a7ad15c7ad5b5b1148a6107dc341d3739cd492576de732cede5
+      ANS_TEST_ACCOUNT_PRIVATE_KEY: 0x37368b46ce665362562c6d1d4ec01a08c8644c488690df5a17e13ba163e20221
+      ANS_TEST_ACCOUNT_ADDRESS: 0x585fc9f0f0c54183b039ffc770ca282ebd87307916c215a3e692f2f8e4305e82
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
         with:
@@ -96,8 +96,8 @@ jobs:
       - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines ${{ runner.temp }}/specs/spec.json api/doc/spec.json
 
       # Set up dotenv file for tests (jest doesn't read env vars properly).
-      - run: echo 'APTOS_NODE_URL="http://127.0.0.1:8080/v1"' >> ./ecosystem/typescript/sdk/.env
-      - run: echo 'APTOS_FAUCET_URL="http://127.0.0.1:8081"' >> ./ecosystem/typescript/sdk/.env
+      - run: echo "APTOS_NODE_URL=$APTOS_NODE_URL" >> ./ecosystem/typescript/sdk/.env
+      - run: echo "APTOS_FAUCET_URL=$APTOS_FAUCET_URL" >> ./ecosystem/typescript/sdk/.env
       - run: echo "FAUCET_AUTH_TOKEN=$FAUCET_AUTH_TOKEN" >> ./ecosystem/typescript/sdk/.env
       - run: echo "APTOS_INVOCATION=$APTOS_INVOCATION" >> ./ecosystem/typescript/sdk/.env
       - run: echo "ANS_TEST_ACCOUNT_PRIVATE_KEY=$ANS_TEST_ACCOUNT_PRIVATE_KEY" >> ./ecosystem/typescript/sdk/.env
