@@ -239,26 +239,25 @@ where
                         break;
                     }
 
-                    // When there is a txn with Abort or SkipRest as the execution output, can early halt BlockSTM.
-                    if let ExecutionStatus::Abort(_) | ExecutionStatus::SkipRest(_) =
-                        last_input_output.write_set(txn_idx).as_ref()
-                    {
-                        scheduler.halt();
-                        break;
-                    }
-
-                    // Calculating the accumulated gas of the committed txns.
-                    let txn_gas = match last_input_output.write_set(txn_idx).as_ref() {
-                        ExecutionStatus::Success(output) => output.gas_used(),
-                        _ => unreachable!(),
+                    // For committed txns with Success status, calculate the accumulated gas.
+                    // For committed txns with Abort or SkipRest status, early halt BlockSTM.
+                    match last_input_output.success_gas(txn_idx) {
+                        Ok(gas) => accumulated_gas += gas,
+                        _ => {
+                            debug!("[BlockSTM]: Early halted due to Abort or SkipRest txn.");
+                            scheduler.halt();
+                            break;
+                        },
                     };
-                    accumulated_gas += txn_gas;
 
                     // When the accumulated gas of the committed txns exceeds PER_BLOCK_GAS_LIMIT, early halt BlockSTM.
                     if accumulated_gas >= PER_BLOCK_GAS_LIMIT {
                         // Set the execution output status to be SkipRest, to skip the rest of the txns.
                         last_input_output.update_to_skip_rest(txn_idx);
                         scheduler.halt();
+                        counters::PARALLEL_PER_BLOCK_GAS.observe(accumulated_gas as f64);
+                        counters::PARALLEL_EXCEED_PER_BLOCK_GAS_LIMIT_COUNT.inc();
+                        debug!("[BlockSTM]: Early halted due to accumulated_gas {} >= PER_BLOCK_GAS_LIMIT {}.", accumulated_gas, PER_BLOCK_GAS_LIMIT);
                         break;
                     }
 
@@ -411,7 +410,6 @@ where
             );
 
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
-            let txn_gas;
             match res {
                 ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
                     assert_eq!(
@@ -423,7 +421,8 @@ where
                     for (ap, write_op) in output.get_writes().into_iter() {
                         data_map.insert(ap, write_op);
                     }
-                    txn_gas = output.gas_used();
+                    // Calculating the accumulated gas of the committed txns.
+                    accumulated_gas += output.gas_used();
                     ret.push(output);
                 },
                 ExecutionStatus::Abort(err) => {
@@ -432,15 +431,18 @@ where
                 },
             }
 
+            // When the txn is a SkipRest txn, halt sequential execution.
             if must_skip {
+                debug!("[Execution]: Sequential execution early halted due to SkipRest txn.");
                 break;
             }
 
-            // Calculating the accumulated gas of the committed txns.
-            accumulated_gas += txn_gas;
-
-            // When the accumulated gas of the committed txns exceeds PER_BLOCK_GAS_LIMIT, halt sequential execution.
+            // When the accumulated gas of the committed txns
+            // exceeds PER_BLOCK_GAS_LIMIT, halt sequential execution.
             if accumulated_gas >= PER_BLOCK_GAS_LIMIT {
+                counters::SEQUENTIAL_PER_BLOCK_GAS.observe(accumulated_gas as f64);
+                counters::SEQUENTIAL_EXCEED_PER_BLOCK_GAS_LIMIT_COUNT.inc();
+                debug!("[Execution]: Sequential execution early halted due to accumulated_gas {} >= PER_BLOCK_GAS_LIMIT {}.", accumulated_gas, PER_BLOCK_GAS_LIMIT);
                 break;
             }
         }

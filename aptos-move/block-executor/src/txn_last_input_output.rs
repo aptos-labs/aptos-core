@@ -226,6 +226,15 @@ impl<K: ModulePath, T: TransactionOutput, E: Send + Clone> TxnLastInputOutput<K,
             .expect("[BlockSTM]: Execution output must be recorded after execution")
     }
 
+    pub fn success_gas(&self, txn_idx: TxnIndex) -> anyhow::Result<u64> {
+        match self.write_set(txn_idx).as_ref() {
+            ExecutionStatus::Success(output) => Ok(output.gas_used()),
+            _ => Err(anyhow!(
+                "[BlockSTM] Committing transaction with status SkipRest or Abort, early halt BlockSTM."
+            )),
+        }
+    }
+
     pub fn update_to_skip_rest(&self, txn_idx: TxnIndex) {
         if let ExecutionStatus::Success(output) = self.take_output(txn_idx) {
             self.outputs[txn_idx as usize].store(Some(Arc::new(ExecutionStatus::SkipRest(output))));
