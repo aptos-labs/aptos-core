@@ -46,6 +46,10 @@ sources={{
 Each stake pool can be used to vote on each proposal exactly only one time.
 :::
 
+:::tip
+Remember to verify proposals before voting. Ensure each proposal is linked to its source code and, if there is a corresponding AIP, the AIP is in the title and description.
+:::
+
 ## Who can resolve
 - Anyone can resolve an on-chain proposal that has passed voting requirements by using the `aptos governance execute-proposal` command from Aptos CLI. 
 
