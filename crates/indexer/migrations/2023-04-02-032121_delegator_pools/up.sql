@@ -6,4 +6,4 @@ CREATE TABLE IF NOT EXISTS delegated_staking_pools (
 );
 CREATE INDEX dsp_insat_index ON delegated_staking_pools (inserted_at);
 ALTER TABLE current_staking_pool_voter
-ADD COLUMN IF NOT EXISTS operator_address VARCHAR(66) NOT NULL DEFAULT '';
+ADD COLUMN IF NOT EXISTS operator_address VARCHAR(66) NOT NULL;
