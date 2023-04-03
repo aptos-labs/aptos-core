@@ -237,6 +237,8 @@ impl BufferManager {
                         .item_id(item_hash),
                     "item id {}, item size {}", item.get_hash(), item.get_blocks().len()
                 );
+                let block = item.get_blocks().last().unwrap().block();
+                observe_block(block.timestamp_usecs(), BlockStage::RAND_SENT);
                 // println!("[rand debug] {} send share {} to leader {}", self.author, rand_shares.item_id(), proposer);
                 self.rand_msg_tx
                 .send_rand_shares(rand_shares.clone(), leader)
@@ -296,6 +298,9 @@ impl BufferManager {
                                     self.new_log(LogEvent::LeaderBCastRand).item_id(item_id),
                                     "item id {}, item size {}", item_id, item.get_blocks().len()
                                 );
+                                let block = item.get_blocks().last().unwrap().block();
+                                observe_block(block.timestamp_usecs(), BlockStage::RAND_AGGREGATED);
+
                                 let peers = self.verifier.get_ordered_account_addresses();
                                 let retry_interval = Duration::from_millis(500 as u64);
                                 let rpc_timeout = Duration::from_millis(1000 as u64);
@@ -358,6 +363,9 @@ impl BufferManager {
                 if current_cursor.is_some() {
                     let mut item = self.buffer.take(&current_cursor);
                     if item.is_ordered() {
+                        let block = item.get_blocks().last().unwrap().block();
+                        observe_block(block.timestamp_usecs(), BlockStage::RAND_RECEIVED);
+
                         // add the randomness to block
                         item.update_rand_decisions(*rand_decisions.clone());
                         if item.get_blocks().len() != rand_decisions.decisions().len() {
