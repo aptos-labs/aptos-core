@@ -222,8 +222,8 @@ enum MarketAction {
 }
 
 struct OrderBook {
-    asks: BTreeMap<BigDecimal, Order>,
-    bids: BTreeMap<BigDecimal, Order>,
+    asks: BTreeMap<BigDecimal, Vec<Order>>,
+    bids: BTreeMap<BigDecimal, Vec<Order>>,
 }
 
 impl OrderBook {
