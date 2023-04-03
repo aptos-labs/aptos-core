@@ -84,3 +84,22 @@ test("Test getAddressFromAccountOrAddress", () => {
   );
   expect(getAddressFromAccountOrAddress(account).toString()).toBe(aptosAccountObject.address);
 });
+
+test("Gets the collection object address", () => {
+  const creator = "0x423eab63bed73bb1febb3630e803a1d18b518e798cd2a28d4fea8ba53d097cb1";
+  const collectionName = "Kevin1";
+
+  expect(AptosAccount.getCollectionObjectAddress(creator, collectionName).hex()).toBe(
+    "0x5a8b5f656bd7c37410b3177a928e834bff9a1add03082e7c7f8f56a3dee1e755",
+  );
+});
+
+test("Gets the token object address", () => {
+  const creator = "0x423eab63bed73bb1febb3630e803a1d18b518e798cd2a28d4fea8ba53d097cb1";
+  const collectionName = "Kevin1";
+  const tokenName = "Kevin_token_1";
+
+  expect(AptosAccount.getTokenObjectAddress(creator, collectionName, tokenName).hex()).toBe(
+    "0xdcf50c7ecd3e8f9d56048874ee2cce2a61741182c01673effd5d28299c12c687",
+  );
+});
