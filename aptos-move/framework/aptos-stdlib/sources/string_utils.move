@@ -40,15 +40,15 @@ module aptos_std::string_utils {
 
     #[test]
     fun test_format() {
-        /*assert!(format(&1u64) == std::string::utf8(b"1"), 1);
+        assert!(format(&1u64) == std::string::utf8(b"1"), 1);
         assert!(format(&false) == std::string::utf8(b"false"), 2);
         assert!(format(&1u256) == std::string::utf8(b"1"), 3);
         assert!(format(&vector[1, 2, 3]) == std::string::utf8(b"[1, 2, 3]"), 4);
         assert!(format(&cons(std::string::utf8(b"My string"),2)) == std::string::utf8(b"Cons {car: \"My string\", cdr: 2}"), 5);
-        assert!(format(&std::option::none<u64>()) == std::string::utf8(b"None"), 6);*/
+        assert!(format(&std::option::none<u64>()) == std::string::utf8(b"None"), 6);
         assert!(format(&std::option::some(1)) == std::string::utf8(b"Some(1)"), 7);
     }
-/*
+
     #[test]
     fun test_format_list() {
         let my_string = std::string::utf8(b"My string");
@@ -139,5 +139,5 @@ module aptos_std::string_utils {
         let l = cons(1, cons(2, cons(3, nil())));
         let s = format_list(&std::string::utf8(b"\\{a = {} b = {} c = {}\\}"), &l);
         assert!(s == std::string::utf8(b"{a = 1 b = 2 c = 3}"), 1);
-    }*/
+    }
 }
