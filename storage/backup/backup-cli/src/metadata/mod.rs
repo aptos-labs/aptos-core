@@ -10,7 +10,7 @@ use anyhow::{ensure, Result};
 use aptos_crypto::HashValue;
 use aptos_types::transaction::Version;
 use serde::{Deserialize, Serialize};
-use std::convert::TryInto;
+use std::{cmp::Ordering, collections::HashMap, convert::TryInto};
 
 #[derive(Deserialize, Serialize)]
 #[allow(clippy::enum_variant_names)] // to introduce: BackupperId, etc
@@ -19,6 +19,7 @@ pub(crate) enum Metadata {
     StateSnapshotBackup(StateSnapshotBackupMeta),
     TransactionBackup(TransactionBackupMeta),
     Identity(IdentityMeta),
+    CompactionTimestamps(CompactionTimestampsMeta),
 }
 
 impl Metadata {
@@ -56,6 +57,10 @@ impl Metadata {
             last_version,
             manifest,
         })
+    }
+
+    pub fn new_compaction_timestamps(compaction_timestamps_meta: CompactionTimestampsMeta) -> Self {
+        Self::CompactionTimestamps(compaction_timestamps_meta)
     }
 
     pub fn compact_epoch_ending_backup_range(
@@ -155,6 +160,9 @@ impl Metadata {
                 format!("transaction_{}-{}.meta", t.first_version, t.last_version)
             },
             Metadata::Identity(_) => "identity.meta".into(),
+            Self::CompactionTimestamps(e) => {
+                format!("compaction_timestamps_{}.meta", e.file_compacted_at,)
+            },
         }
         .try_into()
         .unwrap()
@@ -191,4 +199,40 @@ pub struct TransactionBackupMeta {
 #[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq, Ord, PartialOrd)]
 pub struct IdentityMeta {
     pub id: HashValue,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, Eq)]
+pub struct CompactionTimestampsMeta {
+    pub file_compacted_at: u64,
+    pub compaction_timestamps: HashMap<FileHandle, Option<u64>>,
+}
+
+impl CompactionTimestampsMeta {
+    pub fn new(
+        compaction_timestamps: HashMap<FileHandle, Option<u64>>,
+        file_compacted_at: u64,
+    ) -> Self {
+        Self {
+            file_compacted_at,
+            compaction_timestamps,
+        }
+    }
+}
+
+impl PartialEq<Self> for CompactionTimestampsMeta {
+    fn eq(&self, other: &Self) -> bool {
+        self.file_compacted_at.eq(&other.file_compacted_at)
+    }
+}
+
+impl PartialOrd<Self> for CompactionTimestampsMeta {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.file_compacted_at.partial_cmp(&other.file_compacted_at)
+    }
+}
+
+impl Ord for CompactionTimestampsMeta {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.file_compacted_at.cmp(&other.file_compacted_at)
+    }
 }

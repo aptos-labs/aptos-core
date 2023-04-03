@@ -896,6 +896,7 @@ dependencies = [
  "aptos-push-metrics",
  "aptos-temppath",
  "aptos-types",
+ "async-trait",
  "clap 3.2.23",
  "owo-colors",
  "tokio",
