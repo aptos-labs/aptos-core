@@ -1,0 +1,27 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  namespace: {namespace}
+  name: {name} 
+spec:
+  action: netem
+  mode: one
+  selector:
+    namespaces:
+      - {namespace}
+    expressionSelectors:
+      - {{ key: app.kubernetes.io/instance, operator: In, values: [{instance_labels}] }}
+  delay:
+    latency: "{latency_ms}ms"
+    correlation: "{correlation_percentage}"
+    jitter: "{jitter_ms}ms"
+  loss:
+    loss: "{loss_percentage}"
+    correlation: "{correlation_percentage}"
+  target:
+    selector:
+      namespaces:
+        - {namespace}
+      expressionSelectors:
+        - {{ key: app.kubernetes.io/instance, operator: In, values: [{target_instance_labels}] }}
+    mode: all

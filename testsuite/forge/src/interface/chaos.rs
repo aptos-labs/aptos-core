@@ -10,6 +10,7 @@ pub enum SwarmChaos {
     Partition(SwarmNetworkPartition),
     Bandwidth(SwarmNetworkBandwidth),
     Loss(SwarmNetworkLoss),
+    NetEm(SwarmNetEm),
 }
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
@@ -78,4 +79,26 @@ impl Display for SwarmNetworkLoss {
             self.loss_percentage, self.correlation_percentage,
         )
     }
+}
+
+#[derive(Eq, Hash, PartialEq, Debug, Clone)]
+pub struct SwarmNetEm {
+    pub group_netems: Vec<GroupNetEm>,
+}
+
+impl Display for SwarmNetEm {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "NetEm nodes {:?}", self.group_netems)
+    }
+}
+
+#[derive(Eq, Hash, PartialEq, Debug, Clone)]
+pub struct GroupNetEm {
+    pub name: String,
+    pub source_nodes: Vec<PeerId>,
+    pub target_nodes: Vec<PeerId>,
+    pub latency_ms: u64,
+    pub jitter_ms: u64,
+    pub correlation_percentage: u64,
+    pub loss_percentage: u64,
 }
