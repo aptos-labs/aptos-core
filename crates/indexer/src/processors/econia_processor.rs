@@ -224,6 +224,7 @@ enum MarketAction {
 struct OrderBook {
     asks: BTreeMap<u64, Vec<Order>>,
     bids: BTreeMap<u64, Vec<Order>>,
+    orders_to_price_level: HashMap<u64, (Side, u64)>,
 }
 
 impl OrderBook {
@@ -231,6 +232,7 @@ impl OrderBook {
         Self {
             asks: BTreeMap::new(),
             bids: BTreeMap::new(),
+            orders_to_price_level: HashMap::new(),
         }
     }
 }
@@ -313,7 +315,46 @@ impl EconiaRedisCacher {
 
         match MakerEventType::try_from(e.event_type)? {
             MakerEventType::Cancel => todo!(),
-            MakerEventType::Change => todo!(),
+            MakerEventType::Change => {
+                let (side, price) = book
+                    .orders_to_price_level
+                    .get(&e.market_order_id)
+                    .expect("invalid state, order is missing");
+
+                let book_side = match side {
+                    Side::Ask => &mut book.asks,
+                    Side::Bid => &mut book.bids,
+                };
+                let level = book_side
+                    .get_mut(&e.price)
+                    .expect("invalid state, price level missing");
+
+                let order = level
+                    .iter_mut()
+                    .find(|o| o.market_order_id == e.market_order_id)
+                    .expect("invalid state, order missing");
+
+                let pop_and_reinsert_order = (price != &e.price) || (e.size > order.size);
+                order.size = e.size;
+                order.price = e.price;
+
+                if pop_and_reinsert_order {
+                    let order = level
+                        .iter()
+                        .position(|o| o.market_order_id == e.market_order_id)
+                        .map(|i| level.remove(i))
+                        .expect("invalid state, order missing");
+
+                    if level.is_empty() {
+                        book_side.remove(price);
+                    }
+
+                    book.orders_to_price_level
+                        .insert(e.market_order_id, (*side, e.price));
+
+                    book_side.entry(e.price).or_default().push(order);
+                }
+            },
             MakerEventType::Evict => todo!(),
             MakerEventType::Place => {
                 let side = e.side.into();
@@ -328,6 +369,9 @@ impl EconiaRedisCacher {
                     order_state: OrderState::Open,
                     created_at: *CURRENT_BLOCK_TIME.read().unwrap(),
                 };
+
+                book.orders_to_price_level
+                    .insert(e.market_order_id, (side, e.price));
 
                 if side == Side::Ask {
                     book.asks.entry(e.price).or_default().push(o);
