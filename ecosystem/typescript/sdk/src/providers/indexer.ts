@@ -151,7 +151,7 @@ export class IndexerClient {
   }
 
   /**
-   * Queries an account token acount
+   * Gets the count of tokens owned by an account
    *
    * @param ownerAddress Owner address
    * @returns AccountTokensCountQuery response type
@@ -167,7 +167,7 @@ export class IndexerClient {
   }
 
   /**
-   * Queries an account transactions acount
+   * Gets the count of transactions submitted by an account
    *
    * @param address Account address
    * @returns GetAccountTransactionsCountQuery response type
@@ -227,7 +227,7 @@ export class IndexerClient {
   }
 
   /**
-   * Queries token activities count
+   * Gets the count of token's activities
    *
    * @param tokenId Token ID
    * @returns GetTokenActivitiesCountQuery response type
