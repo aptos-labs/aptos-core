@@ -18,6 +18,7 @@ use move_core_types::gas_algebra::NumArgs;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, rc::Rc};
+use crate::natives::cryptography::algebra::gas::ark_msm_bigint_wnaf_cost;
 
 fn feature_flag_of_group_scalar_mul(
     group_opt: Option<Structure>,
@@ -116,10 +117,11 @@ pub fn scalar_mul_internal(
 
 macro_rules! ark_msm_internal {
     (
-        $gas_params:expr,
         $context:expr,
         $args:ident,
-        $structure:expr,
+        $proj_to_affine_cost: expr,
+        $proj_add_cost: expr,
+        $proj_double_cost: expr,
         $element_typ:ty,
         $scalar_typ:ty
     ) => {{
@@ -133,6 +135,7 @@ macro_rules! ark_msm_internal {
             });
         }
         let mut bases = Vec::with_capacity(num_elements);
+        $context.charge($proj_to_affine_cost * NumArgs::from(num_elements as u64))?;
         for handle in element_handles {
             safe_borrow_element!(
                 $context,
@@ -148,7 +151,7 @@ macro_rules! ark_msm_internal {
             safe_borrow_element!($context, handle as usize, $scalar_typ, scalar_ptr, scalar);
             scalars.push(scalar.clone());
         }
-        $context.charge($gas_params.group_multi_scalar_mul($structure, num_elements))?;
+        $context.charge(ark_msm_bigint_wnaf_cost($proj_add_cost, $proj_double_cost, num_elements))?;
         let new_element: $element_typ =
             ark_ec::VariableBaseMSM::msm(bases.as_slice(), scalars.as_slice()).unwrap();
         let new_handle = store_element!($context, new_element);
@@ -169,20 +172,22 @@ pub fn multi_scalar_mul_internal(
     match (structure_opt, scalar_opt) {
         (Some(Structure::BLS12381G1Affine), Some(Structure::BLS12381Fr)) => {
             ark_msm_internal!(
-                gas_params,
                 context,
                 args,
-                Structure::BLS12381G1Affine,
+                gas_params.ark_bls12_381_g1_proj_to_affine,
+                gas_params.ark_bls12_381_g1_proj_add,
+                gas_params.ark_bls12_381_g1_proj_double,
                 ark_bls12_381::G1Projective,
                 ark_bls12_381::Fr
             )
         },
         (Some(Structure::BLS12381G2Affine), Some(Structure::BLS12381Fr)) => {
             ark_msm_internal!(
-                gas_params,
                 context,
                 args,
-                Structure::BLS12381G2Affine,
+                gas_params.ark_bls12_381_g2_proj_to_affine,
+                gas_params.ark_bls12_381_g2_proj_add,
+                gas_params.ark_bls12_381_g2_proj_double,
                 ark_bls12_381::G2Projective,
                 ark_bls12_381::Fr
             )

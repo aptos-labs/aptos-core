@@ -18,7 +18,7 @@ fn ark_msm_window_size(num_entries: usize) -> usize {
 }
 
 /// The approximate cost model of https://github.com/arkworks-rs/algebra/blob/v0.4.0/ec/src/scalar_mul/variable_base/mod.rs#L89.
-fn ark_msm_bigint_wnaf_cost(
+pub fn ark_msm_bigint_wnaf_cost(
     cost_add: InternalGasPerArg,
     cost_double: InternalGasPerArg,
     num_entries: usize,
@@ -96,22 +96,6 @@ pub struct GasParameters {
 }
 
 impl GasParameters {
-    pub fn group_multi_scalar_mul(&self, structure: Structure, num_entries: usize) -> InternalGas {
-        match structure {
-            Structure::BLS12381G1Affine => ark_msm_bigint_wnaf_cost(
-                self.ark_bls12_381_g1_proj_add,
-                self.ark_bls12_381_g1_proj_double,
-                num_entries,
-            ),
-            Structure::BLS12381G2Affine => ark_msm_bigint_wnaf_cost(
-                self.ark_bls12_381_g2_proj_add,
-                self.ark_bls12_381_g2_proj_double,
-                num_entries,
-            ),
-            _ => unreachable!(),
-        }
-    }
-
     pub fn hash_to(
         &self,
         suite: HashToStructureSuite,
