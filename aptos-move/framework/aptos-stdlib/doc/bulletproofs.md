@@ -16,7 +16,7 @@ Pedersen commitment <code>com</code> satisfies $v \in [0, 2^{num_bits})$. Curren
 -  [Function `verify_range_proof`](#0x1_bulletproofs_verify_range_proof)
 -  [Function `verify_range_proof_elgamal`](#0x1_bulletproofs_verify_range_proof_elgamal)
 -  [Function `verify_range_proof_custom_ck`](#0x1_bulletproofs_verify_range_proof_custom_ck)
--  [Function `verify_range_proof_custom_ck_elgamal`](#0x1_bulletproofs_verify_range_proof_custom_ck_elgamal)
+-  [Function `verify_range_proof_custom_valbase_elgamal`](#0x1_bulletproofs_verify_range_proof_custom_valbase_elgamal)
 -  [Function `verify_range_proof_internal`](#0x1_bulletproofs_verify_range_proof_internal)
 -  [Function `verify_range_proof_custom_ck_internal`](#0x1_bulletproofs_verify_range_proof_custom_ck_internal)
 -  [Specification](#@Specification_1)
@@ -252,8 +252,9 @@ for <code>num_bits</code> \in {8, 16, 32, 64}.
         <b>abort</b>(std::error::invalid_state(<a href="bulletproofs.md#0x1_bulletproofs_E_NATIVE_FUN_NOT_AVAILABLE">E_NATIVE_FUN_NOT_AVAILABLE</a>))
     };
 
-    <a href="bulletproofs.md#0x1_bulletproofs_verify_range_proof_internal">verify_range_proof_internal</a>(
+    <a href="bulletproofs.md#0x1_bulletproofs_verify_range_proof_custom_ck_internal">verify_range_proof_custom_ck_internal</a>(
         <a href="ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="elgamal.md#0x1_elgamal_get_value_component_compressed">elgamal::get_value_component_compressed</a>(ct)),
+	    &<a href="ristretto255.md#0x1_ristretto255_basepoint">ristretto255::basepoint</a>(), &<a href="elgamal.md#0x1_elgamal_get_point_from_pubkey">elgamal::get_point_from_pubkey</a>(pubkey),
         proof.bytes,
         num_bits,
         dst
@@ -303,15 +304,15 @@ for some randomness <code>r</code>) satisfies $v \in [0, 2^{num_bits})$. Only wo
 
 </details>
 
-<a name="0x1_bulletproofs_verify_range_proof_custom_ck_elgamal"></a>
+<a name="0x1_bulletproofs_verify_range_proof_custom_valbase_elgamal"></a>
 
-## Function `verify_range_proof_custom_ck_elgamal`
+## Function `verify_range_proof_custom_valbase_elgamal`
 
 Verifies a zero-knowledge range proof that the value <code>v</code> encrypted by <code>ct</code> (as v * val_base + r * rand_base,
 for some randomness <code>r</code>) satisfies $v \in [0, 2^{num_bits})$. Only works for <code>num_bits</code> \in {8, 16, 32, 64}.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bulletproofs.md#0x1_bulletproofs_verify_range_proof_custom_ck_elgamal">verify_range_proof_custom_ck_elgamal</a>(ct: &<a href="elgamal.md#0x1_elgamal_Ciphertext">elgamal::Ciphertext</a>, val_base: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, rand_base: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, proof: &<a href="bulletproofs.md#0x1_bulletproofs_RangeProof">bulletproofs::RangeProof</a>, num_bits: u64, dst: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool
+<pre><code><b>public</b> <b>fun</b> <a href="bulletproofs.md#0x1_bulletproofs_verify_range_proof_custom_valbase_elgamal">verify_range_proof_custom_valbase_elgamal</a>(ct: &<a href="elgamal.md#0x1_elgamal_Ciphertext">elgamal::Ciphertext</a>, val_base: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, rand_base: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, proof: &<a href="bulletproofs.md#0x1_bulletproofs_RangeProof">bulletproofs::RangeProof</a>, num_bits: u64, dst: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool
 </code></pre>
 
 
@@ -320,7 +321,7 @@ for some randomness <code>r</code>) satisfies $v \in [0, 2^{num_bits})$. Only wo
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bulletproofs.md#0x1_bulletproofs_verify_range_proof_custom_ck_elgamal">verify_range_proof_custom_ck_elgamal</a>(
+<pre><code><b>public</b> <b>fun</b> <a href="bulletproofs.md#0x1_bulletproofs_verify_range_proof_custom_valbase_elgamal">verify_range_proof_custom_valbase_elgamal</a>(
     ct: &<a href="elgamal.md#0x1_elgamal_Ciphertext">elgamal::Ciphertext</a>,
     val_base: &RistrettoPoint, rand_base: &RistrettoPoint,
     proof: &<a href="bulletproofs.md#0x1_bulletproofs_RangeProof">RangeProof</a>, num_bits: u64, dst: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool

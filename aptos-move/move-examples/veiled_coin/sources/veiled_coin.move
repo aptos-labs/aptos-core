@@ -352,11 +352,6 @@ module veiled_coin::veiled_coin {
 	assert!(bulletproofs::verify_range_proof_elgamal(&withdraw_amount, range_proof_transferred_amount, pubkey, MAX_BITS_IN_VALUE, VEILED_COIN_DST), ERANGE_PROOF_VERIFICATION_FAILED);
 
         coin_store.private_balance = elgamal::compress_ciphertext(&private_balance);
-
-        // Returns the withdrawn veiled coin
-        //VeiledCoin<CoinType> {
-        //    private_value
-        //}
     }
 
     //
