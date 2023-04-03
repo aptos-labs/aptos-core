@@ -834,7 +834,7 @@
           "color": { "mode": "continuous-RdYlGr" },
           "links": [],
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] },
           "unit": "none"
         },
         "overrides": []
@@ -996,7 +996,7 @@
           "color": { "mode": "continuous-RdYlGr" },
           "links": [],
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] },
           "unit": "none"
         },
         "overrides": []
@@ -2134,7 +2134,7 @@
   "refresh": "10s",
   "schemaVersion": 37,
   "style": "dark",
-  "tags": [],
+  "tags": ["aptos-core"],
   "templating": {
     "list": [
       {
@@ -2311,6 +2311,6 @@
   "timezone": "",
   "title": "Storage (Backup and Restore)",
   "uid": "9oXpx4n4z",
-  "version": 63,
+  "version": 65,
   "weekStart": ""
 }
