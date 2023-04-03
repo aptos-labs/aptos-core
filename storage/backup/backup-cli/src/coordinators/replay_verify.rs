@@ -159,6 +159,7 @@ impl ReplayVerifyCoordinator {
             Some(replay_transactions_from_version), /* replay_from_version */
             None,                                   /* epoch_history */
             self.verify_execution_mode.clone(),
+            None,
         )
         .run()
         .await?;

@@ -20,7 +20,7 @@ use anyhow::Result;
 use aptos_executor_types::VerifyExecutionMode;
 use aptos_logger::prelude::*;
 use aptos_types::transaction::Version;
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 pub struct VerifyCoordinator {
     storage: Arc<dyn BackupStorage>,
@@ -32,6 +32,7 @@ pub struct VerifyCoordinator {
     state_snapshot_before_version: Version,
     skip_epoch_endings: bool,
     validate_modules: bool,
+    output_transaction_analysis: Option<PathBuf>,
 }
 
 impl VerifyCoordinator {
@@ -45,6 +46,7 @@ impl VerifyCoordinator {
         state_snapshot_before_version: Version,
         skip_epoch_endings: bool,
         validate_modules: bool,
+        output_transaction_analysis: Option<PathBuf>,
     ) -> Result<Self> {
         Ok(Self {
             storage,
@@ -56,6 +58,7 @@ impl VerifyCoordinator {
             state_snapshot_before_version,
             skip_epoch_endings,
             validate_modules,
+            output_transaction_analysis,
         })
     }
 
@@ -145,6 +148,7 @@ impl VerifyCoordinator {
             None, /* replay_from_version */
             epoch_history,
             VerifyExecutionMode::NoVerify,
+            self.output_transaction_analysis,
         )
         .run()
         .await?;
