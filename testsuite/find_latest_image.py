@@ -16,9 +16,6 @@ import argparse
 import os
 import sys
 
-# the image name in the repo to search for the image tag in
-# all images are exported together, so this currently checks for validator-testing as well
-IMAGE_NAME = "aptos/validator"
 # the environment variable containing the image tag to check for existence
 IMAGE_TAG_ENV = "IMAGE_TAG"
 # if running in github actions, this is the output key that will contain the latest image tag
@@ -31,6 +28,12 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "--image-name",
+        "-i",
+        help="The name of the image to search for",
+        default="aptos/validator-testing",
+    )
+    parser.add_argument(
         "--variant",
         "-v",
         help="A build variant",
@@ -39,22 +42,25 @@ def main():
         default=[],
     )
     args = parser.parse_args()
+    image_name = args.image_name
 
     # If the IMAGE_TAG environment variable is set, check that
     if IMAGE_TAG_ENV in os.environ and os.environ[IMAGE_TAG_ENV]:
         image_tag = os.environ[IMAGE_TAG_ENV]
-        if not image_exists(shell, IMAGE_NAME, image_tag):
+        if not image_exists(shell, image_name, image_tag):
             sys.exit(1)
 
     variants = args.variants
-    print(f"Finding latest image with build variants: {variants}")
+    print(f"Finding latest {image_name} image with build variants: {variants}")
     variant_prefixes = [f"{v}_" if v != "" else "" for v in variants]
+    if "" not in variant_prefixes:
+        variant_prefixes.append("")  # search for the default release build as well
     print(f"With prefixes: {variant_prefixes}")
 
     # Find the latest image from git history
     num_images_to_find = 1  # for the purposes of this script, this is always 1
     images = list(
-        find_recent_images(shell, git, num_images_to_find, IMAGE_NAME, variant_prefixes)
+        find_recent_images(shell, git, num_images_to_find, image_name, variant_prefixes)
     )
     print(f"Found latest images: {images}")
 

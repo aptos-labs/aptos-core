@@ -1,5 +1,10 @@
-query getTokenActivities($idHash: String!) {
-  token_activities(where: { token_data_id_hash: { _eq: $idHash } }) {
+query getTokenActivities($idHash: String!, $offset: Int, $limit: Int) {
+  token_activities(
+    where: { token_data_id_hash: { _eq: $idHash } }
+    order_by: { transaction_version: desc }
+    offset: $offset
+    limit: $limit
+  ) {
     creator_address
     collection_name
     name

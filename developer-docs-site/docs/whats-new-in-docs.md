@@ -7,13 +7,17 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site. Note, this site is built from the `main` upstream branch of GitHub and so therefore reflects the latest changes to Aptos. If you have checked out [another branch](https://github.com/aptos-labs/aptos-core/branches) to use a [specific network](guides/system-integrators-guide.md#choose-a-network), the code may not yet have all of the features described here.
 
+## 28 March 2023
+
+- Offered an experimental feature to [profile gas usage locally](./cli-tools/aptos-cli-tool/use-aptos-cli.md#profiling-gas-use) via the Aptos CLI that not only simulates use but also generates flame graphs for visualizing gas usage.
+
 ## 27 March 2023
 
-- Described how to [Use the Remix IDE Plugin](./community/contributions/remix-ide-plugin.md) to deploy and run Move modules on the Remix IDE, a graphical interface for developing Move modules written by [0xhsy](https://github.com/0xhsy).
+- Described how to [Use the Remix IDE Plugin](./community/contributions/remix-ide-plugin.md) to deploy and run Move modules on the Remix IDE, a graphical interface for developing Move modules written by [0xhsy](https://github.com/0xhsy) of [WELLDONE Studio](https://docs.welldonestudio.io/).
 
 ## 24 March 2023
 
-- Added instructions to [Integrate with Aptos Names Service UI Package](./guides/aptos-name-service-connector.md) that offers developers a customizable button and modal to enable users to search for and mint Aptos names directly from their website.
+- Added instructions to [Integrate with Aptos Names Service](./guides/aptos-name-service-connector.md) that offers developers a customizable button and modal to enable users to search for and mint Aptos names directly from their website.
 
 ## 23 March 2023
 

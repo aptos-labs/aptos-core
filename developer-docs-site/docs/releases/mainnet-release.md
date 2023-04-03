@@ -27,4 +27,4 @@ Aptos SDK Release v1.7.2
 
 |Release | Docker Image Tag | Docker SHA-256 | Branch | Commit Hash|
 |---|---|---|---|---|
-|[Aptos Node Release v1.2.7](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.2.7)| [`aptos-node-v1.2.7`](https://hub.docker.com/layers/aptoslabs/validator/aptos-node-v1.2.7/images/sha256-b1c4ff8e15cfdfb140738f80f368068c7d68d97c2a205139d661cc6d82a65ea0?context=explore) | `b1c4ff8e15cfdfb140738f80f368068c7d68d97c2a205139d661cc6d82a65ea0` | [aptos-node-v1.2.7](https://github.com/aptos-labs/aptos-core/tree/aptos-node-v1.2.7)| `cc30c46ad41cd1577935466036eb1903b7cbc973` |
+|[Aptos Node Release v1.3.2](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.3.2)| [`aptos-node-v1.3.2`](https://hub.docker.com/layers/aptoslabs/validator/aptos-node-v1.3.2/images/sha256-8542f32b186005e1dc9eadda922fda6aa9ada7f25272b9a0e5e6ec535d5cdfdc?context=explore) | `sha256:8542f32b186005e1dc9eadda922fda6aa9ada7f25272b9a0e5e6ec535d5cdfdc` | [aptos-node-v1.3.2](https://github.com/aptos-labs/aptos-core/tree/aptos-node-v1.3.2)| `88bb502c81fbdbb194a64be1e62a10703d6bfa36` |
