@@ -78,6 +78,19 @@ pub fn native_format_impl(
             out.push(']');
         },
         MoveTypeLayout::Struct(MoveStructLayout::WithTypes { type_, fields, .. }) => {
+            if type_.name.as_str() == "String"
+                && type_.module.as_str() == "string"
+                && type_.address == AccountAddress::ONE
+            {
+                let v = val
+                    .value_as::<Struct>()?
+                    .unpack()?
+                    .next()
+                    .unwrap()
+                    .value_as::<Vec<u8>>()?;
+                write!(out, "\"{}\"", std::str::from_utf8(&v).unwrap()).unwrap();
+                return Ok(());
+            }
             let strct = val.value_as::<Struct>()?;
             out.push_str(type_.name.as_str());
             out.push_str(" {");
