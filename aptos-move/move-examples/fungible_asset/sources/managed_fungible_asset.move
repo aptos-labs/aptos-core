@@ -26,13 +26,17 @@ module fungible_asset::managed_fungible_asset {
     /// Initialize metadata object and store the refs.
     fun init_module(admin: &signer) {
         let constructor_ref = &object::create_named_object(admin, ASSET_SYMBOL);
-        let (mint_ref, transfer_ref, burn_ref) = fungible_asset::make_object_fungible(
+        fungible_asset::make_object_fungible(
             constructor_ref,
             0, /* maximum_supply. 0 means no maximum */
             utf8(b"Aptos Token"), /* name */
             utf8(ASSET_SYMBOL), /* symbol */
             8, /* decimals */
         );
+
+        let mint_ref = fungible_asset::generate_mint_ref(constructor_ref);
+        let burn_ref = fungible_asset::generate_burn_ref(constructor_ref);
+        let transfer_ref = fungible_asset::generate_transfer_ref(constructor_ref);
         let metadata_object_signer = object::generate_signer(constructor_ref);
         move_to(
             &metadata_object_signer,
