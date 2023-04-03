@@ -13,10 +13,10 @@ pub mod hash;
 mod helpers;
 pub mod object;
 pub mod state_storage;
+pub mod string_utils;
 pub mod transaction_context;
 pub mod type_info;
 pub mod util;
-pub mod string_utils;
 
 use crate::natives::cryptography::multi_ed25519;
 use aggregator_natives::{aggregator, aggregator_factory};
@@ -201,7 +201,7 @@ impl GasParameters {
             string_utils: string_utils::GasParameters {
                 base: 0.into(),
                 per_byte: 0.into(),
-            }
+            },
         }
     }
 }
