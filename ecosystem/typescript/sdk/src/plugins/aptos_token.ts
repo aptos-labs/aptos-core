@@ -27,14 +27,32 @@ export class AptosToken {
   }
 
   /**
+   * Creates a new collection within the specified account
    *
+   * @param account AptosAccount where collection will be created
+   * @param description Collection description
+   * @param name Collection name
+   * @param uri URL to additional info about collection
+   * @param maxSupply Maximum number of `token_data` allowed within this collection
+   * @param royaltyNumerator The numerator for calculating royalty
+   * @param royaltyDenominator The denominator for calculating royalty
+   * @param mutableDescription Whether the description in mutable
+   * @param mutableRoyalty Whether the royalt in mutable
+   * @param mutableURI Whether the URI in mutable
+   * @param mutableTokenDescription Whether the token description in mutable
+   * @param mutableTokenName Whether the token name in mutable
+   * @param mutableTokenProperties Whether the token properties are mutable
+   * @param mutableTokenURI Whether the token URI in mutable
+   * @param tokensBurnableByCreator Whether token burnable by creator
+   * @param tokensFreezableByCreator Whether token freezable by creator
+   * @returns The hash of the transaction submitted to the API
    */
   async createCollection(
     account: AptosAccount,
     description: string,
-    maxSupply: AnyNumber = MAX_U64_BIG_INT,
     name: string,
     uri: string,
+    maxSupply: AnyNumber = MAX_U64_BIG_INT,
     royaltyNumerator: number = 0,
     royaltyDenominator: number = 0,
     mutableDescription: boolean = true,
@@ -47,7 +65,7 @@ export class AptosToken {
     tokensBurnableByCreator: boolean = true,
     tokensFreezableByCreator: boolean = true,
     extraArgs?: OptionalTransactionArgs,
-  ) {
+  ): Promise<string> {
     const builder = new TransactionBuilderRemoteABI(this.provider.aptosClient, {
       sender: account.address(),
       ...extraArgs,
@@ -79,7 +97,17 @@ export class AptosToken {
   }
 
   /**
+   * Mint a new token within the specified account
    *
+   * @param account AptosAccount where token will be created
+   * @param collection Name of collection, that token belongs to
+   * @param description Token description
+   * @param name Token name
+   * @param uri URL to additional info about token
+   * @param propertyKeys the property keys for storing on-chain properties
+   * @param propertyTypes the type of property values
+   * @param propertyValues the property values to be stored on-chain
+   * @returns The hash of the transaction submitted to the API
    */
   async mint(
     account: AptosAccount,
@@ -91,7 +119,7 @@ export class AptosToken {
     propertyTypes: Array<string> = [],
     propertyValues: Array<string> = [],
     extraArgs?: OptionalTransactionArgs,
-  ) {
+  ): Promise<string> {
     const builder = new TransactionBuilderRemoteABI(this.provider.aptosClient, {
       sender: account.address(),
       ...extraArgs,
@@ -114,18 +142,32 @@ export class AptosToken {
     return pendingTransaction.hash;
   }
 
+  /**
+   * Mint a soul bound token into a recipient's account
+   *
+   * @param account AptosAccount that mints the token
+   * @param collection Name of collection, that token belongs to
+   * @param description Token description
+   * @param name Token name
+   * @param uri URL to additional info about token
+   * @param recipient AptosAccount where token will be created
+   * @param propertyKeys the property keys for storing on-chain properties
+   * @param propertyTypes the type of property values
+   * @param propertyValues the property values to be stored on-chain
+   * @returns The hash of the transaction submitted to the API
+   */
   async mintSoulBound(
     account: AptosAccount,
     collection: string,
     description: string,
     name: string,
     uri: string,
-    propertyKeys: Array<string>,
-    propertyTypes: Array<string>,
-    propertyValues: Array<string>,
-    soulBoundTo: AptosAccount,
+    recipient: AptosAccount,
+    propertyKeys: Array<string> = [],
+    propertyTypes: Array<string> = [],
+    propertyValues: Array<string> = [],
     extraArgs?: OptionalTransactionArgs,
-  ) {
+  ): Promise<string> {
     const builder = new TransactionBuilderRemoteABI(this.provider.aptosClient, {
       sender: account.address(),
       ...extraArgs,
@@ -141,7 +183,7 @@ export class AptosToken {
         propertyKeys,
         propertyTypes,
         getPropertyValueRaw(propertyValues, propertyTypes),
-        soulBoundTo.address().hex(),
+        recipient.address().hex(),
       ],
     );
     const bcsTxn = AptosClient.generateBCSTransaction(account, rawTxn);
