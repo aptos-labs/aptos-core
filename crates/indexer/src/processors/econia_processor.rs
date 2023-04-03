@@ -1,7 +1,7 @@
 #![allow(dead_code, unused_variables)]
 
 use anyhow::Context;
-use econia_types::order::Order;
+use econia_types::order::{Order, OrderState, Side};
 use std::{
     collections::{BTreeMap, HashMap},
     sync::RwLock,
@@ -22,12 +22,12 @@ use crate::{
 use aptos_api_types::Transaction;
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
-use bigdecimal::BigDecimal;
+use bigdecimal::{BigDecimal, ToPrimitive};
 use chrono::{DateTime, Utc};
 use crossbeam::channel;
 use dashmap::DashMap;
 use diesel::{result::Error, PgConnection};
-use econia_db::models::{self, market::MarketEventType, IntoInsertable};
+use econia_db::models::{self, events::MakerEventType, market::MarketEventType, IntoInsertable};
 use field_count::FieldCount;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
@@ -222,8 +222,8 @@ enum MarketAction {
 }
 
 struct OrderBook {
-    asks: BTreeMap<BigDecimal, Vec<Order>>,
-    bids: BTreeMap<BigDecimal, Vec<Order>>,
+    asks: BTreeMap<u64, Vec<Order>>,
+    bids: BTreeMap<u64, Vec<Order>>,
 }
 
 impl OrderBook {
@@ -239,11 +239,12 @@ struct EconiaRedisCacher {
     redis_client: redis::Client,
     config: RedisConfig,
     // mkt_id => OrderBook
-    books: HashMap<BigDecimal, OrderBook>,
+    books: HashMap<u64, OrderBook>,
     market_rx: channel::Receiver<MarketAction>,
     event_rx: channel::Receiver<EventWrapper>,
 }
 
+// TODO use redis pub/sub
 impl EconiaRedisCacher {
     fn new(
         config: RedisConfig,
@@ -268,6 +269,7 @@ impl EconiaRedisCacher {
         let mut cmd = redis::cmd("HSET");
         cmd.arg(&self.config.markets).arg(mkt_id.to_string()).arg(1);
         cmd.query::<usize>(conn)?;
+        let mkt_id = mkt_id.to_u64().expect("failed to convert to u64");
 
         if self.books.get(&mkt_id).is_none() {
             self.books.insert(mkt_id, OrderBook::new());
@@ -284,7 +286,8 @@ impl EconiaRedisCacher {
         let mut cmd = redis::cmd("HDEL");
         cmd.arg(&self.config.markets).arg(mkt_id.to_string());
         cmd.query::<usize>(conn)?;
-        self.books.remove(mkt_id);
+        let mkt_id = mkt_id.to_u64().expect("failed to convert to u64");
+        self.books.remove(&mkt_id);
         Ok(())
     }
 
@@ -304,7 +307,36 @@ impl EconiaRedisCacher {
         conn: &mut redis::Connection,
         e: MakerEvent,
     ) -> anyhow::Result<()> {
-        todo!()
+        let Some(book) = self.books.get_mut(&e.market_id) else {
+            panic!("invalid state, market is missing")
+        };
+
+        match MakerEventType::try_from(e.event_type)? {
+            MakerEventType::Cancel => todo!(),
+            MakerEventType::Change => todo!(),
+            MakerEventType::Evict => todo!(),
+            MakerEventType::Place => {
+                let side = e.side.into();
+                let o = Order {
+                    market_order_id: e.market_order_id,
+                    market_id: e.market_id,
+                    side,
+                    size: e.size,
+                    price: e.price,
+                    user_address: e.user_address.to_hex_literal(),
+                    custodian_id: e.custodian_id,
+                    order_state: OrderState::Open,
+                    created_at: *CURRENT_BLOCK_TIME.read().unwrap(),
+                };
+
+                if side == Side::Ask {
+                    book.asks.entry(e.price).or_default().push(o);
+                } else {
+                    book.bids.entry(e.price).or_default().push(o);
+                }
+            },
+        };
+        Ok(())
     }
 
     fn handle_taker_event(
