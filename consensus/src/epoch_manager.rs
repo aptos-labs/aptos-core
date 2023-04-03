@@ -135,6 +135,8 @@ pub struct EpochManager {
     batch_retrieval_tx:
         Option<aptos_channel::Sender<AccountAddress, IncomingBatchRetrievalRequest>>,
     bounded_executor: BoundedExecutor,
+    // recovery_mode is set to true when the recovery manager is spawned
+    recovery_mode: bool,
 }
 
 impl EpochManager {
@@ -180,6 +182,7 @@ impl EpochManager {
             quorum_store_storage,
             batch_retrieval_tx: None,
             bounded_executor,
+            recovery_mode: false
         }
     }
 
@@ -426,6 +429,8 @@ impl EpochManager {
     }
 
     async fn initiate_new_epoch(&mut self, proof: EpochChangeProof) -> anyhow::Result<()> {
+        // The recovery manager exits before starting a new epoch. So, we unset the recovery_mode flag here.
+        self.recovery_mode = false;
         let ledger_info = proof
             .verify(self.epoch_state())
             .context("[EpochManager] Invalid EpochChangeProof")?;
@@ -589,7 +594,8 @@ impl EpochManager {
             self.storage.clone(),
             self.commit_state_computer.clone(),
             ledger_data.committed_round(),
-        );
+            );
+        self.recovery_mode = true;
         tokio::spawn(recovery_manager.start(recovery_manager_rx, close_rx));
     }
 
@@ -947,6 +953,9 @@ impl EpochManager {
         peer_id: AccountAddress,
         event: &UnverifiedEvent,
     ) -> anyhow::Result<()> {
+        if self.recovery_mode {
+            return Ok(());
+        }
         match event {
             UnverifiedEvent::BatchMsg(_)
             | UnverifiedEvent::SignedBatchInfo(_)
