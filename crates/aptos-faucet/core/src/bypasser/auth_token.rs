@@ -4,7 +4,7 @@
 use super::BypasserTrait;
 use crate::{
     checkers::CheckerData,
-    common::{AuthTokenManager, AuthTokenManagerConfig},
+    common::{ListManager, ListManagerConfig},
 };
 use anyhow::Result;
 use aptos_logger::info;
@@ -12,15 +12,15 @@ use async_trait::async_trait;
 use poem::http::header::AUTHORIZATION;
 
 pub struct AuthTokenBypasser {
-    pub manager: AuthTokenManager,
+    pub manager: ListManager,
 }
 
 impl AuthTokenBypasser {
-    pub fn new(config: AuthTokenManagerConfig) -> Result<Self> {
-        let manager = AuthTokenManager::new(config)?;
+    pub fn new(config: ListManagerConfig) -> Result<Self> {
+        let manager = ListManager::new(config)?;
         info!(
             "Loaded {} auth tokens into AuthTokenBypasser",
-            manager.num_auth_tokens()
+            manager.num_items()
         );
         Ok(Self { manager })
     }
@@ -38,6 +38,6 @@ impl BypasserTrait for AuthTokenBypasser {
             Some(auth_token) => auth_token,
             None => return Ok(false),
         };
-        Ok(self.manager.contains_auth_token(auth_token))
+        Ok(self.manager.contains(auth_token))
     }
 }

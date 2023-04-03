@@ -169,7 +169,9 @@ import { NODE_URL, FAUCET_URL } from "./common";
   const indexerLedgerInfo = await provider.getIndexerLedgerInfo();
   const fullNodeChainId = await provider.getChainId();
 
-  console.log(`\n fullnode chain id is: ${fullNodeChainId}, indexer chain id is: ${indexerLedgerInfo}`);
+  console.log(
+    `\n fullnode chain id is: ${fullNodeChainId}, indexer chain id is: ${indexerLedgerInfo.ledger_infos[0].chain_id}`,
+  );
 
   if (indexerLedgerInfo.ledger_infos[0].chain_id !== fullNodeChainId) {
     console.log(`\n fullnode chain id and indexer chain id are not synced, skipping rest of tests`);
