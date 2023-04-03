@@ -55,6 +55,8 @@ module veiled_coin::veiled_coin {
     // Core data structures.
     //
 
+    // TODO: Make wrapper struct for overall veiled coin withdrawal proof, VeiledWithdrawalProof
+
     /// Main structure representing a coin in an account's custody.
     struct VeiledCoin<phantom CoinType> {
         /// ElGamal ciphertext of a number of coins v \in [0, 2^{32}), an invariant
@@ -199,19 +201,6 @@ module veiled_coin::veiled_coin {
         &coin.private_value
     }
 
-    /// Returns true if the balance at address `owner` equals `value`, which should be useful for auditability. Requires
-    /// the ElGamal ciphertext randomness as an auxiliary input.
-    public fun verify_opened_balance<CoinType>(owner: address, pubkey: &Pubkey, value: u64, randomness: &Scalar): bool acquires VeiledCoinStore {
-        // compute the expected committed balance
-        let value = new_scalar_from_u64(value);
-        let expected_ct = elgamal::new_ciphertext_with_basepoint(&value, randomness, pubkey);
-
-        // get the actual committed balance
-        let actual_ct = elgamal::decompress_ciphertext(&private_balance<CoinType>(owner));
-
-        elgamal::ciphertext_equals(&actual_ct, &expected_ct)
-    }
-
     /// Initializes a veiled coin store for the specified account.
     public fun register<CoinType>(account: &signer) {
         let account_addr = signer::address_of(account);
@@ -272,25 +261,6 @@ module veiled_coin::veiled_coin {
 
         deposit(recipient, vc);
     }
-
-    /// Sends the specified public amount to `recipient` and updates the private balance of `sender`. Requires a range
-    /// proof on the new balance of the sender, to ensure the sender has enough money to send, in addition to a range proof on the transferred amount. 
-    // TODO: Work out weird move-isms here
-    /*public fun transfer_publicly_to<CoinType>(
-        sender: &signer,
-        recipient: address,
-        public_amount: u64,
-        range_proof_updated_balance: &RangeProof,
-	range_proof_transferred_amount: &RangeProof)
-    acquires VeiledCoinStore {
-        let no_rand_ct = elgamal::new_ciphertext_no_randomness(&new_scalar_from_u64(public_amount));
-
-        withdraw<CoinType>(sender, no_rand_ct, range_proof_updated_balance, range_proof_transferred_amount);
-
-	let vc = VeiledCoin<CoinType> { private_value: no_rand_ct };
-
-        deposit(recipient, vc);
-    }*/
 
     /// Deposits a veiled coin at address `to_addr`.
     public fun deposit<CoinType>(to_addr: address, coin: VeiledCoin<CoinType>) acquires VeiledCoinStore {
