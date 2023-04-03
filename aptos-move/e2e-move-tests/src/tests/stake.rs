@@ -209,8 +209,7 @@ fn test_staking_rewards() {
     assert_success!(harness.run(txn));
 
     // Parameters from the proposal.
-    let one_year_in_micros: u64 = 365 * 24 * 60 * 60 * 1_000_000;
-    let one_year_in_secs: u64 = one_year_in_micros / 1_000_000;
+    let one_year_in_secs: u64 = 365 * 24 * 60 * 60;
     let mut rewards_rate: u64 = 100;
     let min_rewards_rate: u64 = 30;
     let rewards_rate_denominator: u64 = 10000;
@@ -224,32 +223,58 @@ fn test_staking_rewards() {
     harness.new_epoch();
     stake_amount_1 += stake_amount_1 * rewards_rate / rewards_rate_denominator;
     stake_amount_2 += stake_amount_2 * rewards_rate / rewards_rate_denominator;
-    assert_eq!(
-        get_stake_pool(&harness, &validator_1_address).active,
-        stake_amount_1
+    // The calculation uses fixed_point64 so we allow errors up to 1.
+    assert!(
+        stake_amount_1 - 1 <= get_stake_pool(&harness, &validator_1_address).active
+            && get_stake_pool(&harness, &validator_1_address).active <= stake_amount_1 + 1
     );
-    assert_eq!(
-        get_stake_pool(&harness, &validator_2_address).active,
-        stake_amount_2
+    assert!(
+        stake_amount_2 - 1 <= get_stake_pool(&harness, &validator_2_address).active
+            && get_stake_pool(&harness, &validator_2_address).active <= stake_amount_2 + 1
     );
+    stake_amount_1 = get_stake_pool(&harness, &validator_1_address).active;
+    stake_amount_2 = get_stake_pool(&harness, &validator_2_address).active;
 
-    // 1 year passed. Rewards rate halves. New rewards rate is 0.5% every epoch.
+    // 0.5 year passed. Rewards rate halves. Rewards rate doesn't change.
     // Both validators propose a block in the current epoch. Both should receive rewards.
     harness.new_block_with_metadata(validator_1_address, vec![]);
     harness.new_block_with_metadata(validator_2_address, vec![]);
-    harness.fast_forward(one_year_in_secs);
+    harness.fast_forward(one_year_in_secs / 2);
+    harness.new_epoch();
+    stake_amount_1 += stake_amount_1 * rewards_rate / rewards_rate_denominator;
+    stake_amount_2 += stake_amount_2 * rewards_rate / rewards_rate_denominator;
+    // The calculation uses fixed_point64 so we allow errors up to 1.
+    assert!(
+        stake_amount_1 - 1 <= get_stake_pool(&harness, &validator_1_address).active
+            && get_stake_pool(&harness, &validator_1_address).active <= stake_amount_1 + 1
+    );
+    assert!(
+        stake_amount_2 - 1 <= get_stake_pool(&harness, &validator_2_address).active
+            && get_stake_pool(&harness, &validator_2_address).active <= stake_amount_2 + 1
+    );
+    stake_amount_1 = get_stake_pool(&harness, &validator_1_address).active;
+    stake_amount_2 = get_stake_pool(&harness, &validator_2_address).active;
+
+    // Another 0.5 year passed. Rewards rate halves. New rewards rate is 0.5% every epoch.
+    // Both validators propose a block in the current epoch. Both should receive rewards.
+    harness.new_block_with_metadata(validator_1_address, vec![]);
+    harness.new_block_with_metadata(validator_2_address, vec![]);
+    harness.fast_forward(one_year_in_secs / 2);
     harness.new_epoch();
     rewards_rate = rewards_rate * rewards_rate_decrease_rate_bps / bps_denominator;
     stake_amount_1 += stake_amount_1 * rewards_rate / rewards_rate_denominator;
     stake_amount_2 += stake_amount_2 * rewards_rate / rewards_rate_denominator;
-    assert_eq!(
-        get_stake_pool(&harness, &validator_1_address).active,
-        stake_amount_1
+    // The calculation uses fixed_point64 so we allow errors up to 1.
+    assert!(
+        stake_amount_1 - 1 <= get_stake_pool(&harness, &validator_1_address).active
+            && get_stake_pool(&harness, &validator_1_address).active <= stake_amount_1 + 1
     );
-    assert_eq!(
-        get_stake_pool(&harness, &validator_2_address).active,
-        stake_amount_2
+    assert!(
+        stake_amount_2 - 1 <= get_stake_pool(&harness, &validator_2_address).active
+            && get_stake_pool(&harness, &validator_2_address).active <= stake_amount_2 + 1
     );
+    stake_amount_1 = get_stake_pool(&harness, &validator_1_address).active;
+    stake_amount_2 = get_stake_pool(&harness, &validator_2_address).active;
 
     // Another year passed. Rewards rate halves but it cannot be lower than 0.3%.
     // New rewards rate is 0.3% every epoch.
@@ -259,13 +284,14 @@ fn test_staking_rewards() {
     harness.new_epoch();
     rewards_rate = min_rewards_rate;
     stake_amount_1 += stake_amount_1 * rewards_rate / rewards_rate_denominator / 2;
-    assert_eq!(
-        get_stake_pool(&harness, &validator_1_address).active,
-        stake_amount_1
+    // The calculation uses fixed_point64 so we allow errors up to 1.
+    assert!(
+        stake_amount_1 - 1 <= get_stake_pool(&harness, &validator_1_address).active
+            && get_stake_pool(&harness, &validator_1_address).active <= stake_amount_1 + 1
     );
-    assert_eq!(
-        get_stake_pool(&harness, &validator_2_address).active,
-        stake_amount_2
+    assert!(
+        stake_amount_2 - 1 <= get_stake_pool(&harness, &validator_2_address).active
+            && get_stake_pool(&harness, &validator_2_address).active <= stake_amount_2 + 1
     );
 }
 
