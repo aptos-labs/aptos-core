@@ -11,6 +11,10 @@
 -  [Constants](#@Constants_0)
 -  [Function `cons`](#0x1_string_utils_cons)
 -  [Function `nil`](#0x1_string_utils_nil)
+-  [Function `car`](#0x1_string_utils_car)
+-  [Function `cdr`](#0x1_string_utils_cdr)
+-  [Function `car_mut`](#0x1_string_utils_car_mut)
+-  [Function `cdr_mut`](#0x1_string_utils_cdr_mut)
 -  [Function `format`](#0x1_string_utils_format)
 -  [Function `format_list`](#0x1_string_utils_format_list)
 
@@ -176,6 +180,102 @@
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_nil">nil</a>(): <a href="string_utils.md#0x1_string_utils_NIL">NIL</a> { <a href="string_utils.md#0x1_string_utils_NIL">NIL</a> {} }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_string_utils_car"></a>
+
+## Function `car`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_car">car</a>&lt;T, N&gt;(c: &<a href="string_utils.md#0x1_string_utils_Cons">string_utils::Cons</a>&lt;T, N&gt;): &T
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_car">car</a>&lt;T, N&gt;(c: &<a href="string_utils.md#0x1_string_utils_Cons">Cons</a>&lt;T, N&gt;): &T {
+    &c.car
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_string_utils_cdr"></a>
+
+## Function `cdr`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_cdr">cdr</a>&lt;T, N&gt;(c: &<a href="string_utils.md#0x1_string_utils_Cons">string_utils::Cons</a>&lt;T, N&gt;): &N
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_cdr">cdr</a>&lt;T, N&gt;(c: &<a href="string_utils.md#0x1_string_utils_Cons">Cons</a>&lt;T, N&gt;): &N {
+    &c.cdr
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_string_utils_car_mut"></a>
+
+## Function `car_mut`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_car_mut">car_mut</a>&lt;T, N&gt;(c: &<b>mut</b> <a href="string_utils.md#0x1_string_utils_Cons">string_utils::Cons</a>&lt;T, N&gt;): &<b>mut</b> T
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_car_mut">car_mut</a>&lt;T, N&gt;(c: &<b>mut</b> <a href="string_utils.md#0x1_string_utils_Cons">Cons</a>&lt;T, N&gt;): &<b>mut</b> T {
+    &<b>mut</b> c.car
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_string_utils_cdr_mut"></a>
+
+## Function `cdr_mut`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_cdr_mut">cdr_mut</a>&lt;T, N&gt;(c: &<b>mut</b> <a href="string_utils.md#0x1_string_utils_Cons">string_utils::Cons</a>&lt;T, N&gt;): &<b>mut</b> N
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_cdr_mut">cdr_mut</a>&lt;T, N&gt;(c: &<b>mut</b> <a href="string_utils.md#0x1_string_utils_Cons">Cons</a>&lt;T, N&gt;): &<b>mut</b> N {
+    &<b>mut</b> c.cdr
+}
 </code></pre>
 
 
