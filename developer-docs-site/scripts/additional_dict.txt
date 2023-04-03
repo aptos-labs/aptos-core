@@ -121,8 +121,6 @@ Grafana
 GraphQL
 HSM
 Homebrew
-hippospace
-hotfix
 HotStuff
 IDE
 IDEs
@@ -140,6 +138,8 @@ Labs's
 Leaderboard
 Liveness
 MOV
+MSVC
+MVM
 Mainnet
 Mainnnet
 ManagedCoin
@@ -149,7 +149,6 @@ Modularity
 Monterey
 MoonCoin
 MoveVM
-MSVC
 MultiEd
 Multinode
 Multisignature
@@ -173,13 +172,16 @@ PFNs
 PID
 PNG
 Parallelization
+Paymagic
 Petra
+PoS
 Pontem
 Postgres
 PowerShell
 PropertyMap
 PropertyMap
 Prover
+PureEdDSA
 PyPi
 Quickstart
 RBAC
@@ -246,6 +248,7 @@ Validator
 Validators
 Vm
 WAV
+WELLDONE
 WSL
 Waypoint
 WebGL
@@ -274,6 +277,7 @@ backend
 backfill
 balancer
 bcs
+bft
 bitwise
 blockchain
 blockchain's
@@ -293,12 +297,12 @@ clippy
 cn
 codebase
 config
-customizable
 configs
 const
 copyable
 cryptographic
 cryptographically
+customizable
 dApp
 dApps
 dapp
@@ -338,11 +342,15 @@ gcs
 groupId
 haproxy
 hardcoded
+hippospace
+hotfix
+hotstuff
 href
 http
 ide
 ie
 img
+incrementing
 init
 instantiation
 integrations
@@ -400,7 +408,6 @@ overline
 parallelizable
 parallelization
 param
-Paymagic
 pdf
 performant
 permissioned
@@ -428,6 +435,7 @@ quickstarts
 repo
 repos
 requiers
+rpc
 ruleset
 runtime
 sandboxed
@@ -503,7 +511,6 @@ vm
 walkthrough
 waypoint
 webapp
-WELLDONE
 whitepaper
 withdrawable
 xlarge
