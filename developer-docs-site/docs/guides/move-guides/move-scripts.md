@@ -5,7 +5,7 @@ slug: "move-scripts"
 
 # Move Scripts
 
-This tutorial explains how to write and execute a Move script. You can use Move scripts to execute an arbitrary piece of code as the transaction payload.
+This tutorial explains how to write and execute a Move script. You can use Move scripts to execute a series of commands across published Move module interfaces.
 
 ## Example use case
 

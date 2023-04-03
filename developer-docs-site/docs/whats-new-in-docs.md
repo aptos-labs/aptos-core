@@ -9,7 +9,7 @@ This page shows the key updates to the developer documentation on this site. Not
 
 ## 30 March 2023
 
-- Depicted how to employ [Move scripts](./guides/move-guides/move-scripts.md) to execute an arbitrary piece of code as the transaction payload in an example workflow.
+- Depicted how to employ [Move scripts](./guides/move-guides/move-scripts.md) to execute a series of commands across published Move module interfaces.
 
 ## 28 March 2023
 
