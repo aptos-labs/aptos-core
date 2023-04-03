@@ -20,6 +20,39 @@ use move_vm_types::{
 };
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, fmt::Write, ops::Deref, sync::Arc};
+use move_core_types::value::MoveFieldLayout;
+
+pub fn format_vector(
+    context: &mut SafeNativeContext,
+    base_gas: InternalGas,
+    v: Vec<(&MoveTypeLayout, Value)>,
+    out: &mut String,
+) -> SafeNativeResult<()> {
+    for (i, (ty, val)) in v.into_iter().enumerate() {
+        if i > 0 {
+            out.push_str(", ");
+        }
+        native_format_impl(context, base_gas, ty, val, out)?;
+    };
+    Ok(())
+}
+
+pub fn format_vector_with_fields(
+    context: &mut SafeNativeContext,
+    base_gas: InternalGas,
+    fields: &[MoveFieldLayout],
+    strct: Struct,
+    out: &mut String,
+) -> SafeNativeResult<()> {
+    for (i, (ty, x)) in fields.iter().zip(strct.unpack()?).enumerate() {
+        if i > 0 {
+            out.push_str(", ");
+        }
+        write!(out, "{}: ", ty.name).unwrap();
+        native_format_impl(context, base_gas, &ty.layout, x, out)?;
+    }
+    Ok(())
+}
 
 pub fn native_format_impl(
     context: &mut SafeNativeContext,
@@ -69,12 +102,7 @@ pub fn native_format_impl(
         MoveTypeLayout::Vector(ty) => {
             let v = val.value_as::<Vec<Value>>()?;
             out.push('[');
-            for (i, x) in v.into_iter().enumerate() {
-                if i > 0 {
-                    out.push_str(", ");
-                }
-                native_format_impl(context, base_gas, ty.as_ref(), x, out)?;
-            }
+            format_vector(context, base_gas, v.into_iter().map(|x| (ty.as_ref(), x)).collect(), out)?;
             out.push(']');
         },
         MoveTypeLayout::Struct(MoveStructLayout::WithTypes { type_, fields, .. }) => {
@@ -92,39 +120,21 @@ pub fn native_format_impl(
                 return Ok(());
             }
             let strct = val.value_as::<Struct>()?;
-            out.push_str(type_.name.as_str());
-            out.push_str(" {");
-            for (i, (ty, x)) in fields.iter().zip(strct.unpack()?).enumerate() {
-                if i > 0 {
-                    out.push_str(", ");
-                }
-                write!(out, "{}: ", ty.name).unwrap();
-                native_format_impl(context, base_gas, &ty.layout, x, out)?;
-            }
+            write!(out, "{} {{", type_.name.as_str()).unwrap();
+            format_vector_with_fields(context, base_gas, &fields, strct, out)?;
             out.push('}');
         },
         MoveTypeLayout::Struct(MoveStructLayout::WithFields(fields)) => {
             let strct = val.value_as::<Struct>()?;
             out.push('{');
-            for (i, (ty, x)) in fields.iter().zip(strct.unpack()?).enumerate() {
-                if i > 0 {
-                    out.push_str(", ");
-                }
-                write!(out, "{}: ", ty.name).unwrap();
-                native_format_impl(context, base_gas, &ty.layout, x, out)?;
-            }
+            format_vector_with_fields(context, base_gas, &fields, strct, out)?;
             out.push('}');
         },
         MoveTypeLayout::Struct(MoveStructLayout::Runtime(fields)) => {
             let strct = val.value_as::<Struct>()?;
-            out.push('(');
-            for (i, (ty, x)) in fields.iter().zip(strct.unpack()?).enumerate() {
-                if i > 0 {
-                    out.push_str(", ");
-                }
-                native_format_impl(context, base_gas, ty, x, out)?;
-            }
-            out.push(')');
+            out.push('{');
+            format_vector(context, base_gas, fields.iter().zip(strct.unpack()?).collect(), out)?;
+            out.push('}');
         },
     };
     Ok(())
