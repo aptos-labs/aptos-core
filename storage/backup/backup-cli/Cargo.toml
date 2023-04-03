@@ -33,6 +33,7 @@ async-trait = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
 clap = { workspace = true }
+csv = { workspace = true }
 futures = { workspace = true }
 itertools = { workspace = true }
 move-binary-format = { workspace = true }

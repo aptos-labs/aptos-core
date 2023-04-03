@@ -22,7 +22,7 @@ use aptos_backup_cli::{
 };
 use aptos_types::transaction::Version;
 use clap::{Parser, Subcommand};
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 /// Supports one-time and continuous backup, including querying the backup service and verifying the backup.
 #[derive(Subcommand)]
@@ -154,6 +154,12 @@ pub struct VerifyOpt {
     skip_epoch_endings: bool,
     #[clap(long, help = "While verifying a snapshot, run module validation.")]
     validate_modules: bool,
+    #[clap(
+        long,
+        parse(from_os_str),
+        help = "Optionally, while verifying transactions, output analysis files to specified dir."
+    )]
+    output_transaction_analysis: Option<PathBuf>,
 }
 
 impl Command {
@@ -236,6 +242,7 @@ impl Command {
                     opt.state_snapshot_before_version.unwrap_or(Version::MAX),
                     opt.skip_epoch_endings,
                     opt.validate_modules,
+                    opt.output_transaction_analysis,
                 )?
                 .run()
                 .await?
