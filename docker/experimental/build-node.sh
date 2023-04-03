@@ -14,7 +14,7 @@ echo "CARGO_TARGET_DIR: $CARGO_TARGET_DIR"
 # Build and overwrite the aptos-node binary with features if specified
 if [ -n "$FEATURES" ]; then
     echo "Building aptos-node with features ${FEATURES}"
-    (cd aptos-node && cargo build --profile=$PROFILE --features=$FEATURES "$@")
+    cargo build --profile=$PROFILE --features=$FEATURES -p aptos-node "$@"
 else 
     # Build aptos-node separately
     cargo build --locked --profile=$PROFILE \

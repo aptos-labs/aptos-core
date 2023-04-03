@@ -1181,9 +1181,10 @@ impl CliCommand<()> for RunLocalTestnet {
             }
 
             if !started_successfully {
-                return Err(CliError::UnexpectedError(
-                    "Failed to startup local node before faucet".to_string(),
-                ));
+                return Err(CliError::UnexpectedError(format!(
+                    "Local node at {} did not start up before faucet",
+                    rest_url
+                )));
             }
 
             // Build the config for the faucet service.
