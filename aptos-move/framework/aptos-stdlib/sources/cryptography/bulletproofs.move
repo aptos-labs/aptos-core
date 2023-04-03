@@ -79,7 +79,6 @@ module aptos_std::bulletproofs {
 
     /// Verifies a zero-knowledge range proof that the value `v` encrypted by `ct` satisfies $v \in [0, 2^{num_bits})$. Only works
     /// for `num_bits` \in {8, 16, 32, 64}.
-    // TODO: Use public key here
     public fun verify_range_proof_elgamal(ct: &elgamal::Ciphertext, proof: &RangeProof, pubkey: &elgamal::Pubkey, num_bits: u64, dst: vector<u8>): bool {
         if(!features::bulletproofs_enabled()) {
             abort(std::error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE))
