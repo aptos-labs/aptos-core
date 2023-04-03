@@ -98,11 +98,14 @@ where
         &self,
         num_accounts: usize,
         num_txn: usize,
+        run_par: bool,
+        run_seq: bool,
         num_warmups: usize,
         num_runs: usize,
         concurrency_level: usize,
-    ) -> Vec<(usize, usize)> {
-        let mut ret = Vec::new();
+    ) -> (Vec<usize>, Vec<usize>) {
+        let mut par_tps = Vec::new();
+        let mut seq_tps = Vec::new();
 
         let total_runs = num_warmups + num_runs;
         for i in 0..total_runs {
@@ -110,21 +113,23 @@ where
 
             if i < num_warmups {
                 println!("WARMUP - ignore results");
-                state.execute_blockstm_benchmark(concurrency_level);
+                state.execute_blockstm_benchmark(concurrency_level, run_par, run_seq);
             } else {
                 println!(
-                    "RUN BlockSTM-only benchmark for: num_threads = {}, \
+                    "RUN benchmark for: num_threads = {}, \
                         num_account = {}, \
                         block_size = {}",
                     num_cpus::get(),
                     num_accounts,
                     num_txn,
                 );
-                ret.push(state.execute_blockstm_benchmark(concurrency_level));
+                let tps = state.execute_blockstm_benchmark(concurrency_level, run_par, run_seq);
+                par_tps.push(tps.0);
+                seq_tps.push(tps.1);
             }
         }
 
-        ret
+        (par_tps, seq_tps)
     }
 }
 
@@ -236,11 +241,18 @@ impl TransactionBenchState {
         .expect("VM should not fail to start");
     }
 
-    fn execute_blockstm_benchmark(self, concurrency_level: usize) -> (usize, usize) {
+    fn execute_blockstm_benchmark(
+        self,
+        concurrency_level: usize,
+        run_par: bool,
+        run_seq: bool,
+    ) -> (usize, usize) {
         BlockAptosVM::execute_block_benchmark(
             self.transactions,
             self.executor.get_state_view(),
             concurrency_level,
+            run_par,
+            run_seq,
         )
     }
 }
