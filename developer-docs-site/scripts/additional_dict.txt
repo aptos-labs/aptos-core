@@ -258,6 +258,7 @@ YAMLs
 Zxing
 accessors
 accountHasList
+addr
 ait
 allowlist
 analytics
@@ -362,6 +363,7 @@ io
 ip
 ips
 isConnected
+iteratively
 json
 jsx
 kickstart
