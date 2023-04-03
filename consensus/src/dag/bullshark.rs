@@ -146,8 +146,10 @@ impl Bullshark {
             .get(round as usize)
             .map_or(false, |m| m.contains_key(&author)));
 
-        if self.dag.len() < round as usize {
-            assert_some!(self.dag.get(round as usize - 1));
+        if self.dag.len() <= round as usize {
+            if round > 0 {
+                assert_some!(self.dag.get(round as usize));
+            }
             self.dag.push(HashMap::new());
         }
 

@@ -86,6 +86,7 @@ impl DagDriver {
             timeout: false,
             network_sender,
             dag: Dag::new(
+                author,
                 epoch,
                 bullshark.clone(),
                 verifier.clone(),
