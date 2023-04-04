@@ -260,15 +260,16 @@ async fn basic_dag_driver_test() {
         let mut ref_block: Option<OrderedBlocks> = None;
         for receiver in receivers.iter_mut() {
             let block = receiver.next().await.unwrap();
-            println!("received block: {:?}", block.ordered_blocks);
+            println!("received block: {:?}", block.ordered_blocks[0].payload().unwrap());
             if ref_block.is_none() {
                 ref_block = Some(block);
             } else {
                 assert_eq!(
-                    ref_block.as_ref().unwrap().ordered_blocks,
-                    block.ordered_blocks
+                    ref_block.as_ref().unwrap().ordered_blocks[0].payload().unwrap(),
+                    block.ordered_blocks[0].payload().unwrap()
                 );
             }
         }
     }
+    println!("leaving loop");
 }
