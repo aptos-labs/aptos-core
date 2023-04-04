@@ -9,6 +9,7 @@ pub mod config;
 pub mod genesis;
 pub mod governance;
 pub mod move_tool;
+pub mod multisig;
 pub mod node;
 pub mod op;
 pub mod stake;
@@ -43,6 +44,8 @@ pub enum Tool {
     #[clap(subcommand)]
     Move(move_tool::MoveTool),
     #[clap(subcommand)]
+    Multisig(multisig::MultisigTool),
+    #[clap(subcommand)]
     Node(node::NodeTool),
     #[clap(subcommand)]
     Stake(stake::StakeTool),
@@ -62,6 +65,7 @@ impl Tool {
             Init(tool) => tool.execute_serialized_success().await,
             Key(tool) => tool.execute().await,
             Move(tool) => tool.execute().await,
+            Multisig(tool) => tool.execute().await,
             Node(tool) => tool.execute().await,
             Stake(tool) => tool.execute().await,
             Update(tool) => tool.execute_serialized().await,
