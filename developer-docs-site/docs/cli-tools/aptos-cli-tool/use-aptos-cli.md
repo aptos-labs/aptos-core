@@ -29,6 +29,7 @@ SUBCOMMANDS:
     init          Tool to initialize current directory for the aptos tool
     key           Tool for generating, inspecting, and interacting with keys
     move          Tool for Move related operations
+    multisig      Tool for multisig account operations
     node          Tool for operations related to nodes
     stake         Tool for manipulating stake
 ```
@@ -714,6 +715,92 @@ The `peer_config.yaml` file will be created in your current working directory, w
 ```
 
 **Note:** In the addresses key, you should fill in your address.
+
+## Multisig examples
+
+### Create a vanity multisig account
+
+To create a multisig account use the `aptos multisig create` command.
+
+:::tip
+This example will create a vanity multisig account, but you do not have to use a vanity address.
+:::
+
+First generate a new private key file for the initiating owner:
+
+```bash
+# Generate private key file that can create vanity multisig on its first transaction.
+aptos key generate \
+    --output-file starts_with_d00d.key \
+    --vanity-prefix 0xd00d \
+    --vanity-multisig
+{
+  "Result": {
+    "PrivateKey Path": "starts_with_d00d.key",
+    "PublicKey Path": "starts_with_d00d.key.pub",
+    "Multisig Account Address:": "0xd00db2a7c10f8037af443cec1e2c2c82f419bcca2fd557de10fbc58c1635b432",
+    "Account Address:": "0xf2ac0ed090be51d067259101291d3aabca2a3b5e34a27c85da675cd6dbed9ada"
+  }
+}
+```
+
+Fund the owner (here we use the devnet faucet for illustrative purposes):
+
+```bash
+aptos account fund-with-faucet --account 0xf2ac0ed090be51d067259101291d3aabca2a3b5e34a27c85da675cd6dbed9ada
+{
+  "Result": "Added 100000000 Octas to account f2ac0ed090be51d067259101291d3aabca2a3b5e34a27c85da675cd6dbed9ada"
+}
+```
+
+Create the multisig account using the private key:
+
+```bash
+aptos multisig create \
+    --private-key-file starts_with_d00d.key \
+    --num-signatures-required 1
+{
+  "Result": {
+    "transaction_hash": "0x2aeb6f6443ef2a873e8fb3d4db11b923d46d9522f5724ff7d313ed5070f078ff",
+    "gas_used": 1520,
+    "gas_unit_price": 100,
+    "sender": "f2ac0ed090be51d067259101291d3aabca2a3b5e34a27c85da675cd6dbed9ada",
+    "sequence_number": 0,
+    "success": true,
+    "timestamp_us": 1680640710219543,
+    "version": 3202707,
+    "vm_status": "Executed successfully"
+  }
+}
+```
+
+Note that the initiating owner has sent a transaction, which created a new multisig account with the given vanity prefix:
+
+```
+aptos account list --account 0xd00db2a7c10f8037af443cec1e2c2c82f419bcca2fd557de10fbc58c1635b432
+{
+  "Result": [
+    ...
+    {
+      "0x1::multisig_account::MultisigAccount": {
+        "add_owners_events": {
+          "counter": "0",
+          "guid": {
+            "id": {
+              "addr": "0xd00db2a7c10f8037af443cec1e2c2c82f419bcca2fd557de10fbc58c1635b432",
+              "creation_num": "4"
+            }
+          }
+        ...
+        "signer_cap": {
+          "vec": [
+            {
+              "account": "0xd00db2a7c10f8037af443cec1e2c2c82f419bcca2fd557de10fbc58c1635b432"
+            }
+          ]
+        },
+        ...
+```
 
 ## Move examples
 
