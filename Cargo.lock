@@ -409,6 +409,7 @@ dependencies = [
  "serde_json",
  "serde_yaml 0.8.26",
  "tokio",
+ "tokio-io-timeout",
  "tokio-stream",
  "tokio-util 0.7.3",
  "warp",
