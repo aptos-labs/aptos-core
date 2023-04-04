@@ -376,6 +376,7 @@ mod test {
         types::{account_address::AccountAddress, transaction::authenticator::AuthenticationKey},
     };
     use once_cell::sync::OnceCell;
+    use poem::http::header::{AUTHORIZATION, CONTENT_TYPE, REFERER};
     use poem_openapi::types::{ParseFromJSON, ToJSON};
     use rand::{
         rngs::{OsRng, StdRng},
@@ -471,6 +472,10 @@ mod test {
         make_list_file("/tmp/ip_blocklist.txt", ip_ranges)
     }
 
+    fn make_referer_blocklist_file(referers: &[&str]) -> Result<()> {
+        make_list_file("/tmp/referer_blocklist.txt", referers)
+    }
+
     fn get_fund_request(amount: Option<u64>) -> FundRequest {
         FundRequest {
             amount,
@@ -508,8 +513,8 @@ mod test {
             reqwest::Client::new()
                 .post(get_fund_endpoint(port))
                 .body(get_fund_request(Some(10)).to_json_string())
-                .header("Content-Type", "application/json")
-                .header("Authorization", "Bearer test_token")
+                .header(CONTENT_TYPE, "application/json")
+                .header(AUTHORIZATION, "Bearer test_token")
                 .send()
                 .await,
         )
@@ -520,7 +525,7 @@ mod test {
             reqwest::Client::new()
                 .post(get_fund_endpoint(port))
                 .body(get_fund_request(Some(10)).to_json_string())
-                .header("Content-Type", "application/json")
+                .header(CONTENT_TYPE, "application/json")
                 .send()
                 .await
         )
@@ -535,6 +540,7 @@ mod test {
         init();
         make_ip_blocklist(&[])?;
         make_auth_tokens_file(&["test_token"])?;
+        make_referer_blocklist_file(&["https://mysite.com"])?;
         let config_content = include_str!("../../../configs/testing_checkers.yaml");
         let (port, _handle) = start_server(config_content).await?;
 
@@ -542,7 +548,7 @@ mod test {
         let response = reqwest::Client::new()
             .post(get_fund_endpoint(port))
             .body(get_fund_request(Some(10)).to_json_string())
-            .header("Content-Type", "application/json")
+            .header(CONTENT_TYPE, "application/json")
             .send()
             .await?;
         let aptos_error = AptosTapError::parse_from_json_string(&response.text().await?)
@@ -554,8 +560,8 @@ mod test {
             reqwest::Client::new()
                 .post(get_fund_endpoint(port))
                 .body(get_fund_request(Some(10)).to_json_string())
-                .header("Content-Type", "application/json")
-                .header("Authorization", "Bearer test_token")
+                .header(CONTENT_TYPE, "application/json")
+                .header(AUTHORIZATION, "Bearer test_token")
                 .header("what_wallet_my_guy", "the_wallet_that_rocks")
                 .send()
                 .await,
@@ -566,8 +572,8 @@ mod test {
         let response = reqwest::Client::new()
             .post(get_fund_endpoint(port))
             .body(get_fund_request(Some(10)).to_json_string())
-            .header("Content-Type", "application/json")
-            .header("Authorization", "Bearer wrong_token")
+            .header(CONTENT_TYPE, "application/json")
+            .header(AUTHORIZATION, "Bearer wrong_token")
             .header("what_wallet_my_guy", "some_other_wallet")
             .send()
             .await?;
@@ -580,6 +586,23 @@ mod test {
             .collect();
         assert!(rejection_reason_codes.contains(&RejectionReasonCode::MagicHeaderIncorrect));
         assert!(rejection_reason_codes.contains(&RejectionReasonCode::AuthTokenInvalid));
+
+        // Assert that the referer blocklist checker works.
+        let response = reqwest::Client::new()
+            .post(get_fund_endpoint(port))
+            .body(get_fund_request(Some(10)).to_json_string())
+            .header(CONTENT_TYPE, "application/json")
+            .header(REFERER, "https://mysite.com")
+            .send()
+            .await?;
+        let aptos_error = AptosTapError::parse_from_json_string(&response.text().await?)
+            .expect("Failed to read response as AptosError");
+        let rejection_reason_codes: HashSet<RejectionReasonCode> = aptos_error
+            .rejection_reasons
+            .into_iter()
+            .map(|r| r.get_code())
+            .collect();
+        assert!(rejection_reason_codes.contains(&RejectionReasonCode::RefererBlocklisted));
 
         Ok(())
     }
@@ -604,8 +627,8 @@ mod test {
             reqwest::Client::new()
                 .post(get_fund_endpoint(port))
                 .body(get_fund_request(Some(10)).to_json_string())
-                .header("Content-Type", "application/json")
-                .header("Authorization", "Bearer test_token")
+                .header(CONTENT_TYPE, "application/json")
+                .header(AUTHORIZATION, "Bearer test_token")
                 .header("what_wallet_my_guy", "the_wallet_that_rocks")
                 .send()
                 .await,
@@ -615,8 +638,8 @@ mod test {
             reqwest::Client::new()
                 .post(get_fund_endpoint(port))
                 .body(get_fund_request(Some(10)).to_json_string())
-                .header("Content-Type", "application/json")
-                .header("Authorization", "Bearer test_token")
+                .header(CONTENT_TYPE, "application/json")
+                .header(AUTHORIZATION, "Bearer test_token")
                 .header("what_wallet_my_guy", "the_wallet_that_rocks")
                 .send()
                 .await,
@@ -626,8 +649,8 @@ mod test {
             reqwest::Client::new()
                 .post(get_fund_endpoint(port))
                 .body(get_fund_request(Some(10)).to_json_string())
-                .header("Content-Type", "application/json")
-                .header("Authorization", "Bearer test_token")
+                .header(CONTENT_TYPE, "application/json")
+                .header(AUTHORIZATION, "Bearer test_token")
                 .header("what_wallet_my_guy", "the_wallet_that_rocks")
                 .send()
                 .await,
@@ -639,7 +662,7 @@ mod test {
         let response = reqwest::Client::new()
             .post(get_fund_endpoint(port))
             .body(get_fund_request(Some(10)).to_json_string())
-            .header("Content-Type", "application/json")
+            .header(CONTENT_TYPE, "application/json")
             .send()
             .await?;
         assert_eq!(response.status(), reqwest::StatusCode::TOO_MANY_REQUESTS);
@@ -681,7 +704,7 @@ mod test {
                     }
                     .to_json_string(),
                 )
-                .header("Content-Type", "application/json")
+                .header(CONTENT_TYPE, "application/json")
                 .send()
                 .await,
         )
@@ -709,7 +732,7 @@ mod test {
             reqwest::Client::new()
                 .post(get_fund_endpoint(port))
                 .body(get_fund_request(None).to_json_string())
-                .header("Content-Type", "application/json")
+                .header(CONTENT_TYPE, "application/json")
                 .send()
                 .await,
         )
@@ -733,7 +756,7 @@ mod test {
         let response = reqwest::Client::new()
             .post(get_fund_endpoint(port))
             .body(get_fund_request(Some(10)).to_json_string())
-            .header("Content-Type", "application/json")
+            .header(CONTENT_TYPE, "application/json")
             .send()
             .await?;
         assert_eq!(response.status(), reqwest::StatusCode::SERVICE_UNAVAILABLE);
@@ -773,7 +796,7 @@ mod test {
             reqwest::Client::new()
                 .post(get_fund_endpoint(port))
                 .body(fund_request.to_json_string())
-                .header("Content-Type", "application/json")
+                .header(CONTENT_TYPE, "application/json")
                 .send()
                 .await,
         )
@@ -836,7 +859,7 @@ mod test {
             reqwest::Client::new()
                 .post(get_fund_endpoint(port))
                 .body(fund_request.to_json_string())
-                .header("Content-Type", "application/json")
+                .header(CONTENT_TYPE, "application/json")
                 .send()
                 .await,
         )

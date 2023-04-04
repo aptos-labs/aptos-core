@@ -195,7 +195,15 @@ impl CliCommand<()> for InitTool {
                 }
             },
         };
-        if let Some(ref faucet_url) = profile_config.faucet_url {
+
+        // If you want to create a private key, but not fund the account, skipping the faucet is still possible
+        let maybe_faucet_url = if self.skip_faucet {
+            None
+        } else {
+            profile_config.faucet_url.as_ref()
+        };
+
+        if let Some(faucet_url) = maybe_faucet_url {
             if account_exists {
                 eprintln!("Account {} has been already found onchain", address);
             } else {
