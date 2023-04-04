@@ -109,3 +109,4 @@ aptos-move/aptos-vm-profiling/**/*.txt
 metadata-cache
 /local/
 run_*
+tmp_log

@@ -70,11 +70,15 @@ impl Bullshark {
         let mut wave = anchor.round() / 2;
         let new_ordered_wave = wave;
 
-        wave -= 1;
-        round -= 2;
         let mut current_anchor = anchor;
 
-        while wave >= self.lowest_unordered_anchor_wave {
+        // wave -= 1;
+        // round -= 2;
+
+        assert!(wave >= self.lowest_unordered_anchor_wave);
+        while wave > self.lowest_unordered_anchor_wave {
+            wave -= 1;
+            round -= 2;
             let prev_anchor_peer_id = self.proposer_election.get_round_anchor_peer_id(wave);
 
             let is_path =
@@ -93,8 +97,8 @@ impl Bullshark {
                 ));
             }
 
-            wave -= 1;
-            round -= 2;
+            // wave -= 1;
+            // round -= 2;
         }
 
         anchor_stack.push(current_anchor);
@@ -123,7 +127,7 @@ impl Bullshark {
             reachable_nodes.into_iter().for_each(|(_, node)| {
                 node.parents().iter().for_each(|metadata| {
                     if let Some(parent) =
-                        self.dag[metadata.round() as usize].remove(&metadata.source())
+                    self.dag[metadata.round() as usize].remove(&metadata.source())
                     {
                         new_reachable_nodes.insert(parent.digest(), parent);
                     }
@@ -148,7 +152,7 @@ impl Bullshark {
 
         if self.dag.len() <= round as usize {
             if round > 0 {
-                assert_some!(self.dag.get(round as usize));
+                assert_some!(self.dag.get(round as usize - 1));
             }
             self.dag.push(HashMap::new());
         }
@@ -191,14 +195,4 @@ impl Bullshark {
             .collect();
         PayloadFilter::from(&excluded_payload)
     }
-
-    // pub async fn start(self, mut rx: Receiver<CertifiedNode>) {
-    //     loop {
-    //         tokio::select! {
-    //         Some(_) = rx.recv() => {
-    //
-    //         }
-    //             }
-    //     }
-    // }
 }

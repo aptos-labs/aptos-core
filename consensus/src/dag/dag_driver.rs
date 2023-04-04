@@ -61,6 +61,7 @@ impl DagDriver {
         let (rb_tx, rb_rx) = tokio::sync::mpsc::channel(config.channel_size);
 
         let rb = ReliableBroadcast::new(
+            author,
             epoch,
             network_sender.clone(),
             verifier.clone(),

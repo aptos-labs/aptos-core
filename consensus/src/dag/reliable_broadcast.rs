@@ -34,6 +34,7 @@ enum Status {
 // TODO: should we use the same message for node and certifade node -> create two verified events.
 
 pub struct ReliableBroadcast {
+    my_id: PeerId,
     epoch: u64,
     status: Status,
     peer_round_signatures: BTreeMap<(Round, PeerId), SignedNodeDigest>,
@@ -45,12 +46,14 @@ pub struct ReliableBroadcast {
 
 impl ReliableBroadcast {
     pub fn new(
+        my_id: PeerId,
         epoch: u64,
         network_sender: NetworkSender,
         validator_verifier: ValidatorVerifier,
         validator_signer: Arc<ValidatorSigner>,
     ) -> Self {
         Self {
+            my_id,
             epoch,
             status: Status::NothingToSend, // TODO status should be persisted.
             // TODO: we need to persist the map and rebuild after crash
@@ -132,6 +135,7 @@ impl ReliableBroadcast {
     // TODO: consider marge node and certified node and use a trait to resend message.
     async fn handle_tick(&mut self) {
         match &self.status {
+            // Status::NothingToSend => info!("DAG: reliable broadcast has nothing to resend on tick peer_id {},", self.my_id),
             Status::NothingToSend => info!("DAG: reliable broadcast has nothing to resend on tick"),
             Status::SendingNode(node, incremental_node_certificate_state) => {
                 self.network_sender
