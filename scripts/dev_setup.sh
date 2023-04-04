@@ -822,7 +822,7 @@ INSTALL_DIR="${HOME}/bin/"
 OPT_DIR="false"
 
 #parse args
-while getopts "btoprvydsah:i:n" arg; do
+while getopts "btoprvydsaPJh:i:n" arg; do
   case "$arg" in
     b)
       BATCH_MODE="true"
