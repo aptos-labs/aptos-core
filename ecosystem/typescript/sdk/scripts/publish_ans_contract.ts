@@ -12,8 +12,6 @@ require("dotenv").config();
  * This script runs when testing locally and on CI (as part of sdk-release.yaml) using `pnpm test`.
  */
 
-// ans core folder where Move.toml and sources folder are
-const ANS_CORE_FOLDER = "/aptos-names-contracts/core";
 // on local publishing we want to use `aptos` commnads and on CI we want to use `docker`
 const APTOS_INVOCATION = process.env.APTOS_INVOCATION || "aptos";
 // environment we use when testing
@@ -24,14 +22,10 @@ const ANS_TEST_ACCOUNT_PRIVATE_KEY = process.env.ANS_TEST_ACCOUNT_PRIVATE_KEY;
 const ANS_TEST_ACCOUNT_ADDRESS = process.env.ANS_TEST_ACCOUNT_ADDRESS;
 
 try {
-  // delete aptos-names-contracts folder
-  console.log("---deleting aptos-names-contracts folder---");
   deleteAnsFolder();
   // 1. Clone ANS repository into the current directory
   console.log("---clone ANS repository---");
-  execSync("git clone https://github.com/aptos-labs/aptos-names-contracts.git", {
-    cwd: __dirname,
-  });
+  execSync("git clone https://github.com/aptos-labs/aptos-names-contracts.git /tmp/ans");
 
   // 2. fund ans account
   console.log("---funding account---");
@@ -46,9 +40,7 @@ try {
   // 3. publish ans modules under the ans account
   console.log("---publish ans modules---");
   execSync(
-    `${APTOS_INVOCATION} move publish --private-key=${ANS_TEST_ACCOUNT_PRIVATE_KEY} --named-addresses aptos_names=0x${ANS_TEST_ACCOUNT_ADDRESS},aptos_names_admin=0x${ANS_TEST_ACCOUNT_ADDRESS},aptos_names_funds=0x${ANS_TEST_ACCOUNT_ADDRESS} --url=${APTOS_NODE_URL} --package-dir=${
-      __dirname + ANS_CORE_FOLDER
-    } --assume-yes`,
+    `${APTOS_INVOCATION} move publish --private-key=${ANS_TEST_ACCOUNT_PRIVATE_KEY} --named-addresses aptos_names=0x${ANS_TEST_ACCOUNT_ADDRESS},aptos_names_admin=0x${ANS_TEST_ACCOUNT_ADDRESS},aptos_names_funds=0x${ANS_TEST_ACCOUNT_ADDRESS} --url=${APTOS_NODE_URL} --package-dir=${`/tmp/ans/core`} --assume-yes`,
   );
 
   // 4. Delete aptos-names-contracts folder created by the git clone command
@@ -63,7 +55,5 @@ try {
 }
 
 function deleteAnsFolder() {
-  execSync("rm -rf aptos-names-contracts", {
-    cwd: __dirname,
-  });
+  execSync("rm -rf /tmp/ans");
 }
