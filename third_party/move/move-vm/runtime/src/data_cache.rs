@@ -212,7 +212,6 @@ impl<'r, 'l, S: MoveResolverV2> DataStore for TransactionDataCache<'r, 'l, S> {
                             // TODO: Here we don't want to copy but instead use some sort of
                             // CoW mechanism. This requires changes to `GlobalValue` and ideally
                             // to Move `Value`s as well to make them lighter (easier to copy).
-                            let val = val.lock()?;
                             GlobalValue::cached(val.copy_value()?)?
                         },
                     }

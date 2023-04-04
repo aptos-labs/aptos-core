@@ -94,7 +94,7 @@ impl AccountChangeSetV2 {
         for (struct_tag, op) in resources {
             let new_op = op.and_then(|resource| {
                 resource
-                    .serialize()?
+                    .serialize()
                     .ok_or_else(|| PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR))
             })?;
             resource_blobs.insert(struct_tag, new_op);
@@ -176,9 +176,9 @@ impl ChangeSetV2 {
     /// backwards compatibility with `BlobChangeSet` and legacy resolvers.
     pub fn into_change_set(self) -> VMResult<ChangeSet> {
         let accounts = self.into_inner();
-        let mut blob_change_set = ChangeSet::new();
+        let mut change_set = ChangeSet::new();
         for (addr, account_change_set) in accounts {
-            blob_change_set
+            change_set
                 .add_account_changeset(
                     addr,
                     account_change_set
@@ -187,6 +187,6 @@ impl ChangeSetV2 {
                 )
                 .expect("accounts should be unique");
         }
-        Ok(blob_change_set)
+        Ok(change_set)
     }
 }

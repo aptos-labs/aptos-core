@@ -129,7 +129,6 @@ impl<'a, 'b, S: ResourceResolver> ResourceResolver for DeltaStorage<'a, 'b, S> {
             if let Some(resource_op) = account_storage.resources().get(tag) {
                 return Ok(resource_op.as_ref().ok().map(|r| {
                     r.serialize()
-                        .expect("cannot handle poisoned resources")
                         .expect("resource serialization should succeed")
                 }));
             }
@@ -359,7 +358,7 @@ impl ResourceResolver for InMemoryStorage {
     ) -> Result<Option<Vec<u8>>, Self::Error> {
         if let Some(account_storage) = self.accounts.get(address) {
             if let Some(resource) = account_storage.resources.get(tag) {
-                return resource.serialize().map_err(|_| ())?.ok_or(()).map(Some);
+                return resource.serialize().ok_or(()).map(Some);
             }
         }
         Ok(None)

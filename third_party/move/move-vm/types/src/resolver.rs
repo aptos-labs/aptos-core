@@ -4,76 +4,13 @@
 //! Traits for resolving Move resources from persistent storage at runtime.
 
 use crate::values::Value;
-use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     account_address::AccountAddress,
     language_storage::StructTag,
     resolver::{ModuleResolver, ResourceResolver},
     value::MoveTypeLayout,
-    vm_status::StatusCode,
 };
-use std::{
-    fmt::Debug,
-    sync::{Arc, Mutex, RwLock},
-};
-
-/// Encapsulates Move values so that they are thread-safe.
-#[derive(Debug)]
-pub struct ValueMutex(Arc<Mutex<Value>>);
-
-/// Error to propagate to VM instead of panicking on poisoned lock.
-fn poison_error() -> PartialVMError {
-    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-        .with_message("cannot handle poisoned values: {:?}".to_string())
-}
-
-impl ValueMutex {
-    pub fn new(value: Value) -> Self {
-        Self(Arc::new(Mutex::new(value)))
-    }
-
-    pub fn lock(&self) -> PartialVMResult<std::sync::MutexGuard<'_, Value>> {
-        self.0.lock().map_err(|_| poison_error())
-    }
-
-    pub fn try_lock(&self) -> PartialVMResult<std::sync::MutexGuard<'_, Value>> {
-        self.0.try_lock().map_err(|_| poison_error())
-    }
-}
-
-impl Clone for ValueMutex {
-    fn clone(&self) -> Self {
-        Self(Arc::clone(&self.0))
-    }
-}
-
-/// Encapsulates `MoveTypeLayout` so it is read-only and thread-safe.
-#[derive(Debug)]
-pub struct ReadOnlyLayout(Arc<RwLock<MoveTypeLayout>>);
-
-impl ReadOnlyLayout {
-    pub fn new(move_type_layout: MoveTypeLayout) -> Self {
-        Self(Arc::new(RwLock::new(move_type_layout)))
-    }
-
-    pub fn read(&self) -> PartialVMResult<std::sync::RwLockReadGuard<'_, MoveTypeLayout>> {
-        self.0
-            .read()
-            .map_err(|_| PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))
-    }
-
-    pub fn try_read(&self) -> PartialVMResult<std::sync::RwLockReadGuard<'_, MoveTypeLayout>> {
-        self.0
-            .try_read()
-            .map_err(|_| PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))
-    }
-}
-
-impl Clone for ReadOnlyLayout {
-    fn clone(&self) -> Self {
-        Self(Arc::clone(&self.0))
-    }
-}
+use std::{fmt::Debug, sync::Arc};
 
 /// Represents any resource stored in persistent storage or cache.
 #[derive(Debug)]
@@ -82,13 +19,13 @@ pub enum Resource {
     Serialized(Arc<Vec<u8>>),
     // Resource is stored as a Move value and is not serialized yet. This type is
     // useful to cache outputs of VM session and avoid unnecessary deserialization.
-    Cached(ValueMutex, ReadOnlyLayout),
+    Cached(Arc<Value>, Arc<MoveTypeLayout>),
 }
 
 impl Resource {
     /// Creates a new resource from Move value and its layout.
     pub fn from_value_layout(value: Value, layout: MoveTypeLayout) -> Resource {
-        Resource::Cached(ValueMutex::new(value), ReadOnlyLayout::new(layout))
+        Resource::Cached(Arc::new(value), Arc::new(layout))
     }
 
     /// Creates a new resource from blob.
@@ -97,16 +34,11 @@ impl Resource {
     }
 
     /// Serializes the resources into bytes.
-    ///
-    /// This function involves serialization or copying and is therefore expensive to use, and
-    /// should be avoided if possible.
-    pub fn serialize(&self) -> PartialVMResult<Option<Vec<u8>>> {
+    pub fn serialize(&self) -> Option<Vec<u8>> {
         match self {
-            Self::Serialized(blob) => Ok(Some(blob.as_ref().clone())),
+            Self::Serialized(blob) => Some(blob.as_ref().clone()),
             Self::Cached(value, layout) => {
-                let value = value.lock()?;
-                let layout = layout.read()?;
-                Ok(value.simple_serialize(&layout))
+                value.simple_serialize(layout.as_ref())
             },
         }
     }
@@ -117,7 +49,7 @@ impl Clone for Resource {
     fn clone(&self) -> Self {
         match self {
             Resource::Serialized(blob) => Resource::Serialized(Arc::clone(blob)),
-            Resource::Cached(value, layout) => Resource::Cached(value.clone(), layout.clone()),
+            Resource::Cached(value, layout) => Resource::Cached(Arc::clone(value), Arc::clone(layout)),
         }
     }
 }

@@ -15,7 +15,11 @@ use move_vm_types::resolver::MoveResolverV2;
 use std::collections::BTreeMap;
 
 pub trait MoveResolverExt:
-    MoveResolverV2<Err = VMError> + TableResolver + StateStorageUsageResolver + ConfigStorage + StateView
+    MoveResolverV2<Err = VMError>
+    + TableResolver
+    + StateStorageUsageResolver
+    + ConfigStorage
+    + StateView
 {
     fn get_module_metadata(&self, module_id: ModuleId) -> Option<RuntimeModuleMetadataV1>;
 
