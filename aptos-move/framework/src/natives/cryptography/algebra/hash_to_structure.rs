@@ -52,27 +52,25 @@ macro_rules! suite_from_ty_arg {
     }};
 }
 
-/// SHA2-256 cost as defined in `aptos-move/aptos-gas/src/move_stdlib.rs`.
-fn sha256_cost(input_len: usize) -> InternalGas {
-    InternalGas::from((60000 + 1000 * input_len) as u64)
-}
-
 fn hash_to_bls12381gx_cost(
     dst_len: usize,
     msg_len: usize,
-    mapping_base_cost: InternalGasPerArg,
-    per_msg_byte_cost: InternalGasPerArg,
+    dst_shortening_base: InternalGasPerArg,
+    dst_shortening_per_byte: InternalGasPerArg,
+    mapping_base: InternalGasPerArg,
+    mapping_per_byte: InternalGasPerArg,
 ) -> InternalGas {
     // DST shortening as defined in https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-using-dsts-longer-than-255-.
     let dst_shortening_cost = if dst_len <= 255 {
         InternalGas::zero()
     } else {
-        sha256_cost(17 + dst_len)
+        dst_shortening_base * NumArgs::one()
+            + dst_shortening_per_byte * NumArgs::from(dst_len as u64)
     };
 
     // Mapping cost. The gas formula is simplified by assuming the DST length is fixed at 256.
     let mapping_cost =
-        mapping_base_cost * NumArgs::one() + per_msg_byte_cost * NumArgs::from(msg_len as u64);
+        mapping_base * NumArgs::one() + mapping_per_byte * NumArgs::from(msg_len as u64);
 
     dst_shortening_cost + mapping_cost
 }
@@ -101,6 +99,8 @@ pub fn hash_to_internal(
             context.charge(hash_to_bls12381gx_cost(
                 dst.len(),
                 msg.len(),
+                gas_params.sha2_v0_10_6_sha256_base,
+                gas_params.sha2_v0_10_6_sha256_per_byte,
                 gas_params.ark_h2c_bls12381g1_xmd_sha256_sswu_base,
                 gas_params.ark_h2c_bls12381g1_xmd_sha256_sswu_per_msg_byte,
             ))?;
@@ -121,6 +121,8 @@ pub fn hash_to_internal(
             context.charge(hash_to_bls12381gx_cost(
                 dst.len(),
                 msg.len(),
+                gas_params.sha2_v0_10_6_sha256_base,
+                gas_params.sha2_v0_10_6_sha256_per_byte,
                 gas_params.ark_h2c_bls12381g2_xmd_sha256_sswu_base,
                 gas_params.ark_h2c_bls12381g2_xmd_sha256_sswu_per_msg_byte,
             ))?;

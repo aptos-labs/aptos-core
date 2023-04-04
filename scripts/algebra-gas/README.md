@@ -17,6 +17,8 @@ cargo bench -p aptos-crypto -- ark_bls12_381
 ```
 
 If you don't have a `gas_per_ns`, estimate one using `hash/SHA2-256` bench results.
+Background: 1000 units of gas is defined as the average SHA2-256 cost change per byte.
+
 ```
 scripts/algebra-gas/load_bench_datapoints.py --bench_path target/criterion/hash/SHA2-256
 scripts/algebra-gas/fit_linear_model.py --dataset_path hash_SHA2_256.0-1025.json --plot
@@ -28,8 +30,6 @@ Value `k` and `b` should be printed.
 {"b": 336.51096106242346, "k": 4.868293006038344}
 ```
 Take the `k`, and now you can do the calculation `gas_per_ns = 1000/k`.
-(1000 units of gas is defined to be equivalent to
-the average change in ShA2-256 computational cost if the input length (in bytes) increases by 1).
 
 Second last, go to `scripts/algebra-gas/update_algebra_gas_params.py`
 and update the value of global variables `TARGET_GAS_VERSION` and `MUL` if necessary.
