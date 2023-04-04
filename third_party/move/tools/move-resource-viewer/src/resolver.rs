@@ -22,7 +22,7 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
 };
-use move_vm_types::resolver::MoveResolver;
+use move_vm_types::resolver::MoveResolverV2;
 use std::rc::Rc;
 
 pub(crate) struct Resolver<'a, T: ?Sized> {
@@ -30,7 +30,7 @@ pub(crate) struct Resolver<'a, T: ?Sized> {
     cache: ModuleCache,
 }
 
-impl<'a, T: MoveResolver + ?Sized> GetModule for Resolver<'a, T> {
+impl<'a, T: MoveResolverV2 + ?Sized> GetModule for Resolver<'a, T> {
     type Error = Error;
     type Item = Rc<CompiledModule>;
 
@@ -40,7 +40,7 @@ impl<'a, T: MoveResolver + ?Sized> GetModule for Resolver<'a, T> {
         }
         let blob = self
             .state
-            .get_module_blob(module_id)
+            .get_module(module_id)
             .map_err(|e| anyhow!("Error retrieving module {:?}: {:?}", module_id, e))?
             .ok_or_else(|| anyhow!("Module {:?} can't be found", module_id))?;
         let compiled_module = CompiledModule::deserialize(&blob).map_err(|status| {
@@ -54,7 +54,7 @@ impl<'a, T: MoveResolver + ?Sized> GetModule for Resolver<'a, T> {
     }
 }
 
-impl<'a, T: MoveResolver + ?Sized> Resolver<'a, T> {
+impl<'a, T: MoveResolverV2 + ?Sized> Resolver<'a, T> {
     pub fn new(state: &'a T) -> Self {
         Resolver {
             state,

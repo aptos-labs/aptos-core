@@ -8,11 +8,11 @@ use move_core_types::{
     effects::Op,
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
-    resolver::{ModuleBlobResolver, ResourceBlobResolver},
+    resolver::{ModuleResolver, ResourceResolver},
 };
 use move_vm_types::{
-    effects::{AccountChangeSet, ChangeSet},
-    resolver::{MoveResolver, Resource, ResourceResolver},
+    effects::{AccountChangeSetV2, ChangeSetV2},
+    resolver::{MoveResolverV2, Resource, ResourceResolverV2},
 };
 use std::{
     collections::{btree_map, BTreeMap},
@@ -34,22 +34,10 @@ impl BlankStorage {
     }
 }
 
-impl ModuleBlobResolver for BlankStorage {
+impl ModuleResolver for BlankStorage {
     type Error = ();
 
-    fn get_module_blob(&self, _module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
-        Ok(None)
-    }
-}
-
-impl ResourceBlobResolver for BlankStorage {
-    type Error = ();
-
-    fn get_resource_blob(
-        &self,
-        _address: &AccountAddress,
-        _tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, Self::Error> {
+    fn get_module(&self, _module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
         Ok(None)
     }
 }
@@ -58,6 +46,18 @@ impl ResourceResolver for BlankStorage {
     type Error = ();
 
     fn get_resource(
+        &self,
+        _address: &AccountAddress,
+        _tag: &StructTag,
+    ) -> Result<Option<Vec<u8>>, Self::Error> {
+        Ok(None)
+    }
+}
+
+impl ResourceResolverV2 for BlankStorage {
+    type Error = ();
+
+    fn get_resource_v2(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
@@ -82,27 +82,27 @@ impl TableResolver for BlankStorage {
 #[derive(Debug, Clone)]
 pub struct DeltaStorage<'a, 'b, S> {
     base: &'a S,
-    delta: &'b ChangeSet,
+    delta: &'b ChangeSetV2,
 }
 
-impl<'a, 'b, S: ModuleBlobResolver> ModuleBlobResolver for DeltaStorage<'a, 'b, S> {
+impl<'a, 'b, S: ModuleResolver> ModuleResolver for DeltaStorage<'a, 'b, S> {
     type Error = S::Error;
 
-    fn get_module_blob(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
+    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
         if let Some(account_storage) = self.delta.accounts().get(module_id.address()) {
             if let Some(blob_opt) = account_storage.modules().get(module_id.name()) {
                 return Ok(blob_opt.clone().ok());
             }
         }
 
-        self.base.get_module_blob(module_id)
+        self.base.get_module(module_id)
     }
 }
 
-impl<'a, 'b, S: ResourceResolver> ResourceResolver for DeltaStorage<'a, 'b, S> {
+impl<'a, 'b, S: ResourceResolverV2> ResourceResolverV2 for DeltaStorage<'a, 'b, S> {
     type Error = S::Error;
 
-    fn get_resource(
+    fn get_resource_v2(
         &self,
         address: &AccountAddress,
         tag: &StructTag,
@@ -113,14 +113,14 @@ impl<'a, 'b, S: ResourceResolver> ResourceResolver for DeltaStorage<'a, 'b, S> {
             }
         }
 
-        self.base.get_resource(address, tag)
+        self.base.get_resource_v2(address, tag)
     }
 }
 
-impl<'a, 'b, S: ResourceBlobResolver> ResourceBlobResolver for DeltaStorage<'a, 'b, S> {
+impl<'a, 'b, S: ResourceResolver> ResourceResolver for DeltaStorage<'a, 'b, S> {
     type Error = S::Error;
 
-    fn get_resource_blob(
+    fn get_resource(
         &self,
         address: &AccountAddress,
         tag: &StructTag,
@@ -135,7 +135,7 @@ impl<'a, 'b, S: ResourceBlobResolver> ResourceBlobResolver for DeltaStorage<'a, 
             }
         }
 
-        self.base.get_resource_blob(address, tag)
+        self.base.get_resource(address, tag)
     }
 }
 
@@ -151,8 +151,8 @@ impl<'a, 'b, S: TableResolver> TableResolver for DeltaStorage<'a, 'b, S> {
     }
 }
 
-impl<'a, 'b, S: MoveResolver> DeltaStorage<'a, 'b, S> {
-    pub fn new(base: &'a S, delta: &'b ChangeSet) -> Self {
+impl<'a, 'b, S: MoveResolverV2> DeltaStorage<'a, 'b, S> {
+    pub fn new(base: &'a S, delta: &'b ChangeSetV2) -> Self {
         Self { base, delta }
     }
 }
@@ -222,7 +222,7 @@ where
 }
 
 impl InMemoryAccountStorage {
-    fn apply(&mut self, account_changeset: AccountChangeSet) -> Result<()> {
+    fn apply(&mut self, account_changeset: AccountChangeSetV2) -> Result<()> {
         let (modules, resources) = account_changeset.into_inner();
         apply_changes(&mut self.modules, modules)?;
         apply_changes(&mut self.resources, resources)?;
@@ -240,7 +240,7 @@ impl InMemoryAccountStorage {
 impl InMemoryStorage {
     pub fn apply_extended(
         &mut self,
-        changeset: ChangeSet,
+        changeset: ChangeSetV2,
         #[cfg(feature = "table-extension")] table_changes: TableChangeSet,
     ) -> Result<()> {
         for (addr, account_changeset) in changeset.into_inner() {
@@ -262,7 +262,7 @@ impl InMemoryStorage {
         Ok(())
     }
 
-    pub fn apply(&mut self, changeset: ChangeSet) -> Result<()> {
+    pub fn apply(&mut self, changeset: ChangeSetV2) -> Result<()> {
         self.apply_extended(
             changeset,
             #[cfg(feature = "table-extension")]
@@ -323,10 +323,10 @@ impl InMemoryStorage {
     }
 }
 
-impl ModuleBlobResolver for InMemoryStorage {
+impl ModuleResolver for InMemoryStorage {
     type Error = ();
 
-    fn get_module_blob(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
+    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
         if let Some(account_storage) = self.accounts.get(module_id.address()) {
             return Ok(account_storage.modules.get(module_id.name()).cloned());
         }
@@ -334,10 +334,10 @@ impl ModuleBlobResolver for InMemoryStorage {
     }
 }
 
-impl ResourceResolver for InMemoryStorage {
+impl ResourceResolverV2 for InMemoryStorage {
     type Error = ();
 
-    fn get_resource(
+    fn get_resource_v2(
         &self,
         address: &AccountAddress,
         tag: &StructTag,
@@ -349,10 +349,10 @@ impl ResourceResolver for InMemoryStorage {
     }
 }
 
-impl ResourceBlobResolver for InMemoryStorage {
+impl ResourceResolver for InMemoryStorage {
     type Error = ();
 
-    fn get_resource_blob(
+    fn get_resource(
         &self,
         address: &AccountAddress,
         tag: &StructTag,

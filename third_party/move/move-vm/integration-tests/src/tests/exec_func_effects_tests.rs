@@ -6,7 +6,7 @@ use crate::compiler::{as_module, compile_units};
 use move_binary_format::errors::VMResult;
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{BlobChangeSet, Event},
+    effects::{ChangeSet, Event},
     identifier::Identifier,
     language_storage::ModuleId,
     u256::U256,
@@ -85,7 +85,7 @@ fn run(
     module: &ModuleCode,
     fun_name: &str,
     arg_val0: MoveValue,
-) -> VMResult<(BlobChangeSet, Vec<Event>, SerializedReturnValues)> {
+) -> VMResult<(ChangeSet, Vec<Event>, SerializedReturnValues)> {
     let module_id = &module.0;
     let modules = vec![module.clone()];
     let (vm, storage) = setup_vm(&modules);

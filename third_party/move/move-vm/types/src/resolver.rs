@@ -8,7 +8,7 @@ use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     account_address::AccountAddress,
     language_storage::StructTag,
-    resolver::{ModuleBlobResolver, ResourceBlobResolver},
+    resolver::{ModuleResolver, ResourceResolver},
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
@@ -132,11 +132,11 @@ impl Clone for Resource {
 ///                       are always structurally valid)
 ///                    - storage encounters internal error
 ///
-/// This trait is similar to `ResourceBlobResolver` but avoids serialization.
-pub trait ResourceResolver {
+/// This trait is similar to `ResourceResolver` but avoids serialization.
+pub trait ResourceResolverV2 {
     type Error: Debug;
 
-    fn get_resource(
+    fn get_resource_v2(
         &self,
         address: &AccountAddress,
         typ: &StructTag,
@@ -145,37 +145,37 @@ pub trait ResourceResolver {
 
 /// A persistent storage implementation that can resolve both resources and
 /// modules at runtime and avoid serialization if necessary.
-pub trait MoveResolver:
-    ModuleBlobResolver<Error = Self::Err>
-    + ResourceBlobResolver<Error = Self::Err>
+pub trait MoveResolverV2:
+    ModuleResolver<Error = Self::Err>
     + ResourceResolver<Error = Self::Err>
+    + ResourceResolverV2<Error = Self::Err>
 {
     type Err: Debug;
 }
 
 impl<
         E: Debug,
-        T: ModuleBlobResolver<Error = E>
-            + ResourceBlobResolver<Error = E>
+        T: ModuleResolver<Error = E>
             + ResourceResolver<Error = E>
+            + ResourceResolverV2<Error = E>
             + ?Sized,
-    > MoveResolver for T
+    > MoveResolverV2 for T
 {
     type Err = E;
 }
 
-// TODO: Currently `MoveResolver` has `ModuleBlobResolver` and `ResourceBlobResolver`. When
-// we switch to values over blobs `ResourceBlobResolver` bound should be removed. Similarly,
-// when we cache compiled modules we should use `ModuleResolver` over `ModuleBlobResolver`.
+// TODO: Currently `MoveResolver` has `ModuleResolver` and `ResourceResolver` which operate on
+// blobs. When we switch to values over blobs `ResourceBlobResolver` bound should be removed.
+// Similarly, when we cache compiled modules we should use a new trait.
 
-impl<T: ResourceResolver + ?Sized> ResourceResolver for &T {
+impl<T: ResourceResolverV2 + ?Sized> ResourceResolverV2 for &T {
     type Error = T::Error;
 
-    fn get_resource(
+    fn get_resource_v2(
         &self,
         address: &AccountAddress,
         tag: &StructTag,
     ) -> Result<Option<Resource>, Self::Error> {
-        (**self).get_resource(address, tag)
+        (**self).get_resource_v2(address, tag)
     }
 }

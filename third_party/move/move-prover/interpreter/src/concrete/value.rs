@@ -16,7 +16,7 @@ use crate::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{BlobChangeSet, Op},
+    effects::{ChangeSet, Op},
     u256,
     value::{MoveStruct, MoveValue},
 };
@@ -1285,7 +1285,7 @@ impl GlobalState {
     }
 
     /// Calculate the delta (i.e., a ChangeSet) against the old state
-    pub fn delta(&self, old_state: &GlobalState) -> BlobChangeSet {
+    pub fn delta(&self, old_state: &GlobalState) -> ChangeSet {
         fn bcs_serialize_resource(key: &StructInstantiation, val: &BaseValue) -> Vec<u8> {
             let typed_val = TypedValue {
                 ty: Type::mk_struct(key.clone()),
@@ -1295,7 +1295,7 @@ impl GlobalState {
             typed_val.into_bcs_bytes().unwrap()
         }
 
-        let mut change_set = BlobChangeSet::new();
+        let mut change_set = ChangeSet::new();
         let empty_account_state = AccountState::default();
 
         // collect added / modified resources

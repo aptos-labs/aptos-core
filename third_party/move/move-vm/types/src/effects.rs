@@ -8,7 +8,7 @@ use anyhow::{bail, Result};
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{AccountBlobChangeSet, BlobChangeSet, Op},
+    effects::{AccountChangeSet, ChangeSet, Op},
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
     vm_status::StatusCode,
@@ -17,13 +17,13 @@ use std::collections::{btree_map::Entry, BTreeMap};
 
 /// A collection of changes to resources and modules for an account (not serialized).
 #[derive(Default, Debug, Clone)]
-pub struct AccountChangeSet {
+pub struct AccountChangeSetV2 {
     // TODO: Avoid module serialization.
     modules: BTreeMap<Identifier, Op<Vec<u8>>>,
     resources: BTreeMap<StructTag, Op<Resource>>,
 }
 
-impl AccountChangeSet {
+impl AccountChangeSetV2 {
     /// Creates an empty change set for an account.
     pub fn new() -> Self {
         Self {
@@ -88,7 +88,7 @@ impl AccountChangeSet {
 
     /// Converts all changes to this account into blobs. Used for backwards compatibility
     /// with `AccountBlobChangeSet` which operates solely on bytes.
-    fn into_account_blob_change_set(self) -> PartialVMResult<AccountBlobChangeSet> {
+    fn into_account_change_set(self) -> PartialVMResult<AccountChangeSet> {
         let (modules, resources) = self.into_inner();
         let mut resource_blobs = BTreeMap::new();
         for (struct_tag, op) in resources {
@@ -99,7 +99,7 @@ impl AccountChangeSet {
             })?;
             resource_blobs.insert(struct_tag, new_op);
         }
-        Ok(AccountBlobChangeSet::from_modules_resources(
+        Ok(AccountChangeSet::from_modules_resources(
             modules,
             resource_blobs,
         ))
@@ -108,11 +108,11 @@ impl AccountChangeSet {
 
 /// A collection of non-serialized changes to the blockchain state.
 #[derive(Default, Debug, Clone)]
-pub struct ChangeSet {
-    accounts: BTreeMap<AccountAddress, AccountChangeSet>,
+pub struct ChangeSetV2 {
+    accounts: BTreeMap<AccountAddress, AccountChangeSetV2>,
 }
 
-impl ChangeSet {
+impl ChangeSetV2 {
     /// Creates an empty change set.
     pub fn new() -> Self {
         Self {
@@ -124,7 +124,7 @@ impl ChangeSet {
     pub fn add_account_changeset(
         &mut self,
         addr: AccountAddress,
-        account_change_set: AccountChangeSet,
+        account_change_set: AccountChangeSetV2,
     ) -> Result<()> {
         match self.accounts.entry(addr) {
             Entry::Occupied(_) => bail!(
@@ -139,18 +139,21 @@ impl ChangeSet {
     }
 
     /// Returns accounts with changes.
-    pub fn accounts(&self) -> &BTreeMap<AccountAddress, AccountChangeSet> {
+    pub fn accounts(&self) -> &BTreeMap<AccountAddress, AccountChangeSetV2> {
         &self.accounts
     }
 
-    pub fn into_inner(self) -> BTreeMap<AccountAddress, AccountChangeSet> {
+    pub fn into_inner(self) -> BTreeMap<AccountAddress, AccountChangeSetV2> {
         self.accounts
     }
 
-    fn get_or_insert_account_change_set(&mut self, addr: AccountAddress) -> &mut AccountChangeSet {
+    fn get_or_insert_account_change_set(
+        &mut self,
+        addr: AccountAddress,
+    ) -> &mut AccountChangeSetV2 {
         match self.accounts.entry(addr) {
             Entry::Occupied(entry) => entry.into_mut(),
-            Entry::Vacant(entry) => entry.insert(AccountChangeSet::new()),
+            Entry::Vacant(entry) => entry.insert(AccountChangeSetV2::new()),
         }
     }
 
@@ -171,15 +174,15 @@ impl ChangeSet {
 
     /// Converts all resources and modules in this change set to blobs. This ensures
     /// backwards compatibility with `BlobChangeSet` and legacy resolvers.
-    pub fn into_blob_change_set(self) -> VMResult<BlobChangeSet> {
+    pub fn into_change_set(self) -> VMResult<ChangeSet> {
         let accounts = self.into_inner();
-        let mut blob_change_set = BlobChangeSet::new();
+        let mut blob_change_set = ChangeSet::new();
         for (addr, account_change_set) in accounts {
             blob_change_set
-                .add_account_blob_change_set(
+                .add_account_changeset(
                     addr,
                     account_change_set
-                        .into_account_blob_change_set()
+                        .into_account_change_set()
                         .map_err(|e: PartialVMError| e.finish(Location::Undefined))?,
                 )
                 .expect("accounts should be unique");

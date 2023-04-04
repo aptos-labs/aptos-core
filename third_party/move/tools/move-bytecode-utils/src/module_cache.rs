@@ -4,7 +4,7 @@
 
 use anyhow::{anyhow, Result};
 use move_binary_format::CompiledModule;
-use move_core_types::{language_storage::ModuleId, resolver::ModuleBlobResolver};
+use move_core_types::{language_storage::ModuleId, resolver::ModuleResolver};
 use std::{
     borrow::Borrow,
     cell::RefCell,
@@ -23,13 +23,13 @@ pub trait GetModule {
 }
 
 /// Simple in-memory module cache
-pub struct ModuleCache<R: ModuleBlobResolver> {
+pub struct ModuleCache<R: ModuleResolver> {
     cache: RefCell<BTreeMap<ModuleId, CompiledModule>>,
     resolver: R,
 }
 
 #[allow(clippy::len_without_is_empty)]
-impl<R: ModuleBlobResolver> ModuleCache<R> {
+impl<R: ModuleResolver> ModuleCache<R> {
     pub fn new(resolver: R) -> Self {
         ModuleCache {
             cache: RefCell::new(BTreeMap::new()),
@@ -46,7 +46,7 @@ impl<R: ModuleBlobResolver> ModuleCache<R> {
     }
 }
 
-impl<R: ModuleBlobResolver> GetModule for ModuleCache<R> {
+impl<R: ModuleResolver> GetModule for ModuleCache<R> {
     type Error = anyhow::Error;
     type Item = CompiledModule;
 
@@ -55,7 +55,7 @@ impl<R: ModuleBlobResolver> GetModule for ModuleCache<R> {
             Entry::Vacant(entry) => {
                 let module_bytes = self
                     .resolver
-                    .get_module_blob(id)
+                    .get_module(id)
                     .map_err(|_| anyhow!("Failed to get module {:?}", id))?
                     .ok_or_else(|| anyhow!("Module {:?} doesn't exist", id))?;
                 let module = CompiledModule::deserialize(&module_bytes)
@@ -69,13 +69,13 @@ impl<R: ModuleBlobResolver> GetModule for ModuleCache<R> {
 }
 
 /// Simple in-memory module cache that implements Sync
-pub struct SyncModuleCache<R: ModuleBlobResolver> {
+pub struct SyncModuleCache<R: ModuleResolver> {
     cache: RwLock<BTreeMap<ModuleId, Arc<CompiledModule>>>,
     resolver: R,
 }
 
 #[allow(clippy::len_without_is_empty)]
-impl<R: ModuleBlobResolver> SyncModuleCache<R> {
+impl<R: ModuleResolver> SyncModuleCache<R> {
     pub fn new(resolver: R) -> Self {
         SyncModuleCache {
             cache: RwLock::new(BTreeMap::new()),
@@ -92,7 +92,7 @@ impl<R: ModuleBlobResolver> SyncModuleCache<R> {
     }
 }
 
-impl<R: ModuleBlobResolver> GetModule for SyncModuleCache<R> {
+impl<R: ModuleResolver> GetModule for SyncModuleCache<R> {
     type Error = anyhow::Error;
     type Item = Arc<CompiledModule>;
 
@@ -103,7 +103,7 @@ impl<R: ModuleBlobResolver> GetModule for SyncModuleCache<R> {
 
         if let Some(module_bytes) = self
             .resolver
-            .get_module_blob(id)
+            .get_module(id)
             .map_err(|_| anyhow!("Failed to get module {:?}", id))?
         {
             let module = Arc::new(

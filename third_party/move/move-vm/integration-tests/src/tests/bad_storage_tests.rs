@@ -9,16 +9,16 @@ use move_core_types::{
     effects::Op,
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
-    resolver::{ModuleBlobResolver, ResourceBlobResolver},
+    resolver::{ModuleResolver, ResourceResolver},
     value::{serialize_values, MoveValue},
     vm_status::{StatusCode, StatusType},
 };
 use move_vm_runtime::move_vm::MoveVM;
 use move_vm_test_utils::{DeltaStorage, InMemoryStorage};
 use move_vm_types::{
-    effects::ChangeSet,
+    effects::ChangeSetV2,
     gas::UnmeteredGasMeter,
-    resolver::{Resource, ResourceResolver},
+    resolver::{Resource, ResourceResolverV2},
 };
 
 const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGTH]);
@@ -511,22 +511,10 @@ struct BogusStorage {
     bad_status_code: StatusCode,
 }
 
-impl ModuleBlobResolver for BogusStorage {
+impl ModuleResolver for BogusStorage {
     type Error = VMError;
 
-    fn get_module_blob(&self, _module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
-        Err(PartialVMError::new(self.bad_status_code).finish(Location::Undefined))
-    }
-}
-
-impl ResourceBlobResolver for BogusStorage {
-    type Error = VMError;
-
-    fn get_resource_blob(
-        &self,
-        _address: &AccountAddress,
-        _tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, Self::Error> {
+    fn get_module(&self, _module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
         Err(PartialVMError::new(self.bad_status_code).finish(Location::Undefined))
     }
 }
@@ -535,6 +523,18 @@ impl ResourceResolver for BogusStorage {
     type Error = VMError;
 
     fn get_resource(
+        &self,
+        _address: &AccountAddress,
+        _tag: &StructTag,
+    ) -> Result<Option<Vec<u8>>, Self::Error> {
+        Err(PartialVMError::new(self.bad_status_code).finish(Location::Undefined))
+    }
+}
+
+impl ResourceResolverV2 for BogusStorage {
+    type Error = VMError;
+
+    fn get_resource_v2(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
@@ -613,7 +613,7 @@ fn test_storage_returns_bogus_error_when_loading_resource() {
     let mut s_blob = vec![];
     m.serialize(&mut m_blob).unwrap();
     s.serialize(&mut s_blob).unwrap();
-    let mut delta = ChangeSet::new();
+    let mut delta = ChangeSetV2::new();
     delta.add_module_op(m.self_id(), Op::New(m_blob)).unwrap();
     delta.add_module_op(s.self_id(), Op::New(s_blob)).unwrap();
 

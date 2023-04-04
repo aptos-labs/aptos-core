@@ -16,12 +16,12 @@ use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
     parser,
-    resolver::{ModuleBlobResolver, ResourceBlobResolver},
+    resolver::{ModuleResolver, ResourceResolver},
 };
 use move_disassembler::disassembler::Disassembler;
 use move_ir_types::location::Spanned;
 use move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue, MoveValueAnnotator};
-use move_vm_types::resolver::{Resource, ResourceResolver};
+use move_vm_types::resolver::{Resource, ResourceResolverV2};
 use std::{
     convert::{TryFrom, TryInto},
     fs,
@@ -401,18 +401,18 @@ impl OnDiskStateView {
     }
 }
 
-impl ModuleBlobResolver for OnDiskStateView {
+impl ModuleResolver for OnDiskStateView {
     type Error = anyhow::Error;
 
-    fn get_module_blob(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
+    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
         self.get_module_bytes(module_id)
     }
 }
 
-impl ResourceBlobResolver for OnDiskStateView {
+impl ResourceResolver for OnDiskStateView {
     type Error = anyhow::Error;
 
-    fn get_resource_blob(
+    fn get_resource(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
@@ -421,10 +421,10 @@ impl ResourceBlobResolver for OnDiskStateView {
     }
 }
 
-impl ResourceResolver for OnDiskStateView {
+impl ResourceResolverV2 for OnDiskStateView {
     type Error = anyhow::Error;
 
-    fn get_resource(
+    fn get_resource_v2(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,

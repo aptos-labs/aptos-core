@@ -15,7 +15,7 @@ use move_compiler::{
     diagnostics::{self, Diagnostic, Diagnostics},
     unit_test::{ModuleTestPlan, TestName, TestPlan},
 };
-use move_core_types::{effects::BlobChangeSet, language_storage::ModuleId, vm_status::StatusType};
+use move_core_types::{effects::ChangeSet, language_storage::ModuleId, vm_status::StatusType};
 use move_ir_types::location::Loc;
 use move_symbol_pool::Symbol;
 use std::{
@@ -40,9 +40,9 @@ pub enum FailureReason {
     // The execution results of the Move VM and stackless VM does not match
     Mismatch {
         move_vm_return_values: Box<VMResult<Vec<Vec<u8>>>>,
-        move_vm_change_set: Box<VMResult<BlobChangeSet>>,
+        move_vm_change_set: Box<VMResult<ChangeSet>>,
         stackless_vm_return_values: Box<VMResult<Vec<Vec<u8>>>>,
-        stackless_vm_change_set: Box<VMResult<BlobChangeSet>>,
+        stackless_vm_change_set: Box<VMResult<ChangeSet>>,
     },
     // Property checking failed
     Property(String),
@@ -121,9 +121,9 @@ impl FailureReason {
 
     pub fn mismatch(
         move_vm_return_values: VMResult<Vec<Vec<u8>>>,
-        move_vm_change_set: VMResult<BlobChangeSet>,
+        move_vm_change_set: VMResult<ChangeSet>,
         stackless_vm_return_values: VMResult<Vec<Vec<u8>>>,
-        stackless_vm_change_set: VMResult<BlobChangeSet>,
+        stackless_vm_change_set: VMResult<ChangeSet>,
     ) -> Self {
         FailureReason::Mismatch {
             move_vm_return_values: Box::new(move_vm_return_values),

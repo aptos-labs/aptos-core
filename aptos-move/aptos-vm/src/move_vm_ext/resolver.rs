@@ -11,11 +11,11 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_table_extension::TableResolver;
-use move_vm_types::resolver::MoveResolver;
+use move_vm_types::resolver::MoveResolverV2;
 use std::collections::BTreeMap;
 
 pub trait MoveResolverExt:
-    MoveResolver<Err = VMError> + TableResolver + StateStorageUsageResolver + ConfigStorage + StateView
+    MoveResolverV2<Err = VMError> + TableResolver + StateStorageUsageResolver + ConfigStorage + StateView
 {
     fn get_module_metadata(&self, module_id: ModuleId) -> Option<RuntimeModuleMetadataV1>;
 

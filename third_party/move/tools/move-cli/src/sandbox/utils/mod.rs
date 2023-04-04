@@ -21,7 +21,7 @@ use move_compiler::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{BlobChangeSet, Event, Op},
+    effects::{ChangeSet, Event, Op},
     errmap::ErrorMapping,
     language_storage::{ModuleId, TypeTag},
     transaction_argument::TransactionArgument,
@@ -67,7 +67,7 @@ pub(crate) fn module(unit: &CompiledUnit) -> Result<&CompiledModule> {
     }
 }
 
-pub(crate) fn explain_publish_changeset(changeset: &BlobChangeSet) {
+pub(crate) fn explain_publish_changeset(changeset: &ChangeSet) {
     // publish effects should contain no resources
     assert!(changeset.resources().next().is_none());
     // total bytes written across all accounts
@@ -150,7 +150,7 @@ fn print_struct_diff_with_indent(
 }
 
 pub(crate) fn explain_execution_effects(
-    changeset: &BlobChangeSet,
+    changeset: &ChangeSet,
     events: &[Event],
     state: &OnDiskStateView,
 ) -> Result<()> {
@@ -246,7 +246,7 @@ pub(crate) fn explain_execution_effects(
 /// Commit the resources and events modified by a transaction to disk
 pub(crate) fn maybe_commit_effects(
     commit: bool,
-    changeset: BlobChangeSet,
+    changeset: ChangeSet,
     events: Vec<Event>,
     state: &OnDiskStateView,
 ) -> Result<()> {

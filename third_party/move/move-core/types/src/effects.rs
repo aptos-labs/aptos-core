@@ -68,9 +68,9 @@ impl<T> Op<T> {
     }
 }
 
-/// A collection of serialized resource and module operations on a Move account.
+/// A collection of resource and module operations on a Move account.
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
-pub struct AccountBlobChangeSet {
+pub struct AccountChangeSet {
     modules: BTreeMap<Identifier, Op<Vec<u8>>>,
     resources: BTreeMap<StructTag, Op<Vec<u8>>>,
 }
@@ -124,7 +124,7 @@ where
     Ok(())
 }
 
-impl AccountBlobChangeSet {
+impl AccountChangeSet {
     pub fn from_modules_resources(
         modules: BTreeMap<Identifier, Op<Vec<u8>>>,
         resources: BTreeMap<StructTag, Op<Vec<u8>>>,
@@ -203,14 +203,14 @@ impl AccountBlobChangeSet {
 
 // TODO: ChangeSet does not have a canonical representation so the derived Ord is not sound.
 
-/// A collection of serialized changes to a Move state. Each AccountBlobChangeSet in the domain of
-///`accounts` is guaranteed to be nonempty.
+/// A collection of changes to a Move state. Each AccountChangeSet in the domain of `accounts`
+/// is guaranteed to be nonempty
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
-pub struct BlobChangeSet {
-    accounts: BTreeMap<AccountAddress, AccountBlobChangeSet>,
+pub struct ChangeSet {
+    accounts: BTreeMap<AccountAddress, AccountChangeSet>,
 }
 
-impl BlobChangeSet {
+impl ChangeSet {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
@@ -218,10 +218,10 @@ impl BlobChangeSet {
         }
     }
 
-    pub fn add_account_blob_change_set(
+    pub fn add_account_changeset(
         &mut self,
         addr: AccountAddress,
-        account_blob_change_set: AccountBlobChangeSet,
+        account_changeset: AccountChangeSet,
     ) -> Result<()> {
         match self.accounts.entry(addr) {
             btree_map::Entry::Occupied(_) => bail!(
@@ -229,33 +229,30 @@ impl BlobChangeSet {
                 addr
             ),
             btree_map::Entry::Vacant(entry) => {
-                entry.insert(account_blob_change_set);
+                entry.insert(account_changeset);
             },
         }
 
         Ok(())
     }
 
-    pub fn accounts(&self) -> &BTreeMap<AccountAddress, AccountBlobChangeSet> {
+    pub fn accounts(&self) -> &BTreeMap<AccountAddress, AccountChangeSet> {
         &self.accounts
     }
 
-    pub fn into_inner(self) -> BTreeMap<AccountAddress, AccountBlobChangeSet> {
+    pub fn into_inner(self) -> BTreeMap<AccountAddress, AccountChangeSet> {
         self.accounts
     }
 
-    fn get_or_insert_account_blob_change_set(
-        &mut self,
-        addr: AccountAddress,
-    ) -> &mut AccountBlobChangeSet {
+    fn get_or_insert_account_changeset(&mut self, addr: AccountAddress) -> &mut AccountChangeSet {
         match self.accounts.entry(addr) {
             btree_map::Entry::Occupied(entry) => entry.into_mut(),
-            btree_map::Entry::Vacant(entry) => entry.insert(AccountBlobChangeSet::new()),
+            btree_map::Entry::Vacant(entry) => entry.insert(AccountChangeSet::new()),
         }
     }
 
     pub fn add_module_op(&mut self, module_id: ModuleId, op: Op<Vec<u8>>) -> Result<()> {
-        let account = self.get_or_insert_account_blob_change_set(*module_id.address());
+        let account = self.get_or_insert_account_changeset(*module_id.address());
         account.add_module_op(module_id.name().to_owned(), op)
     }
 
@@ -265,7 +262,7 @@ impl BlobChangeSet {
         struct_tag: StructTag,
         op: Op<Vec<u8>>,
     ) -> Result<()> {
-        let account = self.get_or_insert_account_blob_change_set(addr);
+        let account = self.get_or_insert_account_changeset(addr);
         account.add_resource_op(struct_tag, op)
     }
 

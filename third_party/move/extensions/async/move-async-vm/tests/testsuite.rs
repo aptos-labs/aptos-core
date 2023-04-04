@@ -18,14 +18,14 @@ use move_compiler::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{BlobChangeSet, Op},
+    effects::{ChangeSet, Op},
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag},
-    resolver::{ModuleBlobResolver, ResourceBlobResolver},
+    resolver::{ModuleResolver, ResourceResolver},
 };
 use move_prover_test_utils::{baseline_test::verify_or_update_baseline, extract_test_directives};
 use move_vm_test_utils::gas_schedule::GasStatus;
-use move_vm_types::resolver::{Resource, ResourceResolver};
+use move_vm_types::resolver::{Resource, ResourceResolverV2};
 use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet, VecDeque},
@@ -182,7 +182,7 @@ impl Harness {
         }
     }
 
-    fn commit_changeset(&self, changeset: BlobChangeSet) {
+    fn commit_changeset(&self, changeset: ChangeSet) {
         for (addr, change) in changeset.into_inner() {
             for (struct_tag, op) in change.into_inner().1 {
                 self.log(format!(
@@ -377,10 +377,10 @@ struct HarnessProxy<'a> {
     harness: &'a Harness,
 }
 
-impl<'a> ModuleBlobResolver for HarnessProxy<'a> {
+impl<'a> ModuleResolver for HarnessProxy<'a> {
     type Error = ();
 
-    fn get_module_blob(&self, id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
+    fn get_module(&self, id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
         Ok(self
             .harness
             .module_cache
@@ -389,10 +389,10 @@ impl<'a> ModuleBlobResolver for HarnessProxy<'a> {
     }
 }
 
-impl<'a> ResourceBlobResolver for HarnessProxy<'a> {
+impl<'a> ResourceResolver for HarnessProxy<'a> {
     type Error = ();
 
-    fn get_resource_blob(
+    fn get_resource(
         &self,
         address: &AccountAddress,
         typ: &StructTag,
@@ -407,10 +407,10 @@ impl<'a> ResourceBlobResolver for HarnessProxy<'a> {
     }
 }
 
-impl<'a> ResourceResolver for HarnessProxy<'a> {
+impl<'a> ResourceResolverV2 for HarnessProxy<'a> {
     type Error = ();
 
-    fn get_resource(
+    fn get_resource_v2(
         &self,
         address: &AccountAddress,
         typ: &StructTag,

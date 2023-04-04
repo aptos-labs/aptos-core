@@ -35,7 +35,7 @@ use move_vm_runtime::{
     session::{SerializedReturnValues, Session},
 };
 use move_vm_test_utils::{gas_schedule::GasStatus, InMemoryStorage};
-use move_vm_types::resolver::MoveResolver;
+use move_vm_types::resolver::MoveResolverV2;
 use once_cell::sync::Lazy;
 use std::{collections::BTreeMap, path::Path};
 
@@ -48,7 +48,7 @@ struct SimpleVMTestAdapter<'a> {
 }
 
 pub fn view_resource_in_move_storage(
-    storage: &impl MoveResolver,
+    storage: &impl MoveResolverV2,
     address: AccountAddress,
     module: &ModuleId,
     resource: &IdentStr,
@@ -60,7 +60,7 @@ pub fn view_resource_in_move_storage(
         name: resource.to_owned(),
         type_params: type_args,
     };
-    match storage.get_resource(&address, &tag).unwrap() {
+    match storage.get_resource_v2(&address, &tag).unwrap() {
         None => Ok("[No Resource Exists]".to_owned()),
         Some(resource) => {
             // Serialize value to blob in order to avoid implementing annotator APIs for `Resource`.

@@ -28,8 +28,7 @@ use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
     effects::{
-        AccountBlobChangeSet, BlobChangeSet as MoveChangeSet, Event as MoveEvent,
-        Op as MoveStorageOp,
+        AccountChangeSet, ChangeSet as MoveChangeSet, Event as MoveEvent, Op as MoveStorageOp,
     },
     language_storage::{ModuleId, StructTag},
     vm_status::{StatusCode, VMStatus},
@@ -174,7 +173,7 @@ where
         let mut resource_group_change_set = MoveChangeSet::new();
 
         for (addr, account_changeset) in change_set.into_inner() {
-            let mut resource_groups: BTreeMap<StructTag, AccountBlobChangeSet> = BTreeMap::new();
+            let mut resource_groups: BTreeMap<StructTag, AccountChangeSet> = BTreeMap::new();
             let (modules, resources) = account_changeset.into_inner();
 
             for (struct_tag, blob_op) in resources {
@@ -184,7 +183,7 @@ where
                 if let Some(resource_group) = resource_group {
                     resource_groups
                         .entry(resource_group)
-                        .or_insert_with(AccountBlobChangeSet::new)
+                        .or_insert_with(AccountChangeSet::new)
                         .add_resource_op(struct_tag, blob_op)
                         .map_err(|_| common_error.clone())?;
                 } else {

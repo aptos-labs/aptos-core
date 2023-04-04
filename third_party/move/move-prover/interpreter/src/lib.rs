@@ -7,7 +7,7 @@ use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
-    effects::BlobChangeSet,
+    effects::ChangeSet,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, TypeTag},
     parser::{parse_transaction_argument, parse_type_tag},
@@ -108,7 +108,7 @@ struct ExecutionResult {
 pub fn interpret_with_options(
     options: InterpreterOptions,
     env: &GlobalEnv,
-) -> (VMResult<Vec<Vec<u8>>>, BlobChangeSet, GlobalState) {
+) -> (VMResult<Vec<Vec<u8>>>, ChangeSet, GlobalState) {
     // consolidate arguments
     let args: Vec<_> = options
         .signers
@@ -222,7 +222,7 @@ impl<'env> StacklessBytecodeInterpreter<'env> {
         ty_args: &[TypeTag],
         args: &[MoveValue],
         global_state: &GlobalState,
-    ) -> (VMResult<Vec<Vec<u8>>>, BlobChangeSet, GlobalState) {
+    ) -> (VMResult<Vec<Vec<u8>>>, ChangeSet, GlobalState) {
         let mut new_global_state = global_state.clone();
 
         // execute and convert results
@@ -249,14 +249,14 @@ impl<'env> StacklessBytecodeInterpreter<'env> {
         ty_args: &[TypeTag],
         args: &[MoveValue],
         global_state: &GlobalState,
-    ) -> (VMResult<Vec<Vec<u8>>>, BlobChangeSet, GlobalState) {
+    ) -> (VMResult<Vec<Vec<u8>>>, ChangeSet, GlobalState) {
         // find the entrypoint
         let entrypoint_env = match derive_entrypoint_env(self.env, module_id, func_name) {
             Ok(func_env) => func_env,
             Err(err) => {
                 return (
                     Err(err.finish(Location::Undefined)),
-                    BlobChangeSet::new(),
+                    ChangeSet::new(),
                     global_state.clone(),
                 )
             },
@@ -274,14 +274,14 @@ impl<'env> StacklessBytecodeInterpreter<'env> {
         bcs_args: &[Vec<u8>],
         senders_opt: Option<&[AccountAddress]>,
         global_state: &GlobalState,
-    ) -> (VMResult<Vec<Vec<u8>>>, BlobChangeSet, GlobalState) {
+    ) -> (VMResult<Vec<Vec<u8>>>, ChangeSet, GlobalState) {
         // find the entrypoint
         let entrypoint_env = match derive_entrypoint_env(self.env, module_id, func_name) {
             Ok(func_env) => func_env,
             Err(err) => {
                 return (
                     Err(err.finish(Location::Undefined)),
-                    BlobChangeSet::new(),
+                    ChangeSet::new(),
                     global_state.clone(),
                 )
             },
@@ -297,7 +297,7 @@ impl<'env> StacklessBytecodeInterpreter<'env> {
             Err(err) => {
                 return (
                     Err(err.finish(Location::Undefined)),
-                    BlobChangeSet::new(),
+                    ChangeSet::new(),
                     global_state.clone(),
                 )
             },

@@ -22,7 +22,7 @@ use move_compiler::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{BlobChangeSet, Op},
+    effects::{ChangeSet, Op},
     identifier::IdentStr,
     value::serialize_values,
     vm_status::StatusCode,
@@ -113,7 +113,7 @@ fn setup_test_storage<'a>(
 /// Print the updates to storage represented by `cs` in the context of the starting storage state
 /// `storage`.
 fn print_resources_and_extensions(
-    cs: &BlobChangeSet,
+    cs: &ChangeSet,
     extensions: NativeContextExtensions,
     storage: &InMemoryStorage,
 ) -> Result<String> {
@@ -278,7 +278,7 @@ impl SharedTestingConfig {
         function_name: &str,
         test_info: &TestCase,
     ) -> (
-        VMResult<BlobChangeSet>,
+        VMResult<ChangeSet>,
         VMResult<NativeContextExtensions>,
         VMResult<Vec<Vec<u8>>>,
         TestRunInfo,
@@ -332,7 +332,7 @@ impl SharedTestingConfig {
         function_name: &str,
         test_info: &TestCase,
     ) -> (
-        VMResult<BlobChangeSet>,
+        VMResult<ChangeSet>,
         VMResult<Vec<Vec<u8>>>,
         TestRunInfo,
         Option<String>,
