@@ -784,6 +784,8 @@ impl EpochManager {
     }
 
     async fn start_new_epoch(&mut self, payload: OnChainConfigPayload) {
+        // The recovery manager exits before starting a new epoch. So, we unset the recovery_mode flag here.
+        self.recovery_mode = false;
         let validator_set: ValidatorSet = payload
             .get()
             .expect("failed to get ValidatorSet from payload");
@@ -953,7 +955,7 @@ impl EpochManager {
         peer_id: AccountAddress,
         event: &UnverifiedEvent,
     ) -> anyhow::Result<()> {
-        if self.recovery_mode {
+        if self.quorum_store_enabled || self.recovery_mode {
             return Ok(());
         }
         match event {
