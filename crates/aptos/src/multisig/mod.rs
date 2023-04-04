@@ -1,5 +1,8 @@
 use crate::{
-    common::types::{TransactionOptions, TransactionSummary},
+    common::{
+        types::{TransactionOptions, TransactionSummary},
+        utils::profile_or_submit,
+    },
     CliCommand, CliResult, CliTypedResult,
 };
 use aptos_types::account_address::AccountAddress;
@@ -40,22 +43,15 @@ impl CliCommand<TransactionSummary> for CreateMultisig {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
-        // Generate multisig account creation transaction payload, ignoring metadata map.
-        let payload = aptos_cached_packages::aptos_stdlib::multisig_account_create_with_owners(
-            self.additional_owners,
-            self.num_signatures_required,
-            vec![], // Metadata keys not supported here.
-            vec![], // Metadata values not supported here.
-        );
-        // Profile gas if needed.
-        if self.txn_options.profile_gas {
-            self.txn_options.profile_gas(payload).await
-        } else {
-            // Otherwise submit the transaction.
-            self.txn_options
-                .submit_transaction(payload)
-                .await
-                .map(TransactionSummary::from)
-        }
+        profile_or_submit(
+            aptos_cached_packages::aptos_stdlib::multisig_account_create_with_owners(
+                self.additional_owners,
+                self.num_signatures_required,
+                vec![], // Metadata keys not supported for ease of CLI parsing.
+                vec![], // Metadata values not supported for ease of CLI parsing.
+            ),
+            &self.txn_options,
+        )
+        .await
     }
 }
