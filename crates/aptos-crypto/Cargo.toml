@@ -90,10 +90,6 @@ name = "ristretto255"
 harness = false
 
 [[bench]]
-name = "sha2_v0_10_6"
-harness = false
-
-[[bench]]
 name = "secp256k1"
 harness = false
 

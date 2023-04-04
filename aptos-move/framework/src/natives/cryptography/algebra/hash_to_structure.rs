@@ -13,7 +13,9 @@ use crate::{
 };
 use aptos_types::on_chain_config::FeatureFlag;
 use ark_ec::hashing::HashToCurve;
-use move_core_types::gas_algebra::{InternalGas, InternalGasPerArg, InternalGasPerByte, NumArgs, NumBytes};
+use move_core_types::gas_algebra::{
+    InternalGas, InternalGasPerArg, InternalGasPerByte, NumArgs, NumBytes,
+};
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{Value, VectorRef},
@@ -100,8 +102,10 @@ pub fn hash_to_internal(
                 msg.len(),
                 gas_params.sha2.base,
                 gas_params.sha2.per_byte,
-                gas_params.bls12381.ark_h2c_bls12381g1_xmd_sha256_sswu_base,
-                gas_params.bls12381.ark_h2c_bls12381g1_xmd_sha256_sswu_per_msg_byte,
+                gas_params.algebra.ark_h2c_bls12381g1_xmd_sha256_sswu_base,
+                gas_params
+                    .algebra
+                    .ark_h2c_bls12381g1_xmd_sha256_sswu_per_msg_byte,
             ))?;
             let mapper = ark_ec::hashing::map_to_curve_hasher::MapToCurveBasedHasher::<
                 ark_ec::models::short_weierstrass::Projective<ark_bls12_381::g1::Config>,
@@ -122,8 +126,10 @@ pub fn hash_to_internal(
                 msg.len(),
                 gas_params.sha2.base,
                 gas_params.sha2.per_byte,
-                gas_params.bls12381.ark_h2c_bls12381g2_xmd_sha256_sswu_base,
-                gas_params.bls12381.ark_h2c_bls12381g2_xmd_sha256_sswu_per_msg_byte,
+                gas_params.algebra.ark_h2c_bls12381g2_xmd_sha256_sswu_base,
+                gas_params
+                    .algebra
+                    .ark_h2c_bls12381g2_xmd_sha256_sswu_per_msg_byte,
             ))?;
             let mapper = ark_ec::hashing::map_to_curve_hasher::MapToCurveBasedHasher::<
                 ark_ec::models::short_weierstrass::Projective<ark_bls12_381::g2::Config>,

@@ -138,8 +138,6 @@ impl GasParameters {
                 ark_h2c_bls12381g1_xmd_sha256_sswu_per_msg_byte: 0.into(),
                 ark_h2c_bls12381g2_xmd_sha256_sswu_base: 0.into(),
                 ark_h2c_bls12381g2_xmd_sha256_sswu_per_msg_byte: 0.into(),
-                sha2_v0_10_6_sha256_base: 0.into(),
-                sha2_v0_10_6_sha256_per_byte: 0.into(),
             },
             ed25519: ed25519::GasParameters {
                 base: 0.into(),

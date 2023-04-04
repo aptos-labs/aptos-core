@@ -71,8 +71,6 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.algebra.ark_h2c_bls12381g1_xmd_sha256_sswu_per_msg_byte, { 8.. => "algebra.ark_h2c_bls12381g1_xmd_sha256_sswu_per_msg_byte" }, 48 * MUL],
     [.algebra.ark_h2c_bls12381g2_xmd_sha256_sswu_base, { 8.. => "algebra.ark_h2c_bls12381g2_xmd_sha256_sswu_base" }, 6_773_002 * MUL],
     [.algebra.ark_h2c_bls12381g2_xmd_sha256_sswu_per_msg_byte, { 8.. => "algebra.ark_h2c_bls12381g2_xmd_sha256_sswu_per_msg_byte" }, 48 * MUL],
-    [.algebra.sha2_v0_10_6_sha256_base, { 8.. => "algebra.sha2_v0_10_6_sha256_base" }, 51 * MUL],
-    [.algebra.sha2_v0_10_6_sha256_per_byte, { 8.. => "algebra.sha2_v0_10_6_sha256_per_byte" }, 3_577 * MUL],
     // Algebra gas parameters end.
 
     [.bls12381.base, "bls12381.base", 150 * MUL],

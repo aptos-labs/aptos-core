@@ -16,7 +16,7 @@ use crate::natives::{
         casting::{downcast_internal, upcast_internal},
         constants::{one_internal, order_internal, zero_internal},
         eq::eq_internal,
-        gas::GasParameters,
+        gas::HashToGasParameters,
         hash_to_structure::hash_to_internal,
         new::from_u64_internal,
         pairing::{multi_pairing_internal, pairing_internal},
@@ -37,7 +37,6 @@ use move_core_types::{language_storage::TypeTag, vm_status::StatusCode};
 use move_vm_runtime::native_functions::NativeFunction;
 use once_cell::sync::Lazy;
 use std::{any::Any, hash::Hash, rc::Rc, sync::Arc};
-use crate::natives::cryptography::algebra::gas::HashToGasParameters;
 
 pub mod arithmetics;
 pub mod casting;
@@ -417,7 +416,7 @@ pub fn make_all(
             "hash_to_internal",
             make_safe_native(
                 HashToGasParameters {
-                    bls12381: gas_params.clone(),
+                    algebra: gas_params.clone(),
                     sha2: sha256_gas_params,
                 },
                 timed_features.clone(),

@@ -35,7 +35,8 @@ pub fn aptos_natives(
     timed_features: TimedFeatures,
     features: Arc<Features>,
 ) -> NativeFunctionTable {
-    let sha256_gas_params: move_stdlib::natives::hash::Sha2_256GasParameters = gas_params.move_stdlib.hash.sha2_256.clone();
+    let sha256_gas_params: move_stdlib::natives::hash::Sha2_256GasParameters =
+        gas_params.move_stdlib.hash.sha2_256.clone();
     move_stdlib::natives::all_natives(CORE_CODE_ADDRESS, gas_params.move_stdlib)
         .into_iter()
         .filter(|(_, name, _, _)| name.as_str() != "vector")
