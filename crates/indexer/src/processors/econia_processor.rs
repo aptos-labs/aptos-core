@@ -235,6 +235,20 @@ impl OrderBook {
             orders_to_price_level: HashMap::new(),
         }
     }
+
+    fn get_side(&self, side: Side) -> &BTreeMap<u64, Vec<Order>> {
+        match side {
+            Side::Ask => &self.asks,
+            Side::Bid => &self.bids,
+        }
+    }
+
+    fn get_side_mut(&mut self, side: Side) -> &mut BTreeMap<u64, Vec<Order>> {
+        match side {
+            Side::Ask => &mut self.asks,
+            Side::Bid => &mut self.bids,
+        }
+    }
 }
 
 struct EconiaRedisCacher {
@@ -304,6 +318,27 @@ impl EconiaRedisCacher {
         Ok(())
     }
 
+    fn get_book_side_price_level(book: &OrderBook, order_id: u64) -> (Side, u64) {
+        let (side, price) = book
+            .orders_to_price_level
+            .get(&order_id)
+            .expect("invalid state, order is missing");
+        (*side, *price)
+    }
+
+    fn get_order_mut(book: &mut OrderBook, order_id: u64) -> &mut Order {
+        let (side, price) = Self::get_book_side_price_level(book, order_id);
+        let book_side = book.get_side_mut(side);
+        let orders = book_side
+            .get_mut(&price)
+            .expect("invalid state, price level is missing");
+        let order = orders
+            .iter_mut()
+            .find(|o| o.market_order_id == order_id)
+            .expect("invalid state, order is missing");
+        order
+    }
+
     fn handle_maker_event(
         &mut self,
         conn: &mut redis::Connection,
@@ -314,31 +349,40 @@ impl EconiaRedisCacher {
         };
 
         match MakerEventType::try_from(e.event_type)? {
-            MakerEventType::Cancel => todo!(),
-            MakerEventType::Change => {
-                let (side, price) = book
-                    .orders_to_price_level
-                    .get(&e.market_order_id)
-                    .expect("invalid state, order is missing");
-
-                let book_side = match side {
-                    Side::Ask => &mut book.asks,
-                    Side::Bid => &mut book.bids,
-                };
+            MakerEventType::Cancel => {
+                let (side, price) = Self::get_book_side_price_level(book, e.market_order_id);
+                let book_side = book.get_side_mut(side);
                 let level = book_side
-                    .get_mut(&e.price)
+                    .get_mut(&price)
                     .expect("invalid state, price level missing");
-
-                let order = level
-                    .iter_mut()
-                    .find(|o| o.market_order_id == e.market_order_id)
+                let mut order = level
+                    .iter()
+                    .position(|o| o.market_order_id == e.market_order_id)
+                    .map(|i| level.remove(i))
                     .expect("invalid state, order missing");
 
-                let pop_and_reinsert_order = (price != &e.price) || (e.size > order.size);
-                order.size = e.size;
-                order.price = e.price;
+                book.orders_to_price_level.remove(&e.market_order_id);
+                order.order_state = OrderState::Cancelled;
+                // todo send event here to redis
+            },
+            MakerEventType::Change => {
+                let pop_and_reinsert_order = {
+                    let order = Self::get_order_mut(book, e.market_order_id);
+                    let res = (order.price != e.price) || (e.size > order.size);
+                    order.size = e.size;
+                    order.price = e.price;
+                    res
+                };
 
                 if pop_and_reinsert_order {
+                    let (side, price) = Self::get_book_side_price_level(book, e.market_order_id);
+                    book.orders_to_price_level
+                        .insert(e.market_order_id, (side, e.price));
+
+                    let book_side = book.get_side_mut(side);
+                    let level = book_side
+                        .get_mut(&price)
+                        .expect("invalid state, price level missing");
                     let order = level
                         .iter()
                         .position(|o| o.market_order_id == e.market_order_id)
@@ -346,16 +390,29 @@ impl EconiaRedisCacher {
                         .expect("invalid state, order missing");
 
                     if level.is_empty() {
-                        book_side.remove(price);
+                        book_side.remove(&price);
                     }
-
-                    book.orders_to_price_level
-                        .insert(e.market_order_id, (*side, e.price));
 
                     book_side.entry(e.price).or_default().push(order);
                 }
+                // todo send event here to redis
             },
-            MakerEventType::Evict => todo!(),
+            MakerEventType::Evict => {
+                let (side, price) = Self::get_book_side_price_level(book, e.market_order_id);
+                let book_side = book.get_side_mut(side);
+                let level = book_side
+                    .get_mut(&price)
+                    .expect("invalid state, price level missing");
+                let mut order = level
+                    .iter()
+                    .position(|o| o.market_order_id == e.market_order_id)
+                    .map(|i| level.remove(i))
+                    .expect("invalid state, order missing");
+
+                book.orders_to_price_level.remove(&e.market_order_id);
+                order.order_state = OrderState::Evicted;
+                // todo send event here to redis
+            },
             MakerEventType::Place => {
                 let side = e.side.into();
                 let o = Order {
@@ -378,6 +435,7 @@ impl EconiaRedisCacher {
                 } else {
                     book.bids.entry(e.price).or_default().push(o);
                 }
+                // todo send event here to redis
             },
         };
         Ok(())
