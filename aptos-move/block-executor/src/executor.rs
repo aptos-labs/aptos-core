@@ -35,7 +35,7 @@ use std::{
 };
 
 // todo: add this number to config and think about the number.
-const PER_BLOCK_GAS_LIMIT: u64 = 100000;
+const PER_BLOCK_GAS_LIMIT: u64 = 1000000;
 
 pub static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
@@ -219,6 +219,7 @@ where
         scheduler: &Scheduler,
         base_view: &S,
         committing: bool,
+        has_reconfiguration: &AtomicBool,
     ) {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
@@ -244,6 +245,8 @@ where
                     match last_input_output.success_gas(txn_idx) {
                         Ok(gas) => accumulated_gas += gas,
                         _ => {
+                            // To distinguish the early halt caused by reconfiguration or Abort
+                            has_reconfiguration.store(true, Ordering::Relaxed);
                             debug!("[BlockSTM]: Early halted due to Abort or SkipRest txn.");
                             scheduler.halt();
                             break;
@@ -255,6 +258,7 @@ where
                         // Set the execution output status to be SkipRest, to skip the rest of the txns.
                         last_input_output.update_to_skip_rest(txn_idx);
                         scheduler.halt();
+
                         counters::PARALLEL_PER_BLOCK_GAS.observe(accumulated_gas as f64);
                         counters::PARALLEL_EXCEED_PER_BLOCK_GAS_LIMIT_COUNT.inc();
                         debug!("[BlockSTM]: Early halted due to accumulated_gas {} >= PER_BLOCK_GAS_LIMIT {}.", accumulated_gas, PER_BLOCK_GAS_LIMIT);
@@ -309,19 +313,26 @@ where
         executor_initial_arguments: E::Argument,
         signature_verified_block: &Vec<T>,
         base_view: &S,
-    ) -> Result<Vec<(E::Output, Vec<(T::Key, WriteOp)>)>, E::Error> {
+    ) -> (
+        Result<Vec<(E::Output, Vec<(T::Key, WriteOp)>)>, E::Error>,
+        bool,
+    ) {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         assert!(self.concurrency_level > 1, "Must use sequential execution");
 
         let versioned_cache = MVHashMap::new(None);
 
         if signature_verified_block.is_empty() {
-            return Ok(vec![]);
+            return (Ok(vec![]), false);
         }
 
         let num_txns = signature_verified_block.len() as u32;
         let last_input_output = TxnLastInputOutput::new(num_txns);
         let committing = AtomicBool::new(true);
+        // Both reconfiguration and per-block gas limit uses SkipRest to end the block earlier.
+        // But we only add back the StateCheckpoint to the end of the block for per-block gas limit.
+        // So we use this atomic boolean variable to distinguish these two cases.
+        let has_reconfiguration = AtomicBool::new(false);
         let scheduler = Scheduler::new(num_txns);
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
@@ -336,6 +347,7 @@ where
                         &scheduler,
                         base_view,
                         committing.swap(false, Ordering::SeqCst),
+                        &has_reconfiguration,
                     );
                 });
             }
@@ -374,17 +386,20 @@ where
         });
 
         match maybe_err {
-            Some(err) => Err(err),
+            Some(err) => (Err(err), false),
             None => {
                 final_results.resize_with(num_txns, E::Output::skip_output);
                 let (mv_data_cache, _mv_code_cache) = versioned_cache.take();
                 let delta_resolver: OutputDeltaResolver<T> =
                     OutputDeltaResolver::new(mv_data_cache);
                 // TODO: parallelize when necessary.
-                Ok(final_results
-                    .into_iter()
-                    .zip(delta_resolver.resolve(base_view, num_txns).into_iter())
-                    .collect())
+                (
+                    Ok(final_results
+                        .into_iter()
+                        .zip(delta_resolver.resolve(base_view, num_txns).into_iter())
+                        .collect()),
+                    has_reconfiguration.load(Ordering::Relaxed),
+                )
             },
         }
     }
@@ -394,13 +409,17 @@ where
         executor_arguments: E::Argument,
         signature_verified_block: &[T],
         base_view: &S,
-    ) -> Result<Vec<(E::Output, Vec<(T::Key, WriteOp)>)>, E::Error> {
+    ) -> (
+        Result<Vec<(E::Output, Vec<(T::Key, WriteOp)>)>, E::Error>,
+        bool,
+    ) {
         let num_txns = signature_verified_block.len();
         let executor = E::init(executor_arguments);
         let mut data_map = BTreeMap::new();
 
         let mut ret = Vec::with_capacity(num_txns);
         let mut accumulated_gas = 0;
+        let mut has_reconfiguration = false;
         for (idx, txn) in signature_verified_block.iter().enumerate() {
             let res = executor.execute_transaction(
                 &LatestView::<T, S>::new_btree_view(base_view, &data_map, idx as TxnIndex),
@@ -427,12 +446,13 @@ where
                 },
                 ExecutionStatus::Abort(err) => {
                     // Record the status indicating abort.
-                    return Err(Error::UserError(err));
+                    return (Err(Error::UserError(err)), false);
                 },
             }
 
             // When the txn is a SkipRest txn, halt sequential execution.
             if must_skip {
+                has_reconfiguration = true;
                 debug!("[Execution]: Sequential execution early halted due to SkipRest txn.");
                 break;
             }
@@ -448,16 +468,27 @@ where
         }
 
         ret.resize_with(num_txns, E::Output::skip_output);
-        Ok(ret.into_iter().map(|out| (out, vec![])).collect())
+        (
+            Ok(ret.into_iter().map(|out| (out, vec![])).collect()),
+            has_reconfiguration,
+        )
     }
 
     pub fn execute_block(
         &self,
         executor_arguments: E::Argument,
-        signature_verified_block: Vec<T>,
+        mut signature_verified_block: Vec<T>,
         base_view: &S,
     ) -> Result<Vec<(E::Output, Vec<(T::Key, WriteOp)>)>, E::Error> {
-        let mut ret = if self.concurrency_level > 1 {
+        // The last txn must be StateCheckpoint in production. We let the executor
+        // executes all but the last txn first, and then add back the output of the
+        // StateCheckpoint txn if there is no reconfiguration txn.
+        // The reason is that with per-block gas limit, the parallel / sequential execution
+        // may early halt and mark all remaining txns as Discard, so we need to add back
+        // the StateCheckpoint output to satisfy the invariant checks.
+        let state_checkpoint_txn = signature_verified_block.pop();
+
+        let (mut ret, mut has_reconfiguration) = if self.concurrency_level > 1 {
             self.execute_transactions_parallel(
                 executor_arguments,
                 &signature_verified_block,
@@ -478,11 +509,35 @@ where
             // Clear by re-initializing the speculative logs.
             init_speculative_logs(signature_verified_block.len());
 
-            ret = self.execute_transactions_sequential(
+            (ret, has_reconfiguration) = self.execute_transactions_sequential(
                 executor_arguments,
                 &signature_verified_block,
                 base_view,
             )
+        }
+
+        if let Ok(ref mut outputs) = ret {
+            if !has_reconfiguration {
+                if let Some(txn) = state_checkpoint_txn {
+                    // If the block execution is halted due to reconfiguration,
+                    // StateCheckpoint is not added for back-forward compatibility.
+                    // Otherwise, add back the output of the StateCheckpoint txn.
+                    let executor = E::init(executor_arguments);
+                    let res = executor.execute_transaction(
+                        &LatestView::<T, S>::new_btree_view(base_view, &BTreeMap::new(), 0),
+                        &txn,
+                        0,
+                        true,
+                    );
+
+                    if let ExecutionStatus::Success(output) = res {
+                        outputs.push((output, vec![]));
+                    } else {
+                        // The execution result of StateCheckpoint txn must be successful.
+                        unreachable!();
+                    }
+                }
+            }
         }
 
         RAYON_EXEC_POOL.spawn(move || {

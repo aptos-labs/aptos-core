@@ -57,6 +57,7 @@ fn run_transactions<K, V>(
             EmptyDataView<KeyType<K>, ValueType<V>>,
         >::new(num_cpus::get())
         .execute_transactions_parallel((), &transactions, &data_view)
+        .0
         .map(|zipped| zipped.into_iter().map(|(res, _)| res).collect());
 
         if module_access.0 && module_access.1 {
@@ -183,6 +184,7 @@ fn deltas_writes_mixed() {
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         >::new(num_cpus::get())
         .execute_transactions_parallel((), &transactions, &data_view)
+        .0
         .map(|zipped| zipped.into_iter().map(|(res, _)| res).collect());
 
         let baseline = ExpectedOutput::generate_baseline(&transactions, None);
@@ -224,6 +226,7 @@ fn deltas_resolver() {
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         >::new(num_cpus::get())
         .execute_transactions_parallel((), &transactions, &data_view)
+        .0
         .unwrap()
         .into_iter()
         .unzip();
@@ -361,7 +364,7 @@ fn publishing_fixed_params() {
         DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
     >::new(num_cpus::get())
     .execute_transactions_parallel((), &transactions, &data_view);
-    assert_ok!(output);
+    assert_ok!(output.0);
 
     // Adjust the reads of txn indices[2] to contain module read to key 42.
     let r_index = indices[2].index(num_txns);
@@ -398,7 +401,7 @@ fn publishing_fixed_params() {
         >::new(num_cpus::get())
         .execute_transactions_parallel((), &transactions, &data_view);
 
-        assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);
+        assert_eq!(output.0.unwrap_err(), Error::ModulePathReadWrite);
     }
 }
 
