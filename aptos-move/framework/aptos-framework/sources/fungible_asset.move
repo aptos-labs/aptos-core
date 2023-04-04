@@ -1,9 +1,8 @@
 /// This defines the fungible asset module that can issue fungible asset of any `FungibleAssetMetadata` object. The
 /// metadata object can be any object that equipped with `FungibleAssetMetadata` resource.
 module aptos_framework::fungible_asset {
-    use aptos_framework::create_signer;
     use aptos_framework::event;
-    use aptos_framework::object::{Self, Object, ConstructorRef, DeriveRef};
+    use aptos_framework::object::{Self, Object, ConstructorRef};
 
     use std::error;
     use std::option::{Self, Option};
@@ -51,8 +50,6 @@ module aptos_framework::fungible_asset {
         /// For example, if `decimals` equals `2`, a balance of `505` coins should
         /// be displayed to a user as `5.05` (`505 / 10 ** 2`).
         decimals: u8,
-        /// The ref used to create wallet objects for users later.
-        derive_ref: DeriveRef,
     }
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
@@ -96,16 +93,6 @@ module aptos_framework::fungible_asset {
         metadata: Object<FungibleAssetMetadata>
     }
 
-    /// Emitted when fungible assets are minted.
-    struct MintEvent has drop, store {
-        amount: u64,
-    }
-
-    /// Emitted when fungible assets are burnt.
-    struct BurnEvent has drop, store {
-        amount: u64,
-    }
-
     /// Emitted when fungible assets are deposited into a wallet.
     struct DepositEvent has drop, store {
         amount: u64,
@@ -123,7 +110,7 @@ module aptos_framework::fungible_asset {
 
     /// Make an existing object fungible by adding the FungibleAssetMetadata resource.
     /// This returns the capabilities to mint, burn, and transfer.
-    public fun make_object_fungible(
+    public fun add_fungibility(
         constructor_ref: &ConstructorRef,
         maximum_supply: u64,
         name: String,
@@ -143,7 +130,6 @@ module aptos_framework::fungible_asset {
                 name,
                 symbol,
                 decimals,
-                derive_ref: object::generate_derive_ref(constructor_ref),
             }
         );
         object::object_from_constructor_ref<FungibleAssetMetadata>(constructor_ref)
@@ -199,12 +185,6 @@ module aptos_framework::fungible_asset {
     /// Get the decimals from `metadata`.
     public fun decimals<T: key>(metadata: Object<T>): u8 acquires FungibleAssetMetadata {
         borrow_fungible_metadata(&metadata).decimals
-    }
-
-    #[view]
-    public fun deterministic_wallet_address<T: key>(owner: address, metadata: Object<T>): address {
-        let metadata_addr = object::object_address(&metadata);
-        object::create_derived_object_address(owner, metadata_addr)
     }
 
     #[view]
@@ -278,25 +258,9 @@ module aptos_framework::fungible_asset {
         deposit(to, fa);
     }
 
-    /// Create a new wallet object to hold fungible asset.
-    public fun create_deterministic_wallet<T: key>(
-        owner_addr: address,
-        metadata: Object<T>,
-    ): Object<FungibleAssetWallet> acquires FungibleAssetMetadata {
-        let owner = &create_signer::create_signer(owner_addr);
-        let derive_ref = &borrow_fungible_metadata(&metadata).derive_ref;
-        let constructor_ref = &object::create_derived_object(owner, derive_ref);
-
-        // Disable ungated transfer as deterministic wallets shouldn't be transferrable.
-        let transfer_ref = &object::generate_transfer_ref(constructor_ref);
-        object::disable_ungated_transfer(transfer_ref);
-
-        initialize_arbitrary_wallet(constructor_ref, metadata)
-    }
-
     /// Allow an object to hold a wallet for fungible assets.
     /// Applications can use this to create multiple wallets for isolating fungible assets for different purposes.
-    public fun initialize_arbitrary_wallet<T: key>(
+    public fun create_wallet<T: key>(
         constructor_ref: &ConstructorRef,
         metadata: Object<T>,
     ): Object<FungibleAssetWallet> {
@@ -546,7 +510,7 @@ module aptos_framework::fungible_asset {
 
     #[test_only]
     public fun init_test_metadata(constructor_ref: &ConstructorRef): (MintRef, TransferRef, BurnRef) {
-        make_object_fungible(
+        add_fungibility(
             constructor_ref,
             100 /* max supply */,
             string::utf8(b"USDA"),
@@ -566,6 +530,15 @@ module aptos_framework::fungible_asset {
         let (creator_ref, metadata) = create_test_token(creator);
         let (mint, transfer, burn) = init_test_metadata(&creator_ref);
         (mint, transfer, burn, metadata)
+    }
+
+    #[test_only]
+    public fun create_test_wallet<T: key>(owner: &signer, metadata: Object<T>): Object<FungibleAssetWallet> {
+        let owner_addr = signer::address_of(owner);
+        if (!account::exists_at(owner_addr)) {
+            account::create_account_for_test(owner_addr);
+        };
+        create_wallet(&object::create_object_from_account(owner), metadata)
     }
 
     #[test(creator = @0xcafe)]
@@ -607,8 +580,8 @@ module aptos_framework::fungible_asset {
     ) acquires FungibleAssetMetadata, FungibleAssetWallet, FungibleAssetWalletEvents {
         let (mint_ref, transfer_ref, burn_ref, test_token) = create_fungible_asset(creator);
         let metadata = mint_ref.metadata;
-        let creator_wallet = create_deterministic_wallet(signer::address_of(creator), metadata);
-        let aaron_wallet = create_deterministic_wallet(signer::address_of(aaron), metadata);
+        let creator_wallet = create_test_wallet(creator, metadata);
+        let aaron_wallet = create_test_wallet(aaron, metadata);
 
         assert!(supply(test_token) == 0, 1);
         // Mint
@@ -639,7 +612,7 @@ module aptos_framework::fungible_asset {
     ) acquires FungibleAssetMetadata, FungibleAssetWallet, FungibleAssetWalletEvents {
         let (mint_ref, transfer_ref, _burn_ref, _) = create_fungible_asset(creator);
 
-        let creator_wallet = create_deterministic_wallet(signer::address_of(creator), mint_ref.metadata);
+        let creator_wallet = create_test_wallet(creator, mint_ref.metadata);
         let fa = mint(&mint_ref, 100);
         set_ungated_transfer(&transfer_ref, creator_wallet, false);
         deposit(creator_wallet, fa);
@@ -652,8 +625,8 @@ module aptos_framework::fungible_asset {
     ) acquires FungibleAssetMetadata, FungibleAssetWallet, FungibleAssetWalletEvents {
         let (mint_ref, transfer_ref, _burn_ref, _) = create_fungible_asset(creator);
         let metadata = mint_ref.metadata;
-        let creator_wallet = create_deterministic_wallet(signer::address_of(creator), metadata);
-        let aaron_wallet = create_deterministic_wallet(signer::address_of(aaron), metadata);
+        let creator_wallet = create_test_wallet(creator, metadata);
+        let aaron_wallet = create_test_wallet(aaron, metadata);
 
         let fa = mint(&mint_ref, 100);
         set_ungated_transfer(&transfer_ref, creator_wallet, false);

@@ -6,6 +6,8 @@
 This defines the module for interacting with primary wallets of accounts/objects, which have deterministic addresses
 
 
+-  [Resource `PrimaryWalletSupport`](#0x1_primary_wallet_PrimaryWalletSupport)
+-  [Function `enable_primary_wallet`](#0x1_primary_wallet_enable_primary_wallet)
 -  [Function `ensure_primary_wallet_exists`](#0x1_primary_wallet_ensure_primary_wallet_exists)
 -  [Function `create_primary_wallet`](#0x1_primary_wallet_create_primary_wallet)
 -  [Function `primary_wallet_address`](#0x1_primary_wallet_primary_wallet_address)
@@ -19,12 +21,72 @@ This defines the module for interacting with primary wallets of accounts/objects
 -  [Specification](#@Specification_0)
 
 
-<pre><code><b>use</b> <a href="fungible_asset.md#0x1_fungible_asset">0x1::fungible_asset</a>;
+<pre><code><b>use</b> <a href="create_signer.md#0x1_create_signer">0x1::create_signer</a>;
+<b>use</b> <a href="fungible_asset.md#0x1_fungible_asset">0x1::fungible_asset</a>;
 <b>use</b> <a href="object.md#0x1_object">0x1::object</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 </code></pre>
 
 
+
+<a name="0x1_primary_wallet_PrimaryWalletSupport"></a>
+
+## Resource `PrimaryWalletSupport`
+
+Resource stored on the fungible asset metadata object to allow creating primary wallets for it.
+
+
+<pre><code><b>struct</b> <a href="primary_wallet.md#0x1_primary_wallet_PrimaryWalletSupport">PrimaryWalletSupport</a> <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>metadata_derive_ref: <a href="object.md#0x1_object_DeriveRef">object::DeriveRef</a></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_primary_wallet_enable_primary_wallet"></a>
+
+## Function `enable_primary_wallet`
+
+Creators of fungible assets can call this to enable support for creating primary (deterministic) wallets for
+their users.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="primary_wallet.md#0x1_primary_wallet_enable_primary_wallet">enable_primary_wallet</a>(metadata_constructor_ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="primary_wallet.md#0x1_primary_wallet_enable_primary_wallet">enable_primary_wallet</a>(metadata_constructor_ref: &ConstructorRef) {
+    // Ensure that this is a fungible asset metadata <a href="object.md#0x1_object">object</a>.
+    <a href="object.md#0x1_object_object_from_constructor_ref">object::object_from_constructor_ref</a>&lt;FungibleAssetMetadata&gt;(metadata_constructor_ref);
+    <b>let</b> metadata_obj = &<a href="object.md#0x1_object_generate_signer">object::generate_signer</a>(metadata_constructor_ref);
+    <b>move_to</b>(metadata_obj, <a href="primary_wallet.md#0x1_primary_wallet_PrimaryWalletSupport">PrimaryWalletSupport</a> {
+        metadata_derive_ref: <a href="object.md#0x1_object_generate_derive_ref">object::generate_derive_ref</a>(metadata_constructor_ref),
+    });
+}
+</code></pre>
+
+
+
+</details>
 
 <a name="0x1_primary_wallet_ensure_primary_wallet_exists"></a>
 
@@ -41,7 +103,10 @@ This defines the module for interacting with primary wallets of accounts/objects
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="primary_wallet.md#0x1_primary_wallet_ensure_primary_wallet_exists">ensure_primary_wallet_exists</a>&lt;T: key&gt;(owner: <b>address</b>, metadata: Object&lt;T&gt;): Object&lt;FungibleAssetWallet&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="primary_wallet.md#0x1_primary_wallet_ensure_primary_wallet_exists">ensure_primary_wallet_exists</a>&lt;T: key&gt;(
+    owner: <b>address</b>,
+    metadata: Object&lt;T&gt;,
+): Object&lt;FungibleAssetWallet&gt; <b>acquires</b> <a href="primary_wallet.md#0x1_primary_wallet_PrimaryWalletSupport">PrimaryWalletSupport</a> {
     <b>if</b> (!<a href="primary_wallet.md#0x1_primary_wallet_primary_wallet_exists">primary_wallet_exists</a>(owner, metadata)) {
         <a href="primary_wallet.md#0x1_primary_wallet_create_primary_wallet">create_primary_wallet</a>(owner, metadata);
     };
@@ -60,7 +125,7 @@ This defines the module for interacting with primary wallets of accounts/objects
 Create a primary wallet object to hold fungible asset for the given address.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="primary_wallet.md#0x1_primary_wallet_create_primary_wallet">create_primary_wallet</a>&lt;T: key&gt;(owner: <b>address</b>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWallet">fungible_asset::FungibleAssetWallet</a>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="primary_wallet.md#0x1_primary_wallet_create_primary_wallet">create_primary_wallet</a>&lt;T: key&gt;(owner_addr: <b>address</b>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWallet">fungible_asset::FungibleAssetWallet</a>&gt;
 </code></pre>
 
 
@@ -69,8 +134,20 @@ Create a primary wallet object to hold fungible asset for the given address.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="primary_wallet.md#0x1_primary_wallet_create_primary_wallet">create_primary_wallet</a>&lt;T: key&gt;(owner: <b>address</b>, metadata: Object&lt;T&gt;): Object&lt;FungibleAssetWallet&gt; {
-    <a href="fungible_asset.md#0x1_fungible_asset_create_deterministic_wallet">fungible_asset::create_deterministic_wallet</a>(owner, metadata)
+<pre><code><b>public</b> <b>fun</b> <a href="primary_wallet.md#0x1_primary_wallet_create_primary_wallet">create_primary_wallet</a>&lt;T: key&gt;(
+    owner_addr: <b>address</b>,
+    metadata: Object&lt;T&gt;,
+): Object&lt;FungibleAssetWallet&gt; <b>acquires</b> <a href="primary_wallet.md#0x1_primary_wallet_PrimaryWalletSupport">PrimaryWalletSupport</a> {
+    <b>let</b> owner = &<a href="create_signer.md#0x1_create_signer_create_signer">create_signer::create_signer</a>(owner_addr);
+    <b>let</b> metadata_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(&metadata);
+    <b>let</b> derive_ref = &<b>borrow_global</b>&lt;<a href="primary_wallet.md#0x1_primary_wallet_PrimaryWalletSupport">PrimaryWalletSupport</a>&gt;(metadata_addr).metadata_derive_ref;
+    <b>let</b> constructor_ref = &<a href="object.md#0x1_object_create_derived_object">object::create_derived_object</a>(owner, derive_ref);
+
+    // Disable ungated transfer <b>as</b> deterministic wallets shouldn't be transferrable.
+    <b>let</b> transfer_ref = &<a href="object.md#0x1_object_generate_transfer_ref">object::generate_transfer_ref</a>(constructor_ref);
+    <a href="object.md#0x1_object_disable_ungated_transfer">object::disable_ungated_transfer</a>(transfer_ref);
+
+    <a href="fungible_asset.md#0x1_fungible_asset_create_wallet">fungible_asset::create_wallet</a>(constructor_ref, metadata)
 }
 </code></pre>
 
@@ -94,7 +171,8 @@ Create a primary wallet object to hold fungible asset for the given address.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="primary_wallet.md#0x1_primary_wallet_primary_wallet_address">primary_wallet_address</a>&lt;T: key&gt;(owner: <b>address</b>, metadata: Object&lt;T&gt;): <b>address</b> {
-    <a href="fungible_asset.md#0x1_fungible_asset_deterministic_wallet_address">fungible_asset::deterministic_wallet_address</a>(owner, metadata)
+    <b>let</b> metadata_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(&metadata);
+    <a href="object.md#0x1_object_create_derived_object_address">object::create_derived_object_address</a>(owner, metadata_addr)
 }
 </code></pre>
 
@@ -247,7 +325,7 @@ Deposit <code>amount</code> of fungible asset to the given account's primary wal
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="primary_wallet.md#0x1_primary_wallet_deposit">deposit</a>(owner: <b>address</b>, fa: FungibleAsset) {
+<pre><code><b>public</b> <b>fun</b> <a href="primary_wallet.md#0x1_primary_wallet_deposit">deposit</a>(owner: <b>address</b>, fa: FungibleAsset) <b>acquires</b> <a href="primary_wallet.md#0x1_primary_wallet_PrimaryWalletSupport">PrimaryWalletSupport</a> {
     <b>let</b> metadata = <a href="fungible_asset.md#0x1_fungible_asset_asset_metadata">fungible_asset::asset_metadata</a>(&fa);
     <b>let</b> wallet = <a href="primary_wallet.md#0x1_primary_wallet_ensure_primary_wallet_exists">ensure_primary_wallet_exists</a>(owner, metadata);
     <a href="fungible_asset.md#0x1_fungible_asset_deposit">fungible_asset::deposit</a>(wallet, fa);
@@ -274,7 +352,12 @@ Transfer <code>amount</code> of fungible asset from sender's primary wallet to r
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="primary_wallet.md#0x1_primary_wallet_transfer">transfer</a>&lt;T: key&gt;(sender: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, metadata: Object&lt;T&gt;, recipient: <b>address</b>, amount: u64) {
+<pre><code><b>public</b> entry <b>fun</b> <a href="primary_wallet.md#0x1_primary_wallet_transfer">transfer</a>&lt;T: key&gt;(
+    sender: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    metadata: Object&lt;T&gt;,
+    recipient: <b>address</b>,
+    amount: u64,
+) <b>acquires</b> <a href="primary_wallet.md#0x1_primary_wallet_PrimaryWalletSupport">PrimaryWalletSupport</a> {
     <b>let</b> sender_wallet = <a href="primary_wallet.md#0x1_primary_wallet_ensure_primary_wallet_exists">ensure_primary_wallet_exists</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender), metadata);
     <b>let</b> recipient_wallet = <a href="primary_wallet.md#0x1_primary_wallet_ensure_primary_wallet_exists">ensure_primary_wallet_exists</a>(recipient, metadata);
     <a href="fungible_asset.md#0x1_fungible_asset_transfer">fungible_asset::transfer</a>(sender, sender_wallet, recipient_wallet, amount);
