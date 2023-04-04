@@ -1,28 +1,26 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_language_e2e_tests::{current_function_name, executor::FakeExecutor};
 use aptos_types::{
     account_address::AccountAddress,
     account_config,
-    on_chain_config::VMPublishingOption,
     transaction::{ExecutionStatus, Script, TransactionStatus},
 };
-use language_e2e_tests::{current_function_name, executor::FakeExecutor};
-use move_deps::{
-    move_binary_format::file_format::{
-        empty_script, AbilitySet, AddressIdentifierIndex, Bytecode, FunctionHandle,
-        FunctionHandleIndex, IdentifierIndex, ModuleHandle, ModuleHandleIndex, SignatureIndex,
-    },
-    move_core_types::{
-        identifier::Identifier,
-        language_storage::{StructTag, TypeTag},
-        vm_status::{StatusCode, StatusCode::LINKER_ERROR},
-    },
+use move_binary_format::file_format::{
+    empty_script, AbilitySet, AddressIdentifierIndex, Bytecode, FunctionHandle,
+    FunctionHandleIndex, IdentifierIndex, ModuleHandle, ModuleHandleIndex, SignatureIndex,
+};
+use move_core_types::{
+    identifier::Identifier,
+    language_storage::{StructTag, TypeTag},
+    vm_status::{StatusCode, StatusCode::LINKER_ERROR},
 };
 
 #[test]
 fn script_code_unverifiable() {
-    let mut executor = FakeExecutor::from_genesis_with_options(VMPublishingOption::open());
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
 
     // create and publish sender
@@ -72,7 +70,7 @@ fn script_code_unverifiable() {
 
 #[test]
 fn script_none_existing_module_dep() {
-    let mut executor = FakeExecutor::from_genesis_with_options(VMPublishingOption::open());
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
 
     // create and publish sender
@@ -150,7 +148,7 @@ fn script_none_existing_module_dep() {
 
 #[test]
 fn script_non_existing_function_dep() {
-    let mut executor = FakeExecutor::from_genesis_with_options(VMPublishingOption::open());
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
 
     // create and publish sender
@@ -228,7 +226,7 @@ fn script_non_existing_function_dep() {
 
 #[test]
 fn script_bad_sig_function_dep() {
-    let mut executor = FakeExecutor::from_genesis_with_options(VMPublishingOption::open());
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
 
     // create and publish sender
@@ -307,7 +305,7 @@ fn script_bad_sig_function_dep() {
 
 #[test]
 fn script_type_argument_module_does_not_exist() {
-    let mut executor = FakeExecutor::from_genesis_with_options(VMPublishingOption::open());
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
 
     // create and publish sender
@@ -336,12 +334,12 @@ fn script_type_argument_module_does_not_exist() {
         .transaction()
         .script(Script::new(
             blob,
-            vec![TypeTag::Struct(StructTag {
+            vec![TypeTag::Struct(Box::new(StructTag {
                 address,
                 module,
                 name: Identifier::new("fake").unwrap(),
                 type_params: vec![],
-            })],
+            }))],
             vec![],
         ))
         .sequence_number(10)
@@ -372,7 +370,7 @@ fn script_type_argument_module_does_not_exist() {
 
 #[test]
 fn script_nested_type_argument_module_does_not_exist() {
-    let mut executor = FakeExecutor::from_genesis_with_options(VMPublishingOption::open());
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
 
     // create and publish sender
@@ -401,12 +399,14 @@ fn script_nested_type_argument_module_does_not_exist() {
         .transaction()
         .script(Script::new(
             blob,
-            vec![TypeTag::Vector(Box::new(TypeTag::Struct(StructTag {
-                address,
-                module,
-                name: Identifier::new("fake").unwrap(),
-                type_params: vec![],
-            })))],
+            vec![TypeTag::Vector(Box::new(TypeTag::Struct(Box::new(
+                StructTag {
+                    address,
+                    module,
+                    name: Identifier::new("fake").unwrap(),
+                    type_params: vec![],
+                },
+            ))))],
             vec![],
         ))
         .sequence_number(10)

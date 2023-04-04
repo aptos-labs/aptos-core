@@ -1,20 +1,21 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     smoke_test_environment::new_local_swarm_with_aptos,
     test_utils::{
         assert_balance, check_create_mint_transfer, create_and_fund_account, transfer_coins,
+        MAX_HEALTHY_WAIT_SECS,
     },
 };
-use aptos_transaction_builder::aptos_stdlib;
-use forge::{NodeExt, Swarm};
+use aptos_cached_packages::aptos_stdlib;
+use aptos_forge::{NodeExt, Swarm};
 use std::time::{Duration, Instant};
 
 #[tokio::test]
 async fn test_create_mint_transfer_block_metadata() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
-
     // This script does 4 transactions
     check_create_mint_transfer(&mut swarm).await;
 
@@ -65,7 +66,7 @@ async fn test_basic_restartability() {
     let validator = swarm.validators_mut().next().unwrap();
     validator.restart().await.unwrap();
     validator
-        .wait_until_healthy(Instant::now() + Duration::from_secs(10))
+        .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_HEALTHY_WAIT_SECS))
         .await
         .unwrap();
 
@@ -105,4 +106,41 @@ async fn test_concurrent_transfers_single_node() {
     transfer_coins(&client, &transaction_factory, &mut account_0, &account_1, 1).await;
     // assert_balance(&client, &account_0, 79).await;
     assert_balance(&client, &account_1, 31).await;
+}
+
+#[tokio::test]
+async fn test_latest_events_and_transactions() {
+    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let client = swarm.validators().next().unwrap().rest_client();
+    let start_events = client
+        .get_new_block_events_bcs(None, Some(2))
+        .await
+        .unwrap()
+        .into_inner();
+    let start_transations = client
+        .get_transactions(None, Some(2))
+        .await
+        .unwrap()
+        .into_inner();
+
+    create_and_fund_account(&mut swarm, 100).await;
+    let cur_events = client
+        .get_new_block_events_bcs(None, Some(2))
+        .await
+        .unwrap()
+        .into_inner();
+    let (cur_transations, cur_ledger) = client
+        .get_transactions(None, Some(2))
+        .await
+        .unwrap()
+        .into_parts();
+
+    assert!(start_events[0].event.round() < cur_events[0].event.round());
+    assert!(cur_events[0].event.round() < cur_events[1].event.round());
+    assert_eq!(cur_events.len(), 2);
+
+    assert!(start_transations[0].version() < cur_transations[0].version());
+    assert!(cur_transations[0].version() < cur_transations[1].version());
+    assert_eq!(cur_transations.len(), 2);
+    assert_eq!(cur_transations[1].version().unwrap(), cur_ledger.version);
 }

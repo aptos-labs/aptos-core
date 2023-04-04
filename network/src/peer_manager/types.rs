@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 use crate::{
     peer::DisconnectReason,
@@ -46,7 +47,7 @@ pub enum ConnectionRequest {
     ),
 }
 
-#[derive(Clone, PartialEq, Serialize)]
+#[derive(Clone, PartialEq, Eq, Serialize)]
 pub enum ConnectionNotification {
     /// Connection with a new peer has been established.
     NewPeer(ConnectionMetadata, NetworkContext),
@@ -65,10 +66,10 @@ impl fmt::Display for ConnectionNotification {
         match self {
             ConnectionNotification::NewPeer(metadata, context) => {
                 write!(f, "[{},{}]", metadata, context)
-            }
+            },
             ConnectionNotification::LostPeer(metadata, context, reason) => {
                 write!(f, "[{},{},{}]", metadata, context, reason)
-            }
+            },
         }
     }
 }

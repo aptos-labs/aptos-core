@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -7,19 +8,19 @@ use crate::{
     storage::{BackupStorage, FileHandle},
     utils::{error_notes::ErrorNotes, stream::StreamX},
 };
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use aptos_logger::prelude::*;
 use aptos_temppath::TempPath;
 use async_trait::async_trait;
+use clap::Parser;
 use futures::stream::poll_fn;
 use once_cell::sync::Lazy;
 use std::{
     collections::{HashMap, HashSet},
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::Arc,
     time::Instant,
 };
-use structopt::StructOpt;
 use tokio::{
     fs::{create_dir_all, read_dir, remove_file, OpenOptions},
     io::{AsyncRead, AsyncReadExt},
@@ -33,19 +34,28 @@ static TEMP_METADATA_CACHE_DIR: Lazy<TempPath> = Lazy::new(|| {
     dir
 });
 
-#[derive(StructOpt)]
+#[derive(Clone, Parser)]
 pub struct MetadataCacheOpt {
-    #[structopt(
+    #[clap(
         long = "metadata-cache-dir",
         parse(from_os_str),
-        help = "[Defaults to temporary dir] Metadata cache dir."
+        help = "Metadata cache dir. If specified and shared across runs, \
+        metadata files in cache won't be downloaded again from backup source, speeding up tool \
+        boot up significantly. Cache content can be messed up if used across the devnet, \
+        the testnet and the mainnet, hence it [Defaults to temporary dir]."
     )]
     dir: Option<PathBuf>,
 }
 
 impl MetadataCacheOpt {
-    // in cache we save things other than the cached files.
+    // in case we save things other than the cached files.
     const SUB_DIR: &'static str = "cache";
+
+    pub fn new(dir: Option<impl AsRef<Path>>) -> Self {
+        Self {
+            dir: dir.map(|dir| dir.as_ref().to_path_buf()),
+        }
+    }
 
     fn cache_dir(&self) -> PathBuf {
         self.dir
@@ -53,6 +63,14 @@ impl MetadataCacheOpt {
             .unwrap_or_else(|| TEMP_METADATA_CACHE_DIR.path().to_path_buf())
             .join(Self::SUB_DIR)
     }
+}
+
+/// Try to load the identity metadata, if not present, try to write one in.
+pub async fn initialize_identity(storage: &Arc<dyn BackupStorage>) -> Result<()> {
+    let metadata = Metadata::new_random_identity();
+    storage
+        .save_metadata_line(&metadata.name(), &metadata.to_text_line()?)
+        .await
 }
 
 /// Sync local cache folder with remote storage, and load all metadata entries from the cache.
@@ -86,9 +104,18 @@ pub async fn sync_and_load(
         .collect::<Result<HashSet<_>>>()?;
 
     // List remote metadata files.
-    let remote_file_handles = storage.list_metadata_files().await?;
+    let mut remote_file_handles = storage.list_metadata_files().await?;
+    if remote_file_handles.is_empty() {
+        initialize_identity(&storage).await.context(
+            "\
+            Backup storage appears empty and failed to put in identity metadata, \
+            no point to go on. If you believe there is content in the backup, check authentication.\
+            ",
+        )?;
+        remote_file_handles = storage.list_metadata_files().await?;
+    }
     let remote_file_handle_by_hash: HashMap<_, _> = remote_file_handles
-        .into_iter()
+        .iter()
         .map(|file_handle| (file_handle.file_handle_hash(), file_handle))
         .collect();
     let remote_hashes: HashSet<_> = remote_file_handle_by_hash.keys().cloned().collect();
@@ -101,13 +128,15 @@ pub async fn sync_and_load(
     let up_to_date_local_hashes = local_hashes.intersection(&remote_hashes);
 
     for h in stale_local_hashes {
-        let file = cache_dir.join(&*h);
+        let file = cache_dir.join(h);
         remove_file(&file).await.err_notes(&file)?;
+        info!(file_name = h, "Deleted stale metadata file in cache.");
     }
 
-    NUM_META_MISS.set(new_remote_hashes.len() as i64);
+    let num_new_files = new_remote_hashes.len();
+    NUM_META_MISS.set(num_new_files as i64);
     NUM_META_DOWNLOAD.set(0);
-    let futs = new_remote_hashes.iter().map(|h| {
+    let futs = new_remote_hashes.iter().enumerate().map(|(i, h)| {
         let fh_by_h_ref = &remote_file_handle_by_hash;
         let storage_ref = &storage;
         let cache_dir_ref = &cache_dir;
@@ -133,6 +162,12 @@ pub async fn sync_and_load(
             // rename to target file only if successful; stale tmp file caused by failure will be
             // reclaimed on next run
             tokio::fs::rename(local_tmp_file, local_file).await?;
+            info!(
+                file_handle = file_handle,
+                processed = i + 1,
+                total = num_new_files,
+                "Metadata file downloaded."
+            );
             NUM_META_DOWNLOAD.inc();
             Ok(())
         }
@@ -145,10 +180,11 @@ pub async fn sync_and_load(
         .collect::<Result<Vec<_>>>()
         .await?;
 
+    info!("Loading all metadata files to memory.");
     // Load metadata from synced cache files.
     let mut metadata_vec = Vec::new();
     for h in new_remote_hashes.into_iter().chain(up_to_date_local_hashes) {
-        let cached_file = cache_dir.join(&*h);
+        let cached_file = cache_dir.join(h);
         metadata_vec.extend(
             OpenOptions::new()
                 .read(true)
@@ -162,10 +198,11 @@ pub async fn sync_and_load(
         )
     }
     info!(
-        "Metadata cache loaded in {:.2} seconds.",
-        timer.elapsed().as_secs_f64()
+        total_time = timer.elapsed().as_secs(),
+        "Metadata cache loaded.",
     );
-    Ok(metadata_vec.into())
+
+    Ok(MetadataView::new(metadata_vec, remote_file_handles))
 }
 
 trait FileHandleHash {

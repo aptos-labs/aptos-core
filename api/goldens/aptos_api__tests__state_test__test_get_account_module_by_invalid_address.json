@@ -1,4 +1,5 @@
 {
-  "code": 400,
-  "message": "invalid parameter account address: 1"
+  "message": "failed to parse path `address`: failed to parse \"string(Address)\": invalid account address \"1\"",
+  "error_code": "web_framework_error",
+  "vm_error_code": null
 }

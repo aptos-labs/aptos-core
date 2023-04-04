@@ -1,0 +1,315 @@
+# Continuously run stable forge tests against the latest main branch.
+name: Continuous Forge Tests - Stable
+
+permissions:
+  issues: write
+  pull-requests: write
+  contents: read
+  id-token: write
+  actions: write #required for workflow cancellation via check-aptos-core
+
+on:
+  # Allow triggering manually
+  workflow_dispatch:
+    inputs:
+      IMAGE_TAG:
+        required: false
+        type: string
+        description: The docker image tag to test. This may be a git SHA1, or a tag like "<branch>_<git SHA1>". If not specified, Forge will find the latest build based on the git history (starting from GIT_SHA input)
+      GIT_SHA:
+        required: false
+        type: string
+        description: The git SHA1 to checkout. This affects the Forge test runner that is used. If not specified, the latest main will be used
+  schedule:
+    - cron: "0 9 * * *" # the main branch cadence
+    - cron: "0 21 * * *" # the QS "quorum-store" branch cadence
+  pull_request:
+    paths:
+      - ".github/workflows/forge-stable.yaml"
+  push:
+    branches:
+      - aptos-release-v* # the aptos release branches
+      - aptos-node-v*
+
+env:
+  AWS_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  IMAGE_TAG: ${{ inputs.IMAGE_TAG }} # this is only used for workflow_dispatch, otherwise defaults to empty
+  AWS_REGION: us-west-2
+
+jobs:
+  # This job determines the image tag and branch to test, and passes them to the other jobs
+  # NOTE: this may be better as a separate workflow as the logic is quite complex but generalizable
+  determine-test-metadata:
+    runs-on: ubuntu-latest
+    outputs:
+      IMAGE_TAG: ${{ steps.determine-test-image-tag.outputs.IMAGE_TAG }}
+      BRANCH: ${{ steps.determine-test-branch.outputs.BRANCH }}
+    steps:
+      - name: Determine branch based on cadence
+        id: determine-test-branch
+        run: |
+          if [[ "${{ github.event_name }}" == "schedule" ]]; then
+            if [[ "${{ github.event.schedule }}" == "0 9 * * *" ]]; then
+              echo "Branch: main"
+              echo "BRANCH=main" >> $GITHUB_OUTPUT
+            elif [[ "${{ github.event.schedule }}" == "0 21 * * *" ]]; then
+              echo "Branch: quorum-store"
+              echo "BRANCH=quorum-store" >> $GITHUB_OUTPUT
+            else
+              echo "Unknown schedule: ${{ github.event.schedule }}"
+              exit 1
+            fi
+          elif [[ "${{ github.event_name }}" == "push" ]]; then
+              echo "Branch: ${{ github.ref_name }}"
+              echo "BRANCH=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "Using GIT_SHA"
+            # on workflow_dispatch, this will simply use the inputs.GIT_SHA given (or the default)
+            # on pull_request, this will default to null and the following "checkout" step will use the PR's base branch
+            echo "BRANCH=${{ inputs.GIT_SHA }}" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+        with:
+          ref: ${{ steps.determine-test-branch.outputs.BRANCH }}
+          fetch-depth: 0
+
+      - uses: aptos-labs/aptos-core/.github/actions/check-aptos-core@main
+        with:
+          cancel-workflow: ${{ github.event_name == 'schedule' }} # Cancel the workflow if it is scheduled on a fork
+
+      - uses: actions/setup-python@13ae5bb136fac2878aff31522b9efb785519f984 # pin@v4
+
+      - name: Install python deps
+        run: pip3 install click==8.1.3 psutil==5.9.1
+
+      - name: Determine image tag
+        id: determine-test-image-tag
+        # forge relies on the default and failpoints variants
+        run: python3 testsuite/find_latest_image.py --variant failpoints --variant performance
+
+      - name: Write summary
+        run: |
+          IMAGE_TAG=${{ steps.determine-test-image-tag.outputs.IMAGE_TAG }}
+          BRANCH=${{ steps.determine-test-branch.outputs.BRANCH }}
+          if [ -n "${BRANCH}" ]; then
+            echo "BRANCH: [${BRANCH}](https://github.com/${{ github.repository }}/tree/${BRANCH})" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "IMAGE_TAG: [${IMAGE_TAG}](https://github.com/${{ github.repository }}/commit/${IMAGE_TAG})" >> $GITHUB_STEP_SUMMARY
+
+  ### Performance Forge tests
+
+  run-forge-consensus-stress-test:
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: determine-test-metadata
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-consensus-stress-test-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_RUNNER_DURATION_SECS: 2400
+      FORGE_TEST_SUITE: consensus_stress_test
+      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
+
+  run-forge-account-creation-test:
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: determine-test-metadata
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-account-creation-test-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_RUNNER_DURATION_SECS: 900
+      FORGE_TEST_SUITE: account_creation
+      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
+
+  run-forge-performance-test:
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: determine-test-metadata
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-performance-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_RUNNER_DURATION_SECS: 7200
+      FORGE_TEST_SUITE: land_blocking
+      FORGE_ENABLE_PERFORMANCE: true
+      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
+
+  run-forge-single-vfn-perf:
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: determine-test-metadata
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-continuous-e2e-single-vfn-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      # Run for 8 minutes
+      FORGE_RUNNER_DURATION_SECS: 480
+      FORGE_TEST_SUITE: single_vfn_perf
+      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
+
+  run-forge-haproxy:
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: determine-test-metadata
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-haproxy-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_RUNNER_DURATION_SECS: 600
+      FORGE_ENABLE_HAPROXY: true
+      FORGE_TEST_SUITE: land_blocking
+      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
+
+  ### Compatibility Forge tests
+
+  run-forge-compat:
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: determine-test-metadata
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      FORGE_NAMESPACE: forge-compat-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      # Run for 5 minutes
+      FORGE_RUNNER_DURATION_SECS: 300
+      # This will upgrade from testnet branch to the latest main
+      FORGE_TEST_SUITE: compat
+      IMAGE_TAG: testnet
+      GIT_SHA: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }} # this is the git ref to checkout
+      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
+
+  ### Chaos Forge tests
+
+  run-forge-three-region:
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: determine-test-metadata
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-three-region-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_RUNNER_DURATION_SECS: 1800
+      FORGE_TEST_SUITE: three_region_simulation
+      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
+
+  run-forge-fullnode-reboot-stress-test:
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: determine-test-metadata
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-fullnode-reboot-stress-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_RUNNER_DURATION_SECS: 1800
+      FORGE_TEST_SUITE: fullnode_reboot_stress_test
+      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
+
+  run-forge-network-partition-test:
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: determine-test-metadata
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-network-partition-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      # Run for 15 minutes
+      FORGE_RUNNER_DURATION_SECS: 900
+      FORGE_TEST_SUITE: network_partition
+      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
+
+  ### Changing working quorum Forge tests
+
+  run-forge-changing-working-quorum-test:
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: determine-test-metadata
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-changing-working-quorum-test-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_RUNNER_DURATION_SECS: 1200
+      FORGE_TEST_SUITE: changing_working_quorum_test
+      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
+      FORGE_ENABLE_FAILPOINTS: true
+
+  run-forge-different-node-speed-and-reliability-test:
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: determine-test-metadata
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-different-node-speed-and-reliability-test-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_RUNNER_DURATION_SECS: 900
+      FORGE_TEST_SUITE: different_node_speed_and_reliability_test
+      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
+      FORGE_ENABLE_FAILPOINTS: true
+
+  run-forge-changing-working-quorum-test-high-load:
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: determine-test-metadata
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-changing-working-quorum-test-high-load-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_RUNNER_DURATION_SECS: 900
+      FORGE_TEST_SUITE: changing_working_quorum_test_high_load
+      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
+      FORGE_ENABLE_FAILPOINTS: true
+
+  ### State sync Forge tests
+
+  run-forge-state-sync-perf-validator-test:
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: determine-test-metadata
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-state-sync-perf-validator-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      # Run for 40 minutes
+      FORGE_RUNNER_DURATION_SECS: 2400
+      FORGE_TEST_SUITE: state_sync_perf_validators
+      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
+
+  run-forge-state-sync-perf-fullnode-execute-test:
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: determine-test-metadata
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-state-sync-perf-fullnode-execute-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      # Run for 40 minutes
+      FORGE_RUNNER_DURATION_SECS: 2400
+      FORGE_TEST_SUITE: state_sync_perf_fullnodes_execute_transactions
+      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
+
+  run-forge-state-sync-perf-fullnode-fast-sync-test:
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: determine-test-metadata
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-state-sync-perf-fullnode-fast-sync-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      # Run for 40 minutes
+      FORGE_RUNNER_DURATION_SECS: 2400
+      FORGE_TEST_SUITE: state_sync_perf_fullnodes_fast_sync
+      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
+
+  run-forge-state-sync-perf-fullnode-apply-test:
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: determine-test-metadata
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-state-sync-perf-fullnode-apply-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_RUNNER_DURATION_SECS: 2400
+      FORGE_TEST_SUITE: state_sync_perf_fullnodes_apply_outputs
+      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch

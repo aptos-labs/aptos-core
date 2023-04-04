@@ -1,57 +1,82 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{current_function_name, tests::new_test_context};
+use super::new_test_context;
+use aptos_api_test_context::current_function_name;
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 
-static EVENT_KEY: &str =
-    "0x0500000000000000000000000000000000000000000000000000000000000000000000000a550c18";
+static ACCOUNT_ADDRESS: &str = "0xa550c18";
+static CREATION_NUMBER: &str = "0";
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_events() {
     let mut context = new_test_context(current_function_name!());
 
-    let resp = context.get(format!("/events/{}", EVENT_KEY).as_str()).await;
+    let resp = context
+        .get(format!("/accounts/{}/events/{}", ACCOUNT_ADDRESS, CREATION_NUMBER).as_str())
+        .await;
 
     context.check_golden_output(resp);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_events_filter_by_start_sequence_number() {
     let mut context = new_test_context(current_function_name!());
 
     let resp = context
-        .get(format!("/events/{}?start=1", EVENT_KEY).as_str())
+        .get(
+            format!(
+                "/accounts/{}/events/{}?start=1",
+                ACCOUNT_ADDRESS, CREATION_NUMBER
+            )
+            .as_str(),
+        )
         .await;
     context.check_golden_output(resp);
 }
 
 // turn it back until we have multiple events in genesis
 #[ignore]
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_events_filter_by_limit_page_size() {
     let context = new_test_context(current_function_name!());
 
     let resp = context
-        .get(format!("/events/{}?start=1&limit=1", EVENT_KEY).as_str())
+        .get(
+            format!(
+                "/accounts/{}/events/{}?start=1&limit=1",
+                ACCOUNT_ADDRESS, CREATION_NUMBER
+            )
+            .as_str(),
+        )
         .await;
     assert_eq!(resp.as_array().unwrap().len(), 1);
 
     let resp = context
-        .get(format!("/events/{}?start=1&limit=2", EVENT_KEY).as_str())
+        .get(
+            format!(
+                "/accounts/{}/events/{}?start=1&limit=2",
+                ACCOUNT_ADDRESS, CREATION_NUMBER
+            )
+            .as_str(),
+        )
         .await;
     assert_eq!(resp.as_array().unwrap().len(), 2);
 }
 
-#[tokio::test]
-async fn test_get_events_by_invalid_key() {
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_get_events_by_invalid_creation_number() {
     let mut context = new_test_context(current_function_name!());
 
-    let resp = context.expect_status_code(400).get("/events/invalid").await;
+    let resp = context
+        .expect_status_code(400)
+        .get(format!("/accounts/{}/events/invalid", ACCOUNT_ADDRESS).as_str())
+        .await;
     context.check_golden_output(resp);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_events_by_account_event_handle() {
     let mut context = new_test_context(current_function_name!());
     let resp = context
@@ -60,7 +85,7 @@ async fn test_get_events_by_account_event_handle() {
     context.check_golden_output(resp);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_events_by_invalid_account_event_handle_struct_address() {
     let mut context = new_test_context(current_function_name!());
     let resp = context
@@ -70,7 +95,7 @@ async fn test_get_events_by_invalid_account_event_handle_struct_address() {
     context.check_golden_output(resp);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_events_by_invalid_account_event_handle_struct_module() {
     let mut context = new_test_context(current_function_name!());
     let resp = context
@@ -80,7 +105,7 @@ async fn test_get_events_by_invalid_account_event_handle_struct_module() {
     context.check_golden_output(resp);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_events_by_invalid_account_event_handle_struct_name() {
     let mut context = new_test_context(current_function_name!());
     let resp = context
@@ -90,7 +115,7 @@ async fn test_get_events_by_invalid_account_event_handle_struct_name() {
     context.check_golden_output(resp);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_events_by_invalid_account_event_handle_field_name() {
     let mut context = new_test_context(current_function_name!());
     let resp = context
@@ -100,7 +125,7 @@ async fn test_get_events_by_invalid_account_event_handle_field_name() {
     context.check_golden_output(resp);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_events_by_invalid_account_event_handle_field_type() {
     let mut context = new_test_context(current_function_name!());
 
@@ -113,7 +138,7 @@ async fn test_get_events_by_invalid_account_event_handle_field_type() {
 
 // until we have generics in the genesis
 #[ignore]
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_events_by_struct_type_has_generic_type_parameter() {
     let mut context = new_test_context(current_function_name!());
 

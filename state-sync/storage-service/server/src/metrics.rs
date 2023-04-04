@@ -1,10 +1,11 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
     register_histogram_vec, register_int_counter_vec, HistogramTimer, HistogramVec, IntCounterVec,
 };
-use network::ProtocolId;
+use aptos_network::ProtocolId;
 use once_cell::sync::Lazy;
 
 /// Useful metric constants for the storage service
@@ -17,6 +18,17 @@ pub static LRU_CACHE_EVENT: Lazy<IntCounterVec> = Lazy::new(|| {
         "aptos_storage_service_server_lru_cache",
         "Counters for lru cache events in the storage server",
         &["protocol", "event"]
+    )
+    .unwrap()
+});
+
+/// Counter for the number of times a storage response overflowed the network
+/// frame limit size and had to be retried.
+pub static NETWORK_FRAME_OVERFLOW: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_storage_service_server_network_frame_overflow",
+        "Counters for network frame overflows in the storage server",
+        &["response_type"]
     )
     .unwrap()
 });
@@ -70,6 +82,13 @@ pub static STORAGE_REQUEST_PROCESSING_LATENCY: Lazy<HistogramVec> = Lazy::new(||
     )
     .unwrap()
 });
+
+/// Increments the network frame overflow counter for the given response
+pub fn increment_network_frame_overflow(response_type: &str) {
+    NETWORK_FRAME_OVERFLOW
+        .with_label_values(&[response_type])
+        .inc()
+}
 
 /// Increments the given counter with the provided label values.
 pub fn increment_counter(counter: &Lazy<IntCounterVec>, protocol: ProtocolId, label: String) {

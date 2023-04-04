@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -18,7 +19,7 @@ impl<E: Error> std::fmt::Display for MultiResult<E> {
             MultiResult::OtherResult(err) => std::fmt::Display::fmt(&err, f),
             MultiResult::NonMatchingOutput(output1, output2) => {
                 write!(f, "{:?} != {:?}", output1, output2)
-            }
+            },
         }
     }
 }
@@ -60,6 +61,7 @@ impl<TxnType, E: Error> MultiExecutor<TxnType, E> {
 impl<TxnType: Clone, E: Error> Executor for MultiExecutor<TxnType, E> {
     type BlockResult = MultiResult<E>;
     type Txn = TxnType;
+
     fn execute_block(&mut self, block: Block<Self::Txn>) -> ExecutorResult<Self::BlockResult> {
         let mut results = BTreeMap::new();
         for executor in self.executors.iter_mut() {
@@ -71,7 +73,7 @@ impl<TxnType: Clone, E: Error> Executor for MultiExecutor<TxnType, E> {
                 match results.get(&index) {
                     None => {
                         results.insert(index, output);
-                    }
+                    },
                     Some(previous_output) => {
                         if &output != previous_output {
                             return Err(MultiResult::NonMatchingOutput(
@@ -79,10 +81,10 @@ impl<TxnType: Clone, E: Error> Executor for MultiExecutor<TxnType, E> {
                                 previous_output.clone(),
                             ));
                         }
-                    }
+                    },
                 }
             }
         }
-        Ok(results.into_iter().map(|(_, v)| v).collect())
+        Ok(results.into_values().collect())
     }
 }

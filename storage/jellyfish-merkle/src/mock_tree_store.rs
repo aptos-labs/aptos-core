@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -28,18 +29,20 @@ impl<K> TreeReader<K> for MockTreeStore<K>
 where
     K: crate::TestKey,
 {
-    fn get_node_option(&self, node_key: &NodeKey) -> Result<Option<Node<K>>> {
+    fn get_node_option(&self, node_key: &NodeKey, _tag: &str) -> Result<Option<Node<K>>> {
         Ok(self.data.read().0.get(node_key).cloned())
     }
 
-    fn get_rightmost_leaf(&self) -> Result<Option<(NodeKey, LeafNode<K>)>> {
+    fn get_rightmost_leaf(&self, version: Version) -> Result<Option<(NodeKey, LeafNode<K>)>> {
         let locked = self.data.read();
         let mut node_key_and_node: Option<(NodeKey, LeafNode<K>)> = None;
 
         for (key, value) in locked.0.iter() {
             if let Node::Leaf(leaf_node) = value {
-                if node_key_and_node.is_none()
-                    || leaf_node.account_key() > node_key_and_node.as_ref().unwrap().1.account_key()
+                if key.version() == version
+                    && (node_key_and_node.is_none()
+                        || leaf_node.account_key()
+                            > node_key_and_node.as_ref().unwrap().1.account_key())
                 {
                     node_key_and_node.replace((key.clone(), leaf_node.clone()));
                 }
@@ -82,7 +85,7 @@ where
             Entry::Occupied(o) => bail!("Key {:?} exists.", o.key()),
             Entry::Vacant(v) => {
                 v.insert(node);
-            }
+            },
         }
         Ok(())
     }

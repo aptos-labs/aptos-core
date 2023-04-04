@@ -1,0 +1,22 @@
+# This provides a values example for a humio sink with some recommended settings.
+# For docs on availabe config options check https://vector.dev/docs/reference/configuration/sinks/humio_logs/ .
+# The TLDR is:
+# most defaults are fine as baseline config.
+# - set compression: gzip. Typically this will save you 90-95% in Network Egress at the cost of some (negligible amount) of CPU to handle the compression.
+# - set rate_limit_num: 100 or something higher than the default. The default is `10` which is a bit too conservative and can easily lead backpressure for high-volume sources.
+loggingSinks:
+  humio:
+    type: humio_logs
+    inputs:
+      - final_logs
+    endpoint: "https://cloud.us.humio.com"
+    token: "${HUMIO_TOKEN:?err}"
+    compression: gzip
+    encoding:
+      codec: json
+    request:
+      rate_limit_num: 100
+
+secretVars:
+  humio-credentials:
+    HUMIO_TOKEN: "<enter_humio_ingest_token_here" # or set via --set-string secretVars.humio-credentials.HUMIO_TOKEN=<humio-ingest_token>

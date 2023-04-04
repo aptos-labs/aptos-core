@@ -1,7 +1,8 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_secure_push_metrics::{
+use aptos_metrics_core::{
     register_histogram_vec, register_int_counter_vec, register_int_gauge_vec, HistogramTimer,
     HistogramVec, IntCounterVec, IntGaugeVec,
 };

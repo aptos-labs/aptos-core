@@ -4,6 +4,13 @@ resource "google_container_cluster" "aptos" {
   location = local.zone
   network  = google_compute_network.aptos.id
 
+  lifecycle {
+    ignore_changes = [
+      private_cluster_config,
+    ]
+    prevent_destroy = true
+  }
+
   remove_default_node_pool = true
   initial_node_count       = 1
   logging_service          = "logging.googleapis.com/kubernetes"
@@ -29,7 +36,7 @@ resource "google_container_cluster" "aptos" {
   }
 
   private_cluster_config {
-    enable_private_nodes    = true
+    enable_private_nodes    = var.gke_enable_private_nodes
     enable_private_endpoint = false
     master_ipv4_cidr_block  = "172.16.0.0/28"
   }
@@ -53,8 +60,20 @@ resource "google_container_cluster" "aptos" {
     provider = "CALICO"
   }
 
-  pod_security_policy_config {
-    enabled = true
+  cluster_autoscaling {
+    enabled = var.gke_enable_node_autoprovisioning
+
+    dynamic "resource_limits" {
+      for_each = var.gke_enable_node_autoprovisioning ? {
+        "cpu"    = var.gke_node_autoprovisioning_max_cpu
+        "memory" = var.gke_node_autoprovisioning_max_memory
+      } : {}
+      content {
+        resource_type = resource_limits.key
+        minimum       = 1
+        maximum       = resource_limits.value
+      }
+    }
   }
 }
 
@@ -63,12 +82,12 @@ resource "google_container_node_pool" "fullnodes" {
   name       = "fullnodes"
   location   = local.zone
   cluster    = google_container_cluster.aptos.name
-  node_count = var.num_fullnodes
+  node_count = var.gke_enable_autoscaling ? null : var.num_fullnodes + var.num_extra_instance
 
   node_config {
     machine_type    = var.machine_type
     image_type      = "COS_CONTAINERD"
-    disk_size_gb    = 20
+    disk_size_gb    = var.instance_disk_size_gb
     service_account = google_service_account.gke.email
     tags            = ["fullnodes"]
 
@@ -78,6 +97,14 @@ resource "google_container_node_pool" "fullnodes" {
 
     workload_metadata_config {
       mode = "GKE_METADATA"
+    }
+  }
+
+  dynamic "autoscaling" {
+    for_each = var.gke_enable_autoscaling ? [1] : []
+    content {
+      min_node_count = 1
+      max_node_count = var.gke_autoscaling_max_node_count
     }
   }
 }

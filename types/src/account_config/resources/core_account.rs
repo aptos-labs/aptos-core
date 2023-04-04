@@ -1,8 +1,9 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use move_deps::move_core_types::{
-    account_address::AccountAddress,
+use crate::{account_address::AccountAddress, event::EventHandle};
+use move_core_types::{
     ident_str,
     identifier::IdentStr,
     move_resource::{MoveResource, MoveStructType},
@@ -13,12 +14,16 @@ use serde::{Deserialize, Serialize};
 
 /// A Rust representation of an Account resource.
 /// This is not how the Account is represented in the VM but it's a convenient representation.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct AccountResource {
     authentication_key: Vec<u8>,
     sequence_number: u64,
-    self_address: AccountAddress,
+    guid_creation_num: u64,
+    coin_register_events: EventHandle,
+    key_rotation_events: EventHandle,
+    rotation_capability_offer: Option<AccountAddress>,
+    signer_capability_offer: Option<AccountAddress>,
 }
 
 impl AccountResource {
@@ -26,12 +31,17 @@ impl AccountResource {
     pub fn new(
         sequence_number: u64,
         authentication_key: Vec<u8>,
-        self_address: AccountAddress,
+        coin_register_events: EventHandle,
+        key_rotation_events: EventHandle,
     ) -> Self {
         AccountResource {
             authentication_key,
             sequence_number,
-            self_address,
+            guid_creation_num: 0,
+            coin_register_events,
+            key_rotation_events,
+            rotation_capability_offer: None,
+            signer_capability_offer: None,
         }
     }
 
@@ -45,8 +55,24 @@ impl AccountResource {
         &self.authentication_key
     }
 
-    pub fn address(&self) -> AccountAddress {
-        self.self_address
+    pub fn coin_register_events(&self) -> &EventHandle {
+        &self.coin_register_events
+    }
+
+    pub fn key_rotation_events(&self) -> &EventHandle {
+        &self.key_rotation_events
+    }
+
+    pub fn guid_creation_num(&self) -> u64 {
+        self.guid_creation_num
+    }
+
+    pub fn rotation_capability_offer(&self) -> Option<AccountAddress> {
+        self.rotation_capability_offer
+    }
+
+    pub fn signer_capability_offer(&self) -> Option<AccountAddress> {
+        self.signer_capability_offer
     }
 }
 

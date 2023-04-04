@@ -1,11 +1,12 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::utils;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ApiConfig {
     #[serde(default = "default_enabled")]
@@ -18,14 +19,50 @@ pub struct ApiConfig {
     // optional for compatible with old configuration
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content_length_limit: Option<u64>,
+    #[serde(default = "default_disabled")]
+    pub failpoints_enabled: bool,
+    #[serde(default = "default_enabled")]
+    pub json_output_enabled: bool,
+    #[serde(default = "default_enabled")]
+    pub bcs_output_enabled: bool,
+    #[serde(default = "default_enabled")]
+    pub encode_submission_enabled: bool,
+    #[serde(default = "default_enabled")]
+    pub transaction_submission_enabled: bool,
+    #[serde(default = "default_enabled")]
+    pub transaction_simulation_enabled: bool,
+
+    pub max_submit_transaction_batch_size: usize,
+
+    // Maximum page size for paginated APIs
+    pub max_transactions_page_size: u16,
+    pub max_events_page_size: u16,
+    pub max_account_resources_page_size: u16,
+    pub max_account_modules_page_size: u16,
+
+    /// Max gas unit for view function.
+    pub max_gas_view_function: u64,
+
+    // Performance functionality
+    pub max_runtime_workers: Option<usize>, // The maximum number of workers to use for the API runtime
+    pub runtime_worker_multiplier: usize, // If max_runtime_workers is None, use runtime_worker_multiplier * num CPU cores
 }
 
 pub const DEFAULT_ADDRESS: &str = "127.0.0.1";
 pub const DEFAULT_PORT: u16 = 8080;
-pub const DEFAULT_REQUEST_CONTENT_LENGTH_LIMIT: u64 = 4 * 1024 * 1024; // 4mb
+pub const DEFAULT_REQUEST_CONTENT_LENGTH_LIMIT: u64 = 8 * 1024 * 1024; // 8 MB
+pub const DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE: usize = 10;
+pub const DEFAULT_MAX_PAGE_SIZE: u16 = 100;
+pub const DEFAULT_MAX_ACCOUNT_RESOURCES_PAGE_SIZE: u16 = 9999;
+pub const DEFAULT_MAX_ACCOUNT_MODULES_PAGE_SIZE: u16 = 9999;
+pub const DEFAULT_MAX_VIEW_GAS: u64 = 2_000_000; // We keep this value the same as the max number of gas allowed for one single transaction defined in aptos-gas.
 
 fn default_enabled() -> bool {
     true
+}
+
+fn default_disabled() -> bool {
+    false
 }
 
 impl Default for ApiConfig {
@@ -38,6 +75,20 @@ impl Default for ApiConfig {
             tls_cert_path: None,
             tls_key_path: None,
             content_length_limit: None,
+            failpoints_enabled: default_disabled(),
+            bcs_output_enabled: default_enabled(),
+            json_output_enabled: default_enabled(),
+            encode_submission_enabled: default_enabled(),
+            transaction_submission_enabled: default_enabled(),
+            transaction_simulation_enabled: default_enabled(),
+            max_submit_transaction_batch_size: DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE,
+            max_transactions_page_size: DEFAULT_MAX_PAGE_SIZE,
+            max_events_page_size: DEFAULT_MAX_PAGE_SIZE,
+            max_account_resources_page_size: DEFAULT_MAX_ACCOUNT_RESOURCES_PAGE_SIZE,
+            max_account_modules_page_size: DEFAULT_MAX_ACCOUNT_MODULES_PAGE_SIZE,
+            max_gas_view_function: DEFAULT_MAX_VIEW_GAS,
+            max_runtime_workers: None,
+            runtime_worker_multiplier: 2,
         }
     }
 }

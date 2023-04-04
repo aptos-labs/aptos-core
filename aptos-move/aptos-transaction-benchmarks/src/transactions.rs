@@ -1,21 +1,21 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_bitvec::BitVec;
 use aptos_crypto::HashValue;
+use aptos_language_e2e_tests::{
+    account_universe::{log_balance_strategy, AUTransactionGen, AccountUniverseGen},
+    executor::FakeExecutor,
+    gas_costs::TXN_RESERVED,
+};
 use aptos_types::{
     block_metadata::BlockMetadata,
     on_chain_config::{OnChainConfig, ValidatorSet},
     transaction::Transaction,
 };
-use aptos_vm::{
-    data_cache::AsMoveResolver, parallel_executor::ParallelAptosVM, AptosVM, VMExecutor,
-};
+use aptos_vm::{block_executor::BlockAptosVM, data_cache::AsMoveResolver};
 use criterion::{measurement::Measurement, BatchSize, Bencher};
-use language_e2e_tests::{
-    account_universe::{log_balance_strategy, AUTransactionGen, AccountUniverseGen},
-    executor::FakeExecutor,
-    gas_costs::TXN_RESERVED,
-};
 use proptest::{
     collection::vec,
     strategy::{Strategy, ValueTree},
@@ -37,7 +37,6 @@ where
 {
     /// The number of accounts created by default.
     pub const DEFAULT_NUM_ACCOUNTS: usize = 100;
-
     /// The number of transactions created by default.
     pub const DEFAULT_NUM_TRANSACTIONS: usize = 1000;
 
@@ -93,6 +92,40 @@ where
             BatchSize::LargeInput,
         )
     }
+
+    /// Runs the bencher.
+    pub fn blockstm_benchmark(
+        &self,
+        num_accounts: usize,
+        num_txn: usize,
+        num_warmups: usize,
+        num_runs: usize,
+        concurrency_level: usize,
+    ) -> Vec<(usize, usize)> {
+        let mut ret = Vec::new();
+
+        let total_runs = num_warmups + num_runs;
+        for i in 0..total_runs {
+            let state = TransactionBenchState::with_size(&self.strategy, num_accounts, num_txn);
+
+            if i < num_warmups {
+                println!("WARMUP - ignore results");
+                state.execute_blockstm_benchmark(concurrency_level);
+            } else {
+                println!(
+                    "RUN BlockSTM-only benchmark for: num_threads = {}, \
+                        num_account = {}, \
+                        block_size = {}",
+                    num_cpus::get(),
+                    num_accounts,
+                    num_txn,
+                );
+                ret.push(state.execute_blockstm_benchmark(concurrency_level));
+            }
+        }
+
+        ret
+    }
 }
 
 struct TransactionBenchState {
@@ -132,8 +165,8 @@ impl TransactionBenchState {
             HashValue::zero(),
             0,
             0,
-            validator_set.payload().map(|_| false).collect(),
             *validator_set.payload().next().unwrap().account_address(),
+            BitVec::with_num_bits(validator_set.num_validators() as u16).into(),
             vec![],
             1,
         );
@@ -162,7 +195,7 @@ impl TransactionBenchState {
             .expect("creating a new value should succeed")
             .current();
 
-        let mut executor = FakeExecutor::from_genesis_file();
+        let mut executor = FakeExecutor::from_head_genesis();
         // Run in gas-cost-stability mode for now -- this ensures that new accounts are ignored.
         // XXX We may want to include new accounts in case they have interesting performance
         // characteristics.
@@ -187,7 +220,7 @@ impl TransactionBenchState {
     fn execute(self) {
         // The output is ignored here since we're just testing transaction performance, not trying
         // to assert correctness.
-        AptosVM::execute_block(self.transactions, self.executor.get_state_view())
+        BlockAptosVM::execute_block(self.transactions, self.executor.get_state_view(), 1)
             .expect("VM should not fail to start");
     }
 
@@ -195,12 +228,20 @@ impl TransactionBenchState {
     fn execute_parallel(self) {
         // The output is ignored here since we're just testing transaction performance, not trying
         // to assert correctness.
-        ParallelAptosVM::execute_block(
+        BlockAptosVM::execute_block(
             self.transactions,
             self.executor.get_state_view(),
             num_cpus::get(),
         )
         .expect("VM should not fail to start");
+    }
+
+    fn execute_blockstm_benchmark(self, concurrency_level: usize) -> (usize, usize) {
+        BlockAptosVM::execute_block_benchmark(
+            self.transactions,
+            self.executor.get_state_view(),
+            concurrency_level,
+        )
     }
 }
 

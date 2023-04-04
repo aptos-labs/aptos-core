@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -22,7 +23,7 @@ use tokio::time::timeout;
 
 const MEMPOOL_NOTIFICATION_CHANNEL_SIZE: usize = 1;
 
-#[derive(Clone, Debug, Deserialize, Error, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
 pub enum Error {
     #[error("Commit notification failed: {0}")]
     CommitNotificationError(String),
@@ -219,14 +220,14 @@ mod tests {
         block_metadata::BlockMetadata,
         chain_id::ChainId,
         transaction::{
-            ChangeSet, RawTransaction, Script, SignedTransaction, Transaction, TransactionPayload,
-            WriteSetPayload,
+            ChangeSet, NoOpChangeSetChecker, RawTransaction, Script, SignedTransaction,
+            Transaction, TransactionPayload, WriteSetPayload,
         },
         write_set::WriteSetMut,
     };
-    use claim::{assert_matches, assert_ok};
+    use claims::{assert_matches, assert_ok};
     use futures::{executor::block_on, FutureExt, StreamExt};
-    use tokio::runtime::{Builder, Runtime};
+    use tokio::runtime::Runtime;
 
     #[test]
     fn test_mempool_not_listening() {
@@ -303,18 +304,17 @@ mod tests {
         match mempool_listener.select_next_some().now_or_never() {
             Some(mempool_commit_notification) => match user_transaction {
                 Transaction::UserTransaction(signed_transaction) => {
-                    assert_eq!(
-                        mempool_commit_notification.transactions,
-                        vec![CommittedTransaction {
+                    assert_eq!(mempool_commit_notification.transactions, vec![
+                        CommittedTransaction {
                             sender: signed_transaction.sender(),
                             sequence_number: signed_transaction.sequence_number(),
-                        }]
-                    );
+                        }
+                    ]);
                     assert_eq!(
                         mempool_commit_notification.block_timestamp_usecs,
                         block_timestamp_usecs
                     );
-                }
+                },
                 result => panic!("Expected user transaction but got: {:?}", result),
             },
             result => panic!("Expected mempool commit notification but got: {:?}", result),
@@ -363,7 +363,7 @@ mod tests {
         let signed_transaction = SignedTransaction::new(
             raw_transaction.clone(),
             public_key,
-            private_key.sign(&raw_transaction),
+            private_key.sign(&raw_transaction).unwrap(),
         );
 
         Transaction::UserTransaction(signed_transaction)
@@ -374,23 +374,27 @@ mod tests {
             HashValue::new([0; HashValue::LENGTH]),
             0,
             300000001,
-            vec![false],
             AccountAddress::random(),
+            vec![0],
             vec![],
             1,
         ))
     }
 
     fn create_genesis_transaction() -> Transaction {
-        Transaction::GenesisTransaction(WriteSetPayload::Direct(ChangeSet::new(
-            WriteSetMut::new(vec![])
-                .freeze()
-                .expect("freeze cannot fail"),
-            vec![],
-        )))
+        Transaction::GenesisTransaction(WriteSetPayload::Direct(
+            ChangeSet::new(
+                WriteSetMut::new(vec![])
+                    .freeze()
+                    .expect("freeze cannot fail"),
+                vec![],
+                &NoOpChangeSetChecker,
+            )
+            .unwrap(),
+        ))
     }
 
     fn create_runtime() -> Runtime {
-        Builder::new_multi_thread().enable_all().build().unwrap()
+        aptos_runtimes::spawn_named_runtime("test".into(), None)
     }
 }

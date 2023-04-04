@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -133,13 +134,17 @@ impl Arbitrary for EpochChangeProof {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{block_info::BlockInfo, epoch_state::EpochState, waypoint::Waypoint};
+    use crate::{
+        aggregate_signature::{AggregateSignature, PartialSignatures},
+        block_info::BlockInfo,
+        epoch_state::EpochState,
+        waypoint::Waypoint,
+    };
 
     #[test]
     fn verify_epoch_change_proof() {
         use crate::{ledger_info::LedgerInfo, validator_verifier::random_validator_verifier};
         use aptos_crypto::hash::HashValue;
-        use std::collections::BTreeMap;
 
         let all_epoch: Vec<u64> = (1..=10).collect();
         let mut valid_ledger_info = vec![];
@@ -169,11 +174,21 @@ mod tests {
                 ),
                 HashValue::zero(),
             );
-            let signatures = current_signers
-                .iter()
-                .map(|s| (s.author(), s.sign(&ledger_info)))
-                .collect();
-            valid_ledger_info.push(LedgerInfoWithSignatures::new(ledger_info, signatures));
+            let partial_signatures = PartialSignatures::new(
+                current_signers
+                    .iter()
+                    .map(|s| (s.author(), s.sign(&ledger_info).unwrap()))
+                    .collect(),
+            );
+
+            let aggregated_signature = current_verifier
+                .aggregate_signatures(&partial_signatures)
+                .unwrap();
+
+            valid_ledger_info.push(LedgerInfoWithSignatures::new(
+                ledger_info,
+                aggregated_signature,
+            ));
             current_signers = next_signers;
             current_verifier = next_verifier;
             current_version += 1;
@@ -240,7 +255,7 @@ mod tests {
         let proof_6 = EpochChangeProof::new(
             vec![LedgerInfoWithSignatures::new(
                 valid_ledger_info[0].ledger_info().clone(),
-                BTreeMap::new(),
+                AggregateSignature::empty(),
             )],
             /* more = */ false,
         );

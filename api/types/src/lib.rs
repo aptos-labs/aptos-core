@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 mod account;
@@ -6,43 +7,72 @@ mod address;
 mod block;
 mod bytecode;
 mod convert;
+mod derives;
 mod error;
-mod event_key;
 mod hash;
+mod headers;
 mod index;
 mod ledger_info;
 pub mod mime_types;
 mod move_types;
-mod response;
 mod table;
-mod transaction;
+pub mod transaction;
+mod view;
 mod wrappers;
 
 pub use account::AccountData;
 pub use address::Address;
-pub use block::BlockInfo;
+pub use block::{BcsBlock, Block};
 pub use bytecode::Bytecode;
-pub use convert::{new_vm_utf8_string, AsConverter, MoveConverter};
-pub use error::Error;
-pub use event_key::EventKey;
+pub use convert::{new_vm_utf8_string, AsConverter, ExplainVMStatus, MoveConverter};
+pub use error::{AptosError, AptosErrorCode};
 pub use hash::HashValue;
-pub use index::IndexResponse;
+pub use headers::*;
+pub use index::{IndexResponse, IndexResponseBcs};
 pub use ledger_info::LedgerInfo;
 pub use move_types::{
-    HexEncodedBytes, MoveFunction, MoveModule, MoveModuleBytecode, MoveModuleId, MoveResource,
-    MoveScriptBytecode, MoveStructTag, MoveStructValue, MoveType, MoveValue, ScriptFunctionId,
-    U128, U64,
+    verify_field_identifier, verify_function_identifier, verify_module_identifier, EntryFunctionId,
+    HexEncodedBytes, MoveAbility, MoveFunction, MoveFunctionGenericTypeParam,
+    MoveFunctionVisibility, MoveModule, MoveModuleBytecode, MoveModuleId, MoveResource,
+    MoveScriptBytecode, MoveStruct, MoveStructField, MoveStructTag, MoveType, MoveValue,
+    ResourceGroup, MAX_RECURSIVE_TYPES_ALLOWED, U128, U256, U64,
 };
-pub use response::{
-    Response, X_APTOS_CHAIN_ID, X_APTOS_EPOCH, X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION,
-};
-pub use table::TableItemRequest;
+use serde::{Deserialize, Deserializer};
+use std::str::FromStr;
+pub use table::{RawTableItemRequest, TableItemRequest};
 pub use transaction::{
-    BlockMetadataTransaction, DeleteModule, DeleteResource, DeleteTableItem, DirectWriteSet, Event,
-    GenesisTransaction, PendingTransaction, ScriptFunctionPayload, ScriptPayload, ScriptWriteSet,
-    Transaction, TransactionData, TransactionId, TransactionInfo, TransactionOnChainData,
-    TransactionPayload, TransactionSigningMessage, UserCreateSigningMessageRequest,
-    UserTransaction, UserTransactionRequest, WriteModule, WriteResource, WriteSet, WriteSetChange,
+    AccountSignature, BlockMetadataTransaction, DeleteModule, DeleteResource, DeleteTableItem,
+    DirectWriteSet, Ed25519Signature, EncodeSubmissionRequest, EntryFunctionPayload, Event,
+    GasEstimation, GasEstimationBcs, GenesisPayload, GenesisTransaction, ModuleBundlePayload,
+    MultiAgentSignature, MultiEd25519Signature, MultisigPayload, MultisigTransactionPayload,
+    PendingTransaction, ScriptPayload, ScriptWriteSet, SubmitTransactionRequest, Transaction,
+    TransactionData, TransactionId, TransactionInfo, TransactionOnChainData, TransactionPayload,
+    TransactionSignature, TransactionSigningMessage, TransactionsBatchSingleSubmissionFailure,
+    TransactionsBatchSubmissionResult, UserCreateSigningMessageRequest, UserTransaction,
+    UserTransactionRequest, VersionedEvent, WriteModule, WriteResource, WriteSet, WriteSetChange,
     WriteSetPayload, WriteTableItem,
 };
-pub use wrappers::{IdentifierWrapper, MoveStructTagWrapper};
+pub use view::ViewRequest;
+pub use wrappers::{EventGuid, IdentifierWrapper, StateKeyWrapper};
+
+pub fn deserialize_from_string<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    T: FromStr,
+    <T as FromStr>::Err: std::fmt::Display,
+{
+    use serde::de::Error;
+
+    let s = <String>::deserialize(deserializer)?;
+    s.parse::<T>().map_err(D::Error::custom)
+}
+
+/// For verifying a given struct
+pub trait VerifyInput {
+    fn verify(&self) -> anyhow::Result<()>;
+}
+
+/// For verifying a given struct that needs to limit recursion
+pub trait VerifyInputWithRecursion {
+    fn verify(&self, recursion_count: u8) -> anyhow::Result<()>;
+}

@@ -37,7 +37,9 @@ data "aws_iam_policy_document" "alb-ingress" {
       "ec2:DeleteTags",
       "ec2:DeleteSecurityGroup",
       "ec2:DescribeAccountAttributes",
+      # https://github.com/kubernetes-sigs/aws-load-balancer-controller/issues/2525
       "ec2:DescribeAddresses",
+      "ec2:DescribeAvailabilityZones",
       "ec2:DescribeInstances",
       "ec2:DescribeInstanceStatus",
       "ec2:DescribeInternetGateways",
@@ -187,7 +189,7 @@ data "aws_iam_policy_document" "k8s-aws-integrations-assume-role" {
 }
 
 resource "aws_iam_role" "k8s-aws-integrations" {
-  name                 = "${terraform.workspace}-pfn-k8s-aws-integrations"
+  name                 = "${local.workspace_name}-pfn-k8s-aws-integrations"
   path                 = var.iam_path
   assume_role_policy   = data.aws_iam_policy_document.k8s-aws-integrations-assume-role.json
   permissions_boundary = var.permissions_boundary_policy

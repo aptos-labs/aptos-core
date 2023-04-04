@@ -1,4 +1,5 @@
 {
-  "code": 400,
-  "message": "Request body deserialize error: unknown variant `invalid`, expected one of `script_function_payload`, `script_payload`, `module_bundle_payload`, `write_set_payload` at line 1 column 299"
+  "message": "parse request payload error: Expected input type \"TransactionPayload\", found {\"type\":\"invalid\",\"function\":\"0x1::aptos_account::create_account\",\"type_arguments\":[],\"arguments\":[\"0x00000000000000000000000001234567\"]}. (occurred while parsing \"UserTransactionRequestInner\") (occurred while parsing \"EncodeSubmissionRequest\")",
+  "error_code": "web_framework_error",
+  "vm_error_code": null
 }

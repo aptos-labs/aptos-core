@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::network_id::NetworkId;
@@ -7,7 +8,7 @@ use aptos_types::{waypoint::Waypoint, PeerId};
 use rand::{rngs::StdRng, SeedableRng};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     fmt, fs,
     fs::File,
     io::{Read, Write},
@@ -18,6 +19,8 @@ use thiserror::Error;
 
 mod consensus_config;
 pub use consensus_config::*;
+mod quorum_store_config;
+pub use quorum_store_config::*;
 mod error;
 pub use error::*;
 mod execution_config;
@@ -34,6 +37,10 @@ mod secure_backend_config;
 pub use secure_backend_config::*;
 mod state_sync_config;
 pub use state_sync_config::*;
+mod indexer_config;
+pub use indexer_config::*;
+mod indexer_grpc_config;
+pub use indexer_grpc_config::*;
 mod storage_config;
 pub use storage_config::*;
 mod safety_rules_config;
@@ -47,7 +54,7 @@ use aptos_types::account_address::AccountAddress;
 use poem_openapi::Enum as PoemEnum;
 
 /// Represents a deprecated config that provides no field verification.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 pub struct DeprecatedConfig {}
 
 /// Config pulls in configuration information from the config file.
@@ -80,6 +87,10 @@ pub struct NodeConfig {
     #[serde(default)]
     pub state_sync: StateSyncConfig,
     #[serde(default)]
+    pub indexer_grpc: IndexerGrpcConfig,
+    #[serde(default)]
+    pub indexer: IndexerConfig,
+    #[serde(default)]
     pub storage: StorageConfig,
     #[serde(default)]
     pub test: Option<TestConfig>,
@@ -89,10 +100,11 @@ pub struct NodeConfig {
     pub failpoints: Option<HashMap<String, String>>,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct BaseConfig {
     pub data_dir: PathBuf,
+    pub working_dir: Option<PathBuf>,
     pub role: RoleType,
     pub waypoint: WaypointConfig,
 }
@@ -101,13 +113,14 @@ impl Default for BaseConfig {
     fn default() -> BaseConfig {
         BaseConfig {
             data_dir: PathBuf::from("/opt/aptos/data"),
+            working_dir: None,
             role: RoleType::Validator,
             waypoint: WaypointConfig::None,
         }
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum WaypointConfig {
     FromConfig(Waypoint),
@@ -128,14 +141,28 @@ impl WaypointConfig {
     pub fn waypoint(&self) -> Waypoint {
         let waypoint = match &self {
             WaypointConfig::FromConfig(waypoint) => Some(*waypoint),
-            WaypointConfig::FromFile(path) => {
-                let content = fs::read_to_string(path)
-                    .unwrap_or_else(|_| panic!("Failed to read waypoint file {}", path.display()));
-                Some(
-                    Waypoint::from_str(content.trim())
-                        .unwrap_or_else(|_| panic!("Failed to parse waypoint: {}", content.trim())),
-                )
-            }
+            WaypointConfig::FromFile(waypoint_path) => {
+                if !waypoint_path.exists() {
+                    panic!(
+                        "Waypoint file not found! Ensure the given path is correct: {:?}",
+                        waypoint_path.display()
+                    );
+                }
+                let content = fs::read_to_string(waypoint_path).unwrap_or_else(|error| {
+                    panic!(
+                        "Failed to read waypoint file {:?}. Error: {:?}",
+                        waypoint_path.display(),
+                        error
+                    )
+                });
+                Some(Waypoint::from_str(content.trim()).unwrap_or_else(|error| {
+                    panic!(
+                        "Failed to parse waypoint: {:?}. Error: {:?}",
+                        content.trim(),
+                        error
+                    )
+                }))
+            },
             WaypointConfig::FromStorage(backend) => {
                 let storage: Storage = backend.into();
                 let waypoint = storage
@@ -143,7 +170,7 @@ impl WaypointConfig {
                     .expect("Unable to read waypoint")
                     .value;
                 Some(waypoint)
-            }
+            },
             WaypointConfig::None => None,
         };
         waypoint.expect("waypoint should be present")
@@ -157,7 +184,7 @@ impl WaypointConfig {
                     .get::<Waypoint>(aptos_global_constants::GENESIS_WAYPOINT)
                     .expect("Unable to read waypoint")
                     .value
-            }
+            },
             _ => self.waypoint(),
         }
     }
@@ -192,6 +219,7 @@ impl IdentityBlob {
 
 #[derive(Clone, Copy, Deserialize, Eq, PartialEq, PoemEnum, Serialize)]
 #[serde(rename_all = "snake_case")]
+#[oai(rename_all = "snake_case")]
 pub enum RoleType {
     Validator,
     FullNode,
@@ -243,6 +271,13 @@ impl NodeConfig {
         &self.base.data_dir
     }
 
+    pub fn working_dir(&self) -> &Path {
+        match &self.base.working_dir {
+            Some(working_dir) => working_dir,
+            None => &self.base.data_dir,
+        }
+    }
+
     pub fn set_data_dir(&mut self, data_dir: PathBuf) {
         self.base.data_dir = data_dir.clone();
         self.consensus.set_data_dir(data_dir.clone());
@@ -250,15 +285,18 @@ impl NodeConfig {
     }
 
     /// Reads the config file and returns the configuration object in addition to doing some
-    /// post-processing of the config
-    /// Paths used in the config are either absolute or relative to the config location
+    /// post-processing of the config.
+    /// Paths used in the config are either absolute or relative to the config location.
     pub fn load<P: AsRef<Path>>(input_path: P) -> Result<Self, Error> {
         let mut config = Self::load_config(&input_path)?;
 
         let input_dir = RootPath::new(input_path);
         config.execution.load(&input_dir)?;
 
-        let mut config = config.validate_network_configs()?;
+        let mut config = config
+            .validate_indexer_configs()?
+            .validate_indexer_grpc_configs()?
+            .validate_network_configs()?;
         config.set_data_dir(config.data_dir().to_path_buf());
         Ok(config)
     }
@@ -272,6 +310,104 @@ impl NodeConfig {
                 .find(|config| config.network_id == NetworkId::Public)
                 .map(NetworkConfig::peer_id),
         }
+    }
+
+    pub fn identity_key(&self) -> Option<x25519::PrivateKey> {
+        match self.base.role {
+            RoleType::Validator => self
+                .validator_network
+                .as_ref()
+                .map(NetworkConfig::identity_key),
+            RoleType::FullNode => self
+                .full_node_networks
+                .iter()
+                .find(|config| config.network_id == NetworkId::Public)
+                .map(NetworkConfig::identity_key),
+        }
+    }
+
+    /// Validate `IndexerConfig`, ensuring that it's set up correctly
+    /// Additionally, handles any strange missing default cases
+    fn validate_indexer_configs(mut self) -> Result<NodeConfig, Error> {
+        if !self.indexer.enabled {
+            return Ok(self);
+        }
+
+        self.indexer.postgres_uri = env_or_default(
+            "INDEXER_DATABASE_URL",
+            self.indexer.postgres_uri,
+            must_be_set("postgres_uri", "INDEXER_DATABASE_URL"),
+        );
+
+        self.indexer.processor = env_or_default(
+            "PROCESSOR_NAME",
+            self.indexer
+                .processor
+                .or_else(|| Some("default_processor".to_string())),
+            None,
+        );
+
+        self.indexer.starting_version = match std::env::var("STARTING_VERSION").ok() {
+            None => self.indexer.starting_version,
+            Some(s) => match s.parse::<u64>() {
+                Ok(version) => Some(version),
+                Err(_) => {
+                    // Doing this instead of failing. This will allow a processor to have STARTING_VERSION: undefined when deploying
+                    aptos_logger::warn!(
+                        "Invalid STARTING_VERSION: {}, using {:?} instead",
+                        s,
+                        self.indexer.starting_version
+                    );
+                    self.indexer.starting_version
+                },
+            },
+        };
+
+        self.indexer.skip_migrations = self.indexer.skip_migrations.or(Some(false));
+        self.indexer.check_chain_id = self.indexer.check_chain_id.or(Some(true));
+        self.indexer.batch_size = default_if_zero(
+            self.indexer.batch_size.map(|v| v as u64),
+            DEFAULT_BATCH_SIZE as u64,
+        )
+        .map(|v| v as u16);
+        self.indexer.fetch_tasks = default_if_zero(
+            self.indexer.fetch_tasks.map(|v| v as u64),
+            DEFAULT_FETCH_TASKS as u64,
+        )
+        .map(|v| v as u8);
+        self.indexer.processor_tasks =
+            default_if_zero_u8(self.indexer.processor_tasks, DEFAULT_PROCESSOR_TASKS);
+        self.indexer.emit_every = self.indexer.emit_every.or(Some(0));
+        self.indexer.gap_lookback_versions = env_or_default(
+            "GAP_LOOKBACK_VERSIONS",
+            self.indexer.gap_lookback_versions.or(Some(1_500_000)),
+            None,
+        );
+
+        Ok(self)
+    }
+
+    /// Validate `IndexerGrpcConfig`, ensuring that it's set up correctly
+    /// Additionally, handles any strange missing default cases
+    fn validate_indexer_grpc_configs(mut self) -> Result<NodeConfig, Error> {
+        if !self.indexer_grpc.enabled {
+            return Ok(self);
+        }
+
+        self.indexer_grpc.address = self
+            .indexer_grpc
+            .address
+            .or_else(|| Some("0.0.0.0:50051".to_string()));
+
+        self.indexer_grpc.processor_task_count =
+            self.indexer_grpc.processor_task_count.or(Some(20));
+
+        self.indexer_grpc.processor_batch_size =
+            self.indexer_grpc.processor_batch_size.or(Some(1000));
+
+        self.indexer_grpc.output_batch_size = self.indexer_grpc.output_batch_size.or(Some(100));
+
+        Ok(self)
     }
 
     /// Checks `NetworkConfig` setups so that they exist on proper networks
@@ -289,21 +425,12 @@ impl NodeConfig {
             )?;
         }
 
-        let mut network_ids = HashSet::new();
         if let Some(network) = &mut self.validator_network {
             network.load_validator_network()?;
-            network_ids.insert(network.network_id);
+            network.mutual_authentication = true; // This should always be the default for validators
         }
         for network in &mut self.full_node_networks {
             network.load_fullnode_network()?;
-
-            // Check a validator network is not included in a list of full-node networks
-            let network_id = network.network_id;
-            invariant(
-                !matches!(network_id, NetworkId::Validator),
-                "Included a validator network in full_node_networks".into(),
-            )?;
-            network_ids.insert(network_id);
         }
         Ok(self)
     }
@@ -320,6 +447,7 @@ impl NodeConfig {
         self.api.randomize_ports();
         self.inspection_service.randomize_ports();
         self.storage.randomize_ports();
+        self.logger.disable_console();
 
         if let Some(network) = self.validator_network.as_mut() {
             network.listen_address = crate::utils::get_available_port_in_multiaddr(true);
@@ -378,6 +506,8 @@ impl NodeConfig {
     fn default_config(serialized: &str, path: &'static str) -> Self {
         let config = Self::parse(serialized).unwrap_or_else(|e| panic!("Error in {}: {}", path, e));
         config
+            .validate_indexer_configs()
+            .unwrap_or_else(|e| panic!("Error in {}: {}", path, e))
             .validate_network_configs()
             .unwrap_or_else(|e| panic!("Error in {}: {}", path, e))
     }
@@ -400,11 +530,23 @@ impl NodeConfig {
 
 pub trait PersistableConfig: Serialize + DeserializeOwned {
     fn load_config<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
-        let mut file = File::open(&path)
-            .map_err(|e| Error::IO(path.as_ref().to_str().unwrap().to_string(), e))?;
+        // Open the file and read it into a string
+        let config_path_string = path.as_ref().to_str().unwrap().to_string();
+        let mut file = File::open(&path).map_err(|error| {
+            Error::Unexpected(format!(
+                "Failed to open config file: {:?}. Error: {:?}",
+                config_path_string, error
+            ))
+        })?;
         let mut contents = String::new();
-        file.read_to_string(&mut contents)
-            .map_err(|e| Error::IO(path.as_ref().to_str().unwrap().to_string(), e))?;
+        file.read_to_string(&mut contents).map_err(|error| {
+            Error::Unexpected(format!(
+                "Failed to read the config file into a string: {:?}. Error: {:?}",
+                config_path_string, error
+            ))
+        })?;
+
+        // Parse the file string
         Self::parse(&contents)
     }
 
@@ -473,13 +615,12 @@ mod test {
     }
 
     #[test]
-    // TODO(joshlind): once the 'matches' crate becomes stable, clean this test up!
     fn verify_parse_role_error_on_invalid_role() {
         let invalid_role_type = "this is not a valid role type";
-        match RoleType::from_str(invalid_role_type) {
-            Err(ParseRoleError(_)) => { /* the expected error was thrown! */ }
-            _ => panic!("A ParseRoleError should have been thrown on the invalid role type!"),
-        }
+        assert!(matches!(
+            RoleType::from_str(invalid_role_type),
+            Err(ParseRoleError(_))
+        ));
     }
 
     #[test]
@@ -488,13 +629,19 @@ mod test {
         NodeConfig::default_for_validator();
         NodeConfig::default_for_validator_full_node();
 
-        let docker_public_full_node =
-            std::include_str!("../../../docker/compose/public_full_node/public_full_node.yaml");
-        // Only verify it is in the correct format as the values cannot be loaded for this config
-        NodeConfig::parse(docker_public_full_node).unwrap();
-
         let contents = std::include_str!("test_data/safety_rules.yaml");
         SafetyRulesConfig::parse(contents)
             .unwrap_or_else(|e| panic!("Error in safety_rules.yaml: {}", e));
+    }
+
+    #[test]
+    fn validate_invalid_network_id() {
+        let mut config = NodeConfig::default_for_public_full_node();
+        let network = config.full_node_networks.iter_mut().next().unwrap();
+        network.network_id = NetworkId::Validator;
+        assert!(matches!(
+            config.validate_network_configs(),
+            Err(Error::InvariantViolation(_))
+        ));
     }
 }

@@ -1,33 +1,86 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{proof::SparseMerkleRangeProof, state_store::state_key::StateKey};
+use crate::{
+    proof::SparseMerkleRangeProof, state_store::state_key::StateKey, transaction::Version,
+};
 use aptos_crypto::{
-    hash::{CryptoHash, CryptoHasher, SPARSE_MERKLE_PLACEHOLDER_HASH},
+    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
-use aptos_crypto_derive::CryptoHasher;
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use move_core_types::account_address::AccountAddress;
+use once_cell::sync::OnceCell;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::{arbitrary::Arbitrary, prelude::*};
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-#[derive(Clone, Debug, Default, CryptoHasher, Eq, PartialEq, Serialize, Ord, PartialOrd, Hash)]
+#[derive(
+    BCSCryptoHash,
+    Clone,
+    CryptoHasher,
+    Debug,
+    Deserialize,
+    Eq,
+    PartialEq,
+    Serialize,
+    Ord,
+    PartialOrd,
+    Hash,
+)]
+pub enum StateValueMetadata {
+    V0 {
+        payer: AccountAddress,
+        deposit: u64,
+        creation_time_usecs: u64,
+    },
+}
+
+#[derive(Clone, Debug, CryptoHasher)]
 pub struct StateValue {
-    pub maybe_bytes: Option<Vec<u8>>,
-    #[serde(skip)]
-    hash: HashValue,
+    inner: StateValueInner,
+    hash: OnceCell<HashValue>,
+}
+
+impl PartialEq for StateValue {
+    fn eq(&self, other: &Self) -> bool {
+        self.inner == other.inner
+    }
+}
+
+impl Eq for StateValue {}
+
+#[derive(
+    BCSCryptoHash,
+    Clone,
+    CryptoHasher,
+    Debug,
+    Deserialize,
+    Eq,
+    PartialEq,
+    Serialize,
+    Ord,
+    PartialOrd,
+    Hash,
+)]
+#[serde(rename = "StateValue")]
+pub enum StateValueInner {
+    V0(#[serde(with = "serde_bytes")] Vec<u8>),
+    WithMetadata {
+        #[serde(with = "serde_bytes")]
+        data: Vec<u8>,
+        metadata: StateValueMetadata,
+    },
 }
 
 #[cfg(any(test, feature = "fuzzing"))]
 impl Arbitrary for StateValue {
     type Parameters = ();
-    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-        any::<Vec<u8>>()
-            .prop_map(|maybe_bytes| StateValue::new(Some(maybe_bytes)))
-            .boxed()
-    }
-
     type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        any::<Vec<u8>>().prop_map(StateValue::new_legacy).boxed()
+    }
 }
 
 impl<'de> Deserialize<'de> for StateValue {
@@ -35,37 +88,56 @@ impl<'de> Deserialize<'de> for StateValue {
     where
         D: Deserializer<'de>,
     {
-        #[derive(Deserialize)]
-        #[serde(rename = "StateValue")]
-        struct MaybeBytes {
-            maybe_bytes: Option<Vec<u8>>,
-        }
-        let bytes = MaybeBytes::deserialize(deserializer)?;
+        let inner = StateValueInner::deserialize(deserializer)?;
+        let hash = OnceCell::new();
+        Ok(Self { inner, hash })
+    }
+}
 
-        Ok(Self::new(bytes.maybe_bytes))
+impl Serialize for StateValue {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.inner.serialize(serializer)
     }
 }
 
 impl StateValue {
-    fn new(maybe_bytes: Option<Vec<u8>>) -> Self {
-        let mut hasher = StateValueHasher::default();
-        let hash = if let Some(bytes) = &maybe_bytes {
-            hasher.update(bytes);
-            hasher.finish()
-        } else {
-            HashValue::zero()
-        };
-        Self { maybe_bytes, hash }
+    pub fn new_legacy(bytes: Vec<u8>) -> Self {
+        Self::new_impl(StateValueInner::V0(bytes))
     }
 
-    pub fn empty() -> Self {
-        StateValue::new(None)
+    pub fn new_with_metadata(data: Vec<u8>, metadata: StateValueMetadata) -> Self {
+        Self::new_impl(StateValueInner::WithMetadata { data, metadata })
+    }
+
+    fn new_impl(inner: StateValueInner) -> Self {
+        let hash = OnceCell::new();
+        Self { inner, hash }
+    }
+
+    pub fn size(&self) -> usize {
+        self.bytes().len()
+    }
+
+    pub fn bytes(&self) -> &[u8] {
+        match &self.inner {
+            StateValueInner::V0(data) | StateValueInner::WithMetadata { data, .. } => data,
+        }
+    }
+
+    pub fn into_bytes(self) -> Vec<u8> {
+        match self.inner {
+            StateValueInner::V0(data) | StateValueInner::WithMetadata { data, .. } => data,
+        }
     }
 }
 
+#[cfg(any(test, feature = "fuzzing"))]
 impl From<Vec<u8>> for StateValue {
     fn from(bytes: Vec<u8>) -> Self {
-        StateValue::new(Some(bytes))
+        StateValue::new_legacy(bytes)
     }
 }
 
@@ -73,7 +145,7 @@ impl CryptoHash for StateValue {
     type Hasher = StateValueHasher;
 
     fn hash(&self) -> HashValue {
-        self.hash
+        *self.hash.get_or_init(|| CryptoHash::hash(&self.inner))
     }
 }
 
@@ -106,12 +178,14 @@ impl StateValueChunkWithProof {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::state_store::state_value::StateValue;
-
-    #[test]
-    fn test_empty_state_value() {
-        StateValue::new(None);
-    }
+/// Indicates a state value becomes stale since `stale_since_version`.
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
+pub struct StaleStateValueIndex {
+    /// The version since when the node is overwritten and becomes stale.
+    pub stale_since_version: Version,
+    /// The version identifying the value associated with this record.
+    pub version: Version,
+    /// The `StateKey` identifying the value associated with this record.
+    pub state_key: StateKey,
 }

@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -14,16 +15,16 @@ use crate::{
     vm_status::{DiscardedVMStatus, KeptVMStatus, StatusCode, StatusType, VMStatus},
     write_set::WriteSet,
 };
-use anyhow::{ensure, format_err, Error, Result};
+use anyhow::{ensure, format_err, Context, Error, Result};
 use aptos_crypto::{
     ed25519::*,
     hash::{CryptoHash, EventAccumulatorHasher},
     multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature},
     traits::{signing_message, SigningKey},
-    HashValue,
+    CryptoMaterialError, HashValue,
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use move_deps::move_core_types::transaction_argument::convert_txn_args;
+use move_core_types::transaction_argument::convert_txn_args;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
@@ -37,18 +38,22 @@ use std::{
 pub mod authenticator;
 mod change_set;
 mod module;
+mod multisig;
 mod script;
 mod transaction_argument;
 
-pub use change_set::ChangeSet;
+use crate::state_store::{state_key::StateKey, state_value::StateValue};
+#[cfg(any(test, feature = "fuzzing"))]
+pub use change_set::NoOpChangeSetChecker;
+pub use change_set::{ChangeSet, CheckChangeSet};
 pub use module::{Module, ModuleBundle};
+use move_core_types::vm_status::AbortLocation;
+pub use multisig::{ExecutionError, Multisig, MultisigTransactionPayload};
+use once_cell::sync::OnceCell;
 pub use script::{
-    ArgumentABI, Script, ScriptABI, ScriptFunction, ScriptFunctionABI, TransactionScriptABI,
+    ArgumentABI, EntryABI, EntryFunction, EntryFunctionABI, Script, TransactionScriptABI,
     TypeArgumentABI,
 };
-
-use crate::state_store::{state_key::StateKey, state_value::StateValue};
-use move_deps::move_core_types::vm_status::AbortLocation;
 use std::{collections::BTreeSet, hash::Hash, ops::Deref, sync::atomic::AtomicU64};
 pub use transaction_argument::{parse_transaction_argument, TransactionArgument};
 
@@ -135,13 +140,13 @@ impl RawTransaction {
         }
     }
 
-    /// Create a new `RawTransaction` with a script function.
+    /// Create a new `RawTransaction` with an entry function.
     ///
     /// A script transaction contains only code to execute. No publishing is allowed in scripts.
-    pub fn new_script_function(
+    pub fn new_entry_function(
         sender: AccountAddress,
         sequence_number: u64,
-        script_function: ScriptFunction,
+        entry_function: EntryFunction,
         max_gas_amount: u64,
         gas_unit_price: u64,
         expiration_timestamp_secs: u64,
@@ -150,7 +155,28 @@ impl RawTransaction {
         RawTransaction {
             sender,
             sequence_number,
-            payload: TransactionPayload::ScriptFunction(script_function),
+            payload: TransactionPayload::EntryFunction(entry_function),
+            max_gas_amount,
+            gas_unit_price,
+            expiration_timestamp_secs,
+            chain_id,
+        }
+    }
+
+    /// Create a new `RawTransaction` of multisig type.
+    pub fn new_multisig(
+        sender: AccountAddress,
+        sequence_number: u64,
+        multisig: Multisig,
+        max_gas_amount: u64,
+        gas_unit_price: u64,
+        expiration_timestamp_secs: u64,
+        chain_id: ChainId,
+    ) -> Self {
+        RawTransaction {
+            sender,
+            sequence_number,
+            payload: TransactionPayload::Multisig(multisig),
             max_gas_amount,
             gas_unit_price,
             expiration_timestamp_secs,
@@ -206,62 +232,6 @@ impl RawTransaction {
         }
     }
 
-    pub fn new_write_set(
-        sender: AccountAddress,
-        sequence_number: u64,
-        write_set: WriteSet,
-        chain_id: ChainId,
-    ) -> Self {
-        Self::new_change_set(
-            sender,
-            sequence_number,
-            ChangeSet::new(write_set, vec![]),
-            chain_id,
-        )
-    }
-
-    pub fn new_change_set(
-        sender: AccountAddress,
-        sequence_number: u64,
-        change_set: ChangeSet,
-        chain_id: ChainId,
-    ) -> Self {
-        RawTransaction {
-            sender,
-            sequence_number,
-            payload: TransactionPayload::WriteSet(WriteSetPayload::Direct(change_set)),
-            // Since write-set transactions bypass the VM, these fields aren't relevant.
-            max_gas_amount: 0,
-            gas_unit_price: 0,
-            // Write-set transactions are special and important and shouldn't expire.
-            expiration_timestamp_secs: u64::max_value(),
-            chain_id,
-        }
-    }
-
-    pub fn new_writeset_script(
-        sender: AccountAddress,
-        sequence_number: u64,
-        script: Script,
-        signer: AccountAddress,
-        chain_id: ChainId,
-    ) -> Self {
-        RawTransaction {
-            sender,
-            sequence_number,
-            payload: TransactionPayload::WriteSet(WriteSetPayload::Script {
-                execute_as: signer,
-                script,
-            }),
-            // Since write-set transactions bypass the VM, these fields aren't relevant.
-            max_gas_amount: 0,
-            gas_unit_price: 0,
-            // Write-set transactions are special and important and shouldn't expire.
-            expiration_timestamp_secs: u64::max_value(),
-            chain_id,
-        }
-    }
-
     /// Signs the given `RawTransaction`. Note that this consumes the `RawTransaction` and turns it
     /// into a `SignatureCheckedTransaction`.
     ///
@@ -271,7 +241,7 @@ impl RawTransaction {
         private_key: &Ed25519PrivateKey,
         public_key: Ed25519PublicKey,
     ) -> Result<SignatureCheckedTransaction> {
-        let signature = private_key.sign(&self);
+        let signature = private_key.sign(&self)?;
         Ok(SignatureCheckedTransaction(SignedTransaction::new(
             self, public_key, signature,
         )))
@@ -291,7 +261,7 @@ impl RawTransaction {
     ) -> Result<SignatureCheckedTransaction> {
         let message =
             RawTransactionWithData::new_multi_agent(self.clone(), secondary_signers.clone());
-        let sender_signature = sender_private_key.sign(&message);
+        let sender_signature = sender_private_key.sign(&message)?;
         let sender_authenticator = AccountAuthenticator::ed25519(
             Ed25519PublicKey::from(sender_private_key),
             sender_signature,
@@ -304,7 +274,7 @@ impl RawTransaction {
         }
         let mut secondary_authenticators = vec![];
         for priv_key in secondary_private_keys {
-            let signature = priv_key.sign(&message);
+            let signature = priv_key.sign(&message)?;
             secondary_authenticators.push(AccountAuthenticator::ed25519(
                 Ed25519PublicKey::from(priv_key),
                 signature,
@@ -327,7 +297,7 @@ impl RawTransaction {
         private_key: &Ed25519PrivateKey,
         public_key: Ed25519PublicKey,
     ) -> Result<SignatureCheckedTransaction> {
-        let signature = private_key.sign(&self);
+        let signature = private_key.sign(&self)?;
         Ok(SignatureCheckedTransaction(
             SignedTransaction::new_multisig(self, public_key.into(), signature.into()),
         ))
@@ -339,14 +309,20 @@ impl RawTransaction {
 
     pub fn format_for_client(&self, get_transaction_name: impl Fn(&[u8]) -> String) -> String {
         let (code, args) = match &self.payload {
-            TransactionPayload::WriteSet(_) => ("genesis".to_string(), vec![]),
             TransactionPayload::Script(script) => (
                 get_transaction_name(script.code()),
                 convert_txn_args(script.args()),
             ),
-            TransactionPayload::ScriptFunction(script_fn) => (
+            TransactionPayload::EntryFunction(script_fn) => (
                 format!("{}::{}", script_fn.module(), script_fn.function()),
                 script_fn.args().to_vec(),
+            ),
+            TransactionPayload::Multisig(multisig) => (
+                format!(
+                    "Executing next transaction for multisig account {}",
+                    multisig.multisig_address,
+                ),
+                vec![],
             ),
             TransactionPayload::ModuleBundle(_) => ("module publishing".to_string(), vec![]),
         };
@@ -378,13 +354,14 @@ impl RawTransaction {
             self.chain_id,
         )
     }
+
     /// Return the sender of this transaction.
     pub fn sender(&self) -> AccountAddress {
         self.sender
     }
 
     /// Return the signing message for creating transaction signature.
-    pub fn signing_message(&self) -> Vec<u8> {
+    pub fn signing_message(&self) -> Result<Vec<u8>, CryptoMaterialError> {
         signing_message(self)
     }
 }
@@ -414,28 +391,22 @@ impl RawTransactionWithData {
 /// Different kinds of transactions.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum TransactionPayload {
-    /// A system maintenance transaction.
-    WriteSet(WriteSetPayload),
     /// A transaction that executes code.
     Script(Script),
-    /// A transaction that publishes multiple modules at the same time.
+    /// Deprecated.
     ModuleBundle(ModuleBundle),
-    /// A transaction that executes an existing script function published on-chain.
-    ScriptFunction(ScriptFunction),
+    /// A transaction that executes an existing entry function published on-chain.
+    EntryFunction(EntryFunction),
+    /// A multisig transaction that allows an owner of a multisig account to execute a pre-approved
+    /// transaction as the multisig account.
+    Multisig(Multisig),
 }
 
 impl TransactionPayload {
-    pub fn should_trigger_reconfiguration_by_default(&self) -> bool {
+    pub fn into_entry_function(self) -> EntryFunction {
         match self {
-            Self::WriteSet(ws) => ws.should_trigger_reconfiguration_by_default(),
-            Self::Script(_) | Self::ScriptFunction(_) | Self::ModuleBundle(_) => false,
-        }
-    }
-
-    pub fn into_script_function(self) -> ScriptFunction {
-        match self {
-            Self::ScriptFunction(f) => f,
-            payload => panic!("Expected ScriptFunction(_) payload, found: {:#?}", payload),
+            Self::EntryFunction(f) => f,
+            payload => panic!("Expected EntryFunction(_) payload, found: {:#?}", payload),
         }
     }
 }
@@ -471,18 +442,31 @@ impl WriteSetPayload {
 /// **IMPORTANT:** The signature of a `SignedTransaction` is not guaranteed to be verified. For a
 /// transaction whose signature is statically guaranteed to be verified, see
 /// [`SignatureCheckedTransaction`].
-#[derive(Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Eq, Serialize, Deserialize)]
 pub struct SignedTransaction {
     /// The raw transaction
     raw_txn: RawTransaction,
 
     /// Public key and signature to authenticate
     authenticator: TransactionAuthenticator,
+
+    /// A cached size of the raw transaction bytes.
+    /// Prevents serializing the same transaction multiple times to determine size.
+    #[serde(skip)]
+    size: OnceCell<usize>,
+}
+
+/// PartialEq ignores the "bytes" field as this is a OnceCell that may or
+/// may not be initialized during runtime comparison.
+impl PartialEq for SignedTransaction {
+    fn eq(&self, other: &Self) -> bool {
+        self.raw_txn == other.raw_txn && self.authenticator == other.authenticator
+    }
 }
 
 /// A transaction for which the signature has been verified. Created by
 /// [`SignedTransaction::check_signature`] and [`RawTransaction::sign`].
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SignatureCheckedTransaction(SignedTransaction);
 
 impl SignatureCheckedTransaction {
@@ -529,6 +513,7 @@ impl SignedTransaction {
         SignedTransaction {
             raw_txn,
             authenticator,
+            size: OnceCell::new(),
         }
     }
 
@@ -541,6 +526,7 @@ impl SignedTransaction {
         SignedTransaction {
             raw_txn,
             authenticator,
+            size: OnceCell::new(),
         }
     }
 
@@ -557,6 +543,7 @@ impl SignedTransaction {
                 secondary_signer_addresses,
                 secondary_signers,
             ),
+            size: OnceCell::new(),
         }
     }
 
@@ -567,6 +554,7 @@ impl SignedTransaction {
         Self {
             raw_txn,
             authenticator,
+            size: OnceCell::new(),
         }
     }
 
@@ -607,9 +595,11 @@ impl SignedTransaction {
     }
 
     pub fn raw_txn_bytes_len(&self) -> usize {
-        bcs::to_bytes(&self.raw_txn)
-            .expect("Unable to serialize RawTransaction")
-            .len()
+        *self.size.get_or_init(|| {
+            bcs::to_bytes(&self.raw_txn)
+                .expect("Unable to serialize RawTransaction")
+                .len()
+        })
     }
 
     /// Checks that the signature of given transaction. Returns `Ok(SignatureCheckedTransaction)` if
@@ -617,6 +607,12 @@ impl SignedTransaction {
     pub fn check_signature(self) -> Result<SignatureCheckedTransaction> {
         self.authenticator.verify(&self.raw_txn)?;
         Ok(SignatureCheckedTransaction(self))
+    }
+
+    /// Checks that the signature of given transaction inplace. Returns `Ok(())` if
+    /// the signature is valid.
+    pub fn signature_is_valid(&self) -> bool {
+        self.authenticator.verify(&self.raw_txn).is_ok()
     }
 
     pub fn contains_duplicate_signers(&self) -> bool {
@@ -673,6 +669,7 @@ impl TransactionWithProof {
             proof,
         }
     }
+
     /// Verifies the transaction with the proof, both carried by `self`.
     ///
     /// A few things are ensured if no error is raised:
@@ -689,7 +686,10 @@ impl TransactionWithProof {
         sender: AccountAddress,
         sequence_number: u64,
     ) -> Result<()> {
-        let signed_transaction = self.transaction.as_signed_user_txn()?;
+        let signed_transaction = self
+            .transaction
+            .try_as_signed_user_txn()
+            .context("not user transaction")?;
 
         ensure!(
             self.version == version,
@@ -745,6 +745,7 @@ pub enum ExecutionStatus {
     MoveAbort {
         location: AbortLocation,
         code: u64,
+        info: Option<AbortInfo>,
     },
     ExecutionFailure {
         location: AbortLocation,
@@ -754,14 +755,24 @@ pub enum ExecutionStatus {
     MiscellaneousError(Option<StatusCode>),
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+#[cfg_attr(any(test, feature = "fuzzing"), proptest(no_params))]
+pub struct AbortInfo {
+    pub reason_name: String,
+    pub description: String,
+}
+
 impl From<KeptVMStatus> for ExecutionStatus {
     fn from(kept_status: KeptVMStatus) -> Self {
         match kept_status {
             KeptVMStatus::Executed => ExecutionStatus::Success,
             KeptVMStatus::OutOfGas => ExecutionStatus::OutOfGas,
-            KeptVMStatus::MoveAbort(location, code) => {
-                ExecutionStatus::MoveAbort { location, code }
-            }
+            KeptVMStatus::MoveAbort(location, code) => ExecutionStatus::MoveAbort {
+                location,
+                code,
+                info: None,
+            },
             KeptVMStatus::ExecutionFailure {
                 location: loc,
                 function: func,
@@ -781,6 +792,7 @@ impl ExecutionStatus {
         matches!(self, ExecutionStatus::Success)
     }
 }
+
 /// The status of executing a transaction. The VM decides whether or not we should `Keep` the
 /// transaction output or `Discard` it based upon the execution of the transaction. We wrap these
 /// decisions around a `VMStatus` that provides more detail on the final execution state of the VM.
@@ -828,7 +840,7 @@ impl From<VMStatus> for TransactionStatus {
             Ok(recorded) => match recorded {
                 KeptVMStatus::MiscellaneousError => {
                     TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(status_code)))
-                }
+                },
                 _ => TransactionStatus::Keep(recorded.into()),
             },
             Err(code) => TransactionStatus::Discard(code),
@@ -949,6 +961,67 @@ impl TransactionOutput {
         } = self;
         (write_set, events, gas_used, status)
     }
+
+    pub fn ensure_match_transaction_info(
+        &self,
+        version: Version,
+        txn_info: &TransactionInfo,
+        expected_write_set: Option<&WriteSet>,
+        expected_events: Option<&[ContractEvent]>,
+    ) -> Result<()> {
+        const ERR_MSG: &str = "TransactionOutput does not match TransactionInfo";
+
+        let expected_txn_status: TransactionStatus = txn_info.status().clone().into();
+        ensure!(
+            self.status() == &expected_txn_status,
+            "{}: version:{}, status:{:?}, expected:{:?}",
+            ERR_MSG,
+            version,
+            self.status(),
+            expected_txn_status,
+        );
+
+        ensure!(
+            self.gas_used() == txn_info.gas_used(),
+            "{}: version:{}, gas_used:{:?}, expected:{:?}",
+            ERR_MSG,
+            version,
+            self.gas_used(),
+            txn_info.gas_used(),
+        );
+
+        let write_set_hash = CryptoHash::hash(self.write_set());
+        ensure!(
+            write_set_hash == txn_info.state_change_hash(),
+            "{}: version:{}, write_set_hash:{:?}, expected:{:?}, write_set: {:?}, expected(if known): {:?}",
+            ERR_MSG,
+            version,
+            write_set_hash,
+            txn_info.state_change_hash(),
+            self.write_set,
+            expected_write_set,
+        );
+
+        let event_hashes = self
+            .events()
+            .iter()
+            .map(CryptoHash::hash)
+            .collect::<Vec<_>>();
+        let event_root_hash =
+            InMemoryAccumulator::<EventAccumulatorHasher>::from_leaves(&event_hashes).root_hash;
+        ensure!(
+            event_root_hash == txn_info.event_root_hash(),
+            "{}: version:{}, event_root_hash:{:?}, expected:{:?}, events: {:?}, expected(if known): {:?}",
+            ERR_MSG,
+            version,
+            event_root_hash,
+            txn_info.event_root_hash(),
+            self.events(),
+            expected_events,
+        );
+
+        Ok(())
+    }
 }
 
 /// `TransactionInfo` is the object we store in the transaction accumulator. It consists of the
@@ -1030,6 +1103,9 @@ pub struct TransactionInfoV0 {
     /// transaction. Depending on the protocol configuration, this can be generated periodical
     /// only, like per block.
     state_checkpoint_hash: Option<HashValue>,
+
+    /// Potentially summarizes all evicted items from state. Always `None` for now.
+    state_cemetery_hash: Option<HashValue>,
 }
 
 impl TransactionInfoV0 {
@@ -1048,6 +1124,7 @@ impl TransactionInfoV0 {
             event_root_hash,
             state_change_hash,
             state_checkpoint_hash,
+            state_cemetery_hash: None,
         }
     }
 
@@ -1057,6 +1134,10 @@ impl TransactionInfoV0 {
 
     pub fn state_change_hash(&self) -> HashValue {
         self.state_change_hash
+    }
+
+    pub fn is_state_checkpoint(&self) -> bool {
+        self.state_checkpoint_hash().is_some()
     }
 
     pub fn state_checkpoint_hash(&self) -> Option<HashValue> {
@@ -1095,18 +1176,20 @@ impl Display for TransactionInfo {
 pub struct TransactionToCommit {
     transaction: Transaction,
     transaction_info: TransactionInfo,
-    state_updates: HashMap<StateKey, StateValue>,
+    state_updates: HashMap<StateKey, Option<StateValue>>,
     write_set: WriteSet,
     events: Vec<ContractEvent>,
+    is_reconfig: bool,
 }
 
 impl TransactionToCommit {
     pub fn new(
         transaction: Transaction,
         transaction_info: TransactionInfo,
-        state_updates: HashMap<StateKey, StateValue>,
+        state_updates: HashMap<StateKey, Option<StateValue>>,
         write_set: WriteSet,
         events: Vec<ContractEvent>,
+        is_reconfig: bool,
     ) -> Self {
         TransactionToCommit {
             transaction,
@@ -1114,6 +1197,7 @@ impl TransactionToCommit {
             state_updates,
             write_set,
             events,
+            is_reconfig,
         }
     }
 
@@ -1126,7 +1210,7 @@ impl TransactionToCommit {
     }
 
     pub fn is_state_checkpoint(&self) -> bool {
-        self.transaction_info().state_checkpoint_hash.is_some()
+        self.transaction_info().is_state_checkpoint()
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
@@ -1134,7 +1218,7 @@ impl TransactionToCommit {
         self.transaction_info = txn_info
     }
 
-    pub fn state_updates(&self) -> &HashMap<StateKey, StateValue> {
+    pub fn state_updates(&self) -> &HashMap<StateKey, Option<StateValue>> {
         &self.state_updates
     }
 
@@ -1152,6 +1236,10 @@ impl TransactionToCommit {
 
     pub fn status(&self) -> &ExecutionStatus {
         &self.transaction_info.status
+    }
+
+    pub fn is_reconfig(&self) -> bool {
+        self.is_reconfig
     }
 }
 
@@ -1328,6 +1416,16 @@ impl TransactionOutputListWithProof {
             // Check the events against the expected events root hash
             verify_events_against_root_hash(&txn_output.events, txn_info)?;
 
+            // Verify the write set matches for both the transaction info and output
+            let write_set_hash = CryptoHash::hash(&txn_output.write_set);
+            ensure!(
+                txn_info.state_change_hash == write_set_hash,
+                "The write set in transaction output does not match the transaction info \
+                     in proof. Hash of write set in transaction output: {}. Write set hash in txn_info: {}.",
+                write_set_hash,
+                txn_info.state_change_hash,
+            );
+
             // Verify the gas matches for both the transaction info and output
             ensure!(
                 txn_output.gas_used() == txn_info.gas_used(),
@@ -1417,13 +1515,6 @@ impl AccountTransactionsWithProof {
         self.0
     }
 
-    // TODO(philiphayes): this will need to change to support CRSNs
-    // (Conflict-Resistant Sequence Numbers)[https://github.com/aptos/dip/blob/main/dips/dip-168.md].
-    //
-    // If we use a separate event stream under each account for sequence numbers,
-    // we'll probably need to always `include_events: true`, find the sequence
-    // number event, and use that to guarantee the response is sequential and
-    // complete.
     /// 1. Verify all transactions are consistent with the given ledger info.
     /// 2. All transactions were sent by `account`.
     /// 3. The transactions are contiguous by sequence number, starting at `start_seq_num`.
@@ -1484,7 +1575,7 @@ pub enum Transaction {
     ///       transaction types we had in our codebase.
     UserTransaction(SignedTransaction),
 
-    /// Transaction that applies a WriteSet to the current storage, it's applied manually via db-bootstrapper.
+    /// Transaction that applies a WriteSet to the current storage, it's applied manually via aptos-db-bootstrapper.
     GenesisTransaction(WriteSetPayload),
 
     /// Transaction to update the block metadata resource at the beginning of a block.
@@ -1497,10 +1588,17 @@ pub enum Transaction {
 }
 
 impl Transaction {
-    pub fn as_signed_user_txn(&self) -> Result<&SignedTransaction> {
+    pub fn try_as_signed_user_txn(&self) -> Option<&SignedTransaction> {
         match self {
-            Transaction::UserTransaction(txn) => Ok(txn),
-            _ => Err(format_err!("Not a user transaction.")),
+            Transaction::UserTransaction(txn) => Some(txn),
+            _ => None,
+        }
+    }
+
+    pub fn try_as_block_metadata(&self) -> Option<&BlockMetadata> {
+        match self {
+            Transaction::BlockMetadata(v1) => Some(v1),
+            _ => None,
         }
     }
 
@@ -1508,7 +1606,7 @@ impl Transaction {
         match self {
             Transaction::UserTransaction(user_txn) => {
                 user_txn.format_for_client(get_transaction_name)
-            }
+            },
             // TODO: display proper information for client
             Transaction::GenesisTransaction(_write_set) => String::from("genesis"),
             // TODO: display proper information for client

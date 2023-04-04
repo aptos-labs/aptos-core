@@ -1,0 +1,11 @@
+{{ $fullnodeBaseConfig := tpl ($.Files.Get "files/fullnode-base.yaml") $ | fromYaml }}
+{{ $fullnodeMergedConfig := mustMergeOverwrite $.Values.fullnode.config $fullnodeBaseConfig }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "aptos-fullnode.fullname" . }}
+  labels:
+    {{- include "aptos-fullnode.labels" . | nindent 4 }}
+data:
+  fullnode.yaml: |-
+{{ $fullnodeMergedConfig | toYaml | indent 4 }}

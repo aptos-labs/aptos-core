@@ -1,37 +1,52 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     core_mempool::{
         index::{
-            AccountTransactions, ParkingLotIndex, PriorityIndex, PriorityQueueIter, TTLIndex,
-            TimelineIndex,
+            AccountTransactions, MultiBucketTimelineIndex, ParkingLotIndex, PriorityIndex,
+            PriorityQueueIter, TTLIndex,
         },
         transaction::{MempoolTransaction, TimelineState},
-        ttl_cache::TtlCache,
     },
     counters,
+    counters::{
+        BROADCAST_BATCHED_LABEL, BROADCAST_READY_LABEL, CONSENSUS_READY_LABEL, E2E_LABEL,
+        LOCAL_LABEL,
+    },
     logging::{LogEntry, LogEvent, LogSchema, TxnsLog},
+    shared_mempool::types::MultiBucketTimelineIndexIds,
 };
 use aptos_config::config::MempoolConfig;
 use aptos_crypto::HashValue;
-use aptos_logger::prelude::*;
+use aptos_logger::{prelude::*, Level};
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::AccountSequenceInfo,
     mempool_status::{MempoolStatus, MempoolStatusCode},
     transaction::SignedTransaction,
 };
 use std::{
+    cmp::max,
     collections::HashMap,
+    mem::size_of,
     ops::Bound,
     time::{Duration, SystemTime},
 };
+
+/// Estimated per-txn overhead of indexes. Needs to be updated if additional indexes are added.
+pub const TXN_INDEX_ESTIMATED_BYTES: usize = size_of::<crate::core_mempool::index::OrderedQueueKey>() // priority_index
+    + size_of::<crate::core_mempool::index::TTLOrderingKey>() * 2 // expiration_time_index + system_ttl_index
+    + (size_of::<u64>() * 3 + size_of::<AccountAddress>()) // timeline_index
+    + (size_of::<HashValue>() + size_of::<u64>() + size_of::<AccountAddress>()); // hash_index
 
 /// TransactionStore is in-memory storage for all transactions in mempool.
 pub struct TransactionStore {
     // main DS
     transactions: HashMap<AccountAddress, AccountTransactions>,
+
+    // Sequence numbers for accounts with transactions
+    sequence_numbers: HashMap<AccountAddress, u64>,
 
     // indexes
     priority_index: PriorityIndex,
@@ -41,7 +56,8 @@ pub struct TransactionStore {
     // we keep it separate from `expiration_time_index` so Mempool can't be clogged
     //  by old transactions even if it hasn't received commit callbacks for a while
     system_ttl_index: TTLIndex,
-    timeline_index: TimelineIndex,
+    // Broadcast-ready transactions, with a timeline per bucket.
+    timeline_index: MultiBucketTimelineIndex,
     // keeps track of "non-ready" txns (transactions that can't be included in next block)
     parking_lot_index: ParkingLotIndex,
 
@@ -52,9 +68,18 @@ pub struct TransactionStore {
     // one valid hash.
     hash_index: HashMap<HashValue, (AccountAddress, u64)>,
 
+    // estimated size in bytes
+    size_bytes: usize,
+
     // configuration
     capacity: usize,
+    capacity_bytes: usize,
     capacity_per_user: usize,
+    max_batch_bytes: u64,
+
+    // eager expiration
+    eager_expire_threshold: Option<Duration>,
+    eager_expire_time: Duration,
 }
 
 impl TransactionStore {
@@ -62,6 +87,7 @@ impl TransactionStore {
         Self {
             // main DS
             transactions: HashMap::new(),
+            sequence_numbers: HashMap::new(),
 
             // various indexes
             system_ttl_index: TTLIndex::new(Box::new(|t: &MempoolTransaction| t.expiration_time)),
@@ -69,14 +95,35 @@ impl TransactionStore {
                 Duration::from_secs(t.txn.expiration_timestamp_secs())
             })),
             priority_index: PriorityIndex::new(),
-            timeline_index: TimelineIndex::new(),
+            timeline_index: MultiBucketTimelineIndex::new(config.broadcast_buckets.clone())
+                .unwrap(),
             parking_lot_index: ParkingLotIndex::new(),
             hash_index: HashMap::new(),
 
+            // estimated size in bytes
+            size_bytes: 0,
+
             // configuration
             capacity: config.capacity,
+            capacity_bytes: config.capacity_bytes,
             capacity_per_user: config.capacity_per_user,
+            max_batch_bytes: config.shared_mempool_max_batch_bytes,
+
+            // eager expiration
+            eager_expire_threshold: config.eager_expire_threshold_ms.map(Duration::from_millis),
+            eager_expire_time: Duration::from_millis(config.eager_expire_time_ms),
         }
+    }
+
+    #[inline]
+    fn get_mempool_txn(
+        &self,
+        address: &AccountAddress,
+        sequence_number: u64,
+    ) -> Option<&MempoolTransaction> {
+        self.transactions
+            .get(address)
+            .and_then(|txns| txns.get(&sequence_number))
     }
 
     /// Fetch transaction by account address + sequence_number.
@@ -85,12 +132,20 @@ impl TransactionStore {
         address: &AccountAddress,
         sequence_number: u64,
     ) -> Option<SignedTransaction> {
-        if let Some(txn) = self
-            .transactions
-            .get(address)
-            .and_then(|txns| txns.get(&sequence_number))
-        {
+        if let Some(txn) = self.get_mempool_txn(address, sequence_number) {
             return Some(txn.txn.clone());
+        }
+        None
+    }
+
+    /// Fetch transaction by account address + sequence_number, including ranking score
+    pub(crate) fn get_with_ranking_score(
+        &self,
+        address: &AccountAddress,
+        sequence_number: u64,
+    ) -> Option<(SignedTransaction, u64)> {
+        if let Some(txn) = self.get_mempool_txn(address, sequence_number) {
+            return Some((txn.txn.clone(), txn.ranking_score));
         }
         None
     }
@@ -102,22 +157,47 @@ impl TransactionStore {
         }
     }
 
-    /// Fetch mempool transaction by account address + sequence_number.
-    pub(crate) fn get_mempool_txn(
+    /// Return (SystemTime, is the timestamp for end-to-end)
+    pub(crate) fn get_insertion_time_and_bucket(
         &self,
         address: &AccountAddress,
         sequence_number: u64,
-    ) -> Option<MempoolTransaction> {
-        self.transactions
-            .get(address)
-            .and_then(|txns| txns.get(&sequence_number))
-            .cloned()
+    ) -> Option<(&SystemTime, bool, &str)> {
+        if let Some(txn) = self.get_mempool_txn(address, sequence_number) {
+            return Some((
+                &txn.insertion_time,
+                txn.timeline_state != TimelineState::NonQualified,
+                self.get_bucket(txn.ranking_score),
+            ));
+        }
+        None
+    }
+
+    pub(crate) fn get_ranking_score(
+        &self,
+        address: &AccountAddress,
+        sequence_number: u64,
+    ) -> Option<u64> {
+        if let Some(txn) = self.get_mempool_txn(address, sequence_number) {
+            return Some(txn.ranking_score);
+        }
+        None
+    }
+
+    #[inline]
+    pub(crate) fn get_bucket(&self, ranking_score: u64) -> &str {
+        self.timeline_index.get_bucket(ranking_score)
+    }
+
+    pub(crate) fn get_sequence_number(&self, address: &AccountAddress) -> Option<&u64> {
+        self.sequence_numbers.get(address)
     }
 
     /// Insert transaction into TransactionStore. Performs validation checks and updates indexes.
     pub(crate) fn insert(&mut self, txn: MempoolTransaction) -> MempoolStatus {
         let address = txn.get_sender();
-        let sequence_number = txn.sequence_info;
+        let txn_seq_num = txn.sequence_info.transaction_sequence_number;
+        let acc_seq_num = txn.sequence_info.account_sequence_number;
 
         // If the transaction is already in Mempool, we only allow the user to
         // increase the gas unit price to speed up a transaction, but not the max gas.
@@ -125,67 +205,61 @@ impl TransactionStore {
         // Transactions with all the same inputs (but possibly signed differently) are idempotent
         // since the raw transaction is the same
         if let Some(txns) = self.transactions.get_mut(&address) {
-            if let Some(current_version) =
-                txns.get_mut(&sequence_number.transaction_sequence_number)
-            {
+            if let Some(current_version) = txns.get_mut(&txn_seq_num) {
                 if current_version.txn.payload() != txn.txn.payload() {
                     return MempoolStatus::new(MempoolStatusCode::InvalidUpdate).with_message(
-                        "Transaction already in mempool with different payload".to_string(),
+                        "Transaction already in mempool with a different payload".to_string(),
                     );
                 } else if current_version.txn.expiration_timestamp_secs()
                     != txn.txn.expiration_timestamp_secs()
                 {
                     return MempoolStatus::new(MempoolStatusCode::InvalidUpdate).with_message(
-                        "Transaction already in mempool with different expiration timestamp"
+                        "Transaction already in mempool with a different expiration timestamp"
                             .to_string(),
                     );
                 } else if current_version.txn.max_gas_amount() != txn.txn.max_gas_amount() {
                     return MempoolStatus::new(MempoolStatusCode::InvalidUpdate).with_message(
-                        "Transaction already in mempool with different max gas amount".to_string(),
+                        "Transaction already in mempool with a different max gas amount"
+                            .to_string(),
                     );
                 } else if current_version.txn.gas_unit_price() < txn.get_gas_price() {
                     // Update txn if gas unit price is a larger value than before
-                    if let Some(txn) = txns.remove(&sequence_number.transaction_sequence_number) {
+                    if let Some(txn) = txns.remove(&txn_seq_num) {
                         self.index_remove(&txn);
                     };
                 } else if current_version.get_gas_price() > txn.get_gas_price() {
                     return MempoolStatus::new(MempoolStatusCode::InvalidUpdate).with_message(
-                        "Transaction already in mempool with higher gas price".to_string(),
+                        "Transaction already in mempool with a higher gas price".to_string(),
                     );
                 } else {
                     // If the transaction is the same, it's an idempotent call
                     // Updating signers is not supported, the previous submission must fail
+                    counters::CORE_MEMPOOL_IDEMPOTENT_TXNS.inc();
                     return MempoolStatus::new(MempoolStatusCode::Accepted);
                 }
             }
         }
 
-        if self.check_is_full_after_eviction(
-            &txn,
-            sequence_number.account_sequence_number_type.min_seq(),
-        ) {
+        if self.check_is_full_after_eviction(&txn, acc_seq_num) {
             return MempoolStatus::new(MempoolStatusCode::MempoolIsFull).with_message(format!(
-                "mempool size: {}, capacity: {}",
+                "Mempool is full. Mempool size: {}, Capacity: {}",
                 self.system_ttl_index.size(),
                 self.capacity,
             ));
         }
 
+        self.clean_committed_transactions(&address, acc_seq_num);
+
         self.transactions
             .entry(address)
             .or_insert_with(AccountTransactions::new);
-
-        self.clean_committed_transactions(
-            &address,
-            sequence_number.account_sequence_number_type.min_seq(),
-        );
 
         if let Some(txns) = self.transactions.get_mut(&address) {
             // capacity check
             if txns.len() >= self.capacity_per_user {
                 return MempoolStatus::new(MempoolStatusCode::TooManyTransactions).with_message(
                     format!(
-                        "txns length: {} capacity per user: {}",
+                        "Mempool over capacity for account. Number of transactions from account: {} Capacity per account: {}",
                         txns.len(),
                         self.capacity_per_user,
                     ),
@@ -193,19 +267,18 @@ impl TransactionStore {
             }
 
             // insert into storage and other indexes
+            let sender = txn.get_sender();
             self.system_ttl_index.insert(&txn);
             self.expiration_time_index.insert(&txn);
-            self.hash_index.insert(
-                txn.get_committed_hash(),
-                (
-                    txn.get_sender(),
-                    sequence_number.transaction_sequence_number,
-                ),
-            );
-            txns.insert(sequence_number.transaction_sequence_number, txn);
+            self.hash_index
+                .insert(txn.get_committed_hash(), (sender, txn_seq_num));
+            let txn_size_bytes = txn.get_estimated_bytes();
+            txns.insert(txn_seq_num, txn);
+            self.sequence_numbers.insert(sender, acc_seq_num);
+            self.size_bytes += txn_size_bytes;
             self.track_indices();
         }
-        self.process_ready_transactions(&address, sequence_number.account_sequence_number_type);
+        self.process_ready_transactions(&address, acc_seq_num);
         MempoolStatus::new(MempoolStatusCode::Accepted)
     }
 
@@ -230,10 +303,12 @@ impl TransactionStore {
             counters::TIMELINE_INDEX_LABEL,
             self.timeline_index.size(),
         );
+        counters::core_mempool_timeline_index_size(&self.timeline_index.get_sizes());
         counters::core_mempool_index_size(
             counters::TRANSACTION_HASH_INDEX_LABEL,
             self.hash_index.len(),
         );
+        counters::core_mempool_index_size(counters::SIZE_BYTES_LABEL, self.size_bytes);
     }
 
     /// Checks if Mempool is full.
@@ -244,9 +319,7 @@ impl TransactionStore {
         txn: &MempoolTransaction,
         curr_sequence_number: u64,
     ) -> bool {
-        if self.system_ttl_index.size() >= self.capacity
-            && self.check_txn_ready(txn, curr_sequence_number)
-        {
+        if self.is_full() && self.check_txn_ready(txn, curr_sequence_number) {
             // try to free some space in Mempool from ParkingLot by evicting a non-ready txn
             if let Some((address, sequence_number)) = self.parking_lot_index.get_poppable() {
                 if let Some(txn) = self
@@ -264,7 +337,11 @@ impl TransactionStore {
                 }
             }
         }
-        self.system_ttl_index.size() >= self.capacity
+        self.is_full()
+    }
+
+    fn is_full(&self) -> bool {
+        self.system_ttl_index.size() >= self.capacity || self.size_bytes >= self.capacity_bytes
     }
 
     /// Check if a transaction would be ready for broadcast in mempool upon insertion (without inserting it).
@@ -293,67 +370,97 @@ impl TransactionStore {
         false
     }
 
+    fn log_ready_transaction(
+        ranking_score: u64,
+        bucket: &str,
+        time_delta: Duration,
+        broadcast_ready: bool,
+    ) {
+        if broadcast_ready {
+            counters::core_mempool_txn_commit_latency(
+                CONSENSUS_READY_LABEL,
+                E2E_LABEL,
+                bucket,
+                time_delta,
+            );
+            counters::core_mempool_txn_commit_latency(
+                BROADCAST_READY_LABEL,
+                E2E_LABEL,
+                bucket,
+                time_delta,
+            );
+            counters::core_mempool_txn_ranking_score(
+                BROADCAST_READY_LABEL,
+                BROADCAST_READY_LABEL,
+                bucket,
+                ranking_score,
+            );
+        } else {
+            counters::core_mempool_txn_commit_latency(
+                CONSENSUS_READY_LABEL,
+                LOCAL_LABEL,
+                bucket,
+                time_delta,
+            );
+        }
+        counters::core_mempool_txn_ranking_score(
+            CONSENSUS_READY_LABEL,
+            CONSENSUS_READY_LABEL,
+            bucket,
+            ranking_score,
+        );
+    }
+
     /// Maintains the following invariants:
-    /// - All transactions of a given non-CRSN account that are sequential to the current sequence number
+    /// - All transactions of a given account that are sequential to the current sequence number
     ///   should be included in both the PriorityIndex (ordering for Consensus) and
     ///   TimelineIndex (txns for SharedMempool).
-    /// - All transactions of a given CRSN account that are greater than the account's min_nonce
-    ///   should be included in both the PriorityIndex and TimelineIndex.
     /// - Other txns are considered to be "non-ready" and should be added to ParkingLotIndex.
-    fn process_ready_transactions(
-        &mut self,
-        address: &AccountAddress,
-        crsn_or_seqno: AccountSequenceInfo,
-    ) {
+    fn process_ready_transactions(&mut self, address: &AccountAddress, sequence_num: u64) {
         if let Some(txns) = self.transactions.get_mut(address) {
-            let mut min_seq = crsn_or_seqno.min_seq();
+            let mut min_seq = sequence_num;
 
-            match crsn_or_seqno {
-                AccountSequenceInfo::CRSN { min_nonce, size } => {
-                    for i in min_nonce..size {
-                        if let Some(txn) = txns.get_mut(&i) {
-                            self.priority_index.insert(txn);
+            while let Some(txn) = txns.get_mut(&min_seq) {
+                let process_ready = !self.priority_index.contains(txn);
+                self.priority_index.insert(txn);
 
-                            if txn.timeline_state == TimelineState::NotReady {
-                                self.timeline_index.insert(txn);
-                            }
+                let process_broadcast_ready = txn.timeline_state == TimelineState::NotReady;
+                if process_broadcast_ready {
+                    self.timeline_index.insert(txn);
+                }
 
-                            // Remove txn from parking lot after it has been promoted to
-                            // priority_index / timeline_index, i.e., txn status is ready.
-                            self.parking_lot_index.remove(txn);
-                            min_seq = i;
-                        }
+                if process_ready {
+                    if let Ok(time_delta) = SystemTime::now().duration_since(txn.insertion_time) {
+                        Self::log_ready_transaction(
+                            txn.ranking_score,
+                            self.timeline_index.get_bucket(txn.ranking_score),
+                            time_delta,
+                            process_broadcast_ready,
+                        );
                     }
                 }
-                AccountSequenceInfo::Sequential(_) => {
-                    while let Some(txn) = txns.get_mut(&min_seq) {
-                        self.priority_index.insert(txn);
 
-                        if txn.timeline_state == TimelineState::NotReady {
-                            self.timeline_index.insert(txn);
-                        }
-
-                        // Remove txn from parking lot after it has been promoted to
-                        // priority_index / timeline_index, i.e., txn status is ready.
-                        self.parking_lot_index.remove(txn);
-                        min_seq += 1;
-                    }
-                }
+                // Remove txn from parking lot after it has been promoted to
+                // priority_index / timeline_index, i.e., txn status is ready.
+                self.parking_lot_index.remove(txn);
+                min_seq += 1;
             }
 
             let mut parking_lot_txns = 0;
             for (_, txn) in txns.range_mut((Bound::Excluded(min_seq), Bound::Unbounded)) {
                 match txn.timeline_state {
-                    TimelineState::Ready(_) => {}
+                    TimelineState::Ready(_) => {},
                     _ => {
                         self.parking_lot_index.insert(txn);
+                        txn.was_parked = true;
                         parking_lot_txns += 1;
-                    }
+                    },
                 }
             }
+
             trace!(
                 LogSchema::new(LogEntry::ProcessReadyTxns).account(*address),
-                first_ready_seq_num = crsn_or_seqno.min_seq(),
+                first_ready_seq_num = sequence_num,
                 last_ready_seq_num = min_seq,
                 num_parked_txns = parking_lot_txns,
             );
@@ -372,7 +479,10 @@ impl TransactionStore {
             txns.clear();
             txns.append(&mut active);
 
-            let mut rm_txns = TxnsLog::new();
+            let mut rm_txns = match aptos_logger::enabled!(Level::Trace) {
+                true => TxnsLog::new(),
+                false => TxnsLog::new_with_max(10),
+            };
             for transaction in txns_for_removal.values() {
                 rm_txns.add(
                     transaction.get_sender(),
@@ -392,30 +502,44 @@ impl TransactionStore {
     /// Handles transaction commit.
     /// It includes deletion of all transactions with sequence number <= `account_sequence_number`
     /// and potential promotion of sequential txns to PriorityIndex/TimelineIndex.
-    pub(crate) fn commit_transaction(
-        &mut self,
-        account: &AccountAddress,
-        account_sequence_number: AccountSequenceInfo,
-    ) {
-        self.clean_committed_transactions(account, account_sequence_number.min_seq());
-        self.process_ready_transactions(account, account_sequence_number);
+    pub fn commit_transaction(&mut self, account: &AccountAddress, sequence_number: u64) {
+        let current_seq_number = self.get_sequence_number(account).map_or(0, |v| *v);
+        let new_seq_number = max(current_seq_number, sequence_number + 1);
+        self.sequence_numbers.insert(*account, new_seq_number);
+        self.clean_committed_transactions(account, new_seq_number);
+        self.process_ready_transactions(account, new_seq_number);
     }
 
-    pub(crate) fn reject_transaction(&mut self, account: &AccountAddress, _sequence_number: u64) {
-        if let Some(txns) = self.transactions.remove(account) {
-            let mut txns_log = TxnsLog::new();
-            for transaction in txns.values() {
-                txns_log.add(
-                    transaction.get_sender(),
-                    transaction.sequence_info.transaction_sequence_number,
-                );
-                self.index_remove(transaction);
+    pub fn reject_transaction(
+        &mut self,
+        account: &AccountAddress,
+        sequence_number: u64,
+        hash: &HashValue,
+    ) {
+        let mut txn_to_remove = None;
+        if let Some((indexed_account, indexed_sequence_number)) = self.hash_index.get(hash) {
+            if account == indexed_account && sequence_number == *indexed_sequence_number {
+                txn_to_remove = self.get_mempool_txn(account, sequence_number).cloned();
             }
-            debug!(LogSchema::new(LogEntry::CleanRejectedTxn).txns(txns_log));
+        }
+        if let Some(txn_to_remove) = txn_to_remove {
+            if let Some(txns) = self.transactions.get_mut(account) {
+                txns.remove(&sequence_number);
+            }
+            self.index_remove(&txn_to_remove);
+
+            if aptos_logger::enabled!(Level::Trace) {
+                let mut txns_log = TxnsLog::new();
+                txns_log.add(
+                    txn_to_remove.get_sender(),
+                    txn_to_remove.sequence_info.transaction_sequence_number,
+                );
+                trace!(LogSchema::new(LogEntry::CleanRejectedTxn).txns(txns_log));
+            }
         }
     }
 
-    /// Removes transaction from all indexes.
+    /// Removes transaction from all indexes. Only call after removing from main transactions DS.
     fn index_remove(&mut self, txn: &MempoolTransaction) {
         counters::CORE_MEMPOOL_REMOVED_TXNS.inc();
         self.system_ttl_index.remove(txn);
@@ -424,36 +548,81 @@ impl TransactionStore {
         self.timeline_index.remove(txn);
         self.parking_lot_index.remove(txn);
         self.hash_index.remove(&txn.get_committed_hash());
+        self.size_bytes -= txn.get_estimated_bytes();
+
+        // Remove account datastructures if there are no more transactions for the account.
+        let address = &txn.get_sender();
+        if let Some(txns) = self.transactions.get(address) {
+            if txns.is_empty() {
+                self.transactions.remove(address);
+                self.sequence_numbers.remove(address);
+            }
+        }
+
         self.track_indices();
     }
 
-    /// Read `count` transactions from timeline since `timeline_id`.
+    /// Read at most `count` transactions from timeline since `timeline_id`.
+    /// This method takes into account the max number of bytes per transaction batch.
     /// Returns block of transactions and new last_timeline_id.
     pub(crate) fn read_timeline(
         &self,
-        timeline_id: u64,
+        timeline_id: &MultiBucketTimelineIndexIds,
         count: usize,
-    ) -> (Vec<SignedTransaction>, u64) {
+    ) -> (Vec<SignedTransaction>, MultiBucketTimelineIndexIds) {
         let mut batch = vec![];
-        let mut last_timeline_id = timeline_id;
-        for (address, sequence_number) in self.timeline_index.read_timeline(timeline_id, count) {
-            if let Some(txn) = self
-                .transactions
-                .get(&address)
-                .and_then(|txns| txns.get(&sequence_number))
-            {
-                batch.push(txn.txn.clone());
-                if let TimelineState::Ready(timeline_id) = txn.timeline_state {
-                    last_timeline_id = timeline_id;
+        let mut batch_total_bytes: u64 = 0;
+        let mut last_timeline_id = timeline_id.id_per_bucket.clone();
+
+        // Add as many transactions to the batch as possible
+        for (i, bucket) in self
+            .timeline_index
+            .read_timeline(timeline_id, count)
+            .iter()
+            .enumerate()
+            .rev()
+        {
+            for (address, sequence_number) in bucket {
+                if let Some(txn) = self.get_mempool_txn(address, *sequence_number) {
+                    let transaction_bytes = txn.txn.raw_txn_bytes_len() as u64;
+                    if batch_total_bytes.saturating_add(transaction_bytes) > self.max_batch_bytes {
+                        break; // The batch is full
+                    } else {
+                        batch.push(txn.txn.clone());
+                        batch_total_bytes = batch_total_bytes.saturating_add(transaction_bytes);
+                        if let TimelineState::Ready(timeline_id) = txn.timeline_state {
+                            last_timeline_id[i] = timeline_id;
+                        }
+                        if let Ok(time_delta) = SystemTime::now().duration_since(txn.insertion_time)
+                        {
+                            let bucket = self.timeline_index.get_bucket(txn.ranking_score);
+                            counters::core_mempool_txn_commit_latency(
+                                BROADCAST_BATCHED_LABEL,
+                                E2E_LABEL,
+                                bucket,
+                                time_delta,
+                            );
+                            counters::core_mempool_txn_ranking_score(
+                                BROADCAST_BATCHED_LABEL,
+                                BROADCAST_BATCHED_LABEL,
+                                bucket,
+                                txn.ranking_score,
+                            );
+                        }
+                    }
                 }
             }
         }
-        (batch, last_timeline_id)
+
+        (batch, last_timeline_id.into())
     }
 
-    pub(crate) fn timeline_range(&self, start_id: u64, end_id: u64) -> Vec<SignedTransaction> {
+    pub(crate) fn timeline_range(
+        &self,
+        start_end_pairs: &Vec<(u64, u64)>,
+    ) -> Vec<SignedTransaction> {
         self.timeline_index
-            .timeline_range(start_id, end_id)
+            .timeline_range(start_end_pairs)
             .iter()
             .filter_map(|(account, sequence_number)| {
                 self.transactions
@@ -464,31 +633,48 @@ impl TransactionStore {
             .collect()
     }
 
-    /// Garbage collect old transactions.
-    pub(crate) fn gc_by_system_ttl(
-        &mut self,
-        metrics_cache: &TtlCache<(AccountAddress, u64), SystemTime>,
-    ) {
-        let now = aptos_infallible::duration_since_epoch();
+    /// If the oldest transaction (that never entered parking lot) is larger than
+    /// eager_expire_threshold, there is significant backlog so add eager_expire_time
+    fn eager_expire_time(&self, gc_time: Duration) -> Duration {
+        let eager_expire_threshold = match self.eager_expire_threshold {
+            None => {
+                return gc_time;
+            },
+            Some(v) => v,
+        };
 
-        self.gc(now, true, metrics_cache);
+        let mut oldest_insertion_time = None;
+        // Limit the worst-case linear search to 20.
+        for key in self.system_ttl_index.iter().take(20) {
+            if let Some(txn) = self.get_mempool_txn(&key.address, key.sequence_number) {
+                if !txn.was_parked {
+                    oldest_insertion_time = Some(txn.insertion_time);
+                    break;
+                }
+            }
+        }
+        if let Some(insertion_time) = oldest_insertion_time {
+            if let Ok(age) = SystemTime::now().duration_since(insertion_time) {
+                if age > eager_expire_threshold {
+                    counters::CORE_MEMPOOL_GC_EAGER_EXPIRE_EVENT_COUNT.inc();
+                    return gc_time.saturating_add(self.eager_expire_time);
+                }
+            }
+        }
+        gc_time
+    }
+
+    /// Garbage collect old transactions.
+    pub(crate) fn gc_by_system_ttl(&mut self, gc_time: Duration) {
+        self.gc(gc_time, true);
     }
 
     /// Garbage collect old transactions based on client-specified expiration time.
-    pub(crate) fn gc_by_expiration_time(
-        &mut self,
-        block_time: Duration,
-        metrics_cache: &TtlCache<(AccountAddress, u64), SystemTime>,
-    ) {
-        self.gc(block_time, false, metrics_cache);
+    pub(crate) fn gc_by_expiration_time(&mut self, block_time: Duration) {
+        self.gc(self.eager_expire_time(block_time), false);
     }
 
-    fn gc(
-        &mut self,
-        now: Duration,
-        by_system_ttl: bool,
-        metrics_cache: &TtlCache<(AccountAddress, u64), SystemTime>,
-    ) {
+    fn gc(&mut self, now: Duration, by_system_ttl: bool) {
         let (metric_label, index, log_event) = if by_system_ttl {
             (
                 counters::GC_SYSTEM_TTL_LABEL,
@@ -511,7 +697,10 @@ impl TransactionStore {
         gc_txns.sort_by_key(|key| (key.address, key.sequence_number));
         let mut gc_iter = gc_txns.iter().peekable();
 
-        let mut gc_txns_log = TxnsLog::new();
+        let mut gc_txns_log = match aptos_logger::enabled!(Level::Trace) {
+            true => TxnsLog::new(),
+            false => TxnsLog::new_with_max(10),
+        };
         while let Some(key) = gc_iter.next() {
             if let Some(txns) = self.transactions.get_mut(&key.address) {
                 let park_range_start = Bound::Excluded(key.sequence_number);
@@ -522,10 +711,14 @@ impl TransactionStore {
                         Bound::Excluded(next_key.sequence_number)
                     });
                 // mark all following txns as non-ready, i.e. park them
-                for (_, t) in txns.range((park_range_start, park_range_end)) {
+                for (_, t) in txns.range_mut((park_range_start, park_range_end)) {
                     self.parking_lot_index.insert(t);
+                    t.was_parked = true;
                     self.priority_index.remove(t);
                     self.timeline_index.remove(t);
+                    if let TimelineState::Ready(_) = t.timeline_state {
+                        t.timeline_state = TimelineState::NotReady;
+                    }
                 }
                 if let Some(txn) = txns.remove(&key.sequence_number) {
                     let is_active = self.priority_index.contains(&txn);
@@ -537,13 +730,10 @@ impl TransactionStore {
                     let account = txn.get_sender();
                     let txn_sequence_number = txn.sequence_info.transaction_sequence_number;
                     gc_txns_log.add_with_status(account, txn_sequence_number, status);
-                    if let Some(&creation_time) = metrics_cache.get(&(account, txn_sequence_number))
-                    {
-                        if let Ok(time_delta) = SystemTime::now().duration_since(creation_time) {
-                            counters::CORE_MEMPOOL_GC_LATENCY
-                                .with_label_values(&[metric_label, status])
-                                .observe(time_delta.as_secs_f64());
-                        }
+                    if let Ok(time_delta) = SystemTime::now().duration_since(txn.insertion_time) {
+                        counters::CORE_MEMPOOL_GC_LATENCY
+                            .with_label_values(&[metric_label, status])
+                            .observe(time_delta.as_secs_f64());
                     }
 
                     // remove txn
@@ -552,7 +742,11 @@ impl TransactionStore {
             }
         }
 
-        debug!(LogSchema::event_log(LogEntry::GCRemoveTxns, log_event).txns(gc_txns_log));
+        if !gc_txns_log.is_empty() {
+            debug!(LogSchema::event_log(LogEntry::GCRemoveTxns, log_event).txns(gc_txns_log));
+        } else {
+            trace!(LogSchema::event_log(LogEntry::GCRemoveTxns, log_event).txns(gc_txns_log));
+        }
         self.track_indices();
     }
 
@@ -560,20 +754,16 @@ impl TransactionStore {
         self.priority_index.iter()
     }
 
-    pub(crate) fn gen_snapshot(
-        &self,
-        metrics_cache: &TtlCache<(AccountAddress, u64), SystemTime>,
-    ) -> TxnsLog {
+    pub(crate) fn gen_snapshot(&self) -> TxnsLog {
         let mut txns_log = TxnsLog::new();
         for (account, txns) in self.transactions.iter() {
-            for (seq_num, _txn) in txns.iter() {
+            for (seq_num, txn) in txns.iter() {
                 let status = if self.parking_lot_index.contains(account, seq_num) {
                     "parked"
                 } else {
                     "ready"
                 };
-                let timestamp = metrics_cache.get(&(*account, *seq_num)).cloned();
-                txns_log.add_full_metadata(*account, *seq_num, status, timestamp);
+                txns_log.add_full_metadata(*account, *seq_num, status, txn.insertion_time);
             }
         }
         txns_log
@@ -582,5 +772,10 @@ impl TransactionStore {
     #[cfg(test)]
     pub(crate) fn get_parking_lot_size(&self) -> usize {
         self.parking_lot_index.size()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn get_transactions(&self) -> &HashMap<AccountAddress, AccountTransactions> {
+        &self.transactions
     }
 }

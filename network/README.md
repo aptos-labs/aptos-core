@@ -6,7 +6,7 @@ custom_edit_url: https://github.com/aptos-labs/aptos-core/edit/main/network/READ
 
 ## Overview
 
-For more detailed info, see the [AptosNet Specification](../specifications/network/README.md).
+For more detailed info, see the [AptosNet Specification](../documentation/specifications/network/README.md).
 
 AptosNet is the primary protocol for communication between any two nodes in the
 Aptos ecosystem. It is specifically designed to facilitate the consensus, shared
@@ -23,8 +23,8 @@ The network component uses:
 
 * TCP for reliable transport.
 * [NoiseIK] for authentication and full end-to-end encryption.
-* On-chain [`NetworkAddress`](./network-address/src/lib.rs) set for discovery, with
-  optional seed peers in the [`NetworkConfig`](../config/src/config/network_config.rs)
+* On-chain [`NetworkAddress`](../types/src/network_address/mod.rs) set for discovery, with
+  optional seed peers in the [`NetworkConfig`]
   as a fallback.
 
 Validators will only allow connections from other validators. Their identity and
@@ -61,7 +61,7 @@ partial membership views, sophisticated failure detectors, or network overlays.
                       +----------------------+--------------------+   +---------------------+
                       |        Peer(s)       |                    |
                       +----------------------+                    |
-                      |                AptosTransport              |
+                      |                AptosTransport             |
                       +-------------------------------------------+
 ```
 
@@ -96,7 +96,7 @@ on updates to known peers via Discovery updates.
 * [`validator-set-discovery`] &mdash; Discovers the set of peers to connect to
 via on-chain configuration. These are the `validator_network_addresses` and
 `fullnode_network_addresses` of each [`ValidatorConfig`] in the
-[`ValidatorSet::validators`] set. Notifies the [`ConnectivityManager`] of updates
+[`ValidatorSet`] set. Notifies the [`ConnectivityManager`] of updates
 to the known peer set.
 
 * [`HealthChecker`] &mdash; Performs periodic liveness probes to ensure the
@@ -105,18 +105,19 @@ configurable number of probes fail in succession. Probes currently fail on a
 configurable static timeout.
 
 ## How is this module organized?
+    ../types/src
+    ├── network-address            # Network addresses and encryption
 
     network
-    ├── benches                    # Network benchmarks
     ├── builder                    # Builds a network from a NetworkConfig
     ├── memsocket                  # In-memory socket interface for tests
     ├── netcore
     │   └── src
     │       ├── transport          # Composable transport API
     │       └── framing            # Read/write length prefixes to sockets
-    ├── network-address            # Network addresses and encryption
     ├── discovery                  # Protocols for peer discovery
     └── src
+        ├── application
         ├── peer_manager           # Manage peer connections and messages to/from peers
         ├── peer                   # Handles a single peer connection's state
         ├── connectivity_manager   # Monitor connections and ensure connectivity
@@ -129,15 +130,16 @@ configurable static timeout.
         ├── transport              # The base transport layer for dialing/listening
         └── noise                  # Noise handshaking and wire integration
 
+[`NetworkConfig`]:../config/src/config/network_config.rs
 [`ConnectivityManager`]: ./src/connectivity_manager/mod.rs
-[AptosNet Handshake Protocol]: ../specifications/network/handshake-v1.md
-[`ValidatorSet::validators`]: ../aptos-move/framework/core/doc/ValidatorSet.md#struct-ValidatorSet
+[`AptosNet Handshake Protocol`]: ../specifications/network/handshake-v1.md
+[`ValidatorSet`]: ../types/src/on_chain_config/validator_set.rs
 [`AptosTransport`]: ./src/transport/mod.rs
 [`HealthChecker`]: ./src/protocols/health_checker/mod.rs
 [`Network Interface`]: ./src/protocols/network/mod.rs
 [`NetworkMessage`]: ./src/protocols/wire/messaging/v1/mod.rs
-[NoiseIK]: ../specifications/network/noise.md
+[`NoiseIK`]: ../specifications/network/noise.md
 [`PeerManager`]: ./src/peer_manager/mod.rs
 [`Peer`]: ./src/peer/mod.rs
-[`ValidatorConfig`]: ../aptos-move/framework/core/doc/ValidatorConfig.md#struct-config
+[`ValidatorConfig`]: ../documentation/specifications/network/onchain-discovery.md#on-chain-config
 [`validator-set-discovery`]: discovery/src/lib.rs

@@ -1,12 +1,12 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::quorum_store::direct_mempool_quorum_store::DirectMempoolQuorumStore;
-use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
-use consensus_types::{
-    common::{Payload, PayloadFilter},
-    request_response::{ConsensusRequest, ConsensusResponse},
+use aptos_consensus_types::{
+    common::PayloadFilter,
+    request_response::{GetPayloadCommand, GetPayloadResponse},
 };
+use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use futures::{
     channel::{mpsc, oneshot},
     StreamExt,
@@ -29,14 +29,22 @@ async fn test_block_request_no_txns() {
 
     let (consensus_callback, consensus_callback_rcv) = oneshot::channel();
     consensus_to_quorum_store_sender
-        .try_send(ConsensusRequest::GetBlockRequest(
+        .try_send(GetPayloadCommand::GetPayloadRequest(
             100,
+            1000,
+            true,
             PayloadFilter::DirectMempool(vec![]),
             consensus_callback,
         ))
         .unwrap();
 
-    if let QuorumStoreRequest::GetBatchRequest(_max_batch_size, _exclude_txns, callback) = timeout(
+    if let QuorumStoreRequest::GetBatchRequest(
+        _max_batch_size,
+        _max_bytes,
+        _return_non_full,
+        _exclude_txns,
+        callback,
+    ) = timeout(
         Duration::from_millis(1_000),
         quorum_store_to_mempool_receiver.select_next_some(),
     )
@@ -56,16 +64,9 @@ async fn test_block_request_no_txns() {
         .unwrap()
         .unwrap()
     {
-        ConsensusResponse::GetBlockResponse(payload) => {
+        GetPayloadResponse::GetPayloadResponse(payload) => {
             assert!(payload.is_empty());
-            match payload {
-                Payload::DirectMempool(txns) => assert!(txns.is_empty()),
-                _ => panic!("Unexpected payload {:?}", payload),
-            }
-        }
-        _ => {
-            panic!("Unexpected variant")
-        }
+        },
     }
 
     std::mem::drop(consensus_to_quorum_store_sender);

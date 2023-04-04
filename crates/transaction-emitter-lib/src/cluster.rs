@@ -1,18 +1,16 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{emitter::query_sequence_numbers, instance::Instance, ClusterArgs};
+use crate::{emitter::query_sequence_number, instance::Instance, ClusterArgs};
 use anyhow::{anyhow, bail, format_err, Result};
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     test_utils::KeyPair,
-    Uniform,
 };
 use aptos_logger::{info, warn};
 use aptos_rest_client::Client as RestClient;
-use aptos_sdk::{
-    move_types::account_address::AccountAddress,
-    types::{account_config::aptos_root_address, chain_id::ChainId, AccountKey, LocalAccount},
+use aptos_sdk::types::{
+    account_config::aptos_test_root_address, chain_id::ChainId, AccountKey, LocalAccount,
 };
 use rand::seq::SliceRandom;
 use std::convert::TryFrom;
@@ -21,7 +19,8 @@ use url::Url;
 #[derive(Debug)]
 pub struct Cluster {
     instances: Vec<Instance>,
-    mint_key_pair: KeyPair<Ed25519PrivateKey, Ed25519PublicKey>,
+    coin_source_key_pair: KeyPair<Ed25519PrivateKey, Ed25519PublicKey>,
+    pub coin_source_is_root: bool,
     pub chain_id: ChainId,
 }
 
@@ -35,13 +34,13 @@ impl Cluster {
     /// confirm that they have a host and port set.
     pub async fn from_host_port(
         peers: Vec<Url>,
-        mint_key: Ed25519PrivateKey,
+        coin_source_key: Ed25519PrivateKey,
+        coin_source_is_root: bool,
         chain_id: ChainId,
-        vasp: bool,
     ) -> Result<Self> {
         let num_peers = peers.len();
 
-        let mut instances = Vec::new();
+        let mut instance_states = Vec::new();
         let mut errors = Vec::new();
         for url in &peers {
             let instance = Instance::new(
@@ -54,8 +53,14 @@ impl Cluster {
                 None,
             );
             match instance.rest_client().get_ledger_information().await {
-                Ok(_) => instances.push(instance),
-                Err(err) => errors.push(err),
+                Ok(v) => instance_states.push((instance, v.into_inner())),
+                Err(err) => {
+                    warn!(
+                        "Excluding client {} because failing to fetch the ledger information",
+                        instance.peer_name()
+                    );
+                    errors.push(err)
+                },
             }
         }
 
@@ -64,6 +69,36 @@ impl Cluster {
                 "Failed to build some endpoints for the cluster: {:?}",
                 errors
             );
+        }
+
+        let mut instances = Vec::new();
+        let max_version = instance_states
+            .iter()
+            .map(|(_, s)| s.version)
+            .max()
+            .unwrap();
+
+        for (instance, state) in instance_states.into_iter() {
+            if state.chain_id != chain_id.id() {
+                warn!(
+                    "Excluding client {} running wrong chain {}",
+                    instance.peer_name(),
+                    state.chain_id
+                );
+            } else if state.version + 100000 < max_version {
+                warn!(
+                    "Excluding Client {} too stale, {}, while chain at {}",
+                    instance.peer_name(),
+                    state.version,
+                    max_version
+                );
+            } else {
+                info!(
+                    "Client {} is healthy, adding to the list of end points for load testing",
+                    instance.peer_name()
+                );
+                instances.push(instance);
+            }
         }
 
         if instances.is_empty() {
@@ -79,22 +114,17 @@ impl Cluster {
             num_peers
         );
 
-        let mint_key_pair = if vasp {
-            dummy_key_pair()
-        } else {
-            KeyPair::from(mint_key)
-        };
-
         Ok(Self {
             instances,
-            mint_key_pair,
+            coin_source_key_pair: KeyPair::from(coin_source_key),
+            coin_source_is_root,
             chain_id,
         })
     }
 
     pub async fn try_from_cluster_args(args: &ClusterArgs) -> Result<Self> {
         let mut urls = Vec::new();
-        for url in &args.targets {
+        for url in &args.get_targets()? {
             if !url.has_host() {
                 bail!("No host found in URL: {}", url);
             }
@@ -106,49 +136,36 @@ impl Cluster {
             urls.push(url);
         }
 
-        let mint_key = args.mint_args.get_mint_key()?;
+        let (coin_source_key, is_root) = args.coin_source_args.get_private_key()?;
 
-        let cluster = Cluster::from_host_port(urls, mint_key, args.chain_id, args.vasp)
+        let cluster = Cluster::from_host_port(urls, coin_source_key, is_root, args.chain_id)
             .await
-            .map_err(|e| format_err!("failed to create a cluster from host and port: {}", e))?;
+            .map_err(|e| format_err!("failed to create a cluster from host and port: {:?}", e))?;
 
         Ok(cluster)
     }
 
     fn account_key(&self) -> AccountKey {
-        AccountKey::from_private_key(clone(&self.mint_key_pair.private_key))
+        AccountKey::from_private_key(clone(&self.coin_source_key_pair.private_key))
     }
 
-    async fn load_account_with_mint_key(
-        &self,
-        client: &RestClient,
-        address: AccountAddress,
-    ) -> Result<LocalAccount> {
-        let sequence_number = query_sequence_numbers(client, &[address])
-            .await
-            .map_err(|e| {
-                format_err!(
-                    "query_sequence_numbers on {:?} for account {} failed: {}",
-                    client,
-                    address,
-                    e
-                )
-            })?[0];
-        Ok(LocalAccount::new(
-            address,
-            self.account_key(),
-            sequence_number,
-        ))
-    }
+    pub async fn load_coin_source_account(&self, client: &RestClient) -> Result<LocalAccount> {
+        let account_key = self.account_key();
+        let address = if self.coin_source_is_root {
+            aptos_test_root_address()
+        } else {
+            account_key.authentication_key().derived_address()
+        };
 
-    pub async fn load_aptos_root_account(&self, client: &RestClient) -> Result<LocalAccount> {
-        self.load_account_with_mint_key(client, aptos_root_address())
-            .await
-    }
-
-    pub async fn load_faucet_account(&self, client: &RestClient) -> Result<LocalAccount> {
-        self.load_account_with_mint_key(client, aptos_root_address())
-            .await
+        let sequence_number = query_sequence_number(client, address).await.map_err(|e| {
+            format_err!(
+                "query_sequence_number on {:?} for account {} failed: {:?}",
+                client,
+                address,
+                e
+            )
+        })?;
+        Ok(LocalAccount::new(address, account_key, sequence_number))
     }
 
     pub fn random_instance(&self) -> Instance {
@@ -162,8 +179,4 @@ impl Cluster {
     pub fn all_instances(&self) -> impl Iterator<Item = &Instance> {
         self.instances.iter()
     }
-}
-
-pub fn dummy_key_pair() -> KeyPair<Ed25519PrivateKey, Ed25519PublicKey> {
-    Ed25519PrivateKey::generate_for_testing().into()
 }

@@ -2,12 +2,16 @@ chain:
   name:
 validator:
   name:
+fullnode:
+  name:
 
 monitoring:
-  fullKubernetesScrape: true
-  useKubeStateMetrics: false
   prometheus:
+    fullKubernetesScrape: false
     deleteWal: false
+    tsdb_retention_time: 15d
+    tsdb_min_block_duration: 30m
+    tsdb_max_block_duration: 1h
     remote_write:
       enabled: false
       url:
@@ -64,15 +68,15 @@ monitoring:
   grafana:
     image:
       repo: grafana/grafana
-      tag: 8.4.4@sha256:b1a82a9f837ce269542cc023f0607753ca7f709195d2bdec93e2e703fd13f8c0
+      tag: 9.0.9@sha256:4a6b9d8d88522d2851f947f8f84cca10b6a43ca26d5e93102daf3a87935f10a5
       pullPolicy: IfNotPresent
     resources:
       limits:
-        cpu: 0.2
-        memory: 128Mi
+        cpu: 1
+        memory: 256Mi
       requests:
-        cpu: 0.2
-        memory: 128Mi
+        cpu: 1
+        memory: 256Mi
     googleAuth:
     config:
     env:
@@ -98,3 +102,17 @@ serviceAccount:
   # If not set and create is true, a name is generated using the fullname template
   name:
   annotations:
+
+kube-state-metrics:
+  enabled: false
+  namespaceOverride: kube-system
+  podAnnotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+
+prometheus-node-exporter:
+  enabled: false
+  namespaceOverride: kube-system
+  podAnnotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9100"

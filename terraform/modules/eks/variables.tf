@@ -3,6 +3,11 @@ variable "region" {
   type        = string
 }
 
+variable "kubernetes_version" {
+  description = "Version of Kubernetes to use for EKS cluster"
+  default     = "1.22"
+}
+
 variable "eks_cluster_name" {
   description = "Name of the eks cluster"
   type        = string
@@ -71,7 +76,7 @@ variable "utility_instance_type" {
 
 variable "fullnode_instance_type" {
   description = "Instance type used for validator and fullnodes"
-  default     = "c5.xlarge"
+  default     = "c6i.8xlarge"
 }
 
 variable "num_fullnodes" {
@@ -85,12 +90,12 @@ variable "node_pool_sizes" {
   description = "Override the number of nodes in the specified pool"
 }
 
-variable "max_node_pool_surge" {
-  default     = 1
-  description = "Multiplier on the max size of the node pool"
-}
-
 variable "workspace_name_override" {
   description = "If specified, overrides the usage of Terraform workspace for naming purposes"
   default     = ""
+}
+
+variable "num_extra_instance" {
+  default     = 0
+  description = "Number of extra instances to add into node pool"
 }

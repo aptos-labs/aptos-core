@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -11,7 +12,7 @@ use crate::{
     state_store::StateStore,
     transaction_store::TransactionStore,
 };
-use anyhow::{ensure, Result};
+use anyhow::{anyhow, ensure, Context, Result};
 use aptos_crypto::hash::HashValue;
 use aptos_types::{
     contract_event::ContractEvent,
@@ -19,8 +20,8 @@ use aptos_types::{
     proof::{SparseMerkleRangeProof, TransactionAccumulatorRangeProof, TransactionInfoWithProof},
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{Transaction, TransactionInfo, Version},
+    write_set::WriteSet,
 };
-use itertools::zip_eq;
 use serde::{Deserialize, Serialize};
 use std::{fmt, sync::Arc};
 
@@ -53,24 +54,41 @@ impl BackupHandler {
         &self,
         start_version: Version,
         num_transactions: usize,
-    ) -> Result<impl Iterator<Item = Result<(Transaction, TransactionInfo, Vec<ContractEvent>)>> + '_>
-    {
+    ) -> Result<
+        impl Iterator<Item = Result<(Transaction, TransactionInfo, Vec<ContractEvent>, WriteSet)>> + '_,
+    > {
         let txn_iter = self
             .transaction_store
             .get_transaction_iter(start_version, num_transactions)?;
-        let txn_info_iter = self
+        let mut txn_info_iter = self
             .ledger_store
             .get_transaction_info_iter(start_version, num_transactions)?;
-        let events_iter = self
+        let mut event_vec_iter = self
             .event_store
             .get_events_by_version_iter(start_version, num_transactions)?;
+        let mut write_set_iter = self
+            .transaction_store
+            .get_write_set_iter(start_version, num_transactions)?;
 
-        let zipped = zip_eq(zip_eq(txn_iter, txn_info_iter), events_iter)
-            .enumerate()
-            .map(move |(idx, ((txn_res, txn_info_res), events_res))| {
-                BACKUP_TXN_VERSION.set((start_version.wrapping_add(idx as u64)) as i64);
-                Ok((txn_res?, txn_info_res?, events_res?))
-            });
+        let zipped = txn_iter.enumerate().map(move |(idx, txn_res)| {
+            let version = start_version + idx as u64; // overflow is impossible since it's check upon txn_iter construction.
+
+            let txn = txn_res?;
+            let txn_info = txn_info_iter
+                .next()
+                .ok_or_else(|| anyhow!("TransactionInfo not found when Transaction exists."))
+                .context(version)??;
+            let event_vec = event_vec_iter
+                .next()
+                .ok_or_else(|| anyhow!("Events not found when Transaction exists."))
+                .context(version)??;
+            let write_set = write_set_iter
+                .next()
+                .ok_or_else(|| anyhow!("WriteSet not found when Transaction exists."))
+                .context(version)??;
+            BACKUP_TXN_VERSION.set(version as i64);
+            Ok((txn, txn_info, event_vec, write_set))
+        });
         Ok(zipped)
     }
 
@@ -127,27 +145,13 @@ impl BackupHandler {
 
     /// Gets the epoch, committed version, and synced version of the DB.
     pub fn get_db_state(&self) -> Result<Option<DbState>> {
-        self.ledger_store
-            .get_startup_info()?
-            .map(
-                |(latest_li, epoch_state_if_not_in_li, synced_version_opt)| {
-                    Ok(DbState {
-                        epoch: latest_li
-                            .ledger_info()
-                            .next_epoch_state()
-                            .unwrap_or_else(|| {
-                                epoch_state_if_not_in_li
-                                    .as_ref()
-                                    .expect("EpochState must exist")
-                            })
-                            .epoch,
-                        committed_version: latest_li.ledger_info().version(),
-                        synced_version: synced_version_opt
-                            .unwrap_or_else(|| latest_li.ledger_info().version()),
-                    })
-                },
-            )
-            .transpose()
+        Ok(self
+            .ledger_store
+            .get_latest_ledger_info_option()
+            .map(|li| DbState {
+                epoch: li.ledger_info().epoch(),
+                committed_version: li.ledger_info().version(),
+            }))
     }
 
     /// Gets the proof of the state root at specified version.
@@ -185,15 +189,14 @@ impl BackupHandler {
 pub struct DbState {
     pub epoch: u64,
     pub committed_version: Version,
-    pub synced_version: Version,
 }
 
 impl fmt::Display for DbState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "epoch: {}, committed_version: {}, synced_version: {}",
-            self.epoch, self.committed_version, self.synced_version,
+            "epoch: {}, committed_version: {}",
+            self.epoch, self.committed_version,
         )
     }
 }

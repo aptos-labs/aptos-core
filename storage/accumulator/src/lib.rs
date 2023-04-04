@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -113,7 +114,6 @@ use aptos_types::proof::{
     position::{FrozenSubTreeIterator, FrozenSubtreeSiblingIterator, Position},
     AccumulatorConsistencyProof, AccumulatorProof, AccumulatorRangeProof, MerkleTreeInternalNode,
 };
-use mirai_annotations::*;
 use std::marker::PhantomData;
 
 /// Defines the interface between `MerkleAccumulator` and underlying storage.
@@ -278,7 +278,7 @@ where
                     Some((x, left_hash)) => {
                         assert_eq!(x, sibling);
                         Self::hash_internal_node(left_hash, hash)
-                    }
+                    },
                     None => Self::hash_internal_node(self.reader.get(sibling)?, hash),
                 };
                 pos = pos.parent();
@@ -292,7 +292,7 @@ where
         // placeholder hash nodes as needed on the right, and left siblings that have either
         // been newly created or read from storage.
         let (mut pos, mut hash) = left_siblings.pop().expect("Must have at least one node");
-        for _ in pos.level()..root_level as u32 {
+        for _ in pos.level()..root_level {
             hash = if pos.is_left_child() {
                 Self::hash_internal_node(hash, *ACCUMULATOR_PLACEHOLDER_HASH)
             } else {
@@ -301,7 +301,7 @@ where
                     Some((x, left_hash)) => {
                         assert_eq!(x, sibling);
                         Self::hash_internal_node(left_hash, hash)
-                    }
+                    },
                     None => Self::hash_internal_node(self.reader.get(sibling)?, hash),
                 }
             };
@@ -318,9 +318,9 @@ where
     ///     and the full route from root of that subtree to the accumulator root turns frozen
     ///         height - (log2(num_new_leaves) + 1) < height - 1 = root_level
     fn max_to_freeze(num_new_leaves: usize, root_level: u32) -> usize {
-        precondition!(root_level as usize <= MAX_ACCUMULATOR_PROOF_DEPTH);
-        precondition!(num_new_leaves < (usize::max_value() / 2));
-        precondition!(num_new_leaves * 2 <= usize::max_value() - root_level as usize);
+        assert!(root_level as usize <= MAX_ACCUMULATOR_PROOF_DEPTH);
+        assert!(num_new_leaves < (usize::max_value() / 2));
+        assert!(num_new_leaves * 2 <= usize::max_value() - root_level as usize);
         num_new_leaves * 2 + root_level as usize
     }
 
@@ -329,7 +329,7 @@ where
     }
 
     fn rightmost_leaf_index(&self) -> u64 {
-        (self.num_leaves - 1) as u64
+        self.num_leaves - 1
     }
 
     fn get_hash(&self, position: Position) -> Result<HashValue> {
@@ -358,7 +358,7 @@ where
     /// implementation for pub interface `MerkleAccumulator::get_proof`
     fn get_proof(&self, leaf_index: u64) -> Result<AccumulatorProof<H>> {
         ensure!(
-            leaf_index < self.num_leaves as u64,
+            leaf_index < self.num_leaves,
             "invalid leaf_index {}, num_leaves {}",
             leaf_index,
             self.num_leaves
@@ -423,7 +423,7 @@ where
             .checked_add(num_leaves - 1)
             .ok_or_else(|| format_err!("Requesting too many leaves."))?;
         ensure!(
-            last_leaf_index < self.num_leaves as u64,
+            last_leaf_index < self.num_leaves,
             "Invalid last_leaf_index: {}, num_leaves: {}",
             last_leaf_index,
             self.num_leaves,

@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::HashValue;
@@ -28,19 +29,4 @@ pub(crate) fn partition<T>(updates: &[(HashValue, T)], depth: usize) -> usize {
         }
     }
     i
-}
-
-pub(crate) enum Either<A, B> {
-    A(A),
-    B(B),
-}
-
-impl<A, B> Either<A, B> {
-    pub fn or(cond: bool, a: A, b: B) -> Self {
-        if cond {
-            Either::A(a)
-        } else {
-            Either::B(b)
-        }
-    }
 }

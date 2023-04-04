@@ -1,23 +1,27 @@
 [package]
-name = "storage-service-types"
-version = "0.1.0"
-authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+name = "aptos-storage-service-types"
 description = "Common types offered by the Aptos storage service"
-repository = "https://github.com/aptos-labs/aptos-core"
-homepage = "https://aptoslabs.com"
-license = "Apache-2.0"
-publish = false
-edition = "2018"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
 
 [dependencies]
-num-traits = { version = "0.2.15", default-features = false }
-serde = { version = "1.0.137", default-features = false }
-thiserror = "1.0.31"
-
-aptos-config = { path = "../../../config" }
-aptos-crypto = { path = "../../../crates/aptos-crypto" }
-aptos-types = { path = "../../../types" }
+aptos-compression = { workspace = true }
+aptos-config = { workspace = true }
+aptos-crypto = { workspace = true }
+aptos-types = { workspace = true }
+bcs = { workspace = true }
+num-traits = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
-claim = "0.5.0"
-proptest = "1.0.0"
+claims = { workspace = true }
+proptest = { workspace = true }

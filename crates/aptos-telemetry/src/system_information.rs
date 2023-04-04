@@ -1,8 +1,9 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{service::TelemetryEvent, utils};
+use crate::utils;
 use aptos_infallible::Mutex;
+use aptos_telemetry_service::types::telemetry::TelemetryEvent;
 use once_cell::sync::Lazy;
 use std::collections::BTreeMap;
 use sysinfo::{CpuExt, DiskExt, System, SystemExt};
@@ -47,7 +48,7 @@ pub(crate) async fn create_system_info_telemetry_event() -> TelemetryEvent {
 }
 
 /// Used to expose system information
-fn get_system_information() -> BTreeMap<String, String> {
+pub fn get_system_information() -> BTreeMap<String, String> {
     let mut system_information: BTreeMap<String, String> = BTreeMap::new();
     collect_system_info(&mut system_information);
     system_information

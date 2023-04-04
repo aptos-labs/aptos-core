@@ -1,9 +1,10 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_transaction_emitter_lib::emitter::stats::TxnStats;
 use serde::Serialize;
 use std::{fmt, time::Duration};
-use transaction_emitter_lib::emitter::stats::TxnStats;
 
 #[derive(Default, Debug, Serialize)]
 pub struct TestReport {
@@ -38,7 +39,7 @@ impl TestReport {
         self.text.push_str(&text);
     }
 
-    pub fn report_txn_stats(&mut self, test_name: String, stats: TxnStats, window: Duration) {
+    pub fn report_txn_stats(&mut self, test_name: String, stats: &TxnStats, window: Duration) {
         let submitted_txn = stats.submitted;
         let expired_txn = stats.expired;
         let avg_tps = stats.committed / window.as_secs();

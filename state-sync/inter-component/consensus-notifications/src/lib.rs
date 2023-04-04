@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -21,7 +22,7 @@ use std::{
 use thiserror::Error;
 use tokio::time::timeout;
 
-#[derive(Clone, Debug, Deserialize, Error, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
 pub enum Error {
     #[error("Notification failed: {0}")]
     NotificationError(String),
@@ -274,6 +275,7 @@ mod tests {
     use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
     use aptos_types::{
         account_address::AccountAddress,
+        aggregate_signature::AggregateSignature,
         block_info::BlockInfo,
         chain_id::ChainId,
         contract_event::ContractEvent,
@@ -281,11 +283,11 @@ mod tests {
         ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
         transaction::{RawTransaction, Script, SignedTransaction, Transaction, TransactionPayload},
     };
-    use claim::{assert_err, assert_matches, assert_ok};
+    use claims::{assert_err, assert_matches, assert_ok};
     use futures::{executor::block_on, FutureExt, StreamExt};
-    use move_deps::move_core_types::language_storage::TypeTag;
-    use std::{collections::BTreeMap, time::Duration};
-    use tokio::runtime::{Builder, Runtime};
+    use move_core_types::language_storage::TypeTag;
+    use std::time::Duration;
+    use tokio::runtime::Runtime;
 
     const CONSENSUS_NOTIFICATION_TIMEOUT: u64 = 1000;
 
@@ -347,7 +349,7 @@ mod tests {
                         reconfiguration_events,
                         commit_notification.reconfiguration_events
                     );
-                }
+                },
                 result => panic!(
                     "Expected consensus commit notification but got: {:?}",
                     result
@@ -369,7 +371,7 @@ mod tests {
             Some(consensus_notification) => match consensus_notification {
                 ConsensusNotification::SyncToTarget(sync_notification) => {
                     assert_eq!(create_ledger_info(), sync_notification.target);
-                }
+                },
                 result => panic!("Expected consensus sync notification but got: {:?}", result),
             },
             result => panic!("Expected consensus notification but got: {:?}", result),
@@ -392,14 +394,14 @@ mod tests {
                         consensus_listener
                             .respond_to_commit_notification(commit_notification, Ok(())),
                     );
-                }
+                },
                 Some(ConsensusNotification::SyncToTarget(sync_notification)) => {
                     let _result = block_on(consensus_listener.respond_to_sync_notification(
                         sync_notification,
                         Err(Error::UnexpectedErrorEncountered("Oops?".into())),
                     ));
-                }
-                _ => { /* Do nothing */ }
+                },
+                _ => { /* Do nothing */ },
             }
         });
 
@@ -430,7 +432,7 @@ mod tests {
         let signed_transaction = SignedTransaction::new(
             raw_transaction.clone(),
             public_key,
-            private_key.sign(&raw_transaction),
+            private_key.sign(&raw_transaction).unwrap(),
         );
 
         Transaction::UserTransaction(signed_transaction)
@@ -448,11 +450,11 @@ mod tests {
     fn create_ledger_info() -> LedgerInfoWithSignatures {
         LedgerInfoWithSignatures::new(
             LedgerInfo::new(BlockInfo::empty(), HashValue::zero()),
-            BTreeMap::new(),
+            AggregateSignature::empty(),
         )
     }
 
     fn create_runtime() -> Runtime {
-        Builder::new_multi_thread().enable_all().build().unwrap()
+        aptos_runtimes::spawn_named_runtime("test".into(), None)
     }
 }

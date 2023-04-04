@@ -1,23 +1,38 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{proof_fetcher::ProofFetcher, DbReader};
+use crate::{metrics::TIMER, proof_fetcher::ProofFetcher, state_view::DbStateView, DbReader};
 use anyhow::{format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_state_view::{StateView, StateViewId};
+use aptos_scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree, StateStoreStatus};
+use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
-    proof::SparseMerkleProof,
-    state_store::{state_key::StateKey, state_value::StateValue},
+    proof::SparseMerkleProofExt,
+    state_store::{
+        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+    },
     transaction::Version,
     write_set::WriteSet,
 };
+use dashmap::DashMap;
+use once_cell::sync::Lazy;
 use parking_lot::RwLock;
-use scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree, StateStoreStatus};
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
+
+static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(32)
+        .thread_name(|index| format!("kv_reader_{}", index))
+        .build()
+        .unwrap()
+});
 
 /// `CachedStateView` is like a snapshot of the global state comprised of state view at two
 /// levels, persistent storage and memory.
-pub struct CachedStateView<T> {
+pub struct CachedStateView {
     /// For logging and debugging purpose, identifies what this view is for.
     id: StateViewId,
 
@@ -68,23 +83,20 @@ pub struct CachedStateView<T> {
     /// completely and migrate to fine grained storage. A value of None in this cache reflects that
     /// the corresponding key has been deleted. This is a temporary hack until we support deletion
     /// in JMT node.
-    state_cache: RwLock<HashMap<StateKey, StateValue>>,
-    proof_fetcher: T,
+    state_cache: DashMap<StateKey, Option<StateValue>>,
+    proof_fetcher: Arc<dyn ProofFetcher>,
 }
 
-impl<T> CachedStateView<T>
-where
-    T: ProofFetcher,
-{
+impl CachedStateView {
     /// Constructs a [`CachedStateView`] with persistent state view in the DB and the in-memory
     /// speculative state represented by `speculative_state`. The persistent state view is the
     /// latest one preceding `next_version`
     pub fn new(
         id: StateViewId,
-        reader: &dyn DbReader,
+        reader: Arc<dyn DbReader>,
         next_version: Version,
         speculative_state: SparseMerkleTree<StateValue>,
-        proof_fetcher: T,
+        proof_fetcher: Arc<dyn ProofFetcher>,
     ) -> Result<Self> {
         // n.b. Freeze the state before getting the state snapshot, otherwise it's possible that
         // after we got the snapshot, in-mem trees newer than it gets dropped before being frozen,
@@ -96,25 +108,35 @@ where
             id,
             snapshot,
             speculative_state,
-            state_cache: RwLock::new(HashMap::new()),
+            state_cache: DashMap::new(),
             proof_fetcher,
         })
     }
 
-    pub fn prime_cache_by_write_set(&self, write_sets: &[WriteSet]) -> Result<()> {
-        write_sets
-            .iter()
-            .flat_map(|write_set| write_set.iter())
-            .map(|(key, _)| key)
-            .collect::<HashSet<_>>()
-            .into_iter()
-            .try_for_each(|key| self.get_state_value(key).map(|_| ()))
+    pub fn prime_cache_by_write_set<'a, T: IntoIterator<Item = &'a WriteSet> + Send>(
+        &self,
+        write_sets: T,
+    ) -> Result<()> {
+        IO_POOL.scope(|s| {
+            write_sets
+                .into_iter()
+                .flat_map(|write_set| write_set.iter())
+                .map(|(key, _)| key)
+                .collect::<HashSet<_>>()
+                .into_iter()
+                .for_each(|key| {
+                    s.spawn(move |_| {
+                        self.get_state_value_bytes(key).expect("Must succeed.");
+                    })
+                });
+        });
+        Ok(())
     }
 
     pub fn into_state_cache(self) -> StateCache {
         StateCache {
             frozen_base: self.speculative_state,
-            state_cache: self.state_cache.into_inner(),
+            state_cache: self.state_cache,
             proofs: self.proof_fetcher.get_proof_cache(),
         }
     }
@@ -130,9 +152,11 @@ where
             StateStoreStatus::ExistsInDB | StateStoreStatus::Unknown => {
                 match self.snapshot {
                     Some((version, root_hash)) => {
-                        let (value, proof) = self
-                            .proof_fetcher
-                            .fetch_state_value_and_proof(state_key, version)?;
+                        let (value, proof) = self.proof_fetcher.fetch_state_value_and_proof(
+                            state_key,
+                            version,
+                            Some(root_hash),
+                        )?;
                         // TODO: proof verification can be opted out, for performance
                         if let Some(proof) = proof {
                             proof
@@ -147,10 +171,10 @@ where
                                 })?;
                         }
                         value
-                    }
+                    },
                     None => None,
                 }
-            }
+            },
         };
 
         Ok(state_value_option)
@@ -159,34 +183,83 @@ where
 
 pub struct StateCache {
     pub frozen_base: FrozenSparseMerkleTree<StateValue>,
-    pub state_cache: HashMap<StateKey, StateValue>,
-    pub proofs: HashMap<HashValue, SparseMerkleProof>,
+    pub state_cache: DashMap<StateKey, Option<StateValue>>,
+    pub proofs: HashMap<HashValue, SparseMerkleProofExt>,
 }
 
-impl<T> StateView for CachedStateView<T>
-where
-    T: ProofFetcher,
-{
+impl TStateView for CachedStateView {
+    type Key = StateKey;
+
     fn id(&self) -> StateViewId {
         self.id
     }
 
-    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
+    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
+        let _timer = TIMER.with_label_values(&["get_state_value"]).start_timer();
         // First check if the cache has the state value.
-        if let Some(contents) = self.state_cache.read().get(state_key) {
+        if let Some(val_opt) = self.state_cache.get(state_key) {
             // This can return None, which means the value has been deleted from the DB.
-            return Ok(contents.maybe_bytes.as_ref().cloned());
+            return Ok(val_opt.clone());
         }
         let state_value_option = self.get_state_value_internal(state_key)?;
         // Update the cache if still empty
-        let mut cache = self.state_cache.write();
-        let new_value = cache
+        let new_value = self
+            .state_cache
             .entry(state_key.clone())
-            .or_insert_with(|| state_value_option.unwrap_or_default());
-        Ok(new_value.maybe_bytes.as_ref().cloned())
+            .or_insert(state_value_option);
+        Ok(new_value.clone())
     }
 
     fn is_genesis(&self) -> bool {
         self.snapshot.is_none()
+    }
+
+    fn get_usage(&self) -> Result<StateStorageUsage> {
+        Ok(self.speculative_state.usage())
+    }
+}
+
+pub struct CachedDbStateView {
+    db_state_view: DbStateView,
+    state_cache: RwLock<HashMap<StateKey, Option<StateValue>>>,
+}
+
+impl From<DbStateView> for CachedDbStateView {
+    fn from(db_state_view: DbStateView) -> Self {
+        Self {
+            db_state_view,
+            state_cache: RwLock::new(HashMap::new()),
+        }
+    }
+}
+
+impl TStateView for CachedDbStateView {
+    type Key = StateKey;
+
+    fn id(&self) -> StateViewId {
+        self.db_state_view.id()
+    }
+
+    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
+        // First check if the cache has the state value.
+        if let Some(val_opt) = self.state_cache.read().get(state_key) {
+            // This can return None, which means the value has been deleted from the DB.
+            return Ok(val_opt.clone());
+        }
+        let state_value_option = self.db_state_view.get_state_value(state_key)?;
+        // Update the cache if still empty
+        let mut cache = self.state_cache.write();
+        let new_value = cache
+            .entry(state_key.clone())
+            .or_insert_with(|| state_value_option);
+        Ok(new_value.clone())
+    }
+
+    fn is_genesis(&self) -> bool {
+        self.db_state_view.is_genesis()
+    }
+
+    fn get_usage(&self) -> Result<StateStorageUsage> {
+        self.db_state_view.get_usage()
     }
 }

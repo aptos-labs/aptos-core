@@ -1,12 +1,13 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{Result, Version};
 use anyhow::anyhow;
 use aptos_config::{config::NodeConfig, network_id::NetworkId};
+use aptos_inspection_service::inspection_client::InspectionClient;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::PeerId;
-use inspection_service::inspection_client::InspectionClient;
 use std::{
     collections::HashMap,
     time::{Duration, Instant},
@@ -34,6 +35,9 @@ pub trait Node: Send + Sync {
     /// Return the PeerId of this Node
     fn peer_id(&self) -> PeerId;
 
+    /// Return index of the node
+    fn index(&self) -> usize;
+
     /// Return the human readable name of this Node
     fn name(&self) -> &str;
 
@@ -55,12 +59,14 @@ pub trait Node: Send + Sync {
 
     /// Stop this Node.
     /// This should be a noop if the Node isn't running.
-    fn stop(&mut self) -> Result<()>;
+    async fn stop(&mut self) -> Result<()>;
 
-    /// Clears this Node's Storage
-    fn clear_storage(&mut self) -> Result<()>;
+    async fn get_identity(&mut self) -> Result<String>;
 
-    /// Performs a Health Check on the Node
+    async fn set_identity(&mut self, k8s_secret_name: String) -> Result<()>;
+    /// Clears this Node's Storage. This stops the node as well
+    async fn clear_storage(&mut self) -> Result<()>;
+
     async fn health_check(&mut self) -> Result<(), HealthCheckError>;
 
     fn counter(&self, counter: &str, port: u64) -> Result<f64>;
@@ -102,9 +108,16 @@ pub trait FullNode: Node + Sync {
         const DIRECTION: Option<&str> = Some("outbound");
         const EXPECTED_PEERS: usize = 1;
 
-        self.get_connected_peers(NetworkId::Public, DIRECTION)
-            .await
-            .map(|maybe_n| maybe_n.map(|n| n >= EXPECTED_PEERS as i64).unwrap_or(false))
+        for &network_id in &[NetworkId::Public, NetworkId::Vfn] {
+            let r = self
+                .get_connected_peers(network_id, DIRECTION)
+                .await
+                .map(|maybe_n| maybe_n.map(|n| n >= EXPECTED_PEERS as i64).unwrap_or(false));
+            if let Ok(true) = r {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     async fn wait_for_connectivity(&self, deadline: Instant) -> Result<()> {
@@ -129,6 +142,11 @@ pub trait NodeExt: Node {
         RestClient::new(self.rest_api_endpoint())
     }
 
+    /// Return REST API client of this Node
+    fn rest_client_with_timeout(&self, timeout: Duration) -> RestClient {
+        RestClient::new_with_timeout(self.rest_api_endpoint(), timeout)
+    }
+
     /// Return an InspectionClient for this Node
     fn inspection_client(&self) -> InspectionClient {
         InspectionClient::from_url(self.inspection_service_endpoint())
@@ -136,16 +154,18 @@ pub trait NodeExt: Node {
 
     /// Restarts this Node by calling Node::Stop followed by Node::Start
     async fn restart(&mut self) -> Result<()> {
-        self.stop()?;
+        self.stop().await?;
         self.start().await
     }
 
     /// Query a Metric for from this Node
-    async fn get_metric(&self, metric_name: &str) -> Result<Option<i64>> {
-        self.inspection_client().get_node_metric(metric_name).await
+    async fn get_metric_i64(&self, metric_name: &str) -> Result<Option<i64>> {
+        self.inspection_client()
+            .get_node_metric_i64(metric_name)
+            .await
     }
 
-    async fn get_metric_with_fields(
+    async fn get_metric_with_fields_i64(
         &self,
         metric_name: &str,
         fields: HashMap<String, String>,
@@ -171,7 +191,8 @@ pub trait NodeExt: Node {
         Ok(if filtered.is_empty() {
             None
         } else {
-            Some(filtered.iter().sum())
+            let checked: Result<Vec<i64>> = filtered.into_iter().map(|v| v.to_i64()).collect();
+            Some(checked?.into_iter().sum())
         })
     }
 
@@ -185,11 +206,12 @@ pub trait NodeExt: Node {
         if let Some(direction) = direction {
             map.insert("direction".to_string(), direction.to_string());
         }
-        self.get_metric_with_fields("aptos_connections", map).await
+        self.get_metric_with_fields_i64("aptos_connections", map)
+            .await
     }
 
     async fn liveness_check(&self, seconds: u64) -> Result<()> {
-        self.rest_client().health_check(seconds).await
+        Ok(self.rest_client().health_check(seconds).await?)
     }
 
     async fn wait_until_healthy(&mut self, deadline: Instant) -> Result<()> {
@@ -203,8 +225,8 @@ pub trait NodeExt: Node {
                         self.peer_id(),
                         error,
                     ))
-                }
-                Err(_) => {} // For other errors we'll retry
+                },
+                Err(_) => {}, // For other errors we'll retry
             }
 
             tokio::time::sleep(Duration::from_millis(500)).await;

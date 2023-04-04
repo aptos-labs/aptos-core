@@ -1,7 +1,8 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use language_e2e_tests::account_universe::{
+use aptos_language_e2e_tests::account_universe::{
     default_num_transactions, run_and_assert_gas_cost_stability, AccountUniverseGen,
     InsufficientBalanceGen, InvalidAuthkeyGen, SequenceNumberMismatchGen,
 };

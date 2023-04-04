@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{mock_tree_store::MockTreeStore, node_type::LeafNode, JellyfishMerkleTree, TestKey};
@@ -7,6 +8,7 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use aptos_storage_interface::jmt_update_refs;
 use aptos_types::{
     proof::{SparseMerkleInternalNode, SparseMerkleRangeProof},
     transaction::Version,
@@ -37,7 +39,7 @@ use std::{
     Deserialize,
     CryptoHasher,
 )]
-pub(crate) struct ValueBlob(Vec<u8>);
+pub struct ValueBlob(Vec<u8>);
 
 impl From<Vec<u8>> for ValueBlob {
     fn from(blob: Vec<u8>) -> Self {
@@ -45,8 +47,16 @@ impl From<Vec<u8>> for ValueBlob {
     }
 }
 
-impl crate::Key for ValueBlob {}
-impl crate::Value for ValueBlob {}
+impl crate::Key for ValueBlob {
+    fn key_size(&self) -> usize {
+        self.0.len()
+    }
+}
+impl crate::Value for ValueBlob {
+    fn value_size(&self) -> usize {
+        self.0.len()
+    }
+}
 impl crate::TestKey for ValueBlob {}
 impl crate::TestValue for ValueBlob {}
 
@@ -59,7 +69,7 @@ pub(crate) fn gen_value() -> (HashValue, ValueBlob) {
 
 /// Computes the key immediately after `key`.
 pub fn plus_one(key: HashValue) -> HashValue {
-    assert_ne!(key, HashValue::new([0xff; HashValue::LENGTH]));
+    assert_ne!(key, HashValue::new([0xFF; HashValue::LENGTH]));
 
     let mut buf = key.to_vec();
     for i in (0..HashValue::LENGTH).rev() {
@@ -85,7 +95,7 @@ where
 
     for (i, (key, value)) in kvs.iter().enumerate() {
         let (_root_hash, write_batch) = tree
-            .put_value_set_test(vec![(*key, value)], i as Version)
+            .put_value_set_test(vec![(*key, Some(value))], i as Version)
             .unwrap();
         db.write_tree_update_batch(write_batch).unwrap();
     }
@@ -131,7 +141,7 @@ pub fn arb_kv_pair_with_distinct_last_nibble<V: TestKey>(
 ) -> impl Strategy<Value = ((HashValue, (HashValue, V)), (HashValue, (HashValue, V)))> {
     (
         any::<HashValue>().prop_filter("Can't be 0xffffff...", |key| {
-            *key != HashValue::new([0xff; HashValue::LENGTH])
+            *key != HashValue::new([0xFF; HashValue::LENGTH])
         }),
         vec((any::<HashValue>(), any::<V>()), 2),
     )
@@ -357,25 +367,40 @@ fn compute_root_hash_impl(kvs: Vec<(&[bool], HashValue)>) -> HashValue {
             // Every key starts with a 1-bit, i.e., they are all in the right subtree.
             left_hash = *SPARSE_MERKLE_PLACEHOLDER_HASH;
             right_hash = compute_root_hash_impl(reduce(&kvs));
-        }
+        },
         Some(index) => {
             // Both left subtree and right subtree have some keys.
             left_hash = compute_root_hash_impl(reduce(&kvs[..index]));
             right_hash = compute_root_hash_impl(reduce(&kvs[index..]));
-        }
+        },
         None => {
             // Every key starts with a 0-bit, i.e., they are all in the left subtree.
             left_hash = compute_root_hash_impl(reduce(&kvs));
             right_hash = *SPARSE_MERKLE_PLACEHOLDER_HASH;
-        }
+        },
     }
 
     SparseMerkleInternalNode::new(left_hash, right_hash).hash()
 }
 
 pub fn test_get_leaf_count(keys: HashSet<HashValue>) {
-    let kvs = keys.into_iter().map(|k| (k, gen_value())).collect();
+    let keys = keys.into_iter().collect::<Vec<_>>();
+    let idx1 = keys.len() / 3;
+    let idx2 = keys.len() / 3 * 2;
+    let kvs = keys[0..idx2].iter().map(|k| (*k, gen_value())).collect();
     let (db, version) = init_mock_db(&kvs);
+    let updates = keys[idx1..idx2]
+        .iter()
+        .map(|k| (*k, None))
+        .chain(keys[idx2..].iter().map(|k| (*k, Some(gen_value()))))
+        .collect::<Vec<_>>();
     let tree = JellyfishMerkleTree::new(&db);
-    assert_eq!(tree.get_leaf_count(version).unwrap(), kvs.len())
+    let (_, batch) = tree
+        .put_value_set_test(jmt_update_refs(updates.as_slice()), version + 1)
+        .unwrap();
+    db.write_tree_update_batch(batch).unwrap();
+    assert_eq!(
+        tree.get_leaf_count(version + 1).unwrap(),
+        keys.len() - (idx2 - idx1)
+    )
 }

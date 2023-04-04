@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -20,8 +21,6 @@ pub mod gas_costs;
 mod golden_outputs;
 pub mod on_chain_configs;
 mod proptest_types;
-pub mod utils;
-pub mod versioning;
 
 pub fn assert_status_eq(s1: &KeptVMStatus, s2: &KeptVMStatus) -> bool {
     assert_eq!(s1, s2);
@@ -33,11 +32,11 @@ pub fn transaction_status_eq(t1: &TransactionStatus, t2: &TransactionStatus) -> 
         (TransactionStatus::Discard(s1), TransactionStatus::Discard(s2)) => {
             assert_eq!(s1, s2);
             true
-        }
+        },
         (TransactionStatus::Keep(s1), TransactionStatus::Keep(s2)) => {
             assert_eq!(s1, s2);
             true
-        }
+        },
         _ => false,
     }
 }

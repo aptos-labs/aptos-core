@@ -1,20 +1,22 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     block_storage::BlockReader,
     liveness::{
-        proposal_generator::ProposalGenerator, rotating_proposer_election::RotatingProposer,
+        proposal_generator::{ChainHealthBackoffConfig, ProposalGenerator},
+        rotating_proposer_election::RotatingProposer,
         unequivocal_proposer_election::UnequivocalProposerElection,
     },
     test_utils::{build_empty_tree, MockPayloadManager, TreeInserter},
     util::mock_time_service::SimulatedTimeService,
 };
-use aptos_types::validator_signer::ValidatorSigner;
-use consensus_types::{
+use aptos_consensus_types::{
     block::{block_test_utils::certificate_for_genesis, Block},
     common::Author,
 };
+use aptos_types::validator_signer::ValidatorSigner;
 use futures::{future::BoxFuture, FutureExt};
 use std::sync::Arc;
 
@@ -33,6 +35,9 @@ async fn test_proposal_generation_empty_tree() {
         Arc::new(SimulatedTimeService::new()),
         1,
         10,
+        10,
+        ChainHealthBackoffConfig::new_no_backoff(),
+        false,
     );
     let mut proposer_election =
         UnequivocalProposerElection::new(Box::new(RotatingProposer::new(vec![signer.author()], 1)));
@@ -43,7 +48,7 @@ async fn test_proposal_generation_empty_tree() {
         .generate_proposal(1, &mut proposer_election, empty_callback())
         .await
         .unwrap();
-    let proposal = Block::new_proposal_from_block_data(proposal_data, &signer);
+    let proposal = Block::new_proposal_from_block_data(proposal_data, &signer).unwrap();
     assert_eq!(proposal.parent_id(), genesis.id());
     assert_eq!(proposal.round(), 1);
     assert_eq!(proposal.quorum_cert().certified_block().id(), genesis.id());
@@ -67,7 +72,10 @@ async fn test_proposal_generation_parent() {
         Arc::new(MockPayloadManager::new(None)),
         Arc::new(SimulatedTimeService::new()),
         1,
+        1000,
         10,
+        ChainHealthBackoffConfig::new_no_backoff(),
+        false,
     );
     let mut proposer_election = UnequivocalProposerElection::new(Box::new(RotatingProposer::new(
         vec![inserter.signer().author()],
@@ -134,7 +142,10 @@ async fn test_old_proposal_generation() {
         Arc::new(MockPayloadManager::new(None)),
         Arc::new(SimulatedTimeService::new()),
         1,
+        1000,
         10,
+        ChainHealthBackoffConfig::new_no_backoff(),
+        false,
     );
     let mut proposer_election = UnequivocalProposerElection::new(Box::new(RotatingProposer::new(
         vec![inserter.signer().author()],
@@ -166,7 +177,10 @@ async fn test_correct_failed_authors() {
         Arc::new(MockPayloadManager::new(None)),
         Arc::new(SimulatedTimeService::new()),
         1,
+        1000,
         10,
+        ChainHealthBackoffConfig::new_no_backoff(),
+        false,
     );
     let mut proposer_election = UnequivocalProposerElection::new(Box::new(RotatingProposer::new(
         vec![author, peer1, peer2],

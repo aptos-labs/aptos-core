@@ -1,3 +1,4 @@
+// A configuration script for the Rosetta CLI provided by the Rosetta Spec
 // Create account workflow (only 1 at a time)
 create_account(1){
     create_account{
@@ -17,8 +18,8 @@ create_account(1){
 
         // Find the "faucet" loaded account
         currency = {
-          "symbol": "TC",
-          "decimals": 6,
+          "symbol": "APT",
+          "decimals": 8,
           "metadata": {
             "move_type": "0x1::aptos_coin::AptosCoin"
           }
@@ -51,8 +52,8 @@ create_account(1){
 request_funds(1){
   find_account{
     currency = {
-      "symbol": "TC",
-      "decimals": 6,
+      "symbol": "APT",
+      "decimals": 8,
       "metadata": {
         "move_type": "0x1::aptos_coin::AptosCoin"
       }
@@ -83,8 +84,8 @@ transfer(50){
     transfer{
         transfer.network = {"network":"TESTING", "blockchain":"aptos"};
         currency = {
-          "symbol": "TC",
-          "decimals": 6,
+          "symbol": "APT",
+          "decimals": 8,
           "metadata": {
             "move_type": "0x1::aptos_coin::AptosCoin"
           }

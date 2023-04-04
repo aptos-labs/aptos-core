@@ -1,14 +1,18 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{pruner::*, AptosDB, ChangeSet, EventStore};
+use crate::{AptosDB, EventStore, LedgerPrunerManager, PrunerManager};
+use aptos_config::config::LedgerPrunerConfig;
 use aptos_proptest_helpers::Index;
+use aptos_schemadb::SchemaBatch;
 use aptos_temppath::TempPath;
 use aptos_types::{
     contract_event::ContractEvent,
     proptest_types::{AccountInfoUniverse, ContractEventGen},
+    transaction::Version,
 };
 use proptest::{collection::vec, prelude::*, proptest};
+use std::sync::Arc;
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
@@ -46,43 +50,35 @@ proptest! {
 
         verify_event_store_pruner_disabled(event_batches);
     }
-
 }
 
 fn verify_event_store_pruner(events: Vec<Vec<ContractEvent>>) {
     let tmp_dir = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
     let event_store = &aptos_db.event_store;
-    let mut cs = ChangeSet::new();
+    let batch = SchemaBatch::new();
     let num_versions = events.len();
-    let pruner = Pruner::new(
-        Arc::clone(&aptos_db.ledger_db),
-        Arc::clone(&aptos_db.state_merkle_db),
-        StoragePrunerConfig {
-            state_store_prune_window: Some(0),
-            ledger_prune_window: Some(0),
-            ledger_pruning_batch_size: 1,
-            state_store_pruning_batch_size: 100,
-        },
-    );
 
     // Write events to DB
     for (version, events_for_version) in events.iter().enumerate() {
         event_store
-            .put_events(version as u64, events_for_version, &mut cs)
+            .put_events(version as u64, events_for_version, &batch)
             .unwrap();
     }
-    aptos_db.ledger_db.write_schemas(cs.batch).unwrap();
+    aptos_db.ledger_db.write_schemas(batch).unwrap();
 
+    let pruner = LedgerPrunerManager::new(Arc::clone(&aptos_db.ledger_db), LedgerPrunerConfig {
+        enable: true,
+        prune_window: 0,
+        batch_size: 1,
+        user_pruning_window_offset: 0,
+    });
     // start pruning events batches of size 2 and verify transactions have been pruned from DB
     for i in (0..=num_versions).step_by(2) {
         pruner
-            .wake_and_wait(
-                i as u64, /* latest_version */
-                PrunerIndex::LedgerPrunerIndex as usize,
-            )
+            .wake_and_wait_pruner(i as u64 /* latest_version */)
             .unwrap();
-        // ensure that all events up to i * 2 has been pruned
+        // ensure that all events up to i has been pruned
         for j in 0..i {
             verify_events_not_in_store(j as u64, event_store);
             verify_event_by_key_not_in_store(&events, j as u64, event_store);
@@ -101,32 +97,19 @@ fn verify_event_store_pruner_disabled(events: Vec<Vec<ContractEvent>>) {
     let tmp_dir = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
     let event_store = &aptos_db.event_store;
-    let mut cs = ChangeSet::new();
+    let batch = SchemaBatch::new();
     let num_versions = events.len();
-    let pruner = Pruner::new(
-        Arc::clone(&aptos_db.ledger_db),
-        Arc::clone(&aptos_db.state_merkle_db),
-        StoragePrunerConfig {
-            state_store_prune_window: Some(0),
-            ledger_prune_window: None,
-            ledger_pruning_batch_size: 1,
-            state_store_pruning_batch_size: 100,
-        },
-    );
 
     // Write events to DB
     for (version, events_for_version) in events.iter().enumerate() {
         event_store
-            .put_events(version as u64, events_for_version, &mut cs)
+            .put_events(version as u64, events_for_version, &batch)
             .unwrap();
     }
-    aptos_db.ledger_db.write_schemas(cs.batch).unwrap();
+    aptos_db.ledger_db.write_schemas(batch).unwrap();
 
     // Verify no pruning has happened.
     for _i in (0..=num_versions).step_by(2) {
-        pruner
-            .ensure_disabled(PrunerIndex::LedgerPrunerIndex as usize)
-            .unwrap();
         // ensure that all events up to i * 2 are valid in DB
         for version in 0..num_versions {
             verify_events_in_store(&events, version as u64, event_store);
@@ -201,7 +184,7 @@ fn verify_events_in_store(
     version: Version,
     event_store: &Arc<EventStore>,
 ) {
-    let events_from_db = event_store.get_events_by_version(version as u64).unwrap();
+    let events_from_db = event_store.get_events_by_version(version).unwrap();
     assert_eq!(
         events_from_db.len(),
         events.get(version as usize).unwrap().len()

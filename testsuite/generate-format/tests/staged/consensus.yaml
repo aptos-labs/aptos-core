@@ -25,6 +25,60 @@ AccountAuthenticator:
               TYPENAME: MultiEd25519PublicKey
           - signature:
               TYPENAME: MultiEd25519Signature
+AggregateSignature:
+  STRUCT:
+    - validator_bitmask:
+        TYPENAME: BitVec
+    - sig:
+        OPTION:
+          TYPENAME: Signature
+AggregateSignatureWithRounds:
+  STRUCT:
+    - sig:
+        TYPENAME: AggregateSignature
+    - rounds:
+        SEQ: U64
+Batch:
+  STRUCT:
+    - batch_info:
+        TYPENAME: BatchInfo
+    - payload:
+        TYPENAME: BatchPayload
+BatchId:
+  STRUCT:
+    - id: U64
+    - nonce: U64
+BatchInfo:
+  STRUCT:
+    - author:
+        TYPENAME: AccountAddress
+    - batch_id:
+        TYPENAME: BatchId
+    - epoch: U64
+    - expiration: U64
+    - digest:
+        TYPENAME: HashValue
+    - num_txns: U64
+    - num_bytes: U64
+BatchMsg:
+  STRUCT:
+    - batch:
+        TYPENAME: Batch
+BatchPayload:
+  STRUCT:
+    - txns:
+        SEQ:
+          TYPENAME: SignedTransaction
+BatchRequest:
+  STRUCT:
+    - epoch: U64
+    - source:
+        TYPENAME: AccountAddress
+    - digest:
+        TYPENAME: HashValue
+BitVec:
+  STRUCT:
+    - inner: BYTES
 Block:
   STRUCT:
     - block_data:
@@ -60,10 +114,9 @@ BlockMetadata:
         TYPENAME: HashValue
     - epoch: U64
     - round: U64
-    - previous_block_votes:
-        SEQ: BOOL
     - proposer:
         TYPENAME: AccountAddress
+    - previous_block_votes_bitvec: BYTES
     - failed_proposer_indices:
         SEQ: U32
     - timestamp_usecs: U64
@@ -175,6 +228,26 @@ ConsensusMsg:
       CommitDecisionMsg:
         NEWTYPE:
           TYPENAME: CommitDecision
+    9:
+      BatchMsg:
+        NEWTYPE:
+          TYPENAME: BatchMsg
+    10:
+      BatchRequestMsg:
+        NEWTYPE:
+          TYPENAME: BatchRequest
+    11:
+      BatchResponse:
+        NEWTYPE:
+          TYPENAME: Batch
+    12:
+      SignedBatchInfo:
+        NEWTYPE:
+          TYPENAME: SignedBatchInfo
+    13:
+      ProofOfStoreMsg:
+        NEWTYPE:
+          TYPENAME: ProofOfStore
 ContractEvent:
   ENUM:
     0:
@@ -193,6 +266,17 @@ Ed25519PublicKey:
   NEWTYPESTRUCT: BYTES
 Ed25519Signature:
   NEWTYPESTRUCT: BYTES
+EntryFunction:
+  STRUCT:
+    - module:
+        TYPENAME: ModuleId
+    - function:
+        TYPENAME: Identifier
+    - ty_args:
+        SEQ:
+          TYPENAME: TypeTag
+    - args:
+        SEQ: BYTES
 EpochChangeProof:
   STRUCT:
     - ledger_info_with_sigs:
@@ -214,7 +298,11 @@ EventKey:
     - account_address:
         TYPENAME: AccountAddress
 HashValue:
-  NEWTYPESTRUCT: BYTES
+  STRUCT:
+    - hash:
+        TUPLEARRAY:
+          CONTENT: U8
+          SIZE: 32
 Identifier:
   NEWTYPESTRUCT: STR
 LedgerInfo:
@@ -234,11 +322,7 @@ LedgerInfoWithV0:
     - ledger_info:
         TYPENAME: LedgerInfo
     - signatures:
-        MAP:
-          KEY:
-            TYPENAME: AccountAddress
-          VALUE:
-            TYPENAME: Signature
+        TYPENAME: AggregateSignature
 Module:
   STRUCT:
     - code: BYTES
@@ -257,6 +341,19 @@ MultiEd25519PublicKey:
   NEWTYPESTRUCT: BYTES
 MultiEd25519Signature:
   NEWTYPESTRUCT: BYTES
+Multisig:
+  STRUCT:
+    - multisig_address:
+        TYPENAME: AccountAddress
+    - transaction_payload:
+        OPTION:
+          TYPENAME: MultisigTransactionPayload
+MultisigTransactionPayload:
+  ENUM:
+    0:
+      EntryFunction:
+        NEWTYPE:
+          TYPENAME: EntryFunction
 Payload:
   ENUM:
     0:
@@ -267,11 +364,18 @@ Payload:
     1:
       InQuorumStore:
         NEWTYPE:
-          SEQ:
-            TYPENAME: ProofOfStore
+          TYPENAME: ProofWithData
 ProofOfStore:
   STRUCT:
-    - placeholder: U64
+    - info:
+        TYPENAME: BatchInfo
+    - multi_signature:
+        TYPENAME: AggregateSignature
+ProofWithData:
+  STRUCT:
+    - proofs:
+        SEQ:
+          TYPENAME: ProofOfStore
 ProposalMsg:
   STRUCT:
     - proposal:
@@ -307,19 +411,16 @@ Script:
     - args:
         SEQ:
           TYPENAME: TransactionArgument
-ScriptFunction:
-  STRUCT:
-    - module:
-        TYPENAME: ModuleId
-    - function:
-        TYPENAME: Identifier
-    - ty_args:
-        SEQ:
-          TYPENAME: TypeTag
-    - args:
-        SEQ: BYTES
 Signature:
   NEWTYPESTRUCT: BYTES
+SignedBatchInfo:
+  STRUCT:
+    - info:
+        TYPENAME: BatchInfo
+    - signer:
+        TYPENAME: AccountAddress
+    - signature:
+        TYPENAME: Signature
 SignedTransaction:
   STRUCT:
     - raw_txn:
@@ -341,6 +442,15 @@ StateKey:
     2:
       Raw:
         NEWTYPE: BYTES
+StateValueMetadata:
+  ENUM:
+    0:
+      V0:
+        STRUCT:
+          - payer:
+              TYPENAME: AccountAddress
+          - deposit: U64
+          - creation_time_usecs: U64
 StructTag:
   STRUCT:
     - address:
@@ -365,7 +475,8 @@ SyncInfo:
         OPTION:
           TYPENAME: TwoChainTimeoutCertificate
 TableHandle:
-  NEWTYPESTRUCT: U128
+  NEWTYPESTRUCT:
+    TYPENAME: AccountAddress
 Transaction:
   ENUM:
     0:
@@ -405,6 +516,18 @@ TransactionArgument:
     5:
       Bool:
         NEWTYPE: BOOL
+    6:
+      U16:
+        NEWTYPE: U16
+    7:
+      U32:
+        NEWTYPE: U32
+    8:
+      U256:
+        NEWTYPE:
+          TUPLEARRAY:
+            CONTENT: U8
+            SIZE: 32
 TransactionAuthenticator:
   ENUM:
     0:
@@ -435,21 +558,21 @@ TransactionAuthenticator:
 TransactionPayload:
   ENUM:
     0:
-      WriteSet:
-        NEWTYPE:
-          TYPENAME: WriteSetPayload
-    1:
       Script:
         NEWTYPE:
           TYPENAME: Script
-    2:
+    1:
       ModuleBundle:
         NEWTYPE:
           TYPENAME: ModuleBundle
-    3:
-      ScriptFunction:
+    2:
+      EntryFunction:
         NEWTYPE:
-          TYPENAME: ScriptFunction
+          TYPENAME: EntryFunction
+    3:
+      Multisig:
+        NEWTYPE:
+          TYPENAME: Multisig
 TwoChainTimeout:
   STRUCT:
     - epoch: U64
@@ -460,14 +583,8 @@ TwoChainTimeoutCertificate:
   STRUCT:
     - timeout:
         TYPENAME: TwoChainTimeout
-    - signatures:
-        MAP:
-          KEY:
-            TYPENAME: AccountAddress
-          VALUE:
-            TUPLE:
-              - U64
-              - TYPENAME: Signature
+    - signatures_with_rounds:
+        TYPENAME: AggregateSignatureWithRounds
 TypeTag:
   ENUM:
     0:
@@ -490,21 +607,24 @@ TypeTag:
       struct:
         NEWTYPE:
           TYPENAME: StructTag
+    8:
+      u16: UNIT
+    9:
+      u32: UNIT
+    10:
+      u256: UNIT
 ValidatorConsensusInfo:
   STRUCT:
+    - address:
+        TYPENAME: AccountAddress
     - public_key:
         TYPENAME: PublicKey
     - voting_power: U64
 ValidatorVerifier:
   STRUCT:
-    - address_to_validator_info:
-        MAP:
-          KEY:
-            TYPENAME: AccountAddress
-          VALUE:
-            TYPENAME: ValidatorConsensusInfo
-    - quorum_voting_power: U64
-    - total_voting_power: U64
+    - validator_infos:
+        SEQ:
+          TYPENAME: ValidatorConsensusInfo
 Vote:
   STRUCT:
     - vote_data:
@@ -535,20 +655,44 @@ VoteMsg:
 WriteOp:
   ENUM:
     0:
-      Deletion: UNIT
-    1:
-      Value:
+      Creation:
         NEWTYPE: BYTES
+    1:
+      Modification:
+        NEWTYPE: BYTES
+    2:
+      Deletion: UNIT
+    3:
+      CreationWithMetadata:
+        STRUCT:
+          - data: BYTES
+          - metadata:
+              TYPENAME: StateValueMetadata
+    4:
+      ModificationWithMetadata:
+        STRUCT:
+          - data: BYTES
+          - metadata:
+              TYPENAME: StateValueMetadata
+    5:
+      DeletionWithMetadata:
+        STRUCT:
+          - metadata:
+              TYPENAME: StateValueMetadata
 WriteSet:
-  NEWTYPESTRUCT:
-    TYPENAME: WriteSetMut
+  ENUM:
+    0:
+      V0:
+        NEWTYPE:
+          TYPENAME: WriteSetV0
 WriteSetMut:
   STRUCT:
     - write_set:
-        SEQ:
-          TUPLE:
-            - TYPENAME: StateKey
-            - TYPENAME: WriteOp
+        MAP:
+          KEY:
+            TYPENAME: StateKey
+          VALUE:
+            TYPENAME: WriteOp
 WriteSetPayload:
   ENUM:
     0:
@@ -562,3 +706,6 @@ WriteSetPayload:
               TYPENAME: AccountAddress
           - script:
               TYPENAME: Script
+WriteSetV0:
+  NEWTYPESTRUCT:
+    TYPENAME: WriteSetMut

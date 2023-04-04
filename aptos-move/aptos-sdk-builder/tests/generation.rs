@@ -1,9 +1,9 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_sdk_builder as buildgen;
-use aptos_types::transaction::ScriptABI;
-use cached_framework_packages::abis;
+use aptos_types::transaction::EntryABI;
 use serde_generate as serdegen;
 use serde_generate::SourceInstaller as _;
 use serde_reflection::Registry;
@@ -16,13 +16,9 @@ fn get_aptos_registry() -> Registry {
     serde_yaml::from_str::<Registry>(content.as_str()).unwrap()
 }
 
-fn get_script_fun_abis() -> Vec<ScriptABI> {
-    abis()
-}
-
 const EXPECTED_SCRIPT_FUN_OUTPUT: &str = "3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 8 84 101 115 116 67 111 105 110 8 116 114 97 110 115 102 101 114 0 2 32 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 8 135 214 18 0 0 0 0 0 \n";
 
-fn test_rust(abis: &[ScriptABI], demo_file: &str, expected_output: &str) {
+fn test_rust(abis: &[EntryABI], demo_file: &str, expected_output: &str) {
     let mut registry = get_aptos_registry();
     buildgen::rust::replace_keywords(&mut registry);
     let dir = tempdir().unwrap();
@@ -34,19 +30,19 @@ fn test_rust(abis: &[ScriptABI], demo_file: &str, expected_output: &str) {
     let stdlib_dir_path = dir.path().join("framework");
     std::fs::create_dir_all(stdlib_dir_path.clone()).unwrap();
 
-    let mut cargo = std::fs::File::create(&stdlib_dir_path.join("Cargo.toml")).unwrap();
+    let mut cargo = std::fs::File::create(stdlib_dir_path.join("Cargo.toml")).unwrap();
     write!(
         cargo,
         r#"[package]
 name = "framework"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 aptos-types = {{ path = "../aptos-types", version = "0.1.0" }}
 serde_bytes = "0.11.6"
 serde = {{ version = "1.0.114", features = ["derive"] }}
-bcs = "0.1.3"
+bcs = {{ git = "https://github.com/aptos-labs/bcs", rev = "2cde3e8446c460cb17b0c1d6bac7e27e964ac169" }}
 once_cell = "1.10.0"
 
 [[bin]]
@@ -58,7 +54,7 @@ test = false
     .unwrap();
     std::fs::create_dir(stdlib_dir_path.join("src")).unwrap();
     let source_path = stdlib_dir_path.join("src/lib.rs");
-    let mut source = std::fs::File::create(&source_path).unwrap();
+    let mut source = std::fs::File::create(source_path).unwrap();
     buildgen::rust::output(&mut source, abis, /* local types */ false).unwrap();
 
     std::fs::copy(demo_file, stdlib_dir_path.join("src/stdlib_demo.rs")).unwrap();
@@ -88,9 +84,11 @@ test = false
 // Ignored because transactions require minting/transfering Coin<AptosCoin>, which the
 // transaction builder does not support (it doesn't supported typed functions yet).
 #[ignore]
-fn test_that_rust_script_fun_code_compiles() {
+fn test_that_rust_entry_fun_code_compiles() {
+    // TODO: need a way to get abis to reactivate this test
+    let abis = vec![];
     test_rust(
-        &get_script_fun_abis(),
+        &abis, // &aptos_cached_packages::head_release_bundle().abis(),
         "examples/rust/script_fun_demo.rs",
         EXPECTED_SCRIPT_FUN_OUTPUT,
     );

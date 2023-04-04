@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -11,7 +12,7 @@ use std::{
 
 /// A simple wrapper for creating a temporary directory that is automatically deleted when it's
 /// dropped. Used in lieu of tempfile due to the large number of dependencies.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct TempPath {
     path_buf: PathBuf,
     persist: bool,
@@ -39,7 +40,7 @@ impl TempPath {
         let mut rng = rand::thread_rng();
         let mut bytes = [0_u8; 16];
         rng.fill_bytes(&mut bytes);
-        temppath.push(hex::encode(&bytes));
+        temppath.push(hex::encode(bytes));
 
         TempPath {
             path_buf: temppath,

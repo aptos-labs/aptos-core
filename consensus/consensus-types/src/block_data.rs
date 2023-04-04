@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -9,12 +10,12 @@ use crate::{
 use aptos_crypto::hash::HashValue;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
+    aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
 };
 use mirai_annotations::*;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum BlockType {
@@ -38,7 +39,7 @@ pub enum BlockType {
     },
     /// A genesis block is the first committed block in any epoch that is identically constructed on
     /// all validators by any (potentially different) LedgerInfo that justifies the epoch change
-    /// from the previous epoch.  The genesis block is used as the the first root block of the
+    /// from the previous epoch.  The genesis block is used as the first root block of the
     /// BlockTree for all epochs.
     Genesis,
 }
@@ -155,7 +156,7 @@ impl BlockData {
             VoteData::new(ancestor.clone(), ancestor.clone()),
             LedgerInfoWithSignatures::new(
                 LedgerInfo::new(ancestor, HashValue::zero()),
-                BTreeMap::new(),
+                AggregateSignature::empty(),
             ),
         );
 
@@ -259,11 +260,11 @@ fn test_reconfiguration_suffix() {
                 BlockInfo::genesis(HashValue::random(), ValidatorSet::empty()),
                 HashValue::zero(),
             ),
-            BTreeMap::new(),
+            AggregateSignature::empty(),
         ),
     );
     let reconfig_suffix_block = BlockData::new_proposal(
-        Payload::new_empty(),
+        Payload::empty(false),
         AccountAddress::random(),
         Vec::new(),
         2,

@@ -1,0 +1,54 @@
+[package]
+name = "aptos-telemetry-service"
+description = "Web service to receive telemetry from nodes and ingest it to backends"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-config = { workspace = true }
+aptos-crypto = { workspace = true }
+aptos-crypto-derive = { workspace = true }
+aptos-infallible = { workspace = true }
+aptos-logger = { workspace = true }
+aptos-metrics-core = { workspace = true }
+aptos-rest-client = { workspace = true }
+aptos-types = { workspace = true }
+base64 = { workspace = true }
+bcs = { workspace = true }
+chrono = { workspace = true }
+clap = { workspace = true }
+debug-ignore = { workspace = true }
+flate2 = { workspace = true }
+futures = { workspace = true }
+gcp-bigquery-client = { workspace = true }
+hex = { workspace = true }
+jsonwebtoken = { workspace = true }
+once_cell = { workspace = true }
+prometheus = { workspace = true }
+rand ={ workspace = true }
+rand_core = { workspace = true }
+reqwest = { workspace = true }
+reqwest-middleware = { workspace = true }
+reqwest-retry = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_repr = { workspace = true }
+serde_yaml = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+url = { workspace = true }
+uuid = { workspace = true }
+warp = { workspace = true }
+
+[dev-dependencies]
+httpmock = { workspace = true }

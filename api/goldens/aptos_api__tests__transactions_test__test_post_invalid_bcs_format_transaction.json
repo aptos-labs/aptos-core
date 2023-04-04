@@ -1,4 +1,5 @@
 {
-  "code": 400,
-  "message": "invalid request body: deserialize error: unexpected end of input"
+  "message": "Failed to deserialize input into SignedTransaction: unexpected end of input",
+  "error_code": "invalid_input",
+  "vm_error_code": null
 }

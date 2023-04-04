@@ -1,8 +1,12 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
 
+use aptos_storage_service_types::{
+    responses::{CompleteDataRange, TransactionOrOutputListWithProof},
+    Epoch,
+};
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     state_store::state_value::StateValueChunkWithProof,
@@ -11,10 +15,7 @@ use aptos_types::{
 use async_trait::async_trait;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use std::fmt;
-use std::fmt::Display;
-use storage_service::UnexpectedResponseError;
-use storage_service_types::{self as storage_service, CompleteDataRange, Epoch};
+use std::{fmt, fmt::Display};
 use thiserror::Error;
 
 pub type ResponseId = u64;
@@ -25,7 +26,7 @@ pub type Result<T, E = Error> = ::std::result::Result<T, E>;
 
 // TODO(philiphayes): a Error { kind: ErrorKind, inner: BoxError } would be more convenient
 /// An error returned by the Aptos Data Client for failed API calls.
-#[derive(Clone, Debug, Deserialize, Error, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
 pub enum Error {
     #[error("The requested data is unavailable and cannot be found! Error: {0}")]
     DataIsUnavailable(String),
@@ -55,32 +56,39 @@ impl Error {
     }
 }
 
-// TODO(philiphayes): better error wrapping
-impl From<UnexpectedResponseError> for Error {
-    fn from(err: UnexpectedResponseError) -> Self {
-        Self::InvalidResponse(err.0)
+impl From<aptos_storage_service_client::Error> for Error {
+    fn from(error: aptos_storage_service_client::Error) -> Self {
+        Self::UnexpectedErrorEncountered(error.to_string())
+    }
+}
+
+impl From<aptos_storage_service_types::responses::Error> for Error {
+    fn from(error: aptos_storage_service_types::responses::Error) -> Self {
+        Self::InvalidResponse(error.to_string())
     }
 }
 
 /// The API offered by the Aptos Data Client.
 #[async_trait]
 pub trait AptosDataClient {
-    /// Returns a global summary of the data currently available in the network.
+    /// Fetches a global summary of the data currently available in the network.
     ///
     /// This API is intended to be relatively cheap to call, usually returning a
     /// cached view of this data client's available data.
     fn get_global_data_summary(&self) -> GlobalDataSummary;
 
-    /// Returns all epoch ending ledger infos between start and end (inclusive).
-    /// If the data cannot be fetched (e.g., the number of epochs is too large),
+    /// Fetches the epoch ending ledger infos between start and end
+    /// (inclusive). In some cases, fewer ledger infos may be returned (e.g.,
+    /// to tolerate network or chunk limits). If the data cannot be fetched,
     /// an error is returned.
     async fn get_epoch_ending_ledger_infos(
         &self,
         start_epoch: Epoch,
         expected_end_epoch: Epoch,
+        request_timeout_ms: u64,
     ) -> Result<Response<Vec<LedgerInfoWithSignatures>>>;
 
-    /// Returns a new transaction output list with proof. Versions start at
+    /// Fetches a new transaction output list with proof. Versions start at
     /// `known_version + 1` and `known_epoch` (inclusive). The end version
     /// and proof version are specified by the server. If the data cannot be
     /// fetched, an error is returned.
@@ -88,9 +96,10 @@ pub trait AptosDataClient {
         &self,
         known_version: Version,
         known_epoch: Epoch,
+        request_timeout_ms: u64,
     ) -> Result<Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>>;
 
-    /// Returns a new transaction list with proof. Versions start at
+    /// Fetches a new transaction list with proof. Versions start at
     /// `known_version + 1` and `known_epoch` (inclusive). The end version
     /// and proof version are specified by the server. If the data cannot be
     /// fetched, an error is returned.
@@ -99,49 +108,88 @@ pub trait AptosDataClient {
         known_version: Version,
         known_epoch: Epoch,
         include_events: bool,
+        request_timeout_ms: u64,
     ) -> Result<Response<(TransactionListWithProof, LedgerInfoWithSignatures)>>;
 
-    /// Returns the number of states at the specified version.
-    async fn get_number_of_states(&self, version: Version) -> Result<Response<u64>>;
+    /// Fetches a new transaction or output list with proof. Versions start at
+    /// `known_version + 1` and `known_epoch` (inclusive). The end version
+    /// and proof version are specified by the server. If the data cannot be
+    /// fetched, an error is returned.
+    async fn get_new_transactions_or_outputs_with_proof(
+        &self,
+        known_version: Version,
+        known_epoch: Epoch,
+        include_events: bool,
+        request_timeout_ms: u64,
+    ) -> Result<Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>>;
 
-    /// Returns a single state value chunk with proof, containing the values
+    /// Fetches the number of states at the specified version.
+    async fn get_number_of_states(
+        &self,
+        version: Version,
+        request_timeout_ms: u64,
+    ) -> Result<Response<u64>>;
+
+    /// Fetches a single state value chunk with proof, containing the values
     /// from start to end index (inclusive) at the specified version. The proof
-    /// version is the same as the specified version.
+    /// version is the same as the specified version. In some cases, fewer
+    /// state values may be returned (e.g., to tolerate network or chunk
+    /// limits). If the data cannot be fetched, an error is returned.
     async fn get_state_values_with_proof(
         &self,
         version: u64,
         start_index: u64,
         end_index: u64,
+        request_timeout_ms: u64,
     ) -> Result<Response<StateValueChunkWithProof>>;
 
-    /// Returns a transaction output list with proof object, with transaction
-    /// outputs from start to end versions (inclusive). The proof is relative to
-    /// the specified `proof_version`. If the data cannot be fetched (e.g., the
-    /// number of transaction outputs is too large), an error is returned.
+    /// Fetches a transaction output list with proof, with transaction
+    /// outputs from start to end versions (inclusive). The proof is relative
+    /// to the specified `proof_version`. In some cases, fewer outputs may be
+    /// returned (e.g., to tolerate network or chunk limits). If the data
+    /// cannot be fetched, an error is returned.
     async fn get_transaction_outputs_with_proof(
         &self,
         proof_version: Version,
         start_version: Version,
         end_version: Version,
+        request_timeout_ms: u64,
     ) -> Result<Response<TransactionOutputListWithProof>>;
 
-    /// Returns a transaction list with proof object, with transactions from
-    /// start to end versions (inclusive). The proof is relative to the specified
-    /// `proof_version`. If `include_events` is true, events are included in the
-    /// proof. If the data cannot be fetched (e.g., the number of transactions is
-    /// too large), an error is returned.
+    /// Fetches a transaction list with proof, with transactions from
+    /// start to end versions (inclusive). The proof is relative to the
+    /// specified `proof_version`. If `include_events` is true, events are
+    /// included in the proof. In some cases, fewer transactions may be returned
+    /// (e.g., to tolerate network or chunk limits). If the data cannot
+    /// be fetched, an error is returned.
     async fn get_transactions_with_proof(
         &self,
         proof_version: Version,
         start_version: Version,
         end_version: Version,
         include_events: bool,
+        request_timeout_ms: u64,
     ) -> Result<Response<TransactionListWithProof>>;
+
+    /// Fetches a transaction or output list with proof, with data from
+    /// start to end versions (inclusive). The proof is relative to the
+    /// specified `proof_version`. If `include_events` is true, events are
+    /// included in the proof. In some cases, fewer data items may be returned
+    /// (e.g., to tolerate network or chunk limits). If the data cannot
+    /// be fetched, an error is returned.
+    async fn get_transactions_or_outputs_with_proof(
+        &self,
+        proof_version: Version,
+        start_version: Version,
+        end_version: Version,
+        include_events: bool,
+        request_timeout_ms: u64,
+    ) -> Result<Response<TransactionOrOutputListWithProof>>;
 }
 
 /// A response error that users of the Aptos Data Client can use to notify
 /// the Data Client about invalid or malformed responses.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub enum ResponseError {
     InvalidData,
     InvalidPayloadDataType,
@@ -159,7 +207,7 @@ pub enum ResponseError {
 /// This trait provides a simple feedback mechanism for users of the Data Client
 /// to alert it to bad responses so that the peers responsible for providing this
 /// data can be penalized.
-pub trait ResponseCallback: fmt::Debug + Send + 'static {
+pub trait ResponseCallback: fmt::Debug + Send + Sync + 'static {
     // TODO(philiphayes): ideally this would take a `self: Box<Self>`, i.e.,
     // consume the callback, which better communicates that you should only report
     // an error once. however, the current state-sync-v2 code makes this difficult...
@@ -208,7 +256,7 @@ impl<T> Response<T> {
 }
 
 /// The different data client response payloads as an enum.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum ResponsePayload {
     EpochEndingLedgerInfos(Vec<LedgerInfoWithSignatures>),
     NewTransactionOutputsWithProof((TransactionOutputListWithProof, LedgerInfoWithSignatures)),
@@ -259,11 +307,37 @@ impl From<(TransactionListWithProof, LedgerInfoWithSignatures)> for ResponsePayl
     }
 }
 
+impl TryFrom<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)> for ResponsePayload {
+    type Error = Error;
+
+    fn try_from(
+        inner: (TransactionOrOutputListWithProof, LedgerInfoWithSignatures),
+    ) -> Result<Self, Error> {
+        let ((transaction_list, output_list), ledger_info) = inner;
+        if let Some(transaction_list) = transaction_list {
+            Ok(Self::NewTransactionsWithProof((
+                transaction_list,
+                ledger_info,
+            )))
+        } else if let Some(output_list) = output_list {
+            Ok(Self::NewTransactionOutputsWithProof((
+                output_list,
+                ledger_info,
+            )))
+        } else {
+            Err(Error::InvalidResponse(
+                "Invalid response! No transaction or output list was returned!".into(),
+            ))
+        }
+    }
+}
+
 impl From<u64> for ResponsePayload {
     fn from(inner: u64) -> Self {
         Self::NumberOfStates(inner)
     }
 }
+
 impl From<TransactionOutputListWithProof> for ResponsePayload {
     fn from(inner: TransactionOutputListWithProof) -> Self {
         Self::TransactionOutputsWithProof(inner)
@@ -273,6 +347,23 @@ impl From<TransactionOutputListWithProof> for ResponsePayload {
 impl From<TransactionListWithProof> for ResponsePayload {
     fn from(inner: TransactionListWithProof) -> Self {
         Self::TransactionsWithProof(inner)
+    }
+}
+
+impl TryFrom<TransactionOrOutputListWithProof> for ResponsePayload {
+    type Error = Error;
+
+    fn try_from(inner: TransactionOrOutputListWithProof) -> Result<Self, Error> {
+        let (transaction_list, output_list) = inner;
+        if let Some(transaction_list) = transaction_list {
+            Ok(Self::TransactionsWithProof(transaction_list))
+        } else if let Some(output_list) = output_list {
+            Ok(Self::TransactionOutputsWithProof(output_list))
+        } else {
+            Err(Error::InvalidResponse(
+                "Invalid response! No transaction or output list was returned!".into(),
+            ))
+        }
     }
 }
 
@@ -360,7 +451,8 @@ pub struct AdvertisedData {
 
 impl fmt::Debug for AdvertisedData {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let synced_ledger_infos = (&self.synced_ledger_infos)
+        let synced_ledger_infos = self
+            .synced_ledger_infos
             .iter()
             .map(|LedgerInfoWithSignatures::V0(ledger)| {
                 let version = ledger.commit_info().version();

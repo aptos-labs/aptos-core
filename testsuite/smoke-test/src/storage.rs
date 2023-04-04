@@ -1,21 +1,22 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    smoke_test_environment::new_local_swarm_with_aptos,
+    smoke_test_environment::SwarmBuilder,
     test_utils::{
         assert_balance, create_and_fund_account, swarm_utils::insert_waypoint,
-        transfer_and_reconfig, transfer_coins,
+        transfer_and_maybe_reconfig, transfer_coins, MAX_CATCH_UP_WAIT_SECS, MAX_HEALTHY_WAIT_SECS,
     },
     workspace_builder,
     workspace_builder::workspace_root,
 };
 use anyhow::{bail, Result};
+use aptos_backup_cli::metadata::view::BackupStorageState;
+use aptos_forge::{reconfig, NodeExt, Swarm, SwarmExt};
+use aptos_logger::info;
 use aptos_temppath::TempPath;
 use aptos_types::{transaction::Version, waypoint::Waypoint};
-use backup_cli::metadata::view::BackupStorageState;
-use consensus::CONSENSUS_DB_NAME;
-use forge::{NodeExt, Swarm, SwarmExt};
 use std::{
     fs,
     path::Path,
@@ -23,15 +24,16 @@ use std::{
     time::{Duration, Instant},
 };
 
-#[ignore]
 #[tokio::test]
 async fn test_db_restore() {
     // pre-build tools
-    workspace_builder::get_bin("db-backup");
-    workspace_builder::get_bin("db-restore");
-    workspace_builder::get_bin("db-backup-verify");
+    ::aptos_logger::Logger::new().init();
+    info!("---------- 0. test_db_restore started.");
+    workspace_builder::get_bin("aptos-db-tool");
+    info!("---------- 1. pre-building finished.");
 
-    let mut swarm = new_local_swarm_with_aptos(4).await;
+    let mut swarm = SwarmBuilder::new_local(4).with_aptos().build().await;
+    info!("---------- 1.1 swarm built, sending some transactions.");
     let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
     let client_1 = swarm
         .validator(validator_peer_ids[1])
@@ -42,6 +44,19 @@ async fn test_db_restore() {
     // set up: two accounts, a lot of money
     let mut account_0 = create_and_fund_account(&mut swarm, 1000000).await;
     let account_1 = create_and_fund_account(&mut swarm, 1000000).await;
+
+    info!("---------- 1.2 wait for nodes to catch up.");
+    // we need to wait for all nodes to see it, as client_1 is different node from the
+    // one creating accounts above
+    swarm
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_CATCH_UP_WAIT_SECS))
+        .await
+        .unwrap();
+    info!("---------- 1.3 caught up.");
+
+    assert_balance(&client_1, &account_0, 1000000).await;
+    assert_balance(&client_1, &account_1, 1000000).await;
+
     let mut expected_balance_0 = 999999;
     let mut expected_balance_1 = 1000001;
 
@@ -57,31 +72,46 @@ async fn test_db_restore() {
     assert_balance(&client_1, &account_0, expected_balance_0).await;
     assert_balance(&client_1, &account_1, expected_balance_1).await;
 
-    expected_balance_0 -= 20;
-    expected_balance_1 += 20;
+    expected_balance_0 -= 10;
+    expected_balance_1 += 10;
 
-    transfer_and_reconfig(
+    transfer_and_maybe_reconfig(
         &client_1,
         &transaction_factory,
         swarm.chain_info().root_account,
         &mut account_0,
         &account_1,
-        20,
+        5,
+    )
+    .await;
+    // explicit reconfigs: we are at least at epoch 5
+    for _ in 0..4 {
+        reconfig(
+            &client_1,
+            &transaction_factory,
+            swarm.chain_info().root_account,
+        )
+        .await;
+    }
+    // some more reconfigs to complicate things by putting in multiple epoch boundaries
+    // in a transaction backup
+    transfer_and_maybe_reconfig(
+        &client_1,
+        &transaction_factory,
+        swarm.chain_info().root_account,
+        &mut account_0,
+        &account_1,
+        5,
     )
     .await;
     assert_balance(&client_1, &account_0, expected_balance_0).await;
     assert_balance(&client_1, &account_1, expected_balance_1).await;
 
+    info!("---------- 2. reached at least epoch 5, starting backup coordinator.");
     // make a backup from node 1
     let node1_config = swarm.validator(validator_peer_ids[1]).unwrap().config();
-    let backup_path = db_backup(
-        node1_config.storage.backup_service_address.port(),
-        1,
-        50,
-        20,
-        40,
-        &[],
-    );
+    let port = node1_config.storage.backup_service_address.port();
+    let backup_path = db_backup(port, 5, 400, 200, 5, &[]);
 
     // take down node 0
     let node_to_restart = validator_peer_ids[0];
@@ -95,27 +125,33 @@ async fn test_db_restore() {
     node0_config.save(node0_config_path).unwrap();
     let db_dir = node0_config.storage.dir();
     fs::remove_dir_all(db_dir.clone()).unwrap();
-    fs::remove_dir_all(db_dir.join(CONSENSUS_DB_NAME)).unwrap();
 
+    info!("---------- 3. stopped node 0, gonna restore DB.");
     // restore db from backup
-    db_restore(backup_path.path(), db_dir.as_path(), &[]);
+    db_restore(
+        backup_path.path(),
+        db_dir.as_path(),
+        &[],
+        node0_config.storage.rocksdb_configs.use_state_kv_db,
+    );
 
-    expected_balance_0 -= 20;
-    expected_balance_1 += 20;
+    expected_balance_0 -= 3;
+    expected_balance_1 += 3;
 
-    transfer_and_reconfig(
+    transfer_and_maybe_reconfig(
         &client_1,
         &transaction_factory,
         swarm.chain_info().root_account,
         &mut account_0,
         &account_1,
-        20,
+        3,
     )
     .await;
 
     assert_balance(&client_1, &account_0, expected_balance_0).await;
     assert_balance(&client_1, &account_1, expected_balance_1).await;
 
+    info!("---------- 4. Gonna restart node 0.");
     // start node 0 on top of restored db
     swarm
         .validator_mut(node_to_restart)
@@ -125,12 +161,13 @@ async fn test_db_restore() {
     swarm
         .validator_mut(node_to_restart)
         .unwrap()
-        .wait_until_healthy(Instant::now() + Duration::from_secs(10))
+        .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_HEALTHY_WAIT_SECS))
         .await
         .unwrap();
+    info!("---------- 5. Node 0 is healthy, verify it's caught up.");
     // verify it's caught up
     swarm
-        .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(60))
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_CATCH_UP_WAIT_SECS))
         .await
         .unwrap();
 
@@ -138,11 +175,13 @@ async fn test_db_restore() {
 
     assert_balance(&client_0, &account_0, expected_balance_0).await;
     assert_balance(&client_0, &account_1, expected_balance_1).await;
+    info!("6. Done");
 }
 
 fn db_backup_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
+    info!("---------- running aptos-db-tool backup-verify");
     let now = Instant::now();
-    let bin_path = workspace_builder::get_bin("db-backup-verify");
+    let bin_path = workspace_builder::get_bin("aptos-db-tool");
     let metadata_cache_path = TempPath::new();
 
     metadata_cache_path.create_as_dir().unwrap();
@@ -154,21 +193,64 @@ fn db_backup_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
         cmd.arg(&w.to_string());
     });
 
-    let output = cmd
-        .args(&[
+    let status = cmd
+        .args([
+            "backup",
+            "verify",
             "--metadata-cache-dir",
             metadata_cache_path.path().to_str().unwrap(),
-            "local-fs",
-            "--dir",
+            "--concurrent-downloads",
+            "4",
+            "--local-fs-dir",
+            backup_path.to_str().unwrap(),
+        ])
+        .current_dir(workspace_root())
+        .status()
+        .unwrap();
+    assert!(status.success(), "{}", status);
+    info!("Backup verified in {} seconds.", now.elapsed().as_secs());
+}
+
+fn replay_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
+    info!("---------- running replay-verify");
+    let now = Instant::now();
+    let bin_path = workspace_builder::get_bin("aptos-db-tool");
+    let metadata_cache_path = TempPath::new();
+    let target_db_dir = TempPath::new();
+
+    metadata_cache_path.create_as_dir().unwrap();
+
+    let mut cmd = Command::new(bin_path.as_path());
+    cmd.arg("replay-verify");
+    trusted_waypoints.iter().for_each(|w| {
+        cmd.arg("--trust-waypoint");
+        cmd.arg(&w.to_string());
+    });
+
+    let replay = cmd
+        .args([
+            "--metadata-cache-dir",
+            metadata_cache_path.path().to_str().unwrap(),
+            "--concurrent-downloads",
+            "4",
+            "--target-db-dir",
+            target_db_dir.path().to_str().unwrap(),
+            "--local-fs-dir",
             backup_path.to_str().unwrap(),
         ])
         .current_dir(workspace_root())
         .output()
         .unwrap();
-    if !output.status.success() {
-        panic!("db-backup-verify failed, output: {:?}", output);
-    }
-    println!("Backup verified in {} seconds.", now.elapsed().as_secs());
+    assert!(
+        replay.status.success(),
+        "{}",
+        std::str::from_utf8(&replay.stderr).unwrap()
+    );
+
+    info!(
+        "Backup replay-verified in {} seconds.",
+        now.elapsed().as_secs()
+    );
 }
 
 fn wait_for_backups(
@@ -181,42 +263,59 @@ fn wait_for_backups(
     trusted_waypoints: &[Waypoint],
 ) -> Result<()> {
     for i in 0..120 {
-        // the verify should always succeed.
-        db_backup_verify(backup_path, trusted_waypoints);
-
-        println!(
+        info!(
             "{}th wait for the backup to reach epoch {}, version {}.",
             i, target_epoch, target_version,
         );
-        let output = Command::new(bin_path)
-            .current_dir(workspace_root())
-            .args(&[
-                "one-shot",
-                "query",
-                "backup-storage-state",
-                "--metadata-cache-dir",
-                metadata_cache_path.to_str().unwrap(),
-                "local-fs",
-                "--dir",
-                backup_path.to_str().unwrap(),
-            ])
-            .output()?
-            .stdout;
-        let state: BackupStorageState = std::str::from_utf8(&output)?.parse()?;
+        let state = get_backup_storage_state(bin_path, metadata_cache_path, backup_path)?;
         if state.latest_epoch_ending_epoch.is_some()
             && state.latest_transaction_version.is_some()
-            && state.latest_state_snapshot_version.is_some()
+            && state.latest_state_snapshot_epoch.is_some()
+            && state.latest_state_snapshot_epoch.is_some()
             && state.latest_epoch_ending_epoch.unwrap() >= target_epoch
             && state.latest_transaction_version.unwrap() >= target_version
+            && state.latest_transaction_version.unwrap()
+                >= state.latest_state_snapshot_version.unwrap()
         {
-            println!("Backup created in {} seconds.", now.elapsed().as_secs());
+            info!(
+                "Backup created in {} seconds. backup storage state: {}",
+                now.elapsed().as_secs(),
+                state
+            );
             return Ok(());
         }
-        println!("Backup storage state: {}", state);
+        info!("Backup storage state: {}", state);
+        if state.latest_transaction_version.is_some() {
+            // the verify should always succeed unless backup storage is completely empty.
+            db_backup_verify(backup_path, trusted_waypoints);
+        }
         std::thread::sleep(Duration::from_secs(1));
     }
 
     bail!("Failed to create backup.");
+}
+
+fn get_backup_storage_state(
+    bin_path: &Path,
+    metadata_cache_path: &Path,
+    backup_path: &Path,
+) -> Result<BackupStorageState> {
+    let output = Command::new(bin_path)
+        .current_dir(workspace_root())
+        .args([
+            "backup",
+            "query",
+            "backup-storage-state",
+            "--metadata-cache-dir",
+            metadata_cache_path.to_str().unwrap(),
+            "--concurrent-downloads",
+            "4",
+            "--local-fs-dir",
+            backup_path.to_str().unwrap(),
+        ])
+        .output()?
+        .stdout;
+    std::str::from_utf8(&output)?.parse()
 }
 
 pub(crate) fn db_backup(
@@ -224,11 +323,12 @@ pub(crate) fn db_backup(
     target_epoch: u64,
     target_version: Version,
     transaction_batch_size: usize,
-    state_snapshot_interval: usize,
+    state_snapshot_interval_epochs: usize,
     trusted_waypoints: &[Waypoint],
 ) -> TempPath {
+    info!("---------- running aptos db tool backup");
     let now = Instant::now();
-    let bin_path = workspace_builder::get_bin("db-backup");
+    let bin_path = workspace_builder::get_bin("aptos-db-tool");
     let metadata_cache_path1 = TempPath::new();
     let metadata_cache_path2 = TempPath::new();
     let backup_path = TempPath::new();
@@ -237,22 +337,27 @@ pub(crate) fn db_backup(
     metadata_cache_path2.create_as_dir().unwrap();
     backup_path.create_as_dir().unwrap();
 
+    // Initialize backup storage, avoid race between the coordinator and wait_for_backups to create
+    // the identity file.
+    get_backup_storage_state(&bin_path, metadata_cache_path2.path(), backup_path.path()).unwrap();
+
     // spawn the backup coordinator
     let mut backup_coordinator = Command::new(bin_path.as_path())
         .current_dir(workspace_root())
-        .args(&[
-            "coordinator",
-            "run",
+        .args([
+            "backup",
+            "continuously",
             "--backup-service-address",
             &format!("http://localhost:{}", backup_service_port),
             "--transaction-batch-size",
             &transaction_batch_size.to_string(),
-            "--state-snapshot-interval",
-            &state_snapshot_interval.to_string(),
+            "--state-snapshot-interval-epochs",
+            &state_snapshot_interval_epochs.to_string(),
             "--metadata-cache-dir",
             metadata_cache_path1.path().to_str().unwrap(),
-            "local-fs",
-            "--dir",
+            "--concurrent-downloads",
+            "4",
+            "--local-fs-dir",
             backup_path.path().to_str().unwrap(),
         ])
         .spawn()
@@ -268,40 +373,76 @@ pub(crate) fn db_backup(
         backup_path.path(),
         trusted_waypoints,
     );
+
+    // start the backup compaction
+    let compaction = Command::new(bin_path.as_path())
+        .current_dir(workspace_root())
+        .args([
+            "backup-maintenance",
+            "compact",
+            "--epoch-ending-file-compact-factor",
+            "2",
+            "--state-snapshot-file-compact-factor",
+            "2",
+            "--transaction-file-compact-factor",
+            "2",
+            "--metadata-cache-dir",
+            metadata_cache_path1.path().to_str().unwrap(),
+            "--concurrent-downloads",
+            "4",
+            "--local-fs-dir",
+            backup_path.path().to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        compaction.status.success(),
+        "{}",
+        std::str::from_utf8(&compaction.stderr).unwrap()
+    );
     backup_coordinator.kill().unwrap();
     wait_res.unwrap();
+    replay_verify(backup_path.path(), trusted_waypoints);
     backup_path
 }
 
-pub(crate) fn db_restore(backup_path: &Path, db_path: &Path, trusted_waypoints: &[Waypoint]) {
+pub(crate) fn db_restore(
+    backup_path: &Path,
+    db_path: &Path,
+    trusted_waypoints: &[Waypoint],
+    use_state_kv_db: bool,
+) {
     let now = Instant::now();
-    let bin_path = workspace_builder::get_bin("db-restore");
+    let bin_path = workspace_builder::get_bin("aptos-db-tool");
     let metadata_cache_path = TempPath::new();
 
     metadata_cache_path.create_as_dir().unwrap();
 
     let mut cmd = Command::new(bin_path.as_path());
+    cmd.args(["restore", "bootstrap-db"]);
     trusted_waypoints.iter().for_each(|w| {
         cmd.arg("--trust-waypoint");
         cmd.arg(&w.to_string());
     });
 
-    let output = cmd
-        .args(&[
+    if use_state_kv_db {
+        cmd.arg("--use-state-kv-db");
+    }
+
+    let status = cmd
+        .args([
             "--target-db-dir",
             db_path.to_str().unwrap(),
-            "auto",
+            "--concurrent-downloads",
+            "4",
             "--metadata-cache-dir",
             metadata_cache_path.path().to_str().unwrap(),
-            "local-fs",
-            "--dir",
+            "--local-fs-dir",
             backup_path.to_str().unwrap(),
         ])
         .current_dir(workspace_root())
-        .output()
+        .status()
         .unwrap();
-    if !output.status.success() {
-        panic!("db-restore failed, output: {:?}", output);
-    }
-    println!("Backup restored in {} seconds.", now.elapsed().as_secs());
+    assert!(status.success(), "{}", status);
+    info!("Backup restored in {} seconds.", now.elapsed().as_secs());
 }

@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -48,9 +49,9 @@ impl<T: StatelessPipeline> PhaseTester<T> {
     // unit tests are for phase processors only,
     // this function consumes the tester
     pub fn unit_test(self, processor: &T) {
-        let mut runtime = consensus_runtime();
+        let runtime = consensus_runtime();
 
-        timed_block_on(&mut runtime, async move {
+        timed_block_on(&runtime, async move {
             for PhaseTestCase {
                 index,
                 input,
@@ -59,18 +60,12 @@ impl<T: StatelessPipeline> PhaseTester<T> {
             } in self.cases
             {
                 eprint!(
-                    "{}Unit Test{} - {}:",
-                    termion::color::Fg(termion::color::LightBlue),
-                    termion::style::Reset,
+                    "Unit Test - {}:",
                     prompt.unwrap_or(format!("Test {}", index))
                 );
                 let resp = processor.process(input).await;
                 judge(resp);
-                eprintln!(
-                    " {}OK{}",
-                    termion::color::Fg(termion::color::LightGreen),
-                    termion::style::Reset
-                );
+                eprintln!(" OK",);
             }
         })
     }
@@ -82,9 +77,9 @@ impl<T: StatelessPipeline> PhaseTester<T> {
         mut tx: Sender<CountedRequest<T::Request>>,
         mut rx: Receiver<T::Response>,
     ) {
-        let mut runtime = consensus_runtime();
+        let runtime = consensus_runtime();
 
-        timed_block_on(&mut runtime, async move {
+        timed_block_on(&runtime, async move {
             for PhaseTestCase {
                 index,
                 input,
@@ -93,9 +88,7 @@ impl<T: StatelessPipeline> PhaseTester<T> {
             } in self.cases
             {
                 eprint!(
-                    "{}E2E Test{} - {}:",
-                    termion::color::Fg(termion::color::LightBlue),
-                    termion::style::Reset,
+                    "E2E Test - {}:",
                     prompt.unwrap_or(format!("Test {}", index))
                 );
                 tx.send(CountedRequest::new(input, Arc::new(AtomicU64::new(0))))
@@ -103,11 +96,7 @@ impl<T: StatelessPipeline> PhaseTester<T> {
                     .ok();
                 let resp = rx.next().await.unwrap();
                 judge(resp);
-                eprintln!(
-                    " {}OK{}",
-                    termion::color::Fg(termion::color::Green),
-                    termion::style::Reset
-                );
+                eprintln!(" OK",);
             }
         })
     }

@@ -1,20 +1,19 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
-
-use safety_rules::TSafetyRules;
-use std::{
-    fmt::{Debug, Display, Formatter},
-    sync::Arc,
-};
 
 use crate::{
     experimental::pipeline_phase::StatelessPipeline, metrics_safety_rules::MetricsSafetyRules,
 };
 use aptos_crypto::bls12381;
 use aptos_infallible::Mutex;
+use aptos_safety_rules::{Error, TSafetyRules};
 use aptos_types::ledger_info::{LedgerInfo, LedgerInfoWithSignatures};
 use async_trait::async_trait;
-use safety_rules::Error;
+use std::{
+    fmt::{Debug, Display, Formatter},
+    sync::Arc,
+};
 
 /// [ This class is used when consensus.decoupled = true ]
 /// SigningPhase is a singleton that receives executed blocks from
@@ -61,6 +60,7 @@ impl SigningPhase {
 impl StatelessPipeline for SigningPhase {
     type Request = SigningRequest;
     type Response = SigningResponse;
+
     async fn process(&self, req: SigningRequest) -> SigningResponse {
         let SigningRequest {
             ordered_ledger_info,

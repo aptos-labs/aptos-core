@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -8,12 +9,11 @@ use crate::{
         transaction::{authenticator::AuthenticationKey, RawTransaction, TransactionPayload},
     },
 };
-use aptos_crypto::ed25519::Ed25519PublicKey;
-
-pub use aptos_transaction_builder::aptos_stdlib;
+pub use aptos_cached_packages::aptos_stdlib;
+use aptos_crypto::{ed25519::Ed25519PublicKey, HashValue};
+use aptos_global_constants::{GAS_UNIT_PRICE, MAX_GAS_AMOUNT};
 use aptos_types::transaction::{
-    authenticator::AuthenticationKeyPreimage, ChangeSet, ModuleBundle, Script, ScriptFunction,
-    WriteSetPayload,
+    authenticator::AuthenticationKeyPreimage, EntryFunction, ModuleBundle, Script,
 };
 
 pub struct TransactionBuilder {
@@ -27,6 +27,23 @@ pub struct TransactionBuilder {
 }
 
 impl TransactionBuilder {
+    pub fn new(
+        payload: TransactionPayload,
+        expiration_timestamp_secs: u64,
+        chain_id: ChainId,
+    ) -> Self {
+        Self {
+            payload,
+            chain_id,
+            expiration_timestamp_secs,
+            // TODO(Gas): double check this
+            max_gas_amount: MAX_GAS_AMOUNT,
+            gas_unit_price: std::cmp::max(GAS_UNIT_PRICE, 1),
+            sender: None,
+            sequence_number: None,
+        }
+    }
+
     pub fn sender(mut self, sender: AccountAddress) -> Self {
         self.sender = Some(sender);
         self
@@ -82,8 +99,9 @@ pub struct TransactionFactory {
 impl TransactionFactory {
     pub fn new(chain_id: ChainId) -> Self {
         Self {
-            max_gas_amount: 2_000,
-            gas_unit_price: 0,
+            // TODO(Gas): double check if this right
+            max_gas_amount: MAX_GAS_AMOUNT,
+            gas_unit_price: GAS_UNIT_PRICE,
             transaction_expiration_time: 30,
             chain_id,
         }
@@ -119,30 +137,24 @@ impl TransactionFactory {
         )))
     }
 
-    pub fn change_set(&self, change_set: ChangeSet) -> TransactionBuilder {
-        self.payload(TransactionPayload::WriteSet(WriteSetPayload::Direct(
-            change_set,
-        )))
-    }
-
-    pub fn script_function(&self, func: ScriptFunction) -> TransactionBuilder {
-        self.payload(TransactionPayload::ScriptFunction(func))
+    pub fn entry_function(&self, func: EntryFunction) -> TransactionBuilder {
+        self.payload(TransactionPayload::EntryFunction(func))
     }
 
     pub fn create_user_account(&self, public_key: &Ed25519PublicKey) -> TransactionBuilder {
         let preimage = AuthenticationKeyPreimage::ed25519(public_key);
-        self.payload(aptos_stdlib::account_create_account(
+        self.payload(aptos_stdlib::aptos_account_create_account(
             AuthenticationKey::from_preimage(&preimage).derived_address(),
         ))
     }
 
-    pub fn create_and_fund_user_account(
+    pub fn implicitly_create_user_account_and_transfer(
         &self,
         public_key: &Ed25519PublicKey,
         amount: u64,
     ) -> TransactionBuilder {
         let preimage = AuthenticationKeyPreimage::ed25519(public_key);
-        self.payload(aptos_stdlib::account_utils_create_and_fund_account(
+        self.payload(aptos_stdlib::aptos_account_transfer(
             AuthenticationKey::from_preimage(&preimage).derived_address(),
             amount,
         ))
@@ -150,6 +162,67 @@ impl TransactionFactory {
 
     pub fn transfer(&self, to: AccountAddress, amount: u64) -> TransactionBuilder {
         self.payload(aptos_stdlib::aptos_coin_transfer(to, amount))
+    }
+
+    pub fn account_transfer(&self, to: AccountAddress, amount: u64) -> TransactionBuilder {
+        self.payload(aptos_stdlib::aptos_account_transfer(to, amount))
+    }
+
+    pub fn create_multisig_account(
+        &self,
+        additional_owners: Vec<AccountAddress>,
+        signatures_required: u64,
+    ) -> TransactionBuilder {
+        self.payload(aptos_stdlib::multisig_account_create_with_owners(
+            additional_owners,
+            signatures_required,
+            vec![],
+            vec![],
+        ))
+    }
+
+    pub fn create_multisig_transaction(
+        &self,
+        multisig_account: AccountAddress,
+        payload: Vec<u8>,
+    ) -> TransactionBuilder {
+        self.payload(aptos_stdlib::multisig_account_create_transaction(
+            multisig_account,
+            payload,
+        ))
+    }
+
+    pub fn approve_multisig_transaction(
+        &self,
+        multisig_account: AccountAddress,
+        transaction_id: u64,
+    ) -> TransactionBuilder {
+        self.payload(aptos_stdlib::multisig_account_approve_transaction(
+            multisig_account,
+            transaction_id,
+        ))
+    }
+
+    pub fn reject_multisig_transaction(
+        &self,
+        multisig_account: AccountAddress,
+        transaction_id: u64,
+    ) -> TransactionBuilder {
+        self.payload(aptos_stdlib::multisig_account_reject_transaction(
+            multisig_account,
+            transaction_id,
+        ))
+    }
+
+    pub fn create_multisig_transaction_with_payload_hash(
+        &self,
+        multisig_account: AccountAddress,
+        payload: Vec<u8>,
+    ) -> TransactionBuilder {
+        self.payload(aptos_stdlib::multisig_account_create_transaction_with_hash(
+            multisig_account,
+            HashValue::sha3_256_of(&payload).to_vec(),
+        ))
     }
 
     pub fn mint(&self, to: AccountAddress, amount: u64) -> TransactionBuilder {

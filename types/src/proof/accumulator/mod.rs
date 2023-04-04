@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module implements an in-memory Merkle Accumulator that is similar to what we use in
@@ -44,13 +45,13 @@ pub struct InMemoryAccumulator<H> {
     ///      / \     / \     / \
     ///     a   b   c   d   e   placeholder
     /// ```
-    frozen_subtree_roots: Vec<HashValue>,
+    pub frozen_subtree_roots: Vec<HashValue>,
 
     /// The total number of leaves in this accumulator.
-    num_leaves: LeafCount,
+    pub num_leaves: LeafCount,
 
     /// The root hash of this accumulator.
-    root_hash: HashValue,
+    pub root_hash: HashValue,
 
     phantom: PhantomData<H>,
 }

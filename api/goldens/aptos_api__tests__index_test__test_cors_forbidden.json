@@ -1,16 +1,20 @@
 {
-  "code": 403,
-  "message": "CORS request forbidden: request-method not allowed"
+  "message": "request-method not allowed",
+  "error_code": "web_framework_error",
+  "vm_error_code": null
 }
 {
-  "code": 403,
-  "message": "CORS request forbidden: request-method not allowed"
+  "message": "request-method not allowed",
+  "error_code": "web_framework_error",
+  "vm_error_code": null
 }
 {
-  "code": 403,
-  "message": "CORS request forbidden: request-method not allowed"
+  "message": "request-method not allowed",
+  "error_code": "web_framework_error",
+  "vm_error_code": null
 }
 {
-  "code": 403,
-  "message": "CORS request forbidden: request-method not allowed"
+  "message": "request-method not allowed",
+  "error_code": "web_framework_error",
+  "vm_error_code": null
 }

@@ -1,20 +1,17 @@
 ---
-title: "Use Aptos CLI"
+title: "Use the Aptos CLI"
 id: "use-aptos-cli"
 ---
 
-# Use Aptos CLI
+# Use the Aptos CLI
 
-The `aptos` tool is a command line interface (CLI) for debugging, development, and node operation.
-This document describes how to use the `aptos` CLI tool. To install the CLI, see [Install Aptos CLI](install-aptos-cli).
+The `aptos` tool is a command line interface (CLI) for developing on the Aptos blockchain, debugging, and for node operations. This document describes how to use the `aptos` CLI tool. To download or build the CLI, follow [Install Aptos CLI](./index.md).
 
-### Command Line Help
-Command line help is available.  Type `aptos help` or `aptos --help` to see the available command options.
+## Command line help
+
+Command line help is available.  Type `aptos help` or `aptos --help` to see the available command options. See below the usage output from `aptos --help`:
+
 ```bash
-$ aptos 0.2.1
-Aptos Labs <opensource@aptoslabs.com>
-CLI tool for interacting with the Aptos blockchain and nodes
-
 USAGE:
     aptos <SUBCOMMAND>
 
@@ -23,21 +20,24 @@ OPTIONS:
     -V, --version    Print version information
 
 SUBCOMMANDS:
-    account    CLI tool for interacting with accounts
-    config     Tool for configuration of the CLI tool
-    genesis    Tool for setting up and building the Genesis transaction
-    help       Print this message or the help of the given subcommand(s)
-    info       Show information about the build of the CLI
-    init       Tool to initialize current directory for the aptos tool
-    key        CLI tool for generating, inspecting, and interacting with keys
-    move       CLI tool for performing Move tasks
-    node       Tool for manipulating nodes
+    account       Tool for interacting with accounts
+    config        Tool for interacting with configuration of the Aptos CLI tool
+    genesis       Tool for setting up an Aptos chain Genesis transaction
+    governance    Tool for on-chain governance
+    help          Print this message or the help of the given subcommand(s)
+    info          Show build information about the CLI
+    init          Tool to initialize current directory for the aptos tool
+    key           Tool for generating, inspecting, and interacting with keys
+    move          Tool for Move related operations
+    node          Tool for operations related to nodes
+    stake         Tool for manipulating stake
 ```
 
-Command specific help is also available.  For example, type `aptos move --help` to get command-specific help.
+### Command-specific help
+
+Command-specific help is also available.  For example, see below the usage output from `aptos move --help`:
+
 ```bash
-$ aptos-move 0.2.1
-CLI tool for performing Move tasks
 
 USAGE:
     aptos move <SUBCOMMAND>
@@ -47,18 +47,34 @@ OPTIONS:
     -V, --version    Print version information
 
 SUBCOMMANDS:
-    compile    Compiles a package and returns the [`ModuleId`]s
-    help       Print this message or the help of the given subcommand(s)
-    init       Creates a new Move package at the given location
-    publish    Publishes the modules in a Move package
-    run        Run a Move function
-    test       Run Move unit tests against a package path
+    clean
+            Cleans derived artifacts of a package
+    compile
+            Compiles a package and returns the [`ModuleId`]s
+    download
+            Downloads a package and stores it in a directory named after the package
+    help
+            Print this message or the help of the given subcommand(s)
+    init
+            Creates a new Move package at the given location
+    list
+            Lists information about packages and modules on-chain
+    prove
+            Proves the Move package
+    publish
+            Publishes the modules in a Move package to the Aptos blockchain
+    run
+            Run a Move function
+    test
+            Runs Move unit tests for a package
+    transactional-test
+            Run Move transactional tests
 ```
+### Sub-command help
 
-Help for sub-commands is also available.  For example, type `aptos move compile --help` to get command-specific help.
+Help for sub-commands is also available.  For example, see below the usage output from `aptos move compile --help`:
+
 ```bash
-$ aptos-move-compile 0.2.1
-Compiles a package and returns the [`ModuleId`]s
 
 USAGE:
     aptos move compile [OPTIONS]
@@ -69,16 +85,16 @@ OPTIONS:
 
         --named-addresses <NAMED_ADDRESSES>
             Named addresses for the move binary
-            
+
             Example: alice=0x1234, bob=0x5678
-            
+
             Note: This will fail if there are duplicates in the Move.toml file remove those first.
-            
+
             [default: ]
 
         --output-dir <OUTPUT_DIR>
             Path to save the compiled move package
-            
+
             Defaults to `<package_dir>/build`
 
         --package-dir <PACKAGE_DIR>
@@ -88,70 +104,93 @@ OPTIONS:
             Print version information
 ```
 
-## CLI info
+## CLI information
 
-To get CLI info for debugging purposes, you can run the `aptos info` command:
+Run the `aptos info` command to get the CLI information for debugging purposes. See an example output of the `aptos info` command:
 
 ```bash
-$ aptos info
 {
   "Result": {
-    "build_branch": "main",
-    "build_cargo_version": "cargo 1.61.0 (a028ae42f 2022-04-29)",
-    "build_commit_hash": "9593a8d515b7c82886064812753b237d82075e35",
-    "build_os": "macos-aarch64",
-    "build_pkg_version": "0.2.1",
-    "build_rust_channel": "1.61.0-aarch64-apple-darwin",
-    "build_rust_version": "rustc 1.61.0 (fe5b13d68 2022-05-18)"
-  }
-}
-
-```
-
-## Config Examples
-
-### Set global configuration
-
-You can set global configuration options for the CLI accordingly with this command.  The global
-configuration is at `~/.aptos/global_config.yaml`.  For now the only field that is configurable is
-`--config-type` which allows you to set where the profile configuration is set.  By default it is
-`workspace`, which means the current directory (`./.aptos/config.yaml`) that the CLI is being run in, will contain the configuration.
-If set to `global`, it will use the global folder location (`~/.aptos/config.yaml`).
-```bash
-$ aptos config set-global-config --config-type global
-{
-  "Result": "Success"
-}
-```
-
-You can also show the global configuration with the `show-global-config` command.
-```bash
-$ aptos config show-global-config
-{
-  "Result": {
-    "config_type": "Global"
+    "build_branch": "testnet",
+    "build_cargo_version": "cargo 1.62.1 (a748cf5a3 2022-06-08)",
+    "build_commit_hash": "f8bf8fdeec33c8c6ff3d1cbaf4990b9e54c2176a",
+    "build_os": "macos-x86_64",
+    "build_pkg_version": "0.3.2",
+    "build_rust_channel": "1.62.1-x86_64-apple-darwin",
+    "build_rust_version": "rustc 1.62.1 (e092d0b6b 2022-07-16)",
+    "build_tag": "",
+    "build_time": "2022-08-26 22:27:31 +00:00"
   }
 }
 ```
+
+## Configuration examples
+
+Configuration for the CLI works like this:
+
+### In the current working directory for local runs
+
+1. Your configurations are in a **local** YAML configuration file `.aptos/config.yaml`, i.e., located in the current working directory where you run the CLI. In this case you must run your CLI commands from this current working directory for this configuration to be used.
+2. You can verify that the CLI is set to use this local configuration YAML file by running the command:
+
+  ```bash
+  aptos config show-global-config
+  ```
+  You should see the below output:
+  ```bash
+  {
+    "Result": {
+      "config_type": "Workspace"
+    }
+  }
+  ```
+  The `Workspace` value for the `config_type` indicates that the `.aptos/config.yaml` file is used for the CLI configuration.
+
+### In the home directory for the global runs
+
+1. Your configurations are in a **global** YAML configuration file `~/.aptos/global_config.yaml`, i.e., located in your home directory.
+2. Set the CLI to use this global configuration YAML file by running this command:
+  ```bash
+  aptos config set-global-config --config-type global
+  ```
+  You will see the below output:
+  ```
+  {
+    "Result": {
+      "config_type": "Global"
+    }
+  }
+  ```
+  You can also show the global configuration with the `show-global-config` command.
+  ```bash
+  $ aptos config show-global-config
+  {
+    "Result": {
+      "config_type": "Global"
+    }
+  }
+  ```
+
+:::tip Default configuration
+If you did not set any global configuration, then the `./.aptos/config.yaml` in the current working directory is used for configuration.
+:::
 
 ### Setting up shell completion
-You can set up shell completions with the `generate-shell-completions` command.  Please lookup configuration for your
-specific shell.  The supported shells right now are `[bash, zsh, fish, powershell, elvish]`. An example is below for
-oh my zsh.
+
+You can set up shell completions with the `generate-shell-completions` command.  You can lookup configuration for your specific shell. The supported shells are `[bash, zsh, fish, powershell, elvish]`. An example is below for [`oh my zsh`](https://ohmyz.sh/).
 
 ```bash
-$ aptos config generate-shell-completions --shell zsh --output-file ~/.oh-my-zsh/completions/_aptos
+aptos config generate-shell-completions --shell zsh --output-file ~/.oh-my-zsh/completions/_aptos
 ```
 
-### Initialize local configuration and create an account
+## Initialize local configuration and create an account
 
-A local folder named `.aptos/` will be created with a configuration `config.yaml` which can be used
-to store configuration between CLI runs.  This is local to your run, so you will need to continue running CLI from this
-folder, or reinitialize in another folder.
+A local folder named `.aptos/` will be created with a configuration `config.yaml` which can be used to store configuration between CLI runs.  This is local to your run, so you will need to continue running CLI from this folder, or reinitialize in another folder.
 
-#### Step 1: Run Aptos init
+### Step 1: Run Aptos init
 
-This will initialize the configuration with the private key given.
+The `aptos init` command will initialize the configuration with the private key you provided.
+
 ```bash
 $ aptos init
 Configuring for profile default
@@ -164,22 +203,21 @@ No faucet url given, using https://faucet.devnet.aptoslabs.com...
 Enter your private key as a hex literal (0x...) [Current: None | No input: Generate new key (or keep one if present)]
 
 No key given, generating key...
-Account 50A49D913AA6381C01579E3FC00784B49AFA3A771F06389EBC65F8FF3A4E9A7D doesn't exist, creating it and funding it with 10000 coins
-Aptos is now set up for account 50A49D913AA6381C01579E3FC00784B49AFA3A771F06389EBC65F8FF3A4E9A7D!  Run `aptos help` for more information about commands
+Account 00f1f20ddd0b0dd2291b6e42c97274668c479bca70f07c6b6a80b99720779696 doesn't exist, creating it and funding it with 10000 coins
+Aptos is now set up for account 00f1f20ddd0b0dd2291b6e42c97274668c479bca70f07c6b6a80b99720779696!  Run `aptos help` for more information about commands
 
 {
   "Result": "Success"
 }
 ```
 
-#### Step 2: Changing the configuration
-To change the configuration, you can either run the command `aptos init` or you can manually edit
-the `.aptos/config.yaml` that is in your current working directory.
+### Step 2: Changing the configuration
 
-#### Step 3: Creating other profiles
+To change the configuration, you can either run the command `aptos init` or you can manually edit the `.aptos/config.yaml` that is in your current working directory.
 
-You can also create other profiles for different endpoints and different keys.  These can be made
-by adding the `--profile` argument, and can be used in most other commands to replace command line arguments.
+### Creating other profiles
+
+You can also create other profiles for different endpoints and different keys.  These can be made by adding the `--profile` argument, and can be used in most other commands to replace command line arguments.
 
 ```bash
 $ aptos init --profile superuser
@@ -200,57 +238,65 @@ Aptos is now set up for account 18B61497FD290B02BB0751F44381CADA1657C2B3AA6194A0
 }
 ```
 
-## Account Examples
+## Account examples
 
 ### Fund an account with the faucet
 
-You can fund an account with the faucet via the CLI with either an account or a profile:
+You can fund an account with the faucet via the CLI by using either an account address or with `default` (which defaults to the account address created with `aptos init`).
+
+For example, to fund the account `00f1f20ddd0b0dd2291b6e42c97274668c479bca70f07c6b6a80b99720779696` that was created above with the `aptos init` command:
 
 ```bash
-$ aptos account fund --account B9BD2CFA58CA29BCE1D7ADD25FCE5C62220604CD0236FE3F90D9DE91ED9FB8CB
+$ aptos account fund-with-faucet --account 00f1f20ddd0b0dd2291b6e42c97274668c479bca70f07c6b6a80b99720779696
 {
-  "Result": "Added 10000 coins to account B9BD2CFA58CA29BCE1D7ADD25FCE5C62220604CD0236FE3F90D9DE91ED9FB8CB"
+  "Result": "Added 10000 coins to account 00f1f20ddd0b0dd2291b6e42c97274668c479bca70f07c6b6a80b99720779696"
 }
 ```
 
 ```bash
-$ aptos account fund --account default
+$ aptos account fund-with-faucet --account default
 {
-  "Result": "Added 10000 coins to account B9BD2CFA58CA29BCE1D7ADD25FCE5C62220604CD0236FE3F90D9DE91ED9FB8CB"
+  "Result": "Added 10000 coins to account 00f1f20ddd0b0dd2291b6e42c97274668c479bca70f07c6b6a80b99720779696"
 }
 ```
 
 ### View an account's balance and transfer events
 
-You can view the balance and transfer events (deposits and withdrawals) with:
+You can view the balance and transfer events (deposits and withdrawals) either by explicitly specifying the account address, as below:
+
 ```bash
-$ aptos account list --query balance --account 0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb
+$ aptos account list --query balance --account 00f1f20ddd0b0dd2291b6e42c97274668c479bca70f07c6b6a80b99720779696
+```
+or by specifying the `default` as below:
+```bash
+$ aptos account list --query balance --account default
 ```
 
-The above command will generate the following information on your terminal:
+Both the above commands will generate the following information on your terminal:
 
 ```bash
 {
   "Result": [
     {
       "coin": {
-        "value": "10000"
+        "value": "110000"
       },
       "deposit_events": {
-        "counter": "1",
+        "counter": "3",
         "guid": {
           "id": {
-            "addr": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
-            "creation_num": "1"
+            "addr": "0xf1f20ddd0b0dd2291b6e42c97274668c479bca70f07c6b6a80b99720779696",
+            "creation_num": "2"
           }
         }
       },
+      "frozen": false,
       "withdraw_events": {
         "counter": "0",
         "guid": {
           "id": {
-            "addr": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
-            "creation_num": "2"
+            "addr": "0xf1f20ddd0b0dd2291b6e42c97274668c479bca70f07c6b6a80b99720779696",
+            "creation_num": "3"
           }
         }
       }
@@ -262,63 +308,93 @@ The above command will generate the following information on your terminal:
 ### Listing resources in an account
 
 You can list the resources in an account from the command line. For example, see below for how to list the resources in the account you just created above:
-```bash
-$ aptos account list --query resources --account 0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb
 
+```bash
+$ aptos account list --query resources --account default
+```
+or
+```bash
+$ aptos account list --query resources --account 0xf1f20ddd0b0dd2291b6e42c97274668c479bca70f07c6b6a80b99720779696
 ```
 
-The above command will generate the following resource list information on your terminal:
+Both the above commands will generate the following resource list information on your terminal:
 
 ```bash
 {
   "Result": [
     {
-      "coin": {
-        "value": "10000"
-      },
-      "deposit_events": {
-        "counter": "1",
-        "guid": {
-          "id": {
-            "addr": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
-            "creation_num": "1"
+      "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>": {
+        "coin": {
+          "value": "110000"
+        },
+        "deposit_events": {
+          "counter": "3",
+          "guid": {
+            "id": {
+              "addr": "0xf1f20ddd0b0dd2291b6e42c97274668c479bca70f07c6b6a80b99720779696",
+              "creation_num": "2"
+            }
           }
-        }
-      },
-      "withdraw_events": {
-        "counter": "0",
-        "guid": {
-          "id": {
-            "addr": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
-            "creation_num": "2"
-          }
-        }
-      }
-    },
-    {
-      "register_events": {
-        "counter": "1",
-        "guid": {
-          "id": {
-            "addr": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
-            "creation_num": "0"
+        },
+        "frozen": false,
+        "withdraw_events": {
+          "counter": "0",
+          "guid": {
+            "id": {
+              "addr": "0xf1f20ddd0b0dd2291b6e42c97274668c479bca70f07c6b6a80b99720779696",
+              "creation_num": "3"
+            }
           }
         }
       }
     },
     {
-      "counter": "3"
-    },
-    {
-      "authentication_key": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
-      "self_address": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
-      "sequence_number": "0"
+      "0x1::account::Account": {
+        "authentication_key": "0x00f1f20ddd0b0dd2291b6e42c97274668c479bca70f07c6b6a80b99720779696",
+        "coin_register_events": {
+          "counter": "1",
+          "guid": {
+            "id": {
+              "addr": "0xf1f20ddd0b0dd2291b6e42c97274668c479bca70f07c6b6a80b99720779696",
+              "creation_num": "0"
+            }
+          }
+        },
+        "guid_creation_num": "4",
+        "key_rotation_events": {
+          "counter": "0",
+          "guid": {
+            "id": {
+              "addr": "0xf1f20ddd0b0dd2291b6e42c97274668c479bca70f07c6b6a80b99720779696",
+              "creation_num": "1"
+            }
+          }
+        },
+        "rotation_capability_offer": {
+          "for": {
+            "vec": []
+          }
+        },
+        "sequence_number": "0",
+        "signer_capability_offer": {
+          "for": {
+            "vec": []
+          }
+        }
+      }
     }
   ]
 }
 ```
 
-You can additionally list the default profile from configuration with no account specified.
+### List the default profile
+
+You can also list the default profile from configuration with no account specified.
+
+:::tip
+Account addresses may differ from example to example in this section.
+:::
+
 ```bash
 $ aptos account list
 {
@@ -369,7 +445,10 @@ $ aptos account list
 }
 ```
 
+### Use the name of the profile
+
 Additionally, any place that takes an account can use the name of a profile:
+
 ```bash
 $ aptos account list --query resources --account superuser
 {
@@ -425,7 +504,7 @@ $ aptos account list --query resources --account superuser
 You can pass different types of queries to view different items under an account. Currently, 'resources' and
 'modules' are supported but more query types are coming. For example, to fetch modules:
 ```bash
-$ aptos account list --query modules                   
+$ aptos account list --query modules
 {
   "Result": [
     {
@@ -568,7 +647,7 @@ $ aptos account transfer --account superuser --amount 100
 }
 ```
 
-## Key Examples
+## Key examples
 
 ### Generating a key
 
@@ -584,7 +663,7 @@ $ aptos key generate --key-type ed25519 --output-file output.key
 }
 ```
 
-### Generating a Peer config
+### Generating a peer config
 
 To allow others to connect to your node, you need to generate a peer configuration. Below command shows how you can use
 the `aptos` CLI to generate a peer configuration and write it into a file named `peer_config.yaml`.
@@ -629,7 +708,7 @@ The below example uses the `HelloBlockchain` in [move-examples](https://github.c
 The named addresses can be either an account address, or a profile name.
 
 ```bash
-$ aptos move compile --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses HelloBlockchain=superuser
+$ aptos move compile --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses hello_blockchain=superuser
 ```
 
 The above command will generate the below terminal output:
@@ -641,13 +720,13 @@ The above command will generate the below terminal output:
 }
 ```
 
-### Compiling & Unit Testing Move
+### Compiling and unit testing Move
 
 The `aptos` CLI can also be used to compile and run unit tests locally.
 In this example, we'll use the `HelloBlockchain` in [move-examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples).
 
 ```bash
-$ aptos move test --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses HelloBlockchain=superuser
+$ aptos move test --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses hello_blockchain=superuser
 ```
 The above command will generate the following terminal output:
 ```bash
@@ -663,6 +742,107 @@ Test result: OK. Total tests: 2; passed: 2; failed: 0
   "Result": "Success"
 }
 ```
+### Generating test coverage details for Move
+The `aptos` CLI can be used to analyze and improve the testing of your Move modules. To use this feature:
+1. In your `aptos-core` source checkout, navigate to the `aptos-move/framework/move-stdlib` directory.
+2. Execute the command:
+   ```bash
+   $ aptos move test --coverage
+   ```
+3. Receive results in standard output containing the result for each test case followed by a basic coverage summary resembling:
+   ```bash
+   BUILDING MoveStdlib
+Running Move unit tests
+[ PASS    ] 0x1::vector_tests::append_empties_is_empty
+[ PASS    ] 0x1::option_tests::borrow_mut_none
+[ PASS    ] 0x1::fixed_point32_tests::ceil_can_round_up_correctly
+[ PASS    ] 0x1::features::test_change_feature_txn
+[ PASS    ] 0x1::bcs_tests::bcs_bool
+[ PASS    ] 0x1::bit_vector_tests::empty_bitvector
+[ PASS    ] 0x1::option_tests::borrow_mut_some
+Test result: OK. Total tests: 149; passed: 149; failed: 0
++-------------------------+
+| Move Coverage Summary   |
++-------------------------+
+Module 0000000000000000000000000000000000000000000000000000000000000001::bcs
+>>> % Module coverage: NaN
+Module 0000000000000000000000000000000000000000000000000000000000000001::fixed_point32
+>>> % Module coverage: 100.00
+Module 0000000000000000000000000000000000000000000000000000000000000001::hash
+>>> % Module coverage: NaN
+Module 0000000000000000000000000000000000000000000000000000000000000001::vector
+>>> % Module coverage: 92.19
+Module 0000000000000000000000000000000000000000000000000000000000000001::error
+>>> % Module coverage: 0.00
+Module 0000000000000000000000000000000000000000000000000000000000000001::acl
+>>> % Module coverage: 0.00
+Module 0000000000000000000000000000000000000000000000000000000000000001::bit_vector
+>>> % Module coverage: 97.32
+Module 0000000000000000000000000000000000000000000000000000000000000001::signer
+>>> % Module coverage: 100.00
+Module 0000000000000000000000000000000000000000000000000000000000000001::features
+>>> % Module coverage: 69.41
+Module 0000000000000000000000000000000000000000000000000000000000000001::option
+>>> % Module coverage: 100.00
+Module 0000000000000000000000000000000000000000000000000000000000000001::string
+>>> % Module coverage: 81.82
++-------------------------+
+| % Move Coverage: 83.50  |
++-------------------------+
+Please use `aptos move coverage -h` for more detailed test coverage of this package
+{
+  "Result": "Success"
+}
+   ```
+
+4. Optionally, narrow down your test runs and results to a specific package name with the `--filter` option, like so:
+   ```bash
+   $ aptos move test --coverage --filter vector
+   ```
+
+   With results like:
+   ```
+   BUILDING MoveStdlib
+   Running Move unit tests
+   [ PASS    ] 0x1::bit_vector_tests::empty_bitvector
+   [ PASS    ] 0x1::vector_tests::append_empties_is_empty
+   [ PASS    ] 0x1::bit_vector_tests::index_bit_out_of_bounds
+   [ PASS    ] 0x1::vector_tests::append_respects_order_empty_lhs
+   ```
+5. Run the `aptos move coverage` command to obtain more detailed coverage information.
+6. Optionally, isolate the results to a module by passing its name to the `--module` option, for example:
+   ```bash
+   $ aptos move coverage source --module signer
+   ```
+
+   With results:
+   ```
+   module std::signer {
+       // Borrows the address of the signer
+       // Conceptually, you can think of the `signer` as being a struct wrapper arround an
+       // address
+       // ```
+       // struct signer has drop { addr: address }
+       // ```
+       // `borrow_address` borrows this inner field
+       native public fun borrow_address(s: &signer): &address;
+
+       // Copies the address of the signer
+       public fun address_of(s: &signer): address {
+           *borrow_address(s)
+       }
+
+    /// Return true only if `s` is a transaction signer. This is a spec function only available in spec.
+    spec native fun is_txn_signer(s: signer): bool;
+
+    /// Return true only if `a` is a transaction signer address. This is a spec function only available in spec.
+    spec native fun is_txn_signer_addr(a: address): bool;
+}
+{
+  "Result": "Success"
+}
+   ```
+6. Find failures and iteratively improve your testing and running these commands to eliminate gaps in your testing coverage.
 
 ### Proving Move
 
@@ -678,13 +858,58 @@ SUCCESS proving 1 modules from package `hello_prover` in 1.649s
 }
 ```
 
-### Debug and Print Stacktrace
+Move Prover may fail with the following terminal output if the dependencies are not installed and set up properly:
+```bash
+FAILURE proving 1 modules from package `hello_prover` in 0.067s
+{
+  "Error": "Move Prover failed: No boogie executable set.  Please set BOOGIE_EXE"
+}
+```
+In this case, see [Install the dependencies of Move Prover](install-aptos-cli#step-3-optional-install-the-dependencies-of-move-prover).
 
-In this example, we will use `DebugDemo` in [debug-move-example](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos/debug-move-example)
+### Profiling gas usage
 
-First, you need to include Move nursery in your Move.toml file [toml file](debug-move-example/Move.toml)
+This *experimental* feature lets you [profile gas usage](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/aptos-gas-profiling) in the Aptos virtual machine locally rather than [simulating transactions](../../concepts/gas-txn-fee.md#estimating-the-gas-units-via-simulation) at the [fullnode](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/simulate_transaction). You may also use it to visualize gas usage in the form of a flame graph.
 
-Now, you can use `Debug::print` and `Debug::print_stack_trace` in your [move file](debug-move-example/sources/DebugDemo.move)
+Run the gas profiler by appending the `--profile-gas` option to the Aptos CLI `move publish`, `move run` or `move run-script` command, for example:
+```bash
+aptos move publish --profile-gas
+```
+
+And receive output resembling:
+```bash
+Compiling, may take a little while to download git dependencies...
+BUILDING empty_fun
+package size 427 bytes
+Simulating transaction locally with the gas profiler...
+This is still experimental so results may be inaccurate.
+Execution & IO Gas flamegraph saved to gas-profiling/txn-69e19ee4-0x1-code-publish_package_txn.exec_io.svg
+Storage fee flamegraph saved to gas-profiling/txn-69e19ee4-0x1-code-publish_package_txn.storage.svg
+{
+  "Result": {
+    "transaction_hash": "0x69e19ee4cc89cb1f84ee21a46e6b281bd8696115aa332275eca38c4857818dfe",
+    "gas_used": 1007,
+    "gas_unit_price": 100,
+    "sender": "dbcbe741d003a7369d87ec8717afb5df425977106497052f96f4e236372f7dd5",
+    "success": true,
+    "version": 473269362,
+    "vm_status": "status EXECUTED of type Execution"
+  }
+}
+```
+
+Find the flame graphs in the newly created `gas-profiling/` directory. To interact with a graph, open the file in a web browser.
+
+Note these limitations of the experimental gas profiling feature:
+
+  * It may produce results that are different from the simulation.
+  * The graphs may contain errors, and the numbers may not add up to the total gas cost as shown in the transaction output.
+
+### Debugging and printing stack trace
+
+In this example, we will use `DebugDemo` in [debug-move-example](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos/debug-move-example).
+
+Now, you can use `debug::print` and `debug::print_stack_trace` in your [DebugDemo Move file](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos/debug-move-example/sources/DebugDemo.move).
 
 You can run the following command:
 ```bash
@@ -714,9 +939,17 @@ Operand Stack:
 ```
 
 
-### Publishing a Move Package with a named address
+### Publishing a Move package with a named address
 
 In this example, we'll use the `HelloBlockchain` in [move-examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples).
+
+:::important
+As an open source project, the source code as well as compiled code published to the Aptos blockchain is inherently open by default. This means code you upload may be downloaded from on-chain data. Even without source access, it is possible to regenerate Move source from Move bytecode. To disable source access, publish with the `--included-artifacts none` argument, like so:
+
+```
+aptos move publish --included-artifacts none
+```
+:::
 
 Publish the package with your account address set for `HelloBlockchain`.
 
@@ -730,7 +963,11 @@ You can additionally use named profiles for the addresses.  The first placeholde
 $ aptos move publish --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses HelloBlockchain=default
 ```
 
-### Running a Move Function
+:::tip
+When publishing Move modules, if multiple modules are in one package, then all the modules in this package must have the same account. If they have different accounts, then the publishing will fail at the transaction level.
+:::
+
+### Running a Move function
 
 Now that you've published the function above, you can run it.
 
@@ -738,85 +975,7 @@ Arguments must be given a type with a colon to separate it.  In this example, we
 parsed as a string, so we put `string:Hello!`.
 
 ```bash
-$ aptos move run --function-id 0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb::Message::set_message --args string:hello!
-{
-  "Result": {
-    "changes": [
-      {
-        "address": "b9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
-        "data": {
-          "authentication_key": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
-          "self_address": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
-          "sequence_number": "3"
-        },
-        "event": "write_resource",
-        "resource": "0x1::account::Account"
-      },
-      {
-        "address": "b9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
-        "data": {
-          "coin": {
-            "value": "9777"
-          },
-          "deposit_events": {
-            "counter": "1",
-            "guid": {
-              "id": {
-                "addr": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
-                "creation_num": "1"
-              }
-            }
-          },
-          "withdraw_events": {
-            "counter": "1",
-            "guid": {
-              "id": {
-                "addr": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
-                "creation_num": "2"
-              }
-            }
-          }
-        },
-        "event": "write_resource",
-        "resource": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>"
-      },
-      {
-        "address": "b9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
-        "data": {
-          "counter": "4"
-        },
-        "event": "write_resource",
-        "resource": "0x1::guid::Generator"
-      },
-      {
-        "address": "b9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
-        "data": {
-          "message": "hello!",
-          "message_change_events": {
-            "counter": "0",
-            "guid": {
-              "id": {
-                "addr": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
-                "creation_num": "3"
-              }
-            }
-          }
-        },
-        "event": "write_resource",
-        "resource": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb::Message::MessageHolder"
-      }
-    ],
-    "gas_used": 41,
-    "success": true,
-    "version": 3488,
-    "vm_status": "Executed successfully"
-  }
-} 
-```
-
-Additionally, profiles can replace addresses in the function id.
-```bash
-$ aptos move run --function-id default::Message::set_message --args string:hello!
+$ aptos move run --function-id 0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb::message::set_message --args string:hello!
 {
   "Result": {
     "changes": [
@@ -892,7 +1051,85 @@ $ aptos move run --function-id default::Message::set_message --args string:hello
 }
 ```
 
-## Node Command Examples
+Additionally, profiles can replace addresses in the function id.
+```bash
+$ aptos move run --function-id default::message::set_message --args string:hello!
+{
+  "Result": {
+    "changes": [
+      {
+        "address": "b9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+        "data": {
+          "authentication_key": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+          "self_address": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+          "sequence_number": "3"
+        },
+        "event": "write_resource",
+        "resource": "0x1::account::Account"
+      },
+      {
+        "address": "b9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+        "data": {
+          "coin": {
+            "value": "9777"
+          },
+          "deposit_events": {
+            "counter": "1",
+            "guid": {
+              "id": {
+                "addr": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+                "creation_num": "1"
+              }
+            }
+          },
+          "withdraw_events": {
+            "counter": "1",
+            "guid": {
+              "id": {
+                "addr": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+                "creation_num": "2"
+              }
+            }
+          }
+        },
+        "event": "write_resource",
+        "resource": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>"
+      },
+      {
+        "address": "b9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+        "data": {
+          "counter": "4"
+        },
+        "event": "write_resource",
+        "resource": "0x1::guid::Generator"
+      },
+      {
+        "address": "b9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+        "data": {
+          "message": "hello!",
+          "message_change_events": {
+            "counter": "0",
+            "guid": {
+              "id": {
+                "addr": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+                "creation_num": "3"
+              }
+            }
+          }
+        },
+        "event": "write_resource",
+        "resource": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb::Message::MessageHolder"
+      }
+    ],
+    "gas_used": 41,
+    "success": true,
+    "version": 3488,
+    "vm_status": "Executed successfully"
+  }
+}
+```
+
+## Node command examples
 
 ### Running a local testnet
 
@@ -908,7 +1145,7 @@ Completed generating configuration:
         Waypoint: 0:d302c6b10e0fa68bfec9cdb383f24ef1189d8850d50b832365eea21ae52d8101
         ChainId: TESTING
         REST API endpoint: 0.0.0.0:8080
-        FullNode network: /ip4/0.0.0.0/tcp/6181
+        Fullnode network: /ip4/0.0.0.0/tcp/6181
 
 Aptos is running, press ctrl-c to exit
 ```
@@ -927,12 +1164,12 @@ Completed generating configuration:
         Waypoint: 0:649efc34c813d0db8db6fa5b1ffc9cc62f726bb5168e7f4b8730bb155d6213ea
         ChainId: TESTING
         REST API endpoint: 0.0.0.0:8080
-        FullNode network: /ip4/0.0.0.0/tcp/6181
+        Fullnode network: /ip4/0.0.0.0/tcp/6181
 
 Aptos is running, press ctrl-c to exit
 ```
 
-## Genesis Ceremonies
+## Genesis ceremonies
 
 The `aptos` tool supports bootstrapping new blockchains through what is known as a genesis ceremony. The output of the genesis ceremony is the output of move instructions that prepares a blockchain for online operation. The input consists of:
 
@@ -941,7 +1178,7 @@ The `aptos` tool supports bootstrapping new blockchains through what is known as
 * A unique `ChainId` (u8) that distinguishes this from other deployments
 * For test chains, there also exists an account that manages the minting of AptosCoin
 
-## Generating Genesis
+## Generating genesis
 
 * The genesis organizer constructs a `Layout` and distributes it.
 * The genesis organizer prepares the Aptos framework's bytecode and distributes it.
@@ -951,7 +1188,7 @@ The `aptos` tool supports bootstrapping new blockchains through what is known as
 * Each participant begins their `aptos-node`. The `aptos-node` verifies upon startup that the `genesis.blob` with the waypoint provided by the genesis organizer .
 * The blockchain will begin consensus after a quorum of stake is available.
 
-### Prepare Aptos-core
+### Prepare aptos-core
 
 The following guide assumes that you have access to the Aptos-core repository or the associated tools. You can download and prepare Aptos-core from [GitHub](https://github.com/aptos-labs/aptos-core):
 
@@ -963,7 +1200,7 @@ git checkout --track origin/testnet
 source ~/.cargo/env
 ```
 
-### The `Layout` File
+### The `layout` file
 
 The layout file contains:
 * `root_key`: an Ed25519 public key for AptosCoin management.
@@ -981,7 +1218,6 @@ chain_id: 8
 
 ### Building the Aptos Framework
 
-
 From your Aptos-core repository, build the framework and package it:
 ```
 cargo run --package framework
@@ -991,11 +1227,11 @@ cp aptos-framework/releases/artifacts/current/build/**/bytecode_modules/* aptos-
 
 The framework will be stored within the `aptos-framework-release` directory.
 
-### The `ValidatorConfiguration` File
+### The `ValidatorConfiguration` file
 
 The `ValidatorConfiguration` file contains:
 
-* `account_address`: The account that manages this validator. This must be derived from the `account_key` provided within te `ValidatorConfiguration` file.
+* `account_address`: The account that manages this validator. This must be derived from the `account_key` provided within the `ValidatorConfiguration` file.
 * `consensus_key`: The public key for authenticating consensus messages from the validator
 * `account_key`: The public key for the account that manages this validator. This is used to derive the `account_address`.
 * `network_key`: The public key for both validator and fullnode network authentication and encryption.
@@ -1040,14 +1276,14 @@ cargo run --package aptos -- \\
 
 3. The last command will produce a `bob.yaml` file that should be distributed to other participants for `genesis.blob` generation.
 
-### Generating a Genesis and Waypoint
+### Generating a genesis and waypoint
 
-`genesis.blob` and the waypoint can be generated after obtaining the `Layout` file, each of the individual `ValidatorConfiguration` files, and the framework release. It is important to validate that the `ValidatorConfiguration` provided in the earlier stage is the same as in the distribution for generating the `genesis.blob`. If there is a mismatch, inform all participants.
+`genesis.blob` and the waypoint can be generated after obtaining the `layout` file, each of the individual `ValidatorConfiguration` files, and the framework release. It is important to validate that the `ValidatorConfiguration` provided in the earlier stage is the same as in the distribution for generating the `genesis.blob`. If there is a mismatch, inform all participants.
 
 To generate the `genesis.blob` and waypoint:
-* Place the `Layout` file in a directory, e.g., `genesis`.
+* Place the `layout` file in a directory, e.g., `genesis`.
 * Place all the `ValidatorConfiguration` files into the `genesis` directory.
-* Ensure that the `ValidatorConfiguration` files are listed under the set of `users` within the `Layout` file.
+* Ensure that the `ValidatorConfiguration` files are listed under the set of `users` within the `layout` file.
 * Make a `framework` directory within the `genesiss` directory and place the framework release `.mv` files into the `framework` directory.
 * Use the `aptos` CLI to generate genesis and waypoint:
 

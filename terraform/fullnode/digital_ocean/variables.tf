@@ -11,7 +11,7 @@ variable "fullnode_helm_values" {
 }
 
 variable "do_token" {
-  type = string
+  type        = string
   description = "Digital Notion API token"
 }
 
@@ -56,7 +56,12 @@ variable "chain_id" {
   default     = "DEVNET"
 }
 
+variable "chain_name" {
+  description = "Aptos chain name"
+  default     = "devnet"
+}
+
 variable "machine_type" {
   description = "Machine type for running fullnode"
-  default     = "s-4vcpu-8gb"
+  default     = "s-16vcpu-32gb"
 }

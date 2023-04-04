@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! The purpose of this file is to define wrappers that we can use in the
@@ -10,21 +10,27 @@
 //! just strings, using the FromStr impl to parse the path param. They can
 //! then be unpacked to the real type beneath.
 
-use crate::MoveStructTag;
-
-use aptos_openapi::{impl_poem_parameter, impl_poem_type};
-use move_deps::move_core_types::identifier::{IdentStr, Identifier};
-
+use crate::{Address, VerifyInput, U64};
+use anyhow::{bail, Context};
+use aptos_types::{event::EventKey, state_store::state_key::StateKey};
+use move_core_types::identifier::{IdentStr, Identifier};
+use poem_openapi::Object;
 use serde::{Deserialize, Serialize};
-use std::{
-    convert::{From, Into},
-    fmt,
-    ops::Deref,
-    str::FromStr,
-};
+use std::{convert::From, fmt, ops::Deref, str::FromStr};
 
+/// A wrapper of a Move identifier
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct IdentifierWrapper(pub Identifier);
+
+impl VerifyInput for IdentifierWrapper {
+    fn verify(&self) -> anyhow::Result<()> {
+        if Identifier::is_valid(self.as_str()) {
+            Ok(())
+        } else {
+            bail!("Identifier is invalid {}", self)
+        }
+    }
+}
 
 impl FromStr for IdentifierWrapper {
     type Err = anyhow::Error;
@@ -43,6 +49,12 @@ impl From<IdentifierWrapper> for Identifier {
 impl From<Identifier> for IdentifierWrapper {
     fn from(value: Identifier) -> IdentifierWrapper {
         Self(value)
+    }
+}
+
+impl From<&Identifier> for IdentifierWrapper {
+    fn from(value: &Identifier) -> IdentifierWrapper {
+        Self(value.clone())
     }
 }
 
@@ -72,37 +84,70 @@ impl fmt::Display for IdentifierWrapper {
     }
 }
 
-impl_poem_type!(IdentifierWrapper);
-impl_poem_parameter!(IdentifierWrapper);
+// Unlike IdentifierWrapper, we don't use this struct as a path / query param.
+// Instead, we define this wrapper struct for two reasons:
+// 1. To avoid implementing Poem derives on types outside of the API crate.
+// 2. To express the EventKey as types that already work in the API, such as
+//    Address and U64 instead of AccountAddress and u64.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Object, PartialEq, Serialize)]
+pub struct EventGuid {
+    pub creation_number: U64,
+    pub account_address: Address,
+}
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct MoveStructTagWrapper(pub MoveStructTag);
+impl From<EventKey> for EventGuid {
+    fn from(event_key: EventKey) -> Self {
+        Self {
+            creation_number: U64(event_key.get_creation_number()),
+            account_address: Address::from(event_key.get_creator_address()),
+        }
+    }
+}
 
-impl FromStr for MoveStructTagWrapper {
+impl From<EventGuid> for EventKey {
+    fn from(event_key_wrapper: EventGuid) -> EventKey {
+        EventKey::new(
+            event_key_wrapper.creation_number.0,
+            event_key_wrapper.account_address.into(),
+        )
+    }
+}
+
+/// This wraps the StateKey, serializing it as hex encoded bytes.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StateKeyWrapper(pub StateKey);
+
+impl fmt::Display for StateKeyWrapper {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let hex_string = hex::encode(
+            self.0
+                .encode()
+                .context("Failed to encode StateKey")
+                .map_err(|_| fmt::Error)?,
+        );
+        write!(f, "{}", hex_string)
+    }
+}
+
+impl FromStr for StateKeyWrapper {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> anyhow::Result<Self, anyhow::Error> {
-        Ok(MoveStructTagWrapper(MoveStructTag::from_str(s)?))
+        let state_key_prefix: StateKey =
+            StateKey::decode(&hex::decode(s).context("Failed to decode StateKey as hex string")?)
+                .context("Failed to decode StateKey from hex string")?;
+        Ok(StateKeyWrapper(state_key_prefix))
     }
 }
 
-impl From<MoveStructTagWrapper> for MoveStructTag {
-    fn from(value: MoveStructTagWrapper) -> MoveStructTag {
-        value.0
-    }
-}
-
-impl From<MoveStructTag> for MoveStructTagWrapper {
-    fn from(value: MoveStructTag) -> MoveStructTagWrapper {
+impl From<StateKey> for StateKeyWrapper {
+    fn from(value: StateKey) -> StateKeyWrapper {
         Self(value)
     }
 }
 
-impl fmt::Display for MoveStructTagWrapper {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        MoveStructTag::fmt(&self.0, f)
+impl From<StateKeyWrapper> for StateKey {
+    fn from(value: StateKeyWrapper) -> StateKey {
+        value.0
     }
 }
-
-impl_poem_type!(MoveStructTagWrapper);
-impl_poem_parameter!(MoveStructTagWrapper);

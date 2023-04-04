@@ -1,0 +1,31 @@
+# -- Default image tag to use for all aptos images
+imageTag: devnet
+
+node_health_checker:
+  image:
+    # -- Image repo to use for node-checker image for running load tests
+    repo: aptoslabs/node-checker
+    # -- Image tag to use for node-checker image
+    tag:
+    # -- Image pull policy to use for node-checker image
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 1
+      memory: 512Mi
+    requests:
+      cpu: 1
+      memory: 512Mi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  # -- The baseline node URL for the health checker. Defaults to the validator in your deployment
+  baseline_node_url: http://aptos-node-0-validator:8080
+  # -- The mint key for the validator used by node health checker
+  mint_key:
+
+serviceAccount:
+  # -- Specifies whether a service account should be created
+  create: true
+  # -- The name of the service account to use. If not set and create is true, a name is generated using the fullname template
+  name:

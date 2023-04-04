@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 // This is necessary for the derive macros which rely on being used in a
@@ -10,7 +10,6 @@ use crate::{
     test_utils::{random_serializable_struct, uniform_keypair_strategy},
     traits::*,
 };
-
 use aptos_crypto_derive::{
     PrivateKey, PublicKey, Signature, SigningKey, SilentDebug, ValidCryptoMaterial, VerifyingKey,
 };
@@ -81,7 +80,7 @@ proptest! {
         // let mut l: Vec<Box<dyn PrivateKey>> = vec![];
         let mut l: Vec<Ed25519PrivateKey> = vec![ed_keypair1.private_key];
         let ed_key = l.pop().unwrap();
-        let signature = ed_key.sign(&message);
+        let signature = ed_key.sign(&message).unwrap();
 
         // This is business as usual
         prop_assert!(signature.verify(&message, &ed_keypair1.public_key).is_ok());
@@ -93,7 +92,7 @@ proptest! {
         ];
 
         let ed_key = l2.pop().unwrap();
-        let ed_signature = ed_key.sign(&message);
+        let ed_signature = ed_key.sign(&message).unwrap();
 
         // This is still business as usual
         let ed_pubkey2 = PublicK::Ed(ed_keypair2.public_key);
@@ -108,7 +107,7 @@ proptest! {
         // And now just in case we're confused again, we pop in the
         // reverse direction
         let med_key = l2.pop().unwrap();
-        let med_signature = med_key.sign(&message);
+        let med_signature = med_key.sign(&message).unwrap();
 
         // This is still business as usual
         let good_sigver = med_signature.verify(&message, &med_pubkey);

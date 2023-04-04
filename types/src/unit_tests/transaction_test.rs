@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -32,8 +33,7 @@ fn test_invalid_signature() {
         Ed25519PrivateKey::generate_for_testing().public_key(),
         Ed25519Signature::try_from(&[1u8; 64][..]).unwrap(),
     );
-    txn.check_signature()
-        .expect_err("signature checking should fail");
+    assert!(!txn.signature_is_valid(), "Signature checking should fail")
 }
 
 proptest! {

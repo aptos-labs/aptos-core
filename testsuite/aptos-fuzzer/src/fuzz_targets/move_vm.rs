@@ -1,14 +1,13 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::FuzzTargetImpl;
 use anyhow::{bail, Result};
 use aptos_proptest_helpers::ValueGenerator;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use move_deps::{
-    move_core_types::value::{MoveStructLayout, MoveTypeLayout},
-    move_vm_types::values::{prop::layout_and_value_strategy, Value},
-};
+use move_core_types::value::{MoveStructLayout, MoveTypeLayout};
+use move_vm_types::values::{prop::layout_and_value_strategy, Value};
 use std::io::Cursor;
 
 #[derive(Clone, Debug, Default)]
@@ -45,7 +44,9 @@ fn is_valid_layout(layout: &MoveTypeLayout) -> bool {
     use MoveTypeLayout as L;
 
     match layout {
-        L::Bool | L::U8 | L::U64 | L::U128 | L::Address | L::Signer => true,
+        L::Bool | L::U8 | L::U16 | L::U32 | L::U64 | L::U128 | L::U256 | L::Address | L::Signer => {
+            true
+        },
 
         L::Vector(layout) => is_valid_layout(layout),
 
@@ -56,7 +57,7 @@ fn is_valid_layout(layout: &MoveTypeLayout) -> bool {
                 return false;
             }
             struct_layout.fields().iter().all(is_valid_layout)
-        }
+        },
     }
 }
 

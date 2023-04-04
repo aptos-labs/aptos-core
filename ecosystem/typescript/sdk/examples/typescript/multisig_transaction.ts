@@ -1,11 +1,14 @@
 /* eslint-disable no-console */
-import { AptosClient, AptosAccount, FaucetClient, BCS, TxnBuilderTypes, TransactionBuilderMultiEd25519 } from "aptos";
+
+import dotenv from "dotenv";
+dotenv.config();
+
+import { AptosClient, AptosAccount, FaucetClient, BCS, TransactionBuilderMultiEd25519, TxnBuilderTypes } from "aptos";
+import { aptosCoinStore } from "./common";
 import assert from "assert";
 
 const NODE_URL = process.env.APTOS_NODE_URL || "https://fullnode.devnet.aptoslabs.com";
 const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptoslabs.com";
-
-type SigningMessage = TxnBuilderTypes.SigningMessage;
 
 /**
  * This code example demonstrates the process of moving test coins from one multisig
@@ -34,34 +37,34 @@ type SigningMessage = TxnBuilderTypes.SigningMessage;
   );
 
   // Each Aptos account stores an auth key. Initial account address can be derived from auth key.
-  // See https://aptos.dev/basics/basics-accounts for more details.
+  // See https://aptos.dev/concepts/accounts for more details.
   const authKey = TxnBuilderTypes.AuthenticationKey.fromMultiEd25519PublicKey(multiSigPublicKey);
 
   // Derive the multisig account address and fund the address with 5000 AptosCoin.
   const mutisigAccountAddress = authKey.derivedAddress();
-  await faucetClient.fundAccount(mutisigAccountAddress, 5000);
+  await faucetClient.fundAccount(mutisigAccountAddress, 100_000_000);
 
   let resources = await client.getAccountResources(mutisigAccountAddress);
-  let accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>");
+  let accountResource = resources.find((r) => r.type === aptosCoinStore);
   let balance = parseInt((accountResource?.data as any).coin.value);
-  assert(balance === 5000);
-  console.log(`multisig account coins: ${balance}. Should be 5000!`);
+  assert(balance === 100_000_000);
+  console.log(`multisig account coins: ${balance}. Should be 100000000!`);
 
   const account4 = new AptosAccount();
   // Creates a receiver account and fund the account with 0 AptosCoin
   await faucetClient.fundAccount(account4.address(), 0);
   resources = await client.getAccountResources(account4.address());
-  accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>");
+  accountResource = resources.find((r) => r.type === aptosCoinStore);
   balance = parseInt((accountResource?.data as any).coin.value);
   assert(balance === 0);
-  console.log(`multisig account coins: ${balance}. Should be 0!`);
+  console.log(`account4 coins: ${balance}. Should be 0!`);
 
   const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
 
-  // TS SDK support 3 types of transaction payloads: `ScriptFunction`, `Script` and `Module`.
+  // TS SDK support 3 types of transaction payloads: `EntryFunction`, `Script` and `Module`.
   // See https://aptos-labs.github.io/ts-sdk-doc/ for the details.
-  const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-    TxnBuilderTypes.ScriptFunction.natural(
+  const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+    TxnBuilderTypes.EntryFunction.natural(
       // Fully qualified module name, `AccountAddress::ModuleName`
       "0x1::coin",
       // Module function
@@ -73,7 +76,7 @@ type SigningMessage = TxnBuilderTypes.SigningMessage;
     ),
   );
 
-  const [{ sequence_number: sequnceNumber }, chainId] = await Promise.all([
+  const [{ sequence_number: sequenceNumber }, chainId] = await Promise.all([
     client.getAccount(mutisigAccountAddress),
     client.getChainId(),
   ]);
@@ -83,19 +86,19 @@ type SigningMessage = TxnBuilderTypes.SigningMessage;
   const rawTxn = new TxnBuilderTypes.RawTransaction(
     // Transaction sender account address
     TxnBuilderTypes.AccountAddress.fromHex(mutisigAccountAddress),
-    BigInt(sequnceNumber),
-    scriptFunctionPayload,
+    BigInt(sequenceNumber),
+    entryFunctionPayload,
     // Max gas unit to spend
-    1000n,
+    BigInt(10000),
     // Gas price per unit
-    1n,
+    BigInt(100),
     // Expiration timestamp. Transaction is discarded if it is not executed within 10 seconds from now.
     BigInt(Math.floor(Date.now() / 1000) + 10),
     new TxnBuilderTypes.ChainId(chainId),
   );
 
   // account1 and account3 sign the transaction
-  const txnBuilder = new TransactionBuilderMultiEd25519((signingMessage: SigningMessage) => {
+  const txnBuilder = new TransactionBuilderMultiEd25519((signingMessage: TxnBuilderTypes.SigningMessage) => {
     const sigHexStr1 = account1.signBuffer(signingMessage);
     const sigHexStr3 = account3.signBuffer(signingMessage);
 
@@ -120,9 +123,14 @@ type SigningMessage = TxnBuilderTypes.SigningMessage;
 
   await client.waitForTransaction(transactionRes.hash);
 
+  resources = await client.getAccountResources(mutisigAccountAddress);
+  accountResource = resources.find((r) => r.type === aptosCoinStore);
+  balance = parseInt((accountResource?.data as any).coin.value);
+  console.log(`multisig account coins: ${balance}.`);
+
   resources = await client.getAccountResources(account4.address());
-  accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>");
+  accountResource = resources.find((r) => r.type === aptosCoinStore);
   balance = parseInt((accountResource?.data as any).coin.value);
   assert(balance === 123);
-  console.log(`multisig account coins: ${balance}. Should be 123!`);
+  console.log(`account4 coins: ${balance}. Should be 123!`);
 })();

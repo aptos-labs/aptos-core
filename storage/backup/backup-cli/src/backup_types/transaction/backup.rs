@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -10,20 +11,20 @@ use crate::{
         should_cut_chunk, storage_ext::BackupStorageExt, GlobalBackupOpt,
     },
 };
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, ensure, Result};
 use aptos_logger::prelude::*;
 use aptos_types::transaction::Version;
+use clap::Parser;
 use once_cell::sync::Lazy;
 use std::{convert::TryInto, str::FromStr, sync::Arc};
-use structopt::StructOpt;
 use tokio::io::AsyncWriteExt;
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 pub struct TransactionBackupOpt {
-    #[structopt(long = "start-version", help = "First transaction to backup.")]
+    #[clap(long = "start-version", help = "First transaction to backup.")]
     pub start_version: u64,
 
-    #[structopt(long = "num_transactions", help = "Number of transactions to backup")]
+    #[clap(long = "num_transactions", help = "Number of transactions to backup")]
     pub num_transactions: usize,
 }
 
@@ -97,15 +98,18 @@ impl TransactionBackupController {
                 chunk_first_ver = current_ver;
             }
 
-            chunk_bytes.extend(&(record_bytes.len() as u32).to_be_bytes());
+            chunk_bytes.extend((record_bytes.len() as u32).to_be_bytes());
             chunk_bytes.extend(&record_bytes);
             current_ver += 1;
         }
 
         assert!(!chunk_bytes.is_empty());
-        assert_eq!(
+        let expected_next_version = self.start_version + self.num_transactions as u64;
+        ensure!(
+            current_ver == expected_next_version,
+            "Server did not return all transactions requested. Expecting last version {}, got {}",
+            expected_next_version,
             current_ver,
-            self.start_version + self.num_transactions as u64
         );
         let chunk = self
             .write_chunk(

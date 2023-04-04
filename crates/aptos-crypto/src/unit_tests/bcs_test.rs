@@ -1,8 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-
-use rand::{rngs::StdRng, SeedableRng};
-use std::convert::TryFrom;
 
 use crate::{
     ed25519::{
@@ -13,6 +10,8 @@ use crate::{
     test_utils::{TestAptosCrypto, TEST_SEED},
     Signature, SigningKey, Uniform,
 };
+use rand::{rngs::StdRng, SeedableRng};
+use std::convert::TryFrom;
 
 #[test]
 fn ed25519_bcs_material() {
@@ -32,7 +31,7 @@ fn ed25519_bcs_material() {
     assert_eq!(deserialized_public_key, public_key);
 
     let message = TestAptosCrypto("Hello, World".to_string());
-    let signature: Ed25519Signature = private_key.sign(&message);
+    let signature: Ed25519Signature = private_key.sign(&message).unwrap();
 
     let serialized_signature = bcs::to_bytes(&Cow::Borrowed(&signature)).unwrap();
     // Expected size should be 1 byte due to BCS length prefix + 64 bytes for the raw signature bytes
@@ -84,7 +83,8 @@ fn multi_ed25519_bcs_material() {
     let message = TestAptosCrypto("Hello, World".to_string());
 
     // Verifying a 7-of-10 signature against a public key with the same threshold should pass.
-    let multi_signature_7of10: MultiEd25519Signature = multi_private_key_7of10.sign(&message);
+    let multi_signature_7of10: MultiEd25519Signature =
+        multi_private_key_7of10.sign(&message).unwrap();
 
     let serialized_multi_signature = bcs::to_bytes(&Cow::Borrowed(&multi_signature_7of10)).unwrap();
     // Expected size due to specialization is
@@ -98,10 +98,12 @@ fn multi_ed25519_bcs_material() {
     );
 
     // Verify bitmap
-    assert_eq!(
-        multi_signature_7of10.bitmap(),
-        &[0b1111_1110, 0u8, 0u8, 0u8]
-    );
+    assert_eq!(multi_signature_7of10.bitmap(), &[
+        0b1111_1110,
+        0u8,
+        0u8,
+        0u8
+    ]);
 
     // Verify signature
     assert!(multi_signature_7of10

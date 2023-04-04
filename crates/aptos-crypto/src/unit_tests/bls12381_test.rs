@@ -1,18 +1,16 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     bls12381,
-    bls12381::{
-        bls12381_keys::{PrivateKey, PublicKey},
-        ProofOfPossession,
-    },
+    bls12381::{PrivateKey, ProofOfPossession, PublicKey},
     test_utils::{random_subset, KeyPair, TestAptosCrypto},
+    validatable::{Validatable, Validate},
     Signature, SigningKey, Uniform,
 };
 use rand::{distributions::Alphanumeric, Rng};
 use rand_core::OsRng;
-use std::iter::zip;
+use std::{convert::TryFrom, iter::zip};
 
 /// Tests that an individual signature share computed correctly on a message m passes verification on m.
 /// Tests that a signature share computed on a different message m' fails verification on m.
@@ -129,7 +127,7 @@ fn bls12381_multisig_should_verify() {
 
     let good_step = 2;
     for keys in key_pairs.iter().step_by(good_step) {
-        let signature = keys.private_key.sign(&message);
+        let signature = keys.private_key.sign(&message).unwrap();
         signatures.push(signature);
         pubkeys.push(&keys.public_key);
     }
@@ -142,6 +140,21 @@ fn bls12381_multisig_should_verify() {
 
     // multisig should not verify on an incorrect message under the correct aggregate PK
     assert!(multisig.verify(&message_wrong, &aggpk).is_err());
+}
+
+/// Tests signature (de)serialization
+#[test]
+fn bls12381_serialize_sig() {
+    let mut rng = OsRng;
+    let message = b"Hello world";
+    let key_pair = KeyPair::<PrivateKey, PublicKey>::generate(&mut rng);
+    let signature = key_pair.private_key.sign_arbitrary_message(message);
+
+    let sig_bytes = signature.to_bytes();
+
+    let signature_deserialized = bls12381::Signature::try_from(&sig_bytes[..]).unwrap();
+
+    assert_eq!(signature, signature_deserialized);
 }
 
 /// Tests that an aggregate signature on `n` different messages verifies correctly.
@@ -162,7 +175,7 @@ fn bls12381_aggsig_should_verify() {
         let msg = &messages[i];
         let key = &key_pairs[i];
 
-        signatures.push(key.private_key.sign(msg));
+        signatures.push(key.private_key.sign(msg).unwrap());
         pubkeys.push(&key.public_key);
     }
 
@@ -175,6 +188,37 @@ fn bls12381_aggsig_should_verify() {
     // aggsig should NOT verify on incorrect messages under the correct PKs
     let msgs_wrong_refs = messages_wrong.iter().collect::<Vec<&TestAptosCrypto>>();
     assert!(aggsig.verify_aggregate(&msgs_wrong_refs, &pubkeys).is_err());
+}
+
+/// Tests that an aggregate signature on 0 messages or PKs does NOT verify.
+#[test]
+fn bls12381_aggsig_zero_messages_or_pks_does_not_verify() {
+    let mut rng = OsRng;
+
+    let message = random_message_for_signing(&mut rng);
+
+    let key_pair = KeyPair::<PrivateKey, PublicKey>::generate(&mut rng);
+
+    let aggsig =
+        bls12381::Signature::aggregate(vec![key_pair.private_key.sign(&message).unwrap()]).unwrap();
+
+    // aggsig should NOT verify on zero messages and zero PKs
+    let pubkeys: Vec<&PublicKey> = vec![];
+    let messages = vec![];
+    let msgs_refs = messages.iter().collect::<Vec<&TestAptosCrypto>>();
+    assert!(aggsig.verify_aggregate(&msgs_refs, &pubkeys).is_err());
+
+    // aggsig should NOT verify on zero PKs
+    let pubkeys: Vec<&PublicKey> = vec![];
+    let messages = vec![message];
+    let msgs_refs = messages.iter().collect::<Vec<&TestAptosCrypto>>();
+    assert!(aggsig.verify_aggregate(&msgs_refs, &pubkeys).is_err());
+
+    // aggsig should NOT verify on zero messages
+    let pubkeys: Vec<&PublicKey> = vec![&key_pair.public_key];
+    let messages = vec![];
+    let msgs_refs = messages.iter().collect::<Vec<&TestAptosCrypto>>();
+    assert!(aggsig.verify_aggregate(&msgs_refs, &pubkeys).is_err());
 }
 
 /// Tests that a multisignature incorrectly aggregated from signature shares on different messages does
@@ -195,9 +239,9 @@ fn bls12381_multisig_wrong_messages_aggregated() {
 
     for (i, key_pair) in key_pairs.iter().enumerate() {
         let signature = if i % 2 == 0 {
-            key_pair.private_key.sign(&message)
+            key_pair.private_key.sign(&message).unwrap()
         } else {
-            key_pair.private_key.sign(&message_wrong)
+            key_pair.private_key.sign(&message_wrong).unwrap()
         };
         signatures.push(signature);
         pubkeys.push(&key_pair.public_key);
@@ -249,8 +293,8 @@ fn bls12381_multisig_wrong_pks_aggregated() {
     let mut pubkeys2 = vec![];
 
     for (i1, i2) in zip(signers1, signers2) {
-        signatures1.push(key_pairs[i1].private_key.sign(&message1));
-        signatures2.push(key_pairs[i2].private_key.sign(&message2));
+        signatures1.push(key_pairs[i1].private_key.sign(&message1).unwrap());
+        signatures2.push(key_pairs[i2].private_key.sign(&message2).unwrap());
 
         pubkeys1.push(&key_pairs[i1].public_key);
         pubkeys2.push(&key_pairs[i2].public_key);
@@ -285,11 +329,288 @@ fn bls12381_random_multisig_dont_verify_with_random_pk() {
     let keypair = KeyPair::<PrivateKey, PublicKey>::generate(&mut rng);
     let keypair_junk = KeyPair::<PrivateKey, PublicKey>::generate(&mut rng);
 
-    let signature = keypair.private_key.sign(&message);
+    let signature = keypair.private_key.sign(&message).unwrap();
 
     assert!(signature.verify(&message, &keypair.public_key).is_ok());
 
     assert!(signature
         .verify(&message, &keypair_junk.public_key)
         .is_err());
+}
+
+#[test]
+fn bls12381_validatable_pk() {
+    let mut rng = OsRng;
+
+    // Test that prime-order points pass the validate() call
+    let keypair = KeyPair::<PrivateKey, PublicKey>::generate(&mut rng);
+    let pk_bytes = keypair.public_key.to_bytes();
+
+    let validatable = Validatable::from_validated(keypair.public_key);
+
+    assert!(validatable.validate().is_ok());
+    assert_eq!(validatable.validate().unwrap().to_bytes(), pk_bytes);
+
+    // Test that low-order points don't pass the validate() call
+    //
+    // Low-order points were sampled from bls12_381 crate (https://github.com/zkcrypto/bls12_381/blob/main/src/g1.rs)
+    // - The first point was convereted from projective to affine coordinates and serialized via `point.to_affine().to_compressed()`.
+    // - The second point was in affine coordinates and serialized via `a.to_compressed()`.
+    let low_order_points = [
+        "ae3cd9403b69c20a0d455fd860e977fe6ee7140a7f091f26c860f2caccd3e0a7a7365798ac10df776675b3a67db8faa0",
+        "928d4862a40439a67fd76a9c7560e2ff159e770dcf688ff7b2dd165792541c88ee76c82eb77dd6e9e72c89cbf1a56a68",
+    ];
+
+    for p in low_order_points {
+        let point = hex::decode(p).unwrap();
+        assert_eq!(point.len(), PublicKey::LENGTH);
+
+        let pk = PublicKey::try_from(point.as_slice()).unwrap();
+
+        // First, make sure group_check() identifies this point as a low-order point
+        assert!(pk.subgroup_check().is_err());
+
+        // Second, make sure our Validatable<PublicKey> implementation agrees with group_check
+        let validatable = Validatable::<PublicKey>::from_unvalidated(pk.to_unvalidated());
+        assert!(validatable.validate().is_err());
+    }
+}
+
+#[test]
+#[ignore]
+/// Not an actual test: only used to generate test cases for testing the BLS Move module in
+/// aptos-move/framework/move-stdlib/sources/signer.move
+fn bls12381_sample_pop() {
+    let mut rng = OsRng;
+
+    let num = 5;
+
+    let mut kps = vec![];
+
+    for _i in 1..=num {
+        kps.push(KeyPair::<PrivateKey, PublicKey>::generate(&mut rng));
+    }
+
+    println!("let pks = vector[");
+    for kp in &kps {
+        println!("    x\"{}\",", kp.public_key);
+    }
+    println!("];\n");
+
+    println!("let pops = vector[");
+    for kp in &kps {
+        println!("    x\"{}\",", ProofOfPossession::create(&kp.private_key));
+    }
+    println!("];\n");
+}
+
+#[test]
+#[ignore]
+/// Not an actual test: only used to generate test cases for testing the BLS Move module in
+/// aptos-move/framework/move-stdlib/sources/signer.move
+/// For simplicity, we use `sign_arbitrary_message` to generate a signature directly on a
+/// message `m` rather than on its hash derived using the `CryptoHasher` trait. This makes it easier
+/// to verify the signature in our Move code, which uses `verify_arbitrary_message`.
+fn bls12381_sample_signature() {
+    let mut rng = OsRng;
+
+    let keypair = KeyPair::<PrivateKey, PublicKey>::generate(&mut rng);
+    let sk = keypair.private_key;
+    let pk = keypair.public_key;
+
+    let message = b"Hello Aptos!";
+    let signature = sk.sign_arbitrary_message(message);
+
+    println!("SK:        {}", hex::encode(sk.to_bytes()));
+    println!("PK:        {}", hex::encode(pk.to_bytes()));
+    println!("Message:   {}", std::str::from_utf8(message).unwrap());
+    println!("Signature: {}", hex::encode(signature.to_bytes()));
+}
+
+#[test]
+/// Tests deserialization and verification of a signature generated for the Move submodule via
+/// `bls12381_sample_signature` above.
+fn bls12381_sample_signature_verifies() {
+    let pk = PublicKey::try_from(
+        hex::decode(
+            "94209a296b739577cb076d3bfb1ca8ee936f29b69b7dae436118c4dd1cc26fd43dcd16249476a006b8b949bf022a7858"
+        ).unwrap().as_slice()
+    ).unwrap();
+
+    let sig = bls12381::Signature::try_from(
+        hex::decode(
+            "b01ce4632e94d8c611736e96aa2ad8e0528a02f927a81a92db8047b002a8c71dc2d6bfb94729d0973790c10b6ece446817e4b7543afd7ca9a17c75de301ae835d66231c26a003f11ae26802b98d90869a9e73788c38739f7ac9d52659e1f7cf7"
+        ).unwrap().as_slice()
+    ).unwrap();
+
+    assert!(sig.verify_arbitrary_msg(b"Hello Aptos!", &pk).is_ok());
+}
+
+#[test]
+#[ignore]
+fn bls12381_sample_doc_test_for_normal_sigs() {
+    let mut rng = OsRng;
+
+    // A signer locally generated their own BLS key-pair via:
+    let kp = KeyPair::<PrivateKey, PublicKey>::generate(&mut rng);
+
+    // The signer computes a normal signature on a message.
+    let message = TestAptosCrypto("test".to_owned());
+    let sig = kp.private_key.sign(&message).unwrap();
+
+    // Any verifier who has the signer's public key can verify the `(message, sig)` pair as:
+    assert!(sig.verify(&message, &kp.public_key).is_ok());
+
+    println!(
+        "let sk_bytes = hex::decode(\"{}\").unwrap();",
+        hex::encode(kp.private_key.to_bytes())
+    );
+    println!(
+        "let pk_bytes = hex::decode(\"{}\").unwrap();",
+        hex::encode(kp.public_key.to_bytes())
+    );
+    println!("// signature on TestAptosCrypto(\"test\".to_owned())");
+    println!(
+        "let sig_bytes = hex::decode(\"{}\").unwrap();",
+        hex::encode(sig.to_bytes())
+    );
+}
+
+#[test]
+#[ignore]
+/// Not an actual test: only used to generate test cases for testing the BLS Move module in
+/// aptos-move/framework/move-stdlib/sources/signer.move
+fn bls12381_sample_aggregate_pk_and_aggsig() {
+    let mut rng = OsRng;
+
+    let num = 5;
+    let mut messages = vec![];
+
+    let mut pks = vec![];
+    let mut sigs = vec![];
+    let mut aggsigs = vec![];
+
+    for i in 1..=num {
+        let msg = format!("Hello, Aptos {}!", i);
+        let keypair = KeyPair::<PrivateKey, PublicKey>::generate(&mut rng);
+
+        messages.push(msg);
+        pks.push(keypair.public_key);
+        sigs.push(
+            keypair
+                .private_key
+                .sign_arbitrary_message(messages.last().unwrap().as_bytes()),
+        );
+
+        aggsigs.push(bls12381::Signature::aggregate(sigs.clone()).unwrap());
+    }
+
+    println!(
+        "// The signed messages are \"Hello, Aptos <i>!\", where <i> \\in {{1, ..., {}}}",
+        num
+    );
+    println!("let msgs = vector[");
+    for m in messages {
+        println!("    x\"{}\",", hex::encode(m.as_bytes()));
+    }
+    println!("];\n");
+
+    println!("// Public key of signer i");
+    println!("let pks = vector[");
+    for pk in pks {
+        println!("    x\"{}\",", pk);
+    }
+    println!("];\n");
+
+    println!("// aggsigs[i] = \\sum_{{j <= i}}  sigs[j], where sigs[j] is a signature on msgs[j] under pks[j]");
+    println!("let aggsigs = vector[");
+    for multisig in aggsigs {
+        println!("    x\"{}\",", multisig);
+    }
+    println!("];");
+}
+
+#[test]
+#[ignore]
+/// Not an actual test: only used to generate test cases for testing the BLS Move module in
+/// aptos-move/framework/move-stdlib/sources/signer.move
+fn bls12381_sample_aggregate_pk_and_multisig() {
+    let mut rng = OsRng;
+
+    let num = 5;
+    let message = b"Hello, Aptoverse!";
+
+    let mut pks = vec![];
+    let mut agg_pks = vec![];
+    let mut sigs = vec![];
+    let mut multisigs = vec![];
+
+    for _i in 1..=num {
+        let keypair = KeyPair::<PrivateKey, PublicKey>::generate(&mut rng);
+
+        pks.push(keypair.public_key);
+        sigs.push(keypair.private_key.sign_arbitrary_message(message));
+
+        multisigs.push(bls12381::Signature::aggregate(sigs.clone()).unwrap());
+
+        let pk_refs = pks.iter().collect::<Vec<&PublicKey>>();
+        agg_pks.push(PublicKey::aggregate(pk_refs).unwrap());
+    }
+
+    println!("// Public keys for each signer i");
+    println!("let pks = vector[");
+    for pk in pks {
+        println!("    x\"{}\",", pk);
+    }
+    println!("];\n");
+
+    println!("// agg_pks[i] = \\sum_{{j <= i}}  pk[j] (i.e., the aggregation of all public keys from 0 to i, inclusive)");
+    println!("let agg_pks = vector[");
+    for aggpk in agg_pks {
+        println!("    x\"{}\",", aggpk);
+    }
+    println!("];\n");
+
+    println!("// multisigs[i] is a signature on \"Hello, Aptoverse!\" under agg_pks[i]");
+    println!("let multisigs = vector[");
+    for multisig in multisigs {
+        println!("    x\"{}\",", multisig);
+    }
+    println!("];");
+}
+
+#[test]
+#[ignore]
+/// Not an actual test: only used to generate test cases for testing the BLS Move module in
+/// aptos-move/framework/move-stdlib/sources/signer.move
+fn bls12381_sample_aggregate_sigs() {
+    let mut rng = OsRng;
+
+    let num = 5;
+    let message = b"Hello, Aptoverse!";
+
+    let mut sigs = vec![];
+    let mut multisigs = vec![];
+
+    for _i in 1..=num {
+        let keypair = KeyPair::<PrivateKey, PublicKey>::generate(&mut rng);
+
+        sigs.push(keypair.private_key.sign_arbitrary_message(message));
+
+        multisigs.push(bls12381::Signature::aggregate(sigs.clone()).unwrap());
+    }
+
+    println!("// Signatures of each signer i");
+    println!("let sigs = vector[");
+    for sig in sigs {
+        println!("    signature_from_bytes(x\"{}\"),", sig);
+    }
+    println!("];\n");
+
+    println!("// multisigs[i] is a signature on \"Hello, Aptoverse!\" from signers 1 through i (inclusive)");
+    println!("let multisigs = vector[");
+    for multisig in multisigs {
+        println!("    AggrOrMultiSignature {{ bytes: x\"{}\" }},", multisig);
+    }
+    println!("];");
 }

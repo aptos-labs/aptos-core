@@ -7,7 +7,7 @@ resource "aws_cloudwatch_log_group" "eks" {
 resource "aws_eks_cluster" "aptos" {
   name                      = "aptos-${local.workspace_name}"
   role_arn                  = aws_iam_role.cluster.arn
-  version                   = "1.21"
+  version                   = var.kubernetes_version
   enabled_cluster_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
   tags                      = local.default_tags
 
@@ -16,6 +16,13 @@ resource "aws_eks_cluster" "aptos" {
     public_access_cidrs     = var.k8s_api_sources
     endpoint_private_access = true
     security_group_ids      = [aws_security_group.cluster.id]
+  }
+
+  lifecycle {
+    ignore_changes = [
+      # ignore autoupgrade version
+      version,
+    ]
   }
 
   depends_on = [
@@ -36,14 +43,14 @@ locals {
       min_size      = var.utility_instance_min_num
       desired_size  = var.utility_instance_num
       max_size      = var.utility_instance_max_num > 0 ? var.utility_instance_max_num : 2 * var.utility_instance_num
-      taint         = false
+      taint         = var.utility_instance_enable_taint
     }
     validators = {
       instance_type = var.validator_instance_type
       min_size      = var.validator_instance_min_num
       desired_size  = var.validator_instance_num
       max_size      = var.validator_instance_max_num > 0 ? var.validator_instance_max_num : 2 * var.validator_instance_num
-      taint         = true
+      taint         = var.validator_instance_enable_taint
     }
   }
 }
@@ -52,11 +59,16 @@ resource "aws_launch_template" "nodes" {
   for_each      = local.pools
   name          = "aptos-${local.workspace_name}/${each.key}"
   instance_type = each.value.instance_type
-  user_data = base64encode(
-    templatefile("${path.module}/templates/eks_user_data.sh", {
-      taints = each.value.taint ? "aptos.org/nodepool=${each.key}:NoExecute" : ""
-    })
-  )
+
+  block_device_mappings {
+    device_name = "/dev/xvda"
+
+    ebs {
+      delete_on_termination = true
+      volume_size           = 100
+      volume_type           = "gp3"
+    }
+  }
 
   tag_specifications {
     resource_type = "instance"
@@ -77,11 +89,23 @@ resource "aws_eks_node_group" "nodes" {
 
   lifecycle {
     ignore_changes = [
+      # ignore autoupgrade version
+      version,
       # ignore changes to the desired size that may occur due to cluster autoscaler
       scaling_config[0].desired_size,
       # ignore changes to max size, especially when it decreases to < desired_size, which fails
       scaling_config[0].max_size,
     ]
+  }
+
+  # if the NodeGroup should be tainted, then create the below dynamic block
+  dynamic "taint" {
+    for_each = each.value.taint ? [local.pools[each.key]] : []
+    content {
+      key    = "aptos.org/nodepool"
+      value  = each.key
+      effect = "NO_EXECUTE"
+    }
   }
 
   launch_template {
@@ -115,4 +139,51 @@ resource "aws_iam_openid_connect_provider" "cluster" {
 
 locals {
   oidc_provider = replace(aws_iam_openid_connect_provider.cluster.url, "https://", "")
+}
+
+
+# EBS CSI ADDON
+
+data "aws_iam_policy_document" "aws-ebs-csi-driver-trust-policy" {
+  statement {
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+
+    principals {
+      type = "Federated"
+      identifiers = [
+        "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/${local.oidc_provider}"
+      ]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "${local.oidc_provider}:sub"
+      values   = ["system:serviceaccount:kube-system:ebs-csi-controller-sa"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "${local.oidc_provider}:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "aws-ebs-csi-driver" {
+  name                 = "aptos-${local.workspace_name}-ebs-csi-controller"
+  path                 = var.iam_path
+  permissions_boundary = var.permissions_boundary_policy
+  assume_role_policy   = data.aws_iam_policy_document.aws-ebs-csi-driver-trust-policy.json
+}
+
+resource "aws_iam_role_policy_attachment" "caws-ebs-csi-driver" {
+  role = aws_iam_role.aws-ebs-csi-driver.name
+  # From this reference: https://docs.aws.amazon.com/eks/latest/userguide/csi-iam-role.html
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+}
+
+resource "aws_eks_addon" "aws-ebs-csi-driver" {
+  cluster_name             = aws_eks_cluster.aptos.name
+  addon_name               = "aws-ebs-csi-driver"
+  service_account_role_arn = aws_iam_role.aws-ebs-csi-driver.arn
 }

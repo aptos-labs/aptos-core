@@ -1,13 +1,13 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! Global logger definition and functions
 
-use crate::{counters::STRUCT_LOG_COUNT, Event, Metadata};
-
+use crate::{counters::STRUCT_LOG_COUNT, error, Event, Metadata};
 use once_cell::sync::OnceCell;
 use std::sync::Arc;
-use tracing_subscriber::Layer;
+use tracing_subscriber::prelude::*;
 
 /// The global `Logger`
 static LOGGER: OnceCell<Arc<dyn Logger>> = OnceCell::new();
@@ -41,17 +41,40 @@ pub(crate) fn enabled(metadata: &Metadata) -> bool {
 }
 
 /// Sets the global `Logger` exactly once
-pub fn set_global_logger(logger: Arc<dyn Logger>) {
+pub fn set_global_logger(logger: Arc<dyn Logger>, console_port: Option<u16>) {
     if LOGGER.set(logger).is_err() {
         eprintln!("Global logger has already been set");
+        error!("Global logger has already been set");
+        return;
     }
-    let _ = tracing::subscriber::set_global_default(
-        crate::tracing_adapter::TracingToAptosDataLayer
-            .with_subscriber(tracing_subscriber::Registry::default()),
-    );
+
+    /*
+     * if console_port is set all tracing::log are captured by the tokio-tracing infrastructure.
+     * else aptos-logger intercepts all tracing::log events
+     * In both scenarios *ALL* aptos-logger::log events are captured by aptos-logger as usual.
+     */
+    #[cfg(feature = "aptos-console")]
+    {
+        if let Some(p) = console_port {
+            let console_layer = console_subscriber::ConsoleLayer::builder()
+                .server_addr(([0, 0, 0, 0], p))
+                .spawn();
+
+            tracing_subscriber::registry().with(console_layer).init();
+            return;
+        }
+    }
+    if console_port.is_none() {
+        let _ = tracing::subscriber::set_global_default(
+            crate::tracing_adapter::TracingToAptosDataLayer
+                .with_subscriber(tracing_subscriber::Registry::default()),
+        );
+    } else {
+        error!("console_port was set but has no effect, build with --cfg aptos-console");
+    }
 }
 
-/// Flush the global `Logger`
+/// Flush the global `Logger`. Note this is expensive, only use off the critical path.
 pub fn flush() {
     if let Some(logger) = LOGGER.get() {
         logger.flush();

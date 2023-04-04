@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
@@ -7,12 +8,12 @@ use crate::{
     peer_manager::{conn_notifs_channel, ConnectionRequest},
     transport::ConnectionMetadata,
 };
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::{Peer, PeerRole, PeerSet, HANDSHAKE_VERSION};
 use aptos_crypto::{test_utils::TEST_SEED, x25519, Uniform};
 use aptos_logger::info;
 use aptos_time_service::{MockTimeService, TimeService};
 use aptos_types::{account_address::AccountAddress, network_address::NetworkAddress};
-use channel::{aptos_channel, message_queues::QueueStyle};
 use futures::{executor::block_on, future, SinkExt};
 use maplit::{hashmap, hashset};
 use rand::rngs::StdRng;
@@ -69,11 +70,12 @@ fn update_peer_with_address(mut peer: Peer, addr_str: &'static str) -> (Peer, Ne
 }
 
 struct TestHarness {
-    trusted_peers: Arc<RwLock<PeerSet>>,
+    network_context: NetworkContext,
+    peers_and_metadata: Arc<PeersAndMetadata>,
     mock_time: MockTimeService,
     connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
     connection_notifs_tx: conn_notifs_channel::Sender,
-    conn_mgr_reqs_tx: channel::Sender<ConnectivityRequest>,
+    conn_mgr_reqs_tx: aptos_channels::Sender<ConnectivityRequest>,
 }
 
 impl TestHarness {
@@ -83,13 +85,13 @@ impl TestHarness {
         let (connection_reqs_tx, connection_reqs_rx) =
             aptos_channel::new(QueueStyle::FIFO, 1, None);
         let (connection_notifs_tx, connection_notifs_rx) = conn_notifs_channel::new();
-        let (conn_mgr_reqs_tx, conn_mgr_reqs_rx) = channel::new_test(0);
-        let trusted_peers = Arc::new(RwLock::new(HashMap::new()));
+        let (conn_mgr_reqs_tx, conn_mgr_reqs_rx) = aptos_channels::new_test(0);
+        let peers_and_metadata = PeersAndMetadata::new(&[network_context.network_id()]);
 
         let conn_mgr = ConnectivityManager::new(
             network_context,
             time_service.clone(),
-            trusted_peers.clone(),
+            peers_and_metadata.clone(),
             seeds,
             ConnectionRequestSender::new(connection_reqs_tx),
             connection_notifs_rx,
@@ -101,7 +103,8 @@ impl TestHarness {
             true, /* mutual_authentication */
         );
         let mock = Self {
-            trusted_peers,
+            network_context,
+            peers_and_metadata,
             mock_time: time_service.into_mock(),
             connection_reqs_rx,
             connection_notifs_tx,
@@ -205,7 +208,7 @@ impl TestHarness {
             ConnectionRequest::DisconnectPeer(p, result_tx) => {
                 assert_eq!(peer_id, p);
                 result_tx.send(result).unwrap();
-            }
+            },
             request => panic!(
                 "Unexpected ConnectionRequest, expected DisconnectPeer: {:?}",
                 request
@@ -244,7 +247,7 @@ impl TestHarness {
             ConnectionRequest::DialPeer(peer_id, address, result_tx) => {
                 result_tx.send(result).unwrap();
                 (peer_id, address)
-            }
+            },
             request => panic!(
                 "Unexpected ConnectionRequest, expected DialPeer: {:?}",
                 request
@@ -743,7 +746,10 @@ fn public_connection_limit() {
 fn basic_update_discovered_peers() {
     let mut rng = StdRng::from_seed(TEST_SEED);
     let (mock, mut conn_mgr) = TestHarness::new(HashMap::new());
-    let trusted_peers = mock.trusted_peers;
+    let trusted_peers = mock
+        .peers_and_metadata
+        .get_trusted_peers(&mock.network_context.network_id())
+        .unwrap();
 
     // sample some example data
     let peer_id_a = AccountAddress::ZERO;

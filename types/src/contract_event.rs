@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -8,8 +9,7 @@ use crate::{
 };
 use anyhow::{Error, Result};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use move_deps::move_core_types::{language_storage::TypeTag, move_resource::MoveStructType};
-
+use move_core_types::{language_storage::TypeTag, move_resource::MoveStructType};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
@@ -93,13 +93,17 @@ impl ContractEventV0 {
     pub fn type_tag(&self) -> &TypeTag {
         &self.type_tag
     }
+
+    pub fn size(&self) -> usize {
+        self.key.size() + 8 /* u64 */ + bcs::to_bytes(&self.type_tag).unwrap().len() + self.event_data.len()
+    }
 }
 
 impl TryFrom<&ContractEvent> for NewBlockEvent {
     type Error = Error;
 
     fn try_from(event: &ContractEvent) -> Result<Self> {
-        if event.type_tag != TypeTag::Struct(Self::struct_tag()) {
+        if event.type_tag != TypeTag::Struct(Box::new(Self::struct_tag())) {
             anyhow::bail!("Expected NewBlockEvent")
         }
         Self::try_from_bytes(&event.event_data)
@@ -110,7 +114,7 @@ impl TryFrom<&ContractEvent> for NewEpochEvent {
     type Error = Error;
 
     fn try_from(event: &ContractEvent) -> Result<Self> {
-        if event.type_tag != TypeTag::Struct(Self::struct_tag()) {
+        if event.type_tag != TypeTag::Struct(Box::new(Self::struct_tag())) {
             anyhow::bail!("Expected NewEpochEvent")
         }
         Self::try_from_bytes(&event.event_data)
@@ -121,7 +125,7 @@ impl TryFrom<&ContractEvent> for WithdrawEvent {
     type Error = Error;
 
     fn try_from(event: &ContractEvent) -> Result<Self> {
-        if event.type_tag != TypeTag::Struct(WithdrawEvent::struct_tag()) {
+        if event.type_tag != TypeTag::Struct(Box::new(WithdrawEvent::struct_tag())) {
             anyhow::bail!("Expected Sent Payment")
         }
         Self::try_from_bytes(&event.event_data)
@@ -132,7 +136,7 @@ impl TryFrom<&ContractEvent> for DepositEvent {
     type Error = Error;
 
     fn try_from(event: &ContractEvent) -> Result<Self> {
-        if event.type_tag != TypeTag::Struct(DepositEvent::struct_tag()) {
+        if event.type_tag != TypeTag::Struct(Box::new(DepositEvent::struct_tag())) {
             anyhow::bail!("Expected Received Payment")
         }
         Self::try_from_bytes(&event.event_data)

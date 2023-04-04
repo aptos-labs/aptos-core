@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 /***************************************************************************************
@@ -12,19 +12,20 @@
  *     deterministic RNG to not violate the golden file rules.
  *
  **************************************************************************************/
-use crate::{current_function_name, tests::new_test_context};
-use aptos_types::{
-    account_address::AccountAddress,
-    chain_id::ChainId,
-    transaction::{RawTransaction, Script, ScriptFunction, SignedTransaction, TransactionArgument},
-};
 
+use super::new_test_context;
+use aptos_api_test_context::current_function_name;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     SigningKey, Uniform,
 };
 use aptos_proptest_helpers::ValueGenerator;
-use move_deps::move_core_types::{
+use aptos_types::{
+    account_address::AccountAddress,
+    chain_id::ChainId,
+    transaction::{EntryFunction, RawTransaction, Script, SignedTransaction, TransactionArgument},
+};
+use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
 };
@@ -92,12 +93,12 @@ fn type_tag_strategy() -> impl Strategy<Value = TypeTag> {
                 identifier_strategy(),
                 identifier_strategy()).prop_map(|(t_vec, addr, module, name)| {
 
-                TypeTag::Struct(StructTag {
+                TypeTag::Struct(Box::new(StructTag {
                     address: addr,
                     module: Identifier::new(module).unwrap(),
                     name: Identifier::new(name).unwrap(),
                     type_params: t_vec,
-                })}),
+                }))}),
         ]
     })
 }
@@ -125,7 +126,7 @@ fn arg_strategy() -> impl Strategy<Value = Arg> {
 }
 
 #[cfg(test)]
-fn script_function_strategy() -> impl Strategy<Value = ScriptFunction> {
+fn entry_function_strategy() -> impl Strategy<Value = EntryFunction> {
     (
         any::<AccountAddress>(),
         coin_name_strategy(),
@@ -134,7 +135,7 @@ fn script_function_strategy() -> impl Strategy<Value = ScriptFunction> {
         collection::vec(arg_strategy(), 0..=10),
     )
         .prop_map(|(addr, coin, func, type_args, args)| {
-            ScriptFunction::new(
+            EntryFunction::new(
                 ModuleId::new(addr, Identifier::new(coin).unwrap()),
                 Identifier::new(func).unwrap(),
                 type_args,
@@ -148,7 +149,7 @@ fn bytes_strategy() -> impl Strategy<Value = Vec<u8>> {
     string::string_regex("[a-f0-9]+")
         .unwrap()
         .prop_filter("only even letters count", |s| s.len() % 2 == 0)
-        .prop_map(|s| hex::decode(&s).unwrap())
+        .prop_map(|s| hex::decode(s).unwrap())
 }
 
 #[cfg(test)]
@@ -189,8 +190,8 @@ fn gen_address(gen: &mut ValueGenerator) -> AccountAddress {
 }
 
 #[cfg(test)]
-fn gen_script_function(gen: &mut ValueGenerator) -> ScriptFunction {
-    gen.generate(script_function_strategy())
+fn gen_entry_function(gen: &mut ValueGenerator) -> EntryFunction {
+    gen.generate(entry_function_strategy())
 }
 
 #[cfg(test)]
@@ -208,7 +209,7 @@ fn sign_transaction(raw_txn: RawTransaction) -> serde_json::Value {
     let private_key = Ed25519PrivateKey::generate_for_testing();
     let public_key = Ed25519PublicKey::from(&private_key);
 
-    let signature = private_key.sign(&raw_txn);
+    let signature = private_key.sign(&raw_txn).unwrap();
     let txn = SignedTransaction::new(raw_txn.clone(), public_key, signature);
 
     let mut raw_txn_json_out = Vec::new();
@@ -242,15 +243,17 @@ fn byte_array_to_hex(v: &mut serde_json::Value) -> serde_json::Value {
     serde_json::Value::String(hex::encode(byte_array))
 }
 
-#[tokio::test]
-async fn test_script_function_payload() {
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_entry_function_payload() {
     // The purpose of patches is to convert bytes arrays to hex-coded strings.
     // Patches the serde_json result is easier comparing to implement a customized serializer.
     fn patch(raw_txn_json: &mut serde_json::Value) {
-        let args = visit_json_field(
-            raw_txn_json,
-            &["raw_txn", "payload", "ScriptFunction", "args"],
-        );
+        let args = visit_json_field(raw_txn_json, &[
+            "raw_txn",
+            "payload",
+            "EntryFunction",
+            "args",
+        ]);
 
         let mut hex_args: Vec<serde_json::Value> = vec![];
         for arg in args.as_array_mut().unwrap() {
@@ -267,7 +270,7 @@ async fn test_script_function_payload() {
     for _ in 0..100 {
         let transaction_factory = context.transaction_factory();
         let raw_txn = transaction_factory
-            .script_function(gen_script_function(&mut value_gen))
+            .entry_function(gen_entry_function(&mut value_gen))
             .sender(gen_address(&mut value_gen))
             .sequence_number(gen_u64(&mut value_gen))
             .expiration_timestamp_secs(gen_u64(&mut value_gen))
@@ -283,7 +286,7 @@ async fn test_script_function_payload() {
     context.check_golden_output(json!(txns));
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_script_payload() {
     fn patch(raw_txn_json: &mut serde_json::Value) {
         let code = visit_json_field(raw_txn_json, &["raw_txn", "payload", "Script", "code"]);
@@ -294,9 +297,8 @@ async fn test_script_payload() {
         for arg in args.as_array_mut().unwrap() {
             let arg_obj = arg.as_object_mut().unwrap();
 
-            match arg_obj.get_mut("U8Vector") {
-                Some(val) => *val = byte_array_to_hex(val),
-                None => {}
+            if let Some(val) = arg_obj.get_mut("U8Vector") {
+                *val = byte_array_to_hex(val)
             }
         }
     }
@@ -324,13 +326,15 @@ async fn test_script_payload() {
     context.check_golden_output(json!(txns));
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_module_payload() {
     fn patch(raw_txn_json: &mut serde_json::Value) {
-        let codes = visit_json_field(
-            raw_txn_json,
-            &["raw_txn", "payload", "ModuleBundle", "codes"],
-        );
+        let codes = visit_json_field(raw_txn_json, &[
+            "raw_txn",
+            "payload",
+            "ModuleBundle",
+            "codes",
+        ]);
 
         for code_element in codes.as_array_mut().unwrap() {
             let code_obj = code_element.as_object_mut().unwrap();

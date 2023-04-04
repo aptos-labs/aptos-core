@@ -1,9 +1,9 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module provides APIs for private keys and public keys used in Boneh-Lynn-Shacham (BLS)
 //! aggregate signatures (including individual signatures and multisignatures) implemented on top of
-//! Barreto-Lynn-Scott BLS12-381 elliptic curves (https://github.com/supranational/blst).
+//! Barreto-Lynn-Scott BLS12-381 elliptic curves (<https://github.com/supranational/blst>).
 //!
 //! The `PublicKey` struct is used to represent both the public key of an individual signer
 //! as well as the aggregate public key of several signers. Before passing this struct as an
@@ -11,8 +11,8 @@
 //! `ProofOfPossession::verify`.
 //!
 //! The `PublicKey::aggregate` API assumes the caller has already verified
-//! proofs-of-possession for all the given public keys and therefore all public keys are valid group
-//! elements.
+//! proofs-of-possession for all the given public keys and therefore all public keys are valid,
+//! prime-order subgroup elements.
 //!
 //! In general, with the exception of `ProofOfPossession::verify` no library function should
 //! be given a public key as argument without first verifying that public key's PoP. Note that
@@ -30,7 +30,7 @@ use aptos_crypto_derive::{DeserializeKey, SerializeKey, SilentDebug, SilentDispl
 use serde::Serialize;
 use std::{convert::TryFrom, fmt};
 
-#[derive(Clone, Debug, Eq, SerializeKey, DeserializeKey)]
+#[derive(Clone, Eq, SerializeKey, DeserializeKey)]
 /// A BLS12381 public key
 pub struct PublicKey {
     pub(crate) pubkey: blst::min_pk::PublicKey,
@@ -58,12 +58,13 @@ impl PublicKey {
         self.pubkey.to_bytes()
     }
 
-    /// Group-checks the public key (i.e., verifies the public key is a valid group element).
+    /// Subgroup-checks the public key (i.e., verifies the public key is an element of the prime-order
+    /// subgroup and it is not the identity element).
     ///
-    /// WARNING: Group-checking is done implicitly when verifying the proof-of-possession (PoP) for
+    /// WARNING: Subgroup-checking is done implicitly when verifying the proof-of-possession (PoP) for
     /// this public key  in `ProofOfPossession::verify`, so this function should not be called
     /// separately for most use-cases. We leave it here just in case.
-    pub fn group_check(&self) -> Result<()> {
+    pub fn subgroup_check(&self) -> Result<()> {
         self.pubkey.validate().map_err(|e| anyhow!("{:?}", e))
     }
 
@@ -75,7 +76,7 @@ impl PublicKey {
     pub fn aggregate(pubkeys: Vec<&Self>) -> Result<PublicKey> {
         let blst_pubkeys: Vec<_> = pubkeys.iter().map(|pk| &pk.pubkey).collect();
 
-        // CRYPTONOTE(Alin): We assume the PKs have had their PoPs verified and thus have also been group-checked
+        // CRYPTONOTE(Alin): We assume the PKs have had their PoPs verified and thus have also been subgroup-checked
         let aggpk = blst::min_pk::AggregatePublicKey::aggregate(&blst_pubkeys[..], false)
             .map_err(|e| anyhow!("{:?}", e))?;
 
@@ -105,15 +106,18 @@ impl traits::PrivateKey for PrivateKey {
 }
 
 impl traits::SigningKey for PrivateKey {
-    type VerifyingKeyMaterial = PublicKey;
     type SignatureMaterial = bls12381::Signature;
+    type VerifyingKeyMaterial = PublicKey;
 
-    fn sign<T: CryptoHash + Serialize>(&self, message: &T) -> bls12381::Signature {
-        bls12381::Signature {
+    fn sign<T: CryptoHash + Serialize>(
+        &self,
+        message: &T,
+    ) -> Result<bls12381::Signature, CryptoMaterialError> {
+        Ok(bls12381::Signature {
             sig: self
                 .privkey
-                .sign(&signing_message(message), DST_BLS_SIG_IN_G2_WITH_POP, &[]),
-        }
+                .sign(&signing_message(message)?, DST_BLS_SIG_IN_G2_WITH_POP, &[]),
+        })
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
@@ -155,7 +159,7 @@ impl Uniform for PrivateKey {
     {
         // CRYPTONOTE(Alin): This "initial key material (IKM)" is the randomness used inside key_gen
         // below to pseudo-randomly derive the secret key via an HKDF
-        // (see https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature#section-2.3)
+        // (see <https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature#section-2.3>)
         let mut ikm = [0u8; 32];
         rng.fill_bytes(&mut ikm);
         let privkey =
@@ -200,8 +204,8 @@ impl traits::PublicKey for PublicKey {
 }
 
 impl VerifyingKey for PublicKey {
-    type SigningKeyMaterial = PrivateKey;
     type SignatureMaterial = bls12381::Signature;
+    type SigningKeyMaterial = PrivateKey;
 }
 
 impl ValidCryptoMaterial for PublicKey {
@@ -221,9 +225,16 @@ impl TryFrom<&[u8]> for PublicKey {
 
     /// Deserializes a PublicKey from a sequence of bytes.
     ///
-    /// WARNING: Does NOT group-check the public key! Instead, the caller is responsible for
+    /// WARNING: Does NOT subgroup-check the public key! Instead, the caller is responsible for
     /// verifying the public key's proof-of-possession (PoP) via `ProofOfPossession::verify`,
-    /// which implicitly group checks the public key.
+    /// which implicitly subgroup-checks the public key.
+    ///
+    /// NOTE: This function will only check that the PK is a point on the curve:
+    ///  - `blst::min_pk::PublicKey::from_bytes(bytes)` calls `blst::min_pk::PublicKey::deserialize(bytes)`,
+    ///    which calls `$pk_deser` in <https://github.com/supranational/blst/blob/711e1eec747772e8cae15d4a1885dd30a32048a4/bindings/rust/src/lib.rs#L734>,
+    ///    which is mapped to `blst_p1_deserialize` in <https://github.com/supranational/blst/blob/711e1eec747772e8cae15d4a1885dd30a32048a4/bindings/rust/src/lib.rs#L1652>
+    ///  - `blst_p1_deserialize` eventually calls `POINTonE1_Deserialize_BE`, which checks
+    ///    the point is on the curve: <https://github.com/supranational/blst/blob/711e1eec747772e8cae15d4a1885dd30a32048a4/src/e1.c#L296>
     fn try_from(bytes: &[u8]) -> std::result::Result<Self, CryptoMaterialError> {
         Ok(Self {
             pubkey: blst::min_pk::PublicKey::from_bytes(bytes)
@@ -246,9 +257,15 @@ impl PartialEq for PublicKey {
     }
 }
 
+impl fmt::Debug for PublicKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", hex::encode(self.to_bytes()))
+    }
+}
+
 impl fmt::Display for PublicKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", hex::encode(&self.to_bytes()))
+        write!(f, "{}", hex::encode(self.to_bytes()))
     }
 }
 

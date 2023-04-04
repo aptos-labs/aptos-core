@@ -1,0 +1,48 @@
+{{ template "chart.header" . }}
+{{ template "chart.deprecationWarning" . }}
+
+{{ template "chart.badgesSection" . }}
+
+{{ template "chart.description" . }}
+
+{{ template "chart.homepageLine" . }}
+
+{{ template "chart.maintainersSection" . }}
+
+{{ template "chart.sourcesSection" . }}
+
+{{ template "chart.requirementsSection" . }}
+
+{{ template "chart.valuesSection" . }}
+
+
+Configuration
+-------------
+
+This Helm chart deploys a public fullnode for the Aptos blockchain network. The
+fullnode connects to Aptos validators and synchronises the blockchain state to
+a persistent volume. It provides a [REST API][] for interacting with
+the blockchain.
+
+See [values.yaml][] for the full list of options you can configure.
+
+Connecting to Testnet
+-------------
+
+To connect to the Aptos devnet, you must have the correct genesis blob and waypoint. The source of truth for these are hosted here: https://github.com/aptos-labs/aptos-genesis-waypoint
+
+The waypoint and genesis blobs are download at runtime, and their URLs are specified in `.Values.aptos_chains`.
+
+Deployment
+----------
+
+1. Install Helm v3: https://helm.sh/docs/intro/install/
+2. Configure `kubectl` with the Kubernetes cluster you wish to use.
+3. Install the release, setting any options:
+
+       $ helm install fullnode --set storage.class=gp2 .
+
+
+[REST API]: https://github.com/aptos-labs/aptos-core/blob/main/api/doc/v0/openapi.yaml
+[values.yaml]: values.yaml
+[Aptos dockerhub]: https://hub.docker.com/r/aptoslabs/validator/tags?page=1&ordering=last_updated

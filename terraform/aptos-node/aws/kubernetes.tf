@@ -4,6 +4,48 @@ provider "kubernetes" {
   token                  = data.aws_eks_cluster_auth.aptos.token
 }
 
+provider "helm" {
+  kubernetes {
+    host                   = aws_eks_cluster.aptos.endpoint
+    cluster_ca_certificate = base64decode(aws_eks_cluster.aptos.certificate_authority.0.data)
+    token                  = data.aws_eks_cluster_auth.aptos.token
+  }
+}
+
+locals {
+  kubeconfig = "/tmp/kube.config.${md5(timestamp())}"
+
+  # helm chart paths
+  monitoring_helm_chart_path = "${path.module}/../../helm/monitoring"
+  logger_helm_chart_path     = "${path.module}/../../helm/logger"
+  aptos_node_helm_chart_path = var.helm_chart != "" ? var.helm_chart : "${path.module}/../../helm/aptos-node"
+}
+
+resource "null_resource" "delete-gp2" {
+  provisioner "local-exec" {
+    command = <<-EOT
+      aws --region ${var.region} eks update-kubeconfig --name ${aws_eks_cluster.aptos.name} --kubeconfig ${local.kubeconfig} &&
+      kubectl --kubeconfig ${local.kubeconfig} delete --ignore-not-found storageclass gp2
+    EOT
+  }
+}
+
+resource "kubernetes_storage_class" "gp3" {
+  metadata {
+    name = "gp3"
+    annotations = {
+      "storageclass.kubernetes.io/is-default-class" = false
+    }
+  }
+  storage_provisioner = "ebs.csi.aws.com"
+  volume_binding_mode = "WaitForFirstConsumer"
+  parameters = {
+    type = "gp3"
+  }
+
+  depends_on = [null_resource.delete-gp2, aws_eks_addon.aws-ebs-csi-driver]
+}
+
 resource "kubernetes_storage_class" "io1" {
   metadata {
     name = "io1"
@@ -16,87 +58,35 @@ resource "kubernetes_storage_class" "io1" {
   }
 }
 
-resource "null_resource" "delete-gp2" {
-  provisioner "local-exec" {
-    command = <<-EOT
-      aws --region ${var.region} eks update-kubeconfig --name ${aws_eks_cluster.aptos.name} --kubeconfig ${local.kubeconfig} &&
-      kubectl --kubeconfig ${local.kubeconfig} delete --ignore-not-found storageclass gp2
-    EOT
-  }
-
-  depends_on = [kubernetes_storage_class.io1]
-}
-
-
-resource "kubernetes_storage_class" "gp2" {
+resource "kubernetes_storage_class" "io2" {
   metadata {
-    name = "gp2"
-    annotations = {
-      "storageclass.kubernetes.io/is-default-class" = true
-    }
+    name = "io2"
   }
-  storage_provisioner = "kubernetes.io/aws-ebs"
+  storage_provisioner = "ebs.csi.aws.com"
   volume_binding_mode = "WaitForFirstConsumer"
   parameters = {
-    type = "gp2"
+    type = "io2"
+    iops = "40000"
   }
-
-  depends_on = [null_resource.delete-gp2]
 }
 
-resource "kubernetes_role_binding" "psp-kube-system" {
+resource "kubernetes_namespace" "tigera-operator" {
   metadata {
-    name      = "eks:podsecuritypolicy:privileged"
-    namespace = "kube-system"
-  }
+    annotations = {
+      name = "tigera-operator"
+    }
 
-  role_ref {
-    api_group = "rbac.authorization.k8s.io"
-    kind      = "ClusterRole"
-    name      = "eks:podsecuritypolicy:privileged"
-  }
-
-  subject {
-    api_group = "rbac.authorization.k8s.io"
-    kind      = "Group"
-    name      = "system:serviceaccounts:kube-system"
-  }
-}
-
-locals {
-  kubeconfig = "/tmp/kube.config.${md5(timestamp())}"
-
-  # helm chart paths
-  vector_daemonset_helm_chart_path = "${path.module}/../../helm/vector-daemonset"
-  monitoring_helm_chart_path       = "${path.module}/../../helm/monitoring"
-  logger_helm_chart_path           = "${path.module}/../../helm/logger"
-  aptos_node_helm_chart_path       = var.helm_chart != "" ? var.helm_chart : "${path.module}/../../helm/aptos-node"
-}
-
-resource "null_resource" "delete-psp-authenticated" {
-  provisioner "local-exec" {
-    command = <<-EOT
-      aws --region ${var.region} eks update-kubeconfig --name ${aws_eks_cluster.aptos.name} --kubeconfig ${local.kubeconfig} &&
-      kubectl --kubeconfig ${local.kubeconfig} delete --ignore-not-found clusterrolebinding eks:podsecuritypolicy:authenticated
-    EOT
-  }
-
-  depends_on = [kubernetes_role_binding.psp-kube-system]
-}
-
-provider "helm" {
-  kubernetes {
-    host                   = aws_eks_cluster.aptos.endpoint
-    cluster_ca_certificate = base64decode(aws_eks_cluster.aptos.certificate_authority.0.data)
-    token                  = data.aws_eks_cluster_auth.aptos.token
+    name = "tigera-operator"
   }
 }
 
 resource "helm_release" "calico" {
-  name        = "calico"
-  namespace   = "kube-system"
-  chart       = "${path.module}/aws-calico/"
-  max_history = 10
+  count      = var.enable_calico ? 1 : 0
+  name       = "calico"
+  repository = "https://docs.projectcalico.org/charts"
+  chart      = "tigera-operator"
+  version    = "3.23.3"
+  namespace  = "tigera-operator"
 }
 
 locals {
@@ -104,15 +94,16 @@ locals {
     numValidators     = var.num_validators
     numFullnodeGroups = var.num_fullnode_groups
     imageTag          = var.image_tag
+    mangeImages       = var.manage_via_tf # if we're managing the entire deployment via terraform, override the images as well
     chain = {
-      era        = var.era
-      chain_id   = var.chain_id
-      chain_name = var.chain_name
+      era      = var.era
+      chain_id = var.chain_id
+      name     = var.chain_name
     }
     validator = {
       name = var.validator_name
       storage = {
-        class = kubernetes_storage_class.gp2.metadata[0].name
+        class = var.validator_storage_class
       }
       nodeSelector = {
         "eks.amazonaws.com/nodegroup" = "validators"
@@ -126,7 +117,7 @@ locals {
     }
     fullnode = {
       storage = {
-        class = kubernetes_storage_class.gp2.metadata[0].name
+        class = var.fullnode_storage_class
       }
       nodeSelector = {
         "eks.amazonaws.com/nodegroup" = "validators"
@@ -158,16 +149,25 @@ resource "helm_release" "validator" {
   max_history = 5
   wait        = false
 
+  # lifecycle {
+  #   ignore_changes = [
+  #     values,
+  #   ]
+  # }
+
   values = [
     local.helm_values,
     var.helm_values_file != "" ? file(var.helm_values_file) : "{}",
     jsonencode(var.helm_values),
   ]
 
-  # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
-  set {
-    name  = "chart_sha1"
-    value = sha1(join("", [for f in fileset(local.aptos_node_helm_chart_path, "**") : filesha1("${local.aptos_node_helm_chart_path}/${f}")]))
+  dynamic "set" {
+    for_each = var.manage_via_tf ? toset([""]) : toset([])
+    content {
+      # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
+      name  = "chart_sha1"
+      value = sha1(join("", [for f in fileset(local.aptos_node_helm_chart_path, "**") : filesha1("${local.aptos_node_helm_chart_path}/${f}")]))
+    }
   }
 }
 
@@ -202,23 +202,6 @@ resource "helm_release" "logger" {
   }
 }
 
-resource "helm_release" "vector_daemonset" {
-  count            = var.enable_vector_daemonset_logger ? 1 : 0
-  name             = "${local.helm_release_name}-vector-daemonset"
-  chart            = local.vector_daemonset_helm_chart_path
-  max_history      = 5
-  namespace        = "vector"
-  create_namespace = true
-  wait             = false
-
-  values = var.vector_daemonset_helm_values
-
-  # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
-  set {
-    name  = "chart_sha1"
-    value = sha1(join("", [for f in fileset(local.vector_daemonset_helm_chart_path, "**") : filesha1("${local.vector_daemonset_helm_chart_path}/${f}")]))
-  }
-}
 
 resource "helm_release" "monitoring" {
   count       = var.enable_monitoring ? 1 : 0
@@ -241,9 +224,15 @@ resource "helm_release" "monitoring" {
       monitoring = {
         prometheus = {
           storage = {
-            class = kubernetes_storage_class.gp2.metadata[0].name
+            class = kubernetes_storage_class.gp3.metadata[0].name
           }
         }
+      }
+      kube-state-metrics = {
+        enabled = var.enable_kube_state_metrics
+      }
+      prometheus-node-exporter = {
+        enabled = var.enable_prometheus_node_exporter
       }
     }),
     jsonencode(var.monitoring_helm_values),

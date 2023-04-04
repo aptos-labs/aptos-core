@@ -1,23 +1,30 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    backup::restore_utils, event_store::EventStore, ledger_store::LedgerStore,
-    state_store::StateStore, transaction_store::TransactionStore, AptosDB,
+    backup::restore_utils,
+    db_metadata::{DbMetadataKey, DbMetadataSchema},
+    event_store::EventStore,
+    ledger_store::LedgerStore,
+    state_restore::StateSnapshotRestore,
+    state_store::StateStore,
+    transaction_store::TransactionStore,
+    AptosDB,
 };
 use anyhow::Result;
 use aptos_crypto::HashValue;
-use aptos_jellyfish_merkle::restore::StateSnapshotRestore;
+use aptos_schemadb::DB;
+use aptos_storage_interface::DbReader;
 use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     proof::definition::LeafCount,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{Transaction, TransactionInfo, Version},
+    write_set::WriteSet,
 };
-use schemadb::DB;
 use std::sync::Arc;
-use storage_interface::DbReader;
 
 /// Provides functionalities for AptosDB data restore.
 #[derive(Clone)]
@@ -54,16 +61,17 @@ impl RestoreHandler {
         version: Version,
         expected_root_hash: HashValue,
     ) -> Result<StateSnapshotRestore<StateKey, StateValue>> {
-        StateSnapshotRestore::new_overwrite(
+        StateSnapshotRestore::new(
             &self.state_store.state_merkle_db,
             &self.state_store,
             version,
             expected_root_hash,
+            true, /* async_commit */
         )
     }
 
-    pub fn maybe_reset_state_store(&self, latest_snapshot_version: Option<Version>) {
-        self.state_store.maybe_reset(latest_snapshot_version);
+    pub fn reset_state_store(&self) {
+        self.state_store.reset();
     }
 
     pub fn save_ledger_infos(&self, ledger_infos: &[LedgerInfoWithSignatures]) -> Result<()> {
@@ -71,6 +79,7 @@ impl RestoreHandler {
             self.ledger_db.clone(),
             self.ledger_store.clone(),
             ledger_infos,
+            None,
         )
     }
 
@@ -83,6 +92,7 @@ impl RestoreHandler {
             self.ledger_db.clone(),
             num_leaves,
             frozen_subtrees,
+            None,
         )
     }
 
@@ -92,6 +102,7 @@ impl RestoreHandler {
         txns: &[Transaction],
         txn_infos: &[TransactionInfo],
         events: &[Vec<ContractEvent>],
+        write_sets: Vec<WriteSet>,
     ) -> Result<()> {
         restore_utils::save_transactions(
             self.ledger_db.clone(),
@@ -102,6 +113,8 @@ impl RestoreHandler {
             txns,
             txn_infos,
             events,
+            write_sets,
+            None,
         )
     }
 
@@ -110,5 +123,19 @@ impl RestoreHandler {
             .aptosdb
             .get_latest_transaction_info_option()?
             .map_or(0, |(ver, _txn_info)| ver + 1))
+    }
+
+    pub fn get_in_progress_state_snapshot_version(&self) -> Result<Option<Version>> {
+        let mut iter = self
+            .aptosdb
+            .ledger_db
+            .iter::<DbMetadataSchema>(Default::default())?;
+        iter.seek_to_first();
+        while let Some((k, _v)) = iter.next().transpose()? {
+            if let DbMetadataKey::StateSnapshotRestoreProgress(version) = k {
+                return Ok(Some(version));
+            }
+        }
+        Ok(None)
     }
 }

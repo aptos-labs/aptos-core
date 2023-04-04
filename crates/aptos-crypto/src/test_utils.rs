@@ -1,9 +1,11 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! Internal module containing convenience utility functions mainly for testing
 
 use crate::traits::Uniform;
+use rand::distributions;
 use serde::{Deserialize, Serialize};
 
 /// A deterministic seed for PRNGs related to keys
@@ -140,12 +142,12 @@ pub fn small_order_pk_with_adversarial_message(
             |(R, pk_point, msg)| {
                 let pk_bytes = pk_point.compress().to_bytes();
 
-                let msg_bytes = signing_message(msg);
+                let msg_bytes = signing_message(msg).unwrap();
 
                 let mut h: Sha512 = Sha512::new();
                 h.update(R.compress().as_bytes());
                 h.update(pk_bytes);
-                h.update(&msg_bytes);
+                h.update(msg_bytes);
 
                 let k = Scalar::from_hash(h);
 
@@ -193,6 +195,15 @@ where
     vec
 }
 
+/// Returns n random bytes.
+pub fn random_bytes<R>(rng: &mut R, n: usize) -> Vec<u8>
+where
+    R: ::rand::Rng + Copy,
+{
+    let range = distributions::Uniform::from(0u8..u8::MAX);
+    rng.sample_iter(&range).take(n).collect()
+}
+
 /// Generates `num_signers` random key-pairs.
 pub fn random_keypairs<R, PrivKey, PubKey>(
     mut rng: &mut R,
@@ -212,30 +223,30 @@ where
 
 /// This struct provides a means of testing signing and verification through
 /// BCS serialization and domain separation
-#[cfg(any(test, feature = "fuzzing"))]
+//#[cfg(any(test, feature = "fuzzing"))]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TestAptosCrypto(pub String);
 
 // the following block is macro expanded from derive(CryptoHasher, BCSCryptoHash)
 
 /// Cryptographic hasher for an BCS-serializable #item
-#[cfg(any(test, feature = "fuzzing"))]
+// #[cfg(any(test, feature = "fuzzing"))]
 pub struct TestAptosCryptoHasher(crate::hash::DefaultHasher);
-#[cfg(any(test, feature = "fuzzing"))]
+// #[cfg(any(test, feature = "fuzzing"))]
 impl ::core::clone::Clone for TestAptosCryptoHasher {
     #[inline]
     fn clone(&self) -> TestAptosCryptoHasher {
         match *self {
             TestAptosCryptoHasher(ref __self_0_0) => {
-                TestAptosCryptoHasher(::core::clone::Clone::clone(&(*__self_0_0)))
-            }
+                TestAptosCryptoHasher(::core::clone::Clone::clone(__self_0_0))
+            },
         }
     }
 }
-#[cfg(any(test, feature = "fuzzing"))]
+// #[cfg(any(test, feature = "fuzzing"))]
 static TEST_CRYPTO_SEED: crate::_once_cell::sync::OnceCell<[u8; 32]> =
     crate::_once_cell::sync::OnceCell::new();
-#[cfg(any(test, feature = "fuzzing"))]
+// #[cfg(any(test, feature = "fuzzing"))]
 impl TestAptosCryptoHasher {
     fn new() -> Self {
         let name = crate::_serde_name::trace_name::<TestAptosCrypto>()
@@ -243,16 +254,16 @@ impl TestAptosCryptoHasher {
         TestAptosCryptoHasher(crate::hash::DefaultHasher::new(name.as_bytes()))
     }
 }
-#[cfg(any(test, feature = "fuzzing"))]
+// #[cfg(any(test, feature = "fuzzing"))]
 static TEST_CRYPTO_HASHER: crate::_once_cell::sync::Lazy<TestAptosCryptoHasher> =
     crate::_once_cell::sync::Lazy::new(TestAptosCryptoHasher::new);
-#[cfg(any(test, feature = "fuzzing"))]
+// #[cfg(any(test, feature = "fuzzing"))]
 impl std::default::Default for TestAptosCryptoHasher {
     fn default() -> Self {
         TEST_CRYPTO_HASHER.clone()
     }
 }
-#[cfg(any(test, feature = "fuzzing"))]
+// #[cfg(any(test, feature = "fuzzing"))]
 impl crate::hash::CryptoHasher for TestAptosCryptoHasher {
     fn seed() -> &'static [u8; 32] {
         TEST_CRYPTO_SEED.get_or_init(|| {
@@ -262,26 +273,30 @@ impl crate::hash::CryptoHasher for TestAptosCryptoHasher {
             crate::hash::DefaultHasher::prefixed_hash(name)
         })
     }
+
     fn update(&mut self, bytes: &[u8]) {
         self.0.update(bytes);
     }
+
     fn finish(self) -> crate::hash::HashValue {
         self.0.finish()
     }
 }
-#[cfg(any(test, feature = "fuzzing"))]
+// #[cfg(any(test, feature = "fuzzing"))]
 impl std::io::Write for TestAptosCryptoHasher {
     fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
         self.0.update(bytes);
         Ok(bytes.len())
     }
+
     fn flush(&mut self) -> std::io::Result<()> {
         Ok(())
     }
 }
-#[cfg(any(test, feature = "fuzzing"))]
+// #[cfg(any(test, feature = "fuzzing"))]
 impl crate::hash::CryptoHash for TestAptosCrypto {
     type Hasher = TestAptosCryptoHasher;
+
     fn hash(&self) -> crate::hash::HashValue {
         use crate::hash::CryptoHasher;
         let mut state = Self::Hasher::default();

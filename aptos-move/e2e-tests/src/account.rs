@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! Test infrastructure for modeling Aptos accounts.
@@ -14,23 +15,16 @@ use aptos_types::{
     event::{EventHandle, EventKey},
     state_store::state_key::StateKey,
     transaction::{
-        authenticator::AuthenticationKey, Module, ModuleBundle, RawTransaction, Script,
-        ScriptFunction, SignedTransaction, TransactionPayload, WriteSetPayload,
+        authenticator::AuthenticationKey, EntryFunction, Module, ModuleBundle, RawTransaction,
+        Script, SignedTransaction, TransactionPayload,
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
-use move_deps::{
-    move_core_types::{
-        language_storage::{ResourceKey, StructTag},
-        move_resource::MoveStructType,
-        value::{MoveStructLayout, MoveTypeLayout},
-    },
-    move_vm_types::values::{Struct, Value},
-};
-use vm_genesis::GENESIS_KEYPAIR;
+use aptos_vm_genesis::GENESIS_KEYPAIR;
+use move_core_types::move_resource::MoveStructType;
 
 // TTL is 86400s. Initial time was set to 0.
-pub const DEFAULT_EXPIRATION_TIME: u64 = 40_000;
+pub const DEFAULT_EXPIRATION_TIME: u64 = 4_000_000;
 
 /// Details about a Aptos account.
 ///
@@ -95,8 +89,8 @@ impl Account {
 
     /// Creates a new account in memory representing an account created in the genesis transaction.
     ///
-    /// The address will be [`address`], which should be an address for a genesis account and
-    /// the account will use [`GENESIS_KEYPAIR`][struct@GENESIS_KEYPAIR] as its keypair.
+    /// The address will be `address`, which should be an address for a genesis account and
+    /// the account will use [`GENESIS_KEYPAIR`][static@@GENESIS_KEYPAIR] as its keypair.
     pub fn new_genesis_account(address: AccountAddress) -> Self {
         Account {
             addr: address,
@@ -107,10 +101,10 @@ impl Account {
 
     /// Creates a new account representing the aptos root account in memory.
     ///
-    /// The address will be [`aptos_root_address`][account_config::aptos_root_address], and
-    /// the account will use [`GENESIS_KEYPAIR`][struct@GENESIS_KEYPAIR] as its keypair.
+    /// The address will be [`aptos_test_root_address`][account_config::aptos_test_root_address], and
+    /// the account will use [`GENESIS_KEYPAIR`][static@GENESIS_KEYPAIR] as its keypair.
     pub fn new_aptos_root() -> Self {
-        Self::new_genesis_account(account_config::aptos_root_address())
+        Self::new_genesis_account(account_config::aptos_test_root_address())
     }
 
     /// Returns the address of the account. This is a hash of the public key the account was created
@@ -125,19 +119,16 @@ impl Account {
     ///
     /// Use this to retrieve or publish the Account blob.
     pub fn make_account_access_path(&self) -> AccessPath {
-        self.make_access_path(AccountResource::struct_tag())
+        AccessPath::resource_access_path(self.addr, AccountResource::struct_tag())
+            .expect("access path in test")
     }
 
     /// Returns the AccessPath that describes the Account's CoinStore resource instance.
     ///
     /// Use this to retrieve or publish the Account CoinStore blob.
     pub fn make_coin_store_access_path(&self) -> AccessPath {
-        self.make_access_path(CoinStoreResource::struct_tag())
-    }
-
-    pub fn make_access_path(&self, tag: StructTag) -> AccessPath {
-        let resource_tag = ResourceKey::new(self.addr, tag);
-        AccessPath::resource_access_path(resource_tag)
+        AccessPath::resource_access_path(self.addr, CoinStoreResource::struct_tag())
+            .expect("access path in  test")
     }
 
     /// Changes the keys for this account to the provided ones.
@@ -214,18 +205,13 @@ impl TransactionBuilder {
         self
     }
 
-    pub fn script_function(mut self, f: ScriptFunction) -> Self {
-        self.program = Some(TransactionPayload::ScriptFunction(f));
+    pub fn entry_function(mut self, f: EntryFunction) -> Self {
+        self.program = Some(TransactionPayload::EntryFunction(f));
         self
     }
 
     pub fn module(mut self, m: Module) -> Self {
         self.program = Some(TransactionPayload::ModuleBundle(ModuleBundle::from(m)));
-        self
-    }
-
-    pub fn write_set(mut self, w: WriteSetPayload) -> Self {
-        self.program = Some(TransactionPayload::WriteSet(w));
         self
     }
 
@@ -309,6 +295,7 @@ impl TransactionBuilder {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CoinStore {
     coin: u64,
+    frozen: bool,
     deposit_events: EventHandle,
     withdraw_events: EventHandle,
 }
@@ -318,6 +305,7 @@ impl CoinStore {
     pub fn new(coin: u64, deposit_events: EventHandle, withdraw_events: EventHandle) -> Self {
         Self {
             coin,
+            frozen: false,
             deposit_events,
             withdraw_events,
         }
@@ -329,45 +317,14 @@ impl CoinStore {
     }
 
     /// Returns the Move Value for the account's CoinStore
-    pub fn to_value(&self) -> Value {
-        Value::struct_(Struct::pack(vec![
-            Value::u64(self.coin),
-            Value::struct_(Struct::pack(vec![
-                Value::u64(self.withdraw_events.count()),
-                Value::struct_(Struct::pack(vec![
-                    Value::u64(self.withdraw_events.key().get_creation_number()),
-                    Value::address(self.withdraw_events.key().get_creator_address()),
-                ])),
-            ])),
-            Value::struct_(Struct::pack(vec![
-                Value::u64(self.deposit_events.count()),
-                Value::struct_(Struct::pack(vec![
-                    Value::u64(self.deposit_events.key().get_creation_number()),
-                    Value::address(self.deposit_events.key().get_creator_address()),
-                ])),
-            ])),
-        ]))
-    }
-
-    /// Returns the value layout for the account's CoinStore
-    pub fn layout() -> MoveStructLayout {
-        MoveStructLayout::new(vec![
-            MoveTypeLayout::U64,
-            MoveTypeLayout::Struct(MoveStructLayout::new(vec![
-                MoveTypeLayout::U64,
-                MoveTypeLayout::Struct(MoveStructLayout::new(vec![
-                    MoveTypeLayout::U64,
-                    MoveTypeLayout::Address,
-                ])),
-            ])),
-            MoveTypeLayout::Struct(MoveStructLayout::new(vec![
-                MoveTypeLayout::U64,
-                MoveTypeLayout::Struct(MoveStructLayout::new(vec![
-                    MoveTypeLayout::U64,
-                    MoveTypeLayout::Address,
-                ])),
-            ])),
-        ])
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let coin_store = CoinStoreResource::new(
+            self.coin,
+            self.frozen,
+            self.deposit_events.clone(),
+            self.withdraw_events.clone(),
+        );
+        bcs::to_bytes(&coin_store).unwrap()
     }
 }
 
@@ -382,6 +339,8 @@ impl CoinStore {
 pub struct AccountData {
     account: Account,
     sequence_number: u64,
+    coin_register_events: EventHandle,
+    key_rotation_events: EventHandle,
     coin_store: CoinStore,
 }
 
@@ -437,6 +396,8 @@ impl AccountData {
                 new_event_handle(sent_events_count, addr),
             ),
             sequence_number,
+            coin_register_events: new_event_handle(0, addr),
+            key_rotation_events: new_event_handle(1, addr),
         }
     }
 
@@ -445,22 +406,15 @@ impl AccountData {
         self.account.rotate_key(privkey, pubkey)
     }
 
-    /// Returns the (Move value) layout of the Account::Account struct
-    pub fn layout() -> MoveStructLayout {
-        use MoveStructLayout as S;
-        use MoveTypeLayout as T;
-
-        S::new(vec![T::Vector(Box::new(T::U8)), T::U64, T::Address])
-    }
-
     /// Creates and returns the top-level resources to be published under the account
-    pub fn to_value(&self) -> (Value, Value) {
-        let account = Value::struct_(Struct::pack(vec![
-            Value::vector_u8(AuthenticationKey::ed25519(&self.account.pubkey).to_vec()),
-            Value::u64(self.sequence_number),
-            Value::address(*self.address()),
-        ]));
-        (account, self.coin_store.to_value())
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let account = AccountResource::new(
+            self.sequence_number,
+            AuthenticationKey::ed25519(&self.account.pubkey).to_vec(),
+            self.coin_register_events.clone(),
+            self.key_rotation_events.clone(),
+        );
+        bcs::to_bytes(&account).unwrap()
     }
 
     /// Returns the AccessPath that describes the Account resource instance.
@@ -477,38 +431,19 @@ impl AccountData {
         self.account.make_coin_store_access_path()
     }
 
-    pub fn transfer_event_layout() -> MoveStructLayout {
-        let event_layout = MoveTypeLayout::Struct(MoveStructLayout::new(vec![
-            MoveTypeLayout::U64,
-            MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U8)),
-        ]));
-        MoveStructLayout::new(vec![event_layout.clone(), event_layout])
-    }
-
     /// Creates a writeset that contains the account data and can be patched to the storage
     /// directly.
     pub fn to_writeset(&self) -> WriteSet {
-        let (account_blob, coinstore_blob) = self.to_value();
-        let mut write_set = Vec::new();
-        let account = account_blob
-            .value_as::<Struct>()
-            .unwrap()
-            .simple_serialize(&AccountData::layout())
-            .unwrap();
-        write_set.push((
-            StateKey::AccessPath(self.make_account_access_path()),
-            WriteOp::Value(account),
-        ));
-
-        let balance = coinstore_blob
-            .value_as::<Struct>()
-            .unwrap()
-            .simple_serialize(&CoinStore::layout())
-            .unwrap();
-        write_set.push((
-            StateKey::AccessPath(self.make_coin_store_access_path()),
-            WriteOp::Value(balance),
-        ));
+        let write_set = vec![
+            (
+                StateKey::access_path(self.make_account_access_path()),
+                WriteOp::Modification(self.to_bytes()),
+            ),
+            (
+                StateKey::access_path(self.make_coin_store_access_path()),
+                WriteOp::Modification(self.coin_store.to_bytes()),
+            ),
+        ];
 
         WriteSetMut::new(write_set).freeze().unwrap()
     }

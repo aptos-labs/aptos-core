@@ -1,28 +1,24 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![allow(unused_imports)]
 
+use crate::response::InternalError;
 use anyhow::{format_err, Result};
-use aptos_api_types::Error;
-
-use crate::poem_backend::{AptosError, AptosErrorResponse};
+use aptos_api_types::AptosErrorCode;
 use poem_openapi::payload::Json;
 
+/// Build a failpoint to intentionally crash an API for testing
 #[allow(unused_variables)]
 #[inline]
-pub fn fail_point(name: &str) -> Result<(), Error> {
-    Ok(fail::fail_point!(format!("api::{}", name).as_str(), |_| {
-        Err(format_err!("unexpected internal error for {}", name).into())
-    }))
-}
+pub fn fail_point_poem<E: InternalError>(name: &str) -> Result<(), E> {
+    fail::fail_point!(format!("api::{}", name).as_str(), |_| {
+        Err(E::internal_with_code_no_info(
+            format!("Failpoint unexpected internal error for {}", name),
+            AptosErrorCode::InternalError,
+        ))
+    });
 
-#[allow(unused_variables)]
-#[inline]
-pub fn fail_point_poem(name: &str) -> Result<(), AptosErrorResponse> {
-    Ok(fail::fail_point!(format!("api::{}", name).as_str(), |_| {
-        Err(AptosErrorResponse::InternalServerError(Json(
-            AptosError::new(format!("unexpected internal error for {}", name)),
-        )))
-    }))
+    Ok(())
 }

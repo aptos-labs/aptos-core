@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -21,13 +22,13 @@ use aptos_types::{
     transaction::Version,
     waypoint::Waypoint,
 };
+use clap::Parser;
 use futures::StreamExt;
 use std::{collections::HashMap, sync::Arc, time::Instant};
-use structopt::StructOpt;
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 pub struct EpochEndingRestoreOpt {
-    #[structopt(long = "epoch-ending-manifest")]
+    #[clap(long = "epoch-ending-manifest")]
     pub manifest_handle: FileHandle,
 }
 
@@ -250,11 +251,11 @@ impl PreheatedEpochEndingRestore {
 
                 EPOCH_ENDING_EPOCH.set(last_li.epoch() as i64);
                 EPOCH_ENDING_VERSION.set(last_li.version() as i64);
-            }
+            },
             RestoreRunMode::Verify => {
                 VERIFY_EPOCH_ENDING_EPOCH.set(last_li.epoch() as i64);
                 VERIFY_EPOCH_ENDING_VERSION.set(last_li.version() as i64);
-            }
+            },
         };
 
         Ok(preheat_data
@@ -269,30 +270,46 @@ impl PreheatedEpochEndingRestore {
 #[derive(Clone)]
 pub struct EpochHistory {
     pub epoch_endings: Vec<LedgerInfo>,
+    pub trusted_waypoints: Arc<HashMap<Version, Waypoint>>,
 }
 
 impl EpochHistory {
     pub fn verify_ledger_info(&self, li_with_sigs: &LedgerInfoWithSignatures) -> Result<()> {
         let epoch = li_with_sigs.ledger_info().epoch();
         ensure!(!self.epoch_endings.is_empty(), "Empty epoch history.",);
-        ensure!(
-            epoch <= self.epoch_endings.len() as u64,
-            "History until epoch {} can't verify epoch {}",
-            self.epoch_endings.len(),
-            epoch,
-        );
+        if epoch > self.epoch_endings.len() as u64 {
+            // TODO(aldenhu): fix this from upper level
+            warn!(
+                epoch = epoch,
+                epoch_history_until = self.epoch_endings.len(),
+                "Epoch is too new and can't be verified. Previous chunks are verified and node \
+                won't be able to start if this data is malicious."
+            );
+            return Ok(());
+        }
         if epoch == 0 {
             ensure!(
                 li_with_sigs.ledger_info() == &self.epoch_endings[0],
                 "Genesis epoch LedgerInfo info doesn't match.",
             );
-            Ok(())
+        } else if let Some(wp_trusted) = self
+            .trusted_waypoints
+            .get(&li_with_sigs.ledger_info().version())
+        {
+            let wp_li = Waypoint::new_any(li_with_sigs.ledger_info());
+            ensure!(
+                *wp_trusted == wp_li,
+                "Waypoints don't match. In backup: {}, trusted: {}",
+                wp_li,
+                wp_trusted,
+            );
         } else {
             self.epoch_endings[epoch as usize - 1]
                 .next_epoch_state()
                 .ok_or_else(|| anyhow!("Shouldn't contain non- epoch bumping LIs."))?
-                .verify(li_with_sigs)
-        }
+                .verify(li_with_sigs)?;
+        };
+        Ok(())
     }
 }
 
@@ -317,11 +334,7 @@ impl EpochHistoryRestoreController {
 
     pub async fn run(self) -> Result<EpochHistory> {
         let name = self.name();
-        info!(
-            "{} started. Trying epoch endings starting from epoch 0, {} in total.",
-            name,
-            self.manifest_handles.len(),
-        );
+        info!("{} started.", name,);
         let res = self
             .run_impl()
             .await
@@ -341,6 +354,7 @@ impl EpochHistoryRestoreController {
         if self.manifest_handles.is_empty() {
             return Ok(EpochHistory {
                 epoch_endings: Vec::new(),
+                trusted_waypoints: Arc::new(HashMap::new()),
             });
         }
 
@@ -394,6 +408,9 @@ impl EpochHistoryRestoreController {
             "Epoch history recovered in {:.2} seconds",
             timer.elapsed().as_secs_f64()
         );
-        Ok(EpochHistory { epoch_endings })
+        Ok(EpochHistory {
+            epoch_endings,
+            trusted_waypoints: self.global_opt.trusted_waypoints.clone(),
+        })
     }
 }

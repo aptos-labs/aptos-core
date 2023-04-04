@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -37,7 +38,7 @@ pub fn fuzz_network_handshake_protocol_exchange(self_handshake: &HandshakeMsg, d
     fake_socket.set_trailing();
 
     // fuzz the network exchange of HandshakeMsg first
-    let _ = block_on(async move {
+    block_on(async move {
         if let Ok(remote_handshake_msg) = exchange_handshake(self_handshake, &mut fake_socket).await
         {
             // then perform the negotiation

@@ -1,10 +1,11 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 mod admin;
 pub use admin::*;
 mod aptos;
-pub use aptos::*;
+pub use self::aptos::*;
 mod network;
 pub use network::*;
 mod test;
@@ -13,9 +14,14 @@ mod factory;
 pub use factory::*;
 mod swarm;
 pub use swarm::*;
+mod chaos;
+pub use chaos::*;
 mod node;
 pub use node::*;
 mod chain_info;
+pub mod system_metrics;
+
+use aptos_framework::ReleaseBundle;
 pub use chain_info::*;
 
 /// A wrapper around a usize in order to represent an opaque version of a Node.
@@ -43,6 +49,6 @@ impl std::fmt::Display for Version {
 
 #[derive(Clone)]
 pub enum GenesisConfig {
-    Bytes(Vec<Vec<u8>>),
+    Bundle(ReleaseBundle),
     Path(String),
 }

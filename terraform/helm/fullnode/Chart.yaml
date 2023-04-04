@@ -1,4 +1,4 @@
 apiVersion: v2
-appVersion: 1.5.0-rc.1
+appVersion: 1.0.0
 name: aptos-fullnode
-version: 1.5.0-rc.1
+version: 1.0.0

@@ -1,0 +1,5 @@
+{
+  "message": "The given transaction is invalid: Failed to parse transaction payload: parse arguments[0] failed, expect string<address>, caused by error: invalid type: boolean `true`, expected a string",
+  "error_code": "invalid_input",
+  "vm_error_code": null
+}

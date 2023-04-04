@@ -1,7 +1,18 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::serializer::SafetyRulesInput;
+#[cfg(any(test, feature = "fuzzing"))]
+use aptos_consensus_types::block::Block;
+use aptos_consensus_types::{
+    block_data::{BlockData, BlockType},
+    common::Payload,
+    quorum_cert::QuorumCert,
+    timeout_2chain::TwoChainTimeout,
+    vote_data::VoteData,
+    vote_proposal::VoteProposal,
+};
 use aptos_crypto::{
     bls12381,
     hash::{HashValue, TransactionAccumulatorHasher},
@@ -17,16 +28,6 @@ use aptos_types::{
     proptest_types::{AccountInfoUniverse, BlockInfoGen},
     transaction::SignedTransaction,
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
-};
-#[cfg(any(test, feature = "fuzzing"))]
-use consensus_types::block::Block;
-use consensus_types::{
-    block_data::{BlockData, BlockType},
-    common::Payload,
-    quorum_cert::QuorumCert,
-    timeout_2chain::TwoChainTimeout,
-    vote_data::VoteData,
-    vote_proposal::VoteProposal,
 };
 use proptest::prelude::*;
 use rand::{rngs::StdRng, SeedableRng};
@@ -66,7 +67,7 @@ prop_compose! {
         let signature = if include_signature {
             let mut rng = StdRng::from_seed(TEST_SEED);
             let private_key = bls12381::PrivateKey::generate(&mut rng);
-            let signature = private_key.sign(&block_data);
+            let signature = private_key.sign(&block_data).unwrap();
             Some(signature)
         } else {
             None
@@ -164,18 +165,13 @@ prop_compose! {
     )(
         include_epoch_state in any::<bool>(),
         epoch in any::<u64>(),
-        address_to_validator_info in prop::collection::btree_map(
-            any::<AccountAddress>(),
-            arb_validator_consensus_info(),
+        validator_infos in prop::collection::vec(
+            any::<ValidatorConsensusInfo>(),
             0..MAX_NUM_ADDR_TO_VALIDATOR_INFO
         ),
-        quorum_voting_power in any::<u64>(),
-        total_voting_power in any::<u64>(),
     ) -> Option<EpochState> {
-        let verifier = ValidatorVerifier::new_for_testing(
-            address_to_validator_info,
-            quorum_voting_power,
-            total_voting_power
+        let verifier = ValidatorVerifier::new(
+            validator_infos,
         );
         if include_epoch_state {
             Some(EpochState {
@@ -214,17 +210,6 @@ prop_compose! {
     }
 }
 
-// This generates an arbitrary ValidatorConsensusInfo.
-prop_compose! {
-    pub fn arb_validator_consensus_info(
-    )(
-        public_key in any::<bls12381::PublicKey>(),
-        voting_power in any::<u64>(),
-    ) -> ValidatorConsensusInfo {
-        ValidatorConsensusInfo::new(public_key, voting_power)
-    }
-}
-
 // This generates an arbitrary BlockType enum.
 fn arb_block_type() -> impl Strategy<Value = BlockType> {
     prop_oneof![
@@ -252,12 +237,12 @@ pub fn arb_safety_rules_input() -> impl Strategy<Value = SafetyRulesInput> {
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod fuzzing {
     use crate::{error::Error, serializer::SafetyRulesInput, test_utils, TSafetyRules};
-    use aptos_crypto::bls12381;
-    use aptos_types::epoch_change::EpochChangeProof;
-    use consensus_types::{
+    use aptos_consensus_types::{
         block_data::BlockData, timeout_2chain::TwoChainTimeout, vote::Vote,
         vote_proposal::VoteProposal,
     };
+    use aptos_crypto::bls12381;
+    use aptos_types::epoch_change::EpochChangeProof;
 
     pub fn fuzz_initialize(proof: EpochChangeProof) -> Result<(), Error> {
         let mut safety_rules = test_utils::test_safety_rules_uninitialized();

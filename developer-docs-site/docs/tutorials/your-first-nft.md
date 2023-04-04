@@ -1,325 +1,527 @@
 ---
-title: "Your First NFT"
+title: "Mint NFTs with the SDKs"
 slug: "your-first-nft"
-sidebar_position: 3
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
+import ThemedImage from '@theme/ThemedImage';
+import useBaseUrl from '@docusaurus/useBaseUrl';
 
-Note: The following tutorial is a work in progress. Furthermore, the Aptos' (Non-Fungible) Token specification has not been formalized.
+# Mint NFTs with the Aptos SDKs
 
-# Tokens and NFTs in Aptos
+This tutorial describes how to create and transfer NFTs on the Aptos blockchain. The Aptos implementation for core NFTs can be found in the [token.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move) Move module.
 
-An [NFT](https://en.wikipedia.org/wiki/Non-fungible_token) is a non-fungible token or data stored on a blockchain that uniquely defines ownership of an asset. NFTs were first defined in [EIP-721](https://eips.ethereum.org/EIPS/eip-721) and later expanded upon in [EIP-1155](https://eips.ethereum.org/EIPS/eip-1155). NFTs typically comprise of the following aspects:
+For reference, also see:
+* [mint_nft](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/mint_nft) Move example on how to airdrop an NFT 
+* [mint_nft.rs](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/e2e-move-tests/src/tests/mint_nft.rs) Rust end-to-end test
 
-* A name, the name of the asset, which must be unique within a collection
-* A description, the description of the asset
-* A URL, a non-descript pointer off-chain to more information about the asset could be media such as an image or video or more metadata
-* A supply, the total number of units of this NFT, many NFTs have only a single supply while those that have more than one are referred to as editions
+## Step 1: Pick an SDK
 
-Additionally, most NFTs are part of a collection or a set of NFTs with a common attribute, e.g., theme, creator, or minimally contract. Each collection has a similar set of attributes:
+Install your preferred SDK from the below list:
 
-* A name, the name of the collection, which must be unique within the creator's account
-* A description, the description of the asset
-* A URL, a non-descript pointer off-chain to more information about the asset could be media such as an image or video or more metadata
+* [TypeScript SDK](../sdks/ts-sdk/index.md)
+* [Python SDK](../sdks/python-sdk.md)
+* [Rust SDK](../sdks/rust-sdk.md)
 
-The Aptos implementation for core NFTs or Tokens can be found in [Token.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/Token.move).
+---
 
-## Aptos Token Definitions
+## Step 2: Run the example
 
-### The Token
+Each SDK provides an `examples` directory. This tutorial covers the `simple-nft` example.
 
-The Aptos Token is defined as:
+Clone the `aptos-core` repo:
+```bash
+git clone git@github.com:aptos-labs/aptos-core.git ~/aptos-core
+```
 
-| Field | Type | Description |
-| ----- | ---- | ----------- |
-| `id` | `GUID:ID` | A globally unique identifier for this token also useful for identifying the creator |
-| `name` | `string::String` | The name of this token, must be unique within the collection |
-| `collection` | `GUID:ID` | A globally unique identifier for the collection that contains this token |
-| `balance` | `u64` | The current stored amount of this token in relation to the supply, `1 <= balance <= supply` |
+<Tabs groupId="sdk-examples">
+  <TabItem value="typescript" label="Typescript">
 
-The Aptos TokenData is defined as:
+  Navigate to the Typescript SDK examples directory:
+  ```bash
+  cd ~/aptos-core/ecosystem/typescript/sdk/examples/typescript
+  ```
 
-| Field | Type | Description |
-| ----- | ---- | ----------- |
-| `id` | `GUID:ID` | A globally unique identifier for this token also useful for identifying the creator |
-| `description` | `string::String` | Describes this token |
-| `name` | `string::String` | The name of this token, must be unique within the collection |
-| `supply` | `u64` | Total number of editions of this Token |
-| `uri` | `string::String` | URL for additional information / media |
-| `metadata` | `TokenType` | A generic, a optional user defined struct to contain additional information about this token on-chain |
+  Install the necessary dependencies:
+  ```bash
+  pnpm install
+  ```
 
-Tokens are defined with the move attributes `store`, which means that they can be saved to global storage. Tokens cannot be implicitly dropped and must be burned to ensure that the total balance is equal to supply. Tokens cannot be copied. That is the total balance or supply cannot be changed by anyone but the creator due to the lack of a copy operator. Note, the current APIs do not expose the ability for post creation mints. A token can be uniquely identified by either its `id` or by the tuple of `TokenType, collection name, and token name`.
+  Run the Typescript [`simple_nft`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/simple_nft.ts) example:
+  ```bash
+  pnpm run simple_nft
+  ```
+  </TabItem>
+  <TabItem value="python" label="Python">
 
-TokenData has the `copy` attribute to support simplicity of token balance splitting. A token split can happen whenever an individual with balance greater than `1` offers another individual a portion of their balance less than their total balance. Users trading Tokens are advised that two Tokens can share the same TokenData as the Aptos standard does not attempt to identify if a token copies attributes from another. Repeating what was said earlier, the token can be uniquely identified by either its `id` or `TokenType`, collection name, and token name. A creator could change any of the values in the set of `TokenType`, collection name, or token name to create similar but not identtcal tokens.
+  Navigate to the Python SDK directory:
+  ```bash
+  cd ~/aptos-core/ecosystem/python/sdk
+  ```
 
-### The Token Collection
+  Install the necessary dependencies:
+  ```bash
+  curl -sSL https://install.python-poetry.org | python3
+  poetry update
+  ```
 
-Aptos defines a set of collections grouped together by their unique `id`:
+  Run the Python [`simple-nft`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/simple-nft.py) example:
+  ```bash
+  poetry run python -m examples.simple-nft
+  ```
+  </TabItem>
+  <TabItem value="rust" label="Rust">
 
-```rust
-struct Collections<TokenType: copy + drop + store> has key {
-    collections: Table<string::String, Collection>,
+Coming soon.
+  </TabItem>
+</Tabs>
+
+---
+
+## Step 3: Understand the output
+
+The following output should appear after executing the `simple-nft` example, though some values will be different:
+
+```yaml
+=== Addresses ===
+Alice: 0xeef95e86c160fa10a71675c6075f44f8f2c6125f57b4b589424f1fbee385f754
+Bob: 0x4dcd7b180c123fdb989d10f71fba6c978bda268c2e3660c169bdb55f67aab776
+
+=== Initial Coin Balances ===
+Alice: 100000000
+Bob: 100000000
+
+=== Creating Collection and Token ===
+Alice's collection: {
+    "description": "Alice's simple collection",
+    "maximum": "18446744073709551615",
+    "mutability_config": {
+        "description": false,
+        "maximum": false,
+        "uri": false
+    },
+    "name": "Alice's",
+    "supply": "1",
+    "uri": "https://alice.com"
+}
+Alice's token balance: 1
+Alice's token data: {
+    "default_properties": {
+        "map": {
+            "data": []
+        }
+    },
+    "description": "Alice's simple token",
+    "largest_property_version": "0",
+    "maximum": "18446744073709551615",
+    "mutability_config": {
+        "description": false,
+        "maximum": false,
+        "properties": false,
+        "royalty": false,
+        "uri": false
+    },
+    "name": "Alice's first token",
+    "royalty": {
+        "payee_address": "0xeef95e86c160fa10a71675c6075f44f8f2c6125f57b4b589424f1fbee385f754",
+        "royalty_points_denominator": "0",
+        "royalty_points_numerator": "0"
+    },
+    "supply": "1",
+    "uri": "https://aptos.dev/img/nyan.jpeg"
 }
 
-struct TokenMetadata<TokenType: store> has key {
-    metadata: Table<ID, TokenType>,
-}
+=== Transferring the token to Bob ===
+Alice's token balance: 0
+Bob's token balance: 1
+
+=== Transferring the token back to Alice using MultiAgent ===
+Alice's token balance: 1
+Bob's token balance: 0
 ```
 
-As the `Collections` has the attribute `key`, it is stored directly to the creators account. It is important to note, that if there were no notion of `Collections` and instead `Collection` had the `key` attribute, an Aptos account could only have a single collection, which often is not the case. A collection can be looked up in the set of Collections by name, hence enforcing a unique collection name.
+This example demonstrates:
 
-The Token and TokenData structs are fixed in their content. The resource `TokenMetadata` enables creators to store additional token data. The Data in the table is stored as the `Token`'s unique `ID`. The use of this is optional and requires API specialization due to the limitation that script functions cannot support structs or generics.
+* Initializing the REST and faucet clients.
+* The creation of two accounts: Alice and Bob.
+* The funding and creation of Alice and Bob's accounts.
+* The creation of a collection and a token using Alice's account.
+* Alice offering a token and Bob claiming it.
+* Bob unilaterally sending the token to Alice via a multiagent transaction.
 
-Each collection has the following fields:
+---
 
-| Field | Type | Description |
-| ----- | ---- | ----------- |
-| `tokens` | `Table<string::String, TokenMetadata<TokenType>>` | Keeps track of all Tokens associated with this collection |
-| `claimed_tokens` | `Table<string::String, address>` | Keeps track of where tokens wth `supply == 1` are stored |
-| `description` | `string::String` | Describes this collection |
-| `name` | `string::String` | The name of this collection, must be unique within the creators account for the specified `TokenType`. |
-| `uri` | `string::String` | URL for additional information / media |
-| `count` | `u64` | Total number of distinct Tokens tracked by this collection |
-| `maximum` | `Option<u64>` | Optional, maximum amount of tokens that can be minted within this collection |
+## Step 4: The SDK in depth
 
-A collection is not a store for accumulating Tokens, so instead of containing a `Token`, it contains a `TokenData`:
+<Tabs groupId="sdk-examples">
+  <TabItem value="typescript" label="Typescript">
 
-| Field | Type | Description |
-| ----- | ---- | ----------- |
-| `id` | `GUID:ID` | A globally unique identifier for this token also useful for identifying the creator |
-| `data` | `TokenData` | Additional data about this token, this is set of supply of the token `> 1` |
-
-### Storing Tokens
-
-In order to acquire and store tokens, a user must have a `Gallery` of `TokenType`:
-
-```rust
-struct Gallery has key {
-    gallery: Table<ID, Token>,
-}
-```
-
-Like the `Collections`, this is stored as a resource on an Aptos account.
-
-## Introducing Tokens
-
-As part of our core framework, Aptos provides a basic [Token](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/Token.move) interface with no additional data, or explicitly one in which the `TokenMetadata` resource has no entry for that token. The motivations for doing so include:
-
-* Creating a new token requires writing Move code
-* The Script function for creating a new token must be specialized as Move does not support template types or structs as input arguments
-* Template types on script functions add extra friction to writing script functions
-
-This tutorial will walk you through the process of
-* creating your own Token collection,
-* a Token of our favorite cat,
-* and giving that token to someone else.
-
-This tutorial builds on [Your first transaction](/tutorials/your-first-transaction) as a library for this example. The following tutorial contains example code that can be downloaded in its entirety below:
-
-<Tabs>
-  <TabItem value="python" label="Python" default>
-
-For this tutorial, will be focusing on `first_nft.py` and re-using the `first_transaction.py` library from the previous tutorial.
-
-You can find the python project [here](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/python)
-
+:::tip See the full code
+See [`simple_nft`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/simple_nft.ts) for the complete code as you follow the below steps.
+:::
   </TabItem>
-  <TabItem value="rust" label="Rust" default>
+  <TabItem value="python" label="Python">
 
-TODO
-
+:::tip See the full code
+See [`simple-nft`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/simple-nft.py) for the complete code as you follow the below steps.
+:::
   </TabItem>
-  <TabItem value="typescript" label="Typescript" default>
+  <TabItem value="rust" label="Rust">
 
-For this tutorial, will be focusing on `first_nft.ts` and re-using the `first_transaction.ts` library from the previous tutorial.
-
-You can find the typescript project [here](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/typescript)
-
+Coming soon.
   </TabItem>
 </Tabs>
 
-### Creating a Collection
+---
 
-The Aptos Token enables creators to create finite or unlimited collections. Many NFTs are of a limited nature, where the creator only intends on creating a certain amount forever, this enforces scarcity. Whereas other tokens may have an unlimited nature, for example, a collection used for utility may see new tokens appear over time. SimpleToken collections can be instantiated with either behavior by using the appropriate script function:
+### Step 4.1: Initializing the clients
 
-Finite, that is no more than a `maximum` number of tokens can ever be minted:
-```rust
-public(script) fun create_finite_collection_script(
-    account: signer,
-    description: vector<u8>,
-    name: vector<u8>,
-    uri: vector<u8>,
-    maximum: u64,
-)
+In the first step, the example initializes both the API and faucet clients.
+
+- The API client interacts with the REST API.
+- The faucet client interacts with the devnet Faucet service for creating and funding accounts.
+
+<Tabs groupId="sdk-examples">
+  <TabItem value="typescript" label="Typescript">
+
+```ts
+:!: static/sdks/typescript/examples/typescript/simple_nft.ts section_1a
 ```
 
-Unlimited, that is there is no limit to the number of tokens that can be added to the collection:
-```rust
-public(script) fun create_unlimited_collection_script(
-    account: signer,
-    description: vector<u8>,
-    name: vector<u8>,
-    uri: vector<u8>,
-)
+Using the API client we can create a `TokenClient` that we use for common token operations such as creating collections and tokens, transferring them, claiming them, and so on.
+```ts
+:!: static/sdks/typescript/examples/typescript/simple_nft.ts section_1b
 ```
 
-These script functions can be called via the REST API. The following demonstrates how to call the as demonstrated in the following:
-
-<Tabs>
-  <TabItem value="python" label="Python" default>
+`common.ts` initializes the URL values as such:
+```ts
+:!: static/sdks/typescript/examples/typescript/common.ts section_1
+```
+  </TabItem>
+  <TabItem value="python" label="Python">
 
 ```python
-:!: static/examples/python/first_nft.py section_1
-```
-  </TabItem>
-  <TabItem value="rust" label="Rust" default>
-
-TODO
-  </TabItem>
-  <TabItem value="typescript" label="Typescript" default>
-
-```typescript
-:!: static/examples/typescript/first_nft.ts section_1
+:!: static/sdks/python/examples/simple-nft.py section_1
 ```
 
+[`common.py`](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/python/sdk/examples/common.py) initializes these values as follows:
+
+```python
+:!: static/sdks/python/examples/common.py section_1
+```
   </TabItem>
-</Tabs>
+  <TabItem value="rust" label="Rust">
 
-### Creating a Token
-
-Tokens can be created after collection creation. To do so, the token must specify the same `collection_name` as specified as the name of a previously created collection `name`. The Move script function to create a `SimpleToken` is:
 
 ```rust
-public(script) fun create_token_script(
-    account: signer,
-    collection_name: vector<u8>,
-    description: vector<u8>,
-    name: vector<u8>,
-    supply: u64,
-    uri: vector<u8>,
-)
+:!: static/sdks/rust/examples/transfer-coin.rs section_1a
 ```
 
-These script functions can be called via the REST API. The following demonstrates how to call the as demonstrated in the following:
-
-<Tabs>
-  <TabItem value="python" label="Python" default>
-
-```python
-:!: static/examples/python/first_nft.py section_2
+Using the API client we can create a `CoinClient` that we use for common coin operations such as transferring coins and checking balances.
+```rust
+:!: static/sdks/rust/examples/transfer-coin.rs section_1b
 ```
-  </TabItem>
-  <TabItem value="rust" label="Rust" default>
 
-TODO
-  </TabItem>
-  <TabItem value="typescript" label="Typescript" default>
-
-```typescript
-:!: static/examples/typescript/first_nft.ts section_2
+In the example we initialize the URL values as such:
+```rust
+:!: static/sdks/rust/examples/transfer-coin.rs section_1c
 ```
   </TabItem>
 </Tabs>
 
-### Giving Away a Token
 
-In Aptos and Move, each token occupies space and has ownership. Because of this, token transfers are not unilateral and require two phase process similar to a bulletin board. The sender must first register that a token is available for the recipient to claim, the recipient must then claim this token. This has been implemented in a proof of concept move module called [`TokenTransfer`](https://github.com/aptos-labs/aptos-core/blob/nft/aptos-move/framework/aptos-framework/sources/TokenTransfers.move). `SimpleToken` provides a few wrapper functions to support transferring to another account, claiming that transfer, or stopping that transfer.
+:::tip
 
-#### Obtaining the Token ID
+By default, the URLs for both the services point to Aptos devnet services. However, they can be configured with the following environment variables:
+  - `APTOS_NODE_URL`
+  - `APTOS_FAUCET_URL`
+:::
 
-In order to transfer the token, the sender must first identify the token id based upon knowing the creator's account, the collection name, and the token name. This can be obtained by querying REST:
+---
 
-<Tabs>
-  <TabItem value="python" label="Python" default>
+### Step 4.2: Creating local accounts
+
+The next step is to create two accounts locally. [Accounts](../concepts/accounts.md) represent both on and off-chain state. Off-chain state consists of an address and the public/private key pair used to authenticate ownership. This step demonstrates how to generate that off-chain state.
+
+<Tabs groupId="sdk-examples">
+  <TabItem value="typescript" label="Typescript">
+
+```ts
+:!: static/sdks/typescript/examples/typescript/simple_nft.ts section_2
+```
+  </TabItem>
+  <TabItem value="python" label="Python">
 
 ```python
-:!: static/examples/python/first_nft.py section_3
+:!: static/sdks/python/examples/simple-nft.py section_2
 ```
   </TabItem>
-  <TabItem value="rust" label="Rust" default>
+  <TabItem value="rust" label="Rust">
 
-TODO
-  </TabItem>
-  <TabItem value="typescript" label="Typescript" default>
-
-```typescript
-:!: static/examples/typescript/first_nft.ts section_3
-```
-  </TabItem>
-</Tabs>
-
-#### Offering the Token
-
-The following Move script function in `Token` supports transferring a token to another account, effectively registering that the other account can claim the token:
 
 ```rust
-public(script) fun offer_script(
-    sender: signer,
-    receiver: address,
-    creator: address,
-    token_creation_num: u64,
-    amount: u64,
-)
-```
-
-<Tabs>
-  <TabItem value="python" label="Python" default>
-
-```python
-:!: static/examples/python/first_nft.py section_4
-```
-  </TabItem>
-  <TabItem value="rust" label="Rust" default>
-
-TODO
-  </TabItem>
-  <TabItem value="typescript" label="Typescript" default>
-
-```typescript
-:!: static/examples/typescript/first_nft.ts section_4
+:!: static/sdks/rust/examples/transfer-coin.rs section_2
 ```
   </TabItem>
 </Tabs>
 
-#### Claiming the Token
+---
 
-The following Move script function in `SimpleToken` supports receiving a token provided by the previous function, effectively claiming a token:
+### Step 4.3: Creating blockchain accounts
+
+In Aptos, each account must have an on-chain representation in order to receive tokens and coins and interact with other dApps. An account represents a medium for storing assets; hence, it must be explicitly created. This example leverages the Faucet to create Alice and Bob's accounts:
+
+<Tabs groupId="sdk-examples">
+  <TabItem value="typescript" label="Typescript">
+
+```ts
+:!: static/sdks/typescript/examples/typescript/simple_nft.ts section_3
+```
+  </TabItem>
+  <TabItem value="python" label="Python">
+
+```python
+:!: static/sdks/python/examples/simple-nft.py section_3
+```
+  </TabItem>
+  <TabItem value="rust" label="Rust">
+  
+  Since the Rust example here uses the same `transfer-coin.rs` function as in the [Your First Transaction](first-transaction.md) tutorial, it creates but does not fund Bob's account.
 
 ```rust
-public(script) fun claim_script(
-    sender: signer,
-    receiver: address,
-    creator: address,
-    token_creation_num: u64,
-    amount: u64,
-)
-```
-
-<Tabs>
-  <TabItem value="python" label="Python" default>
-
-```python
-:!: static/examples/python/first_nft.py section_5
-```
-  </TabItem>
-  <TabItem value="rust" label="Rust" default>
-TODO
-  </TabItem>
-  <TabItem value="typescript" label="Typescript" default>
-
-```typescript
-:!: static/examples/typescript/first_nft.ts section_5
+:!: static/sdks/rust/examples/transfer-coin.rs section_3
 ```
   </TabItem>
 </Tabs>
 
-## Todos for Tokens
+---
 
-* Add ability for additional mints
-* Ensure that at least a single token is produced at time of mint
-* Add events -- needs feedback on what events
-* Provide mutable APIs for tokens
-* Write a smoketest for generics and simple token directly
-* Enable burning in a safe way
+### Step 4.4: Creating a collection
+
+Now begins the process of creating tokens. First, the creator must create a collection to store tokens. A collection can contain zero, one, or many distinct tokens within it. The collection does not restrict the attributes of the tokens, as it is only a container.
+
+<Tabs groupId="sdk-examples">
+  <TabItem value="typescript" label="Typescript">
+
+Your application will call `createCollection`:
+```ts
+:!: static/sdks/typescript/examples/typescript/simple_nft.ts section_4
+```
+
+The is the function signature of `createCollection`. It returns a transaction hash:
+```ts
+:!: static/sdks/typescript/src/plugins/token_client.ts createCollection
+```
+  </TabItem>
+  <TabItem value="python" label="Python">
+
+Your application will call `create_collection`:
+```python
+:!: static/sdks/python/examples/simple-nft.py section_4
+```
+
+The is the function signature of `create_collection`. It returns a transaction hash:
+```python
+:!: static/sdks/python/aptos_sdk/client.py create_collection
+```
+  </TabItem>
+  <TabItem value="rust" label="Rust">
+
+Coming soon.
+  </TabItem>
+</Tabs>
+
+---
+
+### Step 4.5: Creating a token
+
+To create a token, the creator must specify an associated collection. A token must be associated with a collection, and that collection must have remaining tokens that can be minted. There are many attributes associated with a token, but the helper API exposes only the minimal amount required to create static content.
+
+<Tabs groupId="sdk-examples">
+  <TabItem value="typescript" label="Typescript">
+
+Your application will call `createToken`:
+```ts
+:!: static/sdks/typescript/examples/typescript/simple_nft.ts section_5
+```
+
+The is the function signature of `createToken`. It returns a transaction hash:
+```ts
+:!: static/sdks/typescript/src/plugins/token_client.ts createToken
+```
+  </TabItem>
+  <TabItem value="python" label="Python">
+
+Your application will call `create_token`:
+```python
+:!: static/sdks/python/examples/simple-nft.py section_5
+```
+
+The is the function signature of `create_token`. It returns a transaction hash:
+```python
+:!: static/sdks/python/aptos_sdk/client.py create_token
+```
+  </TabItem>
+  <TabItem value="rust" label="Rust">
+
+Coming soon.
+  </TabItem>
+</Tabs>
+
+---
+
+### Step 4.6: Reading token and collection metadata
+
+Both the collection and token metadata are stored on the creator's account within their `Collections` in a table. The SDKs provide convenience wrappers around querying these specific tables:
+
+<Tabs groupId="sdk-examples">
+  <TabItem value="typescript" label="Typescript">
+
+To read a collection's metadata:
+```ts
+:!: static/sdks/typescript/examples/typescript/simple_nft.ts section_6
+```
+
+To read a token's metadata:
+```ts
+:!: static/sdks/typescript/examples/typescript/simple_nft.ts section_8
+```
+
+Here's how `getTokenData` queries the token metadata:
+```ts
+:!: static/sdks/typescript/src/plugins/token_client.ts getTokenData
+```
+
+  </TabItem>
+  <TabItem value="python" label="Python">
+
+To read a collection's metadata:
+```python
+:!: static/sdks/python/examples/simple-nft.py section_6
+```
+
+To read a token's metadata:
+```python
+:!: static/sdks/python/examples/simple-nft.py section_8
+```
+
+Here's how `get_token_data` queries the token metadata:
+```python
+:!: static/sdks/python/aptos_sdk/client.py read_token_data_table
+```
+
+  </TabItem>
+  <TabItem value="rust" label="Rust">
+
+Coming soon.
+  </TabItem>
+</Tabs>
+
+---
+
+### Step 4.7: Reading a token balance
+
+Each token within Aptos is a distinct asset. The assets owned by the user are stored within their `TokenStore`. To get the balance:
+
+<Tabs groupId="sdk-examples">
+  <TabItem value="typescript" label="Typescript">
+
+```ts
+:!: static/sdks/typescript/examples/typescript/simple_nft.ts section_7
+```
+  </TabItem>
+  <TabItem value="python" label="Python">
+
+```python
+:!: static/sdks/python/examples/simple-nft.py section_7
+```
+  </TabItem>
+  <TabItem value="rust" label="Rust">
+
+Coming soon.
+  </TabItem>
+</Tabs>
+
+---
+
+### Step 4.8: Offering and claiming a token
+
+Many users of other blockchains have received unwanted tokens that may cause anything from minimal embarrassment to serious ramifications. Aptos gives the rights to each account owner to dictate whether or not to receive unilateral transfers. By default, unilateral transfers are unsupported. So Aptos provides a framework for *offering* and *claiming* tokens.
+
+To offer a token:
+
+<Tabs groupId="sdk-examples">
+  <TabItem value="typescript" label="Typescript">
+
+```ts
+:!: static/sdks/typescript/examples/typescript/simple_nft.ts section_9
+```
+  </TabItem>
+  <TabItem value="python" label="Python">
+
+```python
+:!: static/sdks/python/examples/simple-nft.py section_9
+```
+  </TabItem>
+  <TabItem value="rust" label="Rust">
+
+Coming soon!
+  </TabItem>
+</Tabs>
+
+To claim a token:
+
+<Tabs groupId="sdk-examples">
+  <TabItem value="typescript" label="Typescript">
+
+```ts
+:!: static/sdks/typescript/examples/typescript/simple_nft.ts section_10
+```
+  </TabItem>
+  <TabItem value="python" label="Python">
+
+```python
+:!: static/sdks/python/examples/simple-nft.py section_10
+```
+  </TabItem>
+  <TabItem value="rust" label="Rust">
+
+Coming soon.
+  </TabItem>
+</Tabs>
+
+---
+
+### Step 4.9: Safe unilateral transferring of a token
+
+To support safe unilateral transfers of a token, the sender may first ask the recipient to acknowledge off-chain a pending transfer. This comes in the form of a multiagent transaction request. Multiagent transactions contain multiple signatures, one for each on-chain account. Move then can leverage this to give `signer`-level permissions to all who signed the transaction. For token transfers, this process ensures the receiving party does indeed want to receive this token without requiring the use of the token transfer framework described above.
+
+<Tabs groupId="sdk-examples">
+  <TabItem value="typescript" label="Typescript">
+
+```ts
+:!: static/sdks/typescript/examples/typescript/simple_nft.ts section_11
+```
+  </TabItem>
+  <TabItem value="python" label="Python">
+
+```python
+:!: static/sdks/python/examples/simple-nft.py section_11
+```
+  </TabItem>
+  <TabItem value="rust" label="Rust">
+
+Coming soon.
+  </TabItem>
+</Tabs>
+
+---
+
+## Supporting documentation
+
+* [Account basics](../concepts/accounts.md)
+* [TypeScript SDK](../sdks/ts-sdk/index.md)
+* [Python SDK](../sdks/python-sdk.md)
+* [Rust SDK](../sdks/rust-sdk.md)
+* [REST API specification](https://aptos.dev/nodes/aptos-api-spec#/)

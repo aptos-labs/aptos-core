@@ -1,24 +1,23 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use aptos_state_view::{account_with_state_view::AsAccountWithStateView, StateViewId};
+use aptos_state_view::account_with_state_view::AsAccountWithStateView;
+use aptos_storage_interface::{
+    cached_state_view::CachedDbStateView,
+    state_view::{DbStateView, LatestDbStateCheckpointView},
+    DbReader,
+};
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::AccountSequenceInfo,
     account_view::AccountView,
     on_chain_config::OnChainConfigPayload,
     transaction::{SignedTransaction, VMValidatorResult},
 };
 use aptos_vm::AptosVM;
 use fail::fail_point;
-use scratchpad::SparseMerkleTree;
-use std::ops::Deref;
 use std::sync::Arc;
-use storage_interface::no_proof_fetcher::NoProofFetcher;
-use storage_interface::{
-    cached_state_view::CachedStateView, state_view::LatestDbStateCheckpointView, DbReader,
-};
 
 #[cfg(test)]
 #[path = "unit_tests/vm_validator_test.rs"]
@@ -37,26 +36,9 @@ pub trait TransactionValidation: Send + Sync + Clone {
     fn notify_commit(&mut self);
 }
 
-fn latest_state_view(db_reader: &Arc<dyn DbReader>) -> CachedStateView<NoProofFetcher> {
-    let ledger_view = db_reader
-        .get_latest_executed_trees()
-        .expect("Should not fail.");
-
-    CachedStateView::new(
-        StateViewId::TransactionValidation {
-            base_version: ledger_view.version().expect("Must be bootstrapped."),
-        },
-        db_reader.deref(),
-        ledger_view.txn_accumulator().num_leaves(),
-        SparseMerkleTree::new(ledger_view.state().current.root_hash()),
-        NoProofFetcher::new(db_reader.clone()),
-    )
-    .expect("failed to get latest state view.")
-}
-
 pub struct VMValidator {
     db_reader: Arc<dyn DbReader>,
-    cached_state_view: CachedStateView<NoProofFetcher>,
+    state_view: CachedDbStateView,
     vm: AptosVM,
 }
 
@@ -68,12 +50,14 @@ impl Clone for VMValidator {
 
 impl VMValidator {
     pub fn new(db_reader: Arc<dyn DbReader>) -> Self {
-        let cached_state_view = latest_state_view(&db_reader);
+        let db_state_view = db_reader
+            .latest_state_checkpoint_view()
+            .expect("Get db view cannot fail");
 
-        let vm = AptosVM::new_for_validation(&cached_state_view);
+        let vm = AptosVM::new_for_validation(&db_state_view);
         VMValidator {
             db_reader,
-            cached_state_view,
+            state_view: db_state_view.into(),
             vm,
         }
     }
@@ -90,46 +74,40 @@ impl TransactionValidation for VMValidator {
         });
         use aptos_vm::VMValidator;
 
-        Ok(self.vm.validate_transaction(txn, &self.cached_state_view))
+        Ok(self.vm.validate_transaction(txn, &self.state_view))
     }
 
     fn restart(&mut self, _config: OnChainConfigPayload) -> Result<()> {
         self.notify_commit();
 
-        self.vm = AptosVM::new_for_validation(&self.cached_state_view);
+        self.vm = AptosVM::new_for_validation(&self.state_view);
         Ok(())
     }
 
     fn notify_commit(&mut self) {
-        self.cached_state_view = latest_state_view(&self.db_reader);
+        self.state_view = self
+            .db_reader
+            .latest_state_checkpoint_view()
+            .expect("Get db view cannot fail")
+            .into();
     }
 }
 
 /// returns account's sequence number from storage
 pub fn get_account_sequence_number(
-    storage: Arc<dyn DbReader>,
+    state_view: &DbStateView,
     address: AccountAddress,
-) -> Result<AccountSequenceInfo> {
+) -> Result<u64> {
     fail_point!("vm_validator::get_account_sequence_number", |_| {
         Err(anyhow::anyhow!(
             "Injected error in get_account_sequence_number"
         ))
     });
-    let db_state_view = storage.latest_state_checkpoint_view()?;
 
-    let account_state_view = db_state_view.as_account_with_state_view(&address);
-
-    if let Ok(Some(crsn)) = account_state_view.get_crsn_resource() {
-        return Ok(AccountSequenceInfo::CRSN {
-            min_nonce: crsn.min_nonce(),
-            size: crsn.size(),
-        });
-    }
+    let account_state_view = state_view.as_account_with_state_view(&address);
 
     match account_state_view.get_account_resource()? {
-        Some(account_resource) => Ok(AccountSequenceInfo::Sequential(
-            account_resource.sequence_number(),
-        )),
-        None => Ok(AccountSequenceInfo::Sequential(0)),
+        Some(account_resource) => Ok(account_resource.sequence_number()),
+        None => Ok(0),
     }
 }

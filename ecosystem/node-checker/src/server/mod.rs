@@ -1,9 +1,9 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 mod api;
+mod build;
 mod common;
-mod configurations_manager;
 mod generate_openapi;
 mod node_information;
 mod run;
@@ -11,9 +11,8 @@ mod run;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use generate_openapi::{generate_openapi, GenerateOpenapi};
-use run::{run, Run};
-
 pub use node_information::NodeInformation;
+use run::{run, Run};
 
 #[derive(Clone, Debug, Parser)]
 pub struct Server {

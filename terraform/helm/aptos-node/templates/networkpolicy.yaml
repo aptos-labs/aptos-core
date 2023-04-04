@@ -44,6 +44,19 @@ spec:
     ports:
     - protocol: TCP
       port: 9101
+  # Node Health Checker accesses these ports
+  - from:
+    - namespaceSelector: {}
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: node-health-checker
+    ports:
+    - protocol: TCP
+      port: 9101
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 6180
 
   # AptosNet from local full nodes
   - from:

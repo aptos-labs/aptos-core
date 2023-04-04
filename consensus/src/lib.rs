@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -12,8 +13,9 @@
 #![cfg_attr(feature = "fuzzing", allow(dead_code))]
 #![recursion_limit = "512"]
 
+extern crate core;
+
 mod block_storage;
-mod commit_notifier;
 mod consensusdb;
 mod epoch_manager;
 mod error;
@@ -24,10 +26,11 @@ mod metrics_safety_rules;
 mod network;
 #[cfg(test)]
 mod network_tests;
-mod payload_manager;
+mod payload_client;
 mod pending_votes;
 mod persistent_liveness_storage;
 mod quorum_store;
+mod recovery_manager;
 mod round_manager;
 mod state_computer;
 mod state_replication;
@@ -44,9 +47,44 @@ pub mod consensus_provider;
 pub mod counters;
 /// AptosNet interface.
 pub mod network_interface;
+mod payload_manager;
+mod sender_aware_shuffler;
+mod transaction_shuffler;
 
+use aptos_metrics_core::IntGauge;
+pub use consensusdb::create_checkpoint;
 /// Required by the smoke tests
 pub use consensusdb::CONSENSUS_DB_NAME;
-
+pub use quorum_store::quorum_store_db::QUORUM_STORE_DB_NAME;
 #[cfg(feature = "fuzzing")]
 pub use round_manager::round_manager_fuzzing;
+
+struct IntGaugeGuard {
+    gauge: IntGauge,
+}
+
+impl IntGaugeGuard {
+    fn new(gauge: IntGauge) -> Self {
+        gauge.inc();
+        Self { gauge }
+    }
+}
+
+impl Drop for IntGaugeGuard {
+    fn drop(&mut self) {
+        self.gauge.dec();
+    }
+}
+
+/// Helper function to record metrics for external calls.
+/// Include call counts, time, and whether it's inside or not (1 or 0).
+/// It assumes a OpMetrics defined as OP_COUNTERS in crate::counters;
+#[macro_export]
+macro_rules! monitor {
+    ($name:literal, $fn:expr) => {{
+        use $crate::{counters::OP_COUNTERS, IntGaugeGuard};
+        let _timer = OP_COUNTERS.timer($name);
+        let _guard = IntGaugeGuard::new(OP_COUNTERS.gauge(concat!($name, "_running")));
+        $fn
+    }};
+}

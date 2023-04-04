@@ -1,13 +1,12 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::error::MempoolError;
+use crate::{error::MempoolError, monitor};
 use anyhow::{format_err, Result};
+use aptos_consensus_types::common::RejectedTransactionSummary;
+use aptos_executor_types::StateComputeResult;
 use aptos_mempool::QuorumStoreRequest;
-use aptos_metrics_core::monitor;
-use aptos_types::transaction::TransactionStatus;
-use consensus_types::{block::Block, common::TransactionSummary};
-use executor_types::StateComputeResult;
+use aptos_types::transaction::{SignedTransaction, TransactionStatus};
 use futures::channel::{mpsc, oneshot};
 use itertools::Itertools;
 use std::time::Duration;
@@ -20,7 +19,7 @@ pub trait TxnNotifier: Send + Sync {
     /// state sync.)
     async fn notify_failed_txn(
         &self,
-        block: &Block,
+        txns: Vec<SignedTransaction>,
         compute_results: &StateComputeResult,
     ) -> Result<(), MempoolError>;
 }
@@ -49,23 +48,20 @@ impl MempoolNotifier {
 impl TxnNotifier for MempoolNotifier {
     async fn notify_failed_txn(
         &self,
-        block: &Block,
+        txns: Vec<SignedTransaction>,
         compute_results: &StateComputeResult,
     ) -> Result<(), MempoolError> {
         let mut rejected_txns = vec![];
-        let txns: Vec<_> = match block.payload() {
-            Some(payload) => payload,
-            None => return Ok(()),
-        }
-        .clone()
-        .into_iter()
-        .collect();
 
         if txns.is_empty() {
             return Ok(());
         }
         let compute_status = compute_results.compute_status();
         if txns.len() + 2 != compute_status.len() {
+            // reconfiguration suffix blocks don't have any transactions
+            if compute_status.is_empty() {
+                return Ok(());
+            }
             return Err(format_err!(
                 "Block meta and state checkpoint txns are expected. txns len: {}, compute status len: {}",
                 txns.len(),
@@ -75,9 +71,10 @@ impl TxnNotifier for MempoolNotifier {
         let user_txn_status = &compute_status[1..txns.len() + 1];
         for (txn, status) in txns.iter().zip_eq(user_txn_status) {
             if let TransactionStatus::Discard(_) = status {
-                rejected_txns.push(TransactionSummary {
+                rejected_txns.push(RejectedTransactionSummary {
                     sender: txn.sender(),
                     sequence_number: txn.sequence_number(),
+                    hash: txn.clone().committed_hash(),
                 });
             }
         }

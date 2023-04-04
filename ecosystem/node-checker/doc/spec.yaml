@@ -1,0 +1,156 @@
+openapi: 3.0.0
+info:
+  title: Aptos Node Checker
+  version: 0.1.1
+servers:
+- url: http://0.0.0.0:20121/
+tags: []
+paths:
+  /check:
+    get:
+      summary: |-
+        Check the health of a given target node. You must specify a baseline
+        node configuration to use for the evaluation and the URL of your node,
+        without including any port or endpoints. All other parameters are optional.
+        For example, if your node's API port is open but the rest are closed, only
+        set the `api_port`.
+      parameters:
+      - name: baseline_configuration_id
+        schema:
+          type: string
+        in: query
+        description: The ID of the baseline node configuration to use for the evaluation,
+          e.g. devnet_fullnode
+        required: true
+        deprecated: false
+        explode: true
+      - name: node_url
+        schema:
+          type: string
+          format: url
+        in: query
+        description: The URL of the node to check, e.g. http://44.238.19.217 or http://fullnode.mysite.com
+        required: true
+        deprecated: false
+        explode: true
+      - name: metrics_port
+        schema:
+          type: integer
+          format: uint16
+        in: query
+        description: If given, we will assume the metrics service is available at
+          the given port.
+        required: false
+        deprecated: false
+        explode: true
+      - name: api_port
+        schema:
+          type: integer
+          format: uint16
+        in: query
+        description: If given, we will assume the API is available at the given port.
+        required: false
+        deprecated: false
+        explode: true
+      - name: noise_port
+        schema:
+          type: integer
+          format: uint16
+        in: query
+        description: If given, we will assume that clients can communicate with your
+          node via noise at the given port.
+        required: false
+        deprecated: false
+        explode: true
+      - name: public_key
+        schema:
+          type: string
+        in: query
+        description: |-
+          A public key for the node, e.g. 0x44fd1324c66371b4788af0b901c9eb8088781acb29e6b8b9c791d5d9838fbe1f.
+          This is only necessary for certain checkers, e.g. HandshakeChecker.
+        required: false
+        deprecated: false
+        explode: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckSummary'
+  /configurations:
+    get:
+      summary: |-
+        Get the IDs and pretty names for the configurations. For example,
+        devnet_fullnode as the ID and "Devnet Fullnode Checker" as the
+        pretty name.
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ConfigurationDescriptor'
+components:
+  schemas:
+    CheckResult:
+      type: object
+      required:
+      - checker_name
+      - headline
+      - score
+      - explanation
+      - links
+      properties:
+        checker_name:
+          type: string
+          description: Name of the Checker that created the result.
+        headline:
+          type: string
+          description: Headline of the result, e.g. "Healthy!" or "Metrics missing!".
+        score:
+          type: integer
+          format: uint8
+          description: Score out of 100.
+        explanation:
+          type: string
+          description: Explanation of the result.
+        links:
+          type: array
+          description: Links that might help the user fix a potential problem.
+          items:
+            type: string
+    CheckSummary:
+      type: object
+      required:
+      - check_results
+      - summary_score
+      - summary_explanation
+      properties:
+        check_results:
+          type: array
+          description: Results from all the Checkers NHC ran.
+          items:
+            $ref: '#/components/schemas/CheckResult'
+        summary_score:
+          type: integer
+          format: uint8
+          description: An aggeregated summary (method TBA).
+        summary_explanation:
+          type: string
+          description: An overall explanation of the results.
+    ConfigurationDescriptor:
+      type: object
+      required:
+      - id
+      - pretty_name
+      properties:
+        id:
+          type: string
+          description: Configuration ID, for example devnet_fullnode.
+        pretty_name:
+          type: string
+          description: Configuration pretty name, for example "Devnet Fullnode Checker".

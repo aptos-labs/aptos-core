@@ -5,7 +5,7 @@ ModuleId:
   STRUCT:
     - name:
         TYPENAME: Identifier
-ScriptFunction:
+EntryFunction:
   STRUCT:
     - module:
         TYPENAME: ModuleId

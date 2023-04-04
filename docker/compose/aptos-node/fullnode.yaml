@@ -25,6 +25,13 @@ full_node_networks:
     type: "from_file"
     path: "/opt/aptos/genesis/validator-full-node-identity.yaml"
 
+mempool:
+  shared_mempool_max_concurrent_inbound_syncs: 16 # default 4
+  max_broadcasts_per_peer: 4 # default 1
+  default_failovers: 0 # default 3
+  shared_mempool_batch_size: 200 # default 100
+  shared_mempool_tick_interval_ms: 10 # default 50
+
 api:
   enabled: true
   address: "0.0.0.0:8080"

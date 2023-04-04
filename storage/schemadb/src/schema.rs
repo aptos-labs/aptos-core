@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module provides traits that define the behavior of a schema and its associated key and
@@ -12,7 +13,7 @@ use std::fmt::Debug;
 /// `define_schema!` allows a schema to be defined in the following syntax:
 /// ```
 /// use anyhow::Result;
-/// use schemadb::{
+/// use aptos_schemadb::{
 ///     define_schema,
 ///     schema::{KeyCodec, SeekKeyCodec, ValueCodec},
 /// };
@@ -46,7 +47,7 @@ use std::fmt::Debug;
 ///
 /// // And finally define a schema type and associate it with key and value types, as well as the
 /// // column family name, by generating code that implements the `Schema` trait for the type.
-/// define_schema!(ExampleSchema, Key, Value, "exmaple_cf_name");
+/// define_schema!(ExampleSchema, Key, Value, "example_cf_name");
 ///
 /// // SeekKeyCodec is automatically implemented for KeyCodec,
 /// // so you can seek an iterator with the Key type:
@@ -66,13 +67,15 @@ use std::fmt::Debug;
 /// ```
 #[macro_export]
 macro_rules! define_schema {
-    ($schema_type: ident, $key_type: ty, $value_type: ty, $cf_name: expr) => {
+    ($schema_type:ident, $key_type:ty, $value_type:ty, $cf_name:expr) => {
+        #[derive(Debug)]
         pub(crate) struct $schema_type;
 
         impl $crate::schema::Schema for $schema_type {
-            const COLUMN_FAMILY_NAME: $crate::ColumnFamilyName = $cf_name;
             type Key = $key_type;
             type Value = $value_type;
+
+            const COLUMN_FAMILY_NAME: $crate::ColumnFamilyName = $cf_name;
         }
     };
 }
@@ -114,7 +117,7 @@ where
 
 /// This trait defines a schema: an association of a column family name, the key type and the value
 /// type.
-pub trait Schema {
+pub trait Schema: Debug + Send + Sync + 'static {
     /// The column family name associated with this struct.
     /// Note: all schemas within the same SchemaDB must have distinct column family names.
     const COLUMN_FAMILY_NAME: ColumnFamilyName;
@@ -158,9 +161,9 @@ pub mod fuzzing {
 
     #[macro_export]
     macro_rules! test_no_panic_decoding {
-        ($schema_type: ty) => {
+        ($schema_type:ty) => {
+            use aptos_schemadb::schema::fuzzing::{arb_small_vec_u8, assert_no_panic_decoding};
             use proptest::prelude::*;
-            use schemadb::schema::fuzzing::{arb_small_vec_u8, assert_no_panic_decoding};
 
             proptest! {
                 #[test]

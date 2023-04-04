@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "node-health-checker.fullname" . }}
+  labels:
+    {{- include "node-health-checker.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "node-health-checker.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/name: node-health-checker
+  template:
+    metadata:
+      labels:
+        {{- include "node-health-checker.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/name: node-health-checker
+      annotations:
+        seccomp.security.alpha.kubernetes.io/pod: runtime/default
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "node-health-checker.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: node-health-checker
+          image: "{{ .Values.node_health_checker.image.repo }}:{{ .Values.node_health_checker.image.tag | default .Values.imageTag }}"
+          imagePullPolicy: {{ .Values.node_health_checker.image.pullPolicy }}
+          command: ["aptos-node-checker"]
+          args: 
+            - server
+            - run
+            - --baseline-node-config-paths
+            - /nhc/baseline_fullnode.yaml
+          ports:
+            - containerPort: 20121
+          volumeMounts:
+            - name: node-health-checker-config
+              mountPath: /nhc
+          resources:
+            {{- toYaml .Values.node_health_checkerresources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+      {{- with .Values.node_health_checker.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.node_health_checker.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.node_health_checker.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 6180
+        runAsGroup: 6180
+        fsGroup: 6180
+      volumes:
+        - name: node-health-checker-config
+          configMap:
+            name: {{ include "node-health-checker.fullname" . }}

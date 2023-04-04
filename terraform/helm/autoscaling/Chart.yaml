@@ -1,0 +1,8 @@
+apiVersion: v2
+name: autoscaling
+version: 0.1.0
+
+dependencies:
+  - name: metrics-server
+    version: 3.8.2
+    repository: "https://kubernetes-sigs.github.io/metrics-server/"

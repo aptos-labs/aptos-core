@@ -1,8 +1,9 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    register_int_counter_vec, register_int_gauge_vec, IntCounterVec, IntGaugeVec,
+    histogram_opts, register_histogram_vec, register_int_counter_vec, register_int_gauge_vec,
+    HistogramTimer, HistogramVec, IntCounterVec, IntGaugeVec,
 };
 use once_cell::sync::Lazy;
 
@@ -11,6 +12,9 @@ pub const DRIVER_CLIENT_NOTIFICATION: &str = "driver_client_notification";
 pub const DRIVER_CONSENSUS_COMMIT_NOTIFICATION: &str = "driver_consensus_commit_notification";
 pub const DRIVER_CONSENSUS_SYNC_NOTIFICATION: &str = "driver_consensus_sync_notification";
 pub const STORAGE_SYNCHRONIZER_PENDING_DATA: &str = "storage_synchronizer_pending_data";
+pub const STORAGE_SYNCHRONIZER_APPLY_CHUNK: &str = "apply_chunk";
+pub const STORAGE_SYNCHRONIZER_EXECUTE_CHUNK: &str = "execute_chunk";
+pub const STORAGE_SYNCHRONIZER_COMMIT_CHUNK: &str = "commit_chunk";
 
 /// An enum representing the component currently executing
 pub enum ExecutingComponent {
@@ -43,7 +47,7 @@ impl StorageSynchronizerOperations {
         match self {
             StorageSynchronizerOperations::AppliedTransactionOutputs => {
                 "applied_transaction_outputs"
-            }
+            },
             StorageSynchronizerOperations::ExecutedTransactions => "executed_transactions",
             StorageSynchronizerOperations::Synced => "synced",
             StorageSynchronizerOperations::SyncedEpoch => "synced_epoch",
@@ -51,6 +55,12 @@ impl StorageSynchronizerOperations {
         }
     }
 }
+
+/// Histogram buckets for tracking chunk sizes
+const CHUNK_SIZE_BUCKETS: &[f64] = &[
+    1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0, 256.0, 512.0, 1024.0, 2048.0, 4096.0, 8192.0,
+    16384.0,
+];
 
 /// Counter for state sync bootstrapper errors
 pub static BOOTSTRAPPER_ERRORS: Lazy<IntCounterVec> = Lazy::new(|| {
@@ -62,7 +72,7 @@ pub static BOOTSTRAPPER_ERRORS: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Counter for state sync continuous syncer errors
+/// Gauge for state sync continuous syncer fallback mode
 pub static CONTINUOUS_SYNCER_ERRORS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_state_sync_continuous_syncer_errors",
@@ -82,12 +92,12 @@ pub static DRIVER_COUNTERS: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Gauges related to the current epoch state
-pub static EPOCH_STATE: Lazy<IntGaugeVec> = Lazy::new(|| {
+/// Gauge for state sync bootstrapper fallback mode
+pub static DRIVER_FALLBACK_MODE: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
-        "aptos_state_sync_epoch_state_gauges",
-        "Gauges related to the storage synchronizer",
-        &["epoch", "validator_address", "validator_weight"]
+        "aptos_state_sync_driver_fallback_mode",
+        "Gauges related to the driver fallback mode",
+        &["label"]
     )
     .unwrap()
 });
@@ -100,6 +110,16 @@ pub static EXECUTING_COMPONENT: Lazy<IntCounterVec> = Lazy::new(|| {
         &["label"]
     )
     .unwrap()
+});
+
+/// Counter for tracking sizes of data chunks sent to the storage synchronizer
+pub static STORAGE_SYNCHRONIZER_CHUNK_SIZES: Lazy<HistogramVec> = Lazy::new(|| {
+    let histogram_opts = histogram_opts!(
+        "aptos_state_sync_storage_synchronizer_chunk_sizes",
+        "Counter for tracking sizes of data chunks sent to the storage synchronizer",
+        CHUNK_SIZE_BUCKETS.to_vec()
+    );
+    register_histogram_vec!(histogram_opts, &["label"]).unwrap()
 });
 
 /// Counter for storage synchronizer errors
@@ -122,9 +142,17 @@ pub static STORAGE_SYNCHRONIZER_GAUGES: Lazy<IntGaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Gauges for the storage synchronizer operations.
-/// Note: we keep this named "aptos_state_sync_version" to maintain backward
-/// compatibility with the metrics used by state sync v1.
+/// Counter for tracking storage synchronizer latencies
+pub static STORAGE_SYNCHRONIZER_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_state_sync_storage_synchronizer_latencies",
+        "Counters related to the storage synchronizer latencies",
+        &["label"]
+    )
+    .unwrap()
+});
+
+/// Gauges for the storage synchronizer operations
 pub static STORAGE_SYNCHRONIZER_OPERATIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         "aptos_state_sync_version",
@@ -149,6 +177,11 @@ pub fn decrement_gauge(gauge: &Lazy<IntGaugeVec>, label: &str, delta: u64) {
     gauge.with_label_values(&[label]).sub(delta as i64);
 }
 
+/// Adds a new observation for the given histogram, label and value
+pub fn observe_value(histogram: &Lazy<HistogramVec>, label: &str, value: u64) {
+    histogram.with_label_values(&[label]).observe(value as f64);
+}
+
 /// Reads the gauge with the specific label
 pub fn read_gauge(gauge: &Lazy<IntGaugeVec>, label: &str) -> i64 {
     gauge.with_label_values(&[label]).get()
@@ -159,9 +192,7 @@ pub fn set_gauge(gauge: &Lazy<IntGaugeVec>, label: &str, value: u64) {
     gauge.with_label_values(&[label]).set(value as i64);
 }
 
-/// Sets the gauge for the epoch state
-pub fn set_epoch_state_gauge(epoch: &str, validator_address: &str, validator_weight: &str) {
-    EPOCH_STATE
-        .with_label_values(&[epoch, validator_address, validator_weight])
-        .set(1);
+/// Starts the timer for the provided histogram and label
+pub fn start_timer(histogram: &Lazy<HistogramVec>, label: &str) -> HistogramTimer {
+    histogram.with_label_values(&[label]).start_timer()
 }

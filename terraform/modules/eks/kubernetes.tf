@@ -16,6 +16,34 @@ resource "kubernetes_storage_class" "io1" {
   }
 }
 
+resource "kubernetes_storage_class" "gp3" {
+  metadata {
+    name = "gp3"
+    annotations = {
+      "storageclass.kubernetes.io/is-default-class" = false
+    }
+  }
+  storage_provisioner = "ebs.csi.aws.com"
+  volume_binding_mode = "WaitForFirstConsumer"
+  parameters = {
+    type = "gp3"
+  }
+
+  depends_on = [aws_eks_addon.aws-ebs-csi-driver]
+}
+
+resource "kubernetes_storage_class" "io2" {
+  metadata {
+    name = "io2"
+  }
+  storage_provisioner = "ebs.csi.aws.com"
+  volume_binding_mode = "WaitForFirstConsumer"
+  parameters = {
+    type = "io2"
+    iops = "40000"
+  }
+}
+
 resource "null_resource" "delete-gp2" {
   provisioner "local-exec" {
     command = <<-EOT
@@ -44,6 +72,7 @@ resource "kubernetes_storage_class" "gp2" {
   depends_on = [null_resource.delete-gp2]
 }
 
+# FIXME: Remove when migrating to K8s 1.25
 resource "kubernetes_role_binding" "psp-kube-system" {
   metadata {
     name      = "eks:podsecuritypolicy:privileged"
@@ -67,6 +96,7 @@ locals {
   kubeconfig = "/tmp/kube.config.${md5(timestamp())}"
 }
 
+# FIXME: Remove when migrating to K8s 1.25
 resource "null_resource" "delete-psp-authenticated" {
   provisioner "local-exec" {
     command = <<-EOT
@@ -86,11 +116,25 @@ provider "helm" {
   }
 }
 
+resource "kubernetes_namespace" "tigera-operator" {
+  metadata {
+    annotations = {
+      name = "tigera-operator"
+    }
+
+    name = "tigera-operator"
+  }
+}
+
 resource "helm_release" "calico" {
-  name        = "calico"
-  namespace   = "kube-system"
-  chart       = "${path.module}/aws-calico/"
-  max_history = 10
+  name       = "calico"
+  repository = "https://docs.projectcalico.org/charts"
+  chart      = "tigera-operator"
+  version    = "3.23.3"
+  namespace  = "tigera-operator"
+  depends_on = [
+    kubernetes_namespace.tigera-operator
+  ]
 }
 
 resource "kubernetes_cluster_role" "debug" {

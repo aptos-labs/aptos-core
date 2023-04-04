@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "required": ["k8sCluster", "loggingSinks", "secretVars"],
+  "properties": {
+    "image": {
+      "type": "object",
+      "properties": {
+        "repository": {
+          "type": "string"
+        },
+        "tag": {
+          "type": "string"
+        },
+        "pullPolicy": {
+          "type": "string"
+        }
+      }
+    },
+    "k8sCluster": {
+      "description": "A human readable name for the k8s cluster. This will be added as field 'k8s_cluster' to each log event.",
+      "type": "string"
+    },
+    "loggingSinks": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "type": "object" }
+    },
+    "secretVars": {
+      "type": "object",
+      "additionalProperties": { "type": "object", "additionalProperties": { "type": "string" } }
+    }
+  }
+}

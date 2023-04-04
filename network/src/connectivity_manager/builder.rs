@@ -1,13 +1,14 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    application::storage::PeersAndMetadata,
     connectivity_manager::{ConnectivityManager, ConnectivityRequest},
     counters,
     peer_manager::{conn_notifs_channel, ConnectionRequestSender},
 };
 use aptos_config::{config::PeerSet, network_id::NetworkContext};
-use aptos_infallible::RwLock;
 use aptos_time_service::TimeService;
 use std::{sync::Arc, time::Duration};
 use tokio::runtime::Handle;
@@ -17,14 +18,14 @@ pub type ConnectivityManagerService = ConnectivityManager<ExponentialBackoff>;
 
 pub struct ConnectivityManagerBuilder {
     connectivity_manager: Option<ConnectivityManagerService>,
-    conn_mgr_reqs_tx: channel::Sender<ConnectivityRequest>,
+    conn_mgr_reqs_tx: aptos_channels::Sender<ConnectivityRequest>,
 }
 
 impl ConnectivityManagerBuilder {
     pub fn create(
         network_context: NetworkContext,
         time_service: TimeService,
-        eligible: Arc<RwLock<PeerSet>>,
+        peers_and_metadata: Arc<PeersAndMetadata>,
         seeds: PeerSet,
         connectivity_check_interval_ms: u64,
         backoff_base: u64,
@@ -35,7 +36,7 @@ impl ConnectivityManagerBuilder {
         outbound_connection_limit: Option<usize>,
         mutual_authentication: bool,
     ) -> Self {
-        let (conn_mgr_reqs_tx, conn_mgr_reqs_rx) = channel::new(
+        let (conn_mgr_reqs_tx, conn_mgr_reqs_rx) = aptos_channels::new(
             channel_size,
             &counters::PENDING_CONNECTIVITY_MANAGER_REQUESTS,
         );
@@ -45,7 +46,7 @@ impl ConnectivityManagerBuilder {
             connectivity_manager: Some(ConnectivityManager::new(
                 network_context,
                 time_service,
-                eligible,
+                peers_and_metadata,
                 seeds,
                 connection_reqs_tx,
                 connection_notifs_rx,
@@ -59,7 +60,7 @@ impl ConnectivityManagerBuilder {
         }
     }
 
-    pub fn conn_mgr_reqs_tx(&self) -> channel::Sender<ConnectivityRequest> {
+    pub fn conn_mgr_reqs_tx(&self) -> aptos_channels::Sender<ConnectivityRequest> {
         self.conn_mgr_reqs_tx.clone()
     }
 

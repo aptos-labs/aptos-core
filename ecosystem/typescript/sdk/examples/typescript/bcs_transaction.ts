@@ -1,5 +1,10 @@
 /* eslint-disable no-console */
+
+import dotenv from "dotenv";
+dotenv.config();
+
 import { AptosClient, AptosAccount, FaucetClient, BCS, TxnBuilderTypes } from "aptos";
+import { aptosCoinStore } from "./common";
 import assert from "assert";
 
 const NODE_URL = process.env.APTOS_NODE_URL || "https://fullnode.devnet.aptoslabs.com";
@@ -8,9 +13,9 @@ const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptosl
 const {
   AccountAddress,
   TypeTagStruct,
-  ScriptFunction,
+  EntryFunction,
   StructTag,
-  TransactionPayloadScriptFunction,
+  TransactionPayloadEntryFunction,
   RawTransaction,
   ChainId,
 } = TxnBuilderTypes;
@@ -24,29 +29,28 @@ const {
 
   // Generates key pair for a new account
   const account1 = new AptosAccount();
-  // Creates the account on Aptos chain and fund the account with 5000 AptosCoin
-  await faucetClient.fundAccount(account1.address(), 5000);
+  await faucetClient.fundAccount(account1.address(), 100_000_000);
   let resources = await client.getAccountResources(account1.address());
-  let accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>");
+  let accountResource = resources.find((r) => r.type === aptosCoinStore);
   let balance = parseInt((accountResource?.data as any).coin.value);
-  assert(balance === 5000);
-  console.log(`account2 coins: ${balance}. Should be 5000!`);
+  assert(balance === 100_000_000);
+  console.log(`account1 coins: ${balance}. Should be 100000000!`);
 
   const account2 = new AptosAccount();
   // Creates the second account and fund the account with 0 AptosCoin
   await faucetClient.fundAccount(account2.address(), 0);
   resources = await client.getAccountResources(account2.address());
-  accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>");
+  accountResource = resources.find((r) => r.type === aptosCoinStore);
   balance = parseInt((accountResource?.data as any).coin.value);
   assert(balance === 0);
   console.log(`account2 coins: ${balance}. Should be 0!`);
 
   const token = new TypeTagStruct(StructTag.fromString("0x1::aptos_coin::AptosCoin"));
 
-  // TS SDK support 3 types of transaction payloads: `ScriptFunction`, `Script` and `Module`.
+  // TS SDK support 3 types of transaction payloads: `EntryFunction`, `Script` and `Module`.
   // See https://aptos-labs.github.io/ts-sdk-doc/ for the details.
-  const scriptFunctionPayload = new TransactionPayloadScriptFunction(
-    ScriptFunction.natural(
+  const entryFunctionPayload = new TransactionPayloadEntryFunction(
+    EntryFunction.natural(
       // Fully qualified module name, `AccountAddress::ModuleName`
       "0x1::coin",
       // Module function
@@ -58,7 +62,7 @@ const {
     ),
   );
 
-  const [{ sequence_number: sequnceNumber }, chainId] = await Promise.all([
+  const [{ sequence_number: sequenceNumber }, chainId] = await Promise.all([
     client.getAccount(account1.address()),
     client.getChainId(),
   ]);
@@ -68,12 +72,12 @@ const {
   const rawTxn = new RawTransaction(
     // Transaction sender account address
     AccountAddress.fromHex(account1.address()),
-    BigInt(sequnceNumber),
-    scriptFunctionPayload,
+    BigInt(sequenceNumber),
+    entryFunctionPayload,
     // Max gas unit to spend
-    1000n,
+    BigInt(2000),
     // Gas price per unit
-    1n,
+    BigInt(100),
     // Expiration timestamp. Transaction is discarded if it is not executed within 10 seconds from now.
     BigInt(Math.floor(Date.now() / 1000) + 10),
     new ChainId(chainId),
@@ -87,7 +91,7 @@ const {
   await client.waitForTransaction(transactionRes.hash);
 
   resources = await client.getAccountResources(account2.address());
-  accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>");
+  accountResource = resources.find((r) => r.type === aptosCoinStore);
   balance = parseInt((accountResource?.data as any).coin.value);
   assert(balance === 717);
   console.log(`account2 coins: ${balance}. Should be 717!`);

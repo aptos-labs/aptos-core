@@ -1,31 +1,43 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! Support for mocking the Aptos data store.
 
 use crate::account::AccountData;
 use anyhow::Result;
-use aptos_state_view::StateView;
+use aptos_state_view::TStateView;
 use aptos_types::{
     access_path::AccessPath,
-    state_store::state_key::StateKey,
+    account_config::CoinInfoResource,
+    state_store::{
+        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+        table::TableHandle as AptosTableHandle,
+    },
     transaction::ChangeSet,
     write_set::{WriteOp, WriteSet},
 };
-use move_deps::move_core_types::language_storage::ModuleId;
+use aptos_vm_genesis::{
+    generate_genesis_change_set_for_mainnet, generate_genesis_change_set_for_testing,
+    GenesisOptions,
+};
+use move_core_types::language_storage::ModuleId;
+use move_table_extension::{TableHandle, TableResolver};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use vm_genesis::{generate_genesis_change_set_for_testing, GenesisOptions};
 
 /// Dummy genesis ChangeSet for testing
-pub static GENESIS_CHANGE_SET: Lazy<ChangeSet> =
-    Lazy::new(|| generate_genesis_change_set_for_testing(GenesisOptions::Compiled));
+pub static GENESIS_CHANGE_SET_HEAD: Lazy<ChangeSet> =
+    Lazy::new(|| generate_genesis_change_set_for_testing(GenesisOptions::Head));
 
-pub static GENESIS_CHANGE_SET_FRESH: Lazy<ChangeSet> =
-    Lazy::new(|| generate_genesis_change_set_for_testing(GenesisOptions::Fresh));
+pub static GENESIS_CHANGE_SET_TESTNET: Lazy<ChangeSet> =
+    Lazy::new(|| generate_genesis_change_set_for_testing(GenesisOptions::Testnet));
 
-/// An in-memory implementation of [`StateView`] and [`RemoteCache`] for the VM.
+pub static GENESIS_CHANGE_SET_MAINNET: Lazy<ChangeSet> =
+    Lazy::new(|| generate_genesis_change_set_for_mainnet(GenesisOptions::Mainnet));
+
+/// An in-memory implementation of `StateView` and `RemoteCache` for the VM.
 ///
 /// Tests use this to set up state, and pass in a reference to the cache whenever a `StateView` or
 /// `RemoteCache` is needed.
@@ -44,13 +56,15 @@ impl FakeDataStore {
     pub fn add_write_set(&mut self, write_set: &WriteSet) {
         for (state_key, write_op) in write_set {
             match write_op {
-                WriteOp::Value(blob) => {
+                WriteOp::Modification(blob) | WriteOp::Creation(blob) => {
                     self.set(state_key.clone(), blob.clone());
-                }
-                WriteOp::Deletion => {
+                },
+                WriteOp::ModificationWithMetadata { .. } | WriteOp::CreationWithMetadata { .. } => {
+                    unimplemented!()
+                },
+                WriteOp::Deletion | WriteOp::DeletionWithMetadata { .. } => {
                     self.remove(state_key);
-                }
-                WriteOp::Delta(..) => unreachable!("deltas are only used in executor"),
+                },
             }
         }
     }
@@ -75,12 +89,19 @@ impl FakeDataStore {
         self.add_write_set(&write_set)
     }
 
-    /// Adds a [`CompiledModule`] to this data store.
+    /// Adds CoinInfo to this data store.
+    pub fn add_coin_info(&mut self) {
+        let coin_info = CoinInfoResource::random(u128::MAX);
+        let write_set = coin_info.to_writeset().expect("access path in test");
+        self.add_write_set(&write_set)
+    }
+
+    /// Adds a `CompiledModule` to this data store.
     ///
     /// Does not do any sort of verification on the module.
     pub fn add_module(&mut self, module_id: &ModuleId, blob: Vec<u8>) {
         let access_path = AccessPath::from(module_id);
-        self.set(StateKey::AccessPath(access_path), blob);
+        self.set(StateKey::access_path(access_path), blob);
     }
 
     /// Yields a reference to the internal data structure of the global state
@@ -90,13 +111,38 @@ impl FakeDataStore {
 }
 
 // This is used by the `execute_block` API.
-// TODO: only the "sync" get is implemented
-impl StateView for FakeDataStore {
-    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
-        Ok(self.state_data.get(state_key).cloned())
+impl TStateView for FakeDataStore {
+    type Key = StateKey;
+
+    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
+        Ok(self
+            .state_data
+            .get(state_key)
+            .cloned()
+            .map(StateValue::new_legacy))
     }
 
     fn is_genesis(&self) -> bool {
         self.state_data.is_empty()
+    }
+
+    fn get_usage(&self) -> Result<StateStorageUsage> {
+        let mut usage = StateStorageUsage::new_untracked();
+        for (k, v) in self.state_data.iter() {
+            usage.add_item(k.size() + v.len())
+        }
+        Ok(usage)
+    }
+}
+
+// This is used by aggregator tests.
+impl TableResolver for FakeDataStore {
+    fn resolve_table_entry(
+        &self,
+        handle: &TableHandle,
+        key: &[u8],
+    ) -> Result<Option<Vec<u8>>, anyhow::Error> {
+        let state_key = StateKey::table_item(AptosTableHandle::from(*handle), key.to_vec());
+        self.get_state_value_bytes(&state_key)
     }
 }

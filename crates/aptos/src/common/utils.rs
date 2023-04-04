@@ -1,24 +1,27 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     common::types::{CliError, CliTypedResult, PromptOptions},
+    config::GlobalConfig,
     CliResult,
 };
+use aptos_build_info::build_information;
 use aptos_logger::{debug, Level};
-use aptos_rest_client::Client;
-use aptos_telemetry::collect_build_information;
-use aptos_types::chain_id::ChainId;
+use aptos_rest_client::{aptos_api_types::HashValue, Account, Client, State};
+use aptos_telemetry::service::telemetry_is_disabled;
+use aptos_types::{chain_id::ChainId, transaction::authenticator::AuthenticationKey};
 use itertools::Itertools;
-use move_deps::move_core_types::account_address::AccountAddress;
+use move_core_types::account_address::AccountAddress;
 use reqwest::Url;
 use serde::Serialize;
+#[cfg(unix)]
+use std::os::unix::fs::OpenOptionsExt;
 use std::{
     collections::BTreeMap,
     env,
     fs::OpenOptions,
     io::Write,
-    os::unix::fs::OpenOptionsExt,
     path::{Path, PathBuf},
     str::FromStr,
     time::{Duration, Instant},
@@ -61,12 +64,17 @@ pub async fn to_common_result<T: Serialize>(
 ) -> CliResult {
     let latency = start_time.elapsed();
     let is_err = result.is_err();
-    let error = if let Err(ref error) = result {
-        Some(error.to_string())
-    } else {
-        None
-    };
-    send_telemetry_event(command, latency, !is_err, error).await;
+
+    if !telemetry_is_disabled() {
+        let error = if let Err(ref error) = result {
+            // Only print the error type
+            Some(error.to_str())
+        } else {
+            None
+        };
+        send_telemetry_event(command, latency, !is_err, error).await;
+    }
+
     let result: ResultWrapper<T> = result.into();
     let string = serde_json::to_string_pretty(&result).unwrap();
     if is_err {
@@ -76,15 +84,19 @@ pub async fn to_common_result<T: Serialize>(
     }
 }
 
+pub fn cli_build_information() -> BTreeMap<String, String> {
+    build_information!()
+}
+
 /// Sends a telemetry event about the CLI build, command and result
 async fn send_telemetry_event(
     command: &str,
     latency: Duration,
     success: bool,
-    error: Option<String>,
+    error: Option<&str>,
 ) {
     // Collect the build information
-    let build_information = collect_build_information!();
+    let build_information = cli_build_information();
 
     // Send the event
     aptos_telemetry::cli_metrics::send_cli_telemetry_event(
@@ -142,10 +154,22 @@ pub fn check_if_file_exists(file: &Path, prompt_options: PromptOptions) -> CliTy
 }
 
 pub fn prompt_yes_with_override(prompt: &str, prompt_options: PromptOptions) -> CliTypedResult<()> {
-    if prompt_options.assume_no || (!prompt_options.assume_yes && !prompt_yes(prompt)) {
-        Err(CliError::AbortedError)
+    if prompt_options.assume_no {
+        return Err(CliError::AbortedError);
+    } else if prompt_options.assume_yes {
+        return Ok(());
+    }
+
+    let is_yes = if let Some(response) = GlobalConfig::load()?.get_default_prompt_response() {
+        response
     } else {
+        prompt_yes(prompt)
+    };
+
+    if is_yes {
         Ok(())
+    } else {
+        Err(CliError::AbortedError)
     }
 }
 
@@ -199,17 +223,44 @@ pub fn append_file_extension(
     }
 }
 
+/// Retrieves account resource from the rest client
+pub async fn get_account(
+    client: &aptos_rest_client::Client,
+    address: AccountAddress,
+) -> CliTypedResult<Account> {
+    let account_response = client
+        .get_account(address)
+        .await
+        .map_err(|err| CliError::ApiError(err.to_string()))?;
+    Ok(account_response.into_inner())
+}
+
+/// Retrieves account resource from the rest client
+pub async fn get_account_with_state(
+    client: &aptos_rest_client::Client,
+    address: AccountAddress,
+) -> CliTypedResult<(Account, State)> {
+    let account_response = client
+        .get_account(address)
+        .await
+        .map_err(|err| CliError::ApiError(err.to_string()))?;
+    Ok(account_response.into_parts())
+}
+
 /// Retrieves sequence number from the rest client
 pub async fn get_sequence_number(
     client: &aptos_rest_client::Client,
     address: AccountAddress,
 ) -> CliTypedResult<u64> {
-    let account_response = client
-        .get_account(address)
-        .await
-        .map_err(|err| CliError::ApiError(err.to_string()))?;
-    let account = account_response.inner();
-    Ok(account.sequence_number)
+    Ok(get_account(client, address).await?.sequence_number)
+}
+
+/// Retrieves the auth key from the rest client
+pub async fn get_auth_key(
+    client: &aptos_rest_client::Client,
+    address: AccountAddress,
+) -> CliTypedResult<AuthenticationKey> {
+    Ok(get_account(client, address).await?.authentication_key)
 }
 
 /// Retrieves the chain id from the rest client
@@ -293,19 +344,26 @@ pub fn read_line(input_name: &'static str) -> CliTypedResult<String> {
 /// Fund account (and possibly create it) from a faucet
 pub async fn fund_account(
     faucet_url: Url,
-    num_coins: u64,
+    num_octas: u64,
     address: AccountAddress,
-) -> CliTypedResult<()> {
+) -> CliTypedResult<Vec<HashValue>> {
     let response = reqwest::Client::new()
         .post(format!(
             "{}mint?amount={}&auth_key={}",
-            faucet_url, num_coins, address
+            faucet_url, num_octas, address
         ))
+        .body("{}")
         .send()
         .await
-        .map_err(|err| CliError::ApiError(err.to_string()))?;
+        .map_err(|err| {
+            CliError::ApiError(format!("Failed to fund account with faucet: {:#}", err))
+        })?;
     if response.status() == 200 {
-        Ok(())
+        let hashes: Vec<HashValue> = response
+            .json()
+            .await
+            .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
+        Ok(hashes)
     } else {
         Err(CliError::ApiError(format!(
             "Faucet issue: {}",
@@ -316,10 +374,6 @@ pub async fn fund_account(
 
 pub fn start_logger() {
     let mut logger = aptos_logger::Logger::new();
-    logger
-        .channel_size(1000)
-        .is_async(false)
-        .level(Level::Warn)
-        .read_env();
+    logger.channel_size(1000).is_async(false).level(Level::Warn);
     logger.build();
 }

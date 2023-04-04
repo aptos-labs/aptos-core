@@ -1,4 +1,5 @@
 {
-  "code": 400,
-  "message": "invalid parameter limit: 0"
+  "message": "Given limit value (0) must not be zero",
+  "error_code": "invalid_input",
+  "vm_error_code": null
 }

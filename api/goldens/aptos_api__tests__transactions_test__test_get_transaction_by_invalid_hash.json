@@ -1,4 +1,5 @@
 {
-  "code": 400,
-  "message": "invalid parameter transaction hash or version: 0x1"
+  "message": "failed to parse path `txn_hash`: failed to parse \"string(HashValue)\": unable to parse HashValue",
+  "error_code": "web_framework_error",
+  "vm_error_code": null
 }

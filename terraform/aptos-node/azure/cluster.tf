@@ -40,7 +40,7 @@ resource "azurerm_kubernetes_cluster_node_pool" "validators" {
   vnet_subnet_id  = azurerm_subnet.nodes.id
   node_count      = lookup(var.node_pool_sizes, "validators", var.validator_instance_num)
   os_disk_size_gb = 30
-  node_taints     = ["aptos.org/nodepool=validators:NoExecute"]
+  node_taints     = var.validator_instance_enable_taint ? ["aptos.org/nodepool=validators:NoExecute"] : []
 }
 
 resource "azurerm_log_analytics_workspace" "aptos" {

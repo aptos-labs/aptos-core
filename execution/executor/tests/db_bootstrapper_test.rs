@@ -1,18 +1,32 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
 
+use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, Uniform};
+use aptos_db::AptosDB;
+use aptos_executor::{
+    block_executor::BlockExecutor,
+    db_bootstrapper::{generate_waypoint, maybe_bootstrap},
+};
+use aptos_executor_test_helpers::{
+    bootstrap_genesis, gen_ledger_info_with_sigs, get_test_signed_transaction,
+};
+use aptos_executor_types::BlockExecutorTrait;
+use aptos_gas::{ChangeSetConfigs, LATEST_GAS_FEATURE_VERSION};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
+use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReaderWriter};
 use aptos_temppath::TempPath;
-use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
-    account_config::{aptos_root_address, CoinStoreResource, NewBlockEvent, CORE_CODE_ADDRESS},
+    account_config::{
+        aptos_test_root_address, new_block_event_key, CoinStoreResource, NewBlockEvent,
+        CORE_CODE_ADDRESS,
+    },
     account_view::AccountView,
-    block_metadata::new_block_event_key,
     contract_event::ContractEvent,
     event::EventHandle,
     on_chain_config::{access_path_for_config, ConfigurationResource, OnChainConfig, ValidatorSet},
@@ -25,42 +39,31 @@ use aptos_types::{
     write_set::{WriteOp, WriteSetMut},
 };
 use aptos_vm::AptosVM;
-use aptosdb::AptosDB;
-use executor::{
-    block_executor::BlockExecutor,
-    db_bootstrapper::{generate_waypoint, maybe_bootstrap},
-};
-use executor_test_helpers::{
-    bootstrap_genesis, gen_ledger_info_with_sigs, get_test_signed_transaction,
-};
-use executor_types::BlockExecutorTrait;
-use move_deps::move_core_types::{
+use move_core_types::{
     language_storage::TypeTag,
     move_resource::{MoveResource, MoveStructType},
 };
 use rand::SeedableRng;
-use storage_interface::{state_view::LatestDbStateCheckpointView, DbReaderWriter};
 
 #[test]
 fn test_empty_db() {
-    let genesis = vm_genesis::test_genesis_change_set_and_validators(Some(1));
+    let genesis = aptos_vm_genesis::test_genesis_change_set_and_validators(Some(1));
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis.0));
     let tmp_dir = TempPath::new();
     let db_rw = DbReaderWriter::new(AptosDB::new_for_test(&tmp_dir));
 
-    // BlockExecutor won't be able to boot on empty db due to lack of StartupInfo.
-    assert!(db_rw.reader.get_startup_info().unwrap().is_none());
+    assert!(db_rw
+        .reader
+        .get_latest_ledger_info_option()
+        .unwrap()
+        .is_none());
 
     // Bootstrap empty DB.
     let waypoint = generate_waypoint::<AptosVM>(&db_rw, &genesis_txn).expect("Should not fail.");
     maybe_bootstrap::<AptosVM>(&db_rw, &genesis_txn, waypoint).unwrap();
-    let startup_info = db_rw
-        .reader
-        .get_startup_info()
-        .expect("Should not fail.")
-        .expect("Should not be None.");
+    let ledger_info = db_rw.reader.get_latest_ledger_info().unwrap();
     assert_eq!(
-        Waypoint::new_epoch_boundary(startup_info.latest_ledger_info.ledger_info()).unwrap(),
+        Waypoint::new_epoch_boundary(ledger_info.ledger_info()).unwrap(),
         waypoint
     );
 
@@ -82,12 +85,13 @@ fn execute_and_commit(txns: Vec<Transaction>, db: &DbReaderWriter, signer: &Vali
     let version = li.ledger_info().version();
     let epoch = li.ledger_info().next_block_epoch();
     let target_version = version + txns.len() as u64;
-    let executor = BlockExecutor::<AptosVM>::new(db.clone());
+    let executor = BlockExecutor::<AptosVM, Transaction>::new(db.clone());
     let output = executor
         .execute_block((block_id, txns), executor.committed_block_id())
         .unwrap();
     assert_eq!(output.num_leaves(), target_version + 1);
-    let ledger_info_with_sigs = gen_ledger_info_with_sigs(epoch, &output, block_id, vec![signer]);
+    let ledger_info_with_sigs =
+        gen_ledger_info_with_sigs(epoch, &output, block_id, &[signer.clone()]);
     executor
         .commit_blocks(vec![block_id], ledger_info_with_sigs)
         .unwrap();
@@ -123,7 +127,7 @@ fn get_aptos_coin_mint_transaction(
     amount: u64,
 ) -> Transaction {
     get_test_signed_transaction(
-        aptos_root_address(),
+        aptos_test_root_address(),
         /* sequence_number = */ aptos_root_seq_num,
         aptos_root_key.clone(),
         aptos_root_key.public_key(),
@@ -138,11 +142,11 @@ fn get_account_transaction(
     _account_key: &Ed25519PrivateKey,
 ) -> Transaction {
     get_test_signed_transaction(
-        aptos_root_address(),
+        aptos_test_root_address(),
         /* sequence_number = */ aptos_root_seq_num,
         aptos_root_key.clone(),
         aptos_root_key.public_key(),
-        Some(aptos_stdlib::account_create_account(*account)),
+        Some(aptos_stdlib::aptos_account_create_account(*account)),
     )
 }
 
@@ -183,16 +187,17 @@ fn get_configuration(db: &DbReaderWriter) -> ConfigurationResource {
 }
 
 #[test]
+#[cfg_attr(feature = "consensus-only-perf-test", ignore)]
 fn test_new_genesis() {
-    let genesis = vm_genesis::test_genesis_change_set_and_validators(Some(1));
-    let genesis_key = &vm_genesis::GENESIS_KEYPAIR.0;
+    let genesis = aptos_vm_genesis::test_genesis_change_set_and_validators(Some(1));
+    let genesis_key = &aptos_vm_genesis::GENESIS_KEYPAIR.0;
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis.0));
     // Create bootstrapped DB.
     let tmp_dir = TempPath::new();
     let db = DbReaderWriter::new(AptosDB::new_for_test(&tmp_dir));
     let waypoint = bootstrap_genesis::<AptosVM>(&db, &genesis_txn).unwrap();
     let signer = ValidatorSigner::new(
-        genesis.1[0].data.address,
+        genesis.1[0].data.owner_address,
         genesis.1[0].consensus_key.clone(),
     );
 
@@ -200,11 +205,11 @@ fn test_new_genesis() {
     let (account1, account1_key, account2, account2_key) = get_demo_accounts();
     let txn1 = get_account_transaction(genesis_key, 0, &account1, &account1_key);
     let txn2 = get_account_transaction(genesis_key, 1, &account2, &account2_key);
-    let txn3 = get_aptos_coin_mint_transaction(genesis_key, 2, &account1, 2_000_000);
-    let txn4 = get_aptos_coin_mint_transaction(genesis_key, 3, &account2, 2_000_000);
+    let txn3 = get_aptos_coin_mint_transaction(genesis_key, 2, &account1, 200_000_000);
+    let txn4 = get_aptos_coin_mint_transaction(genesis_key, 3, &account2, 200_000_000);
     execute_and_commit(block(vec![txn1, txn2, txn3, txn4]), &db, &signer);
-    assert_eq!(get_balance(&account1, &db), 2_000_000);
-    assert_eq!(get_balance(&account2, &db), 2_000_000);
+    assert_eq!(get_balance(&account1, &db), 200_000_000);
+    assert_eq!(get_balance(&account2, &db), 200_000_000);
 
     let trusted_state = TrustedState::from_epoch_waypoint(waypoint);
     let state_proof = db.reader.get_state_proof(trusted_state.version()).unwrap();
@@ -213,51 +218,63 @@ fn test_new_genesis() {
 
     // New genesis transaction: set validator set, bump epoch and overwrite account1 balance.
     let configuration = get_configuration(&db);
-    let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(ChangeSet::new(
-        WriteSetMut::new(vec![
-            (
-                StateKey::AccessPath(access_path_for_config(ValidatorSet::CONFIG_ID)),
-                WriteOp::Value(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
-            ),
-            (
-                StateKey::AccessPath(AccessPath::new(
-                    CORE_CODE_ADDRESS,
-                    ConfigurationResource::resource_path(),
-                )),
-                WriteOp::Value(bcs::to_bytes(&configuration.bump_epoch_for_test()).unwrap()),
-            ),
-            (
-                StateKey::AccessPath(AccessPath::new(
-                    account1,
-                    CoinStoreResource::resource_path(),
-                )),
-                WriteOp::Value(
-                    bcs::to_bytes(&CoinStoreResource::new(
-                        1_000_000,
-                        EventHandle::random(0),
-                        EventHandle::random(0),
-                    ))
-                    .unwrap(),
+    let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(
+        ChangeSet::new(
+            WriteSetMut::new(vec![
+                (
+                    StateKey::access_path(
+                        access_path_for_config(ValidatorSet::CONFIG_ID)
+                            .expect("access path in test"),
+                    ),
+                    WriteOp::Modification(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
                 ),
-            ),
-        ])
-        .freeze()
+                (
+                    StateKey::access_path(AccessPath::new(
+                        CORE_CODE_ADDRESS,
+                        ConfigurationResource::resource_path(),
+                    )),
+                    WriteOp::Modification(
+                        bcs::to_bytes(&configuration.bump_epoch_for_test()).unwrap(),
+                    ),
+                ),
+                (
+                    StateKey::access_path(AccessPath::new(
+                        account1,
+                        CoinStoreResource::resource_path(),
+                    )),
+                    WriteOp::Modification(
+                        bcs::to_bytes(&CoinStoreResource::new(
+                            100_000_000,
+                            false,
+                            EventHandle::random(0),
+                            EventHandle::random(0),
+                        ))
+                        .unwrap(),
+                    ),
+                ),
+            ])
+            .freeze()
+            .unwrap(),
+            vec![
+                ContractEvent::new(
+                    *configuration.events().key(),
+                    0,
+                    TypeTag::Struct(Box::new(
+                        <ConfigurationResource as MoveStructType>::struct_tag(),
+                    )),
+                    vec![],
+                ),
+                ContractEvent::new(
+                    new_block_event_key(),
+                    0,
+                    TypeTag::Struct(Box::new(NewBlockEvent::struct_tag())),
+                    vec![],
+                ),
+            ],
+            &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
+        )
         .unwrap(),
-        vec![
-            ContractEvent::new(
-                *configuration.events().key(),
-                0,
-                TypeTag::Struct(ConfigurationResource::struct_tag()),
-                vec![],
-            ),
-            ContractEvent::new(
-                new_block_event_key(),
-                0,
-                TypeTag::Struct(NewBlockEvent::struct_tag()),
-                vec![],
-            ),
-        ],
-    )));
+    ));
 
     // Bootstrap DB into new genesis.
     let waypoint = generate_waypoint::<AptosVM>(&db, &genesis_txn).unwrap();
@@ -273,14 +290,15 @@ fn test_new_genesis() {
     assert_eq!(trusted_state.version(), 6);
 
     // Effect of bootstrapping reflected.
-    assert_eq!(get_balance(&account1, &db), 1_000_000);
+    assert_eq!(get_balance(&account1, &db), 100_000_000);
     // State before new genesis accessible.
-    assert_eq!(get_balance(&account2, &db), 2_000_000);
+    assert_eq!(get_balance(&account2, &db), 200_000_000);
 
+    println!("FINAL TRANSFER");
     // Transfer some money.
-    let txn = get_aptos_coin_transfer_transaction(account1, 0, &account1_key, account2, 500_000);
+    let txn = get_aptos_coin_transfer_transaction(account1, 0, &account1_key, account2, 50_000_000);
     execute_and_commit(block(vec![txn]), &db, &signer);
 
     // And verify.
-    assert_eq!(get_balance(&account2, &db), 2_500_000);
+    assert_eq!(get_balance(&account2, &db), 250_000_000);
 }

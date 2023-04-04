@@ -1,4 +1,5 @@
 {
-  "code": 400,
-  "message": "Request body deserialize error: invalid type: integer `1234`, expected internally tagged enum TransactionPayload at line 1 column 172"
+  "message": "parse request payload error: Expected input type \"TransactionPayload\", found 1234. (occurred while parsing \"UserTransactionRequestInner\") (occurred while parsing \"EncodeSubmissionRequest\")",
+  "error_code": "web_framework_error",
+  "vm_error_code": null
 }

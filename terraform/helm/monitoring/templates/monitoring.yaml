@@ -150,6 +150,23 @@ spec:
 
 ---
 
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "aptos-monitoring.fullname" . }}-prometheus
+  labels:
+    {{- include "aptos-monitoring.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "aptos-monitoring.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/name: monitoring
+  ports:
+  - name: prometheus-http
+    port: 9090
+  type: ClusterIP
+
+---
+
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -189,7 +206,13 @@ spec:
            {{- if .prometheus.deleteWal }}
            rm -r /prometheus/data/wal/*
            {{- end }}
-           prometheus --web.enable-lifecycle --config.file=/etc/prometheus/prometheus.yml
+           prometheus \
+            --web.enable-lifecycle \
+            --web.external-url=http://mon.{{ $.Values.service.domain }} \
+            --config.file=/etc/prometheus/prometheus.yml \
+            --storage.tsdb.retention.time={{ .prometheus.tsdb_retention_time }} \
+            --storage.tsdb.min-block-duration={{ .prometheus.tsdb_min_block_duration }} \
+            --storage.tsdb.max-block-duration={{ .prometheus.tsdb_max_block_duration }}
         resources:
           {{- toYaml .prometheus.resources | nindent 10 }}
         ports:

@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -101,6 +102,7 @@ impl AUTransactionGen for CreateExistingAccountGen {
             TransactionStatus::Keep(ExecutionStatus::MoveAbort {
                 location: AbortLocation::Script,
                 code: 777_777,
+                info: None,
             })
         } else {
             // Not enough gas to get past the prologue.

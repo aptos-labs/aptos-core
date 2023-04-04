@@ -1,37 +1,39 @@
 [package]
-name = "vm-genesis"
-version = "0.1.0"
-edition = "2018"
-authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+name = "aptos-vm-genesis"
 description = "Aptos vm genesis"
-repository = "https://github.com/aptos-labs/aptos-core"
-homepage = "https://aptoslabs.com"
-license = "Apache-2.0"
-publish = false
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
 
 [dependencies]
-anyhow = "1.0.57"
-bcs = "0.1.3"
-once_cell = "1.10.0"
-rand = "0.7.3"
-
-aptos-config = { path = "../../config" }
-aptos-crypto = { path = "../../crates/aptos-crypto" }
-aptos-state-view = { path = "../../storage/state-view" }
-aptos-types = { path = "../../types" }
-aptos-vm = { path = "../aptos-vm" }
-
-cached-framework-packages =  { path = "../framework/cached-packages" }
-framework =  { path = "../framework" }
-move-deps = { path = "../../aptos-move/move-deps", features = ["address32"] }
+anyhow = { workspace = true }
+aptos-cached-packages =  { workspace = true }
+aptos-crypto = { workspace = true }
+aptos-framework =  { workspace = true }
+aptos-gas = { workspace = true }
+aptos-state-view = { workspace = true }
+aptos-types = { workspace = true }
+aptos-vm = { workspace = true }
+bcs = { workspace = true }
+move-core-types = { workspace = true }
+move-vm-types = { workspace = true }
+once_cell = { workspace = true }
+rand = { workspace = true }
+serde = { workspace = true }
 
 [dev-dependencies]
-proptest = "1.0.0"
-proptest-derive = "0.3.0"
-
-aptos-proptest-helpers = { path = "../../crates/aptos-proptest-helpers" }
-move-deps = { path = "../../aptos-move/move-deps", features = ["address32", "fuzzing"] }
+aptos-proptest-helpers = { workspace = true }
+move-core-types = { workspace = true }
+proptest = { workspace = true }
+proptest-derive = { workspace = true }
 
 [features]
 default = []
-fuzzing = ["aptos-types/fuzzing", "move-deps/fuzzing"]
+fuzzing = ["aptos-types/fuzzing", "move-core-types/fuzzing", "move-vm-types/fuzzing"]

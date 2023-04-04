@@ -1,25 +1,17 @@
 ---
-title: "Guides"
+title: "Interact with Blockchain"
 slug: "aptos-guides"
 hidden: false
 ---
 
-# Guides
+# Interact with the Aptos Blockchain
 
-Start here to get into the core concepts of the Aptos Blockchain. 
+Follow these guides to work with the Aptos blockchain.
 
-- ### [Life of a Transaction](basics-life-of-txn.md)
-
-
-- ### [Creating a Signed Transaction](sign-a-transaction.md)
-
-
-- ### [Move on Aptos](move-guides/move-on-aptos.md)
-
-
-- ### [Interacting with the Aptos Blockchain](interacting-with-the-blockchain.md)
-
-
-- ### [Building the Wallet Extension](building-wallet-extension.md)
-
-
+- ### [Index Aptos Data](indexing.md)
+- ### [Create a Signed Transaction](sign-a-transaction.md)
+- ### [Use Resource Accounts in Apps](resource-accounts.md)
+- ### [Integrate with Aptos Names Service](aptos-name-service-connector.md)
+- ### [Integrate with the Aptos Faucet](./system-integrators-guide.md#integrating-with-the-faucet)
+- ### [Adhere to Wallet Standard](wallet-standard.md)
+- ### [Handle Errors in Aptos](handle-aptos-errors.md)

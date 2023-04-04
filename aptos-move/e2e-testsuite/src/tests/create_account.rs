@@ -1,15 +1,16 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
-use language_e2e_tests::{
+use aptos_language_e2e_tests::{
     account::Account, common_transactions::create_account_txn, current_function_name,
     executor::FakeExecutor,
 };
+use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
 
 #[test]
 fn create_account() {
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
 
     // create and publish a sender with 1_000_000 coins

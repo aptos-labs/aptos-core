@@ -1,51 +1,91 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use move_deps::{
-    move_binary_format::errors::PartialVMResult,
-    move_core_types::{account_address::AccountAddress, gas_schedule::GasCost},
-    move_vm_runtime::native_functions::NativeContext,
-    move_vm_types::{
-        gas_schedule::NativeCostIndex,
-        loaded_data::runtime_types::Type,
-        natives::function::{native_gas, NativeResult},
-        pop_arg,
-        values::Value,
+use crate::{
+    natives::{
+        create_signer,
+        helpers::{make_safe_native, SafeNativeContext, SafeNativeError, SafeNativeResult},
     },
+    safely_pop_arg,
 };
-use smallvec::smallvec;
-use std::collections::VecDeque;
+use aptos_types::on_chain_config::{Features, TimedFeatures};
+use move_core_types::{account_address::AccountAddress, gas_algebra::InternalGas};
+use move_vm_runtime::native_functions::NativeFunction;
+use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
+use smallvec::{smallvec, SmallVec};
+use std::{collections::VecDeque, sync::Arc};
 
-pub fn native_create_address(
-    _context: &mut NativeContext,
+/***************************************************************************************************
+ * native fun create_address
+ *
+ *   gas cost: base_cost
+ *
+ **************************************************************************************************/
+#[derive(Debug, Clone)]
+pub struct CreateAddressGasParameters {
+    pub base: InternalGas,
+}
+
+fn native_create_address(
+    gas_params: &CreateAddressGasParameters,
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.is_empty());
     debug_assert!(arguments.len() == 1);
 
-    let cost = GasCost::new(super::cost::APTOS_CREATE_ADDRESS, 1).total();
-    let bytes = pop_arg!(arguments, Vec<u8>);
+    context.charge(gas_params.base)?;
+
+    let bytes = safely_pop_arg!(arguments, Vec<u8>);
     let address = AccountAddress::from_bytes(bytes);
     if let Ok(address) = address {
-        Ok(NativeResult::ok(cost, smallvec![Value::address(address)]))
+        Ok(smallvec![Value::address(address)])
     } else {
-        Ok(NativeResult::err(
-            cost,
-            super::status::NFE_UNABLE_TO_PARSE_ADDRESS,
-        ))
+        Err(SafeNativeError::Abort {
+            abort_code: super::status::NFE_UNABLE_TO_PARSE_ADDRESS,
+        })
     }
 }
 
-pub fn native_create_signer(
-    context: &mut NativeContext,
-    ty_args: Vec<Type>,
-    mut arguments: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
-    debug_assert!(ty_args.is_empty());
-    debug_assert!(arguments.len() == 1);
+/***************************************************************************************************
+ * module
+ *
+ **************************************************************************************************/
+#[derive(Debug, Clone)]
+pub struct GasParameters {
+    pub create_address: CreateAddressGasParameters,
+    pub create_signer: create_signer::CreateSignerGasParameters,
+}
 
-    let address = pop_arg!(arguments, AccountAddress);
-    let cost = native_gas(context.cost_table(), NativeCostIndex::CREATE_SIGNER, 0);
-    Ok(NativeResult::ok(cost, smallvec![Value::signer(address)]))
+pub fn make_all(
+    gas_params: GasParameters,
+    timed_features: TimedFeatures,
+    features: Arc<Features>,
+) -> impl Iterator<Item = (String, NativeFunction)> {
+    let natives = [
+        (
+            "create_address",
+            make_safe_native(
+                gas_params.create_address,
+                timed_features.clone(),
+                features.clone(),
+                native_create_address,
+            ),
+        ),
+        // Despite that this is no longer present in account.move, we must keep this around for
+        // replays.
+        (
+            "create_signer",
+            make_safe_native(
+                gas_params.create_signer,
+                timed_features,
+                features,
+                create_signer::native_create_signer,
+            ),
+        ),
+    ];
+
+    crate::natives::helpers::make_module_natives(natives)
 }

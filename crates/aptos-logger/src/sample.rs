@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! Periodic sampling for logs, metrics, and other use cases through a simple macro
@@ -88,7 +89,7 @@ macro_rules! sample {
     };
 
     ($sample_rate:expr, $($args:tt)+) => {{
-        static SAMPLING: Sampling = $crate::sample::Sampling::new($sample_rate);
+        static SAMPLING: $crate::sample::Sampling = $crate::sample::Sampling::new($sample_rate);
         if SAMPLING.sample() {
             $($args)+
         }

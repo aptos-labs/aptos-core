@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 ///! This module provides reusable helpers in tests.
@@ -7,16 +8,80 @@ use crate::{
     jellyfish_merkle_node::JellyfishMerkleNodeSchema, schema::state_value::StateValueSchema,
 };
 use aptos_crypto::hash::{CryptoHash, EventAccumulatorHasher, TransactionAccumulatorHasher};
+use aptos_executor_types::ProofReader;
 use aptos_jellyfish_merkle::node_type::{Node, NodeKey};
+use aptos_scratchpad::SparseMerkleTree;
 use aptos_temppath::TempPath;
 use aptos_types::{
     contract_event::ContractEvent,
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
     proof::accumulator::InMemoryAccumulator,
     proptest_types::{AccountInfoUniverse, BlockGen},
 };
-use executor_types::ProofReader;
-use proptest::{collection::vec, prelude::*};
+use proptest::{collection::vec, prelude::*, sample::Index};
+use std::fmt::Debug;
+
+prop_compose! {
+    pub fn arb_state_kv_sets(
+        key_universe_size: usize,
+        max_update_set_size: usize,
+        max_versions: usize
+    )
+    (
+        keys in vec(any::<StateKey>(), key_universe_size),
+        input in vec(vec((any::<Index>(), any::<Option<StateValue>>()), 1..max_update_set_size), 1..max_versions)
+    ) -> Vec<Vec<(StateKey, Option<StateValue>)>> {
+            input
+            .into_iter()
+            .map(|kvs|
+                kvs
+                .into_iter()
+                .map(|(idx, value)| (idx.get(&keys).clone(), value))
+                .collect::<Vec<_>>()
+            )
+            .collect::<Vec<_>>()
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn update_store(
+    store: &StateStore,
+    input: impl Iterator<Item = (StateKey, Option<StateValue>)>,
+    first_version: Version,
+) -> HashValue {
+    use aptos_storage_interface::{jmt_update_refs, jmt_updates};
+    let mut root_hash = *aptos_crypto::hash::SPARSE_MERKLE_PLACEHOLDER_HASH;
+    for (i, (key, value)) in input.enumerate() {
+        let value_state_set = vec![(key, value)].into_iter().collect();
+        let jmt_updates = jmt_updates(&value_state_set);
+        let version = first_version + i as Version;
+        root_hash = store
+            .merklize_value_set(
+                jmt_update_refs(&jmt_updates),
+                None,
+                version,
+                version.checked_sub(1),
+            )
+            .unwrap();
+        let ledger_batch = SchemaBatch::new();
+        let sharded_state_kv_batches = new_sharded_schema_batch();
+        store
+            .put_value_sets(
+                vec![&value_state_set],
+                version,
+                StateStorageUsage::new_untracked(),
+                &ledger_batch,
+                &sharded_state_kv_batches,
+            )
+            .unwrap();
+        store.ledger_db.write_schemas(ledger_batch).unwrap();
+        store
+            .state_kv_db
+            .commit(version, sharded_state_kv_batches)
+            .unwrap();
+    }
+    root_hash
+}
 
 pub fn update_in_memory_state(state: &mut StateDelta, txns_to_commit: &[TransactionToCommit]) {
     let mut next_version = state.current_version.map_or(0, |v| v + 1);
@@ -37,8 +102,9 @@ pub fn update_in_memory_state(state: &mut StateDelta, txns_to_commit: &[Transact
                     state
                         .updates_since_base
                         .iter()
-                        .map(|(k, v)| (k.hash(), v))
+                        .map(|(k, v)| (k.hash(), v.as_ref()))
                         .collect(),
+                    StateStorageUsage::new_untracked(),
                     &ProofReader::new_empty(),
                 )
                 .unwrap()
@@ -49,6 +115,7 @@ pub fn update_in_memory_state(state: &mut StateDelta, txns_to_commit: &[Transact
             state.updates_since_base.clear();
         }
     }
+
     if next_version.checked_sub(1) != state.current_version {
         state.current = state
             .current
@@ -58,8 +125,9 @@ pub fn update_in_memory_state(state: &mut StateDelta, txns_to_commit: &[Transact
                 state
                     .updates_since_base
                     .iter()
-                    .map(|(k, v)| (k.hash(), v))
+                    .map(|(k, v)| (k.hash(), v.as_ref()))
                     .collect(),
+                StateStorageUsage::new_untracked(),
                 &ProofReader::new_empty(),
             )
             .unwrap()
@@ -78,10 +146,11 @@ prop_compose! {
     fn arb_blocks_to_commit_impl(
         num_accounts: usize,
         max_user_txns_per_block: usize,
+        min_blocks: usize,
         max_blocks: usize,
     )(
         mut universe in any_with::<AccountInfoUniverse>(num_accounts).no_shrink(),
-        block_gens in vec(any_with::<BlockGen>(max_user_txns_per_block), 1..=max_blocks),
+        block_gens in vec(any_with::<BlockGen>(max_user_txns_per_block), min_blocks..=max_blocks),
     ) -> Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)> {
         type EventAccumulator = InMemoryAccumulator<EventAccumulatorHasher>;
         type TxnAccumulator = InMemoryAccumulator<TransactionAccumulatorHasher>;
@@ -89,8 +158,8 @@ prop_compose! {
         let mut txn_accumulator = TxnAccumulator::new_empty();
         let mut result = Vec::new();
 
-    let mut in_memory_state = StateDelta::new_empty();
-    let _ancester = in_memory_state.current.clone().freeze();
+        let mut in_memory_state = StateDelta::new_empty();
+        let _ancester = in_memory_state.current.clone().freeze();
 
         for block_gen in block_gens {
             let (mut txns_to_commit, mut ledger_info) = block_gen.materialize(&mut universe);
@@ -127,11 +196,7 @@ prop_compose! {
             // updated ledger info with real root hash and sign
             ledger_info.set_executed_state_id(txn_accumulator.root_hash());
             let validator_set = universe.get_validator_set(ledger_info.epoch());
-            let signatures = validator_set
-                .iter()
-                .map(|signer| (signer.author(), signer.sign(&ledger_info)))
-                .collect();
-            let ledger_info_with_sigs = LedgerInfoWithSignatures::new(ledger_info, signatures);
+            let ledger_info_with_sigs = generate_ledger_info_with_sig(validator_set, ledger_info);
 
             result.push((txns_to_commit, ledger_info_with_sigs))
         }
@@ -144,7 +209,19 @@ pub fn arb_blocks_to_commit(
     arb_blocks_to_commit_impl(
         5,  /* num_accounts */
         2,  /* max_user_txn_per_block */
+        1,  /* min_blocks */
         10, /* max_blocks */
+    )
+}
+
+pub fn arb_blocks_to_commit_with_block_nums(
+    min_blocks: usize,
+    max_blocks: usize,
+) -> impl Strategy<Value = Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>> {
+    arb_blocks_to_commit_impl(
+        5, /* num_accounts */
+        2, /* max_user_txn_per_block */
+        min_blocks, max_blocks,
     )
 }
 
@@ -201,15 +278,67 @@ fn verify_epochs(db: &AptosDB, ledger_infos_with_sigs: &[LedgerInfoWithSignature
     }
 }
 
-pub fn test_save_blocks_impl(input: Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>) {
-    let tmp_dir = TempPath::new();
-    let db = AptosDB::new_for_test(&tmp_dir);
+fn gen_snapshot_version(
+    updates: &mut HashMap<StateKey, Option<StateValue>>,
+    txns_to_commit: &[TransactionToCommit],
+    cur_ver: Version,
+    threshold: usize,
+) -> Option<Version> {
+    let mut snapshot_version = None;
+    let last_checkpoint = txns_to_commit
+        .iter()
+        .enumerate()
+        .filter(|(_idx, x)| x.is_state_checkpoint())
+        .last()
+        .map(|(idx, _)| idx);
+    if let Some(idx) = last_checkpoint {
+        updates.extend(
+            txns_to_commit[0..=idx]
+                .iter()
+                .flat_map(|x| x.state_updates().clone())
+                .collect::<HashMap<_, _>>(),
+        );
+        if updates.len() >= threshold {
+            snapshot_version = Some(cur_ver + idx as u64);
+            updates.clear();
+        }
+        updates.extend(
+            txns_to_commit[idx + 1..]
+                .iter()
+                .flat_map(|x| x.state_updates().clone())
+                .collect::<HashMap<_, _>>(),
+        );
+    } else {
+        updates.extend(
+            txns_to_commit
+                .iter()
+                .flat_map(|x| x.state_updates().clone())
+                .collect::<HashMap<_, _>>(),
+        );
+    }
+    snapshot_version
+}
 
-    let mut in_memory_state = (*db.state_store.buffered_state().lock()).clone();
+pub fn test_save_blocks_impl(
+    input: Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>,
+    snapshot_size_threshold: usize,
+) {
+    let tmp_dir = TempPath::new();
+    let db =
+        AptosDB::new_for_test_with_buffered_state_target_items(&tmp_dir, snapshot_size_threshold);
+
+    let mut in_memory_state = db
+        .state_store
+        .buffered_state()
+        .lock()
+        .current_state()
+        .clone();
     let _ancester = in_memory_state.current.clone();
     let num_batches = input.len();
     let mut cur_ver: Version = 0;
     let mut all_committed_txns = vec![];
+    let mut updates = HashMap::new();
+    let mut snapshot_versions = vec![];
     for (batch_idx, (txns_to_commit, ledger_info_with_sigs)) in input.iter().enumerate() {
         update_in_memory_state(&mut in_memory_state, txns_to_commit.as_slice());
         db.save_transactions(
@@ -217,9 +346,19 @@ pub fn test_save_blocks_impl(input: Vec<(Vec<TransactionToCommit>, LedgerInfoWit
             cur_ver,                /* first_version */
             cur_ver.checked_sub(1), /* base_state_version */
             Some(ledger_info_with_sigs),
+            false, /* sync_commit */
             in_memory_state.clone(),
         )
         .unwrap();
+
+        if let Some(v) = gen_snapshot_version(
+            &mut updates,
+            txns_to_commit,
+            cur_ver,
+            snapshot_size_threshold,
+        ) {
+            snapshot_versions.push(v);
+        }
 
         assert_eq!(
             db.ledger_store.get_latest_ledger_info().unwrap(),
@@ -239,6 +378,7 @@ pub fn test_save_blocks_impl(input: Vec<(Vec<TransactionToCommit>, LedgerInfoWit
 
         cur_ver += txns_to_commit.len() as u64;
     }
+    db.state_store.buffered_state().lock().sync_commit();
 
     let first_batch = input.first().unwrap().0.clone();
     let first_batch_ledger_info = input.first().unwrap().1.clone();
@@ -261,6 +401,63 @@ pub fn test_save_blocks_impl(input: Vec<(Vec<TransactionToCommit>, LedgerInfoWit
     );
     let (_, ledger_infos_with_sigs): (Vec<_>, Vec<_>) = input.iter().cloned().unzip();
     verify_epochs(&db, &ledger_infos_with_sigs);
+
+    // sync the commits and verify the states
+    db.state_store.buffered_state().lock().sync_commit();
+    verify_snapshots(
+        &db,
+        0, /* first_version */
+        snapshot_versions,
+        input
+            .iter()
+            .flat_map(|(txns_to_commit, _)| txns_to_commit.iter())
+            .collect(),
+    );
+}
+
+fn verify_snapshots(
+    db: &AptosDB,
+    start_version: Version,
+    snapshot_versions: Vec<Version>,
+    txns_to_commit: Vec<&TransactionToCommit>,
+) {
+    let mut cur_version = start_version;
+    let mut updates: HashMap<&StateKey, Option<&StateValue>> = HashMap::new();
+    for snapshot_version in snapshot_versions {
+        let start = (cur_version - start_version) as usize;
+        let end = (snapshot_version - start_version) as usize;
+        assert!(txns_to_commit[end].is_state_checkpoint());
+        let expected_root_hash = db
+            .ledger_store
+            .get_transaction_info(snapshot_version)
+            .unwrap()
+            .state_checkpoint_hash()
+            .unwrap();
+        updates.extend(
+            txns_to_commit[start..=end]
+                .iter()
+                .flat_map(|x| {
+                    x.state_updates()
+                        .iter()
+                        .map(|(k, v_opt)| (k, v_opt.as_ref()))
+                })
+                .collect::<HashMap<&StateKey, Option<&StateValue>>>(),
+        );
+        for (state_key, state_value) in &updates {
+            let (state_value_in_db, proof) = db
+                .get_state_value_with_proof_by_version(state_key, snapshot_version)
+                .unwrap();
+            assert_eq!(state_value_in_db.as_ref(), *state_value);
+            proof
+                .verify(
+                    expected_root_hash,
+                    state_key.hash(),
+                    state_value_in_db.as_ref(),
+                )
+                .unwrap();
+        }
+        cur_version = snapshot_version + 1;
+    }
 }
 
 fn get_events_by_event_key(
@@ -418,13 +615,13 @@ fn verify_account_txns(
         .map(|(account, txns_and_events)| {
             let account = *account;
             let first_seq_num = if let Some((txn, _)) = txns_and_events.first() {
-                txn.as_signed_user_txn().unwrap().sequence_number()
+                txn.try_as_signed_user_txn().unwrap().sequence_number()
             } else {
                 return (account, Vec::new());
             };
 
             let last_txn = &txns_and_events.last().unwrap().0;
-            let last_seq_num = last_txn.as_signed_user_txn().unwrap().sequence_number();
+            let last_seq_num = last_txn.try_as_signed_user_txn().unwrap().sequence_number();
             let limit = last_seq_num + 1;
 
             let acct_txns_with_proof = db
@@ -465,7 +662,7 @@ fn group_txns_by_account(
 ) -> HashMap<AccountAddress, Vec<(Transaction, Vec<ContractEvent>)>> {
     let mut account_to_txns = HashMap::new();
     for txn in txns_to_commit {
-        if let Ok(signed_txn) = txn.transaction().as_signed_user_txn() {
+        if let Some(signed_txn) = txn.transaction().try_as_signed_user_txn() {
             let account = signed_txn.sender();
             account_to_txns
                 .entry(account)
@@ -476,6 +673,64 @@ fn group_txns_by_account(
     account_to_txns
 }
 
+fn assert_items_equal<'a, T: 'a + Debug + Eq>(
+    iter: impl Iterator<Item = &'a T>,
+    db_iter_res: Result<impl Iterator<Item = Result<T>>>,
+) {
+    for (item, db_item) in itertools::zip_eq(iter, db_iter_res.unwrap()) {
+        assert_eq!(item, &db_item.unwrap());
+    }
+}
+
+fn verify_ledger_iterators(
+    db: &AptosDB,
+    txns_to_commit: &[TransactionToCommit],
+    first_version: Version,
+    ledger_info_with_sigs: &LedgerInfoWithSignatures,
+) {
+    let num_txns = txns_to_commit.len() as u64;
+    assert_items_equal(
+        txns_to_commit.iter().map(|t| t.transaction()),
+        db.get_transaction_iterator(first_version, num_txns),
+    );
+    assert_items_equal(
+        txns_to_commit.iter().map(|t| t.transaction_info()),
+        db.get_transaction_info_iterator(first_version, num_txns),
+    );
+    assert_items_equal(
+        txns_to_commit
+            .iter()
+            .map(|t| t.events().to_vec())
+            .collect::<Vec<_>>()
+            .iter(),
+        db.get_events_iterator(first_version, num_txns),
+    );
+    assert_items_equal(
+        txns_to_commit.iter().map(|t| t.write_set()),
+        db.get_write_set_iterator(first_version, num_txns),
+    );
+    let range_proof = db
+        .get_transaction_accumulator_range_proof(
+            first_version,
+            num_txns,
+            ledger_info_with_sigs.ledger_info().version(),
+        )
+        .unwrap();
+    range_proof
+        .verify(
+            ledger_info_with_sigs
+                .ledger_info()
+                .transaction_accumulator_hash(),
+            Some(first_version),
+            &db.get_transaction_info_iterator(first_version, num_txns)
+                .unwrap()
+                .map(|txn_info_res| Ok(txn_info_res?.hash()))
+                .collect::<Result<Vec<_>>>()
+                .unwrap(),
+        )
+        .unwrap()
+}
+
 pub fn verify_committed_transactions(
     db: &AptosDB,
     txns_to_commit: &[TransactionToCommit],
@@ -483,6 +738,7 @@ pub fn verify_committed_transactions(
     ledger_info_with_sigs: &LedgerInfoWithSignatures,
     is_latest: bool,
 ) {
+    verify_ledger_iterators(db, txns_to_commit, first_version, ledger_info_with_sigs);
     let ledger_info = ledger_info_with_sigs.ledger_info();
     let ledger_version = ledger_info.version();
     assert_eq!(
@@ -505,27 +761,15 @@ pub fn verify_committed_transactions(
         for (state_key, state_value) in txn_to_commit.state_updates() {
             updates.insert(state_key, state_value);
             let state_value_in_db = db.get_state_value_by_version(state_key, cur_ver).unwrap();
-            assert_eq!(state_value_in_db, Some(state_value.clone()));
+            assert_eq!(state_value_in_db, *state_value);
         }
 
-        if txn_to_commit.is_state_checkpoint() {
-            for (state_key, state_value) in &updates {
-                let (state_value_in_db, proof) = db
-                    .get_state_value_with_proof_by_version(state_key, cur_ver)
-                    .unwrap();
-                assert_eq!(state_value_in_db, Some((*state_value).clone()));
-                proof
-                    .verify(
-                        txn_info.state_checkpoint_hash().unwrap(),
-                        state_key.hash(),
-                        state_value_in_db.as_ref(),
-                    )
-                    .unwrap();
-            }
-            updates.clear();
-        } else {
+        if !txn_to_commit.is_state_checkpoint() {
             // Fetch and verify transaction itself.
-            let txn = txn_to_commit.transaction().as_signed_user_txn().unwrap();
+            let txn = txn_to_commit
+                .transaction()
+                .try_as_signed_user_txn()
+                .unwrap();
             let txn_with_proof = db
                 .get_transaction_by_hash(txn_to_commit.transaction().hash(), ledger_version, true)
                 .unwrap()
@@ -589,7 +833,6 @@ pub fn verify_committed_transactions(
                 .unwrap();
             assert_eq!(txn_output_list_with_proof.transactions_and_outputs.len(), 1);
         }
-
         cur_ver += 1;
     }
 
@@ -606,11 +849,11 @@ pub fn verify_committed_transactions(
 }
 
 pub fn put_transaction_info(db: &AptosDB, version: Version, txn_info: &TransactionInfo) {
-    let mut cs = ChangeSet::new();
+    let batch = SchemaBatch::new();
     db.ledger_store
-        .put_transaction_infos(version, &[txn_info.clone()], &mut cs)
+        .put_transaction_infos(version, &[txn_info.clone()], &batch)
         .unwrap();
-    db.ledger_db.write_schemas(cs.batch).unwrap();
+    db.ledger_db.write_schemas(batch).unwrap();
 }
 
 pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: StateValue) {
@@ -619,27 +862,46 @@ pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: S
         .put::<JellyfishMerkleNodeSchema>(&NodeKey::new_empty_path(version), &leaf_node)
         .unwrap();
     let smt = SparseMerkleTree::<StateValue>::default()
-        .batch_update(vec![(key.hash(), &value)], &ProofReader::new_empty())
+        .batch_update(vec![(key.hash(), Some(&value))], &ProofReader::new_empty())
         .unwrap();
     db.ledger_db
-        .put::<StateValueSchema>(&(key.clone(), version), &value)
+        .put::<StateValueSchema>(&(key.clone(), version), &Some(value.clone()))
         .unwrap();
-    let mut in_memory_state = db.state_store.buffered_state().lock();
+    let mut in_memory_state = db
+        .state_store
+        .buffered_state()
+        .lock()
+        .current_state()
+        .clone();
     in_memory_state.current = smt;
     in_memory_state.current_version = Some(version);
-    in_memory_state.updates_since_base.insert(key, value);
+    in_memory_state.updates_since_base.insert(key, Some(value));
+    db.state_store
+        .buffered_state()
+        .lock()
+        .update(None, in_memory_state, true)
+        .unwrap();
 }
 
 pub fn test_sync_transactions_impl(
     input: Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>,
+    snapshot_size_threshold: usize,
 ) {
     let tmp_dir = TempPath::new();
-    let db = AptosDB::new_for_test(&tmp_dir);
+    let db =
+        AptosDB::new_for_test_with_buffered_state_target_items(&tmp_dir, snapshot_size_threshold);
 
-    let mut in_memory_state = (*db.state_store.buffered_state().lock()).clone();
-    let _ancester = in_memory_state.current.clone().freeze();
+    let mut in_memory_state = db
+        .state_store
+        .buffered_state()
+        .lock()
+        .current_state()
+        .clone();
+    let _ancester = in_memory_state.current.clone();
     let num_batches = input.len();
     let mut cur_ver: Version = 0;
+    let mut updates = HashMap::new();
+    let mut snapshot_versions = vec![];
     for (batch_idx, (txns_to_commit, ledger_info_with_sigs)) in input.iter().enumerate() {
         // if batch has more than 2 transactions, save them in two batches
         let batch1_len = txns_to_commit.len() / 2;
@@ -651,6 +913,7 @@ pub fn test_sync_transactions_impl(
                 cur_ver, /* first_version */
                 base_state_version,
                 None,
+                false, /* sync_commit */
                 in_memory_state.clone(),
             )
             .unwrap();
@@ -661,9 +924,19 @@ pub fn test_sync_transactions_impl(
             cur_ver + batch1_len as u64, /* first_version */
             base_state_version,
             Some(ledger_info_with_sigs),
+            false, /* sync_commit */
             in_memory_state.clone(),
         )
         .unwrap();
+
+        if let Some(v) = gen_snapshot_version(
+            &mut updates,
+            txns_to_commit,
+            cur_ver,
+            snapshot_size_threshold,
+        ) {
+            snapshot_versions.push(v);
+        }
 
         verify_committed_transactions(
             &db,
@@ -675,4 +948,16 @@ pub fn test_sync_transactions_impl(
 
         cur_ver += txns_to_commit.len() as u64;
     }
+
+    // sync the commits and verify the states
+    db.state_store.buffered_state().lock().sync_commit();
+    verify_snapshots(
+        &db,
+        0, /* first_version */
+        snapshot_versions,
+        input
+            .iter()
+            .flat_map(|(txns_to_commit, _)| txns_to_commit.iter())
+            .collect(),
+    );
 }

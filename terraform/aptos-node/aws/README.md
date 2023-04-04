@@ -20,7 +20,7 @@ Install pre-requisites if needed:
     $ mkdir -p ~/$WORKSPACE
     ```
 
-2. Create a S3 storage bucket for storing the Terraform state on AWS, you can do this on AWS UI or by the command: 
+2. Create a S3 storage bucket for storing the Terraform state on AWS, you can do this on AWS UI or by the command:
 
     ```
     $ aws s3api create-bucket --bucket <bucket name> --region <region name>
@@ -34,7 +34,7 @@ Install pre-requisites if needed:
 
 4. Modify `main.tf` file to configure Terraform, and create fullnode from Terraform module. Example content for `main.tf`:
   ```
-  variable "aws_region" {
+  variable "region" {
     type    = string
     default = <aws region> # pick a region
   }
@@ -44,18 +44,18 @@ Install pre-requisites if needed:
     backend "s3" {
       bucket = "terraform.aptos-node"
       key    = "state/aptos-node"
-      region = var.aws_region
+      region = var.region
     }
   }
 
   provider "aws" {
-    region = var.aws_region
+    region = var.region
   }
 
   module "aptos-node" {
     # download Terraform module from aptos-labs/aptos-core repo
     source        = "github.com/aptos-labs/aptos-core.git//terraform/aptos-node/aws?ref=main"
-    region        = var.aws_region  # Specify the region
+    region        = var.region  # Specify the region
     # zone_id     = "<Route53 zone id>"  # zone id for Route53 if you want to use DNS
     era           = 1              # bump era number to wipe the chain
     chain_id      = 5
@@ -64,7 +64,7 @@ Install pre-requisites if needed:
   }
   ```
 
-    For the full customization options, see the variables file [here](https://github.com/aptos-labs/aptos-core/blob/main/terraform/aptos-node/aws/variables.tf), and the [helm values](https://github.com/aptos-labs/aptos-core/blob/main/terraform/helm/aptos-node/values.yaml).
+For the full customization options, see the variables file [here](https://github.com/aptos-labs/aptos-core/blob/main/terraform/aptos-node/aws/variables.tf), and the [helm values](https://github.com/aptos-labs/aptos-core/blob/main/terraform/helm/aptos-node/values.yaml).
 
 5. Initialize Terraform in the same directory of your `main.tf` file
   ```
@@ -161,7 +161,7 @@ This will download all the terraform dependencies for you, in the `.terraform` f
 
     ```
     $ aptos genesis generate-genesis --local-repository-dir ~/$WORKSPACE --output-dir ~/$WORKSPACE
-    ``` 
+    ```
 
     This should create two files in your working directory, `genesis.blob` and `waypoint.txt`
 

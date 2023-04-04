@@ -1,13 +1,24 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::types::{
-    AccountIdentifier, Allow, Amount, Block, BlockIdentifier, Currency, InternalOperation,
-    NetworkIdentifier, Operation, PartialBlockIdentifier, Peer, PublicKey, Signature,
-    SigningPayload, SyncStatus, Transaction, TransactionIdentifier, Version,
+use crate::{
+    types::{
+        AccountIdentifier, Allow, Amount, Block, BlockIdentifier, Currency, InternalOperation,
+        NetworkIdentifier, Operation, PartialBlockIdentifier, Peer, PublicKey, Signature,
+        SigningPayload, SyncStatus, Transaction, TransactionIdentifier, Version,
+    },
+    AccountAddress, ApiError,
 };
-use aptos_types::chain_id::ChainId;
-use serde::{Deserialize, Serialize};
+use aptos_rest_client::aptos_api_types::U64;
+use aptos_types::{
+    chain_id::ChainId,
+    transaction::{RawTransaction, SignedTransaction},
+};
+use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
+use std::{
+    fmt::{Display, Formatter},
+    str::FromStr,
+};
 
 /// Request for an account's currency balance either now, or historically
 ///
@@ -35,8 +46,17 @@ pub struct AccountBalanceResponse {
     pub block_identifier: BlockIdentifier,
     /// Balances of all known currencies
     pub balances: Vec<Amount>,
+    /// Metadata of account, must have sequence number
+    pub metadata: AccountBalanceMetadata,
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct AccountBalanceMetadata {
+    /// Sequence number of the account
+    pub sequence_number: U64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub operators: Option<Vec<AccountAddress>>,
+}
 /// Reqyest a block (version) on the account
 ///
 /// With neither value for PartialBlockIdentifier, get the latest version
@@ -49,6 +69,14 @@ pub struct BlockRequest {
     /// A set of search parameters (latest, by hash, or by index)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub block_identifier: Option<PartialBlockIdentifier>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<BlockRequestMetadata>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct BlockRequestMetadata {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub keep_empty_transactions: Option<bool>,
 }
 
 impl BlockRequest {
@@ -56,6 +84,7 @@ impl BlockRequest {
         Self {
             network_identifier: chain_id.into(),
             block_identifier,
+            metadata: None,
         }
     }
 
@@ -70,6 +99,13 @@ impl BlockRequest {
     pub fn by_index(chain_id: ChainId, index: u64) -> Self {
         Self::new(chain_id, Some(PartialBlockIdentifier::block_index(index)))
     }
+
+    pub fn with_empty_transactions(mut self) -> Self {
+        self.metadata = Some(BlockRequestMetadata {
+            keep_empty_transactions: Some(true),
+        });
+        self
+    }
 }
 
 /// Response that will always have a valid block populated
@@ -78,11 +114,7 @@ impl BlockRequest {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct BlockResponse {
     /// The block requested.  This should always be populated for a given valid version
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub block: Option<Block>,
-    /// Transactions that weren't included in the block
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub other_transactions: Option<Vec<TransactionIdentifier>>,
+    pub block: Block,
 }
 
 /// Request to combine signatures and an unsigned transaction for submission as a
@@ -133,8 +165,7 @@ pub struct ConstructionDeriveResponse {
     /// The account identifier of the account if the [`aptos_types::account_address::AccountAddress`] can be derived.
     ///
     /// This will always return a value, though it might not match onchain information.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub account_identifier: Option<AccountIdentifier>,
+    pub account_identifier: AccountIdentifier,
 }
 
 /// Request to hash a transaction
@@ -161,8 +192,6 @@ pub struct ConstructionMetadataRequest {
     ///
     /// This comes verbatim from a preprocess request
     pub options: MetadataOptions,
-    /// Set of public keys related to the private keys signing the transaction eventually
-    pub public_keys: Vec<PublicKey>,
 }
 
 /// A set of operations to tell us which metadata to lookup onchain
@@ -172,10 +201,31 @@ pub struct ConstructionMetadataRequest {
 pub struct MetadataOptions {
     /// The operation to run at a high level (e.g. CreateAccount/Transfer)
     pub internal_operation: InternalOperation,
-    /// Maximum gas willing to pay for the transaction
-    pub max_gas: u64,
-    /// Multiplier e.g. how much each unit of gas is worth in the native coin
-    pub gas_price_per_unit: u64,
+    /// Maximum total gas units willing to pay for the transaction
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_gas_amount: Option<U64>,
+    /// Multiplier how much more willing to pay for the fees
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gas_price_per_unit: Option<U64>,
+    /// Unix timestamp of expiry time
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expiry_time_secs: Option<U64>,
+    /// Sequence number of the request
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sequence_number: Option<U64>,
+    /// Public keys to sign simulated transaction.  Must be present if max_gas_amount is not provided
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub public_keys: Option<Vec<PublicKey>>,
+    /// Taking the estimated gas price, and multiplying it
+    /// times this number divided by 100 e.g. 120 is 120%
+    /// of the estimated price
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gas_price_multiplier: Option<u32>,
+    /// Gas price priority.  If the priority is low, it will
+    /// use a deprioritized price.  If it's normal, it will use the estimated
+    /// price, and if it's high, it will use the prioritized price.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gas_price_priority: Option<GasPricePriority>,
 }
 
 /// Response with network specific data for constructing a transaction
@@ -188,19 +238,24 @@ pub struct ConstructionMetadataResponse {
     /// Metadata that will be passed to Payloads to create a transaction
     pub metadata: ConstructionMetadata,
     /// A suggested gas fee based on the current state of the network
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub suggested_fee: Option<Vec<Amount>>,
+    pub suggested_fee: Vec<Amount>,
 }
 
 /// Metadata required to construct a transaction
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ConstructionMetadata {
     /// Sequence number of the sending account
-    pub sequence_number: u64,
+    pub sequence_number: U64,
     /// Maximum gas willing to pay for the transaction
-    pub max_gas: u64,
+    pub max_gas_amount: U64,
     /// Multiplier e.g. how much each unit of gas is worth in the native coin
-    pub gas_price_per_unit: u64,
+    pub gas_price_per_unit: U64,
+    /// Unix timestamp of expiry time, defaults to 30 seconds from the payload request
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expiry_time_secs: Option<U64>,
+    /// Because we need information from metadata to have the real operation
+    /// We don't have to parse any fields in the `Payloads` call
+    pub internal_operation: InternalOperation,
 }
 
 /// Request to parse a signed or unsigned transaction into operations
@@ -230,6 +285,16 @@ pub struct ConstructionParseResponse {
     /// The signers of the transaction, if it was a [`aptos_types::transaction::SignedTransaction`]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub account_identifier_signers: Option<Vec<AccountIdentifier>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<ConstructionParseMetadata>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ConstructionParseMetadata {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unsigned_transaction: Option<RawTransaction>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signed_transaction: Option<SignedTransaction>,
 }
 
 /// Request to build payloads from the operations to sign
@@ -268,18 +333,109 @@ pub struct ConstructionPayloadsResponse {
 /// This should be able to run without a running full node connection
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/models/ConstructionPreprocessRequest.html)
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct ConstructionPreprocessRequest {
     /// Network identifier describing the blockchain and the chain id
     pub network_identifier: NetworkIdentifier,
     /// Operations that make up an `InternalOperation`
     pub operations: Vec<Operation>,
-    /// Max gas price in the native coin
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_fee: Option<Vec<Amount>>,
-    /// Gas price per unit, must be an integer
+    pub metadata: Option<PreprocessMetadata>,
+}
+
+/// This object holds all the possible "changes" to payloads
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub struct PreprocessMetadata {
+    /// Expiry time of the transaction in unix epoch seconds
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub suggested_fee_multiplier: Option<f64>,
+    pub expiry_time_secs: Option<U64>,
+    /// Sequence number to use for this transaction
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sequence_number: Option<U64>,
+    /// Max gas amount for this transaction
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_gas_amount: Option<U64>,
+    /// Gas unit price for this transaction
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gas_price: Option<U64>,
+    /// Public keys used for this transaction
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub public_keys: Option<Vec<PublicKey>>,
+    /// Taking the estimated gas price, and multiplying it
+    /// times this number divided by 100 e.g. 120 is 120%
+    /// of the estimated price
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gas_price_multiplier: Option<u32>,
+    /// Gas price priority.  If the priority is low, it will
+    /// use a deprioritized price.  If it's normal, it will use the estimated
+    /// price, and if it's high, it will use the prioritized price.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gas_price_priority: Option<GasPricePriority>,
+}
+
+/// A gas price priority for what gas price to use
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum GasPricePriority {
+    Low,
+    Normal,
+    High,
+}
+
+impl GasPricePriority {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            GasPricePriority::Low => "low",
+            GasPricePriority::Normal => "normal",
+            GasPricePriority::High => "high",
+        }
+    }
+}
+
+impl Default for GasPricePriority {
+    fn default() -> Self {
+        GasPricePriority::Normal
+    }
+}
+
+impl Display for GasPricePriority {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl FromStr for GasPricePriority {
+    type Err = ApiError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().trim() {
+            "low" => Ok(Self::Low),
+            "normal" => Ok(Self::Normal),
+            "high" => Ok(Self::High),
+            _ => Err(ApiError::InvalidInput(Some(format!(
+                "{} is an invalid gas price priority",
+                s
+            )))),
+        }
+    }
+}
+
+impl Serialize for GasPricePriority {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.as_str().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for GasPricePriority {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let str = <String>::deserialize(deserializer)?;
+        Self::from_str(&str).map_err(|err| D::Error::custom(err.to_string()))
+    }
 }
 
 /// Response for direct input into a [`ConstructionMetadataRequest`]
@@ -288,11 +444,9 @@ pub struct ConstructionPreprocessRequest {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ConstructionPreprocessResponse {
     /// Metadata to be sent verbatim to the Metadata API
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub options: Option<MetadataOptions>,
+    pub options: MetadataOptions,
     /// List of who needs to be signing this transaction
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub required_public_keys: Option<Vec<AccountIdentifier>>,
+    pub required_public_keys: Vec<AccountIdentifier>,
 }
 
 /// Request to submit a signed transaction
@@ -401,8 +555,7 @@ pub struct NetworkStatusResponse {
     /// Genesis block
     pub genesis_block_identifier: BlockIdentifier,
     /// Oldest version that is available after pruning.  Assumed to be genesis block if not present
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub oldest_block_identifier: Option<BlockIdentifier>,
+    pub oldest_block_identifier: BlockIdentifier,
     /// Sync status if a node needs to catch up
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sync_status: Option<SyncStatus>,

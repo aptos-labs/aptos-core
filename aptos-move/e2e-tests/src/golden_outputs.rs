@@ -1,8 +1,9 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use goldenfile::Mint;
-use move_deps::move_command_line_common::testing::EXP_EXT;
+use move_command_line_common::testing::EXP_EXT;
 use std::{cell::RefCell, fmt::Debug, fs::File, io::Write, path::PathBuf};
 
 pub const GOLDEN_DIR_PATH: &str = "goldens";
@@ -21,7 +22,11 @@ fn golden_path() -> PathBuf {
 
 impl GoldenOutputs {
     pub fn new(name: &str) -> Self {
-        let mut mint = Mint::new(golden_path());
+        GoldenOutputs::new_at_path(golden_path(), name)
+    }
+
+    pub fn new_at_path(path: PathBuf, name: &str) -> Self {
+        let mut mint = Mint::new(path);
         let mut file_path = PathBuf::new();
         file_path.push(name);
         let file = RefCell::new(

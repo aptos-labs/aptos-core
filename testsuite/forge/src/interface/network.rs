@@ -1,9 +1,15 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use super::Test;
-use crate::{CoreContext, Result, Swarm, TestReport};
-use transaction_emitter_lib::EmitJobRequest;
+use crate::{
+    success_criteria::{SuccessCriteria, SuccessCriteriaChecker},
+    CoreContext, Result, Swarm, TestReport,
+};
+use aptos_transaction_emitter_lib::{EmitJobRequest, TxnStats};
+use std::time::Duration;
+use tokio::runtime::Runtime;
 
 /// The testing interface which defines a test written with full control over an existing network.
 /// Tests written against this interface will have access to both the Root account as well as the
@@ -17,7 +23,10 @@ pub struct NetworkContext<'t> {
     core: CoreContext,
     swarm: &'t mut dyn Swarm,
     pub report: &'t mut TestReport,
-    pub global_job: EmitJobRequest,
+    pub global_duration: Duration,
+    pub emit_job: EmitJobRequest,
+    pub success_criteria: SuccessCriteria,
+    pub runtime: Runtime,
 }
 
 impl<'t> NetworkContext<'t> {
@@ -25,13 +34,18 @@ impl<'t> NetworkContext<'t> {
         core: CoreContext,
         swarm: &'t mut dyn Swarm,
         report: &'t mut TestReport,
-        global_job: EmitJobRequest,
+        global_duration: Duration,
+        emit_job: EmitJobRequest,
+        success_criteria: SuccessCriteria,
     ) -> Self {
         Self {
             core,
             swarm,
             report,
-            global_job,
+            global_duration,
+            emit_job,
+            success_criteria,
+            runtime: Runtime::new().unwrap(),
         }
     }
 
@@ -41,5 +55,27 @@ impl<'t> NetworkContext<'t> {
 
     pub fn core(&mut self) -> &mut CoreContext {
         &mut self.core
+    }
+
+    pub fn check_for_success(
+        &mut self,
+        stats: &TxnStats,
+        window: Duration,
+        start_time: i64,
+        end_time: i64,
+        start_version: u64,
+        end_version: u64,
+    ) -> Result<()> {
+        self.runtime
+            .block_on(SuccessCriteriaChecker::check_for_success(
+                &self.success_criteria,
+                self.swarm,
+                stats,
+                window,
+                start_time,
+                end_time,
+                start_version,
+                end_version,
+            ))
     }
 }

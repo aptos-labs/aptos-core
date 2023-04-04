@@ -1,12 +1,12 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 mod bad_transaction;
 mod create_account;
 mod peer_to_peer;
-mod rotate_key;
 
-use language_e2e_tests::{
+use aptos_language_e2e_tests::{
     account_universe::{
         all_transactions_strategy, default_num_accounts, default_num_transactions,
         log_balance_strategy, run_and_assert_universe, AccountCurrent, AccountPairGen,
@@ -26,7 +26,7 @@ proptest! {
         universe in AccountUniverseGen::strategy(2..default_num_accounts(), 0u64..10000),
         pairs in vec(any::<AccountPairGen>(), 0..default_num_transactions()),
     ) {
-        let mut executor = FakeExecutor::from_genesis_file();
+        let mut executor = FakeExecutor::from_head_genesis();
         let mut universe = universe.setup(&mut executor);
 
         for pair in pairs {
@@ -49,6 +49,7 @@ proptest! {
     }
 
     #[test]
+    #[ignore]
     fn all_transactions(
         universe in AccountUniverseGen::strategy(
             2..default_num_accounts(),
@@ -60,6 +61,7 @@ proptest! {
     }
 
     #[test]
+    #[ignore]
     fn all_transactions_limited(
         mut universe in AccountUniverseGen::strategy(
             4..default_num_accounts(),

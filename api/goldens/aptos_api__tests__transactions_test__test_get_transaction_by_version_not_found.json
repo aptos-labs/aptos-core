@@ -1,5 +1,5 @@
 {
-  "code": 404,
-  "message": "transaction not found by version(10000)",
-  "aptos_ledger_version": "0"
+  "message": "Transaction not found by Ledger version(10000)",
+  "error_code": "transaction_not_found",
+  "vm_error_code": null
 }

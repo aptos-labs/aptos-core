@@ -1,9 +1,11 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module provides the `Validate` trait and `Validatable` type in order to aid in deferred
 //! validation.
 
+use crate::ValidCryptoMaterial;
 use anyhow::Result;
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
@@ -23,7 +25,7 @@ use std::hash::Hash;
 ///   deserialize a `V::Unvalidated` from a `V` that was previously serialized.
 pub trait Validate: Sized {
     /// The unvalidated form of some type `V`
-    type Unvalidated;
+    type Unvalidated: ValidCryptoMaterial;
 
     /// Attempt to validate a `V::Unvalidated` and returning a validated `V` on success
     fn validate(unvalidated: &Self::Unvalidated) -> Result<Self>;
@@ -41,8 +43,9 @@ pub struct Validatable<V: Validate> {
 }
 
 impl<V: Validate> Validatable<V> {
-    /// Create a new `Validatable` from a valid type
-    pub fn new_valid(valid: V) -> Self {
+    /// Create a new `Validatable` from a validated type. This will assume the input has been validated
+    /// by the caller and as a result `Validatable::<V>::validate().is_ok()` will always return true.
+    pub fn from_validated(valid: V) -> Self {
         let unvalidated = valid.to_unvalidated();
 
         let maybe_valid = OnceCell::new();
@@ -55,7 +58,7 @@ impl<V: Validate> Validatable<V> {
     }
 
     /// Create a new `Validatable` from an unvalidated type
-    pub fn new_unvalidated(unvalidated: V::Unvalidated) -> Self {
+    pub fn from_unvalidated(unvalidated: V::Unvalidated) -> Self {
         Self {
             unvalidated,
             maybe_valid: OnceCell::new(),
@@ -106,7 +109,7 @@ where
         D: serde::Deserializer<'de>,
     {
         let unvalidated = <V::Unvalidated>::deserialize(deserializer)?;
-        Ok(Self::new_unvalidated(unvalidated))
+        Ok(Self::from_unvalidated(unvalidated))
     }
 }
 

@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{common::Round, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate};
@@ -125,6 +126,10 @@ impl SyncInfo {
         ensure!(
             epoch == self.highest_ordered_cert().certified_block().epoch(),
             "Multi epoch in SyncInfo - HOC and HQC"
+        );
+        ensure!(
+            epoch == self.highest_commit_cert().commit_info().epoch(),
+            "Multi epoch in SyncInfo - HOC and HCC"
         );
         if let Some(tc) = &self.highest_2chain_timeout_cert {
             ensure!(epoch == tc.epoch(), "Multi epoch in SyncInfo - TC and HQC");

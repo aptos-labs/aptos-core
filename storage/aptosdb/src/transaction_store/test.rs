@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
@@ -6,9 +7,8 @@ use crate::AptosDB;
 use aptos_proptest_helpers::Index;
 use aptos_temppath::TempPath;
 use aptos_types::{
-    block_metadata::BlockMetadata,
     proptest_types::{AccountInfoUniverse, SignatureCheckedTransactionGen},
-    transaction::{SignedTransaction, Transaction},
+    transaction::Transaction,
 };
 use proptest::{collection::vec, prelude::*};
 use std::collections::BTreeMap;
@@ -31,21 +31,18 @@ proptest! {
         let txns = init_store(universe, gens, store);
 
         // write sets
-        let mut cs = ChangeSet::new();
+        let batch = SchemaBatch::new();
         for (ver, ws) in write_sets.iter().enumerate() {
-            store.put_write_set(ver as Version, ws, &mut cs).unwrap();
+            store.put_write_set(ver as Version, ws, &batch).unwrap();
         }
-        store.db.write_schemas(cs.batch).unwrap();
+        store.db.write_schemas(batch).unwrap();
         assert_eq!(store.get_write_sets(0, write_sets.len() as Version).unwrap(), write_sets);
-
-        assert_eq!(store.get_first_txn_version().unwrap(), Some(0));
-        assert_eq!(store.get_first_write_set_version().unwrap(), Some(0));
 
         let ledger_version = txns.len() as Version - 1;
         for (ver, (txn, write_set)) in itertools::zip_eq(txns.iter(), write_sets.iter()).enumerate() {
             prop_assert_eq!(store.get_transaction(ver as Version).unwrap(), txn.clone());
             let user_txn = txn
-                .as_signed_user_txn()
+                .try_as_signed_user_txn()
                 .expect("All should be user transactions here.");
             prop_assert_eq!(
                 store
@@ -110,60 +107,12 @@ proptest! {
                 actual,
                 txns
                     .into_iter()
-                    .take(total_num_txns as usize - 1)
+                    .take(total_num_txns - 1)
                     .collect::<Vec<_>>()
             );
         }
 
         prop_assert!(store.get_transaction_iter(10, usize::max_value()).is_err());
-    }
-
-    #[test]
-    fn test_get_block_metadata(
-        txns in vec(
-            prop_oneof![
-                any::<BlockMetadata>().prop_map(Transaction::BlockMetadata),
-                any::<SignedTransaction>().prop_map(Transaction::UserTransaction),
-            ],
-            1..100,
-        )
-    ) {
-        let tmp_dir = TempPath::new();
-        let db = AptosDB::new_for_test(&tmp_dir);
-        let store = &db.transaction_store;
-
-        let mut cs = ChangeSet::new();
-        for (ver, txn) in txns.iter().enumerate() {
-            store
-                .put_transaction(ver as Version, txn, &mut cs)
-                .unwrap();
-        }
-        store.db.write_schemas(cs.batch).unwrap();
-
-        let mut timestamp = 0;
-        let mut block_meta_ver = 0;
-        let mut seen_any_block = false;
-        for (ver, txn) in txns.into_iter().enumerate() {
-            if let Transaction::BlockMetadata(b) = txn {
-                timestamp = b.timestamp_usecs();
-                block_meta_ver = ver as Version;
-                seen_any_block = true;
-            }
-            let block_meta_opt = store.get_block_metadata(ver as Version).unwrap();
-            if seen_any_block {
-                let (v, block_meta) = block_meta_opt.unwrap();
-                prop_assert_eq!(
-                    v,
-                    block_meta_ver
-                );
-                prop_assert_eq!(
-                    block_meta.timestamp_usecs(),
-                    timestamp
-                );
-            } else {
-                prop_assert!(block_meta_opt.is_none());
-            }
-        }
     }
 
     #[test]
@@ -185,7 +134,7 @@ proptest! {
         let txns = txns
             .iter()
             .enumerate()
-            .map(|(version, txn)| (version as u64, txn.as_signed_user_txn().unwrap()))
+            .map(|(version, txn)| (version as u64, txn.try_as_signed_user_txn().unwrap()))
             .collect::<Vec<_>>();
 
         // can we just get all the account transaction versions individually
@@ -264,11 +213,11 @@ fn init_store(
 
     assert!(store.get_transaction(0).is_err());
 
-    let mut cs = ChangeSet::new();
+    let batch = SchemaBatch::new();
     for (ver, txn) in txns.iter().enumerate() {
-        store.put_transaction(ver as Version, txn, &mut cs).unwrap();
+        store.put_transaction(ver as Version, txn, &batch).unwrap();
     }
-    store.db.write_schemas(cs.batch).unwrap();
+    store.db.write_schemas(batch).unwrap();
 
     txns
 }

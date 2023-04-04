@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -126,7 +127,7 @@ impl TransactionAuthenticator {
                     signer.verify(&message)?;
                 }
                 Ok(())
-            }
+            },
         }
     }
 
@@ -190,7 +191,7 @@ impl fmt::Display for TransactionAuthenticator {
                     "TransactionAuthenticator[scheme: Ed25519, sender: {}]",
                     self.sender()
                 )
-            }
+            },
             Self::MultiEd25519 {
                 public_key: _,
                 signature: _,
@@ -200,7 +201,7 @@ impl fmt::Display for TransactionAuthenticator {
                     "TransactionAuthenticator[scheme: MultiEd25519, sender: {}]",
                     self.sender()
                 )
-            }
+            },
             Self::MultiAgent {
                 sender,
                 secondary_signer_addresses,
@@ -223,7 +224,7 @@ impl fmt::Display for TransactionAuthenticator {
                         \tsecondary signers: {}]",
                     sender, sec_addrs, sec_signers,
                 )
-            }
+            },
         }
     }
 }
@@ -242,6 +243,13 @@ pub enum Scheme {
     Ed25519 = 0,
     MultiEd25519 = 1,
     // ... add more schemes here
+    /// Scheme identifier used to derive addresses (not the authentication key) of objects and
+    /// resources accounts. This application serves to domain separate hashes. Without such
+    /// separation, an adversary could create (and get a signer for) a these accounts
+    /// when a their address matches matches an existing address of a MultiEd25519 wallet.
+    DeriveObjectAddressFromGuid = 253,
+    DeriveObjectAddressFromSeed = 254,
+    DeriveResourceAccountAddress = 255,
 }
 
 impl fmt::Display for Scheme {
@@ -249,6 +257,9 @@ impl fmt::Display for Scheme {
         let display = match self {
             Scheme::Ed25519 => "Ed25519",
             Scheme::MultiEd25519 => "MultiEd25519",
+            Scheme::DeriveObjectAddressFromGuid => "DeriveObjectAddressFromGuid",
+            Scheme::DeriveObjectAddressFromSeed => "DeriveObjectAddressFromSeed",
+            Scheme::DeriveResourceAccountAddress => "DeriveResourceAccountAddress",
         };
         write!(f, "Scheme::{}", display)
     }
@@ -346,7 +357,7 @@ impl AccountAuthenticator {
     }
 }
 
-/// A struct that represents an account authentication key. An account's address is the last 16
+/// A struct that represents an account authentication key. An account's address is the last 32
 /// bytes of authentication key used to create it
 #[derive(
     Clone,
@@ -365,6 +376,9 @@ impl AccountAuthenticator {
 pub struct AuthenticationKey([u8; AuthenticationKey::LENGTH]);
 
 impl AuthenticationKey {
+    /// The number of bytes in an authentication key.
+    pub const LENGTH: usize = 32;
+
     /// Create an authentication key from `bytes`
     pub const fn new(bytes: [u8; Self::LENGTH]) -> Self {
         Self(bytes)
@@ -375,9 +389,6 @@ impl AuthenticationKey {
     pub const fn zero() -> Self {
         Self([0; 32])
     }
-
-    /// The number of bytes in an authentication key.
-    pub const LENGTH: usize = 32;
 
     /// Create an authentication key from a preimage by taking its sha3 hash
     pub fn from_preimage(preimage: &AuthenticationKeyPreimage) -> AuthenticationKey {
@@ -461,8 +472,8 @@ impl fmt::Display for AccountAuthenticator {
             f,
             "AccountAuthenticator[scheme id: {:?}, public key: {}, signature: {}]",
             self.scheme(),
-            hex::encode(&self.public_key_bytes()),
-            hex::encode(&self.signature_bytes())
+            hex::encode(self.public_key_bytes()),
+            hex::encode(self.signature_bytes())
         )
     }
 }
@@ -510,7 +521,7 @@ impl AsRef<[u8]> for AuthenticationKey {
 
 impl fmt::LowerHex for AuthenticationKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", hex::encode(&self.0))
+        write!(f, "{}", hex::encode(self.0))
     }
 }
 

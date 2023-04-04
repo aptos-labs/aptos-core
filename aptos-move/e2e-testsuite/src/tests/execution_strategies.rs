@@ -1,8 +1,8 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::{transaction::SignedTransaction, vm_status::VMStatus};
-use language_e2e_tests::{
+use aptos_language_e2e_tests::{
     account::Account,
     common_transactions::create_account_txn,
     execution_strategies::{
@@ -16,6 +16,7 @@ use language_e2e_tests::{
         types::Executor,
     },
 };
+use aptos_types::{transaction::SignedTransaction, vm_status::VMStatus};
 
 fn txn(seq_num: u64) -> SignedTransaction {
     let account = Account::new();

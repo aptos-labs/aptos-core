@@ -1,0 +1,5 @@
+{
+  "message": "The given transaction is invalid: Failed to parse transaction payload: Module ModuleId { address: 0000000000000000000000000000000000000000000000000000002342342342, name: Identifier(\"Invalid\") } can't be found",
+  "error_code": "invalid_input",
+  "vm_error_code": null
+}

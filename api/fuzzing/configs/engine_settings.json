@@ -1,0 +1,19 @@
+{
+    "per_resource_settings": {},
+    "max_combinations": 20,
+    "exclude_requests": [
+      {
+        "endpoint": "/-/healthy"
+      }
+    ],
+    "checkers": {
+      "Examples": {},
+      "InvalidDynamicObject": {},
+      "InvalidValues": {},
+      "LeakageRule": {},
+      "NameSpaceRule": {},
+      "PayloadBody": {},
+      "ResourceHierarchy": {},
+      "UseAfterFree": {}
+    }
+  }

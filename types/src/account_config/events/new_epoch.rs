@@ -1,9 +1,10 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::event::EventKey;
 use anyhow::Result;
-use move_deps::move_core_types::{ident_str, identifier::IdentStr, move_resource::MoveStructType};
+use move_core_types::{ident_str, identifier::IdentStr, move_resource::MoveStructType};
 use serde::{Deserialize, Serialize};
 
 /// Struct that represents a NewEpochEvent.

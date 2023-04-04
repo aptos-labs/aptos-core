@@ -2,46 +2,52 @@
   "annotations": {
     "list": [
       {
-        "builtIn": 1,
         "datasource": "-- Grafana --",
         "enable": true,
-        "hide": true,
+        "expr": "",
         "iconColor": "rgba(0, 211, 255, 1)",
+        "iconSize": 0,
+        "lineColor": "",
         "name": "Annotations & Alerts",
+        "query": "",
+        "showLine": false,
+        "step": "",
+        "tagKeys": "",
+        "tags": null,
+        "tagsField": "",
+        "textField": "",
+        "textFormat": "",
+        "titleFormat": "",
         "type": "dashboard"
       }
     ]
   },
   "editable": true,
-  "gnetId": null,
-  "graphTooltip": 0,
+  "hideControls": false,
   "links": [
     {
       "asDropdown": true,
       "icon": "external link",
       "includeVars": true,
       "keepTime": true,
-      "tags": [],
       "title": "Other Dashboards",
       "type": "dashboards"
     }
   ],
+  "originalTitle": "",
   "panels": [
     {
       "collapsed": false,
-      "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
-      },
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 0
-      },
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
       "id": 2,
+      "isNew": false,
       "panels": [],
+      "span": 0,
       "title": "Overview",
+      "transparent": false,
       "type": "row"
     },
     {
@@ -49,48 +55,52 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
-      },
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
       "fieldConfig": {
         "defaults": {
+          "color": { "mode": "" },
           "custom": {
-            "align": null,
-            "filterable": false
+            "axisPlacement": "",
+            "barAlignment": 0,
+            "drawStyle": "",
+            "fillOpacity": 0,
+            "gradientMode": "",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "",
+            "lineStyle": { "fill": "" },
+            "lineWidth": 0,
+            "pointSize": 0,
+            "scaleDistribution": { "type": "" },
+            "showPoints": "",
+            "spanNulls": false,
+            "stacking": { "group": "", "mode": "" },
+            "thresholdsStyle": { "mode": "" }
           },
-          "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
             ]
-          }
-        },
-        "overrides": []
+          },
+          "unit": ""
+        }
       },
       "fill": 1,
-      "fillGradient": 0,
-      "gridPos": {
-        "h": 9,
-        "w": 8,
-        "x": 0,
-        "y": 1
-      },
-      "hiddenSeries": false,
+      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 1 },
       "id": 4,
+      "isNew": false,
       "legend": {
+        "alignAsTable": false,
         "avg": false,
         "current": false,
+        "hideEmpty": false,
+        "hideZero": false,
         "max": false,
         "min": false,
+        "rightSide": false,
         "show": true,
         "total": false,
         "values": false
@@ -98,117 +108,83 @@
       "lines": true,
       "linewidth": 1,
       "nullPointMode": "null",
-      "options": {
-        "alertThreshold": true
-      },
       "percentage": false,
-      "pluginVersion": "7.2.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
-      "seriesOverrides": [],
       "spaceLength": 10,
+      "span": 0,
       "stack": false,
       "steppedLine": false,
       "targets": [
         {
-          "expr": "(count by (failure_domain_beta_kubernetes_io_region\n) (count by (kubernetes_pod_name, failure_domain_beta_kubernetes_io_region\n) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\"}))) / ignoring(failure_domain_beta_kubernetes_io_region) group_left count(count by (kubernetes_pod_name, failure_domain_beta_kubernetes_io_region\n) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\"}))",
+          "expr": "(count by (failure_domain_beta_kubernetes_io_region\n) (count by (kubernetes_pod_name, failure_domain_beta_kubernetes_io_region\n) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\"}))) / ignoring(failure_domain_beta_kubernetes_io_region) group_left count(count by (kubernetes_pod_name, failure_domain_beta_kubernetes_io_region\n) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\"}))",
           "format": "time_series",
-          "instant": false,
-          "interval": "",
           "legendFormat": "{{failure_domain_beta_kubernetes_io_region}}",
           "refId": "A"
         }
       ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
       "title": "Region Distribution",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "transformations": [],
+      "tooltip": { "shared": true, "value_type": "individual" },
+      "transparent": false,
       "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
+      "xaxis": { "format": "", "logBase": 0, "show": true },
       "yaxes": [
-        {
-          "format": "percentunit",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        },
-        {
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
+        { "format": "percentunit", "logBase": 1, "show": true },
+        { "format": "short", "logBase": 1, "show": true }
+      ]
     },
     {
       "aliasColors": {},
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
-      },
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
       "fieldConfig": {
         "defaults": {
+          "color": { "mode": "" },
           "custom": {
-            "align": null,
-            "filterable": false
+            "axisPlacement": "",
+            "barAlignment": 0,
+            "drawStyle": "",
+            "fillOpacity": 0,
+            "gradientMode": "",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "",
+            "lineStyle": { "fill": "" },
+            "lineWidth": 0,
+            "pointSize": 0,
+            "scaleDistribution": { "type": "" },
+            "showPoints": "",
+            "spanNulls": false,
+            "stacking": { "group": "", "mode": "" },
+            "thresholdsStyle": { "mode": "" }
           },
-          "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
             ]
-          }
-        },
-        "overrides": []
+          },
+          "unit": ""
+        }
       },
       "fill": 1,
-      "fillGradient": 0,
-      "gridPos": {
-        "h": 9,
-        "w": 8,
-        "x": 8,
-        "y": 1
-      },
-      "hiddenSeries": false,
+      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 1 },
       "id": 6,
+      "isNew": false,
       "legend": {
+        "alignAsTable": false,
         "avg": false,
         "current": false,
+        "hideEmpty": false,
+        "hideZero": false,
         "max": false,
         "min": false,
+        "rightSide": false,
         "show": true,
         "total": false,
         "values": false
@@ -216,141 +192,97 @@
       "lines": true,
       "linewidth": 1,
       "nullPointMode": "null",
-      "options": {
-        "alertThreshold": true
-      },
       "percentage": false,
-      "pluginVersion": "7.2.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
-      "seriesOverrides": [],
       "spaceLength": 10,
+      "span": 0,
       "stack": false,
       "steppedLine": false,
       "targets": [
         {
-          "expr": "count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"ip.*\"})) / (count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"ip.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"aks.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"gke.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"scw.*\"})))",
-          "hide": false,
-          "instant": false,
-          "interval": "",
+          "expr": "count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"ip.*\"})) / (count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"ip.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"aks.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"gke.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"scw.*\"})))",
           "legendFormat": "AWS",
           "refId": "A"
         },
         {
-          "expr": "count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"aks.*\"})) / (count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"ip.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"aks.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"gke.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"scw.*\"})))",
-          "hide": false,
-          "instant": false,
-          "interval": "",
+          "expr": "count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"aks.*\"})) / (count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"ip.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"aks.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"gke.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"scw.*\"})))",
           "legendFormat": "Azure",
           "refId": "B"
         },
         {
-          "expr": "count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"gke.*\"})) / (count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"ip.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"aks.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"gke.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"scw.*\"})))",
-          "hide": false,
-          "instant": false,
-          "interval": "",
+          "expr": "count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"gke.*\"})) / (count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"ip.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"aks.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"gke.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"scw.*\"})))",
           "legendFormat": "GCP",
           "refId": "C"
         },
         {
-          "expr": "count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"scw.*\"})) / (count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"ip.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"aks.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"gke.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"scw.*\"})))",
-          "hide": false,
-          "instant": false,
-          "interval": "",
+          "expr": "count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"scw.*\"})) / (count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"ip.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"aks.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"gke.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"scw.*\"})))",
           "legendFormat": "Scaleway",
           "refId": "D"
         }
       ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
       "title": "Cloud Distribution",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "transformations": [],
+      "tooltip": { "shared": true, "value_type": "individual" },
+      "transparent": false,
       "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
+      "xaxis": { "format": "", "logBase": 0, "show": true },
       "yaxes": [
-        {
-          "format": "percentunit",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        },
-        {
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
+        { "format": "percentunit", "logBase": 1, "show": true },
+        { "format": "short", "logBase": 1, "show": true }
+      ]
     },
     {
       "aliasColors": {},
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
-      },
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
       "fieldConfig": {
         "defaults": {
+          "color": { "mode": "" },
           "custom": {
-            "align": null,
-            "filterable": false
+            "axisPlacement": "",
+            "barAlignment": 0,
+            "drawStyle": "",
+            "fillOpacity": 0,
+            "gradientMode": "",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "",
+            "lineStyle": { "fill": "" },
+            "lineWidth": 0,
+            "pointSize": 0,
+            "scaleDistribution": { "type": "" },
+            "showPoints": "",
+            "spanNulls": false,
+            "stacking": { "group": "", "mode": "" },
+            "thresholdsStyle": { "mode": "" }
           },
-          "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
             ]
-          }
-        },
-        "overrides": []
+          },
+          "unit": ""
+        }
       },
       "fill": 1,
-      "fillGradient": 0,
-      "gridPos": {
-        "h": 9,
-        "w": 8,
-        "x": 16,
-        "y": 1
-      },
-      "hiddenSeries": false,
+      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 1 },
       "id": 7,
+      "isNew": false,
       "legend": {
+        "alignAsTable": false,
         "avg": false,
         "current": false,
+        "hideEmpty": false,
+        "hideZero": false,
         "max": false,
         "min": false,
+        "rightSide": false,
         "show": true,
         "total": false,
         "values": false
@@ -358,117 +290,83 @@
       "lines": true,
       "linewidth": 1,
       "nullPointMode": "null",
-      "options": {
-        "alertThreshold": true
-      },
       "percentage": false,
-      "pluginVersion": "7.2.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
-      "seriesOverrides": [],
       "spaceLength": 10,
+      "span": 0,
       "stack": false,
       "steppedLine": false,
       "targets": [
         {
-          "expr": "count by (beta_kubernetes_io_instance_type\n) (count by (kubernetes_pod_name, beta_kubernetes_io_instance_type\n) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\"}))",
+          "expr": "count by (beta_kubernetes_io_instance_type\n) (count by (kubernetes_pod_name, beta_kubernetes_io_instance_type\n) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\"}))",
           "format": "time_series",
-          "instant": false,
-          "interval": "",
           "legendFormat": "{{beta_kubernetes_io_instance_type}}",
           "refId": "A"
         }
       ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
       "title": "Server Type",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "transformations": [],
+      "tooltip": { "shared": true, "value_type": "individual" },
+      "transparent": false,
       "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
+      "xaxis": { "format": "", "logBase": 0, "show": true },
       "yaxes": [
-        {
-          "format": "locale",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        },
-        {
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
+        { "format": "locale", "logBase": 1, "show": true },
+        { "format": "short", "logBase": 1, "show": true }
+      ]
     },
     {
       "aliasColors": {},
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
-      },
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
       "fieldConfig": {
         "defaults": {
+          "color": { "mode": "" },
           "custom": {
-            "align": null,
-            "filterable": false
+            "axisPlacement": "",
+            "barAlignment": 0,
+            "drawStyle": "",
+            "fillOpacity": 0,
+            "gradientMode": "",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "",
+            "lineStyle": { "fill": "" },
+            "lineWidth": 0,
+            "pointSize": 0,
+            "scaleDistribution": { "type": "" },
+            "showPoints": "",
+            "spanNulls": false,
+            "stacking": { "group": "", "mode": "" },
+            "thresholdsStyle": { "mode": "" }
           },
-          "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
             ]
-          }
-        },
-        "overrides": []
+          },
+          "unit": ""
+        }
       },
       "fill": 1,
-      "fillGradient": 0,
-      "gridPos": {
-        "h": 9,
-        "w": 8,
-        "x": 0,
-        "y": 10
-      },
-      "hiddenSeries": false,
+      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 10 },
       "id": 8,
+      "isNew": false,
       "legend": {
+        "alignAsTable": false,
         "avg": false,
         "current": false,
+        "hideEmpty": false,
+        "hideZero": false,
         "max": false,
         "min": false,
+        "rightSide": false,
         "show": true,
         "total": false,
         "values": false
@@ -476,117 +374,83 @@
       "lines": true,
       "linewidth": 1,
       "nullPointMode": "null",
-      "options": {
-        "alertThreshold": true
-      },
       "percentage": false,
-      "pluginVersion": "7.2.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
-      "seriesOverrides": [],
       "spaceLength": 10,
+      "span": 0,
       "stack": false,
       "steppedLine": false,
       "targets": [
         {
-          "expr": "count by (kubernetes_pod_name, failure_domain_beta_kubernetes_io_region\n) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\"})",
+          "expr": "count by (kubernetes_pod_name, failure_domain_beta_kubernetes_io_region\n) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\"})",
           "format": "time_series",
-          "instant": false,
-          "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}-{{failure_domain_beta_kubernetes_io_region}}",
           "refId": "A"
         }
       ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
       "title": "Region<>Node Mapping",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "transformations": [],
+      "tooltip": { "shared": true, "value_type": "individual" },
+      "transparent": false,
       "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
+      "xaxis": { "format": "", "logBase": 0, "show": true },
       "yaxes": [
-        {
-          "format": "locale",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        },
-        {
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
+        { "format": "locale", "logBase": 1, "show": true },
+        { "format": "short", "logBase": 1, "show": true }
+      ]
     },
     {
       "aliasColors": {},
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
-      },
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
       "fieldConfig": {
         "defaults": {
+          "color": { "mode": "" },
           "custom": {
-            "align": null,
-            "filterable": false
+            "axisPlacement": "",
+            "barAlignment": 0,
+            "drawStyle": "",
+            "fillOpacity": 0,
+            "gradientMode": "",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "",
+            "lineStyle": { "fill": "" },
+            "lineWidth": 0,
+            "pointSize": 0,
+            "scaleDistribution": { "type": "" },
+            "showPoints": "",
+            "spanNulls": false,
+            "stacking": { "group": "", "mode": "" },
+            "thresholdsStyle": { "mode": "" }
           },
-          "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
             ]
-          }
-        },
-        "overrides": []
+          },
+          "unit": ""
+        }
       },
       "fill": 1,
-      "fillGradient": 0,
-      "gridPos": {
-        "h": 9,
-        "w": 8,
-        "x": 8,
-        "y": 10
-      },
-      "hiddenSeries": false,
+      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 10 },
       "id": 9,
+      "isNew": false,
       "legend": {
+        "alignAsTable": false,
         "avg": false,
         "current": false,
+        "hideEmpty": false,
+        "hideZero": false,
         "max": false,
         "min": false,
+        "rightSide": false,
         "show": true,
         "total": false,
         "values": false
@@ -594,124 +458,91 @@
       "lines": true,
       "linewidth": 1,
       "nullPointMode": "null",
-      "options": {
-        "alertThreshold": true
-      },
       "percentage": false,
-      "pluginVersion": "7.2.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
-      "seriesOverrides": [],
       "spaceLength": 10,
+      "span": 0,
       "stack": false,
       "steppedLine": false,
       "targets": [
         {
-          "expr": "count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"ip.*\"})",
-          "hide": false,
-          "instant": false,
-          "interval": "",
+          "expr": "count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"ip.*\"})",
           "legendFormat": "{{kubernetes_pod_name}}-AWS",
           "refId": "A"
         },
         {
-          "expr": "count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"aks.*\"})",
-          "hide": false,
-          "instant": false,
-          "interval": "",
+          "expr": "count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"aks.*\"})",
           "legendFormat": "{{kubernetes_pod_name}}-Azure",
           "refId": "B"
         },
         {
-          "expr": "count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"gke.*\"})",
-          "hide": false,
-          "instant": false,
-          "interval": "",
+          "expr": "count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"gke.*\"})",
           "legendFormat": "{{kubernetes_pod_name}}-GCP",
           "refId": "C"
         },
         {
-          "expr": "count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", instance=~\"scw.*\"})",
-          "hide": false,
-          "instant": false,
-          "interval": "",
+          "expr": "count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", instance=~\"scw.*\"})",
           "legendFormat": "{{kubernetes_pod_name}}-Scaleway",
           "refId": "D"
         }
       ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
       "title": "Cloud<>Node Mapping",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "transformations": [],
+      "tooltip": { "shared": true, "value_type": "individual" },
+      "transparent": false,
       "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
+      "xaxis": { "format": "", "logBase": 0, "show": true },
       "yaxes": [
-        {
-          "format": "locale",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        },
-        {
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
+        { "format": "locale", "logBase": 1, "show": true },
+        { "format": "short", "logBase": 1, "show": true }
+      ]
     },
     {
       "aliasColors": {},
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
-      },
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
       "fieldConfig": {
         "defaults": {
-          "custom": {}
-        },
-        "overrides": []
+          "color": { "mode": "" },
+          "custom": {
+            "axisPlacement": "",
+            "barAlignment": 0,
+            "drawStyle": "",
+            "fillOpacity": 0,
+            "gradientMode": "",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "",
+            "lineStyle": { "fill": "" },
+            "lineWidth": 0,
+            "pointSize": 0,
+            "scaleDistribution": { "type": "" },
+            "showPoints": "",
+            "spanNulls": false,
+            "stacking": { "group": "", "mode": "" },
+            "thresholdsStyle": { "mode": "" }
+          },
+          "thresholds": { "mode": "", "steps": null },
+          "unit": ""
+        }
       },
       "fill": 1,
-      "fillGradient": 0,
-      "gridPos": {
-        "h": 9,
-        "w": 8,
-        "x": 16,
-        "y": 10
-      },
-      "hiddenSeries": false,
+      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 10 },
       "id": 11,
+      "isNew": false,
       "legend": {
+        "alignAsTable": false,
         "avg": false,
         "current": false,
+        "hideEmpty": false,
+        "hideZero": false,
         "max": false,
         "min": false,
+        "rightSide": false,
         "show": true,
         "total": false,
         "values": false
@@ -719,165 +550,169 @@
       "lines": true,
       "linewidth": 1,
       "nullPointMode": "null",
-      "options": {
-        "alertThreshold": true
-      },
       "percentage": false,
-      "pluginVersion": "7.2.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
-      "seriesOverrides": [],
       "spaceLength": 10,
+      "span": 0,
       "stack": false,
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum(kubernetes_build_info{chain_name=~\"$chain_name\", namespace=~\"$namespace\"}) by (kubernetes_pod_name, git_version)",
-          "interval": "",
+          "expr": "sum(kubernetes_build_info{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\"}) by (kubernetes_pod_name, git_version)",
           "legendFormat": "{{kubernetes_pod_name}}-{{git_version}}",
           "refId": "A"
         }
       ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
       "title": "Kubernetes Node Versions",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
+      "tooltip": { "shared": true, "value_type": "individual" },
+      "transparent": false,
       "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
+      "xaxis": { "format": "", "logBase": 0, "show": true },
       "yaxes": [
-        {
-          "$$hashKey": "object:266",
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        },
-        {
-          "$$hashKey": "object:267",
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
+        { "format": "short", "logBase": 1, "show": true },
+        { "format": "short", "logBase": 1, "show": true }
+      ]
     }
   ],
+  "rows": null,
   "schemaVersion": 26,
+  "sharedCrosshair": false,
+  "slug": "",
   "style": "dark",
   "tags": [],
   "templating": {
     "list": [
       {
+        "allFormat": "",
+        "allValue": "",
+        "current": { "text": ["VictoriaMetrics Mainnet US"], "value": "VictoriaMetrics Mainnet US" },
+        "datasource": null,
         "hide": 0,
         "includeAll": false,
+        "label": "",
         "multi": false,
+        "multiFormat": "",
         "name": "Datasource",
         "options": [],
         "query": "prometheus",
-        "queryValue": "",
         "refresh": 1,
         "regex": "",
-        "skipUrlSync": false,
+        "sort": 0,
         "type": "datasource"
       },
       {
-        "current": {
-          "selected": true,
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
-        },
-        "datasource": {
-          "type": "prometheus",
-          "uid": "${Datasource}"
-        },
-        "definition": "label_values(namespace)",
+        "allFormat": "",
+        "allValue": ".*",
+        "current": { "text": ["telemetry-service"], "value": "telemetry-service" },
+        "datasource": null,
         "hide": 0,
-        "includeAll": false,
+        "includeAll": true,
         "label": "",
         "multi": false,
-        "name": "namespace",
+        "multiFormat": "",
+        "name": "metrics_source",
         "options": [],
         "query": {
-          "query": "label_values(namespace)",
-          "refId": "Prometheus-chain-name-Variable-Query"
+          "query": "label_values(node_process_start_time{}, metrics_source)",
+          "refId": "StandardVariableQuery"
         },
         "refresh": 1,
         "regex": "",
-        "skipUrlSync": false,
-        "sort": 1,
-        "tagValuesQuery": "",
-        "tagsQuery": "",
-        "type": "query",
-        "useTags": false
+        "sort": 0,
+        "type": "query"
       },
       {
-        "current": {
-          "selected": true,
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
-        },
-        "datasource": {
-          "type": "prometheus",
-          "uid": "${Datasource}"
-        },
-        "definition": "label_values(chain_name)",
+        "allFormat": "",
+        "allValue": "",
+        "current": { "text": ["mainnet"], "value": "mainnet" },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
         "hide": 0,
         "includeAll": false,
         "label": "",
         "multi": false,
+        "multiFormat": "",
         "name": "chain_name",
         "options": [],
         "query": {
-          "query": "label_values(chain_name)",
-          "refId": "Prometheus-chain-name-Variable-Query"
+          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\"}, chain_name)",
+          "refId": "StandardVariableQuery"
         },
         "refresh": 1,
         "regex": "",
-        "skipUrlSync": false,
         "sort": 1,
-        "tagValuesQuery": "",
-        "tagsQuery": "",
-        "type": "query",
-        "useTags": false
+        "type": "query"
+      },
+      {
+        "allFormat": "",
+        "allValue": ".*",
+        "current": { "text": ["All"], "value": "$__all" },
+        "datasource": null,
+        "hide": 0,
+        "includeAll": true,
+        "label": "",
+        "multi": false,
+        "multiFormat": "",
+        "name": "cluster",
+        "options": [],
+        "query": {
+          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\"}, cluster)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "allFormat": "",
+        "allValue": ".*",
+        "current": { "text": ["All"], "value": "$__all" },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "hide": 0,
+        "includeAll": true,
+        "label": "",
+        "multi": false,
+        "multiFormat": "",
+        "name": "namespace",
+        "options": [],
+        "query": {
+          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\"}, namespace)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allFormat": "",
+        "allValue": ".*",
+        "current": { "text": ["All"], "value": ["$__all"] },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "hide": 0,
+        "includeAll": true,
+        "label": "",
+        "multi": true,
+        "multiFormat": "",
+        "name": "kubernetes_pod_name",
+        "options": [],
+        "query": {
+          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", namespace=~\"$namespace\"}, kubernetes_pod_name)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
       }
     ]
   },
-  "time": {
-    "from": "now-24h",
-    "to": "now"
-  },
-  "timepicker": {},
+  "time": { "from": "now-24h", "to": "now" },
+  "timepicker": { "refresh_intervals": null, "time_options": null },
   "timezone": "",
   "title": "Diversity",
   "uid": "diversity",
-  "version": 1
+  "version": 4
 }

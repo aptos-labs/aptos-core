@@ -1,23 +1,21 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::{check_network, get_timestamp, handle_request, with_context, with_empty_request},
+    common::{check_network, handle_request, with_context, with_empty_request},
     error::ApiError,
     types::{
-        Allow, BlockIdentifier, MetadataRequest, NetworkListResponse, NetworkOptionsResponse,
-        NetworkRequest, NetworkStatusResponse, OperationStatusType, OperationType, Version,
+        Allow, MetadataRequest, NetworkListResponse, NetworkOptionsResponse, NetworkRequest,
+        NetworkStatusResponse, OperationStatusType, OperationType, Version,
     },
     RosettaContext, NODE_VERSION, ROSETTA_VERSION,
 };
 use aptos_logger::{debug, trace};
 use warp::Filter;
 
-shadow_rs::shadow!(build);
-
 pub fn list_route(
     server_context: RosettaContext,
-) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
     warp::path!("network" / "list")
         .and(warp::post())
         .and(with_empty_request())
@@ -27,7 +25,7 @@ pub fn list_route(
 
 pub fn options_route(
     server_context: RosettaContext,
-) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
     warp::path!("network" / "options")
         .and(warp::post())
         .and(warp::body::json())
@@ -37,7 +35,7 @@ pub fn options_route(
 
 pub fn status_route(
     server_context: RosettaContext,
-) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
     warp::path!("network" / "status")
         .and(warp::post())
         .and(warp::body::json())
@@ -90,7 +88,7 @@ async fn network_options(
         rosetta_version: ROSETTA_VERSION.to_string(),
         // TODO: Get from node via REST API
         node_version: NODE_VERSION.to_string(),
-        middleware_version: build::PKG_VERSION.to_string(),
+        middleware_version: "0.1.0".to_string(),
     };
 
     let operation_statuses = OperationStatusType::all()
@@ -111,12 +109,10 @@ async fn network_options(
         operation_types,
         errors,
         historical_balance_lookup: true,
-        timestamp_start_index: None,
+        timestamp_start_index: 2,
         call_methods: vec![],
         balance_exemptions: vec![],
         mempool_coins: false,
-        block_hash_case: None,
-        transaction_hash_case: None,
     };
 
     let response = NetworkOptionsResponse { version, allow };
@@ -141,33 +137,31 @@ async fn network_status(
     );
 
     check_network(request.network_identifier, &server_context)?;
+    let chain_id = server_context.chain_id;
     let rest_client = server_context.rest_client()?;
     let block_cache = server_context.block_cache()?;
-    let genesis_block_info = block_cache.get_block_info(0).await?;
-    let genesis_block_identifier = BlockIdentifier::from_block_info(genesis_block_info);
+    let genesis_block_identifier = block_cache
+        .get_block_info_by_height(0, chain_id)
+        .await?
+        .block_id;
     let response = rest_client.get_ledger_information().await?;
     let state = response.state();
 
     // Get the oldest block
-    let oldest_block_identifier = if let Some(version) = state.oldest_ledger_version {
-        let block_info = block_cache.get_block_info_by_version(version).await?;
-        Some(BlockIdentifier::from_block_info(block_info))
-    } else {
-        None
-    };
+    let oldest_block_identifier = block_cache
+        .get_block_info_by_height(state.oldest_block_height, chain_id)
+        .await?
+        .block_id;
 
     // Get the latest block
-    let latest_version = state.version;
-    // Get the latest block
-    let block_info = block_cache
-        .get_block_info_by_version(latest_version)
+    let current_block = block_cache
+        .get_block_info_by_height(state.block_height, chain_id)
         .await?;
-    let current_block_identifier = BlockIdentifier::from_block_info(block_info);
-    let current_block_timestamp = get_timestamp(block_info);
+    let current_block_identifier = current_block.block_id;
 
     let response = NetworkStatusResponse {
         current_block_identifier,
-        current_block_timestamp,
+        current_block_timestamp: current_block.timestamp,
         genesis_block_identifier,
         oldest_block_identifier,
         sync_status: None,

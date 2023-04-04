@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -15,14 +16,13 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
-    transaction::{Transaction, Version},
+    transaction::{SignedTransaction, Transaction, Version},
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
 };
 use mirai_annotations::debug_checked_verify_eq;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::{
-    collections::BTreeMap,
     convert::TryFrom,
     fmt::{self, Display, Formatter},
     iter::once,
@@ -100,6 +100,16 @@ impl Block {
 
     pub fn payload(&self) -> Option<&Payload> {
         self.block_data.payload()
+    }
+
+    pub fn payload_size(&self) -> usize {
+        match self.block_data.payload() {
+            None => 0,
+            Some(payload) => match payload {
+                Payload::InQuorumStore(pos) => pos.proofs.len(),
+                Payload::DirectMempool(txns) => txns.len(),
+            },
+        }
     }
 
     pub fn quorum_cert(&self) -> &QuorumCert {
@@ -200,7 +210,7 @@ impl Block {
         quorum_cert: QuorumCert,
         validator_signer: &ValidatorSigner,
         failed_authors: Vec<(Round, Author)>,
-    ) -> Self {
+    ) -> anyhow::Result<Self> {
         let block_data = BlockData::new_proposal(
             payload,
             validator_signer.author(),
@@ -216,9 +226,11 @@ impl Block {
     pub fn new_proposal_from_block_data(
         block_data: BlockData,
         validator_signer: &ValidatorSigner,
-    ) -> Self {
-        let signature = validator_signer.sign(&block_data);
-        Self::new_proposal_from_block_data_and_signature(block_data, signature)
+    ) -> anyhow::Result<Self> {
+        let signature = validator_signer.sign(&block_data)?;
+        Ok(Self::new_proposal_from_block_data_and_signature(
+            block_data, signature,
+        ))
     }
 
     pub fn new_proposal_from_block_data_and_signature(
@@ -245,7 +257,7 @@ impl Block {
                     .ok_or_else(|| format_err!("Missing signature in Proposal"))?;
                 validator.verify(*author, &self.block_data, signature)?;
                 self.quorum_cert().verify(validator)
-            }
+            },
         }
     }
 
@@ -278,7 +290,7 @@ impl Block {
             // but don't allow anything that shouldn't be there.
             //
             // we validate the full correctness of this field in round_manager.process_proposal()
-            let succ_round = self.round() + (if self.is_nil_block() { 1 } else { 0 });
+            let succ_round = self.round() + u64::from(self.is_nil_block());
             let skipped_rounds = succ_round.checked_sub(parent.round() + 1);
             ensure!(
                 skipped_rounds.is_some(),
@@ -330,17 +342,15 @@ impl Block {
         Ok(())
     }
 
-    pub fn transactions_to_execute(&self, validators: &[AccountAddress]) -> Vec<Transaction> {
-        std::iter::once(Transaction::BlockMetadata(
+    pub fn transactions_to_execute(
+        &self,
+        validators: &[AccountAddress],
+        txns: Vec<SignedTransaction>,
+    ) -> Vec<Transaction> {
+        once(Transaction::BlockMetadata(
             self.new_block_metadata(validators),
         ))
-        .chain(
-            self.payload()
-                .unwrap_or(&Payload::new_empty())
-                .clone()
-                .into_iter()
-                .map(Transaction::UserTransaction),
-        )
+        .chain(txns.into_iter().map(Transaction::UserTransaction))
         .chain(once(Transaction::StateCheckpoint(self.id)))
         .collect()
     }
@@ -350,10 +360,14 @@ impl Block {
             self.id(),
             self.epoch(),
             self.round(),
-            // A bitmap of voters
-            Self::voters_to_bitmap(validators, self.quorum_cert().ledger_info().signatures()),
-            // For nil block, we use 0x0 which is convention for nil address in move.
             self.author().unwrap_or(AccountAddress::ZERO),
+            // A bitvec of voters
+            self.quorum_cert()
+                .ledger_info()
+                .get_voters_bitvec()
+                .clone()
+                .into(),
+            // For nil block, we use 0x0 which is convention for nil address in move.
             self.block_data()
                 .failed_authors()
                 .map_or(vec![], |failed_authors| {
@@ -361,16 +375,6 @@ impl Block {
                 }),
             self.timestamp_usecs(),
         )
-    }
-
-    fn voters_to_bitmap<T>(
-        validators: &[AccountAddress],
-        voters: &BTreeMap<AccountAddress, T>,
-    ) -> Vec<bool> {
-        validators
-            .iter()
-            .map(|address| voters.contains_key(address))
-            .collect()
     }
 
     fn failed_authors_to_indices(
@@ -392,33 +396,6 @@ impl Block {
             })
             .map(|index| u32::try_from(index).unwrap())
             .collect()
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use crate::block::Block;
-    use aptos_types::account_address::AccountAddress;
-    use std::collections::BTreeMap;
-
-    #[test]
-    fn test_voters_to_bitmap() {
-        let validators: Vec<_> = (0..4)
-            .into_iter()
-            .map(|_| AccountAddress::random())
-            .collect();
-        let expected_voter_bitmap = vec![true, true, false, true];
-
-        let voters: BTreeMap<_, _> = validators
-            .iter()
-            .zip(expected_voter_bitmap.iter())
-            .filter_map(|(&validator, &voted)| if voted { Some((validator, 0)) } else { None })
-            .collect();
-
-        assert_eq!(
-            expected_voter_bitmap,
-            Block::voters_to_bitmap(&validators, &voters)
-        );
     }
 }
 

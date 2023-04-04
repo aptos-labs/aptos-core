@@ -1,13 +1,16 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_openapi::{impl_poem_parameter, impl_poem_type};
 use aptos_types::account_address::AccountAddress;
-use move_deps::move_core_types;
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 use std::{fmt, str::FromStr};
 
-#[derive(Clone, Debug, PartialEq, Copy)]
+/// The address of an account
+///
+/// This is represented in a string as a 64 character hex string, sometimes
+/// shortened by stripping leading 0s, and adding a 0x.
+#[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Address(AccountAddress);
 
 impl Address {
@@ -18,6 +21,7 @@ impl Address {
 
 impl fmt::Display for Address {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // TODO: This should not be hex literal, it should be the full hex
         write!(f, "{}", self.0.to_hex_literal())
     }
 }
@@ -76,15 +80,10 @@ impl<'de> Deserialize<'de> for Address {
     }
 }
 
-impl_poem_type!(Address);
-impl_poem_parameter!(Address);
-
 #[cfg(test)]
 mod tests {
     use crate::address::Address;
-
     use aptos_types::account_address::AccountAddress;
-
     use serde_json::{json, Value};
 
     #[test]

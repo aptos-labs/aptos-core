@@ -6,17 +6,31 @@
     "node": ">=11.0.0"
   },
   "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
   "scripts": {
-    "build": "rm -rf dist && tsc -p .",
+    "prepack": "pnpm build",
+    "build": "pnpm build:clean && pnpm _build:node && pnpm _build:browser",
+    "build:clean": "rm -rf dist",
+    "_build:browser": "tsup --platform browser --format iife --global-name aptosSDK --minify",
+    "_build:node": "tsup --format cjs,esm --dts",
     "lint": "eslint \"**/*.ts\"",
-    "push": "yarn publish --non-interactive --new-version",
     "test": "jest",
     "_fmt": "prettier 'src/**/*.ts' 'examples/**/*.js' 'examples/**/*.ts' '.eslintrc.js'",
-    "fmt": "yarn _fmt --write",
-    "fmt:check": "yarn _fmt --check",
+    "fmt": "pnpm _fmt --write",
+    "fmt:check": "pnpm _fmt --check",
     "cov:clean": "rm -rf coverage",
-    "changelog": "standard-version --skip.bump --skip.commit --skip.tag"
+    "generate-client": "openapi -i ../../../api/doc/spec.yaml -o ./src/generated -c axios --name AptosGeneratedClient --exportSchemas true",
+    "checked-publish": "scripts/checked_publish.sh",
+    "generate-ts-docs": "scripts/generate_ts_docs.sh",
+    "indexer-codegen": "graphql-codegen --config ./src/indexer/codegen.yml"
   },
   "repository": {
     "type": "git",
@@ -32,31 +46,40 @@
     "Aptos Labs",
     "Move"
   ],
-  "devDependencies": {
-    "@types/jest": "^27.4.1",
-    "@types/node": "^17.0.23",
-    "@typescript-eslint/eslint-plugin": "^5.17.0",
-    "@typescript-eslint/parser": "^5.17.0",
-    "eslint": "^7.32.0",
-    "eslint-config-airbnb-base": "^15.0.0",
-    "eslint-config-airbnb-typescript": "^17.0.0",
-    "eslint-config-prettier": "^8.5.0",
-    "eslint-plugin-import": "^2.25.4",
-    "jest": "^27.5.1",
-    "prettier": "^2.6.2",
-    "standard-version": "^9.5.0",
-    "ts-jest": "^27.1.4",
-    "ts-loader": "^9.2.8",
-    "ts-node": "^10.7.0",
-    "typescript": "^4.6.3"
-  },
   "dependencies": {
-    "axios": "^0.26.1",
-    "buffer": "^6.0.3",
-    "js-sha3": "^0.8.0",
-    "tweetnacl": "^1.0.3",
-    "typescript-memoize": "^1.1.0",
-    "yarn": "^1.22.18"
+    "@noble/hashes": "1.1.3",
+    "@scure/bip39": "1.1.0",
+    "axios": "0.27.2",
+    "form-data": "4.0.0",
+    "tweetnacl": "1.0.3"
   },
-  "version": "1.2.1"
+  "devDependencies": {
+    "@graphql-codegen/cli": "^2.13.5",
+    "@graphql-codegen/import-types-preset": "^2.2.3",
+    "@graphql-codegen/typescript": "^2.7.3",
+    "@graphql-codegen/typescript-graphql-request": "^4.5.8",
+    "@graphql-codegen/typescript-operations": "^2.5.3",
+    "@types/jest": "28.1.8",
+    "@types/node": "18.6.2",
+    "@typescript-eslint/eslint-plugin": "5.36.2",
+    "@typescript-eslint/parser": "5.36.2",
+    "dotenv": "16.0.2",
+    "eslint": "8.23.0",
+    "eslint-config-airbnb-base": "15.0.0",
+    "eslint-config-airbnb-typescript": "17.0.0",
+    "eslint-config-prettier": "8.5.0",
+    "eslint-plugin-import": "2.26.0",
+    "graphql": "^16.5.0",
+    "graphql-request": "^5.1.0",
+    "jest": "28.1.3",
+    "openapi-typescript-codegen": "https://github.com/aptos-labs/openapi-typescript-codegen/releases/download/v0.24.0-p1/openapi-typescript-codegen-v0.24.0-p1.tgz",
+    "prettier": "2.6.2",
+    "ts-jest": "28.0.8",
+    "ts-loader": "9.3.1",
+    "ts-node": "10.9.1",
+    "tsup": "6.2.3",
+    "typedoc": "^0.23.20",
+    "typescript": "4.8.2"
+  },
+  "version": "1.7.2"
 }

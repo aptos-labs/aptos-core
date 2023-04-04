@@ -9,10 +9,10 @@
   - Comments are required for new classes and functions.
   - Comments should follow the TSDoc standard, [https://tsdoc.org/](https://tsdoc.org/).
 - Lints and Formats
-  - ESlint (eslint) and Prettier (prettier) should be used for code checking and code formatting. Make sure to run `yarn lint` and `yarn fmt` after making changes to the code.
+  - ESlint (eslint) and Prettier (prettier) should be used for code checking and code formatting. Make sure to run `pnpm lint` and `pnpm fmt` after making changes to the code.
 - Tests
   - Unit tests are required for any non-trivial changes you make.
   - The Jest testing framework is used in the repo and we recommend you use it. See Jest: [https://jestjs.io/](https://jestjs.io/).
-  - Make sure to run `yarn test` after making changes.
+  - Make sure to run `pnpm test` after making changes.
 - Commits
   - Commit messages follow the [Angular convention](https://www.conventionalcommits.org/en/v1.0.0-beta.4/#summary).

@@ -1,0 +1,12 @@
+{
+  "description": "This is a pure dependency package.json which installs dependencies for js utility scripts used in the repo",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "@types/node": "^18.11.0",
+    "prettier": "^2.7.1",
+    "ts-node": "^10.9.1",
+    "typescript": "^4.8.4",
+    "zx": "^7.1.1"
+  }
+}

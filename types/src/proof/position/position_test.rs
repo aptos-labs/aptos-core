@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::proof::position::*;
@@ -128,49 +129,49 @@ fn test_root_level_from_leaf_count() {
 #[test]
 fn test_is_freezable() {
     let mut position = Position::from_inorder_index(5);
-    assert_eq!(position.is_freezable(2), false);
-    assert_eq!(position.is_freezable(3), true);
-    assert_eq!(position.is_freezable(4), true);
+    assert!(!position.is_freezable(2));
+    assert!(position.is_freezable(3));
+    assert!(position.is_freezable(4));
 
     position = Position::from_inorder_index(0);
-    assert_eq!(position.is_freezable(0), true);
-    assert_eq!(position.is_freezable(3), true);
-    assert_eq!(position.is_freezable(4), true);
+    assert!(position.is_freezable(0));
+    assert!(position.is_freezable(3));
+    assert!(position.is_freezable(4));
 
     // Testing a root
     position = Position::from_inorder_index(7);
-    assert_eq!(position.is_freezable(6), false);
-    assert_eq!(position.is_freezable(7), true);
-    assert_eq!(position.is_freezable(8), true);
+    assert!(!position.is_freezable(6));
+    assert!(position.is_freezable(7));
+    assert!(position.is_freezable(8));
 
     // Testing a leaf
     position = Position::from_inorder_index(10);
-    assert_eq!(position.is_freezable(5), true);
+    assert!(position.is_freezable(5));
 }
 
 #[test]
 fn test_is_freezable_out_of_boundary() {
     // Testing out of boundary
     let position = Position::from_inorder_index(10);
-    assert_eq!(position.is_freezable(2), false);
+    assert!(!position.is_freezable(2));
 }
 
 #[test]
 fn test_is_placeholder() {
-    assert_eq!(Position::from_inorder_index(5).is_placeholder(0), true);
-    assert_eq!(Position::from_inorder_index(5).is_placeholder(1), true);
-    assert_eq!(Position::from_inorder_index(5).is_placeholder(2), false);
-    assert_eq!(Position::from_inorder_index(5).is_placeholder(3), false);
-    assert_eq!(Position::from_inorder_index(13).is_placeholder(5), true);
-    assert_eq!(Position::from_inorder_index(13).is_placeholder(6), false);
+    assert!(Position::from_inorder_index(5).is_placeholder(0));
+    assert!(Position::from_inorder_index(5).is_placeholder(1));
+    assert!(!Position::from_inorder_index(5).is_placeholder(2));
+    assert!(!Position::from_inorder_index(5).is_placeholder(3));
+    assert!(Position::from_inorder_index(13).is_placeholder(5));
+    assert!(!Position::from_inorder_index(13).is_placeholder(6));
 }
 
 #[test]
 fn test_is_placeholder_out_of_boundary() {
     // Testing out of boundary
-    assert_eq!(Position::from_inorder_index(7).is_placeholder(2), false);
-    assert_eq!(Position::from_inorder_index(11).is_placeholder(2), true);
-    assert_eq!(Position::from_inorder_index(14).is_placeholder(2), true);
+    assert!(!Position::from_inorder_index(7).is_placeholder(2));
+    assert!(Position::from_inorder_index(11).is_placeholder(2));
+    assert!(Position::from_inorder_index(14).is_placeholder(2));
 }
 
 #[test]
@@ -180,39 +181,30 @@ pub fn test_sibling_sequence() {
         .take(20)
         .map(Position::to_inorder_index)
         .collect::<Vec<u64>>();
-    assert_eq!(
-        sibling_sequence1,
-        vec![
-            2, 5, 11, 23, 47, 95, 191, 383, 767, 1535, 3071, 6143, 12287, 24575, 49151, 98303,
-            196_607, 393_215, 786_431, 1_572_863
-        ]
-    );
+    assert_eq!(sibling_sequence1, vec![
+        2, 5, 11, 23, 47, 95, 191, 383, 767, 1535, 3071, 6143, 12287, 24575, 49151, 98303, 196_607,
+        393_215, 786_431, 1_572_863
+    ]);
 
     let sibling_sequence2 = Position::from_inorder_index(6)
         .iter_ancestor_sibling()
         .take(20)
         .map(Position::to_inorder_index)
         .collect::<Vec<u64>>();
-    assert_eq!(
-        sibling_sequence2,
-        vec![
-            4, 1, 11, 23, 47, 95, 191, 383, 767, 1535, 3071, 6143, 12287, 24575, 49151, 98303,
-            196_607, 393_215, 786_431, 1_572_863
-        ]
-    );
+    assert_eq!(sibling_sequence2, vec![
+        4, 1, 11, 23, 47, 95, 191, 383, 767, 1535, 3071, 6143, 12287, 24575, 49151, 98303, 196_607,
+        393_215, 786_431, 1_572_863
+    ]);
 
     let sibling_sequence3 = Position::from_inorder_index(7)
         .iter_ancestor_sibling()
         .take(20)
         .map(Position::to_inorder_index)
         .collect::<Vec<u64>>();
-    assert_eq!(
-        sibling_sequence3,
-        vec![
-            23, 47, 95, 191, 383, 767, 1535, 3071, 6143, 12287, 24575, 49151, 98303, 196_607,
-            393_215, 786_431, 1_572_863, 3_145_727, 6_291_455, 12_582_911
-        ]
-    );
+    assert_eq!(sibling_sequence3, vec![
+        23, 47, 95, 191, 383, 767, 1535, 3071, 6143, 12287, 24575, 49151, 98303, 196_607, 393_215,
+        786_431, 1_572_863, 3_145_727, 6_291_455, 12_582_911
+    ]);
 }
 
 #[test]
@@ -222,26 +214,20 @@ pub fn test_parent_sequence() {
         .take(20)
         .map(Position::to_inorder_index)
         .collect::<Vec<u64>>();
-    assert_eq!(
-        parent_sequence1,
-        vec![
-            0, 1, 3, 7, 15, 31, 63, 127, 255, 511, 1023, 2047, 4095, 8191, 16383, 32767, 65535,
-            131_071, 262_143, 524_287
-        ]
-    );
+    assert_eq!(parent_sequence1, vec![
+        0, 1, 3, 7, 15, 31, 63, 127, 255, 511, 1023, 2047, 4095, 8191, 16383, 32767, 65535,
+        131_071, 262_143, 524_287
+    ]);
 
     let parent_sequence2 = Position::from_inorder_index(12)
         .iter_ancestor()
         .take(20)
         .map(Position::to_inorder_index)
         .collect::<Vec<u64>>();
-    assert_eq!(
-        parent_sequence2,
-        vec![
-            12, 13, 11, 7, 15, 31, 63, 127, 255, 511, 1023, 2047, 4095, 8191, 16383, 32767, 65535,
-            131_071, 262_143, 524_287
-        ]
-    );
+    assert_eq!(parent_sequence2, vec![
+        12, 13, 11, 7, 15, 31, 63, 127, 255, 511, 1023, 2047, 4095, 8191, 16383, 32767, 65535,
+        131_071, 262_143, 524_287
+    ]);
 }
 
 fn slow_get_frozen_subtree_roots_impl(root: Position, max_leaf_index: u64) -> Vec<Position> {

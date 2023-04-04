@@ -1,0 +1,22 @@
+kind: NetworkChaos
+apiVersion: chaos-mesh.org/v1alpha1
+metadata:
+  namespace: {namespace}
+  name: forge-namespace-{partition_percentage}-percent-partition
+spec:
+  selector:
+    namespaces:
+      - {namespace}
+    labelSelectors:
+      app.kubernetes.io/name: validator
+  mode: all
+  action: partition
+  direction: both
+  target:
+    selector:
+      namespaces:
+        - {namespace}
+      expressionSelectors:
+        - {{ key: app.kubernetes.io/instance, operator: In, values: [validator-0, validator-1, validator-2] }}
+    mode: fixed-percent
+    value: "{partition_percentage}"

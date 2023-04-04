@@ -3,32 +3,20 @@ module aptos_framework::system_addresses {
     use std::signer;
 
     /// The address/account did not correspond to the core resource address
-    const ENOT_CORE_RESOURCE_ADDRESS: u64 = 0;
+    const ENOT_CORE_RESOURCE_ADDRESS: u64 = 1;
     /// The operation can only be performed by the VM
-    const EVM: u64 = 1;
+    const EVM: u64 = 2;
     /// The address/account did not correspond to the core framework address
-    const ENOT_CORE_FRAMEWORK_ADDRESS: u64 = 2;
+    const ENOT_APTOS_FRAMEWORK_ADDRESS: u64 = 3;
+    /// The address is not framework reserved address
+    const ENOT_FRAMEWORK_RESERVED_ADDRESS: u64 = 4;
 
     public fun assert_core_resource(account: &signer) {
         assert_core_resource_address(signer::address_of(account))
     }
-    spec assert_core_resource {
-        pragma opaque;
-        include AbortsIfNotCoreResource {addr: signer::address_of(account) };
-    }
 
     public fun assert_core_resource_address(addr: address) {
         assert!(is_core_resource_address(addr), error::permission_denied(ENOT_CORE_RESOURCE_ADDRESS))
-    }
-    spec assert_core_resource_address {
-        pragma opaque;
-        include AbortsIfNotCoreResource;
-    }
-
-    /// Specifies that a function aborts if the account does not have the root address.
-    spec schema AbortsIfNotCoreResource {
-        addr: address;
-        aborts_if addr != @core_resources with error::PERMISSION_DENIED;
     }
 
     public fun is_core_resource_address(addr: address): bool {
@@ -36,31 +24,59 @@ module aptos_framework::system_addresses {
     }
 
     public fun assert_aptos_framework(account: &signer) {
-        assert!(signer::address_of(account) == @aptos_framework, error::permission_denied(ENOT_CORE_FRAMEWORK_ADDRESS))
-    }
-    spec assert_aptos_framework {
-        pragma opaque;
-        include AbortsIfNotAptosFramework;
+        assert!(
+            is_aptos_framework_address(signer::address_of(account)),
+            error::permission_denied(ENOT_APTOS_FRAMEWORK_ADDRESS),
+        )
     }
 
-    /// Specifies that a function aborts if the account does not have the aptos framework address.
-    spec schema AbortsIfNotAptosFramework {
-        account: signer;
-        aborts_if signer::address_of(account) != @aptos_framework with error::PERMISSION_DENIED;
+    public fun assert_framework_reserved_address(account: &signer) {
+        assert_framework_reserved(signer::address_of(account));
+    }
+
+    public fun assert_framework_reserved(addr: address) {
+        assert!(
+            is_framework_reserved_address(addr),
+            error::permission_denied(ENOT_FRAMEWORK_RESERVED_ADDRESS),
+        )
+    }
+
+    /// Return true if `addr` is 0x0 or under the on chain governance's control.
+    public fun is_framework_reserved_address(addr: address): bool {
+        is_aptos_framework_address(addr) ||
+            addr == @0x2 ||
+            addr == @0x3 ||
+            addr == @0x4 ||
+            addr == @0x5 ||
+            addr == @0x6 ||
+            addr == @0x7 ||
+            addr == @0x8 ||
+            addr == @0x9 ||
+            addr == @0xa
+    }
+
+    /// Return true if `addr` is 0x1.
+    public fun is_aptos_framework_address(addr: address): bool {
+        addr == @aptos_framework
     }
 
     /// Assert that the signer has the VM reserved address.
     public fun assert_vm(account: &signer) {
-        assert!(signer::address_of(account) == @vm_reserved, error::permission_denied(EVM))
-    }
-    spec assert_vm {
-        pragma opaque;
-        include AbortsIfNotVM;
+        assert!(is_vm(account), error::permission_denied(EVM))
     }
 
-    /// Specifies that a function aborts if the account does not have the VM reserved address.
-    spec schema AbortsIfNotVM {
-        account: signer;
-        aborts_if signer::address_of(account) != @vm_reserved with error::PERMISSION_DENIED;
+    /// Return true if `addr` is a reserved address for the VM to call system modules.
+    public fun is_vm(account: &signer): bool {
+        is_vm_address(signer::address_of(account))
+    }
+
+    /// Return true if `addr` is a reserved address for the VM to call system modules.
+    public fun is_vm_address(addr: address): bool {
+        addr == @vm_reserved
+    }
+
+    /// Return true if `addr` is either the VM address or an Aptos Framework address.
+    public fun is_reserved_address(addr: address): bool {
+        is_aptos_framework_address(addr) || is_vm_address(addr)
     }
 }

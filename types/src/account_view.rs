@@ -1,17 +1,15 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     access_path::AccessPath,
-    account_config::{AccountResource, CRSNResource, ChainIdResource, CoinStoreResource},
-    on_chain_config::{
-        access_path_for_config, ConfigurationResource, OnChainConfig, ValidatorSet, Version,
-    },
+    account_config::{AccountResource, ChainIdResource, CoinStoreResource},
+    on_chain_config::{ConfigurationResource, OnChainConfig, ValidatorSet, Version},
     state_store::state_key::StateKey,
     validator_config::{ValidatorConfig, ValidatorOperatorConfigResource},
 };
 use anyhow::anyhow;
-use move_deps::move_core_types::{account_address::AccountAddress, move_resource::MoveResource};
+use move_core_types::{account_address::AccountAddress, move_resource::MoveResource};
 use serde::de::DeserializeOwned;
 
 pub trait AccountView {
@@ -42,7 +40,7 @@ pub trait AccountView {
     }
 
     fn get_on_chain_config<T: OnChainConfig>(&self) -> anyhow::Result<Option<T>> {
-        self.get_resource_impl(access_path_for_config(T::CONFIG_ID).path)
+        self.get_resource_impl(T::access_path()?.path)
     }
 
     fn get_version(&self) -> anyhow::Result<Option<Version>> {
@@ -57,10 +55,6 @@ pub trait AccountView {
         self.get_resource::<ChainIdResource>()
     }
 
-    fn get_crsn_resource(&self) -> anyhow::Result<Option<CRSNResource>> {
-        self.get_resource::<CRSNResource>()
-    }
-
     fn get_coin_store_resource(&self) -> anyhow::Result<Option<CoinStoreResource>> {
         self.get_resource::<CoinStoreResource>()
     }
@@ -69,7 +63,10 @@ pub trait AccountView {
         let account_address = self
             .get_account_address()?
             .ok_or_else(|| anyhow!("Could not fetch account address"))?;
-        Ok(StateKey::AccessPath(AccessPath::new(account_address, path)))
+        Ok(StateKey::access_path(AccessPath::new(
+            account_address,
+            path,
+        )))
     }
 
     fn get_account_resource(&self) -> anyhow::Result<Option<AccountResource>> {
@@ -77,7 +74,7 @@ pub trait AccountView {
     }
 
     fn get_config<T: OnChainConfig>(&self) -> anyhow::Result<Option<T>> {
-        self.get_resource_impl(access_path_for_config(T::CONFIG_ID).path)
+        self.get_resource_impl(T::access_path()?.path)
     }
 
     fn get_resource_impl<T: DeserializeOwned>(&self, path: Vec<u8>) -> anyhow::Result<Option<T>> {

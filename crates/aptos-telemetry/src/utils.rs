@@ -1,17 +1,26 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
 
-use crate::{build_information::get_build_information, system_information::collect_system_info};
+use aptos_telemetry_service::types::telemetry::TelemetryEvent;
 use prometheus::proto::MetricFamily;
 use std::collections::BTreeMap;
 
-/// Used to expose system and build information
-pub fn get_system_and_build_information(chain_id: Option<String>) -> BTreeMap<String, String> {
-    let mut system_and_build_information = get_build_information(chain_id);
-    collect_system_info(&mut system_and_build_information);
-    system_and_build_information
+/// Build information event name
+const APTOS_NODE_BUILD_INFORMATION: &str = "APTOS_NODE_BUILD_INFORMATION";
+/// Build information keys
+pub const BUILD_CHAIN_ID: &str = "build_chain_id";
+
+/// Collects and sends the build information via telemetry
+pub(crate) async fn create_build_info_telemetry_event(
+    build_info: BTreeMap<String, String>,
+) -> TelemetryEvent {
+    // Create and return a new telemetry event
+    TelemetryEvent {
+        name: APTOS_NODE_BUILD_INFORMATION.into(),
+        params: build_info,
+    }
 }
 
 /// Inserts an optional value into the given map iff the value exists
@@ -52,7 +61,7 @@ pub fn sum_all_histogram_sums(metric_families: &Vec<MetricFamily>) -> f64 {
     let mut count_sum = 0.0;
     for metric_family in metric_families {
         for metric in metric_family.get_metric() {
-            count_sum += metric.get_histogram().get_sample_sum() as f64
+            count_sum += metric.get_histogram().get_sample_sum()
         }
     }
     count_sum

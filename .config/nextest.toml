@@ -6,5 +6,11 @@ failure-output = "immediate-final"
 # Cancel test run on the first failure. Accounts for retries.
 fail-fast = true
 
-[profile.ci.junit]
-path = "junit.xml"
+junit = { path = "junit.xml" }
+
+[profile.smoke-coverage]
+test-threads = 6
+retries = 3
+status-level = "skip"
+failure-output = "immediate-final"
+junit = { path = "junit.xml" }

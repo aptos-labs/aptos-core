@@ -1,25 +1,32 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_config::network_id::PeerNetworkId;
 use aptos_crypto::_once_cell::sync::Lazy;
 use aptos_metrics_core::{
-    register_histogram_vec, register_int_counter_vec, register_int_gauge_vec, HistogramTimer,
-    HistogramVec, IntCounterVec, IntGaugeVec,
+    histogram_opts, register_histogram_vec, register_int_counter_vec, register_int_gauge_vec,
+    HistogramTimer, HistogramVec, IntCounterVec, IntGaugeVec,
 };
-use short_hex_str::AsShortHexStr;
 
 /// The special label TOTAL_COUNT stores the sum of all values in the counter.
 pub const TOTAL_COUNT_LABEL: &str = "TOTAL_COUNT";
 pub const PRIORITIZED_PEER: &str = "prioritized_peer";
 pub const REGULAR_PEER: &str = "regular_peer";
 
+// Latency buckets for network latencies (i.e., the defaults only go up
+// to 10 seconds, but we usually require more).
+const NETWORK_LATENCY_BUCKETS: [f64; 14] = [
+    0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 7.5, 10.0, 15.0, 20.0, 30.0, 40.0, 60.0,
+];
+
+// TOOD(joshlind): add peer priorities back to the requests
+
 /// Counter for tracking sent requests
 pub static SENT_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_data_client_sent_requests",
         "Counters related to sent requests",
-        &["request_types", "network", "peer_id"]
+        &["request_types", "network"]
     )
     .unwrap()
 });
@@ -29,7 +36,7 @@ pub static SUCCESS_RESPONSES: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_data_client_success_responses",
         "Counters related to success responses",
-        &["response_type", "network", "peer_id"]
+        &["response_type", "network"]
     )
     .unwrap()
 });
@@ -39,19 +46,19 @@ pub static ERROR_RESPONSES: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_data_client_error_responses",
         "Counters related to error responses",
-        &["response_type", "network", "peer_id"]
+        &["response_type", "network"]
     )
     .unwrap()
 });
 
 /// Counter for tracking request latencies
 pub static REQUEST_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
-    register_histogram_vec!(
+    let histogram_opts = histogram_opts!(
         "aptos_data_client_request_latencies",
         "Counters related to request latencies",
-        &["request_type", "network", "peer_id"]
-    )
-    .unwrap()
+        NETWORK_LATENCY_BUCKETS.to_vec()
+    );
+    register_histogram_vec!(histogram_opts, &["request_type", "network"]).unwrap()
 });
 
 /// Gauge for tracking the number of in-flight polls
@@ -59,6 +66,16 @@ pub static IN_FLIGHT_POLLS: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         "aptos_data_client_in_flight_polls",
         "Gauge related to the number of in-flight polls",
+        &["peer_type"]
+    )
+    .unwrap()
+});
+
+/// Gauge for tracking the number of connected peers (priority and regular)
+pub static CONNECTED_PEERS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_data_client_connected_peers",
+        "Gauge related to the number of connected peers",
         &["peer_type"]
     )
     .unwrap()
@@ -129,19 +146,16 @@ pub fn increment_request_counter(
     label: &str,
     peer_network_id: PeerNetworkId,
 ) {
-    let peer = peer_network_id.peer_id().short_str();
     let network = peer_network_id.network_id();
+    counter.with_label_values(&[label, network.as_str()]).inc();
     counter
-        .with_label_values(&[label, network.as_str(), peer.as_str()])
-        .inc();
-    counter
-        .with_label_values(&[TOTAL_COUNT_LABEL, network.as_str(), peer.as_str()])
+        .with_label_values(&[TOTAL_COUNT_LABEL, network.as_str()])
         .inc();
 }
 
 /// Sets the gauge with the specific label and value
-pub fn set_gauge(counter: &Lazy<IntGaugeVec>, label: String, value: u64) {
-    counter.with_label_values(&[&label]).set(value as i64);
+pub fn set_gauge(counter: &Lazy<IntGaugeVec>, label: &str, value: u64) {
+    counter.with_label_values(&[label]).set(value as i64);
 }
 
 /// Starts the timer for the provided histogram and label values.
@@ -150,9 +164,8 @@ pub fn start_request_timer(
     request_label: &str,
     peer_network_id: PeerNetworkId,
 ) -> HistogramTimer {
-    let peer = peer_network_id.peer_id().short_str();
     let network = peer_network_id.network_id();
     histogram
-        .with_label_values(&[request_label, network.as_str(), peer.as_str()])
+        .with_label_values(&[request_label, network.as_str()])
         .start_timer()
 }

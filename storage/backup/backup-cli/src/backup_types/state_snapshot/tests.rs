@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -10,13 +11,14 @@ use crate::{
     utils::{
         backup_service_client::BackupServiceClient,
         test_utils::{start_local_backup_service, tmp_db_with_random_content},
-        ConcurrentDownloadsOpt, GlobalBackupOpt, GlobalRestoreOpt, RocksdbOpt, TrustedWaypointOpt,
+        ConcurrentDownloadsOpt, GlobalBackupOpt, GlobalRestoreOpt, ReplayConcurrencyLevelOpt,
+        RocksdbOpt, TrustedWaypointOpt,
     },
 };
+use aptos_db::AptosDB;
+use aptos_storage_interface::DbReader;
 use aptos_temppath::TempPath;
-use aptosdb::AptosDB;
 use std::{convert::TryInto, sync::Arc};
-use storage_interface::DbReader;
 use tokio::time::Duration;
 
 #[test]
@@ -28,20 +30,38 @@ fn end_to_end() {
     backup_dir.create_as_dir().unwrap();
     let store: Arc<dyn BackupStorage> = Arc::new(LocalFs::new(backup_dir.path().to_path_buf()));
 
-    let latest_executed_trees = src_db.get_latest_executed_trees().unwrap();
-    let version = latest_executed_trees.version().unwrap();
-    let state_root_hash = latest_executed_trees.state().base_root_hash();
+    let epoch = src_db
+        .get_latest_ledger_info()
+        .unwrap()
+        .ledger_info()
+        .next_block_epoch()
+        - 1;
+    let latest_epoch_ending_li = src_db
+        .get_epoch_ending_ledger_infos(epoch, epoch + 1)
+        .unwrap()
+        .ledger_info_with_sigs
+        .pop()
+        .unwrap();
+    let version = latest_epoch_ending_li.ledger_info().version();
+    let state_root_hash = src_db
+        .get_transactions(version, 1, version, false)
+        .unwrap()
+        .proof
+        .transaction_infos
+        .pop()
+        .unwrap()
+        .state_checkpoint_hash()
+        .unwrap();
 
     let (rt, port) = start_local_backup_service(src_db);
     let client = Arc::new(BackupServiceClient::new(format!(
         "http://localhost:{}",
         port
     )));
-
     let manifest_handle = rt
         .block_on(
             StateSnapshotBackupController::new(
-                StateSnapshotBackupOpt { version },
+                StateSnapshotBackupOpt { epoch },
                 GlobalBackupOpt {
                     max_chunk_size: 500,
                 },
@@ -57,6 +77,7 @@ fn end_to_end() {
             StateSnapshotRestoreOpt {
                 manifest_handle,
                 version,
+                validate_modules: false,
             },
             GlobalRestoreOpt {
                 dry_run: false,
@@ -64,7 +85,8 @@ fn end_to_end() {
                 target_version: None, // max
                 trusted_waypoints: TrustedWaypointOpt::default(),
                 rocksdb_opt: RocksdbOpt::default(),
-                concurernt_downloads: ConcurrentDownloadsOpt::default(),
+                concurrent_downloads: ConcurrentDownloadsOpt::default(),
+                replay_concurrency_level: ReplayConcurrencyLevelOpt::default(),
             }
             .try_into()
             .unwrap(),
@@ -80,9 +102,8 @@ fn end_to_end() {
         tgt_db
             .get_state_snapshot_before(version + 1) // We cannot use get_latest_snapshot() because it searches backward from the latest txn_info version
             .unwrap()
-            .map(|(_, hash)| hash)
             .unwrap(),
-        state_root_hash,
+        (version, state_root_hash)
     );
 
     rt.shutdown_timeout(Duration::from_secs(1));

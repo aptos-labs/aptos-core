@@ -1,0 +1,9 @@
+{
+    "CustomDictionaryFilePath": "/configs/fuzzing_dictionary.json",
+    "EngineSettingsFilePath": "/configs/engine_settings.json",
+    "SwaggerSpecFilePath": ["/configs/spec.yaml"],
+    "UseQueryExamples": true,
+    "UseHeaderExamples": true,
+    "UsePathExamples": true,
+    "UseBodyExamples": true
+}

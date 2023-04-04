@@ -3,6 +3,16 @@ variable "region" {
   type        = string
 }
 
+variable "num_azs" {
+  description = "Number of availability zones"
+  default     = 3
+}
+
+variable "kubernetes_version" {
+  description = "Version of Kubernetes to use for EKS cluster"
+  default     = "1.24"
+}
+
 variable "k8s_api_sources" {
   description = "List of CIDR subnets which can access the Kubernetes API endpoint"
   default     = ["0.0.0.0/0"]
@@ -130,6 +140,11 @@ variable "vpc_cidr_block" {
   description = "VPC CIDR Block"
 }
 
+variable "maximize_single_az_capacity" {
+  description = "Whether to maximize the capacity of the cluster by allocating more IPs to the first AZ"
+  default     = false
+}
+
 variable "helm_enable_validator" {
   description = "Enable deployment of the validator Helm chart"
   default     = true
@@ -137,7 +152,7 @@ variable "helm_enable_validator" {
 
 variable "utility_instance_type" {
   description = "Instance type used for utilities"
-  default     = "t3.medium"
+  default     = "t3.2xlarge"
 }
 
 variable "utility_instance_num" {
@@ -155,9 +170,14 @@ variable "utility_instance_max_num" {
   default     = 0
 }
 
+variable "utility_instance_enable_taint" {
+  description = "Whether to taint the instances in the utility nodegroup"
+  default     = false
+}
+
 variable "validator_instance_type" {
   description = "Instance type used for validator and fullnodes"
-  default     = "c5.xlarge"
+  default     = "c6i.8xlarge"
 }
 
 variable "validator_instance_num" {
@@ -175,9 +195,19 @@ variable "validator_instance_max_num" {
   default     = 0
 }
 
+variable "validator_instance_enable_taint" {
+  description = "Whether to taint instances in the validator nodegroup"
+  default     = false
+}
+
 variable "workspace_name_override" {
   description = "If specified, overrides the usage of Terraform workspace for naming purposes"
   default     = ""
+}
+
+variable "enable_calico" {
+  description = "Enable Calico networking for NetworkPolicy"
+  default     = true
 }
 
 variable "enable_logger" {
@@ -191,16 +221,6 @@ variable "logger_helm_values" {
   default     = {}
 }
 
-variable "enable_vector_daemonset_logger" {
-  description = "Enable vector daemonset logger helm chart"
-  default     = false
-}
-
-variable "vector_daemonset_helm_values" {
-  description = "Map of helm values to pass to vector-daemonset chart"
-  type        = list(string)
-  default     = []
-}
 
 variable "enable_monitoring" {
   description = "Enable monitoring helm chart"
@@ -213,7 +233,40 @@ variable "monitoring_helm_values" {
   default     = {}
 }
 
+variable "enable_prometheus_node_exporter" {
+  description = "Enable prometheus-node-exporter within monitoring helm chart"
+  default     = false
+}
+
+variable "enable_kube_state_metrics" {
+  description = "Enable kube-state-metrics within monitoring helm chart"
+  default     = false
+}
+
 variable "helm_release_name_override" {
   description = "If set, overrides the name of the aptos-node helm chart"
   default     = ""
+}
+
+variable "validator_storage_class" {
+  description = "Which storage class to use for the validator and fullnode"
+  default     = "io1"
+  validation {
+    condition     = contains(["gp3", "io1", "io2"], var.validator_storage_class)
+    error_message = "Supported storage classes are gp3, io1, io2"
+  }
+}
+
+variable "fullnode_storage_class" {
+  description = "Which storage class to use for the validator and fullnode"
+  default     = "io1"
+  validation {
+    condition     = contains(["gp3", "io1", "io2"], var.fullnode_storage_class)
+    error_message = "Supported storage classes are gp3, io1, io2"
+  }
+}
+
+variable "manage_via_tf" {
+  description = "Whether to manage the aptos-node k8s workload via Terraform. If set to false, the helm_release resource will still be created and updated when values change, but it may not be updated on every apply"
+  default     = true
 }

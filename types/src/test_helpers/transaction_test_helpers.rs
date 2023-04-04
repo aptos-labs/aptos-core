@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -6,14 +7,13 @@ use crate::{
     chain_id::ChainId,
     transaction::{
         authenticator::AccountAuthenticator, Module, RawTransaction, RawTransactionWithData,
-        Script, SignatureCheckedTransaction, SignedTransaction, Transaction, TransactionPayload,
+        Script, SignedTransaction, Transaction, TransactionPayload,
     },
-    write_set::WriteSet,
 };
 use aptos_crypto::{ed25519::*, traits::*, HashValue};
 
 const MAX_GAS_AMOUNT: u64 = 1_000_000;
-const TEST_GAS_PRICE: u64 = 0;
+const TEST_GAS_PRICE: u64 = 100;
 
 static EMPTY_SCRIPT: &[u8] = include_bytes!("empty_script.mv");
 
@@ -45,7 +45,7 @@ pub fn get_test_signed_module_publishing_transaction(
         ChainId::test(),
     );
 
-    let signature = private_key.sign(&raw_txn);
+    let signature = private_key.sign(&raw_txn).unwrap();
 
     SignedTransaction::new(raw_txn, public_key, signature)
 }
@@ -73,7 +73,7 @@ pub fn get_test_signed_transaction(
         ChainId::test(),
     );
 
-    let signature = private_key.sign(&raw_txn);
+    let signature = private_key.sign(&raw_txn).unwrap();
 
     SignedTransaction::new(raw_txn, public_key, signature)
 }
@@ -124,7 +124,7 @@ fn get_test_unchecked_transaction_(
         chain_id,
     );
 
-    let signature = private_key.sign(&raw_txn);
+    let signature = private_key.sign(&raw_txn).unwrap();
 
     SignedTransaction::new(raw_txn, public_key, signature)
 }
@@ -196,12 +196,12 @@ pub fn get_test_unchecked_multi_agent_txn(
     let message =
         RawTransactionWithData::new_multi_agent(raw_txn.clone(), secondary_signers.clone());
 
-    let sender_signature = sender_private_key.sign(&message);
+    let sender_signature = sender_private_key.sign(&message).unwrap();
     let sender_authenticator = AccountAuthenticator::ed25519(sender_public_key, sender_signature);
 
     let mut secondary_authenticators = vec![];
     for i in 0..secondary_public_keys.len() {
-        let signature = secondary_private_keys[i].sign(&message);
+        let signature = secondary_private_keys[i].sign(&message).unwrap();
         secondary_authenticators.push(AccountAuthenticator::ed25519(
             secondary_public_keys[i].clone(),
             signature,
@@ -234,22 +234,9 @@ pub fn get_test_txn_with_chain_id(
         chain_id,
     );
 
-    let signature = private_key.sign(&raw_txn);
+    let signature = private_key.sign(&raw_txn).unwrap();
 
     SignedTransaction::new(raw_txn, public_key, signature)
-}
-
-pub fn get_write_set_txn(
-    sender: AccountAddress,
-    sequence_number: u64,
-    private_key: &Ed25519PrivateKey,
-    public_key: Ed25519PublicKey,
-    write_set: Option<WriteSet>,
-) -> SignatureCheckedTransaction {
-    let write_set = write_set.unwrap_or_default();
-    RawTransaction::new_write_set(sender, sequence_number, write_set, ChainId::test())
-        .sign(private_key, public_key)
-        .unwrap()
 }
 
 pub fn block(mut user_txns: Vec<Transaction>) -> Vec<Transaction> {

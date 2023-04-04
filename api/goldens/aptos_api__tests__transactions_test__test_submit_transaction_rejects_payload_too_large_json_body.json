@@ -1,4 +1,5 @@
 {
-  "code": 413,
-  "message": "The request payload is too large"
+  "message": "payload too large",
+  "error_code": "web_framework_error",
+  "vm_error_code": null
 }

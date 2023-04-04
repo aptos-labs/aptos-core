@@ -1,20 +1,20 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_language_e2e_tests::{
+    account::AccountData, compile::compile_script, current_function_name, executor::FakeExecutor,
+};
 use aptos_types::transaction::{
     ExecutionStatus, Module, SignedTransaction, Transaction, TransactionStatus,
 };
-use language_e2e_tests::{
-    account::AccountData, compile::compile_script, current_function_name, executor::FakeExecutor,
-};
-use move_deps::{
-    move_binary_format::CompiledModule, move_bytecode_verifier::verify_module,
-    move_ir_compiler::Compiler,
-};
+use move_binary_format::CompiledModule;
+use move_bytecode_verifier::verify_module;
+use move_ir_compiler::Compiler;
 
 #[test]
 fn move_from_across_blocks() {
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
     let sender = executor.create_raw_account_data(1_000_000, 10);
     executor.add_account_data(&sender);
@@ -93,7 +93,7 @@ fn move_from_across_blocks() {
 
 #[test]
 fn borrow_after_move() {
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
     let sender = executor.create_raw_account_data(1_000_000, 10);
     executor.add_account_data(&sender);
@@ -102,6 +102,7 @@ fn borrow_after_move() {
     let (module, txn) = add_module_txn(&sender, 10);
     executor.execute_and_apply(txn);
 
+    println!("HERE!");
     // remove resource fails given no resource were published
     let rem_txn = remove_resource_txn(&sender, 11, vec![module.clone()]);
     let output = executor.execute_transaction(rem_txn);
@@ -111,15 +112,18 @@ fn borrow_after_move() {
         Ok(ExecutionStatus::ExecutionFailure { .. })
     ));
     executor.apply_write_set(output.write_set());
+    println!("HERE!");
 
     // publish resource
     let add_txn = add_resource_txn(&sender, 12, vec![module.clone()]);
     executor.execute_and_apply(add_txn);
+    println!("HERE!");
 
     // borrow resource
     let borrow_txn = borrow_resource_txn(&sender, 13, vec![module.clone()]);
     executor.execute_and_apply(borrow_txn);
 
+    println!("HERE!");
     // create a remove and a borrow resource transaction over the same resource in one block
     let txns = vec![
         Transaction::UserTransaction(remove_resource_txn(&sender, 14, vec![module.clone()])),
@@ -132,11 +136,13 @@ fn borrow_after_move() {
         output[0].status(),
         &TransactionStatus::Keep(ExecutionStatus::Success)
     );
+    println!("HERE!");
     assert!(matches!(
         output[1].status().status(),
         // StatusCode::MISSING_DATA
         Ok(ExecutionStatus::ExecutionFailure { .. })
     ));
+    println!("HERE!");
     for out in output {
         executor.apply_write_set(out.write_set());
     }
@@ -144,7 +150,7 @@ fn borrow_after_move() {
 
 #[test]
 fn change_after_move() {
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
     let sender = executor.create_raw_account_data(1_000_000, 10);
     executor.add_account_data(&sender);
@@ -242,8 +248,9 @@ fn add_module_txn(sender: &AccountData, seq_num: u64) -> (CompiledModule, Signed
         sender.address(),
     );
 
+    let framework_modules = aptos_cached_packages::head_release_bundle().compiled_modules();
     let compiler = Compiler {
-        deps: cached_framework_packages::modules().iter().collect(),
+        deps: framework_modules.iter().collect(),
     };
     let module = compiler
         .into_compiled_module(module_code.as_str())

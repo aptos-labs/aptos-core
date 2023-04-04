@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -8,14 +9,10 @@ use crate::{
         build_empty_tree, build_simple_tree, consensus_runtime, timed_block_on, TreeInserter,
     },
 };
-use aptos_crypto::{HashValue, PrivateKey};
-use aptos_types::{
-    validator_signer::ValidatorSigner, validator_verifier::random_validator_verifier,
-};
-use consensus_types::{
+use aptos_consensus_types::{
     block::{
         block_test_utils::{
-            self, certificate_for_genesis, placeholder_certificate_for_block,
+            self, certificate_for_genesis, gen_test_certificate, placeholder_certificate_for_block,
             placeholder_ledger_info,
         },
         Block,
@@ -23,6 +20,10 @@ use consensus_types::{
     common::{Author, Payload},
     vote::Vote,
     vote_data::VoteData,
+};
+use aptos_crypto::{HashValue, PrivateKey};
+use aptos_types::{
+    validator_signer::ValidatorSigner, validator_verifier::random_validator_verifier,
 };
 use proptest::prelude::*;
 use std::{cmp::min, collections::HashSet};
@@ -119,14 +120,14 @@ proptest! {
             // match the signer_strategy in validator_signer.rs
             |key| Author::from_bytes(&key.public_key().to_bytes()[0..32]).unwrap()
         ).collect();
-        let mut runtime = consensus_runtime();
+        let runtime = consensus_runtime();
         let block_store = build_empty_tree();
         for block in blocks {
             if block.round() > 0 && authors.contains(&block.author().unwrap()) {
                 let known_parent = block_store.block_exists(block.parent_id());
                 let certified_parent = block.quorum_cert().certified_block().id() == block.parent_id();
                 let verify_res = block.verify_well_formed();
-                let res = timed_block_on(&mut runtime, block_store.execute_and_insert_block(block.clone()));
+                let res = timed_block_on(&runtime, block_store.execute_and_insert_block(block.clone()));
                 if !certified_parent {
                     prop_assert!(verify_res.is_err());
                 } else if !known_parent {
@@ -296,11 +297,12 @@ async fn test_insert_vote() {
             voter.author(),
             placeholder_ledger_info(),
             voter,
-        );
+        )
+        .unwrap();
         let vote_res = pending_votes.insert_vote(&vote, &validator_verifier);
 
         // first vote of an author is accepted
-        assert_eq!(vote_res, VoteReceptionResult::VoteAdded(i as u64));
+        assert_eq!(vote_res, VoteReceptionResult::VoteAdded(i as u128));
         // filter out duplicates
         assert_eq!(
             pending_votes.insert_vote(&vote, &validator_verifier),
@@ -324,17 +326,18 @@ async fn test_insert_vote() {
         final_voter.author(),
         placeholder_ledger_info(),
         final_voter,
-    );
+    )
+    .unwrap();
     match pending_votes.insert_vote(&vote, &validator_verifier) {
         VoteReceptionResult::NewQuorumCertificate(qc) => {
             assert_eq!(qc.certified_block().id(), block.id());
             block_store
                 .insert_single_quorum_cert(qc.as_ref().clone())
                 .unwrap();
-        }
+        },
         _ => {
             panic!("QC not formed!");
-        }
+        },
     }
 
     let block_qc = block_store.get_quorum_cert_for_block(block.id()).unwrap();
@@ -347,14 +350,15 @@ async fn test_illegal_timestamp() {
     let block_store = build_empty_tree();
     let genesis = block_store.ordered_root();
     let block_with_illegal_timestamp = Block::new_proposal(
-        Payload::new_empty(),
+        Payload::empty(false),
         0,
         // This timestamp is illegal, it is the same as genesis
         genesis.timestamp_usecs(),
         certificate_for_genesis(),
         &signer,
         Vec::new(),
-    );
+    )
+    .unwrap();
     let result = block_store
         .execute_and_insert_block(block_with_illegal_timestamp)
         .await;
@@ -394,7 +398,7 @@ async fn test_need_fetch_for_qc() {
     let a3 = inserter.insert_block(&a2, 3, None).await;
     block_store.prune_tree(a2.id());
     let need_fetch_qc = placeholder_certificate_for_block(
-        vec![inserter.signer()],
+        &[inserter.signer().clone()],
         HashValue::zero(),
         a3.round() + 1,
         HashValue::zero(),
@@ -402,7 +406,7 @@ async fn test_need_fetch_for_qc() {
     );
     let too_old_qc = certificate_for_genesis();
     let can_insert_qc = placeholder_certificate_for_block(
-        vec![inserter.signer()],
+        &[inserter.signer().clone()],
         a3.id(),
         a3.round(),
         a2.id(),
@@ -425,4 +429,55 @@ async fn test_need_fetch_for_qc() {
         block_store.need_fetch_for_quorum_cert(duplicate_qc.as_ref()),
         NeedFetchResult::QCAlreadyExist,
     );
+}
+
+#[tokio::test]
+async fn test_need_sync_for_ledger_info() {
+    let mut inserter = TreeInserter::default();
+    let block_store = inserter.block_store();
+
+    let mut prev = block_store.ordered_root();
+    for i in 1..=30 {
+        prev = inserter.insert_block(&prev, i, None).await;
+    }
+    inserter
+        .insert_block(
+            &prev,
+            31,
+            Some(prev.block().gen_block_info(HashValue::zero(), 1, None)),
+        )
+        .await;
+    assert_eq!(block_store.ordered_root().round(), 30);
+    assert_eq!(block_store.commit_root().round(), 0);
+
+    let create_ledger_info = |round: u64| {
+        let future_block = inserter.create_block_with_qc(
+            certificate_for_genesis(),
+            1,
+            round,
+            Payload::empty(false),
+            vec![],
+        );
+        gen_test_certificate(
+            &[inserter.signer().clone()],
+            future_block.gen_block_info(HashValue::zero(), 0, None),
+            future_block.quorum_cert().parent_block().clone(),
+            Some(future_block.gen_block_info(HashValue::zero(), 0, None)),
+        )
+        .ledger_info()
+        .clone()
+    };
+    // it's larger and the block doesn't exist in the tree
+    let ordered_round_too_far = block_store.ordered_root().round() + 1;
+    let ordered_too_far = create_ledger_info(ordered_round_too_far);
+    assert!(block_store.need_sync_for_ledger_info(&ordered_too_far));
+
+    let committed_round_too_far =
+        block_store.commit_root().round() + block_store.back_pressure_limit * 2 + 1;
+    let committed_too_far = create_ledger_info(committed_round_too_far);
+    assert!(block_store.need_sync_for_ledger_info(&committed_too_far));
+
+    let round_not_too_far = block_store.commit_root().round() + block_store.back_pressure_limit + 1;
+    let not_too_far = create_ledger_info(round_not_too_far);
+    assert!(!block_store.need_sync_for_ledger_info(&not_too_far));
 }

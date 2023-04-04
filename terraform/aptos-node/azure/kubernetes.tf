@@ -31,9 +31,9 @@ resource "helm_release" "validator" {
     jsonencode({
       imageTag = var.image_tag
       chain = {
-        era        = var.era
-        chain_id   = var.chain_id
-        chain_name = var.chain_name
+        era      = var.era
+        chain_id = var.chain_id
+        name     = var.chain_name
       }
       validator = {
         name = var.validator_name
@@ -51,7 +51,7 @@ resource "helm_release" "validator" {
       }
       fullnode = {
         storage = {
-          class = "default"
+          class = "managed-premium"
         }
         nodeSelector = {
           "agentpool" = azurerm_kubernetes_cluster_node_pool.validators.name

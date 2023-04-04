@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -11,26 +12,28 @@ use crate::{
     storage::{local_fs::LocalFs, BackupStorage},
     utils::{
         backup_service_client::BackupServiceClient, test_utils::tmp_db_with_random_content,
-        ConcurrentDownloadsOpt, GlobalBackupOpt, GlobalRestoreOpt, RocksdbOpt, TrustedWaypointOpt,
+        ConcurrentDownloadsOpt, GlobalBackupOpt, GlobalRestoreOpt, ReplayConcurrencyLevelOpt,
+        RocksdbOpt, TrustedWaypointOpt,
     },
 };
+use aptos_backup_service::start_backup_service;
 use aptos_config::utils::get_available_port;
+use aptos_db::AptosDB;
+use aptos_storage_interface::DbReader;
 use aptos_temppath::TempPath;
 use aptos_types::{
+    aggregate_signature::AggregateSignature,
     ledger_info::LedgerInfoWithSignatures,
     proptest_types::{AccountInfoUniverse, LedgerInfoWithSignaturesGen},
     waypoint::Waypoint,
 };
-use aptosdb::AptosDB;
-use backup_service::start_backup_service;
-use proptest::{collection::vec, prelude::*, std_facade::BTreeMap};
+use proptest::{collection::vec, prelude::*};
 use std::{
     convert::TryInto,
     io::Write,
     net::{IpAddr, Ipv4Addr, SocketAddr},
     sync::Arc,
 };
-use storage_interface::DbReader;
 use tokio::{runtime::Runtime, time::Duration};
 use warp::Filter;
 
@@ -82,7 +85,8 @@ fn end_to_end() {
                 target_version: Some(target_version),
                 trusted_waypoints: TrustedWaypointOpt::default(),
                 rocksdb_opt: RocksdbOpt::default(),
-                concurernt_downloads: ConcurrentDownloadsOpt::default(),
+                concurrent_downloads: ConcurrentDownloadsOpt::default(),
+                replay_concurrency_level: ReplayConcurrencyLevelOpt::default(),
             }
             .try_into()
             .unwrap(),
@@ -138,7 +142,7 @@ prop_compose! {
                 if overwrite && li.ledger_info().epoch() != 0 {
                     li = LedgerInfoWithSignatures::new(
                         li.ledger_info().clone(),
-                        BTreeMap::new(),
+                        AggregateSignature::empty(),
                     );
                     should_fail_without_waypoints = true;
                 }
@@ -213,7 +217,8 @@ async fn test_trusted_waypoints_impl(
             target_version: None,
             trusted_waypoints: TrustedWaypointOpt::default(),
             rocksdb_opt: RocksdbOpt::default(),
-            concurernt_downloads: ConcurrentDownloadsOpt::default(),
+            concurrent_downloads: ConcurrentDownloadsOpt::default(),
+            replay_concurrency_level: ReplayConcurrencyLevelOpt::default(),
         }
         .try_into()
         .unwrap(),
@@ -233,7 +238,8 @@ async fn test_trusted_waypoints_impl(
                 trust_waypoint: trusted_waypoints,
             },
             rocksdb_opt: RocksdbOpt::default(),
-            concurernt_downloads: ConcurrentDownloadsOpt::default(),
+            concurrent_downloads: ConcurrentDownloadsOpt::default(),
+            replay_concurrency_level: ReplayConcurrencyLevelOpt::default(),
         }
         .try_into()
         .unwrap(),

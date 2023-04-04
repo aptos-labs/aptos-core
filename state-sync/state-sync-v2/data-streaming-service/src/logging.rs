@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::error::Error;
@@ -37,9 +38,12 @@ pub enum LogEntry {
     InitializeStream,
     ReceivedDataResponse,
     RefreshGlobalData,
+    RequestTimeout,
     RespondToStreamRequest,
+    RetryDataRequest,
     SendDataRequests,
     StreamNotification,
+    TerminateStream,
 }
 
 #[derive(Clone, Copy, Serialize)]

@@ -1,5 +1,5 @@
 resource "azuread_application" "aptos" {
-  display_name = "aptos-${terraform.workspace}/cluster"
+  display_name            = "aptos-${terraform.workspace}/cluster"
   prevent_duplicate_names = true
 }
 

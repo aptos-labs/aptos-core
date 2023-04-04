@@ -1,41 +1,45 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! Objects of the Rosetta spec
 //!
 //! [Spec](https://www.rosetta-api.org/docs/api_objects.html)
 
-use crate::common::native_coin_tag;
-use crate::types::{
-    account_module_identifier, aptos_coin_module_identifier, aptos_coin_resource_identifier,
-    coin_module_identifier, create_account_function_identifier, transfer_function_identifier,
-};
 use crate::{
-    common::{is_native_coin, native_coin},
+    common::{is_native_coin, native_coin, native_coin_tag},
+    construction::{
+        parse_create_stake_pool_operation, parse_distribute_staking_rewards_operation,
+        parse_reset_lockup_operation, parse_set_operator_operation, parse_set_voter_operation,
+        parse_unlock_stake_operation,
+    },
     error::ApiResult,
     types::{
-        account_resource_identifier, coin_store_resource_identifier,
-        deposit_events_field_identifier, sequence_number_field_identifier,
-        withdraw_events_field_identifier, AccountIdentifier, BlockIdentifier, Error,
-        NetworkIdentifier, OperationIdentifier, OperationStatus, OperationStatusType,
-        OperationType, TransactionIdentifier,
+        move_types::*, AccountIdentifier, BlockIdentifier, Error, OperationIdentifier,
+        OperationStatus, OperationStatusType, OperationType, TransactionIdentifier,
     },
-    ApiError,
+    ApiError, RosettaContext,
 };
 use anyhow::anyhow;
+use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{ed25519::Ed25519PublicKey, ValidCryptoMaterialStringExt};
-use aptos_rest_client::aptos_api_types::{
-    Address, Event, MoveStructTag, MoveType, TransactionPayload, WriteResource,
+use aptos_logger::warn;
+use aptos_rest_client::aptos_api_types::{TransactionOnChainData, U64};
+use aptos_types::{
+    account_address::AccountAddress,
+    account_config::{AccountResource, CoinStoreResource, WithdrawEvent},
+    contract_event::ContractEvent,
+    event::EventKey,
+    stake_pool::{SetOperatorEvent, StakePool},
+    state_store::state_key::{StateKey, StateKeyInner},
+    transaction::{EntryFunction, TransactionPayload},
+    write_set::{WriteOp, WriteSet},
 };
-use aptos_rest_client::{
-    aptos::Balance,
-    aptos_api_types::{WriteSetChange, U64},
-};
-use aptos_types::{account_address::AccountAddress, event::EventKey};
-use serde::{de::Error as SerdeError, Deserialize, Deserializer, Serialize};
+use itertools::Itertools;
+use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap,
-    convert::{TryFrom, TryInto},
+    cmp::Ordering,
+    collections::{BTreeMap, HashMap},
+    convert::TryFrom,
     fmt::{Display, Formatter},
     hash::Hash,
     str::FromStr,
@@ -58,8 +62,7 @@ pub struct Allow {
     /// If the server is allowed to lookup historical transactions
     pub historical_balance_lookup: bool,
     /// All times after this are valid timestamps
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub timestamp_start_index: Option<u64>,
+    pub timestamp_start_index: u64,
     /// All call methods supported
     pub call_methods: Vec<String>,
     /// A list of balance exemptions.  These should be as minimal as possible, otherwise it becomes
@@ -68,12 +71,6 @@ pub struct Allow {
     /// Determines if mempool can change the balance on an account
     /// This should be set to false
     pub mempool_coins: bool,
-    /// Case specifics for block hashes.  Set to None if case insensitive
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub block_hash_case: Option<Case>,
-    /// Case specifics for transaction hashes.  Set to None if case insensitive
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub transaction_hash_case: Option<Case>,
 }
 
 /// Amount of a [`Currency`] in atomic units
@@ -87,31 +84,18 @@ pub struct Amount {
     pub currency: Currency,
 }
 
-impl From<Balance> for Amount {
-    fn from(balance: Balance) -> Self {
+impl Amount {
+    pub fn suggested_gas_fee(gas_unit_price: u64, max_gas_amount: u64) -> Amount {
         Amount {
-            value: balance.coin.value.to_string(),
-            // TODO: Support other currencies
+            value: (gas_unit_price * max_gas_amount).to_string(),
             currency: native_coin(),
         }
     }
 }
 
-/// Balance exemptions where the current balance of an account can change without a transaction
-/// operation.  This is typically e
-///
 /// [API Spec](https://www.rosetta-api.org/docs/models/BalanceExemption.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct BalanceExemption {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub sub_account_address: Option<String>,
-    /// The currency that can change based on the exemption
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub currency: Option<Currency>,
-    /// The exemption type of which direction a balance can change
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub exemption_type: Option<ExemptionType>,
-}
+pub struct BalanceExemption {}
 
 /// Representation of a Block for a blockchain.  For aptos it is the version
 ///
@@ -128,32 +112,6 @@ pub struct Block {
     pub transactions: Vec<Transaction>,
 }
 
-/// Events that allow lighter weight block updates of add and removing block
-///
-/// [API Spec](https://www.rosetta-api.org/docs/models/BlockEvent.html)
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct BlockEvent {
-    /// Ordered event index for events on a NetworkIdentifier (likely the same as version)
-    pub sequence: u64,
-    /// Block identifier of the block to change
-    pub block_identifier: BlockIdentifier,
-    /// Block event type add or remove block
-    #[serde(rename = "type")]
-    pub block_event_type: BlockEventType,
-    /// Transactions associated with the update, it should be only one transaction in Aptos.
-    pub transactions: Vec<Transaction>,
-}
-
-/// Determines if the event is about adding or removing blocks
-///
-/// [API Spec](https://www.rosetta-api.org/docs/models/BlockEventType.html)
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum BlockEventType {
-    BlockAdded,
-    BlockRemoved,
-}
-
 /// A combination of a transaction and the block associated.  In Aptos, this is just the same
 /// as the version associated with the transaction
 ///
@@ -166,17 +124,6 @@ pub struct BlockTransaction {
     transaction: Transaction,
 }
 
-/// Tells what cases are supported in hashes. Having no value is case insensitive.
-///
-///[API Spec](https://www.rosetta-api.org/docs/models/Case.html)
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Case {
-    UpperCase,
-    LowerCase,
-    CaseSensitive,
-}
-
 /// Currency represented as atomic units including decimals
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/models/Currency.html)
@@ -185,7 +132,7 @@ pub struct Currency {
     /// Symbol of currency
     pub symbol: String,
     /// Number of decimals to be considered in the currency
-    pub decimals: u64,
+    pub decimals: u8,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<CurrencyMetadata>,
 }
@@ -201,40 +148,6 @@ pub struct CurrencyMetadata {
 #[serde(rename_all = "snake_case")]
 pub enum CurveType {
     Edwards25519,
-    Secp256k1,
-    Secp256r1,
-    Tweedle,
-    Pallas,
-}
-
-/// Used for related transactions to determine direction of relation
-///
-/// [API Spec](https://www.rosetta-api.org/docs/models/Direction.html)
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Direction {
-    /// Associated to a later transaction
-    Forward,
-    /// Associated to an earlier transaction
-    Backward,
-}
-
-/// Tells how balances can change without a specific transaction on the account
-///
-/// Balance exemptions are not necessary, because staking rewards go to the staking
-/// pool and not to the account.  When they are removed from the pool, normal events
-/// for transfer will occur.
-///
-/// [API Spec](https://www.rosetta-api.org/docs/models/ExemptionType.html)
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ExemptionType {
-    /// Balance can be greater than or equal to the current balance e.g. staking
-    GreaterOrEqual,
-    /// Balance can be less than or equal to the current balance
-    LessOrEqual,
-    /// Balance can be less than or greater than the current balance e.g. dynamic supplies
-    Dynamic,
 }
 
 /// A representation of a single account change in a transaction
@@ -245,14 +158,12 @@ pub enum ExemptionType {
 pub struct Operation {
     /// Identifier of an operation within a transaction
     pub operation_identifier: OperationIdentifier,
-    /// Related operations e.g. multiple operations that are related to a transfer
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub related_operations: Option<Vec<OperationIdentifier>>,
     /// Type of operation
     #[serde(rename = "type")]
     pub operation_type: String,
     /// Status of operation.  Must be populated if the transaction is in the past.  If submitting
     /// new transactions, it must NOT be populated.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<String>,
     /// AccountIdentifier should be provided to point at which account the change is
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -263,101 +174,361 @@ pub struct Operation {
     pub amount: Option<Amount>,
     /// Operation specific metadata for any operation that's missing information it needs
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<OperationSpecificMetadata>,
+    pub metadata: Option<OperationMetadata>,
 }
 
 impl Operation {
+    fn new(
+        operation_type: OperationType,
+        operation_index: u64,
+        status: Option<OperationStatusType>,
+        account: AccountIdentifier,
+        amount: Option<Amount>,
+        metadata: Option<OperationMetadata>,
+    ) -> Operation {
+        Operation {
+            operation_identifier: OperationIdentifier {
+                index: operation_index,
+            },
+            operation_type: operation_type.to_string(),
+            status: status.map(|inner| inner.to_string()),
+            account: Some(account),
+            amount,
+            metadata,
+        }
+    }
+
+    pub fn create_stake_pool(
+        operation_index: u64,
+        status: Option<OperationStatusType>,
+        owner: AccountAddress,
+        operator: Option<AccountAddress>,
+        voter: Option<AccountAddress>,
+        staked_balance: Option<u64>,
+        commission_percentage: Option<u64>,
+    ) -> Operation {
+        Operation::new(
+            OperationType::InitializeStakePool,
+            operation_index,
+            status,
+            AccountIdentifier::base_account(owner),
+            None,
+            Some(OperationMetadata::create_stake_pool(
+                operator.map(AccountIdentifier::base_account),
+                voter.map(AccountIdentifier::base_account),
+                staked_balance,
+                commission_percentage,
+            )),
+        )
+    }
+
     pub fn create_account(
         operation_index: u64,
         status: Option<OperationStatusType>,
         address: AccountAddress,
         sender: AccountAddress,
     ) -> Operation {
-        Operation {
-            operation_identifier: OperationIdentifier {
-                index: operation_index,
-                network_index: None,
-            },
-            related_operations: None,
-            operation_type: OperationType::CreateAccount.to_string(),
-            status: status.map(|inner| inner.to_string()),
-            account: Some(address.into()),
-            amount: None,
-            metadata: Some(OperationSpecificMetadata {
-                sender: sender.into(),
+        Operation::new(
+            OperationType::CreateAccount,
+            operation_index,
+            status,
+            AccountIdentifier::base_account(address),
+            None,
+            Some(OperationMetadata::create_account(sender)),
+        )
+    }
+
+    pub fn staking_reward(
+        operation_index: u64,
+        status: Option<OperationStatusType>,
+        account: AccountIdentifier,
+        currency: Currency,
+        amount: u64,
+    ) -> Operation {
+        Operation::new(
+            OperationType::StakingReward,
+            operation_index,
+            status,
+            account,
+            Some(Amount {
+                value: amount.to_string(),
+                currency,
             }),
-        }
+            None,
+        )
     }
 
     pub fn deposit(
         operation_index: u64,
         status: Option<OperationStatusType>,
-        address: AccountAddress,
+        account: AccountIdentifier,
         currency: Currency,
         amount: u64,
     ) -> Operation {
-        Operation {
-            operation_identifier: OperationIdentifier {
-                index: operation_index,
-                network_index: None,
-            },
-            related_operations: None,
-            operation_type: OperationType::Deposit.to_string(),
-            status: status.map(|inner| inner.to_string()),
-            account: Some(address.into()),
-            amount: Some(Amount {
+        Operation::new(
+            OperationType::Deposit,
+            operation_index,
+            status,
+            account,
+            Some(Amount {
                 value: amount.to_string(),
                 currency,
             }),
-            metadata: None,
-        }
+            None,
+        )
     }
 
     pub fn withdraw(
         operation_index: u64,
         status: Option<OperationStatusType>,
-        address: AccountAddress,
+        account: AccountIdentifier,
         currency: Currency,
         amount: u64,
     ) -> Operation {
-        Operation {
-            operation_identifier: OperationIdentifier {
-                index: operation_index,
-                network_index: None,
-            },
-            related_operations: None,
-            operation_type: OperationType::Withdraw.to_string(),
-            status: status.map(|inner| inner.to_string()),
-            account: Some(address.into()),
-            amount: Some(Amount {
+        Operation::new(
+            OperationType::Withdraw,
+            operation_index,
+            status,
+            account,
+            Some(Amount {
                 value: format!("-{}", amount),
                 currency,
             }),
-            metadata: None,
+            None,
+        )
+    }
+
+    pub fn gas_fee(
+        operation_index: u64,
+        address: AccountAddress,
+        gas_used: u64,
+        gas_price_per_unit: u64,
+    ) -> Operation {
+        Operation::new(
+            OperationType::Fee,
+            operation_index,
+            Some(OperationStatusType::Success),
+            AccountIdentifier::base_account(address),
+            Some(Amount {
+                value: format!("-{}", gas_used.saturating_mul(gas_price_per_unit)),
+                currency: native_coin(),
+            }),
+            None,
+        )
+    }
+
+    pub fn set_operator(
+        operation_index: u64,
+        status: Option<OperationStatusType>,
+        owner: AccountAddress,
+        old_operator: Option<AccountIdentifier>,
+        new_operator: AccountIdentifier,
+        staked_balance: Option<u64>,
+    ) -> Operation {
+        Operation::new(
+            OperationType::SetOperator,
+            operation_index,
+            status,
+            AccountIdentifier::base_account(owner),
+            None,
+            Some(OperationMetadata::set_operator(
+                old_operator,
+                new_operator,
+                staked_balance,
+            )),
+        )
+    }
+
+    pub fn set_voter(
+        operation_index: u64,
+        status: Option<OperationStatusType>,
+        owner: AccountAddress,
+        operator: Option<AccountIdentifier>,
+        new_voter: AccountIdentifier,
+    ) -> Operation {
+        Operation::new(
+            OperationType::SetVoter,
+            operation_index,
+            status,
+            AccountIdentifier::base_account(owner),
+            None,
+            Some(OperationMetadata::set_voter(operator, new_voter)),
+        )
+    }
+
+    pub fn reset_lockup(
+        operation_index: u64,
+        status: Option<OperationStatusType>,
+        owner: AccountAddress,
+        operator: Option<AccountIdentifier>,
+    ) -> Operation {
+        Operation::new(
+            OperationType::ResetLockup,
+            operation_index,
+            status,
+            AccountIdentifier::base_account(owner),
+            None,
+            Some(OperationMetadata::reset_lockup(operator)),
+        )
+    }
+
+    pub fn unlock_stake(
+        operation_index: u64,
+        status: Option<OperationStatusType>,
+        owner: AccountAddress,
+        operator: Option<AccountIdentifier>,
+        amount: Option<u64>,
+    ) -> Operation {
+        Operation::new(
+            OperationType::UnlockStake,
+            operation_index,
+            status,
+            AccountIdentifier::base_account(owner),
+            None,
+            Some(OperationMetadata::unlock_stake(operator, amount)),
+        )
+    }
+
+    pub fn distribute_staking_rewards(
+        operation_index: u64,
+        status: Option<OperationStatusType>,
+        account: AccountAddress,
+        operator: AccountIdentifier,
+        staker: AccountIdentifier,
+    ) -> Operation {
+        Operation::new(
+            OperationType::DistributeStakingRewards,
+            operation_index,
+            status,
+            AccountIdentifier::base_account(account),
+            None,
+            Some(OperationMetadata::distribute_staking_rewards(
+                operator, staker,
+            )),
+        )
+    }
+}
+
+impl std::cmp::PartialOrd for Operation {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl std::cmp::Ord for Operation {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let self_op = OperationType::from_str(&self.operation_type).ok();
+        let other_op = OperationType::from_str(&other.operation_type).ok();
+        match (self_op, other_op) {
+            (Some(self_op), Some(other_op)) => {
+                match self_op.cmp(&other_op) {
+                    // Keep the order stable if there's a difference
+                    Ordering::Equal => self
+                        .operation_identifier
+                        .index
+                        .cmp(&other.operation_identifier.index),
+                    order => order,
+                }
+            },
+            (Some(_), None) => Ordering::Less,
+            (None, Some(_)) => Ordering::Greater,
+            (None, None) => Ordering::Equal,
         }
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct OperationSpecificMetadata {
-    /// Sender for operations that affect accounts other than the sender
-    pub sender: AccountIdentifier,
+/// This object is needed for flattening all the types into a
+/// single json object used by Rosetta
+#[derive(Clone, Default, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct OperationMetadata {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sender: Option<AccountIdentifier>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub operator: Option<AccountIdentifier>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub old_operator: Option<AccountIdentifier>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub new_operator: Option<AccountIdentifier>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub new_voter: Option<AccountIdentifier>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub staked_balance: Option<U64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub commission_percentage: Option<U64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub amount: Option<U64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub staker: Option<AccountIdentifier>,
 }
 
-/// Used for query operations to apply conditions.  Defaults to [`Operator::And`] if no value is
-/// present
-///
-/// [API Spec](https://www.rosetta-api.org/docs/models/Operator.html)
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Operator {
-    And,
-    Or,
-}
+impl OperationMetadata {
+    pub fn create_account(sender: AccountAddress) -> Self {
+        OperationMetadata {
+            sender: Some(AccountIdentifier::base_account(sender)),
+            ..Default::default()
+        }
+    }
 
-impl Default for Operator {
-    fn default() -> Self {
-        Operator::And
+    pub fn set_operator(
+        old_operator: Option<AccountIdentifier>,
+        new_operator: AccountIdentifier,
+        staked_balance: Option<u64>,
+    ) -> Self {
+        OperationMetadata {
+            old_operator,
+            new_operator: Some(new_operator),
+            staked_balance: staked_balance.map(U64::from),
+            ..Default::default()
+        }
+    }
+
+    pub fn set_voter(operator: Option<AccountIdentifier>, new_voter: AccountIdentifier) -> Self {
+        OperationMetadata {
+            operator,
+            new_voter: Some(new_voter),
+            ..Default::default()
+        }
+    }
+
+    pub fn create_stake_pool(
+        new_operator: Option<AccountIdentifier>,
+        new_voter: Option<AccountIdentifier>,
+        staked_balance: Option<u64>,
+        commission_percentage: Option<u64>,
+    ) -> Self {
+        OperationMetadata {
+            new_operator,
+            new_voter,
+            staked_balance: staked_balance.map(U64::from),
+            commission_percentage: commission_percentage.map(U64::from),
+            ..Default::default()
+        }
+    }
+
+    pub fn reset_lockup(operator: Option<AccountIdentifier>) -> Self {
+        OperationMetadata {
+            operator,
+            ..Default::default()
+        }
+    }
+
+    pub fn unlock_stake(operator: Option<AccountIdentifier>, amount: Option<u64>) -> Self {
+        OperationMetadata {
+            operator,
+            amount: amount.map(U64::from),
+            ..Default::default()
+        }
+    }
+
+    pub fn distribute_staking_rewards(
+        operator: AccountIdentifier,
+        staker: AccountIdentifier,
+    ) -> Self {
+        OperationMetadata {
+            operator: Some(operator),
+            staker: Some(staker),
+            ..Default::default()
+        }
     }
 }
 
@@ -398,21 +569,6 @@ impl TryFrom<PublicKey> for Ed25519PublicKey {
     }
 }
 
-/// Related Transaction allows for connecting related transactions across shards, networks or
-/// other boundaries.
-///
-/// [API Spec](https://www.rosetta-api.org/docs/models/RelatedTransaction.html)
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct RelatedTransaction {
-    /// Network of transaction.  [`None`] means same network as original transaction
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub network_identifier: Option<NetworkIdentifier>,
-    /// Transaction identifier of the related transaction
-    pub transaction_identifier: TransactionIdentifier,
-    /// Direction of the relation (forward or backward in time)
-    pub direction: Direction,
-}
-
 /// Signature containing the signed payload and the encoded signed payload
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/models/Signature.html)
@@ -435,12 +591,7 @@ pub struct Signature {
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SignatureType {
-    Ecdsa,
-    EcdsaRecovery,
     Ed25519,
-    #[serde(rename = "schnoor_1")]
-    Schnoor1,
-    SchnoorPoseidon,
 }
 
 /// Signing payload should be signed by the client with their own private key
@@ -448,16 +599,11 @@ pub enum SignatureType {
 /// [API Spec](https://www.rosetta-api.org/docs/models/SigningPayload.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SigningPayload {
-    /// Deprecated field, replaced with account_identifier
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub address: Option<String>,
     /// Account identifier of the signer
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub account_identifier: Option<AccountIdentifier>,
+    pub account_identifier: AccountIdentifier,
     /// Hex encoded string of payload bytes to be signed
     pub hex_bytes: String,
     /// Signature type to sign with
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub signature_type: Option<SignatureType>,
 }
 
@@ -470,17 +616,15 @@ pub struct Transaction {
     pub transaction_identifier: TransactionIdentifier,
     /// Individual operations (write set changes) in a transaction
     pub operations: Vec<Operation>,
-    /// Related transactions
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub related_transactions: Option<Vec<RelatedTransaction>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<TransactionMetadata>,
+    pub metadata: TransactionMetadata,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct TransactionMetadata {
     pub transaction_type: TransactionType,
     pub version: U64,
+    pub failed: bool,
+    pub vm_status: String,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -497,93 +641,89 @@ impl Display for TransactionType {
         f.write_str(match self {
             User => "User",
             Genesis => "Genesis",
-            BlockMetadata => "BlockMetadata",
+            BlockMetadata => "BlockResource",
             StateCheckpoint => "StateCheckpoint",
         })
     }
 }
 
 impl Transaction {
-    pub async fn from_transaction(txn: aptos_rest_client::Transaction) -> ApiResult<Transaction> {
-        use aptos_rest_client::Transaction::*;
-        let (txn_type, maybe_sender, txn_info, events, maybe_payload) = match txn {
-            // Pending transactions aren't supported by Rosetta (for now)
-            PendingTransaction(_) => return Err(ApiError::TransactionIsPending),
-            UserTransaction(txn) => (
-                TransactionType::User,
-                Some(txn.request.sender),
-                txn.info,
-                txn.events,
-                Some(txn.request.payload),
-            ),
-            GenesisTransaction(txn) => (TransactionType::Genesis, None, txn.info, txn.events, None),
-            BlockMetadataTransaction(txn) => (
-                TransactionType::BlockMetadata,
-                None,
-                txn.info,
-                txn.events,
-                None,
-            ),
-            StateCheckpointTransaction(txn) => (
-                TransactionType::StateCheckpoint,
-                None,
-                txn.info,
-                vec![],
-                None,
-            ),
+    pub async fn from_transaction(
+        server_context: &RosettaContext,
+        txn: TransactionOnChainData,
+    ) -> ApiResult<Transaction> {
+        use aptos_types::transaction::Transaction::*;
+        let (txn_type, maybe_user_txn, txn_info, events) = match &txn.transaction {
+            UserTransaction(user_txn) => {
+                (TransactionType::User, Some(user_txn), txn.info, txn.events)
+            },
+            GenesisTransaction(_) => (TransactionType::Genesis, None, txn.info, txn.events),
+            BlockMetadata(_) => (TransactionType::BlockMetadata, None, txn.info, txn.events),
+            StateCheckpoint(_) => (TransactionType::StateCheckpoint, None, txn.info, vec![]),
         };
 
         // Operations must be sequential and operation index must always be in the same order
         // with no gaps
+        let successful = txn_info.status().is_success();
         let mut operations = vec![];
         let mut operation_index: u64 = 0;
-        if txn_info.success {
+        if successful {
             // Parse all operations from the writeset changes in a success
-            for change in &txn_info.changes {
+            for (state_key, write_op) in &txn.changes {
                 let mut ops = parse_operations_from_write_set(
-                    change,
+                    server_context,
+                    state_key,
+                    write_op,
                     &events,
-                    &maybe_sender,
+                    maybe_user_txn.map(|inner| inner.sender()),
+                    maybe_user_txn.map(|inner| inner.payload()),
+                    txn.version,
                     operation_index,
-                );
+                    &txn.changes,
+                )
+                .await?;
                 operation_index += ops.len() as u64;
                 operations.append(&mut ops);
             }
         } else {
             // Parse all failed operations from the payload
-            if let Some(sender) = maybe_sender {
-                if let Some(payload) = maybe_payload {
-                    let mut ops = parse_operations_from_txn_payload(
-                        operation_index,
-                        *sender.inner(),
-                        payload,
-                    );
-                    operation_index += ops.len() as u64;
-                    operations.append(&mut ops);
-                }
+            if let Some(user_txn) = maybe_user_txn {
+                let mut ops = parse_failed_operations_from_txn_payload(
+                    operation_index,
+                    user_txn.sender(),
+                    user_txn.payload(),
+                );
+                operation_index += ops.len() as u64;
+                operations.append(&mut ops);
             }
         };
 
+        // Reorder operations by type so that there's no invalid ordering
+        // (Create before transfer) (Withdraw before deposit)
+        operations.sort();
+        for (i, operation) in operations.iter_mut().enumerate() {
+            operation.operation_identifier.index = i as u64;
+        }
+
         // Everything committed costs gas
-        if let Some(sender) = maybe_sender {
-            operations.push(Operation::withdraw(
+        if let Some(txn) = maybe_user_txn {
+            operations.push(Operation::gas_fee(
                 operation_index,
-                // Gas charging is always successful if it's been committed
-                Some(OperationStatusType::Success),
-                *sender.inner(),
-                native_coin(),
-                txn_info.gas_used.0,
+                txn.sender(),
+                txn_info.gas_used(),
+                txn.gas_unit_price(),
             ));
         }
 
         Ok(Transaction {
             transaction_identifier: (&txn_info).into(),
             operations,
-            related_transactions: None,
-            metadata: Some(TransactionMetadata {
+            metadata: TransactionMetadata {
                 transaction_type: txn_type,
-                version: txn_info.version,
-            }),
+                version: txn.version.into(),
+                failed: !successful,
+                vm_status: format!("{:?}", txn_info.status()),
+            },
         })
     }
 }
@@ -592,66 +732,171 @@ impl Transaction {
 ///
 /// This case only occurs if the transaction failed, and that's because it's less accurate
 /// than just following the state changes
-fn parse_operations_from_txn_payload(
+fn parse_failed_operations_from_txn_payload(
     operation_index: u64,
     sender: AccountAddress,
-    payload: TransactionPayload,
+    payload: &TransactionPayload,
 ) -> Vec<Operation> {
     let mut operations = vec![];
-    if let TransactionPayload::ScriptFunctionPayload(inner) = payload {
-        if AccountAddress::ONE == *inner.function.module.address.inner()
-            && coin_module_identifier() == inner.function.module.name.0
-            && transfer_function_identifier() == inner.function.name.0
-        {
-            if let Some(MoveType::Struct(MoveStructTag {
-                address,
-                module,
-                name,
-                ..
-            })) = inner.type_arguments.first()
-            {
-                if *address.inner() == AccountAddress::ONE
-                    && module.0 == aptos_coin_module_identifier()
-                    && name.0 == aptos_coin_resource_identifier()
+    if let TransactionPayload::EntryFunction(inner) = payload {
+        match (
+            *inner.module().address(),
+            inner.module().name().as_str(),
+            inner.function().as_str(),
+        ) {
+            (AccountAddress::ONE, COIN_MODULE, TRANSFER_FUNCTION) => {
+                // Only put the transfer in if we can understand the currency
+                if let Some(type_tag) = inner.ty_args().first() {
+                    // We don't want to do lookups on failures for currencies that don't exist,
+                    // so we only look up cached info not new info
+                    // TODO: If other coins are supported, this will need to be updated to handle more coins
+                    if type_tag == &native_coin_tag() {
+                        operations = parse_transfer_from_txn_payload(
+                            inner,
+                            native_coin(),
+                            sender,
+                            operation_index,
+                        )
+                    }
+                }
+            },
+            (AccountAddress::ONE, APTOS_ACCOUNT_MODULE, TRANSFER_FUNCTION) => {
+                // We could add a create here as well, but we don't know if it will actually happen
+                operations =
+                    parse_transfer_from_txn_payload(inner, native_coin(), sender, operation_index)
+            },
+            (AccountAddress::ONE, ACCOUNT_MODULE, CREATE_ACCOUNT_FUNCTION) => {
+                if let Some(Ok(address)) = inner
+                    .args()
+                    .get(0)
+                    .map(|encoded| bcs::from_bytes::<AccountAddress>(encoded))
                 {
-                    let receiver =
-                        serde_json::from_value::<Address>(inner.arguments.get(0).cloned().unwrap())
-                            .unwrap();
-                    let amount =
-                        serde_json::from_value::<U64>(inner.arguments.get(1).cloned().unwrap())
-                            .unwrap()
-                            .0;
-                    operations.push(Operation::withdraw(
+                    operations.push(Operation::create_account(
                         operation_index,
                         Some(OperationStatusType::Failure),
+                        address,
                         sender,
-                        native_coin(),
-                        amount,
                     ));
-                    operations.push(Operation::deposit(
-                        operation_index + 1,
-                        Some(OperationStatusType::Failure),
-                        receiver.into(),
-                        native_coin(),
-                        amount,
-                    ));
+                } else {
+                    warn!("Failed to parse create account {:?}", inner);
                 }
-            }
-        } else if AccountAddress::ONE == *inner.function.module.address.inner()
-            && account_module_identifier() == inner.function.module.name.0
-            && create_account_function_identifier() == inner.function.name.0
-        {
-            let address =
-                serde_json::from_value::<Address>(inner.arguments.get(0).cloned().unwrap())
-                    .unwrap();
-            operations.push(Operation::create_account(
-                operation_index,
-                Some(OperationStatusType::Failure),
-                address.into(),
-                sender,
-            ));
+            },
+            (
+                AccountAddress::ONE,
+                STAKING_CONTRACT_MODULE,
+                SWITCH_OPERATOR_WITH_SAME_COMMISSION_FUNCTION,
+            ) => {
+                if let Ok(mut ops) =
+                    parse_set_operator_operation(sender, inner.ty_args(), inner.args())
+                {
+                    if let Some(operation) = ops.get_mut(0) {
+                        operation.status = Some(OperationStatusType::Failure.to_string());
+                    }
+                } else {
+                    warn!("Failed to parse set operator {:?}", inner);
+                }
+            },
+            (AccountAddress::ONE, STAKING_CONTRACT_MODULE, UPDATE_VOTER_FUNCTION) => {
+                if let Ok(mut ops) =
+                    parse_set_voter_operation(sender, inner.ty_args(), inner.args())
+                {
+                    if let Some(operation) = ops.get_mut(0) {
+                        operation.status = Some(OperationStatusType::Failure.to_string());
+                    }
+                } else {
+                    warn!("Failed to parse set voter {:?}", inner);
+                }
+            },
+            (AccountAddress::ONE, STAKING_CONTRACT_MODULE, RESET_LOCKUP_FUNCTION) => {
+                if let Ok(mut ops) =
+                    parse_reset_lockup_operation(sender, inner.ty_args(), inner.args())
+                {
+                    if let Some(operation) = ops.get_mut(0) {
+                        operation.status = Some(OperationStatusType::Failure.to_string());
+                    }
+                } else {
+                    warn!("Failed to parse reset lockup {:?}", inner);
+                }
+            },
+            (AccountAddress::ONE, STAKING_CONTRACT_MODULE, CREATE_STAKING_CONTRACT_FUNCTION) => {
+                if let Ok(mut ops) =
+                    parse_create_stake_pool_operation(sender, inner.ty_args(), inner.args())
+                {
+                    if let Some(operation) = ops.get_mut(0) {
+                        operation.status = Some(OperationStatusType::Failure.to_string());
+                    }
+                } else {
+                    warn!("Failed to parse create staking pool {:?}", inner);
+                }
+            },
+            (AccountAddress::ONE, STAKING_CONTRACT_MODULE, UNLOCK_STAKE_FUNCTION) => {
+                if let Ok(mut ops) =
+                    parse_unlock_stake_operation(sender, inner.ty_args(), inner.args())
+                {
+                    if let Some(operation) = ops.get_mut(0) {
+                        operation.status = Some(OperationStatusType::Failure.to_string());
+                    }
+                } else {
+                    warn!("Failed to parse unlock stake {:?}", inner);
+                }
+            },
+            (AccountAddress::ONE, STAKING_CONTRACT_MODULE, DISTRIBUTE_STAKING_REWARDS_FUNCTION) => {
+                if let Ok(mut ops) = parse_distribute_staking_rewards_operation(
+                    sender,
+                    inner.ty_args(),
+                    inner.args(),
+                ) {
+                    if let Some(operation) = ops.get_mut(0) {
+                        operation.status = Some(OperationStatusType::Failure.to_string());
+                    }
+                } else {
+                    warn!("Failed to parse distribute staking rewards {:?}", inner);
+                }
+            },
+            _ => {
+                // If we don't recognize the transaction payload, then we can't parse operations
+            },
         }
     }
+    operations
+}
+
+fn parse_transfer_from_txn_payload(
+    payload: &EntryFunction,
+    currency: Currency,
+    sender: AccountAddress,
+    operation_index: u64,
+) -> Vec<Operation> {
+    let mut operations = vec![];
+
+    let args = payload.args();
+    let maybe_receiver = args
+        .get(0)
+        .map(|encoded| bcs::from_bytes::<AccountAddress>(encoded));
+    let maybe_amount = args.get(1).map(|encoded| bcs::from_bytes::<u64>(encoded));
+
+    if let (Some(Ok(receiver)), Some(Ok(amount))) = (maybe_receiver, maybe_amount) {
+        operations.push(Operation::withdraw(
+            operation_index,
+            Some(OperationStatusType::Failure),
+            AccountIdentifier::base_account(sender),
+            currency.clone(),
+            amount,
+        ));
+        operations.push(Operation::deposit(
+            operation_index + 1,
+            Some(OperationStatusType::Failure),
+            AccountIdentifier::base_account(receiver),
+            currency,
+            amount,
+        ));
+    } else {
+        warn!(
+            "Failed to parse account's {} transfer {:?}",
+            sender, payload
+        );
+    }
+
     operations
 }
 
@@ -659,104 +904,555 @@ fn parse_operations_from_txn_payload(
 ///
 /// This can only be done during a successful transaction because there are actual state changes.
 /// It is more accurate because untracked scripts are included in balance operations
-fn parse_operations_from_write_set(
-    change: &WriteSetChange,
-    events: &[Event],
-    maybe_sender: &Option<Address>,
-    mut operation_index: u64,
-) -> Vec<Operation> {
-    let mut operations = vec![];
-    if let WriteSetChange::WriteResource(WriteResource { address, data, .. }) = change {
-        // Determine operation
-        let address = *address.inner();
-        let account_tag = MoveStructTag::new(
-            AccountAddress::ONE.into(),
-            account_module_identifier().into(),
-            account_resource_identifier().into(),
-            vec![],
-        );
-        let coin_store_tag = MoveStructTag::new(
-            AccountAddress::ONE.into(),
-            coin_module_identifier().into(),
-            coin_store_resource_identifier().into(),
-            vec![native_coin_tag().into()],
-        );
+async fn parse_operations_from_write_set(
+    server_context: &RosettaContext,
+    state_key: &StateKey,
+    write_op: &WriteOp,
+    events: &[ContractEvent],
+    maybe_sender: Option<AccountAddress>,
+    _maybe_payload: Option<&TransactionPayload>,
+    version: u64,
+    operation_index: u64,
+    changes: &WriteSet,
+) -> ApiResult<Vec<Operation>> {
+    let (struct_tag, address) = match state_key.inner() {
+        StateKeyInner::AccessPath(path) => {
+            if let Some(struct_tag) = path.get_struct_tag() {
+                (struct_tag, path.address)
+            } else {
+                return Ok(vec![]);
+            }
+        },
+        _ => {
+            // Ignore all but access path
+            return Ok(vec![]);
+        },
+    };
 
-        if data.typ == account_tag {
-            // Account sequence number increase (possibly creation)
-            // Find out if it's the 0th sequence number (creation)
-            for (id, value) in data.data.0.iter() {
-                if id.0 == sequence_number_field_identifier() {
-                    if let Ok(U64(0)) = serde_json::from_value::<U64>(value.clone()) {
-                        operations.push(Operation::create_account(
-                            operation_index,
-                            Some(OperationStatusType::Success),
-                            address,
-                            maybe_sender
-                                .map(|inner| *inner.inner())
-                                .unwrap_or(AccountAddress::ONE),
-                        ));
-                        operation_index += 1;
+    let data = match write_op.bytes() {
+        Some(bytes) => bytes,
+        None => return Ok(vec![]),
+    };
+
+    // Determine operation
+    match (
+        struct_tag.address,
+        struct_tag.module.as_str(),
+        struct_tag.name.as_str(),
+        struct_tag.type_params.len(),
+    ) {
+        (AccountAddress::ONE, ACCOUNT_MODULE, ACCOUNT_RESOURCE, 0) => {
+            parse_account_resource_changes(version, address, data, maybe_sender, operation_index)
+        },
+        (AccountAddress::ONE, STAKE_MODULE, STAKE_POOL_RESOURCE, 0) => {
+            parse_stake_pool_resource_changes(
+                server_context,
+                version,
+                address,
+                data,
+                events,
+                operation_index,
+            )
+        },
+        (AccountAddress::ONE, STAKING_CONTRACT_MODULE, STORE_RESOURCE, 0) => {
+            parse_staking_contract_resource_changes(address, data, events, operation_index, changes)
+                .await
+        },
+        (AccountAddress::ONE, COIN_MODULE, COIN_STORE_RESOURCE, 1) => {
+            if let Some(type_tag) = struct_tag.type_params.first() {
+                // TODO: This will need to be updated to support more coins
+                if type_tag == &native_coin_tag() {
+                    parse_coinstore_changes(
+                        native_coin(),
+                        version,
+                        address,
+                        data,
+                        events,
+                        operation_index,
+                    )
+                    .await
+                } else {
+                    Ok(vec![])
+                }
+            } else {
+                warn!(
+                    "Failed to parse coinstore {} at version {}",
+                    struct_tag, version
+                );
+                Ok(vec![])
+            }
+        },
+        _ => {
+            // Any unknown type will just skip the operations
+            Ok(vec![])
+        },
+    }
+}
+
+fn parse_account_resource_changes(
+    version: u64,
+    address: AccountAddress,
+    data: &[u8],
+    maybe_sender: Option<AccountAddress>,
+    operation_index: u64,
+) -> ApiResult<Vec<Operation>> {
+    // TODO: Handle key rotation
+    let mut operations = Vec::new();
+    if let Ok(account) = bcs::from_bytes::<AccountResource>(data) {
+        // Account sequence number increase (possibly creation)
+        // Find out if it's the 0th sequence number (creation)
+        if 0 == account.sequence_number() {
+            operations.push(Operation::create_account(
+                operation_index,
+                Some(OperationStatusType::Success),
+                address,
+                maybe_sender.unwrap_or(AccountAddress::ONE),
+            ));
+        }
+    } else {
+        warn!(
+            "Failed to parse AccountResource for {} at version {}",
+            address, version
+        );
+    }
+
+    Ok(operations)
+}
+
+fn parse_stake_pool_resource_changes(
+    _server_context: &RosettaContext,
+    _version: u64,
+    _pool_address: AccountAddress,
+    _data: &[u8],
+    _events: &[ContractEvent],
+    _operation_index: u64,
+) -> ApiResult<Vec<Operation>> {
+    let operations = Vec::new();
+
+    // We at this point only care about balance changes from the stake pool
+    // TODO: Balance changes are not supported for staking at this time
+    /*    if let Some(owner_address) = server_context.pool_address_to_owner.get(&pool_address) {
+            if let Ok(stakepool) = bcs::from_bytes::<StakePool>(data) {
+                let total_stake_account = AccountIdentifier::total_stake_account(*owner_address);
+                let operator_stake_account = AccountIdentifier::operator_stake_account(
+                    *owner_address,
+                    stakepool.operator_address,
+                );
+
+                // Retrieve add stake events
+                let add_stake_events = filter_events(
+                    events,
+                    stakepool.add_stake_events.key(),
+                    |event_key, event| {
+                        if let Ok(event) = bcs::from_bytes::<aptos_types::stake_pool::AddStakeEvent>(
+                            event.event_data(),
+                        ) {
+                            Some(event)
+                        } else {
+                            warn!(
+                                "Failed to parse add stake event!  Skipping for {}:{}",
+                                event_key.get_creator_address(),
+                                event_key.get_creation_number()
+                            );
+                            None
+                        }
+                    },
+                );
+
+                // For every stake event, we distribute to the two sub balances.  The withdrawal from the account
+                // is handled in coin
+                for event in add_stake_events {
+                    operations.push(Operation::deposit(
+                        operation_index,
+                        Some(OperationStatusType::Success),
+                        total_stake_account.clone(),
+                        native_coin(),
+                        event.amount_added,
+                    ));
+                    operation_index += 1;
+                    operations.push(Operation::deposit(
+                        operation_index,
+                        Some(OperationStatusType::Success),
+                        operator_stake_account.clone(),
+                        native_coin(),
+                        event.amount_added,
+                    ));
+                    operation_index += 1;
+                }
+
+                // Retrieve withdraw stake events
+                let withdraw_stake_events = filter_events(
+                    events,
+                    stakepool.withdraw_stake_events.key(),
+                    |event_key, event| {
+                        if let Ok(event) = bcs::from_bytes::<WithdrawStakeEvent>(event.event_data()) {
+                            Some(event)
+                        } else {
+                            warn!(
+                                "Failed to parse withdraw stake event!  Skipping for {}:{}",
+                                event_key.get_creator_address(),
+                                event_key.get_creation_number()
+                            );
+                            None
+                        }
+                    },
+                );
+
+                // For every withdraw event, we have to remove the amounts from the stake pools
+                for event in withdraw_stake_events {
+                    operations.push(Operation::withdraw(
+                        operation_index,
+                        Some(OperationStatusType::Success),
+                        total_stake_account.clone(),
+                        native_coin(),
+                        event.amount_withdrawn,
+                    ));
+                    operation_index += 1;
+                    operations.push(Operation::withdraw(
+                        operation_index,
+                        Some(OperationStatusType::Success),
+                        operator_stake_account.clone(),
+                        native_coin(),
+                        event.amount_withdrawn,
+                    ));
+                    operation_index += 1;
+                }
+
+                // Retrieve staking rewards events
+                let distribute_rewards_events = filter_events(
+                    events,
+                    stakepool.distribute_rewards_events.key(),
+                    |event_key, event| {
+                        if let Ok(event) = bcs::from_bytes::<DistributeRewardsEvent>(event.event_data())
+                        {
+                            Some(event)
+                        } else {
+                            warn!(
+                                "Failed to parse distribute rewards event!  Skipping for {}:{}",
+                                event_key.get_creator_address(),
+                                event_key.get_creation_number()
+                            );
+                            None
+                        }
+                    },
+                );
+
+                // For every distribute rewards events, add to the staking pools
+                for event in distribute_rewards_events {
+                    operations.push(Operation::staking_reward(
+                        operation_index,
+                        Some(OperationStatusType::Success),
+                        total_stake_account.clone(),
+                        native_coin(),
+                        event.rewards_amount,
+                    ));
+                    operation_index += 1;
+                    operations.push(Operation::staking_reward(
+                        operation_index,
+                        Some(OperationStatusType::Success),
+                        operator_stake_account.clone(),
+                        native_coin(),
+                        event.rewards_amount,
+                    ));
+                    operation_index += 1;
+                }
+
+                // Set voter has to be done at the `staking_contract` because there's no event for it here...
+
+                // Handle set operator events
+                let set_operator_events = filter_events(
+                    events,
+                    stakepool.set_operator_events.key(),
+                    |event_key, event| {
+                        if let Ok(event) = bcs::from_bytes::<aptos_types::stake_pool::SetOperatorEvent>(
+                            event.event_data(),
+                        ) {
+                            Some(event)
+                        } else {
+                            // If we can't parse the withdraw event, then there's nothing
+                            warn!(
+                                "Failed to parse set operator event!  Skipping for {}:{}",
+                                event_key.get_creator_address(),
+                                event_key.get_creation_number()
+                            );
+                            None
+                        }
+                    },
+                );
+
+                // For every set operator event, change the operator, and transfer the money between them
+                // We do this after balance transfers so the balance changes are easier
+                let final_staked_amount = stakepool.get_total_staked_amount();
+                for event in set_operator_events {
+                    operations.push(Operation::set_operator(
+                        operation_index,
+                        Some(OperationStatusType::Success),
+                        *owner_address,
+                        Some(AccountIdentifier::base_account(event.old_operator)),
+                        AccountIdentifier::base_account(event.new_operator),
+                    ));
+                    operation_index += 1;
+
+                    let old_operator_account =
+                        AccountIdentifier::operator_stake_account(*owner_address, event.old_operator);
+                    operations.push(Operation::withdraw(
+                        operation_index,
+                        Some(OperationStatusType::Success),
+                        old_operator_account,
+                        native_coin(),
+                        final_staked_amount,
+                    ));
+                    operation_index += 1;
+                    let new_operator_account =
+                        AccountIdentifier::operator_stake_account(*owner_address, event.old_operator);
+                    operations.push(Operation::deposit(
+                        operation_index,
+                        Some(OperationStatusType::Success),
+                        new_operator_account,
+                        native_coin(),
+                        final_staked_amount,
+                    ));
+                    operation_index += 1;
+                }
+            } else {
+                warn!(
+                    "Failed to parse stakepool for {} at version {}",
+                    pool_address, version
+                );
+            }
+        }
+    */
+    Ok(operations)
+}
+
+async fn parse_staking_contract_resource_changes(
+    owner_address: AccountAddress,
+    data: &[u8],
+    events: &[ContractEvent],
+    mut operation_index: u64,
+    changes: &WriteSet,
+) -> ApiResult<Vec<Operation>> {
+    let mut operations = Vec::new();
+
+    // This only handles the voter events from the staking contract
+    // If there are direct events on the pool, they will be ignored
+    if let Ok(store) = bcs::from_bytes::<Store>(data) {
+        // Collect all the stake pools that were created
+        let stake_pools: BTreeMap<AccountAddress, StakePool> = changes
+            .iter()
+            .filter_map(|(state_key, write_op)| {
+                let data = write_op.bytes();
+
+                let mut ret = None;
+                if let (StateKeyInner::AccessPath(path), Some(data)) = (state_key.inner(), data) {
+                    if let Some(struct_tag) = path.get_struct_tag() {
+                        if let (AccountAddress::ONE, STAKE_MODULE, STAKE_POOL_RESOURCE) = (
+                            struct_tag.address,
+                            struct_tag.module.as_str(),
+                            struct_tag.name.as_str(),
+                        ) {
+                            if let Ok(pool) = bcs::from_bytes::<StakePool>(data) {
+                                ret = Some((path.address, pool))
+                            }
+                        }
                     }
                 }
-            }
-        } else if data.typ == coin_store_tag {
-            // Account balance change
-            for (id, value) in data.data.0.iter() {
-                if id.0 == withdraw_events_field_identifier() {
-                    serde_json::from_value::<CoinEventId>(value.clone()).unwrap();
-                    if let Ok(event) = serde_json::from_value::<CoinEventId>(value.clone()) {
-                        let withdraw_event =
-                            EventKey::new(event.guid.id.creation_num.0, event.guid.id.addr);
-                        if let Some(amount) = get_amount_from_event(events, withdraw_event) {
-                            operations.push(Operation::withdraw(
-                                operation_index,
-                                Some(OperationStatusType::Success),
-                                address,
-                                native_coin(),
-                                amount,
-                            ));
-                            operation_index += 1;
+
+                ret
+            })
+            .collect();
+
+        // Collect all operator events for all the stake pools, and add the total stake
+        let mut set_operator_operations = vec![];
+        let mut total_stake = 0;
+        for (operator, staking_contract) in store.staking_contracts {
+            if let Some(stake_pool) = stake_pools.get(&staking_contract.pool_address) {
+                // Skip mismatched operators
+                if operator != stake_pool.operator_address {
+                    continue;
+                }
+                total_stake += stake_pool.get_total_staked_amount();
+
+                // Get all set operator events for this stake pool
+                let set_operator_events = filter_events(
+                    events,
+                    stake_pool.set_operator_events.key(),
+                    |event_key, event| {
+                        if let Ok(event) = bcs::from_bytes::<SetOperatorEvent>(event.event_data()) {
+                            Some(event)
+                        } else {
+                            // If we can't parse the withdraw event, then there's nothing
+                            warn!(
+                                "Failed to parse set operator event!  Skipping for {}:{}",
+                                event_key.get_creator_address(),
+                                event_key.get_creation_number()
+                            );
+                            None
                         }
-                    }
-                } else if id.0 == deposit_events_field_identifier() {
-                    serde_json::from_value::<CoinEventId>(value.clone()).unwrap();
-                    if let Ok(event) = serde_json::from_value::<CoinEventId>(value.clone()) {
-                        let withdraw_event =
-                            EventKey::new(event.guid.id.creation_num.0, event.guid.id.addr);
-                        if let Some(amount) = get_amount_from_event(events, withdraw_event) {
-                            operations.push(Operation::deposit(
-                                operation_index,
-                                Some(OperationStatusType::Success),
-                                address,
-                                native_coin(),
-                                amount,
-                            ));
-                            operation_index += 1;
-                        }
-                    }
+                    },
+                );
+
+                for event in set_operator_events.iter() {
+                    set_operator_operations.push(Operation::set_operator(
+                        operation_index,
+                        Some(OperationStatusType::Success),
+                        owner_address,
+                        Some(AccountIdentifier::base_account(event.old_operator)),
+                        AccountIdentifier::base_account(event.new_operator),
+                        None,
+                    ));
+                    operation_index += 1;
                 }
             }
         }
+
+        // Handle set voter events, there are no events on the stake pool
+        let set_voter_events = filter_events(
+            events,
+            store.update_voter_events.key(),
+            |event_key, event| {
+                if let Ok(event) = bcs::from_bytes::<UpdateVoterEvent>(event.event_data()) {
+                    Some(event)
+                } else {
+                    // If we can't parse the withdraw event, then there's nothing
+                    warn!(
+                        "Failed to parse update voter event!  Skipping for {}:{}",
+                        event_key.get_creator_address(),
+                        event_key.get_creation_number()
+                    );
+                    None
+                }
+            },
+        );
+
+        // Parse all set voter events
+        for event in set_voter_events {
+            operations.push(Operation::set_voter(
+                operation_index,
+                Some(OperationStatusType::Success),
+                owner_address,
+                Some(AccountIdentifier::base_account(event.operator)),
+                AccountIdentifier::base_account(event.new_voter),
+            ));
+            operation_index += 1;
+        }
+
+        // Attach all set operators now, but with the total stake listed
+        for mut operation in set_operator_operations.into_iter() {
+            if let Some(inner) = operation.metadata.as_mut() {
+                inner.staked_balance = Some(total_stake.into())
+            }
+            operations.push(operation);
+        }
+
+        // Handle distribute events, there are no events on the stake pool
+        let distribute_staking_rewards_events =
+            filter_events(events, store.distribute_events.key(), |event_key, event| {
+                if let Ok(event) = bcs::from_bytes::<DistributeEvent>(event.event_data()) {
+                    Some(event)
+                } else {
+                    // If we can't parse the withdraw event, then there's nothing
+                    warn!(
+                        "Failed to parse distribute event!  Skipping for {}:{}",
+                        event_key.get_creator_address(),
+                        event_key.get_creation_number()
+                    );
+                    None
+                }
+            });
+
+        // For every distribute events, add staking reward operation
+        for event in distribute_staking_rewards_events {
+            operations.push(Operation::staking_reward(
+                operation_index,
+                Some(OperationStatusType::Success),
+                AccountIdentifier::base_account(event.recipient),
+                native_coin(),
+                event.amount,
+            ));
+            operation_index += 1;
+        }
     }
 
-    operations
+    Ok(operations)
+}
+async fn parse_coinstore_changes(
+    currency: Currency,
+    version: u64,
+    address: AccountAddress,
+    data: &[u8],
+    events: &[ContractEvent],
+    mut operation_index: u64,
+) -> ApiResult<Vec<Operation>> {
+    let coin_store: CoinStoreResource = if let Ok(coin_store) = bcs::from_bytes(data) {
+        coin_store
+    } else {
+        warn!(
+            "Coin store failed to parse for coin type {:?} and address {} at version {}",
+            currency, address, version
+        );
+        return Ok(vec![]);
+    };
+
+    let mut operations = vec![];
+
+    // Skip if there is no currency that can be found
+    let withdraw_amounts = get_amount_from_event(events, coin_store.withdraw_events().key());
+    for amount in withdraw_amounts {
+        operations.push(Operation::withdraw(
+            operation_index,
+            Some(OperationStatusType::Success),
+            AccountIdentifier::base_account(address),
+            currency.clone(),
+            amount,
+        ));
+        operation_index += 1;
+    }
+
+    let deposit_amounts = get_amount_from_event(events, coin_store.deposit_events().key());
+    for amount in deposit_amounts {
+        operations.push(Operation::deposit(
+            operation_index,
+            Some(OperationStatusType::Success),
+            AccountIdentifier::base_account(address),
+            currency.clone(),
+            amount,
+        ));
+        operation_index += 1;
+    }
+
+    Ok(operations)
 }
 
 /// Pulls the balance change from a withdraw or deposit event
-fn get_amount_from_event(events: &[Event], event_key: EventKey) -> Option<u64> {
-    if let Some(event) = events
-        .iter()
-        .find(|event| EventKey::from(event.key) == event_key)
-    {
-        if let Ok(CoinEvent { amount }) = serde_json::from_value::<CoinEvent>(event.data.clone()) {
-            return Some(amount.0);
+fn get_amount_from_event(events: &[ContractEvent], event_key: &EventKey) -> Vec<u64> {
+    filter_events(events, event_key, |event_key, event| {
+        if let Ok(event) = bcs::from_bytes::<WithdrawEvent>(event.event_data()) {
+            Some(event.amount())
+        } else {
+            // If we can't parse the withdraw event, then there's nothing
+            warn!(
+                "Failed to parse coin store withdraw event!  Skipping for {}:{}",
+                event_key.get_creator_address(),
+                event_key.get_creation_number()
+            );
+            None
         }
-    }
-
-    None
+    })
 }
 
+fn filter_events<F: Fn(&EventKey, &ContractEvent) -> Option<T>, T>(
+    events: &[ContractEvent],
+    event_key: &EventKey,
+    parser: F,
+) -> Vec<T> {
+    events
+        .iter()
+        .filter(|event| event.key() == event_key)
+        .sorted_by(|a, b| a.sequence_number().cmp(&b.sequence_number()))
+        .filter_map(|event| parser(event_key, event))
+        .collect()
+}
 /// An enum for processing which operation is in a transaction
 pub enum OperationDetails {
     CreateAccount,
@@ -773,6 +1469,12 @@ pub enum OperationDetails {
 pub enum InternalOperation {
     CreateAccount(CreateAccount),
     Transfer(Transfer),
+    SetOperator(SetOperator),
+    SetVoter(SetVoter),
+    InitializeStakePool(InitializeStakePool),
+    ResetLockup(ResetLockup),
+    UnlockStake(UnlockStake),
+    DistributeStakingRewards(DistributeStakingRewards),
 }
 
 impl InternalOperation {
@@ -781,22 +1483,176 @@ impl InternalOperation {
         match operations.len() {
             1 => {
                 if let Some(operation) = operations.first() {
-                    if operation.operation_type == OperationType::CreateAccount.to_string() {
-                        if let (Some(OperationSpecificMetadata { sender }), Some(account)) =
-                            (&operation.metadata, &operation.account)
-                        {
-                            return Ok(Self::CreateAccount(CreateAccount {
-                                sender: sender.account_address()?,
-                                new_account: account.account_address()?,
-                            }));
-                        }
+                    match OperationType::from_str(&operation.operation_type) {
+                        Ok(OperationType::InitializeStakePool) => {
+                            if let (
+                                Some(OperationMetadata {
+                                    new_operator,
+                                    new_voter,
+                                    staked_balance,
+                                    commission_percentage,
+                                    ..
+                                }),
+                                Some(account),
+                            ) = (&operation.metadata, &operation.account)
+                            {
+                                let owner_address = account.account_address()?;
+                                let operator_address = if let Some(address) = new_operator {
+                                    address.account_address()?
+                                } else {
+                                    owner_address
+                                };
+                                let voter_address = if let Some(address) = new_voter {
+                                    address.account_address()?
+                                } else {
+                                    owner_address
+                                };
+
+                                return Ok(Self::InitializeStakePool(InitializeStakePool {
+                                    owner: owner_address,
+                                    operator: operator_address,
+                                    voter: voter_address,
+                                    amount: staked_balance.map(u64::from).unwrap_or_default(),
+                                    commission_percentage: commission_percentage
+                                        .map(u64::from)
+                                        .unwrap_or_default(),
+                                    seed: vec![],
+                                }));
+                            }
+                        },
+                        Ok(OperationType::CreateAccount) => {
+                            if let (
+                                Some(OperationMetadata {
+                                    sender: Some(sender),
+                                    ..
+                                }),
+                                Some(account),
+                            ) = (&operation.metadata, &operation.account)
+                            {
+                                return Ok(Self::CreateAccount(CreateAccount {
+                                    sender: sender.account_address()?,
+                                    new_account: account.account_address()?,
+                                }));
+                            }
+                        },
+                        Ok(OperationType::SetOperator) => {
+                            if let (
+                                Some(OperationMetadata {
+                                    old_operator,
+                                    new_operator: Some(new_operator),
+                                    ..
+                                }),
+                                Some(account),
+                            ) = (&operation.metadata, &operation.account)
+                            {
+                                let old_operator = if let Some(old_operator) = old_operator {
+                                    Some(old_operator.account_address()?)
+                                } else {
+                                    None
+                                };
+
+                                return Ok(Self::SetOperator(SetOperator {
+                                    owner: account.account_address()?,
+                                    old_operator,
+                                    new_operator: new_operator.account_address()?,
+                                }));
+                            }
+                        },
+                        Ok(OperationType::SetVoter) => {
+                            if let (
+                                Some(OperationMetadata {
+                                    operator,
+                                    new_voter: Some(new_voter),
+                                    ..
+                                }),
+                                Some(account),
+                            ) = (&operation.metadata, &operation.account)
+                            {
+                                let operator = if let Some(operator) = operator {
+                                    Some(operator.account_address()?)
+                                } else {
+                                    None
+                                };
+                                return Ok(Self::SetVoter(SetVoter {
+                                    owner: account.account_address()?,
+                                    operator,
+                                    new_voter: new_voter.account_address()?,
+                                }));
+                            }
+                        },
+                        Ok(OperationType::ResetLockup) => {
+                            if let (Some(OperationMetadata { operator, .. }), Some(account)) =
+                                (&operation.metadata, &operation.account)
+                            {
+                                let operator = if let Some(operator) = operator {
+                                    operator.account_address()?
+                                } else {
+                                    return Err(ApiError::InvalidInput(Some(
+                                        "Reset lockup missing operator field".to_string(),
+                                    )));
+                                };
+                                return Ok(Self::ResetLockup(ResetLockup {
+                                    owner: account.account_address()?,
+                                    operator,
+                                }));
+                            }
+                        },
+                        Ok(OperationType::UnlockStake) => {
+                            if let (
+                                Some(OperationMetadata {
+                                    operator, amount, ..
+                                }),
+                                Some(account),
+                            ) = (&operation.metadata, &operation.account)
+                            {
+                                let operator = if let Some(operator) = operator {
+                                    operator.account_address()?
+                                } else {
+                                    return Err(ApiError::InvalidInput(Some(
+                                        "Unlock Stake missing operator field".to_string(),
+                                    )));
+                                };
+                                return Ok(Self::UnlockStake(UnlockStake {
+                                    owner: account.account_address()?,
+                                    operator,
+                                    amount: amount.map(u64::from).unwrap_or_default(),
+                                }));
+                            }
+                        },
+                        Ok(OperationType::DistributeStakingRewards) => {
+                            if let (
+                                Some(OperationMetadata {
+                                    operator: Some(operator),
+                                    staker: Some(staker),
+                                    ..
+                                }),
+                                Some(account),
+                            ) = (&operation.metadata, &operation.account)
+                            {
+                                return Ok(Self::DistributeStakingRewards(
+                                    DistributeStakingRewards {
+                                        sender: account.account_address()?,
+                                        operator: operator.account_address()?,
+                                        staker: staker.account_address()?,
+                                    },
+                                ));
+                            }
+                        },
+                        _ => {},
                     }
                 }
 
-                Err(ApiError::InvalidOperations)
-            }
+                // Return invalid operations if for any reason parsing fails
+                Err(ApiError::InvalidOperations(Some(format!(
+                    "Unrecognized single operation {:?}",
+                    operations
+                ))))
+            },
             2 => Ok(Self::Transfer(Transfer::extract_transfer(operations)?)),
-            _ => Err(ApiError::InvalidOperations),
+            _ => Err(ApiError::InvalidOperations(Some(format!(
+                "Unrecognized operation combination {:?}",
+                operations
+            )))),
         }
     }
 
@@ -805,7 +1661,87 @@ impl InternalOperation {
         match self {
             Self::CreateAccount(inner) => inner.sender,
             Self::Transfer(inner) => inner.sender,
+            Self::SetOperator(inner) => inner.owner,
+            Self::SetVoter(inner) => inner.owner,
+            Self::InitializeStakePool(inner) => inner.owner,
+            Self::ResetLockup(inner) => inner.owner,
+            Self::UnlockStake(inner) => inner.owner,
+            Self::DistributeStakingRewards(inner) => inner.sender,
         }
+    }
+
+    pub fn payload(
+        &self,
+    ) -> ApiResult<(aptos_types::transaction::TransactionPayload, AccountAddress)> {
+        Ok(match self {
+            InternalOperation::CreateAccount(create_account) => (
+                aptos_stdlib::aptos_account_create_account(create_account.new_account),
+                create_account.sender,
+            ),
+            InternalOperation::Transfer(transfer) => {
+                is_native_coin(&transfer.currency)?;
+                (
+                    aptos_stdlib::aptos_account_transfer(transfer.receiver, transfer.amount.0),
+                    transfer.sender,
+                )
+            },
+            InternalOperation::SetOperator(set_operator) => {
+                if set_operator.old_operator.is_none() {
+                    return Err(ApiError::InvalidInput(Some(
+                        "SetOperator doesn't have an old operator".to_string(),
+                    )));
+                }
+                (
+                    aptos_stdlib::staking_contract_switch_operator_with_same_commission(
+                        set_operator.old_operator.unwrap(),
+                        set_operator.new_operator,
+                    ),
+                    set_operator.owner,
+                )
+            },
+            InternalOperation::SetVoter(set_voter) => {
+                if set_voter.operator.is_none() {
+                    return Err(ApiError::InvalidInput(Some(
+                        "Set voter doesn't have an operator".to_string(),
+                    )));
+                }
+                (
+                    aptos_stdlib::staking_contract_update_voter(
+                        set_voter.operator.unwrap(),
+                        set_voter.new_voter,
+                    ),
+                    set_voter.owner,
+                )
+            },
+            InternalOperation::InitializeStakePool(init_stake_pool) => (
+                aptos_stdlib::staking_contract_create_staking_contract(
+                    init_stake_pool.operator,
+                    init_stake_pool.voter,
+                    init_stake_pool.amount,
+                    init_stake_pool.commission_percentage,
+                    init_stake_pool.seed.clone(),
+                ),
+                init_stake_pool.owner,
+            ),
+            InternalOperation::ResetLockup(reset_lockup) => (
+                aptos_stdlib::staking_contract_reset_lockup(reset_lockup.operator),
+                reset_lockup.owner,
+            ),
+            InternalOperation::UnlockStake(unlock_stake) => (
+                aptos_stdlib::staking_contract_unlock_stake(
+                    unlock_stake.operator,
+                    unlock_stake.amount,
+                ),
+                unlock_stake.owner,
+            ),
+            InternalOperation::DistributeStakingRewards(distribute_staking_rewards) => (
+                aptos_stdlib::staking_contract_distribute(
+                    distribute_staking_rewards.staker,
+                    distribute_staking_rewards.operator,
+                ),
+                distribute_staking_rewards.sender,
+            ),
+        })
     }
 }
 
@@ -821,7 +1757,7 @@ pub struct CreateAccount {
 pub struct Transfer {
     pub sender: AccountAddress,
     pub receiver: AccountAddress,
-    pub amount: u64,
+    pub amount: U64,
     pub currency: Currency,
 }
 
@@ -840,11 +1776,7 @@ impl Transfer {
             let op_type = OperationType::from_str(&op.operation_type)?;
             op_map.insert(op_type, op);
         }
-        if !op_map.contains_key(&OperationType::Withdraw) {
-            return Err(ApiError::InvalidTransferOperations(Some(
-                "Must have a withdraw",
-            )));
-        }
+        if !op_map.contains_key(&OperationType::Withdraw) {}
 
         if !op_map.contains_key(&OperationType::Deposit) {
             return Err(ApiError::InvalidTransferOperations(Some(
@@ -853,109 +1785,131 @@ impl Transfer {
         }
 
         // Verify accounts and amounts
-        let withdraw = op_map.get(&OperationType::Withdraw).unwrap();
-        let sender = if let Some(ref account) = withdraw.account {
-            account.try_into()?
-        } else {
-            return Err(ApiError::InvalidTransferOperations(Some(
-                "Invalid withdraw account provided",
-            )));
-        };
-
-        let deposit = op_map.get(&OperationType::Deposit).unwrap();
-        let receiver = if let Some(ref account) = deposit.account {
-            account.try_into()?
-        } else {
-            return Err(ApiError::InvalidTransferOperations(Some(
-                "Invalid deposit account provided",
-            )));
-        };
-
-        let (amount, currency): (u64, Currency) =
-            if let (Some(withdraw_amount), Some(deposit_amount)) =
-                (&withdraw.amount, &deposit.amount)
-            {
-                // Currencies have to be the same
-                if withdraw_amount.currency != deposit_amount.currency {
-                    return Err(ApiError::InvalidTransferOperations(Some(
-                        "Currency mismatch between withdraw and deposit",
+        let (sender, withdraw_amount) = if let Some(withdraw) = op_map.get(&OperationType::Withdraw)
+        {
+            if let (Some(account), Some(amount)) = (&withdraw.account, &withdraw.amount) {
+                if account.is_base_account() {
+                    (account.account_address()?, amount)
+                } else {
+                    return Err(ApiError::InvalidInput(Some(
+                        "Transferring stake amounts is not supported".to_string(),
                     )));
                 }
-
-                // Check that the currency is supported
-                // TODO: in future use currency, since there's more than just 1
-                let _ = is_native_coin(&withdraw_amount.currency)?;
-
-                let withdraw_value = i64::from_str(&withdraw_amount.value).map_err(|_| {
-                    ApiError::InvalidTransferOperations(Some("Withdraw amount is invalid"))
-                })?;
-                let deposit_value = i64::from_str(&deposit_amount.value).map_err(|_| {
-                    ApiError::InvalidTransferOperations(Some("Deposit amount is invalid"))
-                })?;
-
-                // We can't create or destroy coins, they must be negatives of each other
-                if -withdraw_value != deposit_value {
-                    return Err(ApiError::InvalidTransferOperations(Some(
-                        "Withdraw amount must be equal to negative of deposit amount",
-                    )));
-                }
-
-                (deposit_value as u64, deposit_amount.currency.clone())
             } else {
                 return Err(ApiError::InvalidTransferOperations(Some(
-                    "Must have exactly 1 withdraw and 1 deposit with amounts",
+                    "Invalid withdraw account provided",
                 )));
-            };
+            }
+        } else {
+            return Err(ApiError::InvalidTransferOperations(Some(
+                "Must have a withdraw",
+            )));
+        };
+
+        let (receiver, deposit_amount) = if let Some(deposit) = op_map.get(&OperationType::Deposit)
+        {
+            if let (Some(account), Some(amount)) = (&deposit.account, &deposit.amount) {
+                if account.is_base_account() {
+                    (account.account_address()?, amount)
+                } else {
+                    return Err(ApiError::InvalidInput(Some(
+                        "Transferring stake amounts is not supported".to_string(),
+                    )));
+                }
+            } else {
+                return Err(ApiError::InvalidTransferOperations(Some(
+                    "Invalid deposit account provided",
+                )));
+            }
+        } else {
+            return Err(ApiError::InvalidTransferOperations(Some(
+                "Must have a deposit",
+            )));
+        };
+
+        // Currencies have to be the same
+        if withdraw_amount.currency != deposit_amount.currency {
+            return Err(ApiError::InvalidTransferOperations(Some(
+                "Currency mismatch between withdraw and deposit",
+            )));
+        }
+
+        // Check that the currency is supported
+        // TODO: in future use currency, since there's more than just 1
+        is_native_coin(&withdraw_amount.currency)?;
+
+        let withdraw_value = i128::from_str(&withdraw_amount.value)
+            .map_err(|_| ApiError::InvalidTransferOperations(Some("Withdraw amount is invalid")))?;
+        let deposit_value = i128::from_str(&deposit_amount.value)
+            .map_err(|_| ApiError::InvalidTransferOperations(Some("Deposit amount is invalid")))?;
+
+        // We can't create or destroy coins, they must be negatives of each other
+        if -withdraw_value != deposit_value {
+            return Err(ApiError::InvalidTransferOperations(Some(
+                "Withdraw amount must be equal to negative of deposit amount",
+            )));
+        }
+
+        // We converted to u128 to ensure no loss of precision in comparison,
+        // but now we actually have to check it's a u64
+        if deposit_value > u64::MAX as i128 {
+            return Err(ApiError::InvalidTransferOperations(Some(
+                "Transfer amount must not be greater than u64 max",
+            )));
+        }
+
+        let transfer_amount = deposit_value as u64;
 
         Ok(Transfer {
             sender,
             receiver,
-            amount,
-            currency,
+            amount: transfer_amount.into(),
+            currency: deposit_amount.currency.clone(),
         })
     }
 }
 
-#[derive(Clone, Debug, Deserialize)]
-pub struct CoinEvent {
-    amount: U64,
+/// Set operator
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct SetOperator {
+    pub owner: AccountAddress,
+    pub old_operator: Option<AccountAddress>,
+    pub new_operator: AccountAddress,
 }
 
-#[derive(Clone, Debug, Deserialize)]
-pub struct CoinEventId {
-    guid: Id,
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct SetVoter {
+    pub owner: AccountAddress,
+    pub operator: Option<AccountAddress>,
+    pub new_voter: AccountAddress,
 }
 
-#[derive(Clone, Debug, Deserialize)]
-pub struct Id {
-    id: EventId,
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct InitializeStakePool {
+    pub owner: AccountAddress,
+    pub operator: AccountAddress,
+    pub voter: AccountAddress,
+    pub amount: u64,
+    pub commission_percentage: u64,
+    pub seed: Vec<u8>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
-pub struct EventId {
-    #[serde(deserialize_with = "deserialize_account_address")]
-    addr: AccountAddress,
-    creation_num: U64,
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ResetLockup {
+    pub owner: AccountAddress,
+    pub operator: AccountAddress,
 }
 
-fn deserialize_account_address<'de, D>(
-    deserializer: D,
-) -> std::result::Result<AccountAddress, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    if deserializer.is_human_readable() {
-        let s = <String>::deserialize(deserializer)?;
-        AccountAddress::from_hex_literal(&s).map_err(D::Error::custom)
-    } else {
-        // In order to preserve the Serde data model and help analysis tools,
-        // make sure to wrap our value in a container with the same name
-        // as the original type.
-        #[derive(::serde::Deserialize)]
-        #[serde(rename = "AccountAddress")]
-        struct Value([u8; AccountAddress::LENGTH]);
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct UnlockStake {
+    pub owner: AccountAddress,
+    pub operator: AccountAddress,
+    pub amount: u64,
+}
 
-        let value = Value::deserialize(deserializer)?;
-        Ok(AccountAddress::new(value.0))
-    }
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct DistributeStakingRewards {
+    pub sender: AccountAddress,
+    pub operator: AccountAddress,
+    pub staker: AccountAddress,
 }

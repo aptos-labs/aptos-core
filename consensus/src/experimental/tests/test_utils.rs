@@ -1,30 +1,30 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{metrics_safety_rules::MetricsSafetyRules, test_utils::MockStorage};
-use aptos_crypto::{bls12381, hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
-use aptos_infallible::Mutex;
-use aptos_secure_storage::Storage;
-use aptos_types::{
-    account_address::AccountAddress,
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    validator_signer::ValidatorSigner,
-    validator_verifier::random_validator_verifier,
-    waypoint::Waypoint,
-};
-use consensus_types::{
+use aptos_consensus_types::{
     block::block_test_utils::certificate_for_genesis,
     common::{Payload, Round},
     executed_block::ExecutedBlock,
     quorum_cert::QuorumCert,
     vote_proposal::VoteProposal,
 };
-use executor_types::StateComputeResult;
-use safety_rules::{
+use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
+use aptos_executor_types::StateComputeResult;
+use aptos_infallible::Mutex;
+use aptos_safety_rules::{
     test_utils::{make_proposal_with_parent, make_proposal_with_qc},
     PersistentSafetyStorage, SafetyRulesManager,
 };
-use std::{collections::BTreeMap, sync::Arc};
+use aptos_secure_storage::Storage;
+use aptos_types::{
+    ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
+    validator_signer::ValidatorSigner,
+    validator_verifier::random_validator_verifier,
+    waypoint::Waypoint,
+};
+use std::sync::Arc;
 
 pub fn prepare_safety_rules() -> (Arc<Mutex<MetricsSafetyRules>>, Vec<ValidatorSigner>) {
     let num_nodes = 1;
@@ -53,7 +53,7 @@ pub fn prepare_safety_rules() -> (Arc<Mutex<MetricsSafetyRules>>, Vec<ValidatorS
     (Arc::new(Mutex::new(safety_rules)), signers)
 }
 
-// This function priorizes using parent over init_qc
+// This function prioritizes using parent over init_qc
 pub fn prepare_executed_blocks_with_ledger_info(
     signer: &ValidatorSigner,
     num_blocks: Round,
@@ -70,7 +70,7 @@ pub fn prepare_executed_blocks_with_ledger_info(
     assert!(num_blocks > 0);
 
     let p1 = if let Some(parent) = some_parent {
-        make_proposal_with_parent(Payload::new_empty(), init_round, &parent, None, signer)
+        make_proposal_with_parent(Payload::empty(false), init_round, &parent, None, signer)
     } else {
         make_proposal_with_qc(init_round, init_qc.unwrap(), signer)
     };
@@ -81,7 +81,7 @@ pub fn prepare_executed_blocks_with_ledger_info(
         println!("Generating {}", i);
         let parent = proposals.last().unwrap();
         let proposal =
-            make_proposal_with_parent(Payload::new_empty(), init_round + i, parent, None, signer);
+            make_proposal_with_parent(Payload::empty(false), init_round + i, parent, None, signer);
         proposals.push(proposal);
     }
 
@@ -106,12 +106,7 @@ pub fn prepare_executed_blocks_with_ledger_info(
         consensus_hash,
     );
 
-    let mut li_sig = LedgerInfoWithSignatures::new(
-        li.clone(),
-        BTreeMap::<AccountAddress, bls12381::Signature>::new(),
-    );
-
-    li_sig.add_signature(signer.author(), signer.sign(&li));
+    let li_sig = generate_ledger_info_with_sig(&[signer.clone()], li);
 
     let executed_blocks: Vec<ExecutedBlock> = proposals
         .iter()
@@ -129,7 +124,7 @@ pub fn prepare_executed_blocks_with_executed_ledger_info(
         signer,
         1,
         HashValue::random(),
-        HashValue::from_u64(0xbeef),
+        HashValue::from_u64(0xBEEF),
         None,
         Some(genesis_qc),
         0,

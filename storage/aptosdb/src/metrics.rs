@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
@@ -51,10 +52,14 @@ pub static NEXT_BLOCK_EPOCH: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static STATE_ITEM_COUNT: Lazy<IntGauge> = Lazy::new(|| {
+pub static STATE_ITEMS: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!("aptos_storage_state_items", "Total number of state items.").unwrap()
+});
+
+pub static TOTAL_STATE_BYTES: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
-        "aptos_storage_state_item_count",
-        "Total number of entries in the StateDB at the latest version."
+        "aptos_storage_total_state_bytes",
+        "Total size in bytes of all state items."
     )
     .unwrap()
 });
@@ -124,6 +129,19 @@ pub static OTHER_TIMERS_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static NODE_CACHE_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        // metric name
+        "aptos_storage_node_cache_seconds",
+        // metric description
+        "Latency of node cache.",
+        // metric labels (dimensions)
+        &["tag", "name"],
+        exponential_buckets(/*start=*/ 1e-9, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+    )
+    .unwrap()
+});
+
 /// Rocksdb metrics
 pub static ROCKSDB_PROPERTIES: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
@@ -133,6 +151,23 @@ pub static ROCKSDB_PROPERTIES: Lazy<IntGaugeVec> = Lazy::new(|| {
         "rocksdb integer properties",
         // metric labels (dimensions)
         &["cf_name", "property_name",]
+    )
+    .unwrap()
+});
+
+// Async committer gauges:
+pub(crate) static LATEST_SNAPSHOT_VERSION: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_storage_latest_state_snapshot_version",
+        "The version of the most recent snapshot."
+    )
+    .unwrap()
+});
+
+pub(crate) static LATEST_CHECKPOINT_VERSION: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_storage_latest_state_checkpoint_version",
+        "The version of the most recent committed checkpoint."
     )
     .unwrap()
 });

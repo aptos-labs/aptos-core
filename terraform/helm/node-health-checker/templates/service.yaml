@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "node-health-checker.fullname" . }}
+  labels:
+    {{- include "node-health-checker.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "node-health-checker.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/name: node-health-checker
+  type: ClusterIP
+  ports:
+    - port: 20121
+      protocol: TCP
+      name: http

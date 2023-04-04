@@ -1,7 +1,7 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use schemadb::SchemaBatch;
+use aptos_schemadb::SchemaBatch;
 
 /// Defines the trait for sub-pruner of a parent DB pruner
 pub trait DBSubPruner {

@@ -1,12 +1,21 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{hash::CryptoHash, PrivateKey};
+use aptos_executor_test_helpers::{
+    gen_block_id, gen_ledger_info_with_sigs, get_test_signed_transaction,
+    integration_test_impl::{
+        create_db_and_executor, test_execution_with_storage_impl, verify_committed_txn_status,
+    },
+};
+use aptos_executor_types::BlockExecutorTrait;
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
-use aptos_transaction_builder::aptos_stdlib;
+use aptos_storage_interface::state_view::DbStateViewAtVersion;
 use aptos_types::{
     access_path::AccessPath,
-    account_config::{aptos_root_address, AccountResource, CORE_CODE_ADDRESS},
+    account_config::{aptos_test_root_address, AccountResource, CORE_CODE_ADDRESS},
     account_view::AccountView,
     block_metadata::BlockMetadata,
     state_store::state_key::StateKey,
@@ -14,21 +23,13 @@ use aptos_types::{
     trusted_state::TrustedState,
     validator_signer::ValidatorSigner,
 };
-use executor_test_helpers::{
-    gen_block_id, gen_ledger_info_with_sigs, get_test_signed_transaction,
-    integration_test_impl::{
-        create_db_and_executor, test_execution_with_storage_impl, verify_committed_txn_status,
-    },
-};
-use executor_types::BlockExecutorTrait;
-use move_deps::move_core_types::move_resource::MoveStructType;
-use storage_interface::state_view::DbStateViewAtVersion;
+use move_core_types::move_resource::MoveStructType;
 
 #[test]
 fn test_genesis() {
     let path = aptos_temppath::TempPath::new();
     path.create_as_dir().unwrap();
-    let genesis = vm_genesis::test_genesis_transaction();
+    let genesis = aptos_vm_genesis::test_genesis_transaction();
     let (_, db, _executor, waypoint) = create_db_and_executor(path.path(), &genesis);
 
     let trusted_state = TrustedState::from_epoch_waypoint(waypoint);
@@ -38,7 +39,7 @@ fn test_genesis() {
     let li = state_proof.latest_ledger_info();
     assert_eq!(li.version(), 0);
 
-    let account_resource_path = StateKey::AccessPath(AccessPath::new(
+    let account_resource_path = StateKey::access_path(AccessPath::new(
         CORE_CODE_ADDRESS,
         AccountResource::struct_tag().access_vector(),
     ));
@@ -62,19 +63,20 @@ fn test_genesis() {
 }
 
 #[test]
+#[cfg_attr(feature = "consensus-only-perf-test", ignore)]
 fn test_reconfiguration() {
     // When executing a transaction emits a validator set change,
     // storage should propagate the new validator set
 
     let path = aptos_temppath::TempPath::new();
     path.create_as_dir().unwrap();
-    let (genesis, validators) = vm_genesis::test_genesis_change_set_and_validators(Some(1));
-    let genesis_key = &vm_genesis::GENESIS_KEYPAIR.0;
+    let (genesis, validators) = aptos_vm_genesis::test_genesis_change_set_and_validators(Some(1));
+    let genesis_key = &aptos_vm_genesis::GENESIS_KEYPAIR.0;
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
     let (_, db, executor, _waypoint) = create_db_and_executor(path.path(), &genesis_txn);
     let parent_block_id = executor.committed_block_id();
     let signer = ValidatorSigner::new(
-        validators[0].data.address,
+        validators[0].data.owner_address,
         validators[0].consensus_key.clone(),
     );
     let validator_account = signer.author();
@@ -108,7 +110,7 @@ fn test_reconfiguration() {
 
     // txn1 = give the validator some money so they can send a tx
     let txn1 = get_test_signed_transaction(
-        aptos_root_address(),
+        aptos_test_root_address(),
         /* sequence_number = */ 0,
         genesis_key.clone(),
         genesis_key.public_key(),
@@ -119,15 +121,15 @@ fn test_reconfiguration() {
         gen_block_id(1),
         0,
         1,
-        vec![false],
         validator_account,
+        vec![0],
         vec![],
         300000001,
     ));
 
     // txn3 = set the aptos version
     let txn3 = get_test_signed_transaction(
-        aptos_root_address(),
+        aptos_test_root_address(),
         /* sequence_number = */ 1,
         genesis_key.clone(),
         genesis_key.public_key(),
@@ -145,7 +147,7 @@ fn test_reconfiguration() {
         vm_output.has_reconfiguration(),
         "StateComputeResult does not see a reconfiguration"
     );
-    let ledger_info_with_sigs = gen_ledger_info_with_sigs(1, &vm_output, block_id, vec![&signer]);
+    let ledger_info_with_sigs = gen_ledger_info_with_sigs(1, &vm_output, block_id, &[signer]);
     executor
         .commit_blocks(vec![block_id], ledger_info_with_sigs)
         .unwrap();
@@ -155,7 +157,7 @@ fn test_reconfiguration() {
 
     let t3 = db
         .reader
-        .get_account_transaction(aptos_root_address(), 1, true, current_version)
+        .get_account_transaction(aptos_test_root_address(), 1, true, current_version)
         .unwrap();
     verify_committed_txn_status(t3.as_ref(), &txn_block[2]).unwrap();
 
@@ -178,6 +180,7 @@ fn test_reconfiguration() {
 }
 
 #[test]
+#[cfg_attr(feature = "consensus-only-perf-test", ignore)]
 fn test_execution_with_storage() {
     test_execution_with_storage_impl();
 }

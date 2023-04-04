@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::{
@@ -20,7 +20,7 @@ fn main() {
         KeyPair::generate(&mut csprng);
 
     let message = TestTypedSemantics(String::from("hello_world"));
-    let signature = ed25519_keypair.private_key.sign(&message);
+    let signature = ed25519_keypair.private_key.sign(&message).unwrap();
 
     let multi_ed25519_keypair: KeyPair<MultiEd25519PrivateKey, MultiEd25519PublicKey> =
         KeyPair::generate(&mut csprng);

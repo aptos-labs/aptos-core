@@ -1,22 +1,29 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{Factory, GenesisConfig, Result, Swarm, Version};
+use crate::{Factory, GenesisConfig, GenesisConfigFn, NodeConfigFn, Result, Swarm, Version};
 use anyhow::{bail, Context};
-use aptos_genesis::builder::InitConfigFn;
+use aptos_config::config::NodeConfig;
+use aptos_framework::ReleaseBundle;
+use aptos_genesis::builder::{InitConfigFn, InitGenesisConfigFn};
+use aptos_infallible::Mutex;
 use rand::rngs::StdRng;
 use std::{
     collections::HashMap,
     num::NonZeroUsize,
     path::{Path, PathBuf},
     sync::Arc,
+    time::Duration,
 };
 
 mod cargo;
 mod node;
 mod swarm;
+pub use self::swarm::ActiveNodesGuard;
+pub use cargo::cargo_build_common_args;
 pub use node::LocalNode;
-pub use swarm::{LocalSwarm, LocalSwarmBuilder, SwarmDirectory};
+pub use swarm::{LocalSwarm, SwarmDirectory};
 
 #[derive(Clone, Debug)]
 pub struct LocalVersion {
@@ -104,45 +111,54 @@ impl LocalFactory {
         Self::with_revision_and_workspace(&merge_base)
     }
 
-    pub async fn new_swarm<R>(
-        &self,
-        rng: R,
-        number_of_validators: NonZeroUsize,
-    ) -> Result<LocalSwarm>
-    where
-        R: ::rand::RngCore + ::rand::CryptoRng,
-    {
-        let version = self.versions.keys().max().unwrap();
-        self.new_swarm_with_version(rng, number_of_validators, version, None, 1, None)
-            .await
-    }
-
     pub async fn new_swarm_with_version<R>(
         &self,
         rng: R,
         number_of_validators: NonZeroUsize,
+        number_of_fullnodes: usize,
         version: &Version,
-        genesis_modules: Option<Vec<Vec<u8>>>,
-        min_price_per_gas_unit: u64,
+        genesis_framework: Option<ReleaseBundle>,
         init_config: Option<InitConfigFn>,
+        vfn_config: Option<NodeConfig>,
+        init_genesis_config: Option<InitGenesisConfigFn>,
+        guard: ActiveNodesGuard,
     ) -> Result<LocalSwarm>
     where
         R: ::rand::RngCore + ::rand::CryptoRng,
     {
-        let mut builder = LocalSwarm::builder(self.versions.clone())
-            .number_of_validators(number_of_validators)
-            .initial_version(version.clone())
-            .min_price_per_gas_unit(min_price_per_gas_unit)
-            .with_init_config(init_config);
-        if let Some(genesis_modules) = genesis_modules {
-            builder = builder.genesis_modules(genesis_modules);
-        }
+        // Build the swarm
+        let mut swarm = LocalSwarm::build(
+            rng,
+            number_of_validators,
+            self.versions.clone(),
+            Some(version.clone()),
+            init_config,
+            init_genesis_config,
+            None,
+            genesis_framework,
+            guard,
+        )?;
 
-        let mut swarm = builder.build(rng)?;
+        // Launch the swarm
         swarm
             .launch()
             .await
             .with_context(|| format!("Swarm logs can be found here: {}", swarm.logs_location()))?;
+
+        // Add and launch the fullnodes
+        let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
+        for validator_peer_id in validator_peer_ids.iter().take(number_of_fullnodes) {
+            let _ = swarm
+                .add_validator_fullnode(
+                    version,
+                    vfn_config
+                        .clone()
+                        .unwrap_or_else(NodeConfig::default_for_validator_full_node),
+                    *validator_peer_id,
+                )
+                .unwrap();
+        }
+        swarm.wait_all_alive(Duration::from_secs(60)).await?;
 
         Ok(swarm)
     }
@@ -157,22 +173,41 @@ impl Factory for LocalFactory {
     async fn launch_swarm(
         &self,
         rng: &mut StdRng,
-        node_num: NonZeroUsize,
+        num_validators: NonZeroUsize,
+        num_fullnodes: usize,
         version: &Version,
         _genesis_version: &Version,
         genesis_config: Option<&GenesisConfig>,
+        _cleanup_duration: Duration,
+        _genesis_config_fn: Option<GenesisConfigFn>,
+        _node_config_fn: Option<NodeConfigFn>,
+        _existing_db_tag: Option<String>,
     ) -> Result<Box<dyn Swarm>> {
-        let genesis_modules = match genesis_config {
+        let framework = match genesis_config {
             Some(config) => match config {
-                GenesisConfig::Bytes(bytes) => Some(bytes.clone()),
+                GenesisConfig::Bundle(bundle) => Some(bundle.clone()),
                 GenesisConfig::Path(_) => {
                     bail!("local forge backend does not support flattened dir for genesis")
-                }
+                },
             },
             None => None,
         };
+
+        // no guarding, as this code path is not used in parallel
+        let guard = ActiveNodesGuard::grab(1, Arc::new(Mutex::new(0))).await;
+
         let swarm = self
-            .new_swarm_with_version(rng, node_num, version, genesis_modules, 1, None)
+            .new_swarm_with_version(
+                rng,
+                num_validators,
+                num_fullnodes,
+                version,
+                framework,
+                None,
+                None,
+                None,
+                guard,
+            )
             .await?;
 
         Ok(Box::new(swarm))

@@ -1,23 +1,58 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
+
+use poem_openapi::Tags;
 
 mod accept_type;
 mod accounts;
+mod basic;
+mod bcs_payload;
+mod blocks;
+mod check_size;
 pub mod context;
+mod error_converter;
 mod events;
-mod health_check;
+mod failpoint;
 mod index;
-pub mod log;
+mod log;
 pub mod metrics;
 mod page;
-pub mod param;
-mod poem_backend;
-pub mod runtime;
+mod response;
+mod runtime;
+mod set_failpoints;
 mod state;
+#[cfg(test)]
+pub mod tests;
 mod transactions;
-pub(crate) mod version;
+mod view_function;
 
-mod blocks;
-mod failpoint;
-#[cfg(any(test))]
-pub(crate) mod tests;
+/// API categories for the OpenAPI spec
+#[derive(Tags)]
+pub enum ApiTags {
+    /// Access to accounts, resources, and modules
+    Accounts,
+    /// Access to blocks
+    Blocks,
+
+    /// Access to events
+    Events,
+
+    /// General information
+    General,
+
+    /// Access to tables
+    Tables,
+
+    /// Access to transactions
+    Transactions,
+
+    /// View functions,
+    View,
+}
+
+// Note: Many of these exports are just for the test-context crate, which is
+// needed outside of the API, e.g. for fh-stream.
+pub use context::Context;
+pub use response::BasicError;
+pub use runtime::{attach_poem_to_runtime, bootstrap, get_api_service};

@@ -1,1 +1,2 @@
-src/api/*
+src/generated/*
+src/indexer/generated/**

@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::FuzzTarget;
@@ -22,7 +23,7 @@ fn coverage() {
         None => {
             let crate_dir = env!("CARGO_MANIFEST_DIR");
             PathBuf::from(&crate_dir).join("fuzz/corpus")
-        }
+        },
     };
 
     // check if it exists

@@ -1,46 +1,39 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_logger::{error, info};
+use anyhow::{Context, Result};
+use aptos_logger::info;
+use aptos_schemadb::SchemaBatch;
 use aptos_types::transaction::Version;
-use std::{cmp::min, thread::sleep, time::Duration};
+use std::cmp::min;
 
 /// Defines the trait for pruner for different DB
-pub trait DBPruner {
+pub trait DBPruner: Send + Sync {
     /// Find out the first undeleted item in the stale node index.
-    ///
-    /// Seeking from the beginning (version 0) is potentially costly, we do it once upon worker
-    /// thread start, record the progress and seek from that position afterwards.
     fn initialize(&self) {
-        loop {
-            match self.initialize_min_readable_version() {
-                Ok(min_readable_version) => {
-                    info!(
-                        min_readable_version = min_readable_version,
-                        "{} initialized.",
-                        self.name()
-                    );
-                    self.record_progress(min_readable_version);
-                    return;
-                }
-                Err(e) => {
-                    error!(
-                        error = ?e,
-                        "{} Error on first seek. Retrying in 1 second.", self.name()
-                    );
-                    sleep(Duration::from_secs(1));
-                }
-            }
-        }
+        let min_readable_version = self
+            .initialize_min_readable_version()
+            .context(self.name())
+            .expect("Pruner failed to initialize.");
+        info!(
+            min_readable_version = min_readable_version,
+            "{} initialized.",
+            self.name()
+        );
+        self.record_progress(min_readable_version);
     }
+
     fn name(&self) -> &'static str;
 
     /// Performs the actual pruning, a target version is passed, which is the target the pruner
     /// tries to prune.
-    fn prune(&self, batch_size: usize) -> anyhow::Result<Version>;
+    fn prune(&self, batch_size: usize) -> Result<Version>;
 
     /// Initializes the least readable version stored in underlying DB storage
-    fn initialize_min_readable_version(&self) -> anyhow::Result<Version>;
+    fn initialize_min_readable_version(&self) -> Result<Version>;
+
+    /// Saves the min readable version.
+    fn save_min_readable_version(&self, version: Version, batch: &SchemaBatch) -> Result<()>;
 
     /// Returns the least readable version stores in the DB pruner
     fn min_readable_version(&self) -> Version;
@@ -53,11 +46,11 @@ pub trait DBPruner {
 
     /// Returns the target version for the current pruning round - this might be different from the
     /// target_version() because we need to keep max_version in account.
-    fn get_currrent_batch_target(&self, max_versions: Version) -> Version {
+    fn get_current_batch_target(&self, max_versions: Version) -> Version {
         // Current target version  might be less than the target version to ensure we don't prune
         // more than max_version in one go.
         min(
-            self.min_readable_version() + max_versions as u64,
+            self.min_readable_version() + max_versions,
             self.target_version(),
         )
     }
@@ -68,4 +61,7 @@ pub trait DBPruner {
     fn is_pruning_pending(&self) -> bool {
         self.target_version() > self.min_readable_version()
     }
+
+    /// (For tests only.) Updates the minimal readable version kept by pruner.
+    fn testonly_update_min_version(&self, version: Version);
 }

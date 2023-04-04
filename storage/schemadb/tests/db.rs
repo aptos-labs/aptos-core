@@ -1,15 +1,15 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use byteorder::{LittleEndian, ReadBytesExt};
-use proptest::{collection::vec, prelude::*};
-use rocksdb::DEFAULT_COLUMN_FAMILY_NAME;
-use schemadb::{
+use aptos_schemadb::{
     define_schema,
     schema::{KeyCodec, Schema, ValueCodec},
     ColumnFamilyName, SchemaBatch, DB,
 };
+use byteorder::{LittleEndian, ReadBytesExt};
+use rocksdb::DEFAULT_COLUMN_FAMILY_NAME;
 
 // Creating two schemas that share exactly the same structure but are stored in different column
 // families. Also note that the key and value are of the same type `TestField`. By implementing
@@ -84,13 +84,13 @@ fn open_db(dir: &aptos_temppath::TempPath) -> DB {
     let mut db_opts = rocksdb::Options::default();
     db_opts.create_if_missing(true);
     db_opts.create_missing_column_families(true);
-    DB::open(&dir.path(), "test", get_column_families(), &db_opts).expect("Failed to open DB.")
+    DB::open(dir.path(), "test", get_column_families(), &db_opts).expect("Failed to open DB.")
 }
 
 fn open_db_read_only(dir: &aptos_temppath::TempPath) -> DB {
     DB::open_cf_readonly(
         &rocksdb::Options::default(),
-        &dir.path(),
+        dir.path(),
         "test",
         get_column_families(),
     )
@@ -100,8 +100,8 @@ fn open_db_read_only(dir: &aptos_temppath::TempPath) -> DB {
 fn open_db_as_secondary(dir: &aptos_temppath::TempPath, dir_sec: &aptos_temppath::TempPath) -> DB {
     DB::open_cf_as_secondary(
         &rocksdb::Options::default(),
-        &dir.path(),
-        &dir_sec.path(),
+        dir.path(),
+        dir_sec.path(),
         "test",
         get_column_families(),
     )
@@ -173,88 +173,6 @@ fn test_schema_put_get() {
     );
 }
 
-fn test_schemabatch_delete_range_util(begin: u32, end: u32, is_inclusive: bool) {
-    let db = TestDB::new();
-    let mut db_batch = SchemaBatch::new();
-    for i in 0..100u32 {
-        db_batch
-            .put::<TestSchema1>(&TestField(i), &TestField(i))
-            .unwrap();
-    }
-    let mut should_exist_vec = [true; 100];
-
-    db_batch
-        .delete_range::<TestSchema1>(&TestField(begin), &TestField(end))
-        .unwrap();
-    if !is_inclusive {
-        for i in begin..end {
-            should_exist_vec[i as usize] = false;
-        }
-    } else {
-        for i in begin..=end {
-            should_exist_vec[i as usize] = false;
-        }
-    }
-    db.write_schemas(db_batch).unwrap();
-    for (i, should_exist) in should_exist_vec.iter().enumerate() {
-        assert_eq!(
-            db.get::<TestSchema1>(&TestField(i as u32))
-                .unwrap()
-                .is_some(),
-            *should_exist,
-        )
-    }
-}
-
-proptest! {
-    #![proptest_config(ProptestConfig::with_cases(10))]
-
-    #[test]
-    fn test_schemabatch_delete_range(
-        ranges_to_delete in vec(
-            (0..100u32).prop_flat_map(|begin| (Just(begin), (begin..100u32))), 0..10)
-    ) {
-        for (begin, end) in ranges_to_delete {
-            test_schemabatch_delete_range_util(begin, end, false);
-        }
-    }
-
-    #[test]
-    fn test_schemabatch_delete_range_inclusive(
-        ranges_to_delete in vec(
-            (0..100u32).prop_flat_map(|begin| (Just(begin), (begin..100u32))), 0..10)
-    ) {
-         for (begin, end) in ranges_to_delete {
-            test_schemabatch_delete_range_util(begin, end, false);
-        }
-    }
-
-    #[test]
-    fn test_schema_range_delete(
-        ranges_to_delete in vec(
-            (0..100u32).prop_flat_map(|begin| (Just(begin), (begin..100u32))), 0..10)
-    ) {
-        let db = TestDB::new();
-        for i in 0..100u32 {
-            db.put::<TestSchema1>(&TestField(i), &TestField(i)).unwrap();
-        }
-        let mut should_exist_vec = [true; 100];
-        for (begin, end) in ranges_to_delete {
-            db.range_delete::<TestSchema1, TestField>(&TestField(begin), &TestField(end)).unwrap();
-            for i in begin..end {
-                should_exist_vec[i as usize] = false;
-            }
-        }
-
-        for (i, should_exist) in should_exist_vec.iter().enumerate() {
-            assert_eq!(
-                db.get::<TestSchema1>(&TestField(i as u32)).unwrap().is_some(),
-                *should_exist,
-            )
-        }
-    }
-}
-
 fn collect_values<S: Schema>(db: &TestDB) -> Vec<(S::Key, S::Value)> {
     let mut iter = db
         .iter::<S>(Default::default())
@@ -275,7 +193,7 @@ fn gen_expected_values(values: &[(u32, u32)]) -> Vec<(TestField, TestField)> {
 fn test_single_schema_batch() {
     let db = TestDB::new();
 
-    let mut db_batch = SchemaBatch::new();
+    let db_batch = SchemaBatch::new();
     db_batch
         .put::<TestSchema1>(&TestField(0), &TestField(0))
         .unwrap();
@@ -313,7 +231,7 @@ fn test_single_schema_batch() {
 fn test_two_schema_batches() {
     let db = TestDB::new();
 
-    let mut db_batch1 = SchemaBatch::new();
+    let db_batch1 = SchemaBatch::new();
     db_batch1
         .put::<TestSchema1>(&TestField(0), &TestField(0))
         .unwrap();
@@ -331,7 +249,7 @@ fn test_two_schema_batches() {
         gen_expected_values(&[(0, 0), (1, 1)]),
     );
 
-    let mut db_batch2 = SchemaBatch::new();
+    let db_batch2 = SchemaBatch::new();
     db_batch2.delete::<TestSchema2>(&TestField(3)).unwrap();
     db_batch2
         .put::<TestSchema2>(&TestField(3), &TestField(3))
@@ -411,7 +329,7 @@ fn test_report_size() {
     let db = TestDB::new();
 
     for i in 0..1000 {
-        let mut db_batch = SchemaBatch::new();
+        let db_batch = SchemaBatch::new();
         db_batch
             .put::<TestSchema1>(&TestField(i), &TestField(i))
             .unwrap();

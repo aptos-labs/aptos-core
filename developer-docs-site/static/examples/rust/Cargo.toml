@@ -1,2 +1,0 @@
-[workspace]
-members = ["first_coin", "first_transaction", "hello_blockchain"]

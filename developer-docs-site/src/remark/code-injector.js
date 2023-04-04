@@ -48,7 +48,30 @@ const plugin = (options) => {
           throw new Error(`Could not find open/closing tags for section '${sectionName}' in ${filepath}`);
         }
         // Remove line breaks from start/end, but not whitespace
-        node.value = matches[1].replace(/^[\r\n]+|[\r\n]+$/g, "");
+        let code = matches[1].replace(/^[\r\n]+|[\r\n]+$/g, "");
+
+        // Remove leading whitespaces, but keep all rows aligned
+        // 1) Split the lines, 2) Find the shortest indented code, 3) Ignore empty lines
+        // 4) Strip the lines, 5) Join
+        let split_lines = code.split(/\r?\n/);
+        let minimum = null;
+        for (let line of split_lines) {
+          let whitespace = line.match(/^\s+/g);
+          if (whitespace === null) {
+            if (line.length === 0) {
+              continue;
+            }
+            minimum = 0;
+            break;
+          } else if (whitespace[0].length < minimum || minimum === null) {
+            minimum = whitespace[0].length;
+          }
+        }
+        let stripped_lines = [];
+        for (let line of split_lines) {
+          stripped_lines.push(line.substr(minimum));
+        }
+        node.value = stripped_lines.join("\n");
       }
     });
   };

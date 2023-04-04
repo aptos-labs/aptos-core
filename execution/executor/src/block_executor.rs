@@ -1,54 +1,156 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
 
-use crate::logging::{LogEntry, LogSchema};
+use crate::{
+    components::{block_tree::BlockTree, chunk_output::ChunkOutput},
+    logging::{LogEntry, LogSchema},
+    metrics::{
+        APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS, APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS,
+        APTOS_EXECUTOR_OTHER_TIMERS_SECONDS, APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS,
+        APTOS_EXECUTOR_TRANSACTIONS_SAVED, APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
+    },
+};
 use anyhow::Result;
 use aptos_crypto::HashValue;
+use aptos_executor_types::{BlockExecutorTrait, Error, StateComputeResult};
+use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
+use aptos_scratchpad::SparseMerkleTree;
 use aptos_state_view::StateViewId;
+use aptos_storage_interface::{
+    async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView, DbReaderWriter,
+};
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures, state_store::state_value::StateValue,
     transaction::Transaction,
 };
-use aptos_vm::VMExecutor;
-use executor_types::{BlockExecutorTrait, Error, StateComputeResult, StateSnapshotDelta};
+use aptos_vm::AptosVM;
 use fail::fail_point;
-use scratchpad::SparseMerkleTree;
-use std::marker::PhantomData;
-use std::ops::Deref;
+use std::{marker::PhantomData, sync::Arc};
 
-use crate::{
-    components::{block_tree::BlockTree, chunk_output::ChunkOutput},
-    metrics::{
-        APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS, APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS,
-        APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS, APTOS_EXECUTOR_TRANSACTIONS_SAVED,
-        APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
-    },
-};
-use storage_interface::{jmt_updates, DbReaderWriter};
-
-pub struct BlockExecutor<V> {
-    pub db: DbReaderWriter,
-    block_tree: BlockTree,
-    phantom: PhantomData<V>,
+pub trait TransactionBlockExecutor<T>: Send + Sync {
+    fn execute_transaction_block(
+        transactions: Vec<T>,
+        state_view: CachedStateView,
+    ) -> Result<ChunkOutput>;
 }
 
-impl<V> BlockExecutor<V>
+impl TransactionBlockExecutor<Transaction> for AptosVM {
+    fn execute_transaction_block(
+        transactions: Vec<Transaction>,
+        state_view: CachedStateView,
+    ) -> Result<ChunkOutput> {
+        ChunkOutput::by_transaction_execution::<AptosVM>(transactions, state_view)
+    }
+}
+
+pub struct BlockExecutor<V, T> {
+    pub db: DbReaderWriter,
+    inner: RwLock<Option<BlockExecutorInner<V, T>>>,
+}
+
+impl<V, T> BlockExecutor<V, T>
 where
-    V: VMExecutor,
+    V: TransactionBlockExecutor<T>,
+    T: Send + Sync,
 {
     pub fn new(db: DbReaderWriter) -> Self {
-        let block_tree = BlockTree::new(&db.reader).expect("Block tree failed to init.");
         Self {
             db,
-            block_tree,
-            phantom: PhantomData,
+            inner: RwLock::new(None),
         }
     }
 
     pub fn root_smt(&self) -> SparseMerkleTree<StateValue> {
+        self.inner
+            .read()
+            .as_ref()
+            .expect("BlockExecutor is not reset")
+            .root_smt()
+    }
+
+    fn maybe_initialize(&self) -> Result<()> {
+        if self.inner.read().is_none() {
+            self.reset()?;
+        }
+        Ok(())
+    }
+}
+
+impl<V, T> BlockExecutorTrait<T> for BlockExecutor<V, T>
+where
+    V: TransactionBlockExecutor<T>,
+    T: Send + Sync,
+{
+    fn committed_block_id(&self) -> HashValue {
+        self.maybe_initialize().expect("Failed to initialize.");
+        self.inner
+            .read()
+            .as_ref()
+            .expect("BlockExecutor is not reset")
+            .committed_block_id()
+    }
+
+    fn reset(&self) -> Result<()> {
+        *self.inner.write() = Some(BlockExecutorInner::new(self.db.clone())?);
+        Ok(())
+    }
+
+    fn execute_block(
+        &self,
+        block: (HashValue, Vec<T>),
+        parent_block_id: HashValue,
+    ) -> Result<StateComputeResult, Error> {
+        self.maybe_initialize()?;
+        self.inner
+            .read()
+            .as_ref()
+            .expect("BlockExecutor is not reset")
+            .execute_block(block, parent_block_id)
+    }
+
+    fn commit_blocks_ext(
+        &self,
+        block_ids: Vec<HashValue>,
+        ledger_info_with_sigs: LedgerInfoWithSignatures,
+        save_state_snapshots: bool,
+    ) -> Result<(), Error> {
+        self.inner
+            .read()
+            .as_ref()
+            .expect("BlockExecutor is not reset")
+            .commit_blocks_ext(block_ids, ledger_info_with_sigs, save_state_snapshots)
+    }
+
+    fn finish(&self) {
+        *self.inner.write() = None;
+    }
+}
+
+struct BlockExecutorInner<V, T> {
+    db: DbReaderWriter,
+    block_tree: BlockTree,
+    phantom: PhantomData<(V, T)>,
+}
+
+impl<V, T> BlockExecutorInner<V, T>
+where
+    V: TransactionBlockExecutor<T>,
+    T: Send + Sync,
+{
+    pub fn new(db: DbReaderWriter) -> Result<Self> {
+        let block_tree = BlockTree::new(&db.reader)?;
+        Ok(Self {
+            db,
+            block_tree,
+            phantom: PhantomData,
+        })
+    }
+
+    fn root_smt(&self) -> SparseMerkleTree<StateValue> {
         self.block_tree
             .root_block()
             .output
@@ -59,23 +161,21 @@ where
     }
 }
 
-impl<V> BlockExecutorTrait for BlockExecutor<V>
+impl<V, T> BlockExecutorInner<V, T>
 where
-    V: VMExecutor,
+    V: TransactionBlockExecutor<T>,
+    T: Send + Sync,
 {
     fn committed_block_id(&self) -> HashValue {
         self.block_tree.root_block().id
     }
 
-    fn reset(&self) -> Result<(), Error> {
-        Ok(self.block_tree.reset(&self.db.reader)?)
-    }
-
     fn execute_block(
         &self,
-        block: (HashValue, Vec<Transaction>),
+        block: (HashValue, Vec<T>),
         parent_block_id: HashValue,
     ) -> Result<StateComputeResult, Error> {
+        let _timer = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
         let (block_id, transactions) = block;
         let committed_block = self.block_tree.root_block();
         let mut block_vec = self
@@ -91,6 +191,7 @@ where
 
         if let Some(b) = block_vec.pop().expect("Must exist") {
             // this is a retry
+            parent_block.ensure_has_child(block_id)?;
             return Ok(b.output.as_state_compute_result(parent_accumulator));
         }
 
@@ -106,11 +207,16 @@ where
                 LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
                 "execute_block"
             );
-            let _timer = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
-            let state_view = parent_view.verified_state_view(
-                StateViewId::BlockExecution { block_id },
-                self.db.reader.deref(),
-            )?;
+            let state_view = {
+                let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+                    .with_label_values(&["verified_state_view"])
+                    .start_timer();
+                parent_view.verified_state_view(
+                    StateViewId::BlockExecution { block_id },
+                    Arc::clone(&self.db.reader),
+                    Arc::new(AsyncProofFetcher::new(self.db.reader.clone())),
+                )?
+            };
 
             let chunk_output = {
                 let _timer = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.start_timer();
@@ -119,15 +225,21 @@ where
                         "Injected error in vm_execute_block"
                     )))
                 });
-                ChunkOutput::by_transaction_execution::<V>(transactions, state_view)?
+                V::execute_transaction_block(transactions, state_view)?
             };
             chunk_output.trace_log_transaction_status();
 
+            let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+                .with_label_values(&["apply_to_ledger"])
+                .start_timer();
             let (output, _, _) = chunk_output.apply_to_ledger(parent_view)?;
             output
         };
         output.ensure_ends_with_state_checkpoint()?;
 
+        let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+            .with_label_values(&["as_state_compute_result"])
+            .start_timer();
         let block = self
             .block_tree
             .add_block(parent_block_id, block_id, output)?;
@@ -138,31 +250,51 @@ where
         &self,
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
-        save_state_snapshots: bool,
-    ) -> Result<Option<StateSnapshotDelta>, Error> {
+        sync_commit: bool,
+    ) -> Result<(), Error> {
         let _timer = APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.start_timer();
+
+        // Ensure the block ids are not empty
+        if block_ids.is_empty() {
+            return Err(anyhow::anyhow!("Cannot commit 0 blocks!").into());
+        }
+
+        // Check for any potential retries
         let committed_block = self.block_tree.root_block();
         if committed_block.num_persisted_transactions()
             == ledger_info_with_sigs.ledger_info().version() + 1
         {
-            // a retry
-            return Ok(None);
+            return Ok(());
         }
 
+        // Ensure the last block id matches the ledger info block id to commit
         let block_id_to_commit = ledger_info_with_sigs.ledger_info().consensus_block_id();
         info!(
             LogSchema::new(LogEntry::BlockExecutor).block_id(block_id_to_commit),
             "commit_block"
         );
+        let last_block_id = *block_ids.last().unwrap();
+        if last_block_id != block_id_to_commit {
+            // This should not happen. If it does, we need to panic!
+            panic!(
+                "Block id to commit ({:?}) does not match last block id ({:?})!",
+                block_id_to_commit, last_block_id
+            );
+        }
 
         let blocks = self.block_tree.get_blocks(&block_ids)?;
-        let txns_to_commit: Vec<_> = blocks
-            .into_iter()
-            .map(|block| block.output.transactions_to_commit())
-            .collect::<Result<Vec<_>>>()?
-            .into_iter()
-            .flatten()
-            .collect();
+        let txns_to_commit: Vec<_> = {
+            let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+                .with_label_values(&["get_txns_to_commit"])
+                .start_timer();
+            blocks
+                .into_iter()
+                .map(|block| block.output.transactions_to_commit())
+                .collect::<Result<Vec<_>>>()?
+                .into_iter()
+                .flatten()
+                .collect()
+        };
         let first_version = committed_block
             .output
             .result_view
@@ -178,40 +310,31 @@ where
             });
         }
 
-        let committed_smt = {
-            let _timer = APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS.start_timer();
-            APTOS_EXECUTOR_TRANSACTIONS_SAVED.observe(to_commit as f64);
+        let _timer = APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS.start_timer();
+        APTOS_EXECUTOR_TRANSACTIONS_SAVED.observe(to_commit as f64);
 
-            fail_point!("executor::commit_blocks", |_| {
-                Err(anyhow::anyhow!("Injected error in commit_blocks.").into())
-            });
-            let result_in_memory_state = self
-                .block_tree
-                .get_block(block_id_to_commit)?
-                .output
-                .result_view
-                .state()
-                .clone();
-            self.db.writer.save_transactions_ext(
-                &txns_to_commit,
-                first_version,
-                committed_block.output.result_view.state().base_version,
-                Some(&ledger_info_with_sigs),
-                save_state_snapshots,
-                result_in_memory_state,
-            )?;
-            self.block_tree
-                .prune(ledger_info_with_sigs.ledger_info())
-                .expect("Failure pruning block tree.")
-        };
-        let jmt_updates = txns_to_commit
-            .iter()
-            .flat_map(|t| jmt_updates(t.state_updates()))
-            .collect();
-        Ok(Some(StateSnapshotDelta {
-            version: ledger_info_with_sigs.ledger_info().version(),
-            smt: committed_smt,
-            jmt_updates,
-        }))
+        fail_point!("executor::commit_blocks", |_| {
+            Err(anyhow::anyhow!("Injected error in commit_blocks.").into())
+        });
+        let result_in_memory_state = self
+            .block_tree
+            .get_block(block_id_to_commit)?
+            .output
+            .result_view
+            .state()
+            .clone();
+        self.db.writer.save_transactions(
+            &txns_to_commit,
+            first_version,
+            committed_block.output.result_view.state().base_version,
+            Some(&ledger_info_with_sigs),
+            sync_commit,
+            result_in_memory_state,
+        )?;
+        self.block_tree
+            .prune(ledger_info_with_sigs.ledger_info())
+            .expect("Failure pruning block tree.");
+
+        Ok(())
     }
 }

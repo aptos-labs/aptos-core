@@ -1,68 +1,22 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use move_deps::{
-    move_binary_format::errors::PartialVMResult,
-    move_core_types::{
-        gas_schedule::GasCost,
-        language_storage::{StructTag, TypeTag},
-    },
-    move_vm_runtime::native_functions::NativeContext,
-    move_vm_types::{
-        loaded_data::runtime_types::Type,
-        natives::function::NativeResult,
-        values::{Struct, Value},
-    },
+use crate::natives::{
+    helpers::{make_safe_native, SafeNativeContext, SafeNativeError, SafeNativeResult},
+    transaction_context::NativeTransactionContext,
+};
+use aptos_types::on_chain_config::{Features, TimedFeatures};
+use move_core_types::{
+    gas_algebra::{InternalGas, InternalGasPerByte, NumBytes},
+    language_storage::{StructTag, TypeTag},
+};
+use move_vm_runtime::native_functions::NativeFunction;
+use move_vm_types::{
+    loaded_data::runtime_types::Type,
+    values::{Struct, Value},
 };
 use smallvec::{smallvec, SmallVec};
-use std::{collections::VecDeque, fmt::Write};
-
-/// Returns the structs Module Address, Module Name and the Structs Name
-pub fn type_of(
-    context: &mut NativeContext,
-    ty_args: Vec<Type>,
-    arguments: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
-    debug_assert!(ty_args.len() == 1);
-    debug_assert!(arguments.is_empty());
-
-    let cost = GasCost::new(super::cost::APTOS_LIB_TYPE_OF, 1).total();
-
-    let type_tag = context.type_to_type_tag(&ty_args[0])?;
-
-    if let TypeTag::Struct(struct_tag) = type_tag {
-        Ok(NativeResult::ok(
-            cost,
-            type_of_internal(&struct_tag).expect("type_of should never fail."),
-        ))
-    } else {
-        Ok(NativeResult::err(
-            cost,
-            super::status::NFE_EXPECTED_STRUCT_TYPE_TAG,
-        ))
-    }
-}
-
-/// Returns a string representing the TypeTag of the parameter.
-pub fn type_name(
-    context: &mut NativeContext,
-    ty_args: Vec<Type>,
-    arguments: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
-    debug_assert!(ty_args.len() == 1);
-    debug_assert!(arguments.is_empty());
-
-    let cost = GasCost::new(super::cost::APTOS_LIB_TYPE_NAME, 1).total();
-    let type_tag = context.type_to_type_tag(&ty_args[0])?;
-    let type_name = type_tag.to_string();
-
-    Ok(NativeResult::ok(
-        cost,
-        smallvec![Value::struct_(Struct::pack(vec![Value::vector_u8(
-            type_name.as_bytes().to_vec()
-        )]))],
-    ))
-}
+use std::{collections::VecDeque, fmt::Write, sync::Arc};
 
 fn type_of_internal(struct_tag: &StructTag) -> Result<SmallVec<[Value; 1]>, std::fmt::Error> {
     let mut name = struct_tag.name.to_string();
@@ -83,13 +37,171 @@ fn type_of_internal(struct_tag: &StructTag) -> Result<SmallVec<[Value; 1]>, std:
     Ok(smallvec![Value::struct_(struct_value)])
 }
 
+/***************************************************************************************************
+ * native fun type_of
+ *
+ *   Returns the structs Module Address, Module Name and the Structs Name.
+ *
+ *   gas cost: base_cost + unit_cost * type_size
+ *
+ **************************************************************************************************/
+#[derive(Debug, Clone)]
+pub struct TypeOfGasParameters {
+    pub base: InternalGas,
+    pub per_byte_in_str: InternalGasPerByte,
+}
+
+fn native_type_of(
+    gas_params: &TypeOfGasParameters,
+    context: &mut SafeNativeContext,
+    ty_args: Vec<Type>,
+    arguments: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    debug_assert!(ty_args.len() == 1);
+    debug_assert!(arguments.is_empty());
+
+    context.charge(gas_params.base)?;
+
+    let type_tag = context.type_to_type_tag(&ty_args[0])?;
+
+    if gas_params.per_byte_in_str > 0.into() {
+        let type_tag_str = type_tag.to_string();
+        // Ideally, we would charge *before* the `type_to_type_tag()` and `type_tag.to_string()` calls above.
+        // But there are other limits in place that prevent this native from being called with too much work.
+        context.charge(gas_params.per_byte_in_str * NumBytes::new(type_tag_str.len() as u64))?;
+    }
+
+    if let TypeTag::Struct(struct_tag) = type_tag {
+        Ok(type_of_internal(&struct_tag).expect("type_of should never fail."))
+    } else {
+        Err(SafeNativeError::Abort {
+            abort_code: super::status::NFE_EXPECTED_STRUCT_TYPE_TAG,
+        })
+    }
+}
+
+/***************************************************************************************************
+ * native fun type_name
+ *
+ *   Returns a string representing the TypeTag of the parameter.
+ *
+ *   gas cost: base_cost + unit_cost * type_size
+ *
+ **************************************************************************************************/
+#[derive(Debug, Clone)]
+pub struct TypeNameGasParameters {
+    pub base: InternalGas,
+    pub per_byte_in_str: InternalGasPerByte,
+}
+
+fn native_type_name(
+    gas_params: &TypeNameGasParameters,
+    context: &mut SafeNativeContext,
+    ty_args: Vec<Type>,
+    arguments: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    debug_assert!(ty_args.len() == 1);
+    debug_assert!(arguments.is_empty());
+
+    context.charge(gas_params.base)?;
+
+    let type_tag = context.type_to_type_tag(&ty_args[0])?;
+    let type_name = type_tag.to_string();
+
+    // TODO: Ideally, we would charge *before* the `type_to_type_tag()` and `type_tag.to_string()` calls above.
+    context.charge(gas_params.per_byte_in_str * NumBytes::new(type_name.len() as u64))?;
+
+    Ok(smallvec![Value::struct_(Struct::pack(vec![
+        Value::vector_u8(type_name.as_bytes().to_vec())
+    ]))])
+}
+
+/***************************************************************************************************
+ * native fun chain_id
+ *
+ *   Returns the chain ID
+ *
+ *   gas cost: base_cost
+ *
+ **************************************************************************************************/
+#[derive(Debug, Clone)]
+pub struct ChainIdGasParameters {
+    pub base: InternalGas,
+}
+
+fn native_chain_id(
+    gas_params: &ChainIdGasParameters,
+    context: &mut SafeNativeContext,
+    _ty_args: Vec<Type>,
+    arguments: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    debug_assert!(_ty_args.is_empty());
+    debug_assert!(arguments.is_empty());
+
+    context.charge(gas_params.base)?;
+
+    let chain_id = context
+        .extensions()
+        .get::<NativeTransactionContext>()
+        .chain_id();
+
+    Ok(smallvec![Value::u8(chain_id)])
+}
+
+/***************************************************************************************************
+ * module
+ *
+ **************************************************************************************************/
+#[derive(Debug, Clone)]
+pub struct GasParameters {
+    pub type_of: TypeOfGasParameters,
+    pub type_name: TypeNameGasParameters,
+    pub chain_id: ChainIdGasParameters,
+}
+
+pub fn make_all(
+    gas_params: GasParameters,
+    timed_features: TimedFeatures,
+    features: Arc<Features>,
+) -> impl Iterator<Item = (String, NativeFunction)> {
+    let natives = [
+        (
+            "type_of",
+            make_safe_native(
+                gas_params.type_of,
+                timed_features.clone(),
+                features.clone(),
+                native_type_of,
+            ),
+        ),
+        (
+            "type_name",
+            make_safe_native(
+                gas_params.type_name,
+                timed_features.clone(),
+                features.clone(),
+                native_type_name,
+            ),
+        ),
+        (
+            "chain_id_internal",
+            make_safe_native(
+                gas_params.chain_id,
+                timed_features,
+                features,
+                native_chain_id,
+            ),
+        ),
+    ];
+
+    crate::natives::helpers::make_module_natives(natives)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use move_deps::{
-        move_core_types::{account_address::AccountAddress, identifier::Identifier},
-        move_vm_types::values::VMValueCast,
-    };
+    use move_core_types::{account_address::AccountAddress, identifier::Identifier};
+    use move_vm_types::values::VMValueCast;
 
     #[test]
     fn test_type_of_internal() {

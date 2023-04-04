@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::{
@@ -130,6 +131,7 @@ pub enum Protocol {
 /// 1. it is not an empty string
 /// 2. it is not larger than 255 bytes
 /// 3. it does not contain any forward slash '/' characters
+/// 4. it is valid ASCII (Unicode characters are not allowed to prevent phishing attacks)
 ///
 /// From the [DNS name syntax RFC](https://tools.ietf.org/html/rfc2181#page-13),
 /// the standard rules are:
@@ -139,7 +141,7 @@ pub enum Protocol {
 /// 3. any binary string is valid
 ///
 /// So the restrictions we're adding are (1) no '/' characters and (2) the name
-/// is a valid unicode string. We do this because '/' characters are already our
+/// is a valid ASCII string. We do this because '/' characters are already our
 /// protocol delimiter and Rust's [`std::net::ToSocketAddrs`] API requires a
 /// `&str`.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize)]
@@ -174,6 +176,9 @@ pub enum ParseError {
 
     #[error("dns name cannot contain '/' characters")]
     InvalidDnsNameCharacter,
+
+    #[error("dns name contains non-ASCII characters: {0}")]
+    DnsNameNonASCII(String),
 
     #[error("dns name is too long: len: {0} bytes, max len: 255 bytes")]
     DnsNameTooLong(usize),
@@ -261,7 +266,7 @@ impl NetworkAddress {
 
         let mut p = iter.next();
 
-        if p == None {
+        if p.is_none() {
             return Ok(Self(protocols));
         }
 
@@ -271,7 +276,7 @@ impl NetworkAddress {
 
         if !matches!(p, Some(Memory(_))) {
             p = iter.next();
-            if p == None {
+            if p.is_none() {
                 return Ok(Self(protocols));
             }
             if !is_transport_layer(p) {
@@ -280,7 +285,7 @@ impl NetworkAddress {
         }
 
         p = iter.next();
-        if p == None {
+        if p.is_none() {
             return Ok(Self(protocols));
         }
         if !is_session_layer(p, true) {
@@ -288,7 +293,7 @@ impl NetworkAddress {
         }
 
         p = iter.next();
-        if p == None {
+        if p.is_none() {
             return Ok(Self(protocols));
         }
         if !is_handshake_layer(p, true) {
@@ -296,7 +301,7 @@ impl NetworkAddress {
         }
 
         p = iter.next();
-        if p == None {
+        if p.is_none() {
             Ok(Self(protocols))
         } else {
             Err(ParseError::RedundantLayer)
@@ -380,6 +385,14 @@ impl NetworkAddress {
         })
     }
 
+    /// Retrieves the port from the network address
+    pub fn find_port(&self) -> Option<u16> {
+        self.0.iter().find_map(|proto| match proto {
+            Protocol::Tcp(port) => Some(*port),
+            _ => None,
+        })
+    }
+
     /// A temporary, hacky function to parse out the first `/noise-ik/<pubkey>` from
     /// a `NetworkAddress`. We can remove this soon, when we move to the interim
     /// "monolithic" transport model.
@@ -413,8 +426,8 @@ impl NetworkAddress {
 }
 
 impl IntoIterator for NetworkAddress {
-    type Item = Protocol;
     type IntoIter = std::vec::IntoIter<Self::Item>;
+    type Item = Protocol;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
@@ -476,7 +489,7 @@ impl TryFrom<Vec<Protocol>> for NetworkAddress {
 
     fn try_from(value: Vec<Protocol>) -> Result<Self, Self::Error> {
         if value.is_empty() {
-            anyhow::private::Err(ParseError::EmptyProtocolString)
+            Err(ParseError::EmptyProtocolString)
         } else {
             NetworkAddress::from_protocols(value)
         }
@@ -657,6 +670,8 @@ impl DnsName {
             Err(ParseError::DnsNameTooLong(s.as_bytes().len()))
         } else if s.contains('/') {
             Err(ParseError::InvalidDnsNameCharacter)
+        } else if !s.is_ascii() {
+            Err(ParseError::DnsNameNonASCII(s.into()))
         } else {
             Ok(())
         }
@@ -884,6 +899,7 @@ mod test {
     use super::*;
     use anyhow::format_err;
     use bcs::test_helpers::assert_canonical_encode_decode;
+    use claims::assert_matches;
 
     #[test]
     fn test_network_address_display() {
@@ -931,30 +947,24 @@ mod test {
                     Handshake(123),
                 ],
             ),
-            (
-                "/ip6/::1/tcp/0",
-                vec![Ip6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), Tcp(0)],
-            ),
-            (
-                "/ip6/dead:beef::c0de/tcp/8080",
-                vec![
-                    Ip6(Ipv6Addr::new(0xdead, 0xbeef, 0, 0, 0, 0, 0, 0xc0de)),
-                    Tcp(8080),
-                ],
-            ),
-            (
-                "/dns/example.com/tcp/80",
-                vec![Dns(DnsName("example.com".to_owned())), Tcp(80)],
-            ),
-            (
-                &noise_addr_str,
-                vec![
-                    Dns(DnsName("example.com".to_owned())),
-                    Tcp(1234),
-                    NoiseIK(pubkey),
-                    Handshake(5),
-                ],
-            ),
+            ("/ip6/::1/tcp/0", vec![
+                Ip6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)),
+                Tcp(0),
+            ]),
+            ("/ip6/dead:beef::c0de/tcp/8080", vec![
+                Ip6(Ipv6Addr::new(0xDEAD, 0xBEEF, 0, 0, 0, 0, 0, 0xC0DE)),
+                Tcp(8080),
+            ]),
+            ("/dns/example.com/tcp/80", vec![
+                Dns(DnsName("example.com".to_owned())),
+                Tcp(80),
+            ]),
+            (&noise_addr_str, vec![
+                Dns(DnsName("example.com".to_owned())),
+                Tcp(1234),
+                NoiseIK(pubkey),
+                Handshake(5),
+            ]),
         ];
 
         for (addr_str, expected_address) in &test_cases {
@@ -1044,6 +1054,13 @@ mod test {
             parse_dns_tcp(addr.as_slice()).unwrap(),
             ((IpFilter::OnlyIp6, &dns_name, 123), expected_suffix)
         );
+
+        // The first `e` in `example.com` is a unicode character and not a regular `e`!
+        let bad_address = "/dns6/еxample.com/tcp/123";
+        assert_matches!(
+            NetworkAddress::from_str(bad_address),
+            Err(ParseError::DnsNameNonASCII(_))
+        );
     }
 
     #[test]
@@ -1088,14 +1105,26 @@ mod test {
     proptest! {
         #[test]
         fn test_network_address_canonical_serialization(addr in arb_aptosnet_addr()) {
-            assert_canonical_encode_decode(addr);
+            if addr.to_string().is_ascii() {
+                assert_canonical_encode_decode(addr);
+            } else {
+                let addr_bytes = bcs::to_bytes(&addr).unwrap();
+                bcs::from_bytes::<NetworkAddress>(&addr_bytes).unwrap_err();
+            }
         }
 
         #[test]
         fn test_network_address_display_roundtrip(addr in arb_aptosnet_addr()) {
             let addr_str = addr.to_string();
-            let addr_parsed = NetworkAddress::from_str(&addr_str).unwrap();
-            assert_eq!(addr, addr_parsed);
+            let addr_parsed = NetworkAddress::from_str(&addr_str);
+            if addr_str.is_ascii() {
+                assert_eq!(addr, addr_parsed.unwrap());
+            } else {
+                assert_matches!(
+                    addr_parsed,
+                    Err(ParseError::DnsNameNonASCII(_))
+                );
+            }
         }
 
         #[test]

@@ -14,7 +14,6 @@ module std::fixed_point32 {
     /// decimal.
     struct FixedPoint32 has copy, drop, store { value: u64 }
 
-    ///> TODO: This is a basic constant and should be provided somewhere centrally in the framework.
     const MAX_U64: u128 = 18446744073709551615;
 
     /// The denominator provided was zero
@@ -121,8 +120,8 @@ module std::fixed_point32 {
     spec schema CreateFromRationalAbortsIf {
         numerator: u64;
         denominator: u64;
-        let scaled_numerator = numerator << 64;
-        let scaled_denominator = denominator << 32;
+        let scaled_numerator = (numerator as u128)<< 64;
+        let scaled_denominator = (denominator as u128) << 32;
         let quotient = scaled_numerator / scaled_denominator;
         aborts_if scaled_denominator == 0 with EDENOMINATOR;
         aborts_if quotient == 0 && scaled_numerator != 0 with ERATIO_OUT_OF_RANGE;
@@ -152,6 +151,138 @@ module std::fixed_point32 {
     /// Returns true if the ratio is zero.
     public fun is_zero(num: FixedPoint32): bool {
         num.value == 0
+    }
+
+    /// Returns the smaller of the two FixedPoint32 numbers.
+    public fun min(num1: FixedPoint32, num2: FixedPoint32): FixedPoint32 {
+        if (num1.value < num2.value) {
+            num1
+        } else {
+            num2
+        }
+    }
+    spec min {
+        pragma opaque;
+        aborts_if false;
+        ensures result == spec_min(num1, num2);
+    }
+    spec fun spec_min(num1: FixedPoint32, num2: FixedPoint32): FixedPoint32 {
+        if (num1.value < num2.value) {
+            num1
+        } else {
+            num2
+        }
+    }
+
+    /// Returns the larger of the two FixedPoint32 numbers.
+    public fun max(num1: FixedPoint32, num2: FixedPoint32): FixedPoint32 {
+        if (num1.value > num2.value) {
+            num1
+        } else {
+            num2
+        }
+    }
+    spec max {
+        pragma opaque;
+        aborts_if false;
+        ensures result == spec_max(num1, num2);
+    }
+    spec fun spec_max(num1: FixedPoint32, num2: FixedPoint32): FixedPoint32 {
+        if (num1.value > num2.value) {
+            num1
+        } else {
+            num2
+        }
+    }
+
+    /// Create a fixedpoint value from a u64 value.
+    public fun create_from_u64(val: u64): FixedPoint32 {
+        let value = (val as u128) << 32;
+        assert!(value <= MAX_U64, ERATIO_OUT_OF_RANGE);
+        FixedPoint32 {value: (value as u64)}
+    }
+    spec create_from_u64 {
+        pragma opaque;
+        include CreateFromU64AbortsIf;
+        ensures result == spec_create_from_u64(val);
+    }
+    spec schema CreateFromU64AbortsIf {
+        val: num;
+        let scaled_value = (val as u128) << 32;
+        aborts_if scaled_value > MAX_U64;
+    }
+    spec fun spec_create_from_u64(val: num): FixedPoint32 {
+        FixedPoint32 {value: val << 32}
+    }
+
+    /// Returns the largest integer less than or equal to a given number.
+    public fun floor(num: FixedPoint32): u64 {
+        num.value >> 32
+    }
+    spec floor {
+        pragma opaque;
+        aborts_if false;
+        ensures result == spec_floor(num);
+    }
+    spec fun spec_floor(val: FixedPoint32): u64 {
+        let fractional = val.value % (1 << 32);
+        if (fractional == 0) {
+            val.value >> 32
+        } else {
+            (val.value - fractional) >> 32
+        }
+    }
+
+    /// Rounds up the given FixedPoint32 to the next largest integer.
+    public fun ceil(num: FixedPoint32): u64 {
+        let floored_num = floor(num) << 32;
+        if (num.value == floored_num) {
+            return floored_num >> 32
+        };
+        let val = ((floored_num as u128) + (1 << 32));
+        (val >> 32 as u64)
+    }
+    spec ceil {
+        /// TODO: worked in the past but started to time out since last z3 update
+        pragma verify = false;
+        pragma opaque;
+        aborts_if false;
+        ensures result == spec_ceil(num);
+    }
+    spec fun spec_ceil(val: FixedPoint32): u64 {
+        let fractional = val.value % (1 << 32);
+        let one = 1 << 32;
+        if (fractional == 0) {
+            val.value >> 32
+        } else {
+            (val.value - fractional + one) >> 32
+        }
+    }
+
+    /// Returns the value of a FixedPoint32 to the nearest integer.
+    public fun round(num: FixedPoint32): u64 {
+        let floored_num = floor(num) << 32;
+        let boundary = floored_num + ((1 << 32) / 2);
+        if (num.value < boundary) {
+            floored_num >> 32
+        } else {
+            ceil(num)
+        }
+    }
+    spec round {
+        pragma opaque;
+        aborts_if false;
+        ensures result == spec_round(num);
+    }
+    spec fun spec_round(val: FixedPoint32): u64 {
+        let fractional = val.value % (1 << 32);
+        let boundary = (1 << 32) / 2;
+        let one = 1 << 32;
+        if (fractional < boundary) {
+            (val.value - fractional) >> 32
+        } else {
+            (val.value - fractional + one) >> 32
+        }
     }
 
     // **************** SPECIFICATIONS ****************

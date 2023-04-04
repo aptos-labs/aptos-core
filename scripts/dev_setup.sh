@@ -1,6 +1,8 @@
 #!/bin/bash
-# Copyright (c) Aptos
+# Copyright © Aptos Foundation
+# Parts of the project are originally copyright © Meta Platforms, Inc.
 # SPDX-License-Identifier: Apache-2.0
+
 # This script sets up the environment for the build by installing necessary dependencies.
 #
 # Usage ./dev_setup.sh <options>
@@ -20,13 +22,14 @@ KUBECTL_VERSION=1.18.6
 TERRAFORM_VERSION=0.12.26
 HELM_VERSION=3.2.4
 VAULT_VERSION=1.5.0
-Z3_VERSION=4.8.13
+Z3_VERSION=4.11.2
 CVC5_VERSION=0.0.3
-DOTNET_VERSION=5.0
-BOOGIE_VERSION=2.9.6
-PYRE_CHECK_VERSION=0.0.59
-NUMPY_VERSION=1.20.1
+DOTNET_VERSION=6.0
+BOOGIE_VERSION=2.15.8
 ALLURE_VERSION=2.15.pr1135
+# this is 3.21.4; the "3" is silent
+PROTOC_VERSION=21.4
+SOLC_VERSION="v0.8.11+commit.d7f03943"
 
 SCRIPT_PATH="$( cd "$( dirname "$0" )" >/dev/null 2>&1 && pwd )"
 cd "$SCRIPT_PATH/.." || exit
@@ -34,17 +37,18 @@ cd "$SCRIPT_PATH/.." || exit
 function usage {
   echo "Usage:"
   echo "Installs or updates necessary dev tools for aptoslabs/aptos-core."
-  echo "-b batch mode, no user interactions and miminal output"
+  echo "-b batch mode, no user interactions and minimal output"
   echo "-p update ${HOME}/.profile"
+  echo "-r install protoc and related tools"
   echo "-t install build tools"
   echo "-o install operations tooling as well: helm, terraform, yamllint, vault, docker, kubectl, python3"
-  echo "-y installs or updates Move prover tools: z3, cvc5, dotnet, boogie"
-  echo "-s installs or updates requirements to test code-generation for Move SDKs"
+  echo "-y install or update Move Prover tools: z3, cvc5, dotnet, boogie"
+  echo "-d install tools for the Move documentation generator: graphviz"
   echo "-a install tools for build and test api"
   echo "-v verbose mode"
   echo "-i installs an individual tool by name"
   echo "-n will target the /opt/ dir rather than the $HOME dir.  /opt/bin/, /opt/rustup/, and /opt/dotnet/ rather than $HOME/bin/, $HOME/.rustup/, and $HOME/.dotnet/"
-  echo "If no toolchain component is selected with -t, -o, -y, or -p, the behavior is as if -t had been provided."
+  echo "If no toolchain component is selected with -t, -o, -y, -d, or -p, the behavior is as if -t had been provided."
   echo "This command must be called from the root folder of the Aptos-core project."
 }
 
@@ -80,6 +84,9 @@ function update_path_and_profile {
   else
     add_to_profile "export PATH=\"${BIN_DIR}:${C_HOME}/bin:\$PATH\""
   fi
+  if [[ "$INSTALL_PROTOC" == "true" ]]; then
+    add_to_profile "export PATH=\$PATH:/usr/local/include"
+  fi
   if [[ "$INSTALL_PROVER" == "true" ]]; then
     add_to_profile "export DOTNET_ROOT=\"${DOTNET_ROOT}\""
     add_to_profile "export PATH=\"${DOTNET_ROOT}/tools:\$PATH\""
@@ -87,14 +94,7 @@ function update_path_and_profile {
     add_to_profile "export CVC5_EXE=\"${BIN_DIR}/cvc5\""
     add_to_profile "export BOOGIE_EXE=\"${DOTNET_ROOT}/tools/boogie\""
   fi
-  if [[ "$INSTALL_CODEGEN" == "true" ]] && [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
-    add_to_profile "export PATH=\$PATH:${INSTALL_DIR}swift/usr/bin"
-    if [[ -n "${GOBIN}" ]]; then
-      add_to_profile "export PATH=\$PATH:/usr/lib/golang/bin"
-    else
-      add_to_profile "export PATH=\$PATH:$GOBIN"
-    fi
-  fi
+  add_to_profile "export SOLC_EXE=\"${BIN_DIR}/solc\""
 }
 
 function install_build_essentials {
@@ -118,6 +118,48 @@ function install_build_essentials {
   #if [[ "$PACKAGE_MANAGER" == "brew" ]]; then
   #  install_pkg pkgconfig "$PACKAGE_MANAGER"
   #fi
+}
+
+function install_protoc {
+  INSTALL_PROTOC="true"
+  echo "Installing protoc and plugins"
+
+  if command -v "${INSTALL_DIR}protoc" &>/dev/null && [[ "$("${INSTALL_DIR}protoc" --version || true)" =~ .*${PROTOC_VERSION}.* ]]; then
+     echo "protoc 3.${PROTOC_VERSION} already installed"
+     return
+  fi
+
+  if [[ "$(uname)" == "Linux" ]]; then
+    PROTOC_PKG="protoc-$PROTOC_VERSION-linux-x86_64"
+  elif [[ "$(uname)" == "Darwin" ]]; then
+    PROTOC_PKG="protoc-$PROTOC_VERSION-osx-universal_binary"
+  else
+    echo "protoc support not configured for this platform (uname=$(uname))"
+    return
+  fi
+
+  TMPFILE=$(mktemp)
+  rm "$TMPFILE"
+  mkdir -p "$TMPFILE"/
+  (
+    cd "$TMPFILE" || exit
+    curl -LOs "https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOC_VERSION/$PROTOC_PKG.zip" --retry 3
+    sudo unzip -o "$PROTOC_PKG.zip" -d /usr/local bin/protoc
+    sudo unzip -o "$PROTOC_PKG.zip" -d /usr/local 'include/*'
+    sudo chmod +x "/usr/local/bin/protoc"
+  )
+  rm -rf "$TMPFILE"
+
+  # Install the cargo plugins
+  if ! command -v protoc-gen-prost &> /dev/null; then
+    cargo install protoc-gen-prost --locked
+  fi
+  if ! command -v protoc-gen-prost-serde &> /dev/null; then
+    cargo install protoc-gen-prost-serde --locked
+  fi
+  if ! command -v protoc-gen-prost-crate &> /dev/null; then
+    cargo install protoc-gen-prost-crate --locked
+  fi
 }
 
 function install_rustup {
@@ -370,6 +412,18 @@ function install_toolchain {
   fi
 }
 
+function install_rustup_components_and_nightly {
+    echo "Updating rustup and installing rustfmt & clippy"
+    rustup update
+    rustup component add rustfmt
+    rustup component add clippy
+
+    # We require nightly for strict rust formatting
+    echo "Installing the nightly toolchain and rustfmt nightly"
+    rustup toolchain install nightly
+    rustup component add rustfmt --toolchain nightly
+}
+
 function install_cargo_sort {
   if ! command -v cargo-sort &> /dev/null; then
     cargo install cargo-sort --locked
@@ -377,7 +431,7 @@ function install_cargo_sort {
 }
 
 function install_cargo_nextest {
-  if ! command -v cargo-nextext &> /dev/null; then
+  if ! command -v cargo-nextest &> /dev/null; then
     cargo install cargo-nextest --locked
   fi
 }
@@ -443,7 +497,7 @@ function install_z3 {
      return
   fi
   if [[ "$(uname)" == "Linux" ]]; then
-    Z3_PKG="z3-$Z3_VERSION-x64-glibc-2.28"
+    Z3_PKG="z3-$Z3_VERSION-x64-glibc-2.31"
   elif [[ "$(uname)" == "Darwin" ]]; then
     Z3_PKG="z3-$Z3_VERSION-x64-osx-10.16"
   else
@@ -455,7 +509,7 @@ function install_z3 {
   mkdir -p "$TMPFILE"/
   (
     cd "$TMPFILE" || exit
-    curl -LOs "https://github.com/junkil-park/z3/releases/download/z3-$Z3_VERSION/$Z3_PKG.zip"
+    curl -LOs "https://github.com/Z3Prover/z3/releases/download/z3-$Z3_VERSION/$Z3_PKG.zip"
     unzip -q "$Z3_PKG.zip"
     cp "$Z3_PKG/bin/z3" "${INSTALL_DIR}"
     chmod +x "${INSTALL_DIR}z3"
@@ -578,6 +632,25 @@ function install_nodejs {
     install_pkg npm "$PACKAGE_MANAGER"
 }
 
+function install_solidity {
+  echo "Installing Solidity compiler"
+  # We fetch the binary from  https://binaries.soliditylang.org
+  if [[ "$(uname)" == "Linux" ]]; then
+    SOLC_BIN="linux-amd64/solc-linux-amd64-${SOLC_VERSION}"
+  elif [[ "$(uname)" == "Darwin" ]]; then
+    SOLC_BIN="macosx-amd64/solc-macosx-amd64-${SOLC_VERSION}"
+  else
+    echo "Solidity support not configured for this platform (uname=$(uname))"
+    return
+  fi
+  curl -o "${INSTALL_DIR}solc" "https://binaries.soliditylang.org/${SOLC_BIN}"
+  chmod +x "${INSTALL_DIR}solc"
+}
+
+function install_pnpm {
+    curl -fsSL https://get.pnpm.io/install.sh | "${PRE_COMMAND[@]}" env PNPM_VERSION=7.14.2 SHELL="$(which bash)" bash -
+}
+
 function install_python3 {
   if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
     install_pkg python3-all-dev "$PACKAGE_MANAGER"
@@ -605,6 +678,13 @@ function install_postgres {
   fi
 }
 
+function install_lld {
+  # Right now, only install lld for linux
+  if [[ "$(uname)" == "Linux" ]]; then
+    install_pkg lld "$PACKAGE_MANAGER"
+  fi
+}
+
 function welcome_message {
 cat <<EOF
 Welcome to Aptos!
@@ -626,6 +706,8 @@ Build tools (since -t or no option was provided):
   * pkg-config
   * libssl-dev
   * NodeJS / NPM
+  * protoc (and related tools)
+  * lld (only for Linux)
 EOF
   fi
 
@@ -654,15 +736,17 @@ Move prover tools (since -y was provided):
 EOF
   fi
 
-  if [[ "$INSTALL_CODEGEN" == "true" ]]; then
+if [[ "$INSTALL_DOC" == "true" ]]; then
 cat <<EOF
-Codegen tools (since -s was provided):
-  * Clang
-  * Python3 (numpy, pyre-check)
-  * Golang
-  * Java
-  * Deno
-  * Swift
+tools for the Move documentation generator (since -d was provided):
+  * graphviz
+EOF
+  fi
+
+  if [[ "$INSTALL_PROTOC" == "true" ]]; then
+cat <<EOF
+protoc and related plugins (since -r was provided):
+  * protoc
 EOF
   fi
 
@@ -691,7 +775,8 @@ INSTALL_BUILD_TOOLS=false;
 OPERATIONS=false;
 INSTALL_PROFILE=false;
 INSTALL_PROVER=false;
-INSTALL_CODEGEN=false;
+INSTALL_DOC=false;
+INSTALL_PROTOC=false;
 INSTALL_API_BUILD_TOOLS=false;
 INSTALL_INDIVIDUAL=false;
 INSTALL_PACKAGES=();
@@ -699,7 +784,7 @@ INSTALL_DIR="${HOME}/bin/"
 OPT_DIR="false"
 
 #parse args
-while getopts "btopvysah:i:n" arg; do
+while getopts "btoprvydsah:i:n" arg; do
   case "$arg" in
     b)
       BATCH_MODE="true"
@@ -713,14 +798,17 @@ while getopts "btopvysah:i:n" arg; do
     p)
       INSTALL_PROFILE="true"
       ;;
+    r)
+      INSTALL_PROTOC="true"
+      ;;
     v)
       VERBOSE=true
       ;;
     y)
       INSTALL_PROVER="true"
       ;;
-    s)
-      INSTALL_CODEGEN="true"
+    d)
+      INSTALL_DOC="true"
       ;;
     a)
       INSTALL_API_BUILD_TOOLS="true"
@@ -748,7 +836,7 @@ if [[ "$INSTALL_BUILD_TOOLS" == "false" ]] && \
    [[ "$OPERATIONS" == "false" ]] && \
    [[ "$INSTALL_PROFILE" == "false" ]] && \
    [[ "$INSTALL_PROVER" == "false" ]] && \
-   [[ "$INSTALL_CODEGEN" == "false" ]] && \
+   [[ "$INSTALL_DOC" == "false" ]] && \
    [[ "$INSTALL_API_BUILD_TOOLS" == "false" ]] && \
    [[ "$INSTALL_INDIVIDUAL" == "false" ]]; then
    INSTALL_BUILD_TOOLS="true"
@@ -824,7 +912,7 @@ if [[ "$INSTALL_PROFILE" == "true" ]]; then
 fi
 
 install_pkg curl "$PACKAGE_MANAGER"
-
+install_pkg unzip "$PACKAGE_MANAGER"
 
 if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   install_build_essentials "$PACKAGE_MANAGER"
@@ -835,11 +923,11 @@ if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   install_openssl_dev "$PACKAGE_MANAGER"
   install_pkg_config "$PACKAGE_MANAGER"
 
+  install_lld
+
   install_rustup "$BATCH_MODE"
   install_toolchain "$(cat ./rust-toolchain)"
-  # Add all the components that we need
-  rustup component add rustfmt
-  rustup component add clippy
+  install_rustup_components_and_nightly
 
   install_cargo_sort
   install_cargo_nextest
@@ -848,6 +936,17 @@ if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   install_pkg git "$PACKAGE_MANAGER"
   install_lcov "$PACKAGE_MANAGER"
   install_nodejs "$PACKAGE_MANAGER"
+  install_pnpm "$PACKAGE_MANAGER"
+  install_pkg unzip "$PACKAGE_MANAGER"
+  install_protoc
+  install_solidity
+fi
+
+if [[ "$INSTALL_PROTOC" == "true" ]]; then
+  if [[ "$INSTALL_BUILD_TOOLS" == "false" ]]; then
+    install_pkg unzip "$PACKAGE_MANAGER"
+    install_protoc
+  fi
 fi
 
 if [[ "$OPERATIONS" == "true" ]]; then
@@ -889,32 +988,15 @@ if [[ "$INSTALL_PROVER" == "true" ]]; then
     export DOTNET_INSTALL_DIR="/opt/dotnet/"
     mkdir -p "$DOTNET_INSTALL_DIR" || true
   fi
+  install_pkg unzip "$PACKAGE_MANAGER"
   install_z3
   install_cvc5
   install_dotnet
   install_boogie
 fi
 
-if [[ "$INSTALL_CODEGEN" == "true" ]]; then
-  install_pkg clang "$PACKAGE_MANAGER"
-  install_pkg llvm "$PACKAGE_MANAGER"
-  install_python3
-  install_deno
-  install_java
-  install_golang
-  if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
-    # Only looked at this for a little while, but depends on glibc so alpine
-    # support isn't easily added. On Mac it requires XCode to be installed,
-    # which is quite largs, so probably something we don't want to download in
-    # this script.
-    install_swift
-  fi
-  if [[ "$PACKAGE_MANAGER" != "apk" ]]; then
-    # depends on wheels which needs glibc which doesn't work on alpine's python.
-    # Only invested a hour or so in this, a work around may exist.
-    "${PRE_COMMAND[@]}" python3 -m pip install pyre-check=="${PYRE_CHECK_VERSION}"
-  fi
-  "${PRE_COMMAND[@]}" python3 -m pip install numpy=="${NUMPY_VERSION}"
+if [[ "$INSTALL_DOC" == "true" ]]; then
+  install_pkg graphviz "$PACKAGE_MANAGER"
 fi
 
 if [[ "$INSTALL_API_BUILD_TOOLS" == "true" ]]; then
@@ -925,7 +1007,13 @@ fi
 
 install_python3
 pip3 install pre-commit
-pre-commit install
+
+# For now best effort install, will need to improve later
+if command -v pre-commit; then
+  pre-commit install
+else
+  ~/.local/bin/pre-commit install
+fi
 
 if [[ "${BATCH_MODE}" == "false" ]]; then
 cat <<EOF

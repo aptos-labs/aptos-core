@@ -1,28 +1,10 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::{
-    atomic::{AtomicU64, Ordering},
-    Arc,
-};
-
-use futures::{
-    channel::{
-        mpsc::{UnboundedReceiver, UnboundedSender},
-        oneshot,
-    },
-    SinkExt, StreamExt,
-};
-use tokio::time::Duration;
-
-use aptos_logger::prelude::*;
-use aptos_types::{
-    account_address::AccountAddress, ledger_info::LedgerInfoWithSignatures,
-    validator_verifier::ValidatorVerifier,
-};
-use consensus_types::{common::Author, executed_block::ExecutedBlock};
-
 use crate::{
+    block_storage::tracing::{observe_block, BlockStage},
+    counters,
     experimental::{
         buffer::{Buffer, Cursor},
         buffer_item::BufferItem,
@@ -31,19 +13,37 @@ use crate::{
         pipeline_phase::CountedRequest,
         signing_phase::{SigningRequest, SigningResponse},
     },
+    monitor,
     network::NetworkSender,
     round_manager::VerifiedEvent,
     state_replication::StateComputerCommitCallBackType,
 };
+use aptos_consensus_types::{common::Author, executed_block::ExecutedBlock};
 use aptos_crypto::HashValue;
-use aptos_types::epoch_change::EpochChangeProof;
-use futures::channel::mpsc::unbounded;
+use aptos_logger::prelude::*;
+use aptos_types::{
+    account_address::AccountAddress, epoch_change::EpochChangeProof,
+    ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier,
+};
+use futures::{
+    channel::{
+        mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
+        oneshot,
+    },
+    FutureExt, SinkExt, StreamExt,
+};
+use once_cell::sync::OnceCell;
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc,
+};
+use tokio::time::{Duration, Instant};
 
-pub const BUFFER_MANAGER_RETRY_INTERVAL: u64 = 1000;
+pub const COMMIT_VOTE_REBROADCAST_INTERVAL_MS: u64 = 1500;
+pub const LOOP_INTERVAL_MS: u64 = 1500;
 
-pub type ResetAck = ();
-
-pub fn sync_ack_new() -> ResetAck {}
+#[derive(Debug, Default)]
+pub struct ResetAck {}
 
 pub struct ResetRequest {
     pub tx: oneshot::Sender<ResetAck>,
@@ -83,7 +83,7 @@ pub struct BufferManager {
     signing_phase_rx: Receiver<SigningResponse>,
 
     commit_msg_tx: NetworkSender,
-    commit_msg_rx: channel::aptos_channel::Receiver<AccountAddress, VerifiedEvent>,
+    commit_msg_rx: aptos_channels::aptos_channel::Receiver<AccountAddress, VerifiedEvent>,
 
     // we don't hear back from the persisting phase
     persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
@@ -95,6 +95,15 @@ pub struct BufferManager {
     verifier: ValidatorVerifier,
 
     ongoing_tasks: Arc<AtomicU64>,
+    // Since proposal_generator is not aware of reconfiguration any more, the suffix blocks
+    // will not have the same timestamp as the reconfig block which violates the invariant
+    // that block.timestamp == state.timestamp because no txn is executed in suffix blocks.
+    // We change the timestamp field of the block info to maintain the invariant.
+    // If the executed blocks are b1 <- b2 <- r <- b4 <- b5 with timestamp t1..t5
+    // we replace t5 with t3 (from reconfiguration block) since that's the last timestamp
+    // being updated on-chain.
+    end_epoch_timestamp: OnceCell<u64>,
+    previous_commit_time: Instant,
 }
 
 impl BufferManager {
@@ -105,7 +114,7 @@ impl BufferManager {
         signing_phase_tx: Sender<CountedRequest<SigningRequest>>,
         signing_phase_rx: Receiver<SigningResponse>,
         commit_msg_tx: NetworkSender,
-        commit_msg_rx: channel::aptos_channel::Receiver<AccountAddress, VerifiedEvent>,
+        commit_msg_rx: aptos_channels::aptos_channel::Receiver<AccountAddress, VerifiedEvent>,
         persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
         block_rx: UnboundedReceiver<OrderedBlocks>,
         reset_rx: UnboundedReceiver<ResetRequest>,
@@ -138,6 +147,8 @@ impl BufferManager {
 
             verifier,
             ongoing_tasks,
+            end_epoch_timestamp: OnceCell::new(),
+            previous_commit_time: Instant::now(),
         }
     }
 
@@ -150,7 +161,8 @@ impl BufferManager {
         request: T,
         duration: Duration,
     ) {
-        tokio::spawn(async move {
+        counters::BUFFER_MANAGER_RETRY_COUNT.inc();
+        spawn_named!("retry request", async move {
             tokio::time::sleep(duration).await;
             sender
                 .send(request)
@@ -167,8 +179,12 @@ impl BufferManager {
             ordered_proof,
             callback,
         } = ordered_blocks;
-        debug!("Receive ordered block {}", ordered_proof.commit_info());
 
+        info!(
+            "Receive ordered block {}, the queue size is {}",
+            ordered_proof.commit_info(),
+            self.buffer.len() + 1,
+        );
         let item = BufferItem::new_ordered(ordered_blocks, ordered_proof, callback);
         self.buffer.push_back(item);
     }
@@ -176,9 +192,13 @@ impl BufferManager {
     /// Set the execution root to the first not executed item (Ordered) and send execution request
     /// Set to None if not exist
     async fn advance_execution_root(&mut self) {
-        let cursor = self.execution_root.or_else(|| *self.buffer.head_cursor());
-        self.execution_root = self.buffer.find_elem_from(cursor, |item| item.is_ordered());
-        debug!(
+        let cursor = self.execution_root;
+        self.execution_root = self
+            .buffer
+            .find_elem_from(cursor.or_else(|| *self.buffer.head_cursor()), |item| {
+                item.is_ordered()
+            });
+        info!(
             "Advance execution root from {:?} to {:?}",
             cursor, self.execution_root
         );
@@ -200,11 +220,13 @@ impl BufferManager {
     /// Set the signing root to the first not signed item (Executed) and send execution request
     /// Set to None if not exist
     async fn advance_signing_root(&mut self) {
-        let cursor = self.signing_root.or_else(|| *self.buffer.head_cursor());
+        let cursor = self.signing_root;
         self.signing_root = self
             .buffer
-            .find_elem_from(cursor, |item| item.is_executed());
-        debug!(
+            .find_elem_from(cursor.or_else(|| *self.buffer.head_cursor()), |item| {
+                item.is_executed()
+            });
+        info!(
             "Advance signing root from {:?} to {:?}",
             cursor, self.signing_root
         );
@@ -213,7 +235,7 @@ impl BufferManager {
             let executed_item = item.unwrap_executed_ref();
             let request = self.create_new_request(SigningRequest {
                 ordered_ledger_info: executed_item.ordered_proof.clone(),
-                commit_ledger_info: executed_item.commit_proof.ledger_info().clone(),
+                commit_ledger_info: executed_item.partial_commit_proof.ledger_info().clone(),
             });
             if cursor == self.signing_root {
                 let sender = self.signing_phase_tx.clone();
@@ -247,6 +269,14 @@ impl BufferManager {
             }
             if item.block_id() == target_block_id {
                 let aggregated_item = item.unwrap_aggregated();
+                let block = aggregated_item.executed_blocks.last().unwrap().block();
+                observe_block(block.timestamp_usecs(), BlockStage::COMMIT_CERTIFIED);
+                // if we're the proposer for the block, we're responsible to broadcast the commit decision.
+                if block.author() == Some(self.author) {
+                    self.commit_msg_tx
+                        .broadcast_commit_proof(aggregated_item.commit_proof.clone())
+                        .await;
+                }
                 if aggregated_item.commit_proof.ledger_info().ends_epoch() {
                     self.commit_msg_tx
                         .send_epoch_change(EpochChangeProof::new(
@@ -272,7 +302,8 @@ impl BufferManager {
                     }))
                     .await
                     .expect("Failed to send persist request");
-                debug!("Advance head to {:?}", self.buffer.head_cursor());
+                info!("Advance head to {:?}", self.buffer.head_cursor());
+                self.previous_commit_time = Instant::now();
                 return;
             }
         }
@@ -286,6 +317,7 @@ impl BufferManager {
         self.buffer = Buffer::new();
         self.execution_root = None;
         self.signing_root = None;
+        self.previous_commit_time = Instant::now();
         // purge the incoming blocks queue
         while let Ok(Some(_)) = self.block_rx.try_next() {}
         // Wait for ongoing tasks to finish before sending back ack.
@@ -297,11 +329,12 @@ impl BufferManager {
     /// It pops everything in the buffer and if reconfig flag is set, it stops the main loop
     async fn process_reset_request(&mut self, request: ResetRequest) {
         let ResetRequest { tx, stop } = request;
-        debug!("Receive reset");
+        info!("Receive reset");
 
         self.stop = stop;
         self.reset().await;
-        tx.send(sync_ack_new()).unwrap();
+        tx.send(ResetAck::default()).unwrap();
+        info!("Reset finishes");
     }
 
     /// If the response is successful, advance the item to Executed, otherwise panic (TODO fix).
@@ -318,15 +351,35 @@ impl BufferManager {
             Err(e) => {
                 error!("Execution error {:?}", e);
                 return;
-            }
+            },
         };
-        debug!(
+        info!(
             "Receive executed response {}",
             executed_blocks.last().unwrap().block_info()
         );
 
+        // Handle reconfiguration timestamp reconciliation.
+        // end epoch timestamp is set to the first block that causes the reconfiguration.
+        // once it's set, any subsequent block commit info will be set to this timestamp.
+        if self.end_epoch_timestamp.get().is_none() {
+            let maybe_reconfig_timestamp = executed_blocks
+                .iter()
+                .find(|b| b.block_info().has_reconfiguration())
+                .map(|b| b.timestamp_usecs());
+            if let Some(timestamp) = maybe_reconfig_timestamp {
+                debug!("Reconfig happens, set epoch end timestamp to {}", timestamp);
+                self.end_epoch_timestamp
+                    .set(timestamp)
+                    .expect("epoch end timestamp should only be set once");
+            }
+        }
+
         let item = self.buffer.take(&current_cursor);
-        let new_item = item.advance_to_executed_or_aggregated(executed_blocks, &self.verifier);
+        let new_item = item.advance_to_executed_or_aggregated(
+            executed_blocks,
+            &self.verifier,
+            self.end_epoch_timestamp.get().cloned(),
+        );
         let aggregated = new_item.is_aggregated();
         self.buffer.set(&current_cursor, new_item);
         if aggregated {
@@ -345,9 +398,9 @@ impl BufferManager {
             Err(e) => {
                 error!("Signing failed {:?}", e);
                 return;
-            }
+            },
         };
-        debug!(
+        info!(
             "Receive signing response {}",
             commit_ledger_info.commit_info()
         );
@@ -361,11 +414,23 @@ impl BufferManager {
             if item.is_executed() {
                 // we have found the buffer item
                 let signed_item = item.advance_to_signed(self.author, signature);
+                let maybe_proposer = signed_item
+                    .unwrap_signed_ref()
+                    .executed_blocks
+                    .last()
+                    .unwrap()
+                    .block()
+                    .author();
                 let commit_vote = signed_item.unwrap_signed_ref().commit_vote.clone();
 
                 self.buffer.set(&current_cursor, signed_item);
-
-                self.commit_msg_tx.broadcast_commit_vote(commit_vote).await;
+                if let Some(proposer) = maybe_proposer {
+                    self.commit_msg_tx
+                        .send_commit_vote(commit_vote, proposer)
+                        .await;
+                } else {
+                    self.commit_msg_tx.broadcast_commit_vote(commit_vote).await;
+                }
             } else {
                 self.buffer.set(&current_cursor, item);
             }
@@ -379,7 +444,9 @@ impl BufferManager {
         match commit_msg {
             VerifiedEvent::CommitVote(vote) => {
                 // find the corresponding item
-                trace!("Receive commit vote {}", vote.commit_info());
+                let author = vote.author();
+                let commit_info = vote.commit_info().clone();
+                info!("Receive commit vote {} from {}", commit_info, author);
                 let target_block_id = vote.commit_info().id();
                 let current_cursor = self
                     .buffer
@@ -389,19 +456,24 @@ impl BufferManager {
                     let new_item = match item.add_signature_if_matched(*vote) {
                         Ok(()) => item.try_advance_to_aggregated(&self.verifier),
                         Err(e) => {
-                            error!("Failed to add commit vote {:?}", e);
+                            error!(
+                                error = ?e,
+                                author = author,
+                                commit_info = commit_info,
+                                "Failed to add commit vote",
+                            );
                             item
-                        }
+                        },
                     };
                     self.buffer.set(&current_cursor, new_item);
                     if self.buffer.get(&current_cursor).is_aggregated() {
                         return Some(target_block_id);
                     }
                 }
-            }
+            },
             VerifiedEvent::CommitDecision(commit_proof) => {
                 let target_block_id = commit_proof.ledger_info().commit_info().id();
-                debug!(
+                info!(
                     "Receive commit decision {}",
                     commit_proof.ledger_info().commit_info()
                 );
@@ -419,18 +491,24 @@ impl BufferManager {
                         return Some(target_block_id);
                     }
                 }
-            }
+            },
             _ => {
                 unreachable!();
-            }
+            },
         }
         None
     }
 
     /// this function retries all the items until the signing root
     /// note that there might be other signed items after the signing root
-    async fn retry_broadcasting_commit_votes(&mut self) {
+    async fn rebroadcast_commit_votes_if_needed(&mut self) {
+        if self.previous_commit_time.elapsed()
+            < Duration::from_millis(COMMIT_VOTE_REBROADCAST_INTERVAL_MS)
+        {
+            return;
+        }
         let mut cursor = *self.buffer.head_cursor();
+        let mut count = 0;
         while cursor.is_some() {
             {
                 let item = self.buffer.get(&cursor);
@@ -441,39 +519,87 @@ impl BufferManager {
                 self.commit_msg_tx
                     .broadcast_commit_vote(signed_item.commit_vote.clone())
                     .await;
+                count += 1;
             }
             cursor = self.buffer.get_next(&cursor);
         }
+        if count > 0 {
+            info!("Rebroadcasting {} commit votes", count);
+        }
+    }
+
+    fn update_buffer_manager_metrics(&self) {
+        let mut cursor = *self.buffer.head_cursor();
+        let mut pending_ordered = 0;
+        let mut pending_executed = 0;
+        let mut pending_signed = 0;
+        let mut pending_aggregated = 0;
+
+        while cursor.is_some() {
+            match self.buffer.get(&cursor) {
+                BufferItem::Ordered(_) => {
+                    pending_ordered += 1;
+                },
+                BufferItem::Executed(_) => {
+                    pending_executed += 1;
+                },
+                BufferItem::Signed(_) => {
+                    pending_signed += 1;
+                },
+                BufferItem::Aggregated(_) => {
+                    pending_aggregated += 1;
+                },
+            }
+            cursor = self.buffer.get_next(&cursor);
+        }
+
+        counters::NUM_BLOCKS_IN_PIPELINE
+            .with_label_values(&["ordered"])
+            .set(pending_ordered as i64);
+        counters::NUM_BLOCKS_IN_PIPELINE
+            .with_label_values(&["executed"])
+            .set(pending_executed as i64);
+        counters::NUM_BLOCKS_IN_PIPELINE
+            .with_label_values(&["signed"])
+            .set(pending_signed as i64);
+        counters::NUM_BLOCKS_IN_PIPELINE
+            .with_label_values(&["aggregated"])
+            .set(pending_aggregated as i64);
     }
 
     pub async fn start(mut self) {
         info!("Buffer manager starts.");
-        let mut interval =
-            tokio::time::interval(Duration::from_millis(BUFFER_MANAGER_RETRY_INTERVAL));
+        let mut interval = tokio::time::interval(Duration::from_millis(LOOP_INTERVAL_MS));
         while !self.stop {
             // advancing the root will trigger sending requests to the pipeline
-            tokio::select! {
-                Some(blocks) = self.block_rx.next() => {
+            ::futures::select! {
+                blocks = self.block_rx.select_next_some() => {
+                    monitor!("buffer_manager_process_ordered", {
                     self.process_ordered_blocks(blocks);
                     if self.execution_root.is_none() {
                         self.advance_execution_root().await;
-                    }
-                }
-                Some(reset_event) = self.reset_rx.next() => {
-                    self.process_reset_request(reset_event).await;
-                }
-                Some(response) = self.execution_phase_rx.next() => {
+                    }});
+                },
+                reset_event = self.reset_rx.select_next_some() => {
+                    monitor!("buffer_manager_process_reset",
+                    self.process_reset_request(reset_event).await);
+                },
+                response = self.execution_phase_rx.select_next_some() => {
+                    monitor!("buffer_manager_process_execution_response", {
                     self.process_execution_response(response).await;
                     self.advance_execution_root().await;
                     if self.signing_root.is_none() {
                         self.advance_signing_root().await;
-                    }
-                }
-                Some(response) = self.signing_phase_rx.next() => {
+                    }});
+                },
+                response = self.signing_phase_rx.select_next_some() => {
+                    monitor!("buffer_manager_process_signing_response", {
                     self.process_signing_response(response).await;
-                    self.advance_signing_root().await;
-                }
-                Some(commit_msg) = self.commit_msg_rx.next() => {
+                    self.advance_signing_root().await
+                    })
+                },
+                commit_msg = self.commit_msg_rx.select_next_some() => {
+                    monitor!("buffer_manager_process_commit_message",
                     if let Some(aggregated_block_id) = self.process_commit_message(commit_msg) {
                         self.advance_head(aggregated_block_id).await;
                         if self.execution_root.is_none() {
@@ -482,11 +608,14 @@ impl BufferManager {
                         if self.signing_root.is_none() {
                             self.advance_signing_root().await;
                         }
-                    }
-                }
-                _ = interval.tick() => {
-                    self.retry_broadcasting_commit_votes().await;
-                }
+                    });
+                },
+                _ = interval.tick().fuse() => {
+                    monitor!("buffer_manager_process_interval_tick", {
+                    self.update_buffer_manager_metrics();
+                    self.rebroadcast_commit_votes_if_needed().await
+                    });
+                },
                 // no else branch here because interval.tick will always be available
             }
         }

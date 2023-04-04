@@ -1,19 +1,21 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{consensusdb::ConsensusDB, epoch_manager::LivenessStorageData, error::DbError};
 use anyhow::{format_err, Context, Result};
 use aptos_config::config::NodeConfig;
-use aptos_crypto::HashValue;
-use aptos_logger::prelude::*;
-use aptos_types::{
-    epoch_change::EpochChangeProof, ledger_info::LedgerInfoWithSignatures, transaction::Version,
-};
-use consensus_types::{
+use aptos_consensus_types::{
     block::Block, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote,
 };
+use aptos_crypto::HashValue;
+use aptos_logger::prelude::*;
+use aptos_storage_interface::DbReader;
+use aptos_types::{
+    block_info::Round, epoch_change::EpochChangeProof, ledger_info::LedgerInfoWithSignatures,
+    proof::TransactionAccumulatorSummary, transaction::Version,
+};
 use std::{cmp::max, collections::HashSet, sync::Arc};
-use storage_interface::DbReader;
 
 /// PersistentLivenessStorage is essential for maintaining liveness when a node crashes.  Specifically,
 /// upon a restart, a correct node will recover.  Even if all nodes crash, liveness is
@@ -52,7 +54,12 @@ pub trait PersistentLivenessStorage: Send + Sync {
 }
 
 #[derive(Clone)]
-pub struct RootInfo(pub Block, pub QuorumCert, pub QuorumCert, pub QuorumCert);
+pub struct RootInfo(
+    pub Box<Block>,
+    pub QuorumCert,
+    pub QuorumCert,
+    pub QuorumCert,
+);
 
 /// LedgerRecoveryData is a subset of RecoveryData that we can get solely from ledger info.
 #[derive(Clone)]
@@ -63,6 +70,10 @@ pub struct LedgerRecoveryData {
 impl LedgerRecoveryData {
     pub fn new(storage_ledger: LedgerInfoWithSignatures) -> Self {
         LedgerRecoveryData { storage_ledger }
+    }
+
+    pub fn committed_round(&self) -> Round {
+        self.storage_ledger.commit_info().round()
     }
 
     /// Finds the root (last committed block) and returns the root block, the QC to the root block
@@ -126,7 +137,7 @@ impl LedgerRecoveryData {
             .expect("Inconsistent commit proof and evaluation decision, cannot commit block");
 
         Ok(RootInfo(
-            root_block,
+            Box::new(root_block),
             root_quorum_cert,
             root_ordered_cert,
             root_commit_cert,
@@ -141,21 +152,27 @@ pub struct RootMetadata {
 }
 
 impl RootMetadata {
-    pub fn new(num_leaves: u64, accu_hash: HashValue, frozen_root_hashes: Vec<HashValue>) -> Self {
-        Self {
-            accu_hash,
-            frozen_root_hashes,
-            num_leaves,
-        }
-    }
-
     pub fn version(&self) -> Version {
         max(self.num_leaves, 1) - 1
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn new_empty() -> Self {
-        Self::new(0, *aptos_crypto::hash::ACCUMULATOR_PLACEHOLDER_HASH, vec![])
+        Self {
+            accu_hash: *aptos_crypto::hash::ACCUMULATOR_PLACEHOLDER_HASH,
+            frozen_root_hashes: vec![],
+            num_leaves: 0,
+        }
+    }
+}
+
+impl From<TransactionAccumulatorSummary> for RootMetadata {
+    fn from(summary: TransactionAccumulatorSummary) -> Self {
+        Self {
+            accu_hash: summary.0.root_hash,
+            frozen_root_hashes: summary.0.frozen_subtree_roots,
+            num_leaves: summary.0.num_leaves,
+        }
     }
 }
 
@@ -189,21 +206,19 @@ impl RecoveryData {
             .find_root(&mut blocks, &mut quorum_certs)
             .with_context(|| {
                 // for better readability
+                blocks.sort_by_key(|block| block.round());
                 quorum_certs.sort_by_key(|qc| qc.certified_block().round());
                 format!(
-                    "\nRoot id: {}\nBlocks in db: {}\nQuorum Certs in db: {}\n",
-                    ledger_recovery_data
-                        .storage_ledger
-                        .ledger_info()
-                        .consensus_block_id(),
+                    "\nRoot: {}\nBlocks in db: {}\nQuorum Certs in db: {}\n",
+                    ledger_recovery_data.storage_ledger.ledger_info(),
                     blocks
                         .iter()
-                        .map(|b| format!("\n\t{}", b))
+                        .map(|b| format!("\n{}", b))
                         .collect::<Vec<String>>()
                         .concat(),
                     quorum_certs
                         .iter()
-                        .map(|qc| format!("\n\t{}", qc))
+                        .map(|qc| format!("\n{}", qc))
                         .collect::<Vec<String>>()
                         .concat(),
                 )
@@ -266,7 +281,7 @@ impl RecoveryData {
     ) -> Vec<HashValue> {
         // prune all the blocks that don't have root as ancestor
         let mut tree = HashSet::new();
-        let mut to_remove = vec![];
+        let mut to_remove = HashSet::new();
         tree.insert(root_id);
         // assume blocks are sorted by round already
         blocks.retain(|block| {
@@ -274,12 +289,19 @@ impl RecoveryData {
                 tree.insert(block.id());
                 true
             } else {
-                to_remove.push(block.id());
+                to_remove.insert(block.id());
                 false
             }
         });
-        quorum_certs.retain(|qc| tree.contains(&qc.certified_block().id()));
-        to_remove
+        quorum_certs.retain(|qc| {
+            if tree.contains(&qc.certified_block().id()) {
+                true
+            } else {
+                to_remove.insert(qc.certified_block().id());
+                false
+            }
+        });
+        to_remove.into_iter().collect()
     }
 }
 
@@ -316,13 +338,11 @@ impl PersistentLivenessStorage for StorageWriteProxy {
     }
 
     fn recover_from_ledger(&self) -> LedgerRecoveryData {
-        let startup_info = self
+        let latest_ledger_info = self
             .aptos_db
-            .get_startup_info()
-            .expect("unable to read ledger info from storage")
-            .expect("startup info is None");
-
-        LedgerRecoveryData::new(startup_info.latest_ledger_info)
+            .get_latest_ledger_info()
+            .expect("Failed to get latest ledger info.");
+        LedgerRecoveryData::new(latest_ledger_info)
     }
 
     fn start(&self) -> LivenessStorageData {
@@ -356,26 +376,21 @@ impl PersistentLivenessStorage for StorageWriteProxy {
         );
 
         // find the block corresponding to storage latest ledger info
-        let startup_info = self
+        let latest_ledger_info = self
             .aptos_db
-            .get_startup_info()
-            .expect("unable to read ledger info from storage")
-            .expect("startup info is None");
-        let ledger_recovery_data = LedgerRecoveryData::new(startup_info.latest_ledger_info.clone());
-        let root_executed_trees = startup_info.committed_trees;
+            .get_latest_ledger_info()
+            .expect("Failed to get latest ledger info.");
+        let accumulator_summary = self
+            .aptos_db
+            .get_accumulator_summary(latest_ledger_info.ledger_info().version())
+            .expect("Failed to get accumulator summary.");
+        let ledger_recovery_data = LedgerRecoveryData::new(latest_ledger_info);
 
         match RecoveryData::new(
             last_vote,
             ledger_recovery_data.clone(),
             blocks,
-            RootMetadata::new(
-                root_executed_trees.txn_accumulator().num_leaves(),
-                root_executed_trees.state_id(),
-                root_executed_trees
-                    .txn_accumulator()
-                    .frozen_subtree_roots()
-                    .clone(),
-            ),
+            accumulator_summary.into(),
             quorum_certs,
             highest_2chain_timeout_cert,
         ) {
@@ -399,12 +414,12 @@ impl PersistentLivenessStorage for StorageWriteProxy {
                     initial_data.highest_2chain_timeout_certificate().as_ref().map_or("None".to_string(), |v| v.to_string()),
                 );
 
-                LivenessStorageData::RecoveryData(initial_data)
-            }
+                LivenessStorageData::FullRecoveryData(initial_data)
+            },
             Err(e) => {
                 error!(error = ?e, "Failed to construct recovery data");
-                LivenessStorageData::LedgerRecoveryData(ledger_recovery_data)
-            }
+                LivenessStorageData::PartialRecoveryData(ledger_recovery_data)
+            },
         }
     }
 

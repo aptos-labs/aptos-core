@@ -1,5 +1,0 @@
-**/Cargo.lock
-**/node_modules/
-**/yarn.lock
-**/.venv
-*.pyc

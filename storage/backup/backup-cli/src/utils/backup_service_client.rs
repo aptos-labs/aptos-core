@@ -1,22 +1,24 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::utils::error_notes::ErrorNotes;
 use anyhow::Result;
 use aptos_crypto::HashValue;
+use aptos_db::backup::backup_handler::DbState;
 use aptos_types::transaction::Version;
-use aptosdb::backup::backup_handler::DbState;
+use clap::Parser;
 use futures::TryStreamExt;
-use structopt::StructOpt;
 use tokio::io::{AsyncRead, AsyncReadExt};
 use tokio_util::compat::FuturesAsyncReadCompatExt;
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 pub struct BackupServiceClientOpt {
-    #[structopt(
+    #[clap(
         long = "backup-service-address",
         default_value = "http://localhost:6186",
-        help = "Backup service address."
+        help = "Backup service address. By default a Aptos Node runs the backup service serving \
+        on tcp port 6186 to localhost only."
     )]
     pub address: String,
 }

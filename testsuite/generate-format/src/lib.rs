@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! How and where to record the Serde format of interesting Aptos types.
@@ -8,6 +9,8 @@ use serde_reflection::Registry;
 use std::str::FromStr;
 use structopt::{clap::arg_enum, StructOpt};
 
+/// Rest API types
+mod api;
 /// Aptos transactions.
 mod aptos;
 /// Consensus messages.
@@ -25,6 +28,7 @@ arg_enum! {
 #[derive(Debug, StructOpt, Clone, Copy)]
 /// A corpus of Rust types to trace, and optionally record on disk.
 pub enum Corpus {
+    API,
     Aptos,
     Consensus,
     Network,
@@ -44,6 +48,7 @@ impl Corpus {
     /// Compute the registry of formats.
     pub fn get_registry(self) -> Registry {
         let result = match self {
+            Corpus::API => api::get_registry(),
             Corpus::Aptos => aptos::get_registry(),
             Corpus::Consensus => consensus::get_registry(),
             Corpus::Network => network::get_registry(),
@@ -53,13 +58,14 @@ impl Corpus {
             Ok(registry) => registry,
             Err(error) => {
                 panic!("{}:{}", error, error.explanation());
-            }
+            },
         }
     }
 
     /// Where to record this corpus on disk.
     pub fn output_file(self) -> Option<&'static str> {
         match self {
+            Corpus::API => api::output_file(),
             Corpus::Aptos => aptos::output_file(),
             Corpus::Consensus => consensus::output_file(),
             Corpus::Network => network::output_file(),

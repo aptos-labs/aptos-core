@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -21,8 +22,8 @@ impl EnvVar {
         Self::new("BACKUP_NAME".to_string(), value)
     }
 
-    pub fn file_name(value: String) -> Self {
-        Self::new("FILE_NAME".to_string(), value)
+    pub fn file_name(value: &str) -> Self {
+        Self::new("FILE_NAME".to_string(), value.to_string())
     }
 
     pub fn file_handle(value: FileHandle) -> Self {
@@ -67,6 +68,8 @@ pub struct Commands {
     /// Command line to list all existing metadata file handles.
     /// expected stdout to stream out lines of file handles.
     pub list_metadata_files: String,
+    /// Command line to backup one metadata file to a metadata backup folder
+    pub backup_metadata_file: Option<String>,
 }
 
 #[derive(Clone, Default, Deserialize)]
@@ -84,10 +87,10 @@ impl CommandAdapterConfig {
         let mut content = Vec::new();
         file.read_to_end(&mut content).await.err_notes(path_str)?;
 
-        Ok(toml::from_slice(&content)?)
+        Ok(serde_yaml::from_slice(&content)?)
     }
 
     pub fn load_from_str(content: &str) -> Result<Self> {
-        Ok(toml::from_str(content)?)
+        Ok(serde_yaml::from_str(content)?)
     }
 }

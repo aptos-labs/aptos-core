@@ -1,31 +1,38 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use std::{
     fmt,
-    ops::Sub,
+    ops::{Add, Sub},
     sync::{
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicU64, AtomicUsize, Ordering},
         Arc,
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct TxnStats {
     pub submitted: u64,
     pub committed: u64,
     pub expired: u64,
+    pub failed_submission: u64,
     pub latency: u64,
+    pub latency_samples: u64,
     pub latency_buckets: AtomicHistogramSnapshot,
+    pub lasted: Duration,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct TxnStatsRate {
     pub submitted: u64,
     pub committed: u64,
     pub expired: u64,
+    pub failed_submission: u64,
     pub latency: u64,
+    pub latency_samples: u64,
+    pub p50_latency: u64,
+    pub p90_latency: u64,
     pub p99_latency: u64,
 }
 
@@ -33,15 +40,15 @@ impl fmt::Display for TxnStatsRate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "submitted: {} txn/s, committed: {} txn/s, expired: {} txn/s, latency: {} ms, p99 latency: {} ms",
-            self.submitted, self.committed, self.expired, self.latency, self.p99_latency,
+            "submitted: {} txn/s, committed: {} txn/s, expired: {} txn/s, failed submission: {} tnx/s, latency: {} ms, (p50: {} ms, p90: {} ms, p99: {} ms), latency samples: {}",
+            self.submitted, self.committed, self.expired, self.failed_submission, self.latency, self.p50_latency, self.p90_latency, self.p99_latency, self.latency_samples,
         )
     }
 }
 
 impl TxnStats {
-    pub fn rate(&self, window: Duration) -> TxnStatsRate {
-        let mut window_secs = window.as_secs();
+    pub fn rate(&self) -> TxnStatsRate {
+        let mut window_secs = self.lasted.as_secs();
         if window_secs < 1 {
             window_secs = 1;
         }
@@ -49,11 +56,15 @@ impl TxnStats {
             submitted: self.submitted / window_secs,
             committed: self.committed / window_secs,
             expired: self.expired / window_secs,
-            latency: if self.committed == 0 {
+            failed_submission: self.failed_submission / window_secs,
+            latency: if self.latency_samples == 0 {
                 0u64
             } else {
-                self.latency / self.committed
+                self.latency / self.latency_samples
             },
+            latency_samples: self.latency_samples,
+            p50_latency: self.latency_buckets.percentile(50, 100),
+            p90_latency: self.latency_buckets.percentile(90, 100),
             p99_latency: self.latency_buckets.percentile(99, 100),
         }
     }
@@ -63,8 +74,8 @@ impl fmt::Display for TxnStats {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "submitted: {}, committed: {}, expired: {}",
-            self.submitted, self.committed, self.expired,
+            "submitted: {}, committed: {}, expired: {}, failed submission: {}",
+            self.submitted, self.committed, self.expired, self.failed_submission,
         )
     }
 }
@@ -77,8 +88,28 @@ impl Sub for &TxnStats {
             submitted: self.submitted - other.submitted,
             committed: self.committed - other.committed,
             expired: self.expired - other.expired,
+            failed_submission: self.failed_submission - other.failed_submission,
             latency: self.latency - other.latency,
+            latency_samples: self.latency_samples - other.latency_samples,
             latency_buckets: &self.latency_buckets - &other.latency_buckets,
+            lasted: self.lasted - other.lasted,
+        }
+    }
+}
+
+impl Add for &TxnStats {
+    type Output = TxnStats;
+
+    fn add(self, other: &TxnStats) -> TxnStats {
+        TxnStats {
+            submitted: self.submitted + other.submitted,
+            committed: self.committed + other.committed,
+            expired: self.expired + other.expired,
+            failed_submission: self.failed_submission + other.failed_submission,
+            latency: self.latency + other.latency,
+            latency_samples: self.latency_samples + other.latency_samples,
+            latency_buckets: &self.latency_buckets + &other.latency_buckets,
+            lasted: self.lasted + other.lasted,
         }
     }
 }
@@ -88,24 +119,31 @@ pub struct StatsAccumulator {
     pub submitted: AtomicU64,
     pub committed: AtomicU64,
     pub expired: AtomicU64,
+    pub failed_submission: AtomicU64,
     pub latency: AtomicU64,
+    pub latency_samples: AtomicU64,
     pub latencies: Arc<AtomicHistogramAccumulator>,
 }
 
 impl StatsAccumulator {
-    pub fn accumulate(&self) -> TxnStats {
+    pub fn accumulate(&self, lasted: Duration) -> TxnStats {
         TxnStats {
             submitted: self.submitted.load(Ordering::Relaxed),
             committed: self.committed.load(Ordering::Relaxed),
             expired: self.expired.load(Ordering::Relaxed),
+            failed_submission: self.failed_submission.load(Ordering::Relaxed),
             latency: self.latency.load(Ordering::Relaxed),
+            latency_samples: self.latency_samples.load(Ordering::Relaxed),
             latency_buckets: self.latencies.snapshot(),
+            lasted,
         }
     }
 }
 
-const DEFAULT_HISTOGRAM_CAPACITY: usize = 1024;
-const DEFAULT_HISTOGRAM_STEP_WIDTH: u64 = 50;
+// have more slots than generally used txn expiration. (240s)
+const DEFAULT_HISTOGRAM_CAPACITY: usize = 2400;
+// we don't have better precision than ~300 ms anyways.
+const DEFAULT_HISTOGRAM_STEP_WIDTH: u64 = 100;
 
 #[derive(Debug)]
 pub struct AtomicHistogramAccumulator {
@@ -145,21 +183,21 @@ impl AtomicHistogramAccumulator {
         }
     }
 
-    fn get_bucket_num(&self, data_value: u64) -> u64 {
+    fn get_bucket_num(&self, data_value: u64) -> usize {
         let bucket_num = data_value / self.step_width;
         if bucket_num >= self.capacity as u64 - 2 {
-            return self.capacity as u64 - 1;
+            return self.capacity - 1;
         }
-        bucket_num
+        bucket_num as usize
     }
 
     pub fn record_data_point(&self, data_value: u64, data_num: u64) {
         let bucket_num = self.get_bucket_num(data_value);
-        self.buckets[bucket_num as usize].fetch_add(data_num as u64, Ordering::Relaxed);
+        self.buckets[bucket_num].fetch_add(data_num, Ordering::Relaxed);
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AtomicHistogramSnapshot {
     capacity: usize,
     step_width: u64,
@@ -195,6 +233,29 @@ impl Sub for &AtomicHistogramSnapshot {
     }
 }
 
+impl Add for &AtomicHistogramSnapshot {
+    type Output = AtomicHistogramSnapshot;
+
+    fn add(self, other: &AtomicHistogramSnapshot) -> AtomicHistogramSnapshot {
+        assert_eq!(
+            self.buckets.len(),
+            other.buckets.len(),
+            "Histogram snapshots must have same size, prev: {}, cur: {}",
+            self.buckets.len(),
+            other.buckets.len()
+        );
+        let mut buf = Vec::with_capacity(self.capacity);
+        for i in 0..self.buckets.len() {
+            buf.push(self.buckets[i] + other.buckets[i]);
+        }
+        AtomicHistogramSnapshot {
+            capacity: self.capacity,
+            step_width: self.step_width,
+            buckets: buf,
+        }
+    }
+}
+
 impl AtomicHistogramSnapshot {
     pub fn percentile(&self, numerator: u64, denominator: u64) -> u64 {
         let committed: u64 = self.buckets.iter().sum();
@@ -210,12 +271,70 @@ impl AtomicHistogramSnapshot {
     }
 }
 
+#[derive(Debug)]
+pub struct DynamicStatsTracking {
+    num_phases: usize,
+    cur_phase: Arc<AtomicUsize>,
+    stats: Vec<StatsAccumulator>,
+}
+
+impl DynamicStatsTracking {
+    pub fn new(num_phases: usize) -> DynamicStatsTracking {
+        assert!(num_phases >= 1);
+        Self {
+            num_phases,
+            cur_phase: Arc::new(AtomicUsize::new(0)),
+            stats: (0..num_phases)
+                .map(|_| StatsAccumulator::default())
+                .collect(),
+        }
+    }
+
+    pub fn start_next_phase(&self) -> usize {
+        let cur_phase = self.cur_phase.fetch_add(1, Ordering::Relaxed) + 1;
+        assert!(cur_phase < self.num_phases);
+        cur_phase
+    }
+
+    pub fn get_cur(&self) -> &StatsAccumulator {
+        self.stats.get(self.get_cur_phase()).unwrap()
+    }
+
+    pub fn get_cur_phase(&self) -> usize {
+        self.cur_phase.load(Ordering::Relaxed)
+    }
+
+    pub fn get_cur_phase_obj(&self) -> Arc<AtomicUsize> {
+        self.cur_phase.clone()
+    }
+
+    pub fn accumulate(&self, phase_starts: &[Instant]) -> Vec<TxnStats> {
+        let now = Instant::now();
+        self.stats
+            .iter()
+            .take(self.get_cur_phase() + 1)
+            .enumerate()
+            .map(|(i, s)| {
+                s.accumulate(
+                    (if i >= self.get_cur_phase() {
+                        now
+                    } else {
+                        phase_starts[i + 1]
+                    })
+                    .duration_since(phase_starts[i]),
+                )
+            })
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::emitter::stats::{
         AtomicHistogramAccumulator, AtomicHistogramSnapshot, TxnStats, DEFAULT_HISTOGRAM_CAPACITY,
         DEFAULT_HISTOGRAM_STEP_WIDTH,
     };
+    use std::time::Duration;
 
     #[test]
     pub fn test_default_atomic_histogram() {
@@ -228,10 +347,19 @@ mod test {
     pub fn test_get_bucket_num() {
         let histogram = AtomicHistogramAccumulator::default();
         assert_eq!(histogram.get_bucket_num(0), 0);
-        assert_eq!(histogram.get_bucket_num(49), 0);
-        assert_eq!(histogram.get_bucket_num(50), 1);
-        assert_eq!(histogram.get_bucket_num(51), 1);
-        assert_eq!(histogram.get_bucket_num(200_000), 1023);
+        assert_eq!(
+            histogram.get_bucket_num(DEFAULT_HISTOGRAM_STEP_WIDTH - 1),
+            0
+        );
+        assert_eq!(histogram.get_bucket_num(DEFAULT_HISTOGRAM_STEP_WIDTH), 1);
+        assert_eq!(
+            histogram.get_bucket_num(DEFAULT_HISTOGRAM_STEP_WIDTH + 1),
+            1
+        );
+        assert_eq!(
+            histogram.get_bucket_num(500_000),
+            DEFAULT_HISTOGRAM_CAPACITY - 1
+        );
     }
 
     #[test]
@@ -269,8 +397,11 @@ mod test {
             submitted: 0,
             committed: 10,
             expired: 0,
+            failed_submission: 0,
             latency: 0,
+            latency_samples: 0,
             latency_buckets: histogram.snapshot(),
+            lasted: Duration::from_secs(10),
         };
         let res = stat.latency_buckets.percentile(9, 10);
         assert_eq!(res, 900);

@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::driver::DriverConfiguration;
@@ -8,15 +9,22 @@ use aptos_crypto::{
     HashValue, PrivateKey, Uniform,
 };
 use aptos_data_client::GlobalDataSummary;
-use aptos_types::on_chain_config::ValidatorSet;
+use aptos_data_streaming_service::{
+    data_notification::DataNotification, data_stream::DataStreamListener, streaming_client::Epoch,
+};
+use aptos_event_notifications::EventNotificationListener;
+use aptos_mempool_notifications::{CommittedTransaction, MempoolNotificationListener};
+use aptos_storage_service_types::responses::CompleteDataRange;
 use aptos_types::{
     account_address::AccountAddress,
+    aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     chain_id::ChainId,
     contract_event::ContractEvent,
     epoch_state::EpochState,
     event::EventKey,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    on_chain_config::ValidatorSet,
     proof::{
         SparseMerkleRangeProof, TransactionAccumulatorRangeProof, TransactionInfoListWithProof,
     },
@@ -29,22 +37,14 @@ use aptos_types::{
     waypoint::Waypoint,
     write_set::WriteSet,
 };
-use channel::{aptos_channel, aptos_channel::Sender, message_queues::QueueStyle};
-use data_streaming_service::{
-    data_notification::DataNotification, data_stream::DataStreamListener, streaming_client::Epoch,
-};
-use event_notifications::EventNotificationListener;
-use futures::StreamExt;
-use mempool_notifications::{CommittedTransaction, MempoolNotificationListener};
-use move_deps::move_core_types::language_storage::TypeTag;
-use std::collections::BTreeMap;
-use storage_service_types::CompleteDataRange;
+use futures::{channel::mpsc, StreamExt};
+use move_core_types::language_storage::TypeTag;
+use rand::{rngs::OsRng, Rng};
 
 /// Creates a new data stream listener and notification sender pair
-pub fn create_data_stream_listener() -> (Sender<(), DataNotification>, DataStreamListener) {
-    let (notification_sender, notification_receiver) =
-        aptos_channel::new(QueueStyle::KLAST, 100, None);
-    let data_stream_listener = DataStreamListener::new(notification_receiver);
+pub fn create_data_stream_listener() -> (mpsc::Sender<DataNotification>, DataStreamListener) {
+    let (notification_sender, notification_receiver) = mpsc::channel(100);
+    let data_stream_listener = DataStreamListener::new(create_random_u64(), notification_receiver);
 
     (notification_sender, data_stream_listener)
 }
@@ -52,7 +52,7 @@ pub fn create_data_stream_listener() -> (Sender<(), DataNotification>, DataStrea
 /// Creates a test epoch ending ledger info
 pub fn create_epoch_ending_ledger_info() -> LedgerInfoWithSignatures {
     let ledger_info = LedgerInfo::genesis(HashValue::zero(), ValidatorSet::empty());
-    LedgerInfoWithSignatures::new(ledger_info, BTreeMap::new())
+    LedgerInfoWithSignatures::new(ledger_info, AggregateSignature::empty())
 }
 
 /// Creates a single test event
@@ -87,7 +87,7 @@ pub fn create_global_summary(highest_ended_epoch: Epoch) -> GlobalDataSummary {
 pub fn create_ledger_info_at_version(version: Version) -> LedgerInfoWithSignatures {
     let block_info = BlockInfo::new(0, 0, HashValue::zero(), HashValue::zero(), version, 0, None);
     let ledger_info = LedgerInfo::new(block_info, HashValue::random());
-    LedgerInfoWithSignatures::new(ledger_info, BTreeMap::new())
+    LedgerInfoWithSignatures::new(ledger_info, AggregateSignature::empty())
 }
 
 /// Creates a test transaction output list with proof
@@ -116,7 +116,7 @@ pub fn create_random_epoch_ending_ledger_info(
         Some(EpochState::empty()),
     );
     let ledger_info = LedgerInfo::new(block_info, HashValue::random());
-    LedgerInfoWithSignatures::new(ledger_info, BTreeMap::new())
+    LedgerInfoWithSignatures::new(ledger_info, AggregateSignature::empty())
 }
 
 /// Returns an empty epoch state
@@ -129,6 +129,12 @@ pub fn create_epoch_state(epoch: u64) -> EpochState {
     let mut epoch_state = create_empty_epoch_state();
     epoch_state.epoch = epoch;
     epoch_state
+}
+
+/// Returns a random u64
+fn create_random_u64() -> u64 {
+    let mut rng = OsRng;
+    rng.gen()
 }
 
 /// Creates a test state value chunk with proof
@@ -187,10 +193,9 @@ pub fn create_transaction_info() -> TransactionInfo {
 
 /// Creates a test transaction info list with proof
 pub fn create_transaction_info_list_with_proof() -> TransactionInfoListWithProof {
-    TransactionInfoListWithProof::new(
-        TransactionAccumulatorRangeProof::new_empty(),
-        vec![create_transaction_info()],
-    )
+    TransactionInfoListWithProof::new(TransactionAccumulatorRangeProof::new_empty(), vec![
+        create_transaction_info(),
+    ])
 }
 
 /// Creates a test transaction list with proof
@@ -228,7 +233,7 @@ pub async fn verify_mempool_and_event_notification(
     let committed_transactions: Vec<CommittedTransaction> = expected_transactions
         .into_iter()
         .map(|txn| CommittedTransaction {
-            sender: txn.as_signed_user_txn().unwrap().sender(),
+            sender: txn.try_as_signed_user_txn().unwrap().sender(),
             sequence_number: 0,
         })
         .collect();

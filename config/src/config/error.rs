@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use thiserror::Error;
@@ -15,6 +16,8 @@ pub enum Error {
     Yaml(String, #[source] serde_yaml::Error),
     #[error("Config is missing expected value: {0}")]
     Missing(&'static str),
+    #[error("Unexpected error: {0}")]
+    Unexpected(String),
 }
 
 pub fn invariant(cond: bool, msg: String) -> Result<(), Error> {

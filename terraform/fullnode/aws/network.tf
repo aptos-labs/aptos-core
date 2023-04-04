@@ -4,7 +4,7 @@ data "aws_route53_zone" "pfn" {
 }
 
 locals {
-  dns_prefix = var.workspace_dns ? "${terraform.workspace}.${var.dns_prefix_name}." : "${var.dns_prefix_name}."
+  dns_prefix = var.workspace_dns ? "${local.workspace_name}.${var.dns_prefix_name}." : "${var.dns_prefix_name}."
   domain     = var.zone_id != "" ? "${local.dns_prefix}${data.aws_route53_zone.pfn[0].name}" : null
 }
 

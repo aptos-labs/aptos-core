@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::storage::FileHandle;
@@ -31,6 +32,8 @@ pub struct StateSnapshotChunk {
 pub struct StateSnapshotBackup {
     /// Version at which this state snapshot is taken.
     pub version: Version,
+    /// Epoch in which this state snapshot is taken.
+    pub epoch: u64,
     /// Hash of the state tree root.
     pub root_hash: HashValue,
     /// All account blobs in chunks.

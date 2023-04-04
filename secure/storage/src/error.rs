@@ -1,11 +1,12 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use serde::{Deserialize, Serialize};
 use std::io;
 use thiserror::Error;
 
-#[derive(Debug, Deserialize, Error, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
 pub enum Error {
     #[error("Entropy error: {0}")]
     EntropyError(String),

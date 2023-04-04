@@ -1,13 +1,21 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    ChainInfo, FullNode, HealthCheckError, LocalNode, LocalVersion, Node, NodeExt, Swarm, SwarmExt,
-    Validator, Version,
+    interface::system_metrics::SystemMetricsThreshold, ChainInfo, FullNode, HealthCheckError,
+    LocalNode, LocalVersion, Node, Swarm, SwarmChaos, SwarmExt, Validator, Version,
 };
 use anyhow::{anyhow, bail, Result};
-use aptos_config::{config::NodeConfig, keys::ConfigKey};
-use aptos_genesis::builder::{FullnodeNodeConfig, InitConfigFn};
+use aptos_config::{
+    config::{NetworkConfig, NodeConfig},
+    keys::ConfigKey,
+    network_id::NetworkId,
+};
+use aptos_framework::ReleaseBundle;
+use aptos_genesis::builder::{FullnodeNodeConfig, InitConfigFn, InitGenesisConfigFn};
+use aptos_infallible::Mutex;
+use aptos_logger::{info, warn};
 use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
     types::{
@@ -15,6 +23,7 @@ use aptos_sdk::{
         PeerId,
     },
 };
+use prometheus_http_query::response::PromqlResult;
 use std::{
     collections::HashMap,
     fs, mem,
@@ -35,12 +44,12 @@ pub enum SwarmDirectory {
 impl SwarmDirectory {
     pub fn persist(&mut self) {
         match self {
-            SwarmDirectory::Persistent(_) => {}
+            SwarmDirectory::Persistent(_) => {},
             SwarmDirectory::Temporary(_) => {
                 let mut temp = SwarmDirectory::Persistent(PathBuf::new());
                 mem::swap(self, &mut temp);
                 let _ = mem::replace(self, temp.into_persistent());
-            }
+            },
         }
     }
 
@@ -72,107 +81,89 @@ impl AsRef<Path> for SwarmDirectory {
     }
 }
 
-pub struct LocalSwarmBuilder {
+#[derive(Debug)]
+pub struct LocalSwarm {
+    node_name_counter: usize,
+    genesis: Transaction,
+    genesis_waypoint: Waypoint,
     versions: Arc<HashMap<Version, LocalVersion>>,
-    initial_version: Option<Version>,
-    template: NodeConfig,
-    init_config: Option<InitConfigFn>,
-    number_of_validators: NonZeroUsize,
-    dir: Option<PathBuf>,
-    genesis_modules: Option<Vec<Vec<u8>>>,
-    min_price_per_gas_unit: u64,
+    validators: HashMap<PeerId, LocalNode>,
+    fullnodes: HashMap<PeerId, LocalNode>,
+    public_networks: HashMap<PeerId, NetworkConfig>,
+    dir: SwarmDirectory,
+    root_account: LocalAccount,
+    chain_id: ChainId,
+    root_key: ConfigKey<Ed25519PrivateKey>,
+
+    launched: bool,
+    #[allow(dead_code)]
+    guard: ActiveNodesGuard,
 }
 
-impl LocalSwarmBuilder {
-    pub fn new(versions: Arc<HashMap<Version, LocalVersion>>) -> Self {
-        Self {
-            versions,
-            initial_version: None,
-            template: NodeConfig::default_for_validator(),
-            init_config: None,
-            number_of_validators: NonZeroUsize::new(1).unwrap(),
-            dir: None,
-            genesis_modules: None,
-            min_price_per_gas_unit: 1,
-        }
-    }
-
-    pub fn initial_version(mut self, initial_version: Version) -> Self {
-        self.initial_version = Some(initial_version);
-        self
-    }
-
-    pub fn template(mut self, template: NodeConfig) -> Self {
-        self.template = template;
-        self
-    }
-
-    pub fn with_init_config(mut self, init_config: Option<InitConfigFn>) -> Self {
-        self.init_config = init_config;
-        self
-    }
-
-    pub fn number_of_validators(mut self, number_of_validators: NonZeroUsize) -> Self {
-        self.number_of_validators = number_of_validators;
-        self
-    }
-
-    pub fn dir<T: AsRef<Path>>(mut self, dir: T) -> Self {
-        self.dir = Some(dir.as_ref().into());
-        self
-    }
-
-    pub fn genesis_modules(mut self, genesis_modules: Vec<Vec<u8>>) -> Self {
-        self.genesis_modules = Some(genesis_modules);
-        self
-    }
-
-    pub fn min_price_per_gas_unit(mut self, min_price_per_gas_unit: u64) -> Self {
-        self.min_price_per_gas_unit = min_price_per_gas_unit;
-        self
-    }
-
-    pub fn build<R>(mut self, rng: R) -> Result<LocalSwarm>
+impl LocalSwarm {
+    pub fn build<R>(
+        rng: R,
+        number_of_validators: NonZeroUsize,
+        versions: Arc<HashMap<Version, LocalVersion>>,
+        initial_version: Option<Version>,
+        init_config: Option<InitConfigFn>,
+        init_genesis_config: Option<InitGenesisConfigFn>,
+        dir: Option<PathBuf>,
+        genesis_framework: Option<ReleaseBundle>,
+        guard: ActiveNodesGuard,
+    ) -> Result<LocalSwarm>
     where
         R: ::rand::RngCore + ::rand::CryptoRng,
     {
-        println!("Building a new swarm");
-        let dir = if let Some(dir) = self.dir {
-            if dir.exists() {
-                fs::remove_dir_all(&dir)?;
+        info!("Building a new swarm");
+        let dir_actual = if let Some(dir_) = dir {
+            if dir_.exists() {
+                fs::remove_dir_all(&dir_)?;
             }
-            fs::create_dir_all(&dir)?;
-            SwarmDirectory::Persistent(dir)
+            fs::create_dir_all(&dir_)?;
+            SwarmDirectory::Persistent(dir_)
         } else {
             SwarmDirectory::Temporary(TempDir::new()?)
         };
 
-        // Single node orders blocks too fast which would trigger backpressure and stall for 1 sec
-        // which cause flakiness in tests.
-        if self.number_of_validators.get() == 1 {
-            // this delays empty block by (30-1) * 30ms
-            self.template.consensus.quorum_store_poll_count = 30;
-        }
-
         let (root_key, genesis, genesis_waypoint, validators) =
             aptos_genesis::builder::Builder::new(
-                &dir,
-                self.genesis_modules
-                    .unwrap_or_else(|| cached_framework_packages::module_blobs().to_vec()),
+                &dir_actual,
+                genesis_framework
+                    .unwrap_or_else(|| aptos_cached_packages::head_release_bundle().clone()),
             )?
-            .with_num_validators(self.number_of_validators)
-            .with_template(self.template)
-            .with_init_config(self.init_config)
-            .with_min_price_per_gas_unit(self.min_price_per_gas_unit)
-            .with_min_lockup_duration_secs(0)
-            .with_max_lockup_duration_secs(86400)
-            .with_initial_lockup_timestamp(0)
+            .with_num_validators(number_of_validators)
+            .with_init_config(Some(Arc::new(
+                move |index, config, genesis_stake_amount| {
+                    // for local tests, turn off parallel execution:
+                    config.execution.concurrency_level = 1;
+
+                    // Single node orders blocks too fast which would trigger backpressure and stall for 1 sec
+                    // which cause flakiness in tests.
+                    if number_of_validators.get() == 1 {
+                        // this delays empty block by (30-1) * 30ms
+                        config.consensus.quorum_store_poll_count = 30;
+                        config
+                            .state_sync
+                            .state_sync_driver
+                            .enable_auto_bootstrapping = true;
+                        config
+                            .state_sync
+                            .state_sync_driver
+                            .max_connection_deadline_secs = 1;
+                    }
+
+                    if let Some(init_config) = &init_config {
+                        (init_config)(index, config, genesis_stake_amount);
+                    }
+                },
+            )))
+            .with_init_genesis_config(init_genesis_config)
             .build(rng)?;
 
         // Get the initial version to start the nodes with, either the one provided or fallback to
-        // using the the latest version
-        let versions = self.versions;
-        let initial_version = self.initial_version.unwrap_or_else(|| {
+        // using the latest version
+        let initial_version_actual = initial_version.unwrap_or_else(|| {
             versions
                 .iter()
                 .max_by(|v1, v2| v1.0.cmp(v2.0))
@@ -180,57 +171,78 @@ impl LocalSwarmBuilder {
                 .0
                 .clone()
         });
-        let version = versions.get(&initial_version).unwrap();
+        let version = versions.get(&initial_version_actual).unwrap();
 
-        let validators = validators
+        let mut validators = validators
             .into_iter()
             .map(|v| {
-                let node = LocalNode::new(version.to_owned(), v.name, v.dir)?;
+                let node = LocalNode::new(
+                    version.to_owned(),
+                    v.name,
+                    v.index,
+                    v.dir,
+                    v.account_private_key,
+                )?;
                 Ok((node.peer_id(), node))
             })
             .collect::<Result<HashMap<_, _>>>()?;
+
+        // After genesis, remove public network from validator and add to public_networks
+        let public_networks = validators
+            .values_mut()
+            .map(|validator| {
+                let mut validator_config = validator.config().clone();
+
+                // Grab the public network config from the validator and insert it into the VFN's config
+                // The validator's public network identity is the same as the VFN's public network identity
+                // We remove it from the validator so the VFN can hold it
+                let public_network = {
+                    let (i, _) = validator_config
+                        .full_node_networks
+                        .iter()
+                        .enumerate()
+                        .find(|(_i, config)| config.network_id == NetworkId::Public)
+                        .expect("Validator should have a public network");
+                    validator_config.full_node_networks.remove(i)
+                };
+
+                // Since the validator's config has changed we need to save it
+                validator_config.save(validator.config_path())?;
+                *validator.config_mut() = validator_config;
+
+                Ok((validator.peer_id(), public_network))
+            })
+            .collect::<Result<HashMap<_, _>>>()?;
+
+        // We print out the root key to make it easy for users to deploy a local faucet
+        let encoded_root_key = hex::encode(root_key.to_bytes());
+        info!(
+            "The root (or mint) key for the swarm is: 0x{}",
+            encoded_root_key
+        );
+
         let root_key = ConfigKey::new(root_key);
         let root_account = LocalAccount::new(
-            aptos_sdk::types::account_config::aptos_root_address(),
+            aptos_sdk::types::account_config::aptos_test_root_address(),
             AccountKey::from_private_key(root_key.private_key()),
             0,
         );
 
         Ok(LocalSwarm {
-            node_name_counter: validators.len() as u64,
+            node_name_counter: validators.len(),
             genesis,
             genesis_waypoint,
             versions,
             validators,
             fullnodes: HashMap::new(),
-            dir,
+            public_networks,
+            dir: dir_actual,
             root_account,
             chain_id: ChainId::test(),
             root_key,
             launched: false,
+            guard,
         })
-    }
-}
-
-#[derive(Debug)]
-pub struct LocalSwarm {
-    node_name_counter: u64,
-    genesis: Transaction,
-    genesis_waypoint: Waypoint,
-    versions: Arc<HashMap<Version, LocalVersion>>,
-    validators: HashMap<PeerId, LocalNode>,
-    fullnodes: HashMap<PeerId, LocalNode>,
-    dir: SwarmDirectory,
-    root_account: LocalAccount,
-    chain_id: ChainId,
-    root_key: ConfigKey<Ed25519PrivateKey>,
-
-    launched: bool,
-}
-
-impl LocalSwarm {
-    pub fn builder(versions: Arc<HashMap<Version, LocalVersion>>) -> LocalSwarmBuilder {
-        LocalSwarmBuilder::new(versions)
     }
 
     pub async fn launch(&mut self) -> Result<()> {
@@ -245,7 +257,7 @@ impl LocalSwarm {
         }
 
         self.wait_all_alive(Duration::from_secs(60)).await?;
-        println!("Swarm launched successfully.");
+        info!("Swarm launched successfully.");
         Ok(())
     }
 
@@ -255,15 +267,15 @@ impl LocalSwarm {
         self.wait_for_startup().await?;
         self.wait_for_connectivity(deadline).await?;
         self.liveness_check(deadline).await?;
-        println!("Swarm alive.");
+        info!("Swarm alive.");
         Ok(())
     }
 
-    async fn wait_for_startup(&mut self) -> Result<()> {
-        let num_attempts = 10;
+    pub async fn wait_for_startup(&mut self) -> Result<()> {
+        let num_attempts = 30;
         let mut done = vec![false; self.validators.len()];
         for i in 0..num_attempts {
-            println!("Wait for startup attempt: {} of {}", i, num_attempts);
+            info!("Wait for startup attempt: {} of {}", i, num_attempts);
             for (node, done) in self.validators.values_mut().zip(done.iter_mut()) {
                 if *done {
                     continue;
@@ -277,18 +289,18 @@ impl LocalSwarm {
                             node.name(),
                             e
                         ));
-                    }
+                    },
                     Err(HealthCheckError::NotRunning(error)) => {
                         return Err(anyhow!(
                             "Node '{}' is not running! Error: {:?}",
                             node.name(),
                             error
                         ));
-                    }
+                    },
                     Err(HealthCheckError::Failure(e)) => {
-                        println!("health check failure: {}", e);
+                        warn!("health check failure: {}", e);
                         break;
-                    }
+                    },
                 }
             }
 
@@ -303,7 +315,7 @@ impl LocalSwarm {
         Err(anyhow!("Launching Swarm timed out"))
     }
 
-    pub async fn add_validator_fullnode(
+    pub fn add_validator_fullnode(
         &mut self,
         version: &Version,
         template: NodeConfig,
@@ -311,35 +323,38 @@ impl LocalSwarm {
     ) -> Result<PeerId> {
         let validator = self
             .validators
-            .get_mut(&validator_peer_id)
+            .get(&validator_peer_id)
             .ok_or_else(|| anyhow!("no validator with peer_id: {}", validator_peer_id))?;
+
+        let public_network = self
+            .public_networks
+            .get(&validator_peer_id)
+            .ok_or_else(|| anyhow!("no public network with peer_id: {}", validator_peer_id))?;
 
         if self.fullnodes.contains_key(&validator_peer_id) {
             bail!("VFN for validator {} already configured", validator_peer_id);
         }
 
-        let mut validator_config = validator.config().clone();
         let name = self.node_name_counter.to_string();
+        let index = self.node_name_counter;
         self.node_name_counter += 1;
         let fullnode_config = FullnodeNodeConfig::validator_fullnode(
             name,
             self.dir.as_ref(),
             template,
-            &mut validator_config,
+            validator.config(),
             &self.genesis_waypoint,
             &self.genesis,
+            public_network,
         )?;
-
-        // Since the validator's config has changed we need to save it
-        validator_config.save(validator.config_path())?;
-        *validator.config_mut() = validator_config;
-        validator.restart().await?;
 
         let version = self.versions.get(version).unwrap();
         let mut fullnode = LocalNode::new(
             version.to_owned(),
             fullnode_config.name,
+            index,
             fullnode_config.dir,
+            None,
         )?;
 
         let peer_id = fullnode.peer_id();
@@ -353,6 +368,7 @@ impl LocalSwarm {
 
     fn add_fullnode(&mut self, version: &Version, template: NodeConfig) -> Result<PeerId> {
         let name = self.node_name_counter.to_string();
+        let index = self.node_name_counter;
         self.node_name_counter += 1;
         let fullnode_config = FullnodeNodeConfig::public_fullnode(
             name,
@@ -366,7 +382,9 @@ impl LocalSwarm {
         let mut fullnode = LocalNode::new(
             version.to_owned(),
             fullnode_config.name,
+            index,
             fullnode_config.dir,
+            None,
         )?;
 
         let peer_id = fullnode.peer_id();
@@ -394,11 +412,17 @@ impl LocalSwarm {
     }
 
     pub fn validators(&self) -> impl Iterator<Item = &LocalNode> {
-        self.validators.values()
+        // sort by id to keep the order consistent:
+        let mut validators: Vec<&LocalNode> = self.validators.values().collect();
+        validators.sort_by_key(|v| v.index());
+        validators.into_iter()
     }
 
     pub fn validators_mut(&mut self) -> impl Iterator<Item = &mut LocalNode> {
-        self.validators.values_mut()
+        // sort by id to keep the order consistent:
+        let mut validators: Vec<&mut LocalNode> = self.validators.values_mut().collect();
+        validators.sort_by_key(|v| v.index());
+        validators.into_iter()
     }
 
     pub fn fullnode(&self, peer_id: PeerId) -> Option<&LocalNode> {
@@ -430,15 +454,23 @@ impl Swarm for LocalSwarm {
     }
 
     fn validators<'a>(&'a self) -> Box<dyn Iterator<Item = &'a dyn Validator> + 'a> {
-        Box::new(self.validators.values().map(|v| v as &'a dyn Validator))
+        let mut validators: Vec<_> = self
+            .validators
+            .values()
+            .map(|v| v as &'a dyn Validator)
+            .collect();
+        validators.sort_by_key(|v| v.index());
+        Box::new(validators.into_iter())
     }
 
     fn validators_mut<'a>(&'a mut self) -> Box<dyn Iterator<Item = &'a mut dyn Validator> + 'a> {
-        Box::new(
-            self.validators
-                .values_mut()
-                .map(|v| v as &'a mut dyn Validator),
-        )
+        let mut validators: Vec<_> = self
+            .validators
+            .values_mut()
+            .map(|v| v as &'a mut dyn Validator)
+            .collect();
+        validators.sort_by_key(|v| v.index());
+        Box::new(validators.into_iter())
     }
 
     fn validator(&self, id: PeerId) -> Option<&dyn Validator> {
@@ -451,7 +483,7 @@ impl Swarm for LocalSwarm {
             .map(|v| v as &mut dyn Validator)
     }
 
-    fn upgrade_validator(&mut self, id: PeerId, version: &Version) -> Result<()> {
+    async fn upgrade_validator(&mut self, id: PeerId, version: &Version) -> Result<()> {
         let version = self
             .versions
             .get(version)
@@ -492,6 +524,15 @@ impl Swarm for LocalSwarm {
         todo!()
     }
 
+    fn add_validator_full_node(
+        &mut self,
+        version: &Version,
+        template: NodeConfig,
+        id: PeerId,
+    ) -> Result<PeerId> {
+        self.add_validator_fullnode(version, template, id)
+    }
+
     fn add_full_node(&mut self, version: &Version, template: NodeConfig) -> Result<PeerId> {
         self.add_fullnode(version, template)
     }
@@ -509,19 +550,112 @@ impl Swarm for LocalSwarm {
     }
 
     fn chain_info(&mut self) -> ChainInfo<'_> {
-        ChainInfo::new(
-            &mut self.root_account,
-            self.validators
-                .values()
-                .map(|v| v.rest_api_endpoint().to_string())
-                .next()
-                .unwrap(),
-            self.chain_id,
-        )
+        let rest_api_url = self
+            .validators()
+            .next()
+            .unwrap()
+            .rest_api_endpoint()
+            .to_string();
+
+        ChainInfo::new(&mut self.root_account, rest_api_url, self.chain_id)
     }
 
     fn logs_location(&mut self) -> String {
         self.dir.persist();
         self.dir.display().to_string()
+    }
+
+    fn inject_chaos(&mut self, _chaos: SwarmChaos) -> Result<()> {
+        todo!()
+    }
+
+    fn remove_chaos(&mut self, _chaos: SwarmChaos) -> Result<()> {
+        todo!()
+    }
+
+    fn remove_all_chaos(&mut self) -> Result<()> {
+        todo!()
+    }
+
+    async fn ensure_no_validator_restart(&self) -> Result<()> {
+        todo!()
+    }
+
+    async fn ensure_no_fullnode_restart(&self) -> Result<()> {
+        todo!()
+    }
+
+    async fn query_metrics(
+        &self,
+        _query: &str,
+        _time: Option<i64>,
+        _timeout: Option<i64>,
+    ) -> Result<PromqlResult> {
+        todo!()
+    }
+
+    async fn ensure_healthy_system_metrics(
+        &mut self,
+        _start_time: i64,
+        _end_time: i64,
+        _threshold: SystemMetricsThreshold,
+    ) -> Result<()> {
+        todo!()
+    }
+
+    fn chain_info_for_node(&mut self, idx: usize) -> ChainInfo<'_> {
+        let rest_api_url = self
+            .validators()
+            .nth(idx)
+            .unwrap()
+            .rest_api_endpoint()
+            .to_string();
+
+        ChainInfo::new(&mut self.root_account, rest_api_url, self.chain_id)
+    }
+}
+
+#[derive(Debug)]
+pub struct ActiveNodesGuard {
+    counter: Arc<Mutex<usize>>,
+    slots: usize,
+}
+
+impl ActiveNodesGuard {
+    pub async fn grab(slots: usize, counter: Arc<Mutex<usize>>) -> Self {
+        let max = num_cpus::get();
+        let mut idx = 0;
+        loop {
+            {
+                let mut guard = counter.lock();
+                // first check is so that if test needs more slots than cores,
+                // we still allow it to run (during low contention)
+                if *guard <= 2 || *guard + slots <= max {
+                    info!(
+                        "Grabbed {} node slots to start test, already active {} swarm nodes",
+                        slots, *guard
+                    );
+                    *guard += slots;
+                    drop(guard);
+                    return Self { counter, slots };
+                }
+                idx += 1;
+                // log only if idx is power of two, to reduce logs
+                if (idx & (idx - 1)) == 0 {
+                    info!(
+                        "Too many active swarm nodes ({}), max allowed is {}, waiting to start {} new ones",
+                        *guard, max, slots,
+                    );
+                }
+            }
+            tokio::time::sleep(Duration::from_secs(2)).await;
+        }
+    }
+}
+
+impl Drop for ActiveNodesGuard {
+    fn drop(&mut self) {
+        let mut guard = self.counter.lock();
+        *guard -= self.slots;
     }
 }

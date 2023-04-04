@@ -1,22 +1,20 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
 
-use std::{cmp::max, collections::HashMap, sync::Arc};
-
 use anyhow::Result;
-use serde::{Deserialize, Serialize};
-
 use aptos_crypto::{
     hash::{EventAccumulatorHasher, TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH},
     HashValue,
 };
+use aptos_scratchpad::{ProofRead, SparseMerkleTree};
 use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
-    proof::{accumulator::InMemoryAccumulator, AccumulatorExtensionProof},
+    proof::{accumulator::InMemoryAccumulator, AccumulatorExtensionProof, SparseMerkleProofExt},
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
         Transaction, TransactionInfo, TransactionListWithProof, TransactionOutputListWithProof,
@@ -27,14 +25,21 @@ use aptos_types::{
 pub use error::Error;
 pub use executed_chunk::ExecutedChunk;
 pub use parsed_transaction_output::ParsedTransactionOutput;
-use scratchpad::{ProofRead, SparseMerkleTree};
+use serde::{Deserialize, Serialize};
+use std::{
+    cmp::max,
+    collections::{BTreeSet, HashMap},
+    fmt::Debug,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+};
 
 mod error;
 mod executed_chunk;
 pub mod in_memory_state_calculator;
 mod parsed_transaction_output;
-
-type SparseMerkleProof = aptos_types::proof::SparseMerkleProof;
 
 pub trait ChunkExecutorTrait: Send + Sync {
     /// Verifies the transactions based on the provided proofs and ledger info. If the transactions
@@ -55,27 +60,16 @@ pub trait ChunkExecutorTrait: Send + Sync {
         // Target LI that has been verified independently: the proofs are relative to this version.
         verified_target_li: &LedgerInfoWithSignatures,
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
-    ) -> anyhow::Result<()>;
+    ) -> Result<()>;
 
     /// Commit a previously executed chunk. Returns a chunk commit notification.
     fn commit_chunk(&self) -> Result<ChunkCommitNotification>;
 
-    fn execute_and_commit_chunk(
-        &self,
-        txn_list_with_proof: TransactionListWithProof,
-        verified_target_li: &LedgerInfoWithSignatures,
-        epoch_change_li: Option<&LedgerInfoWithSignatures>,
-    ) -> Result<ChunkCommitNotification>;
-
-    fn apply_and_commit_chunk(
-        &self,
-        txn_output_list_with_proof: TransactionOutputListWithProof,
-        verified_target_li: &LedgerInfoWithSignatures,
-        epoch_change_li: Option<&LedgerInfoWithSignatures>,
-    ) -> Result<ChunkCommitNotification>;
-
     /// Resets the chunk executor by synchronizing state with storage.
     fn reset(&self) -> Result<()>;
+
+    /// Finishes the chunk executor by releasing memory held by inner data structures(SMT).
+    fn finish(&self);
 }
 
 pub struct StateSnapshotDelta {
@@ -84,17 +78,17 @@ pub struct StateSnapshotDelta {
     pub jmt_updates: Vec<(HashValue, (HashValue, StateKey))>,
 }
 
-pub trait BlockExecutorTrait: Send + Sync {
+pub trait BlockExecutorTrait<T>: Send + Sync {
     /// Get the latest committed block id
     fn committed_block_id(&self) -> HashValue;
 
     /// Reset the internal state including cache with newly fetched latest committed block from storage.
-    fn reset(&self) -> Result<(), Error>;
+    fn reset(&self) -> Result<()>;
 
     /// Executes a block.
     fn execute_block(
         &self,
-        block: (HashValue, Vec<Transaction>),
+        block: (HashValue, Vec<T>),
         parent_block_id: HashValue,
     ) -> Result<StateComputeResult, Error>;
 
@@ -112,18 +106,93 @@ pub trait BlockExecutorTrait: Send + Sync {
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
         save_state_snapshots: bool,
-    ) -> Result<Option<StateSnapshotDelta>, Error>;
+    ) -> Result<(), Error>;
 
     fn commit_blocks(
         &self,
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
-    ) -> Result<Option<StateSnapshotDelta>, Error> {
+    ) -> Result<(), Error> {
         self.commit_blocks_ext(
             block_ids,
             ledger_info_with_sigs,
             true, /* save_state_snapshots */
         )
+    }
+
+    /// Finishes the block executor by releasing memory held by inner data structures(SMT).
+    fn finish(&self);
+}
+
+#[derive(Clone)]
+pub enum VerifyExecutionMode {
+    NoVerify,
+    Verify {
+        txns_to_skip: Arc<BTreeSet<Version>>,
+        lazy_quit: bool,
+        seen_error: Arc<AtomicBool>,
+    },
+}
+
+impl VerifyExecutionMode {
+    pub fn verify_all() -> Self {
+        Self::Verify {
+            txns_to_skip: Arc::new(BTreeSet::new()),
+            lazy_quit: false,
+            seen_error: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    pub fn verify_except(txns_to_skip: Vec<Version>) -> Self {
+        Self::Verify {
+            txns_to_skip: Arc::new(txns_to_skip.into_iter().collect()),
+            lazy_quit: false,
+            seen_error: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    pub fn txns_to_skip(&self) -> Arc<BTreeSet<Version>> {
+        match self {
+            VerifyExecutionMode::NoVerify => Arc::new(BTreeSet::new()),
+            VerifyExecutionMode::Verify { txns_to_skip, .. } => txns_to_skip.clone(),
+        }
+    }
+
+    pub fn set_lazy_quit(mut self, is_lazy_quit: bool) -> Self {
+        if let Self::Verify {
+            ref mut lazy_quit, ..
+        } = self
+        {
+            *lazy_quit = is_lazy_quit
+        }
+        self
+    }
+
+    pub fn is_lazy_quit(&self) -> bool {
+        match self {
+            VerifyExecutionMode::NoVerify => false,
+            VerifyExecutionMode::Verify { lazy_quit, .. } => *lazy_quit,
+        }
+    }
+
+    pub fn mark_seen_error(&self) {
+        match self {
+            VerifyExecutionMode::NoVerify => unreachable!("Should not call in no-verify mode."),
+            VerifyExecutionMode::Verify { seen_error, .. } => {
+                seen_error.store(true, Ordering::Relaxed)
+            },
+        }
+    }
+
+    pub fn should_verify(&self) -> bool {
+        !matches!(self, Self::NoVerify)
+    }
+
+    pub fn seen_error(&self) -> bool {
+        match self {
+            VerifyExecutionMode::NoVerify => false,
+            VerifyExecutionMode::Verify { seen_error, .. } => seen_error.load(Ordering::Relaxed),
+        }
     }
 }
 
@@ -132,6 +201,9 @@ pub trait TransactionReplayer: Send {
         &self,
         transactions: Vec<Transaction>,
         transaction_infos: Vec<TransactionInfo>,
+        write_sets: Vec<WriteSet>,
+        event_vecs: Vec<Vec<ContractEvent>>,
+        verify_execution_mode: &VerifyExecutionMode,
     ) -> Result<()>;
 
     fn commit(&self) -> Result<Arc<ExecutedChunk>>;
@@ -291,11 +363,11 @@ impl StateComputeResult {
 }
 
 pub struct ProofReader {
-    proofs: HashMap<HashValue, SparseMerkleProof>,
+    proofs: HashMap<HashValue, SparseMerkleProofExt>,
 }
 
 impl ProofReader {
-    pub fn new(proofs: HashMap<HashValue, SparseMerkleProof>) -> Self {
+    pub fn new(proofs: HashMap<HashValue, SparseMerkleProofExt>) -> Self {
         ProofReader { proofs }
     }
 
@@ -305,7 +377,7 @@ impl ProofReader {
 }
 
 impl ProofRead for ProofReader {
-    fn get_proof(&self, key: HashValue) -> Option<&SparseMerkleProof> {
+    fn get_proof(&self, key: HashValue) -> Option<&SparseMerkleProofExt> {
         self.proofs.get(&key)
     }
 }
@@ -316,7 +388,7 @@ impl ProofRead for ProofReader {
 pub struct TransactionData {
     /// Each entry in this map represents the new value of a store store object touched by this
     /// transaction.
-    state_updates: HashMap<StateKey, StateValue>,
+    state_updates: HashMap<StateKey, Option<StateValue>>,
 
     /// The writeset generated from this transaction.
     write_set: WriteSet,
@@ -345,7 +417,7 @@ pub struct TransactionData {
 
 impl TransactionData {
     pub fn new(
-        state_updates: HashMap<StateKey, StateValue>,
+        state_updates: HashMap<StateKey, Option<StateValue>>,
         write_set: WriteSet,
         events: Vec<ContractEvent>,
         reconfig_events: Vec<ContractEvent>,
@@ -368,7 +440,7 @@ impl TransactionData {
         }
     }
 
-    pub fn state_updates(&self) -> &HashMap<StateKey, StateValue> {
+    pub fn state_updates(&self) -> &HashMap<StateKey, Option<StateValue>> {
         &self.state_updates
     }
 
@@ -394,5 +466,9 @@ impl TransactionData {
 
     pub fn txn_info_hash(&self) -> HashValue {
         self.txn_info_hash
+    }
+
+    pub fn is_reconfig(&self) -> bool {
+        !self.reconfig_events.is_empty()
     }
 }

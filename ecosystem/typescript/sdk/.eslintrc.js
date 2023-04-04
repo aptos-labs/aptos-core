@@ -4,7 +4,7 @@ module.exports = {
     es2021: true,
     node: true,
   },
-  ignorePatterns: ["*.js", "examples/*"],
+  ignorePatterns: ["*.js", "examples/*", "src/indexer/generated/**"],
   extends: ["airbnb-base", "airbnb-typescript/base", "prettier"],
   parser: "@typescript-eslint/parser",
   parserOptions: {
@@ -22,7 +22,9 @@ module.exports = {
     "import/prefer-default-export": "off",
     "object-curly-newline": "off",
     "no-use-before-define": "off",
+    "no-unused-vars": "off",
     "@typescript-eslint/no-use-before-define": ["error", { functions: false, classes: false }],
+    "@typescript-eslint/no-unused-vars": ["error"],
   },
   settings: {
     "import/resolver": {

@@ -2,6 +2,11 @@ variable "region" {
   description = "AWS region"
 }
 
+variable "workspace_name_override" {
+  description = "If specified, overrides the usage of Terraform workspace for naming purposes"
+  default     = ""
+}
+
 variable "iam_path" {
   default     = "/"
   description = "Path to use when naming IAM objects"
@@ -34,10 +39,6 @@ variable "k8s_admins" {
   default     = []
 }
 
-variable "ssh_pub_key" {
-  description = "SSH public key to configure for bastion and vault access"
-}
-
 variable "num_fullnodes" {
   default = 1
 }
@@ -62,8 +63,18 @@ variable "chain_id" {
   default     = "DEVNET"
 }
 
+variable "chain_name" {
+  description = "Aptos chain name"
+  default     = "devnet"
+}
+
+variable "fullnode_name" {
+  description = "Name of the fullnode node owner"
+  type        = string
+}
+
 variable "pfn_helm_values" {
-  description = "Map of values to pass to testnet Helm"
+  description = "Map of values to pass to pfn-addons Helm"
   type        = any
   default     = {}
 }
@@ -119,5 +130,60 @@ variable "utility_instance_type" {
 
 variable "fullnode_instance_type" {
   description = "Instance type used for validator and fullnodes"
-  default     = "c5.xlarge"
+  default     = "c6i.8xlarge"
+}
+
+variable "num_extra_instance" {
+  default     = 0
+  description = "Number of extra instances to add into node pool"
+}
+
+variable "enable_backup" {
+  description = "enable data backup from fullnode"
+  default     = false
+}
+
+variable "enable_public_backup" {
+  description = "provide data backups to the public"
+  default     = false
+}
+
+variable "backup_fullnode_index" {
+  description = "index of fullnode to backup data from"
+  default     = 0
+}
+
+variable "fullnode_storage_class" {
+  description = "Which storage class to use for the validator and fullnode"
+  default     = "io1"
+  validation {
+    condition     = contains(["gp3", "gp2", "io1", "io2"], var.fullnode_storage_class)
+    error_message = "Supported storage classes are gp3, io1, io2"
+  }
+}
+
+variable "enable_monitoring" {
+  description = "Enable monitoring helm chart"
+  default     = false
+}
+
+variable "monitoring_helm_values" {
+  description = "Map of values to pass to monitoring Helm"
+  type        = any
+  default     = {}
+}
+
+variable "enable_prometheus_node_exporter" {
+  description = "Enable prometheus-node-exporter within monitoring helm chart"
+  default     = false
+}
+
+variable "enable_kube_state_metrics" {
+  description = "Enable kube-state-metrics within monitoring helm chart"
+  default     = false
+}
+
+variable "manage_via_tf" {
+  description = "Whether to manage the aptos-node k8s workload via Terraform. If set to false, the helm_release resource will still be created and updated when values change, but it may not be updated on every apply"
+  default     = true
 }

@@ -1,134 +1,129 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crossbeam::utils::CachePadded;
-use dashmap::DashMap;
-use std::{
-    collections::btree_map::BTreeMap,
-    hash::Hash,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
+use crate::{
+    types::{MVCodeError, MVCodeOutput, MVDataError, MVDataOutput, TxnIndex, Version},
+    versioned_code::VersionedCode,
+    versioned_data::VersionedData,
 };
+use aptos_aggregator::delta_change_set::DeltaOp;
+use aptos_types::{
+    executable::{Executable, ExecutableDescriptor, ModulePath},
+    write_set::TransactionWrite,
+};
+use std::hash::Hash;
+
+pub mod types;
+pub mod versioned_code;
+pub mod versioned_data;
 
 #[cfg(test)]
 mod unit_tests;
 
-// TODO: re-use definitions with the scheduler.
-pub type TxnIndex = usize;
-pub type Incarnation = usize;
-pub type Version = (TxnIndex, Incarnation);
-
-const FLAG_DONE: usize = 0;
-const FLAG_ESTIMATE: usize = 1;
-
-/// Type of entry, recorded in the shared multi-version data-structure for each write.
-struct WriteCell<V> {
-    /// Used to mark the entry as a "write estimate".
-    flag: AtomicUsize,
-    /// Incarnation number of the transaction that wrote the entry. Note that
-    /// TxnIndex is part of the key and not recorded here.
-    incarnation: Incarnation,
-    /// Actual data stored in a shared pointer (to ensure ownership and avoid clones).
-    data: Arc<V>,
-}
-
-impl<V> WriteCell<V> {
-    pub fn new_from(flag: usize, incarnation: Incarnation, data: V) -> WriteCell<V> {
-        WriteCell {
-            flag: AtomicUsize::new(flag),
-            incarnation,
-            data: Arc::new(data),
-        }
-    }
-
-    pub fn flag(&self) -> usize {
-        self.flag.load(Ordering::SeqCst)
-    }
-
-    pub fn mark_estimate(&self) {
-        self.flag.store(FLAG_ESTIMATE, Ordering::SeqCst);
-    }
-}
-
 /// Main multi-version data-structure used by threads to read/write during parallel
-/// execution. Maps each access path to an interal BTreeMap that contains the indices
-/// of transactions that write at the given access path alongside the corresponding
-/// entries of WriteCell type.
+/// execution.
 ///
 /// Concurrency is managed by DashMap, i.e. when a method accesses a BTreeMap at a
 /// given key, it holds exclusive access and doesn't need to explicitly synchronize
 /// with other reader/writers.
-pub struct MVHashMap<K, V> {
-    data: DashMap<K, BTreeMap<TxnIndex, CachePadded<WriteCell<V>>>>,
+///
+/// TODO: separate V into different generic types for data and modules / code (currently
+/// both WriteOp for executor, and use extract_raw_bytes. data for aggregators, and
+/// code for computing the module hash.
+pub struct MVHashMap<K, V: TransactionWrite, X: Executable> {
+    data: VersionedData<K, V>,
+    code: VersionedCode<K, V, X>,
 }
 
-impl<K: Hash + Clone + Eq, V> MVHashMap<K, V> {
-    pub fn new() -> MVHashMap<K, V> {
+impl<K: ModulePath + Hash + Clone + Eq, V: TransactionWrite, X: Executable> MVHashMap<K, V, X> {
+    // -----------------------------------
+    // Functions shared for data and code.
+
+    // Option<VersionedCode> is passed to allow re-using code cache between blocks.
+    pub fn new(code_cache: Option<VersionedCode<K, V, X>>) -> MVHashMap<K, V, X> {
         MVHashMap {
-            data: DashMap::new(),
+            data: VersionedData::new(),
+            code: code_cache.unwrap_or_default(),
         }
     }
 
-    /// Write a versioned data at a specified key. If the WriteCell entry is overwritten,
-    /// asserts that the new incarnation is strictly higher.
-    pub fn write(&self, key: &K, version: Version, data: V) {
-        let (txn_idx, incarnation) = version;
-
-        let mut map = self.data.entry(key.clone()).or_insert(BTreeMap::new());
-        let prev_cell = map.insert(
-            txn_idx,
-            CachePadded::new(WriteCell::new_from(FLAG_DONE, incarnation, data)),
-        );
-
-        // Assert that the previous entry for txn_idx, if present, had lower incarnation.
-        assert!(prev_cell
-            .map(|cell| cell.incarnation < incarnation)
-            .unwrap_or(true));
+    pub fn take(self) -> (VersionedData<K, V>, VersionedCode<K, V, X>) {
+        (self.data, self.code)
     }
 
     /// Mark an entry from transaction 'txn_idx' at access path 'key' as an estimated write
     /// (for future incarnation). Will panic if the entry is not in the data-structure.
     pub fn mark_estimate(&self, key: &K, txn_idx: TxnIndex) {
-        let map = self.data.get(key).expect("Path must exist");
-        map.get(&txn_idx)
-            .expect("Entry by txn must exist")
-            .mark_estimate();
+        match key.module_path() {
+            Some(_) => self.code.mark_estimate(key, txn_idx),
+            None => self.data.mark_estimate(key, txn_idx),
+        }
     }
 
     /// Delete an entry from transaction 'txn_idx' at access path 'key'. Will panic
-    /// if the access path has never been written before.
+    /// if the corresponding entry does not exist.
     pub fn delete(&self, key: &K, txn_idx: TxnIndex) {
-        // TODO: investigate logical deletion.
-        let mut map = self.data.get_mut(key).expect("Path must exist");
-        map.remove(&txn_idx);
+        // This internally deserializes the path, TODO: fix.
+        match key.module_path() {
+            Some(_) => self.code.delete(key, txn_idx),
+            None => self.data.delete(key, txn_idx),
+        };
     }
 
-    /// read may return Ok((Arc<V>, txn_idx, incarnation)), Err(dep_txn_idx) for
-    /// a dependency of transaction dep_txn_idx or Err(None) when no prior entry is found.
-    pub fn read(&self, key: &K, txn_idx: TxnIndex) -> Result<(Version, Arc<V>), Option<TxnIndex>> {
-        match self.data.get(key) {
-            Some(tree) => {
-                // Find the dependency
-                let mut iter = tree.range(0..txn_idx);
-                if let Some((idx, write_cell)) = iter.next_back() {
-                    let flag = write_cell.flag();
-
-                    if flag == FLAG_ESTIMATE {
-                        // Found a dependency.
-                        Err(Some(*idx))
-                    } else {
-                        debug_assert!(flag == FLAG_DONE);
-                        // The entry is populated, return its contents.
-                        let write_version = (*idx, write_cell.incarnation);
-                        Ok((write_version, write_cell.data.clone()))
-                    }
-                } else {
-                    Err(None)
-                }
-            }
-            None => Err(None),
+    /// Add a versioned write at a specified key, in code or data map according to the key.
+    pub fn write(&self, key: &K, version: Version, value: V) {
+        match key.module_path() {
+            Some(_) => self.code.write(key, version.0, value),
+            None => self.data.write(key, version, value),
         }
+    }
+
+    // -----------------------------------------------
+    // Functions specific to the multi-versioned data.
+
+    /// Add a delta at a specified key.
+    pub fn add_delta(&self, key: &K, txn_idx: TxnIndex, delta: DeltaOp) {
+        debug_assert!(
+            key.module_path().is_none(),
+            "Delta must be stored at a path corresponding to data"
+        );
+
+        self.data.add_delta(key, txn_idx, delta);
+    }
+
+    /// Read data at access path 'key', from the perspective of transaction 'txn_idx'.
+    pub fn fetch_data(
+        &self,
+        key: &K,
+        txn_idx: TxnIndex,
+    ) -> anyhow::Result<MVDataOutput<V>, MVDataError> {
+        self.data.fetch_data(key, txn_idx)
+    }
+
+    // ----------------------------------------------
+    // Functions specific to the multi-versioned code.
+
+    /// Adds a new executable to the multiversion data-structure. The executable is either
+    /// storage-version (and fixed) or uniquely identified by the (cryptographic) hash of the
+    /// module published during the block.
+    pub fn store_executable(&self, key: &K, descriptor: ExecutableDescriptor, executable: X) {
+        self.code.store_executable(key, descriptor, executable);
+    }
+
+    pub fn fetch_code(
+        &self,
+        key: &K,
+        txn_idx: TxnIndex,
+    ) -> anyhow::Result<MVCodeOutput<V, X>, MVCodeError> {
+        self.code.fetch_code(key, txn_idx)
+    }
+}
+
+impl<K: ModulePath + Hash + Clone + Eq, V: TransactionWrite, X: Executable> Default
+    for MVHashMap<K, V, X>
+{
+    fn default() -> Self {
+        Self::new(None)
     }
 }

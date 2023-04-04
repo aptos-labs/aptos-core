@@ -1,36 +1,30 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{block_executor::BlockExecutor, chunk_executor::ChunkExecutor};
+use crate::{
+    block_executor::{BlockExecutor, TransactionBlockExecutor},
+    components::chunk_output::ChunkOutput,
+};
 use anyhow::Result;
 use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
+use aptos_executor_types::BlockExecutorTrait;
 use aptos_state_view::StateView;
+use aptos_storage_interface::{
+    cached_state_view::CachedStateView, state_delta::StateDelta, DbReader, DbReaderWriter, DbWriter,
+};
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
-    transaction::{
-        Transaction, TransactionListWithProof, TransactionOutput, TransactionToCommit, Version,
-    },
+    transaction::{Transaction, TransactionOutput, TransactionToCommit, Version},
     vm_status::VMStatus,
 };
 use aptos_vm::VMExecutor;
-use executor_types::{BlockExecutorTrait, ChunkExecutorTrait};
-use storage_interface::{state_delta::StateDelta, DbReader, DbReaderWriter, DbWriter, StartupInfo};
 
-fn create_test_executor() -> BlockExecutor<FakeVM> {
+fn create_test_executor() -> BlockExecutor<FakeVM, Transaction> {
     // setup fake db
     let fake_db = FakeDb {};
     let db_reader_writer = DbReaderWriter::new(fake_db);
-    BlockExecutor::<FakeVM>::new(db_reader_writer)
-}
-
-pub fn fuzz_execute_and_commit_chunk(
-    txn_list_with_proof: TransactionListWithProof,
-    verified_target_li: LedgerInfoWithSignatures,
-) {
-    let db = DbReaderWriter::new(FakeDb {});
-    let executor = ChunkExecutor::<FakeVM>::new(db).unwrap();
-
-    let _events = executor.execute_and_commit_chunk(txn_list_with_proof, &verified_target_li, None);
+    BlockExecutor::<FakeVM, Transaction>::new(db_reader_writer)
 }
 
 pub fn fuzz_execute_and_commit_blocks(
@@ -52,6 +46,15 @@ pub fn fuzz_execute_and_commit_blocks(
 
 /// A fake VM implementing VMExecutor
 pub struct FakeVM;
+
+impl TransactionBlockExecutor<Transaction> for FakeVM {
+    fn execute_transaction_block(
+        transactions: Vec<Transaction>,
+        state_view: CachedStateView,
+    ) -> Result<ChunkOutput> {
+        ChunkOutput::by_transaction_execution::<FakeVM>(transactions, state_view)
+    }
+}
 
 impl VMExecutor for FakeVM {
     fn execute_block(
@@ -75,10 +78,6 @@ impl DbReader for FakeDb {
         let ledger_info = ledger_info_with_sig.ledger_info();
         Ok((ledger_info.version(), ledger_info.timestamp_usecs()))
     }
-
-    fn get_startup_info(&self) -> Result<Option<StartupInfo>> {
-        Ok(Some(StartupInfo::new_for_testing()))
-    }
 }
 
 impl DbWriter for FakeDb {
@@ -88,6 +87,7 @@ impl DbWriter for FakeDb {
         _first_version: Version,
         _base_state_version: Option<Version>,
         _ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        _sync_commit: bool,
         _in_memory_state: StateDelta,
     ) -> Result<()> {
         Ok(())

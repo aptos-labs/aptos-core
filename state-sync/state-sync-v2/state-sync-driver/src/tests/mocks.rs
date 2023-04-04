@@ -1,17 +1,31 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::tests::utils::{create_empty_epoch_state, create_epoch_ending_ledger_info};
 use crate::{
-    storage_synchronizer::StorageSynchronizerInterface, tests::utils::create_transaction_info,
+    error::Error,
+    metadata_storage::MetadataStorageInterface,
+    storage_synchronizer::StorageSynchronizerInterface,
+    tests::utils::{
+        create_empty_epoch_state, create_epoch_ending_ledger_info, create_transaction_info,
+    },
 };
 use anyhow::Result;
 use aptos_crypto::HashValue;
-use aptos_types::epoch_state::EpochState;
+use aptos_data_streaming_service::{
+    data_notification::NotificationId,
+    data_stream::{DataStreamId, DataStreamListener},
+    streaming_client::{DataStreamingClient, Epoch, NotificationAndFeedback},
+};
+use aptos_executor_types::{ChunkCommitNotification, ChunkExecutorTrait};
+use aptos_storage_interface::{
+    state_delta::StateDelta, DbReader, DbReaderWriter, DbWriter, ExecutedTrees, Order,
+    StateSnapshotReceiver,
+};
 use aptos_types::{
     account_address::AccountAddress,
     contract_event::EventWithVersion,
     epoch_change::EpochChangeProof,
+    epoch_state::EpochState,
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
     proof::{
@@ -29,18 +43,8 @@ use aptos_types::{
     },
 };
 use async_trait::async_trait;
-use data_streaming_service::{
-    data_notification::NotificationId,
-    data_stream::DataStreamListener,
-    streaming_client::{DataStreamingClient, Epoch, NotificationFeedback},
-};
-use executor_types::{ChunkCommitNotification, ChunkExecutorTrait};
 use mockall::mock;
 use std::sync::Arc;
-use storage_interface::{
-    state_delta::StateDelta, DbReader, DbReaderWriter, DbWriter, ExecutedTrees, Order, StartupInfo,
-    StateSnapshotReceiver,
-};
 use tokio::task::JoinHandle;
 
 // TODO(joshlind): if we see these as generally useful, we should
@@ -108,6 +112,9 @@ pub fn create_ready_storage_synchronizer(expect_reset_executor: bool) -> MockSto
         .return_const(false);
     if expect_reset_executor {
         mock_storage_synchronizer
+            .expect_finish_chunk_executor()
+            .return_const(());
+        mock_storage_synchronizer
             .expect_reset_chunk_executor()
             .return_const(Ok(()));
     }
@@ -133,23 +140,11 @@ mock! {
             epoch_change_li: Option<&'a LedgerInfoWithSignatures>,
         ) -> anyhow::Result<()>;
 
-        fn execute_and_commit_chunk<'a>(
-            &self,
-            txn_list_with_proof: TransactionListWithProof,
-            verified_target_li: &LedgerInfoWithSignatures,
-            epoch_change_li: Option<&'a LedgerInfoWithSignatures>,
-        ) -> Result<ChunkCommitNotification>;
-
-        fn apply_and_commit_chunk<'a>(
-            &self,
-            txn_output_list_with_proof: TransactionOutputListWithProof,
-            verified_target_li: &LedgerInfoWithSignatures,
-            epoch_change_li: Option<&'a LedgerInfoWithSignatures>,
-        ) -> Result<ChunkCommitNotification>;
-
         fn commit_chunk(&self) -> Result<ChunkCommitNotification>;
 
         fn reset(&self) -> Result<()>;
+
+        fn finish(&self);
     }
 }
 
@@ -198,6 +193,7 @@ mock! {
             start: u64,
             order: Order,
             limit: u64,
+            ledger_version: Version,
         ) -> Result<Vec<EventWithVersion>>;
 
         fn get_block_timestamp(&self, version: u64) -> Result<u64>;
@@ -208,21 +204,15 @@ mock! {
             _ledger_version: Version,
         ) -> Result<Version>;
 
-        fn get_latest_state_value(&self, state_key: StateKey) -> Result<Option<StateValue>>;
-
         fn get_latest_epoch_state(&self) -> Result<EpochState>;
 
         fn get_latest_ledger_info_option(&self) -> Result<Option<LedgerInfoWithSignatures>>;
 
         fn get_latest_ledger_info(&self) -> Result<LedgerInfoWithSignatures>;
 
-        fn get_latest_version_option(&self) -> Result<Option<Version>>;
-
         fn get_latest_version(&self) -> Result<Version>;
 
         fn get_latest_commit_metadata(&self) -> Result<(Version, u64)>;
-
-        fn get_startup_info(&self) -> Result<Option<StartupInfo>>;
 
         fn get_account_transaction(
             &self,
@@ -283,7 +273,7 @@ mock! {
             chunk_size: usize,
         ) -> Result<StateValueChunkWithProof>;
 
-        fn get_state_prune_window(&self) -> Result<Option<usize>>;
+        fn get_epoch_snapshot_prune_window(&self) -> Result<usize>;
     }
 }
 
@@ -301,9 +291,8 @@ mock! {
             &self,
             version: Version,
             output_with_proof: TransactionOutputListWithProof,
+            ledger_infos: &[LedgerInfoWithSignatures],
         ) -> Result<()>;
-
-        fn save_ledger_infos(&self, ledger_infos: &[LedgerInfoWithSignatures]) -> Result<()>;
 
         fn save_transactions<'a>(
             &self,
@@ -311,10 +300,38 @@ mock! {
             first_version: Version,
             base_state_version: Option<Version>,
             ledger_info_with_sigs: Option<&'a LedgerInfoWithSignatures>,
+            sync_commit: bool,
             in_memory_state: StateDelta,
         ) -> Result<()>;
+    }
+}
 
-        fn delete_genesis(&self) -> Result<()>;
+// This automatically creates a MockMetadataStorage.
+mock! {
+    pub MetadataStorage {}
+    impl MetadataStorageInterface for MetadataStorage {
+        fn is_snapshot_sync_complete(
+            &self,
+            target_ledger_info: &LedgerInfoWithSignatures,
+        ) -> Result<bool, Error>;
+
+        fn get_last_persisted_state_value_index(
+            &self,
+            target_ledger_info: &LedgerInfoWithSignatures,
+        ) -> Result<u64, Error>;
+
+        fn previous_snapshot_sync_target(&self) -> Result<Option<LedgerInfoWithSignatures>, Error>;
+
+        fn update_last_persisted_state_value_index(
+            &self,
+            target_ledger_info: &LedgerInfoWithSignatures,
+            last_persisted_state_value_index: u64,
+            snapshot_sync_completed: bool,
+        ) -> Result<(), Error>;
+    }
+
+    impl Clone for MetadataStorage {
+        fn clone(&self) -> Self;
     }
 }
 
@@ -339,19 +356,19 @@ mock! {
             &self,
             version: Version,
             start_index: Option<u64>,
-        ) -> Result<DataStreamListener, data_streaming_service::error::Error>;
+        ) -> Result<DataStreamListener, aptos_data_streaming_service::error::Error>;
 
         async fn get_all_epoch_ending_ledger_infos(
             &self,
             start_epoch: Epoch,
-        ) -> Result<DataStreamListener, data_streaming_service::error::Error>;
+        ) -> Result<DataStreamListener, aptos_data_streaming_service::error::Error>;
 
         async fn get_all_transaction_outputs(
             &self,
             start_version: Version,
             end_version: Version,
             proof_version: Version,
-        ) -> Result<DataStreamListener, data_streaming_service::error::Error>;
+        ) -> Result<DataStreamListener, aptos_data_streaming_service::error::Error>;
 
         async fn get_all_transactions(
             &self,
@@ -359,14 +376,22 @@ mock! {
             end_version: Version,
             proof_version: Version,
             include_events: bool,
-        ) -> Result<DataStreamListener, data_streaming_service::error::Error>;
+        ) -> Result<DataStreamListener, aptos_data_streaming_service::error::Error>;
+
+        async fn get_all_transactions_or_outputs(
+            &self,
+            start_version: Version,
+            end_version: Version,
+            proof_version: Version,
+            include_events: bool,
+        ) -> Result<DataStreamListener, aptos_data_streaming_service::error::Error>;
 
         async fn continuously_stream_transaction_outputs(
             &self,
             start_version: Version,
             start_epoch: Epoch,
             target: Option<LedgerInfoWithSignatures>,
-        ) -> Result<DataStreamListener, data_streaming_service::error::Error>;
+        ) -> Result<DataStreamListener, aptos_data_streaming_service::error::Error>;
 
         async fn continuously_stream_transactions(
             &self,
@@ -374,13 +399,21 @@ mock! {
             start_epoch: Epoch,
             include_events: bool,
             target: Option<LedgerInfoWithSignatures>,
-        ) -> Result<DataStreamListener, data_streaming_service::error::Error>;
+        ) -> Result<DataStreamListener, aptos_data_streaming_service::error::Error>;
+
+        async fn continuously_stream_transactions_or_outputs(
+            &self,
+            start_version: Version,
+            start_epoch: Epoch,
+            include_events: bool,
+            target: Option<LedgerInfoWithSignatures>,
+        ) -> Result<DataStreamListener, aptos_data_streaming_service::error::Error>;
 
         async fn terminate_stream_with_feedback(
             &self,
-            notification_id: NotificationId,
-            notification_feedback: NotificationFeedback,
-        ) -> Result<(), data_streaming_service::error::Error>;
+            data_stream_id: DataStreamId,
+            notification_and_feedback: Option<NotificationAndFeedback>,
+        ) -> Result<(), aptos_data_streaming_service::error::Error>;
     }
     impl Clone for StreamingClient {
         fn clone(&self) -> Self;
@@ -390,8 +423,9 @@ mock! {
 // This automatically creates a MockStorageSynchronizer.
 mock! {
     pub StorageSynchronizer {}
+    #[async_trait]
     impl StorageSynchronizerInterface for StorageSynchronizer {
-        fn apply_transaction_outputs(
+        async fn apply_transaction_outputs(
             &mut self,
             notification_id: NotificationId,
             output_list_with_proof: TransactionOutputListWithProof,
@@ -399,7 +433,7 @@ mock! {
             end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
         ) -> Result<(), crate::error::Error>;
 
-        fn execute_transactions(
+        async fn execute_transactions(
             &mut self,
             notification_id: NotificationId,
             transaction_list_with_proof: TransactionListWithProof,
@@ -422,7 +456,9 @@ mock! {
             state_value_chunk_with_proof: StateValueChunkWithProof,
         ) -> Result<(), crate::error::Error>;
 
-        fn reset_chunk_executor(&mut self) -> Result<(), crate::error::Error>;
+        fn reset_chunk_executor(&self) -> Result<(), crate::error::Error>;
+
+        fn finish_chunk_executor(&self);
     }
     impl Clone for StorageSynchronizer {
         fn clone(&self) -> Self;

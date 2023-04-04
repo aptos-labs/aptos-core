@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! Interface between Mempool and Network layers.
@@ -9,46 +10,36 @@ use crate::{
     shared_mempool::{
         tasks,
         types::{
-            notify_subscribers, BatchId, PeerSyncState, SharedMempool, SharedMempoolNotification,
+            notify_subscribers, MultiBatchId, PeerSyncState, SharedMempool,
+            SharedMempoolNotification,
         },
     },
 };
 use aptos_config::{
     config::{MempoolConfig, PeerRole, RoleType},
-    network_id::{NetworkId, PeerNetworkId},
+    network_id::PeerNetworkId,
 };
-use aptos_infallible::Mutex;
+use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
+use aptos_netcore::transport::ConnectionOrigin;
+use aptos_network::{
+    application::{error::Error, interface::NetworkClientInterface},
+    transport::ConnectionMetadata,
+};
 use aptos_types::{transaction::SignedTransaction, PeerId};
-use async_trait::async_trait;
-use channel::{aptos_channel, message_queues::QueueStyle};
+use aptos_vm_validator::vm_validator::TransactionValidation;
 use fail::fail_point;
 use itertools::Itertools;
-use netcore::transport::ConnectionOrigin;
-use network::{
-    application::{
-        interface::{MultiNetworkSender, NetworkInterface},
-        storage::{LockingHashMap, PeerMetadataStorage},
-    },
-    error::NetworkError,
-    peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
-    protocols::network::{
-        AppConfig, ApplicationNetworkSender, NetworkEvents, NetworkSender, NewNetworkSender,
-        RpcError,
-    },
-    transport::ConnectionMetadata,
-    ProtocolId,
-};
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
-    collections::{BTreeMap, HashMap},
+    collections::{hash_map::RandomState, BTreeMap, BTreeSet, HashMap},
+    hash::{BuildHasher, Hasher},
     ops::Add,
     sync::Arc,
     time::{Duration, Instant, SystemTime},
 };
 use thiserror::Error;
-use vm_validator::vm_validator::TransactionValidation;
 
 /// Container for exchanging transactions with other Mempools.
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -56,85 +47,18 @@ pub enum MempoolSyncMsg {
     /// Broadcast request issued by the sender.
     BroadcastTransactionsRequest {
         /// Unique id of sync request. Can be used by sender for rebroadcast analysis
-        request_id: Vec<u8>,
+        request_id: MultiBatchId,
         transactions: Vec<SignedTransaction>,
     },
     /// Broadcast ack issued by the receiver.
     BroadcastTransactionsResponse {
-        request_id: Vec<u8>,
+        request_id: MultiBatchId,
         /// Retry signal from recipient if there are txns in corresponding broadcast
         /// that were rejected from mempool but may succeed on resend.
         retry: bool,
         /// A backpressure signal from the recipient when it is overwhelmed (e.g., mempool is full).
         backoff: bool,
     },
-}
-
-/// The interface from Network to Mempool layer.
-///
-/// `MempoolNetworkEvents` is a `Stream` of `PeerManagerNotification` where the
-/// raw `Bytes` direct-send and rpc messages are deserialized into
-/// `MempoolMessage` types. `MempoolNetworkEvents` is a thin wrapper around an
-/// `channel::Receiver<PeerManagerNotification>`.
-pub type MempoolNetworkEvents = NetworkEvents<MempoolSyncMsg>;
-
-/// The interface from Mempool to Networking layer.
-///
-/// This is a thin wrapper around a `NetworkSender<MempoolSyncMsg>`, so it is
-/// easy to clone and send off to a separate task. For example, the rpc requests
-/// return Futures that encapsulate the whole flow, from sending the request to
-/// remote, to finally receiving the response and deserializing. It therefore
-/// makes the most sense to make the rpc call on a separate async task, which
-/// requires the `MempoolNetworkSender` to be `Clone` and `Send`.
-#[derive(Clone, Debug)]
-pub struct MempoolNetworkSender {
-    inner: NetworkSender<MempoolSyncMsg>,
-}
-
-pub fn network_endpoint_config(max_broadcasts_per_peer: usize) -> AppConfig {
-    AppConfig::p2p(
-        [ProtocolId::MempoolDirectSend],
-        aptos_channel::Config::new(max_broadcasts_per_peer)
-            .queue_style(QueueStyle::KLAST)
-            .counters(&counters::PENDING_MEMPOOL_NETWORK_EVENTS),
-    )
-}
-
-impl NewNetworkSender for MempoolNetworkSender {
-    fn new(
-        peer_mgr_reqs_tx: PeerManagerRequestSender,
-        connection_reqs_tx: ConnectionRequestSender,
-    ) -> Self {
-        Self {
-            inner: NetworkSender::new(peer_mgr_reqs_tx, connection_reqs_tx),
-        }
-    }
-}
-
-#[async_trait]
-impl ApplicationNetworkSender<MempoolSyncMsg> for MempoolNetworkSender {
-    fn send_to(&self, recipient: PeerId, message: MempoolSyncMsg) -> Result<(), NetworkError> {
-        fail_point!("mempool::send_to", |_| {
-            Err(anyhow::anyhow!("Injected error in mempool::send_to").into())
-        });
-        let protocol = ProtocolId::MempoolDirectSend;
-        self.inner.send_to(recipient, protocol, message)
-    }
-
-    async fn send_rpc(
-        &self,
-        recipient: PeerId,
-        req_msg: MempoolSyncMsg,
-        timeout: Duration,
-    ) -> Result<MempoolSyncMsg, RpcError> {
-        fail_point!("mempool::send_to", |_| {
-            Err(anyhow::anyhow!("Injected error in mempool::send_rpc").into())
-        });
-        let protocol = ProtocolId::MempoolRpc;
-        self.inner
-            .send_rpc(recipient, protocol, req_msg, timeout)
-            .await
-    }
 }
 
 #[derive(Debug, Error)]
@@ -153,44 +77,44 @@ pub enum BroadcastError {
     TooManyPendingBroadcasts(PeerNetworkId),
 }
 
-type MempoolMultiNetworkSender = MultiNetworkSender<MempoolSyncMsg, MempoolNetworkSender>;
-
 #[derive(Clone, Debug)]
-pub(crate) struct MempoolNetworkInterface {
-    peer_metadata_storage: Arc<PeerMetadataStorage>,
-    sender: MempoolMultiNetworkSender,
-    sync_states: Arc<LockingHashMap<PeerNetworkId, PeerSyncState>>,
+pub(crate) struct MempoolNetworkInterface<NetworkClient> {
+    network_client: NetworkClient,
+    sync_states: Arc<RwLock<HashMap<PeerNetworkId, PeerSyncState>>>,
     prioritized_peers: Arc<Mutex<Vec<PeerNetworkId>>>,
     role: RoleType,
     mempool_config: MempoolConfig,
+    prioritized_peers_comparator: PrioritizedPeersComparator,
 }
 
-impl MempoolNetworkInterface {
+impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterface<NetworkClient> {
     pub(crate) fn new(
-        peer_metadata_storage: Arc<PeerMetadataStorage>,
-        network_senders: HashMap<NetworkId, MempoolNetworkSender>,
+        network_client: NetworkClient,
         role: RoleType,
         mempool_config: MempoolConfig,
-    ) -> MempoolNetworkInterface {
-        MempoolNetworkInterface {
-            peer_metadata_storage,
-            sender: MultiNetworkSender::new(network_senders),
-            sync_states: Arc::new(LockingHashMap::new()),
+    ) -> MempoolNetworkInterface<NetworkClient> {
+        Self {
+            network_client,
+            sync_states: Arc::new(RwLock::new(HashMap::new())),
             prioritized_peers: Arc::new(Mutex::new(Vec::new())),
             role,
             mempool_config,
+            prioritized_peers_comparator: PrioritizedPeersComparator::new(),
         }
     }
 
     /// Add a peer to sync states, and returns `false` if the peer already is in storage
     pub fn add_peer(&self, peer: PeerNetworkId, metadata: ConnectionMetadata) -> bool {
-        let mut sync_states = self.sync_states.write_lock();
+        let mut sync_states = self.sync_states.write();
         let is_new_peer = !sync_states.contains_key(&peer);
         if self.is_upstream_peer(&peer, Some(&metadata)) {
             // If we have a new peer, let's insert new data, otherwise, let's just update the current state
             if is_new_peer {
                 counters::active_upstream_peers(&peer.network_id()).inc();
-                sync_states.insert(peer, PeerSyncState::new(metadata));
+                sync_states.insert(
+                    peer,
+                    PeerSyncState::new(metadata, self.mempool_config.broadcast_buckets.len()),
+                );
             } else if let Some(peer_state) = sync_states.get_mut(&peer) {
                 peer_state.metadata = metadata;
             }
@@ -205,7 +129,7 @@ impl MempoolNetworkInterface {
     /// Disables a peer if it can be restarted, otherwise removes it
     pub fn disable_peer(&self, peer: PeerNetworkId) {
         // All other nodes have their state immediately restarted anyways, so let's free them
-        if self.sync_states.write_lock().remove(&peer).is_some() {
+        if self.sync_states.write().remove(&peer).is_some() {
             counters::active_upstream_peers(&peer.network_id()).dec();
         }
 
@@ -221,8 +145,8 @@ impl MempoolNetworkInterface {
 
         // Retrieve just what's needed for the peer ordering
         let peers: Vec<_> = {
-            let peer_states = self.sync_states.read_all();
-            peer_states
+            self.sync_states
+                .read()
                 .iter()
                 .map(|(peer, state)| (*peer, state.metadata.role))
                 .collect()
@@ -234,7 +158,7 @@ impl MempoolNetworkInterface {
         let mut prioritized_peers = self.prioritized_peers.lock();
         let peers: Vec<_> = peers
             .iter()
-            .sorted_by(|peer_a, peer_b| compare_prioritized_peers(peer_a, peer_b))
+            .sorted_by(|peer_a, peer_b| self.prioritized_peers_comparator.compare(peer_a, peer_b))
             .map(|(peer, _)| *peer)
             .collect();
         let _ = std::mem::replace(&mut *prioritized_peers, peers);
@@ -258,26 +182,19 @@ impl MempoolNetworkInterface {
         if let Some(metadata) = metadata {
             metadata.origin == ConnectionOrigin::Outbound
         } else {
-            self.sync_states.read(peer).is_some()
+            self.sync_states_exists(peer)
         }
     }
 
     pub fn process_broadcast_ack(
         &self,
         peer: PeerNetworkId,
-        request_id_bytes: Vec<u8>,
+        batch_id: MultiBatchId,
         retry: bool,
         backoff: bool,
         timestamp: SystemTime,
     ) {
-        let batch_id = if let Ok(id) = bcs::from_bytes::<BatchId>(&request_id_bytes) {
-            id
-        } else {
-            counters::invalid_ack_inc(peer.network_id(), counters::INVALID_REQUEST_ID);
-            return;
-        };
-
-        let mut sync_states = self.sync_states.write_lock();
+        let mut sync_states = self.sync_states.write();
 
         let sync_state = if let Some(state) = sync_states.get_mut(&peer) {
             state
@@ -329,7 +246,7 @@ impl MempoolNetworkInterface {
     }
 
     pub fn is_backoff_mode(&self, peer: &PeerNetworkId) -> bool {
-        if let Some(state) = self.sync_states.write_lock().get(peer) {
+        if let Some(state) = self.sync_states.write().get(peer) {
             state.broadcast_info.backoff_mode
         } else {
             // If we don't have sync state, we shouldn't backoff
@@ -358,16 +275,13 @@ impl MempoolNetworkInterface {
     /// * Expired -> This timed out waiting for a response and needs to be resent
     /// * Retry -> This received a response telling it to retry later
     /// * New -> There are no Expired or Retry broadcasts currently waiting
-    fn determine_broadcast_batch<V>(
+    fn determine_broadcast_batch<TransactionValidator: TransactionValidation>(
         &self,
         peer: PeerNetworkId,
         scheduled_backoff: bool,
-        smp: &mut SharedMempool<V>,
-    ) -> Result<(BatchId, Vec<SignedTransaction>, Option<&str>), BroadcastError>
-    where
-        V: TransactionValidation,
-    {
-        let mut sync_states = self.sync_states.write_lock();
+        smp: &mut SharedMempool<NetworkClient, TransactionValidator>,
+    ) -> Result<(MultiBatchId, Vec<SignedTransaction>, Option<&str>), BroadcastError> {
+        let mut sync_states = self.sync_states.write();
         // If we don't have any info about the node, we shouldn't broadcast to it
         let state = sync_states
             .get_mut(&peer)
@@ -384,7 +298,7 @@ impl MempoolNetworkInterface {
         }
 
         // Sync peer's pending broadcasts with latest mempool state.
-        // A pending broadcast might become empty if the corresponding txns were committed through
+        // A pending or retry broadcast might become empty if the corresponding txns were committed through
         // another peer, so don't track broadcasts for committed txns.
         let mempool = smp.mempool.lock();
         state.broadcast_info.sent_batches = state
@@ -392,8 +306,15 @@ impl MempoolNetworkInterface {
             .sent_batches
             .clone()
             .into_iter()
-            .filter(|(id, _batch)| !mempool.timeline_range(id.0, id.1).is_empty())
-            .collect::<BTreeMap<BatchId, SystemTime>>();
+            .filter(|(id, _batch)| !mempool.timeline_range(&id.0).is_empty())
+            .collect::<BTreeMap<MultiBatchId, SystemTime>>();
+        state.broadcast_info.retry_batches = state
+            .broadcast_info
+            .retry_batches
+            .clone()
+            .into_iter()
+            .filter(|id| !mempool.timeline_range(&id.0).is_empty())
+            .collect::<BTreeSet<MultiBatchId>>();
 
         // Check for batch to rebroadcast:
         // 1. Batch that did not receive ACK in configured window of time
@@ -433,17 +354,21 @@ impl MempoolNetworkInterface {
                         Some(counters::RETRY_BROADCAST_LABEL)
                     };
 
-                    let txns = mempool.timeline_range(id.0, id.1);
-                    (*id, txns, metric_label)
-                }
+                    let txns = mempool.timeline_range(&id.0);
+                    (id.clone(), txns, metric_label)
+                },
                 None => {
                     // Fresh broadcast
                     let (txns, new_timeline_id) = mempool.read_timeline(
-                        state.timeline_id,
+                        &state.timeline_id,
                         self.mempool_config.shared_mempool_batch_size,
                     );
-                    (BatchId(state.timeline_id, new_timeline_id), txns, None)
-                }
+                    (
+                        MultiBatchId::from_timeline_ids(&state.timeline_id, &new_timeline_id),
+                        txns,
+                        None,
+                    )
+                },
             };
 
         if transactions.is_empty() {
@@ -453,23 +378,35 @@ impl MempoolNetworkInterface {
         Ok((batch_id, transactions, metric_label))
     }
 
-    /// Sends a batch to the given `Peer`
-    async fn send_batch(
+    /// Sends a batch to the given peer
+    async fn send_batch_to_peer(
         &self,
         peer: PeerNetworkId,
-        batch_id: BatchId,
+        batch_id: MultiBatchId,
         transactions: Vec<SignedTransaction>,
     ) -> Result<(), BroadcastError> {
         let request = MempoolSyncMsg::BroadcastTransactionsRequest {
-            request_id: bcs::to_bytes(&batch_id).expect("failed BCS serialization of batch ID"),
+            request_id: batch_id,
             transactions,
         };
 
-        if let Err(e) = self.sender.send_to(peer, request) {
+        if let Err(e) = self.network_client.send_to_peer(request, peer) {
             counters::network_send_fail_inc(counters::BROADCAST_TXNS);
             return Err(BroadcastError::NetworkError(peer, e.into()));
         }
         Ok(())
+    }
+
+    /// Sends a message to the given peer
+    pub fn send_message_to_peer(
+        &self,
+        peer: PeerNetworkId,
+        message: MempoolSyncMsg,
+    ) -> Result<(), Error> {
+        fail_point!("mempool::send_to", |_| {
+            Err(anyhow::anyhow!("Injected error in mempool::send_to").into())
+        });
+        self.network_client.send_to_peer(message, peer)
     }
 
     /// Updates the local tracker for a broadcast.  This is used to handle `DirectSend` tracking of
@@ -477,35 +414,32 @@ impl MempoolNetworkInterface {
     fn update_broadcast_state(
         &self,
         peer: PeerNetworkId,
-        batch_id: BatchId,
+        batch_id: MultiBatchId,
         send_time: SystemTime,
     ) -> Result<usize, BroadcastError> {
-        let mut sync_states = self.sync_states.write_lock();
+        let mut sync_states = self.sync_states.write();
         let state = sync_states
             .get_mut(&peer)
             .ok_or(BroadcastError::PeerNotFound(peer))?;
 
         // Update peer sync state with info from above broadcast.
-        state.timeline_id = std::cmp::max(state.timeline_id, batch_id.1);
+        state.timeline_id.update(&batch_id);
         // Turn off backoff mode after every broadcast.
         state.broadcast_info.backoff_mode = false;
+        state.broadcast_info.retry_batches.remove(&batch_id);
         state
             .broadcast_info
             .sent_batches
             .insert(batch_id, send_time);
-        state.broadcast_info.retry_batches.remove(&batch_id);
         Ok(state.broadcast_info.sent_batches.len())
     }
 
-    pub async fn execute_broadcast<V>(
+    pub async fn execute_broadcast<TransactionValidator: TransactionValidation>(
         &self,
         peer: PeerNetworkId,
         scheduled_backoff: bool,
-        smp: &mut SharedMempool<V>,
-    ) -> Result<(), BroadcastError>
-    where
-        V: TransactionValidation,
-    {
+        smp: &mut SharedMempool<NetworkClient, TransactionValidator>,
+    ) -> Result<(), BroadcastError> {
         // Start timer for tracking broadcast latency.
         let start_time = Instant::now();
         let (batch_id, transactions, metric_label) =
@@ -513,8 +447,10 @@ impl MempoolNetworkInterface {
 
         let num_txns = transactions.len();
         let send_time = SystemTime::now();
-        self.send_batch(peer, batch_id, transactions).await?;
-        let num_pending_broadcasts = self.update_broadcast_state(peer, batch_id, send_time)?;
+        self.send_batch_to_peer(peer, batch_id.clone(), transactions)
+            .await?;
+        let num_pending_broadcasts =
+            self.update_broadcast_state(peer, batch_id.clone(), send_time)?;
         notify_subscribers(SharedMempoolNotification::Broadcast, &smp.subscribers);
 
         // Log all the metrics
@@ -541,53 +477,62 @@ impl MempoolNetworkInterface {
         }
         Ok(())
     }
-}
 
-impl NetworkInterface<MempoolSyncMsg, MempoolMultiNetworkSender> for MempoolNetworkInterface {
-    type AppDataKey = PeerNetworkId;
-    type AppData = PeerSyncState;
-
-    fn peer_metadata_storage(&self) -> &PeerMetadataStorage {
-        &self.peer_metadata_storage
-    }
-
-    fn sender(&self) -> MempoolMultiNetworkSender {
-        self.sender.clone()
-    }
-
-    fn app_data(&self) -> &LockingHashMap<PeerNetworkId, PeerSyncState> {
-        &self.sync_states
+    pub fn sync_states_exists(&self, peer: &PeerNetworkId) -> bool {
+        self.sync_states.read().get(peer).is_some()
     }
 }
 
-/// Provides ordering for peers to send transactions to
-fn compare_prioritized_peers(
-    peer_a: &(PeerNetworkId, PeerRole),
-    peer_b: &(PeerNetworkId, PeerRole),
-) -> Ordering {
-    let peer_network_id_a = peer_a.0;
-    let peer_network_id_b = peer_b.0;
+#[derive(Clone, Debug)]
+struct PrioritizedPeersComparator {
+    random_state: RandomState,
+}
 
-    // Sort by NetworkId
-    match peer_network_id_a
-        .network_id()
-        .cmp(&peer_network_id_b.network_id())
-    {
-        Ordering::Equal => {
-            // Then sort by Role
-            let role_a = peer_a.1;
-            let role_b = peer_b.1;
-            match role_a.cmp(&role_b) {
-                // Then tiebreak by PeerId for stability
-                Ordering::Equal => {
-                    let peer_id_a = peer_network_id_a.peer_id();
-                    let peer_id_b = peer_network_id_b.peer_id();
-                    peer_id_a.cmp(&peer_id_b)
-                }
-                ordering => ordering,
-            }
+impl PrioritizedPeersComparator {
+    fn new() -> Self {
+        Self {
+            random_state: RandomState::new(),
         }
-        ordering => ordering,
+    }
+
+    /// Provides ordering for peers to send transactions to
+    fn compare(
+        &self,
+        peer_a: &(PeerNetworkId, PeerRole),
+        peer_b: &(PeerNetworkId, PeerRole),
+    ) -> Ordering {
+        let peer_network_id_a = peer_a.0;
+        let peer_network_id_b = peer_b.0;
+
+        // Sort by NetworkId
+        match peer_network_id_a
+            .network_id()
+            .cmp(&peer_network_id_b.network_id())
+        {
+            Ordering::Equal => {
+                // Then sort by Role
+                let role_a = peer_a.1;
+                let role_b = peer_b.1;
+                match role_a.cmp(&role_b) {
+                    // Tiebreak by hash_peer_id.
+                    Ordering::Equal => {
+                        let hash_a = self.hash_peer_id(&peer_network_id_a.peer_id());
+                        let hash_b = self.hash_peer_id(&peer_network_id_b.peer_id());
+
+                        hash_a.cmp(&hash_b)
+                    },
+                    ordering => ordering,
+                }
+            },
+            ordering => ordering,
+        }
+    }
+
+    /// Stable within a mempool instance but random between instances.
+    fn hash_peer_id(&self, peer_id: &PeerId) -> u64 {
+        let mut hasher = self.random_state.build_hasher();
+        hasher.write(peer_id.as_ref());
+        hasher.finish()
     }
 }
 
@@ -599,6 +544,8 @@ mod test {
 
     #[test]
     fn check_peer_prioritization() {
+        let comparator = PrioritizedPeersComparator::new();
+
         let peer_id_1 = PeerId::from_hex_literal("0x1").unwrap();
         let peer_id_2 = PeerId::from_hex_literal("0x2").unwrap();
         let val_1 = (
@@ -619,24 +566,21 @@ mod test {
         );
 
         // NetworkId ordering
-        assert_eq!(Ordering::Greater, compare_prioritized_peers(&vfn_1, &val_1));
-        assert_eq!(Ordering::Less, compare_prioritized_peers(&val_1, &vfn_1));
+        assert_eq!(Ordering::Greater, comparator.compare(&vfn_1, &val_1));
+        assert_eq!(Ordering::Less, comparator.compare(&val_1, &vfn_1));
 
         // PeerRole ordering
-        assert_eq!(
-            Ordering::Greater,
-            compare_prioritized_peers(&vfn_1, &preferred_1)
-        );
-        assert_eq!(
-            Ordering::Less,
-            compare_prioritized_peers(&preferred_1, &vfn_1)
-        );
+        assert_eq!(Ordering::Greater, comparator.compare(&vfn_1, &preferred_1));
+        assert_eq!(Ordering::Less, comparator.compare(&preferred_1, &vfn_1));
 
         // Tiebreaker on peer_id
-        assert_eq!(Ordering::Greater, compare_prioritized_peers(&val_2, &val_1));
-        assert_eq!(Ordering::Less, compare_prioritized_peers(&val_1, &val_2));
+        let hash_1 = comparator.hash_peer_id(&val_1.0.peer_id());
+        let hash_2 = comparator.hash_peer_id(&val_2.0.peer_id());
+
+        assert_eq!(hash_2.cmp(&hash_1), comparator.compare(&val_2, &val_1));
+        assert_eq!(hash_1.cmp(&hash_2), comparator.compare(&val_1, &val_2));
 
         // Same the only equal case
-        assert_eq!(Ordering::Equal, compare_prioritized_peers(&val_1, &val_1));
+        assert_eq!(Ordering::Equal, comparator.compare(&val_1, &val_1));
     }
 }

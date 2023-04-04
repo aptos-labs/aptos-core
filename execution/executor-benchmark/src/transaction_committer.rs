@@ -1,25 +1,25 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::hash::HashValue;
-use aptos_logger::prelude::*;
-use aptos_types::{
-    block_info::BlockInfo,
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    transaction::Version,
-};
-use aptos_vm::AptosVM;
-use aptosdb::metrics::API_LATENCY_SECONDS;
-use executor::{
-    block_executor::BlockExecutor,
+use aptos_db::metrics::API_LATENCY_SECONDS;
+use aptos_executor::{
+    block_executor::{BlockExecutor, TransactionBlockExecutor},
     metrics::{
         APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS, APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS,
         APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
     },
 };
-use executor_types::{BlockExecutorTrait, StateSnapshotDelta};
+use aptos_executor_types::BlockExecutorTrait;
+use aptos_logger::prelude::*;
+use aptos_types::{
+    aggregate_signature::AggregateSignature,
+    block_info::BlockInfo,
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    transaction::Version,
+};
 use std::{
-    collections::BTreeMap,
     sync::{mpsc, Arc},
     time::{Duration, Instant},
 };
@@ -40,28 +40,32 @@ pub(crate) fn gen_li_with_sigs(
         block_info,
         HashValue::zero(), /* consensus_data_hash, doesn't matter */
     );
-    LedgerInfoWithSignatures::new(ledger_info, BTreeMap::new() /* signatures */)
+    LedgerInfoWithSignatures::new(
+        ledger_info,
+        AggregateSignature::empty(), /* signatures */
+    )
 }
 
-pub struct TransactionCommitter {
-    executor: Arc<BlockExecutor<AptosVM>>,
+pub struct TransactionCommitter<V, T> {
+    executor: Arc<BlockExecutor<V, T>>,
     version: Version,
     block_receiver: mpsc::Receiver<(HashValue, HashValue, Instant, Instant, Duration, usize)>,
-    state_commit_sender: mpsc::SyncSender<StateSnapshotDelta>,
 }
 
-impl TransactionCommitter {
+impl<V, T> TransactionCommitter<V, T>
+where
+    V: TransactionBlockExecutor<T>,
+    T: Send + Sync,
+{
     pub fn new(
-        executor: Arc<BlockExecutor<AptosVM>>,
+        executor: Arc<BlockExecutor<V, T>>,
         version: Version,
         block_receiver: mpsc::Receiver<(HashValue, HashValue, Instant, Instant, Duration, usize)>,
-        state_commit_sender: mpsc::SyncSender<StateSnapshotDelta>,
     ) -> Self {
         Self {
             version,
             executor,
             block_receiver,
-            state_commit_sender,
         }
     }
 
@@ -81,10 +85,8 @@ impl TransactionCommitter {
             self.version += num_txns as u64;
             let commit_start = std::time::Instant::now();
             let ledger_info_with_sigs = gen_li_with_sigs(block_id, root_hash, self.version);
-            let snapshot_delta = self
-                .executor
+            self.executor
                 .commit_blocks_ext(vec![block_id], ledger_info_with_sigs, false)
-                .unwrap()
                 .unwrap();
 
             report_block(
@@ -96,7 +98,6 @@ impl TransactionCommitter {
                 Instant::now().duration_since(commit_start),
                 num_txns,
             );
-            self.state_commit_sender.send(snapshot_delta).unwrap();
         }
     }
 }
@@ -112,12 +113,14 @@ fn report_block(
 ) {
     let total_versions = (version - start_version) as f64;
     info!(
-        "Version: {}. latency: {} ms, execute time: {} ms. commit time: {} ms. TPS: {:.0}. Accumulative TPS: {:.0}",
+        "Version: {}. latency: {} ms, execute time: {} ms. commit time: {} ms. TPS: {:.0} (execution: {:.0}, commit: {:.0}). Accumulative TPS: {:.0}",
         version,
         Instant::now().duration_since(execution_start_time).as_millis(),
         execution_time.as_millis(),
         commit_time.as_millis(),
         block_size as f64 / (std::cmp::max(execution_time, commit_time)).as_secs_f64(),
+        block_size as f64 / execution_time.as_secs_f64(),
+        block_size as f64 / commit_time.as_secs_f64(),
         total_versions / global_start_time.elapsed().as_secs_f64(),
     );
     info!(

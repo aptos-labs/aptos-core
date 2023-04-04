@@ -1,15 +1,17 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    cached_state_view::CachedStateView, no_proof_fetcher::NoProofFetcher, state_delta::StateDelta,
-    sync_proof_fetcher::SyncProofFetcher, DbReader,
+    cached_state_view::CachedStateView, proof_fetcher::ProofFetcher, state_delta::StateDelta,
+    DbReader,
 };
 use anyhow::Result;
 use aptos_crypto::{hash::TransactionAccumulatorHasher, HashValue};
 use aptos_state_view::StateViewId;
-use aptos_types::{proof::accumulator::InMemoryAccumulator, transaction::Version};
-use std::ops::Deref;
+use aptos_types::{
+    proof::accumulator::InMemoryAccumulator, state_store::state_storage_usage::StateStorageUsage,
+    transaction::Version,
+};
 use std::sync::Arc;
 
 /// A wrapper of the in-memory state sparse merkle tree and the transaction accumulator that
@@ -38,7 +40,7 @@ impl ExecutedTrees {
     }
 
     pub fn num_transactions(&self) -> u64 {
-        self.txn_accumulator().num_leaves() as u64
+        self.txn_accumulator().num_leaves()
     }
 
     pub fn state_id(&self) -> HashValue {
@@ -61,11 +63,13 @@ impl ExecutedTrees {
 
     pub fn new_at_state_checkpoint(
         state_root_hash: HashValue,
+        state_usage: StateStorageUsage,
         frozen_subtrees_in_accumulator: Vec<HashValue>,
         num_leaves_in_accumulator: u64,
     ) -> Self {
         let state = StateDelta::new_at_checkpoint(
             state_root_hash,
+            state_usage,
             num_leaves_in_accumulator.checked_sub(1),
         );
         let transaction_accumulator = Arc::new(
@@ -88,31 +92,18 @@ impl ExecutedTrees {
             && self.transaction_accumulator.root_hash() == rhs.transaction_accumulator.root_hash()
     }
 
-    pub fn verified_state_view<'a>(
+    pub fn verified_state_view(
         &self,
         id: StateViewId,
-        reader: &'a dyn DbReader,
-    ) -> Result<CachedStateView<SyncProofFetcher<'a>>> {
+        reader: Arc<dyn DbReader>,
+        proof_fetcher: Arc<dyn ProofFetcher>,
+    ) -> Result<CachedStateView> {
         CachedStateView::new(
             id,
             reader,
             self.transaction_accumulator.num_leaves(),
             self.state.current.clone(),
-            SyncProofFetcher::new(reader),
-        )
-    }
-
-    pub fn state_view(
-        &self,
-        id: StateViewId,
-        reader: &Arc<dyn DbReader>,
-    ) -> Result<CachedStateView<NoProofFetcher>> {
-        CachedStateView::new(
-            id,
-            reader.deref(),
-            self.transaction_accumulator.num_leaves(),
-            self.state.current.clone(),
-            NoProofFetcher::new(reader.clone()),
+            proof_fetcher,
         )
     }
 }

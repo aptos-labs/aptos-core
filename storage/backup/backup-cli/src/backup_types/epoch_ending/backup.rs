@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -13,17 +14,17 @@ use crate::{
 use anyhow::{anyhow, ensure, Result};
 use aptos_logger::prelude::*;
 use aptos_types::{ledger_info::LedgerInfoWithSignatures, waypoint::Waypoint};
+use clap::Parser;
 use once_cell::sync::Lazy;
 use std::{convert::TryInto, str::FromStr, sync::Arc};
-use structopt::StructOpt;
 use tokio::io::AsyncWriteExt;
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 pub struct EpochEndingBackupOpt {
-    #[structopt(long = "start-epoch", help = "First epoch to be backed up.")]
+    #[clap(long = "start-epoch", help = "First epoch to be backed up.")]
     pub start_epoch: u64,
 
-    #[structopt(
+    #[clap(
         long = "end-epoch",
         help = "Epoch before which epoch ending backup stops. Pass in the current open epoch to get all."
     )]
@@ -56,7 +57,7 @@ impl EpochEndingBackupController {
 
     pub async fn run(self) -> Result<FileHandle> {
         info!(
-            "Epoch ending backup started, starting from epoch {}, unill epoch {} (excluded).",
+            "Epoch ending backup started, starting from epoch {start_epoch}, until epoch {end_epoch} (excluded).",
             start_epoch = self.start_epoch,
             end_epoch = self.end_epoch,
         );
@@ -103,7 +104,7 @@ impl EpochEndingBackupController {
             }
 
             waypoints.push(Self::get_waypoint(&record_bytes, current_epoch)?);
-            chunk_bytes.extend(&(record_bytes.len() as u32).to_be_bytes());
+            chunk_bytes.extend((record_bytes.len() as u32).to_be_bytes());
             chunk_bytes.extend(&record_bytes);
             current_epoch += 1;
         }

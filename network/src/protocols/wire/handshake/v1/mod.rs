@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module defines the structs transported during the network handshake protocol v1.
@@ -13,9 +14,12 @@
 //! [AptosNet Handshake v1 Specification]: https://github.com/aptos-labs/aptos-core/blob/main/specifications/network/handshake-v1.md
 
 use anyhow::anyhow;
-use aptos_config::network_id::NetworkId;
+use aptos_compression::metrics::CompressionClient;
+use aptos_config::{config::MAX_APPLICATION_MESSAGE_SIZE, network_id::NetworkId};
 use aptos_types::chain_id::ChainId;
-use serde::{Deserialize, Serialize};
+#[cfg(any(test, feature = "fuzzing"))]
+use proptest_derive::Arbitrary;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
     fmt,
@@ -24,15 +28,15 @@ use std::{
 };
 use thiserror::Error;
 
-#[cfg(any(test, feature = "fuzzing"))]
-use proptest_derive::Arbitrary;
-
 #[cfg(test)]
 mod test;
 
 //
 // ProtocolId
 //
+
+pub const USER_INPUT_RECURSION_LIMIT: usize = 32;
+pub const RECURSION_LIMIT: usize = 64;
 
 /// Unique identifier associated with each application protocol.
 #[repr(u8)]
@@ -43,20 +47,21 @@ pub enum ProtocolId {
     ConsensusDirectSendBcs = 1,
     MempoolDirectSend = 2,
     StateSyncDirectSend = 3,
-    // UNUSED
-    DiscoveryDirectSend = 4,
+    DiscoveryDirectSend = 4, // Currently unused
     HealthCheckerRpc = 5,
-    // json provides flexibility for backwards compatible upgrade
-    ConsensusDirectSendJson = 6,
+    ConsensusDirectSendJson = 6, // Json provides flexibility for backwards compatible upgrade
     ConsensusRpcJson = 7,
     StorageServiceRpc = 8,
-    MempoolRpc = 9,
+    MempoolRpc = 9, // Currently unused
     PeerMonitoringServiceRpc = 10,
+    ConsensusRpcCompressed = 11,
+    ConsensusDirectSendCompressed = 12,
 }
 
 /// The encoding types for Protocols
 enum Encoding {
-    Bcs,
+    Bcs(usize),
+    CompressedBcs(usize),
     Json,
 }
 
@@ -75,6 +80,8 @@ impl ProtocolId {
             StorageServiceRpc => "StorageServiceRpc",
             MempoolRpc => "MempoolRpc",
             PeerMonitoringServiceRpc => "PeerMonitoringServiceRpc",
+            ConsensusRpcCompressed => "ConsensusRpcCompressed",
+            ConsensusDirectSendCompressed => "ConsensusDirectSendCompressed",
         }
     }
 
@@ -91,6 +98,8 @@ impl ProtocolId {
             ProtocolId::StorageServiceRpc,
             ProtocolId::MempoolRpc,
             ProtocolId::PeerMonitoringServiceRpc,
+            ProtocolId::ConsensusRpcCompressed,
+            ProtocolId::ConsensusDirectSendCompressed,
         ]
     }
 
@@ -98,7 +107,26 @@ impl ProtocolId {
     fn encoding(self) -> Encoding {
         match self {
             ProtocolId::ConsensusDirectSendJson | ProtocolId::ConsensusRpcJson => Encoding::Json,
-            _ => Encoding::Bcs,
+            ProtocolId::ConsensusDirectSendCompressed | ProtocolId::ConsensusRpcCompressed => {
+                Encoding::CompressedBcs(RECURSION_LIMIT)
+            },
+            ProtocolId::MempoolDirectSend => Encoding::CompressedBcs(USER_INPUT_RECURSION_LIMIT),
+            ProtocolId::MempoolRpc => Encoding::Bcs(USER_INPUT_RECURSION_LIMIT),
+            _ => Encoding::Bcs(RECURSION_LIMIT),
+        }
+    }
+
+    /// Returns the compression client label based on the current protocol id
+    fn get_compression_client(self) -> CompressionClient {
+        match self {
+            ProtocolId::ConsensusDirectSendCompressed | ProtocolId::ConsensusRpcCompressed => {
+                CompressionClient::Consensus
+            },
+            ProtocolId::MempoolDirectSend => CompressionClient::Mempool,
+            protocol_id => unreachable!(
+                "The given protocol ({:?}) should not be using compression!",
+                protocol_id
+            ),
         }
     }
 
@@ -109,16 +137,44 @@ impl ProtocolId {
 
     pub fn to_bytes<T: Serialize>(&self, value: &T) -> anyhow::Result<Vec<u8>> {
         match self.encoding() {
+            Encoding::Bcs(limit) => self.bcs_encode(value, limit),
+            Encoding::CompressedBcs(limit) => {
+                let compression_client = self.get_compression_client();
+                let bcs_bytes = self.bcs_encode(value, limit)?;
+                aptos_compression::compress(
+                    bcs_bytes,
+                    compression_client,
+                    MAX_APPLICATION_MESSAGE_SIZE,
+                )
+                .map_err(|e| anyhow!("{:?}", e))
+            },
             Encoding::Json => serde_json::to_vec(value).map_err(|e| anyhow!("{:?}", e)),
-            Encoding::Bcs => bcs::to_bytes(value).map_err(|e| anyhow! {"{:?}", e}),
         }
     }
 
-    pub fn from_bytes<'a, T: Deserialize<'a>>(&self, bytes: &'a [u8]) -> anyhow::Result<T> {
+    pub fn from_bytes<T: DeserializeOwned>(&self, bytes: &[u8]) -> anyhow::Result<T> {
         match self.encoding() {
+            Encoding::Bcs(limit) => self.bcs_decode(bytes, limit),
+            Encoding::CompressedBcs(limit) => {
+                let compression_client = self.get_compression_client();
+                let raw_bytes = aptos_compression::decompress(
+                    &bytes.to_vec(),
+                    compression_client,
+                    MAX_APPLICATION_MESSAGE_SIZE,
+                )
+                .map_err(|e| anyhow! {"{:?}", e})?;
+                self.bcs_decode(&raw_bytes, limit)
+            },
             Encoding::Json => serde_json::from_slice(bytes).map_err(|e| anyhow!("{:?}", e)),
-            Encoding::Bcs => bcs::from_bytes(bytes).map_err(|e| anyhow! {"{:?}", e}),
         }
+    }
+
+    fn bcs_encode<T: Serialize>(&self, value: &T, limit: usize) -> anyhow::Result<Vec<u8>> {
+        bcs::to_bytes_with_limit(value, limit).map_err(|e| anyhow!("{:?}", e))
+    }
+
+    fn bcs_decode<T: DeserializeOwned>(&self, bytes: &[u8], limit: usize) -> anyhow::Result<T> {
+        bcs::from_bytes_with_limit(bytes, limit).map_err(|e| anyhow!("{:?}", e))
     }
 }
 
@@ -146,7 +202,7 @@ impl fmt::Display for ProtocolId {
 /// use on a new AptosNet connection.
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-pub struct ProtocolIdSet(bitvec::BitVec);
+pub struct ProtocolIdSet(aptos_bitvec::BitVec);
 
 impl ProtocolIdSet {
     pub fn empty() -> Self {
@@ -171,7 +227,7 @@ impl ProtocolIdSet {
     pub fn iter(&self) -> impl Iterator<Item = ProtocolId> + '_ {
         self.0
             .iter_ones()
-            .filter_map(|idx| bcs::from_bytes(&[idx]).ok())
+            .filter_map(|idx| bcs::from_bytes(&[idx as u8]).ok())
     }
 
     /// Find the intersection between two sets of protocols.
@@ -186,12 +242,12 @@ impl ProtocolIdSet {
 
     /// Returns if the protocol is set.
     pub fn contains(&self, protocol: ProtocolId) -> bool {
-        self.0.is_set(protocol as u8)
+        self.0.is_set(protocol as u16)
     }
 
     /// Insert a new protocol into the set.
     pub fn insert(&mut self, protocol: ProtocolId) {
-        self.0.set(protocol as u8)
+        self.0.set(protocol as u16)
     }
 }
 

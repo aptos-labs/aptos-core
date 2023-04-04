@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #[cfg(test)]
@@ -14,15 +15,31 @@ use crate::{
     error::DbError,
 };
 use anyhow::Result;
+use aptos_consensus_types::{block::Block, quorum_cert::QuorumCert};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
-use consensus_types::{block::Block, quorum_cert::QuorumCert};
+use aptos_schemadb::{Options, ReadOptions, SchemaBatch, DB, DEFAULT_COLUMN_FAMILY_NAME};
 use schema::{BLOCK_CF_NAME, QC_CF_NAME, SINGLE_ENTRY_CF_NAME};
-use schemadb::{Options, ReadOptions, SchemaBatch, DB, DEFAULT_COLUMN_FAMILY_NAME};
 use std::{collections::HashMap, iter::Iterator, path::Path, time::Instant};
 
 /// The name of the consensus db file
 pub const CONSENSUS_DB_NAME: &str = "consensus_db";
+
+/// Creates new physical DB checkpoint in directory specified by `checkpoint_path`.
+pub fn create_checkpoint<P: AsRef<Path> + Clone>(db_path: P, checkpoint_path: P) -> Result<()> {
+    let start = Instant::now();
+    let consensus_db_checkpoint_path = checkpoint_path.as_ref().join(CONSENSUS_DB_NAME);
+    std::fs::remove_dir_all(&consensus_db_checkpoint_path).unwrap_or(());
+    ConsensusDB::new(db_path)
+        .db
+        .create_checkpoint(&consensus_db_checkpoint_path)?;
+    info!(
+        path = consensus_db_checkpoint_path,
+        time_ms = %start.elapsed().as_millis(),
+        "Made ConsensusDB checkpoint."
+    );
+    Ok(())
+}
 
 pub struct ConsensusDB {
     db: DB,
@@ -64,15 +81,10 @@ impl ConsensusDB {
     )> {
         let last_vote = self.get_last_vote()?;
         let highest_2chain_timeout_certificate = self.get_highest_2chain_timeout_certificate()?;
-        let consensus_blocks = self
-            .get_blocks()?
-            .into_iter()
-            .map(|(_block_hash, block_content)| block_content)
-            .collect::<Vec<_>>();
+        let consensus_blocks = self.get_blocks()?.into_values().collect::<Vec<_>>();
         let consensus_qcs = self
             .get_quorum_certificates()?
-            .into_iter()
-            .map(|(_block_hash, qc)| qc)
+            .into_values()
             .collect::<Vec<_>>();
         Ok((
             last_vote,
@@ -83,14 +95,14 @@ impl ConsensusDB {
     }
 
     pub fn save_highest_2chain_timeout_certificate(&self, tc: Vec<u8>) -> Result<(), DbError> {
-        let mut batch = SchemaBatch::new();
+        let batch = SchemaBatch::new();
         batch.put::<SingleEntrySchema>(&SingleEntryKey::Highest2ChainTimeoutCert, &tc)?;
         self.commit(batch)?;
         Ok(())
     }
 
     pub fn save_vote(&self, last_vote: Vec<u8>) -> Result<(), DbError> {
-        let mut batch = SchemaBatch::new();
+        let batch = SchemaBatch::new();
         batch.put::<SingleEntrySchema>(&SingleEntryKey::LastVote, &last_vote)?;
         self.commit(batch)
     }
@@ -103,7 +115,7 @@ impl ConsensusDB {
         if block_data.is_empty() && qc_data.is_empty() {
             return Err(anyhow::anyhow!("Consensus block and qc data is empty!").into());
         }
-        let mut batch = SchemaBatch::new();
+        let batch = SchemaBatch::new();
         block_data
             .iter()
             .try_for_each(|block| batch.put::<BlockSchema>(&block.id(), block))?;
@@ -120,7 +132,7 @@ impl ConsensusDB {
         if block_ids.is_empty() {
             return Err(anyhow::anyhow!("Consensus block ids is empty!").into());
         }
-        let mut batch = SchemaBatch::new();
+        let batch = SchemaBatch::new();
         block_ids.iter().try_for_each(|hash| {
             batch.delete::<BlockSchema>(hash)?;
             batch.delete::<QCSchema>(hash)
@@ -143,10 +155,11 @@ impl ConsensusDB {
     }
 
     pub fn delete_highest_2chain_timeout_certificate(&self) -> Result<(), DbError> {
-        let mut batch = SchemaBatch::new();
+        let batch = SchemaBatch::new();
         batch.delete::<SingleEntrySchema>(&SingleEntryKey::Highest2ChainTimeoutCert)?;
         self.commit(batch)
     }
+
     /// Get serialized latest vote (if available)
     fn get_last_vote(&self) -> Result<Option<Vec<u8>>, DbError> {
         Ok(self
@@ -155,7 +168,7 @@ impl ConsensusDB {
     }
 
     pub fn delete_last_vote_msg(&self) -> Result<(), DbError> {
-        let mut batch = SchemaBatch::new();
+        let batch = SchemaBatch::new();
         batch.delete::<SingleEntrySchema>(&SingleEntryKey::LastVote)?;
         self.commit(batch)?;
         Ok(())

@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate as aptos_crypto;
@@ -14,19 +14,18 @@ use crate::{
     traits::*,
     x25519,
 };
-
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use core::{
     convert::TryFrom,
     ops::{Add, Index, IndexMut, Mul, Neg},
 };
 use curve25519_dalek::{
-    constants::ED25519_BASEPOINT_POINT, edwards::CompressedEdwardsY, edwards::EdwardsPoint,
+    constants::ED25519_BASEPOINT_POINT,
+    edwards::{CompressedEdwardsY, EdwardsPoint},
     scalar::Scalar,
 };
-use ed25519_dalek::ed25519::signature::Verifier as _;
-
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use digest::Digest;
+use ed25519_dalek::ed25519::signature::Verifier as _;
 use proptest::{collection::vec, prelude::*};
 use serde::{Deserialize, Serialize};
 use sha2::Sha512;
@@ -106,9 +105,9 @@ proptest! {
         // Compute k = H(R∥A∥m) //
         //////////////////////////
         let mut h: Sha512 = Sha512::default();
-        h.update(&mixed_r_point.compress().to_bytes());
-        h.update(&mixed_pub_point.compress().to_bytes());
-        h.update(&message);
+        h.update(mixed_r_point.compress().to_bytes());
+        h.update(mixed_pub_point.compress().to_bytes());
+        h.update(message);
         // curve25519_dalek is stuck on an old digest version, so we can't do
         // Scalar::from_hash
         let mut output = [0u8; 64];
@@ -126,7 +125,7 @@ proptest! {
         let nonce = &expanded_priv_key[32..];
         let mut h: Sha512 = Sha512::default();
         h.update(nonce);
-        h.update(&message);
+        h.update(message);
         // curve25519_dalek is stuck on an old digest version, so we can't do
         // Scalar::from_hash
         let mut output = [0u8; 64];
@@ -313,7 +312,7 @@ proptest! {
         keypairs in proptest::array::uniform10(uniform_keypair_strategy::<Ed25519PrivateKey, Ed25519PublicKey>())
     ) {
         let mut signatures: Vec<(Ed25519PublicKey, Ed25519Signature)> = keypairs.iter().map(|keypair| {
-            (keypair.public_key.clone(), keypair.private_key.sign(&message))
+            (keypair.public_key.clone(), keypair.private_key.sign(&message).unwrap())
         }).collect();
         prop_assert!(Ed25519Signature::batch_verify(&message, signatures.clone()).is_ok());
         // We swap message and signature for the last element,
@@ -347,7 +346,7 @@ proptest! {
         message in random_serializable_struct(),
         keypair in uniform_keypair_strategy::<Ed25519PrivateKey, Ed25519PublicKey>()
     ) {
-        let signature = keypair.private_key.sign(&message);
+        let signature = keypair.private_key.sign(&message).unwrap();
         let serialized: &[u8] = &(signature.to_bytes());
         prop_assert_eq!(ED25519_SIGNATURE_LENGTH, serialized.len());
         let deserialized = Ed25519Signature::try_from(serialized).unwrap();
@@ -373,7 +372,7 @@ proptest! {
         keypair in uniform_keypair_strategy::<Ed25519PrivateKey, Ed25519PublicKey>()
     ) {
         let hashable = CryptoHashable(x);
-        let signature = keypair.private_key.sign(&hashable);
+        let signature = keypair.private_key.sign(&hashable).unwrap();
         let serialized: &[u8] = &(signature.to_bytes());
         prop_assert_eq!(ED25519_SIGNATURE_LENGTH, serialized.len());
         let deserialized = Ed25519Signature::try_from(serialized).unwrap();
@@ -387,7 +386,7 @@ proptest! {
         message in random_serializable_struct(),
         keypair in uniform_keypair_strategy::<Ed25519PrivateKey, Ed25519PublicKey>()
     ) {
-        let signature = keypair.private_key.sign(&message);
+        let signature = keypair.private_key.sign(&message).unwrap();
         let mut serialized = signature.to_bytes();
         let serialized_old = serialized; // implements Copy trait
         prop_assert_eq!(serialized_old, serialized);
@@ -486,10 +485,10 @@ proptest! {
         let sig_dalek = ed25519_dalek::Signature::from_bytes(&sig_bytes).unwrap();
 
         // We expect ed25519-dalek verify to succeed
-        prop_assert!(pk_dalek.verify(signing_message(&m).as_ref(), &sig_dalek).is_ok());
+        prop_assert!(pk_dalek.verify(signing_message(&m).unwrap().as_ref(), &sig_dalek).is_ok());
 
         // We expect ed25519-dalek verify_strict to fail
-        prop_assert!(pk_dalek.verify_strict(signing_message(&m).as_ref(), &sig_dalek).is_err());
+        prop_assert!(pk_dalek.verify_strict(signing_message(&m).unwrap().as_ref(), &sig_dalek).is_err());
 
         // We expect our own validation to fail in Ed25519Signature::verify_arbitrary_msg, since it
         // calls ed25519-dalek's verify_strict
@@ -551,9 +550,9 @@ pub struct Scalar52(pub [u64; 5]);
 
 /// `L` is the order of base point, i.e. 2^252 + 27742317777372353535851937790883648493
 pub const L: Scalar52 = Scalar52([
-    0x0002_631a_5cf5_d3ed,
-    0x000d_ea2f_79cd_6581,
-    0x0000_0000_0014_def9,
+    0x0002_631A_5CF5_D3ED,
+    0x000D_EA2F_79CD_6581,
+    0x0000_0000_0014_DEF9,
     0x0000_0000_0000_0000,
     0x0000_1000_0000_0000,
 ]);
@@ -644,6 +643,7 @@ impl Scalar52 {
 
 impl Index<usize> for Scalar52 {
     type Output = u64;
+
     fn index(&self, _index: usize) -> &u64 {
         &(self.0[_index])
     }

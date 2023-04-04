@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::{
@@ -12,7 +13,7 @@ use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
     contract_event, event, state_store::state_key::StateKey, transaction, write_set,
 };
-use move_deps::move_core_types::language_storage;
+use move_core_types::language_storage;
 use rand::{rngs::StdRng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use serde_reflection::{Registry, Result, Samples, Tracer, TracerConfig};
@@ -34,11 +35,11 @@ fn trace_crypto_values(tracer: &mut Tracer, samples: &mut Samples) -> Result<()>
 
     let private_key = Ed25519PrivateKey::generate(&mut rng);
     let public_key = private_key.public_key();
-    let signature = private_key.sign(&message);
+    let signature = private_key.sign(&message).unwrap();
 
     let bls_private_key = bls12381::PrivateKey::generate(&mut rng);
     let bls_public_key = bls_private_key.public_key();
-    let bls_signature = bls_private_key.sign(&message);
+    let bls_signature = bls_private_key.sign(&message).unwrap();
 
     tracer.trace_value(samples, &public_key)?;
     tracer.trace_value(samples, &signature)?;
@@ -58,7 +59,7 @@ pub fn get_registry() -> Result<Registry> {
     trace_crypto_values(&mut tracer, &mut samples)?;
     tracer.trace_value(
         &mut samples,
-        &consensus_types::block::Block::make_genesis_block(),
+        &aptos_consensus_types::block::Block::make_genesis_block(),
     )?;
     tracer.trace_value(&mut samples, &event::EventKey::random())?;
 
@@ -74,10 +75,10 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<write_set::WriteOp>(&samples)?;
 
     tracer.trace_type::<StateKey>(&samples)?;
-    tracer.trace_type::<consensus::network_interface::ConsensusMsg>(&samples)?;
-    tracer.trace_type::<consensus_types::block_data::BlockType>(&samples)?;
-    tracer.trace_type::<consensus_types::block_retrieval::BlockRetrievalStatus>(&samples)?;
-    tracer.trace_type::<consensus_types::common::Payload>(&samples)?;
+    tracer.trace_type::<aptos_consensus::network_interface::ConsensusMsg>(&samples)?;
+    tracer.trace_type::<aptos_consensus_types::block_data::BlockType>(&samples)?;
+    tracer.trace_type::<aptos_consensus_types::block_retrieval::BlockRetrievalStatus>(&samples)?;
+    tracer.trace_type::<aptos_consensus_types::common::Payload>(&samples)?;
 
     tracer.registry()
 }

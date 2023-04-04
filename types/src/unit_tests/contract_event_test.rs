@@ -1,9 +1,10 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{contract_event::ContractEvent, event::EventKey};
 use bcs::test_helpers::assert_canonical_encode_decode;
-use move_deps::move_core_types::language_storage::TypeTag;
+use move_core_types::language_storage::TypeTag;
 use proptest::prelude::*;
 
 proptest! {

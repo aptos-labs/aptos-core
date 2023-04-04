@@ -1,7 +1,52 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! Macros for sending logs at predetermined log `Level`s
+#[cfg(not(feature = "aptos-console"))]
+#[macro_export]
+macro_rules! spawn_named {
+      ($name:expr, $func:expr) => { tokio::spawn($func); };
+      ($name:expr, $handler:expr, $func:expr) => { $handler.spawn($func); };
+      ($name:expr, $async:ident = async; $clojure:block) => { tokio::spawn( async $clojure); };
+      ($name:expr, $handler:expr, $async:ident = async; $clojure:block) => { $handler.spawn( async $clojure); };
+      ($name:expr, $async:ident = async ; $move:ident = move; $clojure:block) => { tokio::spawn( async move $clojure); };
+      ($name:expr, $handler:expr, $async:ident = async ; $move:ident = move; $clojure:block) => { $handler.spawn( async move $clojure); };
+  }
+
+#[cfg(feature = "aptos-console")]
+#[macro_export]
+macro_rules! spawn_named {
+      ($name:expr, $func:expr) => { tokio::task::Builder::new()
+                                          .name($name)
+                                          .spawn($func)
+                                          .unwrap(); };
+      ($name:expr, $handle:expr, $func:expr) => { tokio::task::Builder::new()
+                                                      .name($name)
+                                                      .spawn_on($func, $handle)
+                                                      .unwrap(); };
+
+      ($name:expr, $async:ident = async; $clojure:block) => { tokio::task::Builder::new()
+                                                                      .name($name)
+                                                                      .spawn(async $clojure)
+                                                                      .unwrap(); };
+
+      ($name:expr, $async:ident = async; $move:ident = move; $clojure:block) => { tokio::task::Builder::new()
+                                                                      .name($name)
+                                                                      .spawn(async move $clojure)
+                                                                      .unwrap(); };
+
+      ($name:expr, $handler:expr, $async:ident = async; $clojure:block) => { tokio::task::Builder::new()
+                                                                              .name($name)
+                                                                              .spawn_on(async $clojure, $handler)
+                                                                              .unwrap(); };
+
+      ($name:expr, $handler:expr, $async:ident = async; $move:ident = move; $clojure:block) => { tokio::task::Builder::new()
+                                                                                                  .name($name)
+                                                                                                  .spawn_on(async move $clojure, $handler)
+                                                                                                  .unwrap(); };
+
+}
 
 /// Log at the given level, it's recommended to use a specific level macro instead
 #[macro_export]
@@ -22,6 +67,19 @@ macro_rules! log {
                 $crate::schema!($($args)+),
             );
         }
+    }};
+}
+
+#[macro_export]
+macro_rules! enabled {
+    ($level:expr) => {{
+        const METADATA: $crate::Metadata = $crate::Metadata::new(
+            $level,
+            env!("CARGO_CRATE_NAME"),
+            module_path!(),
+            concat!(file!(), ':', line!()),
+        );
+        METADATA.enabled()
     }};
 }
 

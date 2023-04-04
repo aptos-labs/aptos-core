@@ -1,15 +1,16 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::{Author, Round};
 use anyhow::Context;
-use aptos_crypto::bls12381;
+use aptos_crypto::{bls12381, CryptoMaterialError};
+use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::{
     block_info::BlockInfo, ledger_info::LedgerInfo, validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
 };
 use serde::{Deserialize, Serialize};
-use short_hex_str::AsShortHexStr;
 use std::fmt::{Debug, Display, Formatter};
 
 #[derive(Deserialize, Serialize, Clone, PartialEq, Eq)]
@@ -43,9 +44,13 @@ impl CommitVote {
         author: Author,
         ledger_info_placeholder: LedgerInfo,
         validator_signer: &ValidatorSigner,
-    ) -> Self {
-        let signature = validator_signer.sign(&ledger_info_placeholder);
-        Self::new_with_signature(author, ledger_info_placeholder, signature)
+    ) -> Result<Self, CryptoMaterialError> {
+        let signature = validator_signer.sign(&ledger_info_placeholder)?;
+        Ok(Self::new_with_signature(
+            author,
+            ledger_info_placeholder,
+            signature,
+        ))
     }
 
     /// Generates a new CommitProposal using a signature over the specified ledger_info

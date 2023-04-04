@@ -1,29 +1,93 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
-
-use crate::{
-    block_storage::BlockReader, state_replication::PayloadManager, util::time_service::TimeService,
-};
-use anyhow::{bail, ensure, format_err, Context};
-use consensus_types::{
-    block::Block,
-    block_data::BlockData,
-    common::{Author, Round},
-    quorum_cert::QuorumCert,
-};
-
-use aptos_infallible::Mutex;
-use consensus_types::common::{Payload, PayloadFilter};
-use futures::future::BoxFuture;
-use std::sync::Arc;
 
 use super::{
     proposer_election::ProposerElection, unequivocal_proposer_election::UnequivocalProposerElection,
 };
+use crate::{
+    block_storage::BlockReader,
+    counters::{
+        CHAIN_HEALTH_BACKOFF_TRIGGERED, PROPOSER_PENDING_BLOCKS_COUNT,
+        PROPOSER_PENDING_BLOCKS_FILL_FRACTION,
+    },
+    state_replication::PayloadClient,
+    util::time_service::TimeService,
+};
+use anyhow::{bail, ensure, format_err, Context};
+use aptos_config::config::ChainHealthBackoffValues;
+use aptos_consensus_types::{
+    block::Block,
+    block_data::BlockData,
+    common::{Author, Payload, PayloadFilter, Round},
+    quorum_cert::QuorumCert,
+};
+use aptos_logger::{error, sample, sample::SampleRate, warn};
+use futures::future::BoxFuture;
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 #[cfg(test)]
 #[path = "proposal_generator_test.rs"]
 mod proposal_generator_test;
+
+#[derive(Clone)]
+pub struct ChainHealthBackoffConfig {
+    backoffs: BTreeMap<usize, ChainHealthBackoffValues>,
+}
+
+impl ChainHealthBackoffConfig {
+    pub fn new(backoffs: Vec<ChainHealthBackoffValues>) -> Self {
+        let original_len = backoffs.len();
+        let backoffs = backoffs
+            .into_iter()
+            .map(|v| (v.backoff_if_below_participating_voting_power_percentage, v))
+            .collect::<BTreeMap<_, _>>();
+        assert_eq!(original_len, backoffs.len());
+        Self { backoffs }
+    }
+
+    #[allow(dead_code)]
+    pub fn new_no_backoff() -> Self {
+        Self {
+            backoffs: BTreeMap::new(),
+        }
+    }
+
+    pub fn get_backoff(
+        &self,
+        round: Round,
+        proposer_election: &dyn ProposerElection,
+    ) -> Option<&ChainHealthBackoffValues> {
+        if self.backoffs.is_empty() {
+            return None;
+        }
+
+        let voting_power_ratio = proposer_election.get_voting_power_participation_ratio(round);
+        if voting_power_ratio < 2.0 / 3.0 {
+            error!("Voting power ratio {} is below 2f + 1", voting_power_ratio);
+        }
+        let voting_power_percentage = (voting_power_ratio * 100.0).floor() as usize;
+        if voting_power_percentage > 100 {
+            error!(
+                "Voting power participation percentatge {} is > 100, before rounding {}",
+                voting_power_percentage, voting_power_ratio
+            );
+        }
+        self.backoffs
+            .range(voting_power_percentage..)
+            .next()
+            .map(|(_, v)| {
+                sample!(
+                    SampleRate::Duration(Duration::from_secs(10)),
+                    warn!(
+                        "Using chain health backoff config for {} voting power ratio: {:?}",
+                        voting_power_percentage, v
+                    )
+                );
+                v
+            })
+    }
+}
 
 /// ProposalGenerator is responsible for generating the proposed block on demand: it's typically
 /// used by a validator that believes it's a valid candidate for serving as a proposer at a given
@@ -41,35 +105,47 @@ pub struct ProposalGenerator {
     // proposed block.
     block_store: Arc<dyn BlockReader + Send + Sync>,
     // ProofOfStore manager is delivering the ProofOfStores.
-    payload_manager: Arc<dyn PayloadManager>,
+    payload_client: Arc<dyn PayloadClient>,
     // Transaction manager is delivering the transactions.
     // Time service to generate block timestamps
     time_service: Arc<dyn TimeService>,
     // Max number of transactions to be added to a proposed block.
-    max_block_size: u64,
+    max_block_txns: u64,
+    // Max number of bytes to be added to a proposed block.
+    max_block_bytes: u64,
     // Max number of failed authors to be added to a proposed block.
     max_failed_authors_to_store: usize,
+
+    chain_health_backoff_config: ChainHealthBackoffConfig,
+
     // Last round that a proposal was generated
-    last_round_generated: Mutex<Round>,
+    last_round_generated: Round,
+    quorum_store_enabled: bool,
 }
 
 impl ProposalGenerator {
     pub fn new(
         author: Author,
         block_store: Arc<dyn BlockReader + Send + Sync>,
-        payload_manager: Arc<dyn PayloadManager>,
+        payload_client: Arc<dyn PayloadClient>,
         time_service: Arc<dyn TimeService>,
-        max_block_size: u64,
+        max_block_txns: u64,
+        max_block_bytes: u64,
         max_failed_authors_to_store: usize,
+        chain_health_backoff_config: ChainHealthBackoffConfig,
+        quorum_store_enabled: bool,
     ) -> Self {
         Self {
             author,
             block_store,
-            payload_manager,
+            payload_client,
             time_service,
-            max_block_size,
+            max_block_txns,
+            max_block_bytes,
             max_failed_authors_to_store,
-            last_round_generated: Mutex::new(0),
+            chain_health_backoff_config,
+            last_round_generated: 0,
+            quorum_store_enabled,
         }
     }
 
@@ -110,14 +186,15 @@ impl ProposalGenerator {
         proposer_election: &mut UnequivocalProposerElection,
         wait_callback: BoxFuture<'static, ()>,
     ) -> anyhow::Result<BlockData> {
-        {
-            let mut last_round_generated = self.last_round_generated.lock();
-            if *last_round_generated < round {
-                *last_round_generated = round;
-            } else {
-                bail!("Already proposed in the round {}", round);
-            }
+        if self.last_round_generated < round {
+            self.last_round_generated = round;
+        } else {
+            bail!("Already proposed in the round {}", round);
         }
+
+        let chain_health_backoff = self
+            .chain_health_backoff_config
+            .get_backoff(round, proposer_election);
 
         let hqc = self.ensure_highest_quorum_cert(round)?;
 
@@ -125,7 +202,7 @@ impl ProposalGenerator {
             // Reconfiguration rule - we propose empty blocks with parents' timestamp
             // after reconfiguration until it's committed
             (
-                Payload::new_empty(),
+                Payload::empty(self.quorum_store_enabled),
                 hqc.certified_block().timestamp_usecs(),
             )
         } else {
@@ -159,13 +236,50 @@ impl ProposalGenerator {
             // the local time exceeds it.
             let timestamp = self.time_service.get_current_timestamp();
 
+            let (max_block_txns, max_block_bytes) = if let Some(value) = chain_health_backoff {
+                let max_block_txns = self
+                    .max_block_txns
+                    .min(value.max_sending_block_txns_override);
+                let max_block_bytes = self
+                    .max_block_bytes
+                    .min(value.max_sending_block_bytes_override);
+
+                CHAIN_HEALTH_BACKOFF_TRIGGERED.observe(1.0);
+                warn!(
+                    "Generating proposal reducing limits to {} txns and {} bytes, due to chain health backoff",
+                    max_block_txns,
+                    max_block_bytes,
+                );
+                (max_block_txns, max_block_bytes)
+            } else {
+                CHAIN_HEALTH_BACKOFF_TRIGGERED.observe(0.0);
+                (self.max_block_txns, self.max_block_bytes)
+            };
+
+            let max_pending_block_len = pending_blocks
+                .iter()
+                .map(|block| block.payload().map_or(0, |p| p.len()))
+                .max()
+                .unwrap_or(0);
+            let max_pending_block_bytes = pending_blocks
+                .iter()
+                .map(|block| block.payload().map_or(0, |p| p.size()))
+                .max()
+                .unwrap_or(0);
+            let max_fill_fraction = (max_pending_block_len as f32 / self.max_block_txns as f32)
+                .max(max_pending_block_bytes as f32 / self.max_block_bytes as f32);
+            PROPOSER_PENDING_BLOCKS_COUNT.set(pending_blocks.len() as i64);
+            PROPOSER_PENDING_BLOCKS_FILL_FRACTION.set(max_fill_fraction as f64);
             let payload = self
-                .payload_manager
+                .payload_client
                 .pull_payload(
-                    self.max_block_size,
+                    max_block_txns,
+                    max_block_bytes,
                     payload_filter,
                     wait_callback,
                     pending_ordering,
+                    pending_blocks.len(),
+                    max_fill_fraction,
                 )
                 .await
                 .context("Fail to retrieve payload")?;
@@ -216,7 +330,7 @@ impl ProposalGenerator {
         include_cur_round: bool,
         proposer_election: &mut UnequivocalProposerElection,
     ) -> Vec<(Round, Author)> {
-        let end_round = round + (if include_cur_round { 1 } else { 0 });
+        let end_round = round + u64::from(include_cur_round);
         let mut failed_authors = Vec::new();
         let start = std::cmp::max(
             previous_round + 1,

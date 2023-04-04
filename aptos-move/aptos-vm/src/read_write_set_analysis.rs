@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -11,17 +12,16 @@ use aptos_types::{
     account_config,
     transaction::{SignedTransaction, TransactionPayload},
 };
-use move_deps::{
-    move_bytecode_utils::module_cache::SyncModuleCache,
-    move_core_types::{
-        ident_str,
-        identifier::{IdentStr, Identifier},
-        language_storage::{ModuleId, ResourceKey, StructTag, TypeTag},
-        resolver::ModuleResolver,
-        value::{serialize_values, MoveValue},
-    },
-    read_write_set_dynamic::{ConcretizedFormals, NormalizedReadWriteSetAnalysis},
+use move_bytecode_utils::module_cache::SyncModuleCache;
+use move_core_types::{
+    ident_str,
+    identifier::{IdentStr, Identifier},
+    language_storage::{ModuleId, ResourceKey, StructTag, TypeTag},
+    resolver::ModuleResolver,
+    value::{serialize_values, MoveValue},
 };
+use once_cell::sync::Lazy;
+use read_write_set_dynamic::{ConcretizedFormals, NormalizedReadWriteSetAnalysis};
 use std::ops::Deref;
 
 pub struct ReadWriteSetAnalysis<'a, R: ModuleResolver> {
@@ -30,6 +30,14 @@ pub struct ReadWriteSetAnalysis<'a, R: ModuleResolver> {
     blockchain_view: &'a R,
 }
 
+const TRANSACTION_VALIDATION_MODULE_NAME: &IdentStr = ident_str!("transaction_validation");
+static TRANSACTION_VALIDATION: Lazy<ModuleId> = Lazy::new(|| {
+    ModuleId::new(
+        account_config::CORE_CODE_ADDRESS,
+        TRANSACTION_VALIDATION_MODULE_NAME.to_owned(),
+    )
+});
+
 const TRANSACTION_FEES_MODULE_NAME: &IdentStr = ident_str!("transaction_fee");
 const TRANSACTION_FEES_NAME: &IdentStr = ident_str!("TransactionFee");
 
@@ -37,11 +45,11 @@ pub fn add_on_functions_list() -> Vec<(ModuleId, Identifier)> {
     vec![
         (BLOCK_MODULE.clone(), BLOCK_PROLOGUE.to_owned()),
         (
-            account_config::constants::APTOS_ACCOUNT_MODULE.clone(),
+            TRANSACTION_VALIDATION.clone(),
             SCRIPT_PROLOGUE_NAME.to_owned(),
         ),
         (
-            account_config::constants::APTOS_ACCOUNT_MODULE.clone(),
+            TRANSACTION_VALIDATION.clone(),
             USER_EPILOGUE_NAME.to_owned(),
         ),
     ]
@@ -105,7 +113,7 @@ impl<'a, R: MoveResolverExt> ReadWriteSetAnalysis<'a, R> {
         concretize: bool,
     ) -> Result<(Vec<ResourceKey>, Vec<ResourceKey>)> {
         match tx.payload() {
-            TransactionPayload::ScriptFunction(s) => self.get_concretized_keys_script_function(
+            TransactionPayload::EntryFunction(s) => self.get_concretized_keys_entry_function(
                 tx,
                 s.module(),
                 s.function(),
@@ -115,12 +123,12 @@ impl<'a, R: MoveResolverExt> ReadWriteSetAnalysis<'a, R> {
             ),
             TransactionPayload::Script(s) => {
                 bail!("Unsupported transaction script type {:?}", s)
-            }
+            },
             payload => {
                 // TODO: support tx scripts here. Slightly tricky since we will need to run
                 // analyzer on the fly
                 bail!("Unsupported transaction payload type {:?}", payload)
-            }
+            },
         }
     }
 
@@ -163,25 +171,13 @@ impl<'a, R: MoveResolverExt> ReadWriteSetAnalysis<'a, R> {
         match tx {
             PreprocessedTransaction::UserTransaction(tx) => {
                 self.get_keys_user_transaction_impl(tx, concretize)
-            }
+            },
             PreprocessedTransaction::BlockMetadata(block_metadata) => {
-                let (epoch, round, timestamp, previous_vote, proposer, failed_proposers) =
-                    block_metadata.clone().into_inner();
-                let args = serialize_values(&vec![
-                    MoveValue::Signer(account_config::reserved_vm_address()),
-                    MoveValue::U64(epoch),
-                    MoveValue::U64(round),
-                    MoveValue::Vector(previous_vote.into_iter().map(MoveValue::Bool).collect()),
-                    MoveValue::Address(proposer),
-                    MoveValue::Vector(
-                        failed_proposers
-                            .into_iter()
-                            .map(u64::from)
-                            .map(MoveValue::U64)
-                            .collect(),
-                    ),
-                    MoveValue::U64(timestamp),
-                ]);
+                let args = serialize_values(
+                    &block_metadata
+                        .clone()
+                        .get_prologue_move_args(account_config::reserved_vm_address()),
+                );
                 let metadata_access = self.get_partially_concretized_summary(
                     &BLOCK_MODULE,
                     BLOCK_PROLOGUE,
@@ -191,16 +187,16 @@ impl<'a, R: MoveResolverExt> ReadWriteSetAnalysis<'a, R> {
                     &self.module_cache,
                 )?;
                 self.concretize_secondary_indexes(metadata_access, concretize)
-            }
+            },
             PreprocessedTransaction::InvalidSignature => Ok((vec![], vec![])),
-            PreprocessedTransaction::WriteSet(_) | PreprocessedTransaction::WaypointWriteSet(_) => {
-                bail!("Unsupported writeset transaction")
-            }
             PreprocessedTransaction::StateCheckpoint => Ok((vec![], vec![])),
+            PreprocessedTransaction::WaypointWriteSet(_) => {
+                bail!("Unsupported writeset transaction")
+            },
         }
     }
 
-    fn get_concretized_keys_script_function(
+    fn get_concretized_keys_entry_function(
         &self,
         tx: &SignedTransaction,
         module_name: &ModuleId,
@@ -211,7 +207,7 @@ impl<'a, R: MoveResolverExt> ReadWriteSetAnalysis<'a, R> {
     ) -> Result<(Vec<ResourceKey>, Vec<ResourceKey>)> {
         let signers = vec![tx.sender()];
         let prologue_accesses = self.get_partially_concretized_summary(
-            &account_config::constants::APTOS_ACCOUNT_MODULE,
+            &TRANSACTION_VALIDATION,
             SCRIPT_PROLOGUE_NAME,
             &signers,
             &serialize_values(&vec![
@@ -228,7 +224,7 @@ impl<'a, R: MoveResolverExt> ReadWriteSetAnalysis<'a, R> {
         )?;
 
         let epilogue_accesses = self.get_partially_concretized_summary(
-            &account_config::constants::APTOS_ACCOUNT_MODULE,
+            &TRANSACTION_VALIDATION,
             USER_EPILOGUE_NAME,
             &signers,
             &serialize_values(&vec![

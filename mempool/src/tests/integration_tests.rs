@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::tests::{
@@ -6,8 +7,8 @@ use crate::tests::{
     test_framework::{test_transaction, MempoolNode, MempoolTestFrameworkBuilder},
 };
 use aptos_config::network_id::PeerNetworkId;
-use netcore::transport::ConnectionOrigin;
-use network::{
+use aptos_netcore::transport::ConnectionOrigin;
+use aptos_network::{
     testutils::{
         test_framework::TestFramework,
         test_node::{
@@ -167,7 +168,7 @@ async fn test_skip_ack_rebroadcast() {
         .await;
 }
 
-/// Tests when a node gets disconnected.  Node should pick up after the second sending
+/// Tests when a node gets disconnected. Node should pick up after the second sending
 /// TODO: also add an outbound test to ensure it'll broadcast all transactions again
 #[tokio::test]
 async fn test_interrupt_in_sync_inbound() {
@@ -291,6 +292,31 @@ async fn test_mempool_full_rebroadcast() {
         .await;
 }
 
+/// The retry broadcast can become empty due to commits. The next broadcast should ignore this empty broadcast.
+#[tokio::test]
+async fn test_rebroadcast_retry_is_empty() {
+    let mut node = MempoolTestFrameworkBuilder::single_validator();
+    let (other_peer_network_id, other_metadata) =
+        validator_mock_connection(ConnectionOrigin::Outbound, &ALL_PROTOCOLS);
+
+    // Get first txn
+    node.add_txns_via_client(TXN_1).await;
+    node.assert_txns_in_mempool(TXN_1);
+
+    // Send to other node (which is full)
+    node.connect_self(other_peer_network_id.network_id(), other_metadata.clone());
+    node.send_broadcast_and_receive_retry(other_peer_network_id, TXN_1)
+        .await;
+
+    // Add txn2. In the meantime, txn1 was committed.
+    node.add_txns_via_client(TXN_2).await;
+    node.commit_txns(TXN_1).await;
+
+    // Txn should be sent again later
+    node.send_broadcast_and_receive_ack(other_peer_network_id, TXN_2)
+        .await;
+}
+
 // -- Multi node tests below here --
 
 /// Tests if the node is a VFN, and it's getting forwarded messages from a PFN.  It should forward
@@ -317,8 +343,8 @@ async fn fn_to_val_test() {
 
         // NOTE: Always return node at end, or it will be dropped and channels closed
         let pfn_future = async move {
-            pfn.connect(pfn_vfn_network, vfn_metadata);
             pfn.add_txns_via_client(ALL_TXNS).await;
+            pfn.connect(pfn_vfn_network, vfn_metadata);
 
             // Forward to VFN
             pfn.send_next_network_msg(pfn_vfn_network).await;

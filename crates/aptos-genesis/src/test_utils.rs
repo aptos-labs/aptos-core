@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_config::config::{IdentityBlob, NodeConfig};
@@ -11,13 +11,9 @@ pub fn test_config() -> (NodeConfig, Ed25519PrivateKey) {
     path.create_as_dir().unwrap();
     let (root_key, _genesis, _genesis_waypoint, validators) = crate::builder::Builder::new(
         path.path(),
-        cached_framework_packages::module_blobs().to_vec(),
+        aptos_cached_packages::head_release_bundle().clone(),
     )
     .unwrap()
-    .with_template(NodeConfig::default_for_validator())
-    .with_min_lockup_duration_secs(0)
-    .with_max_lockup_duration_secs(86400)
-    .with_initial_lockup_timestamp(0)
     .build(StdRng::from_seed([0; 32]))
     .unwrap();
     let (
@@ -27,6 +23,7 @@ pub fn test_config() -> (NodeConfig, Ed25519PrivateKey) {
             consensus_private_key,
             ..
         },
+        _,
         _,
         _,
     ) = validators[0].get_key_objects(None).unwrap();

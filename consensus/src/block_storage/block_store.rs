@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -8,26 +9,29 @@ use crate::{
         BlockReader,
     },
     counters,
+    payload_manager::PayloadManager,
     persistent_liveness_storage::{
         PersistentLivenessStorage, RecoveryData, RootInfo, RootMetadata,
     },
+    quorum_store,
     state_replication::StateComputer,
     util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, format_err, Context};
-
-use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
-use aptos_infallible::RwLock;
-use aptos_logger::prelude::*;
-use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::TransactionStatus};
-use consensus_types::{
+use aptos_consensus_types::{
     block::Block, common::Round, executed_block::ExecutedBlock, quorum_cert::QuorumCert,
     sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate,
 };
-use executor_types::{Error, StateComputeResult};
+use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
+use aptos_executor_types::{Error, StateComputeResult};
+use aptos_infallible::RwLock;
+use aptos_logger::prelude::*;
+use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::TransactionStatus};
 use futures::executor::block_on;
 #[cfg(test)]
 use std::collections::VecDeque;
+#[cfg(any(test, feature = "fuzzing"))]
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::{sync::Arc, time::Duration};
 
 #[cfg(test)]
@@ -52,23 +56,26 @@ pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<ExecutedBloc
         counters::LAST_COMMITTED_ROUND.set(block.round() as i64);
         counters::LAST_COMMITTED_VERSION.set(block.compute_result().num_leaves() as i64);
 
+        // Quorum store metrics
+        quorum_store::counters::NUM_BATCH_PER_BLOCK.observe(block.block().payload_size() as f64);
+
         for status in txn_status.iter() {
             match status {
                 TransactionStatus::Keep(_) => {
                     counters::COMMITTED_TXNS_COUNT
                         .with_label_values(&["success"])
                         .inc();
-                }
+                },
                 TransactionStatus::Discard(_) => {
                     counters::COMMITTED_TXNS_COUNT
                         .with_label_values(&["failed"])
                         .inc();
-                }
+                },
                 TransactionStatus::Retry => {
                     counters::COMMITTED_TXNS_COUNT
                         .with_label_values(&["retry"])
                         .inc();
-                }
+                },
             }
         }
     }
@@ -100,6 +107,9 @@ pub struct BlockStore {
     time_service: Arc<dyn TimeService>,
     // consistent with round type
     back_pressure_limit: Round,
+    payload_manager: Arc<PayloadManager>,
+    #[cfg(any(test, feature = "fuzzing"))]
+    back_pressure_for_test: AtomicBool,
 }
 
 impl BlockStore {
@@ -110,6 +120,7 @@ impl BlockStore {
         max_pruned_blocks_in_mem: usize,
         time_service: Arc<dyn TimeService>,
         back_pressure_limit: Round,
+        payload_manager: Arc<PayloadManager>,
     ) -> Self {
         let highest_2chain_tc = initial_data.highest_2chain_timeout_certificate();
         let (root, root_metadata, blocks, quorum_certs) = initial_data.take();
@@ -124,6 +135,7 @@ impl BlockStore {
             max_pruned_blocks_in_mem,
             time_service,
             back_pressure_limit,
+            payload_manager,
         ));
         block_on(block_store.try_commit());
         block_store
@@ -161,6 +173,7 @@ impl BlockStore {
         max_pruned_blocks_in_mem: usize,
         time_service: Arc<dyn TimeService>,
         back_pressure_limit: Round,
+        payload_manager: Arc<PayloadManager>,
     ) -> Self {
         let RootInfo(root_block, root_qc, root_ordered_cert, root_commit_cert) = root;
 
@@ -195,7 +208,7 @@ impl BlockStore {
         );
 
         let executed_root_block = ExecutedBlock::new(
-            root_block,
+            *root_block,
             // Create a dummy state_compute_result with necessary fields filled in.
             result,
         );
@@ -215,7 +228,11 @@ impl BlockStore {
             storage,
             time_service,
             back_pressure_limit,
+            payload_manager,
+            #[cfg(any(test, feature = "fuzzing"))]
+            back_pressure_for_test: AtomicBool::new(false),
         };
+
         for block in blocks {
             block_store
                 .execute_and_insert_block(block)
@@ -308,14 +325,10 @@ impl BlockStore {
             max_pruned_blocks_in_mem,
             Arc::clone(&self.time_service),
             self.back_pressure_limit,
+            self.payload_manager.clone(),
         )
         .await;
 
-        let to_remove = self.inner.read().get_all_block_id();
-        if let Err(e) = self.storage.prune_tree(to_remove) {
-            // it's fine to fail here, the next restart will try to clean up dangling blocks again.
-            error!(error = ?e, "Fail to delete block from consensus db");
-        }
         // Unwrap the new tree and replace the existing tree.
         *self.inner.write() = Arc::try_unwrap(inner)
             .unwrap_or_else(|_| panic!("New block tree is not shared"))
@@ -355,7 +368,7 @@ impl BlockStore {
                     self.execute_block(block.block().clone()).await?;
                 }
                 self.execute_block(block).await
-            }
+            },
             err => err,
         }?;
 
@@ -364,7 +377,7 @@ impl BlockStore {
         let current_timestamp = self.time_service.get_current_timestamp();
         if let Some(t) = block_time.checked_sub(current_timestamp) {
             if t > Duration::from_secs(1) {
-                error!(
+                warn!(
                     "Long wait time {}ms for block {}",
                     t.as_millis(),
                     executed_block.block()
@@ -372,6 +385,9 @@ impl BlockStore {
             }
             self.time_service.wait_until(block_time).await;
         }
+        self.payload_manager
+            .prefetch_payload_data(executed_block.block())
+            .await;
         self.storage
             .save_tree(vec![executed_block.block().clone()], vec![])
             .context("Insert block failed when saving block")?;
@@ -412,7 +428,7 @@ impl BlockStore {
                     executed_block.block().timestamp_usecs(),
                     BlockStage::QC_ADDED,
                 );
-            }
+            },
             None => bail!("Insert {} without having the block in store first", qc),
         };
 
@@ -462,7 +478,7 @@ impl BlockStore {
             // it's fine to fail here, as long as the commit succeeds, the next restart will clean
             // up dangling blocks, and we need to prune the tree to keep the root consistent with
             // executor.
-            error!(error = ?e, "fail to delete block");
+            warn!(error = ?e, "fail to delete block");
         }
 
         // synchronously update both root_id and commit_root_id
@@ -471,6 +487,27 @@ impl BlockStore {
         wlock.update_commit_root(next_root_id);
         wlock.process_pruned_blocks(id_to_remove.clone());
         id_to_remove
+    }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn set_back_pressure_for_test(&self, back_pressure: bool) {
+        self.back_pressure_for_test
+            .store(back_pressure, Ordering::Relaxed)
+    }
+
+    pub fn back_pressure(&self) -> bool {
+        #[cfg(any(test, feature = "fuzzing"))]
+        {
+            if self.back_pressure_for_test.load(Ordering::Relaxed) {
+                return true;
+            }
+        }
+        let commit_round = self.commit_root().round();
+        let ordered_round = self.ordered_root().round();
+        counters::OP_COUNTERS
+            .gauge("back_pressure")
+            .set((ordered_round - commit_round) as i64);
+        ordered_round > self.back_pressure_limit + commit_round
     }
 }
 
@@ -532,6 +569,10 @@ impl BlockReader for BlockStore {
                 .map(|tc| tc.as_ref().clone()),
         )
     }
+
+    fn back_pressure(&self) -> bool {
+        self.back_pressure()
+    }
 }
 
 #[cfg(any(test, feature = "fuzzing"))]
@@ -554,6 +595,9 @@ impl BlockStore {
     /// Helper function to insert the block with the qc together
     pub async fn insert_block_with_qc(&self, block: Block) -> anyhow::Result<Arc<ExecutedBlock>> {
         self.insert_single_quorum_cert(block.quorum_cert().clone())?;
+        if self.ordered_root().round() < block.quorum_cert().commit_info().round() {
+            self.commit(block.quorum_cert().clone()).await?;
+        }
         self.execute_and_insert_block(block).await
     }
 }

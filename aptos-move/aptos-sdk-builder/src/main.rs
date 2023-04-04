@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! # Code generator for Move script builders
@@ -27,7 +27,7 @@ struct Options {
     abi_directories: Vec<PathBuf>,
 
     /// Language for code generation.
-    #[structopt(long, possible_values = &Language::variants(), case_insensitive = true, default_value = "Python3")]
+    #[structopt(long, possible_values = &Language::variants(), case_insensitive = true, default_value = "Rust")]
     language: Language,
 
     /// Directory where to write generated modules (otherwise print code on stdout).
@@ -72,9 +72,9 @@ fn main() {
             let mut out = stdout.lock();
             match options.language {
                 Language::Rust => {
-                    aptos_sdk_builder::rust::output(&mut out, &abis, /* local types */ false)
+                    aptos_sdk_builder::rust::output(&mut out, &abis, /* local types */ true)
                         .unwrap()
-                }
+                },
                 Language::Go => {
                     aptos_sdk_builder::golang::output(
                         &mut out,
@@ -84,10 +84,10 @@ fn main() {
                         &abis,
                     )
                     .unwrap();
-                }
+                },
             }
             return;
-        }
+        },
         Some(dir) => dir,
     };
 

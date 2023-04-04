@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_infallible::Mutex;
@@ -13,10 +14,28 @@ use futures::{
 use once_cell::sync::Lazy;
 use std::{collections::HashMap, num::NonZeroU16, pin::Pin};
 
-static SWITCHBOARD: Lazy<Mutex<SwitchBoard>> =
-    Lazy::new(|| Mutex::new(SwitchBoard(HashMap::default(), 1)));
+/// A global switch board of all in-memory socket servers
+static SWITCHBOARD: Lazy<Mutex<SwitchBoard>> = Lazy::new(|| Mutex::new(SwitchBoard::new()));
 
-struct SwitchBoard(HashMap<NonZeroU16, UnboundedSender<MemorySocket>>, u16);
+/// The port counter at which to search for available ports
+const PORT_TO_START_AT: u16 = 1; // Port 0 is used to request a random port
+
+/// A struct that contains all in-memory socket servers
+/// that have already been bound, and a counter to search
+/// through available ports.
+struct SwitchBoard {
+    pub port_to_sender_map: HashMap<NonZeroU16, UnboundedSender<MemorySocket>>,
+    pub next_port_to_check: u16,
+}
+
+impl SwitchBoard {
+    pub fn new() -> Self {
+        SwitchBoard {
+            port_to_sender_map: HashMap::new(),
+            next_port_to_check: PORT_TO_START_AT,
+        }
+    }
+}
 
 /// An in-memory socket server, listening for connections.
 ///
@@ -34,7 +53,7 @@ struct SwitchBoard(HashMap<NonZeroU16, UnboundedSender<MemorySocket>>, u16);
 /// ```rust,no_run
 /// use std::io::Result;
 ///
-/// use memsocket::{MemoryListener, MemorySocket};
+/// use aptos_memsocket::{MemoryListener, MemorySocket};
 /// use futures::prelude::*;
 ///
 /// async fn write_stormlight(mut stream: MemorySocket) -> Result<()> {
@@ -62,10 +81,10 @@ pub struct MemoryListener {
 
 impl Drop for MemoryListener {
     fn drop(&mut self) {
-        let mut switchboard = (&*SWITCHBOARD).lock();
+        let mut switchboard = (*SWITCHBOARD).lock();
         // Remove the Sending side of the channel in the switchboard when
         // MemoryListener is dropped
-        switchboard.0.remove(&self.port);
+        switchboard.port_to_sender_map.remove(&self.port);
     }
 }
 
@@ -83,7 +102,7 @@ impl MemoryListener {
     /// Create a MemoryListener bound to port 16:
     ///
     /// ```rust,no_run
-    /// use memsocket::MemoryListener;
+    /// use aptos_memsocket::MemoryListener;
     ///
     /// # fn main () -> ::std::io::Result<()> {
     /// let listener = MemoryListener::bind(16)?;
@@ -92,36 +111,42 @@ impl MemoryListener {
     ///
     /// [`local_addr`]: #method.local_addr
     pub fn bind(port: u16) -> Result<Self> {
-        let mut switchboard = (&*SWITCHBOARD).lock();
+        let mut switchboard = (*SWITCHBOARD).lock();
 
-        // Get the port we should bind to.  If 0 was given, use a random port
-        let port = if let Some(port) = NonZeroU16::new(port) {
-            if switchboard.0.contains_key(&port) {
+        // Get the port we should bind to. If 0 was given, use a random port.
+        let port = if port != 0 {
+            let port = NonZeroU16::new(port).unwrap_or_else(|| unreachable!());
+            if switchboard.port_to_sender_map.contains_key(&port) {
                 return Err(ErrorKind::AddrInUse.into());
             }
             port
         } else {
-            loop {
-                let port = NonZeroU16::new(switchboard.1).unwrap_or_else(|| unreachable!());
+            // Check if the switchboard is full and if all ports are in use
+            if Some(switchboard.port_to_sender_map.len())
+                == u16::MAX.checked_sub(1).map(usize::from)
+            {
+                return Err(ErrorKind::AddrInUse.into());
+            }
 
-                // The switchboard is full and all ports are in use
-                if Some(switchboard.0.len()) == std::u16::MAX.checked_sub(1).map(usize::from) {
-                    return Err(ErrorKind::AddrInUse.into());
-                }
+            // Find a random and unused port
+            loop {
+                let port = NonZeroU16::new(switchboard.next_port_to_check)
+                    .unwrap_or_else(|| unreachable!());
 
                 // Instead of overflowing to 0, resume searching at port 1 since port 0 isn't a
                 // valid port to bind to.
-
-                switchboard.1 = switchboard.1.checked_add(1).unwrap_or(1);
-
-                if !switchboard.0.contains_key(&port) {
+                switchboard.next_port_to_check = switchboard
+                    .next_port_to_check
+                    .checked_add(1)
+                    .unwrap_or(PORT_TO_START_AT);
+                if !switchboard.port_to_sender_map.contains_key(&port) {
                     break port;
                 }
             }
         };
 
         let (sender, receiver) = mpsc::unbounded();
-        switchboard.0.insert(port, sender);
+        switchboard.port_to_sender_map.insert(port, sender);
 
         Ok(Self {
             incoming: receiver,
@@ -137,7 +162,7 @@ impl MemoryListener {
     /// # Examples
     ///
     /// ```rust
-    /// use memsocket::MemoryListener;
+    /// use aptos_memsocket::MemoryListener;
     ///
     /// # fn main () -> ::std::io::Result<()> {
     /// let listener = MemoryListener::bind(16)?;
@@ -159,7 +184,7 @@ impl MemoryListener {
     ///
     /// ```rust,no_run
     /// use futures::prelude::*;
-    /// use memsocket::MemoryListener;
+    /// use aptos_memsocket::MemoryListener;
     ///
     /// # async fn work () -> ::std::io::Result<()> {
     /// let mut listener = MemoryListener::bind(16)?;
@@ -186,7 +211,7 @@ impl MemoryListener {
             Poll::Ready(None) => {
                 let err = Error::new(ErrorKind::Other, "MemoryListener unknown error");
                 Poll::Ready(Err(err))
-            }
+            },
             Poll::Pending => Poll::Pending,
         }
     }
@@ -220,7 +245,7 @@ impl<'a> Stream for Incoming<'a> {
 ///
 /// ```rust, no_run
 /// use futures::prelude::*;
-/// use memsocket::MemorySocket;
+/// use aptos_memsocket::MemorySocket;
 ///
 /// # async fn run() -> ::std::io::Result<()> {
 /// let (mut socket_a, mut socket_b) = MemorySocket::new_pair();
@@ -252,7 +277,7 @@ impl MemorySocket {
     /// # Examples
     ///
     /// ```rust
-    /// use memsocket::MemorySocket;
+    /// use aptos_memsocket::MemorySocket;
     ///
     /// let (socket_a, socket_b) = MemorySocket::new_pair();
     /// ```
@@ -283,20 +308,20 @@ impl MemorySocket {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use memsocket::MemorySocket;
+    /// use aptos_memsocket::MemorySocket;
     ///
     /// # fn main () -> ::std::io::Result<()> {
     /// let socket = MemorySocket::connect(16)?;
     /// # Ok(())}
     /// ```
     pub fn connect(port: u16) -> Result<MemorySocket> {
-        let mut switchboard = (&*SWITCHBOARD).lock();
+        let mut switchboard = (*SWITCHBOARD).lock();
 
         // Find port to connect to
         let port = NonZeroU16::new(port).ok_or(ErrorKind::AddrNotAvailable)?;
 
         let sender = switchboard
-            .0
+            .port_to_sender_map
             .get_mut(&port)
             .ok_or(ErrorKind::AddrNotAvailable)?;
 
@@ -349,7 +374,7 @@ impl AsyncRead for MemorySocket {
                         .take(bytes_to_read)
                         .copy_to_slice(&mut buf[bytes_read..(bytes_read + bytes_to_read)]);
                     bytes_read += bytes_to_read;
-                }
+                },
 
                 // Either we've exhausted our current buffer or don't have one
                 _ => {
@@ -362,12 +387,12 @@ impl AsyncRead for MemorySocket {
                                 } else {
                                     return Poll::Pending;
                                 }
-                            }
+                            },
                             Poll::Ready(Some(buf)) => Some(buf),
                             Poll::Ready(None) => return Poll::Ready(Ok(bytes_read)),
                         }
                     };
-                }
+                },
             }
         }
     }
@@ -392,7 +417,7 @@ impl AsyncWrite for MemorySocket {
                     // Unbounded channels should only ever have "Disconnected" errors
                     unreachable!();
                 }
-            }
+            },
             Poll::Ready(Err(e)) => {
                 if e.is_disconnected() {
                     return Poll::Ready(Err(Error::new(ErrorKind::BrokenPipe, e)));
@@ -400,7 +425,7 @@ impl AsyncWrite for MemorySocket {
 
                 // Unbounded channels should only ever have "Disconnected" errors
                 unreachable!();
-            }
+            },
             Poll::Pending => return Poll::Pending,
         }
 

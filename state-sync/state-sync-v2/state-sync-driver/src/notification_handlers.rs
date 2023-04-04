@@ -1,25 +1,26 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     error::Error,
     logging::{LogEntry, LogSchema},
 };
+use aptos_consensus_notifications::{
+    ConsensusCommitNotification, ConsensusNotification, ConsensusNotificationListener,
+    ConsensusSyncNotification,
+};
+use aptos_data_streaming_service::data_notification::NotificationId;
+use aptos_event_notifications::{EventNotificationSender, EventSubscriptionService};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
+use aptos_mempool_notifications::MempoolNotificationSender;
 use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     transaction::{Transaction, Version},
 };
-use consensus_notifications::{
-    ConsensusCommitNotification, ConsensusNotification, ConsensusNotificationListener,
-    ConsensusSyncNotification,
-};
-use data_streaming_service::data_notification::NotificationId;
-use event_notifications::{EventNotificationSender, EventSubscriptionService};
 use futures::{channel::mpsc, stream::FusedStream, Stream};
-use mempool_notifications::MempoolNotificationSender;
 use serde::Serialize;
 use std::{
     pin::Pin,
@@ -33,39 +34,41 @@ const MEMPOOL_COMMIT_ACK_TIMEOUT_MS: u64 = 5000; // 5 seconds
 /// A notification for new data that has been committed to storage
 #[derive(Clone, Debug)]
 pub enum CommitNotification {
-    CommittedStates(CommittedStates),
+    CommittedStateSnapshot(CommittedStateSnapshot),
 }
 
-/// A commit notification for new state values
+/// A commit notification for the new state snapshot
 #[derive(Clone, Debug)]
-pub struct CommittedStates {
-    pub all_states_synced: bool,
+pub struct CommittedStateSnapshot {
+    pub committed_transaction: CommittedTransactions,
     pub last_committed_state_index: u64,
-
-    /// If `all_states_synced` is true, we expect a single committed
-    /// transaction (as the node should have all required state at this version).
-    pub committed_transaction: Option<CommittedTransactions>,
+    pub version: Version,
 }
 
 /// A commit notification for new transactions
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CommittedTransactions {
     pub events: Vec<ContractEvent>,
     pub transactions: Vec<Transaction>,
 }
 
 impl CommitNotification {
-    pub fn new_committed_states(
-        all_states_synced: bool,
+    pub fn new_committed_state_snapshot(
+        events: Vec<ContractEvent>,
+        transactions: Vec<Transaction>,
         last_committed_state_index: u64,
-        committed_transaction: Option<CommittedTransactions>,
+        version: Version,
     ) -> Self {
-        let committed_states = CommittedStates {
-            all_states_synced,
-            last_committed_state_index,
-            committed_transaction,
+        let committed_transaction = CommittedTransactions {
+            events,
+            transactions,
         };
-        CommitNotification::CommittedStates(committed_states)
+        let committed_states = CommittedStateSnapshot {
+            committed_transaction,
+            last_committed_state_index,
+            version,
+        };
+        CommitNotification::CommittedStateSnapshot(committed_states)
     }
 
     /// Handles the commit notification by notifying mempool and the event
@@ -155,6 +158,13 @@ impl ConsensusSyncRequest {
     pub fn get_sync_target(&self) -> LedgerInfoWithSignatures {
         self.consensus_sync_notification.target.clone()
     }
+
+    pub fn get_sync_target_version(&self) -> Version {
+        self.consensus_sync_notification
+            .target
+            .ledger_info()
+            .version()
+    }
 }
 
 /// A simple handler for consensus notifications
@@ -180,7 +190,7 @@ impl ConsensusNotificationHandler {
     }
 
     /// Returns the active sync request that consensus is waiting on
-    pub fn get_consensus_sync_request(&self) -> Arc<Mutex<Option<ConsensusSyncRequest>>> {
+    pub fn get_sync_request(&self) -> Arc<Mutex<Option<ConsensusSyncRequest>>> {
         self.consensus_sync_request.clone()
     }
 
@@ -228,7 +238,7 @@ impl ConsensusNotificationHandler {
         latest_synced_ledger_info: LedgerInfoWithSignatures,
     ) -> Result<(), Error> {
         // Fetch the sync target version
-        let consensus_sync_request = self.get_consensus_sync_request();
+        let consensus_sync_request = self.get_sync_request();
         let sync_target_version = consensus_sync_request.lock().as_ref().map(|sync_request| {
             sync_request
                 .consensus_sync_notification
@@ -251,7 +261,7 @@ impl ConsensusNotificationHandler {
 
             // Check if we've hit the target
             if latest_committed_version == sync_target_version {
-                let consensus_sync_request = self.get_consensus_sync_request().lock().take();
+                let consensus_sync_request = self.get_sync_request().lock().take();
                 if let Some(consensus_sync_request) = consensus_sync_request {
                     self.respond_to_sync_notification(
                         consensus_sync_request.consensus_sync_notification,
@@ -274,7 +284,7 @@ impl ConsensusNotificationHandler {
     ) -> Result<(), Error> {
         // Wrap the result in an error that consensus can process
         let message = result.map_err(|error| {
-            consensus_notifications::Error::UnexpectedErrorEncountered(format!("{:?}", error))
+            aptos_consensus_notifications::Error::UnexpectedErrorEncountered(format!("{:?}", error))
         });
 
         info!(
@@ -304,7 +314,7 @@ impl ConsensusNotificationHandler {
     ) -> Result<(), Error> {
         // Wrap the result in an error that consensus can process
         let message = result.map_err(|error| {
-            consensus_notifications::Error::UnexpectedErrorEncountered(format!("{:?}", error))
+            aptos_consensus_notifications::Error::UnexpectedErrorEncountered(format!("{:?}", error))
         });
 
         debug!(
@@ -391,6 +401,7 @@ impl<M: MempoolNotificationSender> MempoolNotificationHandler<M> {
             mempool_notification_sender,
         }
     }
+
     /// Notifies mempool that transactions have been committed.
     pub async fn notify_mempool_of_committed_transactions(
         &mut self,

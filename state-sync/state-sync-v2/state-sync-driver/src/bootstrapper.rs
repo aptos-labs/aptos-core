@@ -1,21 +1,27 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     driver::DriverConfiguration,
     error::Error,
     logging::{LogEntry, LogSchema},
-    notification_handlers::CommittedStates,
+    metadata_storage::MetadataStorageInterface,
+    metrics,
+    metrics::ExecutingComponent,
     storage_synchronizer::StorageSynchronizerInterface,
     utils,
-    utils::{SpeculativeStreamState, PENDING_DATA_LOG_FREQ_SECS},
+    utils::{OutputFallbackHandler, SpeculativeStreamState, PENDING_DATA_LOG_FREQ_SECS},
 };
 use aptos_config::config::BootstrappingMode;
 use aptos_data_client::GlobalDataSummary;
-use aptos_logger::{
-    prelude::*,
-    sample::{SampleRate, Sampling},
+use aptos_data_streaming_service::{
+    data_notification::{DataNotification, DataPayload, NotificationId},
+    data_stream::DataStreamListener,
+    streaming_client::{DataStreamingClient, NotificationAndFeedback, NotificationFeedback},
 };
+use aptos_logger::{prelude::*, sample::SampleRate};
+use aptos_storage_interface::DbReader;
 use aptos_types::{
     epoch_change::Verifier,
     epoch_state::EpochState,
@@ -24,14 +30,11 @@ use aptos_types::{
     transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
     waypoint::Waypoint,
 };
-use data_streaming_service::{
-    data_notification::{DataNotification, DataPayload, NotificationId},
-    data_stream::DataStreamListener,
-    streaming_client::{DataStreamingClient, NotificationFeedback},
-};
 use futures::channel::oneshot;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
-use storage_interface::DbReader;
+
+/// The expected version of the genesis transaction
+pub const GENESIS_TRANSACTION_VERSION: u64 = 0;
 
 /// A simple container for verified epoch states and epoch ending ledger infos
 /// that have been fetched from the network.
@@ -86,7 +89,7 @@ impl VerifiedEpochStates {
 
     /// Verifies the given epoch ending ledger info, updates our latest
     /// trusted epoch state and attempts to verify any given waypoint.
-    pub fn verify_epoch_ending_ledger_info(
+    pub fn update_verified_epoch_states(
         &mut self,
         epoch_ending_ledger_info: &LedgerInfoWithSignatures,
         waypoint: &Waypoint,
@@ -103,7 +106,7 @@ impl VerifiedEpochStates {
             self.highest_fetched_epoch_ending_version =
                 epoch_ending_ledger_info.ledger_info().version();
             self.latest_epoch_state = next_epoch_state.clone();
-            self.insert_new_epoch_ending_ledger_info(epoch_ending_ledger_info.clone());
+            self.insert_new_epoch_ending_ledger_info(epoch_ending_ledger_info.clone())?;
 
             trace!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
                 "Updated the latest epoch state to epoch: {:?}",
@@ -142,13 +145,13 @@ impl VerifiedEpochStates {
             // Check if we've found the ledger info corresponding to the waypoint version
             if ledger_info_version == waypoint_version {
                 match waypoint.verify(ledger_info) {
-                    Ok(()) => self.verified_waypoint = true,
+                    Ok(()) => self.set_verified_waypoint(),
                     Err(error) => {
                         return Err(Error::VerificationError(
                             format!("Failed to verify the waypoint: {:?}! Waypoint: {:?}, given ledger info: {:?}",
                                     error, waypoint, ledger_info)
                         ));
-                    }
+                    },
                 }
             }
         }
@@ -160,7 +163,7 @@ impl VerifiedEpochStates {
     fn insert_new_epoch_ending_ledger_info(
         &mut self,
         epoch_ending_ledger_info: LedgerInfoWithSignatures,
-    ) {
+    ) -> Result<(), Error> {
         let ledger_info = epoch_ending_ledger_info.ledger_info();
         info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
             "Adding a new epoch to the epoch ending ledger infos. Epoch: {:?}, Version: {:?}, Ends epoch: {:?}",
@@ -173,12 +176,14 @@ impl VerifiedEpochStates {
             .new_epoch_ending_ledger_infos
             .insert(version, epoch_ending_ledger_info)
         {
-            panic!(
+            Err(Error::UnexpectedError(format!(
                 "Duplicate epoch ending ledger info found!\
                  Version: {:?}, \
                  ledger info: {:?}",
                 version, epoch_ending_ledger_info,
-            );
+            )))
+        } else {
+            Ok(())
         }
     }
 
@@ -199,20 +204,21 @@ impl VerifiedEpochStates {
     }
 
     /// Returns the highest known ledger info we've fetched (if any)
-    pub fn get_highest_known_ledger_info(&self) -> Option<LedgerInfoWithSignatures> {
-        if !self.new_epoch_ending_ledger_infos.is_empty() {
+    pub fn get_highest_known_ledger_info(&self) -> Result<Option<LedgerInfoWithSignatures>, Error> {
+        let highest_known_ledger_info = if !self.new_epoch_ending_ledger_infos.is_empty() {
             let highest_fetched_ledger_info = self
                 .get_epoch_ending_ledger_info(self.highest_fetched_epoch_ending_version)
-                .unwrap_or_else(|| {
-                    panic!(
+                .ok_or_else(|| {
+                    Error::UnexpectedError(format!(
                         "The highest known ledger info for version: {:?} was not found!",
                         self.highest_fetched_epoch_ending_version
-                    )
-                });
+                    ))
+                })?;
             Some(highest_fetched_ledger_info)
         } else {
             None
-        }
+        };
+        Ok(highest_known_ledger_info)
     }
 
     /// Returns the next epoch ending version after the given version (if one
@@ -228,21 +234,13 @@ impl VerifiedEpochStates {
     }
 }
 
-// TODO(joshlind): persist the index (e.g., in case we crash mid-download)?
 /// A simple container to manage data related to state value snapshot syncing
-struct StateValueSyncer {
+pub(crate) struct StateValueSyncer {
     // Whether or not a state snapshot receiver has been initialized
     initialized_state_snapshot_receiver: bool,
 
-    // Whether or not all states have been synced
-    is_sync_complete: bool,
-
     // The epoch ending ledger info for the version we're syncing
     ledger_info_to_sync: Option<LedgerInfoWithSignatures>,
-
-    // The next state value index to commit (all state values before this have been
-    // committed).
-    next_state_index_to_commit: u64,
 
     // The next state value index to process (all state values before this have been
     // processed -- i.e., sent to the storage synchronizer).
@@ -256,23 +254,33 @@ impl StateValueSyncer {
     pub fn new() -> Self {
         Self {
             initialized_state_snapshot_receiver: false,
-            is_sync_complete: false,
             ledger_info_to_sync: None,
-            next_state_index_to_commit: 0,
             next_state_index_to_process: 0,
             transaction_output_to_sync: None,
         }
     }
 
-    /// Resets all speculative state related to state value syncing (i.e., all
-    /// speculative data that has not been successfully committed to storage)
-    pub fn reset_speculative_state(&mut self) {
-        self.next_state_index_to_process = self.next_state_index_to_commit
+    /// Sets the ledger info to sync
+    pub fn set_ledger_info_to_sync(&mut self, ledger_info_to_sync: LedgerInfoWithSignatures) {
+        self.ledger_info_to_sync = Some(ledger_info_to_sync);
+    }
+
+    /// Sets the transaction output to sync
+    pub fn set_transaction_output_to_sync(
+        &mut self,
+        transaction_output_to_sync: TransactionOutputListWithProof,
+    ) {
+        self.transaction_output_to_sync = Some(transaction_output_to_sync);
+    }
+
+    /// Updates the next state index to process
+    pub fn update_next_state_index_to_process(&mut self, next_state_index_to_process: u64) {
+        self.next_state_index_to_process = next_state_index_to_process;
     }
 }
 
 /// A simple component that manages the bootstrapping of the node
-pub struct Bootstrapper<StorageSyncer, StreamingClient> {
+pub struct Bootstrapper<MetadataStorage, StorageSyncer, StreamingClient> {
     // The currently active data stream (provided by the data streaming service)
     active_data_stream: Option<DataStreamListener>,
 
@@ -284,6 +292,12 @@ pub struct Bootstrapper<StorageSyncer, StreamingClient> {
 
     // The config of the state sync driver
     driver_configuration: DriverConfiguration,
+
+    // The storage to write metadata about the syncing progress
+    metadata_storage: MetadataStorage,
+
+    // The handler for output fallback behaviour
+    output_fallback_handler: OutputFallbackHandler,
 
     // The speculative state tracking the active data stream
     speculative_stream_state: Option<SpeculativeStreamState>,
@@ -305,12 +319,15 @@ pub struct Bootstrapper<StorageSyncer, StreamingClient> {
 }
 
 impl<
+        MetadataStorage: MetadataStorageInterface + Clone,
         StorageSyncer: StorageSynchronizerInterface + Clone,
         StreamingClient: DataStreamingClient + Clone,
-    > Bootstrapper<StorageSyncer, StreamingClient>
+    > Bootstrapper<MetadataStorage, StorageSyncer, StreamingClient>
 {
     pub fn new(
         driver_configuration: DriverConfiguration,
+        metadata_storage: MetadataStorage,
+        output_fallback_handler: OutputFallbackHandler,
         streaming_client: StreamingClient,
         storage: Arc<dyn DbReader>,
         storage_synchronizer: StorageSyncer,
@@ -326,6 +343,8 @@ impl<
             bootstrap_notifier_channel: None,
             bootstrapped: false,
             driver_configuration,
+            metadata_storage,
+            output_fallback_handler,
             speculative_stream_state: None,
             streaming_client,
             storage,
@@ -334,35 +353,42 @@ impl<
         }
     }
 
+    /// Returns the bootstrapping mode of the node
+    fn get_bootstrapping_mode(&self) -> BootstrappingMode {
+        self.driver_configuration.config.bootstrapping_mode
+    }
+
     /// Returns true iff the node has already completed bootstrapping
     pub fn is_bootstrapped(&self) -> bool {
         self.bootstrapped
     }
 
     /// Marks bootstrapping as complete and notifies any listeners
-    pub fn bootstrapping_complete(&mut self) -> Result<(), Error> {
+    pub async fn bootstrapping_complete(&mut self) -> Result<(), Error> {
         info!(LogSchema::new(LogEntry::Bootstrapper)
             .message("The node has successfully bootstrapped!"));
         self.bootstrapped = true;
-        self.notify_listeners_if_bootstrapped()
+        self.notify_listeners_if_bootstrapped().await
     }
 
     /// Subscribes the specified channel to bootstrap completion notifications
-    pub fn subscribe_to_bootstrap_notifications(
+    pub async fn subscribe_to_bootstrap_notifications(
         &mut self,
         bootstrap_notifier_channel: oneshot::Sender<Result<(), Error>>,
     ) -> Result<(), Error> {
         if self.bootstrap_notifier_channel.is_some() {
-            panic!("Only one boostrap subscriber is supported at a time!");
+            return Err(Error::UnexpectedError(
+                "Only one boostrap subscriber is supported at a time!".into(),
+            ));
         }
 
         self.bootstrap_notifier_channel = Some(bootstrap_notifier_channel);
-        self.notify_listeners_if_bootstrapped()
+        self.notify_listeners_if_bootstrapped().await
     }
 
     /// Notifies any listeners if we've now bootstrapped
-    fn notify_listeners_if_bootstrapped(&mut self) -> Result<(), Error> {
-        if self.bootstrapped {
+    async fn notify_listeners_if_bootstrapped(&mut self) -> Result<(), Error> {
+        if self.is_bootstrapped() {
             if let Some(notifier_channel) = self.bootstrap_notifier_channel.take() {
                 if let Err(error) = notifier_channel.send(Ok(())) {
                     return Err(Error::CallbackSendFailed(format!(
@@ -371,6 +397,8 @@ impl<
                     )));
                 }
             }
+            self.reset_active_stream(None).await?;
+            self.storage_synchronizer.finish_chunk_executor(); // The bootstrapper is now complete
         }
 
         Ok(())
@@ -403,7 +431,7 @@ impl<
         }
 
         // Check if we've now bootstrapped
-        self.notify_listeners_if_bootstrapped()
+        self.notify_listeners_if_bootstrapped().await
     }
 
     /// Returns true iff the bootstrapper should continue to fetch epoch ending
@@ -435,27 +463,88 @@ impl<
         let highest_known_ledger_info = self.get_highest_known_ledger_info()?;
         let highest_known_ledger_version = highest_known_ledger_info.ledger_info().version();
 
-        // Check if we've already fetched the required data for bootstrapping.
-        // If not, bootstrap according to the mode.
-        match self.driver_configuration.config.bootstrapping_mode {
+        // If we've already synced to the highest known version, there's nothing to do
+        if highest_synced_version >= highest_known_ledger_version {
+            info!(LogSchema::new(LogEntry::Bootstrapper)
+                .message(&format!("Highest synced version {} is >= highest known ledger version {}, nothing needs to be done.",
+                    highest_synced_version, highest_known_ledger_version)));
+            return self.bootstrapping_complete().await;
+        }
+
+        info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
+            "Highest synced version is {}, highest_known_ledger_info is {:?}, bootstrapping_mode is {:?}.",
+            highest_synced_version, highest_known_ledger_info, self.get_bootstrapping_mode())));
+
+        // Bootstrap according to the mode
+        match self.get_bootstrapping_mode() {
             BootstrappingMode::DownloadLatestStates => {
-                if (self.state_value_syncer.ledger_info_to_sync.is_none()
-                    && highest_synced_version >= highest_known_ledger_version)
-                    || self.state_value_syncer.is_sync_complete
-                {
-                    return self.bootstrapping_complete();
-                }
-                self.fetch_all_state_values(highest_known_ledger_info).await
-            }
+                self.fetch_missing_state_snapshot_data(
+                    highest_synced_version,
+                    highest_known_ledger_info,
+                )
+                .await
+            },
             _ => {
-                if highest_synced_version >= highest_known_ledger_version {
-                    return self.bootstrapping_complete();
-                }
+                // We're either transaction or output syncing
                 self.fetch_missing_transaction_data(
                     highest_synced_version,
                     highest_known_ledger_info,
                 )
                 .await
+            },
+        }
+    }
+
+    /// Fetches all missing state snapshot data in order to bootstrap the node
+    async fn fetch_missing_state_snapshot_data(
+        &mut self,
+        highest_synced_version: Version,
+        highest_known_ledger_info: LedgerInfoWithSignatures,
+    ) -> Result<(), Error> {
+        if highest_synced_version == GENESIS_TRANSACTION_VERSION {
+            // We're syncing a new node. Check the progress and fetch the missing data.
+            if let Some(target) = self.metadata_storage.previous_snapshot_sync_target()? {
+                if self.metadata_storage.is_snapshot_sync_complete(&target)? {
+                    return Err(Error::UnexpectedError(format!(
+                        "The snapshot sync for the target was marked as complete but \
+                        the highest synced version is genesis! Something has gone wrong! \
+                        Target snapshot sync: {:?}",
+                        target
+                    )));
+                }
+                self.fetch_missing_state_values(target, true).await
+            } else {
+                // No snapshot sync has started. Start a new sync for the highest known ledger info.
+                self.fetch_missing_state_values(highest_known_ledger_info, false)
+                    .await
+            }
+        } else {
+            // This node has already synced some state. Ensure the node is not too far behind.
+            let highest_known_ledger_version = highest_known_ledger_info.ledger_info().version();
+            let num_versions_behind = highest_known_ledger_version
+                .checked_sub(highest_synced_version)
+                .ok_or_else(|| {
+                    Error::IntegerOverflow("The number of versions behind has overflown!".into())
+                })?;
+            if num_versions_behind
+                < self
+                    .driver_configuration
+                    .config
+                    .num_versions_to_skip_snapshot_sync
+            {
+                info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
+                    "The node is only {} versions behind, will skip bootstrapping.",
+                    num_versions_behind
+                )));
+                // We've already bootstrapped to an initial state snapshot. If this a fullnode, the
+                // continuous syncer will take control and get the node up-to-date. If this is a
+                // validator, consensus will take control and sync depending on how it sees fit.
+                self.bootstrapping_complete().await
+            } else {
+                panic!("Fast syncing is currently unsupported for nodes with existing state! \
+                        You are currently {:?} versions behind the latest snapshot version ({:?}). Either \
+                        select a different syncing mode, or delete your storage and restart your node.",
+                       num_versions_behind, highest_known_ledger_version);
             }
         }
     }
@@ -463,13 +552,17 @@ impl<
     /// Attempts to fetch a data notification from the active stream
     async fn fetch_next_data_notification(&mut self) -> Result<DataNotification, Error> {
         let max_stream_wait_time_ms = self.driver_configuration.config.max_stream_wait_time_ms;
-        let result =
-            utils::get_data_notification(max_stream_wait_time_ms, self.active_data_stream.as_mut())
-                .await;
+        let max_num_stream_timeouts = self.driver_configuration.config.max_num_stream_timeouts;
+        let result = utils::get_data_notification(
+            max_stream_wait_time_ms,
+            max_num_stream_timeouts,
+            self.active_data_stream.as_mut(),
+        )
+        .await;
         if matches!(result, Err(Error::CriticalDataStreamTimeout(_))) {
             // If the stream has timed out too many times, we need to reset it
             warn!("Resetting the currently active data stream due to too many timeouts!");
-            self.reset_active_stream();
+            self.reset_active_stream(None).await?;
         }
         result
     }
@@ -490,14 +583,14 @@ impl<
                         state_value_chunk_with_proof,
                     )
                     .await?;
-                }
+                },
                 DataPayload::EpochEndingLedgerInfos(epoch_ending_ledger_infos) => {
                     self.process_epoch_ending_payload(
                         data_notification.notification_id,
                         epoch_ending_ledger_infos,
                     )
                     .await?;
-                }
+                },
                 DataPayload::TransactionsWithProof(transactions_with_proof) => {
                     let payload_start_version = transactions_with_proof.first_transaction_version;
                     self.process_transaction_or_output_payload(
@@ -507,7 +600,7 @@ impl<
                         payload_start_version,
                     )
                     .await?;
-                }
+                },
                 DataPayload::TransactionOutputsWithProof(transaction_outputs_with_proof) => {
                     let payload_start_version =
                         transaction_outputs_with_proof.first_transaction_output_version;
@@ -518,12 +611,12 @@ impl<
                         payload_start_version,
                     )
                     .await?;
-                }
+                },
                 _ => {
                     return self
                         .handle_end_of_stream_or_invalid_payload(data_notification)
                         .await
-                }
+                },
             }
         }
 
@@ -531,36 +624,63 @@ impl<
     }
 
     /// Fetches state values (as required to bootstrap the node)
-    async fn fetch_all_state_values(
+    async fn fetch_missing_state_values(
         &mut self,
-        highest_known_ledger_info: LedgerInfoWithSignatures,
+        target_ledger_info: LedgerInfoWithSignatures,
+        existing_snapshot_progress: bool,
     ) -> Result<(), Error> {
-        // Verify we're trying to sync to an unchanging ledger info
+        // Initialize the target ledger info and verify it never changes
         if let Some(ledger_info_to_sync) = &self.state_value_syncer.ledger_info_to_sync {
-            if ledger_info_to_sync != &highest_known_ledger_info {
-                panic!(
-                    "Mismatch in ledger info to sync! Highest: {:?}, target: {:?}",
-                    highest_known_ledger_info, ledger_info_to_sync
-                );
+            if ledger_info_to_sync != &target_ledger_info {
+                return Err(Error::UnexpectedError(format!(
+                    "Mismatch in ledger info to sync! Given target: {:?}, stored target: {:?}",
+                    target_ledger_info, ledger_info_to_sync
+                )));
             }
         } else {
-            self.state_value_syncer.ledger_info_to_sync = Some(highest_known_ledger_info.clone());
+            self.state_value_syncer
+                .set_ledger_info_to_sync(target_ledger_info.clone());
         }
 
-        // Fetch the transaction info first, before the states
-        let highest_known_ledger_version = highest_known_ledger_info.ledger_info().version();
+        // Fetch the data that we're missing
+        let target_ledger_info_version = target_ledger_info.ledger_info().version();
         let data_stream = if self.state_value_syncer.transaction_output_to_sync.is_none() {
+            // Fetch the transaction info first, before the states
             self.streaming_client
                 .get_all_transaction_outputs(
-                    highest_known_ledger_version,
-                    highest_known_ledger_version,
-                    highest_known_ledger_version,
+                    target_ledger_info_version,
+                    target_ledger_info_version,
+                    target_ledger_info_version,
                 )
                 .await?
         } else {
-            let start_index = Some(self.state_value_syncer.next_state_index_to_commit);
+            // Identify the next state index to fetch
+            let next_state_index_to_process = if existing_snapshot_progress {
+                // The state snapshot receiver requires that after each reboot we
+                // rewrite the last persisted index (again!). This is a limitation
+                // of how the snapshot is persisted (i.e., in-memory sibling freezing).
+                // Thus, on each stream reset, we overlap every chunk by a single item.
+                self
+                    .metadata_storage
+                    .get_last_persisted_state_value_index(&target_ledger_info)
+                    .map_err(|error| {
+                        Error::StorageError(format!(
+                            "Failed to get the last persisted state value index at version {:?}! Error: {:?}",
+                            target_ledger_info_version, error
+                        ))
+                    })?
+            } else {
+                0 // We need to start the snapshot sync from index 0
+            };
+
+            // Fetch the missing state values
+            self.state_value_syncer
+                .update_next_state_index_to_process(next_state_index_to_process);
             self.streaming_client
-                .get_all_state_values(highest_known_ledger_version, start_index)
+                .get_all_state_values(
+                    target_ledger_info_version,
+                    Some(next_state_index_to_process),
+                )
                 .await?
         };
         self.active_data_stream = Some(data_stream);
@@ -581,8 +701,10 @@ impl<
         let end_version = self
             .verified_epoch_states
             .next_epoch_ending_version(highest_synced_version)
-            .expect("No higher epoch ending version known!");
-        let data_stream = match self.driver_configuration.config.bootstrapping_mode {
+            .ok_or_else(|| {
+                Error::UnexpectedError("No higher epoch ending version known!".into())
+            })?;
+        let data_stream = match self.get_bootstrapping_mode() {
             BootstrappingMode::ApplyTransactionOutputsFromGenesis => {
                 self.streaming_client
                     .get_all_transaction_outputs(
@@ -591,7 +713,7 @@ impl<
                         highest_known_ledger_version,
                     )
                     .await?
-            }
+            },
             BootstrappingMode::ExecuteTransactionsFromGenesis => {
                 self.streaming_client
                     .get_all_transactions(
@@ -601,10 +723,40 @@ impl<
                         false,
                     )
                     .await?
-            }
+            },
+            BootstrappingMode::ExecuteOrApplyFromGenesis => {
+                if self.output_fallback_handler.in_fallback_mode() {
+                    metrics::set_gauge(
+                        &metrics::DRIVER_FALLBACK_MODE,
+                        ExecutingComponent::Bootstrapper.get_label(),
+                        1,
+                    );
+                    self.streaming_client
+                        .get_all_transaction_outputs(
+                            next_version,
+                            end_version,
+                            highest_known_ledger_version,
+                        )
+                        .await?
+                } else {
+                    metrics::set_gauge(
+                        &metrics::DRIVER_FALLBACK_MODE,
+                        ExecutingComponent::Bootstrapper.get_label(),
+                        0,
+                    );
+                    self.streaming_client
+                        .get_all_transactions_or_outputs(
+                            next_version,
+                            end_version,
+                            highest_known_ledger_version,
+                            false,
+                        )
+                        .await?
+                }
+            },
             bootstrapping_mode => {
                 unreachable!("Bootstrapping mode not supported: {:?}", bootstrapping_mode)
-            }
+            },
         };
         self.speculative_stream_state = Some(SpeculativeStreamState::new(
             utils::fetch_latest_epoch_state(self.storage.clone())?,
@@ -648,7 +800,7 @@ impl<
                     Error::IntegerOverflow("The highest local epoch end has overflown!".into())
                 })?
         } else {
-            unreachable!("Genesis should always end epoch 0!");
+            unreachable!("Genesis should always end the first epoch!");
         };
 
         // Compare the highest local epoch end to the highest advertised epoch end
@@ -732,15 +884,18 @@ impl<
         // Verify the payload start index is valid
         let expected_start_index = self.state_value_syncer.next_state_index_to_process;
         if expected_start_index != state_value_chunk_with_proof.first_index {
-            self.terminate_active_stream(notification_id, NotificationFeedback::InvalidPayloadData)
-                .await?;
+            self.reset_active_stream(Some(NotificationAndFeedback::new(
+                notification_id,
+                NotificationFeedback::InvalidPayloadData,
+            )))
+            .await?;
             return Err(Error::VerificationError(format!(
                 "The start index of the state values was invalid! Expected: {:?}, received: {:?}",
                 expected_start_index, state_value_chunk_with_proof.first_index
             )));
         }
 
-        // Verify the number of state values is valid
+        // Verify the end index and number of state values is valid
         let expected_num_state_values = state_value_chunk_with_proof
             .last_index
             .checked_sub(state_value_chunk_with_proof.first_index)
@@ -750,28 +905,14 @@ impl<
             })?;
         let num_state_values = state_value_chunk_with_proof.raw_values.len() as u64;
         if expected_num_state_values != num_state_values {
-            self.terminate_active_stream(notification_id, NotificationFeedback::InvalidPayloadData)
-                .await?;
+            self.reset_active_stream(Some(NotificationAndFeedback::new(
+                notification_id,
+                NotificationFeedback::InvalidPayloadData,
+            )))
+            .await?;
             return Err(Error::VerificationError(format!(
                 "The expected number of state values was invalid! Expected: {:?}, received: {:?}",
                 expected_num_state_values, num_state_values,
-            )));
-        }
-
-        // Verify the payload end index is valid
-        let expected_end_index = state_value_chunk_with_proof
-            .first_index
-            .checked_add(num_state_values)
-            .and_then(|version| version.checked_sub(1)) // expected_end_index = first_index + num_state_values - 1
-            .ok_or_else(|| {
-                Error::IntegerOverflow("The expected end of index has overflown!".into())
-            })?;
-        if expected_end_index != state_value_chunk_with_proof.last_index {
-            self.terminate_active_stream(notification_id, NotificationFeedback::InvalidPayloadData)
-                .await?;
-            return Err(Error::VerificationError(format!(
-                "The expected end index was invalid! Expected: {:?}, received: {:?}",
-                expected_num_state_values, state_value_chunk_with_proof.last_index,
             )));
         }
 
@@ -785,28 +926,23 @@ impl<
         state_value_chunk_with_proof: StateValueChunkWithProof,
     ) -> Result<(), Error> {
         // Verify that we're expecting state value payloads
-        let bootstrapping_mode = self.driver_configuration.config.bootstrapping_mode;
+        let bootstrapping_mode = self.get_bootstrapping_mode();
         if self.should_fetch_epoch_ending_ledger_infos()
             || !matches!(bootstrapping_mode, BootstrappingMode::DownloadLatestStates)
         {
-            self.terminate_active_stream(notification_id, NotificationFeedback::InvalidPayloadData)
-                .await?;
+            self.reset_active_stream(Some(NotificationAndFeedback::new(
+                notification_id,
+                NotificationFeedback::InvalidPayloadData,
+            )))
+            .await?;
             return Err(Error::InvalidPayload(
                 "Received an unexpected state values payload!".into(),
             ));
         }
 
         // Fetch the target ledger info and transaction info for bootstrapping
-        let ledger_info_to_sync = self
-            .state_value_syncer
-            .ledger_info_to_sync
-            .clone()
-            .expect("Ledger info to sync is missing!");
-        let transaction_output_to_sync = self
-            .state_value_syncer
-            .transaction_output_to_sync
-            .clone()
-            .expect("Transaction output to sync is missing!");
+        let ledger_info_to_sync = self.get_ledger_info_to_sync()?;
+        let transaction_output_to_sync = self.get_transaction_output_to_sync()?;
 
         // Initialize the state value synchronizer (if not already done)
         if !self.state_value_syncer.initialized_state_snapshot_receiver {
@@ -814,7 +950,7 @@ impl<
             let epoch_change_proofs = self.verified_epoch_states.all_epoch_ending_ledger_infos();
 
             // Initialize the state value synchronizer
-            let _ = self.storage_synchronizer.initialize_state_synchronizer(
+            let _join_handle = self.storage_synchronizer.initialize_state_synchronizer(
                 epoch_change_proofs,
                 ledger_info_to_sync,
                 transaction_output_to_sync.clone(),
@@ -827,16 +963,24 @@ impl<
             .await?;
 
         // Verify the chunk root hash matches the expected root hash
-        let expected_root_hash = transaction_output_to_sync
+        let first_transaction_info = transaction_output_to_sync
             .proof
             .transaction_infos
             .first()
-            .expect("Target transaction info should exist!")
+            .ok_or_else(|| {
+                Error::UnexpectedError("Target transaction info does not exist!".into())
+            })?;
+        let expected_root_hash = first_transaction_info
             .ensure_state_checkpoint_hash()
-            .expect("Must be at state checkpoint.");
+            .map_err(|error| {
+                Error::UnexpectedError(format!("State checkpoint must exist! Error: {:?}", error))
+            })?;
         if state_value_chunk_with_proof.root_hash != expected_root_hash {
-            self.terminate_active_stream(notification_id, NotificationFeedback::InvalidPayloadData)
-                .await?;
+            self.reset_active_stream(Some(NotificationAndFeedback::new(
+                notification_id,
+                NotificationFeedback::InvalidPayloadData,
+            )))
+            .await?;
             return Err(Error::VerificationError(format!(
                 "The states chunk with proof root hash: {:?} didn't match the expected hash: {:?}!",
                 state_value_chunk_with_proof.root_hash, expected_root_hash,
@@ -849,8 +993,11 @@ impl<
             .storage_synchronizer
             .save_state_values(notification_id, state_value_chunk_with_proof)
         {
-            self.terminate_active_stream(notification_id, NotificationFeedback::InvalidPayloadData)
-                .await?;
+            self.reset_active_stream(Some(NotificationAndFeedback::new(
+                notification_id,
+                NotificationFeedback::InvalidPayloadData,
+            )))
+            .await?;
             return Err(Error::InvalidPayload(format!(
                 "The states chunk with proof was invalid! Error: {:?}",
                 error,
@@ -876,8 +1023,11 @@ impl<
     ) -> Result<(), Error> {
         // Verify that we're expecting epoch ending ledger info payloads
         if !self.should_fetch_epoch_ending_ledger_infos() {
-            self.terminate_active_stream(notification_id, NotificationFeedback::InvalidPayloadData)
-                .await?;
+            self.reset_active_stream(Some(NotificationAndFeedback::new(
+                notification_id,
+                NotificationFeedback::InvalidPayloadData,
+            )))
+            .await?;
             return Err(Error::InvalidPayload(
                 "Received an unexpected epoch ending payload!".into(),
             ));
@@ -885,8 +1035,11 @@ impl<
 
         // Verify the payload isn't empty
         if epoch_ending_ledger_infos.is_empty() {
-            self.terminate_active_stream(notification_id, NotificationFeedback::EmptyPayloadData)
-                .await?;
+            self.reset_active_stream(Some(NotificationAndFeedback::new(
+                notification_id,
+                NotificationFeedback::EmptyPayloadData,
+            )))
+            .await?;
             return Err(Error::VerificationError(
                 "The epoch ending payload was empty!".into(),
             ));
@@ -895,14 +1048,14 @@ impl<
         // Verify the epoch change proofs, update our latest epoch state and
         // verify our waypoint.
         for epoch_ending_ledger_info in epoch_ending_ledger_infos {
-            if let Err(error) = self.verified_epoch_states.verify_epoch_ending_ledger_info(
+            if let Err(error) = self.verified_epoch_states.update_verified_epoch_states(
                 &epoch_ending_ledger_info,
                 &self.driver_configuration.waypoint,
             ) {
-                self.terminate_active_stream(
+                self.reset_active_stream(Some(NotificationAndFeedback::new(
                     notification_id,
                     NotificationFeedback::PayloadProofFailed,
-                )
+                )))
                 .await?;
                 return Err(error);
             }
@@ -923,13 +1076,16 @@ impl<
         payload_start_version: Option<Version>,
     ) -> Result<(), Error> {
         // Verify that we're expecting transaction or output payloads
-        let bootstrapping_mode = self.driver_configuration.config.bootstrapping_mode;
+        let bootstrapping_mode = self.get_bootstrapping_mode();
         if self.should_fetch_epoch_ending_ledger_infos()
             || (matches!(bootstrapping_mode, BootstrappingMode::DownloadLatestStates)
                 && self.state_value_syncer.transaction_output_to_sync.is_some())
         {
-            self.terminate_active_stream(notification_id, NotificationFeedback::InvalidPayloadData)
-                .await?;
+            self.reset_active_stream(Some(NotificationAndFeedback::new(
+                notification_id,
+                NotificationFeedback::InvalidPayloadData,
+            )))
+            .await?;
             return Err(Error::InvalidPayload(
                 "Received an unexpected transaction or output payload!".into(),
             ));
@@ -948,7 +1104,7 @@ impl<
 
         // Verify the payload starting version
         let expected_start_version = self
-            .get_speculative_stream_state()
+            .get_speculative_stream_state()?
             .expected_next_version()?;
         let payload_start_version = self
             .verify_payload_start_version(
@@ -959,7 +1115,9 @@ impl<
             .await?;
 
         // Get the expected proof ledger info for the payload
-        let proof_ledger_info = self.get_speculative_stream_state().get_proof_ledger_info();
+        let proof_ledger_info = self
+            .get_speculative_stream_state()?
+            .get_proof_ledger_info()?;
 
         // Get the end of epoch ledger info if the payload ends the epoch
         let end_of_epoch_ledger_info = self
@@ -975,57 +1133,86 @@ impl<
         let num_transactions_or_outputs = match bootstrapping_mode {
             BootstrappingMode::ApplyTransactionOutputsFromGenesis => {
                 if let Some(transaction_outputs_with_proof) = transaction_outputs_with_proof {
-                    let num_transaction_outputs = transaction_outputs_with_proof
-                        .transactions_and_outputs
-                        .len();
-                    self.storage_synchronizer.apply_transaction_outputs(
+                    utils::apply_transaction_outputs(
+                        self.storage_synchronizer.clone(),
                         notification_id,
-                        transaction_outputs_with_proof,
                         proof_ledger_info,
                         end_of_epoch_ledger_info,
-                    )?;
-                    num_transaction_outputs
+                        transaction_outputs_with_proof,
+                    )
+                    .await?
                 } else {
-                    self.terminate_active_stream(
+                    self.reset_active_stream(Some(NotificationAndFeedback::new(
                         notification_id,
                         NotificationFeedback::PayloadTypeIsIncorrect,
-                    )
+                    )))
                     .await?;
                     return Err(Error::InvalidPayload(
                         "Did not receive transaction outputs with proof!".into(),
                     ));
                 }
-            }
+            },
             BootstrappingMode::ExecuteTransactionsFromGenesis => {
                 if let Some(transaction_list_with_proof) = transaction_list_with_proof {
-                    let num_transactions = transaction_list_with_proof.transactions.len();
-                    self.storage_synchronizer.execute_transactions(
+                    utils::execute_transactions(
+                        self.storage_synchronizer.clone(),
                         notification_id,
-                        transaction_list_with_proof,
                         proof_ledger_info,
                         end_of_epoch_ledger_info,
-                    )?;
-                    num_transactions
+                        transaction_list_with_proof,
+                    )
+                    .await?
                 } else {
-                    self.terminate_active_stream(
+                    self.reset_active_stream(Some(NotificationAndFeedback::new(
                         notification_id,
                         NotificationFeedback::PayloadTypeIsIncorrect,
-                    )
+                    )))
                     .await?;
                     return Err(Error::InvalidPayload(
                         "Did not receive transactions with proof!".into(),
                     ));
                 }
-            }
+            },
+            BootstrappingMode::ExecuteOrApplyFromGenesis => {
+                if let Some(transaction_list_with_proof) = transaction_list_with_proof {
+                    utils::execute_transactions(
+                        self.storage_synchronizer.clone(),
+                        notification_id,
+                        proof_ledger_info,
+                        end_of_epoch_ledger_info,
+                        transaction_list_with_proof,
+                    )
+                    .await?
+                } else if let Some(transaction_outputs_with_proof) = transaction_outputs_with_proof
+                {
+                    utils::apply_transaction_outputs(
+                        self.storage_synchronizer.clone(),
+                        notification_id,
+                        proof_ledger_info,
+                        end_of_epoch_ledger_info,
+                        transaction_outputs_with_proof,
+                    )
+                    .await?
+                } else {
+                    self.reset_active_stream(Some(NotificationAndFeedback::new(
+                        notification_id,
+                        NotificationFeedback::PayloadTypeIsIncorrect,
+                    )))
+                    .await?;
+                    return Err(Error::InvalidPayload(
+                        "Did not receive transactions or outputs with proof!".into(),
+                    ));
+                }
+            },
             bootstrapping_mode => {
                 unreachable!("Bootstrapping mode not supported: {:?}", bootstrapping_mode)
-            }
+            },
         };
         let synced_version = payload_start_version
             .checked_add(num_transactions_or_outputs as u64)
             .and_then(|version| version.checked_sub(1)) // synced_version = start + num txns/outputs - 1
             .ok_or_else(|| Error::IntegerOverflow("The synced version has overflown!".into()))?;
-        self.get_speculative_stream_state()
+        self.get_speculative_stream_state()?
             .update_synced_version(synced_version);
 
         Ok(())
@@ -1040,11 +1227,7 @@ impl<
         payload_start_version: Option<Version>,
     ) -> Result<(), Error> {
         // Verify the payload starting version
-        let ledger_info_to_sync = self
-            .state_value_syncer
-            .ledger_info_to_sync
-            .clone()
-            .expect("Ledger info to sync is missing!");
+        let ledger_info_to_sync = self.get_ledger_info_to_sync()?;
         let expected_start_version = ledger_info_to_sync.ledger_info().version();
         let _ = self
             .verify_payload_start_version(
@@ -1063,36 +1246,36 @@ impl<
                     Some(expected_start_version),
                 ) {
                     Ok(()) => {
-                        self.state_value_syncer.transaction_output_to_sync =
-                            Some(transaction_outputs_with_proof);
-                    }
+                        self.state_value_syncer
+                            .set_transaction_output_to_sync(transaction_outputs_with_proof);
+                    },
                     Err(error) => {
-                        self.terminate_active_stream(
+                        self.reset_active_stream(Some(NotificationAndFeedback::new(
                             notification_id,
                             NotificationFeedback::PayloadProofFailed,
-                        )
+                        )))
                         .await?;
                         return Err(Error::VerificationError(format!(
                             "Transaction outputs with proof is invalid! Error: {:?}",
                             error
                         )));
-                    }
+                    },
                 }
             } else {
-                self.terminate_active_stream(
+                self.reset_active_stream(Some(NotificationAndFeedback::new(
                     notification_id,
                     NotificationFeedback::InvalidPayloadData,
-                )
+                )))
                 .await?;
                 return Err(Error::InvalidPayload(
                     "Payload does not contain a single transaction info!".into(),
                 ));
             }
         } else {
-            self.terminate_active_stream(
+            self.reset_active_stream(Some(NotificationAndFeedback::new(
                 notification_id,
                 NotificationFeedback::PayloadTypeIsIncorrect,
-            )
+            )))
             .await?;
             return Err(Error::InvalidPayload(
                 "Did not receive transaction outputs with proof!".into(),
@@ -1111,10 +1294,10 @@ impl<
     ) -> Result<Version, Error> {
         if let Some(payload_start_version) = payload_start_version {
             if payload_start_version != expected_start_version {
-                self.terminate_active_stream(
+                self.reset_active_stream(Some(NotificationAndFeedback::new(
                     notification_id,
                     NotificationFeedback::InvalidPayloadData,
-                )
+                )))
                 .await?;
                 Err(Error::VerificationError(format!(
                     "The payload start version does not match the expected version! Start: {:?}, expected: {:?}",
@@ -1124,8 +1307,11 @@ impl<
                 Ok(payload_start_version)
             }
         } else {
-            self.terminate_active_stream(notification_id, NotificationFeedback::EmptyPayloadData)
-                .await?;
+            self.reset_active_stream(Some(NotificationAndFeedback::new(
+                notification_id,
+                NotificationFeedback::EmptyPayloadData,
+            )))
+            .await?;
             Err(Error::VerificationError(
                 "The playload starting version is missing!".into(),
             ))
@@ -1143,40 +1329,56 @@ impl<
         transaction_outputs_with_proof: Option<&TransactionOutputListWithProof>,
     ) -> Result<Option<LedgerInfoWithSignatures>, Error> {
         // Calculate the payload end version
-        let num_versions = match self.driver_configuration.config.bootstrapping_mode {
+        let num_versions = match self.get_bootstrapping_mode() {
             BootstrappingMode::ApplyTransactionOutputsFromGenesis => {
                 if let Some(transaction_outputs_with_proof) = transaction_outputs_with_proof {
                     transaction_outputs_with_proof
                         .transactions_and_outputs
                         .len()
                 } else {
-                    self.terminate_active_stream(
+                    self.reset_active_stream(Some(NotificationAndFeedback::new(
                         notification_id,
                         NotificationFeedback::PayloadTypeIsIncorrect,
-                    )
+                    )))
                     .await?;
                     return Err(Error::InvalidPayload(
                         "Did not receive transaction outputs with proof!".into(),
                     ));
                 }
-            }
+            },
             BootstrappingMode::ExecuteTransactionsFromGenesis => {
                 if let Some(transaction_list_with_proof) = transaction_list_with_proof {
                     transaction_list_with_proof.transactions.len()
                 } else {
-                    self.terminate_active_stream(
+                    self.reset_active_stream(Some(NotificationAndFeedback::new(
                         notification_id,
                         NotificationFeedback::PayloadTypeIsIncorrect,
-                    )
+                    )))
                     .await?;
                     return Err(Error::InvalidPayload(
                         "Did not receive transactions with proof!".into(),
                     ));
                 }
-            }
+            },
+            BootstrappingMode::ExecuteOrApplyFromGenesis => {
+                if let Some(transaction_list_with_proof) = transaction_list_with_proof {
+                    transaction_list_with_proof.transactions.len()
+                } else if let Some(output_list_with_proof) = transaction_outputs_with_proof {
+                    output_list_with_proof.transactions_and_outputs.len()
+                } else {
+                    self.reset_active_stream(Some(NotificationAndFeedback::new(
+                        notification_id,
+                        NotificationFeedback::PayloadTypeIsIncorrect,
+                    )))
+                    .await?;
+                    return Err(Error::InvalidPayload(
+                        "Did not receive transactions or outputs with proof!".into(),
+                    ));
+                }
+            },
             bootstrapping_mode => {
                 unimplemented!("Bootstrapping mode not supported: {:?}", bootstrapping_mode)
-            }
+            },
         };
         let payload_end_version = payload_start_version
             .checked_add(num_versions as u64)
@@ -1200,7 +1402,7 @@ impl<
         // Fetch the highest verified ledger info (from the network) and take
         // the maximum.
         if let Some(verified_ledger_info) =
-            self.verified_epoch_states.get_highest_known_ledger_info()
+            self.verified_epoch_states.get_highest_known_ledger_info()?
         {
             if verified_ledger_info.ledger_info().version()
                 > highest_known_ledger_info.ledger_info().version()
@@ -1217,76 +1419,101 @@ impl<
         &mut self,
         data_notification: DataNotification,
     ) -> Result<(), Error> {
-        self.reset_active_stream();
+        // Calculate the feedback based on the notification
+        let notification_feedback = match data_notification.data_payload {
+            DataPayload::EndOfStream => NotificationFeedback::EndOfStream,
+            _ => NotificationFeedback::PayloadTypeIsIncorrect,
+        };
+        let notification_and_feedback =
+            NotificationAndFeedback::new(data_notification.notification_id, notification_feedback);
 
-        utils::handle_end_of_stream_or_invalid_payload(
-            &mut self.streaming_client,
-            data_notification,
-        )
-        .await
+        // Reset the stream
+        self.reset_active_stream(Some(notification_and_feedback))
+            .await?;
+
+        // Return an error if the payload was invalid
+        match data_notification.data_payload {
+            DataPayload::EndOfStream => Ok(()),
+            _ => Err(Error::InvalidPayload("Unexpected payload type!".into())),
+        }
     }
 
-    /// Terminates the currently active stream with the provided feedback
-    pub async fn terminate_active_stream(
-        &mut self,
-        notification_id: NotificationId,
-        notification_feedback: NotificationFeedback,
-    ) -> Result<(), Error> {
-        self.reset_active_stream();
-
-        utils::terminate_stream_with_feedback(
-            &mut self.streaming_client,
-            notification_id,
-            notification_feedback,
-        )
-        .await
+    /// Returns the speculative stream state
+    fn get_speculative_stream_state(&mut self) -> Result<&mut SpeculativeStreamState, Error> {
+        self.speculative_stream_state.as_mut().ok_or_else(|| {
+            Error::UnexpectedError("Speculative stream state does not exist!".into())
+        })
     }
 
-    /// Handles a notification from the driver that new state values have been
-    /// committed to storage.
-    pub fn handle_committed_state_values(
-        &mut self,
-        committed_states: CommittedStates,
-    ) -> Result<(), Error> {
-        // Update the last committed state value index
-        self.state_value_syncer.next_state_index_to_commit = committed_states
-            .last_committed_state_index
-            .checked_add(1)
+    /// Returns the ledger info to sync
+    fn get_ledger_info_to_sync(&mut self) -> Result<LedgerInfoWithSignatures, Error> {
+        self.state_value_syncer
+            .ledger_info_to_sync
+            .clone()
+            .ok_or_else(|| Error::UnexpectedError("The ledger info to sync is missing!".into()))
+    }
+
+    /// Returns the transaction output to sync
+    fn get_transaction_output_to_sync(&mut self) -> Result<TransactionOutputListWithProof, Error> {
+        self.state_value_syncer
+            .transaction_output_to_sync
+            .clone()
             .ok_or_else(|| {
-                Error::IntegerOverflow("The next state value index to commit has overflown!".into())
-            })?;
+                Error::UnexpectedError("The transaction output to sync is missing!".into())
+            })
+    }
 
-        // Check if we've downloaded all state values
-        if committed_states.all_states_synced {
-            info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
-                "Successfully synced all state values at version: {:?}. \
-                Last committed index: {:?}",
-                self.state_value_syncer.ledger_info_to_sync,
-                committed_states.last_committed_state_index
-            )));
-            self.state_value_syncer.is_sync_complete = true;
+    /// Handles the storage synchronizer error sent by the driver
+    pub async fn handle_storage_synchronizer_error(
+        &mut self,
+        notification_and_feedback: NotificationAndFeedback,
+    ) -> Result<(), Error> {
+        // Reset the active stream
+        self.reset_active_stream(Some(notification_and_feedback))
+            .await?;
+
+        // Fallback to output syncing if we need to
+        if let BootstrappingMode::ExecuteOrApplyFromGenesis = self.get_bootstrapping_mode() {
+            self.output_fallback_handler.fallback_to_outputs();
+            metrics::set_gauge(
+                &metrics::DRIVER_FALLBACK_MODE,
+                ExecutingComponent::Bootstrapper.get_label(),
+                1,
+            );
         }
 
         Ok(())
     }
 
-    /// Returns the speculative stream state. Assumes that the state exists.
-    fn get_speculative_stream_state(&mut self) -> &mut SpeculativeStreamState {
-        self.speculative_stream_state
-            .as_mut()
-            .expect("Speculative stream state does not exist!")
-    }
-
     /// Resets the currently active data stream and speculative state
-    fn reset_active_stream(&mut self) {
-        self.state_value_syncer.reset_speculative_state();
-        self.speculative_stream_state = None;
+    pub async fn reset_active_stream(
+        &mut self,
+        notification_and_feedback: Option<NotificationAndFeedback>,
+    ) -> Result<(), Error> {
+        if let Some(active_data_stream) = &self.active_data_stream {
+            let data_stream_id = active_data_stream.data_stream_id;
+            utils::terminate_stream_with_feedback(
+                &mut self.streaming_client,
+                data_stream_id,
+                notification_and_feedback,
+            )
+            .await?;
+        }
+
         self.active_data_stream = None;
+        self.speculative_stream_state = None;
+        Ok(())
     }
 
-    /// Returns the verified epoch states struct for testing purposes.
+    /// Returns the verified epoch states struct for testing purposes
     #[cfg(test)]
     pub(crate) fn get_verified_epoch_states(&mut self) -> &mut VerifiedEpochStates {
         &mut self.verified_epoch_states
+    }
+
+    /// Returns the state value syncer struct for testing purposes
+    #[cfg(test)]
+    pub(crate) fn get_state_value_syncer(&mut self) -> &mut StateValueSyncer {
+        &mut self.state_value_syncer
     }
 }

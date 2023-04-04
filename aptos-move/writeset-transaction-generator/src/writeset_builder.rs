@@ -1,28 +1,32 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::format_err;
 use aptos_crypto::HashValue;
+use aptos_gas::{
+    AbstractValueSizeGasParameters, ChangeSetConfigs, NativeGasParameters,
+    LATEST_GAS_FEATURE_VERSION,
+};
 use aptos_state_view::StateView;
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::{self, aptos_root_address},
+    account_config::{self, aptos_test_root_address},
+    on_chain_config::{Features, TimedFeatures},
     transaction::{ChangeSet, Script, Version},
 };
 use aptos_vm::{
-    data_cache::RemoteStorage,
+    data_cache::StorageAdapter,
     move_vm_ext::{MoveResolverExt, MoveVmExt, SessionExt, SessionId},
 };
-use move_deps::{
-    move_core_types::{
-        identifier::Identifier,
-        language_storage::{ModuleId, TypeTag},
-        transaction_argument::convert_txn_args,
-        value::{serialize_values, MoveValue},
-    },
-    move_vm_runtime::session::SerializedReturnValues,
-    move_vm_types::gas_schedule::GasStatus,
+use move_core_types::{
+    identifier::Identifier,
+    language_storage::{ModuleId, TypeTag},
+    transaction_argument::convert_txn_args,
+    value::{serialize_values, MoveValue},
 };
+use move_vm_runtime::session::SerializedReturnValues;
+use move_vm_types::gas::UnmeteredGasMeter;
 
 pub struct GenesisSession<'r, 'l, S>(SessionExt<'r, 'l, S>);
 
@@ -43,7 +47,7 @@ impl<'r, 'l, S: MoveResolverExt> GenesisSession<'r, 'l, S> {
                 &Identifier::new(function_name).unwrap(),
                 ty_args,
                 args,
-                &mut GasStatus::new_unmetered(),
+                &mut UnmeteredGasMeter,
             )
             .unwrap_or_else(|e| {
                 panic!(
@@ -67,7 +71,7 @@ impl<'r, 'l, S: MoveResolverExt> GenesisSession<'r, 'l, S> {
                 script.code().to_vec(),
                 script.ty_args().to_vec(),
                 temp,
-                &mut GasStatus::new_unmetered(),
+                &mut UnmeteredGasMeter,
             )
             .unwrap()
     }
@@ -77,7 +81,7 @@ impl<'r, 'l, S: MoveResolverExt> GenesisSession<'r, 'l, S> {
             "Reconfiguration",
             "disable_reconfiguration",
             vec![],
-            serialize_values(&vec![MoveValue::Signer(aptos_root_address())]),
+            serialize_values(&vec![MoveValue::Signer(aptos_test_root_address())]),
         )
     }
 
@@ -86,29 +90,38 @@ impl<'r, 'l, S: MoveResolverExt> GenesisSession<'r, 'l, S> {
             "Reconfiguration",
             "enable_reconfiguration",
             vec![],
-            serialize_values(&vec![MoveValue::Signer(aptos_root_address())]),
+            serialize_values(&vec![MoveValue::Signer(aptos_test_root_address())]),
         )
     }
+
     pub fn set_aptos_version(&mut self, version: Version) {
         self.exec_func(
             "AptosVersion",
             "set_version",
             vec![],
             serialize_values(&vec![
-                MoveValue::Signer(aptos_root_address()),
+                MoveValue::Signer(aptos_test_root_address()),
                 MoveValue::U64(version),
             ]),
         )
     }
 }
 
-pub fn build_changeset<S: StateView, F>(state_view: &S, procedure: F) -> ChangeSet
+pub fn build_changeset<S: StateView, F>(state_view: &S, procedure: F, chain_id: u8) -> ChangeSet
 where
-    F: FnOnce(&mut GenesisSession<RemoteStorage<S>>),
+    F: FnOnce(&mut GenesisSession<StorageAdapter<S>>),
 {
-    let move_vm = MoveVmExt::new().unwrap();
-    let state_view_storage = RemoteStorage::new(state_view);
-    let session_out = {
+    let move_vm = MoveVmExt::new(
+        NativeGasParameters::zeros(),
+        AbstractValueSizeGasParameters::zeros(),
+        LATEST_GAS_FEATURE_VERSION,
+        chain_id,
+        Features::default(),
+        TimedFeatures::enable_all(),
+    )
+    .unwrap();
+    let state_view_storage = StorageAdapter::new(state_view);
+    let change_set_ext = {
         // TODO: specify an id by human and pass that in.
         let genesis_id = HashValue::zero();
         let mut session = GenesisSession(
@@ -119,13 +132,15 @@ where
         session.enable_reconfiguration();
         session
             .0
-            .finish()
+            .finish(
+                &mut (),
+                &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
+            )
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
             .unwrap()
     };
 
-    session_out
-        .into_change_set(&mut ())
-        .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
-        .unwrap()
+    // Genesis never produces the delta change set.
+    let (_delta_change_set, change_set) = change_set_ext.into_inner();
+    change_set
 }

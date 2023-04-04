@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -6,11 +7,17 @@
 use crate::components::chunk_output::ChunkOutput;
 use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_crypto::HashValue;
+use aptos_executor_types::ExecutedChunk;
 use aptos_logger::prelude::*;
-use aptos_state_view::{StateView, StateViewId};
+use aptos_state_view::{StateViewId, TStateView};
+use aptos_storage_interface::{
+    cached_state_view::CachedStateView, sync_proof_fetcher::SyncProofFetcher, DbReaderWriter,
+    DbWriter, ExecutedTrees,
+};
 use aptos_types::{
     access_path::AccessPath,
     account_config::CORE_CODE_ADDRESS,
+    aggregate_signature::AggregateSignature,
     block_info::{BlockInfo, GENESIS_EPOCH, GENESIS_ROUND, GENESIS_TIMESTAMP_USECS},
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::ConfigurationResource,
@@ -20,14 +27,8 @@ use aptos_types::{
     waypoint::Waypoint,
 };
 use aptos_vm::VMExecutor;
-use executor_types::ExecutedChunk;
-use move_deps::move_core_types::move_resource::MoveResource;
-use std::ops::Deref;
-use std::{collections::btree_map::BTreeMap, sync::Arc};
-use storage_interface::sync_proof_fetcher::SyncProofFetcher;
-use storage_interface::{
-    cached_state_view::CachedStateView, DbReaderWriter, DbWriter, ExecutedTrees,
-};
+use move_core_types::move_resource::MoveResource;
+use std::sync::Arc;
 
 pub fn generate_waypoint<V: VMExecutor>(
     db: &DbReaderWriter,
@@ -104,6 +105,7 @@ impl GenesisCommitter {
             self.output.result_view.txn_accumulator().version(),
             self.base_state_version,
             self.output.ledger_info.as_ref(),
+            true, /* sync_commit */
             self.output.result_view.state().clone(),
         )?;
         info!("Genesis commited.");
@@ -122,8 +124,11 @@ pub fn calculate_genesis<V: VMExecutor>(
     // In the very extreme and sad situation of losing quorum among validators, we refer to the
     // second use case said above.
     let genesis_version = executed_trees.version().map_or(0, |v| v + 1);
-    let base_state_view =
-        executed_trees.verified_state_view(StateViewId::Miscellaneous, db.reader.deref())?;
+    let base_state_view = executed_trees.verified_state_view(
+        StateViewId::Miscellaneous,
+        Arc::clone(&db.reader),
+        Arc::new(SyncProofFetcher::new(db.reader.clone())),
+    )?;
 
     let epoch = if genesis_version == 0 {
         GENESIS_EPOCH
@@ -143,9 +148,11 @@ pub fn calculate_genesis<V: VMExecutor>(
         // TODO(aldenhu): fix existing tests before using real timestamp and check on-chain epoch.
         GENESIS_TIMESTAMP_USECS
     } else {
-        let state_view = output
-            .result_view
-            .verified_state_view(StateViewId::Miscellaneous, db.reader.deref())?;
+        let state_view = output.result_view.verified_state_view(
+            StateViewId::Miscellaneous,
+            Arc::clone(&db.reader),
+            Arc::new(SyncProofFetcher::new(db.reader.clone())),
+        )?;
         let next_epoch = epoch
             .checked_add(1)
             .ok_or_else(|| format_err!("integer overflow occurred"))?;
@@ -173,7 +180,7 @@ pub fn calculate_genesis<V: VMExecutor>(
             ),
             genesis_block_id(), /* consensus_data_hash */
         ),
-        BTreeMap::default(), /* signatures */
+        AggregateSignature::empty(), /* signatures */
     );
     output.ledger_info = Some(ledger_info_with_sigs);
 
@@ -189,9 +196,9 @@ pub fn calculate_genesis<V: VMExecutor>(
     Ok(committer)
 }
 
-fn get_state_timestamp(state_view: &CachedStateView<SyncProofFetcher>) -> Result<u64> {
+fn get_state_timestamp(state_view: &CachedStateView) -> Result<u64> {
     let rsrc_bytes = &state_view
-        .get_state_value(&StateKey::AccessPath(AccessPath::new(
+        .get_state_value_bytes(&StateKey::access_path(AccessPath::new(
             CORE_CODE_ADDRESS,
             TimestampResource::resource_path(),
         )))?
@@ -200,9 +207,9 @@ fn get_state_timestamp(state_view: &CachedStateView<SyncProofFetcher>) -> Result
     Ok(rsrc.timestamp.microseconds)
 }
 
-fn get_state_epoch(state_view: &CachedStateView<SyncProofFetcher>) -> Result<u64> {
+fn get_state_epoch(state_view: &CachedStateView) -> Result<u64> {
     let rsrc_bytes = &state_view
-        .get_state_value(&StateKey::AccessPath(AccessPath::new(
+        .get_state_value_bytes(&StateKey::access_path(AccessPath::new(
             CORE_CODE_ADDRESS,
             ConfigurationResource::resource_path(),
         )))?

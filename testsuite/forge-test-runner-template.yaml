@@ -4,19 +4,45 @@ metadata:
   name: {FORGE_POD_NAME}
   labels:
     app.kubernetes.io/name: forge
+    forge-namespace: {FORGE_NAMESPACE}
+    forge-image-tag: {FORGE_IMAGE_TAG}
 spec:
   restartPolicy: Never
   serviceAccountName: forge
   containers:
   - name: main
-    image: {AWS_ACCOUNT_NUM}.dkr.ecr.{AWS_REGION}.amazonaws.com/aptos/forge:{IMAGE_TAG}
+    image: {FORGE_IMAGE_REPO}:{FORGE_IMAGE_TAG}
     imagePullPolicy: Always
     command:
     - /bin/bash
     - -c
     - |
       ulimit -n 1048576
-      forge --suite {FORGE_TEST_SUITE} test k8s-swarm --image-tag {IMAGE_TAG} --namespace {FORGE_NAMESPACE} {REUSE_ARGS} {KEEP_ARGS} {ENABLE_HAPROXY_ARGS}
+      {FORGE_ARGS}
+    resources:
+      limits:
+        cpu: 15.5
+        memory: 26Gi
+      requests:
+        cpu: 15
+        memory: 26Gi
+    env:
+    - name: FORGE_TRIGGERED_BY
+      value: {FORGE_TRIGGERED_BY}
+    - name: PROMETHEUS_URL
+      valueFrom:
+        secretKeyRef:
+          name: prometheus-read-only
+          key: url
+          optional: true
+    - name: PROMETHEUS_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: prometheus-read-only
+          key: token
+          optional: true
+    # - name: RUST_LOG
+    #   value: debug
   affinity:
     # avoid scheduling with other forge or validator/fullnode pods
     podAntiAffinity:
@@ -32,9 +58,8 @@ spec:
   # schedule on a k8s worker node in the "validators" nodegroup
   # to access more compute
   nodeSelector:
-    eks.amazonaws.com/nodegroup: validators
+    {VALIDATOR_NODE_SELECTOR}
   tolerations:
   - effect: NoExecute
     key: aptos.org/nodepool
     value: validators
-  

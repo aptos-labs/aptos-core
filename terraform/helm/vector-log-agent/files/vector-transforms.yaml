@@ -1,0 +1,81 @@
+transforms:
+  k8s_logs:
+    type: remap
+    inputs:
+      - kubernetes_logs
+    source: |
+      .k8s = del(.kubernetes)
+      .k8s.cluster = "${K8S_CLUSTER:?err}"
+
+      del(.k8s.container_id)
+
+      del(.k8s.namespace_labels)
+
+      del(.k8s.node_labels."beta.kubernetes.io/instance-type")
+      del(.k8s.node_labels."beta.kubernetes.io/arch")
+      del(.k8s.node_labels."beta.kubernetes.io/os")
+      del(.k8s.node_labels."eks.amazonaws.com/capacityType")
+      del(.k8s.node_labels."eks.amazonaws.com/nodegroup-image")
+      del(.k8s.node_labels."eks.amazonaws.com/sourceLaunchTemplateId")
+      del(.k8s.node_labels."eks.amazonaws.com/sourceLaunchTemplateVersion")
+      del(.k8s.node_labels."failure-domain.beta.kubernetes.io/region")
+      del(.k8s.node_labels."failure-domain.beta.kubernetes.io/zone")
+      del(.k8s.node_labels."topology.ebs.csi.aws.com/zone")
+      del(.k8s.node_labels."kubernetes.io/arch")
+      del(.k8s.node_labels."kubernetes.io/os")
+      del(.k8s.node_labels."kubernetes.io/hostname")
+      del(.k8s.node_labels."topology.kubernetes.io/region")
+      del(.k8s.node_labels."topology.kubernetes.io/zone")
+      del(.k8s.node_labels."k8s.io/cloud-provider-aws")
+      del(.k8s.node_labels."eks.amazonaws.com/nodegroup")
+      del(.k8s.labels."statefulset.kubernetes.io/pod-name")
+      del(.k8s.pod_owner)
+      del(.k8s.labels."forge-image-tag")
+      del(.k8s.labels."controller-uid")
+
+      del(.k8s.annotations."kubectl.kubernetes.io/last-applied-configuration")
+      del(.k8s.annotations."seccomp.security.alpha.kubernetes.io/pod")
+      del(.k8s.annotations."checksum/validator.yaml")
+      del(.k8s.annotations."kubernetes.io/psp")
+
+      del(.k8s.labels."app.kubernetes.io/managed-by")
+      del(.k8s.labels."app.kubernetes.io/part-of")
+      del(.k8s.labels."pod-template-hash")
+      del(.k8s.labels."controller-revision-hash")
+      .k8s.node_name = del(.k8s.pod_node_name)
+
+      del(.k8s.pod_ips)
+      del(.k8s.pod_uid)
+
+      del(."@timestamp.nanos")
+      del(.source_type)
+      del(.hostname)
+      del(.file)
+
+  final_logs:
+    type: remap
+    inputs:
+      - k8s_logs
+    source: |
+      parsed_message, err = parse_json(.message)
+      if err == null && is_object(parsed_message) {
+        del(.message)
+        . = merge!(., parsed_message, deep: true)
+        # if the parsed_message didn't have a `.message` property fall back to some common fields under `.data`
+        if !exists(.message) {
+          fallback_message, err = string(parsed_message.data.message) ?? string(parsed_message.data.event) ?? string(parsed_message.data.error) ?? string(parsed_message.data.name) ?? string(parsed_message.data.method)
+          if err == null {
+            .message = fallback_message
+          }
+        }
+      }
+      if exists(.level) && is_string(.level) {
+        .level = downcase!(.level);
+      }
+      if !exists(.message) && exists(.msg) {
+        .message = del(.msg)
+      }
+      parsed_timestamp, err = to_timestamp(.timestamp)
+      if err == null {
+        .timestamp = parsed_timestamp
+      }

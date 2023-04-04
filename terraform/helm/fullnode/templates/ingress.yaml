@@ -1,0 +1,27 @@
+{{- if .Values.ingress.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "aptos-fullnode.fullname" . }}-ingress
+  labels:
+    {{- include "aptos-fullnode.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{ if .Values.ingress.ingressClassName }}
+  ingressClassName: {{ .Values.ingress.ingressClassName }} 
+  {{ end }}
+  rules:
+  - host: {{ .Values.ingress.hostName }} 
+    http:
+      paths:
+      - path: /
+        backend:
+          service:
+            name: {{ include "aptos-fullnode.fullname" . }}-lb
+            port:
+              number: 80
+        pathType: ImplementationSpecific
+{{- end -}}

@@ -31,10 +31,9 @@ BlockMetadata:
         TYPENAME: HashValue
     - epoch: U64
     - round: U64
-    - previous_block_votes:
-        SEQ: BOOL
     - proposer:
         TYPENAME: AccountAddress
+    - previous_block_votes_bitvec: BYTES
     - failed_proposer_indices:
         SEQ: U32
     - timestamp_usecs: U64
@@ -65,13 +64,28 @@ Ed25519PublicKey:
   NEWTYPESTRUCT: BYTES
 Ed25519Signature:
   NEWTYPESTRUCT: BYTES
+EntryFunction:
+  STRUCT:
+    - module:
+        TYPENAME: ModuleId
+    - function:
+        TYPENAME: Identifier
+    - ty_args:
+        SEQ:
+          TYPENAME: TypeTag
+    - args:
+        SEQ: BYTES
 EventKey:
   STRUCT:
     - creation_number: U64
     - account_address:
         TYPENAME: AccountAddress
 HashValue:
-  NEWTYPESTRUCT: BYTES
+  STRUCT:
+    - hash:
+        TUPLEARRAY:
+          CONTENT: U8
+          SIZE: 32
 Identifier:
   NEWTYPESTRUCT: STR
 Module:
@@ -92,6 +106,19 @@ MultiEd25519PublicKey:
   NEWTYPESTRUCT: BYTES
 MultiEd25519Signature:
   NEWTYPESTRUCT: BYTES
+Multisig:
+  STRUCT:
+    - multisig_address:
+        TYPENAME: AccountAddress
+    - transaction_payload:
+        OPTION:
+          TYPENAME: MultisigTransactionPayload
+MultisigTransactionPayload:
+  ENUM:
+    0:
+      EntryFunction:
+        NEWTYPE:
+          TYPENAME: EntryFunction
 RawTransaction:
   STRUCT:
     - sender:
@@ -113,17 +140,6 @@ Script:
     - args:
         SEQ:
           TYPENAME: TransactionArgument
-ScriptFunction:
-  STRUCT:
-    - module:
-        TYPENAME: ModuleId
-    - function:
-        TYPENAME: Identifier
-    - ty_args:
-        SEQ:
-          TYPENAME: TypeTag
-    - args:
-        SEQ: BYTES
 SignedTransaction:
   STRUCT:
     - raw_txn:
@@ -145,6 +161,15 @@ StateKey:
     2:
       Raw:
         NEWTYPE: BYTES
+StateValueMetadata:
+  ENUM:
+    0:
+      V0:
+        STRUCT:
+          - payer:
+              TYPENAME: AccountAddress
+          - deposit: U64
+          - creation_time_usecs: U64
 StructTag:
   STRUCT:
     - address:
@@ -157,7 +182,8 @@ StructTag:
         SEQ:
           TYPENAME: TypeTag
 TableHandle:
-  NEWTYPESTRUCT: U128
+  NEWTYPESTRUCT:
+    TYPENAME: AccountAddress
 Transaction:
   ENUM:
     0:
@@ -197,6 +223,18 @@ TransactionArgument:
     5:
       Bool:
         NEWTYPE: BOOL
+    6:
+      U16:
+        NEWTYPE: U16
+    7:
+      U32:
+        NEWTYPE: U32
+    8:
+      U256:
+        NEWTYPE:
+          TUPLEARRAY:
+            CONTENT: U8
+            SIZE: 32
 TransactionAuthenticator:
   ENUM:
     0:
@@ -227,21 +265,21 @@ TransactionAuthenticator:
 TransactionPayload:
   ENUM:
     0:
-      WriteSet:
-        NEWTYPE:
-          TYPENAME: WriteSetPayload
-    1:
       Script:
         NEWTYPE:
           TYPENAME: Script
-    2:
+    1:
       ModuleBundle:
         NEWTYPE:
           TYPENAME: ModuleBundle
-    3:
-      ScriptFunction:
+    2:
+      EntryFunction:
         NEWTYPE:
-          TYPENAME: ScriptFunction
+          TYPENAME: EntryFunction
+    3:
+      Multisig:
+        NEWTYPE:
+          TYPENAME: Multisig
 TypeTag:
   ENUM:
     0:
@@ -264,23 +302,53 @@ TypeTag:
       struct:
         NEWTYPE:
           TYPENAME: StructTag
+    8:
+      u16: UNIT
+    9:
+      u32: UNIT
+    10:
+      u256: UNIT
 WriteOp:
   ENUM:
     0:
-      Deletion: UNIT
-    1:
-      Value:
+      Creation:
         NEWTYPE: BYTES
+    1:
+      Modification:
+        NEWTYPE: BYTES
+    2:
+      Deletion: UNIT
+    3:
+      CreationWithMetadata:
+        STRUCT:
+          - data: BYTES
+          - metadata:
+              TYPENAME: StateValueMetadata
+    4:
+      ModificationWithMetadata:
+        STRUCT:
+          - data: BYTES
+          - metadata:
+              TYPENAME: StateValueMetadata
+    5:
+      DeletionWithMetadata:
+        STRUCT:
+          - metadata:
+              TYPENAME: StateValueMetadata
 WriteSet:
-  NEWTYPESTRUCT:
-    TYPENAME: WriteSetMut
+  ENUM:
+    0:
+      V0:
+        NEWTYPE:
+          TYPENAME: WriteSetV0
 WriteSetMut:
   STRUCT:
     - write_set:
-        SEQ:
-          TUPLE:
-            - TYPENAME: StateKey
-            - TYPENAME: WriteOp
+        MAP:
+          KEY:
+            TYPENAME: StateKey
+          VALUE:
+            TYPENAME: WriteOp
 WriteSetPayload:
   ENUM:
     0:
@@ -294,3 +362,6 @@ WriteSetPayload:
               TYPENAME: AccountAddress
           - script:
               TYPENAME: Script
+WriteSetV0:
+  NEWTYPESTRUCT:
+    TYPENAME: WriteSetMut

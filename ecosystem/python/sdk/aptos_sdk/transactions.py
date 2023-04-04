@@ -1,4 +1,4 @@
-# Copyright (c) Aptos
+# Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
 """
@@ -10,13 +10,14 @@ from __future__ import annotations
 import hashlib
 import typing
 import unittest
+from typing import List
 
-import ed25519
-from account_address import AccountAddress
-from authenticator import (Authenticator, Ed25519Authenticator,
-                           MultiAgentAuthenticator)
-from bcs import Deserializer, Serializer
-from type_tag import StructTag, TypeTag
+from . import ed25519
+from .account_address import AccountAddress
+from .authenticator import (Authenticator, Ed25519Authenticator,
+                            MultiAgentAuthenticator)
+from .bcs import Deserializer, Serializer
+from .type_tag import StructTag, TypeTag
 
 
 class RawTransaction:
@@ -31,7 +32,7 @@ class RawTransaction:
     max_gas_amount: int
     # Price to be paid per gas unit.
     gas_unit_price: int
-    # Expiration timestamp ffor this transactions, represented as seconds from the Unix epoch.
+    # Expiration timestamp for this transaction, represented as seconds from the Unix epoch.
     expiration_timestamps_secs: int
     # Chain ID of the Aptos network this transaction is intended for.
     chain_id: int
@@ -54,7 +55,9 @@ class RawTransaction:
         self.expiration_timestamps_secs = expiration_timestamps_secs
         self.chain_id = chain_id
 
-    def __eq__(self, other: RawTranasction) -> bool:
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, RawTransaction):
+            return NotImplemented
         return (
             self.sender == other.sender
             and self.sequence_number == other.sequence_number
@@ -66,7 +69,7 @@ class RawTransaction:
         )
 
     def __str__(self):
-        return f"""RawTranasction:
+        return f"""RawTransaction:
     sender: {self.sender}
     sequence_number: {self.sequence_number}
     payload: {self.payload}
@@ -94,6 +97,7 @@ class RawTransaction:
     def verify(self, key: ed25519.PublicKey, signature: ed25519.Signature) -> bool:
         return key.verify(self.keyed(), signature)
 
+    @staticmethod
     def deserialize(deserializer: Deserializer) -> RawTransaction:
         return RawTransaction(
             AccountAddress.deserialize(deserializer),
@@ -152,44 +156,42 @@ class MultiAgentRawTransaction:
 
 
 class TransactionPayload:
-    WRITE_SET: int = 0
-    SCRIPT: int = 1
-    MODULE_BUNDLE: int = 2
-    SCRIPT_FUNCTION: int = 3
+    SCRIPT: int = 0
+    MODULE_BUNDLE: int = 1
+    SCRIPT_FUNCTION: int = 2
 
     variant: int
     value: typing.Any
 
     def __init__(self, payload: typing.Any):
-        if isinstance(payload, WriteSet):
-            self.variant = TransactionPayload.WRITE_SET
-        elif isinstance(payload, Script):
+        if isinstance(payload, Script):
             self.variant = TransactionPayload.SCRIPT
         elif isinstance(payload, ModuleBundle):
             self.variant = TransactionPayload.MODULE_BUNDLE
-        elif isinstance(payload, ScriptFunction):
+        elif isinstance(payload, EntryFunction):
             self.variant = TransactionPayload.SCRIPT_FUNCTION
         else:
             raise Exception("Invalid type")
         self.value = payload
 
-    def __eq__(self, other: TransactionPayload) -> bool:
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, TransactionPayload):
+            return NotImplemented
         return self.variant == other.variant and self.value == other.value
 
     def __str__(self) -> str:
         return self.value.__str__()
 
+    @staticmethod
     def deserialize(deserializer: Deserializer) -> TransactionPayload:
         variant = deserializer.uleb128()
 
-        if variant == TransactionPayload.WRITE_SET:
-            payload = WriteSet.deserialize(deserializer)
-        elif variant == TransactionPayload.SCRIPT:
-            payload = Script.deserialize(deserializer)
+        if variant == TransactionPayload.SCRIPT:
+            payload: typing.Any = Script.deserialize(deserializer)
         elif variant == TransactionPayload.MODULE_BUNDLE:
             payload = ModuleBundle.deserialize(deserializer)
         elif variant == TransactionPayload.SCRIPT_FUNCTION:
-            payload = ScriptFunction.deserialize(deserializer)
+            payload = EntryFunction.deserialize(deserializer)
         else:
             raise Exception("Invalid type")
 
@@ -204,6 +206,7 @@ class ModuleBundle:
     def __init__(self):
         raise NotImplementedError
 
+    @staticmethod
     def deserialize(deserializer: Deserializer) -> ModuleBundle:
         raise NotImplementedError
 
@@ -212,17 +215,119 @@ class ModuleBundle:
 
 
 class Script:
-    def __init__(self):
-        raise NotImplementedError
+    code: bytes
+    ty_args: List[TypeTag]
+    args: List[ScriptArgument]
 
+    def __init__(self, code: bytes, ty_args: List[TypeTag], args: List[ScriptArgument]):
+        self.code = code
+        self.ty_args = ty_args
+        self.args = args
+
+    @staticmethod
     def deserialize(deserializer: Deserializer) -> Script:
-        raise NotImplementedError
+        code = deserializer.to_bytes()
+        ty_args = deserializer.sequence(TypeTag.deserialize)
+        args = deserializer.sequence(ScriptArgument.deserialize)
+        return Script(code, ty_args, args)
 
     def serialize(self, serializer: Serializer):
-        raise NotImplementedError
+        serializer.to_bytes(self.code)
+        serializer.sequence(self.ty_args, Serializer.struct)
+        serializer.sequence(self.args, Serializer.struct)
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Script):
+            return NotImplemented
+        return (
+            self.code == other.code
+            and self.ty_args == other.ty_args
+            and self.args == other.args
+        )
+
+    def __str__(self):
+        return f"<{self.ty_args}>({self.args})"
 
 
-class ScriptFunction:
+class ScriptArgument:
+    U8: int = 0
+    U64: int = 1
+    U128: int = 2
+    ADDRESS: int = 3
+    U8_VECTOR: int = 4
+    BOOL: int = 5
+    U16: int = 6
+    U32: int = 7
+    U256: int = 8
+
+    variant: int
+    value: typing.Any
+
+    def __init__(self, variant: int, value: typing.Any):
+        if variant < 0 or variant > 5:
+            raise Exception("Invalid variant")
+
+        self.variant = variant
+        self.value = value
+
+    @staticmethod
+    def deserialize(deserializer: Deserializer) -> ScriptArgument:
+        variant = deserializer.u8()
+        if variant == ScriptArgument.U8:
+            value: typing.Any = deserializer.u8()
+        elif variant == ScriptArgument.U16:
+            value = deserializer.u16()
+        elif variant == ScriptArgument.U32:
+            value = deserializer.u32()
+        elif variant == ScriptArgument.U64:
+            value = deserializer.u64()
+        elif variant == ScriptArgument.U128:
+            value = deserializer.u128()
+        elif variant == ScriptArgument.U256:
+            value = deserializer.u256()
+        elif variant == ScriptArgument.ADDRESS:
+            value = AccountAddress.deserialize(deserializer)
+        elif variant == ScriptArgument.U8_VECTOR:
+            value = deserializer.to_bytes()
+        elif variant == ScriptArgument.BOOL:
+            value = deserializer.bool()
+        else:
+            raise Exception("Invalid variant")
+        return ScriptArgument(variant, value)
+
+    def serialize(self, serializer: Serializer):
+        serializer.u8(self.variant)
+        if self.variant == ScriptArgument.U8:
+            serializer.u8(self.value)
+        elif self.variant == ScriptArgument.U16:
+            serializer.u16(self.value)
+        elif self.variant == ScriptArgument.U32:
+            serializer.u32(self.value)
+        elif self.variant == ScriptArgument.U64:
+            serializer.u64(self.value)
+        elif self.variant == ScriptArgument.U128:
+            serializer.u128(self.value)
+        elif self.variant == ScriptArgument.U256:
+            serializer.u256(self.value)
+        elif self.variant == ScriptArgument.ADDRESS:
+            serializer.struct(self.value)
+        elif self.variant == ScriptArgument.U8_VECTOR:
+            serializer.to_bytes(self.value)
+        elif self.variant == ScriptArgument.BOOL:
+            serializer.bool(self.value)
+        else:
+            raise Exception(f"Invalid ScriptArgument variant {self.variant}")
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, ScriptArgument):
+            return NotImplemented
+        return self.variant == other.variant and self.value == other.value
+
+    def __str__(self):
+        return f"[{self.variant}] {self.value}"
+
+
+class EntryFunction:
     module: ModuleId
     function: str
     ty_args: List[TypeTag]
@@ -236,7 +341,10 @@ class ScriptFunction:
         self.ty_args = ty_args
         self.args = args
 
-    def __eq__(self, other: ScriptFunction) -> bool:
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, EntryFunction):
+            return NotImplemented
+
         return (
             self.module == other.module
             and self.function == other.function
@@ -247,42 +355,33 @@ class ScriptFunction:
     def __str__(self):
         return f"{self.module}::{self.function}::<{self.ty_args}>({self.args})"
 
+    @staticmethod
     def natural(
         module: str,
         function: str,
         ty_args: List[TypeTag],
         args: List[TransactionArgument],
-    ) -> ScriptFunction:
+    ) -> EntryFunction:
         module_id = ModuleId.from_str(module)
 
         byte_args = []
         for arg in args:
             byte_args.append(arg.encode())
-        return ScriptFunction(module_id, function, ty_args, byte_args)
+        return EntryFunction(module_id, function, ty_args, byte_args)
 
-    def deserialize(deserializer: Deserializer) -> ScriptFunction:
+    @staticmethod
+    def deserialize(deserializer: Deserializer) -> EntryFunction:
         module = ModuleId.deserialize(deserializer)
         function = deserializer.str()
         ty_args = deserializer.sequence(TypeTag.deserialize)
-        args = deserializer.sequence(Deserializer.bytes)
-        return ScriptFunction(module, function, ty_args, args)
+        args = deserializer.sequence(Deserializer.to_bytes)
+        return EntryFunction(module, function, ty_args, args)
 
     def serialize(self, serializer: Serializer):
         self.module.serialize(serializer)
         serializer.str(self.function)
         serializer.sequence(self.ty_args, Serializer.struct)
-        serializer.sequence(self.args, Serializer.bytes)
-
-
-class WriteSet:
-    def __init__(self):
-        raise NotImplementedError
-
-    def deserialize(deserializer: Deserializer) -> WriteSet:
-        raise NotImplementedError
-
-    def serialize(self, serializer: Serializer):
-        raise NotImplementedError
+        serializer.sequence(self.args, Serializer.to_bytes)
 
 
 class ModuleId:
@@ -293,16 +392,20 @@ class ModuleId:
         self.address = address
         self.name = name
 
-    def __eq__(self, other: ModuleId) -> bool:
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, ModuleId):
+            return NotImplemented
         return self.address == other.address and self.name == other.name
 
     def __str__(self) -> str:
         return f"{self.address}::{self.name}"
 
+    @staticmethod
     def from_str(module_id: str) -> ModuleId:
         split = module_id.split("::")
         return ModuleId(AccountAddress.from_hex(split[0]), split[1])
 
+    @staticmethod
     def deserialize(deserializer: Deserializer) -> ModuleId:
         addr = AccountAddress.deserialize(deserializer)
         name = deserializer.str()
@@ -339,7 +442,9 @@ class SignedTransaction:
         self.transaction = transaction
         self.authenticator = authenticator
 
-    def __eq__(self, other: SignedTransaction) -> bool:
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, SignedTransaction):
+            return NotImplemented
         return (
             self.transaction == other.transaction
             and self.authenticator == other.authenticator
@@ -363,6 +468,7 @@ class SignedTransaction:
             keyed = self.transaction.keyed()
         return self.authenticator.verify(keyed)
 
+    @staticmethod
     def deserialize(deserializer: Deserializer) -> SignedTransaction:
         transaction = RawTransaction.deserialize(deserializer)
         authenticator = Authenticator.deserialize(deserializer)
@@ -374,7 +480,7 @@ class SignedTransaction:
 
 
 class Test(unittest.TestCase):
-    def test_script_function(self):
+    def test_entry_function(self):
         private_key = ed25519.PrivateKey.random()
         public_key = private_key.public_key()
         account_address = AccountAddress.from_key(public_key)
@@ -388,7 +494,7 @@ class Test(unittest.TestCase):
             TransactionArgument(5000, Serializer.u64),
         ]
 
-        payload = ScriptFunction.natural(
+        payload = EntryFunction.natural(
             "0x1::coin",
             "transfer",
             [TypeTag(StructTag.from_str("0x1::aptos_coin::AptosCoin"))],
@@ -412,7 +518,7 @@ class Test(unittest.TestCase):
         signed_transaction = SignedTransaction(raw_transaction, authenticator)
         self.assertTrue(signed_transaction.verify())
 
-    def test_script_function_with_corpus(self):
+    def test_entry_function_with_corpus(self):
         # Define common inputs
         sender_key_input = (
             "9bf49a6a0755f953811fce125f2683d50429c3bb49e074147e0089a52eae155f"
@@ -443,7 +549,7 @@ class Test(unittest.TestCase):
             TransactionArgument(amount_input, Serializer.u64),
         ]
 
-        payload = ScriptFunction.natural(
+        payload = EntryFunction.natural(
             "0x1::coin",
             "transfer",
             [TypeTag(StructTag.from_str("0x1::aptos_coin::AptosCoin"))],
@@ -473,9 +579,8 @@ class Test(unittest.TestCase):
 
         # Validated corpus
 
-        raw_transaction_input = "7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d60b0000000000000003000000000000000000000000000000000000000000000000000000000000000104436f696e087472616e73666572010700000000000000000000000000000000000000000000000000000000000000010854657374436f696e0854657374436f696e0002202d133ddd281bb6205558357cc6ac75661817e9aaeac3afebc32842759cbf7fa9088813000000000000d0070000000000000100000000000000d20296490000000004"
-
-        signed_transaction_input = "7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d60b0000000000000003000000000000000000000000000000000000000000000000000000000000000104436f696e087472616e73666572010700000000000000000000000000000000000000000000000000000000000000010854657374436f696e0854657374436f696e0002202d133ddd281bb6205558357cc6ac75661817e9aaeac3afebc32842759cbf7fa9088813000000000000d0070000000000000100000000000000d202964900000000040020b9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a49200407ebd2803534914639096e34407266fdc5820ec7aef8f1be507fe1bb1a37e41f508749574998273606db8b83628fbd76811e454e2648211abbe6ac96b74ffc60c"
+        raw_transaction_input = "7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d60b0000000000000002000000000000000000000000000000000000000000000000000000000000000104636f696e087472616e73666572010700000000000000000000000000000000000000000000000000000000000000010a6170746f735f636f696e094170746f73436f696e0002202d133ddd281bb6205558357cc6ac75661817e9aaeac3afebc32842759cbf7fa9088813000000000000d0070000000000000100000000000000d20296490000000004"
+        signed_transaction_input = "7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d60b0000000000000002000000000000000000000000000000000000000000000000000000000000000104636f696e087472616e73666572010700000000000000000000000000000000000000000000000000000000000000010a6170746f735f636f696e094170746f73436f696e0002202d133ddd281bb6205558357cc6ac75661817e9aaeac3afebc32842759cbf7fa9088813000000000000d0070000000000000100000000000000d202964900000000040020b9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a4920040f25b74ec60a38a1ed780fd2bef6ddb6eb4356e3ab39276c9176cdf0fcae2ab37d79b626abb43d926e91595b66503a4a3c90acbae36a28d405e308f3537af720b"
 
         self.verify_transactions(
             raw_transaction_input,
@@ -484,7 +589,7 @@ class Test(unittest.TestCase):
             signed_transaction_generated,
         )
 
-    def test_script_function_multi_agent_with_corpus(self):
+    def test_entry_function_multi_agent_with_corpus(self):
         # Define common inputs
         sender_key_input = (
             "9bf49a6a0755f953811fce125f2683d50429c3bb49e074147e0089a52eae155f"
@@ -516,8 +621,8 @@ class Test(unittest.TestCase):
             TransactionArgument(1, Serializer.u64),
         ]
 
-        payload = ScriptFunction.natural(
-            "0x1::token",
+        payload = EntryFunction.natural(
+            "0x3::token",
             "direct_transfer_script",
             [],
             transaction_arguments,
@@ -570,8 +675,8 @@ class Test(unittest.TestCase):
 
         # Validated corpus
 
-        raw_transaction_input = "7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d60b0000000000000003000000000000000000000000000000000000000000000000000000000000000105546f6b656e166469726563745f7472616e736665725f7363726970740004202d133ddd281bb6205558357cc6ac75661817e9aaeac3afebc32842759cbf7fa9100f636f6c6c656374696f6e5f6e616d650b0a746f6b656e5f6e616d65080100000000000000d0070000000000000100000000000000d20296490000000004"
-        signed_transaction_input = "7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d60b0000000000000003000000000000000000000000000000000000000000000000000000000000000105546f6b656e166469726563745f7472616e736665725f7363726970740004202d133ddd281bb6205558357cc6ac75661817e9aaeac3afebc32842759cbf7fa9100f636f6c6c656374696f6e5f6e616d650b0a746f6b656e5f6e616d65080100000000000000d0070000000000000100000000000000d20296490000000004020020b9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a4920040c7554ce3d6ed0bcbce3ee6f0e79620d5bb1b319cbaf8e081e1685db7a98b275e89e71ee744ca31cd7c9c545a8c40fa28528c35cef74150cfd27650b024a2c606012d133ddd281bb6205558357cc6ac75661817e9aaeac3afebc32842759cbf7fa9010020aef3f4a4b8eca1dfc343361bf8e436bd42de9259c04b8314eb8e2054dd6e82ab400d2cf2ecfa18838d52a96705b34fdb5725e8862607c346feeba5396eeafb1720b1cee9fbd18bea80d058a99109e13f1cf3c229ad22f388a6bc7c743aa4f1bd0c"
+        raw_transaction_input = "7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d60b0000000000000002000000000000000000000000000000000000000000000000000000000000000305746f6b656e166469726563745f7472616e736665725f7363726970740004202d133ddd281bb6205558357cc6ac75661817e9aaeac3afebc32842759cbf7fa9100f636f6c6c656374696f6e5f6e616d650b0a746f6b656e5f6e616d65080100000000000000d0070000000000000100000000000000d20296490000000004"
+        signed_transaction_input = "7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d60b0000000000000002000000000000000000000000000000000000000000000000000000000000000305746f6b656e166469726563745f7472616e736665725f7363726970740004202d133ddd281bb6205558357cc6ac75661817e9aaeac3afebc32842759cbf7fa9100f636f6c6c656374696f6e5f6e616d650b0a746f6b656e5f6e616d65080100000000000000d0070000000000000100000000000000d20296490000000004020020b9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a4920040343e7b10aa323c480391a5d7cd2d0cf708d51529b96b5a2be08cbb365e4f11dcc2cf0655766cf70d40853b9c395b62dad7a9f58ed998803d8bf1901ba7a7a401012d133ddd281bb6205558357cc6ac75661817e9aaeac3afebc32842759cbf7fa9010020aef3f4a4b8eca1dfc343361bf8e436bd42de9259c04b8314eb8e2054dd6e82ab408a7f06e404ae8d9535b0cbbeafb7c9e34e95fe1425e4529758150a4f7ce7a683354148ad5c313ec36549e3fb29e669d90010f97467c9074ff0aec3ed87f76608"
 
         self.verify_transactions(
             raw_transaction_input,
@@ -582,9 +687,9 @@ class Test(unittest.TestCase):
 
     def verify_transactions(
         self,
-        raw_transaction_input: bytes,
+        raw_transaction_input: str,
         raw_transaction_generated: RawTransaction,
-        signed_transaction_input: bytes,
+        signed_transaction_input: str,
         signed_transaction_generated: SignedTransaction,
     ):
         # Produce serialized generated transactions

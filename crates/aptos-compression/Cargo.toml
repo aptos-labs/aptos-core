@@ -1,0 +1,26 @@
+[package]
+name = "aptos-compression"
+description = "A unified compression interface and implementation offered by Aptos"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+aptos-logger = { workspace = true }
+aptos-metrics-core = { workspace = true }
+lz4 = { workspace = true }
+once_cell = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+aptos-crypto = { workspace = true }
+aptos-types = { workspace = true }
+bcs = { workspace = true }
+serde = { workspace = true }

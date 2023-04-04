@@ -1,0 +1,5 @@
+{
+  "message": "parse request payload error: failed to parse \"string(EntryFunctionId)\": Invalid entry function ID invalid (occurred while parsing \"EntryFunctionPayload\") (occurred while parsing \"TransactionPayload\") (occurred while parsing \"UserTransactionRequestInner\") (occurred while parsing \"EncodeSubmissionRequest\")",
+  "error_code": "web_framework_error",
+  "vm_error_code": null
+}

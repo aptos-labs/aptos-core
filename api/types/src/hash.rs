@@ -1,7 +1,7 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_openapi::impl_poem_type;
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     fmt,
@@ -9,8 +9,9 @@ use std::{
     str::FromStr,
 };
 
+/// A hex encoded 32-byte hash value
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, PartialOrd, Ord)]
-pub struct HashValue(aptos_crypto::hash::HashValue);
+pub struct HashValue(pub aptos_crypto::hash::HashValue);
 
 impl From<aptos_crypto::hash::HashValue> for HashValue {
     fn from(val: aptos_crypto::hash::HashValue) -> Self {
@@ -64,12 +65,15 @@ impl LowerHex for HashValue {
     }
 }
 
-impl_poem_type!(HashValue);
+impl HashValue {
+    pub fn zero() -> Self {
+        Self(aptos_crypto::hash::HashValue::zero())
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use crate::hash::HashValue;
-
     use serde_json::{json, Value};
 
     #[test]
