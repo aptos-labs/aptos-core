@@ -503,13 +503,6 @@ impl EncodingType {
 }
 
 #[derive(Clone, Debug, Parser)]
-pub struct VanityPrefix {
-    /// Vanity prefix that resultant account address should start with, e.g. 0xaceface or d00d
-    #[clap(long)]
-    pub vanity_prefix: Option<String>,
-}
-
-#[derive(Clone, Debug, Parser)]
 pub struct RngArgs {
     /// The seed used for key generation, should be a 64 character hex string and only used for testing
     ///
