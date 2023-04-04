@@ -21,6 +21,7 @@ impl Cmd {
         ensure!(!self.output_dir.exists(), "Output dir already exists.");
         fs::create_dir_all(&self.output_dir)?;
 
-        AptosDB::create_checkpoint(self.db_dir, self.output_dir)
+        // TODO(grao): Support sharded state merkle db here.
+        AptosDB::create_checkpoint(self.db_dir, self.output_dir, false)
     }
 }

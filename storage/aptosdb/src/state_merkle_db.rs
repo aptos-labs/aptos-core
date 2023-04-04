@@ -49,7 +49,7 @@ pub struct StateMerkleDb {
     // Stores metadata and top levels (non-sharded part) of tree nodes.
     state_merkle_metadata_db: Arc<DB>,
     // Stores sharded part of tree nodes.
-    _state_merkle_db_shards: [Arc<DB>; NUM_STATE_SHARDS],
+    state_merkle_db_shards: [Arc<DB>; NUM_STATE_SHARDS],
     enable_cache: bool,
     version_cache: VersionedNodeCache,
     lru_cache: LruNodeCache,
@@ -81,17 +81,33 @@ impl StateMerkleDb {
             )?);
             return Ok(Self {
                 state_merkle_metadata_db: Arc::clone(&db),
-                _state_merkle_db_shards: arr![Arc::clone(&db); 16],
+                state_merkle_db_shards: arr![Arc::clone(&db); 16],
                 enable_cache,
                 version_cache,
                 lru_cache,
             });
         }
 
-        let state_merkle_metadata_db_path = db_root_path
-            .as_ref()
-            .join(STATE_MERKLE_DB_FOLDER_NAME)
-            .join("metadata");
+        Self::open(
+            db_root_path,
+            state_merkle_db_config,
+            readonly,
+            enable_cache,
+            version_cache,
+            lru_cache,
+        )
+    }
+
+    pub(crate) fn open<P: AsRef<Path>>(
+        db_root_path: P,
+        state_merkle_db_config: RocksdbConfig,
+        readonly: bool,
+        enable_cache: bool,
+        version_cache: VersionedNodeCache,
+        lru_cache: LruNodeCache,
+    ) -> Result<Self> {
+        let state_merkle_metadata_db_path =
+            Self::metadata_db_path(db_root_path.as_ref(), /*sharding=*/ true);
 
         let state_merkle_metadata_db = Arc::new(Self::open_db(
             state_merkle_metadata_db_path.clone(),
@@ -114,7 +130,7 @@ impl StateMerkleDb {
 
         let state_merkle_db = Self {
             state_merkle_metadata_db,
-            _state_merkle_db_shards: state_merkle_db_shards,
+            state_merkle_db_shards,
             enable_cache,
             version_cache,
             lru_cache,
@@ -124,8 +140,52 @@ impl StateMerkleDb {
         Ok(state_merkle_db)
     }
 
+    pub(crate) fn create_checkpoint(
+        db_root_path: impl AsRef<Path>,
+        cp_root_path: impl AsRef<Path>,
+        sharding: bool,
+    ) -> Result<()> {
+        let state_merkle_db = Self::open(
+            db_root_path,
+            RocksdbConfig::default(),
+            false,
+            /*enable_cache=*/ false,
+            VersionedNodeCache::new(),
+            LruNodeCache::new(0),
+        )?;
+        let cp_state_merkle_db_path = cp_root_path.as_ref().join(STATE_MERKLE_DB_FOLDER_NAME);
+
+        info!("Creating state_merkle_db checkpoint at: {cp_state_merkle_db_path:?}");
+
+        std::fs::remove_dir_all(&cp_state_merkle_db_path).unwrap_or(());
+        if sharding {
+            std::fs::create_dir_all(&cp_state_merkle_db_path).unwrap_or(());
+        }
+
+        state_merkle_db
+            .metadata_db()
+            .create_checkpoint(Self::metadata_db_path(cp_root_path.as_ref(), sharding))?;
+
+        if sharding {
+            for shard_id in 0..NUM_STATE_SHARDS {
+                state_merkle_db
+                    .db_shard(shard_id as u8)
+                    .create_checkpoint(Self::db_shard_path(
+                        cp_root_path.as_ref(),
+                        shard_id as u8,
+                    ))?;
+            }
+        }
+
+        Ok(())
+    }
+
     pub(crate) fn metadata_db(&self) -> &DB {
         &self.state_merkle_metadata_db
+    }
+
+    pub(crate) fn db_shard(&self, shard_id: u8) -> &DB {
+        &self.state_merkle_db_shards[shard_id as usize]
     }
 
     pub fn get_with_proof_ext(
@@ -278,13 +338,13 @@ impl StateMerkleDb {
         state_merkle_db_config: &RocksdbConfig,
         readonly: bool,
     ) -> Result<DB> {
-        let shard_name = format!("shard_{}", shard_id);
         let db_name = format!("state_merkle_db_shard_{}", shard_id);
-        let path = db_root_path
-            .as_ref()
-            .join(STATE_MERKLE_DB_FOLDER_NAME)
-            .join(Path::new(&shard_name));
-        Self::open_db(path, &db_name, state_merkle_db_config, readonly)
+        Self::open_db(
+            Self::db_shard_path(db_root_path, shard_id),
+            &db_name,
+            state_merkle_db_config,
+            readonly,
+        )
     }
 
     fn open_db(
@@ -308,6 +368,25 @@ impl StateMerkleDb {
                 gen_state_merkle_cfds(state_merkle_db_config),
             )?
         })
+    }
+
+    fn db_shard_path<P: AsRef<Path>>(db_root_path: P, shard_id: u8) -> PathBuf {
+        let shard_sub_path = format!("shard_{}", shard_id);
+        db_root_path
+            .as_ref()
+            .join(STATE_MERKLE_DB_FOLDER_NAME)
+            .join(Path::new(&shard_sub_path))
+    }
+
+    fn metadata_db_path<P: AsRef<Path>>(db_root_path: P, sharding: bool) -> PathBuf {
+        if sharding {
+            db_root_path
+                .as_ref()
+                .join(STATE_MERKLE_DB_FOLDER_NAME)
+                .join("metadata")
+        } else {
+            db_root_path.as_ref().join(STATE_MERKLE_DB_NAME)
+        }
     }
 
     /// Finds the rightmost leaf by scanning the entire DB.
