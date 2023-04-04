@@ -799,6 +799,8 @@ NOTE: Membership check in <code>S</code> is performed inside, which can be expen
 Hash an arbitrary-length byte array <code>msg</code> into structure <code>S</code> with a domain separation tag <code>dst</code>
 using the given hash-to-structure suite <code>H</code>.
 
+NOTE: in the future, some hashing methods do not accept a <code>dst</code> and will abort if a non-empty one is provided.
+
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_hash_to">hash_to</a>&lt;S, H&gt;(dst: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, msg: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;
 </code></pre>
