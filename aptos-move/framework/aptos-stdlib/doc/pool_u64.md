@@ -1260,4 +1260,4 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code> wi
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

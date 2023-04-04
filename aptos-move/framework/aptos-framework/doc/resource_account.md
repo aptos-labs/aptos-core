@@ -208,7 +208,7 @@ Creates a new resource account, transfer the amount of coins from the origin to 
 account, and rotates the authentication key to either the optional auth key if it is
 non-empty (though auth keys are 32-bytes) or the source accounts current auth key. Note,
 this function adds additional resource ownership to the resource account and should only be
-used for resource accounts that need access to Coin<AptosCoin>.
+used for resource accounts that need access to <code>Coin&lt;AptosCoin&gt;</code>.
 
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="resource_account.md#0x1_resource_account_create_resource_account_and_fund">create_resource_account_and_fund</a>(origin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, optional_auth_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, fund_amount: u64)
@@ -486,4 +486,4 @@ the SignerCapability.
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

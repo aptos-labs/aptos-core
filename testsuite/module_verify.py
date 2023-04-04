@@ -35,23 +35,18 @@ def main():
     else:
         print("[main process] skipping clearing backup artifacts")
 
-    LATEST_VERSION = query_backup_latest_version(BACKUP_CONFIG_TEMPLATE_PATH)
-
-    print(f"Latest version: {LATEST_VERSION}")
-
     # run verify-modules
     os.mkdir("local")
-    shutil.copytree("metadata-cache", "local/metadata-cache")
     subprocess.run(
         [
             "target/release/aptos-db-tool",
-            "replay-verify",
+            "backup",
+            "verify",
             "--validate-modules",
             "--concurrent-downloads=16",
-            "--replay-concurrency-level=4",
             "--metadata-cache-dir=./local/metadata-cache",
-            "--target-db-dir=./local/db",
-            f"--start-version={LATEST_VERSION}",
+            "--start-version=max",  # to disable transaction verification
+            "--skip-epoch-endings",
             "--command-adapter-config",
             f"{BACKUP_CONFIG_TEMPLATE_PATH}",
         ]

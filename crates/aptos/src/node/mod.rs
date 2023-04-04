@@ -986,9 +986,9 @@ impl ValidatorConfig {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct ValidatorConfigSummary {
     pub consensus_public_key: String,
-    /// This is an bcs serialized Vec<NetworkAddress>
+    /// This is an bcs serialized `Vec<NetworkAddress>`
     pub validator_network_addresses: Vec<NetworkAddress>,
-    /// This is an bcs serialized Vec<NetworkAddress>
+    /// This is an bcs serialized `Vec<NetworkAddress>`
     pub fullnode_network_addresses: Vec<NetworkAddress>,
     pub validator_index: u64,
 }
@@ -1181,9 +1181,10 @@ impl CliCommand<()> for RunLocalTestnet {
             }
 
             if !started_successfully {
-                return Err(CliError::UnexpectedError(
-                    "Failed to startup local node before faucet".to_string(),
-                ));
+                return Err(CliError::UnexpectedError(format!(
+                    "Local node at {} did not start up before faucet",
+                    rest_url
+                )));
             }
 
             // Build the config for the faucet service.

@@ -9,7 +9,7 @@
 //! integer indexes.
 //!
 //! We use LEB128 for integer compression. LEB128 is a representation from the DWARF3 spec,
-//! http://dwarfstd.org/Dwarf3Std.php or https://en.wikipedia.org/wiki/LEB128.
+//! <http://dwarfstd.org/Dwarf3Std.php> or <https://en.wikipedia.org/wiki/LEB128>.
 //! It's used to compress mostly indexes into the main binary tables.
 use crate::file_format::Bytecode;
 use anyhow::{bail, Result};
@@ -20,7 +20,7 @@ use std::{
 
 /// Constant values for the binary format header.
 ///
-/// The binary header is magic +  version info + table count.
+/// The binary header is magic + version info + table count.
 pub enum BinaryConstants {}
 impl BinaryConstants {
     /// The `DIEM_MAGIC` size, 4 byte for major version and 1 byte for table count.

@@ -366,8 +366,7 @@ impl BackupCompactor {
         )
         .await?;
 
-        // Get a snapshot of remote metadata files before compaction
-        let files = self.storage.list_metadata_files().await?;
+        let files = metaview.get_file_handles();
 
         info!("Start compacting backup metadata files.");
         // Get all compacted chunks to be written back to storage

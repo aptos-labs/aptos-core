@@ -363,22 +363,6 @@ One of them are not exists
 
 
 
-
-<a name="0x1_staking_proxy_SetStakePoolOperator"></a>
-
-
-<pre><code><b>schema</b> <a href="staking_proxy.md#0x1_staking_proxy_SetStakePoolOperator">SetStakePoolOperator</a> {
-    owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
-    new_operator: <b>address</b>;
-    <b>let</b> owner_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
-    <b>let</b> ownership_cap = <b>borrow_global</b>&lt;<a href="stake.md#0x1_stake_OwnerCapability">stake::OwnerCapability</a>&gt;(owner_address);
-    <b>let</b> pool_address = ownership_cap.pool_address;
-    <b>aborts_if</b> <a href="stake.md#0x1_stake_stake_pool_exists">stake::stake_pool_exists</a>(owner_address) && !(<b>exists</b>&lt;<a href="stake.md#0x1_stake_OwnerCapability">stake::OwnerCapability</a>&gt;(owner_address) && <a href="stake.md#0x1_stake_stake_pool_exists">stake::stake_pool_exists</a>(pool_address));
-}
-</code></pre>
-
-
-
 <a name="@Specification_0_set_vesting_contract_voter"></a>
 
 ### Function `set_vesting_contract_voter`
@@ -466,4 +450,4 @@ Then abort if the resource is not exist
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

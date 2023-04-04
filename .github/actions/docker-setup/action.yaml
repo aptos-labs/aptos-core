@@ -45,6 +45,17 @@ runs:
         version: v0.10.1
         custom-name: "core-builder"
         keep-state: true
+        config-inline: |
+          [worker.oci]
+            gc = true
+            gckeepstorage = 900000000000 # Use 900GB out of 1TB for builder storage
+            [[worker.oci.gcpolicy]]
+              keepBytes = 700000000000 # Use 700GB out of 900GB for cache storage
+              keepDuration = 604800 # Keep cache for 7 days
+              filters = [ "type==source.local", "type==exec.cachemount", "type==source.git.checkout"]
+            [[worker.oci.gcpolicy]]
+              all = true
+              keepBytes = 900000000000
 
     - uses: imjasonh/setup-crane@5146f708a817ea23476677995bf2133943b9be0b # pin@v0.1
 

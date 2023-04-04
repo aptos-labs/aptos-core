@@ -5,6 +5,9 @@ inputs:
   NETWORK:
     description: "The network branch for running the local testnet: devnet or testnet."
     required: true
+  GCP_DOCKER_ARTIFACT_REPO:
+    description: "The GCP Docker artifact repository."
+    required: true
 
 runs:
   using: composite
@@ -39,7 +42,7 @@ runs:
     # testnet, moving the mint key where the tests expect it to be, and running the
     # integration tests.
     - name: Run integration tests
-      run: poetry run python main.py --base-network ${{ inputs.NETWORK }} --external-test-dir ${{ runner.temp }}/testnet
+      run: poetry run python main.py --base-network ${{ inputs.NETWORK }} --external-test-dir ${{ runner.temp }}/testnet --image-repo-with-project ${{ inputs.GCP_DOCKER_ARTIFACT_REPO }}
       working-directory: crates/aptos-faucet/integration-tests
       shell: bash
 

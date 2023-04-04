@@ -15,7 +15,7 @@ use crate::{
     vm_status::{DiscardedVMStatus, KeptVMStatus, StatusCode, StatusType, VMStatus},
     write_set::WriteSet,
 };
-use anyhow::{ensure, format_err, Error, Result};
+use anyhow::{ensure, format_err, Context, Error, Result};
 use aptos_crypto::{
     ed25519::*,
     hash::{CryptoHash, EventAccumulatorHasher},
@@ -686,7 +686,10 @@ impl TransactionWithProof {
         sender: AccountAddress,
         sequence_number: u64,
     ) -> Result<()> {
-        let signed_transaction = self.transaction.as_signed_user_txn()?;
+        let signed_transaction = self
+            .transaction
+            .try_as_signed_user_txn()
+            .context("not user transaction")?;
 
         ensure!(
             self.version == version,
@@ -1585,10 +1588,17 @@ pub enum Transaction {
 }
 
 impl Transaction {
-    pub fn as_signed_user_txn(&self) -> Result<&SignedTransaction> {
+    pub fn try_as_signed_user_txn(&self) -> Option<&SignedTransaction> {
         match self {
-            Transaction::UserTransaction(txn) => Ok(txn),
-            _ => Err(format_err!("Not a user transaction.")),
+            Transaction::UserTransaction(txn) => Some(txn),
+            _ => None,
+        }
+    }
+
+    pub fn try_as_block_metadata(&self) -> Option<&BlockMetadata> {
+        match self {
+            Transaction::BlockMetadata(v1) => Some(v1),
+            _ => None,
         }
     }
 

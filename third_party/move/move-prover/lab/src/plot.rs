@@ -99,7 +99,7 @@ pub fn plot_svg(args: &[String]) -> anyhow::Result<()> {
     plot_benchmarks_to_file(&out_file, data.as_slice())
 }
 
-pub const LIGHT_GRAY: RGBColor = RGBColor(0xb4, 0xb4, 0xb4);
+pub const LIGHT_GRAY: RGBColor = RGBColor(0xB4, 0xB4, 0xB4);
 pub const MEDIUM_GRAY: RGBColor = RGBColor(0x90, 0x90, 0x90);
 pub const GRAY: RGBColor = RGBColor(0x63, 0x63, 0x63);
 pub const DARK_GRAY: RGBColor = RGBColor(0x49, 0x48, 0x48);

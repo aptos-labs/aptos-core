@@ -698,4 +698,4 @@ Aborts if <code><a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabil
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

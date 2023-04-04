@@ -14,6 +14,7 @@ Standard math utilities missing in the Move Language.
 -  [Function `pow`](#0x1_math128_pow)
 -  [Function `floor_log2`](#0x1_math128_floor_log2)
 -  [Function `log2`](#0x1_math128_log2)
+-  [Function `log2_64`](#0x1_math128_log2_64)
 -  [Function `sqrt`](#0x1_math128_sqrt)
 -  [Function `assert_approx_the_same`](#0x1_math128_assert_approx_the_same)
 -  [Specification](#@Specification_1)
@@ -25,6 +26,7 @@ Standard math utilities missing in the Move Language.
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32">0x1::fixed_point32</a>;
+<b>use</b> <a href="fixed_point64.md#0x1_fixed_point64">0x1::fixed_point64</a>;
 </code></pre>
 
 
@@ -272,6 +274,48 @@ Returns floor(log2(x))
 
 </details>
 
+<a name="0x1_math128_log2_64"></a>
+
+## Function `log2_64`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="math128.md#0x1_math128_log2_64">log2_64</a>(x: u128): <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="math128.md#0x1_math128_log2_64">log2_64</a>(x: u128): FixedPoint64 {
+    <b>let</b> integer_part = <a href="math128.md#0x1_math128_floor_log2">floor_log2</a>(x);
+    // Normalize x <b>to</b> [1, 2) in fixed point 63. To ensure x is smaller then 1&lt;&lt;64
+    <b>if</b> (x &gt;= 1 &lt;&lt; 63) {
+        x = x &gt;&gt; (integer_part - 63);
+    } <b>else</b> {
+        x = x &lt;&lt; (63 - integer_part);
+    };
+    <b>let</b> frac = 0;
+    <b>let</b> delta = 1 &lt;&lt; 63;
+    <b>while</b> (delta != 0) {
+        // log x = 1/2 log x^2
+        // x in [1, 2)
+        x = (x * x) &gt;&gt; 63;
+        // x is now in [1, 4)
+        // <b>if</b> x in [2, 4) then log x = 1 + log (x / 2)
+        <b>if</b> (x &gt;= (2 &lt;&lt; 63)) { frac = frac + delta; x = x &gt;&gt; 1; };
+        delta = delta &gt;&gt; 1;
+    };
+    <a href="fixed_point64.md#0x1_fixed_point64_create_from_raw_value">fixed_point64::create_from_raw_value</a> (((integer_part <b>as</b> u128) &lt;&lt; 64) + frac)
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_math128_sqrt"></a>
 
 ## Function `sqrt`
@@ -436,4 +480,4 @@ to the most correct value up to last digit
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
