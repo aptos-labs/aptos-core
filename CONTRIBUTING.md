@@ -20,6 +20,13 @@ cd aptos-core
 git remote add upstream https://github.com/aptos-labs/aptos-core.git
 ./scripts/dev_setup.sh
 cargo build
+cargo test -- --skip prover
+```
+
+Bonus round, install prover tools and don't skip the prover tests:
+
+```bash
+./scripts/dev_setup.sh -y -p
 cargo test
 ```
 

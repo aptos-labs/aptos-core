@@ -23,7 +23,7 @@ TERRAFORM_VERSION=0.12.26
 HELM_VERSION=3.2.4
 VAULT_VERSION=1.5.0
 Z3_VERSION=4.11.2
-CVC5_VERSION=0.0.3
+CVC5_VERSION=1.0.5
 DOTNET_VERSION=6.0
 BOOGIE_VERSION=2.15.8
 ALLURE_VERSION=2.15.pr1135
@@ -45,6 +45,8 @@ function usage {
   echo "-y install or update Move Prover tools: z3, cvc5, dotnet, boogie"
   echo "-d install tools for the Move documentation generator: graphviz"
   echo "-a install tools for build and test api"
+  echo "-P install PostgreSQL"
+  echo "-J install js/ts tools"
   echo "-v verbose mode"
   echo "-i installs an individual tool by name"
   echo "-n will target the /opt/ dir rather than the $HOME dir.  /opt/bin/, /opt/rustup/, and /opt/dotnet/ rather than $HOME/bin/, $HOME/.rustup/, and $HOME/.dotnet/"
@@ -499,7 +501,13 @@ function install_z3 {
   if [[ "$(uname)" == "Linux" ]]; then
     Z3_PKG="z3-$Z3_VERSION-x64-glibc-2.31"
   elif [[ "$(uname)" == "Darwin" ]]; then
-    Z3_PKG="z3-$Z3_VERSION-x64-osx-10.16"
+    if [[ "$(uname -m)" == "arm64" ]]; then
+      # brew has a newer, arm64-native version
+      brew install z3
+      return
+    else
+      Z3_PKG="z3-$Z3_VERSION-x64-osx-10.16"
+    fi
   else
     echo "Z3 support not configured for this platform (uname=$(uname))"
     return
@@ -531,7 +539,11 @@ function install_cvc5 {
   if [[ "$(uname)" == "Linux" ]]; then
     CVC5_PKG="cvc5-Linux"
   elif [[ "$(uname)" == "Darwin" ]]; then
-    CVC5_PKG="cvc5-macOS"
+    if [[ "$(uname -m)" == "arm64" ]]; then
+      CVC5_PKG="cvc5-macOS-arm64"
+    else
+      CVC5_PKG="cvc5-macOS"
+    fi
   else
     echo "cvc5 support not configured for this platform (uname=$(uname))"
     return
@@ -541,8 +553,7 @@ function install_cvc5 {
   mkdir -p "$TMPFILE"/
   (
     cd "$TMPFILE" || exit
-    curl -LOs "https://github.com/cvc5/cvc5/releases/download/cvc5-$CVC5_VERSION/$CVC5_PKG"
-    cp "$CVC5_PKG" "${INSTALL_DIR}cvc5"
+    curl -o "${INSTALL_DIR}cvc5" -Ls "https://github.com/cvc5/cvc5/releases/download/cvc5-$CVC5_VERSION/$CVC5_PKG"
     chmod +x "${INSTALL_DIR}cvc5"
   )
   rm -rf "$TMPFILE"
@@ -634,11 +645,21 @@ function install_nodejs {
 
 function install_solidity {
   echo "Installing Solidity compiler"
+  if [ -f "${INSTALL_DIR}solc" ]; then
+    echo "Solidity alreayd installed at ${INSTALL_DIR}solc"
+    return
+  fi
   # We fetch the binary from  https://binaries.soliditylang.org
   if [[ "$(uname)" == "Linux" ]]; then
     SOLC_BIN="linux-amd64/solc-linux-amd64-${SOLC_VERSION}"
   elif [[ "$(uname)" == "Darwin" ]]; then
-    SOLC_BIN="macosx-amd64/solc-macosx-amd64-${SOLC_VERSION}"
+    if [[ "$(uname -m)" == "arm64" ]]; then
+      # no native binary supplied, but brew can build one
+      brew install solidity
+      return
+    else
+      SOLC_BIN="macosx-amd64/solc-macosx-amd64-${SOLC_VERSION}"
+    fi
   else
     echo "Solidity support not configured for this platform (uname=$(uname))"
     return
@@ -705,7 +726,7 @@ Build tools (since -t or no option was provided):
   * lcov
   * pkg-config
   * libssl-dev
-  * NodeJS / NPM
+#  * NodeJS / NPM
   * protoc (and related tools)
   * lld (only for Linux)
 EOF
@@ -757,6 +778,21 @@ API build and testing tools (since -a was provided):
 EOF
   fi
 
+  if [[ "$INSTALL_POSTGRES" == "true" ]]; then
+cat <<EOF
+PostgreSQL database (since -P was provided):
+EOF
+  fi
+
+  if [[ "$INSTALL_JSTS" == "true" ]]; then
+cat <<EOF
+Javascript/TypeScript tools (since -J was provided):
+  * node.js
+  * pnpm
+  * solidity
+EOF
+  fi
+
   if [[ "$INSTALL_PROFILE" == "true" ]]; then
 cat <<EOF
 Moreover, ~/.profile will be updated (since -p was provided).
@@ -778,6 +814,8 @@ INSTALL_PROVER=false;
 INSTALL_DOC=false;
 INSTALL_PROTOC=false;
 INSTALL_API_BUILD_TOOLS=false;
+INSTALL_POSTGRES=false;
+INSTALL_JSTS=false;
 INSTALL_INDIVIDUAL=false;
 INSTALL_PACKAGES=();
 INSTALL_DIR="${HOME}/bin/"
@@ -813,6 +851,12 @@ while getopts "btoprvydsah:i:n" arg; do
     a)
       INSTALL_API_BUILD_TOOLS="true"
       ;;
+    P)
+      INSTALL_POSTGRES="true"
+      ;;
+    J)
+      INSTALL_JSTS="true"
+      ;;
     i)
       INSTALL_INDIVIDUAL="true"
       echo "$OPTARG"
@@ -838,6 +882,8 @@ if [[ "$INSTALL_BUILD_TOOLS" == "false" ]] && \
    [[ "$INSTALL_PROVER" == "false" ]] && \
    [[ "$INSTALL_DOC" == "false" ]] && \
    [[ "$INSTALL_API_BUILD_TOOLS" == "false" ]] && \
+   [[ "$INSTALL_POSTGRES" == "false" ]] && \
+   [[ "$INSTALL_JSTS" == "false" ]] && \
    [[ "$INSTALL_INDIVIDUAL" == "false" ]]; then
    INSTALL_BUILD_TOOLS="true"
 fi
@@ -932,14 +978,10 @@ if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   install_cargo_sort
   install_cargo_nextest
   install_grcov
-  install_postgres
   install_pkg git "$PACKAGE_MANAGER"
   install_lcov "$PACKAGE_MANAGER"
-  install_nodejs "$PACKAGE_MANAGER"
-  install_pnpm "$PACKAGE_MANAGER"
   install_pkg unzip "$PACKAGE_MANAGER"
   install_protoc
-  install_solidity
 fi
 
 if [[ "$INSTALL_PROTOC" == "true" ]]; then
@@ -1003,6 +1045,17 @@ if [[ "$INSTALL_API_BUILD_TOOLS" == "true" ]]; then
   # python and tools
   install_python3
   "${PRE_COMMAND[@]}" python3 -m pip install schemathesis
+fi
+
+if [[ "$INSTALL_POSTGRES" == "true" ]]; then
+  install_postgres
+fi
+
+if [[ "$INSTALL_JSTS" == "true" ]]; then
+  # javascript and typescript tools
+  install_nodejs "$PACKAGE_MANAGER"
+  install_pnpm "$PACKAGE_MANAGER"
+  install_solidity
 fi
 
 install_python3
