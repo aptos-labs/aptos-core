@@ -33,15 +33,15 @@ the Move stdlib, the Aptos stdlib, and the Aptos framework.
 -  [Function `cryptography_algebra_enabled`](#0x1_features_cryptography_algebra_enabled)
 -  [Function `get_bls12_381_strutures_feature`](#0x1_features_get_bls12_381_strutures_feature)
 -  [Function `bls12_381_structures_enabled`](#0x1_features_bls12_381_structures_enabled)
--  [Function `get_reward_rate_decrease_feature`](#0x1_features_get_reward_rate_decrease_feature)
--  [Function `reward_rate_decrease_enabled`](#0x1_features_reward_rate_decrease_enabled)
+-  [Function `get_periodical_reward_rate_decrease_feature`](#0x1_features_get_periodical_reward_rate_decrease_feature)
+-  [Function `periodical_reward_rate_decrease_enabled`](#0x1_features_periodical_reward_rate_decrease_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
 -  [Function `contains`](#0x1_features_contains)
 -  [Specification](#@Specification_1)
     -  [Resource `Features`](#@Specification_1_Features)
-    -  [Function `reward_rate_decrease_enabled`](#@Specification_1_reward_rate_decrease_enabled)
+    -  [Function `periodical_reward_rate_decrease_enabled`](#@Specification_1_periodical_reward_rate_decrease_enabled)
     -  [Function `change_feature_flags`](#@Specification_1_change_feature_flags)
     -  [Function `is_enabled`](#@Specification_1_is_enabled)
     -  [Function `set`](#@Specification_1_set)
@@ -212,6 +212,17 @@ Lifetime: transient
 
 
 
+<a name="0x1_features_PERIODICAL_REWARD_RATE_DECREASE"></a>
+
+Whether reward rate decreases periodically.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_PERIODICAL_REWARD_RATE_DECREASE">PERIODICAL_REWARD_RATE_DECREASE</a>: u64 = 16;
+</code></pre>
+
+
+
 <a name="0x1_features_RESOURCE_GROUPS"></a>
 
 Whether resource groups are enabled.
@@ -219,17 +230,6 @@ This is needed because of new attributes for structs and a change in storage rep
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_RESOURCE_GROUPS">RESOURCE_GROUPS</a>: u64 = 9;
-</code></pre>
-
-
-
-<a name="0x1_features_REWARD_RATE_DECREASE"></a>
-
-Whether reward rate decreases periodically.
-Lifetime: transient
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_REWARD_RATE_DECREASE">REWARD_RATE_DECREASE</a>: u64 = 16;
 </code></pre>
 
 
@@ -835,13 +835,13 @@ Lifetime: transient
 
 </details>
 
-<a name="0x1_features_get_reward_rate_decrease_feature"></a>
+<a name="0x1_features_get_periodical_reward_rate_decrease_feature"></a>
 
-## Function `get_reward_rate_decrease_feature`
+## Function `get_periodical_reward_rate_decrease_feature`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_reward_rate_decrease_feature">get_reward_rate_decrease_feature</a>(): u64
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_periodical_reward_rate_decrease_feature">get_periodical_reward_rate_decrease_feature</a>(): u64
 </code></pre>
 
 
@@ -850,20 +850,20 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_reward_rate_decrease_feature">get_reward_rate_decrease_feature</a>(): u64 { <a href="features.md#0x1_features_REWARD_RATE_DECREASE">REWARD_RATE_DECREASE</a> }
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_periodical_reward_rate_decrease_feature">get_periodical_reward_rate_decrease_feature</a>(): u64 { <a href="features.md#0x1_features_PERIODICAL_REWARD_RATE_DECREASE">PERIODICAL_REWARD_RATE_DECREASE</a> }
 </code></pre>
 
 
 
 </details>
 
-<a name="0x1_features_reward_rate_decrease_enabled"></a>
+<a name="0x1_features_periodical_reward_rate_decrease_enabled"></a>
 
-## Function `reward_rate_decrease_enabled`
+## Function `periodical_reward_rate_decrease_enabled`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_reward_rate_decrease_enabled">reward_rate_decrease_enabled</a>(): bool
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_periodical_reward_rate_decrease_enabled">periodical_reward_rate_decrease_enabled</a>(): bool
 </code></pre>
 
 
@@ -872,8 +872,8 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_reward_rate_decrease_enabled">reward_rate_decrease_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_REWARD_RATE_DECREASE">REWARD_RATE_DECREASE</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_periodical_reward_rate_decrease_enabled">periodical_reward_rate_decrease_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_PERIODICAL_REWARD_RATE_DECREASE">PERIODICAL_REWARD_RATE_DECREASE</a>)
 }
 </code></pre>
 
@@ -1041,12 +1041,12 @@ Helper to check whether a feature flag is enabled.
 
 
 
-<a name="@Specification_1_reward_rate_decrease_enabled"></a>
+<a name="@Specification_1_periodical_reward_rate_decrease_enabled"></a>
 
-### Function `reward_rate_decrease_enabled`
+### Function `periodical_reward_rate_decrease_enabled`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_reward_rate_decrease_enabled">reward_rate_decrease_enabled</a>(): bool
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_periodical_reward_rate_decrease_enabled">periodical_reward_rate_decrease_enabled</a>(): bool
 </code></pre>
 
 
@@ -1109,7 +1109,7 @@ Helper to check whether a feature flag is enabled.
 
 
 <pre><code><b>fun</b> <a href="features.md#0x1_features_spec_reward_rate_decrease_enabled">spec_reward_rate_decrease_enabled</a>(): bool {
-   <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(<a href="features.md#0x1_features_REWARD_RATE_DECREASE">REWARD_RATE_DECREASE</a>)
+   <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(<a href="features.md#0x1_features_PERIODICAL_REWARD_RATE_DECREASE">PERIODICAL_REWARD_RATE_DECREASE</a>)
 }
 </code></pre>
 

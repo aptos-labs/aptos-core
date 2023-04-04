@@ -6,11 +6,8 @@ module aptos_framework::staking_config {
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
 
-    use aptos_std::fixed_point64::{FixedPoint64, less_or_equal};
-    use aptos_std::fixed_point64;
+    use aptos_std::fixed_point64::{Self, FixedPoint64, less_or_equal};
     use aptos_std::math_fixed64;
-    #[test_only]
-    use aptos_std::fixed_point64::{equal, create_from_rational};
 
     friend aptos_framework::genesis;
 
@@ -152,7 +149,6 @@ module aptos_framework::staking_config {
             rewards_rate_period_in_secs,
             rewards_rate_decrease_rate,
         );
-        // TODO: we need last_rewards_rate_period_start_in_secs because genesis time is not available on chain.
         assert!(
             timestamp::now_seconds() >= last_rewards_rate_period_start_in_secs,
             error::invalid_argument(EINVALID_LAST_REWARDS_RATE_PERIOD_START)
@@ -190,7 +186,7 @@ module aptos_framework::staking_config {
     /// DEPRECATING
     /// Return the reward rate.
     public fun get_reward_rate(config: &StakingConfig): (u64, u64) {
-        assert!(!features::reward_rate_decrease_enabled(), EDEPRECATED_FUNCTION);
+        assert!(!features::periodical_reward_rate_decrease_enabled(), EDEPRECATED_FUNCTION);
         (config.rewards_rate, config.rewards_rate_denominator)
     }
 
@@ -201,13 +197,13 @@ module aptos_framework::staking_config {
 
     /// Return the rewards rate of a epoch in the format of (nominator, denominator).
     public fun calculate_and_save_latest_epoch_rewards_rate(): FixedPoint64 acquires StakingRewardsConfig {
-        assert!(features::reward_rate_decrease_enabled(), error::invalid_state(EDISABLED_FUNCTION));
+        assert!(features::periodical_reward_rate_decrease_enabled(), error::invalid_state(EDISABLED_FUNCTION));
         let staking_rewards_config = calculate_and_save_latest_rewards_config();
         staking_rewards_config.rewards_rate
     }
 
     /// Calculate and return the up-to-date StakingRewardsConfig.
-    public fun calculate_and_save_latest_rewards_config(): StakingRewardsConfig acquires StakingRewardsConfig {
+    fun calculate_and_save_latest_rewards_config(): StakingRewardsConfig acquires StakingRewardsConfig {
         let staking_rewards_config = borrow_global_mut<StakingRewardsConfig>(@aptos_framework);
         let current_time_in_secs = timestamp::now_seconds();
         assert!(
@@ -275,7 +271,7 @@ module aptos_framework::staking_config {
         new_rewards_rate: u64,
         new_rewards_rate_denominator: u64,
     ) acquires StakingConfig {
-        assert!(!features::reward_rate_decrease_enabled(), error::invalid_state(EDEPRECATED_FUNCTION));
+        assert!(!features::periodical_reward_rate_decrease_enabled(), error::invalid_state(EDEPRECATED_FUNCTION));
         system_addresses::assert_aptos_framework(aptos_framework);
         assert!(
             new_rewards_rate_denominator > 0,
@@ -301,7 +297,6 @@ module aptos_framework::staking_config {
         rewards_rate_period_in_secs: u64,
         rewards_rate_decrease_rate: FixedPoint64,
     ) acquires StakingRewardsConfig {
-        assert!(features::reward_rate_decrease_enabled(), error::invalid_state(EDISABLED_FUNCTION));
         system_addresses::assert_aptos_framework(aptos_framework);
 
         validate_rewards_config(
@@ -366,6 +361,9 @@ module aptos_framework::staking_config {
             error::invalid_argument(EINVALID_REWARDS_RATE_PERIOD),
         );
     }
+
+    #[test_only]
+    use aptos_std::fixed_point64::{equal, create_from_rational};
 
     #[test(aptos_framework = @aptos_framework)]
     public entry fun test_change_staking_configs(aptos_framework: signer) acquires StakingConfig {
@@ -490,7 +488,7 @@ module aptos_framework::staking_config {
     #[test(account = @0x123, aptos_framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x50003, location = aptos_framework::system_addresses)]
     public entry fun test_update_rewards_config_unauthorized_should_fail(account: signer, aptos_framework: signer) acquires StakingRewardsConfig {
-        features::change_feature_flags(&aptos_framework, vector[features::get_reward_rate_decrease_feature()], vector[]);
+        features::change_feature_flags(&aptos_framework, vector[features::get_periodical_reward_rate_decrease_feature()], vector[]);
         update_rewards_config(
             &account,
             create_from_rational(1, 100),
@@ -522,19 +520,6 @@ module aptos_framework::staking_config {
     #[expected_failure(abort_code = 0x10002, location = Self)]
     public entry fun test_update_rewards_invalid_denominator_should_fail(aptos_framework: signer) acquires StakingConfig {
         update_rewards_rate(&aptos_framework, 1, 0);
-    }
-
-    #[test(aptos_framework = @aptos_framework)]
-    #[expected_failure(abort_code = 0x3000B, location = Self)]
-    public entry fun test_feature_flag_disabled_update_rewards_config_should_fail(aptos_framework: signer) acquires StakingRewardsConfig {
-        features::change_feature_flags(&aptos_framework, vector[], vector[features::get_reward_rate_decrease_feature()]);
-        update_rewards_config(
-            &aptos_framework,
-            create_from_rational(1, 100),
-            create_from_rational(1, 100),
-            ONE_YEAR_IN_SECS,
-            create_from_rational(1, 100),
-        );
     }
 
     #[test(aptos_framework = @aptos_framework)]
@@ -582,7 +567,7 @@ module aptos_framework::staking_config {
     #[test(aptos_framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x3000B, location = Self)]
     public entry fun test_feature_flag_disabled_get_epoch_rewards_rate_should_fail(aptos_framework: signer) acquires StakingRewardsConfig {
-        features::change_feature_flags(&aptos_framework, vector[], vector[features::get_reward_rate_decrease_feature()]);
+        features::change_feature_flags(&aptos_framework, vector[], vector[features::get_periodical_reward_rate_decrease_feature()]);
         calculate_and_save_latest_epoch_rewards_rate();
     }
 
@@ -637,7 +622,7 @@ module aptos_framework::staking_config {
         last_rewards_rate_period_start_in_secs: u64,
         rewards_rate_decrease_rate: FixedPoint64,
     ) {
-        features::change_feature_flags(aptos_framework, vector[features::get_reward_rate_decrease_feature()], vector[]);
+        features::change_feature_flags(aptos_framework, vector[features::get_periodical_reward_rate_decrease_feature()], vector[]);
         timestamp::set_time_has_started_for_testing(aptos_framework);
         timestamp::update_global_time_for_test_secs(last_rewards_rate_period_start_in_secs);
         initialize_rewards(

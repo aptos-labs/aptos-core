@@ -1163,7 +1163,7 @@ module aptos_framework::stake {
             assume cur_validator_perf.successful_proposals + cur_validator_perf.failed_proposals <= MAX_U64;
         };
         let num_total_proposals = cur_validator_perf.successful_proposals + cur_validator_perf.failed_proposals;
-        let (rewards_rate, rewards_rate_denominator) = if (features::reward_rate_decrease_enabled()) {
+        let (rewards_rate, rewards_rate_denominator) = if (features::periodical_reward_rate_decrease_enabled()) {
             let epoch_rewards_rate = staking_config::calculate_and_save_latest_epoch_rewards_rate();
             if (fixed_point64::is_zero(epoch_rewards_rate)) {
                 (0u64, 1u64)
@@ -2460,7 +2460,7 @@ module aptos_framework::stake {
             genesis_time_in_secs,
             fixed_point64::create_from_rational(50, 100),
         );
-        features::change_feature_flags(aptos_framework, vector[features::get_reward_rate_decrease_feature()], vector[]);
+        features::change_feature_flags(aptos_framework, vector[features::get_periodical_reward_rate_decrease_feature()], vector[]);
 
         // For some reason, this epoch is very long. It has been 1 year since genesis when the epoch ends.
         timestamp::fast_forward_seconds(one_year_in_secs - EPOCH_DURATION * 3);

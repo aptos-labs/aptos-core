@@ -153,7 +153,6 @@ spec aptos_framework::staking_config {
         rewards_rate_decrease_rate: FixedPoint64,
     ) {
         use std::signer;
-        aborts_if !features::spec_reward_rate_decrease_enabled();
         include StakingRewardsConfigRequirement;
         let addr = signer::address_of(aptos_framework);
         aborts_if addr != @aptos_framework;
