@@ -31,7 +31,6 @@ use aptos_memsocket::MemorySocket;
 use aptos_netcore::transport::{
     boxed::BoxedTransport, memory::MemoryTransport, ConnectionOrigin, TransportExt,
 };
-use aptos_rate_limiter::rate_limit::TokenBucketRateLimiter;
 use aptos_time_service::TimeService;
 use aptos_types::{network_address::NetworkAddress, PeerId};
 use bytes::Bytes;
@@ -116,8 +115,6 @@ fn build_test_peer_manager(
         constants::MAX_FRAME_SIZE,
         constants::MAX_MESSAGE_SIZE,
         MAX_INBOUND_CONNECTIONS,
-        TokenBucketRateLimiter::open("inbound"),
-        TokenBucketRateLimiter::open("outbound"),
     );
 
     (

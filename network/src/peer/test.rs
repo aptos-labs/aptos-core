@@ -90,8 +90,6 @@ fn build_test_peer(
         MAX_CONCURRENT_OUTBOUND_RPCS,
         MAX_FRAME_SIZE,
         MAX_MESSAGE_SIZE,
-        None,
-        None,
     );
     let peer_handle = PeerHandle(peer_reqs_tx);
 
