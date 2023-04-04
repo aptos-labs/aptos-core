@@ -24,6 +24,11 @@ variable "GCP_DOCKER_ARTIFACT_REPO" {}
 
 variable "AWS_ECR_ACCOUNT_NUM" {}
 
+variable "TARGET_REGISTRY" {
+  // must be "aws" | "remote" | "local", informs which docker tags are being generated
+  default = CI == "true" ? "remote" : "local"
+}
+
 variable "ecr_base" {
   default = "${AWS_ECR_ACCOUNT_NUM}.dkr.ecr.us-west-2.amazonaws.com/aptos"
 }
@@ -49,6 +54,7 @@ group "all" {
     "faucet",
     "forge",
     "telemetry-service",
+    "indexer-grpc",
     "validator-testing",
   ])
 }
@@ -197,6 +203,14 @@ target "telemetry-service" {
   tags       = generate_tags("telemetry-service")  
 }
 
+target "indexer-grpc" {
+  inherits = ["_common"]
+  dockerfile = "docker/experimental/indexer-grpc.Dockerfile"
+  target   = "indexer-grpc"
+  cache-to = generate_cache_to("indexer-grpc")
+  tags     = generate_tags("indexer-grpc")
+}
+
 function "generate_cache_from" {
   params = [target]
   result = CI == "true" ? [
@@ -208,7 +222,7 @@ function "generate_cache_from" {
 
 function "generate_cache_to" {
   params = [target]
-  result = CI == "true" ? [
+  result = TARGET_REGISTRY == "remote" ? [
     "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}",
     "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-${IMAGE_TAG_PREFIX}${GIT_SHA}"
   ] : []
@@ -216,7 +230,7 @@ function "generate_cache_to" {
 
 function "generate_tags" {
   params = [target]
-  result = CI == "true" ? [
+  result = TARGET_REGISTRY == "remote" ? [
       "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}",
       "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}",
       "${ecr_base}/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}",

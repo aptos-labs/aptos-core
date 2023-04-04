@@ -988,7 +988,7 @@ pub struct ListPackage {
 
     /// Type of items to query
     ///
-    /// Current supported types [packages]
+    /// Current supported types `[packages]`
     #[clap(long, default_value_t = MoveListQuery::Packages)]
     query: MoveListQuery,
 

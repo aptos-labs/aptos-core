@@ -412,7 +412,7 @@ impl StateStore {
         let state_merkle_db = Arc::new(StateMerkleDb::new(arc_state_merkle_rocksdb, 0));
         let state_kv_pruner = StateKvPrunerManager::new(
             Arc::clone(&state_kv_db),
-            NO_OP_STORAGE_PRUNER_CONFIG.state_kv_pruner_config,
+            NO_OP_STORAGE_PRUNER_CONFIG.ledger_pruner_config,
         );
         let state_db = Arc::new(StateDb {
             ledger_db,

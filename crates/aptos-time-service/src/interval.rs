@@ -15,7 +15,7 @@ use std::{
     time::Duration,
 };
 
-/// Stream returned by [`TimeService::interval`](crate::TimeService::interval).
+/// Stream returned by [`TimeServiceTrait::interval`](crate::TimeServiceTrait::interval).
 ///
 /// Mostly taken from [`tokio::time::Interval`] but uses our `Sleep` future.
 #[pin_project]

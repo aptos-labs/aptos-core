@@ -99,7 +99,7 @@ module aptos_framework::resource_account {
     /// account, and rotates the authentication key to either the optional auth key if it is
     /// non-empty (though auth keys are 32-bytes) or the source accounts current auth key. Note,
     /// this function adds additional resource ownership to the resource account and should only be
-    /// used for resource accounts that need access to Coin<AptosCoin>.
+    /// used for resource accounts that need access to `Coin<AptosCoin>`.
     public entry fun create_resource_account_and_fund(
         origin: &signer,
         seed: vector<u8>,

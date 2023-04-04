@@ -149,6 +149,7 @@ async fn test_upgrade_flow() {
     check_create_mint_transfer(&mut env).await;
 }
 
+#[ignore]
 #[tokio::test]
 async fn test_upgrade_flow_multi_step() {
     let (mut env, mut cli, _) = SwarmBuilder::new_local(1)

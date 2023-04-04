@@ -9474,6 +9474,7 @@ components:
       - name
       - visibility
       - is_entry
+      - is_view
       - generic_type_params
       - params
       - return
@@ -9486,6 +9487,9 @@ components:
           type: boolean
           description: Whether the function can be called as an entry function directly
             in a transaction
+        is_view:
+          type: boolean
+          description: Whether the function is a view function or not
         generic_type_params:
           type: array
           description: Generic type params associated with the Move function
