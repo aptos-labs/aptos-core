@@ -9,7 +9,7 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.account.create_signer.base, "account.create_signer.base", 300 * MUL],
 
     // Algebra gas parameters begin.
-    // Generated at time 1680606720.0709136 by `scripts/algebra-gas/update_algebra_gas_params.py` with gas_per_ns=204.6.
+    // Generated at time 1680606720.0709136 by `scripts/algebra-gas/update_algebra_gas_params.py` with gas_per_ns=10.23.
     [.algebra.ark_bls12_381_fq12_add, { 8.. => "algebra.ark_bls12_381_fq12_add" }, 1_819 * MUL],
     [.algebra.ark_bls12_381_fq12_clone, { 8.. => "algebra.ark_bls12_381_fq12_clone" }, 211 * MUL],
     [.algebra.ark_bls12_381_fq12_deser, { 8.. => "algebra.ark_bls12_381_fq12_deser" }, 11_180 * MUL],

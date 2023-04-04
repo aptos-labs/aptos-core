@@ -14,9 +14,6 @@ from math import ceil
 from pathlib import Path
 from time import time
 
-# This should match `EXECUTION_GAS_MULTIPLIER` defined in `aptos-move/aptos-gas/src/gas_meter.rs`.
-MUL = 20
-
 # Typically you are making a new version of gas schedule,
 # so this should be larger than `LATEST_GAS_FEATURE_VERSION` in `aptos-move/aptos-gas/src/gas_meter.rs`.
 TARGET_GAS_VERSION = 8
@@ -96,8 +93,7 @@ def get_algebra_lines(gas_per_ns):
     _,_,nanoseconds['ark_h2c_bls12381g2_xmd_sha256_sswu_per_msg_byte'],nanoseconds['ark_h2c_bls12381g2_xmd_sha256_sswu_base'] = get_bench_ns_linear('target/criterion/ark_bls12_381/hash_to_g2_proj')
     _,_,nanoseconds['sha2_v0_10_6_sha256_base'],nanoseconds['sha2_v0_10_6_sha256_per_byte'] = get_bench_ns_linear('target/criterion/sha2_v0_10_6/sha256')
     gas_units = {k:gas_per_ns*v for k,v in nanoseconds.items()}
-    gas_over_mul_units = {k:ceil(v/MUL) for k,v in gas_units.items()}
-    lines = [f'    [.algebra.{k}, {{ {TARGET_GAS_VERSION}.. => "algebra.{k}" }}, {prettify_number(v)} * MUL],' for k,v in sorted(gas_over_mul_units.items())]
+    lines = [f'    [.algebra.{k}, {{ {TARGET_GAS_VERSION}.. => "algebra.{k}" }}, {prettify_number(v)} * MUL],' for k,v in sorted(gas_units.items())]
     return lines
 
 def main(gas_per_ns):
