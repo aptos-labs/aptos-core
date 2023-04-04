@@ -71,3 +71,8 @@ pub struct GasParameters {
     pub sha2_v0_10_6_sha256_base: InternalGasPerArg,
     pub sha2_v0_10_6_sha256_per_byte: InternalGasPerArg,
 }
+
+pub struct HashToGasParameters {
+    pub bls12381: GasParameters,
+    pub sha2: move_stdlib::natives::hash::Sha2_256GasParameters,
+}

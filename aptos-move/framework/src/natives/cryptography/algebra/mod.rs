@@ -37,6 +37,7 @@ use move_core_types::{language_storage::TypeTag, vm_status::StatusCode};
 use move_vm_runtime::native_functions::NativeFunction;
 use once_cell::sync::Lazy;
 use std::{any::Any, hash::Hash, rc::Rc, sync::Arc};
+use crate::natives::cryptography::algebra::gas::HashToGasParameters;
 
 pub mod arithmetics;
 pub mod casting;
@@ -250,7 +251,8 @@ static BLS12381_Q12_LENDIAN: Lazy<Vec<u8>> = Lazy::new(|| {
 });
 
 pub fn make_all(
-    gas_params: GasParameters,
+    gas_params: crate::natives::cryptography::algebra::gas::GasParameters,
+    sha256_gas_params: move_stdlib::natives::hash::Sha2_256GasParameters,
     timed_features: TimedFeatures,
     features: Arc<Features>,
 ) -> impl Iterator<Item = (String, NativeFunction)> {
@@ -414,7 +416,10 @@ pub fn make_all(
         (
             "hash_to_internal",
             make_safe_native(
-                gas_params.clone(),
+                HashToGasParameters {
+                    bls12381: gas_params.clone(),
+                    sha2: sha256_gas_params,
+                },
                 timed_features.clone(),
                 features.clone(),
                 hash_to_internal,

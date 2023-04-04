@@ -4,7 +4,7 @@ use crate::{
     abort_unless_feature_flag_enabled,
     natives::{
         cryptography::algebra::{
-            gas::GasParameters, AlgebraContext, HashToStructureSuite, Structure,
+            gas::HashToGasParameters, AlgebraContext, HashToStructureSuite, Structure,
             MOVE_ABORT_CODE_NOT_IMPLEMENTED,
         },
         helpers::{SafeNativeContext, SafeNativeError, SafeNativeResult},
@@ -13,7 +13,7 @@ use crate::{
 };
 use aptos_types::on_chain_config::FeatureFlag;
 use ark_ec::hashing::HashToCurve;
-use move_core_types::gas_algebra::{InternalGas, InternalGasPerArg, NumArgs};
+use move_core_types::gas_algebra::{InternalGas, InternalGasPerArg, InternalGasPerByte, NumArgs, NumBytes};
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{Value, VectorRef},
@@ -55,8 +55,8 @@ macro_rules! suite_from_ty_arg {
 fn hash_to_bls12381gx_cost(
     dst_len: usize,
     msg_len: usize,
-    dst_shortening_base: InternalGasPerArg,
-    dst_shortening_per_byte: InternalGasPerArg,
+    dst_shortening_base: InternalGas,
+    dst_shortening_per_byte: InternalGasPerByte,
     mapping_base: InternalGasPerArg,
     mapping_per_byte: InternalGasPerArg,
 ) -> InternalGas {
@@ -64,8 +64,7 @@ fn hash_to_bls12381gx_cost(
     let dst_shortening_cost = if dst_len <= 255 {
         InternalGas::zero()
     } else {
-        dst_shortening_base * NumArgs::one()
-            + dst_shortening_per_byte * NumArgs::from((17 + dst_len) as u64)
+        dst_shortening_base + dst_shortening_per_byte * NumBytes::from((17 + dst_len) as u64)
     };
 
     // Mapping cost. The gas formula is simplified by assuming the DST length is fixed at 256.
@@ -76,7 +75,7 @@ fn hash_to_bls12381gx_cost(
 }
 
 pub fn hash_to_internal(
-    gas_params: &GasParameters,
+    gas_params: &HashToGasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -99,10 +98,10 @@ pub fn hash_to_internal(
             context.charge(hash_to_bls12381gx_cost(
                 dst.len(),
                 msg.len(),
-                gas_params.sha2_v0_10_6_sha256_base,
-                gas_params.sha2_v0_10_6_sha256_per_byte,
-                gas_params.ark_h2c_bls12381g1_xmd_sha256_sswu_base,
-                gas_params.ark_h2c_bls12381g1_xmd_sha256_sswu_per_msg_byte,
+                gas_params.sha2.base,
+                gas_params.sha2.per_byte,
+                gas_params.bls12381.ark_h2c_bls12381g1_xmd_sha256_sswu_base,
+                gas_params.bls12381.ark_h2c_bls12381g1_xmd_sha256_sswu_per_msg_byte,
             ))?;
             let mapper = ark_ec::hashing::map_to_curve_hasher::MapToCurveBasedHasher::<
                 ark_ec::models::short_weierstrass::Projective<ark_bls12_381::g1::Config>,
@@ -121,10 +120,10 @@ pub fn hash_to_internal(
             context.charge(hash_to_bls12381gx_cost(
                 dst.len(),
                 msg.len(),
-                gas_params.sha2_v0_10_6_sha256_base,
-                gas_params.sha2_v0_10_6_sha256_per_byte,
-                gas_params.ark_h2c_bls12381g2_xmd_sha256_sswu_base,
-                gas_params.ark_h2c_bls12381g2_xmd_sha256_sswu_per_msg_byte,
+                gas_params.sha2.base,
+                gas_params.sha2.per_byte,
+                gas_params.bls12381.ark_h2c_bls12381g2_xmd_sha256_sswu_base,
+                gas_params.bls12381.ark_h2c_bls12381g2_xmd_sha256_sswu_per_msg_byte,
             ))?;
             let mapper = ark_ec::hashing::map_to_curve_hasher::MapToCurveBasedHasher::<
                 ark_ec::models::short_weierstrass::Projective<ark_bls12_381::g2::Config>,

@@ -49,6 +49,7 @@ move-package ={ workspace = true }
 move-prover ={ workspace = true }
 move-prover-boogie-backend ={ workspace = true }
 move-stackless-bytecode ={ workspace = true }
+move-stdlib = { workspace = true }
 move-table-extension ={ workspace = true }
 move-vm-runtime ={ workspace = true }
 move-vm-types ={ workspace = true }
