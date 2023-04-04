@@ -40,7 +40,7 @@ jobs:
       FAUCET_AUTH_TOKEN: ${{ secrets.DEVNET_TAP_AUTH_TOKEN }}
       APTOS_INVOCATION: docker run --network host ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos
       ANS_TEST_ACCOUNT_PRIVATE_KEY: "0x37368b46ce665362562c6d1d4ec01a08c8644c488690df5a17e13ba163e20221"
-      ANS_TEST_ACCOUNT_ADDRESS: "0x585fc9f0f0c54183b039ffc770ca282ebd87307916c215a3e692f2f8e4305e82"
+      ANS_TEST_ACCOUNT_ADDRESS: "585fc9f0f0c54183b039ffc770ca282ebd87307916c215a3e692f2f8e4305e82"
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
         with:
