@@ -2,13 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    create_emitter_and_request, three_region_simulation_test::ThreeRegionSameCloudSimulationTest,
-    traffic_emitter_runtime, LoadDestination, NetworkLoadTest,
+    create_emitter_and_request, traffic_emitter_runtime, LoadDestination, NetworkLoadTest,
 };
 use anyhow::{bail, Ok};
 use aptos_forge::{
     success_criteria::{LatencyType, SuccessCriteriaChecker},
-    EmitJobMode, EmitJobRequest, NetworkContext, NetworkTest, Result, Swarm, Test,
+    EmitJobMode, EmitJobRequest, NetworkContext, NetworkTest, Result, Swarm, Test, TransactionType,
 };
 use aptos_logger::info;
 use rand::{rngs::OsRng, Rng, SeedableRng};
@@ -20,6 +19,7 @@ pub struct TwoTrafficsTest {
     pub inner_tps: usize,
     pub inner_gas_price: u64,
     pub inner_init_gas_price_multiplier: u64,
+    pub inner_transaction_type: TransactionType,
 
     pub avg_tps: usize,
     pub latency_thresholds: &'static [(f32, LatencyType)],
@@ -37,7 +37,8 @@ impl NetworkLoadTest for TwoTrafficsTest {
             "Running TwoTrafficsTest test for duration {}s",
             duration.as_secs_f32()
         );
-        let nodes_to_send_load_to = LoadDestination::AllFullnodes.get_destination_nodes(swarm);
+        let nodes_to_send_load_to =
+            LoadDestination::FullnodesOtherwiseValidators.get_destination_nodes(swarm);
         let rng = ::rand::rngs::StdRng::from_seed(OsRng.gen());
 
         let (emitter, emit_job_request) = create_emitter_and_request(
@@ -47,7 +48,8 @@ impl NetworkLoadTest for TwoTrafficsTest {
                     tps: self.inner_tps,
                 })
                 .gas_price(self.inner_gas_price)
-                .init_gas_price_multiplier(self.inner_init_gas_price_multiplier),
+                .init_gas_price_multiplier(self.inner_init_gas_price_multiplier)
+                .transaction_type(self.inner_transaction_type),
             &nodes_to_send_load_to,
             rng,
         )?;
@@ -96,46 +98,6 @@ impl NetworkLoadTest for TwoTrafficsTest {
 }
 
 impl NetworkTest for TwoTrafficsTest {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
-        <dyn NetworkLoadTest>::run(self, ctx)
-    }
-}
-
-pub struct ThreeRegionSimulationTwoTrafficsTest {
-    pub traffic_test: TwoTrafficsTest,
-    pub three_region_simulation_test: ThreeRegionSameCloudSimulationTest,
-}
-
-impl Test for ThreeRegionSimulationTwoTrafficsTest {
-    fn name(&self) -> &'static str {
-        "three region simulation two traffics test"
-    }
-}
-
-impl NetworkLoadTest for ThreeRegionSimulationTwoTrafficsTest {
-    fn setup(&self, ctx: &mut NetworkContext) -> Result<LoadDestination> {
-        self.traffic_test.setup(ctx)?;
-        self.three_region_simulation_test.setup(ctx)?;
-
-        Ok(LoadDestination::FullnodesOtherwiseValidators)
-    }
-
-    fn test(&self, swarm: &mut dyn Swarm, duration: Duration) -> Result<()> {
-        info!(
-            "Running ThreeRegionSimulationTwoTrafficsTest test for duration {}s",
-            duration.as_secs_f32()
-        );
-        self.traffic_test.test(swarm, duration)
-    }
-
-    fn finish(&self, swarm: &mut dyn Swarm) -> Result<()> {
-        self.traffic_test.finish(swarm)?;
-        self.three_region_simulation_test.finish(swarm)?;
-        Ok(())
-    }
-}
-
-impl NetworkTest for ThreeRegionSimulationTwoTrafficsTest {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx)
     }

@@ -1227,7 +1227,7 @@ def test(
     ### XXX: hack these arguments to force Forge to run with overrides
     # cloud = "gcp"
     # forge_cluster_name = "aptos-forge-0"
-    # forge_enable_performance = "true"
+    forge_enable_failpoints = "true"
 
     # Initialize all configs
     shell = LocalShell(verbose == "true")

@@ -65,7 +65,7 @@ impl OnChainConsensusConfig {
 /// This is used when on-chain config is not initialized.
 impl Default for OnChainConsensusConfig {
     fn default() -> Self {
-        OnChainConsensusConfig::V1(ConsensusConfigV1::default())
+        OnChainConsensusConfig::V2(ConsensusConfigV1::default())
     }
 }
 
