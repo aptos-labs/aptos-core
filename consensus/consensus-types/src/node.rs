@@ -19,7 +19,7 @@ pub enum SignedNodeDigestError {
 }
 
 #[derive(
-    Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash, PartialEq, Eq, Hash,
+Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash, PartialEq, Eq, Hash,
 )]
 pub struct SignedNodeDigestInfo {
     digest: HashValue,
@@ -291,6 +291,10 @@ impl Node {
 
     pub fn maybe_payload(&self) -> Option<&Payload> {
         Some(&self.consensus_payload)
+    }
+
+    pub fn take_payload(self) -> Payload {
+        self.consensus_payload
     }
 }
 

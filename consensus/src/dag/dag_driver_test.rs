@@ -257,7 +257,7 @@ async fn basic_dag_driver_test() {
         let mut ref_block: Option<OrderedBlocks> = None;
         for receiver in receivers.iter_mut() {
             let block = receiver.next().await.unwrap();
-            println!("received block: {:?}", block.ordered_blocks[0].payload().unwrap());
+            // println!("received block: {:?}", block.ordered_blocks[0].payload().unwrap());
 
             if ref_block.is_none() {
                 ref_block = Some(block);

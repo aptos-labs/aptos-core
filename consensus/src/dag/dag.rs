@@ -467,11 +467,6 @@ impl Dag {
             )
             .await;
 
-
-        // self.bullshark
-        //     .lock()
-        //     .try_ordering(certified_node.take_node());
-
         let mut bs = self.bullshark.lock().await;
 
         bs.try_ordering(certified_node.take_node()).await;

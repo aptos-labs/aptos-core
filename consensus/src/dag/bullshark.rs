@@ -28,6 +28,7 @@ use aptos_types::{
 use claims::assert_some;
 use itertools::Itertools;
 use std::{collections::HashMap, hash::Hash, iter::Extend, sync::Arc};
+use std::collections::BTreeMap;
 
 pub struct Bullshark {
     state_computer: Arc<dyn StateComputer>,
@@ -133,11 +134,11 @@ impl Bullshark {
     fn order_anchor_causal_history(&mut self, anchor: Node) -> Vec<Node> {
         let mut ordered_history = Vec::new();
 
-        let mut reachable_nodes = HashMap::new();
+        let mut reachable_nodes = BTreeMap::new();
         reachable_nodes.insert(anchor.digest(), anchor);
 
         while !reachable_nodes.is_empty() {
-            let mut new_reachable_nodes = HashMap::new();
+            let mut new_reachable_nodes = BTreeMap::new();
             reachable_nodes.into_iter().for_each(|(_, node)| {
                 node.parents().iter().for_each(|metadata| {
                     if let Some(parent) =
@@ -198,30 +199,39 @@ impl Bullshark {
     }
 
     async fn push_to_execution(&self, ordered_history: Vec<Node>) {
-        let blocks: Vec<Arc<ExecutedBlock>> = ordered_history
-            .iter()
-            .map(|node| {
-                let block = ExecutedBlock::new(
-                    Block::new_proposal(
-                        node.maybe_payload().unwrap().clone(),
-                        node.round(),
-                        0,
-                        QuorumCert::new(
-                            VoteData::new(BlockInfo::empty(), BlockInfo::empty()),
-                            LedgerInfoWithSignatures::new(
-                                LedgerInfo::new(BlockInfo::empty(), HashValue::zero()),
-                                AggregateSignature::empty(),
-                            ),
-                        ),
-                        &ValidatorSigner::random(None),
-                        Vec::new(),
-                    )
-                    .unwrap(),
-                    StateComputeResult::new_dummy(),
-                );
-                Arc::new(block)
-            })
-            .collect();
+
+        let mut payload = Payload::empty(false);
+        // let mut payload = ordered_history[0].maybe_payload().unwrap().clone();
+        let round = ordered_history[0].round();
+
+            ordered_history
+                .into_iter()
+                .rev()
+                .for_each(|node| {
+                    payload.extend(node.take_payload());
+                });
+
+
+        let block = ExecutedBlock::new(
+            Block::new_proposal(
+                payload,
+                round,
+                0,
+                QuorumCert::new(
+                    VoteData::new(BlockInfo::empty(), BlockInfo::empty()),
+                    LedgerInfoWithSignatures::new(
+                        LedgerInfo::new(BlockInfo::empty(), HashValue::zero()),
+                        AggregateSignature::empty(),
+                    ),
+                ),
+                &ValidatorSigner::random(None),
+                Vec::new(),
+            )
+                .unwrap(),
+            StateComputeResult::new_dummy(),
+        );
+        let mut blocks: Vec<Arc<ExecutedBlock>> = Vec::new();
+        blocks.push(Arc::new(block));
 
         self.state_computer
             .commit(

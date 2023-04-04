@@ -30,7 +30,7 @@ pub struct TransactionSummary {
 
 impl fmt::Display for TransactionSummary {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}", self.sender, self.sequence_number,)
+        write!(f, "{}:{}", self.sender, self.sequence_number, )
     }
 }
 
@@ -130,6 +130,14 @@ impl Payload {
         }
     }
 
+    pub fn extend(&mut self, payload: Payload) {
+        match (self, payload) {
+            (Payload::DirectMempool(v1), Payload::DirectMempool(v2)) => v1.extend(v2.into_iter()),
+            (Payload::InQuorumStore(p1), Payload::InQuorumStore(p2)) => todo!(),
+            (_, _) => unreachable!(),
+        }
+    }
+
     pub fn verify(
         &self,
         validator: &ValidatorVerifier,
@@ -142,7 +150,7 @@ impl Payload {
                     proof.verify(validator)?;
                 }
                 Ok(())
-            },
+            }
             (_, _) => Err(anyhow::anyhow!(
                 "Wrong payload type. Expected Payload::InQuorumStore {} got {} ",
                 quorum_store_enabled,
@@ -157,10 +165,10 @@ impl fmt::Display for Payload {
         match self {
             Payload::DirectMempool(txns) => {
                 write!(f, "InMemory txns: {}", txns.len())
-            },
+            }
             Payload::InQuorumStore(proof_with_status) => {
                 write!(f, "InMemory proofs: {}", proof_with_status.proofs.len())
-            },
+            }
         }
     }
 }
@@ -216,17 +224,17 @@ impl fmt::Display for PayloadFilter {
                     write!(txns_str, "{} ", tx)?;
                 }
                 write!(f, "{}", txns_str)
-            },
+            }
             PayloadFilter::InQuorumStore(excluded_proofs) => {
                 let mut proofs_str = "".to_string();
                 for proof in excluded_proofs.iter() {
                     write!(proofs_str, "{} ", proof)?;
                 }
                 write!(f, "{}", proofs_str)
-            },
+            }
             PayloadFilter::Empty => {
                 write!(f, "Empty filter")
-            },
+            }
         }
     }
 }
