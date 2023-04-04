@@ -26,14 +26,17 @@ module fungible_asset::managed_fungible_asset {
     /// Initialize metadata object and store the refs.
     fun init_module(admin: &signer) {
         let constructor_ref = &object::create_named_object(admin, ASSET_SYMBOL);
-        fungible_asset::make_object_fungible(
+        fungible_asset::add_fungibility(
             constructor_ref,
             0, /* maximum_supply. 0 means no maximum */
             utf8(b"Aptos Token"), /* name */
             utf8(ASSET_SYMBOL), /* symbol */
             8, /* decimals */
         );
+        // Add primary wallet support.
+        primary_wallet::enable_primary_wallet(constructor_ref);
 
+        // Create mint/burn/transfer refs to allow creator to manage the fungible asset.
         let mint_ref = fungible_asset::generate_mint_ref(constructor_ref);
         let burn_ref = fungible_asset::generate_burn_ref(constructor_ref);
         let transfer_ref = fungible_asset::generate_transfer_ref(constructor_ref);
@@ -54,9 +57,10 @@ module fungible_asset::managed_fungible_asset {
     /// Mint as the owner of metadata object.
     public entry fun mint(admin: &signer, amount: u64, to: address) acquires ManagedFungibleAsset {
         let asset = get_asset();
-        let mint_ref = &authorized_borrow_refs(admin, asset).mint_ref;
+        let managed_fungible_asset = authorized_borrow_refs(admin, asset);
         let to_wallet = primary_wallet::ensure_primary_wallet_exists(to, asset);
-        fungible_asset::deposit(to_wallet, fungible_asset::mint(mint_ref, amount));
+        let fa = fungible_asset::mint(&managed_fungible_asset.mint_ref, amount);
+        fungible_asset::deposit_with_ref(&managed_fungible_asset.transfer_ref, to_wallet, fa);
     }
 
     /// Transfer as the owner of metadata object ignoring `allow_ungated_transfer` field.

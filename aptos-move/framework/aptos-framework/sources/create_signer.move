@@ -11,10 +11,10 @@
 module aptos_framework::create_signer {
     friend aptos_framework::account;
     friend aptos_framework::aptos_account;
-    friend aptos_framework::fungible_asset;
     friend aptos_framework::genesis;
     friend aptos_framework::multisig_account;
     friend aptos_framework::object;
+    friend aptos_framework::primary_wallet;
 
     public(friend) native fun create_signer(addr: address): signer;
 }

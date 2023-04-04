@@ -14,13 +14,11 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Struct `MintRef`](#0x1_fungible_asset_MintRef)
 -  [Struct `TransferRef`](#0x1_fungible_asset_TransferRef)
 -  [Struct `BurnRef`](#0x1_fungible_asset_BurnRef)
--  [Struct `MintEvent`](#0x1_fungible_asset_MintEvent)
--  [Struct `BurnEvent`](#0x1_fungible_asset_BurnEvent)
 -  [Struct `DepositEvent`](#0x1_fungible_asset_DepositEvent)
 -  [Struct `WithdrawEvent`](#0x1_fungible_asset_WithdrawEvent)
 -  [Struct `SetUngatedTransferEvent`](#0x1_fungible_asset_SetUngatedTransferEvent)
 -  [Constants](#@Constants_0)
--  [Function `make_object_fungible`](#0x1_fungible_asset_make_object_fungible)
+-  [Function `add_fungibility`](#0x1_fungible_asset_add_fungibility)
 -  [Function `generate_mint_ref`](#0x1_fungible_asset_generate_mint_ref)
 -  [Function `generate_burn_ref`](#0x1_fungible_asset_generate_burn_ref)
 -  [Function `generate_transfer_ref`](#0x1_fungible_asset_generate_transfer_ref)
@@ -29,7 +27,6 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Function `name`](#0x1_fungible_asset_name)
 -  [Function `symbol`](#0x1_fungible_asset_symbol)
 -  [Function `decimals`](#0x1_fungible_asset_decimals)
--  [Function `deterministic_wallet_address`](#0x1_fungible_asset_deterministic_wallet_address)
 -  [Function `wallet_exists`](#0x1_fungible_asset_wallet_exists)
 -  [Function `metadata_from_asset`](#0x1_fungible_asset_metadata_from_asset)
 -  [Function `wallet_metadata`](#0x1_fungible_asset_wallet_metadata)
@@ -41,8 +38,7 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Function `transfer_ref_metadata`](#0x1_fungible_asset_transfer_ref_metadata)
 -  [Function `burn_ref_metadata`](#0x1_fungible_asset_burn_ref_metadata)
 -  [Function `transfer`](#0x1_fungible_asset_transfer)
--  [Function `create_deterministic_wallet`](#0x1_fungible_asset_create_deterministic_wallet)
--  [Function `initialize_arbitrary_wallet`](#0x1_fungible_asset_initialize_arbitrary_wallet)
+-  [Function `create_wallet`](#0x1_fungible_asset_create_wallet)
 -  [Function `withdraw`](#0x1_fungible_asset_withdraw)
 -  [Function `deposit`](#0x1_fungible_asset_deposit)
 -  [Function `mint`](#0x1_fungible_asset_mint)
@@ -62,8 +58,7 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Specification](#@Specification_1)
 
 
-<pre><code><b>use</b> <a href="create_signer.md#0x1_create_signer">0x1::create_signer</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="object.md#0x1_object">0x1::object</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
@@ -122,12 +117,6 @@ Define the metadata required of an metadata to be fungible.
  Number of decimals used for display purposes.
  For example, if <code>decimals</code> equals <code>2</code>, a balance of <code>505</code> coins should
  be displayed to a user as <code>5.05</code> (<code>505 / 10 ** 2</code>).
-</dd>
-<dt>
-<code>derive_ref: <a href="object.md#0x1_object_DeriveRef">object::DeriveRef</a></code>
-</dt>
-<dd>
- The ref used to create wallet objects for users later.
 </dd>
 </dl>
 
@@ -324,62 +313,6 @@ BurnRef can be used to burn fungible assets from a given holder account.
 <dl>
 <dt>
 <code>metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">fungible_asset::FungibleAssetMetadata</a>&gt;</code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
-<a name="0x1_fungible_asset_MintEvent"></a>
-
-## Struct `MintEvent`
-
-Emitted when fungible assets are minted.
-
-
-<pre><code><b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_MintEvent">MintEvent</a> <b>has</b> drop, store
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>amount: u64</code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
-<a name="0x1_fungible_asset_BurnEvent"></a>
-
-## Struct `BurnEvent`
-
-Emitted when fungible assets are burnt.
-
-
-<pre><code><b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_BurnEvent">BurnEvent</a> <b>has</b> drop, store
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>amount: u64</code>
 </dt>
 <dd>
 
@@ -598,15 +531,15 @@ Account cannot transfer or receive fungible assets.
 
 
 
-<a name="0x1_fungible_asset_make_object_fungible"></a>
+<a name="0x1_fungible_asset_add_fungibility"></a>
 
-## Function `make_object_fungible`
+## Function `add_fungibility`
 
 Make an existing object fungible by adding the FungibleAssetMetadata resource.
 This returns the capabilities to mint, burn, and transfer.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_make_object_fungible">make_object_fungible</a>(constructor_ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>, maximum_supply: u64, name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, symbol: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, decimals: u8): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">fungible_asset::FungibleAssetMetadata</a>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_add_fungibility">add_fungibility</a>(constructor_ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>, maximum_supply: u64, name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, symbol: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, decimals: u8): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">fungible_asset::FungibleAssetMetadata</a>&gt;
 </code></pre>
 
 
@@ -615,7 +548,7 @@ This returns the capabilities to mint, burn, and transfer.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_make_object_fungible">make_object_fungible</a>(
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_add_fungibility">add_fungibility</a>(
     constructor_ref: &ConstructorRef,
     maximum_supply: u64,
     name: String,
@@ -635,7 +568,6 @@ This returns the capabilities to mint, burn, and transfer.
             name,
             symbol,
             decimals,
-            derive_ref: <a href="object.md#0x1_object_generate_derive_ref">object::generate_derive_ref</a>(constructor_ref),
         }
     );
     <a href="object.md#0x1_object_object_from_constructor_ref">object::object_from_constructor_ref</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a>&gt;(constructor_ref)
@@ -846,31 +778,6 @@ Get the decimals from <code>metadata</code>.
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_decimals">decimals</a>&lt;T: key&gt;(metadata: Object&lt;T&gt;): u8 <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a> {
     borrow_fungible_metadata(&metadata).decimals
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_fungible_asset_deterministic_wallet_address"></a>
-
-## Function `deterministic_wallet_address`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_deterministic_wallet_address">deterministic_wallet_address</a>&lt;T: key&gt;(owner: <b>address</b>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <b>address</b>
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_deterministic_wallet_address">deterministic_wallet_address</a>&lt;T: key&gt;(owner: <b>address</b>, metadata: Object&lt;T&gt;): <b>address</b> {
-    <b>let</b> metadata_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(&metadata);
-    <a href="object.md#0x1_object_create_derived_object_address">object::create_derived_object_address</a>(owner, metadata_addr)
 }
 </code></pre>
 
@@ -1165,51 +1072,15 @@ Note: it does not move the underlying object.
 
 </details>
 
-<a name="0x1_fungible_asset_create_deterministic_wallet"></a>
+<a name="0x1_fungible_asset_create_wallet"></a>
 
-## Function `create_deterministic_wallet`
-
-Create a new wallet object to hold fungible asset.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_create_deterministic_wallet">create_deterministic_wallet</a>&lt;T: key&gt;(owner_addr: <b>address</b>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWallet">fungible_asset::FungibleAssetWallet</a>&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_create_deterministic_wallet">create_deterministic_wallet</a>&lt;T: key&gt;(
-    owner_addr: <b>address</b>,
-    metadata: Object&lt;T&gt;,
-): Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWallet">FungibleAssetWallet</a>&gt; <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a> {
-    <b>let</b> owner = &<a href="create_signer.md#0x1_create_signer_create_signer">create_signer::create_signer</a>(owner_addr);
-    <b>let</b> derive_ref = &borrow_fungible_metadata(&metadata).derive_ref;
-    <b>let</b> constructor_ref = &<a href="object.md#0x1_object_create_derived_object">object::create_derived_object</a>(owner, derive_ref);
-
-    // Disable ungated transfer <b>as</b> deterministic wallets shouldn't be transferrable.
-    <b>let</b> transfer_ref = &<a href="object.md#0x1_object_generate_transfer_ref">object::generate_transfer_ref</a>(constructor_ref);
-    <a href="object.md#0x1_object_disable_ungated_transfer">object::disable_ungated_transfer</a>(transfer_ref);
-
-    <a href="fungible_asset.md#0x1_fungible_asset_initialize_arbitrary_wallet">initialize_arbitrary_wallet</a>(constructor_ref, metadata)
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_fungible_asset_initialize_arbitrary_wallet"></a>
-
-## Function `initialize_arbitrary_wallet`
+## Function `create_wallet`
 
 Allow an object to hold a wallet for fungible assets.
 Applications can use this to create multiple wallets for isolating fungible assets for different purposes.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_initialize_arbitrary_wallet">initialize_arbitrary_wallet</a>&lt;T: key&gt;(constructor_ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWallet">fungible_asset::FungibleAssetWallet</a>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_create_wallet">create_wallet</a>&lt;T: key&gt;(constructor_ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWallet">fungible_asset::FungibleAssetWallet</a>&gt;
 </code></pre>
 
 
@@ -1218,7 +1089,7 @@ Applications can use this to create multiple wallets for isolating fungible asse
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_initialize_arbitrary_wallet">initialize_arbitrary_wallet</a>&lt;T: key&gt;(
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_create_wallet">create_wallet</a>&lt;T: key&gt;(
     constructor_ref: &ConstructorRef,
     metadata: Object&lt;T&gt;,
 ): Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWallet">FungibleAssetWallet</a>&gt; {
