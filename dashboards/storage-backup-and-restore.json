@@ -834,7 +834,7 @@
           "color": { "mode": "continuous-RdYlGr" },
           "links": [],
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
           "unit": "none"
         },
         "overrides": []
@@ -996,7 +996,7 @@
           "color": { "mode": "continuous-RdYlGr" },
           "links": [],
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
           "unit": "none"
         },
         "overrides": []
@@ -1119,7 +1119,13 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
           "unit": "dateTimeAsLocal"
         },
         "overrides": [
@@ -2309,8 +2315,8 @@
   "time": { "from": "now-24h", "to": "now" },
   "timepicker": {},
   "timezone": "",
-  "title": "Storage (Backup and Restore)",
+  "title": "Storage Backup and Restore",
   "uid": "9oXpx4n4z",
-  "version": 65,
+  "version": 66,
   "weekStart": ""
 }
