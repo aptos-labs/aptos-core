@@ -38,10 +38,10 @@ spec std::features {
     spec fun spec_is_enabled(feature: u64): bool;
 
     spec fun spec_reward_rate_decrease_enabled(): bool {
-        spec_is_enabled(REWARD_RATE_DECREASE)
+        spec_is_enabled(PERIODICAL_REWARD_RATE_DECREASE)
     }
 
-    spec reward_rate_decrease_enabled {
+    spec periodical_reward_rate_decrease_enabled {
         pragma opaque;
         aborts_if [abstract] false;
         ensures [abstract] result == spec_reward_rate_decrease_enabled();
