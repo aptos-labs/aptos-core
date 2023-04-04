@@ -200,9 +200,9 @@ impl CliCommand<HashMap<&'static str, PathBuf>> for GenerateKey {
             )));
         }
         if self.vanity_multisig && self.vanity_prefix.is_none() {
-            return Err(CliError::CommandArgumentError(format!(
-                "No vanity prefix provided"
-            )));
+            return Err(CliError::CommandArgumentError(
+                "No vanity prefix provided".to_string(),
+            ));
         }
         self.save_params.check_key_file()?;
         let mut keygen = self.rng_args.key_generator()?;
