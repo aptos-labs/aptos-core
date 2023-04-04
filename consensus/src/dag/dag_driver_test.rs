@@ -245,14 +245,11 @@ async fn basic_dag_driver_test() {
     let nodes = NodeSetup::create_nodes(&mut playground, &runtime, 7);
     runtime.spawn(playground.start());
     let mut receivers = Vec::new();
-    let mut runtimes = Vec::new();
     for mut node in nodes {
-        let node_runtime = consensus_runtime();
         receivers.push(node.ordered_blocks_events.take().unwrap());
-        node_runtime.spawn(async move {
+        runtime.spawn(async move {
             node.start().await;
         });
-        runtimes.push(node_runtime);
     }
 
     println!("Started nodes. Waiting for blocks...");
@@ -260,15 +257,16 @@ async fn basic_dag_driver_test() {
         let mut ref_block: Option<OrderedBlocks> = None;
         for receiver in receivers.iter_mut() {
             let block = receiver.next().await.unwrap();
-            println!("received block: {:?}", block.ordered_blocks);
+            println!("received block: {:?}", block.ordered_blocks[0].payload());
             if ref_block.is_none() {
                 ref_block = Some(block);
             } else {
                 assert_eq!(
-                    ref_block.as_ref().unwrap().ordered_blocks,
-                    block.ordered_blocks
+                    ref_block.as_ref().unwrap().ordered_blocks[0].payload(),
+                    block.ordered_blocks[0].payload()
                 );
             }
         }
     }
+    runtime.shutdown_background();
 }
