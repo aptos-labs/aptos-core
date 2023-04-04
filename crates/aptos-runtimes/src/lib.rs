@@ -9,7 +9,7 @@ use tokio::runtime::{Builder, Runtime};
 /// The max thread name length before the name will be truncated
 /// when it's displayed. Note: the max display length is 15, but
 /// we need to leave space for the thread IDs.
-const MAX_THREAD_NAME_LENGTH: usize = 12;
+const MAX_THREAD_NAME_LENGTH: usize = 20;
 
 /// Returns a tokio runtime with named threads.
 /// This is useful for tracking threads when debugging.

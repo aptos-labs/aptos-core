@@ -19,14 +19,16 @@ use aptos_consensus_types::{
     common::{Author, Round},
     node::{CertifiedNode, CertifiedNodeAck, CertifiedNodeRequest, Node, NodeMetaData},
 };
-use aptos_infallible::Mutex;
 use aptos_logger::spawn_named;
 use aptos_types::{
     validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier, PeerId,
 };
 use futures::StreamExt;
 use std::{collections::HashSet, sync::Arc, time::Duration};
-use tokio::{sync::mpsc::Sender, time};
+use tokio::{
+    sync::{mpsc::Sender, Mutex},
+    time,
+};
 
 pub struct DagDriver {
     epoch: u64,
@@ -122,7 +124,7 @@ impl DagDriver {
     }
 
     async fn create_node(&mut self, parents: HashSet<NodeMetaData>) -> Node {
-        let payload_filter = self.bullshark.lock().pending_payload();
+        let payload_filter = self.bullshark.lock().await.pending_payload();
         let payload = self
             .payload_client
             .pull_payload_for_dag(

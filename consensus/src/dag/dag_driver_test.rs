@@ -245,11 +245,14 @@ async fn basic_dag_driver_test() {
     let nodes = NodeSetup::create_nodes(&mut playground, &runtime, 7);
     runtime.spawn(playground.start());
     let mut receivers = Vec::new();
+    let mut runtimes = Vec::new();
     for mut node in nodes {
+        let node_runtime = consensus_runtime();
         receivers.push(node.ordered_blocks_events.take().unwrap());
-        runtime.spawn(async move {
+        node_runtime.spawn(async move {
             node.start().await;
         });
+        runtimes.push(node_runtime);
     }
 
     println!("Started nodes. Waiting for blocks...");

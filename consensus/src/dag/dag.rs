@@ -7,7 +7,6 @@ use crate::{
 };
 use aptos_consensus_types::node::{CertifiedNode, CertifiedNodeRequest, NodeMetaData};
 use aptos_crypto::HashValue;
-use aptos_infallible::Mutex;
 use aptos_logger::info;
 use aptos_types::{block_info::Round, validator_verifier::ValidatorVerifier, PeerId};
 use async_recursion::async_recursion;
@@ -15,6 +14,7 @@ use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
     sync::Arc,
 };
+use tokio::sync::Mutex;
 
 // TODO: bug - what if I link to a node but before broadcasting I already create a node in the next round.
 enum PeerStatus {
@@ -467,15 +467,16 @@ impl Dag {
             )
             .await;
 
-        self.bullshark
-            .lock()
-            .try_ordering(certified_node.take_node());
-        // TODO: send/call to all subscribed application and make sure shutdown logic is safe with the expect.
 
-        // self.bullshark_tx
-        //     .send(certified_node)
-        //     .await
-        //     .expect("Bullshark receiver not available");
+        // self.bullshark
+        //     .lock()
+        //     .try_ordering(certified_node.take_node());
+
+        let mut bs = self.bullshark.lock().await;
+
+        bs.try_ordering(certified_node.take_node()).await;
+
+        // TODO: send/call to all subscribed application and make sure shutdown logic is safe with the expect.
     }
 
     #[async_recursion]
