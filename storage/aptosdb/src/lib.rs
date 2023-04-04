@@ -47,8 +47,8 @@ use crate::{
     backup::{backup_handler::BackupHandler, restore_handler::RestoreHandler, restore_utils},
     db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
     db_options::{
-        gen_ledger_cfds, gen_state_merkle_cfds, ledger_db_column_families,
-        state_kv_db_column_families, state_merkle_db_column_families,
+        gen_ledger_cfds, ledger_db_column_families, state_kv_db_column_families,
+        state_merkle_db_column_families,
     },
     errors::AptosDbError,
     event_store::EventStore,
@@ -68,6 +68,7 @@ use crate::{
     stale_node_index::StaleNodeIndexSchema,
     stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
     state_kv_db::StateKvDb,
+    state_merkle_db::StateMerkleDb,
     state_store::StateStore,
     transaction_store::TransactionStore,
 };
@@ -204,7 +205,7 @@ fn error_if_too_many_requested(num_requested: u64, max_allowed: u64) -> Result<(
     }
 }
 
-fn update_rocksdb_properties(ledger_rocksdb: &DB, state_merkle_rocksdb: &DB) -> Result<()> {
+fn update_rocksdb_properties(ledger_rocksdb: &DB, state_merkle_db: &StateMerkleDb) -> Result<()> {
     let _timer = OTHER_TIMERS_SECONDS
         .with_label_values(&["update_rocksdb_properties"])
         .start_timer();
@@ -217,9 +218,14 @@ fn update_rocksdb_properties(ledger_rocksdb: &DB, state_merkle_rocksdb: &DB) -> 
     }
     for cf_name in state_merkle_db_column_families() {
         for (rockdb_property_name, aptos_rocksdb_property_name) in &*ROCKSDB_PROPERTY_MAP {
+            // TODO(grao): Support sharding here.
             ROCKSDB_PROPERTIES
                 .with_label_values(&[cf_name, aptos_rocksdb_property_name])
-                .set(state_merkle_rocksdb.get_property(cf_name, rockdb_property_name)? as i64);
+                .set(
+                    state_merkle_db
+                        .metadata_db()
+                        .get_property(cf_name, rockdb_property_name)? as i64,
+                );
         }
     }
     Ok(())
@@ -232,7 +238,7 @@ struct RocksdbPropertyReporter {
 }
 
 impl RocksdbPropertyReporter {
-    fn new(ledger_rocksdb: Arc<DB>, state_merkle_rocksdb: Arc<DB>) -> Self {
+    fn new(ledger_rocksdb: Arc<DB>, state_merkle_rocksdb: Arc<StateMerkleDb>) -> Self {
         let (send, recv) = mpsc::channel();
         let join_handle = Some(thread::spawn(move || loop {
             if let Err(e) = update_rocksdb_properties(&ledger_rocksdb, &state_merkle_rocksdb) {
@@ -273,7 +279,7 @@ impl Drop for RocksdbPropertyReporter {
 /// access to the core Aptos data structures.
 pub struct AptosDB {
     ledger_db: Arc<DB>,
-    state_merkle_db: Arc<DB>,
+    state_merkle_db: Arc<StateMerkleDb>,
     state_kv_db: Arc<StateKvDb>,
     event_store: Arc<EventStore>,
     ledger_store: Arc<LedgerStore>,
@@ -288,34 +294,32 @@ pub struct AptosDB {
 impl AptosDB {
     fn new_with_dbs(
         ledger_rocksdb: Arc<DB>,
-        state_merkle_rocksdb: DB,
+        state_merkle_db: StateMerkleDb,
         state_kv_db: StateKvDb,
         pruner_config: PrunerConfig,
         buffered_state_target_items: usize,
-        max_nodes_per_lru_cache_shard: usize,
         hack_for_tests: bool,
     ) -> Self {
-        let arc_state_merkle_rocksdb = Arc::new(state_merkle_rocksdb);
+        let state_merkle_db = Arc::new(state_merkle_db);
         let state_kv_db = Arc::new(state_kv_db);
         let state_merkle_pruner = StateMerklePrunerManager::new(
-            Arc::clone(&arc_state_merkle_rocksdb),
+            Arc::clone(&state_merkle_db),
             pruner_config.state_merkle_pruner_config,
         );
         let epoch_snapshot_pruner = StateMerklePrunerManager::new(
-            Arc::clone(&arc_state_merkle_rocksdb),
+            Arc::clone(&state_merkle_db),
             pruner_config.epoch_snapshot_pruner_config.into(),
         );
         let state_kv_pruner =
             StateKvPrunerManager::new(Arc::clone(&state_kv_db), pruner_config.ledger_pruner_config);
         let state_store = Arc::new(StateStore::new(
             Arc::clone(&ledger_rocksdb),
-            Arc::clone(&arc_state_merkle_rocksdb),
+            Arc::clone(&state_merkle_db),
             Arc::clone(&state_kv_db),
             state_merkle_pruner,
             epoch_snapshot_pruner,
             state_kv_pruner,
             buffered_state_target_items,
-            max_nodes_per_lru_cache_shard,
             hack_for_tests,
         ));
 
@@ -326,16 +330,17 @@ impl AptosDB {
 
         AptosDB {
             ledger_db: Arc::clone(&ledger_rocksdb),
-            state_merkle_db: Arc::clone(&arc_state_merkle_rocksdb),
+            state_merkle_db: Arc::clone(&state_merkle_db),
             state_kv_db: Arc::clone(&state_kv_db),
             event_store: Arc::new(EventStore::new(Arc::clone(&ledger_rocksdb))),
             ledger_store: Arc::new(LedgerStore::new(Arc::clone(&ledger_rocksdb))),
             state_store,
             transaction_store: Arc::new(TransactionStore::new(Arc::clone(&ledger_rocksdb))),
             ledger_pruner,
+            // TODO(grao): Include other DBs.
             _rocksdb_property_reporter: RocksdbPropertyReporter::new(
                 Arc::clone(&ledger_rocksdb),
-                Arc::clone(&arc_state_merkle_rocksdb),
+                Arc::clone(&state_merkle_db),
             ),
             ledger_commit_lock: std::sync::Mutex::new(()),
             indexer: None,
@@ -356,8 +361,12 @@ impl AptosDB {
             "Do not set prune_window when opening readonly.",
         );
 
-        let (ledger_db, state_merkle_db, state_kv_db) =
-            Self::open_dbs(db_root_path.as_ref(), rocksdb_configs, readonly)?;
+        let (ledger_db, state_merkle_db, state_kv_db) = Self::open_dbs(
+            db_root_path.as_ref(),
+            rocksdb_configs,
+            readonly,
+            max_num_nodes_per_lru_cache_shard,
+        )?;
 
         let mut myself = Self::new_with_dbs(
             ledger_db,
@@ -365,7 +374,6 @@ impl AptosDB {
             state_kv_db,
             pruner_config,
             buffered_state_target_items,
-            max_num_nodes_per_lru_cache_shard,
             readonly,
         );
 
@@ -380,57 +388,46 @@ impl AptosDB {
         db_root_path: P,
         rocksdb_configs: RocksdbConfigs,
         readonly: bool,
-    ) -> Result<(Arc<DB>, DB, StateKvDb)> {
+        max_num_nodes_per_lru_cache_shard: usize,
+    ) -> Result<(Arc<DB>, StateMerkleDb, StateKvDb)> {
         let instant = Instant::now();
 
         let ledger_db_path = db_root_path.as_ref().join(LEDGER_DB_NAME);
-        let state_merkle_db_path = db_root_path.as_ref().join(STATE_MERKLE_DB_NAME);
 
-        let (ledger_db, state_merkle_db) = if readonly {
-            (
-                DB::open_cf_readonly(
-                    &gen_rocksdb_options(&rocksdb_configs.ledger_db_config, true),
-                    ledger_db_path.clone(),
-                    LEDGER_DB_NAME,
-                    ledger_db_column_families(),
-                )?,
-                DB::open_cf_readonly(
-                    &gen_rocksdb_options(&rocksdb_configs.state_merkle_db_config, true),
-                    state_merkle_db_path.clone(),
-                    STATE_MERKLE_DB_NAME,
-                    state_merkle_db_column_families(),
-                )?,
-            )
+        let ledger_db = if readonly {
+            DB::open_cf_readonly(
+                &gen_rocksdb_options(&rocksdb_configs.ledger_db_config, true),
+                ledger_db_path.clone(),
+                LEDGER_DB_NAME,
+                ledger_db_column_families(),
+            )?
         } else {
-            (
-                DB::open_cf(
-                    &gen_rocksdb_options(&rocksdb_configs.ledger_db_config, false),
-                    ledger_db_path.clone(),
-                    LEDGER_DB_NAME,
-                    gen_ledger_cfds(&rocksdb_configs.ledger_db_config),
-                )?,
-                DB::open_cf(
-                    &gen_rocksdb_options(&rocksdb_configs.state_merkle_db_config, false),
-                    state_merkle_db_path.clone(),
-                    STATE_MERKLE_DB_NAME,
-                    gen_state_merkle_cfds(&rocksdb_configs.state_merkle_db_config),
-                )?,
-            )
+            DB::open_cf(
+                &gen_rocksdb_options(&rocksdb_configs.ledger_db_config, false),
+                ledger_db_path.clone(),
+                LEDGER_DB_NAME,
+                gen_ledger_cfds(&rocksdb_configs.ledger_db_config),
+            )?
         };
 
         let ledger_db = Arc::new(ledger_db);
         let state_kv_db = StateKvDb::new(
-            db_root_path,
+            db_root_path.as_ref(),
             rocksdb_configs,
             readonly,
             Arc::clone(&ledger_db),
         )?;
+        let state_merkle_db = StateMerkleDb::new(
+            db_root_path,
+            rocksdb_configs,
+            readonly,
+            max_num_nodes_per_lru_cache_shard,
+        )?;
 
         info!(
             ledger_db_path = ledger_db_path,
-            state_merkle_db_path = state_merkle_db_path,
             time_ms = %instant.elapsed().as_millis(),
-            "Opened AptosDB (LedgerDB + StateMerkleDB).",
+            "Opened AptosDB.",
         );
 
         Ok((ledger_db, state_merkle_db, state_kv_db))
@@ -2004,8 +2001,10 @@ impl DbWriter for AptosDB {
                 .save_min_readable_version(version, &state_kv_batch)?;
 
             // Apply the change set writes to the database (atomically) and update in-memory state
+            //
+            // TODO(grao): Support sharding here.
             self.state_merkle_db
-                .clone()
+                .metadata_db()
                 .write_schemas(state_merkle_batch)?;
             self.state_kv_db
                 .clone()

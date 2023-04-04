@@ -56,6 +56,8 @@ pub struct RocksdbConfigs {
     pub state_merkle_db_config: RocksdbConfig,
     // Note: Not ready for production use yet.
     pub use_state_kv_db: bool,
+    // Note: Not ready for production use yet.
+    pub use_sharded_state_merkle_db: bool,
     pub state_kv_db_config: RocksdbConfig,
     pub index_db_config: RocksdbConfig,
 }
@@ -66,6 +68,7 @@ impl Default for RocksdbConfigs {
             ledger_db_config: RocksdbConfig::default(),
             state_merkle_db_config: RocksdbConfig::default(),
             use_state_kv_db: false,
+            use_sharded_state_merkle_db: false,
             state_kv_db_config: RocksdbConfig::default(),
             index_db_config: RocksdbConfig {
                 max_open_files: 1000,
