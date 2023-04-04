@@ -326,6 +326,11 @@ impl EmitJobRequest {
                     "TPS ({}) needs to be larger than 0",
                     tps,
                 );
+                assert!(
+                    clients_count > 0,
+                    "Number of clients ({}) needs to be larger than 0",
+                    clients_count,
+                );
 
                 // compute num_workers_per_endpoint, so that target_tps is achieved.
                 let num_workers_per_endpoint =
