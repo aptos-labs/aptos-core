@@ -23,7 +23,7 @@ TERRAFORM_VERSION=0.12.26
 HELM_VERSION=3.2.4
 VAULT_VERSION=1.5.0
 Z3_VERSION=4.11.2
-CVC5_VERSION=1.0.5
+CVC5_VERSION=0.0.3
 DOTNET_VERSION=6.0
 BOOGIE_VERSION=2.15.8
 ALLURE_VERSION=2.15.pr1135
@@ -553,7 +553,8 @@ function install_cvc5 {
   mkdir -p "$TMPFILE"/
   (
     cd "$TMPFILE" || exit
-    curl -o "${INSTALL_DIR}cvc5" -Ls "https://github.com/cvc5/cvc5/releases/download/cvc5-$CVC5_VERSION/$CVC5_PKG"
+    curl -LOs "https://github.com/cvc5/cvc5/releases/download/cvc5-$CVC5_VERSION/$CVC5_PKG"
+    cp "$CVC5_PKG" "${INSTALL_DIR}cvc5"
     chmod +x "${INSTALL_DIR}cvc5"
   )
   rm -rf "$TMPFILE"
