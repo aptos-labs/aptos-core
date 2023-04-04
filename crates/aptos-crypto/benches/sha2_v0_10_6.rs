@@ -12,7 +12,7 @@ use rand::thread_rng;
 use sha2_0_10_6::Digest;
 fn bench_group(c: &mut Criterion) {
     let mut group = c.benchmark_group("sha2_v0_10_6");
-    for msg_len in [0, 1, 4, 16, 64, 256, 1024, 4096, 16384, 65536] {
+    for msg_len in [0, 64, 256, 1024, 4096, 16384, 65536, 262144, 1048576] {
         group.bench_function(BenchmarkId::new("sha256", msg_len), move |b| {
             b.iter_with_setup(
                 || random_bytes(&mut thread_rng(), msg_len),
