@@ -431,8 +431,9 @@ impl TransactionRestoreBatchController {
                         TRANSACTION_SAVE_VERSION.set(last_saved as i64);
                         info!(
                             version = last_saved,
-                            accumulative_tps = (last_saved - global_first_version + 1) as f64
-                                / start.elapsed().as_secs_f64(),
+                            accumulative_tps = ((last_saved - global_first_version + 1) as f64
+                                / start.elapsed().as_secs_f64())
+                                as u64,
                             "Transactions saved."
                         );
                     }
@@ -517,8 +518,9 @@ impl TransactionRestoreBatchController {
                         TRANSACTION_REPLAY_VERSION.set(v as i64);
                         info!(
                             version = v,
-                            accumulative_tps =
-                                total_replayed as f64 / replay_start.elapsed().as_secs_f64(),
+                            accumulative_tps = (total_replayed as f64
+                                / replay_start.elapsed().as_secs_f64())
+                                as u64,
                             "Transactions replayed."
                         );
                         Ok(v)
@@ -530,7 +532,8 @@ impl TransactionRestoreBatchController {
             .await?;
         info!(
             total_replayed = total_replayed,
-            accumulative_tps = total_replayed as f64 / replay_start.elapsed().as_secs_f64(),
+            accumulative_tps =
+                (total_replayed as f64 / replay_start.elapsed().as_secs_f64()) as u64,
             "Replay finished."
         );
         Ok(())
@@ -562,8 +565,9 @@ impl TransactionRestoreBatchController {
                 VERIFY_TRANSACTION_VERSION.set(last_version as i64);
                 info!(
                     version = last_version,
-                    accumulative_tps =
-                        (last_version - first_version + 1) as f64 / start.elapsed().as_secs_f64(),
+                    accumulative_tps = ((last_version - first_version + 1) as f64
+                        / start.elapsed().as_secs_f64())
+                        as u64,
                     "Transactions verified."
                 );
                 Ok(analysis)
