@@ -796,9 +796,8 @@ NOTE: Membership check in <code>S</code> is performed inside, which can be expen
 
 ## Function `hash_to`
 
-Hash an arbitrary-length byte array <code>msg</code> into structure <code>S</code> using the given hash suite <code>H</code>.
-A unique domain separation tag <code>dst</code> is required
-for each independent collision-resistent mapping involved in the protocol built atop.
+Hash an arbitrary-length byte array <code>msg</code> into structure <code>S</code> with a domain separation tag <code>dst</code>
+using the given hash-to-structure suite <code>H</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_hash_to">hash_to</a>&lt;S, H&gt;(dst: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, msg: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;

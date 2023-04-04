@@ -250,9 +250,8 @@ module aptos_std::algebra {
         }
     }
 
-    /// Hash an arbitrary-length byte array `msg` into structure `S` using the given hash suite `H`.
-    /// A unique domain separation tag `dst` is required
-    /// for each independent collision-resistent mapping involved in the protocol built atop.
+    /// Hash an arbitrary-length byte array `msg` into structure `S` with a domain separation tag `dst`
+    /// using the given hash-to-structure suite `H`.
     public fun hash_to<S, H>(dst: &vector<u8>, msg: &vector<u8>): Element<S> {
         abort_unless_cryptography_algebra_natives_enabled();
         Element {

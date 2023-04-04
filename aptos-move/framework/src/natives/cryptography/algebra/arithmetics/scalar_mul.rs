@@ -54,6 +54,7 @@ macro_rules! ark_scalar_mul_internal {
     }};
 }
 
+/// WARNING: Be careful with the unwrap() below, if you modify this if statement.
 fn ark_msm_window_size(num_entries: usize) -> usize {
     if num_entries < 32 {
         3

@@ -1,260 +1,235 @@
 /// This module defines marker types, constants and test cases for working with BLS12-381 curves
 /// using the generic API defined in `algebra.move`.
-///
 /// See https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-pairing-friendly-curves-11#name-bls-curves-for-the-128-bit-
 /// for the full specification of BLS12-381 curves.
 ///
-/// Currently-supported BLS12-381 structures include `Fq12`, `Fr`, `G1Affine`, `G2Affine` and `Gt`,
+/// Currently-supported BLS12-381 structures include `Fq12`, `Fr`, `G1`, `G2` and `Gt`,
 /// along with their widely-used serialization formats,
-/// the pairing between `G1Affine`, `G2Affine` and `Gt`,
-/// and the hash-to-curve operations for `G1Affine` and `G2Affine` defined in https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-16.
+/// the pairing between `G1`, `G2` and `Gt`,
+/// and the hash-to-curve operations for `G1` and `G2` defined in https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-16.
+///
+/// Other unimplemented BLS12-381 structures and serialization formats are also listed here,
+/// as they help define some of the currently supported structures.
+/// Their implementation may also be added in the future.
+///
+/// `Fq`: the finite field $F_q$ used in BLS12-381 curves with a prime order $q$ equal to
+/// 0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab.
+///
+/// `FormatFqLsb`: a serialization format for `Fq` elements,
+/// where an element is represented by a byte array `b[]` of size 48 with the least significant byte (LSB) coming first.
+///
+/// `FormatFqMsb`: a serialization format for `Fq` elements,
+/// where an element is represented by a byte array `b[]` of size 48 with the most significant byte (MSB) coming first.
+///
+/// `Fq2`: the finite field $F_{q^2}$ used in BLS12-381 curves,
+/// which is an extension field of `Fq`, constructed as $F_{q^2}=F_q[u]/(u^2+1)$.
+///
+/// `FormatFq2LscLsb`: a serialization format for `Fq2` elements,
+/// where an element in the form $(c_0+c_1\cdot u)$ is represented by a byte array `b[]` of size 96,
+/// which is a concatenation of its coefficients serialized, with the least significant coefficient (LSC) coming first:
+/// - `b[0..48]` is $c_0$ serialized using `FormatFqLsb`.
+/// - `b[48..96]` is $c_1$ serialized using `FormatFqLsb`.
+///
+/// `FormatFq2MscMsb`: a serialization format for `Fq2` elements,
+/// where an element in the form $(c_0+c_1\cdot u)$ is represented by a byte array `b[]` of size 96,
+/// which is a concatenation of its coefficients serialized, with the most significant coefficient (MSC) coming first:
+/// - `b[0..48]` is $c_1$ serialized using `FormatFqLsb`.
+/// - `b[48..96]` is $c_0$ serialized using `FormatFqLsb`.
+///
+/// `Fq6`: the finite field $F_{q^6}$ used in BLS12-381 curves,
+/// which is an extension field of `Fq2`, constructed as $F_{q^6}=F_{q^2}[v]/(v^3-u-1)$.
+///
+/// `FormatFq6LscLsb`: a serialization scheme for `Fq6` elements,
+/// where an element in the form $(c_0+c_1\cdot v+c_2\cdot v^2)$ is represented by a byte array `b[]` of size 288,
+/// which is a concatenation of its coefficients serialized, with the least significant coefficient (LSC) coming first:
+/// - `b[0..96]` is $c_0$ serialized using `FormatFq2LscLsb`.
+/// - `b[96..192]` is $c_1$ serialized using `FormatFq2LscLsb`.
+/// - `b[192..288]` is $c_2$ serialized using `FormatFq2LscLsb`.
+///
+/// `G1Full`: a group constructed by the points on the BLS12-381 curve $E(F_q): y^2=x^3+4$ and the point at infinity,
+/// under the elliptic curve point addition.
+/// It contains the prime-order subgroup $G_1$ used in pairing.
+///
+/// `G2Full`: a group constructed by the points on a curve $E'(F_{q^2}): y^2=x^3+4(u+1)$ and the point at infinity,
+/// under the elliptic curve point addition.
+/// It contains the prime-order subgroup $G_2$ used in pairing.
 module aptos_std::algebra_bls12381 {
     //
     // Marker types + serialization formats begin.
     //
-    /// The finite field $F_q$ used in BLS12-381 curves.
-    /// It has a prime order $q$ equal to 0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab.
-    ///
-    /// NOTE: currently information-only and no operations are implemented for this structure.
-    struct Fq {}
 
-    /// A serialization format for `Fq` elements,
-    /// where an element is represented by a byte array `b[]` of size 48 with the least signature byte coming first.
-    ///
-    /// NOTE: currently information-only, not implemented.
-    struct FqFormatLsb {}
-
-    /// A serialization format for `Fq` elements,
-    /// where an element is represented by a byte array `b[]` of size 48 with the most significant byte coming first.
-    ///
-    /// NOTE: currently information-only, not implemented.
-    struct FqFormatMsb {}
-
-    /// The finite field $F_{q^2}$ used in BLS12-381 curves.
-    /// It is an extension field of `Fq`, constructed as $F_{q^2}=F_q[u]/(u^2+1)$.
-    ///
-    /// NOTE: currently information-only and no operations are implemented for this structure.
-    struct Fq2 {}
-
-    /// A serialization format for `Fq2` elements.
-    /// where an element in the form $(c_0+c_1\cdot u)$ is represented by a byte array `b[]` of size 96
-    /// with the following rules.
-    /// - `b[0..48]` is $c_0$ serialized using `FqFormatLsb`.
-    /// - `b[48..96]` is $c_1$ serialized using `FqFormatLsb`.
-    ///
-    /// NOTE: currently information-only, not implemented.
-    struct Fq2FormatLscLsb {}
-
-    /// A serialization format for `Fq2` elements,
-    /// where an element in the form $(c_1\cdot u+c_0)$ is represented by a byte array `b[]` of size 96,
-    /// with the following rules.
-    /// - `b[0..48]` is $c_1$ serialized using `FqFormatMsb`.
-    /// - `b[48..96]` is $c_0$ serialized using `FqFormatMsb`.
-    ///
-    /// NOTE: currently information-only, not implemented.
-    struct Fq2FormatMscMsb {}
-
-    /// The finite field $F_{q^6}$ used in BLS12-381 curves.
-    /// It is an extension field of `Fq2`, constructed as $F_{q^6}=F_{q^2}[v]/(v^3-u-1)$.
-    ///
-    /// NOTE: currently information-only and no operations are implemented for this structure.
-    struct Fq6 {}
-
-    /// A serialization scheme for `Fq6` elements,
-    /// where an element $(c_0+c_1\cdot v+c_2\cdot v^2)$ is represented by a byte array `b[]` of size 288,
-    /// with the following rules.
-    /// - `b[0..96]` is $c_0$ serialized using `Fq2FormatLscLsb`.
-    /// - `b[96..192]` is $c_1$ serialized using `Fq2FormatLscLsb`.
-    /// - `b[192..288]` is $c_2$ serialized using `Fq2FormatLscLsb`.
-    ///
-    /// NOTE: currently information-only, not implemented.
-    struct Fq6FormatLscLsb {}
-
-    /// The finite field $F_{q^12}$ used in BLS12-381 curves.
-    /// It is an extension field of `Fq6`, constructed as $F_{q^12}=F_{q^6}[w]/(w^2-v)$.
+    /// The finite field $F_{q^12}$ used in BLS12-381 curves,
+    /// which is an extension field of `Fq6` (defined in the module documentation), constructed as $F_{q^12}=F_{q^6}[w]/(w^2-v)$.
     struct Fq12 {}
 
     /// A serialization scheme for `Fq12` elements,
-    /// where an element $(c_0+c_1\cdot w)$ is represented by a byte array `b[]` of size 576.
-    /// `b[0..288]` is $c_0$ serialized using `Fq6FormatLscLsb`.
-    /// `b[288..576]` is $c_1$ serialized using `Fq6FormatLscLsb`.
+    /// where an element $(c_0+c_1\cdot w)$ is represented by a byte array `b[]` of size 576,
+    /// which is a concatenation of its coefficients serialized, with the least significant coefficient (LSC) coming first.
+    /// - `b[0..288]` is $c_0$ serialized using `FormatFq6LscLsb` (defined in the module documentation).
+    /// - `b[288..576]` is $c_1$ serialized using `FormatFq6LscLsb`.
     ///
     /// NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
-    struct Fq12FormatLscLsb {}
-
-    /// A group constructed by the points on the BLS12-381 curve $E(F_q): y^2=x^3+4$ and the point at infinity,
-    /// under the elliptic curve point addition.
-    /// It contains the prime-order subgroup $G_1$ used in pairing.
-    /// The identity is the point at infinity.
-    ///
-    /// NOTE: currently information-only and no operations are implemented for this structure.
-    struct G1AffineParent {}
+    struct FormatFq12LscLsb {}
 
     /// The group $G_1$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow G_t$.
-    /// It is subgroup of `G1AffineParent`.
-    /// It has a prime order $r$ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
-    /// (so `Fr` is the scalar field).
-    struct G1Affine {}
+    /// It is a subgroup of `G1Full` (defined in the module documentation) with a prime order $r$
+    /// equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
+    /// (so `Fr` is the associated scalar field).
+    struct G1 {}
 
-    /// A serialization scheme for `G1Affine` elements derived from
+    /// A serialization scheme for `G1` elements derived from
     /// https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-11.html#name-zcash-serialization-format-.
     ///
-    /// Below is the serialization procedure that takes a `G1Affine` element `p` and outputs a byte array of size 96.
+    /// Below is the serialization procedure that takes a `G1` element `p` and outputs a byte array of size 96.
     /// 1. Let `(x,y)` be the coordinates of `p` if `p` is on the curve, or `(0,0)` otherwise.
-    /// 1. Serialize `x` into `b_x[]` using `FqFormatMsb`.
-    /// 1. Serialize `y` into `b_y[]` using `FqFormatMsb`.
+    /// 1. Serialize `x` and `y` into `b_x[]` and `b_y[]` respectively using `FormatFqMsb` (defined in the module documentation).
     /// 1. Concatenate `b_x[]` and `b_y[]` into `b[]`.
     /// 1. If `p` is the point at infinity, set the infinity bit: `b[0]: = b[0] | 0x40`.
     /// 1. Return `b[]`.
     ///
-    /// Below is the deserialization procedure that takes a byte array `b[]` and outputs either a `G1Affine` element or none.
+    /// Below is the deserialization procedure that takes a byte array `b[]` and outputs either a `G1` element or none.
     /// 1. If the size of `b[]` is not 96, return none.
     /// 1. Compute the compression flag as `b[0] & 0x80 != 0`.
     /// 1. If the compression flag is true, return none.
     /// 1. Compute the infinity flag as `b[0] & 0x40 != 0`.
     /// 1. If the infinity flag is set, return the point at infinity.
-    /// 1. Deserialize `[b[0] & 0x1f, b[1], ..., b[47]]` to `x` using `FqFormatMsb`. If `x` is none, return none.
-    /// 1. Deserialize `[b[48], ..., b[95]]` to `y` using `FqFormatMsb`. If `y` is none, return none.
+    /// 1. Deserialize `[b[0] & 0x1f, b[1], ..., b[47]]` to `x` using `FormatFqMsb`. If `x` is none, return none.
+    /// 1. Deserialize `[b[48], ..., b[95]]` to `y` using `FormatFqMsb`. If `y` is none, return none.
     /// 1. Check if `(x,y)` is on curve `E`. If not, return none.
     /// 1. Check if `(x,y)` is in the subgroup of order `r`. If not, return none.
     /// 1. Return `(x,y)`.
     ///
     /// NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
-    struct G1AffineFormatUncompressed {}
+    struct FormatG1AffineUncompressed {}
 
-    /// A serialization scheme for `G1Affine` elements derived from
+    /// A serialization scheme for `G1` elements derived from
     /// https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-11.html#name-zcash-serialization-format-.
     ///
-    /// Below is the serialization procedure that takes a `G1Affine` element `p` and outputs a byte array of size 48.
+    /// Below is the serialization procedure that takes a `G1` element `p` and outputs a byte array of size 48.
     /// 1. Let `(x,y)` be the coordinates of `p` if `p` is on the curve, or `(0,0)` otherwise.
-    /// 1. Serialize `x` into `b[]` using `FqFormatMsb`.
+    /// 1. Serialize `x` into `b[]` using `FormatFqMsb` (defined in the module documentation).
     /// 1. Set the compression bit: `b[0] := b[0] | 0x80`.
     /// 1. If `p` is the point at infinity, set the infinity bit: `b[0]: = b[0] | 0x40`.
     /// 1. If `y > -y`, set the lexicographical flag: `b[0] := b[0] | 0x20`.
     /// 1. Return `b[]`.
     ///
-    /// Below is the deserialization procedure that takes a byte array `b[]` and outputs either a `G1Affine` element or none.
+    /// Below is the deserialization procedure that takes a byte array `b[]` and outputs either a `G1` element or none.
     /// 1. If the size of `b[]` is not 48, return none.
     /// 1. Compute the compression flag as `b[0] & 0x80 != 0`.
     /// 1. If the compression flag is false, return none.
     /// 1. Compute the infinity flag as `b[0] & 0x40 != 0`.
     /// 1. If the infinity flag is set, return the point at infinity.
     /// 1. Compute the lexicographical flag as `b[0] & 0x20 != 0`.
-    /// 1. Deserialize `[b[0] & 0x1f, b[1], ..., b[47]]` to `x` using `FqFormatMsb`. If `x` is none, return none.
+    /// 1. Deserialize `[b[0] & 0x1f, b[1], ..., b[47]]` to `x` using `FormatFqMsb`. If `x` is none, return none.
     /// 1. Solve the curve equation with `x` for `y`. If no such `y` exists, return none.
     /// 1. Let `y'` be `max(y,-y)` if the lexicographical flag is set, or `min(y,-y)` otherwise.
     /// 1. Check if `(x,y')` is in the subgroup of order `r`. If not, return none.
     /// 1. Return `(x,y')`.
     ///
     /// NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
-    struct G1AffineFormatCompressed {}
-
-    /// A group constructed by the points on a curve $E'(F_{q^2})$ and the point at infinity under the elliptic curve point addition.
-    /// $E'(F_{q^2})$ is an elliptic curve $y^2=x^3+4(u+1)$ defined over $F_{q^2}$.
-    /// The identity of `G2Affine` is the point at infinity.
-    ///
-    /// NOTE: currently information-only and no operations are implemented for this structure.
-    struct G2AffineParent {}
+    struct FormatG1AffineCompressed {}
 
     /// The group $G_2$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow G_t$.
-    /// It is a subgroup of `G2AffineParent`.
-    /// It has a prime order $r$ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
+    /// It is a subgroup of `G2Full` (defined in the module documentation) with a prime order $r$ equal to
+    /// 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
     /// (so `Fr` is the scalar field).
-    struct G2Affine {}
+    struct G2 {}
 
-    /// A serialization scheme for `G2Affine` elements derived from
+    /// A serialization scheme for `G2` elements derived from
     /// https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-11.html#name-zcash-serialization-format-.
     ///
-    /// Below is the serialization procedure that takes a `G2Affine` element `p` and outputs a byte array of size 192.
+    /// Below is the serialization procedure that takes a `G2` element `p` and outputs a byte array of size 192.
     /// 1. Let `(x,y)` be the coordinates of `p` if `p` is on the curve, or `(0,0)` otherwise.
-    /// 1. Serialize `x` into `b_x[]` using `Fq2FormatMscMsb`.
-    /// 1. Serialize `y` into `b_y[]` using `Fq2FormatMscMsb`.
+    /// 1. Serialize `x` and `y` into `b_x[]` and `b_y[]` respectively using `FormatFq2MscMsb` (defined in the module documentation).
     /// 1. Concatenate `b_x[]` and `b_y[]` into `b[]`.
     /// 1. If `p` is the point at infinity, set the infinity bit in `b[]`: `b[0]: = b[0] | 0x40`.
     /// 1. Return `b[]`.
     ///
-    /// Below is the deserialization procedure that takes a byte array `b[]` and outputs either a `G2Affine` element or none.
+    /// Below is the deserialization procedure that takes a byte array `b[]` and outputs either a `G2` element or none.
     /// 1. If the size of `b[]` is not 192, return none.
     /// 1. Compute the compression flag as `b[0] & 0x80 != 0`.
     /// 1. If the compression flag is true, return none.
     /// 1. Compute the infinity flag as `b[0] & 0x40 != 0`.
     /// 1. If the infinity flag is set, return the point at infinity.
-    /// 1. Deserialize `[b[0] & 0x1f, ..., b[95]]` to `x` using `Fq2FormatMscMsb`. If `x` is none, return none.
-    /// 1. Deserialize `[b[96], ..., b[191]]` to `y` using `Fq2FormatMscMsb`. If `y` is none, return none.
+    /// 1. Deserialize `[b[0] & 0x1f, ..., b[95]]` to `x` using `FormatFq2MscMsb`. If `x` is none, return none.
+    /// 1. Deserialize `[b[96], ..., b[191]]` to `y` using `FormatFq2MscMsb`. If `y` is none, return none.
     /// 1. Check if `(x,y)` is on the curve `E'`. If not, return none.
     /// 1. Check if `(x,y)` is in the subgroup of order `r`. If not, return none.
     /// 1. Return `(x,y)`.
     ///
     /// NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
-    struct G2AffineFormatUncompressed {}
+    struct FormatG2AffineUncompressed {}
 
-    /// A serialization scheme for `G2Affine` elements derived from
+    /// A serialization scheme for `G2` elements derived from
     /// https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-11.html#name-zcash-serialization-format-.
     ///
-    /// Below is the serialization procedure that takes a `G2Affine` element `p` and outputs a byte array of size 96.
+    /// Below is the serialization procedure that takes a `G2` element `p` and outputs a byte array of size 96.
     /// 1. Let `(x,y)` be the coordinates of `p` if `p` is on the curve, or `(0,0)` otherwise.
-    /// 1. Serialize `x` into `b[]` using `Fq2FormatMscMsb`.
+    /// 1. Serialize `x` into `b[]` using `FormatFq2MscMsb` (defined in the module documentation).
     /// 1. Set the compression bit: `b[0] := b[0] | 0x80`.
     /// 1. If `p` is the point at infinity, set the infinity bit: `b[0]: = b[0] | 0x40`.
     /// 1. If `y > -y`, set the lexicographical flag: `b[0] := b[0] | 0x20`.
     /// 1. Return `b[]`.
     ///
-    /// Below is the deserialization procedure that takes a byte array `b[]` and outputs either a `G2Affine` element or none.
+    /// Below is the deserialization procedure that takes a byte array `b[]` and outputs either a `G2` element or none.
     /// 1. If the size of `b[]` is not 96, return none.
     /// 1. Compute the compression flag as `b[0] & 0x80 != 0`.
     /// 1. If the compression flag is false, return none.
     /// 1. Compute the infinity flag as `b[0] & 0x40 != 0`.
     /// 1. If the infinity flag is set, return the point at infinity.
     /// 1. Compute the lexicographical flag as `b[0] & 0x20 != 0`.
-    /// 1. Deserialize `[b[0] & 0x1f, b[1], ..., b[95]]` to `x` using `Fq2FormatMscMsb`. If `x` is none, return none.
+    /// 1. Deserialize `[b[0] & 0x1f, b[1], ..., b[95]]` to `x` using `FormatFq2MscMsb`. If `x` is none, return none.
     /// 1. Solve the curve equation with `x` for `y`. If no such `y` exists, return none.
     /// 1. Let `y'` be `max(y,-y)` if the lexicographical flag is set, or `min(y,-y)` otherwise.
     /// 1. Check if `(x,y')` is in the subgroup of order `r`. If not, return none.
     /// 1. Return `(x,y')`.
     ///
     /// NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
-    struct G2AffineFormatCompressed {}
+    struct FormatG2AffineCompressed {}
 
     /// The group $G_t$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow G_t$.
-    /// It is a multiplicative subgroup of `Fq12`.
-    /// It has a prime order $r$ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
+    /// It is a multiplicative subgroup of `Fq12`,
+    /// with a prime order $r$ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
     /// (so `Fr` is the scalar field).
     /// The identity of `Gt` is 1.
     struct Gt {}
 
-    /// A serialization scheme for `Gt` elements,
-    /// essentially `Fq12FormatLscLsb` but only applicable to `Gt` elements.
+    /// A serialization scheme for `Gt` elements.
+    ///
+    /// To serialize, it treats a `Gt` element `p` as an `Fq12` element and serialize it using `FormatFq12LscLsb`.
+    ///
+    /// To deserialize, it uses `FormatFq12LscLsb` to try deserializing to an `Fq12` element then test the membership in `Gt`.
     ///
     /// NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
-    struct GtFormat {}
+    struct FormatGt {}
 
     /// The finite field $F_r$ that can be used as the scalar fields
-    /// for the groups $G_1$, $G_2$, $G_t$ in BLS12-381-based pairing.
+    /// associated with the groups $G_1$, $G_2$, $G_t$ in BLS12-381-based pairing.
     struct Fr {}
 
     /// A serialization format for `Fr` elements,
-    /// where an element is represented by a byte array `b[]` of size 32 with the least significant byte coming first.
+    /// where an element is represented by a byte array `b[]` of size 32 with the least significant byte (LSB) coming first.
     ///
     /// NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0, blst-0.3.7.
-    struct FrFormatLsb {}
+    struct FormatFrLsb {}
 
     /// A serialization scheme for `Fr` elements,
-    /// where an element is represented by a byte array `b[]` of size 32 with the most significant byte coming first.
+    /// where an element is represented by a byte array `b[]` of size 32 with the most significant byte (MSB) coming first.
     ///
     /// NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0, blst-0.3.7.
-    struct FrFormatMsb {}
+    struct FormatFrMsb {}
 
     //
     // (Marker types + serialization formats end here.)
     // Hash-to-structure suites begin.
     //
 
-    /// The hash-to-curve suite `BLS12381G1_XMD:SHA-256_SSWU_RO_` that hashes a byte array into `G1Affine` elements.
+    /// The hash-to-curve suite `BLS12381G1_XMD:SHA-256_SSWU_RO_` that hashes a byte array into `G1` elements.
     ///
     /// Full specification is defined in https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-16#name-bls12-381-g1.
     struct HashG1XmdSha256SswuRo {}
 
-    /// The hash-to-curve suite `BLS12381G2_XMD:SHA-256_SSWU_RO_` that hashes a byte array into `G1Affine` elements.
+    /// The hash-to-curve suite `BLS12381G2_XMD:SHA-256_SSWU_RO_` that hashes a byte array into `G2` elements.
     ///
     /// Full specification is defined in https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-16#name-bls12-381-g2.
     struct HashG2XmdSha256SswuRo {}
@@ -295,17 +270,17 @@ module aptos_std::algebra_bls12381 {
         // Serialization/deserialization.
         let val_0 = zero<Fq12>();
         let val_1 = one<Fq12>();
-        assert!(FQ12_VAL_0_SERIALIZED == serialize<Fq12, Fq12FormatLscLsb>(&val_0), 1);
-        assert!(FQ12_VAL_1_SERIALIZED == serialize<Fq12, Fq12FormatLscLsb>(&val_1), 1);
+        assert!(FQ12_VAL_0_SERIALIZED == serialize<Fq12, FormatFq12LscLsb>(&val_0), 1);
+        assert!(FQ12_VAL_1_SERIALIZED == serialize<Fq12, FormatFq12LscLsb>(&val_1), 1);
         let val_7 = from_u64<Fq12>(7);
-        let val_7_another = std::option::extract(&mut deserialize<Fq12, Fq12FormatLscLsb>(&FQ12_VAL_7_SERIALIZED));
+        let val_7_another = std::option::extract(&mut deserialize<Fq12, FormatFq12LscLsb>(&FQ12_VAL_7_SERIALIZED));
         assert!(eq(&val_7, &val_7_another), 1);
-        assert!(FQ12_VAL_7_SERIALIZED == serialize<Fq12, Fq12FormatLscLsb>(&val_7), 1);
-        assert!(std::option::is_none(&deserialize<Fq12, Fq12FormatLscLsb>(&x"ffff")), 1);
+        assert!(FQ12_VAL_7_SERIALIZED == serialize<Fq12, FormatFq12LscLsb>(&val_7), 1);
+        assert!(std::option::is_none(&deserialize<Fq12, FormatFq12LscLsb>(&x"ffff")), 1);
 
         // Negation.
         let val_minus_7 = neg(&val_7);
-        assert!(FQ12_VAL_7_NEG_SERIALIZED == serialize<Fq12, Fq12FormatLscLsb>(&val_minus_7), 1);
+        assert!(FQ12_VAL_7_NEG_SERIALIZED == serialize<Fq12, FormatFq12LscLsb>(&val_minus_7), 1);
 
         // Addition.
         let val_9 = from_u64<Fq12>(9);
@@ -360,67 +335,67 @@ module aptos_std::algebra_bls12381 {
         enable_cryptography_algebra_natives(&fx);
 
         // Constants.
-        assert!(R_SERIALIZED == order<G1Affine>(), 1);
-        let point_at_infinity = zero<G1Affine>();
-        let generator = one<G1Affine>();
+        assert!(R_SERIALIZED == order<G1>(), 1);
+        let point_at_infinity = zero<G1>();
+        let generator = one<G1>();
 
         // Serialization/deserialization.
-        assert!(G1AFFINE_GENERATOR_SERIALIZED_UNCOMP == serialize<G1Affine, G1AffineFormatUncompressed>(&generator), 1);
-        assert!(G1AFFINE_GENERATOR_SERIALIZED_COMP == serialize<G1Affine, G1AffineFormatCompressed>(&generator), 1);
-        let generator_from_comp = std::option::extract(&mut deserialize<G1Affine, G1AffineFormatCompressed>(&G1AFFINE_GENERATOR_SERIALIZED_COMP));
-        let generator_from_uncomp = std::option::extract(&mut deserialize<G1Affine, G1AffineFormatUncompressed>(&G1AFFINE_GENERATOR_SERIALIZED_UNCOMP));
+        assert!(G1AFFINE_GENERATOR_SERIALIZED_UNCOMP == serialize<G1, FormatG1AffineUncompressed>(&generator), 1);
+        assert!(G1AFFINE_GENERATOR_SERIALIZED_COMP == serialize<G1, FormatG1AffineCompressed>(&generator), 1);
+        let generator_from_comp = std::option::extract(&mut deserialize<G1, FormatG1AffineCompressed>(&G1AFFINE_GENERATOR_SERIALIZED_COMP));
+        let generator_from_uncomp = std::option::extract(&mut deserialize<G1, FormatG1AffineUncompressed>(&G1AFFINE_GENERATOR_SERIALIZED_UNCOMP));
         assert!(eq(&generator, &generator_from_comp), 1);
         assert!(eq(&generator, &generator_from_uncomp), 1);
 
         // Deserialization should fail if given a byte array of correct size but the value is not a member.
-        assert!(std::option::is_none(&deserialize<Fq12, Fq12FormatLscLsb>(&x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
+        assert!(std::option::is_none(&deserialize<Fq12, FormatFq12LscLsb>(&x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
 
         // Deserialization should fail if given a byte array of wrong size.
-        assert!(std::option::is_none(&deserialize<Fq12, Fq12FormatLscLsb>(&x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
+        assert!(std::option::is_none(&deserialize<Fq12, FormatFq12LscLsb>(&x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
 
         assert!(
-            G1AFFINE_INF_SERIALIZED_UNCOMP == serialize<G1Affine, G1AffineFormatUncompressed>(&point_at_infinity), 1);
-        assert!(G1AFFINE_INF_SERIALIZED_COMP == serialize<G1Affine, G1AffineFormatCompressed>(&point_at_infinity), 1);
-        let inf_from_uncomp = std::option::extract(&mut deserialize<G1Affine, G1AffineFormatUncompressed>(&G1AFFINE_INF_SERIALIZED_UNCOMP
+            G1AFFINE_INF_SERIALIZED_UNCOMP == serialize<G1, FormatG1AffineUncompressed>(&point_at_infinity), 1);
+        assert!(G1AFFINE_INF_SERIALIZED_COMP == serialize<G1, FormatG1AffineCompressed>(&point_at_infinity), 1);
+        let inf_from_uncomp = std::option::extract(&mut deserialize<G1, FormatG1AffineUncompressed>(&G1AFFINE_INF_SERIALIZED_UNCOMP
         ));
-        let inf_from_comp = std::option::extract(&mut deserialize<G1Affine, G1AffineFormatCompressed>(&G1AFFINE_INF_SERIALIZED_COMP
+        let inf_from_comp = std::option::extract(&mut deserialize<G1, FormatG1AffineCompressed>(&G1AFFINE_INF_SERIALIZED_COMP
         ));
         assert!(eq(&point_at_infinity, &inf_from_comp), 1);
         assert!(eq(&point_at_infinity, &inf_from_uncomp), 1);
 
-        let point_7g_from_uncomp = std::option::extract(&mut deserialize<G1Affine, G1AffineFormatUncompressed>(&G1AFFINE_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP));
-        let point_7g_from_comp = std::option::extract(&mut deserialize<G1Affine, G1AffineFormatCompressed>(&G1AFFINE_GENERATOR_MUL_BY_7_SERIALIZED_COMP));
+        let point_7g_from_uncomp = std::option::extract(&mut deserialize<G1, FormatG1AffineUncompressed>(&G1AFFINE_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP));
+        let point_7g_from_comp = std::option::extract(&mut deserialize<G1, FormatG1AffineCompressed>(&G1AFFINE_GENERATOR_MUL_BY_7_SERIALIZED_COMP));
         assert!(eq(&point_7g_from_comp, &point_7g_from_uncomp), 1);
 
         // Deserialization should fail if given a point on the curve but off its prime-order subgroup, e.g., `(0,2)`.
-        assert!(std::option::is_none(&deserialize<G1Affine, G1AffineFormatUncompressed>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002")), 1);
-        assert!(std::option::is_none(&deserialize<G1Affine, G1AffineFormatCompressed>(&x"800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")), 1);
+        assert!(std::option::is_none(&deserialize<G1, FormatG1AffineUncompressed>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002")), 1);
+        assert!(std::option::is_none(&deserialize<G1, FormatG1AffineCompressed>(&x"800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")), 1);
 
         // Deserialization should fail if given a valid point in (Fq,Fq) but not on the curve.
-        assert!(std::option::is_none(&deserialize<G1Affine, G1AffineFormatUncompressed>(&x"8959e137e0719bf872abb08411010f437a8955bd42f5ba20fca64361af58ce188b1adb96ef229698bb7860b79e24ba12000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")), 1);
+        assert!(std::option::is_none(&deserialize<G1, FormatG1AffineUncompressed>(&x"8959e137e0719bf872abb08411010f437a8955bd42f5ba20fca64361af58ce188b1adb96ef229698bb7860b79e24ba12000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")), 1);
 
         // Deserialization should fail if given an invalid point (x not in Fq).
-        assert!(std::option::is_none(&deserialize<G1Affine, G1AffineFormatUncompressed>(&x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffa76e9853b35f5c9b2002d9e5833fd8f9ab4cd3934a4722a06f6055bfca720c91629811e2ecae7f0cf301b6d07898a90f")), 1);
-        assert!(std::option::is_none(&deserialize<G1Affine, G1AffineFormatCompressed>(&x"9fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
+        assert!(std::option::is_none(&deserialize<G1, FormatG1AffineUncompressed>(&x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffa76e9853b35f5c9b2002d9e5833fd8f9ab4cd3934a4722a06f6055bfca720c91629811e2ecae7f0cf301b6d07898a90f")), 1);
+        assert!(std::option::is_none(&deserialize<G1, FormatG1AffineCompressed>(&x"9fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
 
         // Deserialization should fail if given a byte array of wrong size.
-        assert!(std::option::is_none(&deserialize<G1Affine, G1AffineFormatUncompressed>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
-        assert!(std::option::is_none(&deserialize<G1Affine, G1AffineFormatCompressed>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
+        assert!(std::option::is_none(&deserialize<G1, FormatG1AffineUncompressed>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
+        assert!(std::option::is_none(&deserialize<G1, FormatG1AffineCompressed>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
 
         // Scalar multiplication.
         let scalar_7 = from_u64<Fr>(7);
         let point_7g_calc = scalar_mul(&generator, &scalar_7);
         assert!(eq(&point_7g_calc, &point_7g_from_comp), 1);
-        assert!(G1AFFINE_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP == serialize<G1Affine, G1AffineFormatUncompressed>(&point_7g_calc), 1);
-        assert!(G1AFFINE_GENERATOR_MUL_BY_7_SERIALIZED_COMP == serialize<G1Affine, G1AffineFormatCompressed>( &point_7g_calc), 1);
+        assert!(G1AFFINE_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP == serialize<G1, FormatG1AffineUncompressed>(&point_7g_calc), 1);
+        assert!(G1AFFINE_GENERATOR_MUL_BY_7_SERIALIZED_COMP == serialize<G1, FormatG1AffineCompressed>( &point_7g_calc), 1);
 
         // Multi-scalar multiplication.
         let num_entries = 1;
         while (num_entries < 10) {
             let scalars = rand_vector<Fr>(num_entries);
-            let elements = rand_vector<G1Affine>(num_entries);
+            let elements = rand_vector<G1>(num_entries);
 
-            let expected = zero<G1Affine>();
+            let expected = zero<G1>();
             let i = 0;
             while (i < num_entries) {
                 let element = std::vector::borrow(&elements, i);
@@ -443,8 +418,8 @@ module aptos_std::algebra_bls12381 {
 
         // Negation.
         let point_minus_7g_calc = neg(&point_7g_calc);
-        assert!(G1AFFINE_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP == serialize<G1Affine, G1AffineFormatCompressed>(&point_minus_7g_calc), 1);
-        assert!(G1AFFINE_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP == serialize<G1Affine, G1AffineFormatUncompressed>(&point_minus_7g_calc), 1);
+        assert!(G1AFFINE_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP == serialize<G1, FormatG1AffineCompressed>(&point_minus_7g_calc), 1);
+        assert!(G1AFFINE_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP == serialize<G1, FormatG1AffineUncompressed>(&point_minus_7g_calc), 1);
 
         // Addition.
         let scalar_9 = from_u64<Fr>(9);
@@ -458,11 +433,11 @@ module aptos_std::algebra_bls12381 {
 
         // Hash-to-group using suite `BLS12381G1_XMD:SHA-256_SSWU_RO_`.
         // Test vectors source: https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-bls12381g1_xmdsha-256_sswu_
-        let actual = hash_to<G1Affine, HashG1XmdSha256SswuRo>(&b"QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_", &b"");
-        let expected = std::option::extract(&mut deserialize<G1Affine, G1AffineFormatUncompressed>(&x"052926add2207b76ca4fa57a8734416c8dc95e24501772c814278700eed6d1e4e8cf62d9c09db0fac349612b759e79a108ba738453bfed09cb546dbb0783dbb3a5f1f566ed67bb6be0e8c67e2e81a4cc68ee29813bb7994998f3eae0c9c6a265"));
+        let actual = hash_to<G1, HashG1XmdSha256SswuRo>(&b"QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_", &b"");
+        let expected = std::option::extract(&mut deserialize<G1, FormatG1AffineUncompressed>(&x"052926add2207b76ca4fa57a8734416c8dc95e24501772c814278700eed6d1e4e8cf62d9c09db0fac349612b759e79a108ba738453bfed09cb546dbb0783dbb3a5f1f566ed67bb6be0e8c67e2e81a4cc68ee29813bb7994998f3eae0c9c6a265"));
         assert!(eq(&expected, &actual), 1);
-        let actual = hash_to<G1Affine, HashG1XmdSha256SswuRo>(&b"QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_", &b"abcdef0123456789");
-        let expected = std::option::extract(&mut deserialize<G1Affine, G1AffineFormatUncompressed>(&x"11e0b079dea29a68f0383ee94fed1b940995272407e3bb916bbf268c263ddd57a6a27200a784cbc248e84f357ce82d9803a87ae2caf14e8ee52e51fa2ed8eefe80f02457004ba4d486d6aa1f517c0889501dc7413753f9599b099ebcbbd2d709"));
+        let actual = hash_to<G1, HashG1XmdSha256SswuRo>(&b"QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_", &b"abcdef0123456789");
+        let expected = std::option::extract(&mut deserialize<G1, FormatG1AffineUncompressed>(&x"11e0b079dea29a68f0383ee94fed1b940995272407e3bb916bbf268c263ddd57a6a27200a784cbc248e84f357ce82d9803a87ae2caf14e8ee52e51fa2ed8eefe80f02457004ba4d486d6aa1f517c0889501dc7413753f9599b099ebcbbd2d709"));
         assert!(eq(&expected, &actual), 1);
     }
 
@@ -488,56 +463,56 @@ module aptos_std::algebra_bls12381 {
         enable_cryptography_algebra_natives(&fx);
 
         // Special constants.
-        assert!(R_SERIALIZED == order<G2Affine>(), 1);
-        let point_at_infinity = zero<G2Affine>();
-        let generator = one<G2Affine>();
+        assert!(R_SERIALIZED == order<G2>(), 1);
+        let point_at_infinity = zero<G2>();
+        let generator = one<G2>();
 
         // Serialization/deserialization.
-        assert!(G2AFFINE_GENERATOR_SERIALIZED_COMP == serialize<G2Affine, G2AffineFormatCompressed>(&generator), 1);
-        assert!(G2AFFINE_GENERATOR_SERIALIZED_UNCOMP == serialize<G2Affine, G2AffineFormatUncompressed>(&generator), 1);
-        let generator_from_uncomp = std::option::extract(&mut deserialize<G2Affine, G2AffineFormatUncompressed>(&G2AFFINE_GENERATOR_SERIALIZED_UNCOMP));
-        let generator_from_comp = std::option::extract(&mut deserialize<G2Affine, G2AffineFormatCompressed>(&G2AFFINE_GENERATOR_SERIALIZED_COMP));
+        assert!(G2AFFINE_GENERATOR_SERIALIZED_COMP == serialize<G2, FormatG2AffineCompressed>(&generator), 1);
+        assert!(G2AFFINE_GENERATOR_SERIALIZED_UNCOMP == serialize<G2, FormatG2AffineUncompressed>(&generator), 1);
+        let generator_from_uncomp = std::option::extract(&mut deserialize<G2, FormatG2AffineUncompressed>(&G2AFFINE_GENERATOR_SERIALIZED_UNCOMP));
+        let generator_from_comp = std::option::extract(&mut deserialize<G2, FormatG2AffineCompressed>(&G2AFFINE_GENERATOR_SERIALIZED_COMP));
         assert!(eq(&generator, &generator_from_comp), 1);
         assert!(eq(&generator, &generator_from_uncomp), 1);
-        assert!(G2AFFINE_INF_SERIALIZED_UNCOMP == serialize<G2Affine, G2AffineFormatUncompressed>(&point_at_infinity), 1);
-        assert!(G2AFFINE_INF_SERIALIZED_COMP == serialize<G2Affine, G2AffineFormatCompressed>(&point_at_infinity), 1);
-        let inf_from_uncomp = std::option::extract(&mut deserialize<G2Affine, G2AffineFormatUncompressed>(&G2AFFINE_INF_SERIALIZED_UNCOMP));
-        let inf_from_comp = std::option::extract(&mut deserialize<G2Affine, G2AffineFormatCompressed>(&G2AFFINE_INF_SERIALIZED_COMP));
+        assert!(G2AFFINE_INF_SERIALIZED_UNCOMP == serialize<G2, FormatG2AffineUncompressed>(&point_at_infinity), 1);
+        assert!(G2AFFINE_INF_SERIALIZED_COMP == serialize<G2, FormatG2AffineCompressed>(&point_at_infinity), 1);
+        let inf_from_uncomp = std::option::extract(&mut deserialize<G2, FormatG2AffineUncompressed>(&G2AFFINE_INF_SERIALIZED_UNCOMP));
+        let inf_from_comp = std::option::extract(&mut deserialize<G2, FormatG2AffineCompressed>(&G2AFFINE_INF_SERIALIZED_COMP));
         assert!(eq(&point_at_infinity, &inf_from_comp), 1);
         assert!(eq(&point_at_infinity, &inf_from_uncomp), 1);
-        let point_7g_from_uncomp = std::option::extract(&mut deserialize<G2Affine, G2AffineFormatUncompressed>(&G2AFFINE_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP));
-        let point_7g_from_comp = std::option::extract(&mut deserialize<G2Affine, G2AffineFormatCompressed>(&G2AFFINE_GENERATOR_MUL_BY_7_SERIALIZED_COMP));
+        let point_7g_from_uncomp = std::option::extract(&mut deserialize<G2, FormatG2AffineUncompressed>(&G2AFFINE_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP));
+        let point_7g_from_comp = std::option::extract(&mut deserialize<G2, FormatG2AffineCompressed>(&G2AFFINE_GENERATOR_MUL_BY_7_SERIALIZED_COMP));
         assert!(eq(&point_7g_from_comp, &point_7g_from_uncomp), 1);
 
         // Deserialization should fail if given a point on the curve but not in the prime-order subgroup.
-        assert!(std::option::is_none(&deserialize<G1Affine, G1AffineFormatUncompressed>(&x"f037d4ccd5ee751eba1c1fd4c7edbb76d2b04c3a1f3f554827cf37c3acbc2dbb7cdb320a2727c2462d6c55ca1f637707b96eeebc622c1dbe7c56c34f93887c8751b42bd04f29253a82251c192ef27ece373993b663f4360505299c5bd18c890ddd862a6308796bf47e2265073c1f7d81afd69f9497fc1403e2e97a866129b43b672295229c21116d4a99f3e5c2ae720a31f181dbed8a93e15f909c20cf69d11a8879adbbe6890740def19814e6d4ed23fb0dcbd79291655caf48b466ac9cae04")), 1);
-        assert!(std::option::is_none(&deserialize<G1Affine, G1AffineFormatCompressed>(&x"f037d4ccd5ee751eba1c1fd4c7edbb76d2b04c3a1f3f554827cf37c3acbc2dbb7cdb320a2727c2462d6c55ca1f637707b96eeebc622c1dbe7c56c34f93887c8751b42bd04f29253a82251c192ef27ece373993b663f4360505299c5bd18c890d")), 1);
+        assert!(std::option::is_none(&deserialize<G1, FormatG1AffineUncompressed>(&x"f037d4ccd5ee751eba1c1fd4c7edbb76d2b04c3a1f3f554827cf37c3acbc2dbb7cdb320a2727c2462d6c55ca1f637707b96eeebc622c1dbe7c56c34f93887c8751b42bd04f29253a82251c192ef27ece373993b663f4360505299c5bd18c890ddd862a6308796bf47e2265073c1f7d81afd69f9497fc1403e2e97a866129b43b672295229c21116d4a99f3e5c2ae720a31f181dbed8a93e15f909c20cf69d11a8879adbbe6890740def19814e6d4ed23fb0dcbd79291655caf48b466ac9cae04")), 1);
+        assert!(std::option::is_none(&deserialize<G1, FormatG1AffineCompressed>(&x"f037d4ccd5ee751eba1c1fd4c7edbb76d2b04c3a1f3f554827cf37c3acbc2dbb7cdb320a2727c2462d6c55ca1f637707b96eeebc622c1dbe7c56c34f93887c8751b42bd04f29253a82251c192ef27ece373993b663f4360505299c5bd18c890d")), 1);
 
         // Deserialization should fail if given a valid point in (Fq2,Fq2) but not on the curve.
-        assert!(std::option::is_none(&deserialize<G1Affine, G1AffineFormatUncompressed>(&x"f037d4ccd5ee751eba1c1fd4c7edbb76d2b04c3a1f3f554827cf37c3acbc2dbb7cdb320a2727c2462d6c55ca1f637707b96eeebc622c1dbe7c56c34f93887c8751b42bd04f29253a82251c192ef27ece373993b663f4360505299c5bd18c890d000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")), 1);
+        assert!(std::option::is_none(&deserialize<G1, FormatG1AffineUncompressed>(&x"f037d4ccd5ee751eba1c1fd4c7edbb76d2b04c3a1f3f554827cf37c3acbc2dbb7cdb320a2727c2462d6c55ca1f637707b96eeebc622c1dbe7c56c34f93887c8751b42bd04f29253a82251c192ef27ece373993b663f4360505299c5bd18c890d000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")), 1);
 
         // Deserialization should fail if given an invalid point (x not in Fq2).
-        assert!(std::option::is_none(&deserialize<G1Affine, G1AffineFormatUncompressed>(&x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffdd862a6308796bf47e2265073c1f7d81afd69f9497fc1403e2e97a866129b43b672295229c21116d4a99f3e5c2ae720a31f181dbed8a93e15f909c20cf69d11a8879adbbe6890740def19814e6d4ed23fb0dcbd79291655caf48b466ac9cae04")), 1);
-        assert!(std::option::is_none(&deserialize<G1Affine, G1AffineFormatCompressed>(&x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
+        assert!(std::option::is_none(&deserialize<G1, FormatG1AffineUncompressed>(&x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffdd862a6308796bf47e2265073c1f7d81afd69f9497fc1403e2e97a866129b43b672295229c21116d4a99f3e5c2ae720a31f181dbed8a93e15f909c20cf69d11a8879adbbe6890740def19814e6d4ed23fb0dcbd79291655caf48b466ac9cae04")), 1);
+        assert!(std::option::is_none(&deserialize<G1, FormatG1AffineCompressed>(&x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
 
         // Deserialization should fail if given a byte array of wrong size.
-        assert!(std::option::is_none(&deserialize<G1Affine, G1AffineFormatUncompressed>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
-        assert!(std::option::is_none(&deserialize<G1Affine, G1AffineFormatCompressed>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
+        assert!(std::option::is_none(&deserialize<G1, FormatG1AffineUncompressed>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
+        assert!(std::option::is_none(&deserialize<G1, FormatG1AffineCompressed>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
 
         // Scalar multiplication.
         let scalar_7 = from_u64<Fr>(7);
         let point_7g_calc = scalar_mul(&generator, &scalar_7);
         assert!(eq(&point_7g_calc, &point_7g_from_comp), 1);
-        assert!(G2AFFINE_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP == serialize<G2Affine, G2AffineFormatUncompressed>(&point_7g_calc), 1);
-        assert!(G2AFFINE_GENERATOR_MUL_BY_7_SERIALIZED_COMP == serialize<G2Affine, G2AffineFormatCompressed>(&point_7g_calc), 1);
+        assert!(G2AFFINE_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP == serialize<G2, FormatG2AffineUncompressed>(&point_7g_calc), 1);
+        assert!(G2AFFINE_GENERATOR_MUL_BY_7_SERIALIZED_COMP == serialize<G2, FormatG2AffineCompressed>(&point_7g_calc), 1);
 
         // Multi-scalar multiplication.
         let num_entries = 1;
         while (num_entries < 10) {
             let scalars = rand_vector<Fr>(num_entries);
-            let elements = rand_vector<G2Affine>(num_entries);
+            let elements = rand_vector<G2>(num_entries);
 
-            let expected = zero<G2Affine>();
+            let expected = zero<G2>();
             let i = 0;
             while (i < num_entries) {
                 let element = std::vector::borrow(&elements, i);
@@ -560,8 +535,8 @@ module aptos_std::algebra_bls12381 {
 
         // Negation.
         let point_minus_7g_calc = neg(&point_7g_calc);
-        assert!(G2AFFINE_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP == serialize<G2Affine, G2AffineFormatCompressed>(&point_minus_7g_calc), 1);
-        assert!(G2AFFINE_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP == serialize<G2Affine, G2AffineFormatUncompressed>(&point_minus_7g_calc), 1);
+        assert!(G2AFFINE_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP == serialize<G2, FormatG2AffineCompressed>(&point_minus_7g_calc), 1);
+        assert!(G2AFFINE_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP == serialize<G2, FormatG2AffineUncompressed>(&point_minus_7g_calc), 1);
 
         // Addition.
         let scalar_9 = from_u64<Fr>(9);
@@ -575,11 +550,11 @@ module aptos_std::algebra_bls12381 {
 
         // Hash-to-group using suite `BLS12381G2_XMD:SHA-256_SSWU_RO_`.
         // Test vectors source: https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-bls12381g2_xmdsha-256_sswu_
-        let actual = hash_to<G2Affine, HashG2XmdSha256SswuRo>(&b"QUUX-V01-CS02-with-BLS12381G2_XMD:SHA-256_SSWU_RO_", &b"");
-        let expected = std::option::extract(&mut deserialize<G2Affine, G2AffineFormatUncompressed>(&x"05cb8437535e20ecffaef7752baddf98034139c38452458baeefab379ba13dff5bf5dd71b72418717047f5b0f37da03d0141ebfbdca40eb85b87142e130ab689c673cf60f1a3e98d69335266f30d9b8d4ac44c1038e9dcdd5393faf5c41fb78a12424ac32561493f3fe3c260708a12b7c620e7be00099a974e259ddc7d1f6395c3c811cdd19f1e8dbf3e9ecfdcbab8d60503921d7f6a12805e72940b963c0cf3471c7b2a524950ca195d11062ee75ec076daf2d4bc358c4b190c0c98064fdd92"));
+        let actual = hash_to<G2, HashG2XmdSha256SswuRo>(&b"QUUX-V01-CS02-with-BLS12381G2_XMD:SHA-256_SSWU_RO_", &b"");
+        let expected = std::option::extract(&mut deserialize<G2, FormatG2AffineUncompressed>(&x"05cb8437535e20ecffaef7752baddf98034139c38452458baeefab379ba13dff5bf5dd71b72418717047f5b0f37da03d0141ebfbdca40eb85b87142e130ab689c673cf60f1a3e98d69335266f30d9b8d4ac44c1038e9dcdd5393faf5c41fb78a12424ac32561493f3fe3c260708a12b7c620e7be00099a974e259ddc7d1f6395c3c811cdd19f1e8dbf3e9ecfdcbab8d60503921d7f6a12805e72940b963c0cf3471c7b2a524950ca195d11062ee75ec076daf2d4bc358c4b190c0c98064fdd92"));
         assert!(eq(&expected, &actual), 1);
-        let actual = hash_to<G2Affine, HashG2XmdSha256SswuRo>(&b"QUUX-V01-CS02-with-BLS12381G2_XMD:SHA-256_SSWU_RO_", &b"abcdef0123456789");
-        let expected = std::option::extract(&mut deserialize<G2Affine, G2AffineFormatUncompressed>(&x"190d119345b94fbd15497bcba94ecf7db2cbfd1e1fe7da034d26cbba169fb3968288b3fafb265f9ebd380512a71c3f2c121982811d2491fde9ba7ed31ef9ca474f0e1501297f68c298e9f4c0028add35aea8bb83d53c08cfc007c1e005723cd00bb5e7572275c567462d91807de765611490205a941a5a6af3b1691bfe596c31225d3aabdf15faff860cb4ef17c7c3be05571a0f8d3c08d094576981f4a3b8eda0a8e771fcdcc8ecceaf1356a6acf17574518acb506e435b639353c2e14827c8"));
+        let actual = hash_to<G2, HashG2XmdSha256SswuRo>(&b"QUUX-V01-CS02-with-BLS12381G2_XMD:SHA-256_SSWU_RO_", &b"abcdef0123456789");
+        let expected = std::option::extract(&mut deserialize<G2, FormatG2AffineUncompressed>(&x"190d119345b94fbd15497bcba94ecf7db2cbfd1e1fe7da034d26cbba169fb3968288b3fafb265f9ebd380512a71c3f2c121982811d2491fde9ba7ed31ef9ca474f0e1501297f68c298e9f4c0028add35aea8bb83d53c08cfc007c1e005723cd00bb5e7572275c567462d91807de765611490205a941a5a6af3b1691bfe596c31225d3aabdf15faff860cb4ef17c7c3be05571a0f8d3c08d094576981f4a3b8eda0a8e771fcdcc8ecceaf1356a6acf17574518acb506e435b639353c2e14827c8"));
         assert!(eq(&expected, &actual), 1);
     }
 
@@ -602,31 +577,31 @@ module aptos_std::algebra_bls12381 {
         let generator = one<Gt>();
 
         // Serialization/deserialization.
-        assert!(GT_GENERATOR_SERIALIZED == serialize<Gt, GtFormat>(&generator), 1);
-        let generator_from_deser = std::option::extract(&mut deserialize<Gt, GtFormat>(&GT_GENERATOR_SERIALIZED));
+        assert!(GT_GENERATOR_SERIALIZED == serialize<Gt, FormatGt>(&generator), 1);
+        let generator_from_deser = std::option::extract(&mut deserialize<Gt, FormatGt>(&GT_GENERATOR_SERIALIZED));
         assert!(eq(&generator, &generator_from_deser), 1);
-        assert!(FQ12_ONE_SERIALIZED == serialize<Gt, GtFormat>(&identity), 1);
-        let identity_from_deser = std::option::extract(&mut deserialize<Gt, GtFormat>(&FQ12_ONE_SERIALIZED));
+        assert!(FQ12_ONE_SERIALIZED == serialize<Gt, FormatGt>(&identity), 1);
+        let identity_from_deser = std::option::extract(&mut deserialize<Gt, FormatGt>(&FQ12_ONE_SERIALIZED));
         assert!(eq(&identity, &identity_from_deser), 1);
-        let element_7g_from_deser = std::option::extract(&mut deserialize<Gt, GtFormat>(&GT_GENERATOR_MUL_BY_7_SERIALIZED
+        let element_7g_from_deser = std::option::extract(&mut deserialize<Gt, FormatGt>(&GT_GENERATOR_MUL_BY_7_SERIALIZED
         ));
-        assert!(std::option::is_none(&deserialize<Gt, GtFormat>(&x"ffff")), 1);
+        assert!(std::option::is_none(&deserialize<Gt, FormatGt>(&x"ffff")), 1);
 
         // Deserialization should fail if given an element in Fq12 but not in the prime-order subgroup.
-        assert!(std::option::is_none(&deserialize<Gt, GtFormat>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")), 1);
+        assert!(std::option::is_none(&deserialize<Gt, FormatGt>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")), 1);
 
         // Deserialization should fail if given a byte array of wrong size.
-        assert!(std::option::is_none(&deserialize<Gt, GtFormat>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
+        assert!(std::option::is_none(&deserialize<Gt, FormatGt>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
 
         // Element scalar multiplication.
         let scalar_7 = from_u64<Fr>(7);
         let element_7g_calc = scalar_mul(&generator, &scalar_7);
         assert!(eq(&element_7g_calc, &element_7g_from_deser), 1);
-        assert!(GT_GENERATOR_MUL_BY_7_SERIALIZED == serialize<Gt, GtFormat>(&element_7g_calc), 1);
+        assert!(GT_GENERATOR_MUL_BY_7_SERIALIZED == serialize<Gt, FormatGt>(&element_7g_calc), 1);
 
         // Element negation.
         let element_minus_7g_calc = neg(&element_7g_calc);
-        assert!(GT_GENERATOR_MUL_BY_7_NEG_SERIALIZED == serialize<Gt, GtFormat>(&element_minus_7g_calc), 1);
+        assert!(GT_GENERATOR_MUL_BY_7_NEG_SERIALIZED == serialize<Gt, FormatGt>(&element_minus_7g_calc), 1);
 
         // Element addition.
         let scalar_9 = from_u64<Fr>(9);
@@ -667,29 +642,29 @@ module aptos_std::algebra_bls12381 {
         // Serialization/deserialization.
         let val_0 = zero<Fr>();
         let val_1 = one<Fr>();
-        assert!(FR_VAL_0_SERIALIZED_LSB == serialize<Fr, FrFormatLsb>(&val_0), 1);
-        assert!(FR_VAL_1_SERIALIZED_LSB == serialize<Fr, FrFormatLsb>(&val_1), 1);
+        assert!(FR_VAL_0_SERIALIZED_LSB == serialize<Fr, FormatFrLsb>(&val_0), 1);
+        assert!(FR_VAL_1_SERIALIZED_LSB == serialize<Fr, FormatFrLsb>(&val_1), 1);
         let val_7 = from_u64<Fr>(7);
-        let val_7_2nd = std::option::extract(&mut deserialize<Fr, FrFormatLsb>(&FR_VAL_7_SERIALIZED_LSB));
-        let val_7_3rd = std::option::extract(&mut deserialize<Fr, FrFormatMsb>(&FR_VAL_7_SERIALIZED_MSB));
+        let val_7_2nd = std::option::extract(&mut deserialize<Fr, FormatFrLsb>(&FR_VAL_7_SERIALIZED_LSB));
+        let val_7_3rd = std::option::extract(&mut deserialize<Fr, FormatFrMsb>(&FR_VAL_7_SERIALIZED_MSB));
         assert!(eq(&val_7, &val_7_2nd), 1);
         assert!(eq(&val_7, &val_7_3rd), 1);
-        assert!(FR_VAL_7_SERIALIZED_LSB == serialize<Fr, FrFormatLsb>(&val_7), 1);
-        assert!(FR_VAL_7_SERIALIZED_MSB == serialize<Fr, FrFormatMsb>(&val_7), 1);
+        assert!(FR_VAL_7_SERIALIZED_LSB == serialize<Fr, FormatFrLsb>(&val_7), 1);
+        assert!(FR_VAL_7_SERIALIZED_MSB == serialize<Fr, FormatFrMsb>(&val_7), 1);
 
         // Deserialization should fail if given a byte array of right size but the value is not a member.
-        assert!(std::option::is_none(&deserialize<Fr, FrFormatLsb>(&x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73")), 1);
-        assert!(std::option::is_none(&deserialize<Fr, FrFormatMsb>(&x"73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001")), 1);
+        assert!(std::option::is_none(&deserialize<Fr, FormatFrLsb>(&x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73")), 1);
+        assert!(std::option::is_none(&deserialize<Fr, FormatFrMsb>(&x"73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001")), 1);
 
         // Deserialization should fail if given a byte array of wrong size.
-        assert!(std::option::is_none(&deserialize<Fr, FrFormatLsb>(&x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed7300")), 1);
-        assert!(std::option::is_none(&deserialize<Fr, FrFormatMsb>(&x"0073eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001")), 1);
-        assert!(std::option::is_none(&deserialize<Fr, FrFormatLsb>(&x"ffff")), 1);
-        assert!(std::option::is_none(&deserialize<Fr, FrFormatMsb>(&x"ffff")), 1);
+        assert!(std::option::is_none(&deserialize<Fr, FormatFrLsb>(&x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed7300")), 1);
+        assert!(std::option::is_none(&deserialize<Fr, FormatFrMsb>(&x"0073eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001")), 1);
+        assert!(std::option::is_none(&deserialize<Fr, FormatFrLsb>(&x"ffff")), 1);
+        assert!(std::option::is_none(&deserialize<Fr, FormatFrMsb>(&x"ffff")), 1);
 
         // Negation.
         let val_minus_7 = neg(&val_7);
-        assert!(FR_VAL_7_NEG_SERIALIZED_LSB == serialize<Fr, FrFormatLsb>(&val_minus_7), 1);
+        assert!(FR_VAL_7_NEG_SERIALIZED_LSB == serialize<Fr, FormatFrLsb>(&val_minus_7), 1);
 
         // Addition.
         let val_9 = from_u64<Fr>(9);
@@ -722,12 +697,12 @@ module aptos_std::algebra_bls12381 {
         enable_cryptography_algebra_natives(&fx);
 
         // pairing(a*P,b*Q) == (a*b)*pairing(P,Q)
-        let element_p = rand_insecure<G1Affine>();
-        let element_q = rand_insecure<G2Affine>();
+        let element_p = rand_insecure<G1>();
+        let element_q = rand_insecure<G2>();
         let a = rand_insecure<Fr>();
         let b = rand_insecure<Fr>();
-        let gt_element = pairing<G1Affine,G2Affine,Gt>(&scalar_mul(&element_p, &a), &scalar_mul(&element_q, &b));
-        let gt_element_another = scalar_mul(&pairing<G1Affine,G2Affine,Gt>(&element_p, &element_q), &mul(&a, &b));
+        let gt_element = pairing<G1, G2,Gt>(&scalar_mul(&element_p, &a), &scalar_mul(&element_q, &b));
+        let gt_element_another = scalar_mul(&pairing<G1, G2,Gt>(&element_p, &element_q), &mul(&a, &b));
         assert!(eq(&gt_element, &gt_element_another), 1);
     }
 
@@ -739,33 +714,33 @@ module aptos_std::algebra_bls12381 {
         let a0 = rand_insecure<Fr>();
         let a1 = rand_insecure<Fr>();
         let a2 = rand_insecure<Fr>();
-        let element_p0 = rand_insecure<G1Affine>();
-        let element_p1 = rand_insecure<G1Affine>();
-        let element_p2 = rand_insecure<G1Affine>();
+        let element_p0 = rand_insecure<G1>();
+        let element_p1 = rand_insecure<G1>();
+        let element_p2 = rand_insecure<G1>();
         let p0_a0 = scalar_mul(&element_p0, &a0);
         let p1_a1 = scalar_mul(&element_p1, &a1);
         let p2_a2 = scalar_mul(&element_p2, &a2);
         let b0 = rand_insecure<Fr>();
         let b1 = rand_insecure<Fr>();
         let b2 = rand_insecure<Fr>();
-        let element_q0 = rand_insecure<G2Affine>();
-        let element_q1 = rand_insecure<G2Affine>();
-        let element_q2 = rand_insecure<G2Affine>();
+        let element_q0 = rand_insecure<G2>();
+        let element_q1 = rand_insecure<G2>();
+        let element_q2 = rand_insecure<G2>();
         let q0_b0 = scalar_mul(&element_q0, &b0);
         let q1_b1 = scalar_mul(&element_q1, &b1);
         let q2_b2 = scalar_mul(&element_q2, &b2);
 
         // Naive method.
-        let n0 = pairing<G1Affine,G2Affine,Gt>(&p0_a0, &q0_b0);
-        let n1 = pairing<G1Affine,G2Affine,Gt>(&p1_a1, &q1_b1);
-        let n2 = pairing<G1Affine,G2Affine,Gt>(&p2_a2, &q2_b2);
+        let n0 = pairing<G1, G2,Gt>(&p0_a0, &q0_b0);
+        let n1 = pairing<G1, G2,Gt>(&p1_a1, &q1_b1);
+        let n2 = pairing<G1, G2,Gt>(&p2_a2, &q2_b2);
         let n = zero<Gt>();
         n = add(&n, &n0);
         n = add(&n, &n1);
         n = add(&n, &n2);
 
         // Efficient API.
-        let m = multi_pairing<G1Affine, G2Affine, Gt>(&vector[p0_a0, p1_a1, p2_a2], &vector[q0_b0, q1_b1, q2_b2]);
+        let m = multi_pairing<G1, G2, Gt>(&vector[p0_a0, p1_a1, p2_a2], &vector[q0_b0, q1_b1, q2_b2]);
         assert!(eq(&n, &m), 1);
     }
 
@@ -773,16 +748,16 @@ module aptos_std::algebra_bls12381 {
     #[expected_failure(abort_code = 0x010002, location = aptos_std::algebra)]
     fun test_multi_pairing_should_abort_when_sizes_mismatch(fx: signer) {
         enable_cryptography_algebra_natives(&fx);
-        let g1_elements = vector[rand_insecure<G1Affine>()];
-        let g2_elements = vector[rand_insecure<G2Affine>(), rand_insecure<G2Affine>()];
-        multi_pairing<G1Affine, G2Affine, Gt>(&g1_elements, &g2_elements);
+        let g1_elements = vector[rand_insecure<G1>()];
+        let g2_elements = vector[rand_insecure<G2>(), rand_insecure<G2>()];
+        multi_pairing<G1, G2, Gt>(&g1_elements, &g2_elements);
     }
 
     #[test(fx = @std)]
     #[expected_failure(abort_code = 0x010002, location = aptos_std::algebra)]
     fun test_multi_scalar_mul_should_abort_when_sizes_mismatch(fx: signer) {
         enable_cryptography_algebra_natives(&fx);
-        let elements = vector[rand_insecure<G1Affine>()];
+        let elements = vector[rand_insecure<G1>()];
         let scalars = vector[rand_insecure<Fr>(), rand_insecure<Fr>()];
         multi_scalar_mul(&elements, &scalars);
     }
