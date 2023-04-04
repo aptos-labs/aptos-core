@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use crate::{
     common::{
         types::{TransactionOptions, TransactionSummary},
