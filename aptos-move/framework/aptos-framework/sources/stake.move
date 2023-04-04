@@ -467,7 +467,7 @@ module aptos_framework::stake {
         operator: address,
         voter: address,
     ) acquires AllowedValidators, OwnerCapability, StakePool, ValidatorSet {
-        initialize_owner(owner);
+        initialize_owner(owner); 
         move_to(owner, ValidatorConfig {
             consensus_pubkey: vector::empty(),
             network_addresses: vector::empty(),
@@ -548,6 +548,13 @@ module aptos_framework::stake {
         let owner_address = signer::address_of(owner);
         assert_owner_cap_exists(owner_address);
         move_from<OwnerCapability>(owner_address)
+    }
+
+    public fun get_owner_cap_address(owner: &signer): address acquires OwnerCapability {
+        let owner_address = signer::address_of(owner);
+        assert_owner_cap_exists(owner_address);
+        let ownership_cap = borrow_global<OwnerCapability>(owner_address);
+        ownership_cap.pool_address
     }
 
     /// Deposit `owner_cap` into `account`. This requires `account` to not already have owernship of another
