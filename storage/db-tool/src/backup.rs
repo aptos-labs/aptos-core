@@ -152,7 +152,10 @@ pub struct VerifyOpt {
     state_snapshot_before_version: Option<Version>,
     #[clap(long, help = "Skip verifying epoch ending info.")]
     skip_epoch_endings: bool,
-    #[clap(long, help = "While verifying a snapshot, run module validation.")]
+    #[clap(
+        long,
+        help = "Optionally, while verifying a snapshot, run module validation."
+    )]
     validate_modules: bool,
     #[clap(
         long,
