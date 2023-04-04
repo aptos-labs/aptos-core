@@ -71,6 +71,7 @@ module veiled_coin::veiled_coin {
         private_balance: CompressedCiphertext,
         deposit_events: EventHandle<DepositEvent>,
         withdraw_events: EventHandle<WithdrawEvent>,
+	pubkey: elgamal::Pubkey,
     }
 
     /// Holds a signer capability for the resource account created when initializing this module. This account houses a
@@ -136,11 +137,9 @@ module veiled_coin::veiled_coin {
     /// This value is the amount being transferred. These two ciphertexts are required as we need to update 
     /// both the sender's and the recipient's balances, which use different public keys and so must be updated 
     /// with ciphertexts encrypted with their respective public keys. 
-    // TODO: Handle pubkey storage in move code
     public entry fun private_transfer_to<CoinType>(
 	sender: &signer, 
 	recipient: address, 
-	pubkey: vector<u8>,
 	withdraw_ct: vector<u8>, 
 	deposit_ct: vector<u8>, 
 	range_proof_updated_balance: vector<u8>, 
@@ -150,12 +149,10 @@ module veiled_coin::veiled_coin {
 	assert!(std::option::is_some(&private_withdraw_amount), EDESERIALIZATION_FAILED);
 	let private_deposit_amount = elgamal::new_ciphertext_from_bytes(deposit_ct);
 	assert!(std::option::is_some(&private_deposit_amount), EDESERIALIZATION_FAILED);
-	let pubkey = elgamal::new_pubkey_from_bytes(pubkey);
 
 	transfer_privately_to<CoinType>(
 		sender,
 		recipient,
-		&std::option::extract(&mut pubkey),
 		std::option::extract(&mut private_withdraw_amount),
 		std::option::extract(&mut private_deposit_amount),
 		&bulletproofs::range_proof_from_bytes(range_proof_updated_balance),
@@ -201,8 +198,16 @@ module veiled_coin::veiled_coin {
         &coin.private_value
     }
 
-    /// Initializes a veiled coin store for the specified account.
-    public fun register<CoinType>(account: &signer) {
+    /// Initializes a veiled coin store for the specified account. Requires an el-gamal public
+    /// encryption key to be provided. The user must retain their corresponding secret key. 
+    public entry fun register<CoinType>(sender: &signer, pubkey: vector<u8>) {
+	let pubkey = elgamal::new_pubkey_from_bytes(pubkey);	
+	register_internal<CoinType>(sender, std::option::extract(&mut pubkey));
+    }
+
+    /// Initializes a veiled coin store for the specified account. Requires an el-gamal public
+    /// encryption key to be provided. The user must retain their corresponding secret key. 
+    public fun register_internal<CoinType>(account: &signer, pubkey: elgamal::Pubkey) {
         let account_addr = signer::address_of(account);
         assert!(
             !has_veiled_coin_store<CoinType>(account_addr),
@@ -213,6 +218,7 @@ module veiled_coin::veiled_coin {
             private_balance: elgamal::new_ciphertext_from_compressed(ristretto255::point_identity_compressed(), ristretto255::point_identity_compressed()),
             deposit_events: account::new_event_handle<DepositEvent>(account),
             withdraw_events: account::new_event_handle<WithdrawEvent>(account),
+	    pubkey: pubkey,
         };
         move_to(account, coin_store);
     }
@@ -249,14 +255,15 @@ module veiled_coin::veiled_coin {
     public fun transfer_privately_to<CoinType>(
         sender: &signer,
         recipient: address,
-	pubkey: &Pubkey,
         private_withdraw_amount: Ciphertext,
 	private_deposit_amount: Ciphertext,
         range_proof_updated_balance: &RangeProof,
 	range_proof_transferred_amount: &RangeProof)
     acquires VeiledCoinStore {
+	let sender_addr = signer::address_of(sender);
+	let sender_coin_store = borrow_global_mut<VeiledCoinStore<CoinType>>(sender_addr);
 	// TODO: Insert sigma protocol here which proves 'private_deposit_amount' and 'private_withdraw_amount' encrypt the same values using the same randomness
-        withdraw<CoinType>(sender, private_withdraw_amount, pubkey, range_proof_updated_balance, range_proof_transferred_amount);
+        withdraw<CoinType>(sender, private_withdraw_amount, sender_coin_store, range_proof_updated_balance, range_proof_transferred_amount);
 	let vc = VeiledCoin<CoinType> { private_value: private_deposit_amount };
 
         deposit(recipient, vc);
@@ -289,17 +296,17 @@ module veiled_coin::veiled_coin {
     public fun withdraw<CoinType>(
         account: &signer,
         withdraw_amount: Ciphertext,
-	pubkey: &Pubkey,
+	coin_store: &mut VeiledCoinStore<CoinType>,
         range_proof_updated_balance: &RangeProof,
 	range_proof_transferred_amount: &RangeProof,
-    ) acquires VeiledCoinStore {
+    ) {
         let account_addr = signer::address_of(account);
         assert!(
             has_veiled_coin_store<CoinType>(account_addr),
             error::not_found(EVEILED_COIN_STORE_NOT_PUBLISHED),
         );
 
-        let coin_store = borrow_global_mut<VeiledCoinStore<CoinType>>(account_addr);
+	let pubkey = &coin_store.pubkey;
 
         event::emit_event<WithdrawEvent>(
             &mut coin_store.withdraw_events,

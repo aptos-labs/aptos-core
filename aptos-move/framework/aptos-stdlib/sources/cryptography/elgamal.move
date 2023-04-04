@@ -24,7 +24,7 @@ module aptos_std::elgamal {
     }
 
     /// An ElGamal public key.
-    struct Pubkey has drop {
+    struct Pubkey has store, copy, drop {
         point: CompressedRistretto,
     }
 
