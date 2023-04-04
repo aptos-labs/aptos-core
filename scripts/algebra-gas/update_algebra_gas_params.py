@@ -91,7 +91,6 @@ def get_algebra_lines(gas_per_ns):
     _,_,nanoseconds['ark_bls12_381_multi_pairing_per_pair'],nanoseconds['ark_bls12_381_multi_pairing_base'] = get_bench_ns_linear('target/criterion/ark_bls12_381/pairing_product')
     _,_,nanoseconds['ark_h2c_bls12381g1_xmd_sha256_sswu_per_msg_byte'],nanoseconds['ark_h2c_bls12381g1_xmd_sha256_sswu_base'] = get_bench_ns_linear('target/criterion/ark_bls12_381/hash_to_g1_proj')
     _,_,nanoseconds['ark_h2c_bls12381g2_xmd_sha256_sswu_per_msg_byte'],nanoseconds['ark_h2c_bls12381g2_xmd_sha256_sswu_base'] = get_bench_ns_linear('target/criterion/ark_bls12_381/hash_to_g2_proj')
-    _,_,nanoseconds['sha2_v0_10_6_sha256_base'],nanoseconds['sha2_v0_10_6_sha256_per_byte'] = get_bench_ns_linear('target/criterion/sha2_v0_10_6/sha256')
     gas_units = {k:gas_per_ns*v for k,v in nanoseconds.items()}
     lines = [f'    [.algebra.{k}, {{ {TARGET_GAS_VERSION}.. => "algebra.{k}" }}, {prettify_number(v)} * MUL],' for k,v in sorted(gas_units.items())]
     return lines

@@ -138,8 +138,6 @@ impl GasParameters {
                 ark_h2c_bls12381g1_xmd_sha256_sswu_per_msg_byte: 0.into(),
                 ark_h2c_bls12381g2_xmd_sha256_sswu_base: 0.into(),
                 ark_h2c_bls12381g2_xmd_sha256_sswu_per_msg_byte: 0.into(),
-                sha2_v0_10_6_sha256_base: 0.into(),
-                sha2_v0_10_6_sha256_per_byte: 0.into(),
             },
             ed25519: ed25519::GasParameters {
                 base: 0.into(),
@@ -266,6 +264,7 @@ impl GasParameters {
 
 pub fn all_natives(
     framework_addr: AccountAddress,
+    sha256_gas_params: move_stdlib::natives::hash::Sha2_256GasParameters,
     gas_params: GasParameters,
     timed_features: TimedFeatures,
     features: Arc<Features>,
@@ -309,6 +308,7 @@ pub fn all_natives(
         "algebra",
         cryptography::algebra::make_all(
             gas_params.algebra.clone(),
+            sha256_gas_params,
             timed_features.clone(),
             features.clone()
         )
