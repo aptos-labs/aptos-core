@@ -63,11 +63,11 @@ It contains the prime-order subgroup $G_2$ used in pairing.
 -  [Struct `Fq12`](#0x1_algebra_bls12381_Fq12)
 -  [Struct `FormatFq12LscLsb`](#0x1_algebra_bls12381_FormatFq12LscLsb)
 -  [Struct `G1`](#0x1_algebra_bls12381_G1)
--  [Struct `FormatG1AffineUncompressed`](#0x1_algebra_bls12381_FormatG1AffineUncompressed)
--  [Struct `FormatG1AffineCompressed`](#0x1_algebra_bls12381_FormatG1AffineCompressed)
+-  [Struct `FormatG1AffineUncompr`](#0x1_algebra_bls12381_FormatG1AffineUncompr)
+-  [Struct `FormatG1AffineCompr`](#0x1_algebra_bls12381_FormatG1AffineCompr)
 -  [Struct `G2`](#0x1_algebra_bls12381_G2)
--  [Struct `FormatG2AffineUncompressed`](#0x1_algebra_bls12381_FormatG2AffineUncompressed)
--  [Struct `FormatG2AffineCompressed`](#0x1_algebra_bls12381_FormatG2AffineCompressed)
+-  [Struct `FormatG2AffineUncompr`](#0x1_algebra_bls12381_FormatG2AffineUncompr)
+-  [Struct `FormatG2AffineCompr`](#0x1_algebra_bls12381_FormatG2AffineCompr)
 -  [Struct `Gt`](#0x1_algebra_bls12381_Gt)
 -  [Struct `FormatGt`](#0x1_algebra_bls12381_FormatGt)
 -  [Struct `Fr`](#0x1_algebra_bls12381_Fr)
@@ -175,9 +175,9 @@ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
 
 </details>
 
-<a name="0x1_algebra_bls12381_FormatG1AffineUncompressed"></a>
+<a name="0x1_algebra_bls12381_FormatG1AffineUncompr"></a>
 
-## Struct `FormatG1AffineUncompressed`
+## Struct `FormatG1AffineUncompr`
 
 A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1">G1</a></code> elements derived from
 https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-11.html#name-zcash-serialization-format-.
@@ -204,7 +204,7 @@ Below is the deserialization procedure that takes a byte array <code>b[]</code> 
 NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
 
 
-<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_FormatG1AffineUncompressed">FormatG1AffineUncompressed</a>
+<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_FormatG1AffineUncompr">FormatG1AffineUncompr</a>
 </code></pre>
 
 
@@ -225,9 +225,9 @@ NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
 
 </details>
 
-<a name="0x1_algebra_bls12381_FormatG1AffineCompressed"></a>
+<a name="0x1_algebra_bls12381_FormatG1AffineCompr"></a>
 
-## Struct `FormatG1AffineCompressed`
+## Struct `FormatG1AffineCompr`
 
 A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1">G1</a></code> elements derived from
 https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-11.html#name-zcash-serialization-format-.
@@ -256,7 +256,7 @@ Below is the deserialization procedure that takes a byte array <code>b[]</code> 
 NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
 
 
-<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_FormatG1AffineCompressed">FormatG1AffineCompressed</a>
+<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_FormatG1AffineCompr">FormatG1AffineCompr</a>
 </code></pre>
 
 
@@ -308,9 +308,9 @@ It is a subgroup of <code>G2Full</code> (defined in the module documentation) wi
 
 </details>
 
-<a name="0x1_algebra_bls12381_FormatG2AffineUncompressed"></a>
+<a name="0x1_algebra_bls12381_FormatG2AffineUncompr"></a>
 
-## Struct `FormatG2AffineUncompressed`
+## Struct `FormatG2AffineUncompr`
 
 A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G2">G2</a></code> elements derived from
 https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-11.html#name-zcash-serialization-format-.
@@ -337,7 +337,7 @@ Below is the deserialization procedure that takes a byte array <code>b[]</code> 
 NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
 
 
-<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_FormatG2AffineUncompressed">FormatG2AffineUncompressed</a>
+<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_FormatG2AffineUncompr">FormatG2AffineUncompr</a>
 </code></pre>
 
 
@@ -358,9 +358,9 @@ NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
 
 </details>
 
-<a name="0x1_algebra_bls12381_FormatG2AffineCompressed"></a>
+<a name="0x1_algebra_bls12381_FormatG2AffineCompr"></a>
 
-## Struct `FormatG2AffineCompressed`
+## Struct `FormatG2AffineCompr`
 
 A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G2">G2</a></code> elements derived from
 https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-11.html#name-zcash-serialization-format-.
@@ -389,7 +389,7 @@ Below is the deserialization procedure that takes a byte array <code>b[]</code> 
 NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
 
 
-<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_FormatG2AffineCompressed">FormatG2AffineCompressed</a>
+<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_FormatG2AffineCompr">FormatG2AffineCompr</a>
 </code></pre>
 
 

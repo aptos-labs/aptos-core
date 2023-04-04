@@ -110,16 +110,16 @@ impl TryFrom<TypeTag> for SerializationFormat {
             "0x1::algebra_bls12381::FormatFq12LscLsb" => {
                 Ok(SerializationFormat::BLS12381Fq12LscLsb)
             },
-            "0x1::algebra_bls12381::FormatG1AffineUncompressed" => {
+            "0x1::algebra_bls12381::FormatG1AffineUncompr" => {
                 Ok(SerializationFormat::BLS12381G1AffineUncompressed)
             },
-            "0x1::algebra_bls12381::FormatG1AffineCompressed" => {
+            "0x1::algebra_bls12381::FormatG1AffineCompr" => {
                 Ok(SerializationFormat::BLS12381G1AffineCompressed)
             },
-            "0x1::algebra_bls12381::FormatG2AffineUncompressed" => {
+            "0x1::algebra_bls12381::FormatG2AffineUncompr" => {
                 Ok(SerializationFormat::BLS12381G2AffineUncompressed)
             },
-            "0x1::algebra_bls12381::FormatG2AffineCompressed" => {
+            "0x1::algebra_bls12381::FormatG2AffineCompr" => {
                 Ok(SerializationFormat::BLS12381G2AffineCompressed)
             },
             "0x1::algebra_bls12381::FormatGt" => Ok(SerializationFormat::BLS12381Gt),

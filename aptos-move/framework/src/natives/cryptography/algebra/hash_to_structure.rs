@@ -65,7 +65,7 @@ fn hash_to_bls12381gx_cost(
         InternalGas::zero()
     } else {
         dst_shortening_base * NumArgs::one()
-            + dst_shortening_per_byte * NumArgs::from(dst_len as u64)
+            + dst_shortening_per_byte * NumArgs::from((17 + dst_len) as u64)
     };
 
     // Mapping cost. The gas formula is simplified by assuming the DST length is fixed at 256.
