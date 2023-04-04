@@ -3,7 +3,7 @@
 
 //! Traits for resolving Move resources from persistent storage at runtime.
 
-use crate::values::Value;
+use crate::values::FrozenValue;
 use move_core_types::{
     account_address::AccountAddress,
     language_storage::StructTag,
@@ -19,12 +19,12 @@ pub enum Resource {
     Serialized(Arc<Vec<u8>>),
     // Resource is stored as a Move value and is not serialized yet. This type is
     // useful to cache outputs of VM session and avoid unnecessary deserialization.
-    Cached(Arc<Value>, Arc<MoveTypeLayout>),
+    Cached(Arc<FrozenValue>, Arc<MoveTypeLayout>),
 }
 
 impl Resource {
     /// Creates a new resource from Move value and its layout.
-    pub fn from_value_layout(value: Value, layout: MoveTypeLayout) -> Resource {
+    pub fn from_value_layout(value: FrozenValue, layout: MoveTypeLayout) -> Resource {
         Resource::Cached(Arc::new(value), Arc::new(layout))
     }
 

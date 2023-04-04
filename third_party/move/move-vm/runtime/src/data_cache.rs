@@ -99,11 +99,11 @@ impl<'r, 'l, S: MoveResolverV2> TransactionDataCache<'r, 'l, S> {
 
                 match op {
                     Op::New(val) => {
-                        let resource = Resource::from_value_layout(val, layout);
+                        let resource = Resource::from_value_layout(val.freeze()?, layout);
                         resources.insert(struct_tag, Op::New(resource));
                     },
                     Op::Modify(val) => {
-                        let resource = Resource::from_value_layout(val, layout);
+                        let resource = Resource::from_value_layout(val.freeze()?, layout);
                         resources.insert(struct_tag, Op::Modify(resource));
                     },
                     Op::Delete => {
@@ -205,14 +205,12 @@ impl<'r, 'l, S: MoveResolverV2> DataStore for TransactionDataCache<'r, 'l, S> {
 
                             GlobalValue::cached(val)?
                         },
-                        Resource::Cached(val, _) => {
+                        Resource::Cached(frozen_val, _) => {
                             // Data was not serialized and should not be charged for loading.
                             load_res = Some(None);
-
-                            // TODO: Here we don't want to copy but instead use some sort of
-                            // CoW mechanism. This requires changes to `GlobalValue` and ideally
-                            // to Move `Value`s as well to make them lighter (easier to copy).
-                            GlobalValue::cached(val.copy_value()?)?
+                            // TODO: instead of unfreezing the value here, we can store its frozen
+                            // version and only unfreeze on modification.
+                            GlobalValue::cached(frozen_val.unfreeze()?)?
                         },
                     }
                 },
