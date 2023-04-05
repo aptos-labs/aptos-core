@@ -98,6 +98,9 @@ struct Opt {
     #[structopt(long)]
     use_state_kv_db: bool,
 
+    #[structopt(long)]
+    use_sharded_state_merkle_db: bool,
+
     #[structopt(subcommand)]
     cmd: Command,
 
@@ -186,6 +189,7 @@ where
                 opt.pruner_opt.pruner_config(),
                 opt.verify_sequence_numbers,
                 opt.use_state_kv_db,
+                opt.use_sharded_state_merkle_db,
             );
         },
         Command::RunExecutor {
@@ -202,6 +206,7 @@ where
                 opt.verify_sequence_numbers,
                 opt.pruner_opt.pruner_config(),
                 opt.use_state_kv_db,
+                opt.use_sharded_state_merkle_db,
             );
         },
         Command::AddAccounts {
@@ -219,6 +224,7 @@ where
                 opt.pruner_opt.pruner_config(),
                 opt.verify_sequence_numbers,
                 opt.use_state_kv_db,
+                opt.use_sharded_state_merkle_db,
             );
         },
     }

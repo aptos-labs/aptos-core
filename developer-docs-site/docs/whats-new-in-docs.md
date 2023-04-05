@@ -9,7 +9,7 @@ This page shows the key updates to the developer documentation on this site. Not
 
 ## 28 March 2023
 
-- Offered an experimental feature to [profile gas usage locally](./cli-tools/aptos-cli-tool/use-aptos-cli.md#profiling-gas-use) via the Aptos CLI that not only simulates use but also generates flame graphs for visualizing gas usage.
+- Offered an experimental feature to [profile gas usage locally](./cli-tools/aptos-cli-tool/use-aptos-cli.md#profiling-gas-usage) via the Aptos CLI that not only simulates use but also generates flame graphs for visualizing gas usage.
 
 ## 27 March 2023
 

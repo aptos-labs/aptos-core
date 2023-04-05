@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct StakePoolResource {
     pub delegated_voter: String,
+    pub operator_address: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

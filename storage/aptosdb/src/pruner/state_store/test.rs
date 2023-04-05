@@ -6,13 +6,14 @@ use crate::{
     pruner::{state_merkle_pruner_worker::StateMerklePrunerWorker, *},
     stale_node_index::StaleNodeIndexSchema,
     stale_state_value_index::StaleStateValueIndexSchema,
+    state_merkle_db::StateMerkleDb,
     state_store::StateStore,
     test_helper::{arb_state_kv_sets, update_store},
     AptosDB, PrunerManager, StateKvPrunerManager, StateMerklePrunerManager,
 };
 use aptos_config::config::{LedgerPrunerConfig, StateMerklePrunerConfig};
 use aptos_crypto::HashValue;
-use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
+use aptos_schemadb::{ReadOptions, SchemaBatch};
 use aptos_storage_interface::{jmt_update_refs, jmt_updates, DbReader};
 use aptos_temppath::TempPath;
 use aptos_types::{
@@ -80,7 +81,7 @@ fn verify_state_in_store(
 }
 
 fn create_state_merkle_pruner_manager(
-    state_merkle_db: &Arc<DB>,
+    state_merkle_db: &Arc<StateMerkleDb>,
     prune_batch_size: usize,
 ) -> StateMerklePrunerManager<StaleNodeIndexSchema> {
     StateMerklePrunerManager::new(Arc::clone(state_merkle_db), StateMerklePrunerConfig {
@@ -251,9 +252,12 @@ fn test_state_store_pruner_partial_version() {
     }
 
     // Make sure all stale indices are gone.
+    //
+    // TODO(grao): Support sharding here.
     assert_eq!(
         aptos_db
             .state_merkle_db
+            .metadata_db()
             .iter::<StaleNodeIndexSchema>(ReadOptions::default())
             .unwrap()
             .count(),
