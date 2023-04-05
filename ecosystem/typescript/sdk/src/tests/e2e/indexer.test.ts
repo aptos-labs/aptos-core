@@ -7,7 +7,7 @@ import { TokenClient } from "../../plugins/token_client";
 import { FAUCET_AUTH_TOKEN, longTestTimeout } from "../unit/test_helper.test";
 import { Network, NetworkToIndexerAPI, NetworkToNodeAPI, sleep } from "../../utils";
 import axios from "axios";
-import { VERSION } from "../../version";
+import { ProviderUtil } from "../../providers/Utils";
 
 const aptosClient = new AptosClient(NetworkToNodeAPI[Network.TESTNET]);
 const faucetClient = new FaucetClient(
@@ -204,7 +204,7 @@ describe("Indexer", () => {
       });
 
       // Call queryIndexer and expect it to make a request with the expected User-Agent header
-      const expectedUserAgent = `aptos-ts-sdk/${VERSION}`;
+      const expectedUserAgent = ProviderUtil.getUserAgent();
       await indexerClient.queryIndexer({ query: '{ mockQuery }' });
       expect(mockHeaders['User-Agent']).toEqual(expectedUserAgent);
     });

@@ -34,7 +34,7 @@ import {
   GetTopUserTransactions,
   GetUserTransactions,
 } from "../indexer/generated/queries";
-import { VERSION } from "../version";
+import { ProviderUtil } from "./Utils";
 
 /**
  * Controls the number of results that are returned and the starting position of those results.
@@ -50,7 +50,7 @@ interface PaginationArgs {
 }
 
 const headers = {
-  "User-Agent": `aptos-ts-sdk/${VERSION}`,
+  "User-Agent": ProviderUtil.getUserAgent(),
 };
 
 type GraphqlQuery = {
