@@ -59,8 +59,15 @@ fn create_rocksdb_checkpoint_and_change_working_dir(
     fs::create_dir_all(&checkpoint_dir).unwrap();
 
     // Open the database and create a checkpoint
-    AptosDB::create_checkpoint(&source_dir, &checkpoint_dir)
-        .expect("AptosDB checkpoint creation failed.");
+    AptosDB::create_checkpoint(
+        &source_dir,
+        &checkpoint_dir,
+        node_config
+            .storage
+            .rocksdb_configs
+            .use_sharded_state_merkle_db,
+    )
+    .expect("AptosDB checkpoint creation failed.");
 
     // Create a consensus db checkpoint
     aptos_consensus::create_checkpoint(&source_dir, &checkpoint_dir)

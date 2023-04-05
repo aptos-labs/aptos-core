@@ -212,6 +212,7 @@ module aptos_token_objects::collection {
         borrow_global<Collection>(collection_address)
     }
 
+    #[view]
     public fun count<T: key>(collection: Object<T>): Option<u64> acquires FixedSupply {
         let collection_address = object::object_address(&collection);
         assert!(
@@ -227,18 +228,22 @@ module aptos_token_objects::collection {
         }
     }
 
+    #[view]
     public fun creator<T: key>(collection: Object<T>): address acquires Collection {
         borrow(&collection).creator
     }
 
+    #[view]
     public fun description<T: key>(collection: Object<T>): String acquires Collection {
         borrow(&collection).description
     }
 
+    #[view]
     public fun name<T: key>(collection: Object<T>): String acquires Collection {
         borrow(&collection).name
     }
 
+    #[view]
     public fun uri<T: key>(collection: Object<T>): String acquires Collection {
         borrow(&collection).uri
     }

@@ -1442,6 +1442,7 @@ A non decreasing curve must ensure that next is greater than cur.
 
 
 <pre><code><b>pragma</b> aborts_if_is_strict = <b>false</b>;
+<b>pragma</b> verify = <b>false</b>;
 <b>pragma</b> opaque;
 <b>include</b> <a href="storage_gas.md#0x1_storage_gas_ValidatePointsAbortsIf">ValidatePointsAbortsIf</a>;
 </code></pre>

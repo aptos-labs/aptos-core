@@ -1,0 +1,7 @@
+query getTokenActivitiesCount($token_id: String) {
+  token_activities_aggregate(where: { token_data_id_hash: { _eq: $token_id } }) {
+    aggregate {
+      count
+    }
+  }
+}

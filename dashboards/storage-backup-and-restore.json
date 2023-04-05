@@ -1119,7 +1119,13 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
           "unit": "dateTimeAsLocal"
         },
         "overrides": [
@@ -2134,7 +2140,7 @@
   "refresh": "10s",
   "schemaVersion": 37,
   "style": "dark",
-  "tags": [],
+  "tags": ["aptos-core"],
   "templating": {
     "list": [
       {
@@ -2309,8 +2315,8 @@
   "time": { "from": "now-24h", "to": "now" },
   "timepicker": {},
   "timezone": "",
-  "title": "Storage (Backup and Restore)",
+  "title": "Storage Backup and Restore",
   "uid": "9oXpx4n4z",
-  "version": 63,
+  "version": 66,
   "weekStart": ""
 }

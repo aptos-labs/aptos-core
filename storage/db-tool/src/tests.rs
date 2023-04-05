@@ -70,6 +70,15 @@ fn test_various_cmd_parsing() {
         "--local-fs-dir",
         ".",
     ]);
+    run_cmd(&[
+        "aptos-db-tool",
+        "backup",
+        "verify",
+        "--local-fs-dir",
+        ".",
+        "--start-version",
+        "Max",
+    ]);
 }
 
 fn run_cmd(args: &[&str]) {
