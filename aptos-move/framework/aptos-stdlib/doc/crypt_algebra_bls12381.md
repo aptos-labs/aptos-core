@@ -1,17 +1,17 @@
 
-<a name="0x1_algebra_bls12381"></a>
+<a name="0x1_crypt_algebra_bls12381"></a>
 
-# Module `0x1::algebra_bls12381`
+# Module `0x1::crypt_algebra_bls12381`
 
 This module defines marker types, constants and test cases for working with BLS12-381 curves
-using the generic API defined in <code><a href="algebra.md#0x1_algebra">algebra</a>.<b>move</b></code>.
+using the generic API defined in <code>algebra.<b>move</b></code>.
 See https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-pairing-friendly-curves-11#name-bls-curves-for-the-128-bit-
 for the full specification of BLS12-381 curves.
 
-Currently-supported BLS12-381 structures include <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq12">Fq12</a></code>, <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fr">Fr</a></code>, <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1">G1</a></code>, <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G2">G2</a></code> and <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Gt">Gt</a></code>,
+Currently-supported BLS12-381 structures include <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_Fq12">Fq12</a></code>, <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_Fr">Fr</a></code>, <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_G1">G1</a></code>, <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_G2">G2</a></code> and <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_Gt">Gt</a></code>,
 along with their widely-used serialization formats,
-the pairing between <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1">G1</a></code>, <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G2">G2</a></code> and <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Gt">Gt</a></code>,
-and the hash-to-curve operations for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1">G1</a></code> and <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G2">G2</a></code> defined in https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-16.
+the pairing between <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_G1">G1</a></code>, <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_G2">G2</a></code> and <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_Gt">Gt</a></code>,
+and the hash-to-curve operations for <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_G1">G1</a></code> and <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_G2">G2</a></code> defined in https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-16.
 
 Other unimplemented BLS12-381 structures and serialization formats are also listed here,
 as they help define some of the currently supported structures.
@@ -60,28 +60,28 @@ under the elliptic curve point addition.
 It contains the prime-order subgroup $G_2$ used in pairing.
 
 
--  [Struct `Fq12`](#0x1_algebra_bls12381_Fq12)
--  [Struct `FormatFq12LscLsb`](#0x1_algebra_bls12381_FormatFq12LscLsb)
--  [Struct `G1`](#0x1_algebra_bls12381_G1)
--  [Struct `FormatG1Uncompr`](#0x1_algebra_bls12381_FormatG1Uncompr)
--  [Struct `FormatG1Compr`](#0x1_algebra_bls12381_FormatG1Compr)
--  [Struct `G2`](#0x1_algebra_bls12381_G2)
--  [Struct `FormatG2Uncompr`](#0x1_algebra_bls12381_FormatG2Uncompr)
--  [Struct `FormatG2Compr`](#0x1_algebra_bls12381_FormatG2Compr)
--  [Struct `Gt`](#0x1_algebra_bls12381_Gt)
--  [Struct `FormatGt`](#0x1_algebra_bls12381_FormatGt)
--  [Struct `Fr`](#0x1_algebra_bls12381_Fr)
--  [Struct `FormatFrLsb`](#0x1_algebra_bls12381_FormatFrLsb)
--  [Struct `FormatFrMsb`](#0x1_algebra_bls12381_FormatFrMsb)
--  [Struct `HashG1XmdSha256SswuRo`](#0x1_algebra_bls12381_HashG1XmdSha256SswuRo)
--  [Struct `HashG2XmdSha256SswuRo`](#0x1_algebra_bls12381_HashG2XmdSha256SswuRo)
+-  [Struct `Fq12`](#0x1_crypt_algebra_bls12381_Fq12)
+-  [Struct `FormatFq12LscLsb`](#0x1_crypt_algebra_bls12381_FormatFq12LscLsb)
+-  [Struct `G1`](#0x1_crypt_algebra_bls12381_G1)
+-  [Struct `FormatG1Uncompr`](#0x1_crypt_algebra_bls12381_FormatG1Uncompr)
+-  [Struct `FormatG1Compr`](#0x1_crypt_algebra_bls12381_FormatG1Compr)
+-  [Struct `G2`](#0x1_crypt_algebra_bls12381_G2)
+-  [Struct `FormatG2Uncompr`](#0x1_crypt_algebra_bls12381_FormatG2Uncompr)
+-  [Struct `FormatG2Compr`](#0x1_crypt_algebra_bls12381_FormatG2Compr)
+-  [Struct `Gt`](#0x1_crypt_algebra_bls12381_Gt)
+-  [Struct `FormatGt`](#0x1_crypt_algebra_bls12381_FormatGt)
+-  [Struct `Fr`](#0x1_crypt_algebra_bls12381_Fr)
+-  [Struct `FormatFrLsb`](#0x1_crypt_algebra_bls12381_FormatFrLsb)
+-  [Struct `FormatFrMsb`](#0x1_crypt_algebra_bls12381_FormatFrMsb)
+-  [Struct `HashG1XmdSha256SswuRo`](#0x1_crypt_algebra_bls12381_HashG1XmdSha256SswuRo)
+-  [Struct `HashG2XmdSha256SswuRo`](#0x1_crypt_algebra_bls12381_HashG2XmdSha256SswuRo)
 
 
 <pre><code></code></pre>
 
 
 
-<a name="0x1_algebra_bls12381_Fq12"></a>
+<a name="0x1_crypt_algebra_bls12381_Fq12"></a>
 
 ## Struct `Fq12`
 
@@ -89,7 +89,7 @@ The finite field $F_{q^12}$ used in BLS12-381 curves,
 which is an extension field of <code>Fq6</code> (defined in the module documentation), constructed as $F_{q^12}=F_{q^6}[w]/(w^2-v)$.
 
 
-<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq12">Fq12</a>
+<pre><code><b>struct</b> <a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_Fq12">Fq12</a>
 </code></pre>
 
 
@@ -110,11 +110,11 @@ which is an extension field of <code>Fq6</code> (defined in the module documenta
 
 </details>
 
-<a name="0x1_algebra_bls12381_FormatFq12LscLsb"></a>
+<a name="0x1_crypt_algebra_bls12381_FormatFq12LscLsb"></a>
 
 ## Struct `FormatFq12LscLsb`
 
-A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq12">Fq12</a></code> elements,
+A serialization scheme for <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_Fq12">Fq12</a></code> elements,
 where an element $(c_0+c_1\cdot w)$ is represented by a byte array <code>b[]</code> of size 576,
 which is a concatenation of its coefficients serialized, with the least significant coefficient (LSC) coming first.
 - <code>b[0..288]</code> is $c_0$ serialized using <code>FormatFq6LscLsb</code> (defined in the module documentation).
@@ -123,7 +123,7 @@ which is a concatenation of its coefficients serialized, with the least signific
 NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
 
 
-<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_FormatFq12LscLsb">FormatFq12LscLsb</a>
+<pre><code><b>struct</b> <a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_FormatFq12LscLsb">FormatFq12LscLsb</a>
 </code></pre>
 
 
@@ -144,17 +144,17 @@ NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
 
 </details>
 
-<a name="0x1_algebra_bls12381_G1"></a>
+<a name="0x1_crypt_algebra_bls12381_G1"></a>
 
 ## Struct `G1`
 
 The group $G_1$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow G_t$.
 It is a subgroup of <code>G1Full</code> (defined in the module documentation) with a prime order $r$
 equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
-(so <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fr">Fr</a></code> is the associated scalar field).
+(so <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_Fr">Fr</a></code> is the associated scalar field).
 
 
-<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_G1">G1</a>
+<pre><code><b>struct</b> <a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_G1">G1</a>
 </code></pre>
 
 
@@ -175,21 +175,21 @@ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
 
 </details>
 
-<a name="0x1_algebra_bls12381_FormatG1Uncompr"></a>
+<a name="0x1_crypt_algebra_bls12381_FormatG1Uncompr"></a>
 
 ## Struct `FormatG1Uncompr`
 
-A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1">G1</a></code> elements derived from
+A serialization scheme for <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_G1">G1</a></code> elements derived from
 https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-11.html#name-zcash-serialization-format-.
 
-Below is the serialization procedure that takes a <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1">G1</a></code> element <code>p</code> and outputs a byte array of size 96.
+Below is the serialization procedure that takes a <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_G1">G1</a></code> element <code>p</code> and outputs a byte array of size 96.
 1. Let <code>(x,y)</code> be the coordinates of <code>p</code> if <code>p</code> is on the curve, or <code>(0,0)</code> otherwise.
 1. Serialize <code>x</code> and <code>y</code> into <code>b_x[]</code> and <code>b_y[]</code> respectively using <code>FormatFqMsb</code> (defined in the module documentation).
 1. Concatenate <code>b_x[]</code> and <code>b_y[]</code> into <code>b[]</code>.
 1. If <code>p</code> is the point at infinity, set the infinity bit: <code>b[0]: = b[0] | 0x40</code>.
 1. Return <code>b[]</code>.
 
-Below is the deserialization procedure that takes a byte array <code>b[]</code> and outputs either a <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1">G1</a></code> element or none.
+Below is the deserialization procedure that takes a byte array <code>b[]</code> and outputs either a <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_G1">G1</a></code> element or none.
 1. If the size of <code>b[]</code> is not 96, return none.
 1. Compute the compression flag as <code>b[0] & 0x80 != 0</code>.
 1. If the compression flag is true, return none.
@@ -204,7 +204,7 @@ Below is the deserialization procedure that takes a byte array <code>b[]</code> 
 NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
 
 
-<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_FormatG1Uncompr">FormatG1Uncompr</a>
+<pre><code><b>struct</b> <a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_FormatG1Uncompr">FormatG1Uncompr</a>
 </code></pre>
 
 
@@ -225,14 +225,14 @@ NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
 
 </details>
 
-<a name="0x1_algebra_bls12381_FormatG1Compr"></a>
+<a name="0x1_crypt_algebra_bls12381_FormatG1Compr"></a>
 
 ## Struct `FormatG1Compr`
 
-A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1">G1</a></code> elements derived from
+A serialization scheme for <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_G1">G1</a></code> elements derived from
 https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-11.html#name-zcash-serialization-format-.
 
-Below is the serialization procedure that takes a <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1">G1</a></code> element <code>p</code> and outputs a byte array of size 48.
+Below is the serialization procedure that takes a <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_G1">G1</a></code> element <code>p</code> and outputs a byte array of size 48.
 1. Let <code>(x,y)</code> be the coordinates of <code>p</code> if <code>p</code> is on the curve, or <code>(0,0)</code> otherwise.
 1. Serialize <code>x</code> into <code>b[]</code> using <code>FormatFqMsb</code> (defined in the module documentation).
 1. Set the compression bit: <code>b[0] := b[0] | 0x80</code>.
@@ -240,7 +240,7 @@ Below is the serialization procedure that takes a <code><a href="algebra_bls1238
 1. If <code>y &gt; -y</code>, set the lexicographical flag: <code>b[0] := b[0] | 0x20</code>.
 1. Return <code>b[]</code>.
 
-Below is the deserialization procedure that takes a byte array <code>b[]</code> and outputs either a <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1">G1</a></code> element or none.
+Below is the deserialization procedure that takes a byte array <code>b[]</code> and outputs either a <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_G1">G1</a></code> element or none.
 1. If the size of <code>b[]</code> is not 48, return none.
 1. Compute the compression flag as <code>b[0] & 0x80 != 0</code>.
 1. If the compression flag is false, return none.
@@ -256,7 +256,7 @@ Below is the deserialization procedure that takes a byte array <code>b[]</code> 
 NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
 
 
-<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_FormatG1Compr">FormatG1Compr</a>
+<pre><code><b>struct</b> <a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_FormatG1Compr">FormatG1Compr</a>
 </code></pre>
 
 
@@ -277,17 +277,17 @@ NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
 
 </details>
 
-<a name="0x1_algebra_bls12381_G2"></a>
+<a name="0x1_crypt_algebra_bls12381_G2"></a>
 
 ## Struct `G2`
 
 The group $G_2$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow G_t$.
 It is a subgroup of <code>G2Full</code> (defined in the module documentation) with a prime order $r$ equal to
 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
-(so <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fr">Fr</a></code> is the scalar field).
+(so <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_Fr">Fr</a></code> is the scalar field).
 
 
-<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_G2">G2</a>
+<pre><code><b>struct</b> <a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_G2">G2</a>
 </code></pre>
 
 
@@ -308,21 +308,21 @@ It is a subgroup of <code>G2Full</code> (defined in the module documentation) wi
 
 </details>
 
-<a name="0x1_algebra_bls12381_FormatG2Uncompr"></a>
+<a name="0x1_crypt_algebra_bls12381_FormatG2Uncompr"></a>
 
 ## Struct `FormatG2Uncompr`
 
-A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G2">G2</a></code> elements derived from
+A serialization scheme for <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_G2">G2</a></code> elements derived from
 https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-11.html#name-zcash-serialization-format-.
 
-Below is the serialization procedure that takes a <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G2">G2</a></code> element <code>p</code> and outputs a byte array of size 192.
+Below is the serialization procedure that takes a <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_G2">G2</a></code> element <code>p</code> and outputs a byte array of size 192.
 1. Let <code>(x,y)</code> be the coordinates of <code>p</code> if <code>p</code> is on the curve, or <code>(0,0)</code> otherwise.
 1. Serialize <code>x</code> and <code>y</code> into <code>b_x[]</code> and <code>b_y[]</code> respectively using <code>FormatFq2MscMsb</code> (defined in the module documentation).
 1. Concatenate <code>b_x[]</code> and <code>b_y[]</code> into <code>b[]</code>.
 1. If <code>p</code> is the point at infinity, set the infinity bit in <code>b[]</code>: <code>b[0]: = b[0] | 0x40</code>.
 1. Return <code>b[]</code>.
 
-Below is the deserialization procedure that takes a byte array <code>b[]</code> and outputs either a <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G2">G2</a></code> element or none.
+Below is the deserialization procedure that takes a byte array <code>b[]</code> and outputs either a <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_G2">G2</a></code> element or none.
 1. If the size of <code>b[]</code> is not 192, return none.
 1. Compute the compression flag as <code>b[0] & 0x80 != 0</code>.
 1. If the compression flag is true, return none.
@@ -337,7 +337,7 @@ Below is the deserialization procedure that takes a byte array <code>b[]</code> 
 NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
 
 
-<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_FormatG2Uncompr">FormatG2Uncompr</a>
+<pre><code><b>struct</b> <a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_FormatG2Uncompr">FormatG2Uncompr</a>
 </code></pre>
 
 
@@ -358,14 +358,14 @@ NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
 
 </details>
 
-<a name="0x1_algebra_bls12381_FormatG2Compr"></a>
+<a name="0x1_crypt_algebra_bls12381_FormatG2Compr"></a>
 
 ## Struct `FormatG2Compr`
 
-A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G2">G2</a></code> elements derived from
+A serialization scheme for <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_G2">G2</a></code> elements derived from
 https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-11.html#name-zcash-serialization-format-.
 
-Below is the serialization procedure that takes a <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G2">G2</a></code> element <code>p</code> and outputs a byte array of size 96.
+Below is the serialization procedure that takes a <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_G2">G2</a></code> element <code>p</code> and outputs a byte array of size 96.
 1. Let <code>(x,y)</code> be the coordinates of <code>p</code> if <code>p</code> is on the curve, or <code>(0,0)</code> otherwise.
 1. Serialize <code>x</code> into <code>b[]</code> using <code>FormatFq2MscMsb</code> (defined in the module documentation).
 1. Set the compression bit: <code>b[0] := b[0] | 0x80</code>.
@@ -373,7 +373,7 @@ Below is the serialization procedure that takes a <code><a href="algebra_bls1238
 1. If <code>y &gt; -y</code>, set the lexicographical flag: <code>b[0] := b[0] | 0x20</code>.
 1. Return <code>b[]</code>.
 
-Below is the deserialization procedure that takes a byte array <code>b[]</code> and outputs either a <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G2">G2</a></code> element or none.
+Below is the deserialization procedure that takes a byte array <code>b[]</code> and outputs either a <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_G2">G2</a></code> element or none.
 1. If the size of <code>b[]</code> is not 96, return none.
 1. Compute the compression flag as <code>b[0] & 0x80 != 0</code>.
 1. If the compression flag is false, return none.
@@ -389,7 +389,7 @@ Below is the deserialization procedure that takes a byte array <code>b[]</code> 
 NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
 
 
-<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_FormatG2Compr">FormatG2Compr</a>
+<pre><code><b>struct</b> <a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_FormatG2Compr">FormatG2Compr</a>
 </code></pre>
 
 
@@ -410,18 +410,18 @@ NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
 
 </details>
 
-<a name="0x1_algebra_bls12381_Gt"></a>
+<a name="0x1_crypt_algebra_bls12381_Gt"></a>
 
 ## Struct `Gt`
 
 The group $G_t$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow G_t$.
-It is a multiplicative subgroup of <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq12">Fq12</a></code>,
+It is a multiplicative subgroup of <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_Fq12">Fq12</a></code>,
 with a prime order $r$ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
-(so <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fr">Fr</a></code> is the scalar field).
-The identity of <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Gt">Gt</a></code> is 1.
+(so <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_Fr">Fr</a></code> is the scalar field).
+The identity of <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_Gt">Gt</a></code> is 1.
 
 
-<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_Gt">Gt</a>
+<pre><code><b>struct</b> <a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_Gt">Gt</a>
 </code></pre>
 
 
@@ -442,20 +442,20 @@ The identity of <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Gt">Gt</
 
 </details>
 
-<a name="0x1_algebra_bls12381_FormatGt"></a>
+<a name="0x1_crypt_algebra_bls12381_FormatGt"></a>
 
 ## Struct `FormatGt`
 
-A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Gt">Gt</a></code> elements.
+A serialization scheme for <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_Gt">Gt</a></code> elements.
 
-To serialize, it treats a <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Gt">Gt</a></code> element <code>p</code> as an <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq12">Fq12</a></code> element and serialize it using <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_FormatFq12LscLsb">FormatFq12LscLsb</a></code>.
+To serialize, it treats a <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_Gt">Gt</a></code> element <code>p</code> as an <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_Fq12">Fq12</a></code> element and serialize it using <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_FormatFq12LscLsb">FormatFq12LscLsb</a></code>.
 
-To deserialize, it uses <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_FormatFq12LscLsb">FormatFq12LscLsb</a></code> to try deserializing to an <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq12">Fq12</a></code> element then test the membership in <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Gt">Gt</a></code>.
+To deserialize, it uses <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_FormatFq12LscLsb">FormatFq12LscLsb</a></code> to try deserializing to an <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_Fq12">Fq12</a></code> element then test the membership in <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_Gt">Gt</a></code>.
 
 NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
 
 
-<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_FormatGt">FormatGt</a>
+<pre><code><b>struct</b> <a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_FormatGt">FormatGt</a>
 </code></pre>
 
 
@@ -476,7 +476,7 @@ NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
 
 </details>
 
-<a name="0x1_algebra_bls12381_Fr"></a>
+<a name="0x1_crypt_algebra_bls12381_Fr"></a>
 
 ## Struct `Fr`
 
@@ -484,7 +484,7 @@ The finite field $F_r$ that can be used as the scalar fields
 associated with the groups $G_1$, $G_2$, $G_t$ in BLS12-381-based pairing.
 
 
-<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_Fr">Fr</a>
+<pre><code><b>struct</b> <a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_Fr">Fr</a>
 </code></pre>
 
 
@@ -505,17 +505,17 @@ associated with the groups $G_1$, $G_2$, $G_t$ in BLS12-381-based pairing.
 
 </details>
 
-<a name="0x1_algebra_bls12381_FormatFrLsb"></a>
+<a name="0x1_crypt_algebra_bls12381_FormatFrLsb"></a>
 
 ## Struct `FormatFrLsb`
 
-A serialization format for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fr">Fr</a></code> elements,
+A serialization format for <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_Fr">Fr</a></code> elements,
 where an element is represented by a byte array <code>b[]</code> of size 32 with the least significant byte (LSB) coming first.
 
 NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0, blst-0.3.7.
 
 
-<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_FormatFrLsb">FormatFrLsb</a>
+<pre><code><b>struct</b> <a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_FormatFrLsb">FormatFrLsb</a>
 </code></pre>
 
 
@@ -536,17 +536,17 @@ NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0, blst-0.3.7
 
 </details>
 
-<a name="0x1_algebra_bls12381_FormatFrMsb"></a>
+<a name="0x1_crypt_algebra_bls12381_FormatFrMsb"></a>
 
 ## Struct `FormatFrMsb`
 
-A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fr">Fr</a></code> elements,
+A serialization scheme for <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_Fr">Fr</a></code> elements,
 where an element is represented by a byte array <code>b[]</code> of size 32 with the most significant byte (MSB) coming first.
 
 NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0, blst-0.3.7.
 
 
-<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_FormatFrMsb">FormatFrMsb</a>
+<pre><code><b>struct</b> <a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_FormatFrMsb">FormatFrMsb</a>
 </code></pre>
 
 
@@ -567,16 +567,16 @@ NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0, blst-0.3.7
 
 </details>
 
-<a name="0x1_algebra_bls12381_HashG1XmdSha256SswuRo"></a>
+<a name="0x1_crypt_algebra_bls12381_HashG1XmdSha256SswuRo"></a>
 
 ## Struct `HashG1XmdSha256SswuRo`
 
-The hash-to-curve suite <code>BLS12381G1_XMD:SHA-256_SSWU_RO_</code> that hashes a byte array into <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1">G1</a></code> elements.
+The hash-to-curve suite <code>BLS12381G1_XMD:SHA-256_SSWU_RO_</code> that hashes a byte array into <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_G1">G1</a></code> elements.
 
 Full specification is defined in https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-16#name-bls12-381-g1.
 
 
-<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_HashG1XmdSha256SswuRo">HashG1XmdSha256SswuRo</a>
+<pre><code><b>struct</b> <a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_HashG1XmdSha256SswuRo">HashG1XmdSha256SswuRo</a>
 </code></pre>
 
 
@@ -597,16 +597,16 @@ Full specification is defined in https://datatracker.ietf.org/doc/html/draft-irt
 
 </details>
 
-<a name="0x1_algebra_bls12381_HashG2XmdSha256SswuRo"></a>
+<a name="0x1_crypt_algebra_bls12381_HashG2XmdSha256SswuRo"></a>
 
 ## Struct `HashG2XmdSha256SswuRo`
 
-The hash-to-curve suite <code>BLS12381G2_XMD:SHA-256_SSWU_RO_</code> that hashes a byte array into <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G2">G2</a></code> elements.
+The hash-to-curve suite <code>BLS12381G2_XMD:SHA-256_SSWU_RO_</code> that hashes a byte array into <code><a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_G2">G2</a></code> elements.
 
 Full specification is defined in https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-16#name-bls12-381-g2.
 
 
-<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_HashG2XmdSha256SswuRo">HashG2XmdSha256SswuRo</a>
+<pre><code><b>struct</b> <a href="crypt_algebra_bls12381.md#0x1_crypt_algebra_bls12381_HashG2XmdSha256SswuRo">HashG2XmdSha256SswuRo</a>
 </code></pre>
 
 
