@@ -35,7 +35,7 @@
 /// `upcast<Gt, Fq12>()` and `downcast<Fq12, Gt>()` will be supported.
 ///
 /// See `algebra_*.move` for currently implemented algebraic structures.
-module aptos_std::algebra {
+module aptos_std::crypt_algebra {
     use std::option::{Option, some, none};
     use std::features;
 

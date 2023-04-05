@@ -71,11 +71,11 @@ impl TryFrom<TypeTag> for Structure {
 
     fn try_from(value: TypeTag) -> Result<Self, Self::Error> {
         match value.to_string().as_str() {
-            "0x1::algebra_bls12381::Fr" => Ok(Structure::BLS12381Fr),
-            "0x1::algebra_bls12381::Fq12" => Ok(Structure::BLS12381Fq12),
-            "0x1::algebra_bls12381::G1" => Ok(Structure::BLS12381G1),
-            "0x1::algebra_bls12381::G2" => Ok(Structure::BLS12381G2),
-            "0x1::algebra_bls12381::Gt" => Ok(Structure::BLS12381Gt),
+            "0x1::crypt_algebra_bls12381::Fr" => Ok(Structure::BLS12381Fr),
+            "0x1::crypt_algebra_bls12381::Fq12" => Ok(Structure::BLS12381Fq12),
+            "0x1::crypt_algebra_bls12381::G1" => Ok(Structure::BLS12381G1),
+            "0x1::crypt_algebra_bls12381::G2" => Ok(Structure::BLS12381G2),
+            "0x1::crypt_algebra_bls12381::Gt" => Ok(Structure::BLS12381Gt),
             _ => Err(()),
         }
     }
@@ -107,20 +107,20 @@ impl TryFrom<TypeTag> for SerializationFormat {
 
     fn try_from(value: TypeTag) -> Result<Self, Self::Error> {
         match value.to_string().as_str() {
-            "0x1::algebra_bls12381::FormatFq12LscLsb" => {
+            "0x1::crypt_algebra_bls12381::FormatFq12LscLsb" => {
                 Ok(SerializationFormat::BLS12381Fq12LscLsb)
             },
-            "0x1::algebra_bls12381::FormatG1Uncompr" => {
+            "0x1::crypt_algebra_bls12381::FormatG1Uncompr" => {
                 Ok(SerializationFormat::BLS12381G1Uncompressed)
             },
-            "0x1::algebra_bls12381::FormatG1Compr" => Ok(SerializationFormat::BLS12381G1Compressed),
-            "0x1::algebra_bls12381::FormatG2Uncompr" => {
+            "0x1::crypt_algebra_bls12381::FormatG1Compr" => Ok(SerializationFormat::BLS12381G1Compressed),
+            "0x1::crypt_algebra_bls12381::FormatG2Uncompr" => {
                 Ok(SerializationFormat::BLS12381G2Uncompressed)
             },
-            "0x1::algebra_bls12381::FormatG2Compr" => Ok(SerializationFormat::BLS12381G2Compressed),
-            "0x1::algebra_bls12381::FormatGt" => Ok(SerializationFormat::BLS12381Gt),
-            "0x1::algebra_bls12381::FormatFrLsb" => Ok(SerializationFormat::BLS12381FrLsb),
-            "0x1::algebra_bls12381::FormatFrMsb" => Ok(SerializationFormat::BLS12381FrMsb),
+            "0x1::crypt_algebra_bls12381::FormatG2Compr" => Ok(SerializationFormat::BLS12381G2Compressed),
+            "0x1::crypt_algebra_bls12381::FormatGt" => Ok(SerializationFormat::BLS12381Gt),
+            "0x1::crypt_algebra_bls12381::FormatFrLsb" => Ok(SerializationFormat::BLS12381FrLsb),
+            "0x1::crypt_algebra_bls12381::FormatFrMsb" => Ok(SerializationFormat::BLS12381FrMsb),
             _ => Err(()),
         }
     }
@@ -138,10 +138,10 @@ impl TryFrom<TypeTag> for HashToStructureSuite {
 
     fn try_from(value: TypeTag) -> Result<Self, Self::Error> {
         match value.to_string().as_str() {
-            "0x1::algebra_bls12381::HashG1XmdSha256SswuRo" => {
+            "0x1::crypt_algebra_bls12381::HashG1XmdSha256SswuRo" => {
                 Ok(HashToStructureSuite::Bls12381g1XmdSha256SswuRo)
             },
-            "0x1::algebra_bls12381::HashG2XmdSha256SswuRo" => {
+            "0x1::crypt_algebra_bls12381::HashG2XmdSha256SswuRo" => {
                 Ok(HashToStructureSuite::Bls12381g2XmdSha256SswuRo)
             },
             _ => Err(()),
