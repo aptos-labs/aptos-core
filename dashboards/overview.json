@@ -32,6 +32,7 @@
       }
     ]
   },
+  "description": "Overview of an Aptos network",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
@@ -1836,7 +1837,7 @@
           },
           "mappings": [],
           "min": 0,
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "transparent", "value": null }] },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "transparent" }] },
           "unit": "none"
         },
         "overrides": []
@@ -1889,7 +1890,7 @@
           },
           "mappings": [],
           "min": 0,
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "transparent", "value": null }] },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "transparent" }] },
           "unit": "none"
         },
         "overrides": []
@@ -2540,13 +2541,7 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          }
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
         },
         "overrides": []
       },
@@ -2595,13 +2590,7 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          }
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
         },
         "overrides": []
       },
@@ -2915,13 +2904,7 @@
           },
           "mappings": [],
           "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
           "unit": "s"
         },
         "overrides": []
@@ -3080,13 +3063,7 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          }
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
         },
         "overrides": []
       },
@@ -3135,13 +3112,7 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          }
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
         },
         "overrides": []
       },
@@ -3201,13 +3172,7 @@
           },
           "mappings": [],
           "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
           "unit": "percentunit"
         },
         "overrides": []
@@ -3284,13 +3249,7 @@
           },
           "mappings": [],
           "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
           "unit": "deckbytes"
         },
         "overrides": []
@@ -3343,13 +3302,7 @@
           },
           "mappings": [],
           "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
           "unit": "decbytes"
         },
         "overrides": []
@@ -3401,13 +3354,7 @@
           },
           "mappings": [],
           "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
           "unit": "iops"
         },
         "overrides": []
@@ -3459,13 +3406,7 @@
           },
           "mappings": [],
           "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
           "unit": "Bps"
         },
         "overrides": []
@@ -3517,13 +3458,7 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
           "unit": "percentunit"
         },
         "overrides": []
@@ -3572,13 +3507,7 @@
             "scaleDistribution": { "type": "linear" }
           },
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          }
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
         },
         "overrides": []
       },
@@ -3611,7 +3540,7 @@
       "type": "barchart"
     }
   ],
-  "refresh": "10s",
+  "refresh": "1m",
   "schemaVersion": 37,
   "style": "dark",
   "tags": ["aptos-core"],
@@ -3620,7 +3549,7 @@
       {
         "allFormat": "",
         "allValue": "",
-        "current": { "text": ["VictoriaMetrics Mainnet US"], "value": "VictoriaMetrics Mainnet US" },
+        "current": { "selected": false, "text": "VictoriaMetrics Global", "value": "VictoriaMetrics Global" },
         "hide": 0,
         "includeAll": false,
         "label": "",
@@ -3639,7 +3568,7 @@
       {
         "allFormat": "",
         "allValue": ".*",
-        "current": { "text": ["telemetry-service"], "value": "telemetry-service" },
+        "current": { "selected": false, "text": "vmagent", "value": "vmagent" },
         "datasource": { "type": "prometheus", "uid": "Zu4MxH4Vk" },
         "definition": "",
         "hide": 0,
@@ -3662,7 +3591,7 @@
       {
         "allFormat": "",
         "allValue": "",
-        "current": { "text": ["mainnet"], "value": "mainnet" },
+        "current": { "selected": false, "text": "PREVIEWNET", "value": "PREVIEWNET" },
         "datasource": { "type": "prometheus", "uid": "${Datasource}" },
         "definition": "",
         "hide": 0,
@@ -3685,7 +3614,7 @@
       {
         "allFormat": "",
         "allValue": ".*",
-        "current": { "text": ["All"], "value": "$__all" },
+        "current": { "selected": false, "text": "All", "value": "$__all" },
         "datasource": { "type": "prometheus", "uid": "Zu4MxH4Vk" },
         "definition": "",
         "hide": 0,
@@ -3708,7 +3637,7 @@
       {
         "allFormat": "",
         "allValue": ".*",
-        "current": { "text": ["All"], "value": "$__all" },
+        "current": { "selected": false, "text": "All", "value": "$__all" },
         "datasource": { "type": "prometheus", "uid": "${Datasource}" },
         "definition": "",
         "hide": 0,
@@ -3731,7 +3660,7 @@
       {
         "allFormat": "",
         "allValue": ".*",
-        "current": { "text": ["All"], "value": ["$__all"] },
+        "current": { "selected": true, "text": ["All"], "value": ["$__all"] },
         "datasource": { "type": "prometheus", "uid": "${Datasource}" },
         "definition": "",
         "hide": 0,
@@ -3758,6 +3687,6 @@
   "timezone": "",
   "title": "Overview",
   "uid": "overview",
-  "version": 283,
+  "version": 288,
   "weekStart": ""
 }
