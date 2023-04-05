@@ -10,6 +10,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     install \
     wget \
     curl \
+    git \
     libssl1.1 \
     ca-certificates \
     socat \

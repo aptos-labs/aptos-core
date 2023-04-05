@@ -133,6 +133,7 @@ RUN apt-get update && apt-get --no-install-recommends -y \
     install \
     wget \
     curl \
+    git \
     libssl1.1 \
     ca-certificates \
     socat \
