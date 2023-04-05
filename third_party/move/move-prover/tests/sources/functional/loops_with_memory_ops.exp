@@ -44,9 +44,12 @@ error: unknown assertion failed
    =     at tests/sources/functional/loops_with_memory_ops.move:74: nested_loop2
    =     at tests/sources/functional/loops_with_memory_ops.move:80: nested_loop2
    =     at tests/sources/functional/loops_with_memory_ops.move:81: nested_loop2
-   =         b = <redacted>
-   =         b = <redacted>
-   =         a = <redacted>
+   =     at <internal>:1
+   =     at tests/sources/functional/loops_with_memory_ops.move:81: nested_loop2
+   =     at <internal>:1
+   =     at tests/sources/functional/loops_with_memory_ops.move:81: nested_loop2
+   =     at <internal>:1
+   =     at tests/sources/functional/loops_with_memory_ops.move:81: nested_loop2
    =     at <internal>:1
    =     at tests/sources/functional/loops_with_memory_ops.move:81: nested_loop2
    =     at tests/sources/functional/loops_with_memory_ops.move:85: nested_loop2
@@ -99,10 +102,14 @@ error: induction case of the loop invariant does not hold
    =     at tests/sources/functional/loops_with_memory_ops.move:74: nested_loop2
    =     at tests/sources/functional/loops_with_memory_ops.move:80: nested_loop2
    =     at tests/sources/functional/loops_with_memory_ops.move:81: nested_loop2
-   =         b = <redacted>
-   =         b = <redacted>
-   =         a = <redacted>
-   =         a = <redacted>
+   =     at <internal>:1
+   =     at tests/sources/functional/loops_with_memory_ops.move:81: nested_loop2
+   =     at <internal>:1
+   =     at tests/sources/functional/loops_with_memory_ops.move:81: nested_loop2
+   =     at <internal>:1
+   =     at tests/sources/functional/loops_with_memory_ops.move:81: nested_loop2
+   =     at <internal>:1
+   =     at tests/sources/functional/loops_with_memory_ops.move:81: nested_loop2
    =     at tests/sources/functional/loops_with_memory_ops.move:85: nested_loop2
    =         i = <redacted>
    =     at tests/sources/functional/loops_with_memory_ops.move:86: nested_loop2
