@@ -319,13 +319,12 @@ fn create_transaction_chunks(
         let txn = encode_mint_transaction(gen_address(i), 100);
         txns.push(txn);
     }
-    txns.push(Transaction::StateCheckpoint(HashValue::random()));
     let id = gen_block_id(1);
 
     let output = executor
         .execute_block((id, txns.clone()), executor.committed_block_id())
         .unwrap();
-    let ledger_version = txns.len() as u64;
+    let ledger_version = (txns.len() + 1) as u64;
     let ledger_info = gen_ledger_info(ledger_version, output.root_hash(), id, 1);
     executor
         .commit_blocks(vec![id], ledger_info.clone())
@@ -432,7 +431,7 @@ fn apply_transaction_by_writeset(
     let chunk_output =
         ChunkOutput::by_transaction_output(transactions_and_outputs, state_view).unwrap();
 
-    let (executed, _, _) = chunk_output.apply_to_ledger(&ledger_view).unwrap();
+    let (executed, _, _) = chunk_output.apply_to_ledger(&ledger_view, None).unwrap();
 
     db.writer
         .save_transactions(
@@ -572,7 +571,7 @@ fn run_transactions_naive(transactions: Vec<Transaction>) -> HashValue {
                 .unwrap(),
         )
         .unwrap();
-        let (executed, _, _) = out.apply_to_ledger(&ledger_view).unwrap();
+        let (executed, _, _) = out.apply_to_ledger(&ledger_view, None).unwrap();
         db.writer
             .save_transactions(
                 &executed.transactions_to_commit().unwrap(),
@@ -613,23 +612,30 @@ proptest! {
             (block_a.id, block_a.txns.clone()), parent_block_id
         ).unwrap();
         let root_hash_a = output_a.root_hash();
-        prop_assert_eq!(output_a.version(), block_a.len());
+        prop_assert_eq!(output_a.version(), block_a.len() + 1);
         let output_b = executor.execute_block((block_b.id, block_b.txns.clone()), block_a.id).unwrap();
-        prop_assert_eq!(output_b.version(), block_a.len() + block_b.len());
+        prop_assert_eq!(output_b.version(), block_a.len() + block_b.len() + 2);
         let output_c = executor.execute_block((block_c.id, block_c.txns.clone()), block_a.id).unwrap();
-        prop_assert_eq!(output_c.version(), block_a.len() + block_c.len());
+        prop_assert_eq!(output_c.version(), block_a.len() + block_c.len() + 2);
 
         let root_hash_b = output_b.root_hash();
         let root_hash_c = output_c.root_hash();
 
         // Execute block A and B. Execute and commit one transaction at a time.
-        let expected_root_hash_a = run_transactions_naive(block_a.txns.clone());
+        let expected_root_hash_a = run_transactions_naive({
+            let mut txns = vec![];
+            txns.extend(block_a.txns.iter().cloned());
+            txns.push(Transaction::StateCheckpoint(block_a.id));
+            txns
+        });
         prop_assert_eq!(root_hash_a, expected_root_hash_a);
 
         let expected_root_hash_b = run_transactions_naive({
             let mut txns = vec![];
             txns.extend(block_a.txns.iter().cloned());
+            txns.push(Transaction::StateCheckpoint(block_a.id));
             txns.extend(block_b.txns.iter().cloned());
+            txns.push(Transaction::StateCheckpoint(block_b.id));
             txns
         });
         prop_assert_eq!(root_hash_b, expected_root_hash_b);
@@ -637,7 +643,9 @@ proptest! {
         let expected_root_hash_c = run_transactions_naive({
             let mut txns = vec![];
             txns.extend(block_a.txns.iter().cloned());
+            txns.push(Transaction::StateCheckpoint(block_a.id));
             txns.extend(block_c.txns.iter().cloned());
+            txns.push(Transaction::StateCheckpoint(block_c.id));
             txns
         });
         prop_assert_eq!(root_hash_c, expected_root_hash_c);
@@ -684,13 +692,13 @@ proptest! {
             prop_assert!(retry_output.compute_status().iter().all(|s| matches!(*s, TransactionStatus::Keep(_))));
 
             // commit
-            let ledger_info = gen_ledger_info(num_txns as Version, retry_output.root_hash(), retry_block_id, 12345 /* timestamp */);
+            let ledger_info = gen_ledger_info(num_txns as Version + 1, retry_output.root_hash(), retry_block_id, 12345 /* timestamp */);
             executor.commit_blocks(vec![retry_block_id], ledger_info).unwrap();
 
             // get txn_infos from db
             let db = executor.db.reader.clone();
-            prop_assert_eq!(db.get_latest_version().unwrap(), num_txns as Version);
-            let txn_list = db.get_transactions(1 /* start version */, num_txns, num_txns as Version /* ledger version */, false /* fetch events */).unwrap();
+            prop_assert_eq!(db.get_latest_version().unwrap(), num_txns as Version + 1);
+            let txn_list = db.get_transactions(1 /* start version */, num_txns, num_txns as Version + 1 /* ledger version */, false /* fetch events */).unwrap();
             prop_assert_eq!(&block.txns, &txn_list.transactions);
             let txn_infos = txn_list.proof.transaction_infos;
             let write_sets = db.get_write_set_iterator(1, num_txns).unwrap().collect::<Result<_>>().unwrap();
@@ -725,7 +733,7 @@ proptest! {
                 (block_a.id, block_a.txns.clone()), parent_block_id
             ).unwrap();
             root_hash = output_a.root_hash();
-            let ledger_info = gen_ledger_info(block_a.txns.len() as u64, root_hash, block_a.id, 1);
+            let ledger_info = gen_ledger_info((block_a.txns.len() + 1) as u64, root_hash, block_a.id, 1);
             executor.commit_blocks(vec![block_a.id], ledger_info).unwrap();
             parent_block_id = block_a.id;
         }
@@ -736,7 +744,7 @@ proptest! {
             let output_b = executor.execute_block((block_b.id, block_b.txns.clone()), parent_block_id).unwrap();
             root_hash = output_b.root_hash();
             let ledger_info = gen_ledger_info(
-                (block_a.txns.len() + block_b.txns.len()) as u64,
+                (block_a.txns.len() + block_b.txns.len() + 2) as u64,
                 root_hash,
                 block_b.id,
                 2,
@@ -747,7 +755,9 @@ proptest! {
         let expected_root_hash = run_transactions_naive({
             let mut txns = vec![];
             txns.extend(block_a.txns.iter().cloned());
+            txns.push(Transaction::StateCheckpoint(block_a.id));
             txns.extend(block_b.txns.iter().cloned());
+            txns.push(Transaction::StateCheckpoint(block_b.id));
             txns
         });
         prop_assert_eq!(root_hash, expected_root_hash);

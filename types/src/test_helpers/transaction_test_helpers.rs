@@ -239,7 +239,7 @@ pub fn get_test_txn_with_chain_id(
     SignedTransaction::new(raw_txn, public_key, signature)
 }
 
-pub fn block(mut user_txns: Vec<Transaction>) -> Vec<Transaction> {
-    user_txns.push(Transaction::StateCheckpoint(HashValue::random()));
+pub fn block(user_txns: Vec<Transaction>) -> Vec<Transaction> {
+    // user_txns.push(Transaction::StateCheckpoint(HashValue::random()));
     user_txns
 }

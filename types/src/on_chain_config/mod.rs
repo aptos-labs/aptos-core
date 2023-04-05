@@ -27,6 +27,7 @@ mod execution_config;
 mod gas_schedule;
 mod timed_features;
 mod validator_set;
+mod block_gas_limit_config;
 
 pub use self::{
     approved_execution_hashes::ApprovedExecutionHashes,

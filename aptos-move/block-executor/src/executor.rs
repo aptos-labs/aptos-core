@@ -314,17 +314,14 @@ where
         executor_initial_arguments: E::Argument,
         signature_verified_block: &Vec<T>,
         base_view: &S,
-    ) -> (
-        Result<Vec<(E::Output, Vec<(T::Key, WriteOp)>)>, E::Error>,
-        bool,
-    ) {
+    ) -> Result<Vec<(E::Output, Vec<(T::Key, WriteOp)>)>, E::Error> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         assert!(self.concurrency_level > 1, "Must use sequential execution");
 
         let versioned_cache = MVHashMap::new(None);
 
         if signature_verified_block.is_empty() {
-            return (Ok(vec![]), false);
+            return Ok(vec![]);
         }
 
         let num_txns = signature_verified_block.len() as u32;
@@ -387,20 +384,17 @@ where
         });
 
         match maybe_err {
-            Some(err) => (Err(err), false),
+            Some(err) => Err(err),
             None => {
                 final_results.resize_with(num_txns, E::Output::skip_output);
                 let (mv_data_cache, _mv_code_cache) = versioned_cache.take();
                 let delta_resolver: OutputDeltaResolver<T> =
                     OutputDeltaResolver::new(mv_data_cache);
                 // TODO: parallelize when necessary.
-                (
-                    Ok(final_results
+                Ok(final_results
                         .into_iter()
                         .zip(delta_resolver.resolve(base_view, num_txns).into_iter())
-                        .collect()),
-                    has_reconfiguration.load(Ordering::Relaxed),
-                )
+                        .collect())
             },
         }
     }
@@ -410,17 +404,13 @@ where
         executor_arguments: E::Argument,
         signature_verified_block: &[T],
         base_view: &S,
-    ) -> (
-        Result<Vec<(E::Output, Vec<(T::Key, WriteOp)>)>, E::Error>,
-        bool,
-    ) {
+    ) -> Result<Vec<(E::Output, Vec<(T::Key, WriteOp)>)>, E::Error> {
         let num_txns = signature_verified_block.len();
         let executor = E::init(executor_arguments);
         let mut data_map = BTreeMap::new();
 
         let mut ret = Vec::with_capacity(num_txns);
         let mut accumulated_gas = 0;
-        let mut has_reconfiguration = false;
         for (idx, txn) in signature_verified_block.iter().enumerate() {
             let res = executor.execute_transaction(
                 &LatestView::<T, S>::new_btree_view(base_view, &data_map, idx as TxnIndex),
@@ -447,13 +437,12 @@ where
                 },
                 ExecutionStatus::Abort(err) => {
                     // Record the status indicating abort.
-                    return (Err(Error::UserError(err)), false);
+                    return Err(Error::UserError(err));
                 },
             }
 
             // When the txn is a SkipRest txn, halt sequential execution.
             if must_skip {
-                has_reconfiguration = true;
                 debug!("[Execution]: Sequential execution early halted due to SkipRest txn.");
                 break;
             }
@@ -471,16 +460,13 @@ where
         }
 
         ret.resize_with(num_txns, E::Output::skip_output);
-        (
-            Ok(ret.into_iter().map(|out| (out, vec![])).collect()),
-            has_reconfiguration,
-        )
+        Ok(ret.into_iter().map(|out| (out, vec![])).collect())
     }
 
     pub fn execute_block(
         &self,
         executor_arguments: E::Argument,
-        mut signature_verified_block: Vec<T>,
+        signature_verified_block: Vec<T>,
         base_view: &S,
     ) -> Result<Vec<(E::Output, Vec<(T::Key, WriteOp)>)>, E::Error> {
         // The last txn must be StateCheckpoint in production. We let the executor
@@ -489,9 +475,9 @@ where
         // The reason is that with per-block gas limit, the parallel / sequential execution
         // may early halt and mark all remaining txns as Discard, so we need to add back
         // the StateCheckpoint output to satisfy the invariant checks.
-        let state_checkpoint_txn = signature_verified_block.pop();
+        // let state_checkpoint_txn = signature_verified_block.pop();
 
-        let (mut ret, mut has_reconfiguration) = if self.concurrency_level > 1 {
+        let mut ret = if self.concurrency_level > 1 {
             self.execute_transactions_parallel(
                 executor_arguments,
                 &signature_verified_block,
@@ -512,35 +498,11 @@ where
             // Clear by re-initializing the speculative logs.
             init_speculative_logs(signature_verified_block.len());
 
-            (ret, has_reconfiguration) = self.execute_transactions_sequential(
+            ret = self.execute_transactions_sequential(
                 executor_arguments,
                 &signature_verified_block,
                 base_view,
             )
-        }
-
-        if let Ok(ref mut outputs) = ret {
-            if !has_reconfiguration {
-                if let Some(txn) = state_checkpoint_txn {
-                    // If the block execution is halted due to reconfiguration,
-                    // StateCheckpoint is not added for back-forward compatibility.
-                    // Otherwise, add back the output of the StateCheckpoint txn.
-                    let executor = E::init(executor_arguments);
-                    let res = executor.execute_transaction(
-                        &LatestView::<T, S>::new_btree_view(base_view, &BTreeMap::new(), 0),
-                        &txn,
-                        0,
-                        true,
-                    );
-
-                    if let ExecutionStatus::Success(output) = res {
-                        outputs.push((output, vec![]));
-                    } else {
-                        // The execution result of StateCheckpoint txn must be successful.
-                        unreachable!();
-                    }
-                }
-            }
         }
 
         RAYON_EXEC_POOL.spawn(move || {

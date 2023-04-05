@@ -6,6 +6,7 @@
 
 use crate::{components::apply_chunk_output::ApplyChunkOutput, metrics};
 use anyhow::Result;
+use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutedChunk;
 use aptos_logger::{sample, sample::SampleRate, trace, warn};
 use aptos_storage_interface::{
@@ -101,11 +102,12 @@ impl ChunkOutput {
     pub fn apply_to_ledger(
         self,
         base_view: &ExecutedTrees,
+        append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<(ExecutedChunk, Vec<Transaction>, Vec<Transaction>)> {
         fail_point!("executor::vm_execute_chunk", |_| {
             Err(anyhow::anyhow!("Injected error in apply_to_ledger."))
         });
-        ApplyChunkOutput::apply(self, base_view)
+        ApplyChunkOutput::apply(self, base_view, append_state_checkpoint_to_block)
     }
 
     pub fn trace_log_transaction_status(&self) {
