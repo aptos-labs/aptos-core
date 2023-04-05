@@ -10,6 +10,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     install \
     wget \
     curl \
+    perl-base=5.32.1-4+deb11u1 \
     git \
     libssl1.1 \
     ca-certificates \
