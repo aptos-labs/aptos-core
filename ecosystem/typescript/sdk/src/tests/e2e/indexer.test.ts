@@ -204,7 +204,7 @@ describe("Indexer", () => {
       });
 
       // Call queryIndexer and expect it to make a request with the expected User-Agent header
-      const expectedUserAgent = `aptos-indexer/${VERSION}`;
+      const expectedUserAgent = `aptos-ts-sdk/${VERSION}`;
       await indexerClient.queryIndexer({ query: '{ mockQuery }' });
       expect(mockHeaders['User-Agent']).toEqual(expectedUserAgent);
     });

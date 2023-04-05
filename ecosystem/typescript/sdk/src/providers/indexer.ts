@@ -50,7 +50,7 @@ interface PaginationArgs {
 }
 
 const headers = {
-  "User-Agent": `aptos-indexer/${VERSION}`,
+  "User-Agent": `aptos-ts-sdk/${VERSION}`,
 };
 
 type GraphqlQuery = {
