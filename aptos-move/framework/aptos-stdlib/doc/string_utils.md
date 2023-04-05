@@ -326,7 +326,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_format_list">format_list</a>&lt;T&gt;(fmt: &<a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, val: &T): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_format_list">format_list</a>&lt;T&gt;(fmt: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, val: &T): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
@@ -335,7 +335,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_format_list">format_list</a>&lt;T&gt;(fmt: &String, val: &T): String;
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_format_list">format_list</a>&lt;T&gt;(fmt: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, val: &T): String;
 </code></pre>
 
 

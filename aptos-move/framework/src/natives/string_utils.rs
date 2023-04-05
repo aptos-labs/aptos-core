@@ -195,6 +195,9 @@ pub fn native_format_list(
     debug_assert!(ty_args.len() == 1);
     let mut list_ty = &ty_args[0];
 
+    let arg_mismatch = 1;
+    let invalid_fmt = 2;
+
     let val = safely_pop_arg!(arguments, Reference);
     let mut val = val
         .read_ref()
@@ -203,19 +206,13 @@ pub fn native_format_list(
     let fmt = safely_pop_arg!(arguments, Reference);
     let fmt = fmt
         .read_ref()
-        .map_err(SafeNativeError::InvariantViolation)?;
-    let fmt = fmt
-        .value_as::<Struct>()?
-        .unpack()?
-        .next()
-        .unwrap()
+        .map_err(SafeNativeError::InvariantViolation)?
         .value_as::<Vec<u8>>()?;
-    let fmt = std::str::from_utf8(&fmt).unwrap();
+    let fmt = std::str::from_utf8(&fmt).map_err(|_| SafeNativeError::Abort {
+        abort_code: invalid_fmt,
+    })?;
 
     context.charge(gas_params.per_byte * GasQuantity::from(fmt.len() as u64))?;
-
-    let arg_mismatch = 1;
-    let invalid_fmt = 2;
 
     let match_list_ty = |context: &mut SafeNativeContext, list_ty, name| {
         if let TypeTag::Struct(struct_tag) = context
