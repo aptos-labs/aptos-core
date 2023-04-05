@@ -22,11 +22,11 @@ aptos-language-e2e-tests = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 aptos-vm-genesis = { workspace = true }
+aptos-move-stdlib = { workspace = true }
 
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-ir-compiler = { workspace = true }
-aptos-move-stdlib = { workspace = true }
 move-table-extension = { workspace = true }
 move-vm-runtime = { workspace = true }
 move-vm-test-utils = { workspace = true }
