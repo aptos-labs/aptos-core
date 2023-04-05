@@ -20,7 +20,6 @@ use aptos_mvhashmap::{
     types::{MVDataError, MVDataOutput, TxnIndex, Version},
     MVHashMap,
 };
-use aptos_state_view::TStateView;
 use aptos_types::{
     executable::ExecutableTestType, // TODO: fix up with the proper generics.
     write_set::WriteOp,
@@ -33,6 +32,7 @@ use std::{
     marker::PhantomData,
     sync::atomic::{AtomicBool, Ordering},
 };
+use aptos_vm_view::types::TStateViewWithRemoteCache;
 
 pub static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
@@ -53,7 +53,7 @@ impl<T, E, S> BlockExecutor<T, E, S>
 where
     T: Transaction,
     E: ExecutorTask<Txn = T>,
-    S: TStateView<Key = T::Key> + Sync,
+    S: TStateViewWithRemoteCache<CommonKey = T::Key> + Sync,
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.

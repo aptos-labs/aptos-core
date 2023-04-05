@@ -462,6 +462,7 @@ dependencies = [
  "aptos-state-view",
  "aptos-types",
  "aptos-vm-logging",
+ "aptos-vm-view",
  "arc-swap",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "claims",
@@ -1761,6 +1762,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
+ "aptos-vm-view",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "goldenfile",
  "hex",
@@ -3143,6 +3145,7 @@ dependencies = [
  "aptos-state-view",
  "aptos-types",
  "aptos-vm-logging",
+ "aptos-vm-view",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "dashmap",
  "fail 0.5.0",
@@ -3180,6 +3183,7 @@ dependencies = [
  "aptos-state-view",
  "aptos-types",
  "aptos-vm",
+ "aptos-vm-view",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "move-core-types",
  "move-vm-types",
@@ -3250,6 +3254,16 @@ dependencies = [
  "fail 0.5.0",
  "move-core-types",
  "rand 0.7.3",
+]
+
+[[package]]
+name = "aptos-vm-view"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-state-view",
+ "aptos-types",
+ "move-vm-types",
 ]
 
 [[package]]

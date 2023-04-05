@@ -4,8 +4,8 @@
 use crate::{executor::RAYON_EXEC_POOL, task::Transaction};
 use aptos_aggregator::delta_change_set::{deserialize, serialize};
 use aptos_mvhashmap::versioned_data::VersionedData;
-use aptos_state_view::TStateView;
 use aptos_types::write_set::WriteOp;
+use aptos_vm_view::types::TStateViewWithRemoteCache;
 
 pub(crate) struct OutputDeltaResolver<T: Transaction> {
     versioned_outputs: VersionedData<T::Key, T::Value>,
@@ -21,7 +21,7 @@ impl<T: Transaction> OutputDeltaResolver<T> {
     /// and blocksize, and returns a Vec of materialized deltas per transaction index.
     pub(crate) fn resolve(
         self,
-        base_view: &impl TStateView<Key = T::Key>,
+        base_view: &impl TStateViewWithRemoteCache<CommonKey = T::Key>,
         block_size: usize,
     ) -> Vec<Vec<(T::Key, WriteOp)>> {
         let mut ret: Vec<Vec<(T::Key, WriteOp)>> = vec![vec![]; block_size];

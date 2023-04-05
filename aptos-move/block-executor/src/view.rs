@@ -21,6 +21,7 @@ use aptos_types::{
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use move_binary_format::errors::Location;
 use std::{cell::RefCell, collections::BTreeMap, hash::Hash, sync::Arc};
+use aptos_vm_view::types::{AptosResource, TRemoteCache, TStateViewWithRemoteCache};
 
 /// A struct that is always used by a single thread performing an execution task. The struct is
 /// passed to the VM and acts as a proxy to resolve reads first in the shared multi-version
@@ -165,13 +166,15 @@ enum ViewMapKind<'a, T: Transaction> {
     BTree(&'a BTreeMap<T::Key, T::Value>),
 }
 
-pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>> {
+pub(crate) struct LatestView<'a, T: Transaction, S: TStateViewWithRemoteCache<CommonKey = T::Key>> {
     base_view: &'a S,
     latest_view: ViewMapKind<'a, T>,
     txn_idx: TxnIndex,
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
+impl<'a, T: Transaction, S: TStateViewWithRemoteCache<CommonKey = T::Key>> TStateViewWithRemoteCache for LatestView<'a, T, S> { type CommonKey = T::Key; }
+
+impl<'a, T: Transaction, S: TStateViewWithRemoteCache<CommonKey = T::Key>> LatestView<'a, T, S> {
     pub(crate) fn new_mv_view(
         base_view: &'a S,
         map: &'a MVHashMapView<'a, T::Key, T::Value>,
@@ -213,8 +216,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TStateView for LatestView<'a, T, S> {
+impl<'a, T: Transaction, S: TStateViewWithRemoteCache<CommonKey = T::Key>> TStateView for LatestView<'a, T, S> {
     type Key = T::Key;
+
+    fn id(&self) -> StateViewId {
+        self.base_view.id()
+    }
 
     fn get_state_value(&self, state_key: &T::Key) -> anyhow::Result<Option<StateValue>> {
         match self.latest_view {
@@ -258,15 +265,27 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TStateView for LatestView<
         }
     }
 
-    fn id(&self) -> StateViewId {
-        self.base_view.id()
-    }
-
     fn is_genesis(&self) -> bool {
         self.base_view.is_genesis()
     }
 
     fn get_usage(&self) -> Result<StateStorageUsage> {
         self.base_view.get_usage()
+    }
+}
+
+impl<'a, T: Transaction, S: TStateViewWithRemoteCache<CommonKey = T::Key>> TRemoteCache for LatestView<'a, T, S> {
+    type Key = T::Key;
+
+    fn get_cached_aggregator_value(&self, state_key: &Self::Key) -> Result<Option<u128>> {
+        todo!()
+    }
+
+    fn get_cached_module(&self, state_key: &Self::Key) -> Result<Option<Vec<u8>>> {
+        todo!()
+    }
+
+    fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosResource<Self::Key>>> {
+        todo!()
     }
 }

@@ -29,7 +29,6 @@ use aptos_gas::{
     StorageGasParameters,
 };
 use aptos_logger::prelude::*;
-use aptos_state_view::StateView;
 use aptos_types::{
     account_config,
     account_config::new_block_event_key,
@@ -74,6 +73,7 @@ use std::{
         Arc,
     },
 };
+use aptos_vm_view::types::StateViewWithRemoteCache;
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
@@ -102,11 +102,11 @@ macro_rules! unwrap_or_discard {
 }
 
 impl AptosVM {
-    pub fn new<S: StateView>(state: &S) -> Self {
+    pub fn new<S: StateViewWithRemoteCache>(state: &S) -> Self {
         Self(AptosVMImpl::new(state))
     }
 
-    pub fn new_for_validation<S: StateView>(state: &S) -> Self {
+    pub fn new_for_validation<S: StateViewWithRemoteCache>(state: &S) -> Self {
         info!(
             AdapterLogSchema::new(state.id(), 0),
             "Adapter created for Validation"
@@ -480,7 +480,7 @@ impl AptosVM {
     // failure object. In case of success, keep the session and also do any necessary module publish
     // cleanup.
     // 3. Call post transaction cleanup function in multisig account module with the result from (2)
-    fn execute_multisig_transaction<S: MoveResolverExt + StateView, SS: MoveResolverExt>(
+    fn execute_multisig_transaction<S: MoveResolverExt + StateViewWithRemoteCache, SS: MoveResolverExt>(
         &self,
         storage: &S,
         mut session: SessionExt<SS>,
@@ -633,7 +633,7 @@ impl AptosVM {
         Ok(())
     }
 
-    fn success_multisig_payload_cleanup<S: MoveResolverExt + StateView, SS: MoveResolverExt>(
+    fn success_multisig_payload_cleanup<S: MoveResolverExt + StateViewWithRemoteCache, SS: MoveResolverExt>(
         &self,
         storage: &S,
         session: SessionExt<SS>,
@@ -686,7 +686,7 @@ impl AptosVM {
             .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, None))
     }
 
-    fn failure_multisig_payload_cleanup<S: MoveResolverExt + StateView>(
+    fn failure_multisig_payload_cleanup<S: MoveResolverExt + StateViewWithRemoteCache>(
         &self,
         storage: &S,
         execution_error: VMStatus,
@@ -1028,7 +1028,7 @@ impl AptosVM {
     ) -> (VMStatus, TransactionOutputExt)
     where
         G: AptosGasMeter,
-        S: MoveResolverExt + StateView,
+        S: MoveResolverExt + StateViewWithRemoteCache,
     {
         // Revalidate the transaction.
         let resolver = self.0.new_move_resolver(storage);
@@ -1131,7 +1131,7 @@ impl AptosVM {
         }
     }
 
-    pub(crate) fn execute_user_transaction<S: MoveResolverExt + StateView>(
+    pub(crate) fn execute_user_transaction<S: MoveResolverExt + StateViewWithRemoteCache>(
         &self,
         storage: &S,
         txn: &SignatureCheckedTransaction,
@@ -1151,7 +1151,7 @@ impl AptosVM {
         make_gas_meter: F,
     ) -> Result<(VMStatus, TransactionOutput, G), VMStatus>
     where
-        S: StateView,
+        S: StateViewWithRemoteCache,
         G: AptosGasMeter,
         F: FnOnce(u64, AptosGasParameters, StorageGasParameters, Gas) -> Result<G, VMStatus>,
     {
@@ -1231,7 +1231,7 @@ impl AptosVM {
 
     fn read_writeset(
         &self,
-        state_view: &impl StateView,
+        state_view: &impl StateViewWithRemoteCache,
         write_set: &WriteSet,
     ) -> Result<(), VMStatus> {
         // All Move executions satisfy the read-before-write property. Thus we need to read each
@@ -1353,7 +1353,7 @@ impl AptosVM {
 
     pub fn simulate_signed_transaction(
         txn: &SignedTransaction,
-        state_view: &impl StateView,
+        state_view: &impl StateViewWithRemoteCache,
     ) -> (VMStatus, TransactionOutputExt) {
         let vm = AptosVM::new(state_view);
         let simulation_vm = AptosSimulationVM(vm);
@@ -1362,7 +1362,7 @@ impl AptosVM {
     }
 
     pub fn execute_view_function(
-        state_view: &impl StateView,
+        state_view: &impl StateViewWithRemoteCache,
         module_id: ModuleId,
         func_name: Identifier,
         type_args: Vec<TypeTag>,
@@ -1466,7 +1466,7 @@ impl VMExecutor for AptosVM {
     /// transaction output.
     fn execute_block(
         transactions: Vec<Transaction>,
-        state_view: &(impl StateView + Sync),
+        state_view: &(impl StateViewWithRemoteCache + Sync),
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         fail_point!("move_adapter::execute_block", |_| {
             Err(VMStatus::Error(
@@ -1509,7 +1509,7 @@ impl VMValidator for AptosVM {
     fn validate_transaction(
         &self,
         transaction: SignedTransaction,
-        state_view: &impl StateView,
+        state_view: &impl StateViewWithRemoteCache,
     ) -> VMValidatorResult {
         let _timer = TXN_VALIDATION_SECONDS.start_timer();
         let log_context = AdapterLogSchema::new(state_view.id(), 0);

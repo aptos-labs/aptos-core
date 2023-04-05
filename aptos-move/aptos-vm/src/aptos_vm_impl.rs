@@ -17,7 +17,6 @@ use aptos_gas::{
     Gas, NativeGasParameters, StorageGasParameters,
 };
 use aptos_logger::{enabled, prelude::*, Level};
-use aptos_state_view::StateView;
 use aptos_types::{
     account_config::{TransactionValidation, APTOS_TRANSACTION_VALIDATION, CORE_CODE_ADDRESS},
     chain_id::ChainId,
@@ -40,6 +39,7 @@ use move_core_types::{
 use move_vm_runtime::logging::expect_no_verification_errors;
 use move_vm_types::gas::UnmeteredGasMeter;
 use std::sync::Arc;
+use aptos_vm_view::types::StateViewWithRemoteCache;
 
 pub const MAXIMUM_APPROVED_TRANSACTION_SIZE: u64 = 1024 * 1024;
 
@@ -57,7 +57,7 @@ pub struct AptosVMImpl {
 
 impl AptosVMImpl {
     #[allow(clippy::new_without_default)]
-    pub fn new<S: StateView>(state: &S) -> Self {
+    pub fn new<S: StateViewWithRemoteCache>(state: &S) -> Self {
         let storage = StorageAdapter::new(state);
 
         // Get the gas parameters

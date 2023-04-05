@@ -1,0 +1,70 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+use aptos_types::state_store::state_key::StateKey;
+use move_vm_types::resolver::Resource;
+use std::collections::BTreeMap;
+use std::ops::Deref;
+use aptos_state_view::TStateView;
+
+pub enum AptosResource<K> {
+    Standard(Resource),
+    Group(BTreeMap<K, Resource>),
+}
+
+/// Snapshot of memory available to the VM. Note that this trait explicitly hides
+/// all interaction with the global memory. Implementors of this trait can redirect
+/// calls to the `StateView` to obtain blobs or add custom logic.
+pub trait TRemoteCache {
+    type Key;
+
+    /// Gets the aggregator value for a given state key.
+    fn get_cached_aggregator_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<u128>>;
+
+    /// Gets the module for a given state key.
+    /// TODO: Change to a new Move type when available instead of a blob.
+    fn get_cached_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<Vec<u8>>>;
+
+    /// Gets the resource for a given state key.
+    fn get_cached_resource(&self, state_key: &Self::Key) -> anyhow::Result<Option<AptosResource<Self::Key>>>;
+}
+
+pub trait RemoteCache: TRemoteCache<Key = StateKey> {}
+
+impl<T: TRemoteCache<Key = StateKey>> RemoteCache for T {}
+
+impl<R, S, K> TRemoteCache for R
+    where
+        R: Deref<Target = S>,
+        S: TRemoteCache<Key = K>,
+{
+    type Key = K;
+
+    fn get_cached_aggregator_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<u128>> {
+        self.deref().get_cached_aggregator_value(state_key)
+    }
+
+    fn get_cached_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<Vec<u8>>> {
+        self.deref().get_cached_module(state_key)
+    }
+
+    fn get_cached_resource(&self, state_key: &Self::Key) -> anyhow::Result<Option<AptosResource<Self::Key>>> {
+        self.deref().get_cached_resource(state_key)
+    }
+}
+
+pub trait TStateViewWithRemoteCache: TStateView<Key = Self::CommonKey> + TRemoteCache<Key = Self::CommonKey> {
+    type CommonKey;
+}
+
+pub trait StateViewWithRemoteCache: TStateViewWithRemoteCache<CommonKey = StateKey> {}
+
+impl<T: TStateViewWithRemoteCache<CommonKey = StateKey>> StateViewWithRemoteCache for T {}
+
+impl<R, S, K> TStateViewWithRemoteCache for R
+    where
+        R: Deref<Target = S>,
+        S: TStateViewWithRemoteCache<CommonKey = K>,
+{
+    type CommonKey = K;
+}

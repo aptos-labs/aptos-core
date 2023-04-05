@@ -26,6 +26,7 @@ use move_table_extension::{TableHandle, TableResolver};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use aptos_vm_view::types::{AptosResource, TRemoteCache, TStateViewWithRemoteCache};
 
 /// Dummy genesis ChangeSet for testing
 pub static GENESIS_CHANGE_SET_HEAD: Lazy<ChangeSet> =
@@ -133,6 +134,26 @@ impl TStateView for FakeDataStore {
         }
         Ok(usage)
     }
+}
+
+impl TRemoteCache for FakeDataStore {
+    type Key = StateKey;
+
+    fn get_cached_aggregator_value(&self, state_key: &Self::Key) -> Result<Option<u128>> {
+        todo!()
+    }
+
+    fn get_cached_module(&self, state_key: &Self::Key) -> Result<Option<Vec<u8>>> {
+        todo!()
+    }
+
+    fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosResource<Self::Key>>> {
+        todo!()
+    }
+}
+
+impl TStateViewWithRemoteCache for FakeDataStore {
+    type CommonKey = StateKey;
 }
 
 // This is used by aggregator tests.

@@ -14,6 +14,7 @@ use aptos_types::{
 };
 use move_core_types::language_storage::ModuleId;
 use std::collections::HashMap;
+use aptos_vm_view::types::{AptosResource, TRemoteCache, TStateViewWithRemoteCache};
 
 // `StateView` has no data given we are creating the genesis
 pub(crate) struct GenesisStateView {
@@ -54,3 +55,21 @@ impl TStateView for GenesisStateView {
         Ok(StateStorageUsage::zero())
     }
 }
+
+impl TRemoteCache for GenesisStateView {
+    type Key = StateKey;
+
+    fn get_cached_aggregator_value(&self, state_key: &Self::Key) -> Result<Option<u128>> {
+        todo!()
+    }
+
+    fn get_cached_module(&self, state_key: &Self::Key) -> Result<Option<Vec<u8>>> {
+        todo!()
+    }
+
+    fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosResource<Self::Key>>> {
+        todo!()
+    }
+}
+
+impl TStateViewWithRemoteCache for GenesisStateView { type CommonKey = StateKey; }
