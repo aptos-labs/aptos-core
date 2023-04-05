@@ -98,7 +98,7 @@ pub fn start_state_sync_and_get_notification_handles(
 
     // Start the data streaming service
     let (streaming_service_client, streaming_service_runtime) =
-        setup_data_streaming_service(node_config.state_sync.clone(), aptos_data_client.clone())?;
+        setup_data_streaming_service(node_config.state_sync, aptos_data_client.clone())?;
 
     // Create the chunk executor and persistent storage
     let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw.clone()));

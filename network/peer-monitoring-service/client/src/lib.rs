@@ -60,7 +60,7 @@ pub async fn start_peer_monitor(
     // Spawn the peer metadata updater
     let time_service = TimeService::real();
     spawn_peer_metadata_updater(
-        node_config.peer_monitoring_service.clone(),
+        node_config.peer_monitoring_service,
         peer_monitor_state.clone(),
         peer_monitoring_client.get_peers_and_metadata(),
         time_service.clone(),
@@ -93,7 +93,7 @@ async fn start_peer_monitor_with_state(
     let peers_and_metadata = peer_monitoring_client.get_peers_and_metadata();
 
     // Create an interval ticker for the monitor loop
-    let monitoring_service_config = node_config.peer_monitoring_service.clone();
+    let monitoring_service_config = node_config.peer_monitoring_service;
     let peer_monitor_duration =
         Duration::from_millis(monitoring_service_config.peer_monitor_interval_ms);
     let peer_monitor_ticker = time_service.interval(peer_monitor_duration);

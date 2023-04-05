@@ -325,7 +325,7 @@ impl NetworkConfig {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct PeerMonitoringServiceConfig {
     pub enable_peer_monitoring_client: bool, // Whether or not to spawn the monitoring client
@@ -355,7 +355,7 @@ impl Default for PeerMonitoringServiceConfig {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct LatencyMonitoringConfig {
     pub latency_ping_interval_ms: u64, // The interval (ms) between latency pings for each peer
@@ -375,7 +375,7 @@ impl Default for LatencyMonitoringConfig {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct NetworkMonitoringConfig {
     pub network_info_request_interval_ms: u64, // The interval (ms) between network info requests
@@ -482,7 +482,7 @@ pub struct IdentityFromFile {
     pub path: PathBuf,
 }
 
-#[derive(Copy, Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct RateLimitConfig {
     /// Maximum number of bytes/s for an IP

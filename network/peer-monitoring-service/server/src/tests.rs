@@ -477,7 +477,7 @@ impl MockClient {
         let peer_monitoring_config = peer_monitoring_config.unwrap_or_default();
         let node_config = NodeConfig {
             base: base_config,
-            peer_monitoring_service: peer_monitoring_config.clone(),
+            peer_monitoring_service: peer_monitoring_config,
             ..Default::default()
         };
 

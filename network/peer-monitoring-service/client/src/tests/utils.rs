@@ -185,7 +185,7 @@ pub async fn start_peer_metadata_updater(
 ) {
     // Spawn the peer metadata updater
     tokio::spawn(spawn_peer_metadata_updater(
-        node_config.peer_monitoring_service.clone(),
+        node_config.peer_monitoring_service,
         peer_monitor_state.clone(),
         peers_and_metadata,
         time_service.clone(),
