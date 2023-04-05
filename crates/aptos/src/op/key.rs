@@ -172,13 +172,16 @@ pub struct GenerateKey {
     /// Key type to generate. Must be one of [x25519, ed25519, bls12381]
     #[clap(long, default_value_t = KeyType::Ed25519)]
     pub(crate) key_type: KeyType,
-    /// Vanity prefix that resultant account address should start with, e.g. 0xaceface or d00d
-    #[clap(long, short('p'))]
+    /// Vanity prefix that resultant account address should start with, e.g. 0xaceface or d00d. Each
+    /// additional character multiplies by a factor of 16 the computational difficulty associated
+    /// with generating an address, so try out shorter prefixes first and be prepared to wait for
+    /// longer ones
+    #[clap(long)]
     pub vanity_prefix: Option<String>,
     /// Use this flag when vanity prefix is for a multisig account. This mines a private key for
     /// a single signer account that can, as its first transaction, create a multisig account with
     /// the given vanity prefix
-    #[clap(long, short('m'))]
+    #[clap(long)]
     pub vanity_multisig: bool,
     #[clap(flatten)]
     pub rng_args: RngArgs,

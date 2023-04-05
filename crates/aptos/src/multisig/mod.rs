@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     common::{
@@ -29,10 +30,10 @@ impl MultisigTool {
 #[derive(Debug, Parser)]
 pub struct CreateMultisig {
     /// Hex account address(es) to add as owners, each prefixed with "0x" and separated by spaces
-    #[clap(short, long, multiple(true), parse(try_from_str=crate::common::types::load_account_arg))]
+    #[clap(long, multiple(true), parse(try_from_str=crate::common::types::load_account_arg))]
     pub additional_owners: Vec<AccountAddress>,
     /// Number of signatures required to approve a transaction
-    #[clap(short, long)]
+    #[clap(long)]
     pub num_signatures_required: u64,
     #[clap(flatten)]
     pub txn_options: TransactionOptions,
