@@ -75,6 +75,7 @@ pub struct BatchInfo {
     digest: HashValue,
     num_txns: u64,
     num_bytes: u64,
+    gas_bucket_start: u64,
 }
 
 impl BatchInfo {
@@ -86,6 +87,7 @@ impl BatchInfo {
         digest: HashValue,
         num_txns: u64,
         num_bytes: u64,
+        gas_bucket_start: u64,
     ) -> Self {
         Self {
             author,
@@ -95,6 +97,7 @@ impl BatchInfo {
             digest,
             num_txns,
             num_bytes,
+            gas_bucket_start,
         }
     }
 
@@ -124,6 +127,39 @@ impl BatchInfo {
 
     pub fn num_bytes(&self) -> u64 {
         self.num_bytes
+    }
+
+    pub fn gas_bucket_start(&self) -> u64 {
+        self.gas_bucket_start
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct SignedBatchInfoMsg {
+    signed_infos: Vec<SignedBatchInfo>,
+}
+
+impl SignedBatchInfoMsg {
+    pub fn new(signed_infos: Vec<SignedBatchInfo>) -> Self {
+        Self { signed_infos }
+    }
+
+    pub fn verify(&self, sender: PeerId, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+        for signed_info in &self.signed_infos {
+            signed_info.verify(sender, validator)?
+        }
+        Ok(())
+    }
+
+    pub fn epoch(&self) -> anyhow::Result<u64> {
+        match self.signed_infos.first() {
+            Some(signed_info) => Ok(signed_info.epoch()),
+            None => bail!("Empty message"),
+        }
+    }
+
+    pub fn unpack(self) -> Vec<SignedBatchInfo> {
+        self.signed_infos
     }
 }
 
@@ -183,6 +219,35 @@ pub enum SignedBatchInfoError {
     WrongInfo,
     DuplicatedSignature,
     InvalidAuthor,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+pub struct ProofOfStoreMsg {
+    proofs: Vec<ProofOfStore>,
+}
+
+impl ProofOfStoreMsg {
+    pub fn new(proofs: Vec<ProofOfStore>) -> Self {
+        Self { proofs }
+    }
+
+    pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+        for proof in &self.proofs {
+            proof.verify(validator)?
+        }
+        Ok(())
+    }
+
+    pub fn epoch(&self) -> anyhow::Result<u64> {
+        match self.proofs.first() {
+            Some(proof) => Ok(proof.epoch()),
+            None => bail!("Empty message"),
+        }
+    }
+
+    pub fn unpack(self) -> Vec<ProofOfStore> {
+        self.proofs
+    }
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]

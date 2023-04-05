@@ -9,7 +9,7 @@ use crate::{
     },
 };
 use aptos_consensus_types::proof_of_store::{
-    BatchInfo, ProofOfStore, SignedBatchInfo, SignedBatchInfoError,
+    BatchInfo, ProofOfStore, SignedBatchInfo, SignedBatchInfoError, SignedBatchInfoMsg,
 };
 use aptos_crypto::{bls12381, HashValue};
 use aptos_logger::prelude::*;
@@ -28,7 +28,7 @@ use tokio::{
 
 #[derive(Debug)]
 pub(crate) enum ProofCoordinatorCommand {
-    AppendSignature(SignedBatchInfo),
+    AppendSignature(SignedBatchInfoMsg),
     Shutdown(TokioOneshot::Sender<()>),
 }
 
@@ -266,23 +266,29 @@ impl ProofCoordinator {
                                 .expect("Failed to send shutdown ack to QuorumStore");
                             break;
                         },
-                        ProofCoordinatorCommand::AppendSignature(signed_batch_info) => {
-                            let peer_id = signed_batch_info.signer();
-                            let digest = *signed_batch_info.digest();
-                            match self.add_signature(signed_batch_info, &validator_verifier) {
-                                Ok(result) => {
-                                    if let Some(proof) = result {
-                                        debug!("QS: received quorum of signatures, digest {}", digest);
-                                        network_sender.broadcast_proof_of_store(proof).await;
-                                    }
-                                },
-                                Err(e) => {
-                                    // TODO: better error messages
-                                    // Can happen if we already garbage collected
-                                    if peer_id == self.peer_id {
-                                        debug!("QS: could not add signature from self, err = {:?}", e);
-                                    }
-                                },
+                        ProofCoordinatorCommand::AppendSignature(signed_batch_infos) => {
+                            let mut proofs = vec![];
+                            for signed_batch_info in signed_batch_infos.unpack().into_iter() {
+                                let peer_id = signed_batch_info.signer();
+                                let digest = *signed_batch_info.digest();
+                                match self.add_signature(signed_batch_info, &validator_verifier) {
+                                    Ok(result) => {
+                                        if let Some(proof) = result {
+                                            debug!("QS: received quorum of signatures, digest {}", digest);
+                                            proofs.push(proof);
+                                        }
+                                    },
+                                    Err(e) => {
+                                        // TODO: better error messages
+                                        // Can happen if we already garbage collected
+                                        if peer_id == self.peer_id {
+                                            debug!("QS: could not add signature from self, err = {:?}", e);
+                                        }
+                                    },
+                                }
+                            }
+                            if !proofs.is_empty() {
+                                network_sender.broadcast_proof_of_store_msg(proofs).await;
                             }
                         },
                     }

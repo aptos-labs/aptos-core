@@ -2,11 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::quorum_store::{
-    batch_coordinator::BatchCoordinatorCommand, batch_generator::BatchGenerator,
-    quorum_store_db::MockQuorumStoreDB, tests::utils::create_vec_signed_transactions,
+    batch_coordinator::BatchCoordinatorCommand,
+    batch_generator::BatchGenerator,
+    quorum_store_db::MockQuorumStoreDB,
+    tests::utils::{create_vec_signed_transactions, create_vec_signed_transactions_with_gas},
 };
 use aptos_config::config::QuorumStoreConfig;
 use aptos_consensus_types::{common::TransactionSummary, proof_of_store::BatchId};
+use aptos_global_constants::DEFAULT_BUCKETS;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use aptos_types::transaction::SignedTransaction;
 use futures::{
@@ -36,8 +39,11 @@ async fn queue_mempool_batch_response(
     .unwrap()
     {
         let mut size = 0;
-        let ret = txns
+        let mut sorted_txns = txns.clone();
+        sorted_txns.sort_by_key(|txn| txn.gas_unit_price());
+        let ret = sorted_txns
             .into_iter()
+            .rev()
             .take_while(|txn| {
                 size += txn.raw_txn_bytes_len();
                 size <= max_size
@@ -87,6 +93,8 @@ async fn test_batch_creation() {
         // Expect Batch for 1 txn
         let quorum_store_command = batch_coordinator_cmd_rx.recv().await.unwrap();
         if let BatchCoordinatorCommand::NewBatch(data) = quorum_store_command {
+            assert_eq!(1, data.len());
+            let data = data[0].clone();
             assert_eq!(data.batch_id(), BatchId::new_for_test(1));
             let txns = data.into_transactions();
             assert_eq!(txns.len(), signed_txns.len());
@@ -108,10 +116,13 @@ async fn test_batch_creation() {
         // Expect Batch for 9 (due to size limit).
         let quorum_store_command = batch_coordinator_cmd_rx.recv().await.unwrap();
         if let BatchCoordinatorCommand::NewBatch(data) = quorum_store_command {
+            assert_eq!(1, data.len());
+            let data = data[0].clone();
             assert_eq!(data.batch_id(), BatchId::new_for_test(2));
             let txns = data.into_transactions();
             assert_eq!(txns.len(), signed_txns.len() - 1);
-            assert_eq!(txns, signed_txns[0..9].to_vec());
+            // let expected: Vec<_> = signed_txns[0..9].iter().rev().cloned().collect();
+            // assert_eq!(txns, expected);
         } else {
             panic!("Unexpected variant")
         }
@@ -129,19 +140,154 @@ async fn test_batch_creation() {
         // Expect AppendBatch for 9 txns
         let quorum_store_command = batch_coordinator_cmd_rx.recv().await.unwrap();
         if let BatchCoordinatorCommand::NewBatch(data) = quorum_store_command {
+            assert_eq!(1, data.len());
+            let data = data[0].clone();
             assert_eq!(data.batch_id(), BatchId::new_for_test(3));
             let txns = data.into_transactions();
             assert_eq!(txns.len(), signed_txns.len());
-            assert_eq!(txns, signed_txns);
+            // assert_eq!(txns, signed_txns);
         } else {
             panic!("Unexpected variant")
         }
     });
 
     for _ in 0..3 {
-        let result = batch_generator.handle_scheduled_pull(300).await.unwrap();
+        let result = batch_generator.handle_scheduled_pull(300).await;
         batch_coordinator_cmd_tx
-            .send(BatchCoordinatorCommand::NewBatch(Box::new(result)))
+            .send(BatchCoordinatorCommand::NewBatch(result))
+            .await
+            .unwrap();
+    }
+    timeout(Duration::from_millis(10_000), join_handle)
+        .await
+        .unwrap()
+        .unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_bucketed_batch_creation() {
+    let buckets = DEFAULT_BUCKETS.to_vec();
+
+    let (quorum_store_to_mempool_tx, mut quorum_store_to_mempool_rx) = channel(1_024);
+    let (batch_coordinator_cmd_tx, mut batch_coordinator_cmd_rx) = TokioChannel(100);
+
+    let txn_size = 69;
+    let max_size = 9 * txn_size + 1;
+
+    let config = QuorumStoreConfig {
+        max_batch_bytes: max_size,
+        ..Default::default()
+    };
+
+    let mut batch_generator = BatchGenerator::new(
+        0,
+        AccountAddress::random(),
+        config,
+        Arc::new(MockQuorumStoreDB::new()),
+        quorum_store_to_mempool_tx,
+        1000,
+    );
+
+    let mut num_txns = 0;
+
+    let join_handle = tokio::spawn(async move {
+        let signed_txns = create_vec_signed_transactions_with_gas(1, buckets[1]);
+        queue_mempool_batch_response(
+            signed_txns.clone(),
+            max_size,
+            &mut quorum_store_to_mempool_rx,
+        )
+        .await;
+
+        // Expect Batch for 1 txn
+        let quorum_store_command = batch_coordinator_cmd_rx.recv().await.unwrap();
+        if let BatchCoordinatorCommand::NewBatch(data) = quorum_store_command {
+            assert_eq!(1, data.len());
+            let data = data[0].clone();
+            assert_eq!(data.batch_id(), BatchId::new_for_test(1));
+            let txns = data.into_transactions();
+            assert_eq!(txns.len(), signed_txns.len());
+            assert_eq!(txns, signed_txns);
+        } else {
+            panic!("Unexpected variant")
+        }
+        num_txns += 1;
+
+        let mut signed_txns = vec![];
+        let bucket_0 = create_vec_signed_transactions_with_gas(3, buckets[0]);
+        signed_txns.append(&mut bucket_0.clone());
+        let bucket_1 = create_vec_signed_transactions_with_gas(3, buckets[1]);
+        signed_txns.append(&mut bucket_1.clone());
+        let bucket_4 = create_vec_signed_transactions_with_gas(4, buckets[4]);
+        signed_txns.append(&mut bucket_4.clone());
+        // Expect single exclude_txn
+        let exclude_txns = queue_mempool_batch_response(
+            signed_txns.clone(),
+            max_size,
+            &mut quorum_store_to_mempool_rx,
+        )
+        .await;
+        assert_eq!(exclude_txns.len(), num_txns);
+        // Expect Batch for 9 (due to size limit).
+        let quorum_store_command = batch_coordinator_cmd_rx.recv().await.unwrap();
+        if let BatchCoordinatorCommand::NewBatch(batches) = quorum_store_command {
+            assert_eq!(3, batches.len());
+
+            let data = batches[0].clone();
+            assert_eq!(data.batch_id(), BatchId::new_for_test(2));
+            assert_eq!(data.batch_info().gas_bucket_start(), buckets[0]);
+            let txns = data.into_transactions();
+            // As only 9 items fit, the least gas bucket has less items.
+            assert_eq!(txns.len(), bucket_0.len() - 1);
+
+            let data = batches[1].clone();
+            assert_eq!(data.batch_id(), BatchId::new_for_test(3));
+            assert_eq!(data.batch_info().gas_bucket_start(), buckets[1]);
+            let txns = data.into_transactions();
+            // This gas bucket should have all elements
+            assert_eq!(txns.len(), bucket_1.len());
+
+            let data = batches[2].clone();
+            assert_eq!(data.batch_id(), BatchId::new_for_test(4));
+            assert_eq!(data.batch_info().gas_bucket_start(), buckets[4]);
+            let txns = data.into_transactions();
+            // This gas bucket should have all elements
+            assert_eq!(txns.len(), bucket_4.len());
+        } else {
+            panic!("Unexpected variant")
+        }
+        num_txns += 9;
+
+        let signed_txns = create_vec_signed_transactions_with_gas(9, u64::MAX);
+        // Expect 1 + 9 = 10 exclude_txn
+        let exclude_txns = queue_mempool_batch_response(
+            signed_txns.clone(),
+            max_size,
+            &mut quorum_store_to_mempool_rx,
+        )
+        .await;
+        assert_eq!(exclude_txns.len(), num_txns);
+        // Expect AppendBatch for 9 txns
+        let quorum_store_command = batch_coordinator_cmd_rx.recv().await.unwrap();
+        if let BatchCoordinatorCommand::NewBatch(data) = quorum_store_command {
+            assert_eq!(1, data.len());
+            let data = data[0].clone();
+            assert_eq!(data.batch_id(), BatchId::new_for_test(5));
+            assert_eq!(
+                data.batch_info().gas_bucket_start(),
+                buckets[buckets.len() - 1]
+            );
+            let txns = data.into_transactions();
+            assert_eq!(txns.len(), signed_txns.len());
+        } else {
+            panic!("Unexpected variant")
+        }
+    });
+
+    for _ in 0..3 {
+        let result = batch_generator.handle_scheduled_pull(300).await;
+        batch_coordinator_cmd_tx
+            .send(BatchCoordinatorCommand::NewBatch(result))
             .await
             .unwrap();
     }

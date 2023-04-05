@@ -17,7 +17,7 @@ use tokio::sync::{mpsc::Receiver, oneshot};
 #[derive(Debug)]
 pub enum BatchCoordinatorCommand {
     Shutdown(oneshot::Sender<()>),
-    NewBatch(Box<Batch>),
+    NewBatch(Vec<Batch>),
 }
 
 pub struct BatchCoordinator {
@@ -62,18 +62,23 @@ impl BatchCoordinator {
         Some(batch.into())
     }
 
-    fn persist_and_send_digest(&self, persist_request: PersistedValue) {
+    fn persist_and_send_digests(&self, persist_requests: Vec<PersistedValue>) {
+        if persist_requests.is_empty() {
+            return;
+        }
+
         let batch_store = self.batch_store.clone();
         let network_sender = self.network_sender.clone();
         let my_peer_id = self.my_peer_id;
         tokio::spawn(async move {
-            let peer_id = persist_request.author();
-            if let Some(signed_batch_info) = batch_store.persist(persist_request) {
+            let peer_id = persist_requests[0].author();
+            let signed_batch_infos = batch_store.persist(persist_requests);
+            if !signed_batch_infos.is_empty() {
                 if my_peer_id != peer_id {
-                    counters::RECEIVED_REMOTE_BATCHES_COUNT.inc();
+                    counters::RECEIVED_REMOTE_BATCHES_COUNT.inc_by(signed_batch_infos.len() as u64);
                 }
                 network_sender
-                    .send_signed_batch_info(signed_batch_info, vec![peer_id])
+                    .send_signed_batch_info_msg(signed_batch_infos, vec![peer_id])
                     .await;
             }
         });
@@ -88,10 +93,14 @@ impl BatchCoordinator {
                         .expect("Failed to send shutdown ack to QuorumStoreCoordinator");
                     break;
                 },
-                BatchCoordinatorCommand::NewBatch(batch) => {
-                    if let Some(persist_request) = self.handle_batch(*batch).await {
-                        self.persist_and_send_digest(persist_request);
+                BatchCoordinatorCommand::NewBatch(batches) => {
+                    let mut persist_requests = vec![];
+                    for batch in batches.into_iter() {
+                        if let Some(persist_request) = self.handle_batch(batch).await {
+                            persist_requests.push(persist_request);
+                        }
                     }
+                    self.persist_and_send_digests(persist_requests);
                 },
             }
         }

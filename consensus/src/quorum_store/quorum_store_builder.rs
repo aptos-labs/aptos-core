@@ -282,7 +282,7 @@ impl InnerBuilder {
         let batch_generator = BatchGenerator::new(
             self.epoch,
             self.author,
-            self.config,
+            self.config.clone(),
             self.quorum_store_storage.clone(),
             self.quorum_store_to_mempool_sender,
             self.mempool_txn_pull_timeout_ms,

@@ -7,7 +7,7 @@ use crate::{
 };
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter, ProofWithData},
-    proof_of_store::ProofOfStore,
+    proof_of_store::{ProofOfStore, ProofOfStoreMsg},
     request_response::{GetPayloadCommand, GetPayloadResponse},
 };
 use aptos_crypto::HashValue;
@@ -19,7 +19,7 @@ use std::collections::HashSet;
 
 #[derive(Debug)]
 pub enum ProofManagerCommand {
-    ReceiveProof(ProofOfStore),
+    ReceiveProofs(ProofOfStoreMsg),
     CommitNotification(u64, Vec<HashValue>),
     Shutdown(tokio::sync::oneshot::Sender<()>),
 }
@@ -57,11 +57,13 @@ impl ProofManager {
         self.remaining_total_proof_num += 1;
     }
 
-    pub(crate) fn receive_proof(&mut self, proof: ProofOfStore) {
-        let is_local = proof.author() == self.my_peer_id;
-        let num_txns = proof.num_txns();
-        self.increment_remaining_txns(num_txns);
-        self.proofs_for_consensus.push(proof, is_local);
+    pub(crate) fn receive_proofs(&mut self, proofs: Vec<ProofOfStore>) {
+        for proof in proofs.into_iter() {
+            let is_local = proof.author() == self.my_peer_id;
+            let num_txns = proof.num_txns();
+            self.increment_remaining_txns(num_txns);
+            self.proofs_for_consensus.push(proof, is_local);
+        }
     }
 
     pub(crate) fn handle_commit_notification(
@@ -175,8 +177,8 @@ impl ProofManager {
                                     .expect("Failed to send shutdown ack to QuorumStore");
                                 break;
                             },
-                            ProofManagerCommand::ReceiveProof(proof) => {
-                                self.receive_proof(proof);
+                            ProofManagerCommand::ReceiveProofs(proofs) => {
+                                self.receive_proofs(proofs.unpack());
                             },
                             ProofManagerCommand::CommitNotification(block_timestamp, digests) => {
                                 self.handle_commit_notification(block_timestamp, digests);

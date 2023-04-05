@@ -11,7 +11,9 @@ use crate::{
     },
     test_utils::mock_quorum_store_sender::MockQuorumStoreSender,
 };
-use aptos_consensus_types::proof_of_store::{BatchId, ProofOfStore, SignedBatchInfo};
+use aptos_consensus_types::proof_of_store::{
+    BatchId, ProofOfStore, SignedBatchInfo, SignedBatchInfoMsg,
+};
 use aptos_crypto::HashValue;
 use aptos_executor_types::Error;
 use aptos_types::{
@@ -55,22 +57,25 @@ async fn test_proof_coordinator_basic() {
     let batch_author = signers[0].author();
     let batch_id = BatchId::new_for_test(1);
     let payload = create_vec_signed_transactions(100);
-    let batch = Batch::new(batch_id, payload, 1, 20, batch_author);
+    let batch = Batch::new(batch_id, payload, 1, 20, batch_author, 0);
     let digest = batch.digest();
 
     for signer in &signers {
         let signed_batch_info = SignedBatchInfo::new(batch.batch_info().clone(), signer).unwrap();
         assert!(proof_coordinator_tx
-            .send(ProofCoordinatorCommand::AppendSignature(signed_batch_info))
+            .send(ProofCoordinatorCommand::AppendSignature(
+                SignedBatchInfoMsg::new(vec![signed_batch_info])
+            ))
             .await
             .is_ok());
     }
 
-    let proof = match rx.recv().await.expect("channel dropped") {
-        (ConsensusMsg::ProofOfStoreMsg(proof), _) => *proof,
+    let proof_msg = match rx.recv().await.expect("channel dropped") {
+        (ConsensusMsg::ProofOfStoreMsg(proof_msg), _) => *proof_msg,
         msg => panic!("Expected LocalProof but received: {:?}", msg),
     };
     // check normal path
-    assert_eq!(proof.digest(), digest);
-    assert!(proof.verify(&verifier).is_ok());
+    assert!(proof_msg.verify(&verifier).is_ok());
+    let proofs = proof_msg.unpack();
+    assert_eq!(proofs[0].digest(), digest);
 }

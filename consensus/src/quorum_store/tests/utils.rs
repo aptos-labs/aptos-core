@@ -12,7 +12,7 @@ use aptos_types::{
 };
 
 // Creates a single test transaction
-fn create_transaction() -> Transaction {
+fn create_transaction(gas_unit_price: u64) -> Transaction {
     let private_key = Ed25519PrivateKey::generate_for_testing();
     let public_key = private_key.public_key();
 
@@ -22,7 +22,7 @@ fn create_transaction() -> Transaction {
         0,
         transaction_payload,
         0,
-        0,
+        gas_unit_price,
         0,
         ChainId::new(10),
     );
@@ -37,7 +37,19 @@ fn create_transaction() -> Transaction {
 
 pub(crate) fn create_vec_signed_transactions(size: u64) -> Vec<SignedTransaction> {
     (0..size)
-        .map(|_| match create_transaction() {
+        .map(|_| match create_transaction(0) {
+            Transaction::UserTransaction(inner) => inner,
+            _ => panic!("Not a user transaction."),
+        })
+        .collect()
+}
+
+pub(crate) fn create_vec_signed_transactions_with_gas(
+    size: u64,
+    gas_unit_price: u64,
+) -> Vec<SignedTransaction> {
+    (0..size)
+        .map(|_| match create_transaction(gas_unit_price) {
             Transaction::UserTransaction(inner) => inner,
             _ => panic!("Not a user transaction."),
         })

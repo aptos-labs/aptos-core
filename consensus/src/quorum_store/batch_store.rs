@@ -308,7 +308,17 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
         ret
     }
 
-    pub fn persist(&self, persist_request: PersistedValue) -> Option<SignedBatchInfo> {
+    pub fn persist(&self, persist_requests: Vec<PersistedValue>) -> Vec<SignedBatchInfo> {
+        let mut signed_infos = vec![];
+        for persist_request in persist_requests.into_iter() {
+            if let Some(signed_info) = self.persist_inner(persist_request) {
+                signed_infos.push(signed_info);
+            }
+        }
+        signed_infos
+    }
+
+    pub fn persist_inner(&self, persist_request: PersistedValue) -> Option<SignedBatchInfo> {
         match self.save(persist_request.clone()) {
             Ok(needs_db) => {
                 let batch_info = persist_request.batch_info().clone();

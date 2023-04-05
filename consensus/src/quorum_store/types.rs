@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::ensure;
+use anyhow::{bail, ensure};
 use aptos_consensus_types::proof_of_store::{BatchId, BatchInfo};
 use aptos_crypto::{
     hash::{CryptoHash, CryptoHasher},
@@ -131,6 +131,7 @@ impl Batch {
         epoch: u64,
         expiration: u64,
         batch_author: PeerId,
+        gas_bucket_start: u64,
     ) -> Self {
         let payload = BatchPayload::new(payload);
         let batch_info = BatchInfo::new(
@@ -141,6 +142,7 @@ impl Batch {
             payload.hash(),
             payload.num_txns() as u64,
             payload.num_bytes() as u64,
+            gas_bucket_start,
         );
         Self {
             batch_info,
@@ -234,27 +236,43 @@ impl From<Batch> for PersistedValue {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct BatchMsg {
-    batch: Batch,
+    batches: Vec<Batch>,
 }
 
 impl BatchMsg {
-    pub fn new(batch: Batch) -> Self {
-        Self { batch }
+    pub fn new(batches: Vec<Batch>) -> Self {
+        Self { batches }
     }
 
     pub fn verify(&self, peer_id: PeerId) -> anyhow::Result<()> {
-        ensure!(
-            self.batch.author() == peer_id,
-            "Batch author doesn't match sender"
-        );
-        self.batch.verify()
+        ensure!(!self.batches.is_empty(), "No batches in message");
+        let mut epoch = None;
+        for batch in self.batches.iter() {
+            ensure!(
+                batch.author() == peer_id,
+                "Batch author doesn't match sender"
+            );
+            match epoch {
+                Some(epoch) => ensure!(epoch == batch.epoch(), "Epoch mismatch within batches"),
+                None => epoch = Some(batch.epoch()),
+            }
+            batch.verify()?
+        }
+        Ok(())
     }
 
-    pub fn epoch(&self) -> u64 {
-        self.batch.epoch()
+    pub fn epoch(&self) -> anyhow::Result<u64> {
+        match self.batches.first() {
+            Some(batch) => Ok(batch.epoch()),
+            None => bail!("Empty message"),
+        }
     }
 
-    pub fn unpack(self) -> Batch {
-        self.batch
+    pub fn author(&self) -> PeerId {
+        self.batches[0].author()
+    }
+
+    pub fn unpack(self) -> Vec<Batch> {
+        self.batches
     }
 }

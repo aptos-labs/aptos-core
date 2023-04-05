@@ -34,6 +34,8 @@ pub const MAX_GAS_AMOUNT: u64 = 2_000_000;
 pub const GAS_HEADROOM_NUMERATOR: u64 = 3;
 pub const GAS_HEADROOM_DENOMINATOR: u64 = 2;
 
+pub const DEFAULT_BUCKETS: &[u64] = &[0, 150, 300, 500, 1000, 3000, 5000, 10000, 100000, 1000000];
+
 /// Gas costs are dynamic based on storage, so the simulation values need some headroom applied by
 /// the user if using it to estimate gas
 pub fn adjust_gas_headroom(gas_used: u64, max_possible_gas: u64) -> u64 {
