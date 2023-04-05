@@ -16,6 +16,7 @@ fn main() {
 
     let mut measurements: Vec<Vec<(usize, usize)>> = Vec::new();
     let concurrency_level = num_cpus::get();
+    let maybe_gas_limit = None;
 
     for block_size in txns {
         for num_accounts in acts {
@@ -25,6 +26,7 @@ fn main() {
                 num_warmups,
                 num_runs,
                 concurrency_level,
+                maybe_gas_limit,
             );
             times.sort();
             measurements.push(times);

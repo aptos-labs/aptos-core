@@ -101,6 +101,7 @@ where
         num_warmups: usize,
         num_runs: usize,
         concurrency_level: usize,
+        maybe_gas_limit: Option<u64>,
     ) -> Vec<(usize, usize)> {
         let mut ret = Vec::new();
 
@@ -110,7 +111,7 @@ where
 
             if i < num_warmups {
                 println!("WARMUP - ignore results");
-                state.execute_blockstm_benchmark(concurrency_level);
+                state.execute_blockstm_benchmark(concurrency_level, maybe_gas_limit);
             } else {
                 println!(
                     "RUN BlockSTM-only benchmark for: num_threads = {}, \
@@ -120,7 +121,7 @@ where
                     num_accounts,
                     num_txn,
                 );
-                ret.push(state.execute_blockstm_benchmark(concurrency_level));
+                ret.push(state.execute_blockstm_benchmark(concurrency_level, maybe_gas_limit));
             }
         }
 
@@ -237,11 +238,16 @@ impl TransactionBenchState {
         .expect("VM should not fail to start");
     }
 
-    fn execute_blockstm_benchmark(self, concurrency_level: usize) -> (usize, usize) {
+    fn execute_blockstm_benchmark(
+        self,
+        concurrency_level: usize,
+        maybe_gas_limit: Option<u64>,
+    ) -> (usize, usize) {
         BlockAptosVM::execute_block_benchmark(
             self.transactions,
             self.executor.get_state_view(),
             concurrency_level,
+            maybe_gas_limit,
         )
     }
 }
