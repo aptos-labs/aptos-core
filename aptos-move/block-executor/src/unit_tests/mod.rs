@@ -35,7 +35,6 @@ where
         None,
     )
     .execute_transactions_parallel((), &transactions, &data_view)
-    .0
     .map(|zipped| zipped.into_iter().map(|(res, _)| res).collect());
 
     let baseline = ExpectedOutput::generate_baseline(&transactions, None);

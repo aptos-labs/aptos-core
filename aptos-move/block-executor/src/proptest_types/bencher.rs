@@ -119,7 +119,6 @@ where
             EmptyDataView<KeyType<K>, ValueType<V>>,
         >::new(num_cpus::get(), None)
         .execute_transactions_parallel((), &self.transactions, &data_view)
-        .0
         .map(|zipped| zipped.into_iter().map(|(res, _)| res).collect());
 
         self.expected_output.assert_output(&output);

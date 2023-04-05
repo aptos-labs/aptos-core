@@ -239,7 +239,7 @@ where
             let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
                 .with_label_values(&["apply_to_ledger"])
                 .start_timer();
-            let (output, _, _) = chunk_output.apply_to_ledger(parent_view)?;
+            let (output, _, _) = chunk_output.apply_to_ledger(parent_view, Some(block_id))?;
             output
         };
         output.ensure_ends_with_state_checkpoint()?;

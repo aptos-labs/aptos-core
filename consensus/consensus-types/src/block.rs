@@ -351,7 +351,8 @@ impl Block {
             self.new_block_metadata(validators),
         ))
         .chain(txns.into_iter().map(Transaction::UserTransaction))
-        .chain(once(Transaction::StateCheckpoint(self.id)))
+        // todo: read from on-chain config
+        // .chain(once(Transaction::StateCheckpoint(self.id)))
         .collect()
     }
 

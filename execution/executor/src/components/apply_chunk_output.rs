@@ -22,10 +22,10 @@ use aptos_storage_interface::ExecutedTrees;
 use aptos_types::{
     proof::accumulator::InMemoryAccumulator,
     state_store::{state_key::StateKey, state_value::StateValue},
-    transaction::{Transaction, TransactionInfo, TransactionOutput, TransactionStatus},
+    transaction::{Transaction, TransactionInfo, TransactionOutput, TransactionStatus, ExecutionStatus}, write_set::WriteSet,
 };
 use rayon::prelude::*;
-use std::{collections::HashMap, iter::repeat, sync::Arc};
+use std::{collections::HashMap, iter::{repeat, once}, sync::Arc};
 
 pub struct ApplyChunkOutput;
 
@@ -33,6 +33,7 @@ impl ApplyChunkOutput {
     pub fn apply(
         chunk_output: ChunkOutput,
         base_view: &ExecutedTrees,
+        append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<(ExecutedChunk, Vec<Transaction>, Vec<Transaction>)> {
         let ChunkOutput {
             state_cache,
@@ -44,7 +45,7 @@ impl ApplyChunkOutput {
                 .with_label_values(&["sort_transactions"])
                 .start_timer();
             // Separate transactions with different VM statuses.
-            Self::sort_transactions(transactions, transaction_outputs)?
+            Self::sort_transactions(transactions, transaction_outputs, append_state_checkpoint_to_block)?
         };
 
         // Apply the write set, get the latest state.
@@ -83,6 +84,7 @@ impl ApplyChunkOutput {
     fn sort_transactions(
         mut transactions: Vec<Transaction>,
         transaction_outputs: Vec<TransactionOutput>,
+        append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<(
         bool,
         Vec<TransactionStatus>,
@@ -99,29 +101,66 @@ impl ApplyChunkOutput {
             .position(|o| o.is_reconfig())
             .map(|idx| idx + 1);
 
+        let block_gas_limit_marker = transaction_outputs
+            .iter()
+            .position(|o| matches!(o.status(), TransactionStatus::Retry));
+
         // Transactions after the epoch ending are all to be retried.
+        // Transactions after exceedng per-block gas limit are also to be retried.
         let to_retry = if let Some(pos) = new_epoch_marker {
+            transaction_outputs.drain(pos..);
+            transactions.drain(pos..).collect()
+        } else if let Some(pos) = block_gas_limit_marker {
             transaction_outputs.drain(pos..);
             transactions.drain(pos..).collect()
         } else {
             vec![]
         };
 
-        // N.B. Transaction status after the epoch marker are ignored and set to Retry forcibly.
-        let status = transaction_outputs
+        let status: Vec<TransactionStatus> = if append_state_checkpoint_to_block.is_some() && new_epoch_marker.is_none() {
+            println!("daniel status");
+            // Append the StateCheckpoint transaction to status
+            transaction_outputs
+            .iter()
+            .map(|t| t.status())
+            .cloned()
+            .chain(once(TransactionStatus::Keep(ExecutionStatus::Success)))
+            .chain(repeat(TransactionStatus::Retry))
+            .take(num_txns + 1)
+            .collect()
+        } else {
+            // For state sync execution or epoch change,
+            // no StateCheckpoint transaction is appended
+            transaction_outputs
             .iter()
             .map(|t| t.status())
             .cloned()
             .chain(repeat(TransactionStatus::Retry))
             .take(num_txns)
-            .collect();
+            .collect()
+        };
 
         // Separate transactions with the Keep status out.
-        let (to_keep, to_discard) =
+        let (mut to_keep, to_discard) =
             itertools::zip_eq(transactions.into_iter(), transaction_outputs.into_iter())
                 .partition::<Vec<(Transaction, ParsedTransactionOutput)>, _>(|(_, o)| {
                     matches!(o.status(), TransactionStatus::Keep(_))
                 });
+
+        // Append the StateCheckpoint transaction to the end of to_keep
+        if let Some(block_id) = append_state_checkpoint_to_block {
+            if new_epoch_marker.is_none() {
+                println!("daniel txn");
+                let state_checkpoint_txn = Transaction::StateCheckpoint(block_id);
+                let state_checkpoint_txn_output: ParsedTransactionOutput = Into::into(TransactionOutput::new(
+                    WriteSet::default(),
+                    Vec::new(),
+                    0,
+                    TransactionStatus::Keep(ExecutionStatus::Success),
+                ));
+                to_keep.push((state_checkpoint_txn, state_checkpoint_txn_output));
+            }
+        }
 
         // Sanity check transactions with the Discard status:
         let to_discard = to_discard
