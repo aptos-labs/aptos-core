@@ -38,7 +38,7 @@ class RunHelper:
         self.host_working_directory = host_working_directory
         self.image_repo_with_project = image_repo_with_project
         self.image_tag = image_tag
-        self.cli_path = os.path.abspath(cli_path)
+        self.cli_path = os.path.abspath(cli_path) if cli_path else cli_path
         self.test_count = 0
         self.api_client = RestClient(f"http://127.0.0.1:8080/v1")
 
