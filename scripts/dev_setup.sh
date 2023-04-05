@@ -553,62 +553,11 @@ function install_cvc5 {
   mkdir -p "$TMPFILE"/
   (
     cd "$TMPFILE" || exit
-    curl -LOs "https://github.com/cvc5/cvc5/releases/download/cvc5-$CVC5_VERSION/$CVC5_PKG"
-    cp "$CVC5_PKG" "${INSTALL_DIR}cvc5"
-    chmod +x "${INSTALL_DIR}cvc5"
+    curl -LOs "https://github.com/cvc5/cvc5/releases/download/cvc5-$CVC5_VERSION/$CVC5_PKG" || true
+    cp "$CVC5_PKG" "${INSTALL_DIR}cvc5" || true
+    chmod +x "${INSTALL_DIR}cvc5" || true
   )
   rm -rf "$TMPFILE"
-}
-
-function install_golang {
-    if [[ $(go version | grep -c "go1.14" || true) == "0" ]]; then
-      if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
-        curl -LO https://golang.org/dl/go1.14.15.linux-amd64.tar.gz
-        "${PRE_COMMAND[@]}" rm -rf /usr/local/go
-        "${PRE_COMMAND[@]}" tar -C /usr/local -xzf go1.14.15.linux-amd64.tar.gz
-        "${PRE_COMMAND[@]}" ln -sf /usr/local/go /usr/lib/golang
-        rm go1.14.15.linux-amd64.tar.gz
-      elif [[ "$PACKAGE_MANAGER" == "apk" ]]; then
-        apk --update add --no-cache git make musl-dev go
-      elif [[ "$PACKAGE_MANAGER" == "brew" ]]; then
-        failed=$(brew install go || echo "failed")
-        if [[ "$failed" == "failed" ]]; then
-          brew link --overwrite go
-        fi
-      else
-        install_pkg golang "$PACKAGE_MANAGER"
-      fi
-    fi
-}
-
-function install_deno {
-  curl -fsSL https://deno.land/x/install/install.sh | sh
-  cp "${HOME}/.deno/bin/deno" "${INSTALL_DIR}"
-  chmod +x "${INSTALL_DIR}deno"
-}
-
-function install_swift {
-    echo Installing Swift.
-    install_pkg wget "$PACKAGE_MANAGER"
-    install_pkg libncurses5 "$PACKAGE_MANAGER"
-    install_pkg clang "$PACKAGE_MANAGER"
-    install_pkg libcurl4 "$PACKAGE_MANAGER"
-    install_pkg libpython2.7 "$PACKAGE_MANAGER"
-    install_pkg libpython2.7-dev "$PACKAGE_MANAGER"
-    wget -q https://swift.org/builds/swift-5.3.3-release/ubuntu1804/swift-5.3.3-RELEASE/swift-5.3.3-RELEASE-ubuntu18.04.tar.gz
-    tar xzf swift-5.3.3-RELEASE-ubuntu18.04.tar.gz
-    rm -rf swift-5.3.3-RELEASE-ubuntu18.04.tar.gz
-    mv swift-5.3.3-RELEASE-ubuntu18.04 "${INSTALL_DIR}swift"
-}
-
-function install_java {
-    if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
-      "${PRE_COMMAND[@]}" apt-get install -y default-jdk
-    elif [[ "$PACKAGE_MANAGER" == "apk" ]]; then
-      apk --update add --no-cache  -X http://dl-cdn.alpinelinux.org/alpine/edge/community openjdk11
-    else
-      install_pkg java "$PACKAGE_MANAGER"
-    fi
 }
 
 function install_allure {
@@ -647,7 +596,7 @@ function install_nodejs {
 function install_solidity {
   echo "Installing Solidity compiler"
   if [ -f "${INSTALL_DIR}solc" ]; then
-    echo "Solidity alreayd installed at ${INSTALL_DIR}solc"
+    echo "Solidity already installed at ${INSTALL_DIR}solc"
     return
   fi
   # We fetch the binary from  https://binaries.soliditylang.org
@@ -727,7 +676,6 @@ Build tools (since -t or no option was provided):
   * lcov
   * pkg-config
   * libssl-dev
-#  * NodeJS / NPM
   * protoc (and related tools)
   * lld (only for Linux)
 EOF
@@ -823,7 +771,7 @@ INSTALL_DIR="${HOME}/bin/"
 OPT_DIR="false"
 
 #parse args
-while getopts "btoprvydsaPJh:i:n" arg; do
+while getopts "btoprvydaPJh:i:n" arg; do
   case "$arg" in
     b)
       BATCH_MODE="true"

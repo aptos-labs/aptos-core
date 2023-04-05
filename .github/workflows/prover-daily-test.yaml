@@ -26,7 +26,7 @@ jobs:
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
       - name: install Prover dependencies
         shell: bash
-        run: scripts/dev_setup.sh -b -p -y
+        run: scripts/dev_setup.sh -b -p -y -J
       - name: prepare move lang prover tooling.
         shell: bash
         run: |
