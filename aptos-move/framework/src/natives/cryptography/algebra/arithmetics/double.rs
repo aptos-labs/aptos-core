@@ -29,14 +29,14 @@ pub fn double_internal(
     let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
     abort_unless_arithmetics_enabled_for_structure!(context, structure_opt);
     match structure_opt {
-        Some(Structure::BLS12381G1Affine) => ark_unary_op_internal!(
+        Some(Structure::BLS12381G1) => ark_unary_op_internal!(
             context,
             args,
             ark_bls12_381::G1Projective,
             double,
             gas_params.ark_bls12_381_g1_proj_double * NumArgs::one()
         ),
-        Some(Structure::BLS12381G2Affine) => ark_unary_op_internal!(
+        Some(Structure::BLS12381G2) => ark_unary_op_internal!(
             context,
             args,
             ark_bls12_381::G2Projective,

@@ -100,7 +100,7 @@ module aptos_std::algebra_bls12381 {
     /// 1. Return `(x,y)`.
     ///
     /// NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
-    struct FormatG1AffineUncompr {}
+    struct FormatG1Uncompr {}
 
     /// A serialization scheme for `G1` elements derived from
     /// https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-11.html#name-zcash-serialization-format-.
@@ -127,7 +127,7 @@ module aptos_std::algebra_bls12381 {
     /// 1. Return `(x,y')`.
     ///
     /// NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
-    struct FormatG1AffineCompr {}
+    struct FormatG1Compr {}
 
     /// The group $G_2$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow G_t$.
     /// It is a subgroup of `G2Full` (defined in the module documentation) with a prime order $r$ equal to
@@ -158,7 +158,7 @@ module aptos_std::algebra_bls12381 {
     /// 1. Return `(x,y)`.
     ///
     /// NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
-    struct FormatG2AffineUncompr {}
+    struct FormatG2Uncompr {}
 
     /// A serialization scheme for `G2` elements derived from
     /// https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-11.html#name-zcash-serialization-format-.
@@ -185,7 +185,7 @@ module aptos_std::algebra_bls12381 {
     /// 1. Return `(x,y')`.
     ///
     /// NOTE: other implementation(s) using this format: ark-bls12-381-0.4.0.
-    struct FormatG2AffineCompr {}
+    struct FormatG2Compr {}
 
     /// The group $G_t$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow G_t$.
     /// It is a multiplicative subgroup of `Fq12`,
@@ -314,21 +314,21 @@ module aptos_std::algebra_bls12381 {
     #[test_only]
     const R_SERIALIZED: vector<u8> = x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73";
     #[test_only]
-    const G1AFFINE_INF_SERIALIZED_COMP: vector<u8> = x"c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+    const G1_INF_SERIALIZED_COMP: vector<u8> = x"c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
     #[test_only]
-    const G1AFFINE_INF_SERIALIZED_UNCOMP: vector<u8> = x"400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+    const G1_INF_SERIALIZED_UNCOMP: vector<u8> = x"400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
     #[test_only]
-    const G1AFFINE_GENERATOR_SERIALIZED_COMP: vector<u8> = x"97f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb";
+    const G1_GENERATOR_SERIALIZED_COMP: vector<u8> = x"97f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb";
     #[test_only]
-    const G1AFFINE_GENERATOR_SERIALIZED_UNCOMP: vector<u8> = x"17f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb08b3f481e3aaa0f1a09e30ed741d8ae4fcf5e095d5d00af600db18cb2c04b3edd03cc744a2888ae40caa232946c5e7e1";
+    const G1_GENERATOR_SERIALIZED_UNCOMP: vector<u8> = x"17f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb08b3f481e3aaa0f1a09e30ed741d8ae4fcf5e095d5d00af600db18cb2c04b3edd03cc744a2888ae40caa232946c5e7e1";
     #[test_only]
-    const G1AFFINE_GENERATOR_MUL_BY_7_SERIALIZED_COMP: vector<u8> = x"b928f3beb93519eecf0145da903b40a4c97dca00b21f12ac0df3be9116ef2ef27b2ae6bcd4c5bc2d54ef5a70627efcb7";
+    const G1_GENERATOR_MUL_BY_7_SERIALIZED_COMP: vector<u8> = x"b928f3beb93519eecf0145da903b40a4c97dca00b21f12ac0df3be9116ef2ef27b2ae6bcd4c5bc2d54ef5a70627efcb7";
     #[test_only]
-    const G1AFFINE_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP: vector<u8> = x"1928f3beb93519eecf0145da903b40a4c97dca00b21f12ac0df3be9116ef2ef27b2ae6bcd4c5bc2d54ef5a70627efcb7108dadbaa4b636445639d5ae3089b3c43a8a1d47818edd1839d7383959a41c10fdc66849cfa1b08c5a11ec7e28981a1c";
+    const G1_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP: vector<u8> = x"1928f3beb93519eecf0145da903b40a4c97dca00b21f12ac0df3be9116ef2ef27b2ae6bcd4c5bc2d54ef5a70627efcb7108dadbaa4b636445639d5ae3089b3c43a8a1d47818edd1839d7383959a41c10fdc66849cfa1b08c5a11ec7e28981a1c";
     #[test_only]
-    const G1AFFINE_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP: vector<u8> = x"9928f3beb93519eecf0145da903b40a4c97dca00b21f12ac0df3be9116ef2ef27b2ae6bcd4c5bc2d54ef5a70627efcb7";
+    const G1_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP: vector<u8> = x"9928f3beb93519eecf0145da903b40a4c97dca00b21f12ac0df3be9116ef2ef27b2ae6bcd4c5bc2d54ef5a70627efcb7";
     #[test_only]
-    const G1AFFINE_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP: vector<u8> = x"1928f3beb93519eecf0145da903b40a4c97dca00b21f12ac0df3be9116ef2ef27b2ae6bcd4c5bc2d54ef5a70627efcb70973642f94c9b055f4e1d20812c1f91329ed2e3d71f635a72d599a679d0cda1320e597b4e1b24f735fed1381d767908f";
+    const G1_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP: vector<u8> = x"1928f3beb93519eecf0145da903b40a4c97dca00b21f12ac0df3be9116ef2ef27b2ae6bcd4c5bc2d54ef5a70627efcb70973642f94c9b055f4e1d20812c1f91329ed2e3d71f635a72d599a679d0cda1320e597b4e1b24f735fed1381d767908f";
 
     #[test(fx = @std)]
     fun test_g1affine(fx: signer) {
@@ -340,10 +340,12 @@ module aptos_std::algebra_bls12381 {
         let generator = one<G1>();
 
         // Serialization/deserialization.
-        assert!(G1AFFINE_GENERATOR_SERIALIZED_UNCOMP == serialize<G1, FormatG1AffineUncompr>(&generator), 1);
-        assert!(G1AFFINE_GENERATOR_SERIALIZED_COMP == serialize<G1, FormatG1AffineCompr>(&generator), 1);
-        let generator_from_comp = std::option::extract(&mut deserialize<G1, FormatG1AffineCompr>(&G1AFFINE_GENERATOR_SERIALIZED_COMP));
-        let generator_from_uncomp = std::option::extract(&mut deserialize<G1, FormatG1AffineUncompr>(&G1AFFINE_GENERATOR_SERIALIZED_UNCOMP));
+        assert!(G1_GENERATOR_SERIALIZED_UNCOMP == serialize<G1, FormatG1Uncompr>(&generator), 1);
+        assert!(G1_GENERATOR_SERIALIZED_COMP == serialize<G1, FormatG1Compr>(&generator), 1);
+        let generator_from_comp = std::option::extract(&mut deserialize<G1, FormatG1Compr>(&G1_GENERATOR_SERIALIZED_COMP
+        ));
+        let generator_from_uncomp = std::option::extract(&mut deserialize<G1, FormatG1Uncompr>(&G1_GENERATOR_SERIALIZED_UNCOMP
+        ));
         assert!(eq(&generator, &generator_from_comp), 1);
         assert!(eq(&generator, &generator_from_uncomp), 1);
 
@@ -354,40 +356,42 @@ module aptos_std::algebra_bls12381 {
         assert!(std::option::is_none(&deserialize<Fq12, FormatFq12LscLsb>(&x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
 
         assert!(
-            G1AFFINE_INF_SERIALIZED_UNCOMP == serialize<G1, FormatG1AffineUncompr>(&point_at_infinity), 1);
-        assert!(G1AFFINE_INF_SERIALIZED_COMP == serialize<G1, FormatG1AffineCompr>(&point_at_infinity), 1);
-        let inf_from_uncomp = std::option::extract(&mut deserialize<G1, FormatG1AffineUncompr>(&G1AFFINE_INF_SERIALIZED_UNCOMP
+            G1_INF_SERIALIZED_UNCOMP == serialize<G1, FormatG1Uncompr>(&point_at_infinity), 1);
+        assert!(G1_INF_SERIALIZED_COMP == serialize<G1, FormatG1Compr>(&point_at_infinity), 1);
+        let inf_from_uncomp = std::option::extract(&mut deserialize<G1, FormatG1Uncompr>(&G1_INF_SERIALIZED_UNCOMP
         ));
-        let inf_from_comp = std::option::extract(&mut deserialize<G1, FormatG1AffineCompr>(&G1AFFINE_INF_SERIALIZED_COMP
+        let inf_from_comp = std::option::extract(&mut deserialize<G1, FormatG1Compr>(&G1_INF_SERIALIZED_COMP
         ));
         assert!(eq(&point_at_infinity, &inf_from_comp), 1);
         assert!(eq(&point_at_infinity, &inf_from_uncomp), 1);
 
-        let point_7g_from_uncomp = std::option::extract(&mut deserialize<G1, FormatG1AffineUncompr>(&G1AFFINE_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP));
-        let point_7g_from_comp = std::option::extract(&mut deserialize<G1, FormatG1AffineCompr>(&G1AFFINE_GENERATOR_MUL_BY_7_SERIALIZED_COMP));
+        let point_7g_from_uncomp = std::option::extract(&mut deserialize<G1, FormatG1Uncompr>(&G1_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP
+        ));
+        let point_7g_from_comp = std::option::extract(&mut deserialize<G1, FormatG1Compr>(&G1_GENERATOR_MUL_BY_7_SERIALIZED_COMP
+        ));
         assert!(eq(&point_7g_from_comp, &point_7g_from_uncomp), 1);
 
         // Deserialization should fail if given a point on the curve but off its prime-order subgroup, e.g., `(0,2)`.
-        assert!(std::option::is_none(&deserialize<G1, FormatG1AffineUncompr>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002")), 1);
-        assert!(std::option::is_none(&deserialize<G1, FormatG1AffineCompr>(&x"800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")), 1);
+        assert!(std::option::is_none(&deserialize<G1, FormatG1Uncompr>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002")), 1);
+        assert!(std::option::is_none(&deserialize<G1, FormatG1Compr>(&x"800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")), 1);
 
         // Deserialization should fail if given a valid point in (Fq,Fq) but not on the curve.
-        assert!(std::option::is_none(&deserialize<G1, FormatG1AffineUncompr>(&x"8959e137e0719bf872abb08411010f437a8955bd42f5ba20fca64361af58ce188b1adb96ef229698bb7860b79e24ba12000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")), 1);
+        assert!(std::option::is_none(&deserialize<G1, FormatG1Uncompr>(&x"8959e137e0719bf872abb08411010f437a8955bd42f5ba20fca64361af58ce188b1adb96ef229698bb7860b79e24ba12000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")), 1);
 
         // Deserialization should fail if given an invalid point (x not in Fq).
-        assert!(std::option::is_none(&deserialize<G1, FormatG1AffineUncompr>(&x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffa76e9853b35f5c9b2002d9e5833fd8f9ab4cd3934a4722a06f6055bfca720c91629811e2ecae7f0cf301b6d07898a90f")), 1);
-        assert!(std::option::is_none(&deserialize<G1, FormatG1AffineCompr>(&x"9fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
+        assert!(std::option::is_none(&deserialize<G1, FormatG1Uncompr>(&x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffa76e9853b35f5c9b2002d9e5833fd8f9ab4cd3934a4722a06f6055bfca720c91629811e2ecae7f0cf301b6d07898a90f")), 1);
+        assert!(std::option::is_none(&deserialize<G1, FormatG1Compr>(&x"9fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
 
         // Deserialization should fail if given a byte array of wrong size.
-        assert!(std::option::is_none(&deserialize<G1, FormatG1AffineUncompr>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
-        assert!(std::option::is_none(&deserialize<G1, FormatG1AffineCompr>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
+        assert!(std::option::is_none(&deserialize<G1, FormatG1Uncompr>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
+        assert!(std::option::is_none(&deserialize<G1, FormatG1Compr>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
 
         // Scalar multiplication.
         let scalar_7 = from_u64<Fr>(7);
         let point_7g_calc = scalar_mul(&generator, &scalar_7);
         assert!(eq(&point_7g_calc, &point_7g_from_comp), 1);
-        assert!(G1AFFINE_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP == serialize<G1, FormatG1AffineUncompr>(&point_7g_calc), 1);
-        assert!(G1AFFINE_GENERATOR_MUL_BY_7_SERIALIZED_COMP == serialize<G1, FormatG1AffineCompr>( &point_7g_calc), 1);
+        assert!(G1_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP == serialize<G1, FormatG1Uncompr>(&point_7g_calc), 1);
+        assert!(G1_GENERATOR_MUL_BY_7_SERIALIZED_COMP == serialize<G1, FormatG1Compr>( &point_7g_calc), 1);
 
         // Multi-scalar multiplication.
         let num_entries = 1;
@@ -418,8 +422,8 @@ module aptos_std::algebra_bls12381 {
 
         // Negation.
         let point_minus_7g_calc = neg(&point_7g_calc);
-        assert!(G1AFFINE_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP == serialize<G1, FormatG1AffineCompr>(&point_minus_7g_calc), 1);
-        assert!(G1AFFINE_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP == serialize<G1, FormatG1AffineUncompr>(&point_minus_7g_calc), 1);
+        assert!(G1_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP == serialize<G1, FormatG1Compr>(&point_minus_7g_calc), 1);
+        assert!(G1_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP == serialize<G1, FormatG1Uncompr>(&point_minus_7g_calc), 1);
 
         // Addition.
         let scalar_9 = from_u64<Fr>(9);
@@ -434,29 +438,29 @@ module aptos_std::algebra_bls12381 {
         // Hash-to-group using suite `BLS12381G1_XMD:SHA-256_SSWU_RO_`.
         // Test vectors source: https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-bls12381g1_xmdsha-256_sswu_
         let actual = hash_to<G1, HashG1XmdSha256SswuRo>(&b"QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_", &b"");
-        let expected = std::option::extract(&mut deserialize<G1, FormatG1AffineUncompr>(&x"052926add2207b76ca4fa57a8734416c8dc95e24501772c814278700eed6d1e4e8cf62d9c09db0fac349612b759e79a108ba738453bfed09cb546dbb0783dbb3a5f1f566ed67bb6be0e8c67e2e81a4cc68ee29813bb7994998f3eae0c9c6a265"));
+        let expected = std::option::extract(&mut deserialize<G1, FormatG1Uncompr>(&x"052926add2207b76ca4fa57a8734416c8dc95e24501772c814278700eed6d1e4e8cf62d9c09db0fac349612b759e79a108ba738453bfed09cb546dbb0783dbb3a5f1f566ed67bb6be0e8c67e2e81a4cc68ee29813bb7994998f3eae0c9c6a265"));
         assert!(eq(&expected, &actual), 1);
         let actual = hash_to<G1, HashG1XmdSha256SswuRo>(&b"QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_", &b"abcdef0123456789");
-        let expected = std::option::extract(&mut deserialize<G1, FormatG1AffineUncompr>(&x"11e0b079dea29a68f0383ee94fed1b940995272407e3bb916bbf268c263ddd57a6a27200a784cbc248e84f357ce82d9803a87ae2caf14e8ee52e51fa2ed8eefe80f02457004ba4d486d6aa1f517c0889501dc7413753f9599b099ebcbbd2d709"));
+        let expected = std::option::extract(&mut deserialize<G1, FormatG1Uncompr>(&x"11e0b079dea29a68f0383ee94fed1b940995272407e3bb916bbf268c263ddd57a6a27200a784cbc248e84f357ce82d9803a87ae2caf14e8ee52e51fa2ed8eefe80f02457004ba4d486d6aa1f517c0889501dc7413753f9599b099ebcbbd2d709"));
         assert!(eq(&expected, &actual), 1);
     }
 
     #[test_only]
-    const G2AFFINE_INF_SERIALIZED_UNCOMP: vector<u8> = x"400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+    const G2_INF_SERIALIZED_UNCOMP: vector<u8> = x"400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
     #[test_only]
-    const G2AFFINE_INF_SERIALIZED_COMP: vector<u8> = x"c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+    const G2_INF_SERIALIZED_COMP: vector<u8> = x"c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
     #[test_only]
-    const G2AFFINE_GENERATOR_SERIALIZED_UNCOMP: vector<u8> = x"13e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049334cf11213945d57e5ac7d055d042b7e024aa2b2f08f0a91260805272dc51051c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb80606c4a02ea734cc32acd2b02bc28b99cb3e287e85a763af267492ab572e99ab3f370d275cec1da1aaa9075ff05f79be0ce5d527727d6e118cc9cdc6da2e351aadfd9baa8cbdd3a76d429a695160d12c923ac9cc3baca289e193548608b82801";
+    const G2_GENERATOR_SERIALIZED_UNCOMP: vector<u8> = x"13e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049334cf11213945d57e5ac7d055d042b7e024aa2b2f08f0a91260805272dc51051c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb80606c4a02ea734cc32acd2b02bc28b99cb3e287e85a763af267492ab572e99ab3f370d275cec1da1aaa9075ff05f79be0ce5d527727d6e118cc9cdc6da2e351aadfd9baa8cbdd3a76d429a695160d12c923ac9cc3baca289e193548608b82801";
     #[test_only]
-    const G2AFFINE_GENERATOR_SERIALIZED_COMP: vector<u8> = x"93e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049334cf11213945d57e5ac7d055d042b7e024aa2b2f08f0a91260805272dc51051c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb8";
+    const G2_GENERATOR_SERIALIZED_COMP: vector<u8> = x"93e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049334cf11213945d57e5ac7d055d042b7e024aa2b2f08f0a91260805272dc51051c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb8";
     #[test_only]
-    const G2AFFINE_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP: vector<u8> = x"0d0273f6bf31ed37c3b8d68083ec3d8e20b5f2cc170fa24b9b5be35b34ed013f9a921f1cad1644d4bdb14674247234c8049cd1dbb2d2c3581e54c088135fef36505a6823d61b859437bfc79b617030dc8b40e32bad1fa85b9c0f368af6d38d3c05ecf93654b7a1885695aaeeb7caf41b0239dc45e1022be55d37111af2aecef87799638bec572de86a7437898efa702008b7ae4dbf802c17a6648842922c9467e460a71c88d393ee7af356da123a2f3619e80c3bdcc8e2b1da52f8cd9913ccdd";
+    const G2_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP: vector<u8> = x"0d0273f6bf31ed37c3b8d68083ec3d8e20b5f2cc170fa24b9b5be35b34ed013f9a921f1cad1644d4bdb14674247234c8049cd1dbb2d2c3581e54c088135fef36505a6823d61b859437bfc79b617030dc8b40e32bad1fa85b9c0f368af6d38d3c05ecf93654b7a1885695aaeeb7caf41b0239dc45e1022be55d37111af2aecef87799638bec572de86a7437898efa702008b7ae4dbf802c17a6648842922c9467e460a71c88d393ee7af356da123a2f3619e80c3bdcc8e2b1da52f8cd9913ccdd";
     #[test_only]
-    const G2AFFINE_GENERATOR_MUL_BY_7_SERIALIZED_COMP: vector<u8> = x"8d0273f6bf31ed37c3b8d68083ec3d8e20b5f2cc170fa24b9b5be35b34ed013f9a921f1cad1644d4bdb14674247234c8049cd1dbb2d2c3581e54c088135fef36505a6823d61b859437bfc79b617030dc8b40e32bad1fa85b9c0f368af6d38d3c";
+    const G2_GENERATOR_MUL_BY_7_SERIALIZED_COMP: vector<u8> = x"8d0273f6bf31ed37c3b8d68083ec3d8e20b5f2cc170fa24b9b5be35b34ed013f9a921f1cad1644d4bdb14674247234c8049cd1dbb2d2c3581e54c088135fef36505a6823d61b859437bfc79b617030dc8b40e32bad1fa85b9c0f368af6d38d3c";
     #[test_only]
-    const G2AFFINE_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP: vector<u8> = x"0d0273f6bf31ed37c3b8d68083ec3d8e20b5f2cc170fa24b9b5be35b34ed013f9a921f1cad1644d4bdb14674247234c8049cd1dbb2d2c3581e54c088135fef36505a6823d61b859437bfc79b617030dc8b40e32bad1fa85b9c0f368af6d38d3c141418b3e4c84511f485fcc78b80b8bc623d6f3f1282e6da09f9c1860402272ba7129c72c4fcd2174f8ac87671053a8b1149639c79ffba82a4b71f73b11f186f8016a4686ab17ed0ec3d7bc6e476c6ee04c3f3c2d48b1d4ddfac073266ebddce";
+    const G2_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP: vector<u8> = x"0d0273f6bf31ed37c3b8d68083ec3d8e20b5f2cc170fa24b9b5be35b34ed013f9a921f1cad1644d4bdb14674247234c8049cd1dbb2d2c3581e54c088135fef36505a6823d61b859437bfc79b617030dc8b40e32bad1fa85b9c0f368af6d38d3c141418b3e4c84511f485fcc78b80b8bc623d6f3f1282e6da09f9c1860402272ba7129c72c4fcd2174f8ac87671053a8b1149639c79ffba82a4b71f73b11f186f8016a4686ab17ed0ec3d7bc6e476c6ee04c3f3c2d48b1d4ddfac073266ebddce";
     #[test_only]
-    const G2AFFINE_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP: vector<u8> = x"ad0273f6bf31ed37c3b8d68083ec3d8e20b5f2cc170fa24b9b5be35b34ed013f9a921f1cad1644d4bdb14674247234c8049cd1dbb2d2c3581e54c088135fef36505a6823d61b859437bfc79b617030dc8b40e32bad1fa85b9c0f368af6d38d3c";
+    const G2_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP: vector<u8> = x"ad0273f6bf31ed37c3b8d68083ec3d8e20b5f2cc170fa24b9b5be35b34ed013f9a921f1cad1644d4bdb14674247234c8049cd1dbb2d2c3581e54c088135fef36505a6823d61b859437bfc79b617030dc8b40e32bad1fa85b9c0f368af6d38d3c";
 
     #[test(fx = @std)]
     fun test_g2affine(fx: signer) {
@@ -468,43 +472,47 @@ module aptos_std::algebra_bls12381 {
         let generator = one<G2>();
 
         // Serialization/deserialization.
-        assert!(G2AFFINE_GENERATOR_SERIALIZED_COMP == serialize<G2, FormatG2AffineCompr>(&generator), 1);
-        assert!(G2AFFINE_GENERATOR_SERIALIZED_UNCOMP == serialize<G2, FormatG2AffineUncompr>(&generator), 1);
-        let generator_from_uncomp = std::option::extract(&mut deserialize<G2, FormatG2AffineUncompr>(&G2AFFINE_GENERATOR_SERIALIZED_UNCOMP));
-        let generator_from_comp = std::option::extract(&mut deserialize<G2, FormatG2AffineCompr>(&G2AFFINE_GENERATOR_SERIALIZED_COMP));
+        assert!(G2_GENERATOR_SERIALIZED_COMP == serialize<G2, FormatG2Compr>(&generator), 1);
+        assert!(G2_GENERATOR_SERIALIZED_UNCOMP == serialize<G2, FormatG2Uncompr>(&generator), 1);
+        let generator_from_uncomp = std::option::extract(&mut deserialize<G2, FormatG2Uncompr>(&G2_GENERATOR_SERIALIZED_UNCOMP
+        ));
+        let generator_from_comp = std::option::extract(&mut deserialize<G2, FormatG2Compr>(&G2_GENERATOR_SERIALIZED_COMP
+        ));
         assert!(eq(&generator, &generator_from_comp), 1);
         assert!(eq(&generator, &generator_from_uncomp), 1);
-        assert!(G2AFFINE_INF_SERIALIZED_UNCOMP == serialize<G2, FormatG2AffineUncompr>(&point_at_infinity), 1);
-        assert!(G2AFFINE_INF_SERIALIZED_COMP == serialize<G2, FormatG2AffineCompr>(&point_at_infinity), 1);
-        let inf_from_uncomp = std::option::extract(&mut deserialize<G2, FormatG2AffineUncompr>(&G2AFFINE_INF_SERIALIZED_UNCOMP));
-        let inf_from_comp = std::option::extract(&mut deserialize<G2, FormatG2AffineCompr>(&G2AFFINE_INF_SERIALIZED_COMP));
+        assert!(G2_INF_SERIALIZED_UNCOMP == serialize<G2, FormatG2Uncompr>(&point_at_infinity), 1);
+        assert!(G2_INF_SERIALIZED_COMP == serialize<G2, FormatG2Compr>(&point_at_infinity), 1);
+        let inf_from_uncomp = std::option::extract(&mut deserialize<G2, FormatG2Uncompr>(&G2_INF_SERIALIZED_UNCOMP));
+        let inf_from_comp = std::option::extract(&mut deserialize<G2, FormatG2Compr>(&G2_INF_SERIALIZED_COMP));
         assert!(eq(&point_at_infinity, &inf_from_comp), 1);
         assert!(eq(&point_at_infinity, &inf_from_uncomp), 1);
-        let point_7g_from_uncomp = std::option::extract(&mut deserialize<G2, FormatG2AffineUncompr>(&G2AFFINE_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP));
-        let point_7g_from_comp = std::option::extract(&mut deserialize<G2, FormatG2AffineCompr>(&G2AFFINE_GENERATOR_MUL_BY_7_SERIALIZED_COMP));
+        let point_7g_from_uncomp = std::option::extract(&mut deserialize<G2, FormatG2Uncompr>(&G2_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP
+        ));
+        let point_7g_from_comp = std::option::extract(&mut deserialize<G2, FormatG2Compr>(&G2_GENERATOR_MUL_BY_7_SERIALIZED_COMP
+        ));
         assert!(eq(&point_7g_from_comp, &point_7g_from_uncomp), 1);
 
         // Deserialization should fail if given a point on the curve but not in the prime-order subgroup.
-        assert!(std::option::is_none(&deserialize<G1, FormatG1AffineUncompr>(&x"f037d4ccd5ee751eba1c1fd4c7edbb76d2b04c3a1f3f554827cf37c3acbc2dbb7cdb320a2727c2462d6c55ca1f637707b96eeebc622c1dbe7c56c34f93887c8751b42bd04f29253a82251c192ef27ece373993b663f4360505299c5bd18c890ddd862a6308796bf47e2265073c1f7d81afd69f9497fc1403e2e97a866129b43b672295229c21116d4a99f3e5c2ae720a31f181dbed8a93e15f909c20cf69d11a8879adbbe6890740def19814e6d4ed23fb0dcbd79291655caf48b466ac9cae04")), 1);
-        assert!(std::option::is_none(&deserialize<G1, FormatG1AffineCompr>(&x"f037d4ccd5ee751eba1c1fd4c7edbb76d2b04c3a1f3f554827cf37c3acbc2dbb7cdb320a2727c2462d6c55ca1f637707b96eeebc622c1dbe7c56c34f93887c8751b42bd04f29253a82251c192ef27ece373993b663f4360505299c5bd18c890d")), 1);
+        assert!(std::option::is_none(&deserialize<G1, FormatG1Uncompr>(&x"f037d4ccd5ee751eba1c1fd4c7edbb76d2b04c3a1f3f554827cf37c3acbc2dbb7cdb320a2727c2462d6c55ca1f637707b96eeebc622c1dbe7c56c34f93887c8751b42bd04f29253a82251c192ef27ece373993b663f4360505299c5bd18c890ddd862a6308796bf47e2265073c1f7d81afd69f9497fc1403e2e97a866129b43b672295229c21116d4a99f3e5c2ae720a31f181dbed8a93e15f909c20cf69d11a8879adbbe6890740def19814e6d4ed23fb0dcbd79291655caf48b466ac9cae04")), 1);
+        assert!(std::option::is_none(&deserialize<G1, FormatG1Compr>(&x"f037d4ccd5ee751eba1c1fd4c7edbb76d2b04c3a1f3f554827cf37c3acbc2dbb7cdb320a2727c2462d6c55ca1f637707b96eeebc622c1dbe7c56c34f93887c8751b42bd04f29253a82251c192ef27ece373993b663f4360505299c5bd18c890d")), 1);
 
         // Deserialization should fail if given a valid point in (Fq2,Fq2) but not on the curve.
-        assert!(std::option::is_none(&deserialize<G1, FormatG1AffineUncompr>(&x"f037d4ccd5ee751eba1c1fd4c7edbb76d2b04c3a1f3f554827cf37c3acbc2dbb7cdb320a2727c2462d6c55ca1f637707b96eeebc622c1dbe7c56c34f93887c8751b42bd04f29253a82251c192ef27ece373993b663f4360505299c5bd18c890d000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")), 1);
+        assert!(std::option::is_none(&deserialize<G1, FormatG1Uncompr>(&x"f037d4ccd5ee751eba1c1fd4c7edbb76d2b04c3a1f3f554827cf37c3acbc2dbb7cdb320a2727c2462d6c55ca1f637707b96eeebc622c1dbe7c56c34f93887c8751b42bd04f29253a82251c192ef27ece373993b663f4360505299c5bd18c890d000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")), 1);
 
         // Deserialization should fail if given an invalid point (x not in Fq2).
-        assert!(std::option::is_none(&deserialize<G1, FormatG1AffineUncompr>(&x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffdd862a6308796bf47e2265073c1f7d81afd69f9497fc1403e2e97a866129b43b672295229c21116d4a99f3e5c2ae720a31f181dbed8a93e15f909c20cf69d11a8879adbbe6890740def19814e6d4ed23fb0dcbd79291655caf48b466ac9cae04")), 1);
-        assert!(std::option::is_none(&deserialize<G1, FormatG1AffineCompr>(&x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
+        assert!(std::option::is_none(&deserialize<G1, FormatG1Uncompr>(&x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffdd862a6308796bf47e2265073c1f7d81afd69f9497fc1403e2e97a866129b43b672295229c21116d4a99f3e5c2ae720a31f181dbed8a93e15f909c20cf69d11a8879adbbe6890740def19814e6d4ed23fb0dcbd79291655caf48b466ac9cae04")), 1);
+        assert!(std::option::is_none(&deserialize<G1, FormatG1Compr>(&x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
 
         // Deserialization should fail if given a byte array of wrong size.
-        assert!(std::option::is_none(&deserialize<G1, FormatG1AffineUncompr>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
-        assert!(std::option::is_none(&deserialize<G1, FormatG1AffineCompr>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
+        assert!(std::option::is_none(&deserialize<G1, FormatG1Uncompr>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
+        assert!(std::option::is_none(&deserialize<G1, FormatG1Compr>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
 
         // Scalar multiplication.
         let scalar_7 = from_u64<Fr>(7);
         let point_7g_calc = scalar_mul(&generator, &scalar_7);
         assert!(eq(&point_7g_calc, &point_7g_from_comp), 1);
-        assert!(G2AFFINE_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP == serialize<G2, FormatG2AffineUncompr>(&point_7g_calc), 1);
-        assert!(G2AFFINE_GENERATOR_MUL_BY_7_SERIALIZED_COMP == serialize<G2, FormatG2AffineCompr>(&point_7g_calc), 1);
+        assert!(G2_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP == serialize<G2, FormatG2Uncompr>(&point_7g_calc), 1);
+        assert!(G2_GENERATOR_MUL_BY_7_SERIALIZED_COMP == serialize<G2, FormatG2Compr>(&point_7g_calc), 1);
 
         // Multi-scalar multiplication.
         let num_entries = 1;
@@ -535,8 +543,8 @@ module aptos_std::algebra_bls12381 {
 
         // Negation.
         let point_minus_7g_calc = neg(&point_7g_calc);
-        assert!(G2AFFINE_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP == serialize<G2, FormatG2AffineCompr>(&point_minus_7g_calc), 1);
-        assert!(G2AFFINE_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP == serialize<G2, FormatG2AffineUncompr>(&point_minus_7g_calc), 1);
+        assert!(G2_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP == serialize<G2, FormatG2Compr>(&point_minus_7g_calc), 1);
+        assert!(G2_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP == serialize<G2, FormatG2Uncompr>(&point_minus_7g_calc), 1);
 
         // Addition.
         let scalar_9 = from_u64<Fr>(9);
@@ -551,10 +559,10 @@ module aptos_std::algebra_bls12381 {
         // Hash-to-group using suite `BLS12381G2_XMD:SHA-256_SSWU_RO_`.
         // Test vectors source: https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-bls12381g2_xmdsha-256_sswu_
         let actual = hash_to<G2, HashG2XmdSha256SswuRo>(&b"QUUX-V01-CS02-with-BLS12381G2_XMD:SHA-256_SSWU_RO_", &b"");
-        let expected = std::option::extract(&mut deserialize<G2, FormatG2AffineUncompr>(&x"05cb8437535e20ecffaef7752baddf98034139c38452458baeefab379ba13dff5bf5dd71b72418717047f5b0f37da03d0141ebfbdca40eb85b87142e130ab689c673cf60f1a3e98d69335266f30d9b8d4ac44c1038e9dcdd5393faf5c41fb78a12424ac32561493f3fe3c260708a12b7c620e7be00099a974e259ddc7d1f6395c3c811cdd19f1e8dbf3e9ecfdcbab8d60503921d7f6a12805e72940b963c0cf3471c7b2a524950ca195d11062ee75ec076daf2d4bc358c4b190c0c98064fdd92"));
+        let expected = std::option::extract(&mut deserialize<G2, FormatG2Uncompr>(&x"05cb8437535e20ecffaef7752baddf98034139c38452458baeefab379ba13dff5bf5dd71b72418717047f5b0f37da03d0141ebfbdca40eb85b87142e130ab689c673cf60f1a3e98d69335266f30d9b8d4ac44c1038e9dcdd5393faf5c41fb78a12424ac32561493f3fe3c260708a12b7c620e7be00099a974e259ddc7d1f6395c3c811cdd19f1e8dbf3e9ecfdcbab8d60503921d7f6a12805e72940b963c0cf3471c7b2a524950ca195d11062ee75ec076daf2d4bc358c4b190c0c98064fdd92"));
         assert!(eq(&expected, &actual), 1);
         let actual = hash_to<G2, HashG2XmdSha256SswuRo>(&b"QUUX-V01-CS02-with-BLS12381G2_XMD:SHA-256_SSWU_RO_", &b"abcdef0123456789");
-        let expected = std::option::extract(&mut deserialize<G2, FormatG2AffineUncompr>(&x"190d119345b94fbd15497bcba94ecf7db2cbfd1e1fe7da034d26cbba169fb3968288b3fafb265f9ebd380512a71c3f2c121982811d2491fde9ba7ed31ef9ca474f0e1501297f68c298e9f4c0028add35aea8bb83d53c08cfc007c1e005723cd00bb5e7572275c567462d91807de765611490205a941a5a6af3b1691bfe596c31225d3aabdf15faff860cb4ef17c7c3be05571a0f8d3c08d094576981f4a3b8eda0a8e771fcdcc8ecceaf1356a6acf17574518acb506e435b639353c2e14827c8"));
+        let expected = std::option::extract(&mut deserialize<G2, FormatG2Uncompr>(&x"190d119345b94fbd15497bcba94ecf7db2cbfd1e1fe7da034d26cbba169fb3968288b3fafb265f9ebd380512a71c3f2c121982811d2491fde9ba7ed31ef9ca474f0e1501297f68c298e9f4c0028add35aea8bb83d53c08cfc007c1e005723cd00bb5e7572275c567462d91807de765611490205a941a5a6af3b1691bfe596c31225d3aabdf15faff860cb4ef17c7c3be05571a0f8d3c08d094576981f4a3b8eda0a8e771fcdcc8ecceaf1356a6acf17574518acb506e435b639353c2e14827c8"));
         assert!(eq(&expected, &actual), 1);
     }
 

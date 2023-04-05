@@ -31,10 +31,10 @@ pub fn feature_flag_of_serialization_format(
         Some(SerializationFormat::BLS12381FrLsb)
         | Some(SerializationFormat::BLS12381FrMsb)
         | Some(SerializationFormat::BLS12381Fq12LscLsb)
-        | Some(SerializationFormat::BLS12381G1AffineUncompressed)
-        | Some(SerializationFormat::BLS12381G1AffineCompressed)
-        | Some(SerializationFormat::BLS12381G2AffineUncompressed)
-        | Some(SerializationFormat::BLS12381G2AffineCompressed)
+        | Some(SerializationFormat::BLS12381G1Uncompressed)
+        | Some(SerializationFormat::BLS12381G1Compressed)
+        | Some(SerializationFormat::BLS12381G2Uncompressed)
+        | Some(SerializationFormat::BLS12381G2Compressed)
         | Some(SerializationFormat::BLS12381Gt) => Some(FeatureFlag::BLS12_381_STRUCTURES),
         _ => None,
     }
@@ -96,10 +96,7 @@ pub fn serialize_internal(
                 .map_err(|_e| abort_invariant_violated())?;
             Ok(smallvec![Value::vector_u8(buf)])
         },
-        (
-            Some(Structure::BLS12381G1Affine),
-            Some(SerializationFormat::BLS12381G1AffineUncompressed),
-        ) => {
+        (Some(Structure::BLS12381G1), Some(SerializationFormat::BLS12381G1Uncompressed)) => {
             let handle = safely_pop_arg!(args, u64) as usize;
             safe_borrow_element!(
                 context,
@@ -116,10 +113,7 @@ pub fn serialize_internal(
                 .map_err(|_e| abort_invariant_violated())?;
             Ok(smallvec![Value::vector_u8(buf)])
         },
-        (
-            Some(Structure::BLS12381G1Affine),
-            Some(SerializationFormat::BLS12381G1AffineCompressed),
-        ) => {
+        (Some(Structure::BLS12381G1), Some(SerializationFormat::BLS12381G1Compressed)) => {
             let handle = safely_pop_arg!(args, u64) as usize;
             safe_borrow_element!(
                 context,
@@ -136,10 +130,7 @@ pub fn serialize_internal(
                 .map_err(|_e| abort_invariant_violated())?;
             Ok(smallvec![Value::vector_u8(buf)])
         },
-        (
-            Some(Structure::BLS12381G2Affine),
-            Some(SerializationFormat::BLS12381G2AffineUncompressed),
-        ) => {
+        (Some(Structure::BLS12381G2), Some(SerializationFormat::BLS12381G2Uncompressed)) => {
             let handle = safely_pop_arg!(args, u64) as usize;
             safe_borrow_element!(
                 context,
@@ -156,10 +147,7 @@ pub fn serialize_internal(
                 .map_err(|_e| abort_invariant_violated())?;
             Ok(smallvec![Value::vector_u8(buf)])
         },
-        (
-            Some(Structure::BLS12381G2Affine),
-            Some(SerializationFormat::BLS12381G2AffineCompressed),
-        ) => {
+        (Some(Structure::BLS12381G2), Some(SerializationFormat::BLS12381G2Compressed)) => {
             let handle = safely_pop_arg!(args, u64) as usize;
             safe_borrow_element!(
                 context,
@@ -290,10 +278,7 @@ pub fn deserialize_internal(
                 gas_params.ark_bls12_381_fq12_deser * NumArgs::one()
             )
         },
-        (
-            Some(Structure::BLS12381G1Affine),
-            Some(SerializationFormat::BLS12381G1AffineUncompressed),
-        ) => {
+        (Some(Structure::BLS12381G1), Some(SerializationFormat::BLS12381G1Uncompressed)) => {
             // Valid BLS12381G1AffineUncompressed serialization should be 96-byte.
             if bytes.len() != 96 {
                 return Ok(smallvec![Value::bool(false), Value::u64(0)]);
@@ -306,10 +291,7 @@ pub fn deserialize_internal(
                 gas_params.ark_bls12_381_g1_affine_deser_uncomp * NumArgs::one()
             )
         },
-        (
-            Some(Structure::BLS12381G1Affine),
-            Some(SerializationFormat::BLS12381G1AffineCompressed),
-        ) => {
+        (Some(Structure::BLS12381G1), Some(SerializationFormat::BLS12381G1Compressed)) => {
             // Valid BLS12381G1AffineCompressed serialization should be 48-byte.
             if bytes.len() != 48 {
                 return Ok(smallvec![Value::bool(false), Value::u64(0)]);
@@ -322,10 +304,7 @@ pub fn deserialize_internal(
                 gas_params.ark_bls12_381_g1_affine_deser_comp * NumArgs::one()
             )
         },
-        (
-            Some(Structure::BLS12381G2Affine),
-            Some(SerializationFormat::BLS12381G2AffineUncompressed),
-        ) => {
+        (Some(Structure::BLS12381G2), Some(SerializationFormat::BLS12381G2Uncompressed)) => {
             // Valid BLS12381G2AffineUncompressed serialization should be 192-byte.
             if bytes.len() != 192 {
                 return Ok(smallvec![Value::bool(false), Value::u64(0)]);
@@ -338,10 +317,7 @@ pub fn deserialize_internal(
                 gas_params.ark_bls12_381_g2_affine_deser_uncomp * NumArgs::one()
             )
         },
-        (
-            Some(Structure::BLS12381G2Affine),
-            Some(SerializationFormat::BLS12381G2AffineCompressed),
-        ) => {
+        (Some(Structure::BLS12381G2), Some(SerializationFormat::BLS12381G2Compressed)) => {
             // Valid BLS12381G2AffineCompressed serialization should be 96-byte.
             if bytes.len() != 96 {
                 return Ok(smallvec![Value::bool(false), Value::u64(0)]);

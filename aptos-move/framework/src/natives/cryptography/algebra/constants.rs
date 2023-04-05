@@ -50,13 +50,13 @@ pub fn zero_internal(
             zero,
             gas_params.ark_bls12_381_fq12_zero * NumArgs::one()
         ),
-        Some(Structure::BLS12381G1Affine) => ark_constant_op_internal!(
+        Some(Structure::BLS12381G1) => ark_constant_op_internal!(
             context,
             ark_bls12_381::G1Projective,
             zero,
             gas_params.ark_bls12_381_g1_proj_infinity * NumArgs::one()
         ),
-        Some(Structure::BLS12381G2Affine) => ark_constant_op_internal!(
+        Some(Structure::BLS12381G2) => ark_constant_op_internal!(
             context,
             ark_bls12_381::G2Projective,
             zero,
@@ -95,13 +95,13 @@ pub fn one_internal(
             one,
             gas_params.ark_bls12_381_fq12_one * NumArgs::one()
         ),
-        Some(Structure::BLS12381G1Affine) => ark_constant_op_internal!(
+        Some(Structure::BLS12381G1) => ark_constant_op_internal!(
             context,
             ark_bls12_381::G1Projective,
             generator,
             gas_params.ark_bls12_381_g1_proj_generator * NumArgs::one()
         ),
-        Some(Structure::BLS12381G2Affine) => ark_constant_op_internal!(
+        Some(Structure::BLS12381G2) => ark_constant_op_internal!(
             context,
             ark_bls12_381::G2Projective,
             generator,
@@ -130,8 +130,8 @@ pub fn order_internal(
     abort_unless_arithmetics_enabled_for_structure!(context, structure_opt);
     match structure_opt {
         Some(Structure::BLS12381Fr)
-        | Some(Structure::BLS12381G1Affine)
-        | Some(Structure::BLS12381G2Affine)
+        | Some(Structure::BLS12381G1)
+        | Some(Structure::BLS12381G2)
         | Some(Structure::BLS12381Gt) => {
             Ok(smallvec![Value::vector_u8(BLS12381_R_LENDIAN.clone())])
         },

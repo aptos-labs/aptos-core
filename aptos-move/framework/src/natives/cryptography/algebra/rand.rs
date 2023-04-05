@@ -47,10 +47,10 @@ pub fn rand_insecure_internal(
         Some(Structure::BLS12381Fq12) => {
             ark_rand_internal!(context, ark_bls12_381::Fq12)
         },
-        Some(Structure::BLS12381G1Affine) => {
+        Some(Structure::BLS12381G1) => {
             ark_rand_internal!(context, ark_bls12_381::G1Projective)
         },
-        Some(Structure::BLS12381G2Affine) => {
+        Some(Structure::BLS12381G2) => {
             ark_rand_internal!(context, ark_bls12_381::G2Projective)
         },
         Some(Structure::BLS12381Gt) => {

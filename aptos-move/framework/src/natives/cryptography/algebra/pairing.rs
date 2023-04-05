@@ -24,11 +24,9 @@ fn feature_flag_of_pairing(
     gt_opt: Option<Structure>,
 ) -> Option<FeatureFlag> {
     match (g1_opt, g2_opt, gt_opt) {
-        (
-            Some(Structure::BLS12381G1Affine),
-            Some(Structure::BLS12381G2Affine),
-            Some(Structure::BLS12381Gt),
-        ) => Some(FeatureFlag::BLS12_381_STRUCTURES),
+        (Some(Structure::BLS12381G1), Some(Structure::BLS12381G2), Some(Structure::BLS12381Gt)) => {
+            Some(FeatureFlag::BLS12_381_STRUCTURES)
+        },
         _ => None,
     }
 }
@@ -52,11 +50,7 @@ pub fn multi_pairing_internal(
     let gt_opt = structure_from_ty_arg!(context, &ty_args[2]);
     abort_unless_pairing_enabled!(context, g1_opt, g2_opt, gt_opt);
     match (g1_opt, g2_opt, gt_opt) {
-        (
-            Some(Structure::BLS12381G1Affine),
-            Some(Structure::BLS12381G2Affine),
-            Some(Structure::BLS12381Gt),
-        ) => {
+        (Some(Structure::BLS12381G1), Some(Structure::BLS12381G2), Some(Structure::BLS12381Gt)) => {
             let g2_element_handles = safely_pop_arg!(args, Vec<u64>);
             let g1_element_handles = safely_pop_arg!(args, Vec<u64>);
             let num_entries = g1_element_handles.len();
@@ -124,11 +118,7 @@ pub fn pairing_internal(
     let gt_opt = structure_from_ty_arg!(context, &ty_args[2]);
     abort_unless_pairing_enabled!(context, g1_opt, g2_opt, gt_opt);
     match (g1_opt, g2_opt, gt_opt) {
-        (
-            Some(Structure::BLS12381G1Affine),
-            Some(Structure::BLS12381G2Affine),
-            Some(Structure::BLS12381Gt),
-        ) => {
+        (Some(Structure::BLS12381G1), Some(Structure::BLS12381G2), Some(Structure::BLS12381Gt)) => {
             let g2_element_handle = safely_pop_arg!(args, u64) as usize;
             let g1_element_handle = safely_pop_arg!(args, u64) as usize;
             safe_borrow_element!(

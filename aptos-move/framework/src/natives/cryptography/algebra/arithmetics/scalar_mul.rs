@@ -24,8 +24,8 @@ fn feature_flag_of_group_scalar_mul(
     scalar_field_opt: Option<Structure>,
 ) -> Option<FeatureFlag> {
     match (group_opt, scalar_field_opt) {
-        (Some(Structure::BLS12381G1Affine), Some(Structure::BLS12381Fr))
-        | (Some(Structure::BLS12381G2Affine), Some(Structure::BLS12381Fr))
+        (Some(Structure::BLS12381G1), Some(Structure::BLS12381Fr))
+        | (Some(Structure::BLS12381G2), Some(Structure::BLS12381Fr))
         | (Some(Structure::BLS12381Gt), Some(Structure::BLS12381Fr)) => {
             Some(FeatureFlag::BLS12_381_STRUCTURES)
         },
@@ -87,7 +87,7 @@ pub fn scalar_mul_internal(
     let scalar_field_opt = structure_from_ty_arg!(context, &ty_args[1]);
     abort_unless_group_scalar_mul_enabled!(context, group_opt, scalar_field_opt);
     match (group_opt, scalar_field_opt) {
-        (Some(Structure::BLS12381G1Affine), Some(Structure::BLS12381Fr)) => {
+        (Some(Structure::BLS12381G1), Some(Structure::BLS12381Fr)) => {
             ark_scalar_mul_internal!(
                 context,
                 args,
@@ -97,7 +97,7 @@ pub fn scalar_mul_internal(
                 gas_params.ark_bls12_381_g1_proj_scalar_mul * NumArgs::one()
             )
         },
-        (Some(Structure::BLS12381G2Affine), Some(Structure::BLS12381Fr)) => {
+        (Some(Structure::BLS12381G2), Some(Structure::BLS12381Fr)) => {
             ark_scalar_mul_internal!(
                 context,
                 args,
@@ -195,7 +195,7 @@ pub fn multi_scalar_mul_internal(
     let scalar_opt = structure_from_ty_arg!(context, &ty_args[1]);
     abort_unless_group_scalar_mul_enabled!(context, structure_opt, scalar_opt);
     match (structure_opt, scalar_opt) {
-        (Some(Structure::BLS12381G1Affine), Some(Structure::BLS12381Fr)) => {
+        (Some(Structure::BLS12381G1), Some(Structure::BLS12381Fr)) => {
             ark_msm_internal!(
                 context,
                 args,
@@ -206,7 +206,7 @@ pub fn multi_scalar_mul_internal(
                 ark_bls12_381::Fr
             )
         },
-        (Some(Structure::BLS12381G2Affine), Some(Structure::BLS12381Fr)) => {
+        (Some(Structure::BLS12381G2), Some(Structure::BLS12381Fr)) => {
             ark_msm_internal!(
                 context,
                 args,

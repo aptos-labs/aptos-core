@@ -28,14 +28,10 @@ fn feature_flag_of_hash_to_structure(
     suite_opt: Option<HashToStructureSuite>,
 ) -> Option<FeatureFlag> {
     match (structure_opt, suite_opt) {
-        (
-            Some(Structure::BLS12381G1Affine),
-            Some(HashToStructureSuite::Bls12381g1XmdSha256SswuRo),
-        )
-        | (
-            Some(Structure::BLS12381G2Affine),
-            Some(HashToStructureSuite::Bls12381g2XmdSha256SswuRo),
-        ) => Some(FeatureFlag::BLS12_381_STRUCTURES),
+        (Some(Structure::BLS12381G1), Some(HashToStructureSuite::Bls12381g1XmdSha256SswuRo))
+        | (Some(Structure::BLS12381G2), Some(HashToStructureSuite::Bls12381g2XmdSha256SswuRo)) => {
+            Some(FeatureFlag::BLS12_381_STRUCTURES)
+        },
         _ => None,
     }
 }
@@ -93,10 +89,7 @@ pub fn hash_to_internal(
     let bytes_ref = tag_ref.as_bytes_ref();
     let dst = bytes_ref.as_slice();
     match (structure_opt, suite_opt) {
-        (
-            Some(Structure::BLS12381G1Affine),
-            Some(HashToStructureSuite::Bls12381g1XmdSha256SswuRo),
-        ) => {
+        (Some(Structure::BLS12381G1), Some(HashToStructureSuite::Bls12381g1XmdSha256SswuRo)) => {
             context.charge(hash_to_bls12381gx_cost(
                 dst.len(),
                 msg.len(),
@@ -117,10 +110,7 @@ pub fn hash_to_internal(
             let new_handle = store_element!(context, new_element);
             Ok(smallvec![Value::u64(new_handle as u64)])
         },
-        (
-            Some(Structure::BLS12381G2Affine),
-            Some(HashToStructureSuite::Bls12381g2XmdSha256SswuRo),
-        ) => {
+        (Some(Structure::BLS12381G2), Some(HashToStructureSuite::Bls12381g2XmdSha256SswuRo)) => {
             context.charge(hash_to_bls12381gx_cost(
                 dst.len(),
                 msg.len(),

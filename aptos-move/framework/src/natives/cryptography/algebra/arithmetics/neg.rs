@@ -42,14 +42,14 @@ pub fn neg_internal(
             neg,
             gas_params.ark_bls12_381_fq12_neg * NumArgs::one()
         ),
-        Some(Structure::BLS12381G1Affine) => ark_unary_op_internal!(
+        Some(Structure::BLS12381G1) => ark_unary_op_internal!(
             context,
             args,
             ark_bls12_381::G1Projective,
             neg,
             gas_params.ark_bls12_381_g1_proj_neg * NumArgs::one()
         ),
-        Some(Structure::BLS12381G2Affine) => ark_unary_op_internal!(
+        Some(Structure::BLS12381G2) => ark_unary_op_internal!(
             context,
             args,
             ark_bls12_381::G2Projective,

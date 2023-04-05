@@ -50,13 +50,13 @@ pub fn eq_internal(
             ark_bls12_381::Fq12,
             gas_params.ark_bls12_381_fq12_eq * NumArgs::one()
         ),
-        Some(Structure::BLS12381G1Affine) => ark_eq_internal!(
+        Some(Structure::BLS12381G1) => ark_eq_internal!(
             context,
             args,
             ark_bls12_381::G1Projective,
             gas_params.ark_bls12_381_g1_proj_eq * NumArgs::one()
         ),
-        Some(Structure::BLS12381G2Affine) => ark_eq_internal!(
+        Some(Structure::BLS12381G2) => ark_eq_internal!(
             context,
             args,
             ark_bls12_381::G2Projective,

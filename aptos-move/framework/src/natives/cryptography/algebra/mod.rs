@@ -60,8 +60,8 @@ const MOVE_ABORT_CODE_NOT_IMPLEMENTED: u64 = 0x0C_0001;
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub enum Structure {
     BLS12381Fq12,
-    BLS12381G1Affine,
-    BLS12381G2Affine,
+    BLS12381G1,
+    BLS12381G2,
     BLS12381Gt,
     BLS12381Fr,
 }
@@ -73,8 +73,8 @@ impl TryFrom<TypeTag> for Structure {
         match value.to_string().as_str() {
             "0x1::algebra_bls12381::Fr" => Ok(Structure::BLS12381Fr),
             "0x1::algebra_bls12381::Fq12" => Ok(Structure::BLS12381Fq12),
-            "0x1::algebra_bls12381::G1" => Ok(Structure::BLS12381G1Affine),
-            "0x1::algebra_bls12381::G2" => Ok(Structure::BLS12381G2Affine),
+            "0x1::algebra_bls12381::G1" => Ok(Structure::BLS12381G1),
+            "0x1::algebra_bls12381::G2" => Ok(Structure::BLS12381G2),
             "0x1::algebra_bls12381::Gt" => Ok(Structure::BLS12381Gt),
             _ => Err(()),
         }
@@ -93,10 +93,10 @@ macro_rules! structure_from_ty_arg {
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub enum SerializationFormat {
     BLS12381Fq12LscLsb,
-    BLS12381G1AffineCompressed,
-    BLS12381G1AffineUncompressed,
-    BLS12381G2AffineCompressed,
-    BLS12381G2AffineUncompressed,
+    BLS12381G1Compressed,
+    BLS12381G1Uncompressed,
+    BLS12381G2Compressed,
+    BLS12381G2Uncompressed,
     BLS12381Gt,
     BLS12381FrLsb,
     BLS12381FrMsb,
@@ -110,18 +110,14 @@ impl TryFrom<TypeTag> for SerializationFormat {
             "0x1::algebra_bls12381::FormatFq12LscLsb" => {
                 Ok(SerializationFormat::BLS12381Fq12LscLsb)
             },
-            "0x1::algebra_bls12381::FormatG1AffineUncompr" => {
-                Ok(SerializationFormat::BLS12381G1AffineUncompressed)
+            "0x1::algebra_bls12381::FormatG1Uncompr" => {
+                Ok(SerializationFormat::BLS12381G1Uncompressed)
             },
-            "0x1::algebra_bls12381::FormatG1AffineCompr" => {
-                Ok(SerializationFormat::BLS12381G1AffineCompressed)
+            "0x1::algebra_bls12381::FormatG1Compr" => Ok(SerializationFormat::BLS12381G1Compressed),
+            "0x1::algebra_bls12381::FormatG2Uncompr" => {
+                Ok(SerializationFormat::BLS12381G2Uncompressed)
             },
-            "0x1::algebra_bls12381::FormatG2AffineUncompr" => {
-                Ok(SerializationFormat::BLS12381G2AffineUncompressed)
-            },
-            "0x1::algebra_bls12381::FormatG2AffineCompr" => {
-                Ok(SerializationFormat::BLS12381G2AffineCompressed)
-            },
+            "0x1::algebra_bls12381::FormatG2Compr" => Ok(SerializationFormat::BLS12381G2Compressed),
             "0x1::algebra_bls12381::FormatGt" => Ok(SerializationFormat::BLS12381Gt),
             "0x1::algebra_bls12381::FormatFrLsb" => Ok(SerializationFormat::BLS12381FrLsb),
             "0x1::algebra_bls12381::FormatFrMsb" => Ok(SerializationFormat::BLS12381FrMsb),
@@ -197,8 +193,8 @@ fn feature_flag_from_structure(structure_opt: Option<Structure>) -> Option<Featu
     match structure_opt {
         Some(Structure::BLS12381Fr)
         | Some(Structure::BLS12381Fq12)
-        | Some(Structure::BLS12381G1Affine)
-        | Some(Structure::BLS12381G2Affine)
+        | Some(Structure::BLS12381G1)
+        | Some(Structure::BLS12381G2)
         | Some(Structure::BLS12381Gt) => Some(FeatureFlag::BLS12_381_STRUCTURES),
         _ => None,
     }

@@ -45,14 +45,14 @@ pub fn add_internal(
             add,
             gas_params.ark_bls12_381_fq12_add * NumArgs::one()
         ),
-        Some(Structure::BLS12381G1Affine) => ark_binary_op_internal!(
+        Some(Structure::BLS12381G1) => ark_binary_op_internal!(
             context,
             args,
             ark_bls12_381::G1Projective,
             add,
             gas_params.ark_bls12_381_g1_proj_add * NumArgs::one()
         ),
-        Some(Structure::BLS12381G2Affine) => ark_binary_op_internal!(
+        Some(Structure::BLS12381G2) => ark_binary_op_internal!(
             context,
             args,
             ark_bls12_381::G2Projective,
