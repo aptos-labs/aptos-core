@@ -98,6 +98,7 @@ const config = {
           {
             type: "dropdown",
             label: "Start",
+            to: "whats-new-in-docs",
             position: "left",
             items: [
               {
@@ -135,6 +136,7 @@ const config = {
           {
             type: "dropdown",
             label: "Apps",
+            to: "concepts/coin-and-token/index",
             position: "left",
             items: [
               {
@@ -172,6 +174,7 @@ const config = {
           {
             type: "dropdown",
             label: "Move",
+            to: "guides/move-guides/aptos-move-guides",
             position: "left",
             items: [
               {
@@ -224,6 +227,7 @@ const config = {
           {
             type: "dropdown",
             label: "Tokens",
+            to: "/category/nft",
             position: "left",
             items: [
               {
@@ -266,6 +270,7 @@ const config = {
           {
             type: "dropdown",
             label: "Nodes",
+            to: "nodes/nodes-landing",
             position: "left",
             items: [
               {
@@ -308,6 +313,7 @@ const config = {
           {
             type: "dropdown",
             label: "Reference",
+            to: "reference/aptos-ref-docs",
             position: "left",
             items: [
               {
@@ -345,6 +351,7 @@ const config = {
           {
             type: "dropdown",
             label: "Community",
+            to: "community/help-index",
             position: "left",
             items: [
               {

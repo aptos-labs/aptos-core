@@ -30,7 +30,7 @@ module aptos_token_objects::aptos_token {
     /// Attempted to mutate a property map that is not mutable
     const EPROPERTIES_NOT_MUTABLE: u64 = 5;
     // The collection does not exist
-    const ECOLLECTION_DOES_NOT_EXIST: u64 = 1;
+    const ECOLLECTION_DOES_NOT_EXIST: u64 = 6;
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Storage state for managing the no-code Collection.

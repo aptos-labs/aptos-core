@@ -15,6 +15,7 @@ use crate::{
         write_set::WriteSetSchema,
     },
     state_kv_db::StateKvDb,
+    state_merkle_db::StateMerkleDb,
     EventStore, TransactionStore, NUM_STATE_SHARDS,
 };
 use anyhow::Result;
@@ -150,7 +151,7 @@ pub(crate) fn truncate_state_kv_db_single_shard(
 }
 
 pub(crate) fn truncate_state_merkle_db(
-    state_merkle_db: &DB,
+    state_merkle_db: &StateMerkleDb,
     target_version: Version,
 ) -> Result<()> {
     let status = StatusLine::new(Progress::new(target_version));
@@ -164,7 +165,10 @@ pub(crate) fn truncate_state_merkle_db(
             break;
         }
 
-        let mut iter = state_merkle_db.iter::<JellyfishMerkleNodeSchema>(ReadOptions::default())?;
+        // TODO(grao): Support sharding here.
+        let mut iter = state_merkle_db
+            .metadata_db()
+            .iter::<JellyfishMerkleNodeSchema>(ReadOptions::default())?;
         iter.seek(&NodeKey::new_empty_path(current_version))?;
         for item in iter {
             let (key, _) = item?;
@@ -182,23 +186,25 @@ pub(crate) fn truncate_state_merkle_db(
             &batch,
         )?;
 
-        state_merkle_db.write_schemas(batch)?;
+        state_merkle_db.metadata_db().write_schemas(batch)?;
     }
 
     Ok(())
 }
 
 pub(crate) fn get_current_version_in_state_merkle_db(
-    state_merkle_db: &DB,
+    state_merkle_db: &StateMerkleDb,
 ) -> Result<Option<Version>> {
     find_closest_node_version_at_or_before(state_merkle_db, u64::max_value())
 }
 
 pub(crate) fn find_closest_node_version_at_or_before(
-    state_merkle_db: &DB,
+    state_merkle_db: &StateMerkleDb,
     version: Version,
 ) -> Result<Option<Version>> {
-    let mut iter = state_merkle_db.rev_iter::<JellyfishMerkleNodeSchema>(Default::default())?;
+    let mut iter = state_merkle_db
+        .metadata_db()
+        .rev_iter::<JellyfishMerkleNodeSchema>(Default::default())?;
     iter.seek_for_prev(&NodeKey::new_empty_path(version))?;
     Ok(iter.next().transpose()?.map(|item| item.0.version()))
 }
@@ -342,7 +348,7 @@ fn delete_state_value_and_index(
 }
 
 fn delete_stale_node_index_at_version<S>(
-    state_merkle_db: &DB,
+    state_merkle_db: &StateMerkleDb,
     version: Version,
     batch: &SchemaBatch,
 ) -> Result<()>
@@ -350,7 +356,10 @@ where
     S: Schema<Key = StaleNodeIndex>,
     Version: SeekKeyCodec<S>,
 {
-    let mut iter = state_merkle_db.iter::<S>(ReadOptions::default())?;
+    // TODO(grao): Support sharding here.
+    let mut iter = state_merkle_db
+        .metadata_db()
+        .iter::<S>(ReadOptions::default())?;
     iter.seek(&version)?;
     for item in iter {
         let (index, _) = item?;

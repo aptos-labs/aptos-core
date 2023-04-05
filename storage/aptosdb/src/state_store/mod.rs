@@ -280,13 +280,12 @@ impl StateDb {
 impl StateStore {
     pub fn new(
         ledger_db: Arc<DB>,
-        state_merkle_db: Arc<DB>,
+        state_merkle_db: Arc<StateMerkleDb>,
         state_kv_db: Arc<StateKvDb>,
         state_merkle_pruner: StateMerklePrunerManager<StaleNodeIndexSchema>,
         epoch_snapshot_pruner: StateMerklePrunerManager<StaleNodeIndexCrossEpochSchema>,
         state_kv_pruner: StateKvPrunerManager,
         buffered_state_target_items: usize,
-        max_nodes_per_lru_cache_shard: usize,
         hack_for_tests: bool,
     ) -> Self {
         Self::sync_commit_progress(
@@ -294,10 +293,6 @@ impl StateStore {
             Arc::clone(&state_kv_db),
             /*crash_if_difference_is_too_large=*/ true,
         );
-        let state_merkle_db = Arc::new(StateMerkleDb::new(
-            state_merkle_db,
-            max_nodes_per_lru_cache_shard,
-        ));
         let state_db = Arc::new(StateDb {
             ledger_db,
             state_merkle_db,
@@ -395,21 +390,19 @@ impl StateStore {
     #[cfg(feature = "db-debugger")]
     pub fn catch_up_state_merkle_db(
         ledger_db: Arc<DB>,
-        state_merkle_db: DB,
+        state_merkle_db: Arc<StateMerkleDb>,
         state_kv_db: Arc<StateKvDb>,
     ) -> Result<Option<Version>> {
         use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
 
-        let arc_state_merkle_rocksdb = Arc::new(state_merkle_db);
         let state_merkle_pruner = StateMerklePrunerManager::new(
-            Arc::clone(&arc_state_merkle_rocksdb),
+            Arc::clone(&state_merkle_db),
             NO_OP_STORAGE_PRUNER_CONFIG.state_merkle_pruner_config,
         );
         let epoch_snapshot_pruner = StateMerklePrunerManager::new(
-            Arc::clone(&arc_state_merkle_rocksdb),
+            Arc::clone(&state_merkle_db),
             NO_OP_STORAGE_PRUNER_CONFIG.state_merkle_pruner_config,
         );
-        let state_merkle_db = Arc::new(StateMerkleDb::new(arc_state_merkle_rocksdb, 0));
         let state_kv_pruner = StateKvPrunerManager::new(
             Arc::clone(&state_kv_db),
             NO_OP_STORAGE_PRUNER_CONFIG.ledger_pruner_config,
@@ -761,7 +754,8 @@ impl StateStore {
             base_version,
             None, // previous epoch ending version
         )?;
-        self.state_merkle_db.write_schemas(batch)?;
+        // TODO(grao): Support sharding here.
+        self.state_merkle_db.metadata_db().write_schemas(batch)?;
         Ok(hash)
     }
 
@@ -860,10 +854,11 @@ impl StateStore {
 
     #[cfg(test)]
     pub fn get_all_jmt_nodes(&self) -> Result<Vec<aptos_jellyfish_merkle::node_type::NodeKey>> {
+        // TODO(grao): Support sharding here.
         let mut iter = self
             .state_db
             .state_merkle_db
-            .db
+            .metadata_db()
             .iter::<crate::jellyfish_merkle_node::JellyfishMerkleNodeSchema>(
             Default::default(),
         )?;
