@@ -1,3 +1,5 @@
+#syntax=docker/dockerfile:1.4
+
 ### Validator Image ###
 
 FROM node-builder
@@ -7,7 +9,7 @@ FROM tools-builder
 FROM debian-base AS validator
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \   
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get install --no-install-recommends -y \
         libssl1.1 \
         ca-certificates \

@@ -1,3 +1,5 @@
+#syntax=docker/dockerfile:1.4
+
 ### Faucet Image ###
 FROM debian-base AS faucet
 
