@@ -53,7 +53,7 @@
 /// `G2Full`: a group constructed by the points on a curve $E'(F_{q^2}): y^2=x^3+4(u+1)$ and the point at infinity,
 /// under the elliptic curve point addition.
 /// It contains the prime-order subgroup $G_2$ used in pairing.
-module aptos_std::algebra_bls12381 {
+module aptos_std::crypt_algebra_bls12381 {
     //
     // Marker types + serialization formats begin.
     //
@@ -627,7 +627,7 @@ module aptos_std::algebra_bls12381 {
     }
 
     #[test_only]
-    use aptos_std::algebra::{zero, one, from_u64, eq, deserialize, serialize, neg, add, sub, mul, div, inv, rand_insecure, sqr, order, scalar_mul, multi_scalar_mul, double, hash_to, upcast, enable_cryptography_algebra_natives, pairing, multi_pairing, downcast, Element};
+    use aptos_std::crypt_algebra::{zero, one, from_u64, eq, deserialize, serialize, neg, add, sub, mul, div, inv, rand_insecure, sqr, order, scalar_mul, multi_scalar_mul, double, hash_to, upcast, enable_cryptography_algebra_natives, pairing, multi_pairing, downcast, Element};
 
     #[test_only]
     const FR_VAL_0_SERIALIZED_LSB: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000000";
@@ -753,7 +753,7 @@ module aptos_std::algebra_bls12381 {
     }
 
     #[test(fx = @std)]
-    #[expected_failure(abort_code = 0x010002, location = aptos_std::algebra)]
+    #[expected_failure(abort_code = 0x010002, location = aptos_std::crypt_algebra)]
     fun test_multi_pairing_should_abort_when_sizes_mismatch(fx: signer) {
         enable_cryptography_algebra_natives(&fx);
         let g1_elements = vector[rand_insecure<G1>()];
@@ -762,7 +762,7 @@ module aptos_std::algebra_bls12381 {
     }
 
     #[test(fx = @std)]
-    #[expected_failure(abort_code = 0x010002, location = aptos_std::algebra)]
+    #[expected_failure(abort_code = 0x010002, location = aptos_std::crypt_algebra)]
     fun test_multi_scalar_mul_should_abort_when_sizes_mismatch(fx: signer) {
         enable_cryptography_algebra_natives(&fx);
         let elements = vector[rand_insecure<G1>()];
