@@ -2316,11 +2316,13 @@ fn unbound_names_spec_block_member(unbound: &mut UnboundNames, sp!(_, m_): &E::S
                 .iter()
                 .for_each(|e| unbound_names_exp(unbound, e));
         },
+        M::Update { rhs, .. } => {
+            unbound_names_exp(unbound, rhs);
+        },
         // No unbound names
         // And will error in the Move prover
         M::Function { .. }
         | M::Variable { .. }
-        | M::Update { .. }
         | M::Let { .. }
         | M::Include { .. }
         | M::Apply { .. }

@@ -20,7 +20,7 @@ pub(crate) trait QuorumStoreStorage: Sync + Send {
 
     fn get_all_batches(&self) -> Result<HashMap<HashValue, PersistedValue>>;
 
-    fn save_batch(&self, digest: HashValue, batch: PersistedValue) -> Result<(), DbError>;
+    fn save_batch(&self, batch: PersistedValue) -> Result<(), DbError>;
 
     fn get_batch(&self, digest: &HashValue) -> Result<Option<PersistedValue>, DbError>;
 
@@ -78,13 +78,13 @@ impl QuorumStoreStorage for QuorumStoreDB {
         iter.collect::<Result<HashMap<HashValue, PersistedValue>>>()
     }
 
-    fn save_batch(&self, digest: HashValue, batch: PersistedValue) -> Result<(), DbError> {
+    fn save_batch(&self, batch: PersistedValue) -> Result<(), DbError> {
         trace!(
             "QS: db persists digest {} expiration {:?}",
-            digest,
+            batch.digest(),
             batch.expiration()
         );
-        Ok(self.db.put::<BatchSchema>(&digest, &batch)?)
+        Ok(self.db.put::<BatchSchema>(batch.digest(), &batch)?)
     }
 
     fn get_batch(&self, digest: &HashValue) -> Result<Option<PersistedValue>, DbError> {
@@ -138,7 +138,7 @@ impl QuorumStoreStorage for MockQuorumStoreDB {
         Ok(HashMap::new())
     }
 
-    fn save_batch(&self, _: HashValue, _: PersistedValue) -> Result<(), DbError> {
+    fn save_batch(&self, _: PersistedValue) -> Result<(), DbError> {
         Ok(())
     }
 
