@@ -272,12 +272,12 @@ Creates a new token object and returns the ConstructorRef for additional special
     <b>let</b> creator_address = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(creator);
     <b>let</b> seed = <a href="token.md#0x4_token_create_token_seed">create_token_seed</a>(&collection_name, &name);
 
-    <b>let</b> collection_addr = <a href="collection.md#0x4_collection_create_collection_address">collection::create_collection_address</a>(&creator_address, &collection_name);
-    <b>let</b> <a href="collection.md#0x4_collection">collection</a> = <a href="../../aptos-framework/doc/object.md#0x1_object_address_to_object">object::address_to_object</a>&lt;Collection&gt;(collection_addr);
-    <b>let</b> id = <a href="collection.md#0x4_collection_increment_supply">collection::increment_supply</a>(&<a href="collection.md#0x4_collection">collection</a>);
-
     <b>let</b> constructor_ref = <a href="../../aptos-framework/doc/object.md#0x1_object_create_named_object">object::create_named_object</a>(creator, seed);
     <b>let</b> object_signer = <a href="../../aptos-framework/doc/object.md#0x1_object_generate_signer">object::generate_signer</a>(&constructor_ref);
+
+    <b>let</b> collection_addr = <a href="collection.md#0x4_collection_create_collection_address">collection::create_collection_address</a>(&creator_address, &collection_name);
+    <b>let</b> <a href="collection.md#0x4_collection">collection</a> = <a href="../../aptos-framework/doc/object.md#0x1_object_address_to_object">object::address_to_object</a>&lt;Collection&gt;(collection_addr);
+    <b>let</b> id = <a href="collection.md#0x4_collection_increment_supply">collection::increment_supply</a>(&<a href="collection.md#0x4_collection">collection</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&object_signer));
 
     <b>let</b> <a href="token.md#0x4_token">token</a> = <a href="token.md#0x4_token_Token">Token</a> {
         <a href="collection.md#0x4_collection">collection</a>,
@@ -679,7 +679,7 @@ Extracts the tokens address from a BurnRef.
 
     <b>let</b> <a href="token.md#0x4_token_Token">Token</a> {
         <a href="collection.md#0x4_collection">collection</a>,
-        collection_id: _,
+        collection_id,
         description: _,
         name: _,
         creation_name: _,
@@ -688,7 +688,7 @@ Extracts the tokens address from a BurnRef.
     } = <b>move_from</b>&lt;<a href="token.md#0x4_token_Token">Token</a>&gt;(addr);
 
     <a href="../../aptos-framework/doc/event.md#0x1_event_destroy_handle">event::destroy_handle</a>(mutation_events);
-    <a href="collection.md#0x4_collection_decrement_supply">collection::decrement_supply</a>(&<a href="collection.md#0x4_collection">collection</a>);
+    <a href="collection.md#0x4_collection_decrement_supply">collection::decrement_supply</a>(&<a href="collection.md#0x4_collection">collection</a>, addr, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(collection_id));
 }
 </code></pre>
 

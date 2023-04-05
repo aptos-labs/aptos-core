@@ -71,6 +71,20 @@ module aptos_token_objects::collection {
         current_supply: u64,
         max_supply: u64,
         total_minted: u64,
+        /// Emitted upon burning a Token.
+        burn_events: event::EventHandle<BurnEvent>,
+        /// Emitted upon minting an Token.
+        mint_events: event::EventHandle<MintEvent>,
+    }
+
+    struct BurnEvent has drop, store {
+        collection_id: u64,
+        token: address,
+    }
+
+    struct MintEvent has drop, store {
+        collection_id: u64,
+        token: address,
     }
 
     /// Creates a fixed-sized collection, or a collection that supports a fixed amount of tokens.
@@ -85,14 +99,21 @@ module aptos_token_objects::collection {
         royalty: Option<Royalty>,
         uri: String,
     ): ConstructorRef {
+        let collection_seed = create_collection_seed(&name);
+        let constructor_ref = object::create_named_object(creator, collection_seed);
+        let object_signer = object::generate_signer(&constructor_ref);
+
         let supply = FixedSupply {
             current_supply: 0,
             max_supply,
             total_minted: 0,
+            burn_events: object::new_event_handle(&object_signer),
+            mint_events: object::new_event_handle(&object_signer),
         };
 
         create_collection_internal(
             creator,
+            constructor_ref,
             description,
             name,
             royalty,
@@ -103,6 +124,7 @@ module aptos_token_objects::collection {
 
     /// Creates an untracked collection, or a collection that supports an arbitrary amount of
     /// tokens. This is useful for mass airdrops that fully leverage Aptos parallelization.
+    /// TODO: Hide this until we bring back meaningful way to enforce burns
     public fun create_untracked_collection(
         creator: &signer,
         description: String,
@@ -110,8 +132,12 @@ module aptos_token_objects::collection {
         royalty: Option<Royalty>,
         uri: String,
     ): ConstructorRef {
+        let collection_seed = create_collection_seed(&name);
+        let constructor_ref = object::create_named_object(creator, collection_seed);
+
         create_collection_internal<FixedSupply>(
             creator,
+            constructor_ref,
             description,
             name,
             royalty,
@@ -122,14 +148,13 @@ module aptos_token_objects::collection {
 
     inline fun create_collection_internal<Supply: key>(
         creator: &signer,
+        constructor_ref: ConstructorRef,
         description: String,
         name: String,
         royalty: Option<Royalty>,
         uri: String,
         supply: Option<Supply>,
     ): ConstructorRef {
-        let collection_seed = create_collection_seed(&name);
-        let constructor_ref = object::create_named_object(creator, collection_seed);
         let object_signer = object::generate_signer(&constructor_ref);
 
         let collection = Collection {
@@ -170,6 +195,7 @@ module aptos_token_objects::collection {
     /// Called by token on mint to increment supply if there's an appropriate Supply struct.
     public(friend) fun increment_supply(
         collection: &Object<Collection>,
+        token: address,
     ): Option<u64> acquires FixedSupply {
         let collection_addr = object::object_address(collection);
         if (exists<FixedSupply>(collection_addr)) {
@@ -180,6 +206,13 @@ module aptos_token_objects::collection {
                 supply.current_supply <= supply.max_supply,
                 error::out_of_range(EEXCEEDS_MAX_SUPPLY),
             );
+            event::emit_event(
+                &mut supply.mint_events,
+                MintEvent {
+                    collection_id: supply.total_minted,
+                    token,
+                },
+            );
             option::some(supply.total_minted)
         } else {
             option::none()
@@ -187,11 +220,22 @@ module aptos_token_objects::collection {
     }
 
     /// Called by token on burn to decrement supply if there's an appropriate Supply struct.
-    public(friend) fun decrement_supply(collection: &Object<Collection>) acquires FixedSupply {
+    public(friend) fun decrement_supply(
+        collection: &Object<Collection>,
+        token: address,
+        collection_id: Option<u64>,
+    ) acquires FixedSupply {
         let collection_addr = object::object_address(collection);
         if (exists<FixedSupply>(collection_addr)) {
             let supply = borrow_global_mut<FixedSupply>(collection_addr);
             supply.current_supply = supply.current_supply - 1;
+            event::emit_event(
+                &mut supply.mint_events,
+                MintEvent {
+                    collection_id: *option::borrow(&collection_id),
+                    token,
+                },
+            );
         }
     }
 
