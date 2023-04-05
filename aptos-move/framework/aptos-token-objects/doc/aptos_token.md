@@ -202,7 +202,7 @@ Storage state for managing the no-code Token.
 
 
 
-<pre><code><b>const</b> <a href="aptos_token.md#0x4_aptos_token_ECOLLECTION_DOES_NOT_EXIST">ECOLLECTION_DOES_NOT_EXIST</a>: u64 = 1;
+<pre><code><b>const</b> <a href="aptos_token.md#0x4_aptos_token_ECOLLECTION_DOES_NOT_EXIST">ECOLLECTION_DOES_NOT_EXIST</a>: u64 = 6;
 </code></pre>
 
 
