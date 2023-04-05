@@ -26,15 +26,13 @@ module fungible_asset::managed_fungible_asset {
     /// Initialize metadata object and store the refs.
     fun init_module(admin: &signer) {
         let constructor_ref = &object::create_named_object(admin, ASSET_SYMBOL);
-        fungible_asset::add_fungibility(
+        primary_wallet::create_primary_wallet_enabled_fungible_asset(
             constructor_ref,
             0, /* maximum_supply. 0 means no maximum */
             utf8(b"Aptos Token"), /* name */
             utf8(ASSET_SYMBOL), /* symbol */
             8, /* decimals */
         );
-        // Add primary wallet support.
-        primary_wallet::enable_primary_wallet(constructor_ref);
 
         // Create mint/burn/transfer refs to allow creator to manage the fungible asset.
         let mint_ref = fungible_asset::generate_mint_ref(constructor_ref);

@@ -1,10 +1,11 @@
 /// This defines the module for interacting with primary wallets of accounts/objects, which have deterministic addresses
 module aptos_framework::primary_wallet {
     use aptos_framework::create_signer;
-    use aptos_framework::fungible_asset::{Self, FungibleAsset, FungibleAssetMetadata, FungibleAssetWallet};
+    use aptos_framework::fungible_asset::{Self, FungibleAsset, FungibleAssetWallet};
     use aptos_framework::object::{Self, Object, ConstructorRef, DeriveRef};
 
     use std::signer;
+    use std::string::String;
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Resource stored on the fungible asset metadata object to allow creating primary wallets for it.
@@ -14,12 +15,17 @@ module aptos_framework::primary_wallet {
 
     /// Creators of fungible assets can call this to enable support for creating primary (deterministic) wallets for
     /// their users.
-    public fun enable_primary_wallet(metadata_constructor_ref: &ConstructorRef) {
-        // Ensure that this is a fungible asset metadata object.
-        object::object_from_constructor_ref<FungibleAssetMetadata>(metadata_constructor_ref);
-        let metadata_obj = &object::generate_signer(metadata_constructor_ref);
+    public fun create_primary_wallet_enabled_fungible_asset(
+        constructor_ref: &ConstructorRef,
+        maximum_supply: u64,
+        name: String,
+        symbol: String,
+        decimals: u8,
+    ) {
+        fungible_asset::add_fungibility(constructor_ref, maximum_supply, name, symbol, decimals);
+        let metadata_obj = &object::generate_signer(constructor_ref);
         move_to(metadata_obj, PrimaryWalletSupport {
-            metadata_derive_ref: object::generate_derive_ref(metadata_constructor_ref),
+            metadata_derive_ref: object::generate_derive_ref(constructor_ref),
         });
     }
 
@@ -41,7 +47,7 @@ module aptos_framework::primary_wallet {
         let owner = &create_signer::create_signer(owner_addr);
         let metadata_addr = object::object_address(&metadata);
         let derive_ref = &borrow_global<PrimaryWalletSupport>(metadata_addr).metadata_derive_ref;
-        let constructor_ref = &object::create_derived_object(owner, derive_ref);
+        let constructor_ref = &object::create_user_derived_object(owner, derive_ref);
 
         // Disable ungated transfer as deterministic wallets shouldn't be transferrable.
         let transfer_ref = &object::generate_transfer_ref(constructor_ref);
@@ -53,7 +59,7 @@ module aptos_framework::primary_wallet {
     #[view]
     public fun primary_wallet_address<T: key>(owner: address, metadata: Object<T>): address {
         let metadata_addr = object::object_address(&metadata);
-        object::create_derived_object_address(owner, metadata_addr)
+        object::create_user_derived_object_address(owner, metadata_addr)
     }
 
     #[view]

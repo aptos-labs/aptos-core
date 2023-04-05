@@ -34,12 +34,12 @@ make it so that a reference to a global object can be returned from a function.
 -  [Constants](#@Constants_0)
 -  [Function `address_to_object`](#0x1_object_address_to_object)
 -  [Function `create_object_address`](#0x1_object_create_object_address)
--  [Function `create_derived_object_address`](#0x1_object_create_derived_object_address)
+-  [Function `create_user_derived_object_address`](#0x1_object_create_user_derived_object_address)
 -  [Function `exists_at`](#0x1_object_exists_at)
 -  [Function `object_address`](#0x1_object_object_address)
 -  [Function `convert`](#0x1_object_convert)
 -  [Function `create_named_object`](#0x1_object_create_named_object)
--  [Function `create_derived_object`](#0x1_object_create_derived_object)
+-  [Function `create_user_derived_object`](#0x1_object_create_user_derived_object)
 -  [Function `create_object_from_account`](#0x1_object_create_object_from_account)
 -  [Function `create_object_from_object`](#0x1_object_create_object_from_object)
 -  [Function `create_object_from_guid`](#0x1_object_create_object_from_guid)
@@ -617,14 +617,14 @@ Derives an object address from source material: sha3_256([creator address | seed
 
 </details>
 
-<a name="0x1_object_create_derived_object_address"></a>
+<a name="0x1_object_create_user_derived_object_address"></a>
 
-## Function `create_derived_object_address`
+## Function `create_user_derived_object_address`
 
 Derives an object address from the source address and an object: sha3_256([source | object addr | 0xFC]).
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_create_derived_object_address">create_derived_object_address</a>(source: <b>address</b>, derive_from: <b>address</b>): <b>address</b>
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_create_user_derived_object_address">create_user_derived_object_address</a>(source: <b>address</b>, derive_from: <b>address</b>): <b>address</b>
 </code></pre>
 
 
@@ -633,7 +633,7 @@ Derives an object address from the source address and an object: sha3_256([sourc
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_create_derived_object_address">create_derived_object_address</a>(source: <b>address</b>, derive_from: <b>address</b>): <b>address</b> {
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_create_user_derived_object_address">create_user_derived_object_address</a>(source: <b>address</b>, derive_from: <b>address</b>): <b>address</b> {
     <b>let</b> bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&source);
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> bytes, <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&derive_from));
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> bytes, <a href="object.md#0x1_object_OBJECT_DERIVED_SCHEME">OBJECT_DERIVED_SCHEME</a>);
@@ -745,15 +745,15 @@ by knowing the user generated seed used to create them. Named objects cannot be 
 
 </details>
 
-<a name="0x1_object_create_derived_object"></a>
+<a name="0x1_object_create_user_derived_object"></a>
 
-## Function `create_derived_object`
+## Function `create_user_derived_object`
 
 Create a new object whose address is derived based on the creator account address and another object.
 Derivde objects, similar to named objects, cannot be deleted.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_create_derived_object">create_derived_object</a>(creator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, derive_ref: &<a href="object.md#0x1_object_DeriveRef">object::DeriveRef</a>): <a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_create_user_derived_object">create_user_derived_object</a>(creator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, derive_ref: &<a href="object.md#0x1_object_DeriveRef">object::DeriveRef</a>): <a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>
 </code></pre>
 
 
@@ -762,9 +762,9 @@ Derivde objects, similar to named objects, cannot be deleted.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_create_derived_object">create_derived_object</a>(creator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, derive_ref: &<a href="object.md#0x1_object_DeriveRef">DeriveRef</a>): <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_create_user_derived_object">create_user_derived_object</a>(creator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, derive_ref: &<a href="object.md#0x1_object_DeriveRef">DeriveRef</a>): <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> {
     <b>let</b> creator_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(creator);
-    <b>let</b> obj_addr = <a href="object.md#0x1_object_create_derived_object_address">create_derived_object_address</a>(creator_address, derive_ref.self);
+    <b>let</b> obj_addr = <a href="object.md#0x1_object_create_user_derived_object_address">create_user_derived_object_address</a>(creator_address, derive_ref.self);
     <a href="object.md#0x1_object_create_object_internal">create_object_internal</a>(creator_address, obj_addr, <b>false</b>)
 }
 </code></pre>
