@@ -253,7 +253,7 @@ module aptos_std::algebra {
     /// Hash an arbitrary-length byte array `msg` into structure `S` with a domain separation tag `dst`
     /// using the given hash-to-structure suite `H`.
     ///
-    /// NOTE: in the future, some hashing methods do not accept a `dst` and will abort if a non-empty one is provided.
+    /// NOTE: some hashing methods do not accept a `dst` and will abort if a non-empty one is provided.
     public fun hash_to<S, H>(dst: &vector<u8>, msg: &vector<u8>): Element<S> {
         abort_unless_cryptography_algebra_natives_enabled();
         Element {
