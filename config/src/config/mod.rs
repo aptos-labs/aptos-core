@@ -565,7 +565,9 @@ pub trait PersistableConfig: Serialize + DeserializeOwned {
     }
 }
 
-impl<T: ?Sized> PersistableConfig for T where T: Serialize + DeserializeOwned {}
+// We only implement PersistableConfig for the configs that should be read/written to disk
+impl PersistableConfig for NodeConfig {}
+impl PersistableConfig for SafetyRulesConfig {}
 
 #[derive(Debug)]
 pub struct RootPath {

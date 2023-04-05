@@ -9,10 +9,7 @@ use aptos::{
     test::{CliTestFramework, INVALID_ACCOUNT},
 };
 use aptos_cached_packages::aptos_stdlib;
-use aptos_config::{
-    config::{ApiConfig, PersistableConfig},
-    utils::get_available_port,
-};
+use aptos_config::{config::ApiConfig, utils::get_available_port};
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519Signature},
     HashValue, PrivateKey,
@@ -1339,8 +1336,10 @@ async fn parse_operations(
                         native_coin(),
                         "Balance should be the native coin"
                     );
-                    let delta =
-                        u64::parse(&amount.value).expect("Should be able to parse amount value");
+                    let delta = amount
+                        .value
+                        .parse::<u64>()
+                        .expect("Should be able to parse amount value");
 
                     // Add with panic on overflow in case of too high of a balance
                     let new_balance = *latest_balance + delta as i128;
@@ -1379,13 +1378,12 @@ async fn parse_operations(
                         native_coin(),
                         "Balance should be the native coin"
                     );
-                    let delta = u64::parse(
-                        amount
-                            .value
-                            .strip_prefix('-')
-                            .expect("Should have a negative number"),
-                    )
-                    .expect("Should be able to parse amount value");
+                    let delta = amount
+                        .value
+                        .strip_prefix('-')
+                        .expect("Should have a negative number")
+                        .parse::<u64>()
+                        .expect("Should be able to parse amount value");
 
                     // Subtract with panic on overflow in case of a negative balance
                     let new_balance = *latest_balance - delta as i128;
@@ -1423,8 +1421,10 @@ async fn parse_operations(
                         native_coin(),
                         "Balance should be the native coin"
                     );
-                    let delta =
-                        u64::parse(&amount.value).expect("Should be able to parse amount value");
+                    let delta = amount
+                        .value
+                        .parse::<u64>()
+                        .expect("Should be able to parse amount value");
 
                     // Add with panic on overflow in case of too high of a balance
                     let new_balance = *latest_balance + delta as i128;
@@ -1562,13 +1562,12 @@ async fn parse_operations(
                     native_coin(),
                     "Balance should be the native coin"
                 );
-                let delta = u64::parse(
-                    amount
-                        .value
-                        .strip_prefix('-')
-                        .expect("Should have a negative number"),
-                )
-                .expect("Should be able to parse amount value");
+                let delta = amount
+                    .value
+                    .strip_prefix('-')
+                    .expect("Should have a negative number")
+                    .parse::<u64>()
+                    .expect("Should be able to parse amount value");
 
                 // Subtract with panic on overflow in case of a negative balance
                 let new_balance = *latest_balance - delta as i128;
@@ -1865,8 +1864,10 @@ async fn check_balances(
             );
             assert_eq!(
                 expected_balance,
-                u64::parse(&balance.value).expect("Should have a balance from account balance")
-                    as i128,
+                balance
+                    .value
+                    .parse::<u64>()
+                    .expect("Should have a balance from account balance") as i128,
                 "Expected {} to have a balance of {}, but was {} at block {}",
                 account,
                 expected_balance,
