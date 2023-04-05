@@ -3,75 +3,81 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::network_id::NetworkId;
-use aptos_secure_storage::{KVStorage, Storage};
-use aptos_types::{waypoint::Waypoint, PeerId};
+use aptos_crypto::x25519;
+use aptos_types::PeerId;
 use rand::{rngs::StdRng, SeedableRng};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
     collections::HashMap,
-    fmt, fs,
     fs::File,
     io::{Read, Write},
     path::{Path, PathBuf},
-    str::FromStr,
 };
 use thiserror::Error;
 
-mod consensus_config;
-pub use consensus_config::*;
-mod quorum_store_config;
-pub use quorum_store_config::*;
-mod error;
-pub use error::*;
-mod execution_config;
-pub use execution_config::*;
-mod inspection_service_config;
-pub use inspection_service_config::*;
-mod logger_config;
-pub use logger_config::*;
-mod mempool_config;
-pub use mempool_config::*;
-mod network_config;
-pub use network_config::*;
-mod secure_backend_config;
-pub use secure_backend_config::*;
-mod state_sync_config;
-pub use state_sync_config::*;
-mod indexer_config;
-pub use indexer_config::*;
-mod indexer_grpc_config;
-pub use indexer_grpc_config::*;
-mod storage_config;
-pub use storage_config::*;
-mod safety_rules_config;
-pub use safety_rules_config::*;
-mod test_config;
-pub use test_config::*;
+// All modules should be declared below
 mod api_config;
+mod base_config;
+mod consensus_config;
+mod error;
+mod execution_config;
+mod identity_config;
+mod indexer_config;
+mod indexer_grpc_config;
+mod inspection_service_config;
+mod logger_config;
+mod mempool_config;
+mod network_config;
+mod quorum_store_config;
+mod safety_rules_config;
+mod secure_backend_config;
+mod state_sync_config;
+mod storage_config;
+mod test_config;
+
+// All public usage statements should be declared below
 pub use api_config::*;
-use aptos_crypto::{bls12381, ed25519::Ed25519PrivateKey, x25519};
-use aptos_types::account_address::AccountAddress;
-use poem_openapi::Enum as PoemEnum;
+pub use base_config::*;
+pub use consensus_config::*;
+pub use error::*;
+pub use execution_config::*;
+pub use identity_config::*;
+pub use indexer_config::*;
+pub use indexer_grpc_config::*;
+pub use inspection_service_config::*;
+pub use logger_config::*;
+pub use mempool_config::*;
+pub use network_config::*;
+pub use quorum_store_config::*;
+pub use safety_rules_config::*;
+pub use secure_backend_config::*;
+pub use state_sync_config::*;
+pub use storage_config::*;
+pub use test_config::*;
 
-/// Represents a deprecated config that provides no field verification.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
-pub struct DeprecatedConfig {}
-
-/// Config pulls in configuration information from the config file.
-/// This is used to set up the nodes and configure various parameters.
-/// The config file is broken up into sections for each module
-/// so that only that module can be passed around
+/// The node configuration defines the configuration for a single Aptos
+/// node (i.e., validator or fullnode). It is composed of module
+/// configurations for each of the modules that the node uses (e.g.,
+/// the API, indexer, mempool, state sync, etc.).
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct NodeConfig {
+    #[serde(default)]
+    pub api: ApiConfig,
     #[serde(default)]
     pub base: BaseConfig,
     #[serde(default)]
     pub consensus: ConsensusConfig,
     #[serde(default)]
     pub execution: ExecutionConfig,
+    #[serde(default)]
+    pub failpoints: Option<HashMap<String, String>>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub full_node_networks: Vec<NetworkConfig>,
+    #[serde(default)]
+    pub indexer: IndexerConfig,
+    #[serde(default)]
+    pub indexer_grpc: IndexerGrpcConfig,
     #[serde(default)]
     pub inspection_service: InspectionServiceConfig,
     #[serde(default)]
@@ -79,192 +85,16 @@ pub struct NodeConfig {
     #[serde(default)]
     pub mempool: MempoolConfig,
     #[serde(default)]
-    pub metrics: DeprecatedConfig,
-    #[serde(default)]
     pub peer_monitoring_service: PeerMonitoringServiceConfig,
     #[serde(default)]
-    pub api: ApiConfig,
-    #[serde(default)]
     pub state_sync: StateSyncConfig,
-    #[serde(default)]
-    pub indexer_grpc: IndexerGrpcConfig,
-    #[serde(default)]
-    pub indexer: IndexerConfig,
     #[serde(default)]
     pub storage: StorageConfig,
     #[serde(default)]
     pub test: Option<TestConfig>,
     #[serde(default)]
     pub validator_network: Option<NetworkConfig>,
-    #[serde(default)]
-    pub failpoints: Option<HashMap<String, String>>,
 }
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct BaseConfig {
-    pub data_dir: PathBuf,
-    pub working_dir: Option<PathBuf>,
-    pub role: RoleType,
-    pub waypoint: WaypointConfig,
-}
-
-impl Default for BaseConfig {
-    fn default() -> BaseConfig {
-        BaseConfig {
-            data_dir: PathBuf::from("/opt/aptos/data"),
-            working_dir: None,
-            role: RoleType::Validator,
-            waypoint: WaypointConfig::None,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum WaypointConfig {
-    FromConfig(Waypoint),
-    FromFile(PathBuf),
-    FromStorage(SecureBackend),
-    None,
-}
-
-impl WaypointConfig {
-    pub fn waypoint_from_config(&self) -> Option<Waypoint> {
-        if let WaypointConfig::FromConfig(waypoint) = self {
-            Some(*waypoint)
-        } else {
-            None
-        }
-    }
-
-    pub fn waypoint(&self) -> Waypoint {
-        let waypoint = match &self {
-            WaypointConfig::FromConfig(waypoint) => Some(*waypoint),
-            WaypointConfig::FromFile(waypoint_path) => {
-                if !waypoint_path.exists() {
-                    panic!(
-                        "Waypoint file not found! Ensure the given path is correct: {:?}",
-                        waypoint_path.display()
-                    );
-                }
-                let content = fs::read_to_string(waypoint_path).unwrap_or_else(|error| {
-                    panic!(
-                        "Failed to read waypoint file {:?}. Error: {:?}",
-                        waypoint_path.display(),
-                        error
-                    )
-                });
-                Some(Waypoint::from_str(content.trim()).unwrap_or_else(|error| {
-                    panic!(
-                        "Failed to parse waypoint: {:?}. Error: {:?}",
-                        content.trim(),
-                        error
-                    )
-                }))
-            },
-            WaypointConfig::FromStorage(backend) => {
-                let storage: Storage = backend.into();
-                let waypoint = storage
-                    .get::<Waypoint>(aptos_global_constants::WAYPOINT)
-                    .expect("Unable to read waypoint")
-                    .value;
-                Some(waypoint)
-            },
-            WaypointConfig::None => None,
-        };
-        waypoint.expect("waypoint should be present")
-    }
-
-    pub fn genesis_waypoint(&self) -> Waypoint {
-        match &self {
-            WaypointConfig::FromStorage(backend) => {
-                let storage: Storage = backend.into();
-                storage
-                    .get::<Waypoint>(aptos_global_constants::GENESIS_WAYPOINT)
-                    .expect("Unable to read waypoint")
-                    .value
-            },
-            _ => self.waypoint(),
-        }
-    }
-}
-
-/// A single struct for reading / writing to a file for identity across config
-#[derive(Deserialize, Serialize)]
-pub struct IdentityBlob {
-    /// Optional account address.  Used for validators and validator full nodes
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub account_address: Option<AccountAddress>,
-    /// Optional account key.  Only used for validators
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub account_private_key: Option<Ed25519PrivateKey>,
-    /// Optional consensus key.  Only used for validators
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub consensus_private_key: Option<bls12381::PrivateKey>,
-    /// Network private key.  Peer id is derived from this if account address is not present
-    pub network_private_key: x25519::PrivateKey,
-}
-
-impl IdentityBlob {
-    pub fn from_file(path: &Path) -> anyhow::Result<IdentityBlob> {
-        Ok(serde_yaml::from_str(&fs::read_to_string(path)?)?)
-    }
-
-    pub fn to_file(&self, path: &Path) -> anyhow::Result<()> {
-        let mut file = File::open(path)?;
-        Ok(file.write_all(serde_yaml::to_string(self)?.as_bytes())?)
-    }
-}
-
-#[derive(Clone, Copy, Deserialize, Eq, PartialEq, PoemEnum, Serialize)]
-#[serde(rename_all = "snake_case")]
-#[oai(rename_all = "snake_case")]
-pub enum RoleType {
-    Validator,
-    FullNode,
-}
-
-impl RoleType {
-    pub fn is_validator(self) -> bool {
-        self == RoleType::Validator
-    }
-
-    pub fn as_str(self) -> &'static str {
-        match self {
-            RoleType::Validator => "validator",
-            RoleType::FullNode => "full_node",
-        }
-    }
-}
-
-impl FromStr for RoleType {
-    type Err = ParseRoleError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "validator" => Ok(RoleType::Validator),
-            "full_node" => Ok(RoleType::FullNode),
-            _ => Err(ParseRoleError(s.to_string())),
-        }
-    }
-}
-
-impl fmt::Debug for RoleType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self)
-    }
-}
-
-impl fmt::Display for RoleType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.as_str())
-    }
-}
-
-#[derive(Debug, Error)]
-#[error("Invalid node role: {0}")]
-pub struct ParseRoleError(String);
 
 impl NodeConfig {
     pub fn data_dir(&self) -> &Path {
@@ -604,26 +434,6 @@ impl RootPath {
 #[cfg(test)]
 mod test {
     use super::*;
-
-    #[test]
-    fn verify_role_type_conversion() {
-        // Verify relationship between RoleType and as_string() is reflexive
-        let validator = RoleType::Validator;
-        let full_node = RoleType::FullNode;
-        let converted_validator = RoleType::from_str(validator.as_str()).unwrap();
-        let converted_full_node = RoleType::from_str(full_node.as_str()).unwrap();
-        assert_eq!(converted_validator, validator);
-        assert_eq!(converted_full_node, full_node);
-    }
-
-    #[test]
-    fn verify_parse_role_error_on_invalid_role() {
-        let invalid_role_type = "this is not a valid role type";
-        assert!(matches!(
-            RoleType::from_str(invalid_role_type),
-            Err(ParseRoleError(_))
-        ));
-    }
 
     #[test]
     fn verify_configs() {
