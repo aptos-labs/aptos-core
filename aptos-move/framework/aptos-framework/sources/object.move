@@ -161,7 +161,7 @@ module aptos_framework::object {
     }
 
     /// Derives an object address from the source address and an object: sha3_256([source | object addr | 0xFC]).
-    public fun create_derived_object_address(source: address, derive_from: address): address {
+    public fun create_user_derived_object_address(source: address, derive_from: address): address {
         let bytes = bcs::to_bytes(&source);
         vector::append(&mut bytes, bcs::to_bytes(&derive_from));
         vector::push_back(&mut bytes, OBJECT_DERIVED_SCHEME);
@@ -190,9 +190,9 @@ module aptos_framework::object {
 
     /// Create a new object whose address is derived based on the creator account address and another object.
     /// Derivde objects, similar to named objects, cannot be deleted.
-    public fun create_derived_object(creator: &signer, derive_ref: &DeriveRef): ConstructorRef {
+    public fun create_user_derived_object(creator: &signer, derive_ref: &DeriveRef): ConstructorRef {
         let creator_address = signer::address_of(creator);
-        let obj_addr = create_derived_object_address(creator_address, derive_ref.self);
+        let obj_addr = create_user_derived_object_address(creator_address, derive_ref.self);
         create_object_internal(creator_address, obj_addr, false)
     }
 
