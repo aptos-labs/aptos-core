@@ -180,7 +180,6 @@ members = [
     # "third_party/move/move-prover/mutation",
     "third_party/move/move-prover/test-utils",
     "third_party/move/move-prover/tools/spec-flatten",
-    "third_party/move/move-stdlib",
     "third_party/move/move-symbol-pool",
     "third_party/move/move-vm/integration-tests",
     "third_party/move/move-vm/paranoid-tests",
@@ -600,7 +599,7 @@ move-package = { path = "third_party/move/tools/move-package" }
 move-prover = { path = "third_party/move/move-prover" }
 move-prover-boogie-backend = { path = "third_party/move/move-prover/boogie-backend" }
 move-stackless-bytecode = { path = "third_party/move/move-prover/bytecode" }
-move-stdlib = { path = "third_party/move/move-stdlib" }
+aptos-move-stdlib = { path = "aptos-move/framework/move-stdlib" }
 move-prover-test-utils = { path = "third_party/move/move-prover/test-utils" }
 move-resource-viewer = { path = "third_party/move/tools/move-resource-viewer" }
 move-stackless-bytecode-interpreter = { path = "third_party/move/move-prover/interpreter" }

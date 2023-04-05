@@ -1374,6 +1374,7 @@ dependencies = [
  "aptos-gas-algebra-ext",
  "aptos-global-constants",
  "aptos-logger",
+ "aptos-move-stdlib",
  "aptos-package-builder",
  "aptos-types",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
@@ -1381,7 +1382,6 @@ dependencies = [
  "move-binary-format",
  "move-core-types",
  "move-model",
- "move-stdlib",
  "move-table-extension",
  "move-vm-types",
  "tempfile",
@@ -1904,6 +1904,34 @@ dependencies = [
  "move-unit-test",
  "move-vm-runtime",
  "tempfile",
+]
+
+[[package]]
+name = "aptos-move-stdlib"
+version = "0.1.1"
+dependencies = [
+ "anyhow",
+ "dir-diff",
+ "file_diff",
+ "hex",
+ "log",
+ "move-binary-format",
+ "move-cli",
+ "move-command-line-common",
+ "move-compiler",
+ "move-core-types",
+ "move-docgen",
+ "move-errmapgen",
+ "move-package",
+ "move-prover",
+ "move-unit-test",
+ "move-vm-runtime",
+ "move-vm-types",
+ "sha2 0.9.9",
+ "sha3 0.9.1",
+ "smallvec",
+ "tempfile",
+ "walkdir",
 ]
 
 [[package]]
@@ -3140,6 +3168,7 @@ dependencies = [
  "aptos-gas",
  "aptos-logger",
  "aptos-metrics-core",
+ "aptos-move-stdlib",
  "aptos-mvhashmap",
  "aptos-state-view",
  "aptos-types",
@@ -3151,7 +3180,6 @@ dependencies = [
  "move-bytecode-utils",
  "move-bytecode-verifier",
  "move-core-types",
- "move-stdlib",
  "move-table-extension",
  "move-unit-test",
  "move-vm-runtime",
@@ -3213,6 +3241,7 @@ dependencies = [
  "anyhow",
  "aptos-cached-packages",
  "aptos-language-e2e-tests",
+ "aptos-move-stdlib",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
@@ -3222,7 +3251,6 @@ dependencies = [
  "move-binary-format",
  "move-core-types",
  "move-ir-compiler",
- "move-stdlib",
  "move-table-extension",
  "move-vm-runtime",
  "move-vm-test-utils",
