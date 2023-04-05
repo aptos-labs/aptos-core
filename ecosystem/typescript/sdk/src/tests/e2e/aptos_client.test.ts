@@ -14,7 +14,7 @@ import { HexString } from "../../utils";
 import { getFaucetClient, longTestTimeout, NODE_URL } from "../unit/test_helper.test";
 import { bcsSerializeUint64, bcsToBytes } from "../../bcs";
 import { Ed25519PublicKey } from "../../aptos_types";
-import { ProviderUtil } from "../../providers/Utils";
+import { ProviderUtil } from "../../providers/utils";
 
 const account = "0x1::account::Account";
 

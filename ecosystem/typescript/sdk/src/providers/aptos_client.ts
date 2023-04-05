@@ -35,7 +35,7 @@ import {
   AnyNumber,
 } from "../bcs";
 import { Ed25519PublicKey, MultiEd25519PublicKey } from "../aptos_types";
-import { ProviderUtil } from "./Utils";
+import { ProviderUtil } from "./utils";
 
 export interface OptionalTransactionArgs {
   maxGasAmount?: Uint64;

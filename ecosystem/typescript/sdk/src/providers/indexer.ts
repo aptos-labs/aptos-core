@@ -34,7 +34,7 @@ import {
   GetTopUserTransactions,
   GetUserTransactions,
 } from "../indexer/generated/queries";
-import { ProviderUtil } from "./Utils";
+import { ProviderUtil } from "./utils";
 
 /**
  * Controls the number of results that are returned and the starting position of those results.

@@ -7,7 +7,7 @@ import { TokenClient } from "../../plugins/token_client";
 import { FAUCET_AUTH_TOKEN, longTestTimeout } from "../unit/test_helper.test";
 import { Network, NetworkToIndexerAPI, NetworkToNodeAPI, sleep } from "../../utils";
 import axios from "axios";
-import { ProviderUtil } from "../../providers/Utils";
+import { ProviderUtil } from "../../providers/utils";
 
 const aptosClient = new AptosClient(NetworkToNodeAPI[Network.TESTNET]);
 const faucetClient = new FaucetClient(
