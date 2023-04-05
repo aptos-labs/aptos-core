@@ -594,7 +594,7 @@ var entry_function_decoder_map = map[string]func(aptostypes.TransactionPayload) 
         let encoding = match Self::bcs_primitive_type_name(type_tag) {
             None => {
                 if "vecstring".eq(&common::mangle_type(type_tag)) {
-                    format!("return encode_vecbytes_argument(arg)")
+                    "return encode_vecbytes_argument(arg)".to_string()
                 } else {
                 format!(r#"
     if val, err := arg.BcsSerialize(); err == nil {{
