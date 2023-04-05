@@ -13,7 +13,7 @@ use move_model::{
     pragmas::{BV_PARAM_PROP, BV_RET_PROP},
     ty::Type,
 };
-use std::{collections::BTreeMap, str};
+use std::{collections::BTreeMap, ops::Deref, str};
 
 static PARSING_ERROR: &str = "error happened when parsing the bv pragma";
 
@@ -197,8 +197,10 @@ impl GlobalNumberOperationState {
         // Obtain positions that are marked as Bitwise by analyzing the pragma
         let para_sym = &func_env.module_env.env.symbol_pool().make(BV_PARAM_PROP);
         let ret_sym = &func_env.module_env.env.symbol_pool().make(BV_RET_PROP);
-        let number_param_property = func_env.get_spec().properties.get(para_sym);
-        let number_ret_property = func_env.get_spec().properties.get(ret_sym);
+        let binding = func_env.get_spec();
+        let binding = binding.deref();
+        let number_param_property = binding.properties.get(para_sym);
+        let number_ret_property = binding.properties.get(ret_sym);
         let para_idx_vec = Self::extract_bv_vars(number_param_property);
         let ret_idx_vec = Self::extract_bv_vars(number_ret_property);
 

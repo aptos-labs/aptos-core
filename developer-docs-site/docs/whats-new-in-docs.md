@@ -7,9 +7,14 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site. Note, this site is built from the `main` upstream branch of GitHub and so therefore reflects the latest changes to Aptos. If you have checked out [another branch](https://github.com/aptos-labs/aptos-core/branches) to use a [specific network](guides/system-integrators-guide.md#choose-a-network), the code may not yet have all of the features described here.
 
+## 30 March 2023
+
+- Depicted how to employ [Move scripts](./guides/move-guides/move-scripts.md) to execute a series of commands across published Move module interfaces.
+
 ## 28 March 2023
 
 - Offered an experimental feature to [profile gas usage locally](./cli-tools/aptos-cli-tool/use-aptos-cli.md#profiling-gas-usage) via the Aptos CLI that not only simulates use but also generates flame graphs for visualizing gas usage.
+
 
 ## 27 March 2023
 
