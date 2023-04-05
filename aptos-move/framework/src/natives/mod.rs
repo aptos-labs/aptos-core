@@ -305,7 +305,7 @@ pub fn all_natives(
         )
     );
     add_natives_from_module!(
-        "crypt_algebra",
+        "crypto_algebra",
         cryptography::algebra::make_all(
             gas_params.algebra.clone(),
             sha256_gas_params,

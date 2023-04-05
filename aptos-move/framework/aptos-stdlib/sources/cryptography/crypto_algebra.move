@@ -34,8 +34,8 @@
 /// E.g., in BLS12-381 pairing, since `Gt` is a subset of `Fq12`,
 /// `upcast<Gt, Fq12>()` and `downcast<Fq12, Gt>()` will be supported.
 ///
-/// See `algebra_*.move` for currently implemented algebraic structures.
-module aptos_std::crypt_algebra {
+/// See `*_algebra.move` for currently implemented algebraic structures.
+module aptos_std::crypto_algebra {
     use std::option::{Option, some, none};
     use std::features;
 

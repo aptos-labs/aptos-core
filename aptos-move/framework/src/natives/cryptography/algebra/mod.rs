@@ -56,7 +56,7 @@ const MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING: u64 = 0x01_0002;
 /// Equivalent to `std::error::not_implemented(0)` in Move.
 const MOVE_ABORT_CODE_NOT_IMPLEMENTED: u64 = 0x0C_0001;
 
-/// This encodes an algebraic structure defined in `algebra_*.move`.
+/// This encodes an algebraic structure defined in `*_algebra.move`.
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub enum Structure {
     BLS12381Fq12,
@@ -71,11 +71,11 @@ impl TryFrom<TypeTag> for Structure {
 
     fn try_from(value: TypeTag) -> Result<Self, Self::Error> {
         match value.to_string().as_str() {
-            "0x1::crypt_algebra_bls12381::Fr" => Ok(Structure::BLS12381Fr),
-            "0x1::crypt_algebra_bls12381::Fq12" => Ok(Structure::BLS12381Fq12),
-            "0x1::crypt_algebra_bls12381::G1" => Ok(Structure::BLS12381G1),
-            "0x1::crypt_algebra_bls12381::G2" => Ok(Structure::BLS12381G2),
-            "0x1::crypt_algebra_bls12381::Gt" => Ok(Structure::BLS12381Gt),
+            "0x1::bls12381_algebra::Fr" => Ok(Structure::BLS12381Fr),
+            "0x1::bls12381_algebra::Fq12" => Ok(Structure::BLS12381Fq12),
+            "0x1::bls12381_algebra::G1" => Ok(Structure::BLS12381G1),
+            "0x1::bls12381_algebra::G2" => Ok(Structure::BLS12381G2),
+            "0x1::bls12381_algebra::Gt" => Ok(Structure::BLS12381Gt),
             _ => Err(()),
         }
     }
@@ -89,7 +89,7 @@ macro_rules! structure_from_ty_arg {
     }};
 }
 
-/// This encodes a supported serialization format defined in `algebra_*.move`.
+/// This encodes a supported serialization format defined in `*_algebra.move`.
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub enum SerializationFormat {
     BLS12381Fq12LscLsb,
@@ -107,26 +107,26 @@ impl TryFrom<TypeTag> for SerializationFormat {
 
     fn try_from(value: TypeTag) -> Result<Self, Self::Error> {
         match value.to_string().as_str() {
-            "0x1::crypt_algebra_bls12381::FormatFq12LscLsb" => {
+            "0x1::bls12381_algebra::FormatFq12LscLsb" => {
                 Ok(SerializationFormat::BLS12381Fq12LscLsb)
             },
-            "0x1::crypt_algebra_bls12381::FormatG1Uncompr" => {
+            "0x1::bls12381_algebra::FormatG1Uncompr" => {
                 Ok(SerializationFormat::BLS12381G1Uncompressed)
             },
-            "0x1::crypt_algebra_bls12381::FormatG1Compr" => Ok(SerializationFormat::BLS12381G1Compressed),
-            "0x1::crypt_algebra_bls12381::FormatG2Uncompr" => {
+            "0x1::bls12381_algebra::FormatG1Compr" => Ok(SerializationFormat::BLS12381G1Compressed),
+            "0x1::bls12381_algebra::FormatG2Uncompr" => {
                 Ok(SerializationFormat::BLS12381G2Uncompressed)
             },
-            "0x1::crypt_algebra_bls12381::FormatG2Compr" => Ok(SerializationFormat::BLS12381G2Compressed),
-            "0x1::crypt_algebra_bls12381::FormatGt" => Ok(SerializationFormat::BLS12381Gt),
-            "0x1::crypt_algebra_bls12381::FormatFrLsb" => Ok(SerializationFormat::BLS12381FrLsb),
-            "0x1::crypt_algebra_bls12381::FormatFrMsb" => Ok(SerializationFormat::BLS12381FrMsb),
+            "0x1::bls12381_algebra::FormatG2Compr" => Ok(SerializationFormat::BLS12381G2Compressed),
+            "0x1::bls12381_algebra::FormatGt" => Ok(SerializationFormat::BLS12381Gt),
+            "0x1::bls12381_algebra::FormatFrLsb" => Ok(SerializationFormat::BLS12381FrLsb),
+            "0x1::bls12381_algebra::FormatFrMsb" => Ok(SerializationFormat::BLS12381FrMsb),
             _ => Err(()),
         }
     }
 }
 
-/// This encodes a supported hash-to-structure suite defined in `algebra_*.move`.
+/// This encodes a supported hash-to-structure suite defined in `*_algebra.move`.
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub enum HashToStructureSuite {
     Bls12381g1XmdSha256SswuRo,
@@ -138,10 +138,10 @@ impl TryFrom<TypeTag> for HashToStructureSuite {
 
     fn try_from(value: TypeTag) -> Result<Self, Self::Error> {
         match value.to_string().as_str() {
-            "0x1::crypt_algebra_bls12381::HashG1XmdSha256SswuRo" => {
+            "0x1::bls12381_algebra::HashG1XmdSha256SswuRo" => {
                 Ok(HashToStructureSuite::Bls12381g1XmdSha256SswuRo)
             },
-            "0x1::crypt_algebra_bls12381::HashG2XmdSha256SswuRo" => {
+            "0x1::bls12381_algebra::HashG2XmdSha256SswuRo" => {
                 Ok(HashToStructureSuite::Bls12381g2XmdSha256SswuRo)
             },
             _ => Err(()),

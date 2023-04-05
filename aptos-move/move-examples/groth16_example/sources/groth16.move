@@ -2,7 +2,7 @@
 /// Actual proof verifiers can be constructed using the pairings supported in the generic algebra module.
 /// See the test cases in this module for an example of constructing with BLS12-381 curves.
 module groth16_example::groth16 {
-    use aptos_std::crypt_algebra::{Element, from_u64, multi_scalar_mul, eq, multi_pairing, upcast, pairing, add, zero};
+    use aptos_std::crypto_algebra::{Element, from_u64, multi_scalar_mul, eq, multi_pairing, upcast, pairing, add, zero};
 
     /// Proof verification as specified in the original paper,
     /// with the following input (in the original paper notations).
@@ -77,9 +77,9 @@ module groth16_example::groth16 {
     }
 
     #[test_only]
-    use aptos_std::crypt_algebra::{deserialize, enable_cryptography_algebra_natives};
+    use aptos_std::crypto_algebra::{deserialize, enable_cryptography_algebra_natives};
     #[test_only]
-    use aptos_std::crypt_algebra_bls12381::{Fr, FormatFrLsb, FormatG1Compr, FormatG2Compr, FormatFq12LscLsb, G1, G2, Gt, Fq12, FormatGt};
+    use aptos_std::bls12381_algebra::{Fr, FormatFrLsb, FormatG1Compr, FormatG2Compr, FormatFq12LscLsb, G1, G2, Gt, Fq12, FormatGt};
 
     #[test(fx = @std)]
     fun test_verify_proof_with_bls12381(fx: signer) {

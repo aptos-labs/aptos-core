@@ -140,7 +140,7 @@ module std::features {
         is_enabled(DELEGATION_POOLS)
     }
 
-    /// Whether generic algebra basic operation support in `algebra.move` are enabled.
+    /// Whether generic algebra basic operation support in `crypto_algebra.move` are enabled.
     ///
     /// Lifetime: transient
     const CRYPTOGRAPHY_ALGEBRA_NATIVES: u64 = 12;
