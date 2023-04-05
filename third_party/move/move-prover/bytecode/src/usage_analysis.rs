@@ -334,7 +334,7 @@ impl UsageProcessor {
         let cache = SummaryCache::new(targets, func_env.module_env.env);
         let analysis = MemoryUsageAnalysis { cache };
         let mut summary = analysis.summarize(&func_target, UsageState::default());
-        analysis.compute_spec_usage(func_env.get_spec(), &mut summary);
+        analysis.compute_spec_usage(&func_env.get_spec(), &mut summary);
         summary
     }
 }
