@@ -133,6 +133,7 @@ RUN apt-get update && apt-get --no-install-recommends -y \
     install \
     wget \
     curl \
+    perl-base=5.32.1-4+deb11u1 \
     git \
     libssl1.1 \
     ca-certificates \
