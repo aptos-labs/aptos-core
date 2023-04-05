@@ -79,12 +79,12 @@ module aptos_token_objects::token {
         let creator_address = signer::address_of(creator);
         let seed = create_token_seed(&collection_name, &name);
 
-        let collection_addr = collection::create_collection_address(&creator_address, &collection_name);
-        let collection = object::address_to_object<Collection>(collection_addr);
-        let id = collection::increment_supply(&collection);
-
         let constructor_ref = object::create_named_object(creator, seed);
         let object_signer = object::generate_signer(&constructor_ref);
+
+        let collection_addr = collection::create_collection_address(&creator_address, &collection_name);
+        let collection = object::address_to_object<Collection>(collection_addr);
+        let id = collection::increment_supply(&collection, signer::address_of(&object_signer));
 
         let token = Token {
             collection,
@@ -235,7 +235,7 @@ module aptos_token_objects::token {
 
         let Token {
             collection,
-            collection_id: _,
+            collection_id,
             description: _,
             name: _,
             creation_name: _,
@@ -244,7 +244,7 @@ module aptos_token_objects::token {
         } = move_from<Token>(addr);
 
         event::destroy_handle(mutation_events);
-        collection::decrement_supply(&collection);
+        collection::decrement_supply(&collection, addr, option::some(collection_id));
     }
 
     public fun set_description(mutator_ref: &MutatorRef, description: String) acquires Token {
