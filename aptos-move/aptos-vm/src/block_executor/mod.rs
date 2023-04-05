@@ -95,6 +95,7 @@ impl BlockAptosVM {
         transactions: Vec<Transaction>,
         state_view: &S,
         concurrency_level: usize,
+        maybe_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
         // Verify the signatures of all the transactions in parallel.
@@ -117,6 +118,7 @@ impl BlockAptosVM {
         BLOCK_EXECUTOR_CONCURRENCY.set(concurrency_level as i64);
         let executor = BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>, S>::new(
             concurrency_level,
+            maybe_gas_limit,
         );
 
         let ret = executor
@@ -178,6 +180,7 @@ impl BlockAptosVM {
         BLOCK_EXECUTOR_CONCURRENCY.set(concurrency_level as i64);
         let executor = BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>, S>::new(
             concurrency_level,
+            None,
         );
         println!("Parallel execution starts...");
         let timer = Instant::now();
@@ -192,7 +195,7 @@ impl BlockAptosVM {
 
         // sequentially execute the block and check if the results match
         let seq_executor =
-            BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>, S>::new(1);
+            BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>, S>::new(1, None);
         println!("Sequential execution starts...");
         let seq_timer = Instant::now();
         let seq_ret =

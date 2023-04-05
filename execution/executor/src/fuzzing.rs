@@ -63,6 +63,14 @@ impl VMExecutor for FakeVM {
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         Ok(Vec::new())
     }
+
+    fn execute_block_with_gas_limit(
+        _transactions: Vec<Transaction>,
+        _state_view: &impl StateView,
+        _maybe_gas_limit: Option<u64>,
+    ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        Ok(Vec::new())
+    }
 }
 
 /// A fake database implementing DbReader and DbWriter

@@ -199,6 +199,14 @@ impl VMExecutor for MockVM {
 
         Ok(outputs)
     }
+
+    fn execute_block_with_gas_limit(
+        transactions: Vec<Transaction>,
+        state_view: &(impl StateView + Sync),
+        _maybe_gas_limit: Option<u64>,
+    ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        MockVM::execute_block(transactions, state_view)
+    }
 }
 
 fn read_balance(

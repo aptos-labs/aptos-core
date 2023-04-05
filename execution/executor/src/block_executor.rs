@@ -31,6 +31,9 @@ use aptos_vm::AptosVM;
 use fail::fail_point;
 use std::{marker::PhantomData, sync::Arc};
 
+// todo: read from on-chain config
+const PER_BLOCK_GAS_LIMIT: u64 = 1000000;
+
 pub trait TransactionBlockExecutor<T>: Send + Sync {
     fn execute_transaction_block(
         transactions: Vec<T>,
@@ -43,7 +46,11 @@ impl TransactionBlockExecutor<Transaction> for AptosVM {
         transactions: Vec<Transaction>,
         state_view: CachedStateView,
     ) -> Result<ChunkOutput> {
-        ChunkOutput::by_transaction_execution::<AptosVM>(transactions, state_view)
+        ChunkOutput::by_transaction_execution_with_gas_limit::<AptosVM>(
+            transactions,
+            state_view,
+            Some(PER_BLOCK_GAS_LIMIT),
+        )
     }
 }
 

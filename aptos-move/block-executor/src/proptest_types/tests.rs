@@ -55,7 +55,7 @@ fn run_transactions<K, V>(
             Transaction<KeyType<K>, ValueType<V>>,
             Task<KeyType<K>, ValueType<V>>,
             EmptyDataView<KeyType<K>, ValueType<V>>,
-        >::new(num_cpus::get())
+        >::new(num_cpus::get(), None)
         .execute_transactions_parallel((), &transactions, &data_view)
         .0
         .map(|zipped| zipped.into_iter().map(|(res, _)| res).collect());
@@ -182,7 +182,7 @@ fn deltas_writes_mixed() {
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-        >::new(num_cpus::get())
+        >::new(num_cpus::get(), None)
         .execute_transactions_parallel((), &transactions, &data_view)
         .0
         .map(|zipped| zipped.into_iter().map(|(res, _)| res).collect());
@@ -224,7 +224,7 @@ fn deltas_resolver() {
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-        >::new(num_cpus::get())
+        >::new(num_cpus::get(), None)
         .execute_transactions_parallel((), &transactions, &data_view)
         .0
         .unwrap()
@@ -362,7 +362,7 @@ fn publishing_fixed_params() {
         Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-    >::new(num_cpus::get())
+    >::new(num_cpus::get(), None)
     .execute_transactions_parallel((), &transactions, &data_view);
     assert_ok!(output.0);
 
@@ -398,7 +398,7 @@ fn publishing_fixed_params() {
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-        >::new(num_cpus::get())
+        >::new(num_cpus::get(), None)
         .execute_transactions_parallel((), &transactions, &data_view);
 
         assert_eq!(output.0.unwrap_err(), Error::ModulePathReadWrite);

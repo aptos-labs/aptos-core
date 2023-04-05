@@ -34,9 +34,6 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
-// todo: add this number to config and think about the number.
-const PER_BLOCK_GAS_LIMIT: u64 = 1000000;
-
 pub static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
         .num_threads(num_cpus::get())
@@ -49,6 +46,7 @@ pub struct BlockExecutor<T, E, S> {
     // number of active concurrent tasks, corresponding to the maximum number of rayon
     // threads that may be concurrently participating in parallel execution.
     concurrency_level: usize,
+    maybe_gas_limit: Option<u64>,
     phantom: PhantomData<(T, E, S)>,
 }
 
@@ -60,7 +58,7 @@ where
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.
-    pub fn new(concurrency_level: usize) -> Self {
+    pub fn new(concurrency_level: usize, maybe_gas_limit: Option<u64>) -> Self {
         assert!(
             concurrency_level > 0 && concurrency_level <= num_cpus::get(),
             "Parallel execution concurrency level {} should be between 1 and number of CPUs",
@@ -68,6 +66,7 @@ where
         );
         Self {
             concurrency_level,
+            maybe_gas_limit,
             phantom: PhantomData,
         }
     }
@@ -253,16 +252,18 @@ where
                         },
                     };
 
-                    // When the accumulated gas of the committed txns exceeds PER_BLOCK_GAS_LIMIT, early halt BlockSTM.
-                    if accumulated_gas >= PER_BLOCK_GAS_LIMIT {
-                        // Set the execution output status to be SkipRest, to skip the rest of the txns.
-                        last_input_output.update_to_skip_rest(txn_idx);
-                        scheduler.halt();
+                    if let Some(per_block_gas_limit) = self.maybe_gas_limit {
+                        // When the accumulated gas of the committed txns exceeds PER_BLOCK_GAS_LIMIT, early halt BlockSTM.
+                        if accumulated_gas >= per_block_gas_limit {
+                            // Set the execution output status to be SkipRest, to skip the rest of the txns.
+                            last_input_output.update_to_skip_rest(txn_idx);
+                            scheduler.halt();
 
-                        counters::PARALLEL_PER_BLOCK_GAS.observe(accumulated_gas as f64);
-                        counters::PARALLEL_EXCEED_PER_BLOCK_GAS_LIMIT_COUNT.inc();
-                        debug!("[BlockSTM]: Early halted due to accumulated_gas {} >= PER_BLOCK_GAS_LIMIT {}.", accumulated_gas, PER_BLOCK_GAS_LIMIT);
-                        break;
+                            counters::PARALLEL_PER_BLOCK_GAS.observe(accumulated_gas as f64);
+                            counters::PARALLEL_EXCEED_PER_BLOCK_GAS_LIMIT_COUNT.inc();
+                            debug!("[BlockSTM]: Early halted due to accumulated_gas {} >= PER_BLOCK_GAS_LIMIT {}.", accumulated_gas, per_block_gas_limit);
+                            break;
+                        }
                     }
 
                     // Remark: When early halting the BlockSTM, we have to make sure the current / new tasks
@@ -457,13 +458,15 @@ where
                 break;
             }
 
-            // When the accumulated gas of the committed txns
-            // exceeds PER_BLOCK_GAS_LIMIT, halt sequential execution.
-            if accumulated_gas >= PER_BLOCK_GAS_LIMIT {
-                counters::SEQUENTIAL_PER_BLOCK_GAS.observe(accumulated_gas as f64);
-                counters::SEQUENTIAL_EXCEED_PER_BLOCK_GAS_LIMIT_COUNT.inc();
-                debug!("[Execution]: Sequential execution early halted due to accumulated_gas {} >= PER_BLOCK_GAS_LIMIT {}.", accumulated_gas, PER_BLOCK_GAS_LIMIT);
-                break;
+            if let Some(per_block_gas_limit) = self.maybe_gas_limit {
+                // When the accumulated gas of the committed txns
+                // exceeds per_block_gas_limit, halt sequential execution.
+                if accumulated_gas >= per_block_gas_limit {
+                    counters::SEQUENTIAL_PER_BLOCK_GAS.observe(accumulated_gas as f64);
+                    counters::SEQUENTIAL_EXCEED_PER_BLOCK_GAS_LIMIT_COUNT.inc();
+                    debug!("[Execution]: Sequential execution early halted due to accumulated_gas {} >= PER_BLOCK_GAS_LIMIT {}.", accumulated_gas, per_block_gas_limit);
+                    break;
+                }
             }
         }
 

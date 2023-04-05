@@ -50,6 +50,29 @@ impl ChunkOutput {
         })
     }
 
+    pub fn by_transaction_execution_with_gas_limit<V: VMExecutor>(
+        transactions: Vec<Transaction>,
+        state_view: CachedStateView,
+        maybe_gas_limit: Option<u64>,
+    ) -> Result<Self> {
+        let transaction_outputs = Self::execute_block_with_gas_limit::<V>(
+            transactions.clone(),
+            &state_view,
+            maybe_gas_limit,
+        )?;
+
+        // to print txn output for debugging, uncomment:
+        // println!("{:?}", transaction_outputs.iter().map(|t| t.status() ).collect::<Vec<_>>());
+
+        update_counters_for_processed_chunk(&transactions, &transaction_outputs, "executed");
+
+        Ok(Self {
+            transactions,
+            transaction_outputs,
+            state_cache: state_view.into_state_cache(),
+        })
+    }
+
     pub fn by_transaction_output(
         transactions_and_outputs: Vec<(Transaction, TransactionOutput)>,
         state_view: CachedStateView,
@@ -106,6 +129,21 @@ impl ChunkOutput {
         state_view: &CachedStateView,
     ) -> Result<Vec<TransactionOutput>> {
         Ok(V::execute_block(transactions, &state_view)?)
+    }
+
+    /// Executes the block of [Transaction]s using the [VMExecutor] and returns
+    /// a vector of [TransactionOutput]s.
+    #[cfg(not(feature = "consensus-only-perf-test"))]
+    fn execute_block_with_gas_limit<V: VMExecutor>(
+        transactions: Vec<Transaction>,
+        state_view: &CachedStateView,
+        maybe_gas_limit: Option<u64>,
+    ) -> Result<Vec<TransactionOutput>> {
+        Ok(V::execute_block_with_gas_limit(
+            transactions,
+            &state_view,
+            maybe_gas_limit,
+        )?)
     }
 
     /// In consensus-only mode, executes the block of [Transaction]s using the

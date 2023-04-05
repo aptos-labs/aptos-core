@@ -220,7 +220,7 @@ impl TransactionBenchState {
     fn execute(self) {
         // The output is ignored here since we're just testing transaction performance, not trying
         // to assert correctness.
-        BlockAptosVM::execute_block(self.transactions, self.executor.get_state_view(), 1)
+        BlockAptosVM::execute_block(self.transactions, self.executor.get_state_view(), 1, None)
             .expect("VM should not fail to start");
     }
 
@@ -232,6 +232,7 @@ impl TransactionBenchState {
             self.transactions,
             self.executor.get_state_view(),
             num_cpus::get(),
+            None,
         )
         .expect("VM should not fail to start");
     }

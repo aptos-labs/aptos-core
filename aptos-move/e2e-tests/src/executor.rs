@@ -388,7 +388,12 @@ impl FakeExecutor {
         &self,
         txn_block: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        BlockAptosVM::execute_block(txn_block, &self.data_store, usize::min(4, num_cpus::get()))
+        BlockAptosVM::execute_block(
+            txn_block,
+            &self.data_store,
+            usize::min(4, num_cpus::get()),
+            None,
+        )
     }
 
     pub fn execute_transaction_block(
