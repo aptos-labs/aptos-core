@@ -3,14 +3,14 @@
 
 # Module `0x1::fungible_asset`
 
-This defines the fungible asset module that can issue fungible asset of any <code><a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a></code> object. The
-metadata object can be any object that equipped with <code><a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a></code> resource.
+This defines the fungible asset module that can issue fungible asset of any <code><a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a></code> object. The
+metadata object can be any object that equipped with <code><a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a></code> resource.
 
 
--  [Resource `FungibleAssetMetadata`](#0x1_fungible_asset_FungibleAssetMetadata)
--  [Resource `FungibleAssetWallet`](#0x1_fungible_asset_FungibleAssetWallet)
--  [Resource `FungibleAssetWalletEvents`](#0x1_fungible_asset_FungibleAssetWalletEvents)
--  [Struct `FungibleAsset`](#0x1_fungible_asset_FungibleAsset)
+-  [Resource `Metadata`](#0x1_fungible_asset_Metadata)
+-  [Resource `FungibleAsset`](#0x1_fungible_asset_FungibleAsset)
+-  [Resource `FungibleAssetEvents`](#0x1_fungible_asset_FungibleAssetEvents)
+-  [Struct `ExtractedAsset`](#0x1_fungible_asset_ExtractedAsset)
 -  [Struct `MintRef`](#0x1_fungible_asset_MintRef)
 -  [Struct `TransferRef`](#0x1_fungible_asset_TransferRef)
 -  [Struct `BurnRef`](#0x1_fungible_asset_BurnRef)
@@ -68,14 +68,14 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 
 
 
-<a name="0x1_fungible_asset_FungibleAssetMetadata"></a>
+<a name="0x1_fungible_asset_Metadata"></a>
 
-## Resource `FungibleAssetMetadata`
+## Resource `Metadata`
 
 Define the metadata required of an metadata to be fungible.
 
 
-<pre><code><b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a> <b>has</b> key
+<pre><code><b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a> <b>has</b> key
 </code></pre>
 
 
@@ -123,14 +123,14 @@ Define the metadata required of an metadata to be fungible.
 
 </details>
 
-<a name="0x1_fungible_asset_FungibleAssetWallet"></a>
+<a name="0x1_fungible_asset_FungibleAsset"></a>
 
-## Resource `FungibleAssetWallet`
+## Resource `FungibleAsset`
 
 The wallet object that holds fungible assets of a specific type associated with an account.
 
 
-<pre><code><b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWallet">FungibleAssetWallet</a> <b>has</b> key
+<pre><code><b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> <b>has</b> key
 </code></pre>
 
 
@@ -141,7 +141,7 @@ The wallet object that holds fungible assets of a specific type associated with 
 
 <dl>
 <dt>
-<code>metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">fungible_asset::FungibleAssetMetadata</a>&gt;</code>
+<code>metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;</code>
 </dt>
 <dd>
  The address of the base metadata object.
@@ -163,13 +163,13 @@ The wallet object that holds fungible assets of a specific type associated with 
 
 </details>
 
-<a name="0x1_fungible_asset_FungibleAssetWalletEvents"></a>
+<a name="0x1_fungible_asset_FungibleAssetEvents"></a>
 
-## Resource `FungibleAssetWalletEvents`
+## Resource `FungibleAssetEvents`
 
 
 
-<pre><code><b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWalletEvents">FungibleAssetWalletEvents</a> <b>has</b> key
+<pre><code><b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetEvents">FungibleAssetEvents</a> <b>has</b> key
 </code></pre>
 
 
@@ -202,15 +202,15 @@ The wallet object that holds fungible assets of a specific type associated with 
 
 </details>
 
-<a name="0x1_fungible_asset_FungibleAsset"></a>
+<a name="0x1_fungible_asset_ExtractedAsset"></a>
 
-## Struct `FungibleAsset`
+## Struct `ExtractedAsset`
 
 FungibleAsset can be passed into function for type safety and to guarantee a specific amount.
 FungibleAsset cannot be stored directly and will have to be deposited back into a wallet.
 
 
-<pre><code><b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>
+<pre><code><b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">ExtractedAsset</a>
 </code></pre>
 
 
@@ -221,7 +221,7 @@ FungibleAsset cannot be stored directly and will have to be deposited back into 
 
 <dl>
 <dt>
-<code>metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">fungible_asset::FungibleAssetMetadata</a>&gt;</code>
+<code>metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;</code>
 </dt>
 <dd>
 
@@ -255,7 +255,7 @@ MintRef can be used to mint the fungible asset into an account's wallet.
 
 <dl>
 <dt>
-<code>metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">fungible_asset::FungibleAssetMetadata</a>&gt;</code>
+<code>metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;</code>
 </dt>
 <dd>
 
@@ -284,7 +284,7 @@ and allow the holder of TransferRef to transfer fungible assets from any account
 
 <dl>
 <dt>
-<code>metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">fungible_asset::FungibleAssetMetadata</a>&gt;</code>
+<code>metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;</code>
 </dt>
 <dd>
 
@@ -312,7 +312,7 @@ BurnRef can be used to burn fungible assets from a given holder account.
 
 <dl>
 <dt>
-<code>metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">fungible_asset::FungibleAssetMetadata</a>&gt;</code>
+<code>metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;</code>
 </dt>
 <dd>
 
@@ -535,11 +535,11 @@ Account cannot transfer or receive fungible assets.
 
 ## Function `add_fungibility`
 
-Make an existing object fungible by adding the FungibleAssetMetadata resource.
+Make an existing object fungible by adding the Metadata resource.
 This returns the capabilities to mint, burn, and transfer.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_add_fungibility">add_fungibility</a>(constructor_ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>, maximum_supply: u64, name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, symbol: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, decimals: u8): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">fungible_asset::FungibleAssetMetadata</a>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_add_fungibility">add_fungibility</a>(constructor_ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>, maximum_supply: u64, name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, symbol: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, decimals: u8): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;
 </code></pre>
 
 
@@ -554,7 +554,7 @@ This returns the capabilities to mint, burn, and transfer.
     name: String,
     symbol: String,
     decimals: u8,
-): Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a>&gt; {
+): Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt; {
     <b>let</b> metadata_object_signer = &<a href="object.md#0x1_object_generate_signer">object::generate_signer</a>(constructor_ref);
     <b>let</b> converted_maximum = <b>if</b> (maximum_supply == 0) {
         <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
@@ -562,7 +562,7 @@ This returns the capabilities to mint, burn, and transfer.
         <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(maximum_supply)
     };
     <b>move_to</b>(metadata_object_signer,
-        <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a> {
+        <a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a> {
             supply: 0,
             maximum: converted_maximum,
             name,
@@ -570,7 +570,7 @@ This returns the capabilities to mint, burn, and transfer.
             decimals,
         }
     );
-    <a href="object.md#0x1_object_object_from_constructor_ref">object::object_from_constructor_ref</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a>&gt;(constructor_ref)
+    <a href="object.md#0x1_object_object_from_constructor_ref">object::object_from_constructor_ref</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt;(constructor_ref)
 }
 </code></pre>
 
@@ -596,7 +596,7 @@ This can only be called at object creation time as constructor_ref is only avail
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_generate_mint_ref">generate_mint_ref</a>(constructor_ref: &ConstructorRef): <a href="fungible_asset.md#0x1_fungible_asset_MintRef">MintRef</a> {
-    <b>let</b> metadata = <a href="object.md#0x1_object_object_from_constructor_ref">object::object_from_constructor_ref</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a>&gt;(constructor_ref);
+    <b>let</b> metadata = <a href="object.md#0x1_object_object_from_constructor_ref">object::object_from_constructor_ref</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt;(constructor_ref);
     <a href="fungible_asset.md#0x1_fungible_asset_MintRef">MintRef</a> { metadata }
 }
 </code></pre>
@@ -623,7 +623,7 @@ This can only be called at object creation time as constructor_ref is only avail
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_generate_burn_ref">generate_burn_ref</a>(constructor_ref: &ConstructorRef): <a href="fungible_asset.md#0x1_fungible_asset_BurnRef">BurnRef</a> {
-    <b>let</b> metadata = <a href="object.md#0x1_object_object_from_constructor_ref">object::object_from_constructor_ref</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a>&gt;(constructor_ref);
+    <b>let</b> metadata = <a href="object.md#0x1_object_object_from_constructor_ref">object::object_from_constructor_ref</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt;(constructor_ref);
     <a href="fungible_asset.md#0x1_fungible_asset_BurnRef">BurnRef</a> { metadata }
 }
 </code></pre>
@@ -651,7 +651,7 @@ This can only be called at object creation time as constructor_ref is only avail
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_generate_transfer_ref">generate_transfer_ref</a>(constructor_ref: &ConstructorRef): <a href="fungible_asset.md#0x1_fungible_asset_TransferRef">TransferRef</a> {
-    <b>let</b> metadata = <a href="object.md#0x1_object_object_from_constructor_ref">object::object_from_constructor_ref</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a>&gt;(constructor_ref);
+    <b>let</b> metadata = <a href="object.md#0x1_object_object_from_constructor_ref">object::object_from_constructor_ref</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt;(constructor_ref);
     <a href="fungible_asset.md#0x1_fungible_asset_TransferRef">TransferRef</a> { metadata }
 }
 </code></pre>
@@ -676,7 +676,7 @@ Get the current supply from <code>metadata</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_supply">supply</a>&lt;T: key&gt;(metadata: Object&lt;T&gt;): u64 <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_supply">supply</a>&lt;T: key&gt;(metadata: Object&lt;T&gt;): u64 <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a> {
     borrow_fungible_metadata(&metadata).supply
 }
 </code></pre>
@@ -701,7 +701,7 @@ Get the maximum supply from <code>metadata</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_maximum">maximum</a>&lt;T: key&gt;(metadata: Object&lt;T&gt;): Option&lt;u64&gt; <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_maximum">maximum</a>&lt;T: key&gt;(metadata: Object&lt;T&gt;): Option&lt;u64&gt; <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a> {
     borrow_fungible_metadata(&metadata).maximum
 }
 </code></pre>
@@ -726,7 +726,7 @@ Get the name of the fungible asset from <code>metadata</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_name">name</a>&lt;T: key&gt;(metadata: Object&lt;T&gt;): String <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_name">name</a>&lt;T: key&gt;(metadata: Object&lt;T&gt;): String <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a> {
     borrow_fungible_metadata(&metadata).name
 }
 </code></pre>
@@ -751,7 +751,7 @@ Get the symbol of the fungible asset from <code>metadata</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_symbol">symbol</a>&lt;T: key&gt;(metadata: Object&lt;T&gt;): String <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_symbol">symbol</a>&lt;T: key&gt;(metadata: Object&lt;T&gt;): String <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a> {
     borrow_fungible_metadata(&metadata).symbol
 }
 </code></pre>
@@ -776,7 +776,7 @@ Get the decimals from <code>metadata</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_decimals">decimals</a>&lt;T: key&gt;(metadata: Object&lt;T&gt;): u8 <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_decimals">decimals</a>&lt;T: key&gt;(metadata: Object&lt;T&gt;): u8 <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a> {
     borrow_fungible_metadata(&metadata).decimals
 }
 </code></pre>
@@ -802,7 +802,7 @@ Return whether the provided address has a wallet initialized.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_wallet_exists">wallet_exists</a>(wallet: <b>address</b>): bool {
-    <b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWallet">FungibleAssetWallet</a>&gt;(wallet)
+    <b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>&gt;(wallet)
 }
 </code></pre>
 
@@ -817,7 +817,7 @@ Return whether the provided address has a wallet initialized.
 Return the underlying metadata object
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_metadata_from_asset">metadata_from_asset</a>(fa: &<a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">fungible_asset::FungibleAssetMetadata</a>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_metadata_from_asset">metadata_from_asset</a>(fa: &<a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">fungible_asset::ExtractedAsset</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;
 </code></pre>
 
 
@@ -826,7 +826,7 @@ Return the underlying metadata object
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_metadata_from_asset">metadata_from_asset</a>(fa: &<a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>): Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a>&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_metadata_from_asset">metadata_from_asset</a>(fa: &<a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">ExtractedAsset</a>): Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt; {
     fa.metadata
 }
 </code></pre>
@@ -842,7 +842,7 @@ Return the underlying metadata object
 Return the underlying metadata object.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_wallet_metadata">wallet_metadata</a>&lt;T: key&gt;(wallet: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">fungible_asset::FungibleAssetMetadata</a>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_wallet_metadata">wallet_metadata</a>&lt;T: key&gt;(wallet: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;
 </code></pre>
 
 
@@ -851,7 +851,7 @@ Return the underlying metadata object.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_wallet_metadata">wallet_metadata</a>&lt;T: key&gt;(wallet: Object&lt;T&gt;): Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a>&gt; <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWallet">FungibleAssetWallet</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_wallet_metadata">wallet_metadata</a>&lt;T: key&gt;(wallet: Object&lt;T&gt;): Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt; <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> {
     borrow_wallet_resource(&wallet).metadata
 }
 </code></pre>
@@ -867,7 +867,7 @@ Return the underlying metadata object.
 Return <code>amount</code> of a given fungible asset.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_amount">amount</a>(fa: &<a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>): u64
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_amount">amount</a>(fa: &<a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">fungible_asset::ExtractedAsset</a>): u64
 </code></pre>
 
 
@@ -876,7 +876,7 @@ Return <code>amount</code> of a given fungible asset.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_amount">amount</a>(fa: &<a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>): u64 {
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_amount">amount</a>(fa: &<a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">ExtractedAsset</a>): u64 {
     fa.amount
 }
 </code></pre>
@@ -901,7 +901,7 @@ Get the balance of a given wallet.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_balance">balance</a>&lt;T: key&gt;(wallet: Object&lt;T&gt;): u64 <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWallet">FungibleAssetWallet</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_balance">balance</a>&lt;T: key&gt;(wallet: Object&lt;T&gt;): u64 <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> {
     <b>if</b> (<a href="fungible_asset.md#0x1_fungible_asset_wallet_exists">wallet_exists</a>(<a href="object.md#0x1_object_object_address">object::object_address</a>(&wallet))) {
         borrow_wallet_resource(&wallet).balance
     } <b>else</b> {
@@ -931,7 +931,7 @@ If the wallet has not been created, we default to returning true as deposits can
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_ungated_transfer_allowed">ungated_transfer_allowed</a>&lt;T: key&gt;(wallet: Object&lt;T&gt;): bool <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWallet">FungibleAssetWallet</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_ungated_transfer_allowed">ungated_transfer_allowed</a>&lt;T: key&gt;(wallet: Object&lt;T&gt;): bool <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> {
     !<a href="fungible_asset.md#0x1_fungible_asset_wallet_exists">wallet_exists</a>(<a href="object.md#0x1_object_object_address">object::object_address</a>(&wallet)) ||
         borrow_wallet_resource(&wallet).allow_ungated_transfer
 }
@@ -947,7 +947,7 @@ If the wallet has not been created, we default to returning true as deposits can
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_asset_metadata">asset_metadata</a>(fa: &<a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">fungible_asset::FungibleAssetMetadata</a>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_asset_metadata">asset_metadata</a>(fa: &<a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">fungible_asset::ExtractedAsset</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;
 </code></pre>
 
 
@@ -956,7 +956,7 @@ If the wallet has not been created, we default to returning true as deposits can
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_asset_metadata">asset_metadata</a>(fa: &<a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>): Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a>&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_asset_metadata">asset_metadata</a>(fa: &<a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">ExtractedAsset</a>): Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt; {
     fa.metadata
 }
 </code></pre>
@@ -972,7 +972,7 @@ If the wallet has not been created, we default to returning true as deposits can
 Get the underlying metadata object from <code><a href="fungible_asset.md#0x1_fungible_asset_MintRef">MintRef</a></code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_mint_ref_metadata">mint_ref_metadata</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_MintRef">fungible_asset::MintRef</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">fungible_asset::FungibleAssetMetadata</a>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_mint_ref_metadata">mint_ref_metadata</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_MintRef">fungible_asset::MintRef</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;
 </code></pre>
 
 
@@ -981,7 +981,7 @@ Get the underlying metadata object from <code><a href="fungible_asset.md#0x1_fun
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_mint_ref_metadata">mint_ref_metadata</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_MintRef">MintRef</a>): Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a>&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_mint_ref_metadata">mint_ref_metadata</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_MintRef">MintRef</a>): Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt; {
     ref.metadata
 }
 </code></pre>
@@ -997,7 +997,7 @@ Get the underlying metadata object from <code><a href="fungible_asset.md#0x1_fun
 Get the underlying metadata object from <code><a href="fungible_asset.md#0x1_fungible_asset_TransferRef">TransferRef</a></code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_transfer_ref_metadata">transfer_ref_metadata</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_TransferRef">fungible_asset::TransferRef</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">fungible_asset::FungibleAssetMetadata</a>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_transfer_ref_metadata">transfer_ref_metadata</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_TransferRef">fungible_asset::TransferRef</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;
 </code></pre>
 
 
@@ -1006,7 +1006,7 @@ Get the underlying metadata object from <code><a href="fungible_asset.md#0x1_fun
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_transfer_ref_metadata">transfer_ref_metadata</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_TransferRef">TransferRef</a>): Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a>&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_transfer_ref_metadata">transfer_ref_metadata</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_TransferRef">TransferRef</a>): Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt; {
     ref.metadata
 }
 </code></pre>
@@ -1022,7 +1022,7 @@ Get the underlying metadata object from <code><a href="fungible_asset.md#0x1_fun
 Get the underlying metadata object from <code><a href="fungible_asset.md#0x1_fungible_asset_BurnRef">BurnRef</a></code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_burn_ref_metadata">burn_ref_metadata</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_BurnRef">fungible_asset::BurnRef</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">fungible_asset::FungibleAssetMetadata</a>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_burn_ref_metadata">burn_ref_metadata</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_BurnRef">fungible_asset::BurnRef</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;
 </code></pre>
 
 
@@ -1031,7 +1031,7 @@ Get the underlying metadata object from <code><a href="fungible_asset.md#0x1_fun
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_burn_ref_metadata">burn_ref_metadata</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_BurnRef">BurnRef</a>): Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a>&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_burn_ref_metadata">burn_ref_metadata</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_BurnRef">BurnRef</a>): Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt; {
     ref.metadata
 }
 </code></pre>
@@ -1062,7 +1062,7 @@ Note: it does not move the underlying object.
     from: Object&lt;T&gt;,
     <b>to</b>: Object&lt;T&gt;,
     amount: u64,
-) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWallet">FungibleAssetWallet</a>, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWalletEvents">FungibleAssetWalletEvents</a> {
+) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetEvents">FungibleAssetEvents</a> {
     <b>let</b> fa = <a href="fungible_asset.md#0x1_fungible_asset_withdraw">withdraw</a>(sender, from, amount);
     <a href="fungible_asset.md#0x1_fungible_asset_deposit">deposit</a>(<b>to</b>, fa);
 }
@@ -1080,7 +1080,7 @@ Allow an object to hold a wallet for fungible assets.
 Applications can use this to create multiple wallets for isolating fungible assets for different purposes.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_create_wallet">create_wallet</a>&lt;T: key&gt;(constructor_ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWallet">fungible_asset::FungibleAssetWallet</a>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_create_wallet">create_wallet</a>&lt;T: key&gt;(constructor_ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>&gt;
 </code></pre>
 
 
@@ -1092,23 +1092,23 @@ Applications can use this to create multiple wallets for isolating fungible asse
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_create_wallet">create_wallet</a>&lt;T: key&gt;(
     constructor_ref: &ConstructorRef,
     metadata: Object&lt;T&gt;,
-): Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWallet">FungibleAssetWallet</a>&gt; {
+): Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>&gt; {
     <b>let</b> wallet_obj = &<a href="object.md#0x1_object_generate_signer">object::generate_signer</a>(constructor_ref);
-    <b>let</b> metadata = <a href="object.md#0x1_object_convert">object::convert</a>&lt;T, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a>&gt;(metadata);
-    <b>move_to</b>(wallet_obj, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWallet">FungibleAssetWallet</a> {
+    <b>let</b> metadata = <a href="object.md#0x1_object_convert">object::convert</a>&lt;T, <a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt;(metadata);
+    <b>move_to</b>(wallet_obj, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> {
         metadata,
         balance: 0,
         allow_ungated_transfer: <b>true</b>,
     });
     <b>move_to</b>(wallet_obj,
-        <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWalletEvents">FungibleAssetWalletEvents</a> {
+        <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetEvents">FungibleAssetEvents</a> {
             deposit_events: <a href="object.md#0x1_object_new_event_handle">object::new_event_handle</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_DepositEvent">DepositEvent</a>&gt;(wallet_obj),
             withdraw_events: <a href="object.md#0x1_object_new_event_handle">object::new_event_handle</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_WithdrawEvent">WithdrawEvent</a>&gt;(wallet_obj),
             set_ungated_transfer_events: <a href="object.md#0x1_object_new_event_handle">object::new_event_handle</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_SetUngatedTransferEvent">SetUngatedTransferEvent</a>&gt;(wallet_obj),
         }
     );
 
-    <a href="object.md#0x1_object_object_from_constructor_ref">object::object_from_constructor_ref</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWallet">FungibleAssetWallet</a>&gt;(constructor_ref)
+    <a href="object.md#0x1_object_object_from_constructor_ref">object::object_from_constructor_ref</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>&gt;(constructor_ref)
 }
 </code></pre>
 
@@ -1123,7 +1123,7 @@ Applications can use this to create multiple wallets for isolating fungible asse
 Withdraw <code>amount</code> of fungible asset from <code>wallet</code> by the owner.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_withdraw">withdraw</a>&lt;T: key&gt;(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, wallet: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, amount: u64): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_withdraw">withdraw</a>&lt;T: key&gt;(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, wallet: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, amount: u64): <a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">fungible_asset::ExtractedAsset</a>
 </code></pre>
 
 
@@ -1136,7 +1136,7 @@ Withdraw <code>amount</code> of fungible asset from <code>wallet</code> by the o
     owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     wallet: Object&lt;T&gt;,
     amount: u64,
-): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWallet">FungibleAssetWallet</a>, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWalletEvents">FungibleAssetWalletEvents</a> {
+): <a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">ExtractedAsset</a> <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetEvents">FungibleAssetEvents</a> {
     <b>assert</b>!(<a href="object.md#0x1_object_owns">object::owns</a>(wallet, <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner)), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="fungible_asset.md#0x1_fungible_asset_ENOT_WALLET_OWNER">ENOT_WALLET_OWNER</a>));
     <b>assert</b>!(<a href="fungible_asset.md#0x1_fungible_asset_ungated_transfer_allowed">ungated_transfer_allowed</a>(wallet), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_EUNGATED_TRANSFER_IS_NOT_ALLOWED">EUNGATED_TRANSFER_IS_NOT_ALLOWED</a>));
     <a href="fungible_asset.md#0x1_fungible_asset_withdraw_internal">withdraw_internal</a>(<a href="object.md#0x1_object_object_address">object::object_address</a>(&wallet), amount)
@@ -1154,7 +1154,7 @@ Withdraw <code>amount</code> of fungible asset from <code>wallet</code> by the o
 Deposit <code>amount</code> of fungible asset to <code>wallet</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_deposit">deposit</a>&lt;T: key&gt;(wallet: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, fa: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_deposit">deposit</a>&lt;T: key&gt;(wallet: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, fa: <a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">fungible_asset::ExtractedAsset</a>)
 </code></pre>
 
 
@@ -1163,10 +1163,7 @@ Deposit <code>amount</code> of fungible asset to <code>wallet</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_deposit">deposit</a>&lt;T: key&gt;(
-    wallet: Object&lt;T&gt;,
-    fa: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>,
-) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWallet">FungibleAssetWallet</a>, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWalletEvents">FungibleAssetWalletEvents</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_deposit">deposit</a>&lt;T: key&gt;(wallet: Object&lt;T&gt;, fa: <a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">ExtractedAsset</a>) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetEvents">FungibleAssetEvents</a> {
     <b>assert</b>!(<a href="fungible_asset.md#0x1_fungible_asset_ungated_transfer_allowed">ungated_transfer_allowed</a>(wallet), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_EUNGATED_TRANSFER_IS_NOT_ALLOWED">EUNGATED_TRANSFER_IS_NOT_ALLOWED</a>));
     <a href="fungible_asset.md#0x1_fungible_asset_deposit_internal">deposit_internal</a>(wallet, fa);
 }
@@ -1183,7 +1180,7 @@ Deposit <code>amount</code> of fungible asset to <code>wallet</code>.
 Mint the specified <code>amount</code> of fungible asset.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_mint">mint</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_MintRef">fungible_asset::MintRef</a>, amount: u64): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_mint">mint</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_MintRef">fungible_asset::MintRef</a>, amount: u64): <a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">fungible_asset::ExtractedAsset</a>
 </code></pre>
 
 
@@ -1192,15 +1189,12 @@ Mint the specified <code>amount</code> of fungible asset.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_mint">mint</a>(
-    ref: &<a href="fungible_asset.md#0x1_fungible_asset_MintRef">MintRef</a>,
-    amount: u64,
-): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_mint">mint</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_MintRef">MintRef</a>, amount: u64): <a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">ExtractedAsset</a> <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a> {
     <b>assert</b>!(amount &gt; 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_EAMOUNT_CANNOT_BE_ZERO">EAMOUNT_CANNOT_BE_ZERO</a>));
     <b>let</b> metadata = ref.metadata;
     <a href="fungible_asset.md#0x1_fungible_asset_increase_supply">increase_supply</a>(&metadata, amount);
 
-    <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> {
+    <a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">ExtractedAsset</a> {
         metadata,
         amount
     }
@@ -1231,7 +1225,7 @@ Mint the specified <code>amount</code> of fungible asset to a destination wallet
     ref: &<a href="fungible_asset.md#0x1_fungible_asset_MintRef">MintRef</a>,
     wallet: Object&lt;T&gt;,
     amount: u64,
-) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a>, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWallet">FungibleAssetWallet</a>, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWalletEvents">FungibleAssetWalletEvents</a> {
+) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetEvents">FungibleAssetEvents</a> {
     <a href="fungible_asset.md#0x1_fungible_asset_deposit">deposit</a>(wallet, <a href="fungible_asset.md#0x1_fungible_asset_mint">mint</a>(ref, amount));
 }
 </code></pre>
@@ -1260,15 +1254,15 @@ Enable/disable a wallet's ability to do direct transfers of fungible asset.
     ref: &<a href="fungible_asset.md#0x1_fungible_asset_TransferRef">TransferRef</a>,
     wallet: Object&lt;T&gt;,
     allow: bool,
-) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWallet">FungibleAssetWallet</a>, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWalletEvents">FungibleAssetWalletEvents</a> {
+) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetEvents">FungibleAssetEvents</a> {
     <b>assert</b>!(
         ref.metadata == <a href="fungible_asset.md#0x1_fungible_asset_wallet_metadata">wallet_metadata</a>(wallet),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_ETRANSFER_REF_AND_WALLET_MISMATCH">ETRANSFER_REF_AND_WALLET_MISMATCH</a>),
     );
     <b>let</b> wallet_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(&wallet);
-    <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWallet">FungibleAssetWallet</a>&gt;(wallet_addr).allow_ungated_transfer = allow;
+    <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>&gt;(wallet_addr).allow_ungated_transfer = allow;
 
-    <b>let</b> events = <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWalletEvents">FungibleAssetWalletEvents</a>&gt;(wallet_addr);
+    <b>let</b> events = <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetEvents">FungibleAssetEvents</a>&gt;(wallet_addr);
     <a href="event.md#0x1_event_emit_event">event::emit_event</a>(&<b>mut</b> events.set_ungated_transfer_events, <a href="fungible_asset.md#0x1_fungible_asset_SetUngatedTransferEvent">SetUngatedTransferEvent</a> { transfer_allowed: allow });
 }
 </code></pre>
@@ -1297,11 +1291,11 @@ Burn the <code>amount</code> of fungible metadata from the given wallet.
     ref: &<a href="fungible_asset.md#0x1_fungible_asset_BurnRef">BurnRef</a>,
     wallet: Object&lt;T&gt;,
     amount: u64
-) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a>, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWallet">FungibleAssetWallet</a>, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWalletEvents">FungibleAssetWalletEvents</a> {
+) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetEvents">FungibleAssetEvents</a> {
     <b>let</b> metadata = ref.metadata;
     <b>assert</b>!(metadata == <a href="fungible_asset.md#0x1_fungible_asset_wallet_metadata">wallet_metadata</a>(wallet), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_EBURN_REF_AND_WALLET_MISMATCH">EBURN_REF_AND_WALLET_MISMATCH</a>));
     <b>let</b> wallet_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(&wallet);
-    <b>let</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> {
+    <b>let</b> <a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">ExtractedAsset</a> {
         metadata,
         amount,
     } = <a href="fungible_asset.md#0x1_fungible_asset_withdraw_internal">withdraw_internal</a>(wallet_addr, amount);
@@ -1320,7 +1314,7 @@ Burn the <code>amount</code> of fungible metadata from the given wallet.
 Withdraw <code>amount</code> of fungible metadata from <code>wallet</code> ignoring <code>allow_ungated_transfer</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_withdraw_with_ref">withdraw_with_ref</a>&lt;T: key&gt;(ref: &<a href="fungible_asset.md#0x1_fungible_asset_TransferRef">fungible_asset::TransferRef</a>, wallet: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, amount: u64): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_withdraw_with_ref">withdraw_with_ref</a>&lt;T: key&gt;(ref: &<a href="fungible_asset.md#0x1_fungible_asset_TransferRef">fungible_asset::TransferRef</a>, wallet: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, amount: u64): <a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">fungible_asset::ExtractedAsset</a>
 </code></pre>
 
 
@@ -1333,7 +1327,7 @@ Withdraw <code>amount</code> of fungible metadata from <code>wallet</code> ignor
     ref: &<a href="fungible_asset.md#0x1_fungible_asset_TransferRef">TransferRef</a>,
     wallet: Object&lt;T&gt;,
     amount: u64
-): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWallet">FungibleAssetWallet</a>, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWalletEvents">FungibleAssetWalletEvents</a> {
+): <a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">ExtractedAsset</a> <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetEvents">FungibleAssetEvents</a> {
     <b>assert</b>!(
         ref.metadata == <a href="fungible_asset.md#0x1_fungible_asset_wallet_metadata">wallet_metadata</a>(wallet),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_ETRANSFER_REF_AND_WALLET_MISMATCH">ETRANSFER_REF_AND_WALLET_MISMATCH</a>),
@@ -1353,7 +1347,7 @@ Withdraw <code>amount</code> of fungible metadata from <code>wallet</code> ignor
 Deposit fungible asset into <code>wallet</code> ignoring <code>allow_ungated_transfer</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_deposit_with_ref">deposit_with_ref</a>&lt;T: key&gt;(ref: &<a href="fungible_asset.md#0x1_fungible_asset_TransferRef">fungible_asset::TransferRef</a>, wallet: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, fa: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_deposit_with_ref">deposit_with_ref</a>&lt;T: key&gt;(ref: &<a href="fungible_asset.md#0x1_fungible_asset_TransferRef">fungible_asset::TransferRef</a>, wallet: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, fa: <a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">fungible_asset::ExtractedAsset</a>)
 </code></pre>
 
 
@@ -1365,8 +1359,8 @@ Deposit fungible asset into <code>wallet</code> ignoring <code>allow_ungated_tra
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_deposit_with_ref">deposit_with_ref</a>&lt;T: key&gt;(
     ref: &<a href="fungible_asset.md#0x1_fungible_asset_TransferRef">TransferRef</a>,
     wallet: Object&lt;T&gt;,
-    fa: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>
-) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWallet">FungibleAssetWallet</a>, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWalletEvents">FungibleAssetWalletEvents</a> {
+    fa: <a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">ExtractedAsset</a>
+) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetEvents">FungibleAssetEvents</a> {
     <b>assert</b>!(
         ref.metadata == fa.metadata,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_ETRANSFER_REF_AND_FUNGIBLE_ASSET_MISMATCH">ETRANSFER_REF_AND_FUNGIBLE_ASSET_MISMATCH</a>)
@@ -1400,7 +1394,7 @@ Transfer <code>ammount</code> of  fungible metadata with <code><a href="fungible
     from: Object&lt;T&gt;,
     <b>to</b>: Object&lt;T&gt;,
     amount: u64,
-) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWallet">FungibleAssetWallet</a>, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWalletEvents">FungibleAssetWalletEvents</a> {
+) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetEvents">FungibleAssetEvents</a> {
     <b>let</b> fa = <a href="fungible_asset.md#0x1_fungible_asset_withdraw_with_ref">withdraw_with_ref</a>(transfer_ref, from, amount);
     <a href="fungible_asset.md#0x1_fungible_asset_deposit_with_ref">deposit_with_ref</a>(transfer_ref, <b>to</b>, fa);
 }
@@ -1417,7 +1411,7 @@ Transfer <code>ammount</code> of  fungible metadata with <code><a href="fungible
 Extract a given amount from the given fungible asset and return a new one.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_extract">extract</a>(<a href="fungible_asset.md#0x1_fungible_asset">fungible_asset</a>: &<b>mut</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>, amount: u64): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_extract">extract</a>(<a href="fungible_asset.md#0x1_fungible_asset">fungible_asset</a>: &<b>mut</b> <a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">fungible_asset::ExtractedAsset</a>, amount: u64): <a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">fungible_asset::ExtractedAsset</a>
 </code></pre>
 
 
@@ -1426,10 +1420,10 @@ Extract a given amount from the given fungible asset and return a new one.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_extract">extract</a>(<a href="fungible_asset.md#0x1_fungible_asset">fungible_asset</a>: &<b>mut</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>, amount: u64): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_extract">extract</a>(<a href="fungible_asset.md#0x1_fungible_asset">fungible_asset</a>: &<b>mut</b> <a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">ExtractedAsset</a>, amount: u64): <a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">ExtractedAsset</a> {
     <b>assert</b>!(<a href="fungible_asset.md#0x1_fungible_asset">fungible_asset</a>.amount &gt;= amount, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_EINSUFFICIENT_BALANCE">EINSUFFICIENT_BALANCE</a>));
     <a href="fungible_asset.md#0x1_fungible_asset">fungible_asset</a>.amount = <a href="fungible_asset.md#0x1_fungible_asset">fungible_asset</a>.amount - amount;
-    <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> {
+    <a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">ExtractedAsset</a> {
         metadata: <a href="fungible_asset.md#0x1_fungible_asset">fungible_asset</a>.metadata,
         amount,
     }
@@ -1448,7 +1442,7 @@ Extract a given amount from the given fungible asset and return a new one.
 to the sum of the two (<code>dst_fungible_asset</code> and <code>src_fungible_asset</code>).
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_merge">merge</a>(dst_fungible_asset: &<b>mut</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>, src_fungible_asset: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_merge">merge</a>(dst_fungible_asset: &<b>mut</b> <a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">fungible_asset::ExtractedAsset</a>, src_fungible_asset: <a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">fungible_asset::ExtractedAsset</a>)
 </code></pre>
 
 
@@ -1457,8 +1451,8 @@ to the sum of the two (<code>dst_fungible_asset</code> and <code>src_fungible_as
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_merge">merge</a>(dst_fungible_asset: &<b>mut</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>, src_fungible_asset: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>) {
-    <b>let</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> { metadata: _, amount } = src_fungible_asset;
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_merge">merge</a>(dst_fungible_asset: &<b>mut</b> <a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">ExtractedAsset</a>, src_fungible_asset: <a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">ExtractedAsset</a>) {
+    <b>let</b> <a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">ExtractedAsset</a> { metadata: _, amount } = src_fungible_asset;
     dst_fungible_asset.amount = dst_fungible_asset.amount + amount;
 }
 </code></pre>
@@ -1474,7 +1468,7 @@ to the sum of the two (<code>dst_fungible_asset</code> and <code>src_fungible_as
 Destroy an empty fungible asset.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_destroy_zero">destroy_zero</a>(<a href="fungible_asset.md#0x1_fungible_asset">fungible_asset</a>: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_destroy_zero">destroy_zero</a>(<a href="fungible_asset.md#0x1_fungible_asset">fungible_asset</a>: <a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">fungible_asset::ExtractedAsset</a>)
 </code></pre>
 
 
@@ -1483,8 +1477,8 @@ Destroy an empty fungible asset.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_destroy_zero">destroy_zero</a>(<a href="fungible_asset.md#0x1_fungible_asset">fungible_asset</a>: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>) {
-    <b>let</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> { amount, metadata: _ } = <a href="fungible_asset.md#0x1_fungible_asset">fungible_asset</a>;
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_destroy_zero">destroy_zero</a>(<a href="fungible_asset.md#0x1_fungible_asset">fungible_asset</a>: <a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">ExtractedAsset</a>) {
+    <b>let</b> <a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">ExtractedAsset</a> { amount, metadata: _ } = <a href="fungible_asset.md#0x1_fungible_asset">fungible_asset</a>;
     <b>assert</b>!(amount == 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_EAMOUNT_IS_NOT_ZERO">EAMOUNT_IS_NOT_ZERO</a>));
 }
 </code></pre>
@@ -1499,7 +1493,7 @@ Destroy an empty fungible asset.
 
 
 
-<pre><code><b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_deposit_internal">deposit_internal</a>&lt;T: key&gt;(wallet: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, fa: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>)
+<pre><code><b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_deposit_internal">deposit_internal</a>&lt;T: key&gt;(wallet: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, fa: <a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">fungible_asset::ExtractedAsset</a>)
 </code></pre>
 
 
@@ -1508,18 +1502,15 @@ Destroy an empty fungible asset.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_deposit_internal">deposit_internal</a>&lt;T: key&gt;(
-    wallet: Object&lt;T&gt;,
-    fa: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>,
-) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWallet">FungibleAssetWallet</a>, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWalletEvents">FungibleAssetWalletEvents</a> {
-    <b>let</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> { metadata, amount } = fa;
+<pre><code><b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_deposit_internal">deposit_internal</a>&lt;T: key&gt;(wallet: Object&lt;T&gt;, fa: <a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">ExtractedAsset</a>) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetEvents">FungibleAssetEvents</a> {
+    <b>let</b> <a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">ExtractedAsset</a> { metadata, amount } = fa;
     <b>let</b> wallet_metadata = <a href="fungible_asset.md#0x1_fungible_asset_wallet_metadata">wallet_metadata</a>(wallet);
     <b>assert</b>!(metadata == wallet_metadata, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_EFUNGIBLE_ASSET_AND_WALLET_MISMATCH">EFUNGIBLE_ASSET_AND_WALLET_MISMATCH</a>));
     <b>let</b> wallet_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(&wallet);
-    <b>let</b> wallet = <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWallet">FungibleAssetWallet</a>&gt;(wallet_addr);
+    <b>let</b> wallet = <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>&gt;(wallet_addr);
     wallet.balance = wallet.balance + amount;
 
-    <b>let</b> events = <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWalletEvents">FungibleAssetWalletEvents</a>&gt;(wallet_addr);
+    <b>let</b> events = <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetEvents">FungibleAssetEvents</a>&gt;(wallet_addr);
     <a href="event.md#0x1_event_emit_event">event::emit_event</a>(&<b>mut</b> events.deposit_events, <a href="fungible_asset.md#0x1_fungible_asset_DepositEvent">DepositEvent</a> { amount });
 }
 </code></pre>
@@ -1535,7 +1526,7 @@ Destroy an empty fungible asset.
 Extract <code>amount</code> of fungible asset from <code>wallet</code>.
 
 
-<pre><code><b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_withdraw_internal">withdraw_internal</a>(wallet_addr: <b>address</b>, amount: u64): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>
+<pre><code><b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_withdraw_internal">withdraw_internal</a>(wallet_addr: <b>address</b>, amount: u64): <a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">fungible_asset::ExtractedAsset</a>
 </code></pre>
 
 
@@ -1547,17 +1538,17 @@ Extract <code>amount</code> of fungible asset from <code>wallet</code>.
 <pre><code><b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_withdraw_internal">withdraw_internal</a>(
     wallet_addr: <b>address</b>,
     amount: u64,
-): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWallet">FungibleAssetWallet</a>, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWalletEvents">FungibleAssetWalletEvents</a> {
+): <a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">ExtractedAsset</a> <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetEvents">FungibleAssetEvents</a> {
     <b>assert</b>!(amount != 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_EAMOUNT_CANNOT_BE_ZERO">EAMOUNT_CANNOT_BE_ZERO</a>));
-    <b>let</b> wallet = <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWallet">FungibleAssetWallet</a>&gt;(wallet_addr);
+    <b>let</b> wallet = <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>&gt;(wallet_addr);
     <b>assert</b>!(wallet.balance &gt;= amount, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_EINSUFFICIENT_BALANCE">EINSUFFICIENT_BALANCE</a>));
     wallet.balance = wallet.balance - amount;
 
-    <b>let</b> events = <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetWalletEvents">FungibleAssetWalletEvents</a>&gt;(wallet_addr);
+    <b>let</b> events = <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetEvents">FungibleAssetEvents</a>&gt;(wallet_addr);
     <b>let</b> metadata = wallet.metadata;
     <a href="event.md#0x1_event_emit_event">event::emit_event</a>(&<b>mut</b> events.withdraw_events, <a href="fungible_asset.md#0x1_fungible_asset_WithdrawEvent">WithdrawEvent</a> { amount });
 
-    <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> { metadata, amount }
+    <a href="fungible_asset.md#0x1_fungible_asset_ExtractedAsset">ExtractedAsset</a> { metadata, amount }
 }
 </code></pre>
 
@@ -1581,7 +1572,7 @@ Increase the supply of a fungible metadata by minting.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_increase_supply">increase_supply</a>&lt;T: key&gt;(metadata: &Object&lt;T&gt;, amount: u64) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a> {
+<pre><code><b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_increase_supply">increase_supply</a>&lt;T: key&gt;(metadata: &Object&lt;T&gt;, amount: u64) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a> {
     <b>assert</b>!(amount != 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_EAMOUNT_CANNOT_BE_ZERO">EAMOUNT_CANNOT_BE_ZERO</a>));
     <b>let</b> fungible_metadata = borrow_fungible_metadata_mut(metadata);
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&fungible_metadata.maximum)) {
@@ -1612,7 +1603,7 @@ Decrease the supply of a fungible metadata by burning.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_decrease_supply">decrease_supply</a>&lt;T: key&gt;(metadata: &Object&lt;T&gt;, amount: u64) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetMetadata">FungibleAssetMetadata</a> {
+<pre><code><b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_decrease_supply">decrease_supply</a>&lt;T: key&gt;(metadata: &Object&lt;T&gt;, amount: u64) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a> {
     <b>assert</b>!(amount != 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_EAMOUNT_CANNOT_BE_ZERO">EAMOUNT_CANNOT_BE_ZERO</a>));
     <b>let</b> fungible_metadata = borrow_fungible_metadata_mut(metadata);
     <b>assert</b>!(fungible_metadata.supply &gt;= amount, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_ESUPPLY_UNDERFLOW">ESUPPLY_UNDERFLOW</a>));
