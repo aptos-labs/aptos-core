@@ -226,8 +226,7 @@ mod test {
         // Create the latency info state
         let latency_monitoring_config = LatencyMonitoringConfig::default();
         let time_service = TimeService::mock();
-        let mut latency_info_state =
-            LatencyInfoState::new(latency_monitoring_config.clone(), time_service);
+        let mut latency_info_state = LatencyInfoState::new(latency_monitoring_config, time_service);
 
         // Verify the initial latency info state
         assert_eq!(latency_info_state.latency_ping_counter, 0);
@@ -273,8 +272,7 @@ mod test {
         // Create the latency info state
         let latency_monitoring_config = LatencyMonitoringConfig::default();
         let time_service = TimeService::mock();
-        let mut latency_info_state =
-            LatencyInfoState::new(latency_monitoring_config.clone(), time_service);
+        let mut latency_info_state = LatencyInfoState::new(latency_monitoring_config, time_service);
 
         // Verify the initial latency info state
         assert_eq!(latency_info_state.latency_ping_counter, 0);
