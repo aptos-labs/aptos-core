@@ -32,7 +32,6 @@ use std::{
     time::Duration,
 };
 use strum_macros::EnumString;
-use tokio::time;
 
 const RUST_LOG: &str = "RUST_LOG";
 pub const RUST_LOG_TELEMETRY: &str = "RUST_LOG_TELEMETRY";
@@ -40,8 +39,8 @@ const RUST_LOG_FORMAT: &str = "RUST_LOG_FORMAT";
 /// Default size of log write channel, if the channel is full, logs will be dropped
 pub const CHANNEL_SIZE: usize = 10000;
 const FLUSH_TIMEOUT: Duration = Duration::from_secs(5);
-const FILTER_REFRESH_INTERVAL: Duration =
-    Duration::from_secs(5 /* minutes */ * 60 /* seconds */);
+// const FILTER_REFRESH_INTERVAL: Duration =
+//Duration::from_secs(5 /* minutes */ * 60 /* seconds */);
 
 #[derive(EnumString)]
 #[strum(serialize_all = "lowercase")]
@@ -143,8 +142,8 @@ impl LogEntry {
 
         let hostname = HOSTNAME.as_deref();
         let namespace = NAMESPACE.as_deref();
-        let peer_id = aptos_node_identity::peer_id_as_str();
-        let chain_id = aptos_node_identity::chain_id().map(|chain_id| chain_id.id());
+        let peer_id = None;
+        let chain_id = None;
 
         let backtrace = if enable_backtrace && matches!(metadata.level(), Level::Error) {
             let mut backtrace = Backtrace::new();
@@ -725,12 +724,8 @@ impl LoggerFilterUpdater {
     }
 
     pub async fn run(self) {
-        let mut interval = time::interval(FILTER_REFRESH_INTERVAL);
-        loop {
-            interval.tick().await;
-
-            self.update_filter();
-        }
+        // Just update once! We don't really care :)
+        self.update_filter();
     }
 
     fn update_filter(&self) {
