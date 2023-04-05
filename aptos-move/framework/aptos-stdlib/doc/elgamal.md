@@ -119,7 +119,7 @@ A compressed ElGamal ciphertext to some value.
 An ElGamal public key.
 
 
-<pre><code><b>struct</b> <a href="elgamal.md#0x1_elgamal_Pubkey">Pubkey</a> <b>has</b> drop
+<pre><code><b>struct</b> <a href="elgamal.md#0x1_elgamal_Pubkey">Pubkey</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
 
@@ -218,7 +218,7 @@ Creates a new public key from a serialized RistrettoPoint
 
 ## Function `new_ciphertext_from_bytes`
 
-Creates a new ciphertext from two serialized Ristrotto points
+Creates a new ciphertext from two serialized Ristretto points
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="elgamal.md#0x1_elgamal_new_ciphertext_from_bytes">new_ciphertext_from_bytes</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="elgamal.md#0x1_elgamal_Ciphertext">elgamal::Ciphertext</a>&gt;

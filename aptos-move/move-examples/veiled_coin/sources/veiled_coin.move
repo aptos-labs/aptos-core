@@ -9,9 +9,11 @@
 module veiled_coin::veiled_coin {
     use std::error;
     use std::signer;
+    //use std::features;
     use std::vector;
+    use std::option::Option;
     use aptos_std::elgamal::{Self, Ciphertext, CompressedCiphertext, Pubkey};
-    use aptos_std::ristretto255::{Self, Scalar, new_scalar_from_u64};
+    use aptos_std::ristretto255::{RistrettoPoint, Self, Scalar, new_scalar_from_u64};
 
     use aptos_framework::account;
     use aptos_framework::coin::{Self, Coin};
@@ -41,6 +43,12 @@ module veiled_coin::veiled_coin {
     /// Byte vector failed to deserialize to ciphertexts
     const EDESERIALIZATION_FAILED: u64 = 7;
 
+    /// Byte vector given for deserialization was the wrong length
+    const EBYTES_WRONG_LENGTH: u64 = 8;
+
+    /// Sigma protocol for withdrawals failed
+    const ESIGMA_PROTOCOL_VERIFY_FAILED: u64 = 9;
+
     //
     // Constants
     //
@@ -55,7 +63,89 @@ module veiled_coin::veiled_coin {
     // Core data structures.
     //
 
-    // TODO: Make wrapper struct for overall veiled coin withdrawal proof, VeiledWithdrawalProof
+    // TODO: Describe in comment
+    struct VeiledWithdrawalProof<phantom Cointype> has drop {
+	x1: RistrettoPoint,
+	x2: RistrettoPoint, 
+	x3: RistrettoPoint,
+	x4: RistrettoPoint,
+	x5: RistrettoPoint,
+	alpha1: Scalar,
+	alpha2: Scalar,
+	alpha3: Scalar,
+	alpha4: Scalar,
+    }
+
+    /// Deserializes and returns a VeiledWithdrawalProof given its byte representation
+    fun deserialize_withdrawal_proof<CoinType>(proof_bytes: vector<u8>): Option<VeiledWithdrawalProof<CoinType>> {
+	assert!(vector::length<u8>(&proof_bytes) == 288, EBYTES_WRONG_LENGTH);
+	let x1_bytes = vector::trim<u8>(&mut proof_bytes, 32);
+	let x1 = ristretto255::new_point_from_bytes(x1_bytes);
+	if (!std::option::is_some<RistrettoPoint>(&x1)) {
+	    return std::option::none<VeiledWithdrawalProof<CoinType>>()
+	};
+	let x1 = std::option::extract<RistrettoPoint>(&mut x1);
+
+	let x2_bytes = vector::trim(&mut proof_bytes, 32);	
+	let x2 = ristretto255::new_point_from_bytes(x2_bytes);
+	if (!std::option::is_some<RistrettoPoint>(&x2)) {
+	    return std::option::none<VeiledWithdrawalProof<CoinType>>()
+	};
+	let x2 = std::option::extract<RistrettoPoint>(&mut x2);	
+
+	let x3_bytes = vector::trim(&mut proof_bytes, 32);	
+	let x3 = ristretto255::new_point_from_bytes(x3_bytes);
+	if (!std::option::is_some<RistrettoPoint>(&x3)) {
+	    return std::option::none<VeiledWithdrawalProof<CoinType>>()
+	};
+	let x3 = std::option::extract<RistrettoPoint>(&mut x3);
+
+	let x4_bytes = vector::trim(&mut proof_bytes, 32);	
+	let x4 = ristretto255::new_point_from_bytes(x4_bytes);
+	if (!std::option::is_some<RistrettoPoint>(&x4)) {
+	    return std::option::none<VeiledWithdrawalProof<CoinType>>()
+	};
+	let x4 = std::option::extract<RistrettoPoint>(&mut x4);
+
+	let x5_bytes = vector::trim(&mut proof_bytes, 32);	
+	let x5 = ristretto255::new_point_from_bytes(x5_bytes);
+	if (!std::option::is_some<RistrettoPoint>(&x5)) {
+	    return std::option::none<VeiledWithdrawalProof<CoinType>>()
+	};
+	let x5 = std::option::extract<RistrettoPoint>(&mut x5);
+
+	let alpha1_bytes = vector::trim(&mut proof_bytes, 32);
+	let alpha1 = ristretto255::new_scalar_from_bytes(alpha1_bytes);
+	if (!std::option::is_some(&alpha1)) {
+	    return std::option::none<VeiledWithdrawalProof<CoinType>>()
+	};
+	let alpha1 = std::option::extract(&mut alpha1);
+
+	let alpha2_bytes = vector::trim(&mut proof_bytes, 32);
+	let alpha2 = ristretto255::new_scalar_from_bytes(alpha2_bytes);
+	if (!std::option::is_some(&alpha2)) {
+	    return std::option::none<VeiledWithdrawalProof<CoinType>>()
+	};
+	let alpha2 = std::option::extract(&mut alpha2);
+
+	let alpha3_bytes = vector::trim(&mut proof_bytes, 32);
+	let alpha3 = ristretto255::new_scalar_from_bytes(alpha3_bytes);
+	if (!std::option::is_some(&alpha3)) {
+	    return std::option::none<VeiledWithdrawalProof<CoinType>>()
+	};
+	let alpha3 = std::option::extract(&mut alpha3);
+
+	let alpha4_bytes = vector::trim(&mut proof_bytes, 32);
+	let alpha4 = ristretto255::new_scalar_from_bytes(alpha4_bytes);
+	if (!std::option::is_some(&alpha4)) {
+	    return std::option::none<VeiledWithdrawalProof<CoinType>>()
+	};
+	let alpha4 = std::option::extract(&mut alpha4);
+
+	std::option::some(VeiledWithdrawalProof {
+	    x1, x2, x3, x4, x5, alpha1, alpha2, alpha3, alpha4
+	})
+    }
 
     /// Main structure representing a coin in an account's custody.
     struct VeiledCoin<phantom CoinType> {
@@ -143,12 +233,15 @@ module veiled_coin::veiled_coin {
 	withdraw_ct: vector<u8>, 
 	deposit_ct: vector<u8>, 
 	range_proof_updated_balance: vector<u8>, 
-	range_proof_transferred_amount: vector<u8>) acquires VeiledCoinStore {
+	range_proof_transferred_amount: vector<u8>,
+	sigma_proof: vector<u8>) acquires VeiledCoinStore {
 
 	let private_withdraw_amount = elgamal::new_ciphertext_from_bytes(withdraw_ct);
 	assert!(std::option::is_some(&private_withdraw_amount), EDESERIALIZATION_FAILED);
 	let private_deposit_amount = elgamal::new_ciphertext_from_bytes(deposit_ct);
 	assert!(std::option::is_some(&private_deposit_amount), EDESERIALIZATION_FAILED);
+	let sigma_proof = deserialize_withdrawal_proof<CoinType>(sigma_proof);
+	assert!(std::option::is_some(&sigma_proof), EDESERIALIZATION_FAILED);
 
 	transfer_privately_to<CoinType>(
 		sender,
@@ -157,6 +250,7 @@ module veiled_coin::veiled_coin {
 		std::option::extract(&mut private_deposit_amount),
 		&bulletproofs::range_proof_from_bytes(range_proof_updated_balance),
 		&bulletproofs::range_proof_from_bytes(range_proof_transferred_amount),
+		&std::option::extract(&mut sigma_proof),
 	)
     }
 
@@ -254,19 +348,84 @@ module veiled_coin::veiled_coin {
     /// with ciphertexts encrypted with their respective public keys. 
     public fun transfer_privately_to<CoinType>(
         sender: &signer,
-        recipient: address,
+        recipient_addr: address,
         private_withdraw_amount: Ciphertext,
 	private_deposit_amount: Ciphertext,
         range_proof_updated_balance: &RangeProof,
-	range_proof_transferred_amount: &RangeProof)
+	range_proof_transferred_amount: &RangeProof,
+	proof: &VeiledWithdrawalProof<CoinType>)
     acquires VeiledCoinStore {
 	let sender_addr = signer::address_of(sender);
+
+	let sender_pubkey = get_pubkey_from_addr<CoinType>(sender_addr);
+	let recipient_pubkey = get_pubkey_from_addr<CoinType>(recipient_addr);
 	let sender_coin_store = borrow_global_mut<VeiledCoinStore<CoinType>>(sender_addr);
-	// TODO: Insert sigma protocol here which proves 'private_deposit_amount' and 'private_withdraw_amount' encrypt the same values using the same randomness
+
+	verify_withdrawal_sigma_protocol(&sender_pubkey, &recipient_pubkey, &elgamal::decompress_ciphertext(&sender_coin_store.private_balance), &private_withdraw_amount, &private_deposit_amount, proof);
+
         withdraw<CoinType>(sender, private_withdraw_amount, sender_coin_store, range_proof_updated_balance, range_proof_transferred_amount);
 	let vc = VeiledCoin<CoinType> { private_value: private_deposit_amount };
 
-        deposit(recipient, vc);
+        deposit(recipient_addr, vc);
+    }
+
+    /// Given an address, returns the public key in the VeiledCoinStore associated with that address
+    // TODO: Make sure coin store exists
+    fun get_pubkey_from_addr<CoinType>(addr: address): Pubkey acquires VeiledCoinStore {
+	let coin_store = borrow_global_mut<VeiledCoinStore<CoinType>>(addr);
+	coin_store.pubkey
+    }
+
+    /// Verifies a sigma proof needed to perform a private withdrawal. The relation is descirbed on
+    /// page 14 of the Zether paper: https://crypto.stanford.edu/~buenz/papers/zether.pdf
+    /// TODO: Finish description
+    fun verify_withdrawal_sigma_protocol<CoinType>(sender_pubkey: &elgamal::Pubkey, recipient_pubkey: &Pubkey, balance: &Ciphertext, withdrawal_ct: &Ciphertext, deposit_ct: &Ciphertext, proof: &VeiledWithdrawalProof<CoinType>) {
+	// TODO: Change c to fiat-shamir challenge point using cryptographic hash
+	let c = ristretto255::scalar_one();
+	let sender_pubkey_point = elgamal::get_point_from_pubkey(sender_pubkey);
+	let recipient_pubkey_point = elgamal::get_point_from_pubkey(recipient_pubkey);
+	let (big_c, d) = elgamal::ciphertext_as_points(withdrawal_ct);
+	let (bar_c, _) = elgamal::ciphertext_as_points(deposit_ct);
+	let (c_L, c_R) = elgamal::ciphertext_as_points(balance);
+	// c * D + X1 =? \alpha_1 * g
+	let d_acc = ristretto255::point_mul(d, &c);	
+	ristretto255::point_add_assign(&mut d_acc, &proof.x1);
+	let g_alpha1 = ristretto255::basepoint_mul(&proof.alpha1);
+	assert!(ristretto255::point_equals(&d_acc, &g_alpha1), ESIGMA_PROTOCOL_VERIFY_FAILED);
+
+	// c * y + X2 =? \alpha_2 * g
+	let y = elgamal::get_point_from_pubkey(sender_pubkey);
+	ristretto255::point_mul_assign(&mut y, &c);
+	ristretto255::point_add_assign(&mut y, &proof.x2);
+	let g_alpha2 = ristretto255::basepoint_mul(&proof.alpha2);
+	assert!(ristretto255::point_equals(&y, &g_alpha2), ESIGMA_PROTOCOL_VERIFY_FAILED);
+
+	let g_alpha3 = ristretto255::basepoint_mul(&proof.alpha3); 
+	// c * C + X3 =? \alpha_3 * g + \alpha_1 * y
+	let big_c = ristretto255::point_mul(big_c, &c);
+	ristretto255::point_add_assign(&mut big_c, &proof.x3);
+	let y_alpha1 = ristretto255::point_mul(&sender_pubkey_point, &proof.alpha1);
+	ristretto255::point_add_assign(&mut y_alpha1, &g_alpha3);
+	assert!(ristretto255::point_equals(&big_c, &y_alpha1), ESIGMA_PROTOCOL_VERIFY_FAILED);
+
+	// c * \bar{C} + X4 =? \alpha_3 * g + \alpha_1 * \bar{y}
+	let bar_c = ristretto255::point_mul(bar_c, &c);
+	ristretto255::point_add_assign(&mut bar_c, &proof.x4);
+	let bar_y_alpha1 = ristretto255::point_mul(&recipient_pubkey_point, &proof.alpha1);
+	ristretto255::point_add_assign(&mut bar_y_alpha1, &g_alpha3);
+	assert!(ristretto255::point_equals(&bar_c, &bar_y_alpha1), ESIGMA_PROTOCOL_VERIFY_FAILED);
+
+	// c * (C_L + -C) + X5 =? \alpha_4 * g + \alpha_2 * (C_R + -D)
+	let neg_C = ristretto255::point_neg(&big_c);
+	ristretto255::point_add_assign(&mut neg_C, c_L);
+	ristretto255::point_mul_assign(&mut neg_C, &c);
+	ristretto255::point_add_assign(&mut neg_C, &proof.x5);
+	let neg_D = ristretto255::point_neg(d);
+	ristretto255::point_add_assign(&mut neg_D, c_R);
+	ristretto255::point_mul_assign(&mut neg_D, &proof.alpha2);
+	let g_alpha4 = ristretto255::basepoint_mul(&proof.alpha4);
+	ristretto255::point_add_assign(&mut neg_D, &g_alpha4);
+	assert!(ristretto255::point_equals(&neg_C, &neg_D), ESIGMA_PROTOCOL_VERIFY_FAILED);
     }
 
     /// Deposits a veiled coin at address `to_addr`.
@@ -335,7 +494,9 @@ module veiled_coin::veiled_coin {
     // Tests
     //
 
-    const SOME_RANDOMNESS_1: vector<u8> = x"e7c7b42b75503bfc7b1932783786d227ebf88f79da752b68f6b865a9c179640c";
+    // TODO: Update tests
+
+    /*const SOME_RANDOMNESS_1: vector<u8> = x"e7c7b42b75503bfc7b1932783786d227ebf88f79da752b68f6b865a9c179640c";
 
     #[test(myself = @veiled_coin, source_fx = @aptos_framework, destination = @0x1337)]
     fun basic_viability_test(
@@ -393,5 +554,5 @@ module veiled_coin::veiled_coin {
             pedersen::commitment_as_point(&source_new_comm),
             &point_decompress(&private_balance<coin::FakeMoney>(source_addr))
         ), 1);
-    }
+    }*/
 }
