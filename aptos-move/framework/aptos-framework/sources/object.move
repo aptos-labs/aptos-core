@@ -386,7 +386,7 @@ module aptos_framework::object {
 
     /// Transfers ownership of the object (and all associated resources) at the specified address
     /// for Object<T> to the "to" address.
-    public fun transfer<T: key>(
+    public entry fun transfer<T: key>(
         owner: &signer,
         object: Object<T>,
         to: address,
@@ -423,7 +423,7 @@ module aptos_framework::object {
     }
 
     /// Transfer the given object to another object. See `transfer` for more information.
-    public fun transfer_to_object<O: key, T: key>(
+    public entry fun transfer_to_object<O: key, T: key>(
         owner: &signer,
         object: Object<O>,
         to: Object<T>,
