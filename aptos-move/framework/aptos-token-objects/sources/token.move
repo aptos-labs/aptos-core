@@ -154,18 +154,22 @@ module aptos_token_objects::token {
         borrow_global<Token>(token_address)
     }
 
+    #[view]
     public fun creator<T: key>(token: Object<T>): address acquires Token {
         collection::creator(borrow(&token).collection)
     }
 
+    #[view]
     public fun collection<T: key>(token: Object<T>): String acquires Token {
         collection::name(borrow(&token).collection)
     }
 
+    #[view]
     public fun collection_object<T: key>(token: Object<T>): Object<Collection> acquires Token {
         borrow(&token).collection
     }
 
+    #[view]
     public fun creation_name<T: key>(token: Object<T>): String acquires Token {
         let token = borrow(&token);
         if (option::is_some(&token.creation_name)) {
@@ -175,18 +179,22 @@ module aptos_token_objects::token {
         }
     }
 
+    #[view]
     public fun description<T: key>(token: Object<T>): String acquires Token {
         borrow(&token).description
     }
 
+    #[view]
     public fun name<T: key>(token: Object<T>): String acquires Token {
         borrow(&token).name
     }
 
+    #[view]
     public fun uri<T: key>(token: Object<T>): String acquires Token {
         borrow(&token).uri
     }
 
+    #[view]
     public fun royalty<T: key>(token: Object<T>): Option<Royalty> acquires Token {
         borrow(&token);
         let royalty = royalty::get(token);
