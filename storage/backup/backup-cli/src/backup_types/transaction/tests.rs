@@ -109,6 +109,7 @@ fn end_to_end() {
             None,
             None,
             VerifyExecutionMode::verify_all(),
+            None,
         )
         .run(),
     )
