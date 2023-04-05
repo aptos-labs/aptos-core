@@ -3,7 +3,7 @@
 /// The deployer will also become the initial admin and can mint/burn/freeze/unfreeze accounts.
 /// The admin can transfer the asset via object::transfer() at any point to set a new admin.
 module fungible_asset::managed_fungible_asset {
-    use aptos_framework::fungible_asset::{Self, MintRef, TransferRef, BurnRef, FungibleAsset, FungibleAssetMetadata};
+    use aptos_framework::fungible_asset::{Self, MintRef, TransferRef, BurnRef, ExtractedAsset, Metadata};
     use aptos_framework::object::{Self, Object};
     use aptos_framework::primary_wallet;
     use std::error;
@@ -47,9 +47,9 @@ module fungible_asset::managed_fungible_asset {
 
     #[view]
     /// Return the address of the managed fungible asset that's created when this module is deployed.
-    public fun get_asset(): Object<FungibleAssetMetadata> {
+    public fun get_asset(): Object<Metadata> {
         let asset_address = object::create_object_address(&@fungible_asset, ASSET_SYMBOL);
-        object::address_to_object<FungibleAssetMetadata>(asset_address)
+        object::address_to_object<Metadata>(asset_address)
     }
 
     /// Mint as the owner of metadata object.
@@ -95,7 +95,7 @@ module fungible_asset::managed_fungible_asset {
     }
 
     /// Withdraw as the owner of metadata object ignoring `allow_ungated_transfer` field.
-    public fun withdraw(admin: &signer, amount: u64, from: address): FungibleAsset acquires ManagedFungibleAsset {
+    public fun withdraw(admin: &signer, amount: u64, from: address): ExtractedAsset acquires ManagedFungibleAsset {
         let asset = get_asset();
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
         let from_wallet = primary_wallet::ensure_primary_wallet_exists(from, asset);
@@ -103,7 +103,7 @@ module fungible_asset::managed_fungible_asset {
     }
 
     /// Deposit as the owner of metadata object ignoring `allow_ungated_transfer` field.
-    public fun deposit(admin: &signer, to: address, fa: FungibleAsset) acquires ManagedFungibleAsset {
+    public fun deposit(admin: &signer, to: address, fa: ExtractedAsset) acquires ManagedFungibleAsset {
         let asset = get_asset();
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
         let to_wallet = primary_wallet::ensure_primary_wallet_exists(to, asset);
@@ -114,7 +114,7 @@ module fungible_asset::managed_fungible_asset {
     /// This validates that the signer is the metadata object's owner.
     inline fun authorized_borrow_refs(
         owner: &signer,
-        asset: Object<FungibleAssetMetadata>,
+        asset: Object<Metadata>,
     ): &ManagedFungibleAsset acquires ManagedFungibleAsset {
         assert!(object::is_owner(asset, signer::address_of(owner)), error::permission_denied(ENOT_OWNER));
         borrow_global<ManagedFungibleAsset>(object::object_address(&asset))

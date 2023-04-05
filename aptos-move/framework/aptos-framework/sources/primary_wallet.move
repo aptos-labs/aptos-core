@@ -1,7 +1,7 @@
 /// This defines the module for interacting with primary wallets of accounts/objects, which have deterministic addresses
 module aptos_framework::primary_wallet {
     use aptos_framework::create_signer;
-    use aptos_framework::fungible_asset::{Self, FungibleAsset, FungibleAssetWallet};
+    use aptos_framework::fungible_asset::{Self, ExtractedAsset, FungibleAsset};
     use aptos_framework::object::{Self, Object, ConstructorRef, DeriveRef};
 
     use std::signer;
@@ -32,7 +32,7 @@ module aptos_framework::primary_wallet {
     public fun ensure_primary_wallet_exists<T: key>(
         owner: address,
         metadata: Object<T>,
-    ): Object<FungibleAssetWallet> acquires PrimaryWalletSupport {
+    ): Object<FungibleAsset> acquires PrimaryWalletSupport {
         if (!primary_wallet_exists(owner, metadata)) {
             create_primary_wallet(owner, metadata);
         };
@@ -43,7 +43,7 @@ module aptos_framework::primary_wallet {
     public fun create_primary_wallet<T: key>(
         owner_addr: address,
         metadata: Object<T>,
-    ): Object<FungibleAssetWallet> acquires PrimaryWalletSupport {
+    ): Object<FungibleAsset> acquires PrimaryWalletSupport {
         let owner = &create_signer::create_signer(owner_addr);
         let metadata_addr = object::object_address(&metadata);
         let derive_ref = &borrow_global<PrimaryWalletSupport>(metadata_addr).metadata_derive_ref;
@@ -63,9 +63,9 @@ module aptos_framework::primary_wallet {
     }
 
     #[view]
-    public fun primary_wallet<T: key>(owner: address, metadata: Object<T>): Object<FungibleAssetWallet> {
+    public fun primary_wallet<T: key>(owner: address, metadata: Object<T>): Object<FungibleAsset> {
         let wallet = primary_wallet_address(owner, metadata);
-        object::address_to_object<FungibleAssetWallet>(wallet)
+        object::address_to_object<FungibleAsset>(wallet)
     }
 
     #[view]
@@ -90,13 +90,13 @@ module aptos_framework::primary_wallet {
     }
 
     /// Withdraw `amount` of fungible asset from `wallet` by the owner.
-    public fun withdraw<T: key>(owner: &signer, metadata: Object<T>, amount: u64): FungibleAsset {
+    public fun withdraw<T: key>(owner: &signer, metadata: Object<T>, amount: u64): ExtractedAsset {
         let wallet = primary_wallet(signer::address_of(owner), metadata);
         fungible_asset::withdraw(owner, wallet, amount)
     }
 
     /// Deposit `amount` of fungible asset to the given account's primary wallet.
-    public fun deposit(owner: address, fa: FungibleAsset) acquires PrimaryWalletSupport {
+    public fun deposit(owner: address, fa: ExtractedAsset) acquires PrimaryWalletSupport {
         let metadata = fungible_asset::asset_metadata(&fa);
         let wallet = ensure_primary_wallet_exists(owner, metadata);
         fungible_asset::deposit(wallet, fa);
