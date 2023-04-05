@@ -4,12 +4,14 @@
 use anyhow::Result;
 use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
+    resource::TransactionWrite,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
-    write_set::{TransactionWrite, WriteSet},
+    write_set::WriteSet,
 };
-use aptos_vm_view::types::{AptosResource, TRemoteCache, TStateViewWithRemoteCache};
+use aptos_types::resource::AptosResource;
+use aptos_vm_view::types::{TRemoteCache, TStateViewWithRemoteCache};
 
 pub struct DeltaStateView<'a, 'b, S> {
     base: &'a S,
@@ -62,15 +64,14 @@ impl<'a, 'b, S> TRemoteCache for DeltaStateView<'a, 'b, S>
 {
     type Key = StateKey;
 
-    fn get_cached_aggregator_value(&self, state_key: &Self::Key) -> Result<Option<u128>> {
-        todo!()
-    }
-
     fn get_cached_module(&self, state_key: &Self::Key) -> Result<Option<Vec<u8>>> {
         todo!()
     }
 
-    fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosResource<Self::Key>>> {
-        todo!()
+    fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosResource>> {
+        match self.write_set.get(state_key) {
+            Some(write_op) => Ok(write_op.as_aptos_resource()),
+            None => self.base.get_cached_resource(state_key),
+        }
     }
 }

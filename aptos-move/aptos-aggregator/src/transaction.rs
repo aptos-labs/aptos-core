@@ -5,8 +5,9 @@ use crate::delta_change_set::{deserialize, DeltaChangeSet};
 use anyhow::bail;
 use aptos_state_view::StateView;
 use aptos_types::{
+    resource::TransactionWrite,
     transaction::{ChangeSet, CheckChangeSet, TransactionOutput},
-    write_set::{TransactionWrite, WriteOp, WriteSet, WriteSetMut},
+    write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use std::{collections::btree_map, sync::Arc};
 

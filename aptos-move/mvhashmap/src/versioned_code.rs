@@ -5,7 +5,7 @@ use crate::types::{MVCodeError, MVCodeOutput, TxnIndex};
 use aptos_crypto::hash::{DefaultHasher, HashValue};
 use aptos_types::{
     executable::{Executable, ExecutableDescriptor},
-    write_set::TransactionWrite,
+    resource::TransactionWrite,
 };
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;

@@ -3076,6 +3076,7 @@ dependencies = [
  "itertools",
  "move-core-types",
  "move-table-extension",
+ "move-vm-types",
  "num-derive",
  "num-traits 0.2.15",
  "once_cell",

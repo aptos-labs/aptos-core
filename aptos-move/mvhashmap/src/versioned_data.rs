@@ -7,7 +7,7 @@ use aptos_aggregator::{
     transaction::AggregatorValue,
 };
 use aptos_infallible::Mutex;
-use aptos_types::write_set::TransactionWrite;
+use aptos_types::resource::TransactionWrite;
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
 use std::{

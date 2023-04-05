@@ -4,7 +4,7 @@
 
 use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_types::{executable::ModulePath, write_set::TransactionWrite};
+use aptos_types::{executable::ModulePath, resource::TransactionWrite};
 use std::{fmt::Debug, hash::Hash};
 use aptos_vm_view::types::TStateViewWithRemoteCache;
 

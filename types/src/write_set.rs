@@ -16,6 +16,7 @@ use std::{
     collections::{btree_map, BTreeMap},
     ops::Deref,
 };
+use crate::resource::{AptosResource, TransactionWrite};
 
 #[derive(Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub enum WriteOp {
@@ -165,12 +166,6 @@ impl WriteOp {
     }
 }
 
-pub trait TransactionWrite {
-    fn extract_raw_bytes(&self) -> Option<Vec<u8>>;
-
-    fn as_state_value(&self) -> Option<StateValue>;
-}
-
 impl TransactionWrite for WriteOp {
     fn extract_raw_bytes(&self) -> Option<Vec<u8>> {
         self.clone().into_bytes()
@@ -181,6 +176,11 @@ impl TransactionWrite for WriteOp {
             None => StateValue::new_legacy(bytes.to_vec()),
             Some(metadata) => StateValue::new_with_metadata(bytes.to_vec(), metadata.clone()),
         })
+    }
+
+    fn as_aptos_resource(&self) -> Option<AptosResource> {
+        let bytes = self.clone().into_bytes();
+        bytes.map(AptosResource::from_blob)
     }
 }
 

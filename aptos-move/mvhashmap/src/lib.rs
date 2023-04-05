@@ -10,7 +10,7 @@ use crate::{
 use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_types::{
     executable::{Executable, ExecutableDescriptor, ModulePath},
-    write_set::TransactionWrite,
+    resource::TransactionWrite,
 };
 use std::hash::Hash;
 

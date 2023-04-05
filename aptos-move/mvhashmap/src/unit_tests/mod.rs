@@ -13,6 +13,7 @@ use aptos_aggregator::{
 use aptos_types::{
     access_path::AccessPath,
     executable::{ExecutableTestType, ModulePath},
+    resource::AptosResource,
     state_store::state_value::StateValue,
 };
 use std::sync::Arc;
@@ -35,6 +36,10 @@ impl TransactionWrite for Value {
     }
 
     fn as_state_value(&self) -> Option<StateValue> {
+        unimplemented!()
+    }
+
+    fn as_aptos_resource(&self) -> Option<AptosResource> {
         unimplemented!()
     }
 }

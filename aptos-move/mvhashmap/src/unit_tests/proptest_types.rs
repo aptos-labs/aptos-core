@@ -13,7 +13,7 @@ use aptos_aggregator::{
 };
 use aptos_types::{
     executable::ExecutableTestType, state_store::state_value::StateValue,
-    write_set::TransactionWrite,
+    resource::TransactionWrite,
 };
 use proptest::{collection::vec, prelude::*, sample::Index, strategy::Strategy};
 use std::{

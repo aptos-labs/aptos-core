@@ -16,8 +16,9 @@ use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     executable::ModulePath,
+    resource::TransactionWrite,
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
-    write_set::{TransactionWrite, WriteOp},
+    write_set::WriteOp,
 };
 use claims::assert_none;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};

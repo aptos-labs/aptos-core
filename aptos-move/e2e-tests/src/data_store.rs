@@ -10,6 +10,7 @@ use aptos_state_view::TStateView;
 use aptos_types::{
     access_path::AccessPath,
     account_config::CoinInfoResource,
+    resource::AptosResource,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
         table::TableHandle as AptosTableHandle,
@@ -26,7 +27,7 @@ use move_table_extension::{TableHandle, TableResolver};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use aptos_vm_view::types::{AptosResource, TRemoteCache, TStateViewWithRemoteCache};
+use aptos_vm_view::types::{TRemoteCache, TStateViewWithRemoteCache};
 
 /// Dummy genesis ChangeSet for testing
 pub static GENESIS_CHANGE_SET_HEAD: Lazy<ChangeSet> =
@@ -139,15 +140,11 @@ impl TStateView for FakeDataStore {
 impl TRemoteCache for FakeDataStore {
     type Key = StateKey;
 
-    fn get_cached_aggregator_value(&self, state_key: &Self::Key) -> Result<Option<u128>> {
-        todo!()
-    }
-
     fn get_cached_module(&self, state_key: &Self::Key) -> Result<Option<Vec<u8>>> {
         todo!()
     }
 
-    fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosResource<Self::Key>>> {
+    fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosResource>> {
         todo!()
     }
 }

@@ -25,6 +25,7 @@ aptos-vm-logging = { workspace = true }
 aptos-vm-view = { workspace = true }
 arc-swap = { workspace = true }
 bcs = { workspace = true }
+claims = { workspace = true }
 criterion = { workspace = true, optional = true }
 crossbeam = { workspace = true }
 crossbeam-queue = { workspace = true }
