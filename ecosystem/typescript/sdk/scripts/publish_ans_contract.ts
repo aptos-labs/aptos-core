@@ -37,10 +37,15 @@ try {
   console.log("---sleeps for 10 seconds to make sure account has funded---");
   execSync("sleep 10");
 
+  // debugging
+  execSync("ls -la /tmp");
+  execSync("ls -la /tmp/ans");
+  execSync("ls -la /tmp/ans/core");
+
   // 3. publish ans modules under the ans account
   console.log("---publish ans modules---");
   execSync(
-    `${APTOS_INVOCATION} move publish --private-key=${ANS_TEST_ACCOUNT_PRIVATE_KEY} --named-addresses aptos_names=0x${ANS_TEST_ACCOUNT_ADDRESS},aptos_names_admin=0x${ANS_TEST_ACCOUNT_ADDRESS},aptos_names_funds=0x${ANS_TEST_ACCOUNT_ADDRESS} --url=${APTOS_NODE_URL} --package-dir=${`/tmp/ans/core`} --assume-yes`,
+    `${APTOS_INVOCATION} move publish --private-key=${ANS_TEST_ACCOUNT_PRIVATE_KEY} --named-addresses aptos_names=0x${ANS_TEST_ACCOUNT_ADDRESS},aptos_names_admin=0x${ANS_TEST_ACCOUNT_ADDRESS},aptos_names_funds=0x${ANS_TEST_ACCOUNT_ADDRESS} --url=${APTOS_NODE_URL} --package-dir=/tmp/ans/core --assume-yes`,
   );
 
   // 4. Delete aptos-names-contracts folder created by the git clone command
