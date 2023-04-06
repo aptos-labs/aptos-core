@@ -166,10 +166,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     // Publishing stdlib should not produce any deltas around aggregators and map to write ops and
     // not deltas. The second session only publishes the framework module bundle, which should not
     // produce deltas either.
-    assert!(
-        deltas.is_empty(),
-        "non-empty delta change set in genesis"
-    );
+    assert!(deltas.is_empty(), "non-empty delta change set in genesis");
 
     // TODO: fix this
     // Construct legacy change set.
@@ -286,10 +283,7 @@ pub fn encode_genesis_change_set(
     // Publishing stdlib should not produce any deltas around aggregators and map to write ops and
     // not deltas. The second session only publishes the framework module bundle, which should not
     // produce deltas either.
-    assert!(
-        deltas.is_empty(),
-        "non-empty delta change set in genesis"
-    );
+    assert!(deltas.is_empty(), "non-empty delta change set in genesis");
 
     // TODO: fix this
     // Construct legcay change set.

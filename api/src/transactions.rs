@@ -34,19 +34,19 @@ use aptos_types::{
     mempool_status::MempoolStatusCode,
     transaction::{
         EntryFunction, ExecutionStatus, MultisigTransactionPayload, RawTransaction,
-        RawTransactionWithData, SignedTransaction, TransactionPayload, TransactionStatus,
+        RawTransactionWithData, SignedTransaction, TransactionOutput, TransactionPayload,
+        TransactionStatus,
     },
     vm_status::StatusCode,
 };
 use aptos_vm::AptosVM;
+use aptos_vm_types::change_set::{AptosChangeSet, ChangeSet};
 use poem_openapi::{
     param::{Path, Query},
     payload::Json,
     ApiRequest, OpenApi,
 };
 use std::sync::Arc;
-use aptos_types::transaction::TransactionOutput;
-use aptos_vm_types::change_set::{AptosChangeSet, ChangeSet};
 
 generate_success_response!(SubmitTransactionResponse, (202, Accepted));
 
@@ -1185,16 +1185,17 @@ impl TransactionsApi {
 
         // TODO: Make this nicer!
         let (mut writes, deltas, events, gas_used, status) = vm_output.unpack();
-        let materialized_writes = AptosChangeSet::try_materialize_deltas(deltas, &move_resolver).expect("should not fail");
-        AptosChangeSet::extend_with_writes(&mut writes, &mut ChangeSet::empty(), materialized_writes).expect("should not fail");
+        let materialized_writes = AptosChangeSet::try_materialize_deltas(deltas, &move_resolver)
+            .expect("should not fail");
+        AptosChangeSet::extend_with_writes(
+            &mut writes,
+            &mut ChangeSet::empty(),
+            materialized_writes,
+        )
+        .expect("should not fail");
         let write_set = AptosChangeSet::into_write_set(writes).expect("should not fail");
 
-        let output = TransactionOutput::new(
-            write_set,
-            events,
-            gas_used,
-            status,
-        );
+        let output = TransactionOutput::new(write_set, events, gas_used, status);
 
         // Ensure that all known statuses return their values in the output (even if they aren't supposed to)
         let exe_status = match output.status().clone() {

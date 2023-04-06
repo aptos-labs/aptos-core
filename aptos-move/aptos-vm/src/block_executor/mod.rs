@@ -26,14 +26,16 @@ use aptos_types::{
     transaction::{Transaction, TransactionOutput, TransactionStatus},
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
+use aptos_vm_types::{
+    change_set::{AptosChangeSet, ChangeSet},
+    delta::DeltaOp,
+    remote_cache::StateViewWithRemoteCache,
+    transaction_output::VMTransactionOutput,
+    write::{AptosWrite, Op},
+};
 use move_core_types::vm_status::VMStatus;
 use rayon::prelude::*;
 use std::time::Instant;
-use aptos_vm_types::change_set::{AptosChangeSet, ChangeSet};
-use aptos_vm_types::delta::DeltaOp;
-use aptos_vm_types::remote_cache::StateViewWithRemoteCache;
-use aptos_vm_types::transaction_output::VMTransactionOutput;
-use aptos_vm_types::write::{AptosWrite, Op};
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Key = StateKey;
@@ -125,12 +127,18 @@ impl BlockAptosVM {
                     results
                         .into_par_iter()
                         .map(|(output, delta_writes)| {
-                            let (mut writes, deltas, events, gas_used, status) = output.into().unpack();
+                            let (mut writes, deltas, events, gas_used, status) =
+                                output.into().unpack();
 
                             // We should have a delta write for every delta in the output.
                             assert_eq!(deltas.len(), delta_writes.len());
 
-                            AptosChangeSet::extend_with_writes(&mut writes, &mut ChangeSet::empty(), ChangeSet::new(delta_writes)).expect("should not fail");
+                            AptosChangeSet::extend_with_writes(
+                                &mut writes,
+                                &mut ChangeSet::empty(),
+                                ChangeSet::new(delta_writes),
+                            )
+                            .expect("should not fail");
                             TransactionOutput::new(
                                 AptosChangeSet::into_write_set(writes).expect("should not fail"),
                                 events,

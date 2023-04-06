@@ -4,9 +4,8 @@
 
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{executable::ModulePath, resource::TransactionWrite};
+use aptos_vm_types::{delta::DeltaOp, remote_cache::TStateViewWithRemoteCache};
 use std::{fmt::Debug, hash::Hash};
-use aptos_vm_types::remote_cache::TStateViewWithRemoteCache;
-use aptos_vm_types::delta::DeltaOp;
 
 /// The execution result of a transaction
 #[derive(Debug)]

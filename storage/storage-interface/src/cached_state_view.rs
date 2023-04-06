@@ -8,11 +8,12 @@ use aptos_scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree, StateStoreStatu
 use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
     proof::SparseMerkleProofExt,
+    resource::AptosResource,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
     transaction::Version,
-    write_set::WriteSet, resource::AptosResource,
+    write_set::WriteSet,
 };
 use aptos_vm_types::remote_cache::{TRemoteCache, TStateViewWithRemoteCache};
 use dashmap::DashMap;
@@ -280,7 +281,6 @@ impl TStateView for CachedDbStateView {
         self.db_state_view.get_usage()
     }
 }
-
 
 impl TRemoteCache for CachedDbStateView {
     type Key = StateKey;

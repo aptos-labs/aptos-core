@@ -1,10 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::{
-    aggregator_extension::{AggregatorData, AggregatorID, AggregatorState},
-};
+use aptos_aggregator::aggregator_extension::{AggregatorData, AggregatorID, AggregatorState};
 use aptos_types::vm_status::VMStatus;
+use aptos_vm_types::delta::{DeltaOp, DeltaUpdate};
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::Location;
 use move_table_extension::TableResolver;
@@ -12,7 +11,6 @@ use std::{
     cell::RefCell,
     collections::{btree_map, BTreeMap},
 };
-use aptos_vm_types::delta::{DeltaOp, DeltaUpdate};
 
 /// Represents a single aggregator change.
 #[derive(Copy, Clone, Debug)]

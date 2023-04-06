@@ -1,23 +1,26 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::fmt::{Debug, Formatter, Result};
+use crate::{
+    remote_cache::StateViewWithRemoteCache,
+    write::{AptosWrite, Op},
+};
 use aptos_state_view::StateView;
 use aptos_types::state_store::state_key::StateKey;
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult};
-use move_core_types::ident_str;
-use move_core_types::identifier::IdentStr;
-use move_core_types::language_storage::{CORE_CODE_ADDRESS, ModuleId};
-use move_core_types::vm_status::{StatusCode, VMStatus};
-use crate::write::{AptosWrite, Op};
+use move_core_types::{
+    ident_str,
+    identifier::IdentStr,
+    language_storage::{ModuleId, CORE_CODE_ADDRESS},
+    vm_status::{StatusCode, VMStatus},
+};
 use once_cell::sync::Lazy;
-use crate::remote_cache::StateViewWithRemoteCache;
+use std::fmt::{Debug, Formatter, Result};
 
 // TODO: Find a better place for these?
 pub(crate) const AGGREGATOR_MODULE_IDENTIFIER: &IdentStr = ident_str!("aggregator");
 pub(crate) static AGGREGATOR_MODULE: Lazy<ModuleId> =
     Lazy::new(|| ModuleId::new(CORE_CODE_ADDRESS, AGGREGATOR_MODULE_IDENTIFIER.to_owned()));
-
 
 /// Error code for overflows.
 const LIMIT_OVERFLOW: u64 = 0x02_0001;
@@ -200,7 +203,8 @@ impl DeltaOp {
             .and_then(|maybe_bytes| {
                 match maybe_bytes {
                     Some(bytes) => {
-                        let base = bcs::from_bytes(&bytes).expect("unexpected deserialization error in aggregator");
+                        let base = bcs::from_bytes(&bytes)
+                            .expect("unexpected deserialization error in aggregator");
                         self.apply_to(base)
                             .map_err(|partial_error| {
                                 // If delta application fails, transform partial VM

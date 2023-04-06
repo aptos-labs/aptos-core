@@ -14,16 +14,17 @@ use aptos_types::{
     account_state::AccountState,
     account_view::AccountView,
     on_chain_config::ValidatorSet,
+    resource::AptosResource,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
-    transaction::{Transaction, TransactionInfo, Version}, resource::AptosResource,
+    transaction::{Transaction, TransactionInfo, Version},
 };
+use aptos_vm_types::remote_cache::{TRemoteCache, TStateViewWithRemoteCache};
 use lru::LruCache;
 use move_binary_format::file_format::CompiledModule;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
-use aptos_vm_types::remote_cache::{TRemoteCache, TStateViewWithRemoteCache};
 
 // TODO(skedia) Clean up this interfact to remove account specific logic and move to state store
 // key-value interface with fine grained storage project

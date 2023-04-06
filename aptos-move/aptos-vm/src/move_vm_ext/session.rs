@@ -5,9 +5,7 @@ use crate::{
     access_path_cache::AccessPathCache, data_cache::MoveResolverWithVMMetadata,
     move_vm_ext::MoveResolverExt, transaction_metadata::TransactionMetadata,
 };
-use aptos_aggregator::{
-    aggregator_extension::AggregatorID,
-};
+use aptos_aggregator::aggregator_extension::AggregatorID;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_framework::natives::{
@@ -21,27 +19,29 @@ use aptos_types::{
     state_store::{state_key::StateKey, table::TableHandle},
     transaction::SignatureCheckedTransaction,
 };
+use aptos_vm_types::{
+    change_set::{AptosChangeSet, ChangeSet},
+    write::{AptosWrite, Op},
+};
 use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{
-        Event as MoveEvent, Op as MoveStorageOp,
-    },
+    effects::{Event as MoveEvent, Op as MoveStorageOp},
     language_storage::{ModuleId, StructTag},
     vm_status::{StatusCode, VMStatus},
 };
 use move_table_extension::{NativeTableContext, TableChangeSet};
 use move_vm_runtime::{move_vm::MoveVM, session::Session};
-use move_vm_types::effects::{AccountChangeSetV2 as AccountChangeSet, ChangeSetV2 as MoveChangeSet};
+use move_vm_types::{
+    effects::{AccountChangeSetV2 as AccountChangeSet, ChangeSetV2 as MoveChangeSet},
+    resolver::Resource,
+};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
     ops::{Deref, DerefMut},
     sync::Arc,
 };
-use aptos_vm_types::change_set::{AptosChangeSet, ChangeSet};
-use aptos_vm_types::write::{AptosWrite, Op};
-use move_vm_types::resolver::Resource;
 
 #[derive(BCSCryptoHash, CryptoHasher, Deserialize, Serialize)]
 pub enum SessionId {

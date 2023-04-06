@@ -20,10 +20,12 @@ use aptos_mvhashmap::{
     types::{MVDataError, MVDataOutput, TxnIndex, Version},
     MVHashMap,
 };
-use aptos_types::{
-    executable::ExecutableTestType, // TODO: fix up with the proper generics.
-};
+use aptos_types::executable::ExecutableTestType;
 use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
+use aptos_vm_types::{
+    remote_cache::TStateViewWithRemoteCache,
+    write::{AptosWrite, Op},
+};
 use num_cpus;
 use once_cell::sync::Lazy;
 use std::{
@@ -31,8 +33,6 @@ use std::{
     marker::PhantomData,
     sync::atomic::{AtomicBool, Ordering},
 };
-use aptos_vm_types::remote_cache::TStateViewWithRemoteCache;
-use aptos_vm_types::write::{AptosWrite, Op};
 
 pub static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()

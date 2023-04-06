@@ -5,9 +5,12 @@
 //! For each transaction the VM executes, the VM will output a `WriteSet` that contains each access
 //! path it updates. For each access path, the VM can either give its new value or delete it.
 
-use crate::state_store::{
-    state_key::StateKey,
-    state_value::{StateValue, StateValueMetadata},
+use crate::{
+    resource::{AptosResource, TransactionWrite},
+    state_store::{
+        state_key::StateKey,
+        state_value::{StateValue, StateValueMetadata},
+    },
 };
 use anyhow::{bail, Result};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -16,7 +19,6 @@ use std::{
     collections::{btree_map, BTreeMap},
     ops::Deref,
 };
-use crate::resource::{AptosResource, TransactionWrite};
 
 #[derive(Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub enum WriteOp {

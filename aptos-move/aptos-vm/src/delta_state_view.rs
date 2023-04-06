@@ -4,15 +4,16 @@
 use anyhow::Result;
 use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
-    resource::TransactionWrite,
+    resource::{AptosResource, TransactionWrite},
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
 };
-use aptos_types::resource::AptosResource;
-use aptos_vm_types::change_set::ChangeSet;
-use aptos_vm_types::remote_cache::{TRemoteCache, TStateViewWithRemoteCache};
-use aptos_vm_types::write::{AptosWrite, Op};
+use aptos_vm_types::{
+    change_set::ChangeSet,
+    remote_cache::{TRemoteCache, TStateViewWithRemoteCache},
+    write::{AptosWrite, Op},
+};
 
 pub struct DeltaStateView<'a, 'b, S> {
     base: &'a S,
@@ -61,8 +62,8 @@ where
 }
 
 impl<'a, 'b, S> TRemoteCache for DeltaStateView<'a, 'b, S>
-    where
-        S: TRemoteCache<Key = StateKey>,
+where
+    S: TRemoteCache<Key = StateKey>,
 {
     type Key = StateKey;
 

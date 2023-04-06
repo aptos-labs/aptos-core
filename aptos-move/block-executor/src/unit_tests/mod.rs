@@ -9,7 +9,7 @@ use crate::{
 };
 use aptos_aggregator::delta_change_set::{delta_add, delta_sub, DeltaOp, DeltaUpdate};
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_types::{executable::ModulePath, resource::TransactionWrite,};
+use aptos_types::{executable::ModulePath, resource::TransactionWrite};
 use claims::{assert_matches, assert_some_eq};
 use rand::{prelude::*, random};
 use std::{

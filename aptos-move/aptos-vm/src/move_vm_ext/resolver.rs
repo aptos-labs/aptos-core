@@ -3,6 +3,7 @@
 
 use aptos_framework::{natives::state_storage::StateStorageUsageResolver, RuntimeModuleMetadataV1};
 use aptos_types::on_chain_config::ConfigStorage;
+use aptos_vm_types::remote_cache::StateViewWithRemoteCache;
 use move_binary_format::errors::{Location, PartialVMError, VMError};
 use move_core_types::{
     account_address::AccountAddress,
@@ -12,7 +13,6 @@ use move_core_types::{
 use move_table_extension::TableResolver;
 use move_vm_types::resolver::MoveResolverV2;
 use std::collections::BTreeMap;
-use aptos_vm_types::remote_cache::StateViewWithRemoteCache;
 
 pub trait MoveResolverExt:
     MoveResolverV2<Err = VMError>

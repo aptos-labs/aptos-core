@@ -1,18 +1,27 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::btree_map::{Entry, IntoIter, Iter};
-use std::collections::btree_map::Entry::{Occupied, Vacant};
-use std::collections::BTreeMap;
-use aptos_types::contract_event::ContractEvent;
-use aptos_types::state_store::state_key::StateKey;
-use aptos_types::transaction::CheckChangeSet;
-use aptos_types::write_set::{WriteSet, WriteSetMut};
+use crate::{
+    delta::DeltaOp,
+    remote_cache::StateViewWithRemoteCache,
+    write::{AptosWrite, Op},
+};
+use aptos_types::{
+    contract_event::ContractEvent,
+    state_store::state_key::StateKey,
+    transaction::CheckChangeSet,
+    write_set::{WriteSet, WriteSetMut},
+};
 use move_binary_format::errors::{Location, PartialVMResult};
 use move_core_types::vm_status::VMStatus;
-use crate::delta::DeltaOp;
-use crate::remote_cache::StateViewWithRemoteCache;
-use crate::write::{AptosWrite, Op};
+use std::collections::{
+    btree_map::{
+        Entry,
+        Entry::{Occupied, Vacant},
+        IntoIter, Iter,
+    },
+    BTreeMap,
+};
 
 /// Container to hold arbitrary changes to the global state.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -21,7 +30,6 @@ pub struct ChangeSet<T> {
 }
 
 impl<T> ChangeSet<T> {
-
     pub fn new(items: impl IntoIterator<Item = (StateKey, T)>) -> Self {
         Self {
             inner: items.into_iter().collect(),
@@ -71,8 +79,8 @@ impl<T> ChangeSet<T> {
 }
 
 impl<'a, T> IntoIterator for &'a ChangeSet<T> {
-    type Item = (&'a StateKey, &'a T);
     type IntoIter = Iter<'a, StateKey, T>;
+    type Item = (&'a StateKey, &'a T);
 
     fn into_iter(self) -> Self::IntoIter {
         self.inner.iter()
@@ -80,8 +88,8 @@ impl<'a, T> IntoIterator for &'a ChangeSet<T> {
 }
 
 impl<T> IntoIterator for ChangeSet<T> {
-    type Item = (StateKey, T);
     type IntoIter = IntoIter<StateKey, T>;
+    type Item = (StateKey, T);
 
     fn into_iter(self) -> Self::IntoIter {
         self.inner.into_iter()
@@ -99,7 +107,11 @@ pub struct AptosChangeSet {
 }
 
 impl AptosChangeSet {
-    pub fn new(writes: ChangeSet<Op<AptosWrite>>, deltas: ChangeSet<DeltaOp>, events: Vec<ContractEvent>) -> Self {
+    pub fn new(
+        writes: ChangeSet<Op<AptosWrite>>,
+        deltas: ChangeSet<DeltaOp>,
+        events: Vec<ContractEvent>,
+    ) -> Self {
         Self {
             writes,
             deltas,
@@ -121,16 +133,25 @@ impl AptosChangeSet {
         // checker.check_change_set(&self)
     }
 
-    pub fn into_inner(self) -> (ChangeSet<Op<AptosWrite>>, ChangeSet<DeltaOp>, Vec<ContractEvent>) {
+    pub fn into_inner(
+        self,
+    ) -> (
+        ChangeSet<Op<AptosWrite>>,
+        ChangeSet<DeltaOp>,
+        Vec<ContractEvent>,
+    ) {
         (self.writes, self.deltas, self.events)
     }
 
-    pub fn into_write_set(
-        writes: ChangeSet<Op<AptosWrite>>,
-    ) -> anyhow::Result<WriteSet, VMStatus> {
+    pub fn into_write_set(writes: ChangeSet<Op<AptosWrite>>) -> anyhow::Result<WriteSet, VMStatus> {
         let mut write_set_mut = WriteSetMut::default();
         for (key, write) in writes {
-            write_set_mut.insert((key, write.into_write_op().map_err(|e| e.finish(Location::Undefined).into_vm_status())?));
+            write_set_mut.insert((
+                key,
+                write
+                    .into_write_op()
+                    .map_err(|e| e.finish(Location::Undefined).into_vm_status())?,
+            ));
         }
 
         // TODO: revisit!
@@ -160,8 +181,7 @@ impl AptosChangeSet {
         for (key, mut delta_op) in other_deltas.into_iter() {
             if let Some(r) = writes.get_mut(&key) {
                 match r {
-                    Op::Creation(write)
-                    | Op::Modification(write) => {
+                    Op::Creation(write) | Op::Modification(write) => {
                         let value: u128 = write.as_aggregator_value()?;
                         *write = AptosWrite::AggregatorValue(delta_op.apply_to(value)?);
                     },
@@ -222,4 +242,3 @@ impl AptosChangeSet {
         Ok(Self::new(writes, deltas, events))
     }
 }
-

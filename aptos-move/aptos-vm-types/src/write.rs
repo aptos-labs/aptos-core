@@ -1,16 +1,20 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::BTreeMap;
-use std::fmt::{Debug, Formatter, Result};
-use aptos_types::resource::{AptosResource, TransactionWrite};
-use aptos_types::state_store::state_value::StateValue;
-use aptos_types::write_set::WriteOp;
-use move_core_types::language_storage::StructTag;
-use move_core_types::vm_status::StatusCode;
-use move_vm_types::natives::function::{PartialVMError, PartialVMResult};
-use move_vm_types::resolver::Resource;
-
+use aptos_types::{
+    resource::{AptosResource, TransactionWrite},
+    state_store::state_value::StateValue,
+    write_set::WriteOp,
+};
+use move_core_types::{language_storage::StructTag, vm_status::StatusCode};
+use move_vm_types::{
+    natives::function::{PartialVMError, PartialVMResult},
+    resolver::Resource,
+};
+use std::{
+    collections::BTreeMap,
+    fmt::{Debug, Formatter, Result},
+};
 
 /// Represents any write produced by a transaction.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -18,7 +22,7 @@ pub enum AptosWrite {
     AggregatorValue(u128),
     Module(Vec<u8>),
     Standard(Resource),
-    Group(BTreeMap<StructTag, Resource>)
+    Group(BTreeMap<StructTag, Resource>),
 }
 
 impl AptosWrite {
@@ -39,7 +43,9 @@ impl AptosWrite {
     pub fn as_aggregator_value(&self) -> PartialVMResult<u128> {
         match self {
             AptosWrite::AggregatorValue(value) => Ok(*value),
-            _ => Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))
+            _ => Err(PartialVMError::new(
+                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+            )),
         }
     }
 }
@@ -61,7 +67,7 @@ impl AsBytes for Op<AptosWrite> {
         match self {
             Op::Creation(write) => write.as_bytes(),
             Op::Modification(write) => write.as_bytes(),
-            Op::Deletion => None
+            Op::Deletion => None,
         }
     }
 }
@@ -72,7 +78,7 @@ impl<T: Debug + AsBytes> TransactionWrite for Op<T> {
         match self {
             Op::Creation(write) => write.as_bytes(),
             Op::Modification(write) => write.as_bytes(),
-            Op::Deletion => None
+            Op::Deletion => None,
         }
     }
 
@@ -80,7 +86,7 @@ impl<T: Debug + AsBytes> TransactionWrite for Op<T> {
         match self {
             Op::Creation(write) => write.as_bytes().map(|bytes| StateValue::new_legacy(bytes)),
             Op::Modification(write) => write.as_bytes().map(|bytes| StateValue::new_legacy(bytes)),
-            Op::Deletion => None
+            Op::Deletion => None,
         }
     }
 
@@ -101,9 +107,15 @@ impl<T: Debug + AsBytes> Op<T> {
     /// Converts this op into a write op which can be used by the storage.
     pub fn into_write_op(self) -> PartialVMResult<WriteOp> {
         match self {
-            Op::Creation(value) => value.as_bytes().map(WriteOp::Creation).ok_or(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)),
-            Op::Modification(value) => value.as_bytes().map(WriteOp::Modification).ok_or(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)),
-            Op::Deletion => Ok(WriteOp::Deletion)
+            Op::Creation(value) => value
+                .as_bytes()
+                .map(WriteOp::Creation)
+                .ok_or(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)),
+            Op::Modification(value) => value
+                .as_bytes()
+                .map(WriteOp::Modification)
+                .ok_or(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)),
+            Op::Deletion => Ok(WriteOp::Deletion),
         }
     }
 

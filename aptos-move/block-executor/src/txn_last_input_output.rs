@@ -7,6 +7,7 @@ use crate::{
 };
 use aptos_mvhashmap::types::{Incarnation, TxnIndex, Version};
 use aptos_types::{access_path::AccessPath, executable::ModulePath};
+use aptos_vm_types::delta::DeltaOp;
 use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
 use dashmap::DashSet;
@@ -17,7 +18,6 @@ use std::{
         Arc,
     },
 };
-use aptos_vm_types::delta::DeltaOp;
 
 type TxnInput<K> = Vec<ReadDescriptor<K>>;
 type TxnOutput<T, E> = ExecutionStatus<T, Error<E>>;

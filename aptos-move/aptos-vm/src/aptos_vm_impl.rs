@@ -27,6 +27,9 @@ use aptos_types::{
     vm_status::{StatusCode, VMStatus},
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
+use aptos_vm_types::{
+    remote_cache::StateViewWithRemoteCache, transaction_output::VMTransactionOutput,
+};
 use fail::fail_point;
 use move_binary_format::{errors::VMResult, CompiledModule};
 use move_core_types::{
@@ -38,8 +41,6 @@ use move_core_types::{
 use move_vm_runtime::logging::expect_no_verification_errors;
 use move_vm_types::gas::UnmeteredGasMeter;
 use std::sync::Arc;
-use aptos_vm_types::remote_cache::StateViewWithRemoteCache;
-use aptos_vm_types::transaction_output::VMTransactionOutput;
 
 pub const MAXIMUM_APPROVED_TRANSACTION_SIZE: u64 = 1024 * 1024;
 

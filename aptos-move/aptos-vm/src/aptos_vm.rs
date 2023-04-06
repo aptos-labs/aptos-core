@@ -33,13 +33,18 @@ use aptos_types::{
     transaction::{
         EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
         MultisigTransactionPayload, SignatureCheckedTransaction, SignedTransaction, Transaction,
-        TransactionPayload, TransactionStatus, VMValidatorResult,
+        TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
         WriteSetPayload,
     },
     vm_status::{AbortLocation, DiscardedVMStatus, StatusCode, VMStatus},
     write_set::WriteSet,
 };
 use aptos_vm_logging::{init_speculative_logs, log_schema::AdapterLogSchema};
+use aptos_vm_types::{
+    change_set::{AptosChangeSet, ChangeSet},
+    remote_cache::StateViewWithRemoteCache,
+    transaction_output::VMTransactionOutput,
+};
 use fail::fail_point;
 use move_binary_format::{
     access::ModuleAccess,
@@ -69,10 +74,6 @@ use std::{
         Arc,
     },
 };
-use aptos_types::transaction::TransactionOutput;
-use aptos_vm_types::change_set::{AptosChangeSet, ChangeSet};
-use aptos_vm_types::remote_cache::StateViewWithRemoteCache;
-use aptos_vm_types::transaction_output::VMTransactionOutput;
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
@@ -291,8 +292,7 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<(VMStatus, VMTransactionOutput), VMStatus> {
-        let storage_with_changes =
-            DeltaStateView::new(storage, user_txn_change_set.writes());
+        let storage_with_changes = DeltaStateView::new(storage, user_txn_change_set.writes());
         // TODO: at this point we know that delta application failed
         // (and it should have occurred in user transaction in general).
         // We need to rerun the epilogue and charge gas. Currently, the use
@@ -302,7 +302,8 @@ impl AptosVM {
         // rather ugly and has a lot of legacy code. This makes proper error
         // handling quite challenging.
         let deltas = user_txn_change_set.deltas().clone();
-        let materialized_deltas = AptosChangeSet::try_materialize_deltas(deltas, storage).expect("something terrible happened when applying aggregator deltas");
+        let materialized_deltas = AptosChangeSet::try_materialize_deltas(deltas, storage)
+            .expect("something terrible happened when applying aggregator deltas");
         let storage_with_changes =
             DeltaStateView::new(&storage_with_changes, &materialized_deltas).into_move_resolver();
 
@@ -334,10 +335,7 @@ impl AptosVM {
             TransactionStatus::Keep(ExecutionStatus::Success),
         );
 
-        Ok((
-            VMStatus::Executed,
-            txn_output,
-        ))
+        Ok((VMStatus::Executed, txn_output))
     }
 
     fn validate_and_execute_entry_function<SS: MoveResolverExt>(
@@ -474,7 +472,10 @@ impl AptosVM {
     // failure object. In case of success, keep the session and also do any necessary module publish
     // cleanup.
     // 3. Call post transaction cleanup function in multisig account module with the result from (2)
-    fn execute_multisig_transaction<S: MoveResolverExt + StateViewWithRemoteCache, SS: MoveResolverExt>(
+    fn execute_multisig_transaction<
+        S: MoveResolverExt + StateViewWithRemoteCache,
+        SS: MoveResolverExt,
+    >(
         &self,
         storage: &S,
         mut session: SessionExt<SS>,
@@ -627,7 +628,10 @@ impl AptosVM {
         Ok(())
     }
 
-    fn success_multisig_payload_cleanup<S: MoveResolverExt + StateViewWithRemoteCache, SS: MoveResolverExt>(
+    fn success_multisig_payload_cleanup<
+        S: MoveResolverExt + StateViewWithRemoteCache,
+        SS: MoveResolverExt,
+    >(
         &self,
         storage: &S,
         session: SessionExt<SS>,
@@ -652,11 +656,12 @@ impl AptosVM {
         //     txn_data.gas_unit_price,
         // )?;
 
-        let storage_with_changes =
-            DeltaStateView::new(storage, inner_function_change_set.writes());
+        let storage_with_changes = DeltaStateView::new(storage, inner_function_change_set.writes());
         let materialized_deltas = AptosChangeSet::try_materialize_deltas(
-            inner_function_change_set.deltas().clone(), storage,
-        ).expect("something terrible happened when applying aggregator deltas");
+            inner_function_change_set.deltas().clone(),
+            storage,
+        )
+        .expect("something terrible happened when applying aggregator deltas");
         let storage_with_changes =
             DeltaStateView::new(&storage_with_changes, &materialized_deltas).into_move_resolver();
         let resolver = self.0.new_move_resolver(&storage_with_changes);
@@ -1191,7 +1196,7 @@ impl AptosVM {
                     legacy_change_set.events().clone().into(),
                     // Arc::new(change_set_configs),
                 )
-            }
+            },
             WriteSetPayload::Script { script, execute_as } => {
                 let resolver = self.0.new_move_resolver(storage);
                 let mut tmp_session = self.0.new_session(&resolver, session_id);
@@ -1290,11 +1295,9 @@ impl AptosVM {
         // self.read_writeset(storage, &write_set)?;
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
-        let txn_output = VMTransactionOutput::new(writes, deltas, events, 0, VMStatus::Executed.into());
-        Ok((
-            VMStatus::Executed,
-            txn_output,
-        ))
+        let txn_output =
+            VMTransactionOutput::new(writes, deltas, events, 0, VMStatus::Executed.into());
+        Ok((VMStatus::Executed, txn_output))
     }
 
     pub(crate) fn process_block_prologue<S: MoveResolverExt>(
@@ -1663,11 +1666,7 @@ impl VMAdapter for AptosVM {
                     0,
                     TransactionStatus::Keep(ExecutionStatus::Success),
                 );
-                (
-                    VMStatus::Executed,
-                    output,
-                    Some("state_checkpoint".into()),
-                )
+                (VMStatus::Executed, output, Some("state_checkpoint".into()))
             },
         })
     }

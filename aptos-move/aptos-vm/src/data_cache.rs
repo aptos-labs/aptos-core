@@ -12,6 +12,7 @@ use aptos_types::{
     on_chain_config::ConfigStorage,
     state_store::{state_key::StateKey, state_storage_usage::StateStorageUsage},
 };
+use aptos_vm_types::remote_cache::StateViewWithRemoteCache;
 use move_binary_format::{errors::*, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
@@ -23,7 +24,6 @@ use move_table_extension::{TableHandle, TableResolver};
 use move_vm_runtime::move_vm::MoveVM;
 use move_vm_types::resolver::{Resource, ResourceResolverV2};
 use std::ops::{Deref, DerefMut};
-use aptos_vm_types::remote_cache::StateViewWithRemoteCache;
 
 pub struct MoveResolverWithVMMetadata<'a, 'm, S> {
     move_resolver: &'a S,

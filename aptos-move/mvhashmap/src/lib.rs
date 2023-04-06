@@ -11,8 +11,8 @@ use aptos_types::{
     executable::{Executable, ExecutableDescriptor, ModulePath},
     resource::TransactionWrite,
 };
-use std::hash::Hash;
 use aptos_vm_types::delta::DeltaOp;
+use std::hash::Hash;
 
 pub mod types;
 pub mod versioned_code;

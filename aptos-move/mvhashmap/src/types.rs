@@ -3,8 +3,8 @@
 
 use aptos_crypto::hash::HashValue;
 use aptos_types::executable::ExecutableDescriptor;
-use std::sync::Arc;
 use aptos_vm_types::delta::DeltaOp;
+use std::sync::Arc;
 
 pub type TxnIndex = u32;
 pub type Incarnation = u32;

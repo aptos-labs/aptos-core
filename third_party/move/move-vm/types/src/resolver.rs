@@ -37,9 +37,7 @@ impl Resource {
     pub fn serialize(&self) -> Option<Vec<u8>> {
         match self {
             Self::Serialized(blob) => Some(blob.as_ref().clone()),
-            Self::Cached(value, layout) => {
-                value.simple_serialize(layout.as_ref())
-            },
+            Self::Cached(value, layout) => value.simple_serialize(layout.as_ref()),
         }
     }
 }
@@ -49,7 +47,9 @@ impl Clone for Resource {
     fn clone(&self) -> Self {
         match self {
             Resource::Serialized(blob) => Resource::Serialized(Arc::clone(blob)),
-            Resource::Cached(value, layout) => Resource::Cached(Arc::clone(value), Arc::clone(layout)),
+            Resource::Cached(value, layout) => {
+                Resource::Cached(Arc::clone(value), Arc::clone(layout))
+            },
         }
     }
 }

@@ -1,10 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::state_store::state_key::StateKey;
-use std::ops::Deref;
 use aptos_state_view::TStateView;
-use aptos_types::resource::AptosResource;
+use aptos_types::{resource::AptosResource, state_store::state_key::StateKey};
+use std::ops::Deref;
 
 /// Snapshot of memory available to the VM. Note that this trait explicitly hides
 /// all interaction with the global memory. Implementors of this trait can redirect
@@ -25,9 +24,9 @@ pub trait RemoteCache: TRemoteCache<Key = StateKey> {}
 impl<T: TRemoteCache<Key = StateKey>> RemoteCache for T {}
 
 impl<R, S, K> TRemoteCache for R
-    where
-        R: Deref<Target = S>,
-        S: TRemoteCache<Key = K>,
+where
+    R: Deref<Target = S>,
+    S: TRemoteCache<Key = K>,
 {
     type Key = K;
 
@@ -40,7 +39,9 @@ impl<R, S, K> TRemoteCache for R
     }
 }
 
-pub trait TStateViewWithRemoteCache: TStateView<Key = Self::CommonKey> + TRemoteCache<Key = Self::CommonKey> {
+pub trait TStateViewWithRemoteCache:
+    TStateView<Key = Self::CommonKey> + TRemoteCache<Key = Self::CommonKey>
+{
     type CommonKey;
 }
 
@@ -49,9 +50,9 @@ pub trait StateViewWithRemoteCache: TStateViewWithRemoteCache<CommonKey = StateK
 impl<T: TStateViewWithRemoteCache<CommonKey = StateKey>> StateViewWithRemoteCache for T {}
 
 impl<R, S, K> TStateViewWithRemoteCache for R
-    where
-        R: Deref<Target = S>,
-        S: TStateViewWithRemoteCache<CommonKey = K>,
+where
+    R: Deref<Target = S>,
+    S: TStateViewWithRemoteCache<CommonKey = K>,
 {
     type CommonKey = K;
 }

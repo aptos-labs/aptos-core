@@ -20,6 +20,7 @@ use aptos_types::{
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
     write_set::WriteOp,
 };
+use aptos_vm_types::delta::{delta_add, delta_sub, DeltaOp};
 use claims::assert_none;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
 use proptest_derive::Arbitrary;
@@ -34,7 +35,6 @@ use std::{
         Arc,
     },
 };
-use aptos_vm_types::delta::{DeltaOp, delta_add, delta_sub};
 
 // Should not be possible to overflow or underflow, as each delta is at
 // most 100 in the tests.

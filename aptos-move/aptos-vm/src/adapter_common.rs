@@ -14,8 +14,7 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
-use aptos_vm_types::change_set::ChangeSet;
-use aptos_vm_types::transaction_output::VMTransactionOutput;
+use aptos_vm_types::{change_set::ChangeSet, transaction_output::VMTransactionOutput};
 
 /// This trait describes the VM adapter's interface.
 /// TODO: bring more of the execution logic in aptos_vm into this file.

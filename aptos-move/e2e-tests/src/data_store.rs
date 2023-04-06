@@ -22,12 +22,12 @@ use aptos_vm_genesis::{
     generate_genesis_change_set_for_mainnet, generate_genesis_change_set_for_testing,
     GenesisOptions,
 };
+use aptos_vm_types::remote_cache::{TRemoteCache, TStateViewWithRemoteCache};
 use move_core_types::language_storage::ModuleId;
 use move_table_extension::{TableHandle, TableResolver};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use aptos_vm_types::remote_cache::{TRemoteCache, TStateViewWithRemoteCache};
 
 /// Dummy genesis ChangeSet for testing
 pub static GENESIS_CHANGE_SET_HEAD: Lazy<ChangeSet> =

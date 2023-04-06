@@ -29,9 +29,9 @@ use aptos_vm::{
     AptosVM, VMExecutor,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
+use aptos_vm_types::{change_set::AptosChangeSet, transaction_output::VMTransactionOutput};
 use move_binary_format::errors::VMResult;
 use std::{path::Path, sync::Arc};
-use aptos_vm_types::{change_set::AptosChangeSet, transaction_output::VMTransactionOutput};
 
 pub struct AptosDebugger {
     debugger: Arc<dyn AptosValidatorInterface + Send>,
@@ -244,7 +244,7 @@ impl AptosDebugger {
             )
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
         let (writes, _deltas, events) = change_set.into_inner();
-        
+
         let write_set = AptosChangeSet::into_write_set(writes).expect("should not fail");
         let legacy_change_set = ChangeSet::new_no_check(write_set, events);
         Ok(legacy_change_set)

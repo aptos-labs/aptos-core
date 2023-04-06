@@ -616,7 +616,7 @@ impl FakeExecutor {
                     &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
                 )
                 .expect("Failed to generate txn effects");
-            
+
             let (writes, _deltas, _events) = change_set.into_inner();
             let write_set = AptosChangeSet::into_write_set(writes).expect("should not fail");
             write_set

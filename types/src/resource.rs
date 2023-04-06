@@ -1,10 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::BTreeMap;
+use crate::state_store::{state_key::StateKey, state_value::StateValue};
 use move_vm_types::resolver::Resource;
-use crate::state_store::state_key::StateKey;
-use crate::state_store::state_value::StateValue;
+use std::collections::BTreeMap;
 
 pub trait TransactionWrite {
     // We do not need this anymore!

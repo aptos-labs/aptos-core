@@ -14,16 +14,18 @@ use aptos_mvhashmap::{
 use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
     executable::{ExecutableTestType, ModulePath},
+    resource::{AptosResource, TransactionWrite},
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
     vm_status::{StatusCode, VMStatus},
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
+use aptos_vm_types::{
+    delta::DeltaOp,
+    remote_cache::{TRemoteCache, TStateViewWithRemoteCache},
+};
+use claims::assert_none;
 use move_binary_format::errors::Location;
 use std::{cell::RefCell, collections::BTreeMap, hash::Hash, sync::Arc};
-use claims::assert_none;
-use aptos_types::resource::{AptosResource, TransactionWrite};
-use aptos_vm_types::delta::DeltaOp;
-use aptos_vm_types::remote_cache::{TRemoteCache, TStateViewWithRemoteCache};
 
 /// A struct that is always used by a single thread performing an execution task. The struct is
 /// passed to the VM and acts as a proxy to resolve reads first in the shared multi-version
@@ -174,7 +176,11 @@ pub(crate) struct LatestView<'a, T: Transaction, S: TStateViewWithRemoteCache<Co
     txn_idx: TxnIndex,
 }
 
-impl<'a, T: Transaction, S: TStateViewWithRemoteCache<CommonKey = T::Key>> TStateViewWithRemoteCache for LatestView<'a, T, S> { type CommonKey = T::Key; }
+impl<'a, T: Transaction, S: TStateViewWithRemoteCache<CommonKey = T::Key>> TStateViewWithRemoteCache
+    for LatestView<'a, T, S>
+{
+    type CommonKey = T::Key;
+}
 
 impl<'a, T: Transaction, S: TStateViewWithRemoteCache<CommonKey = T::Key>> LatestView<'a, T, S> {
     pub(crate) fn new_mv_view(
@@ -218,7 +224,9 @@ impl<'a, T: Transaction, S: TStateViewWithRemoteCache<CommonKey = T::Key>> Lates
     }
 }
 
-impl<'a, T: Transaction, S: TStateViewWithRemoteCache<CommonKey = T::Key>> TStateView for LatestView<'a, T, S> {
+impl<'a, T: Transaction, S: TStateViewWithRemoteCache<CommonKey = T::Key>> TStateView
+    for LatestView<'a, T, S>
+{
     type Key = T::Key;
 
     fn id(&self) -> StateViewId {
@@ -276,7 +284,9 @@ impl<'a, T: Transaction, S: TStateViewWithRemoteCache<CommonKey = T::Key>> TStat
     }
 }
 
-impl<'a, T: Transaction, S: TStateViewWithRemoteCache<CommonKey = T::Key>> TRemoteCache for LatestView<'a, T, S> {
+impl<'a, T: Transaction, S: TStateViewWithRemoteCache<CommonKey = T::Key>> TRemoteCache
+    for LatestView<'a, T, S>
+{
     type Key = T::Key;
 
     fn get_cached_module(&self, state_key: &Self::Key) -> Result<Option<Vec<u8>>> {
@@ -287,23 +297,20 @@ impl<'a, T: Transaction, S: TStateViewWithRemoteCache<CommonKey = T::Key>> TRemo
         assert_none!(state_key.module_path());
 
         match self.latest_view {
-            ViewMapKind::MultiVersion(map) => {
-                match map.fetch_data(state_key, self.txn_idx) {
-                    ReadResult::Value(v) => Ok(v.as_aptos_resource()),
-                    ReadResult::U128(v) => Ok(Some(AptosResource::Aggregator(v))),
-                    ReadResult::Unresolved(delta) => {
-                        let from_storage =
-                            self.base_view.get_state_value_bytes(state_key)?.map_or(
-                                Err(VMStatus::Error(StatusCode::STORAGE_ERROR, None)),
-                                |bytes| Ok(deserialize(&bytes)),
-                            )?;
-                        let result = delta
-                            .apply_to(from_storage)
-                            .map_err(|pe| pe.finish(Location::Undefined).into_vm_status())?;
-                        Ok(Some(AptosResource::Aggregator(result)))
-                    },
-                    ReadResult::None => self.base_view.get_cached_resource(state_key),
-                }
+            ViewMapKind::MultiVersion(map) => match map.fetch_data(state_key, self.txn_idx) {
+                ReadResult::Value(v) => Ok(v.as_aptos_resource()),
+                ReadResult::U128(v) => Ok(Some(AptosResource::Aggregator(v))),
+                ReadResult::Unresolved(delta) => {
+                    let from_storage = self.base_view.get_state_value_bytes(state_key)?.map_or(
+                        Err(VMStatus::Error(StatusCode::STORAGE_ERROR, None)),
+                        |bytes| Ok(deserialize(&bytes)),
+                    )?;
+                    let result = delta
+                        .apply_to(from_storage)
+                        .map_err(|pe| pe.finish(Location::Undefined).into_vm_status())?;
+                    Ok(Some(AptosResource::Aggregator(result)))
+                },
+                ReadResult::None => self.base_view.get_cached_resource(state_key),
             },
             ViewMapKind::BTree(map) => map.get(state_key).map_or_else(
                 || self.base_view.get_cached_resource(state_key),

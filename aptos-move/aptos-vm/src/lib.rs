@@ -127,8 +127,8 @@ use aptos_types::{
     transaction::{SignedTransaction, Transaction, TransactionOutput, VMValidatorResult},
     vm_status::VMStatus,
 };
-use std::marker::Sync;
 use aptos_vm_types::remote_cache::StateViewWithRemoteCache;
+use std::marker::Sync;
 pub use verifier::view_function::determine_is_view;
 
 /// This trait describes the VM's validation interfaces.

@@ -6,14 +6,14 @@ use crate::DbReader;
 use anyhow::Result;
 use aptos_state_view::TStateView;
 use aptos_types::{
+    resource::AptosResource,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
     transaction::Version,
 };
-use std::sync::Arc;
-use aptos_types::resource::AptosResource;
 use aptos_vm_types::remote_cache::{TRemoteCache, TStateViewWithRemoteCache};
+use std::sync::Arc;
 
 pub struct DbStateView {
     pub db: Arc<dyn DbReader>,

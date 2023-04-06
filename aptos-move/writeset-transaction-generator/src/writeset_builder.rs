@@ -19,6 +19,7 @@ use aptos_vm::{
     data_cache::StorageAdapter,
     move_vm_ext::{MoveResolverExt, MoveVmExt, SessionExt, SessionId},
 };
+use aptos_vm_types::{change_set::AptosChangeSet, remote_cache::StateViewWithRemoteCache};
 use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
@@ -27,7 +28,6 @@ use move_core_types::{
 };
 use move_vm_runtime::session::SerializedReturnValues;
 use move_vm_types::gas::UnmeteredGasMeter;
-use aptos_vm_types::{remote_cache::StateViewWithRemoteCache, change_set::AptosChangeSet};
 
 pub struct GenesisSession<'r, 'l, S>(SessionExt<'r, 'l, S>);
 
@@ -108,7 +108,11 @@ impl<'r, 'l, S: MoveResolverExt> GenesisSession<'r, 'l, S> {
     }
 }
 
-pub fn build_changeset<S: StateViewWithRemoteCache, F>(state_view: &S, procedure: F, chain_id: u8) -> ChangeSet
+pub fn build_changeset<S: StateViewWithRemoteCache, F>(
+    state_view: &S,
+    procedure: F,
+    chain_id: u8,
+) -> ChangeSet
 where
     F: FnOnce(&mut GenesisSession<StorageAdapter<S>>),
 {

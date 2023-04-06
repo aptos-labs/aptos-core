@@ -8,12 +8,15 @@ use crate::{
     block_executor::AptosTransactionOutput,
     data_cache::{AsMoveResolver, StorageAdapter},
 };
-use aptos_aggregator::{delta_change_set::DeltaChangeSet, transaction::TransactionOutputExt};
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
-use aptos_vm_types::{remote_cache::StateViewWithRemoteCache, transaction_output::VMTransactionOutput, change_set::{ChangeSet, AptosChangeSet}};
+use aptos_vm_types::{
+    change_set::{AptosChangeSet, ChangeSet},
+    remote_cache::StateViewWithRemoteCache,
+    transaction_output::VMTransactionOutput,
+};
 use move_core_types::{
     ident_str,
     language_storage::{ModuleId, CORE_CODE_ADDRESS},
@@ -75,11 +78,17 @@ impl<'a, S: 'a + StateViewWithRemoteCache + Sync> ExecutorTask for AptosExecutor
 
                     // TODO: Add API to materialize.
                     let (mut writes, deltas, events, gas_used, status) = vm_output.unpack();
-                    let materialized_writes = AptosChangeSet::try_materialize_deltas(deltas, view).expect("should not fail");
+                    let materialized_writes = AptosChangeSet::try_materialize_deltas(deltas, view)
+                        .expect("should not fail");
 
                     // This is safe because state keys will be different!
-                    AptosChangeSet::extend_with_writes(&mut writes, &mut ChangeSet::empty(), materialized_writes).expect("should not fail");
-                    
+                    AptosChangeSet::extend_with_writes(
+                        &mut writes,
+                        &mut ChangeSet::empty(),
+                        materialized_writes,
+                    )
+                    .expect("should not fail");
+
                     vm_output = VMTransactionOutput::new(
                         writes,
                         ChangeSet::empty(),
