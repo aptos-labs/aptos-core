@@ -38,8 +38,6 @@ jobs:
       APTOS_NODE_URL: http://127.0.0.1:8080/v1
       APTOS_FAUCET_URL: http://127.0.0.1:8081
       FAUCET_AUTH_TOKEN: ${{ secrets.DEVNET_TAP_AUTH_TOKEN }}
-      APTOS_INVOCATION: docker run -v ${{ runner.temp }}/ans:/tmp/ans --network host ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos
-      ANS_REPO_LOCATION: ${{ runner.temp }}/ans
       ANS_TEST_ACCOUNT_PRIVATE_KEY: "0x37368b46ce665362562c6d1d4ec01a08c8644c488690df5a17e13ba163e20221"
       ANS_TEST_ACCOUNT_ADDRESS: "585fc9f0f0c54183b039ffc770ca282ebd87307916c215a3e692f2f8e4305e82"
     steps:
@@ -100,9 +98,10 @@ jobs:
       - run: echo "APTOS_NODE_URL=$APTOS_NODE_URL" >> ./ecosystem/typescript/sdk/.env
       - run: echo "APTOS_FAUCET_URL=$APTOS_FAUCET_URL" >> ./ecosystem/typescript/sdk/.env
       - run: echo "FAUCET_AUTH_TOKEN=$FAUCET_AUTH_TOKEN" >> ./ecosystem/typescript/sdk/.env
-      - run: echo "APTOS_INVOCATION=$APTOS_INVOCATION" >> ./ecosystem/typescript/sdk/.env
       - run: echo "ANS_TEST_ACCOUNT_PRIVATE_KEY=$ANS_TEST_ACCOUNT_PRIVATE_KEY" >> ./ecosystem/typescript/sdk/.env
       - run: echo "ANS_TEST_ACCOUNT_ADDRESS=$ANS_TEST_ACCOUNT_ADDRESS" >> ./ecosystem/typescript/sdk/.env
+      - run: echo "APTOS_INVOCATION='docker run -v ${{ runner.temp }}/ans:/tmp/ans --network host ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos'" >> ./ecosystem/typescript/sdk/.env
+      - run: echo "ANS_REPO_LOCATION=${{ runner.temp }}/ans" >> ./ecosystem/typescript/sdk/.env
       - run: cp ./ecosystem/typescript/sdk/.env ./ecosystem/typescript/sdk/examples/typescript/.env
       - run: cp ./ecosystem/typescript/sdk/.env ./ecosystem/typescript/sdk/examples/javascript/.env
 
