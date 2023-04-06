@@ -988,7 +988,6 @@ mod tests {
     fn test_initialise_remove_markets() {
         let config = RedisConfig {
             url: "redis://localhost:6379".to_string(),
-            open_orders: "open_orders".to_string(),
             book_prefix: "book".to_string(),
             order_prefix: "order".to_string(),
             markets: "markets".to_string(),
