@@ -9,13 +9,15 @@ import { MAX_U64_BIG_INT } from "../bcs/consts";
 import { Provider } from "../providers";
 import { AptosClient, OptionalTransactionArgs } from "../providers/aptos_client";
 import { TransactionBuilderRemoteABI } from "../transaction_builder";
-import { getPropertyValueRaw } from "../utils/property_map_serde";
+import { HexString, MaybeHexString } from "../utils";
+import { getPropertyValueRaw, getSinglePropertyValueRaw } from "../utils/property_map_serde";
 
 /**
  * Class for managing aptos_token
  */
 export class AptosToken {
   provider: Provider;
+  tokenType: string = "0x4::token::Token";
 
   /**
    * Creates new AptosToken instance
@@ -26,10 +28,27 @@ export class AptosToken {
     this.provider = provider;
   }
 
+  private async submitTransaction(
+    account: AptosAccount,
+    funcName: string,
+    typeArgs: string[],
+    args: any[],
+    extraArgs?: OptionalTransactionArgs,
+  ) {
+    const builder = new TransactionBuilderRemoteABI(this.provider.aptosClient, {
+      sender: account.address(),
+      ...extraArgs,
+    });
+    const rawTxn = await builder.build(`0x4::aptos_token::${funcName}`, typeArgs, args);
+    const bcsTxn = AptosClient.generateBCSTransaction(account, rawTxn);
+    const pendingTransaction = await this.provider.aptosClient.submitSignedBCSTransaction(bcsTxn);
+    return pendingTransaction.hash;
+  }
+
   /**
    * Creates a new collection within the specified account
    *
-   * @param account AptosAccount where collection will be created
+   * @param creator AptosAccount where collection will be created
    * @param description Collection description
    * @param name Collection name
    * @param uri URL to additional info about collection
@@ -48,7 +67,7 @@ export class AptosToken {
    * @returns The hash of the transaction submitted to the API
    */
   async createCollection(
-    account: AptosAccount,
+    creator: AptosAccount,
     description: string,
     name: string,
     uri: string,
@@ -66,12 +85,9 @@ export class AptosToken {
     tokensFreezableByCreator: boolean = true,
     extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
-    const builder = new TransactionBuilderRemoteABI(this.provider.aptosClient, {
-      sender: account.address(),
-      ...extraArgs,
-    });
-    const rawTxn = await builder.build(
-      "0x4::aptos_token::create_collection",
+    return this.submitTransaction(
+      creator,
+      "create_collection",
       [],
       [
         description,
@@ -90,10 +106,8 @@ export class AptosToken {
         royaltyNumerator,
         royaltyDenominator,
       ],
+      extraArgs,
     );
-    const bcsTxn = AptosClient.generateBCSTransaction(account, rawTxn);
-    const pendingTransaction = await this.provider.aptosClient.submitSignedBCSTransaction(bcsTxn);
-    return pendingTransaction.hash;
   }
 
   /**
@@ -120,12 +134,9 @@ export class AptosToken {
     propertyValues: Array<string> = [],
     extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
-    const builder = new TransactionBuilderRemoteABI(this.provider.aptosClient, {
-      sender: account.address(),
-      ...extraArgs,
-    });
-    const rawTxn = await builder.build(
-      "0x4::aptos_token::mint",
+    return this.submitTransaction(
+      account,
+      "mint",
       [],
       [
         collection,
@@ -136,10 +147,8 @@ export class AptosToken {
         propertyTypes,
         getPropertyValueRaw(propertyValues, propertyTypes),
       ],
+      extraArgs,
     );
-    const bcsTxn = AptosClient.generateBCSTransaction(account, rawTxn);
-    const pendingTransaction = await this.provider.aptosClient.submitSignedBCSTransaction(bcsTxn);
-    return pendingTransaction.hash;
   }
 
   /**
@@ -168,12 +177,9 @@ export class AptosToken {
     propertyValues: Array<string> = [],
     extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
-    const builder = new TransactionBuilderRemoteABI(this.provider.aptosClient, {
-      sender: account.address(),
-      ...extraArgs,
-    });
-    const rawTxn = await builder.build(
-      "0x4::aptos_token::mint_soul_bound",
+    return this.submitTransaction(
+      account,
+      "mint_soul_bound",
       [],
       [
         collection,
@@ -185,9 +191,216 @@ export class AptosToken {
         getPropertyValueRaw(propertyValues, propertyTypes),
         recipient.address().hex(),
       ],
+      extraArgs,
     );
-    const bcsTxn = AptosClient.generateBCSTransaction(account, rawTxn);
-    const pendingTransaction = await this.provider.aptosClient.submitSignedBCSTransaction(bcsTxn);
-    return pendingTransaction.hash;
+  }
+
+  /**
+   * Burn a token by its creator
+   * @param creator Creator account
+   * @param token Token address
+   * @returns The hash of the transaction submitted to the API
+   */
+  async burnToken(
+    creator: AptosAccount,
+    token: MaybeHexString,
+    tokenType?: string,
+    extraArgs?: OptionalTransactionArgs,
+  ): Promise<string> {
+    return this.submitTransaction(
+      creator,
+      "burn",
+      [tokenType || this.tokenType],
+      [HexString.ensure(token).hex()],
+      extraArgs,
+    );
+  }
+
+  /**
+   * Freeze token transfer ability
+   * @param creator Creator account
+   * @param token Token address
+   * @returns The hash of the transaction submitted to the API
+   */
+  async freezeTokenTransafer(
+    creator: AptosAccount,
+    token: MaybeHexString,
+    tokenType?: string,
+    extraArgs?: OptionalTransactionArgs,
+  ): Promise<string> {
+    return this.submitTransaction(
+      creator,
+      "freeze_transfer",
+      [tokenType || this.tokenType],
+      [HexString.ensure(token).hex()],
+      extraArgs,
+    );
+  }
+
+  /**
+   * Unfreeze token transfer ability
+   * @param creator Creator account
+   * @param token Token address
+   * @returns The hash of the transaction submitted to the API
+   */
+  async unfreezeTokenTransafer(
+    creator: AptosAccount,
+    token: MaybeHexString,
+    tokenType?: string,
+    extraArgs?: OptionalTransactionArgs,
+  ): Promise<string> {
+    return this.submitTransaction(
+      creator,
+      "unfreeze_transfer",
+      [tokenType || this.tokenType],
+      [HexString.ensure(token).hex()],
+      extraArgs,
+    );
+  }
+
+  /**
+   * Set token description
+   * @param creator Creator account
+   * @param token Token address
+   * @param description Token description
+   * @returns The hash of the transaction submitted to the API
+   */
+  async setTokenDescription(
+    creator: AptosAccount,
+    token: MaybeHexString,
+    description: string,
+    tokenType?: string,
+    extraArgs?: OptionalTransactionArgs,
+  ): Promise<string> {
+    return this.submitTransaction(
+      creator,
+      "set_description",
+      [tokenType || this.tokenType],
+      [HexString.ensure(token).hex(), description],
+      extraArgs,
+    );
+  }
+
+  /**
+   * Set token name
+   * @param creator Creator account
+   * @param token Token address
+   * @param name Token name
+   * @returns The hash of the transaction submitted to the API
+   */
+  async setTokenName(
+    creator: AptosAccount,
+    token: MaybeHexString,
+    name: string,
+    tokenType?: string,
+    extraArgs?: OptionalTransactionArgs,
+  ): Promise<string> {
+    return this.submitTransaction(
+      creator,
+      "set_name",
+      [tokenType || this.tokenType],
+      [HexString.ensure(token).hex(), name],
+      extraArgs,
+    );
+  }
+
+  /**
+   * Set token URI
+   * @param creator Creator account
+   * @param token Token address
+   * @param uri Token uri
+   * @returns The hash of the transaction submitted to the API
+   */
+  async setTokenURI(
+    creator: AptosAccount,
+    token: MaybeHexString,
+    uri: string,
+    tokenType?: string,
+    extraArgs?: OptionalTransactionArgs,
+  ): Promise<string> {
+    return this.submitTransaction(
+      creator,
+      "set_uri",
+      [tokenType || this.tokenType],
+      [HexString.ensure(token).hex(), uri],
+      extraArgs,
+    );
+  }
+
+  /**
+   * Add token property
+   * @param creator Creator account
+   * @param token Token address
+   * @param key the property key for storing on-chain property
+   * @param type the type of property value
+   * @param value the property value to be stored on-chain
+   * @returns The hash of the transaction submitted to the API
+   */
+  async addTokenProperty(
+    creator: AptosAccount,
+    token: MaybeHexString,
+    key: string,
+    type: string,
+    value: string,
+    tokenType?: string,
+    extraArgs?: OptionalTransactionArgs,
+  ): Promise<string> {
+    return this.submitTransaction(
+      creator,
+      "add_property",
+      [tokenType || this.tokenType],
+      [HexString.ensure(token).hex(), key, type, getSinglePropertyValueRaw(value, type)],
+      extraArgs,
+    );
+  }
+
+  /**
+   * Remove token property
+   * @param creator Creator account
+   * @param token Token address
+   * @param key the property key stored on-chain
+   * @returns The hash of the transaction submitted to the API
+   */
+  async removeTokenProperty(
+    creator: AptosAccount,
+    token: MaybeHexString,
+    key: string,
+    tokenType?: string,
+    extraArgs?: OptionalTransactionArgs,
+  ): Promise<string> {
+    return this.submitTransaction(
+      creator,
+      "remove_property",
+      [tokenType || this.tokenType],
+      [HexString.ensure(token).hex(), key],
+      extraArgs,
+    );
+  }
+
+  /**
+   * Update token property
+   * @param creator Creator account
+   * @param token Token address
+   * @param key the property key stored on-chain
+   * @param type the property typed stored on-chain
+   * @param value the property value to be stored on-chain
+   * @returns The hash of the transaction submitted to the API
+   */
+  async updateTokenProperty(
+    creator: AptosAccount,
+    token: MaybeHexString,
+    key: string,
+    type: string,
+    value: string,
+    tokenType?: string,
+    extraArgs?: OptionalTransactionArgs,
+  ): Promise<string> {
+    return this.submitTransaction(
+      creator,
+      "update_property",
+      [tokenType || this.tokenType],
+      [HexString.ensure(token).hex(), key, type, getSinglePropertyValueRaw(value, type)],
+      extraArgs,
+    );
   }
 }

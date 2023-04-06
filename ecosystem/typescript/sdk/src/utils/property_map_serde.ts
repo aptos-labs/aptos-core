@@ -65,6 +65,22 @@ export function getPropertyValueRaw(values: Array<string>, types: Array<string>)
   return results;
 }
 
+export function getSinglePropertyValueRaw(value: string, type: string): Uint8Array {
+  if (!value || !type) {
+    throw new Error("value or type can not be empty");
+  }
+
+  try {
+    const typeTag = getPropertyType(type);
+    const serializer = new Serializer();
+    serializeArg(value, typeTag, serializer);
+    return serializer.getBytes();
+  } catch (error) {
+    // if not support type, just use the raw string bytes
+    return new TextEncoder().encode(value);
+  }
+}
+
 export function deserializePropertyMap(rawPropertyMap: any): PropertyMap {
   const entries = rawPropertyMap.map.data;
   const pm = new PropertyMap();

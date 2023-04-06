@@ -139,7 +139,7 @@ export class AptosAccount {
     const source = bcsToBytes(AccountAddress.fromHex(creator));
     const seed = new TextEncoder().encode(collectionName);
 
-    const bytes = new Uint8Array([...source, ...seed, AuthenticationKey.DERIVE_COLLECTION_OBJECT_ACCOUNT_SCHEME]);
+    const bytes = new Uint8Array([...source, ...seed, AuthenticationKey.DERIVE_OBJECT_FROM_SEED_SCHEME]);
 
     const hash = sha3Hash.create();
     hash.update(bytes);
@@ -149,7 +149,7 @@ export class AptosAccount {
 
   /**
    * Takes creator address, collection name and token name and returns the token object address.
-   * Token object addresses are generated as sha256 hash of (creator address + collection's name + :: + token name)
+   * Token object addresses are generated as sha256 hash of (creator address + `collection's name + :: + token name`)
    *
    * @param creator Creator address
    * @param collectionName The collection name
@@ -162,12 +162,12 @@ export class AptosAccount {
     const collectionBytes = new TextEncoder().encode(collectionName);
     const tokenBytes = new TextEncoder().encode(tokenName);
 
-    const seed = new Uint8Array(collectionBytes.length + tokenBytes.length + 2);
+    const seed = new Uint8Array(collectionBytes.length + 2 + tokenBytes.length);
     seed.set(collectionBytes);
     seed.set([AuthenticationKey.COLON, AuthenticationKey.COLON], collectionBytes.length);
     seed.set(tokenBytes, collectionBytes.length + 2);
 
-    const bytes = new Uint8Array([...source, ...seed, AuthenticationKey.DERIVE_COLLECTION_OBJECT_ACCOUNT_SCHEME]);
+    const bytes = new Uint8Array([...source, ...seed, AuthenticationKey.DERIVE_OBJECT_FROM_SEED_SCHEME]);
 
     const hash = sha3Hash.create();
     hash.update(bytes);
