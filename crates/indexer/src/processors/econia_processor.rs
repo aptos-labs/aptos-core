@@ -538,26 +538,36 @@ impl EconiaRedisCacher {
 
     fn handle_taker_event(
         &mut self,
-        _conn: &mut redis::Connection,
+        conn: &mut redis::Connection,
         e: TakerEvent,
     ) -> anyhow::Result<()> {
         let Some(book) = self.books.get_mut(&e.market_id) else {
             panic!("invalid state, market is missing")
         };
 
-        let size_left = {
+        let remove_order = {
             let order = Self::get_order_mut(book, e.market_order_id);
             order.size = order.size.checked_sub(e.size).unwrap_or_default();
-            order.size
+            let remove_order = order.size == 0;
+            if remove_order {
+                order.order_state = OrderState::Filled;
+            }
+            Self::send_order_update(conn, &self.config.order_prefix, e.market_id, order)?;
+            remove_order
         };
 
-        if size_left == 0 {
-            let mut order = Self::remove_order(book, e.market_order_id);
-            order.order_state = OrderState::Filled;
-            // todo send event here
-        } else {
-            // todo send event here
-        };
+        if remove_order {
+            Self::remove_order(book, e.market_order_id);
+        }
+
+        Self::send_price_level_update(
+            conn,
+            &self.config.book_prefix,
+            e.market_id,
+            book,
+            e.side.into(),
+            e.price,
+        )?;
 
         Ok(())
     }
