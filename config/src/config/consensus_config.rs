@@ -58,7 +58,7 @@ pub struct ConsensusConfig {
     pub window_for_chain_health: usize,
     pub chain_health_backoff: Vec<ChainHealthBackoffValues>,
     // length of inbound queue of messages
-    pub max_receiving_messages: usize,
+    pub max_network_channel_size: usize,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -135,7 +135,7 @@ impl Default for ConsensusConfig {
                     max_sending_block_bytes_override: 25 * 1024,
                 },
             ],
-            max_receiving_messages: 1024,
+            max_network_channel_size: 1024,
         }
     }
 }

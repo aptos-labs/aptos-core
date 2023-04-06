@@ -30,7 +30,7 @@ pub struct MempoolConfig {
     pub eager_expire_threshold_ms: Option<u64>,
     pub eager_expire_time_ms: u64,
     // length of inbound queue of messages
-    pub max_receiving_messages: usize,
+    pub max_network_channel_size: usize,
 }
 
 impl Default for MempoolConfig {
@@ -53,7 +53,7 @@ impl Default for MempoolConfig {
             broadcast_buckets: DEFAULT_BROADCAST_BUCKETS.to_vec(),
             eager_expire_threshold_ms: Some(10_000),
             eager_expire_time_ms: 3_000,
-            max_receiving_messages: 1024,
+            max_network_channel_size: 1024,
         }
     }
 }
