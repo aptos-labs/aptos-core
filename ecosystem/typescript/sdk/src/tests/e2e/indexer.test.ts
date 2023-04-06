@@ -198,15 +198,15 @@ describe("Indexer", () => {
       let mockHeaders: any = {};
 
       // spy on axios.post and mock the response
-      jest.spyOn(axios, 'post').mockImplementation((url, query, config) => {
-        mockHeaders['User-Agent'] = config?.headers?.['User-Agent'];
+      jest.spyOn(axios, "post").mockImplementation((url, query, config) => {
+        mockHeaders["User-Agent"] = config?.headers?.["User-Agent"];
         return Promise.resolve({ data: { data: {}, errors: null } });
       });
 
       // Call queryIndexer and expect it to make a request with the expected User-Agent header
       const expectedUserAgent = ProviderUtil.getUserAgent();
-      await indexerClient.queryIndexer({ query: '{ mockQuery }' });
-      expect(mockHeaders['User-Agent']).toEqual(expectedUserAgent);
+      await indexerClient.queryIndexer({ query: "{ mockQuery }" });
+      expect(mockHeaders["User-Agent"]).toEqual(expectedUserAgent);
     });
   });
 });
