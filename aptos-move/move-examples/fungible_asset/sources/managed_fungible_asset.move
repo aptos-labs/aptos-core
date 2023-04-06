@@ -3,9 +3,9 @@
 /// The deployer will also become the initial admin and can mint/burn/freeze/unfreeze accounts.
 /// The admin can transfer the asset via object::transfer() at any point to set a new admin.
 module fungible_asset::managed_fungible_asset {
-    use aptos_framework::fungible_asset::{Self, MintRef, TransferRef, BurnRef, ExtractedAsset, Metadata};
+    use aptos_framework::fungible_asset::{Self, MintRef, TransferRef, BurnRef, FungibleAsset, Metadata};
     use aptos_framework::object::{Self, Object};
-    use aptos_framework::primary_wallet;
+    use aptos_framework::primary_store;
     use std::error;
     use std::signer;
     use std::string::utf8;
@@ -26,7 +26,7 @@ module fungible_asset::managed_fungible_asset {
     /// Initialize metadata object and store the refs.
     fun init_module(admin: &signer) {
         let constructor_ref = &object::create_named_object(admin, ASSET_SYMBOL);
-        primary_wallet::create_primary_wallet_enabled_fungible_asset(
+        primary_store::create_primary_wallet_enabled_fungible_asset(
             constructor_ref,
             0, /* maximum_supply. 0 means no maximum */
             utf8(b"Aptos Token"), /* name */
@@ -56,7 +56,7 @@ module fungible_asset::managed_fungible_asset {
     public entry fun mint(admin: &signer, amount: u64, to: address) acquires ManagedFungibleAsset {
         let asset = get_asset();
         let managed_fungible_asset = authorized_borrow_refs(admin, asset);
-        let to_wallet = primary_wallet::ensure_primary_wallet_exists(to, asset);
+        let to_wallet = primary_store::ensure_primary_wallet_exists(to, asset);
         let fa = fungible_asset::mint(&managed_fungible_asset.mint_ref, amount);
         fungible_asset::deposit_with_ref(&managed_fungible_asset.transfer_ref, to_wallet, fa);
     }
@@ -65,8 +65,8 @@ module fungible_asset::managed_fungible_asset {
     public entry fun transfer(admin: &signer, from: address, to: address, amount: u64) acquires ManagedFungibleAsset {
         let asset = get_asset();
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
-        let from_wallet = primary_wallet::ensure_primary_wallet_exists(from, asset);
-        let to_wallet = primary_wallet::ensure_primary_wallet_exists(to, asset);
+        let from_wallet = primary_store::ensure_primary_wallet_exists(from, asset);
+        let to_wallet = primary_store::ensure_primary_wallet_exists(to, asset);
         fungible_asset::transfer_with_ref(transfer_ref, from_wallet, to_wallet, amount);
     }
 
@@ -74,7 +74,7 @@ module fungible_asset::managed_fungible_asset {
     public entry fun burn(admin: &signer, from: address, amount: u64) acquires ManagedFungibleAsset {
         let asset = get_asset();
         let burn_ref = &authorized_borrow_refs(admin, asset).burn_ref;
-        let from_wallet = primary_wallet::ensure_primary_wallet_exists(from, asset);
+        let from_wallet = primary_store::ensure_primary_wallet_exists(from, asset);
         fungible_asset::burn(burn_ref, from_wallet, amount);
     }
 
@@ -82,7 +82,7 @@ module fungible_asset::managed_fungible_asset {
     public entry fun freeze_account(admin: &signer, account: address) acquires ManagedFungibleAsset {
         let asset = get_asset();
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
-        let wallet = primary_wallet::ensure_primary_wallet_exists(account, asset);
+        let wallet = primary_store::ensure_primary_wallet_exists(account, asset);
         fungible_asset::set_ungated_transfer(transfer_ref, wallet, false);
     }
 
@@ -90,23 +90,23 @@ module fungible_asset::managed_fungible_asset {
     public entry fun unfreeze_account(admin: &signer, account: address) acquires ManagedFungibleAsset {
         let asset = get_asset();
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
-        let wallet = primary_wallet::ensure_primary_wallet_exists(account, asset);
+        let wallet = primary_store::ensure_primary_wallet_exists(account, asset);
         fungible_asset::set_ungated_transfer(transfer_ref, wallet, true);
     }
 
     /// Withdraw as the owner of metadata object ignoring `allow_ungated_transfer` field.
-    public fun withdraw(admin: &signer, amount: u64, from: address): ExtractedAsset acquires ManagedFungibleAsset {
+    public fun withdraw(admin: &signer, amount: u64, from: address): FungibleAsset acquires ManagedFungibleAsset {
         let asset = get_asset();
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
-        let from_wallet = primary_wallet::ensure_primary_wallet_exists(from, asset);
+        let from_wallet = primary_store::ensure_primary_wallet_exists(from, asset);
         fungible_asset::withdraw_with_ref(transfer_ref, from_wallet, amount)
     }
 
     /// Deposit as the owner of metadata object ignoring `allow_ungated_transfer` field.
-    public fun deposit(admin: &signer, to: address, fa: ExtractedAsset) acquires ManagedFungibleAsset {
+    public fun deposit(admin: &signer, to: address, fa: FungibleAsset) acquires ManagedFungibleAsset {
         let asset = get_asset();
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
-        let to_wallet = primary_wallet::ensure_primary_wallet_exists(to, asset);
+        let to_wallet = primary_store::ensure_primary_wallet_exists(to, asset);
         fungible_asset::deposit_with_ref(transfer_ref, to_wallet, fa);
     }
 
@@ -130,14 +130,14 @@ module fungible_asset::managed_fungible_asset {
 
         mint(creator, 100, creator_address);
         let asset = get_asset();
-        assert!(primary_wallet::balance(creator_address, asset) == 100, 4);
+        assert!(primary_store::balance(creator_address, asset) == 100, 4);
         freeze_account(creator, creator_address);
-        assert!(!primary_wallet::ungated_transfer_allowed(creator_address, asset), 5);
+        assert!(!primary_store::ungated_transfer_allowed(creator_address, asset), 5);
         transfer(creator, creator_address, aaron_address, 10);
-        assert!(primary_wallet::balance(aaron_address, asset) == 10, 6);
+        assert!(primary_store::balance(aaron_address, asset) == 10, 6);
 
         unfreeze_account(creator, creator_address);
-        assert!(primary_wallet::ungated_transfer_allowed(creator_address, asset), 7);
+        assert!(primary_store::ungated_transfer_allowed(creator_address, asset), 7);
         burn(creator, creator_address, 90);
     }
 
