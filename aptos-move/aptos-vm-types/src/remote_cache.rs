@@ -1,8 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::write::AptosWrite;
 use aptos_state_view::TStateView;
-use aptos_types::{resource::AptosResource, state_store::state_key::StateKey};
+use aptos_types::state_store::state_key::StateKey;
 use std::ops::Deref;
 
 /// Snapshot of memory available to the VM. Note that this trait explicitly hides
@@ -16,7 +17,7 @@ pub trait TRemoteCache {
     fn get_cached_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<Vec<u8>>>;
 
     /// Gets the resource for a given state key.
-    fn get_cached_resource(&self, state_key: &Self::Key) -> anyhow::Result<Option<AptosResource>>;
+    fn get_cached_resource(&self, state_key: &Self::Key) -> anyhow::Result<Option<AptosWrite>>;
 }
 
 pub trait RemoteCache: TRemoteCache<Key = StateKey> {}
@@ -34,7 +35,7 @@ where
         self.deref().get_cached_module(state_key)
     }
 
-    fn get_cached_resource(&self, state_key: &Self::Key) -> anyhow::Result<Option<AptosResource>> {
+    fn get_cached_resource(&self, state_key: &Self::Key) -> anyhow::Result<Option<AptosWrite>> {
         self.deref().get_cached_resource(state_key)
     }
 }

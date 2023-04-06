@@ -9,8 +9,8 @@ use super::{
 use crate::unit_tests::KeyType;
 use aptos_aggregator::transaction::AggregatorValue;
 use aptos_types::{
-    executable::ExecutableTestType, resource::TransactionWrite,
-    state_store::state_value::StateValue,
+    executable::ExecutableTestType, state_store::state_value::StateValue,
+    write_set::TransactionWrite,
 };
 use aptos_vm_types::delta::{delta_add, delta_sub, DeltaOp};
 use proptest::{collection::vec, prelude::*, sample::Index, strategy::Strategy};
@@ -59,10 +59,6 @@ impl<V: Into<Vec<u8>> + Clone> TransactionWrite for Value<V> {
     }
 
     fn as_state_value(&self) -> Option<StateValue> {
-        unimplemented!()
-    }
-
-    fn as_aptos_resource(&self) -> Option<aptos_types::resource::AptosResource> {
         unimplemented!()
     }
 }

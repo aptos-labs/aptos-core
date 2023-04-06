@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::{
-    resource::{AptosResource, TransactionWrite},
     state_store::state_value::StateValue,
-    write_set::WriteOp,
+    write_set::{TransactionWrite, WriteOp},
 };
 use move_core_types::{language_storage::StructTag, vm_status::StatusCode};
 use move_vm_types::{
@@ -88,10 +87,6 @@ impl<T: Debug + AsBytes> TransactionWrite for Op<T> {
             Op::Modification(write) => write.as_bytes().map(|bytes| StateValue::new_legacy(bytes)),
             Op::Deletion => None,
         }
-    }
-
-    fn as_aptos_resource(&self) -> Option<AptosResource> {
-        todo!()
     }
 }
 

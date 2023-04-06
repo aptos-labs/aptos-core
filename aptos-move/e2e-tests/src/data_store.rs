@@ -10,7 +10,6 @@ use aptos_state_view::TStateView;
 use aptos_types::{
     access_path::AccessPath,
     account_config::CoinInfoResource,
-    resource::AptosResource,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
         table::TableHandle as AptosTableHandle,
@@ -22,7 +21,10 @@ use aptos_vm_genesis::{
     generate_genesis_change_set_for_mainnet, generate_genesis_change_set_for_testing,
     GenesisOptions,
 };
-use aptos_vm_types::remote_cache::{TRemoteCache, TStateViewWithRemoteCache};
+use aptos_vm_types::{
+    remote_cache::{TRemoteCache, TStateViewWithRemoteCache},
+    write::AptosWrite,
+};
 use move_core_types::language_storage::ModuleId;
 use move_table_extension::{TableHandle, TableResolver};
 use once_cell::sync::Lazy;
@@ -144,7 +146,7 @@ impl TRemoteCache for FakeDataStore {
         todo!()
     }
 
-    fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosResource>> {
+    fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosWrite>> {
         todo!()
     }
 }

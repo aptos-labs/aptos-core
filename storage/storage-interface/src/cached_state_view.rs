@@ -8,14 +8,16 @@ use aptos_scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree, StateStoreStatu
 use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
     proof::SparseMerkleProofExt,
-    resource::AptosResource,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
     transaction::Version,
     write_set::WriteSet,
 };
-use aptos_vm_types::remote_cache::{TRemoteCache, TStateViewWithRemoteCache};
+use aptos_vm_types::{
+    remote_cache::{TRemoteCache, TStateViewWithRemoteCache},
+    write::AptosWrite,
+};
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
@@ -228,7 +230,7 @@ impl TRemoteCache for CachedStateView {
         todo!()
     }
 
-    fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosResource>> {
+    fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosWrite>> {
         todo!()
     }
 }
@@ -289,7 +291,7 @@ impl TRemoteCache for CachedDbStateView {
         todo!()
     }
 
-    fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosResource>> {
+    fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosWrite>> {
         todo!()
     }
 }

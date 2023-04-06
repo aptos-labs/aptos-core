@@ -5,12 +5,9 @@
 //! For each transaction the VM executes, the VM will output a `WriteSet` that contains each access
 //! path it updates. For each access path, the VM can either give its new value or delete it.
 
-use crate::{
-    resource::{AptosResource, TransactionWrite},
-    state_store::{
-        state_key::StateKey,
-        state_value::{StateValue, StateValueMetadata},
-    },
+use crate::state_store::{
+    state_key::StateKey,
+    state_value::{StateValue, StateValueMetadata},
 };
 use anyhow::{bail, Result};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -19,6 +16,15 @@ use std::{
     collections::{btree_map, BTreeMap},
     ops::Deref,
 };
+
+// TODO: Deprecate this trait!
+pub trait TransactionWrite {
+    // We do not need this anymore!
+    fn extract_raw_bytes(&self) -> Option<Vec<u8>>;
+
+    // We do not need this anymore!
+    fn as_state_value(&self) -> Option<StateValue>;
+}
 
 #[derive(Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub enum WriteOp {
@@ -178,11 +184,6 @@ impl TransactionWrite for WriteOp {
             None => StateValue::new_legacy(bytes.to_vec()),
             Some(metadata) => StateValue::new_with_metadata(bytes.to_vec(), metadata.clone()),
         })
-    }
-
-    fn as_aptos_resource(&self) -> Option<AptosResource> {
-        let bytes = self.clone().into_bytes();
-        bytes.map(AptosResource::from_blob)
     }
 }
 

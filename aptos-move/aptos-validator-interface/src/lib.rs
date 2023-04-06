@@ -14,13 +14,15 @@ use aptos_types::{
     account_state::AccountState,
     account_view::AccountView,
     on_chain_config::ValidatorSet,
-    resource::AptosResource,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
     transaction::{Transaction, TransactionInfo, Version},
 };
-use aptos_vm_types::remote_cache::{TRemoteCache, TStateViewWithRemoteCache};
+use aptos_vm_types::{
+    remote_cache::{TRemoteCache, TStateViewWithRemoteCache},
+    write::AptosWrite,
+};
 use lru::LruCache;
 use move_binary_format::file_format::CompiledModule;
 use std::sync::{Arc, Mutex};
@@ -210,7 +212,7 @@ impl TRemoteCache for DebuggerStateView {
         todo!()
     }
 
-    fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosResource>> {
+    fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosWrite>> {
         todo!()
     }
 }

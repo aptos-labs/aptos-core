@@ -8,12 +8,14 @@ use anyhow::Result;
 use aptos_state_view::TStateView;
 use aptos_types::{
     access_path::AccessPath,
-    resource::AptosResource,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
 };
-use aptos_vm_types::remote_cache::{TRemoteCache, TStateViewWithRemoteCache};
+use aptos_vm_types::{
+    remote_cache::{TRemoteCache, TStateViewWithRemoteCache},
+    write::AptosWrite,
+};
 use move_core_types::language_storage::ModuleId;
 use std::collections::HashMap;
 
@@ -64,7 +66,7 @@ impl TRemoteCache for GenesisStateView {
         todo!()
     }
 
-    fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosResource>> {
+    fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosWrite>> {
         todo!()
     }
 }

@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_types::{executable::ModulePath, resource::TransactionWrite};
+use aptos_types::{executable::ModulePath, write_set::TransactionWrite};
 use aptos_vm_types::{delta::DeltaOp, remote_cache::TStateViewWithRemoteCache};
 use std::{fmt::Debug, hash::Hash};
 

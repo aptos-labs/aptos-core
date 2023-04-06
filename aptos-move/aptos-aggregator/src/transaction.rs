@@ -4,12 +4,7 @@
 use crate::delta_change_set::{deserialize, DeltaChangeSet};
 use anyhow::bail;
 use aptos_state_view::StateView;
-use aptos_types::{
-    resource::TransactionWrite,
-    transaction::{ChangeSet, CheckChangeSet, TransactionOutput},
-    write_set::{WriteOp, WriteSet, WriteSetMut},
-};
-use std::{collections::btree_map, sync::Arc};
+use aptos_types::write_set::{TransactionWrite, WriteOp, WriteSet, WriteSetMut};
 
 /// Helpful trait for e.g. extracting u128 value out of TransactionWrite that we know is
 /// for aggregator (i.e. if we have seen a DeltaOp for the same access path).

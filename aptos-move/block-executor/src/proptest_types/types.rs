@@ -16,9 +16,8 @@ use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     executable::ModulePath,
-    resource::TransactionWrite,
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
-    write_set::WriteOp,
+    write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_types::delta::{delta_add, delta_sub, DeltaOp};
 use claims::assert_none;
@@ -160,10 +159,6 @@ impl<V: Into<Vec<u8>> + Debug + Clone + Eq + Send + Sync + Arbitrary> Transactio
 
     fn as_state_value(&self) -> Option<StateValue> {
         self.extract_raw_bytes().map(StateValue::new_legacy)
-    }
-
-    fn as_aptos_resource(&self) -> Option<aptos_types::resource::AptosResource> {
-        todo!()
     }
 }
 

@@ -4,10 +4,10 @@
 use anyhow::Result;
 use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
-    resource::{AptosResource, TransactionWrite},
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
+    write_set::TransactionWrite,
 };
 use aptos_vm_types::{
     change_set::ChangeSet,
@@ -71,9 +71,12 @@ where
         todo!()
     }
 
-    fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosResource>> {
+    fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosWrite>> {
         match self.writes.get(state_key) {
-            Some(write_op) => Ok(write_op.as_aptos_resource()),
+            Some(write_op) => Ok(match write_op {
+                Op::Creation(write) | Op::Modification(write) => Some(write.clone()),
+                Op::Deletion => None,
+            }),
             None => self.base.get_cached_resource(state_key),
         }
     }

@@ -6,13 +6,15 @@ use crate::DbReader;
 use anyhow::Result;
 use aptos_state_view::TStateView;
 use aptos_types::{
-    resource::AptosResource,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
     transaction::Version,
 };
-use aptos_vm_types::remote_cache::{TRemoteCache, TStateViewWithRemoteCache};
+use aptos_vm_types::{
+    remote_cache::{TRemoteCache, TStateViewWithRemoteCache},
+    write::AptosWrite,
+};
 use std::sync::Arc;
 
 pub struct DbStateView {
@@ -53,7 +55,7 @@ impl TRemoteCache for DbStateView {
         todo!()
     }
 
-    fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosResource>> {
+    fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosWrite>> {
         todo!()
     }
 }

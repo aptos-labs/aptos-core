@@ -4,7 +4,7 @@
 use crate::types::{Incarnation, MVDataError, MVDataOutput, TxnIndex, Version};
 use aptos_aggregator::{delta_change_set::deserialize, transaction::AggregatorValue};
 use aptos_infallible::Mutex;
-use aptos_types::resource::TransactionWrite;
+use aptos_types::write_set::TransactionWrite;
 use aptos_vm_types::delta::DeltaOp;
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;

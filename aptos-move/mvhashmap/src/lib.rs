@@ -9,7 +9,7 @@ use crate::{
 };
 use aptos_types::{
     executable::{Executable, ExecutableDescriptor, ModulePath},
-    resource::TransactionWrite,
+    write_set::TransactionWrite,
 };
 use aptos_vm_types::delta::DeltaOp;
 use std::hash::Hash;

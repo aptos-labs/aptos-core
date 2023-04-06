@@ -14,14 +14,15 @@ use aptos_mvhashmap::{
 use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
     executable::{ExecutableTestType, ModulePath},
-    resource::{AptosResource, TransactionWrite},
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
     vm_status::{StatusCode, VMStatus},
+    write_set::TransactionWrite,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::{
     delta::DeltaOp,
     remote_cache::{TRemoteCache, TStateViewWithRemoteCache},
+    write::AptosWrite,
 };
 use claims::assert_none;
 use move_binary_format::errors::Location;
@@ -233,6 +234,7 @@ impl<'a, T: Transaction, S: TStateViewWithRemoteCache<CommonKey = T::Key>> TStat
         self.base_view.id()
     }
 
+    // TODO: This should not be called, instead one should call `get_cached_resource` for resources.
     fn get_state_value(&self, state_key: &T::Key) -> anyhow::Result<Option<StateValue>> {
         match self.latest_view {
             ViewMapKind::MultiVersion(map) => match state_key.module_path() {
@@ -293,29 +295,30 @@ impl<'a, T: Transaction, S: TStateViewWithRemoteCache<CommonKey = T::Key>> TRemo
         todo!()
     }
 
-    fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosResource>> {
-        assert_none!(state_key.module_path());
-
-        match self.latest_view {
-            ViewMapKind::MultiVersion(map) => match map.fetch_data(state_key, self.txn_idx) {
-                ReadResult::Value(v) => Ok(v.as_aptos_resource()),
-                ReadResult::U128(v) => Ok(Some(AptosResource::Aggregator(v))),
-                ReadResult::Unresolved(delta) => {
-                    let from_storage = self.base_view.get_state_value_bytes(state_key)?.map_or(
-                        Err(VMStatus::Error(StatusCode::STORAGE_ERROR, None)),
-                        |bytes| Ok(deserialize(&bytes)),
-                    )?;
-                    let result = delta
-                        .apply_to(from_storage)
-                        .map_err(|pe| pe.finish(Location::Undefined).into_vm_status())?;
-                    Ok(Some(AptosResource::Aggregator(result)))
-                },
-                ReadResult::None => self.base_view.get_cached_resource(state_key),
-            },
-            ViewMapKind::BTree(map) => map.get(state_key).map_or_else(
-                || self.base_view.get_cached_resource(state_key),
-                |v| Ok(v.as_aptos_resource()),
-            ),
-        }
+    fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosWrite>> {
+        todo!()
+        // assert_none!(state_key.module_path());
+        //
+        // match self.latest_view {
+        //     ViewMapKind::MultiVersion(map) => match map.fetch_data(state_key, self.txn_idx) {
+        //         ReadResult::Value(v) => Ok(v.as_aptos_resource()),
+        //         ReadResult::U128(v) => Ok(Some(AptosResource::Aggregator(v))),
+        //         ReadResult::Unresolved(delta) => {
+        //             let from_storage = self.base_view.get_state_value_bytes(state_key)?.map_or(
+        //                 Err(VMStatus::Error(StatusCode::STORAGE_ERROR, None)),
+        //                 |bytes| Ok(deserialize(&bytes)),
+        //             )?;
+        //             let result = delta
+        //                 .apply_to(from_storage)
+        //                 .map_err(|pe| pe.finish(Location::Undefined).into_vm_status())?;
+        //             Ok(Some(AptosResource::Aggregator(result)))
+        //         },
+        //         ReadResult::None => self.base_view.get_cached_resource(state_key),
+        //     },
+        //     ViewMapKind::BTree(map) => map.get(state_key).map_or_else(
+        //         || self.base_view.get_cached_resource(state_key),
+        //         |v| Ok(v.as_aptos_resource()),
+        //     ),
+        // }
     }
 }

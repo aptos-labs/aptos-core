@@ -13,12 +13,11 @@ use aptos_types::{
     epoch_state::EpochState,
     event::EventKey,
     on_chain_config,
-    resource::TransactionWrite,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
     transaction::{Transaction, Version},
-    write_set::{WriteOp, WriteSet},
+    write_set::{TransactionWrite, WriteOp, WriteSet},
 };
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
