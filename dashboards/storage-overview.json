@@ -76,7 +76,7 @@
               "decimals": 0,
               "links": [],
               "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
               "unit": "none"
             },
             "overrides": [
@@ -173,7 +173,13 @@
               },
               "links": [],
               "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              },
               "unit": "none"
             },
             "overrides": [
@@ -244,7 +250,13 @@
               "decimals": 2,
               "links": [],
               "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              },
               "unit": "none"
             },
             "overrides": [
@@ -268,7 +280,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sort_desc(rate(aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m]) / on (kubernetes_pod_name, run_uuid) rate(aptos_storage_api_latency_seconds_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", api_name=\"save_transactions\", role=~\"$role\", result=\"Ok\"}[1m]) < 10000)",
+              "expr": "sort_desc(rate(aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m]) / on (kubernetes_pod_name, run_uuid) rate(aptos_storage_api_latency_seconds_count{api_name=\"save_transactions\", result=\"Ok\", role=~\"$role\"}[1m]) < 10000)",
               "hide": false,
               "interval": "",
               "legendFormat": "{{kubernetes_pod_name}} ",
@@ -278,7 +290,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "quantile(0.5, rate(aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m]) / on (kubernetes_pod_name, run_uuid) rate(aptos_storage_api_latency_seconds_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", api_name=\"save_transactions\", role=~\"$role\", result=\"Ok\"}[1m]) < 10000)",
+              "expr": "quantile(0.5, rate(aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[1m]) / on (kubernetes_pod_name, run_uuid) rate(aptos_storage_api_latency_seconds_count{api_name=\"save_transactions\", role=~\"$role\", result=\"Ok\"}[1m]) < 10000)",
               "hide": false,
               "legendFormat": "P50",
               "range": true,
@@ -318,7 +330,7 @@
               "thresholds": {
                 "mode": "absolute",
                 "steps": [
-                  { "color": "green" },
+                  { "color": "green", "value": null },
                   { "color": "#EAB839", "value": 100000 },
                   { "color": "red", "value": 1000000 }
                 ]
@@ -391,7 +403,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
               "unit": "none"
             },
             "overrides": [
@@ -469,7 +481,13 @@
               },
               "decimals": 0,
               "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              },
               "unit": "bytes"
             },
             "overrides": [
@@ -557,7 +575,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
               "unit": "short"
             },
             "overrides": [
@@ -628,7 +646,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
               "unit": "bytes"
             },
             "overrides": [
@@ -699,7 +717,13 @@
               },
               "links": [],
               "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              },
               "unit": "decbytes"
             },
             "overrides": [
@@ -773,7 +797,7 @@
               "decimals": 0,
               "links": [],
               "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
               "unit": "decbytes"
             },
             "overrides": [
@@ -878,7 +902,7 @@
               "decimals": 0,
               "links": [],
               "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
               "unit": "decbytes"
             },
             "overrides": [
@@ -982,7 +1006,7 @@
               "decimals": 0,
               "links": [],
               "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
               "unit": "decbytes"
             },
             "overrides": [
@@ -1102,7 +1126,13 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              },
               "unit": "bytes"
             },
             "overrides": []
@@ -1183,13 +1213,7 @@
                 "thresholdsStyle": { "mode": "line" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 950 }
-                ]
-              },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 950 }] },
               "unit": "s"
             },
             "overrides": []
@@ -1238,13 +1262,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
               "unit": "s"
             },
             "overrides": []
@@ -1294,13 +1312,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
               "unit": "s"
             },
             "overrides": []
@@ -1358,13 +1370,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
               "unit": "s"
             },
             "overrides": []
@@ -1425,13 +1431,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              }
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
             },
             "overrides": []
           },
@@ -1480,13 +1480,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
               "unit": "percentunit"
             },
             "overrides": []
@@ -1535,13 +1529,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
               "unit": "short"
             },
             "overrides": []
@@ -1605,13 +1593,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              }
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
             },
             "overrides": []
           },
@@ -1733,13 +1715,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
               "unit": "bytes"
             },
             "overrides": []
@@ -1797,13 +1773,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              }
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
             },
             "overrides": []
           },
@@ -1851,13 +1821,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
               "unit": "ms"
             },
             "overrides": []
@@ -1916,13 +1880,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
               "unit": "bytes"
             },
             "overrides": []
@@ -1985,7 +1943,7 @@
               "decimals": 0,
               "links": [],
               "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] },
               "unit": "none"
             },
             "overrides": [
@@ -2115,13 +2073,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
               "unit": "percentunit"
             },
             "overrides": []
@@ -2637,6 +2589,6 @@
   "timezone": "",
   "title": "Storage Overview",
   "uid": "ptUp6Vn4k",
-  "version": 214,
+  "version": 217,
   "weekStart": ""
 }
