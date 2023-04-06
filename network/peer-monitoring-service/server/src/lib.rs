@@ -173,15 +173,21 @@ impl Handler {
     }
 
     fn get_network_information(&self) -> Result<PeerMonitoringServiceResponse, Error> {
-        // Get all required network information
+        // Get the connected peers
         let connected_peers_and_metadata =
             self.peers_and_metadata.get_connected_peers_and_metadata()?;
+        let connected_peers = connected_peers_and_metadata
+            .into_iter()
+            .map(|(peer, metadata)| (peer, metadata.get_connection_metadata()))
+            .collect();
+
+        // Get the distance from the validators
         let distance_from_validators =
             get_distance_from_validators(&self.base_config, self.peers_and_metadata.clone());
 
         // Create and send the response
         let network_information_response = NetworkInformationResponse {
-            connected_peers_and_metadata,
+            connected_peers,
             distance_from_validators,
         };
         Ok(PeerMonitoringServiceResponse::NetworkInformation(

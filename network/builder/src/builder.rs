@@ -12,10 +12,10 @@
 //! long as the latter is in its trusted peers set.
 use aptos_config::{
     config::{
-        DiscoveryMethod, NetworkConfig, Peer, PeerRole, PeerSet, RateLimitConfig, RoleType,
-        CONNECTION_BACKOFF_BASE, CONNECTIVITY_CHECK_INTERVAL_MS, MAX_CONCURRENT_NETWORK_REQS,
-        MAX_CONNECTION_DELAY_MS, MAX_FRAME_SIZE, MAX_FULLNODE_OUTBOUND_CONNECTIONS,
-        MAX_INBOUND_CONNECTIONS, NETWORK_CHANNEL_SIZE,
+        DiscoveryMethod, NetworkConfig, Peer, PeerRole, PeerSet, RoleType, CONNECTION_BACKOFF_BASE,
+        CONNECTIVITY_CHECK_INTERVAL_MS, MAX_CONCURRENT_NETWORK_REQS, MAX_CONNECTION_DELAY_MS,
+        MAX_FRAME_SIZE, MAX_FULLNODE_OUTBOUND_CONNECTIONS, MAX_INBOUND_CONNECTIONS,
+        NETWORK_CHANNEL_SIZE,
     },
     network_id::NetworkContext,
 };
@@ -87,8 +87,6 @@ impl NetworkBuilder {
         network_channel_size: usize,
         max_concurrent_network_reqs: usize,
         inbound_connection_limit: usize,
-        inbound_rate_limit_config: Option<RateLimitConfig>,
-        outbound_rate_limit_config: Option<RateLimitConfig>,
         tcp_buffer_cfg: TCPBufferCfg,
     ) -> Self {
         // A network cannot exist without a PeerManager
@@ -106,8 +104,6 @@ impl NetworkBuilder {
             max_message_size,
             enable_proxy_protocol,
             inbound_connection_limit,
-            inbound_rate_limit_config,
-            outbound_rate_limit_config,
             tcp_buffer_cfg,
         );
 
@@ -148,8 +144,6 @@ impl NetworkBuilder {
             NETWORK_CHANNEL_SIZE,
             MAX_CONCURRENT_NETWORK_REQS,
             MAX_INBOUND_CONNECTIONS,
-            None,
-            None,
             TCPBufferCfg::default(),
         );
 
@@ -201,8 +195,6 @@ impl NetworkBuilder {
             config.network_channel_size,
             config.max_concurrent_network_reqs,
             config.max_inbound_connections,
-            config.inbound_rate_limit_config,
-            config.outbound_rate_limit_config,
             TCPBufferCfg::new_configs(
                 config.inbound_rx_buffer_size_bytes,
                 config.inbound_tx_buffer_size_bytes,
@@ -328,9 +320,9 @@ impl NetworkBuilder {
         self.peer_manager_builder.listen_address()
     }
 
-    /// Add a [`network::connectivity_manager::ConnectivityManager`] to the network.
+    /// Add a `network::connectivity_manager::ConnectivityManager` to the network.
     ///
-    /// [`network::connectivity_manager::ConnectivityManager`] is responsible for ensuring that we are connected
+    /// `network::connectivity_manager::ConnectivityManager` is responsible for ensuring that we are connected
     /// to a node iff. it is an eligible node and maintaining persistent
     /// connections with all eligible nodes. A list of eligible nodes is received
     /// at initialization, and updates are received on changes to system membership.

@@ -288,4 +288,4 @@ Serialize an element of an algebraic structure <code>S</code> to a byte array us
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

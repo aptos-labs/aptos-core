@@ -180,7 +180,6 @@ macro_rules! ark_serialize_internal {
         $ark_type:ty,
         $ark_ser_func:ident
     ) => {{
-        $context.charge($gas_params.placeholder)?;
         let handle = safely_pop_arg!($args, u64) as usize;
         safe_borrow_element!($context, handle, $ark_type, element_ptr, element);
         let mut buf = vec![];
@@ -196,7 +195,7 @@ macro_rules! ark_serialize_internal {
 }
 
 fn serialize_internal(
-    gas_params: &GasParameters,
+    _gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -235,7 +234,6 @@ macro_rules! ark_deserialize_internal {
         $ark_typ:ty,
         $ark_deser_func:ident
     ) => {{
-        $context.charge($gas_params.placeholder)?;
         match <$ark_typ>::$ark_deser_func($bytes) {
             Ok(element) => {
                 let handle = store_element!($context, element);
@@ -254,7 +252,7 @@ macro_rules! ark_deserialize_internal {
 }
 
 fn deserialize_internal(
-    gas_params: &GasParameters,
+    _gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -289,7 +287,6 @@ fn deserialize_internal(
 
 macro_rules! ark_add_internal {
     ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $ark_type:ty) => {{
-        $context.charge($gas_params.placeholder)?;
         let handle_2 = safely_pop_arg!($args, u64) as usize;
         let handle_1 = safely_pop_arg!($args, u64) as usize;
         safe_borrow_element!($context, handle_1, $ark_type, element_1_ptr, element_1);
@@ -301,7 +298,7 @@ macro_rules! ark_add_internal {
 }
 
 fn add_internal(
-    gas_params: &GasParameters,
+    _gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,

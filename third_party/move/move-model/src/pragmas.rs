@@ -76,6 +76,10 @@ pub const DISABLE_INVARIANTS_IN_BODY_PRAGMA: &str = "disable_invariants_in_body"
 /// to this function
 pub const DELEGATE_INVARIANTS_TO_CALLER_PRAGMA: &str = "delegate_invariants_to_caller";
 
+/// Pragma indicating that all loops within the scope of this pragma should be unrolled
+/// to a certain depth *when there are no invariants specified*
+pub const UNROLL_PRAGMA: &str = "unroll";
+
 /// # Pragmas for intrinsic table declaration
 
 /// The intrinsic type for `Map<K, V>`
@@ -155,6 +159,10 @@ pub const INTRINSIC_FUN_MAP_BORROW: &str = "map_borrow";
 /// `[move] fun map_borrow_mut<K, V>(m: &mut Map<K, V>, k: K): &mut V`
 pub const INTRINSIC_FUN_MAP_BORROW_MUT: &str = "map_borrow_mut";
 
+/// Mutable borrow of a value from the map, add the entry (k,default) if the key does not exist
+/// `[move] fun map_borrow_mut<K, V>(m: &mut Map<K, V>, k: K, default: V): &mut V`
+pub const INTRINSIC_FUN_MAP_BORROW_MUT_WITH_DEFAULT: &str = "map_borrow_mut_with_default";
+
 /// All intrinsic functions associated with the map type
 pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, bool>> =
     Lazy::new(|| {
@@ -177,6 +185,7 @@ pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, bool>
             (INTRINSIC_FUN_MAP_DEL_RETURN_KEY, true),
             (INTRINSIC_FUN_MAP_BORROW, true),
             (INTRINSIC_FUN_MAP_BORROW_MUT, true),
+            (INTRINSIC_FUN_MAP_BORROW_MUT_WITH_DEFAULT, true),
         ])
     });
 
@@ -197,6 +206,7 @@ pub fn is_pragma_valid_for_block(
                 | ABORTS_IF_IS_STRICT_PRAGMA
                 | ABORTS_IF_IS_PARTIAL_PRAGMA
                 | INTRINSIC_PRAGMA
+                | UNROLL_PRAGMA
         ),
         Function(..) => matches!(
             pragma,
@@ -220,6 +230,7 @@ pub fn is_pragma_valid_for_block(
                 | DELEGATE_INVARIANTS_TO_CALLER_PRAGMA
                 | BV_PARAM_PROP
                 | BV_RET_PROP
+                | UNROLL_PRAGMA
         ),
         Struct(..) => match pragma {
             INTRINSIC_PRAGMA | BV_PARAM_PROP => true,
@@ -287,6 +298,10 @@ pub const CONDITION_CHECK_ABORT_CODES_PROP: &str = "check";
 /// enabled disabled by the disable_invariant_in_body pragma
 pub const CONDITION_SUSPENDABLE_PROP: &str = "suspendable";
 
+/// A property that can be attached to a loop invariant to indicate that the loop needs to
+/// be unrolled to a certain depth, a typical relaxation in bounded model checking.
+pub const CONDITION_UNROLL_PROP: &str = "unroll";
+
 /// A pragama defined in the spec block of a function or a struct
 /// to explicitly specify which argument or field will be translated into a bv type in the boogie file
 /// example: bv=b"0,1"
@@ -312,6 +327,9 @@ pub fn is_property_valid_for_condition(kind: &ConditionKind, prop: &str) -> bool
     }
     use crate::ast::ConditionKind::*;
     match kind {
+        LoopInvariant => {
+            matches!(prop, CONDITION_UNROLL_PROP)
+        },
         GlobalInvariant(..) | GlobalInvariantUpdate(..) => {
             matches!(
                 prop,

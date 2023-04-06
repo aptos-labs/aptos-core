@@ -37,7 +37,6 @@ use crate::{
 use aptos_channels::aptos_channel;
 use aptos_config::network_id::NetworkContext;
 use aptos_logger::prelude::*;
-use aptos_rate_limiter::rate_limit::SharedBucket;
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::PeerId;
@@ -137,10 +136,6 @@ pub struct Peer<TSocket> {
     max_frame_size: usize,
     /// The maximum size of an inbound or outbound request message
     max_message_size: usize,
-    /// Optional inbound rate limiter
-    inbound_rate_limiter: Option<SharedBucket>,
-    /// Optional outbound rate limiter
-    outbound_rate_limiter: Option<SharedBucket>,
     /// Inbound stream buffer
     inbound_stream: InboundStreamBuffer,
 }
@@ -163,8 +158,6 @@ where
         max_concurrent_outbound_rpcs: u32,
         max_frame_size: usize,
         max_message_size: usize,
-        inbound_rate_limiter: Option<SharedBucket>,
-        outbound_rate_limiter: Option<SharedBucket>,
     ) -> Self {
         let Connection {
             metadata: connection_metadata,
@@ -197,8 +190,6 @@ where
             state: State::Connected,
             max_frame_size,
             max_message_size,
-            inbound_rate_limiter,
-            outbound_rate_limiter,
             inbound_stream: InboundStreamBuffer::new(max_fragments),
         }
     }
@@ -221,17 +212,9 @@ where
         let (read_socket, write_socket) =
             tokio::io::split(self.connection.take().unwrap().compat());
 
-        let mut reader = MultiplexMessageStream::new(
-            read_socket.compat(),
-            self.max_frame_size,
-            self.inbound_rate_limiter.clone(),
-        )
-        .fuse();
-        let writer = MultiplexMessageSink::new(
-            write_socket.compat_write(),
-            self.max_frame_size,
-            self.outbound_rate_limiter.clone(),
-        );
+        let mut reader =
+            MultiplexMessageStream::new(read_socket.compat(), self.max_frame_size).fuse();
+        let writer = MultiplexMessageSink::new(write_socket.compat_write(), self.max_frame_size);
 
         // Start writer "process" as a separate task. We receive two handles to
         // communicate with the task:

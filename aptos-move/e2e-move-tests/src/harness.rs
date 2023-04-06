@@ -615,3 +615,18 @@ macro_rules! assert_vm_status {
         );
     }};
 }
+
+#[macro_export]
+macro_rules! assert_move_abort {
+    ($s:expr, $c:ident) => {{
+        use aptos_types::transaction::*;
+        assert!(match $s {
+            TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+                location: _,
+                code: _,
+                info,
+            }) => info == $c,
+            _ => false,
+        });
+    }};
+}

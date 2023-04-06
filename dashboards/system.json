@@ -283,10 +283,13 @@
       "steppedLine": false,
       "targets": [
         {
+          "datasource": { "type": "prometheus", "uid": "Zu4MxH4Vk" },
+          "editorMode": "code",
           "expr": "kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*-($container)-e.*\"} / kubelet_volume_stats_capacity_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*-($container)-e.*\"}",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{pod}}-{{persistentvolumeclaim}}",
+          "range": true,
           "refId": "A"
         }
       ],
@@ -346,12 +349,11 @@
       "steppedLine": false,
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "P968F4F8972F6D74D" },
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*$container.*\"}",
-          "format": "time_series",
-          "intervalFactor": 1,
-          "legendFormat": "{{pod}}-{{persistentvolumeclaim}}",
+          "expr": "kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*-($container)-e.*\"}",
+          "hide": false,
+          "legendFormat": "{{cluster}} {{kubernetes_pod_name}}",
           "range": true,
           "refId": "A"
         }
@@ -762,6 +764,6 @@
   "timezone": "",
   "title": "System",
   "uid": "system",
-  "version": 8,
+  "version": 10,
   "weekStart": ""
 }

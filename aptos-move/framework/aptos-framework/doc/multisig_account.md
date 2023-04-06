@@ -2390,4 +2390,4 @@ This function is private so no other code can call this beside the VM itself as 
 </details>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

@@ -74,6 +74,10 @@ pub struct NetworkReceivers {
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
     >,
+    pub buffer_manager_messages: aptos_channel::Receiver<
+        (AccountAddress, Discriminant<ConsensusMsg>),
+        (AccountAddress, ConsensusMsg),
+    >,
     pub quorum_store_messages: aptos_channel::Receiver<
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
@@ -380,6 +384,10 @@ pub struct NetworkTask {
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
     >,
+    buffer_manager_messages_tx: aptos_channel::Sender<
+        (AccountAddress, Discriminant<ConsensusMsg>),
+        (AccountAddress, ConsensusMsg),
+    >,
     quorum_store_messages_tx: aptos_channel::Sender<
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
@@ -394,8 +402,16 @@ impl NetworkTask {
         network_service_events: NetworkServiceEvents<ConsensusMsg>,
         self_receiver: aptos_channels::Receiver<Event<ConsensusMsg>>,
     ) -> (NetworkTask, NetworkReceivers) {
-        let (consensus_messages_tx, consensus_messages) =
-            aptos_channel::new(QueueStyle::LIFO, 1, Some(&counters::CONSENSUS_CHANNEL_MSGS));
+        let (consensus_messages_tx, consensus_messages) = aptos_channel::new(
+            QueueStyle::FIFO,
+            10,
+            Some(&counters::CONSENSUS_CHANNEL_MSGS),
+        );
+        let (buffer_manager_messages_tx, buffer_manager_messages) = aptos_channel::new(
+            QueueStyle::FIFO,
+            100,
+            Some(&counters::BUFFER_MANAGER_CHANNEL_MSGS),
+        );
         let (quorum_store_messages_tx, quorum_store_messages) = aptos_channel::new(
             QueueStyle::FIFO,
             // TODO: tune this value based on quorum store messages with backpressure
@@ -421,12 +437,14 @@ impl NetworkTask {
         (
             NetworkTask {
                 consensus_messages_tx,
+                buffer_manager_messages_tx,
                 quorum_store_messages_tx,
                 rpc_tx,
                 all_events,
             },
             NetworkReceivers {
                 consensus_messages,
+                buffer_manager_messages,
                 quorum_store_messages,
                 rpc_rx,
             },
@@ -467,6 +485,14 @@ impl NetworkTask {
                                 peer_id,
                                 quorum_store_msg,
                                 &self.quorum_store_messages_tx,
+                            );
+                        },
+                        buffer_manager_msg @ (ConsensusMsg::CommitVoteMsg(_)
+                        | ConsensusMsg::CommitDecisionMsg(_)) => {
+                            Self::push_msg(
+                                peer_id,
+                                buffer_manager_msg,
+                                &self.buffer_manager_messages_tx,
                             );
                         },
                         consensus_msg => {

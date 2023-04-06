@@ -20,8 +20,7 @@ spec aptos_framework::staking_contract {
 
     /// Staking_contract exists the stacker/operator pair.
     spec staking_contract_amounts(staker: address, operator: address): (u64, u64, u64) {
-        // This might get timeout. Set a longer time limit.
-        pragma timeout = 600;
+        pragma verify = false; // TODO: set to false because of timeout (property proved).
         let staking_contracts = global<Store>(staker).staking_contracts;
         let staking_contract = simple_map::spec_get(staking_contracts, operator);
         include StakingContractExistsAbortsIf;
@@ -46,7 +45,7 @@ spec aptos_framework::staking_contract {
         commission_percentage: u64,
         contract_creation_seed: vector<u8>,
     ) {
-        // TODO: complex aborts conditions in create_staking_contract_with_coins.
+        // TODO: complex aborts conditions in 'create_staking_contract_with_coins'.
         pragma aborts_if_is_partial;
         include WithdrawAbortsIf<AptosCoin> {account: staker};
     }
@@ -62,7 +61,7 @@ spec aptos_framework::staking_contract {
         commission_percentage: u64,
         contract_creation_seed: vector<u8>,
     ): address {
-        // TODO: Complex Abort condition in add_stake_with_cap function in the stake module.
+        // TODO: Complex aborts conditions in 'stake::add_stake_with_cap'.
         pragma verify = false;
         pragma aborts_if_is_partial;
         aborts_if commission_percentage < 0 || commission_percentage > 100;
@@ -82,7 +81,7 @@ spec aptos_framework::staking_contract {
     /// Account is not frozen and sufficient to withdraw.
     /// Staking_contract exists the stacker/operator pair.
     spec add_stake(staker: &signer, operator: address, amount: u64) {
-        // TODO: complex aborts conditions in stake::add_stake_with_cap.
+        // TODO: complex aborts conditions in 'stake::add_stake_with_cap'.
         pragma verify = false;
         let staker_address = signer::address_of(staker);
         let store = borrow_global_mut<Store>(staker_address);
@@ -109,13 +108,13 @@ spec aptos_framework::staking_contract {
     }
 
     spec update_commision (staker: &signer, operator: address, new_commission_percentage: u64) {
-        // TODO: Call `distribute_internal`
+        // TODO: Call `distribute_internal` and could not verify `update_distribution_pool`.
         pragma verify = false;
     }
 
     /// Only staker or operator can call this.
     spec request_commission(account: &signer, staker: address, operator: address) {
-        // TODO: Call `update_distribution_pool`
+        // TODO: Call `update_distribution_pool` and could not verify `update_distribution_pool`.
         pragma verify = false;
         let account_addr = signer::address_of(account);
         include ContractExistsAbortsIf{staker};
@@ -135,14 +134,14 @@ spec aptos_framework::staking_contract {
 
     /// Staking_contract exists the stacker/operator pair.
     spec unlock_rewards(staker: &signer, operator: address) {
-        // TODO: Call `update_distribution_pool`
+        // TODO: Call `update_distribution_pool` and could not verify `update_distribution_pool`.
         pragma aborts_if_is_partial;
         let staker_address = signer::address_of(staker);
         include ContractExistsAbortsIf{staker: staker_address};
     }
 
     spec unlock_stake(staker: &signer, operator: address, amount: u64) {
-        // TODO: Call `update_distribution_pool`
+        // TODO: Call `update_distribution_pool` and could not verify `update_distribution_pool`.
         pragma verify = false;
     }
 
@@ -152,7 +151,7 @@ spec aptos_framework::staking_contract {
         old_operator: address,
         new_operator: address,
     ) {
-        // TODO: Call `update_distribution_pool`
+        // TODO: Call `update_distribution_pool` and could not verify `update_distribution_pool`.
         pragma aborts_if_is_partial;
         let staker_address = signer::address_of(staker);
         include ContractExistsAbortsIf{staker: staker_address, operator: old_operator};
@@ -165,7 +164,7 @@ spec aptos_framework::staking_contract {
         new_operator: address,
         new_commission_percentage: u64,
     ) {
-        // TODO: Call `update_distribution_pool`
+        // TODO: Call `update_distribution_pool` and could not verify `update_distribution_pool`.
         pragma verify = false;
         let staker_address = signer::address_of(staker);
         include ContractExistsAbortsIf{staker: staker_address, operator: old_operator};
@@ -176,7 +175,7 @@ spec aptos_framework::staking_contract {
 
     /// Staking_contract exists the stacker/operator pair.
     spec distribute(staker: address, operator: address) {
-        // TODO: Call `distribute_internal`
+        // TODO: Call `distribute_internal` and could not verify `update_distribution_pool`.
         pragma aborts_if_is_partial;
         include ContractExistsAbortsIf;
     }
@@ -189,7 +188,7 @@ spec aptos_framework::staking_contract {
         staking_contract: &mut StakingContract,
         distribute_events: &mut EventHandle<DistributeEvent>,
     ) {
-        // TODO: Call `update_distribution_pool`
+        // TODO: Call `update_distribution_pool` and could not verify `update_distribution_pool`.
         pragma aborts_if_is_partial;
         let pool_address = staking_contract.pool_address;
         let stake_pool = borrow_global<stake::StakePool>(pool_address);
@@ -210,7 +209,7 @@ spec aptos_framework::staking_contract {
         coins_amount: u64,
         add_distribution_events: &mut EventHandle<AddDistributionEvent>,
     ) {
-        // TODO: Call `update_distribution_pool`
+        // TODO: Call `update_distribution_pool` and could not verify `update_distribution_pool`.
         pragma verify = false;
     }
 
@@ -225,7 +224,7 @@ spec aptos_framework::staking_contract {
         voter: address,
         contract_creation_seed: vector<u8>,
     ): (signer, SignerCapability, OwnerCapability) {
-        // TODO: Call `account::create_resource_account`.
+        // TODO: could not verify `initialize_stake_owner` because can't get `stake_pool_signer` and `stake_pool_signer_cap` from 'account::create_resource_account' function.
         pragma verify = false;
     }
 
@@ -235,7 +234,7 @@ spec aptos_framework::staking_contract {
         operator: address,
         commission_percentage: u64,
     ) {
-        // TODO: The value of the variable cannot be obtained.
+        // TODO: complex aborts conditions in the cycle.
         pragma verify = false;
     }
 

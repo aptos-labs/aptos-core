@@ -4,6 +4,7 @@ import { OpenAPIConfig } from "../../generated";
 export const NODE_URL = process.env.APTOS_NODE_URL!;
 export const FAUCET_URL = process.env.APTOS_FAUCET_URL!;
 export const API_TOKEN = process.env.API_TOKEN!;
+export const FAUCET_AUTH_TOKEN = process.env.FAUCET_AUTH_TOKEN!;
 
 /**
  * Returns an instance of a FaucetClient with NODE_URL and FAUCET_URL from the

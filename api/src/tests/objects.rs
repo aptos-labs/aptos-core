@@ -37,7 +37,7 @@ async fn test_gen_object() {
     let collection_addr = account_address::create_collection_address(user_addr, "Hero Quest!");
     let token_addr = account_address::create_token_address(user_addr, "Hero Quest!", "Wukong");
     let object_resource = "0x1::object::ObjectCore";
-    let token_resource = format!("0x{}::token::Token", user_addr);
+    let token_resource = "0x4::token::Token";
     let hero_resource = format!("0x{}::hero::Hero", user_addr);
 
     let collection0 = context.gen_all_resources(&collection_addr).await;
@@ -56,7 +56,7 @@ async fn test_gen_object() {
     let hero = context.gen_all_resources(&token_addr).await;
     let hero_map = to_object(hero);
     assert!(hero_map.contains_key(object_resource));
-    assert!(hero_map.contains_key(&token_resource));
+    assert!(hero_map.contains_key(token_resource));
     assert!(hero_map.contains_key(&hero_resource));
     let owner: AccountAddress = hero_map[object_resource]["owner"]
         .as_str()
