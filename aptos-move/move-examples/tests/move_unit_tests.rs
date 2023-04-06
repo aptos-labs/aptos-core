@@ -172,3 +172,14 @@ fn test_nft_dao_test() {
     )]);
     run_tests_for_pkg("dao/nft_dao", named_address);
 }
+
+#[test]
+fn test_rng() {
+    let named_address = BTreeMap::from([
+        (
+            String::from("rng_address"),
+            AccountAddress::from_hex_literal("0xcafe").unwrap(),
+        ),
+    ]);
+    run_tests_for_pkg("simple_rng", named_address);
+}

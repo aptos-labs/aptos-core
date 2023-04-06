@@ -1,0 +1,9 @@
+[package]
+name = "Simple Random Number Generator (RNG)"
+version = "0.0.0"
+
+[addresses]
+rng_address = "_"
+
+[dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }
