@@ -84,7 +84,7 @@ fn execute_and_commit(txns: Vec<Transaction>, db: &DbReaderWriter, signer: &Vali
     let li = db.reader.get_latest_ledger_info().unwrap();
     let version = li.ledger_info().version();
     let epoch = li.ledger_info().next_block_epoch();
-    let target_version = version + txns.len() as u64;
+    let target_version = version + txns.len() as u64 + 1; // Due to StateCheckpoint txn
     let executor = BlockExecutor::<AptosVM, Transaction>::new(db.clone());
     let output = executor
         .execute_block((block_id, txns), executor.committed_block_id())
