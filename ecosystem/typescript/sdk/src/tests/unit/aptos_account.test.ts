@@ -86,20 +86,20 @@ test("Test getAddressFromAccountOrAddress", () => {
 });
 
 test("Gets the collection object address", () => {
-  const creator = "0x423eab63bed73bb1febb3630e803a1d18b518e798cd2a28d4fea8ba53d097cb1";
-  const collectionName = "Kevin1";
+  const creator = "0x28aa1624f8a8974c4158da696eea0e1c26af2cf7cacdb3564193ae817a44f908";
+  const collectionName = "AliceCollection";
 
   expect(AptosAccount.getCollectionObjectAddress(creator, collectionName).hex()).toBe(
-    "0x5a8b5f656bd7c37410b3177a928e834bff9a1add03082e7c7f8f56a3dee1e755",
+    "0xe74374a411c3db7991608d3cfb06501f6c90852ffee35da4bb2fa4839a947047",
   );
 });
 
 test("Gets the token object address", () => {
-  const creator = "0x423eab63bed73bb1febb3630e803a1d18b518e798cd2a28d4fea8ba53d097cb1";
-  const collectionName = "Kevin1";
-  const tokenName = "Kevin_token_1";
+  const creator = "0xe10674d895b75c8192add21d0ef08b0e1bb2481b741074d1d41c1986d8e14915";
+  const collectionName = "AliceCollection";
+  const tokenName = "Alice Token";
 
   expect(AptosAccount.getTokenObjectAddress(creator, collectionName, tokenName).hex()).toBe(
-    "0xdcf50c7ecd3e8f9d56048874ee2cce2a61741182c01673effd5d28299c12c687",
+    "0x9f402496db3ee295f45d2873e47cd81372743b919efbb8171f56a1c695c5164f",
   );
 });
