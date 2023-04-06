@@ -940,7 +940,7 @@ fn individual_workload_tests(test_name: String, config: ForgeConfig) -> ForgeCon
                         .max_transactions_per_account(1)
                         .mode(EmitJobMode::MaxLoad {
                         // 20s of backlog
-                        mempool_backlog: 500,
+                        mempool_backlog: 1500,
                     });
                 }
                 job.transaction_type(match test_name.as_str() {
