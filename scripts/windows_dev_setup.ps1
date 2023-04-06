@@ -393,7 +393,7 @@ function install_dotnet {
     Write-Host "Installing Microsoft DotNet..."
     winget install "Microsoft.DotNet.SDK.6" --accept-source-agreements --silent
     [Environment]::SetEnvironmentVariable("DOTNET_ROOT", "$env:PROGRAMFILES\dotnet", "User")
-    [Environment]::SetEnvironmentVariable("PATH", "$env:PATH;$env:PROGRAMFILES\dotnet\sdk\$global:dotnet_version\DotnetTools", "User")
+    [Environment]::SetEnvironmentVariable("PATH", "$env:PATH;$env:PROGRAMFILES\dotnet\sdk\$global:dotnet_version\DotnetTools;;$env:PATH;$env:USERPROFILE\.dotnet\tools", "User")
     Write-Host "User environment variables set for DotNet"
   } 
   else {
