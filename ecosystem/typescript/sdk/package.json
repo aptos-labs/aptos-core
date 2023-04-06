@@ -23,7 +23,7 @@
     "_build:node": "tsup --format cjs,esm --dts",
     "lint": "eslint \"**/*.ts\"",
     "test": "pnpm publish-ans-contract && jest",
-    "_fmt": "prettier 'src/**/*.ts' 'examples/**/*.js' 'examples/**/*.ts' '.eslintrc.js'",
+    "_fmt": "prettier 'scripts/**/*.ts' 'src/**/*.ts' 'examples/**/*.js' 'examples/**/*.ts' '.eslintrc.js'",
     "fmt": "pnpm _fmt --write",
     "fmt:check": "pnpm _fmt --check",
     "cov:clean": "rm -rf coverage",

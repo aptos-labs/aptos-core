@@ -25,27 +25,25 @@ try {
   deleteAnsFolder();
   // 1. Clone ANS repository into the current directory
   console.log("---clone ANS repository---");
-  execSync("git clone https://github.com/aptos-labs/aptos-names-contracts.git /tmp/ans");
+  execSync("git clone https://github.com/aptos-labs/aptos-names-contracts.git /tmp/ans", { stdio: "inherit" });
 
   // 2. fund ans account
   console.log("---funding account---");
   execSync(
     `${APTOS_INVOCATION} account fund-with-faucet --account ${ANS_TEST_ACCOUNT_ADDRESS} --faucet-url ${APTOS_FAUCET_URL} --url ${APTOS_NODE_URL}`,
+    { stdio: "inherit" },
   );
 
-  // Sleep for 10 seconds to make sure account has funded
-  console.log("---sleeps for 10 seconds to make sure account has funded---");
-  execSync("sleep 10");
-
   // debugging
-  execSync("ls -la /tmp");
-  execSync("ls -la /tmp/ans");
-  execSync("ls -la /tmp/ans/core");
+  execSync("ls -la /tmp", { stdio: "inherit" });
+  execSync("ls -la /tmp/ans", { stdio: "inherit" });
+  execSync("ls -la /tmp/ans/core", { stdio: "inherit" });
 
   // 3. publish ans modules under the ans account
   console.log("---publish ans modules---");
   execSync(
     `${APTOS_INVOCATION} move publish --private-key=${ANS_TEST_ACCOUNT_PRIVATE_KEY} --named-addresses aptos_names=0x${ANS_TEST_ACCOUNT_ADDRESS},aptos_names_admin=0x${ANS_TEST_ACCOUNT_ADDRESS},aptos_names_funds=0x${ANS_TEST_ACCOUNT_ADDRESS} --url=${APTOS_NODE_URL} --package-dir=/tmp/ans/core --assume-yes`,
+    { stdio: "inherit" },
   );
 
   // 4. Delete aptos-names-contracts folder created by the git clone command
@@ -60,5 +58,5 @@ try {
 }
 
 function deleteAnsFolder() {
-  execSync("rm -rf /tmp/ans");
+  execSync("rm -rf /tmp/ans", { stdio: "inherit" });
 }
