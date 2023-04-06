@@ -1,12 +1,3 @@
-#![allow(dead_code, unused_variables)]
-
-use anyhow::Context;
-use econia_types::order::{Order, OrderState, Side};
-use std::{
-    collections::{BTreeMap, HashMap},
-    sync::RwLock,
-};
-
 use crate::{
     database::{clean_data_for_db, execute_with_better_error, get_chunks, PgDbPool},
     indexer::{
@@ -19,6 +10,7 @@ use crate::{
         transactions::{TransactionDetail, TransactionModel},
     },
 };
+use anyhow::Context;
 use aptos_api_types::Transaction;
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
@@ -28,9 +20,14 @@ use crossbeam::channel;
 use dashmap::DashMap;
 use diesel::{result::Error, PgConnection};
 use econia_db::models::{self, events::MakerEventType, market::MarketEventType, IntoInsertable};
+use econia_types::order::{Order, OrderState, Side};
 use field_count::FieldCount;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::RwLock,
+};
 
 pub const NAME: &str = "econia_processor";
 
@@ -260,7 +257,8 @@ struct EconiaRedisCacher {
     event_rx: channel::Receiver<EventWrapper>,
 }
 
-// TODO use redis pub/sub
+// TODO use redis pub/sub, send maker and taker events to user channels
+// and then send overall book price level messages separately too
 impl EconiaRedisCacher {
     fn new(
         config: RedisConfig,
@@ -326,6 +324,19 @@ impl EconiaRedisCacher {
         (*side, *price)
     }
 
+    fn get_order(book: &OrderBook, order_id: u64) -> &Order {
+        let (side, price) = Self::get_book_side_price_level(book, order_id);
+        let book_side = book.get_side(side);
+        let orders = book_side
+            .get(&price)
+            .expect("invalid state, price level is missing");
+        let order = orders
+            .iter()
+            .find(|o| o.market_order_id == order_id)
+            .expect("invalid state, order is missing");
+        order
+    }
+
     fn get_order_mut(book: &mut OrderBook, order_id: u64) -> &mut Order {
         let (side, price) = Self::get_book_side_price_level(book, order_id);
         let book_side = book.get_side_mut(side);
@@ -337,6 +348,21 @@ impl EconiaRedisCacher {
             .find(|o| o.market_order_id == order_id)
             .expect("invalid state, order is missing");
         order
+    }
+
+    fn add_order(book: &mut OrderBook, order: Order) {
+        let market_order_id = order.market_order_id;
+        let side = order.side;
+        let price = order.price;
+
+        if side == Side::Ask {
+            book.asks.entry(price).or_default().push(order);
+        } else {
+            book.bids.entry(price).or_default().push(order);
+        }
+
+        book.orders_to_price_level
+            .insert(market_order_id, (side, price));
     }
 
     fn remove_order(book: &mut OrderBook, order_id: u64) -> Order {
@@ -360,6 +386,29 @@ impl EconiaRedisCacher {
         order
     }
 
+    fn send_price_level_update(
+        conn: &mut redis::Connection,
+        mkt_id: u64,
+        book: &OrderBook,
+        side: Side,
+        price: u64,
+    ) -> anyhow::Result<()> {
+        let cum_size = book
+            .get_side(side)
+            .get(&price)
+            .map_or(0, |v| v.iter().fold(0, |i, s: &Order| i + s.size));
+        let channel_name = format!("book:{}", mkt_id);
+        let message = serde_json::json!({
+            "price": price,
+            "size": cum_size
+        });
+        let message = serde_json::to_string(&message)?;
+        let mut cmd = redis::cmd("PUBLISH");
+        cmd.arg(&channel_name).arg(&message);
+        cmd.query::<usize>(conn)?;
+        Ok(())
+    }
+
     fn handle_maker_event(
         &mut self,
         conn: &mut redis::Connection,
@@ -373,29 +422,36 @@ impl EconiaRedisCacher {
             MakerEventType::Cancel => {
                 let mut order = Self::remove_order(book, e.market_order_id);
                 order.order_state = OrderState::Cancelled;
-                // todo send event here to redis
+                Self::send_price_level_update(conn, e.market_id, book, order.side, order.price)?;
+                // todo send order event here to redis
             },
             MakerEventType::Change => {
-                let pop_and_reinsert_order = {
-                    let order = Self::get_order_mut(book, e.market_order_id);
-                    let res = (order.price != e.price) || (e.size > order.size);
+                let pop_and_reinsert = {
+                    let order = Self::get_order(book, e.market_order_id);
+                    (order.price != e.price) || (e.size > order.size)
+                };
+                if pop_and_reinsert {
+                    let mut order = Self::remove_order(book, e.market_order_id);
+                    let side = order.side;
+                    Self::send_price_level_update(conn, e.market_id, book, side, order.price)?;
                     order.size = e.size;
                     order.price = e.price;
-                    res
-                };
-
-                if pop_and_reinsert_order {
-                    let (side, price) = Self::get_book_side_price_level(book, e.market_order_id);
-                    let order = Self::remove_order(book, e.market_order_id);
-                    let book_side = book.get_side_mut(side);
-                    book_side.entry(e.price).or_default().push(order);
+                    Self::add_order(book, order);
+                    Self::send_price_level_update(conn, e.market_id, book, side, e.price)?;
+                } else {
+                    let order = Self::get_order_mut(book, e.market_order_id);
+                    let side = order.side;
+                    order.size = e.size;
+                    order.price = e.price;
+                    Self::send_price_level_update(conn, e.market_id, book, side, e.price)?;
                 }
-                // todo send event here to redis
+                // todo send order event here to redis
             },
             MakerEventType::Evict => {
                 let mut order = Self::remove_order(book, e.market_order_id);
                 order.order_state = OrderState::Evicted;
-                // todo send event here to redis
+                Self::send_price_level_update(conn, e.market_id, book, order.side, order.price)?;
+                // todo send order event here to redis
             },
             MakerEventType::Place => {
                 let side = e.side.into();
@@ -411,15 +467,9 @@ impl EconiaRedisCacher {
                     created_at: *CURRENT_BLOCK_TIME.read().unwrap(),
                 };
 
-                book.orders_to_price_level
-                    .insert(e.market_order_id, (side, e.price));
-
-                if side == Side::Ask {
-                    book.asks.entry(e.price).or_default().push(o);
-                } else {
-                    book.bids.entry(e.price).or_default().push(o);
-                }
-                // todo send event here to redis
+                Self::add_order(book, o);
+                Self::send_price_level_update(conn, e.market_id, book, side, e.price)?;
+                // todo send order event here to redis
             },
         };
         Ok(())
@@ -427,7 +477,7 @@ impl EconiaRedisCacher {
 
     fn handle_taker_event(
         &mut self,
-        conn: &mut redis::Connection,
+        _conn: &mut redis::Connection,
         e: TakerEvent,
     ) -> anyhow::Result<()> {
         let Some(book) = self.books.get_mut(&e.market_id) else {
