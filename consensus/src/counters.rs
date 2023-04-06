@@ -53,6 +53,15 @@ pub static LAST_COMMITTED_VERSION: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Count of the committed failed rounds since last restart.
+pub static COMMITTED_FAILED_ROUNDS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_committed_failed_rounds_count",
+        "Count of the committed failed rounds since last restart."
+    )
+    .unwrap()
+});
+
 /// Count of the committed blocks since last restart.
 pub static COMMITTED_BLOCKS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
