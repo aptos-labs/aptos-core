@@ -60,8 +60,8 @@ module aptos_std::elgamal {
 	}
     }
 
-    /// Moves a Ristretto point into an ElGamal ciphertext.
-    public fun new_ciphertext_from_point(left: RistrettoPoint, right: RistrettoPoint): Ciphertext {
+    /// Moves a pair of Ristretto points into an ElGamal ciphertext.
+    public fun new_ciphertext_from_points(left: RistrettoPoint, right: RistrettoPoint): Ciphertext {
         Ciphertext {
             left,
 	    right,
