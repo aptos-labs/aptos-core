@@ -22,10 +22,17 @@ use aptos_storage_interface::ExecutedTrees;
 use aptos_types::{
     proof::accumulator::InMemoryAccumulator,
     state_store::{state_key::StateKey, state_value::StateValue},
-    transaction::{Transaction, TransactionInfo, TransactionOutput, TransactionStatus, ExecutionStatus}, write_set::WriteSet,
+    transaction::{
+        ExecutionStatus, Transaction, TransactionInfo, TransactionOutput, TransactionStatus,
+    },
+    write_set::WriteSet,
 };
 use rayon::prelude::*;
-use std::{collections::HashMap, iter::{repeat, once}, sync::Arc};
+use std::{
+    collections::HashMap,
+    iter::{once, repeat},
+    sync::Arc,
+};
 
 pub struct ApplyChunkOutput;
 
@@ -45,7 +52,11 @@ impl ApplyChunkOutput {
                 .with_label_values(&["sort_transactions"])
                 .start_timer();
             // Separate transactions with different VM statuses.
-            Self::sort_transactions(transactions, transaction_outputs, append_state_checkpoint_to_block)?
+            Self::sort_transactions(
+                transactions,
+                transaction_outputs,
+                append_state_checkpoint_to_block,
+            )?
         };
 
         // Apply the write set, get the latest state.
@@ -117,28 +128,28 @@ impl ApplyChunkOutput {
             vec![]
         };
 
-        let status: Vec<TransactionStatus> = if append_state_checkpoint_to_block.is_some() && new_epoch_marker.is_none() {
-            println!("daniel status");
-            // Append the StateCheckpoint transaction to status
-            transaction_outputs
-            .iter()
-            .map(|t| t.status())
-            .cloned()
-            .chain(once(TransactionStatus::Keep(ExecutionStatus::Success)))
-            .chain(repeat(TransactionStatus::Retry))
-            .take(num_txns + 1)
-            .collect()
-        } else {
-            // For state sync execution or epoch change,
-            // no StateCheckpoint transaction is appended
-            transaction_outputs
-            .iter()
-            .map(|t| t.status())
-            .cloned()
-            .chain(repeat(TransactionStatus::Retry))
-            .take(num_txns)
-            .collect()
-        };
+        let status: Vec<TransactionStatus> =
+            if append_state_checkpoint_to_block.is_some() && new_epoch_marker.is_none() {
+                // Append the StateCheckpoint transaction to status
+                transaction_outputs
+                    .iter()
+                    .map(|t| t.status())
+                    .cloned()
+                    .chain(once(TransactionStatus::Keep(ExecutionStatus::Success)))
+                    .chain(repeat(TransactionStatus::Retry))
+                    .take(num_txns + 1)
+                    .collect()
+            } else {
+                // For state sync execution or epoch change,
+                // no StateCheckpoint transaction is appended
+                transaction_outputs
+                    .iter()
+                    .map(|t| t.status())
+                    .cloned()
+                    .chain(repeat(TransactionStatus::Retry))
+                    .take(num_txns)
+                    .collect()
+            };
 
         // Separate transactions with the Keep status out.
         let (mut to_keep, to_discard) =
@@ -150,14 +161,14 @@ impl ApplyChunkOutput {
         // Append the StateCheckpoint transaction to the end of to_keep
         if let Some(block_id) = append_state_checkpoint_to_block {
             if new_epoch_marker.is_none() {
-                println!("daniel txn");
                 let state_checkpoint_txn = Transaction::StateCheckpoint(block_id);
-                let state_checkpoint_txn_output: ParsedTransactionOutput = Into::into(TransactionOutput::new(
-                    WriteSet::default(),
-                    Vec::new(),
-                    0,
-                    TransactionStatus::Keep(ExecutionStatus::Success),
-                ));
+                let state_checkpoint_txn_output: ParsedTransactionOutput =
+                    Into::into(TransactionOutput::new(
+                        WriteSet::default(),
+                        Vec::new(),
+                        0,
+                        TransactionStatus::Keep(ExecutionStatus::Success),
+                    ));
                 to_keep.push((state_checkpoint_txn, state_checkpoint_txn_output));
             }
         }

@@ -21,13 +21,13 @@ use std::{collections::HashMap, fmt, sync::Arc};
 mod approved_execution_hashes;
 mod aptos_features;
 mod aptos_version;
+mod block_gas_limit_config;
 mod chain_id;
 mod consensus_config;
 mod execution_config;
 mod gas_schedule;
 mod timed_features;
 mod validator_set;
-mod block_gas_limit_config;
 
 pub use self::{
     approved_execution_hashes::ApprovedExecutionHashes,

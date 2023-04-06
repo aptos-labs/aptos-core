@@ -114,8 +114,27 @@ impl ExecutedBlock {
         if self.is_reconfiguration_suffix() {
             return vec![];
         }
+
+        let mut txns_with_state_checkpoint = self.block.transactions_to_execute(validators, txns);
+        if !self.state_compute_result.has_reconfiguration() {
+            // Insert state checkpoint to the last txn with status Keep
+            let last_pos_with_status_keep = self
+                .state_compute_result
+                .compute_status()
+                .iter()
+                .enumerate()
+                .rev()
+                .find_map(|(i, status)| match status.status() {
+                    Ok(_) => Some(i),
+                    _ => None,
+                });
+            if let Some(pos) = last_pos_with_status_keep {
+                txns_with_state_checkpoint.insert(pos, Transaction::StateCheckpoint(self.id()));
+            }
+        }
+
         itertools::zip_eq(
-            self.block.transactions_to_execute(validators, txns),
+            txns_with_state_checkpoint,
             self.state_compute_result.compute_status(),
         )
         .filter_map(|(txn, status)| match status {

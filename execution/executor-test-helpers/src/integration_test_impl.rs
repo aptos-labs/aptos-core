@@ -431,7 +431,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
 
     let transaction_list_with_proof = db
         .reader
-        .get_transactions(14, 16, current_version, false)
+        .get_transactions(14, 15, current_version, false)
         .unwrap();
     verify_transactions(&transaction_list_with_proof, &block3).unwrap();
 

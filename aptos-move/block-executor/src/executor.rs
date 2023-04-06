@@ -392,9 +392,9 @@ where
                     OutputDeltaResolver::new(mv_data_cache);
                 // TODO: parallelize when necessary.
                 Ok(final_results
-                        .into_iter()
-                        .zip(delta_resolver.resolve(base_view, num_txns).into_iter())
-                        .collect())
+                    .into_iter()
+                    .zip(delta_resolver.resolve(base_view, num_txns).into_iter())
+                    .collect())
             },
         }
     }
