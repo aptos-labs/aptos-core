@@ -321,7 +321,7 @@
           "type": "text"
         },
         {
-          "datasource": { "type": "grafana-bigquery-datasource", "uid": "P67060240DC0051B8" },
+          "datasource": { "type": "grafana-bigquery-datasource", "uid": "${BigQuery}" },
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -358,7 +358,7 @@
           "targets": [
             {
               "dataset": "indexer_mainnet_gcp",
-              "datasource": { "type": "grafana-bigquery-datasource", "uid": "P67060240DC0051B8" },
+              "datasource": { "type": "grafana-bigquery-datasource", "uid": "${BigQuery}" },
               "editorMode": "code",
               "format": 0,
               "location": "US",
@@ -2334,14 +2334,36 @@
   "templating": {
     "list": [
       {
-        "current": { "text": ["VictoriaMetrics Mainnet US"], "value": "VictoriaMetrics Mainnet US" },
+        "allFormat": "",
+        "allValue": "",
+        "current": {
+          "selected": true,
+          "text": "VictoriaMetrics Global (Non-mainnet)",
+          "value": "VictoriaMetrics Global (Non-mainnet)"
+        },
         "hide": 0,
         "includeAll": false,
+        "label": "",
         "multi": false,
+        "multiFormat": "",
         "name": "Datasource",
         "options": [],
         "query": "prometheus",
         "queryValue": "",
+        "refresh": 1,
+        "regex": ".*Prometheus.*|.*Victoria.*|.*Telemetry.*",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "datasource"
+      },
+      {
+        "description": "BigQuery data source",
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "BigQuery",
+        "options": [],
+        "query": "grafana-bigquery-datasource",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
@@ -2351,7 +2373,7 @@
         "allFormat": "",
         "allValue": ".*",
         "current": { "text": ["telemetry-service"], "value": "telemetry-service" },
-        "datasource": { "type": "prometheus", "uid": "Zu4MxH4Vk" },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
         "definition": "",
         "hide": 0,
         "includeAll": true,
@@ -2397,7 +2419,7 @@
         "allFormat": "",
         "allValue": ".*",
         "current": { "text": ["All"], "value": "$__all" },
-        "datasource": { "type": "prometheus", "uid": "Zu4MxH4Vk" },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
         "definition": "",
         "hide": 0,
         "includeAll": true,
@@ -2587,8 +2609,8 @@
     "time_options": ["5m", "15m", "1h", "6h", "12h", "24h", "2d", "7d", "30d"]
   },
   "timezone": "",
-  "title": "Storage Overview",
+  "title": "storage-overview",
   "uid": "ptUp6Vn4k",
-  "version": 217,
+  "version": 5,
   "weekStart": ""
 }
