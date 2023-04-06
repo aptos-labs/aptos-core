@@ -10,10 +10,13 @@ from test_results import test_case
 
 @test_case
 def test_init(run_helper: RunHelper, test_name=None):
-    # Init the CLI, which creates an account.
+    # Inititalize a profile for the CLI to use. Note that we do not set the
+    # --skip-faucet flag. This means that in addition to creating a profile locally,
+    # it will use the faucet to create the account on chain. This will fund the
+    # account with the default amount of 100000000 OCTA.
     run_helper.run_command(
         test_name,
-        ["aptos", "init", "--assume-yes", "--network", "local", "--skip-faucet"],
+        ["aptos", "init", "--assume-yes", "--network", "local"],
         input="\n",
     )
 

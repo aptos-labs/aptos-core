@@ -434,7 +434,8 @@ proptest! {
 
         let dummy_state_key = StateKey::raw(vec![]);
         let (batch, _) = store2.state_merkle_db.merklize_value_set(vec![(max_hash, Some(&(HashValue::random(), dummy_state_key)))], None, 0, None, None).unwrap();
-        store2.state_merkle_db.db.write_schemas(batch).unwrap();
+        // TODO(grao): Support sharding here.
+        store2.state_merkle_db.metadata_db().write_schemas(batch).unwrap();
         assert!(store2.state_merkle_db.get_rightmost_leaf(version).unwrap().is_none());
 
         let mut ordered_input: Vec<_> = input

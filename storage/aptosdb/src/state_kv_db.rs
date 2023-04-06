@@ -46,11 +46,15 @@ impl StateKvDb {
             });
         }
 
-        let state_kv_db_config = rocksdb_configs.state_kv_db_config;
-        let state_kv_metadata_db_path = db_root_path
-            .as_ref()
-            .join(STATE_KV_DB_FOLDER_NAME)
-            .join("metadata");
+        Self::open(db_root_path, rocksdb_configs.state_kv_db_config, readonly)
+    }
+
+    pub(crate) fn open<P: AsRef<Path>>(
+        db_root_path: P,
+        state_kv_db_config: RocksdbConfig,
+        readonly: bool,
+    ) -> Result<Self> {
+        let state_kv_metadata_db_path = Self::metadata_db_path(db_root_path.as_ref());
 
         let state_kv_metadata_db = Arc::new(Self::open_db(
             state_kv_metadata_db_path.clone(),
@@ -137,6 +141,37 @@ impl StateKvDb {
         )
     }
 
+    pub(crate) fn create_checkpoint(
+        db_root_path: impl AsRef<Path>,
+        cp_root_path: impl AsRef<Path>,
+    ) -> Result<()> {
+        let state_kv_db = Self::open(db_root_path, RocksdbConfig::default(), false)?;
+        let cp_state_kv_db_path = cp_root_path.as_ref().join(STATE_KV_DB_FOLDER_NAME);
+
+        info!("Creating state_kv_db checkpoint at: {cp_state_kv_db_path:?}");
+
+        std::fs::remove_dir_all(&cp_state_kv_db_path).unwrap_or(());
+        std::fs::create_dir_all(&cp_state_kv_db_path).unwrap_or(());
+
+        state_kv_db
+            .metadata_db()
+            .create_checkpoint(Self::metadata_db_path(cp_root_path.as_ref()))?;
+
+        let sharding = false;
+        if sharding {
+            for shard_id in 0..NUM_STATE_SHARDS {
+                state_kv_db
+                    .db_shard(shard_id as u8)
+                    .create_checkpoint(Self::db_shard_path(
+                        cp_root_path.as_ref(),
+                        shard_id as u8,
+                    ))?;
+            }
+        }
+
+        Ok(())
+    }
+
     pub(crate) fn metadata_db(&self) -> &DB {
         &self.state_kv_metadata_db
     }
@@ -164,13 +199,13 @@ impl StateKvDb {
         state_kv_db_config: &RocksdbConfig,
         readonly: bool,
     ) -> Result<DB> {
-        let shard_name = format!("shard_{}", shard_id);
         let db_name = format!("state_kv_db_shard_{}", shard_id);
-        let path = db_root_path
-            .as_ref()
-            .join(STATE_KV_DB_FOLDER_NAME)
-            .join(Path::new(&shard_name));
-        Self::open_db(path, &db_name, state_kv_db_config, readonly)
+        Self::open_db(
+            Self::db_shard_path(db_root_path, shard_id),
+            &db_name,
+            state_kv_db_config,
+            readonly,
+        )
     }
 
     fn open_db(
@@ -194,5 +229,20 @@ impl StateKvDb {
                 gen_state_kv_cfds(state_kv_db_config),
             )?
         })
+    }
+
+    fn db_shard_path<P: AsRef<Path>>(db_root_path: P, shard_id: u8) -> PathBuf {
+        let shard_sub_path = format!("shard_{}", shard_id);
+        db_root_path
+            .as_ref()
+            .join(STATE_KV_DB_FOLDER_NAME)
+            .join(Path::new(&shard_sub_path))
+    }
+
+    fn metadata_db_path<P: AsRef<Path>>(db_root_path: P) -> PathBuf {
+        db_root_path
+            .as_ref()
+            .join(STATE_KV_DB_FOLDER_NAME)
+            .join("metadata")
     }
 }

@@ -10,16 +10,8 @@ import * as Gen from "../generated/index";
 import { HexString, MaybeHexString } from "../utils";
 import { TransactionBuilder, TransactionBuilderRemoteABI, TxnBuilderTypes } from "../transaction_builder";
 import { MAX_U64_BIG_INT } from "../bcs/consts";
-import { TOKEN_TRANSFER_OPT_IN } from "../abis";
 import { AnyNumber, bcsToBytes, Bytes } from "../bcs";
 import { getPropertyValueRaw, PropertyMap } from "../utils/property_map_serde";
-import {
-  Script,
-  TransactionArgumentAddress,
-  TransactionArgumentU64,
-  TransactionArgumentU8Vector,
-  TransactionPayloadScript,
-} from "../aptos_types";
 import { Token, TokenData } from "../aptos_types/token_types";
 
 /**
@@ -396,23 +388,15 @@ export class TokenClient {
     amount: AnyNumber,
     extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
-    // compile script to invoke public transfer function
-    const payload = new TransactionPayloadScript(
-      new Script(
-        new HexString(TOKEN_TRANSFER_OPT_IN).toUint8Array(),
-        [],
-        [
-          new TransactionArgumentAddress(TxnBuilderTypes.AccountAddress.fromHex(creator)),
-          new TransactionArgumentU8Vector(new TextEncoder().encode(collectionName)),
-          new TransactionArgumentU8Vector(new TextEncoder().encode(tokenName)),
-          new TransactionArgumentU64(BigInt(propertyVersion)),
-          new TransactionArgumentAddress(TxnBuilderTypes.AccountAddress.fromHex(receiver)),
-          new TransactionArgumentU64(BigInt(amount)),
-        ],
-      ),
+    const builder = new TransactionBuilderRemoteABI(this.aptosClient, { sender: sender.address(), ...extraArgs });
+    const rawTxn = await builder.build(
+      "0x3::token::transfer_with_opt_in",
+      [],
+      [creator, collectionName, tokenName, propertyVersion, receiver, amount],
     );
-
-    return this.aptosClient.generateSignSubmitTransaction(sender, payload, extraArgs);
+    const bcsTxn = AptosClient.generateBCSTransaction(sender, rawTxn);
+    const pendingTransaction = await this.aptosClient.submitSignedBCSTransaction(bcsTxn);
+    return pendingTransaction.hash;
   }
 
   /**

@@ -167,7 +167,7 @@ impl NormalizedReadWriteSetAnalysis {
     /// Returns the access paths in global storage that will be read/written by `module::fun` if called with arguments `signers`, `actuals`, `type_actuals`. This will be an overapproximation if `module::fun` contains no secondary indexes; otherwise it is neither an overapproximation nor an underapproximation
     /// by `module::fun` if called with arguments `signers`, `actuals`, `type_actuals`.
     ///
-    /// We say "partially concretized" because the summary may contain secondary indexes that require reads from the current blockchain state to be concretized. If desired, the caller can concretized them using <add API for this>
+    /// We say "partially concretized" because the summary may contain secondary indexes that require reads from the current blockchain state to be concretized. If desired, the caller can concretized them using `<add API for this>`
     /// be resolved or not.
     pub fn get_partially_concretized_summary<R: GetModule>(
         &self,

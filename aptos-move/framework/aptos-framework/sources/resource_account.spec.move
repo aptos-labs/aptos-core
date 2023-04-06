@@ -30,6 +30,7 @@ spec aptos_framework::resource_account {
         code: vector<vector<u8>>,
     ) {
         // TODO: Calls `code::publish_package_txn`.
+        // TODO: Could not verify `code::publish_package_txn` because can't get `resource` and `resource_signer_cap`.
         pragma verify = false;
     }
 
