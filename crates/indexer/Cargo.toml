@@ -47,8 +47,12 @@ tokio = { workspace = true }
 url = { workspace = true }
 
 # econia
+crossbeam = { workspace = true }
+dashmap = { workspace = true }
 econia_db = { workspace = true }
 econia_types = { workspace = true }
+redis = { workspace = true }
 
 [dev-dependencies]
 aptos-api-test-context = { workspace = true }
+redis-test = "0.1.1"

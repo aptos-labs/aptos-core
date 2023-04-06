@@ -1,5 +1,3 @@
-use std::{collections::HashMap, sync::RwLock};
-
 use crate::{
     database::{clean_data_for_db, execute_with_better_error, get_chunks, PgDbPool},
     indexer::{
@@ -12,35 +10,67 @@ use crate::{
         transactions::{TransactionDetail, TransactionModel},
     },
 };
+use anyhow::Context;
 use aptos_api_types::Transaction;
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
-use bigdecimal::BigDecimal;
+use bigdecimal::{BigDecimal, ToPrimitive};
 use chrono::{DateTime, Utc};
+use crossbeam::channel;
+use dashmap::DashMap;
 use diesel::{result::Error, PgConnection};
-use econia_db::models::{self, market::MarketEventType, IntoInsertable};
+use econia_db::models::{self, events::MakerEventType, market::MarketEventType, IntoInsertable};
+use econia_types::order::{Fill, Order, OrderState, Side};
 use field_count::FieldCount;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::RwLock,
+};
 
 pub const NAME: &str = "econia_processor";
 
-static ECONIA_ADDRESS: Lazy<String> =
-    Lazy::new(|| std::env::var("ECONIA_ADDRESS").expect("ECONIA_ADDRESS not set"));
+#[derive(Debug, Deserialize, Clone)]
+struct RedisConfig {
+    url: String,
+    book_prefix: String,
+    order_prefix: String,
+    fill_prefix: String,
+    markets: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct EconiaConfig {
+    redis: RedisConfig,
+    econia_address: String,
+}
+
+static ECONIA_CONFIG: Lazy<EconiaConfig> = Lazy::new(|| {
+    let path = std::env::var("ECONIA_CONFIG_PATH").expect("ECONIA_CONFIG not set");
+    let config_file = std::fs::File::open(path).expect("Failed to open econia config file");
+    serde_json::from_reader(config_file).expect("Failed to parse econia config file")
+});
 
 static EVENT_TYPES: Lazy<Vec<String>> = Lazy::new(|| {
     vec![
-        format!("{}::market::TakerEvent", &*ECONIA_ADDRESS),
-        format!("{}::market::MakerEvent", &*ECONIA_ADDRESS),
-        format!("{}::registry::MarketRegistrationEvent", &*ECONIA_ADDRESS),
-        format!("{}::registry::RecognizedMarketEvent", &*ECONIA_ADDRESS),
+        format!("{}::market::TakerEvent", &ECONIA_CONFIG.econia_address),
+        format!("{}::market::MakerEvent", &ECONIA_CONFIG.econia_address),
+        format!(
+            "{}::registry::MarketRegistrationEvent",
+            &ECONIA_CONFIG.econia_address
+        ),
+        format!(
+            "{}::registry::RecognizedMarketEvent",
+            &ECONIA_CONFIG.econia_address
+        ),
     ]
 });
 
 static CURRENT_BLOCK_TIME: Lazy<RwLock<DateTime<Utc>>> =
     Lazy::new(|| RwLock::new(DateTime::<Utc>::MIN_UTC));
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 struct TakerEvent {
     market_id: u64,
     side: bool,
@@ -66,7 +96,7 @@ impl From<TakerEvent> for models::events::TakerEvent {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 struct MakerEvent {
     market_id: u64,
     side: bool,
@@ -127,7 +157,7 @@ impl From<MarketRegistrationEvent> for models::market::MarketRegistrationEvent {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 struct TradingPair {
     base_type: TypeInfo,
     base_name_generic: String,
@@ -135,7 +165,7 @@ struct TradingPair {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 struct RecognizedMarketInfo {
     market_id: u64,
     lot_size: u64,
@@ -144,13 +174,13 @@ struct RecognizedMarketInfo {
     underwriter_id: u64,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 struct RecognizedMarketEvent {
     trading_pair: TradingPair,
     recognized_market_info: Option<RecognizedMarketInfo>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[serde(untagged)]
 enum EventWrapper {
     Maker(MakerEvent),
@@ -184,10 +214,418 @@ fn create_base_quote_key(m: &models::market::MarketRegistrationEvent) -> BaseQuo
     )
 }
 
+#[derive(Debug, Clone)]
+enum MarketAction {
+    Add(BigDecimal),
+    Remove(BigDecimal),
+}
+
+struct OrderBook {
+    asks: BTreeMap<u64, Vec<Order>>,
+    bids: BTreeMap<u64, Vec<Order>>,
+    orders_to_price_level: HashMap<u64, (Side, u64)>,
+}
+
+impl OrderBook {
+    fn new() -> Self {
+        Self {
+            asks: BTreeMap::new(),
+            bids: BTreeMap::new(),
+            orders_to_price_level: HashMap::new(),
+        }
+    }
+
+    fn get_side(&self, side: Side) -> &BTreeMap<u64, Vec<Order>> {
+        match side {
+            Side::Ask => &self.asks,
+            Side::Bid => &self.bids,
+        }
+    }
+
+    fn get_side_mut(&mut self, side: Side) -> &mut BTreeMap<u64, Vec<Order>> {
+        match side {
+            Side::Ask => &mut self.asks,
+            Side::Bid => &mut self.bids,
+        }
+    }
+}
+
+struct EconiaRedisCacher {
+    redis_client: redis::Client,
+    config: RedisConfig,
+    // mkt_id => OrderBook
+    books: HashMap<u64, OrderBook>,
+    market_rx: channel::Receiver<MarketAction>,
+    event_rx: channel::Receiver<EventWrapper>,
+}
+
+impl EconiaRedisCacher {
+    fn new(
+        config: RedisConfig,
+        market_rx: channel::Receiver<MarketAction>,
+        event_rx: channel::Receiver<EventWrapper>,
+    ) -> Self {
+        let redis_client = redis::Client::open(&*config.url).expect("failed to connect to redis");
+        Self {
+            redis_client,
+            config,
+            books: HashMap::new(),
+            market_rx,
+            event_rx,
+        }
+    }
+
+    fn initialise_market(
+        &mut self,
+        conn: &mut redis::Connection,
+        mkt_id: BigDecimal,
+    ) -> anyhow::Result<()> {
+        let mut cmd = redis::cmd("HSET");
+        cmd.arg(&self.config.markets).arg(mkt_id.to_string()).arg(1);
+        cmd.query::<usize>(conn)?;
+        let mkt_id = mkt_id.to_u64().expect("failed to convert to u64");
+
+        if self.books.get(&mkt_id).is_none() {
+            self.books.insert(mkt_id, OrderBook::new());
+        }
+
+        Ok(())
+    }
+
+    fn remove_market(
+        &mut self,
+        conn: &mut redis::Connection,
+        mkt_id: &BigDecimal,
+    ) -> anyhow::Result<()> {
+        let mut cmd = redis::cmd("HDEL");
+        cmd.arg(&self.config.markets).arg(mkt_id.to_string());
+        cmd.query::<usize>(conn)?;
+        let mkt_id = mkt_id.to_u64().expect("failed to convert to u64");
+        self.books.remove(&mkt_id);
+        Ok(())
+    }
+
+    fn initialise_markets(&mut self, books: Vec<BigDecimal>) -> anyhow::Result<()> {
+        let mut conn = self
+            .redis_client
+            .get_connection()
+            .context("failed to connect to redis")?;
+        for mkt_id in books.into_iter() {
+            self.initialise_market(&mut conn, mkt_id)?;
+        }
+        Ok(())
+    }
+
+    fn get_book_side_price_level(book: &OrderBook, order_id: u64) -> (Side, u64) {
+        let (side, price) = book
+            .orders_to_price_level
+            .get(&order_id)
+            .expect("invalid state, order is missing");
+        (*side, *price)
+    }
+
+    fn get_order(book: &OrderBook, order_id: u64) -> &Order {
+        let (side, price) = Self::get_book_side_price_level(book, order_id);
+        let book_side = book.get_side(side);
+        let orders = book_side
+            .get(&price)
+            .expect("invalid state, price level is missing");
+        let order = orders
+            .iter()
+            .find(|o| o.market_order_id == order_id)
+            .expect("invalid state, order is missing");
+        order
+    }
+
+    fn get_order_mut(book: &mut OrderBook, order_id: u64) -> &mut Order {
+        let (side, price) = Self::get_book_side_price_level(book, order_id);
+        let book_side = book.get_side_mut(side);
+        let orders = book_side
+            .get_mut(&price)
+            .expect("invalid state, price level is missing");
+        let order = orders
+            .iter_mut()
+            .find(|o| o.market_order_id == order_id)
+            .expect("invalid state, order is missing");
+        order
+    }
+
+    fn add_order(book: &mut OrderBook, order: Order) {
+        let market_order_id = order.market_order_id;
+        let side = order.side;
+        let price = order.price;
+
+        if side == Side::Ask {
+            book.asks.entry(price).or_default().push(order);
+        } else {
+            book.bids.entry(price).or_default().push(order);
+        }
+
+        book.orders_to_price_level
+            .insert(market_order_id, (side, price));
+    }
+
+    fn remove_order(book: &mut OrderBook, order_id: u64) -> Order {
+        book.orders_to_price_level.remove(&order_id);
+        let (side, price) = Self::get_book_side_price_level(book, order_id);
+        let book_side = book.get_side_mut(side);
+        let level = book_side
+            .get_mut(&price)
+            .expect("invalid state, price level missing");
+
+        let order = level
+            .iter()
+            .position(|o| o.market_order_id == order_id)
+            .map(|i| level.remove(i))
+            .expect("invalid state, order missing");
+
+        if level.is_empty() {
+            book_side.remove(&price);
+        }
+
+        order
+    }
+
+    fn send_order_update(
+        conn: &mut redis::Connection,
+        order_prefix: &str,
+        order: &Order,
+    ) -> anyhow::Result<()> {
+        let channel_name = format!("{}:{}", order_prefix, order.market_id);
+        let message = serde_json::to_string(order)?;
+        let mut cmd = redis::cmd("PUBLISH");
+        cmd.arg(&channel_name).arg(&message);
+        cmd.query::<usize>(conn)?;
+        Ok(())
+    }
+
+    fn send_fill(
+        conn: &mut redis::Connection,
+        fill_prefix: &str,
+        taker_event: &TakerEvent,
+        order: &Order,
+    ) -> anyhow::Result<()> {
+        let fill = Fill {
+            market_id: taker_event.market_id,
+            maker_order_id: taker_event.market_order_id,
+            maker: taker_event.maker.to_hex_literal(),
+            maker_side: order.side,
+            custodian_id: order.custodian_id,
+            size: taker_event.size,
+            price: taker_event.price,
+            time: *CURRENT_BLOCK_TIME.read().unwrap(),
+        };
+        let channel_name = format!("{}:{}", fill_prefix, taker_event.market_id);
+        let message = serde_json::to_string(&fill)?;
+        let mut cmd = redis::cmd("PUBLISH");
+        cmd.arg(&channel_name).arg(&message);
+        cmd.query::<usize>(conn)?;
+        Ok(())
+    }
+
+    fn send_price_level_update(
+        conn: &mut redis::Connection,
+        book_prefix: &str,
+        mkt_id: u64,
+        book: &OrderBook,
+        side: Side,
+        price: u64,
+    ) -> anyhow::Result<()> {
+        let cum_size = book
+            .get_side(side)
+            .get(&price)
+            .map_or(0, |v| v.iter().fold(0, |i, s: &Order| i + s.size));
+        let channel_name = format!("{}:{}", book_prefix, mkt_id);
+        let message = serde_json::json!({
+            "price": price,
+            "size": cum_size
+        });
+        let message = serde_json::to_string(&message)?;
+        let mut cmd = redis::cmd("PUBLISH");
+        cmd.arg(&channel_name).arg(&message);
+        cmd.query::<usize>(conn)?;
+        Ok(())
+    }
+
+    fn handle_maker_event(
+        &mut self,
+        conn: &mut redis::Connection,
+        e: MakerEvent,
+    ) -> anyhow::Result<()> {
+        let Some(book) = self.books.get_mut(&e.market_id) else {
+            panic!("invalid state, market is missing")
+        };
+
+        match MakerEventType::try_from(e.event_type)? {
+            MakerEventType::Cancel => {
+                let mut order = Self::remove_order(book, e.market_order_id);
+                order.order_state = OrderState::Cancelled;
+                Self::send_price_level_update(
+                    conn,
+                    &self.config.book_prefix,
+                    e.market_id,
+                    book,
+                    order.side,
+                    order.price,
+                )?;
+                Self::send_order_update(conn, &self.config.order_prefix, &order)?;
+            },
+            MakerEventType::Change => {
+                let pop_and_reinsert = {
+                    let order = Self::get_order(book, e.market_order_id);
+                    (order.price != e.price) || (e.size > order.size)
+                };
+                if pop_and_reinsert {
+                    let mut order = Self::remove_order(book, e.market_order_id);
+                    let side = order.side;
+                    Self::send_price_level_update(
+                        conn,
+                        &self.config.book_prefix,
+                        e.market_id,
+                        book,
+                        side,
+                        order.price,
+                    )?;
+                    order.size = e.size;
+                    order.price = e.price;
+                    Self::add_order(book, order);
+                    Self::send_price_level_update(
+                        conn,
+                        &self.config.book_prefix,
+                        e.market_id,
+                        book,
+                        side,
+                        e.price,
+                    )?;
+                } else {
+                    let order = Self::get_order_mut(book, e.market_order_id);
+                    let side = order.side;
+                    order.size = e.size;
+                    order.price = e.price;
+                    Self::send_price_level_update(
+                        conn,
+                        &self.config.book_prefix,
+                        e.market_id,
+                        book,
+                        side,
+                        e.price,
+                    )?;
+                }
+
+                let order = Self::get_order(book, e.market_order_id);
+                Self::send_order_update(conn, &self.config.order_prefix, order)?;
+            },
+            MakerEventType::Evict => {
+                let mut order = Self::remove_order(book, e.market_order_id);
+                order.order_state = OrderState::Evicted;
+                Self::send_price_level_update(
+                    conn,
+                    &self.config.book_prefix,
+                    e.market_id,
+                    book,
+                    order.side,
+                    order.price,
+                )?;
+                Self::send_order_update(conn, &self.config.order_prefix, &order)?;
+            },
+            MakerEventType::Place => {
+                let side = e.side.into();
+                let o = Order {
+                    market_order_id: e.market_order_id,
+                    market_id: e.market_id,
+                    side,
+                    size: e.size,
+                    price: e.price,
+                    user_address: e.user_address.to_hex_literal(),
+                    custodian_id: e.custodian_id,
+                    order_state: OrderState::Open,
+                    created_at: *CURRENT_BLOCK_TIME.read().unwrap(),
+                };
+
+                Self::add_order(book, o.clone());
+                Self::send_price_level_update(
+                    conn,
+                    &self.config.book_prefix,
+                    e.market_id,
+                    book,
+                    side,
+                    e.price,
+                )?;
+                Self::send_order_update(conn, &self.config.order_prefix, &o)?;
+            },
+        };
+        Ok(())
+    }
+
+    fn handle_taker_event(
+        &mut self,
+        conn: &mut redis::Connection,
+        e: TakerEvent,
+    ) -> anyhow::Result<()> {
+        let Some(book) = self.books.get_mut(&e.market_id) else {
+            panic!("invalid state, market is missing")
+        };
+
+        let remove_order = {
+            let order = Self::get_order_mut(book, e.market_order_id);
+            Self::send_fill(conn, &self.config.fill_prefix, &e, order)?;
+            order.size = order.size.checked_sub(e.size).unwrap_or_default();
+            let remove_order = order.size == 0;
+            if remove_order {
+                order.order_state = OrderState::Filled;
+            }
+            Self::send_order_update(conn, &self.config.order_prefix, order)?;
+            remove_order
+        };
+
+        if remove_order {
+            Self::remove_order(book, e.market_order_id);
+        }
+
+        Self::send_price_level_update(
+            conn,
+            &self.config.book_prefix,
+            e.market_id,
+            book,
+            e.side.into(),
+            e.price,
+        )?;
+
+        Ok(())
+    }
+
+    fn start(&mut self, books: Vec<BigDecimal>) {
+        // initialise markets
+        self.initialise_markets(books)
+            .expect("failed to initialise markets");
+
+        let mut conn = self
+            .redis_client
+            .get_connection()
+            .expect("failed to connect to redis");
+
+        loop {
+            channel::select! {
+                recv(self.market_rx) -> mkt => match mkt.unwrap() {
+                    MarketAction::Add(m) => self.initialise_market(&mut conn, m).expect("failed to initialise market"),
+                    MarketAction::Remove(m) => self.remove_market(&mut conn, &m).expect("failed to remove market"),
+                },
+                recv(self.event_rx) -> event => match event.unwrap() {
+                    EventWrapper::Maker(e) => self.handle_maker_event(&mut conn, e).expect("failed to handle maker event"),
+                    EventWrapper::Taker(e) => self.handle_taker_event(&mut conn, e).expect("failed to handle taker event"),
+                    _ => panic!("received incorrect event in redis handler")
+                }
+            };
+        }
+    }
+}
+
 pub struct EconiaTransactionProcessor {
     connection_pool: PgDbPool,
-    markets: RwLock<HashMap<BigDecimal, models::market::MarketRegistrationEvent>>,
-    base_quote_to_market_id: RwLock<HashMap<BaseQuoteKey, BigDecimal>>,
+    markets: DashMap<BigDecimal, models::market::MarketRegistrationEvent>,
+    base_quote_to_market_id: DashMap<BaseQuoteKey, BigDecimal>,
+    market_tx: channel::Sender<MarketAction>,
+    event_tx: channel::Sender<EventWrapper>,
 }
 
 impl EconiaTransactionProcessor {
@@ -196,31 +634,55 @@ impl EconiaTransactionProcessor {
             .get()
             .expect("failed connecting to db on startup");
         let mkts = fetch_all_markets(&mut conn).expect("failed loading markets on startup");
-        let mut markets = HashMap::new();
-        let mut base_quote_to_market_id = HashMap::new();
+        let markets = DashMap::new();
+        let base_quote_to_market_id = DashMap::new();
         for m in mkts.into_iter() {
             let key = create_base_quote_key(&m);
             base_quote_to_market_id.insert(key, m.market_id.clone());
             markets.insert(m.market_id.clone(), m);
         }
 
+        let (event_tx, event_rx) = channel::unbounded();
+        let (market_tx, market_rx) = channel::unbounded();
+
+        // start redis task
+        let books = markets
+            .iter()
+            .map(|m| m.key().clone())
+            .collect::<Vec<BigDecimal>>();
+        std::thread::spawn(move || {
+            let mut cacher =
+                EconiaRedisCacher::new(ECONIA_CONFIG.redis.clone(), market_rx, event_rx);
+            cacher.start(books);
+        });
+
         Self {
             connection_pool,
-            markets: RwLock::new(markets),
-            base_quote_to_market_id: RwLock::new(base_quote_to_market_id),
+            markets,
+            base_quote_to_market_id,
+            market_tx,
+            event_tx,
         }
     }
 
-    fn update_markets_cache(&self, ev: &[MarketRegistrationEvent]) {
+    fn insert_markets_in_cache(&self, ev: &[MarketRegistrationEvent]) {
         for e in ev.iter().cloned() {
             let m = models::market::MarketRegistrationEvent::from(e);
             let key = create_base_quote_key(&m);
+            self.market_tx
+                .send(MarketAction::Add(m.market_id.clone()))
+                .expect("market add tx failed");
             self.base_quote_to_market_id
-                .write()
-                .unwrap()
                 .insert(key, m.market_id.clone());
-            self.markets.write().unwrap().insert(m.market_id.clone(), m);
+            self.markets.insert(m.market_id.clone(), m);
         }
+    }
+
+    fn remove_market_from_cache(&self, market_id: &BigDecimal) {
+        self.market_tx
+            .send(MarketAction::Remove(market_id.clone()))
+            .expect("market removal tx failed");
+        self.markets.remove(market_id);
     }
 
     fn insert_to_db(
@@ -255,7 +717,7 @@ impl EconiaTransactionProcessor {
         conn.build_transaction()
             .read_write()
             .run::<_, Error, _>(|pg_conn| {
-                self.insert_events(pg_conn, events, &block_to_time)?;
+                self.insert_events(pg_conn, events, block_to_time)?;
                 Ok(())
             })?;
         Ok(())
@@ -285,9 +747,20 @@ impl EconiaTransactionProcessor {
 
             let event_wrapper: EventWrapper = serde_json::from_value(e.data.clone())
                 .map_err(|e| Error::DeserializationError(Box::new(e)))?;
+
             match event_wrapper {
-                EventWrapper::Maker(e) => maker.push(e),
-                EventWrapper::Taker(e) => taker.push(e),
+                EventWrapper::Maker(e) => {
+                    self.event_tx
+                        .send(EventWrapper::Maker(e.clone()))
+                        .expect("maker event tx failed");
+                    maker.push(e);
+                },
+                EventWrapper::Taker(e) => {
+                    self.event_tx
+                        .send(EventWrapper::Taker(e.clone()))
+                        .expect("taker event tx failed");
+                    taker.push(e);
+                },
                 EventWrapper::MarketRegistration(e) => market_registration.push(e),
                 EventWrapper::RecognizedMarket(e) => recognized_market.push(e),
             }
@@ -297,7 +770,7 @@ impl EconiaTransactionProcessor {
         self.insert_taker_events(conn, taker)?;
 
         // update markets cache
-        self.update_markets_cache(&market_registration);
+        self.insert_markets_in_cache(&market_registration);
 
         self.insert_market_registration_events(conn, market_registration)?;
         self.insert_recognized_market_events(conn, recognized_market)?;
@@ -386,8 +859,10 @@ impl EconiaTransactionProcessor {
         let mut events = vec![];
         for e in ev.into_iter() {
             if let Some(r) = e.recognized_market_info {
-                let mkt = self.markets.read().unwrap();
-                let mkt = mkt.get(&r.market_id.into()).ok_or(Error::NotFound)?;
+                let mkt = self
+                    .markets
+                    .get(&r.market_id.into())
+                    .ok_or(Error::NotFound)?;
                 let new_lot_size = BigDecimal::from(r.lot_size);
                 let new_tick_size = BigDecimal::from(r.tick_size);
                 let new_min_size = BigDecimal::from(r.min_size);
@@ -415,8 +890,7 @@ impl EconiaTransactionProcessor {
                     e.trading_pair.quote_type.module_name,
                     e.trading_pair.quote_type.struct_name,
                 );
-                let mkt_id = self.base_quote_to_market_id.read().unwrap();
-                let mkt_id = mkt_id.get(&key).unwrap();
+                let mkt_id = self.base_quote_to_market_id.get(&key).unwrap();
                 events.push(models::market::RecognizedMarketEvent {
                     market_id: mkt_id.clone(),
                     time: *CURRENT_BLOCK_TIME.read().unwrap(),
@@ -424,7 +898,10 @@ impl EconiaTransactionProcessor {
                     lot_size: None,
                     tick_size: None,
                     min_size: None,
-                })
+                });
+
+                // update markets cache
+                self.remove_market_from_cache(&mkt_id);
             }
         }
         Ok(events)
@@ -530,5 +1007,39 @@ impl TransactionProcessor for EconiaTransactionProcessor {
 
     fn connection_pool(&self) -> &PgDbPool {
         &self.connection_pool
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{EconiaRedisCacher, RedisConfig};
+    use bigdecimal::BigDecimal;
+    use crossbeam::channel;
+
+    #[test]
+    fn test_initialise_remove_markets() {
+        let config = RedisConfig {
+            url: "redis://localhost:6379".to_string(),
+            book_prefix: "book".to_string(),
+            order_prefix: "order".to_string(),
+            fill_prefix: "fill".to_string(),
+            markets: "markets".to_string(),
+        };
+        let books = vec![BigDecimal::from(10)];
+        let (_, a_rx) = channel::unbounded();
+        let (_, b_rx) = channel::unbounded();
+        let mut cacher = EconiaRedisCacher::new(config, a_rx, b_rx);
+        cacher.initialise_markets(books).unwrap();
+        let mut conn = cacher.redis_client.get_connection().unwrap();
+        let mut cmd = redis::cmd("HGET");
+        cmd.arg("markets").arg("10");
+        let res = cmd.query::<u64>(&mut conn).unwrap();
+        assert_eq!(res, 1);
+
+        cacher
+            .remove_market(&mut conn, &BigDecimal::from(10))
+            .unwrap();
+        let res = cmd.query::<u64>(&mut conn);
+        assert!(res.is_err());
     }
 }
