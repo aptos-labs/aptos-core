@@ -9,11 +9,12 @@ FEATURES=${FEATURES:-""}
 echo "Building aptos-node"
 echo "PROFILE: $PROFILE"
 echo "FEATURES: $FEATURES"
+echo "CARGO_TARGET_DIR: $CARGO_TARGET_DIR"
 
 # Build and overwrite the aptos-node binary with features if specified
 if [ -n "$FEATURES" ]; then
     echo "Building aptos-node with features ${FEATURES}"
-    (cd aptos-node && cargo build --profile=$PROFILE --features=$FEATURES "$@")
+    cargo build --profile=$PROFILE --features=$FEATURES -p aptos-node "$@"
 else 
     # Build aptos-node separately
     cargo build --locked --profile=$PROFILE \
@@ -29,5 +30,5 @@ BINS=(
 mkdir dist
 
 for BIN in "${BINS[@]}"; do
-    cp target/$PROFILE/$BIN dist/$BIN
+    cp $CARGO_TARGET_DIR/$PROFILE/$BIN dist/$BIN
 done

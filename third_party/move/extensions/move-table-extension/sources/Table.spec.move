@@ -14,6 +14,8 @@ spec extensions::table {
             map_del_must_exist = remove,
             map_borrow = borrow,
             map_borrow_mut = borrow_mut,
+            map_borrow_mut_with_default = borrow_mut_with_default,
+            map_spec_new = spec_new,
             map_spec_get = spec_get,
             map_spec_set = spec_set,
             map_spec_del = spec_remove,
@@ -22,7 +24,7 @@ spec extensions::table {
     }
 
     // Specification functions for tables
-
+    spec native fun spec_new<K, V>(): Table<K, V>;
     spec native fun spec_len<K, V>(t: Table<K, V>): num;
     spec native fun spec_contains<K, V>(t: Table<K, V>, k: K): bool;
     spec native fun spec_set<K, V>(t: Table<K, V>, k: K, v: V): Table<K, V>;

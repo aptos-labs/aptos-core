@@ -1286,8 +1286,8 @@ pub enum Bytecode {
     /// The values of the fields of the instance appear on the stack in the order defined
     /// in the struct definition.
     ///
-    /// This order makes Unpack<T> the inverse of Pack<T>. So `Unpack<T>; Pack<T>` is the identity
-    /// for struct T.
+    /// This order makes `Unpack<T>` the inverse of `Pack<T>`. So `Unpack<T>; Pack<T>` is the identity
+    /// for struct `T`.
     ///
     /// Stack transition:
     ///
@@ -2069,12 +2069,14 @@ pub fn empty_module() -> CompiledModule {
 }
 
 /// Create the following module which is convenient in tests:
-/// // module <SELF> {
-/// //     struct Bar { x: u64 }
-/// //
-/// //     foo() {
-/// //     }
-/// // }
+/// ```text
+/// module <SELF> {
+///     struct Bar { x: u64 }
+///
+///     fun foo() {
+///     }
+/// }
+/// ```
 pub fn basic_test_module() -> CompiledModule {
     let mut m = empty_module();
 

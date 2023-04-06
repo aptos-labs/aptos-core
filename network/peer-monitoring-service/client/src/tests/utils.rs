@@ -14,7 +14,7 @@ use aptos_config::{
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_network::{
-    application::{interface::NetworkClient, metadata::PeerMetadata, storage::PeersAndMetadata},
+    application::{interface::NetworkClient, storage::PeersAndMetadata},
     transport::ConnectionMetadata,
 };
 use aptos_peer_monitoring_service_types::{
@@ -123,20 +123,21 @@ pub async fn initialize_and_verify_peer_states(
     node_config: &NodeConfig,
     peer_network_id: &PeerNetworkId,
     mock_time: &MockTimeService,
-) -> (HashMap<PeerNetworkId, PeerMetadata>, u64) {
+) -> (HashMap<PeerNetworkId, ConnectionMetadata>, u64) {
     // Elapse enough time for the peer monitor to execute
     let time_before_update = mock_time.now();
     elapse_peer_monitor_interval(node_config.clone(), mock_time.clone()).await;
 
     // Create the test response data
-    let connected_peers_and_metadata = hashmap! { PeerNetworkId::random() => PeerMetadata::new(ConnectionMetadata::mock(PeerId::random())) };
+    let connected_peers =
+        hashmap! { PeerNetworkId::random() => ConnectionMetadata::mock(PeerId::random()) };
     let distance_from_validators = get_distance_from_validators(peer_network_id);
 
     // Verify the initial client requests and send responses
     verify_all_requests_and_respond(
         network_id,
         mock_monitoring_server,
-        &connected_peers_and_metadata,
+        &connected_peers,
         distance_from_validators,
     )
     .await;
@@ -154,12 +155,12 @@ pub async fn initialize_and_verify_peer_states(
     verify_peer_monitor_state(
         peer_monitor_state,
         peer_network_id,
-        &connected_peers_and_metadata,
+        &connected_peers,
         distance_from_validators,
         1,
     );
 
-    (connected_peers_and_metadata, distance_from_validators)
+    (connected_peers, distance_from_validators)
 }
 
 /// Spawns the given task with a timeout
@@ -256,7 +257,7 @@ pub fn update_network_info_for_peer(
     peers_and_metadata: Arc<PeersAndMetadata>,
     peer_network_id: &PeerNetworkId,
     peer_state: &mut PeerState,
-    connected_peers_and_metadata: HashMap<PeerNetworkId, PeerMetadata>,
+    connected_peers: HashMap<PeerNetworkId, ConnectionMetadata>,
     distance_from_validators: u64,
     response_time_secs: f64,
 ) {
@@ -274,7 +275,7 @@ pub fn update_network_info_for_peer(
     let network_info_request = PeerMonitoringServiceRequest::GetNetworkInformation;
     let network_info_response =
         PeerMonitoringServiceResponse::NetworkInformation(NetworkInformationResponse {
-            connected_peers_and_metadata,
+            connected_peers,
             distance_from_validators,
         });
 
@@ -342,7 +343,7 @@ pub async fn verify_and_handle_network_info_request(
     node_config: &NodeConfig,
     peer_network_id: &PeerNetworkId,
     mock_time: &MockTimeService,
-    connected_peers_and_metadata: &HashMap<PeerNetworkId, PeerMetadata>,
+    connected_peers: &HashMap<PeerNetworkId, ConnectionMetadata>,
     distance_from_validators: u64,
 ) {
     // Elapse enough time for a network info update
@@ -353,7 +354,7 @@ pub async fn verify_and_handle_network_info_request(
     verify_network_info_request_and_respond(
         network_id,
         mock_monitoring_server,
-        connected_peers_and_metadata,
+        connected_peers,
         distance_from_validators,
         false,
         false,
@@ -374,7 +375,7 @@ pub async fn verify_and_handle_network_info_request(
     verify_peer_network_state(
         peer_monitor_state,
         peer_network_id,
-        connected_peers_and_metadata,
+        connected_peers,
         distance_from_validators,
         0,
     );
@@ -385,7 +386,7 @@ pub async fn verify_and_handle_network_info_request(
 pub async fn verify_all_requests_and_respond(
     network_id: &NetworkId,
     mock_monitoring_server: &mut MockMonitoringServer,
-    connected_peers_and_metadata: &HashMap<PeerNetworkId, PeerMetadata>,
+    connected_peers: &HashMap<PeerNetworkId, ConnectionMetadata>,
     distance_from_validators: u64,
 ) {
     // Create a task that waits for all the requests and sends responses
@@ -409,7 +410,7 @@ pub async fn verify_all_requests_and_respond(
 
                     // Return the response
                     PeerMonitoringServiceResponse::NetworkInformation(NetworkInformationResponse {
-                        connected_peers_and_metadata: connected_peers_and_metadata.clone(),
+                        connected_peers: connected_peers.clone(),
                         distance_from_validators,
                     })
                 },
@@ -510,7 +511,7 @@ pub async fn verify_latency_request_and_respond(
 pub async fn verify_network_info_request_and_respond(
     network_id: &NetworkId,
     mock_monitoring_server: &mut MockMonitoringServer,
-    connected_peers_and_metadata: &HashMap<PeerNetworkId, PeerMetadata>,
+    connected_peers: &HashMap<PeerNetworkId, ConnectionMetadata>,
     distance_from_validators: u64,
     respond_with_invalid_distance: bool,
     respond_with_invalid_message: bool,
@@ -528,7 +529,7 @@ pub async fn verify_network_info_request_and_respond(
                 if respond_with_invalid_distance {
                     // Respond with an invalid distance
                     PeerMonitoringServiceResponse::NetworkInformation(NetworkInformationResponse {
-                        connected_peers_and_metadata: connected_peers_and_metadata.clone(),
+                        connected_peers: connected_peers.clone(),
                         distance_from_validators: 1,
                     })
                 } else if respond_with_invalid_message {
@@ -539,7 +540,7 @@ pub async fn verify_network_info_request_and_respond(
                 } else {
                     // Send a valid response
                     PeerMonitoringServiceResponse::NetworkInformation(NetworkInformationResponse {
-                        connected_peers_and_metadata: connected_peers_and_metadata.clone(),
+                        connected_peers: connected_peers.clone(),
                         distance_from_validators,
                     })
                 }
@@ -591,7 +592,7 @@ pub fn verify_peer_latency_state(
 pub fn verify_peer_monitor_state(
     peer_monitor_state: &PeerMonitorState,
     peer_network_id: &PeerNetworkId,
-    expected_connected_peers_and_metadata: &HashMap<PeerNetworkId, PeerMetadata>,
+    expected_connected_peers: &HashMap<PeerNetworkId, ConnectionMetadata>,
     expected_distance_from_validators: u64,
     expected_num_recorded_latency_pings: u64,
 ) {
@@ -607,7 +608,7 @@ pub fn verify_peer_monitor_state(
     verify_peer_network_state(
         peer_monitor_state,
         peer_network_id,
-        expected_connected_peers_and_metadata,
+        expected_connected_peers,
         expected_distance_from_validators,
         0,
     );
@@ -617,7 +618,7 @@ pub fn verify_peer_monitor_state(
 pub fn verify_peer_network_state(
     peer_monitor_state: &PeerMonitorState,
     peer_network_id: &PeerNetworkId,
-    expected_connected_peers_and_metadata: &HashMap<PeerNetworkId, PeerMetadata>,
+    expected_connected_peers: &HashMap<PeerNetworkId, ConnectionMetadata>,
     expected_distance_from_validators: u64,
     expected_num_consecutive_failures: u64,
 ) {
@@ -631,8 +632,8 @@ pub fn verify_peer_network_state(
         .get_latest_network_info_response()
         .unwrap();
     assert_eq!(
-        latest_network_info_response.connected_peers_and_metadata,
-        expected_connected_peers_and_metadata.clone()
+        latest_network_info_response.connected_peers,
+        expected_connected_peers.clone()
     );
     assert_eq!(
         latest_network_info_response.distance_from_validators,

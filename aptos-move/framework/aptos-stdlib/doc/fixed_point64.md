@@ -612,7 +612,7 @@ Returns the value of a FixedPoint64 to the nearest integer.
 
 
 <pre><code><b>pragma</b> opaque;
-<b>pragma</b> timeout = 600;
+<b>pragma</b> verify = <b>false</b>;
 <b>include</b> <a href="fixed_point64.md#0x1_fixed_point64_CreateFromRationalAbortsIf">CreateFromRationalAbortsIf</a>;
 <b>ensures</b> result == <a href="fixed_point64.md#0x1_fixed_point64_spec_create_from_rational">spec_create_from_rational</a>(numerator, denominator);
 </code></pre>
@@ -881,4 +881,4 @@ TODO: worked in the past but started to time out since last z3 update
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

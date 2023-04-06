@@ -492,7 +492,7 @@ impl EpochManager {
 
         let (commit_msg_tx, commit_msg_rx) = aptos_channel::new::<AccountAddress, VerifiedEvent>(
             QueueStyle::FIFO,
-            self.config.channel_size,
+            100,
             Some(&counters::BUFFER_MANAGER_MSGS),
         );
 
@@ -1073,6 +1073,12 @@ impl EpochManager {
             tokio::select! {
                 (peer, msg) = network_receivers.consensus_messages.select_next_some() => {
                     monitor!("epoch_manager_process_consensus_messages",
+                    if let Err(e) = self.process_message(peer, msg).await {
+                        error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
+                    });
+                },
+                (peer, msg) = network_receivers.buffer_manager_messages.select_next_some() => {
+                    monitor!("epoch_manager_process_buffer_manager_messages",
                     if let Err(e) = self.process_message(peer, msg).await {
                         error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
                     });

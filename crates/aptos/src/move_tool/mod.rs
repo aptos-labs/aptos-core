@@ -78,51 +78,51 @@ use transactional_tests_runner::TransactionalTestOpts;
 /// about this code.
 #[derive(Subcommand)]
 pub enum MoveTool {
+    Clean(CleanPackage),
     Compile(CompilePackage),
     CompileScript(CompileScript),
-    Init(InitPackage),
-    Publish(PublishPackage),
-    Download(DownloadPackage),
-    List(ListPackage),
-    Clean(CleanPackage),
-    VerifyPackage(VerifyPackage),
-    Run(RunFunction),
-    RunScript(RunScript),
-    Test(TestPackage),
-    Prove(ProvePackage),
-    Document(DocumentPackage),
-    TransactionalTest(TransactionalTestOpts),
-    CreateResourceAccountAndPublishPackage(CreateResourceAccountAndPublishPackage),
-    View(ViewFunction),
     #[clap(subcommand)]
     Coverage(coverage::CoveragePackage),
+    CreateResourceAccountAndPublishPackage(CreateResourceAccountAndPublishPackage),
+    Document(DocumentPackage),
+    Download(DownloadPackage),
+    Init(InitPackage),
+    List(ListPackage),
+    Prove(ProvePackage),
+    Publish(PublishPackage),
+    Run(RunFunction),
+    RunScript(RunScript),
     #[clap(subcommand, hide = true)]
     Show(show::ShowTool),
+    Test(TestPackage),
+    TransactionalTest(TransactionalTestOpts),
+    VerifyPackage(VerifyPackage),
+    View(ViewFunction),
 }
 
 impl MoveTool {
     pub async fn execute(self) -> CliResult {
         match self {
+            MoveTool::Clean(tool) => tool.execute_serialized().await,
             MoveTool::Compile(tool) => tool.execute_serialized().await,
             MoveTool::CompileScript(tool) => tool.execute_serialized().await,
-            MoveTool::Init(tool) => tool.execute_serialized_success().await,
-            MoveTool::Publish(tool) => tool.execute_serialized().await,
-            MoveTool::Download(tool) => tool.execute_serialized().await,
-            MoveTool::List(tool) => tool.execute_serialized().await,
-            MoveTool::Clean(tool) => tool.execute_serialized().await,
-            MoveTool::VerifyPackage(tool) => tool.execute_serialized().await,
-            MoveTool::Run(tool) => tool.execute_serialized().await,
-            MoveTool::RunScript(tool) => tool.execute_serialized().await,
-            MoveTool::Test(tool) => tool.execute_serialized().await,
-            MoveTool::Prove(tool) => tool.execute_serialized().await,
-            MoveTool::Document(tool) => tool.execute_serialized().await,
-            MoveTool::TransactionalTest(tool) => tool.execute_serialized_success().await,
+            MoveTool::Coverage(tool) => tool.execute().await,
             MoveTool::CreateResourceAccountAndPublishPackage(tool) => {
                 tool.execute_serialized_success().await
             },
-            MoveTool::View(tool) => tool.execute_serialized().await,
-            MoveTool::Coverage(tool) => tool.execute().await,
+            MoveTool::Document(tool) => tool.execute_serialized().await,
+            MoveTool::Download(tool) => tool.execute_serialized().await,
+            MoveTool::Init(tool) => tool.execute_serialized_success().await,
+            MoveTool::List(tool) => tool.execute_serialized().await,
+            MoveTool::Prove(tool) => tool.execute_serialized().await,
+            MoveTool::Publish(tool) => tool.execute_serialized().await,
+            MoveTool::Run(tool) => tool.execute_serialized().await,
+            MoveTool::RunScript(tool) => tool.execute_serialized().await,
             MoveTool::Show(tool) => tool.execute_serialized().await,
+            MoveTool::Test(tool) => tool.execute_serialized().await,
+            MoveTool::TransactionalTest(tool) => tool.execute_serialized_success().await,
+            MoveTool::VerifyPackage(tool) => tool.execute_serialized().await,
+            MoveTool::View(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -744,10 +744,14 @@ impl CliCommand<TransactionSummary> for PublishPackage {
                 MAX_PUBLISH_PACKAGE_SIZE, size
             )));
         }
-        txn_options
-            .submit_transaction(payload)
-            .await
-            .map(TransactionSummary::from)
+        if txn_options.profile_gas {
+            txn_options.profile_gas(payload).await
+        } else {
+            txn_options
+                .submit_transaction(payload)
+                .await
+                .map(TransactionSummary::from)
+        }
     }
 }
 
@@ -984,7 +988,7 @@ pub struct ListPackage {
 
     /// Type of items to query
     ///
-    /// Current supported types [packages]
+    /// Current supported types `[packages]`
     #[clap(long, default_value_t = MoveListQuery::Packages)]
     query: MoveListQuery,
 
@@ -1133,15 +1137,21 @@ impl CliCommand<TransactionSummary> for RunFunction {
             type_args.push(type_tag)
         }
 
-        self.txn_options
-            .submit_transaction(TransactionPayload::EntryFunction(EntryFunction::new(
-                self.function_id.module_id,
-                self.function_id.member_id,
-                type_args,
-                args,
-            )))
-            .await
-            .map(TransactionSummary::from)
+        let payload = TransactionPayload::EntryFunction(EntryFunction::new(
+            self.function_id.module_id,
+            self.function_id.member_id,
+            type_args,
+            args,
+        ));
+
+        if self.txn_options.profile_gas {
+            self.txn_options.profile_gas(payload).await
+        } else {
+            self.txn_options
+                .submit_transaction(payload)
+                .await
+                .map(TransactionSummary::from)
+        }
     }
 }
 
@@ -1243,13 +1253,16 @@ impl CliCommand<TransactionSummary> for RunScript {
             type_args.push(type_tag)
         }
 
-        let txn = self
-            .txn_options
-            .submit_transaction(TransactionPayload::Script(Script::new(
-                bytecode, type_args, args,
-            )))
-            .await?;
-        Ok(TransactionSummary::from(&txn))
+        let payload = TransactionPayload::Script(Script::new(bytecode, type_args, args));
+
+        if self.txn_options.profile_gas {
+            self.txn_options.profile_gas(payload).await
+        } else {
+            self.txn_options
+                .submit_transaction(payload)
+                .await
+                .map(TransactionSummary::from)
+        }
     }
 }
 

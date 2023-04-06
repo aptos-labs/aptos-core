@@ -37,6 +37,7 @@ struct itself, while the operations are implemented as native functions. No trav
     -  [Function `add`](#@Specification_0_add)
     -  [Function `borrow`](#@Specification_0_borrow)
     -  [Function `borrow_mut`](#@Specification_0_borrow_mut)
+    -  [Function `borrow_mut_with_default`](#@Specification_0_borrow_mut_with_default)
     -  [Function `upsert`](#@Specification_0_upsert)
     -  [Function `remove`](#@Specification_0_remove)
     -  [Function `contains`](#@Specification_0_contains)
@@ -587,6 +588,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
     map_del_must_exist = remove,
     map_borrow = borrow,
     map_borrow_mut = borrow_mut,
+    map_borrow_mut_with_default = borrow_mut_with_default,
     map_spec_get = spec_get,
     map_spec_set = spec_set,
     map_spec_del = spec_remove,
@@ -649,6 +651,22 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="table.md#0x1_table_borrow_mut">borrow_mut</a>&lt;K: <b>copy</b>, drop, V&gt;(<a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="table.md#0x1_table_Table">table::Table</a>&lt;K, V&gt;, key: K): &<b>mut</b> V
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic;
+</code></pre>
+
+
+
+<a name="@Specification_0_borrow_mut_with_default"></a>
+
+### Function `borrow_mut_with_default`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="table.md#0x1_table_borrow_mut_with_default">borrow_mut_with_default</a>&lt;K: <b>copy</b>, drop, V: drop&gt;(<a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="table.md#0x1_table_Table">table::Table</a>&lt;K, V&gt;, key: K, default: V): &<b>mut</b> V
 </code></pre>
 
 
@@ -758,4 +776,4 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

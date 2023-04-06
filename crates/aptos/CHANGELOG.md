@@ -3,6 +3,13 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
+### Fixed
+* If `aptos init` is run with a faucet URL specified (which happens by default when using the local, devnet, or testnet network options) and funding the account fails, the account creation is considered a failure and nothing is persisted. Previously it would report success despite the account not being created on chain.
+
+## [1.0.9] - 2023/03/29
+* `aptos move show abi` allows for viewing the ABI of a compiled move package
+* Experimental gas profiler with the `--profile-gas` flag on any transaction submitting CLI command
+* Updates to the prover and framework specs
 
 ## [1.0.8] - 2023/03/16
 ### Added

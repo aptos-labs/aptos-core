@@ -157,6 +157,7 @@ diesel::table! {
         voter_address -> Varchar,
         last_transaction_version -> Int8,
         inserted_at -> Timestamp,
+        operator_address -> Varchar,
     }
 }
 
@@ -244,6 +245,14 @@ diesel::table! {
         pool_address -> Varchar,
         event_type -> Text,
         amount -> Numeric,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    delegated_staking_pools (staking_pool_address) {
+        staking_pool_address -> Varchar,
+        first_transaction_version -> Int8,
         inserted_at -> Timestamp,
     }
 }
@@ -547,6 +556,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     current_token_ownerships,
     current_token_pending_claims,
     delegated_staking_activities,
+    delegated_staking_pools,
     events,
     indexer_status,
     ledger_infos,
