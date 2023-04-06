@@ -6,7 +6,7 @@ RUN echo "deb http://deb.debian.org/debian bullseye main" > /etc/apt/sources.lis
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && apt-get --no-install-recommends -y \
+    apt-get update && apt-get --no-install-recommends --allow-downgrades -y \
     install \
     wget \
     curl \
