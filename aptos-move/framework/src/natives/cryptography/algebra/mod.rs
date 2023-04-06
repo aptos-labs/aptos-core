@@ -246,8 +246,8 @@ static BLS12381_Q12_LENDIAN: Lazy<Vec<u8>> = Lazy::new(|| {
 });
 
 pub fn make_all(
+    move_gas_params: aptos_move_stdlib::natives::GasParameters,
     gas_params: crate::natives::cryptography::algebra::gas::GasParameters,
-    sha256_gas_params: aptos_move_stdlib::natives::hash::Sha2_256GasParameters,
     timed_features: TimedFeatures,
     features: Arc<Features>,
 ) -> impl Iterator<Item = (String, NativeFunction)> {
@@ -413,7 +413,7 @@ pub fn make_all(
             make_safe_native(
                 HashToGasParameters {
                     algebra: gas_params.clone(),
-                    sha2: sha256_gas_params,
+                    sha2: move_gas_params.hash.sha2_256,
                 },
                 timed_features.clone(),
                 features.clone(),
