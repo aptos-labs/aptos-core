@@ -19,8 +19,9 @@ const APTOS_NODE_URL = process.env.APTOS_NODE_URL;
 const APTOS_FAUCET_URL = process.env.APTOS_FAUCET_URL;
 // ans account we use to publish the contract
 const ANS_REPO_LOCATION = process.env.ANS_REPO_LOCATION || "/tmp/ans";
-const ANS_TEST_ACCOUNT_PRIVATE_KEY = process.env.ANS_TEST_ACCOUNT_PRIVATE_KEY;
-const ANS_TEST_ACCOUNT_ADDRESS = process.env.ANS_TEST_ACCOUNT_ADDRESS;
+const ANS_TEST_ACCOUNT_PRIVATE_KEY =
+  process.env.ANS_TEST_ACCOUNT_PRIVATE_KEY || "0x37368b46ce665362562c6d1d4ec01a08c8644c488690df5a17e13ba163e20221";
+const ANS_TEST_ACCOUNT_ADDRESS = process.env.ANS_TEST_ACCOUNT_ADDRESS || "585fc9f0f0c54183b039ffc770ca282ebd87307916c215a3e692f2f8e4305e82";
 
 try {
   deleteAnsFolder();
