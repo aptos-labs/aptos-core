@@ -20,7 +20,7 @@ message TransactionsOutput {
 
 message TransactionOutput {
   // Encoded aptos.proto.v1.Transaction proto data.
-  string encoded_proto_data = 1;
+  bytes encoded_proto_data = 1;
   uint64 version = 2;
   aptos.util.timestamp.Timestamp timestamp = 3;
 }

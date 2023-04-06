@@ -255,10 +255,13 @@ fn raw_datastream_response_builder(
         response: Some(DatastreamProtoResponse::Data(TransactionsOutput {
             transactions: data
                 .into_iter()
-                .map(|(encoded, version)| TransactionOutput {
-                    encoded_proto_data: encoded,
-                    version,
-                    ..TransactionOutput::default()
+                .map(|(encoded, version)| {
+                    let decoded_proto_data = base64::decode(encoded).unwrap();
+                    TransactionOutput {
+                        encoded_proto_data: decoded_proto_data,
+                        version,
+                        ..TransactionOutput::default()
+                    }
                 })
                 .collect(),
         })),

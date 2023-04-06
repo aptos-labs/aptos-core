@@ -150,7 +150,8 @@ async fn process_raw_datastream_response(
                         Some(timestamp) => timestamp.seconds as u64,
                         None => 0,
                     };
-                    (tx.version, tx.encoded_proto_data, timestamp_in_seconds)
+                    let base64_encoded_proto_data = base64::encode(tx.encoded_proto_data);
+                    (tx.version, base64_encoded_proto_data, timestamp_in_seconds)
                 })
                 .collect::<Vec<(u64, String, u64)>>();
 

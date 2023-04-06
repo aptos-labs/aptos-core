@@ -330,14 +330,15 @@ impl IndexerStreamCoordinator {
         pb_txns
             .iter()
             .map(|txn| {
-                let mut buf = vec![];
-                txn.encode(&mut buf).unwrap_or_else(|_| {
+                let mut encoded_proto_data = vec![];
+                txn.encode(&mut encoded_proto_data).unwrap_or_else(|_| {
                     panic!(
                         "Could not convert protobuf transaction to bytes '{:?}'",
                         txn
                     )
                 });
-                let encoded_proto_data = base64::encode(buf);
+                // let encoded_proto_data = base64::encode(buf);
+                // let encoded_proto_data = bcs::to_bytes(txn);
                 TransactionOutput {
                     encoded_proto_data,
                     version: txn.version,

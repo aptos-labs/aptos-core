@@ -1,5 +1,10 @@
 version: v1
 
+# detect breaking changes
+breaking:
+  use:
+    - FILE
+
 # lint contains the options for lint rules.
 lint:
   use:
