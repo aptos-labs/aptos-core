@@ -461,14 +461,6 @@ where
         signature_verified_block: Vec<T>,
         base_view: &S,
     ) -> Result<Vec<(E::Output, Vec<(T::Key, WriteOp)>)>, E::Error> {
-        // The last txn must be StateCheckpoint in production. We let the executor
-        // executes all but the last txn first, and then add back the output of the
-        // StateCheckpoint txn if there is no reconfiguration txn.
-        // The reason is that with per-block gas limit, the parallel / sequential execution
-        // may early halt and mark all remaining txns as Discard, so we need to add back
-        // the StateCheckpoint output to satisfy the invariant checks.
-        // let state_checkpoint_txn = signature_verified_block.pop();
-
         let mut ret = if self.concurrency_level > 1 {
             self.execute_transactions_parallel(
                 executor_arguments,
