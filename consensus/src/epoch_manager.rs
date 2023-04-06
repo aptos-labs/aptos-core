@@ -429,8 +429,6 @@ impl EpochManager {
     }
 
     async fn initiate_new_epoch(&mut self, proof: EpochChangeProof) -> anyhow::Result<()> {
-        // The recovery manager exits before starting a new epoch. So, we unset the recovery_mode flag here.
-        self.recovery_mode = false;
         let ledger_info = proof
             .verify(self.epoch_state())
             .context("[EpochManager] Invalid EpochChangeProof")?;
