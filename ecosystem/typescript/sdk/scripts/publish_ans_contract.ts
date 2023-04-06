@@ -27,6 +27,13 @@ try {
   console.log("---clone ANS repository---");
   execSync("git clone https://github.com/aptos-labs/aptos-names-contracts.git /tmp/ans", { stdio: "inherit" });
 
+  // Debugging: Confirm code was mounted in correctly
+  const blah = APTOS_INVOCATION.slice(0, APTOS_INVOCATION.length - 5);
+  console.log(blah);
+  execSync(`${blah} ls -la /tmp`, { stdio: "inherit" });
+  execSync(`${blah} ls -la /tmp/ans`, { stdio: "inherit" });
+  execSync(`${blah} ls -la /tmp/ans/core`, { stdio: "inherit" });
+
   // 2. fund ans account
   console.log("---funding account---");
   execSync(
@@ -34,15 +41,10 @@ try {
     { stdio: "inherit" },
   );
 
-  // debugging
-  execSync("ls -la /tmp", { stdio: "inherit" });
-  execSync("ls -la /tmp/ans", { stdio: "inherit" });
-  execSync("ls -la /tmp/ans/core", { stdio: "inherit" });
-
   // 3. publish ans modules under the ans account
   console.log("---publish ans modules---");
   execSync(
-    `${APTOS_INVOCATION} move publish --private-key=${ANS_TEST_ACCOUNT_PRIVATE_KEY} --named-addresses aptos_names=0x${ANS_TEST_ACCOUNT_ADDRESS},aptos_names_admin=0x${ANS_TEST_ACCOUNT_ADDRESS},aptos_names_funds=0x${ANS_TEST_ACCOUNT_ADDRESS} --url=${APTOS_NODE_URL} --package-dir=/tmp/ans/core --assume-yes`,
+    `${APTOS_INVOCATION} move publish --package-dir /tmp/ans/core --assume-yes --private-key=${ANS_TEST_ACCOUNT_PRIVATE_KEY} --named-addresses aptos_names=0x${ANS_TEST_ACCOUNT_ADDRESS},aptos_names_admin=0x${ANS_TEST_ACCOUNT_ADDRESS},aptos_names_funds=0x${ANS_TEST_ACCOUNT_ADDRESS} --url=${APTOS_NODE_URL}`,
     { stdio: "inherit" },
   );
 
