@@ -595,7 +595,6 @@ impl EpochManager {
             self.commit_state_computer.clone(),
             ledger_data.committed_round(),
         );
-        self.recovery_mode = true;
         tokio::spawn(recovery_manager.start(recovery_manager_rx, close_rx));
     }
 
@@ -784,8 +783,6 @@ impl EpochManager {
     }
 
     async fn start_new_epoch(&mut self, payload: OnChainConfigPayload) {
-        // The recovery manager exits before starting a new epoch. So, we unset the recovery_mode flag here.
-        self.recovery_mode = false;
         let validator_set: ValidatorSet = payload
             .get()
             .expect("failed to get ValidatorSet from payload");
@@ -807,6 +804,7 @@ impl EpochManager {
                 let consensus_config = onchain_consensus_config.unwrap_or_default();
                 let execution_config = onchain_execution_config.unwrap_or_default();
                 self.quorum_store_enabled = self.enable_quorum_store(&consensus_config);
+                self.recovery_mode = false;
                 self.start_round_manager(
                     initial_data,
                     epoch_state,
@@ -816,6 +814,7 @@ impl EpochManager {
                 .await
             },
             LivenessStorageData::PartialRecoveryData(ledger_data) => {
+                self.recovery_mode = true;
                 self.start_recovery_manager(ledger_data, epoch_state).await
             },
         }
@@ -955,14 +954,11 @@ impl EpochManager {
         peer_id: AccountAddress,
         event: &UnverifiedEvent,
     ) -> anyhow::Result<()> {
-        if self.quorum_store_enabled || self.recovery_mode {
-            return Ok(());
-        }
         match event {
             UnverifiedEvent::BatchMsg(_)
             | UnverifiedEvent::SignedBatchInfo(_)
             | UnverifiedEvent::ProofOfStoreMsg(_) => {
-                if self.quorum_store_enabled {
+                if self.quorum_store_enabled || self.recovery_mode {
                     Ok(())
                 } else {
                     Err(anyhow::anyhow!(
