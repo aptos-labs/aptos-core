@@ -33,6 +33,8 @@ module aptos_framework::fungible_asset {
     const EFUNGIBLE_ASSET_AND_STORE_MISMATCH: u64 = 11;
     /// Cannot destroy non-empty fungible assets.
     const EAMOUNT_IS_NOT_ZERO: u64 = 12;
+    /// Burn ref and fungible asset do not match.
+    const EBURN_REF_AND_FUNGIBLE_ASSET_MISMATCH: u64 = 13;
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Define the metadata required of an metadata to be fungible.
@@ -71,7 +73,7 @@ module aptos_framework::fungible_asset {
     }
 
     /// FungibleAsset can be passed into function for type safety and to guarantee a specific amount.
-    /// FungibleAsset cannot be stored directly and will have to be deposited back into a store.
+    /// FungibleAsset is ephermeral that it cannot be stored directly and will have to be deposited back into a store.
     struct FungibleAsset {
         metadata: Object<Metadata>,
         amount: u64,
@@ -337,8 +339,17 @@ module aptos_framework::fungible_asset {
         event::emit_event(&mut events.set_ungated_transfer_events, SetUngatedTransferEvent { transfer_allowed: allow });
     }
 
+    public fun burn(ref: &BurnRef, fa: FungibleAsset) acquires Metadata {
+        let FungibleAsset {
+            metadata,
+            amount,
+        } = fa;
+        assert!(ref.metadata == metadata, error::invalid_argument(EBURN_REF_AND_FUNGIBLE_ASSET_MISMATCH));
+        decrease_supply(&metadata, amount);
+    }
+
     /// Burn the `amount` of fungible metadata from the given store.
-    public fun burn<T: key>(
+    public fun burn_from<T: key>(
         ref: &BurnRef,
         store: Object<T>,
         amount: u64
@@ -346,11 +357,7 @@ module aptos_framework::fungible_asset {
         let metadata = ref.metadata;
         assert!(metadata == store_metadata(store), error::invalid_argument(EBURN_REF_AND_STORE_MISMATCH));
         let store_addr = object::object_address(&store);
-        let FungibleAsset {
-            metadata,
-            amount,
-        } = withdraw_internal(store_addr, amount);
-        decrease_supply(&metadata, amount);
+        burn(ref, withdraw_internal(store_addr, amount));
     }
 
     /// Withdraw `amount` of fungible metadata from `store` ignoring `allow_ungated_transfer`.
@@ -413,10 +420,7 @@ module aptos_framework::fungible_asset {
         assert!(amount == 0, error::invalid_argument(EAMOUNT_IS_NOT_ZERO));
     }
 
-    fun deposit_internal<T: key>(
-        store: Object<T>,
-        fa: FungibleAsset
-    ) acquires FungibleAssetStore, FungibleAssetEvents {
+    fun deposit_internal<T: key>(store: Object<T>, fa: FungibleAsset) acquires FungibleAssetStore, FungibleAssetEvents {
         let FungibleAsset { metadata, amount } = fa;
         let store_metadata = store_metadata(store);
         assert!(metadata == store_metadata, error::invalid_argument(EFUNGIBLE_ASSET_AND_STORE_MISMATCH));
@@ -588,7 +592,7 @@ module aptos_framework::fungible_asset {
         assert!(supply(test_token) == 100, 3);
         deposit(aaron_store, fa);
         // Burn
-        burn(&burn_ref, aaron_store, 30);
+        burn_from(&burn_ref, aaron_store, 30);
         assert!(supply(test_token) == 70, 4);
         // Transfer
         transfer(creator, creator_store, aaron_store, 10);
@@ -631,5 +635,19 @@ module aptos_framework::fungible_asset {
         assert!(balance(aaron_store) == 80, 2);
         assert!(!ungated_transfer_allowed(creator_store), 3);
         assert!(!ungated_transfer_allowed(aaron_store), 4);
+    }
+
+    #[test(creator = @0xcafe)]
+    fun test_merge_and_exact(creator: &signer) acquires Metadata {
+        let (mint_ref, _transfer_ref, burn_ref, _) = create_fungible_asset(creator);
+        let fa = mint(&mint_ref, 100);
+        let cash = extract(&mut fa, 80);
+        assert!(fa.amount == 20, 1);
+        assert!(cash.amount == 80, 2);
+        let more_cash = extract(&mut fa, 20);
+        destroy_zero(fa);
+        merge(&mut cash, more_cash);
+        assert!(cash.amount == 100, 3);
+        burn(&burn_ref, cash);
     }
 }
