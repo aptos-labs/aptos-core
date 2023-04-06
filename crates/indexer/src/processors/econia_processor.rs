@@ -35,6 +35,8 @@ pub const NAME: &str = "econia_processor";
 struct RedisConfig {
     url: String,
     open_orders: String,
+    book_prefix: String,
+    order_prefix: String,
     markets: String,
 }
 
@@ -388,6 +390,7 @@ impl EconiaRedisCacher {
 
     fn send_price_level_update(
         conn: &mut redis::Connection,
+        book_prefix: &str,
         mkt_id: u64,
         book: &OrderBook,
         side: Side,
@@ -397,7 +400,7 @@ impl EconiaRedisCacher {
             .get_side(side)
             .get(&price)
             .map_or(0, |v| v.iter().fold(0, |i, s: &Order| i + s.size));
-        let channel_name = format!("book:{}", mkt_id);
+        let channel_name = format!("{}:{}", book_prefix, mkt_id);
         let message = serde_json::json!({
             "price": price,
             "size": cum_size
@@ -422,7 +425,14 @@ impl EconiaRedisCacher {
             MakerEventType::Cancel => {
                 let mut order = Self::remove_order(book, e.market_order_id);
                 order.order_state = OrderState::Cancelled;
-                Self::send_price_level_update(conn, e.market_id, book, order.side, order.price)?;
+                Self::send_price_level_update(
+                    conn,
+                    &self.config.book_prefix,
+                    e.market_id,
+                    book,
+                    order.side,
+                    order.price,
+                )?;
                 // todo send order event here to redis
             },
             MakerEventType::Change => {
@@ -433,24 +443,52 @@ impl EconiaRedisCacher {
                 if pop_and_reinsert {
                     let mut order = Self::remove_order(book, e.market_order_id);
                     let side = order.side;
-                    Self::send_price_level_update(conn, e.market_id, book, side, order.price)?;
+                    Self::send_price_level_update(
+                        conn,
+                        &self.config.book_prefix,
+                        e.market_id,
+                        book,
+                        side,
+                        order.price,
+                    )?;
                     order.size = e.size;
                     order.price = e.price;
                     Self::add_order(book, order);
-                    Self::send_price_level_update(conn, e.market_id, book, side, e.price)?;
+                    Self::send_price_level_update(
+                        conn,
+                        &self.config.book_prefix,
+                        e.market_id,
+                        book,
+                        side,
+                        e.price,
+                    )?;
                 } else {
                     let order = Self::get_order_mut(book, e.market_order_id);
                     let side = order.side;
                     order.size = e.size;
                     order.price = e.price;
-                    Self::send_price_level_update(conn, e.market_id, book, side, e.price)?;
+                    Self::send_price_level_update(
+                        conn,
+                        &self.config.book_prefix,
+                        e.market_id,
+                        book,
+                        side,
+                        e.price,
+                    )?;
                 }
                 // todo send order event here to redis
             },
             MakerEventType::Evict => {
                 let mut order = Self::remove_order(book, e.market_order_id);
                 order.order_state = OrderState::Evicted;
-                Self::send_price_level_update(conn, e.market_id, book, order.side, order.price)?;
+                Self::send_price_level_update(
+                    conn,
+                    &self.config.book_prefix,
+                    e.market_id,
+                    book,
+                    order.side,
+                    order.price,
+                )?;
                 // todo send order event here to redis
             },
             MakerEventType::Place => {
@@ -468,7 +506,14 @@ impl EconiaRedisCacher {
                 };
 
                 Self::add_order(book, o);
-                Self::send_price_level_update(conn, e.market_id, book, side, e.price)?;
+                Self::send_price_level_update(
+                    conn,
+                    &self.config.book_prefix,
+                    e.market_id,
+                    book,
+                    side,
+                    e.price,
+                )?;
                 // todo send order event here to redis
             },
         };
@@ -928,6 +973,8 @@ mod tests {
         let config = RedisConfig {
             url: "redis://localhost:6379".to_string(),
             open_orders: "open_orders".to_string(),
+            book_prefix: "book".to_string(),
+            order_prefix: "order".to_string(),
             markets: "markets".to_string(),
         };
         let books = vec![BigDecimal::from(10)];
