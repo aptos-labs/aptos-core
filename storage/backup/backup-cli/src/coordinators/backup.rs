@@ -244,7 +244,7 @@ impl BackupCoordinator {
             self.state_snapshot_interval_epochs,
         );
 
-        // <= becuse db_state.epoch is still open
+        // <= because db_state.epoch is still open
         if db_state.epoch <= epoch {
             // wait for the next db_state update
             return Ok(last_snapshot_epoch_in_backup);
@@ -366,8 +366,7 @@ impl BackupCompactor {
         )
         .await?;
 
-        // Get a snapshot of remote metadata files before compaction
-        let files = self.storage.list_metadata_files().await?;
+        let files = metaview.get_file_handles();
 
         info!("Start compacting backup metadata files.");
         // Get all compacted chunks to be written back to storage

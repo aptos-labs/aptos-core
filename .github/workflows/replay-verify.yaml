@@ -46,7 +46,10 @@ jobs:
           cancel-workflow: ${{ github.event_name == 'schedule' }} # Cancel the workflow if it is scheduled on a fork
 
   replay-testnet:
-    if: ${{ github.event_name == 'schedule' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' && inputs.CHAIN_NAME == 'testnet' || inputs.CHAIN_NAME == 'all' }}
+    if: |
+      github.event_name == 'schedule' ||
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch' && (inputs.CHAIN_NAME == 'testnet' || inputs.CHAIN_NAME == 'all')
     needs: determine-test-metadata
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-replay-verify.yaml@main
     secrets: inherit
@@ -63,7 +66,10 @@ jobs:
       TIMEOUT_MINUTES: 720
 
   replay-mainnet:
-    if: ${{ github.event_name == 'schedule' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' && inputs.CHAIN_NAME == 'testnet' || inputs.CHAIN_NAME == 'all' }}
+    if: |
+      github.event_name == 'schedule' ||
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch' && (inputs.CHAIN_NAME == 'testnet' || inputs.CHAIN_NAME == 'all' )
     needs: determine-test-metadata
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-replay-verify.yaml@main
     secrets: inherit

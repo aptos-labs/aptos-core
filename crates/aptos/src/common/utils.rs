@@ -24,7 +24,7 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
     str::FromStr,
-    time::{Duration, Instant},
+    time::{Duration, Instant, SystemTime},
 };
 
 /// Prompts for confirmation until a yes or no is given explicitly
@@ -370,6 +370,29 @@ pub async fn fund_account(
             response.status()
         )))
     }
+}
+
+/// Wait for transactions, returning an error if any of them fail.
+pub async fn wait_for_transactions(
+    client: &aptos_rest_client::Client,
+    hashes: Vec<HashValue>,
+) -> CliTypedResult<()> {
+    let sys_time = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map_err(|e| CliError::UnexpectedError(e.to_string()))?
+        .as_secs()
+        + 30;
+    for hash in hashes {
+        client
+            .wait_for_transaction_by_hash(
+                hash.into(),
+                sys_time,
+                Some(Duration::from_secs(60)),
+                None,
+            )
+            .await?;
+    }
+    Ok(())
 }
 
 pub fn start_logger() {

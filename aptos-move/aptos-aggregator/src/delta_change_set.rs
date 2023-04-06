@@ -68,7 +68,7 @@ impl DeltaOp {
         addition(base, self.max_positive, self.limit)?;
         subtraction(base, self.min_negative)?;
 
-        // If delta has been sucessfully validated, apply the update.
+        // If delta has been successfully validated, apply the update.
         match self.update {
             DeltaUpdate::Plus(value) => addition(base, value, self.limit),
             DeltaUpdate::Minus(value) => subtraction(base, value),
@@ -78,10 +78,10 @@ impl DeltaOp {
     /// Shifts by a `delta` the maximum positive value seen by `self`.
     fn shifted_max_positive_by(&self, delta: &DeltaOp) -> PartialVMResult<u128> {
         match delta.update {
-            // Suppose that maximim value seen is +M and we shift by +V. Then the
+            // Suppose that maximum value seen is +M and we shift by +V. Then the
             // new maximum value is M+V provided addition do no overflow.
             DeltaUpdate::Plus(value) => addition(value, self.max_positive, self.limit),
-            // Suppose that maximim value seen is +M and we shift by -V this time.
+            // Suppose that maximum value seen is +M and we shift by -V this time.
             // If M >= V, the result is +(M-V). Otherwise, `self` should have never
             // reached any positive value. By convention, we use 0 for the latter
             // case. Also, we can reuse `subtraction` which throws an error when M < V,
@@ -349,15 +349,11 @@ impl ::std::iter::IntoIterator for DeltaChangeSet {
 }
 
 #[cfg(test)]
-mod tests {
+mod test {
     use super::*;
-    use aptos_state_view::TStateView;
-    use aptos_types::state_store::{
-        state_storage_usage::StateStorageUsage, state_value::StateValue,
-    };
+    use aptos_language_e2e_tests::data_store::FakeDataStore;
     use claims::{assert_err, assert_matches, assert_ok, assert_ok_eq};
     use once_cell::sync::Lazy;
-    use std::collections::HashMap;
 
     fn delta_add_with_history(v: u128, limit: u128, max: u128, min: u128) -> DeltaOp {
         let mut delta = delta_add(v, limit);
@@ -534,36 +530,11 @@ mod tests {
         assert_eq!(d.update, Plus(1));
     }
 
-    #[derive(Default)]
-    pub struct FakeView {
-        data: HashMap<StateKey, Vec<u8>>,
-    }
-
-    impl TStateView for FakeView {
-        type Key = StateKey;
-
-        fn get_state_value(&self, state_key: &StateKey) -> anyhow::Result<Option<StateValue>> {
-            Ok(self
-                .data
-                .get(state_key)
-                .cloned()
-                .map(StateValue::new_legacy))
-        }
-
-        fn is_genesis(&self) -> bool {
-            self.data.is_empty()
-        }
-
-        fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
-            Ok(StateStorageUsage::new_untracked())
-        }
-    }
-
     static KEY: Lazy<StateKey> = Lazy::new(|| StateKey::raw(String::from("test-key").into_bytes()));
 
     #[test]
     fn test_failed_delta_application() {
-        let state_view = FakeView::default();
+        let state_view = FakeDataStore::default();
         let delta_op = delta_add(10, 1000);
         assert_matches!(
             delta_op.try_into_write_op(&state_view, &KEY),
@@ -573,8 +544,8 @@ mod tests {
 
     #[test]
     fn test_successful_delta_application() {
-        let mut state_view = FakeView::default();
-        state_view.data.insert(KEY.clone(), serialize(&100));
+        let mut state_view = FakeDataStore::default();
+        state_view.set(KEY.clone(), serialize(&100));
 
         // Both addition and subtraction should succeed!
         let add_op = delta_add(100, 200);
@@ -589,8 +560,8 @@ mod tests {
 
     #[test]
     fn test_unsuccessful_delta_application() {
-        let mut state_view = FakeView::default();
-        state_view.data.insert(KEY.clone(), serialize(&100));
+        let mut state_view = FakeDataStore::default();
+        state_view.set(KEY.clone(), serialize(&100));
 
         // Both addition and subtraction should fail!
         let add_op = delta_add(15, 100);

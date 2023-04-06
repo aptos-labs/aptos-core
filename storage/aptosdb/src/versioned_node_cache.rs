@@ -8,6 +8,7 @@ use aptos_types::transaction::Version;
 use rayon::prelude::*;
 use std::{
     collections::{HashMap, VecDeque},
+    fmt,
     sync::Arc,
 };
 
@@ -15,6 +16,17 @@ type NodeCache = HashMap<NodeKey, Node>;
 
 pub(crate) struct VersionedNodeCache {
     inner: RwLock<VecDeque<(Version, Arc<NodeCache>)>>,
+}
+
+impl fmt::Debug for VersionedNodeCache {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let entries = self.inner.read();
+        writeln!(f, "Total versions: {}.", entries.len())?;
+        for entry in entries.iter() {
+            writeln!(f, "Version {} has {} elements.", entry.0, entry.1.len())?;
+        }
+        Ok(())
+    }
 }
 
 impl VersionedNodeCache {

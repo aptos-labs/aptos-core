@@ -283,10 +283,13 @@
       "steppedLine": false,
       "targets": [
         {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
           "expr": "kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*-($container)-e.*\"} / kubelet_volume_stats_capacity_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*-($container)-e.*\"}",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{pod}}-{{persistentvolumeclaim}}",
+          "range": true,
           "refId": "A"
         }
       ],
@@ -346,12 +349,11 @@
       "steppedLine": false,
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "P968F4F8972F6D74D" },
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*$container.*\"}",
-          "format": "time_series",
-          "intervalFactor": 1,
-          "legendFormat": "{{pod}}-{{persistentvolumeclaim}}",
+          "expr": "kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*-($container)-e.*\"}",
+          "hide": false,
+          "legendFormat": "{{cluster}} {{kubernetes_pod_name}}",
           "range": true,
           "refId": "A"
         }
@@ -570,7 +572,11 @@
       {
         "allFormat": "",
         "allValue": "",
-        "current": { "text": ["VictoriaMetrics Mainnet US"], "value": "VictoriaMetrics Mainnet US" },
+        "current": {
+          "selected": true,
+          "text": "VictoriaMetrics Global (Non-mainnet)",
+          "value": "VictoriaMetrics Global (Non-mainnet)"
+        },
         "hide": 0,
         "includeAll": false,
         "label": "",
@@ -581,7 +587,7 @@
         "query": "prometheus",
         "queryValue": "",
         "refresh": 1,
-        "regex": "",
+        "regex": ".*Prometheus.*|.*Victoria.*|.*Telemetry.*",
         "skipUrlSync": false,
         "sort": 0,
         "type": "datasource"
@@ -590,7 +596,7 @@
         "allFormat": "",
         "allValue": ".*",
         "current": { "text": ["telemetry-service"], "value": "telemetry-service" },
-        "datasource": { "type": "prometheus", "uid": "Zu4MxH4Vk" },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
         "definition": "",
         "hide": 0,
         "includeAll": true,
@@ -636,7 +642,7 @@
         "allFormat": "",
         "allValue": ".*",
         "current": { "text": ["All"], "value": "$__all" },
-        "datasource": { "type": "prometheus", "uid": "Zu4MxH4Vk" },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
         "definition": "",
         "hide": 0,
         "includeAll": true,
@@ -760,8 +766,8 @@
     "time_options": ["5m", "15m", "1h", "6h", "12h", "24h", "2d", "7d", "30d"]
   },
   "timezone": "",
-  "title": "System",
+  "title": "system",
   "uid": "system",
-  "version": 8,
+  "version": 1,
   "weekStart": ""
 }

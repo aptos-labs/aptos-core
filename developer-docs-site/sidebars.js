@@ -174,6 +174,7 @@ const sidebars = {
     "guides/move-guides/index",
     "guides/move-guides/move-on-aptos",
     "guides/move-guides/move-structure",
+    "guides/move-guides/move-scripts",
     "guides/move-guides/bytecode-dependencies",
     "concepts/base-gas",
     "guides/interacting-with-the-blockchain",
