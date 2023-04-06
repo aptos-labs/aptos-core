@@ -85,13 +85,12 @@ Some Linux distributions are not supported. Currently, OpenSUSE and Amazon Linux
 - [Move Prover Examples by Zellic](https://github.com/zellic/move-prover-examples)
 - [`basic-coin` example](https://github.com/move-language/move/tree/main/language/documentation/examples/experimental/basic-coin)
 - [`math-puzzle` example](https://github.com/move-language/move/tree/main/language/documentation/examples/experimental/math-puzzle)
-- [rounding-error` example](https://github.com/move-language/move/tree/main/language/documentation/examples/experimental/rounding-error)
+- [`rounding-error` example](https://github.com/move-language/move/tree/main/language/documentation/examples/experimental/rounding-error)
 - [`verify-sort` example](https://github.com/move-language/move/tree/main/language/documentation/examples/experimental/verify-sort)
 
 ### Tutorials
 - [The Move Tutorial, chapter 7](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/move-tutorial#step-7--use-the-move-prover)
 - [The Move Prover: A Practical Guide by OtterSec](https://osec.io/blog/tutorials/2022-09-16-move-prover/)
-- [Verify Smart Contracts in Aptos with the Move Prover by MoveBit](https://blog.movebit.xyz/post/move-prover-tutorial-part-1.html)
 - [Formal Verification, the Move Language, and the Move Prover by Certik](https://www.certik.com/resources/blog/2wSOZ3mC55AB6CYol6Q2rP-formal-verification-the-move-language-and-the-move-prover)
 - [The Move Prover: Quality Assurance of Formal Verification by Certik](https://www.certik.com/resources/blog/1NygvVeqIwhbUk1U1q3vJF-the-move-prover-quality-assurance-of-formal-verification)
 
