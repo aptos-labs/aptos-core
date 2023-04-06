@@ -20,7 +20,7 @@ use crossbeam::channel;
 use dashmap::DashMap;
 use diesel::{result::Error, PgConnection};
 use econia_db::models::{self, events::MakerEventType, market::MarketEventType, IntoInsertable};
-use econia_types::order::{Order, OrderState, Side};
+use econia_types::order::{Fill, Order, OrderState, Side};
 use field_count::FieldCount;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
@@ -36,6 +36,7 @@ struct RedisConfig {
     url: String,
     book_prefix: String,
     order_prefix: String,
+    fill_prefix: String,
     markets: String,
 }
 
@@ -258,8 +259,6 @@ struct EconiaRedisCacher {
     event_rx: channel::Receiver<EventWrapper>,
 }
 
-// TODO use redis pub/sub, send maker and taker events to user channels
-// and then send overall book price level messages separately too
 impl EconiaRedisCacher {
     fn new(
         config: RedisConfig,
@@ -390,12 +389,34 @@ impl EconiaRedisCacher {
     fn send_order_update(
         conn: &mut redis::Connection,
         order_prefix: &str,
-        mkt_id: u64,
         order: &Order,
     ) -> anyhow::Result<()> {
-        let channel_name = format!("{}:{}", order_prefix, mkt_id);
+        let channel_name = format!("{}:{}", order_prefix, order.market_id);
         let message = serde_json::to_string(order)?;
-        let message = serde_json::to_string(&message)?;
+        let mut cmd = redis::cmd("PUBLISH");
+        cmd.arg(&channel_name).arg(&message);
+        cmd.query::<usize>(conn)?;
+        Ok(())
+    }
+
+    fn send_fill(
+        conn: &mut redis::Connection,
+        fill_prefix: &str,
+        taker_event: &TakerEvent,
+        order: &Order,
+    ) -> anyhow::Result<()> {
+        let fill = Fill {
+            market_id: taker_event.market_id,
+            maker_order_id: taker_event.market_order_id,
+            maker: taker_event.maker.to_hex_literal(),
+            maker_side: order.side,
+            custodian_id: order.custodian_id,
+            size: taker_event.size,
+            price: taker_event.price,
+            time: *CURRENT_BLOCK_TIME.read().unwrap(),
+        };
+        let channel_name = format!("{}:{}", fill_prefix, taker_event.market_id);
+        let message = serde_json::to_string(&fill)?;
         let mut cmd = redis::cmd("PUBLISH");
         cmd.arg(&channel_name).arg(&message);
         cmd.query::<usize>(conn)?;
@@ -447,7 +468,7 @@ impl EconiaRedisCacher {
                     order.side,
                     order.price,
                 )?;
-                Self::send_order_update(conn, &self.config.order_prefix, e.market_id, &order)?;
+                Self::send_order_update(conn, &self.config.order_prefix, &order)?;
             },
             MakerEventType::Change => {
                 let pop_and_reinsert = {
@@ -492,7 +513,7 @@ impl EconiaRedisCacher {
                 }
 
                 let order = Self::get_order(book, e.market_order_id);
-                Self::send_order_update(conn, &self.config.order_prefix, e.market_id, order)?;
+                Self::send_order_update(conn, &self.config.order_prefix, order)?;
             },
             MakerEventType::Evict => {
                 let mut order = Self::remove_order(book, e.market_order_id);
@@ -505,7 +526,7 @@ impl EconiaRedisCacher {
                     order.side,
                     order.price,
                 )?;
-                Self::send_order_update(conn, &self.config.order_prefix, e.market_id, &order)?;
+                Self::send_order_update(conn, &self.config.order_prefix, &order)?;
             },
             MakerEventType::Place => {
                 let side = e.side.into();
@@ -530,7 +551,7 @@ impl EconiaRedisCacher {
                     side,
                     e.price,
                 )?;
-                Self::send_order_update(conn, &self.config.order_prefix, e.market_id, &o)?;
+                Self::send_order_update(conn, &self.config.order_prefix, &o)?;
             },
         };
         Ok(())
@@ -547,12 +568,13 @@ impl EconiaRedisCacher {
 
         let remove_order = {
             let order = Self::get_order_mut(book, e.market_order_id);
+            Self::send_fill(conn, &self.config.fill_prefix, &e, order)?;
             order.size = order.size.checked_sub(e.size).unwrap_or_default();
             let remove_order = order.size == 0;
             if remove_order {
                 order.order_state = OrderState::Filled;
             }
-            Self::send_order_update(conn, &self.config.order_prefix, e.market_id, order)?;
+            Self::send_order_update(conn, &self.config.order_prefix, order)?;
             remove_order
         };
 
@@ -1000,6 +1022,7 @@ mod tests {
             url: "redis://localhost:6379".to_string(),
             book_prefix: "book".to_string(),
             order_prefix: "order".to_string(),
+            fill_prefix: "fill".to_string(),
             markets: "markets".to_string(),
         };
         let books = vec![BigDecimal::from(10)];
