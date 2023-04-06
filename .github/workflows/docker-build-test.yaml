@@ -115,6 +115,8 @@ jobs:
     needs: [permission-check, determine-docker-build-metadata]
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
     if: |
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch' ||
       contains(github.event.pull_request.labels.*.name, 'CICD:build-indexer-images')
     secrets: inherit
     with:
@@ -128,6 +130,8 @@ jobs:
     needs: [permission-check, determine-docker-build-metadata]
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
     if: |
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch' ||
       contains(github.event.pull_request.labels.*.name, 'CICD:build-failpoints-images')
     secrets: inherit
     with:
@@ -141,6 +145,8 @@ jobs:
     needs: [permission-check, determine-docker-build-metadata]
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
     if: |
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch' ||
       contains(github.event.pull_request.labels.*.name, 'CICD:build-performance-images')
     secrets: inherit
     with:
