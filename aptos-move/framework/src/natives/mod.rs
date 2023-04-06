@@ -264,7 +264,7 @@ impl GasParameters {
 
 pub fn all_natives(
     framework_addr: AccountAddress,
-    sha256_gas_params: move_stdlib::natives::hash::Sha2_256GasParameters,
+    sha256_gas_params: aptos_move_stdlib::natives::hash::Sha2_256GasParameters,
     gas_params: GasParameters,
     timed_features: TimedFeatures,
     features: Arc<Features>,

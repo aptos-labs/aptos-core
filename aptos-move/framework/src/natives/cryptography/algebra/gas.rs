@@ -72,5 +72,5 @@ pub struct GasParameters {
 
 pub struct HashToGasParameters {
     pub algebra: GasParameters,
-    pub sha2: move_stdlib::natives::hash::Sha2_256GasParameters,
+    pub sha2: aptos_move_stdlib::natives::hash::Sha2_256GasParameters,
 }
