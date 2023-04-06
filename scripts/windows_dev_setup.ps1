@@ -1,49 +1,73 @@
 # This script installs the necessary dependencies to build in Aptos.
 
+param (
+    [switch]$t,
+    [switch]$y
+)
+
 $ErrorActionPreference = 'Stop'
 
 Set-Location (Split-Path -Parent $MyInvocation.MyCommand.Path) | Out-Null; Set-Location '..' -ErrorAction Stop
 
+$global:user_selection = $null
 $global:os = $null
 $global:architecture = $null
 $global:msvcpath = $null
 $global:grcov_version = "0.8.2"
 $global:protoc_version = "21.4"
+$global:cvc5_version = "0.0.8"
+$global:dotnet_version = "6.0.407"
+$global:z3_version = "4.11.2"
+$global:boogie_version = "2.16.3"
+
 
 function welcome_message {
-    $welcome_message = "`nWelcome to Aptos!
+    $message = "`nWelcome to Aptos!
+    `nThis script will download and install the necessary dependencies for Aptos Core based on your selection:
+      * Install Aptos build tools: t
+      * Install Move Prover tools: y`n
+      Selection"
+    
+    return $message
+}
 
-    This script will download and install the necessary dependencies needed to build Aptos Core.
+function build_tools_message {
+    $message = "`nYou selected option 't'.
+    `nThe following dependencies needed to build Aptos Core will be downloaded and installed if not found on your system:
+    * Rust (and necessary components)
+      * rust-fmt
+      * clippy
+      * cargo-sort
+      * cargo-nextest
+    * MSVC Build Tools - Desktop development with C++ (and necessary components)
+      * MSVC C++ build tools
+      * Windows 10/11 SDK
+    * Protoc (and necessary components)
+      * protoc-gen-prost
+      * protoc-gen-prost-serde
+      * protoc-gen-prost-crate
+    * Python (and necessary components)
+      * pip
+      * schemathesis
+    * LLVM
+    * CMake
+    * OpenSSL
+    * NodeJS
+    * NPM
+    * PostgreSQL
+    * Grcov"
 
-    These tools will be installed if not found on your system:
-        
-        * Rust (and necessary components)
-            * rust-fmt
-            * clippy
-            * cargo-sort
-            * cargo-nextest
-        * MSVC Build Tools - Desktop development with C++ (and necessary components)
-            * MSVC C++ build tools
-            * Windows 10/11 SDK
-        * Protoc (and necessary components)
-            * protoc-gen-prost
-            * protoc-gen-prost-serde
-            * protoc-gen-prost-crate
-        * Python (and necessary components)
-            * pip
-	    * schemathesis
-	* LLVM
-        * CMake
-        * OpenSSL
-        * NodeJS
-        * NPM
-        * PostgreSQL
-        * Grcov"
+    return $message
+}
 
-
-    Write-Host $welcome_message
-    Write-Host "`nPress any key to begin installation..."
-    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+function move_prover_message {
+    $message = "`nYou selected option 'y'.
+    `nThe following dependencies needed to use the Move Prover will be downloaded and installed if not found on your system:
+    * Dotnet
+    * Z3
+    * Boogie
+    * CVC5"
+    return $message
 }
 
 function verify_architecture {  # Checks whether the Windows machine is 32-bit or 64-bit
@@ -81,11 +105,11 @@ function check_os {
 
 function install_winget {
     # Download and extract XAML dependency
-    Invoke-WebRequest -Uri "https://www.nuget.org/api/v2/package/Microsoft.UI.Xaml/2.8.2" -OutFile "Microsoft.UI.Xaml.2.8.2.nupkg.zip" -ErrorAction SilentlyContinue
-    while ((Get-Item "Microsoft.UI.Xaml.2.8.2.nupkg.zip").Length -lt 19MB) {
+    Invoke-WebRequest -Uri "https://www.nuget.org/api/v2/package/Microsoft.UI.Xaml/2.7.1" -OutFile "Microsoft.UI.Xaml.2.7.1.nupkg.zip" -ErrorAction SilentlyContinue
+    while ((Get-Item "Microsoft.UI.Xaml.2.7.1.nupkg.zip").Length -lt 18MB) {
         Start-Sleep -Seconds 1
     }
-    Expand-Archive "Microsoft.UI.Xaml.2.8.2.nupkg.zip" -ErrorAction SilentlyContinue
+    Expand-Archive "Microsoft.UI.Xaml.2.7.1.nupkg.zip" -ErrorAction SilentlyContinue
 
     if ($global:architecture -eq "64") {
         # Install x64 dependencies (VCLibs and XAML)
@@ -94,7 +118,7 @@ function install_winget {
             Start-Sleep -Seconds 1
         }
         Add-AppxPackage "Microsoft.VCLibs.x64.14.00.Desktop.appx" -ErrorAction SilentlyContinue
-        Add-AppxPackage "Microsoft.UI.Xaml.2.8.2.nupkg\tools\AppX\x64\Release\Microsoft.UI.Xaml.2.8.appx" -ErrorAction SilentlyContinue
+        Add-AppxPackage "Microsoft.UI.Xaml.2.7.1.nupkg\tools\AppX\x64\Release\Microsoft.UI.Xaml.2.7.appx" -ErrorAction SilentlyContinue
     }
     elseif ($global:architecture -eq "86") {
         # Install x86 dependencies (VCLibs and XAML)
@@ -103,7 +127,7 @@ function install_winget {
             Start-Sleep -Seconds 1
         }
         Add-AppxPackage "Microsoft.VCLibs.x86.14.00.Desktop.appx" -ErrorAction SilentlyContinue
-        Add-AppxPackage "Microsoft.UI.Xaml.2.8.2.nupkg\tools\AppX\x86\Release\Microsoft.UI.Xaml.2.8.appx" -ErrorAction SilentlyContinue
+        Add-AppxPackage "Microsoft.UI.Xaml.2.7.1.nupkg\tools\AppX\x86\Release\Microsoft.UI.Xaml.2.7.appx" -ErrorAction SilentlyContinue
     }
 
     # Install WinGet
@@ -118,8 +142,8 @@ function install_winget {
     Add-AppxProvisionedPackage -Online -PackagePath "msftwinget.msixbundle" -LicensePath "license.xml" -ErrorAction SilentlyContinue
 
     # Add WinGet directory to the user's PATH environment variable
-    [Environment]::SetEnvironmentVariable("PATH", "$env:PATH;%LOCALAPPDATA%\Microsoft\WindowsApps", "User")
-    
+    [Environment]::SetEnvironmentVariable("PATH", "$env:PATH;$env:%LOCALAPPDATA%\Microsoft\WindowsApps", "User")
+
     Write-Host "Please restart your system to ensure WinGet is setup correctly. Afterward, re-run the script."
 }
 
@@ -213,9 +237,9 @@ function get_msvc_version {  # Finds the MSVC version number and creates a valid
 }
 
 function set_msvc_env_variables {  # Sets the environment variables based on the architecture and MSVC version
-    $msvcversion = get_msvc_version
-	[Environment]::SetEnvironmentVariable("PATH", "$env:PATH;$global:msvcpath\VC\Tools\MSVC\$msvcversion\bin\Hostx$global:architecture\x$global:architecture\link.exe", "User")
-	[Environment]::SetEnvironmentVariable("PATH", "$env:PATH;$global:msvcpath\VC\Tools\MSVC\$msvcversion\bin\Hostx$global:architecture\x$global:architecture\cl.exe", "User")
+  $msvcversion = get_msvc_version
+  $filepath = "$global:msvcpath\VC\Tools\MSVC\$msvcversion\bin\Hostx$global:architecture\x$global:architecture"
+	[Environment]::SetEnvironmentVariable("PATH", "$env:PATH;$filepath\link.exe;$filepath\cl.exe", "User")
 	Write-Host "Environment variables set"
 }
 
@@ -336,17 +360,133 @@ function existing_package {
 	Write-Host "This package is already installed."
 }
 
-welcome_message
-verify_architecture
-check_os
-install_msvc_build_tools
-install_llvm
-install_openssl
-install_nodejs
-install_pnpm
-install_postgresql
-install_python
-install_protoc
-install_rustup
-install_cargo_plugins
+function install_git {
+  if (Get-Command git -ErrorAction SilentlyContinue) {
+    Write-Host "Installing Git..."
+    winget install Git.Git --silent
+  } 
+  else {
+    winget upgrade --id Git.Git
+  }
+}
+
+function install_cvc5 {
+  if (![System.IO.Path]::IsPathRooted($env:CVC5_EXE)) {
+    Write-Host "Installing CVC5..."
+    # Download and extract the 64-bit version of Protoc
+    $cvc5_exe = "$env:USERPROFILE\cvc5-$global:cvc5_version\cvc5-Win64.exe"
+    Write-Host $path
+    Invoke-WebRequest -Uri "https://github.com/cvc5/cvc5/releases/download/cvc5-$global:cvc5_version/cvc5-Win64.exe" -OutFile (New-Item -Path "$cvc5_exe" -Force) -ErrorAction SilentlyContinue
+    [Environment]::SetEnvironmentVariable("CVC5_EXE", "$cvc5_exe", "User") 
+    Write-Host "User environment variables set for CVC5"
+  }
+  elseif ($global:architecture -eq "86") {
+    Write-Host "Only 64-bit systems can install CVC5"
+  }
+  else {
+    Write-Host "CVC5 is already installed."
+  }
+}
+
+function install_dotnet {
+  if (![System.IO.Path]::IsPathRooted($env:DOTNET_ROOT)) {
+    Write-Host "Installing Microsoft DotNet..."
+    winget install "Microsoft.DotNet.SDK.6" --accept-source-agreements --silent
+    [Environment]::SetEnvironmentVariable("DOTNET_ROOT", "$env:PROGRAMFILES\dotnet", "User")
+    [Environment]::SetEnvironmentVariable("PATH", "$env:PATH;$env:PROGRAMFILES\dotnet\sdk\$global:dotnet_version\DotnetTools", "User")
+    Write-Host "User environment variables set for DotNet"
+  } 
+  else {
+    Write-Host "Microsoft DotNet is already installed."
+  }
+}
+
+function install_z3 {
+  if (![System.IO.Path]::IsPathRooted($env:Z3_EXE)) {
+    Write-Host "Installing Z3..."
+    $uri = "z3-$global:z3_version"
+    $z3_zip = "z3-$global:z3_version-x$global:architecture-win.zip"
+    $z3_filepath = "$env:USERPROFILE\$z3_zip"
+    # Download and extract the 64-bit version of Protoc
+    Invoke-WebRequest -Uri "https://github.com/Z3Prover/z3/releases/download/$uri/$z3_zip" -OutFile (New-Item -Path "$z3_filepath" -Force) -ErrorAction SilentlyContinue
+    if ($global:architecture -eq "64") {
+      while ((Get-Item "$z3_filepath").Length -lt 52MB) {
+        Start-Sleep -Seconds 1
+      }
+    }
+    else {
+      while ((Get-Item "$z3_filepath").Length -lt 40MB) {
+        Start-Sleep -Seconds 1
+      }
+    }
+    Expand-Archive "$z3_filepath" -ErrorAction SilentlyContinue
+    $z3_exe = "$env:USERPROFILE\z3-$global:z3_version-x$global:architecture-win\z3-$global:z3_version-x$global:architecture-win\bin\z3.exe"
+    [Environment]::SetEnvironmentVariable("Z3_EXE", "$z3_exe", "User")    
+    Write-Host "User environment variable set for Z3"
+    }
+  else {
+    Write-Host "Z3 is already installed."
+  }
+}
+
+function install_boogie {
+    if (![System.IO.Path]::IsPathRooted($env:BOOGIE_EXE)) {
+      Write-Host "Installing boogie..."
+      dotnet tool install --global Boogie --version $global:boogie_version
+      $boogie_exe = "$env:USERPROFILE\.dotnet\tools\boogie.exe"
+      [Environment]::SetEnvironmentVariable("BOOGIE_EXE", $boogie_exe, "User")
+      Write-Host "User environment variables set for Boogie"
+    } 
+    else {
+      Write-Host "Boogie is already installed."
+    }
+}
+
+function install_build_tools {
+  Write-Host (build_tools_message)
+  verify_architecture
+  check_os
+  install_msvc_build_tools
+  install_llvm
+  install_openssl
+  install_nodejs
+  install_pnpm
+  install_postgresql
+  install_python
+  install_protoc
+  install_rustup
+  install_cargo_plugins
+  Write-Host "Installation complete. Open a new PowerShell session to update the environment variables."
+}
+
+function install_move_prover {
+  Write-Host (move_prover_message)
+  verify_architecture
+  check_os
+  install_cvc5
+  install_dotnet
+  install_z3
+  install_boogie
+  install_git
+  Write-Host "Installation complete. Open a new PowerShell session to update the environment variables."
+}
+
+if ($t -or $y) {
+    if ($t) {
+      $global:user_selection = 't'
+      install_build_tools
+    }
+    if ($y) {
+      $global:user_selection = 'y'
+      install_move_prover
+    }
+} else {
+    $selection = Read-Host -Prompt (welcome_message)
+    $global:user_selection = $selection
+    switch ($selection) {
+        't' { install_build_tools }
+        'y' { install_move_prover }
+        default { Write-Host "Invalid option selected. Please enter 't' or 'y'." }
+    }
+}
 Write-Host "Finished..."
