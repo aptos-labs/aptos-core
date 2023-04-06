@@ -13,7 +13,7 @@ use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
-use aptos_vm_view::types::StateViewWithRemoteCache;
+use aptos_vm_types::{remote_cache::StateViewWithRemoteCache, transaction_output::VMTransactionOutput, change_set::{ChangeSet, AptosChangeSet}};
 use move_core_types::{
     ident_str,
     language_storage::{ModuleId, CORE_CODE_ADDRESS},
@@ -69,16 +69,27 @@ impl<'a, S: 'a + StateViewWithRemoteCache + Sync> ExecutorTask for AptosExecutor
             .vm
             .execute_single_transaction(txn, &view.as_move_resolver(), &log_context)
         {
-            Ok((vm_status, mut output_ext, sender)) => {
+            Ok((vm_status, mut vm_output, sender)) => {
                 if materialize_deltas {
                     // Keep TransactionOutputExt type for wrapper.
-                    output_ext = TransactionOutputExt::new(
-                        DeltaChangeSet::empty(),                  // Cleared deltas.
-                        output_ext.into_transaction_output(view), // Materialize.
+
+                    // TODO: Add API to materialize.
+                    let (mut writes, deltas, events, gas_used, status) = vm_output.unpack();
+                    let materialized_writes = AptosChangeSet::try_materialize_deltas(deltas, view).expect("should not fail");
+
+                    // This is safe because state keys will be different!
+                    AptosChangeSet::extend_with_writes(&mut writes, &mut ChangeSet::empty(), materialized_writes).expect("should not fail");
+                    
+                    vm_output = VMTransactionOutput::new(
+                        writes,
+                        ChangeSet::empty(),
+                        events,
+                        gas_used,
+                        status,
                     );
                 }
 
-                if output_ext.txn_output().status().is_discarded() {
+                if vm_output.status().is_discarded() {
                     match sender {
                         Some(s) => speculative_trace!(
                             &log_context,
@@ -95,14 +106,14 @@ impl<'a, S: 'a + StateViewWithRemoteCache + Sync> ExecutorTask for AptosExecutor
                         },
                     };
                 }
-                if AptosVM::should_restart_execution(output_ext.txn_output()) {
+                if AptosVM::should_restart_execution(&vm_output) {
                     speculative_info!(
                         &log_context,
                         "Reconfiguration occurred: restart required".into()
                     );
-                    ExecutionStatus::SkipRest(AptosTransactionOutput::new(output_ext))
+                    ExecutionStatus::SkipRest(AptosTransactionOutput::new(vm_output))
                 } else {
-                    ExecutionStatus::Success(AptosTransactionOutput::new(output_ext))
+                    ExecutionStatus::Success(AptosTransactionOutput::new(vm_output))
                 }
             },
             Err(err) => ExecutionStatus::Abort(err),

@@ -57,7 +57,7 @@ enum ValueImpl {
 }
 
 /// Internal representation of immutable Move value.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum FrozenValueImpl {
     U8(u8),
     U16(u16),
@@ -73,7 +73,7 @@ enum FrozenValueImpl {
 /// Same as `Container` but immutable and only used for values that can be
 /// stored in global storage (i.e. no `Locals`). Can be shared between multiple
 /// threads.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum FrozenContainer {
     Vec(Arc<Vec<FrozenValueImpl>>),
     Struct(Arc<Vec<FrozenValueImpl>>),
@@ -88,7 +88,7 @@ enum FrozenContainer {
 }
 
 /// Immutable Move struct.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct FrozenStruct {
     fields: Vec<FrozenValueImpl>,
 }
@@ -174,7 +174,7 @@ enum ReferenceImpl {
 pub struct Value(ValueImpl);
 
 /// Same as `Value` but immutable and can be shared between threads.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct FrozenValue(FrozenValueImpl);
 
 /// An integer value in Move.

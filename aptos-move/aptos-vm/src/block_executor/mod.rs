@@ -13,7 +13,6 @@ use crate::{
     },
     AptosVM,
 };
-use aptos_aggregator::{delta_change_set::DeltaOp, transaction::TransactionOutputExt};
 use aptos_block_executor::{
     errors::Error,
     executor::{BlockExecutor, RAYON_EXEC_POOL},
@@ -25,29 +24,32 @@ use aptos_block_executor::{
 use aptos_types::{
     state_store::state_key::StateKey,
     transaction::{Transaction, TransactionOutput, TransactionStatus},
-    write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
 use move_core_types::vm_status::VMStatus;
 use rayon::prelude::*;
 use std::time::Instant;
-use aptos_vm_view::types::StateViewWithRemoteCache;
+use aptos_vm_types::change_set::{AptosChangeSet, ChangeSet};
+use aptos_vm_types::delta::DeltaOp;
+use aptos_vm_types::remote_cache::StateViewWithRemoteCache;
+use aptos_vm_types::transaction_output::VMTransactionOutput;
+use aptos_vm_types::write::{AptosWrite, Op};
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Key = StateKey;
-    type Value = WriteOp;
+    type Value = Op<AptosWrite>;
 }
 
 // Wrapper to avoid orphan rule
 #[derive(PartialEq, Debug)]
-pub(crate) struct AptosTransactionOutput(TransactionOutputExt);
+pub(crate) struct AptosTransactionOutput(VMTransactionOutput);
 
 impl AptosTransactionOutput {
-    pub fn new(output: TransactionOutputExt) -> Self {
+    pub fn new(output: VMTransactionOutput) -> Self {
         Self(output)
     }
 
-    pub fn into(self) -> TransactionOutputExt {
+    pub fn into(self) -> VMTransactionOutput {
         self.0
     }
 }
@@ -55,10 +57,10 @@ impl AptosTransactionOutput {
 impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     type Txn = PreprocessedTransaction;
 
-    fn get_writes(&self) -> Vec<(StateKey, WriteOp)> {
+    // TODO can we avoid clones here?
+    fn get_writes(&self) -> Vec<(StateKey, Op<AptosWrite>)> {
         self.0
-            .txn_output()
-            .write_set()
+            .writes()
             .iter()
             .map(|(key, op)| (key.clone(), op.clone()))
             .collect()
@@ -66,7 +68,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 
     fn get_deltas(&self) -> Vec<(StateKey, DeltaOp)> {
         self.0
-            .delta_change_set()
+            .deltas()
             .iter()
             .map(|(key, op)| (key.clone(), *op))
             .collect()
@@ -74,12 +76,13 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 
     /// Execution output for transactions that comes after SkipRest signal.
     fn skip_output() -> Self {
-        Self(TransactionOutputExt::from(TransactionOutput::new(
-            WriteSet::default(),
+        Self(VMTransactionOutput::new(
+            ChangeSet::empty(),
+            ChangeSet::empty(),
             vec![],
             0,
             TransactionStatus::Retry,
-        )))
+        ))
     }
 }
 
@@ -122,9 +125,18 @@ impl BlockAptosVM {
                     results
                         .into_par_iter()
                         .map(|(output, delta_writes)| {
-                            output      // AptosTransactionOutput
-                            .into()     // TransactionOutputExt
-                            .output_with_delta_writes(WriteSetMut::new(delta_writes))
+                            let (mut writes, deltas, events, gas_used, status) = output.into().unpack();
+
+                            // We should have a delta write for every delta in the output.
+                            assert_eq!(deltas.len(), delta_writes.len());
+
+                            AptosChangeSet::extend_with_writes(&mut writes, &mut ChangeSet::empty(), ChangeSet::new(delta_writes)).expect("should not fail");
+                            TransactionOutput::new(
+                                AptosChangeSet::into_write_set(writes).expect("should not fail"),
+                                events,
+                                gas_used,
+                                status,
+                            )
                         })
                         .collect()
                 })

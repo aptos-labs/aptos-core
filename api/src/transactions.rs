@@ -45,6 +45,8 @@ use poem_openapi::{
     ApiRequest, OpenApi,
 };
 use std::sync::Arc;
+use aptos_types::transaction::TransactionOutput;
+use aptos_vm_types::change_set::{AptosChangeSet, ChangeSet};
 
 generate_success_response!(SubmitTransactionResponse, (202, Accepted));
 
@@ -1173,14 +1175,26 @@ impl TransactionsApi {
 
         // Simulate transaction
         let move_resolver = self.context.move_resolver_poem(&ledger_info)?;
-        let (_, output_ext) = AptosVM::simulate_signed_transaction(&txn, &move_resolver);
+        let (_, vm_output) = AptosVM::simulate_signed_transaction(&txn, &move_resolver);
         let version = ledger_info.version();
 
         // Apply transaction outputs to build up a transaction
         // TODO: while `into_transaction_output_with_status()` should never fail
         // to apply deltas, we should propagate errors properly. Fix this when
         // VM error handling is fixed.
-        let output = output_ext.into_transaction_output(&move_resolver);
+
+        // TODO: Make this nicer!
+        let (mut writes, deltas, events, gas_used, status) = vm_output.unpack();
+        let materialized_writes = AptosChangeSet::try_materialize_deltas(deltas, &move_resolver).expect("should not fail");
+        AptosChangeSet::extend_with_writes(&mut writes, &mut ChangeSet::empty(), materialized_writes).expect("should not fail");
+        let write_set = AptosChangeSet::into_write_set(writes).expect("should not fail");
+
+        let output = TransactionOutput::new(
+            write_set,
+            events,
+            gas_used,
+            status,
+        );
 
         // Ensure that all known statuses return their values in the output (even if they aren't supposed to)
         let exe_status = match output.status().clone() {

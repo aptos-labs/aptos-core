@@ -2,11 +2,11 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{executable::ModulePath, resource::TransactionWrite};
 use std::{fmt::Debug, hash::Hash};
-use aptos_vm_view::types::TStateViewWithRemoteCache;
+use aptos_vm_types::remote_cache::TStateViewWithRemoteCache;
+use aptos_vm_types::delta::DeltaOp;
 
 /// The execution result of a transaction
 #[derive(Debug)]

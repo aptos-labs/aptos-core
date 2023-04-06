@@ -17,6 +17,7 @@ pub trait TransactionWrite {
     fn as_aptos_resource(&self) -> Option<AptosResource>;
 }
 
+// TODO: Remove this file!
 pub enum AptosResource {
     Aggregator(u128),
     Standard(Resource),

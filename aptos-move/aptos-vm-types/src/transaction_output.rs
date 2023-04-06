@@ -1,14 +1,16 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::contract_event::ContractEvent;
-use crate::transaction::TransactionStatus;
-use crate::vm_types::change_set::ChangeSet;
-use crate::vm_types::delta::DeltaOp;
-use crate::vm_types::write::{AptosWrite, Op};
+
+use aptos_types::contract_event::ContractEvent;
+use aptos_types::transaction::{TransactionOutput, TransactionStatus};
+use crate::change_set::{AptosChangeSet, ChangeSet};
+use crate::delta::DeltaOp;
+use crate::remote_cache::StateViewWithRemoteCache;
+use crate::write::{AptosWrite, Op};
 
 /// Output of a transaction at VM level.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VMTransactionOutput {
     /// The list of writes this transaction intends to do.
     writes: ChangeSet<Op<AptosWrite>>,
@@ -45,6 +47,10 @@ impl VMTransactionOutput {
 
     pub fn into(self) -> (ChangeSet<Op<AptosWrite>>, ChangeSet<DeltaOp>, Vec<ContractEvent>) {
         (self.writes, self.deltas, self.events)
+    }
+
+    pub fn unpack(self) -> (ChangeSet<Op<AptosWrite>>, ChangeSet<DeltaOp>, Vec<ContractEvent>, u64, TransactionStatus) {
+        (self.writes, self.deltas, self.events, self.gas_used, self.status)
     }
 
     pub fn writes(&self) -> &ChangeSet<Op<AptosWrite>> {

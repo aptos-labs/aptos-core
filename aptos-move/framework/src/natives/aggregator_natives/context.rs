@@ -3,7 +3,6 @@
 
 use aptos_aggregator::{
     aggregator_extension::{AggregatorData, AggregatorID, AggregatorState},
-    delta_change_set::{DeltaOp, DeltaUpdate},
 };
 use aptos_types::vm_status::VMStatus;
 use better_any::{Tid, TidAble};
@@ -13,6 +12,7 @@ use std::{
     cell::RefCell,
     collections::{btree_map, BTreeMap},
 };
+use aptos_vm_types::delta::{DeltaOp, DeltaUpdate};
 
 /// Represents a single aggregator change.
 #[derive(Copy, Clone, Debug)]

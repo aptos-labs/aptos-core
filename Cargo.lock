@@ -272,6 +272,7 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-types",
  "aptos-vm",
+ "aptos-vm-types",
  "async-trait",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "bytes",
@@ -462,7 +463,7 @@ dependencies = [
  "aptos-state-view",
  "aptos-types",
  "aptos-vm-logging",
- "aptos-vm-view",
+ "aptos-vm-types",
  "arc-swap",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "claims",
@@ -921,6 +922,7 @@ dependencies = [
  "aptos-validator-interface",
  "aptos-vm",
  "aptos-vm-logging",
+ "aptos-vm-types",
  "clap 3.2.23",
  "move-binary-format",
  "move-cli",
@@ -1261,6 +1263,7 @@ dependencies = [
  "aptos-state-view",
  "aptos-types",
  "aptos-vm",
+ "aptos-vm-types",
  "ark-bls12-381",
  "ark-ec",
  "ark-ff",
@@ -1762,7 +1765,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
- "aptos-vm-view",
+ "aptos-vm-types",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "goldenfile",
  "hex",
@@ -1923,6 +1926,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-infallible",
  "aptos-types",
+ "aptos-vm-types",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "crossbeam",
  "dashmap",
@@ -2729,6 +2733,7 @@ dependencies = [
  "aptos-state-view",
  "aptos-types",
  "aptos-vm",
+ "aptos-vm-types",
  "assert_unordered",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "crossbeam-channel",
@@ -3104,6 +3109,7 @@ dependencies = [
  "aptos-state-view",
  "aptos-storage-interface",
  "aptos-types",
+ "aptos-vm-types",
  "async-trait",
  "itertools",
  "lru 0.7.8",
@@ -3146,7 +3152,7 @@ dependencies = [
  "aptos-state-view",
  "aptos-types",
  "aptos-vm-logging",
- "aptos-vm-view",
+ "aptos-vm-types",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "dashmap",
  "fail 0.5.0",
@@ -3184,7 +3190,7 @@ dependencies = [
  "aptos-state-view",
  "aptos-types",
  "aptos-vm",
- "aptos-vm-view",
+ "aptos-vm-types",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "move-core-types",
  "move-vm-types",
@@ -3236,6 +3242,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-vm-types"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-state-view",
+ "aptos-types",
+ "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
+ "move-binary-format",
+ "move-core-types",
+ "move-vm-types",
+ "once_cell",
+]
+
+[[package]]
 name = "aptos-vm-validator"
 version = "0.1.0"
 dependencies = [
@@ -3255,16 +3275,6 @@ dependencies = [
  "fail 0.5.0",
  "move-core-types",
  "rand 0.7.3",
-]
-
-[[package]]
-name = "aptos-vm-view"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-state-view",
- "aptos-types",
- "move-vm-types",
 ]
 
 [[package]]
@@ -3295,6 +3305,7 @@ dependencies = [
  "aptos-state-view",
  "aptos-types",
  "aptos-vm",
+ "aptos-vm-types",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "handlebars",
  "move-command-line-common",

@@ -20,6 +20,7 @@ aptos-gas-algebra-ext =  { workspace = true }
 aptos-sdk-builder = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
+aptos-vm-types = { workspace = true }
 ark-bls12-381 = { workspace = true }
 ark-ec = { workspace = true }
 ark-ff = { workspace = true }

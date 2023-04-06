@@ -31,6 +31,7 @@ use aptos_vm::{
     data_cache::AsMoveResolver,
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
 };
+use aptos_vm_types::change_set::AptosChangeSet;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
@@ -158,24 +159,29 @@ pub fn encode_aptos_mainnet_genesis_transaction(
             &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
         )
         .unwrap();
-    let change_set_ext = cs1.squash(cs2).unwrap();
+    let change_set = cs1.squash(cs2).unwrap();
 
-    let (delta_change_set, change_set) = change_set_ext.into_inner();
+    let (writes, deltas, events) = change_set.into_inner();
 
     // Publishing stdlib should not produce any deltas around aggregators and map to write ops and
     // not deltas. The second session only publishes the framework module bundle, which should not
     // produce deltas either.
     assert!(
-        delta_change_set.is_empty(),
+        deltas.is_empty(),
         "non-empty delta change set in genesis"
     );
 
-    assert!(!change_set
+    // TODO: fix this
+    // Construct legacy change set.
+    let write_set = AptosChangeSet::into_write_set(writes).expect("should not fail");
+    let legacy_change_set = ChangeSet::new_no_check(write_set, events);
+
+    assert!(!legacy_change_set
         .write_set()
         .iter()
         .any(|(_, op)| op.is_deletion()));
-    verify_genesis_write_set(change_set.events());
-    Transaction::GenesisTransaction(WriteSetPayload::Direct(change_set))
+    verify_genesis_write_set(legacy_change_set.events());
+    Transaction::GenesisTransaction(WriteSetPayload::Direct(legacy_change_set))
 }
 
 pub fn encode_genesis_transaction(
@@ -274,24 +280,28 @@ pub fn encode_genesis_change_set(
         )
         .unwrap();
 
-    let change_set_ext = cs1.squash(cs2).unwrap();
-
-    let (delta_change_set, change_set) = change_set_ext.into_inner();
+    let change_set = cs1.squash(cs2).unwrap();
+    let (writes, deltas, events) = change_set.into_inner();
 
     // Publishing stdlib should not produce any deltas around aggregators and map to write ops and
     // not deltas. The second session only publishes the framework module bundle, which should not
     // produce deltas either.
     assert!(
-        delta_change_set.is_empty(),
+        deltas.is_empty(),
         "non-empty delta change set in genesis"
     );
 
-    assert!(!change_set
+    // TODO: fix this
+    // Construct legcay change set.
+    let write_set = AptosChangeSet::into_write_set(writes).expect("should not fail");
+    let legacy_change_set = ChangeSet::new_no_check(write_set, events);
+
+    assert!(!legacy_change_set
         .write_set()
         .iter()
         .any(|(_, op)| op.is_deletion()));
-    verify_genesis_write_set(change_set.events());
-    change_set
+    verify_genesis_write_set(legacy_change_set.events());
+    legacy_change_set
 }
 
 fn validate_genesis_config(genesis_config: &GenesisConfiguration) {

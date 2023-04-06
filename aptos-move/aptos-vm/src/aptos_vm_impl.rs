@@ -10,7 +10,6 @@ use crate::{
     system_module_names::{MULTISIG_ACCOUNT_MODULE, VALIDATE_MULTISIG_TRANSACTION},
     transaction_metadata::TransactionMetadata,
 };
-use aptos_aggregator::transaction::TransactionOutputExt;
 use aptos_framework::RuntimeModuleMetadataV1;
 use aptos_gas::{
     AbstractValueSizeGasParameters, AptosGasParameters, ChangeSetConfigs, FromOnChainGasSchedule,
@@ -39,7 +38,8 @@ use move_core_types::{
 use move_vm_runtime::logging::expect_no_verification_errors;
 use move_vm_types::gas::UnmeteredGasMeter;
 use std::sync::Arc;
-use aptos_vm_view::types::StateViewWithRemoteCache;
+use aptos_vm_types::remote_cache::StateViewWithRemoteCache;
+use aptos_vm_types::transaction_output::VMTransactionOutput;
 
 pub const MAXIMUM_APPROVED_TRANSACTION_SIZE: u64 = 1024 * 1024;
 
@@ -666,26 +666,24 @@ pub(crate) fn get_transaction_output<A: AccessPathCache, S: MoveResolverExt>(
     txn_data: &TransactionMetadata,
     status: ExecutionStatus,
     change_set_configs: &ChangeSetConfigs,
-) -> Result<TransactionOutputExt, VMStatus> {
+) -> Result<VMTransactionOutput, VMStatus> {
     let gas_used = txn_data
         .max_gas_amount()
         .checked_sub(gas_left)
         .expect("Balance should always be less than or equal to max gas amount");
 
-    let change_set_ext = session
+    let change_set = session
         .finish(ap_cache, change_set_configs)
         .map_err(|e| e.into_vm_status())?;
-    let (delta_change_set, change_set) = change_set_ext.into_inner();
-    let (write_set, events) = change_set.into_inner();
+    let (writes, deltas, events) = change_set.into_inner();
 
-    let txn_output = TransactionOutput::new(
-        write_set,
+    Ok(VMTransactionOutput::new(
+        writes,
+        deltas,
         events,
         gas_used.into(),
         TransactionStatus::Keep(status),
-    );
-
-    Ok(TransactionOutputExt::new(delta_change_set, txn_output))
+    ))
 }
 
 #[test]

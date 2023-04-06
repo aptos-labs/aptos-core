@@ -8,19 +8,21 @@ use aptos_types::{
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
-    write_set::WriteSet,
 };
 use aptos_types::resource::AptosResource;
-use aptos_vm_view::types::{TRemoteCache, TStateViewWithRemoteCache};
+use aptos_vm_types::change_set::ChangeSet;
+use aptos_vm_types::remote_cache::{TRemoteCache, TStateViewWithRemoteCache};
+use aptos_vm_types::write::{AptosWrite, Op};
 
 pub struct DeltaStateView<'a, 'b, S> {
     base: &'a S,
-    write_set: &'b WriteSet,
+    writes: &'b ChangeSet<Op<AptosWrite>>,
+    // TODO: add deltas here!
 }
 
 impl<'a, 'b, S> DeltaStateView<'a, 'b, S> {
-    pub fn new(base: &'a S, write_set: &'b WriteSet) -> Self {
-        Self { base, write_set }
+    pub fn new(base: &'a S, writes: &'b ChangeSet<Op<AptosWrite>>) -> Self {
+        Self { base, writes }
     }
 }
 
@@ -42,8 +44,8 @@ where
     }
 
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
-        match self.write_set.get(state_key) {
-            Some(write_op) => Ok(write_op.as_state_value()),
+        match self.writes.get(state_key) {
+            Some(write) => Ok(write.clone().into_write_op()?.as_state_value()),
             None => self.base.get_state_value(state_key),
         }
     }
@@ -69,7 +71,7 @@ impl<'a, 'b, S> TRemoteCache for DeltaStateView<'a, 'b, S>
     }
 
     fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosResource>> {
-        match self.write_set.get(state_key) {
+        match self.writes.get(state_key) {
             Some(write_op) => Ok(write_op.as_aptos_resource()),
             None => self.base.get_cached_resource(state_key),
         }

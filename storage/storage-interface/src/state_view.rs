@@ -12,6 +12,8 @@ use aptos_types::{
     transaction::Version,
 };
 use std::sync::Arc;
+use aptos_types::resource::AptosResource;
+use aptos_vm_types::remote_cache::{TRemoteCache, TStateViewWithRemoteCache};
 
 pub struct DbStateView {
     pub db: Arc<dyn DbReader>,
@@ -42,6 +44,22 @@ impl TStateView for DbStateView {
     fn get_usage(&self) -> Result<StateStorageUsage> {
         self.db.get_state_storage_usage(self.version)
     }
+}
+
+impl TRemoteCache for DbStateView {
+    type Key = StateKey;
+
+    fn get_cached_module(&self, state_key: &Self::Key) -> Result<Option<Vec<u8>>> {
+        todo!()
+    }
+
+    fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosResource>> {
+        todo!()
+    }
+}
+
+impl TStateViewWithRemoteCache for DbStateView {
+    type CommonKey = StateKey;
 }
 
 pub trait LatestDbStateCheckpointView {

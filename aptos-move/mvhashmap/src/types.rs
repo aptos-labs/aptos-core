@@ -1,10 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_crypto::hash::HashValue;
 use aptos_types::executable::ExecutableDescriptor;
 use std::sync::Arc;
+use aptos_vm_types::delta::DeltaOp;
 
 pub type TxnIndex = u32;
 pub type Incarnation = u32;

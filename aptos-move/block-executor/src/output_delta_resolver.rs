@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{executor::RAYON_EXEC_POOL, task::Transaction};
-use aptos_aggregator::delta_change_set::{deserialize, serialize};
+use aptos_aggregator::delta_change_set::{deserialize};
 use aptos_mvhashmap::versioned_data::VersionedData;
-use aptos_types::write_set::WriteOp;
-use aptos_vm_view::types::TStateViewWithRemoteCache;
+use aptos_vm_types::{remote_cache::TStateViewWithRemoteCache, write::{AptosWrite, Op}};
 
 pub(crate) struct OutputDeltaResolver<T: Transaction> {
     versioned_outputs: VersionedData<T::Key, T::Value>,
@@ -23,8 +22,8 @@ impl<T: Transaction> OutputDeltaResolver<T> {
         self,
         base_view: &impl TStateViewWithRemoteCache<CommonKey = T::Key>,
         block_size: usize,
-    ) -> Vec<Vec<(T::Key, WriteOp)>> {
-        let mut ret: Vec<Vec<(T::Key, WriteOp)>> = vec![vec![]; block_size];
+    ) -> Vec<Vec<(T::Key, Op<AptosWrite>)>> {
+        let mut ret: Vec<Vec<(T::Key, Op<AptosWrite>)>> = vec![vec![]; block_size];
 
         // TODO: with more deltas, re-use executor threads and process in parallel.
         for key in self.versioned_outputs.take_aggregator_keys() {
@@ -35,7 +34,7 @@ impl<T: Transaction> OutputDeltaResolver<T> {
                     .ok() // Was anything found in storage
                     .and_then(|value| value.map(|bytes| deserialize(&bytes))),
             ) {
-                ret[idx as usize].push((key.clone(), WriteOp::Modification(serialize(&value))));
+                ret[idx as usize].push((key.clone(), Op::Modification(AptosWrite::AggregatorValue(value))));
             }
         }
 

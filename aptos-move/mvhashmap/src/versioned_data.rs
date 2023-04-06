@@ -3,7 +3,7 @@
 
 use crate::types::{Incarnation, MVDataError, MVDataOutput, TxnIndex, Version};
 use aptos_aggregator::{
-    delta_change_set::{deserialize, DeltaOp},
+    delta_change_set::{deserialize},
     transaction::AggregatorValue,
 };
 use aptos_infallible::Mutex;
@@ -18,6 +18,7 @@ use std::{
         Arc,
     },
 };
+use aptos_vm_types::delta::DeltaOp;
 
 const FLAG_DONE: usize = 0;
 const FLAG_ESTIMATE: usize = 1;
@@ -135,7 +136,7 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite> VersionedData<K, V> {
             .filter_map(|(idx, entry)| {
                 match &entry.cell {
                     EntryCell::Write(_, data) => {
-                        latest_value = data.extract_raw_bytes().map(|bytes| deserialize(&bytes));
+                        latest_value = data.extract_raw_bytes().map(|bytes| bcs::from_bytes(&bytes).expect("should not fail"));
                         None
                     },
                     EntryCell::Delta(delta) => {

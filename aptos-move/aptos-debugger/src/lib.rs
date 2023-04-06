@@ -31,6 +31,7 @@ use aptos_vm::{
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use move_binary_format::errors::VMResult;
 use std::{path::Path, sync::Arc};
+use aptos_vm_types::{change_set::AptosChangeSet, transaction_output::VMTransactionOutput};
 
 pub struct AptosDebugger {
     debugger: Arc<dyn AptosValidatorInterface + Send>,
@@ -65,7 +66,7 @@ impl AptosDebugger {
         &self,
         version: Version,
         txn: SignedTransaction,
-    ) -> Result<(VMStatus, TransactionOutput, TransactionGasLog)> {
+    ) -> Result<(VMStatus, VMTransactionOutput, TransactionGasLog)> {
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
         let txn = txn
@@ -236,14 +237,17 @@ impl AptosDebugger {
         .unwrap();
         let mut session = move_vm.new_session(&state_view_storage, SessionId::Void);
         f(&mut session).map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
-        let change_set_ext = session
+        let change_set = session
             .finish(
                 &mut (),
                 &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
             )
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
-        let (_delta_change_set, change_set) = change_set_ext.into_inner();
-        Ok(change_set)
+        let (writes, _deltas, events) = change_set.into_inner();
+        
+        let write_set = AptosChangeSet::into_write_set(writes).expect("should not fail");
+        let legacy_change_set = ChangeSet::new_no_check(write_set, events);
+        Ok(legacy_change_set)
     }
 }
 

@@ -128,7 +128,7 @@ use aptos_types::{
     vm_status::VMStatus,
 };
 use std::marker::Sync;
-use aptos_vm_view::types::StateViewWithRemoteCache;
+use aptos_vm_types::remote_cache::StateViewWithRemoteCache;
 pub use verifier::view_function::determine_is_view;
 
 /// This trait describes the VM's validation interfaces.

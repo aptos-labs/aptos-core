@@ -6,8 +6,6 @@ use std::ops::Deref;
 use aptos_state_view::TStateView;
 use aptos_types::resource::AptosResource;
 
-// TODO: Move to types?
-
 /// Snapshot of memory available to the VM. Note that this trait explicitly hides
 /// all interaction with the global memory. Implementors of this trait can redirect
 /// calls to the `StateView` to obtain blobs or add custom logic.

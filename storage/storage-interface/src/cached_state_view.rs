@@ -12,8 +12,9 @@ use aptos_types::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
     transaction::Version,
-    write_set::WriteSet,
+    write_set::WriteSet, resource::AptosResource,
 };
+use aptos_vm_types::remote_cache::{TRemoteCache, TStateViewWithRemoteCache};
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
@@ -219,6 +220,22 @@ impl TStateView for CachedStateView {
     }
 }
 
+impl TRemoteCache for CachedStateView {
+    type Key = StateKey;
+
+    fn get_cached_module(&self, state_key: &Self::Key) -> Result<Option<Vec<u8>>> {
+        todo!()
+    }
+
+    fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosResource>> {
+        todo!()
+    }
+}
+
+impl TStateViewWithRemoteCache for CachedStateView {
+    type CommonKey = StateKey;
+}
+
 pub struct CachedDbStateView {
     db_state_view: DbStateView,
     state_cache: RwLock<HashMap<StateKey, Option<StateValue>>>,
@@ -262,4 +279,21 @@ impl TStateView for CachedDbStateView {
     fn get_usage(&self) -> Result<StateStorageUsage> {
         self.db_state_view.get_usage()
     }
+}
+
+
+impl TRemoteCache for CachedDbStateView {
+    type Key = StateKey;
+
+    fn get_cached_module(&self, state_key: &Self::Key) -> Result<Option<Vec<u8>>> {
+        todo!()
+    }
+
+    fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosResource>> {
+        todo!()
+    }
+}
+
+impl TStateViewWithRemoteCache for CachedDbStateView {
+    type CommonKey = StateKey;
 }

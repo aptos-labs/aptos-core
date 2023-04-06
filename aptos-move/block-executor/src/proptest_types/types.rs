@@ -7,7 +7,7 @@ use crate::{
     task::{ExecutionStatus, ExecutorTask, Transaction as TransactionType, TransactionOutput},
 };
 use aptos_aggregator::{
-    delta_change_set::{delta_add, delta_sub, deserialize, serialize, DeltaOp},
+    delta_change_set::{deserialize, serialize},
     transaction::AggregatorValue,
 };
 use aptos_mvhashmap::types::TxnIndex;
@@ -34,6 +34,7 @@ use std::{
         Arc,
     },
 };
+use aptos_vm_types::delta::{DeltaOp, delta_add, delta_sub};
 
 // Should not be possible to overflow or underflow, as each delta is at
 // most 100 in the tests.
@@ -159,6 +160,10 @@ impl<V: Into<Vec<u8>> + Debug + Clone + Eq + Send + Sync + Arbitrary> Transactio
 
     fn as_state_value(&self) -> Option<StateValue> {
         self.extract_raw_bytes().map(StateValue::new_legacy)
+    }
+
+    fn as_aptos_resource(&self) -> Option<aptos_types::resource::AptosResource> {
+        todo!()
     }
 }
 

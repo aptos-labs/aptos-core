@@ -44,11 +44,6 @@ pub mod validator_signer;
 pub mod validator_verifier;
 pub mod vesting;
 pub mod vm_status;
-
-// TODO: This has to be moved to VM crate (and so has to aggregator/deltas?)
-// Keep it for no for easier development.
-pub mod vm_types;
-
 pub mod waypoint;
 pub mod write_set;
 

@@ -12,7 +12,7 @@ use move_core_types::{
 use move_table_extension::TableResolver;
 use move_vm_types::resolver::MoveResolverV2;
 use std::collections::BTreeMap;
-use aptos_vm_view::types::StateViewWithRemoteCache;
+use aptos_vm_types::remote_cache::StateViewWithRemoteCache;
 
 pub trait MoveResolverExt:
     MoveResolverV2<Err = VMError>

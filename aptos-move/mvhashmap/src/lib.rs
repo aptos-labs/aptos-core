@@ -7,12 +7,12 @@ use crate::{
     versioned_code::VersionedCode,
     versioned_data::VersionedData,
 };
-use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_types::{
     executable::{Executable, ExecutableDescriptor, ModulePath},
     resource::TransactionWrite,
 };
 use std::hash::Hash;
+use aptos_vm_types::delta::DeltaOp;
 
 pub mod types;
 pub mod versioned_code;

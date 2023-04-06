@@ -13,7 +13,7 @@ use move_core_types::{
 use std::{fmt::Debug, sync::Arc};
 
 /// Represents any resource stored in persistent storage or cache.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Resource {
     // Resource is stored as a blob.
     Serialized(Arc<Vec<u8>>),

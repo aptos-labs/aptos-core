@@ -37,6 +37,13 @@ impl ChangeSet {
         Ok(myself)
     }
 
+    pub fn new_no_check(
+        write_set: WriteSet,
+        events: Vec<ContractEvent>,
+    ) -> Self {
+        Self { write_set, events }
+    }
+
     pub fn into_inner(self) -> (WriteSet, Vec<ContractEvent>) {
         (self.write_set, self.events)
     }

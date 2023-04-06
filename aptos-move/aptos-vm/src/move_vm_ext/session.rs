@@ -7,8 +7,6 @@ use crate::{
 };
 use aptos_aggregator::{
     aggregator_extension::AggregatorID,
-    delta_change_set::{serialize, DeltaChangeSet},
-    transaction::ChangeSetExt,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -21,26 +19,29 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     contract_event::ContractEvent,
     state_store::{state_key::StateKey, table::TableHandle},
-    transaction::{ChangeSet, SignatureCheckedTransaction},
-    write_set::{WriteOp, WriteSetMut},
+    transaction::SignatureCheckedTransaction,
 };
 use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
     effects::{
-        AccountChangeSet, ChangeSet as MoveChangeSet, Event as MoveEvent, Op as MoveStorageOp,
+        Event as MoveEvent, Op as MoveStorageOp,
     },
     language_storage::{ModuleId, StructTag},
     vm_status::{StatusCode, VMStatus},
 };
 use move_table_extension::{NativeTableContext, TableChangeSet};
 use move_vm_runtime::{move_vm::MoveVM, session::Session};
+use move_vm_types::effects::{AccountChangeSetV2 as AccountChangeSet, ChangeSetV2 as MoveChangeSet};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
     ops::{Deref, DerefMut},
     sync::Arc,
 };
+use aptos_vm_types::change_set::{AptosChangeSet, ChangeSet};
+use aptos_vm_types::write::{AptosWrite, Op};
+use move_vm_types::resolver::Resource;
 
 #[derive(BCSCryptoHash, CryptoHasher, Deserialize, Serialize)]
 pub enum SessionId {
@@ -113,10 +114,12 @@ where
         self,
         ap_cache: &mut C,
         configs: &ChangeSetConfigs,
-    ) -> VMResult<ChangeSetExt> {
-        let (change_set, events, mut extensions) = self.inner.finish_with_extensions()?;
-        let (change_set, resource_group_change_set) =
-            Self::split_and_merge_resource_groups(&self.remote, change_set)?;
+    ) -> VMResult<AptosChangeSet> {
+        let (change_set, events, mut extensions) = self.inner.pause_with_extensions()?;
+
+        // TODO: Fix resource groups :(
+        let (change_set, resource_group_change_set) = (change_set, MoveChangeSet::new());
+        //    Self::split_and_merge_resource_groups(&self.remote, change_set)?;
 
         let table_context: NativeTableContext = extensions.remove();
         let table_change_set = table_context
@@ -161,99 +164,99 @@ where
     ///   * If group or data does't exist, Unreachable
     ///   * If elements remain, Modify
     ///   * Otherwise delete
-    fn split_and_merge_resource_groups(
-        remote: &MoveResolverWithVMMetadata<S>,
-        change_set: MoveChangeSet,
-    ) -> VMResult<(MoveChangeSet, MoveChangeSet)> {
-        // The use of this implies that we could theoretically call unwrap with no consequences,
-        // but using unwrap means the code panics if someone can come up with an attack.
-        let common_error = PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-            .finish(Location::Undefined);
-        let mut change_set_filtered = MoveChangeSet::new();
-        let mut resource_group_change_set = MoveChangeSet::new();
+    // fn split_and_merge_resource_groups(
+    //     remote: &MoveResolverWithVMMetadata<S>,
+    //     change_set: MoveChangeSet,
+    // ) -> VMResult<(MoveChangeSet, MoveChangeSet)> {
+    //     // The use of this implies that we could theoretically call unwrap with no consequences,
+    //     // but using unwrap means the code panics if someone can come up with an attack.
+    //     let common_error = PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+    //         .finish(Location::Undefined);
+    //     let mut change_set_filtered = MoveChangeSet::new();
+    //     let mut resource_group_change_set = MoveChangeSet::new();
+    //
+    //     for (addr, account_changeset) in change_set.into_inner() {
+    //         let mut resource_groups: BTreeMap<StructTag, AccountChangeSet> = BTreeMap::new();
+    //         let (modules, resources) = account_changeset.into_inner();
+    //
+    //         for (struct_tag, resource_op) in resources {
+    //             let resource_group_tag = remote
+    //                 .get_resource_group(&struct_tag)
+    //                 .map_err(|_| common_error.clone())?;
+    //             if let Some(resource_group_tag) = resource_group_tag {
+    //                 resource_groups
+    //                     .entry(resource_group_tag)
+    //                     .or_insert_with(AccountChangeSet::new)
+    //                     .add_resource_op(struct_tag, resource_op)
+    //                     .map_err(|_| common_error.clone())?;
+    //             } else {
+    //                 change_set_filtered
+    //                     .add_resource_op(addr, struct_tag, resource_op)
+    //                     .map_err(|_| common_error.clone())?;
+    //             }
+    //         }
+    //
+    //         for (name, blob_op) in modules {
+    //             change_set_filtered
+    //                 .add_module_op(ModuleId::new(addr, name), blob_op)
+    //                 .map_err(|_| common_error.clone())?;
+    //         }
+    //
+    //         for (resource_tag, resources) in resource_groups {
+    //             let source_data = remote
+    //                 .get_resource_group_data(&addr, &resource_tag)
+    //                 .map_err(|_| common_error.clone())?;
+    //             let (mut source_data, create) = if let Some(source_data) = source_data {
+    //                 let source_data =
+    //                     bcs::from_bytes(&source_data).map_err(|_| common_error.clone())?;
+    //                 (source_data, false)
+    //             } else {
+    //                 (BTreeMap::new(), true)
+    //             };
+    //
+    //             for (struct_tag, current_op) in resources.into_resources() {
+    //                 match current_op {
+    //                     MoveStorageOp::Delete => {
+    //                         source_data
+    //                             .remove(&struct_tag)
+    //                             .ok_or_else(|| common_error.clone())?;
+    //                     },
+    //                     MoveStorageOp::Modify(new_data) => {
+    //                         let data = source_data
+    //                             .get_mut(&struct_tag)
+    //                             .ok_or_else(|| common_error.clone())?;
+    //                         *data = new_data;
+    //                     },
+    //                     MoveStorageOp::New(data) => {
+    //                         let data = source_data.insert(struct_tag, data);
+    //                         if data.is_some() {
+    //                             return Err(common_error);
+    //                         }
+    //                     },
+    //                 }
+    //             }
+    //
+    //             let op = if source_data.is_empty() {
+    //                 MoveStorageOp::Delete
+    //             } else if create {
+    //                 MoveStorageOp::New(
+    //                     bcs::to_bytes(&source_data).map_err(|_| common_error.clone())?,
+    //                 )
+    //             } else {
+    //                 MoveStorageOp::Modify(
+    //                     bcs::to_bytes(&source_data).map_err(|_| common_error.clone())?,
+    //                 )
+    //             };
+    //             resource_group_change_set
+    //                 .add_resource_op(addr, resource_tag, op)
+    //                 .map_err(|_| common_error.clone())?;
+    //         }
+    //     }
+    //
+    //     Ok((change_set_filtered, resource_group_change_set))
+    // }
 
-        for (addr, account_changeset) in change_set.into_inner() {
-            let mut resource_groups: BTreeMap<StructTag, AccountChangeSet> = BTreeMap::new();
-            let (modules, resources) = account_changeset.into_inner();
-
-            for (struct_tag, blob_op) in resources {
-                let resource_group = remote
-                    .get_resource_group(&struct_tag)
-                    .map_err(|_| common_error.clone())?;
-                if let Some(resource_group) = resource_group {
-                    resource_groups
-                        .entry(resource_group)
-                        .or_insert_with(AccountChangeSet::new)
-                        .add_resource_op(struct_tag, blob_op)
-                        .map_err(|_| common_error.clone())?;
-                } else {
-                    change_set_filtered
-                        .add_resource_op(addr, struct_tag, blob_op)
-                        .map_err(|_| common_error.clone())?;
-                }
-            }
-
-            for (name, blob_op) in modules {
-                change_set_filtered
-                    .add_module_op(ModuleId::new(addr, name), blob_op)
-                    .map_err(|_| common_error.clone())?;
-            }
-
-            for (resource_tag, resources) in resource_groups {
-                let source_data = remote
-                    .get_resource_group_data(&addr, &resource_tag)
-                    .map_err(|_| common_error.clone())?;
-                let (mut source_data, create) = if let Some(source_data) = source_data {
-                    let source_data =
-                        bcs::from_bytes(&source_data).map_err(|_| common_error.clone())?;
-                    (source_data, false)
-                } else {
-                    (BTreeMap::new(), true)
-                };
-
-                for (struct_tag, current_op) in resources.into_resources() {
-                    match current_op {
-                        MoveStorageOp::Delete => {
-                            source_data
-                                .remove(&struct_tag)
-                                .ok_or_else(|| common_error.clone())?;
-                        },
-                        MoveStorageOp::Modify(new_data) => {
-                            let data = source_data
-                                .get_mut(&struct_tag)
-                                .ok_or_else(|| common_error.clone())?;
-                            *data = new_data;
-                        },
-                        MoveStorageOp::New(data) => {
-                            let data = source_data.insert(struct_tag, data);
-                            if data.is_some() {
-                                return Err(common_error);
-                            }
-                        },
-                    }
-                }
-
-                let op = if source_data.is_empty() {
-                    MoveStorageOp::Delete
-                } else if create {
-                    MoveStorageOp::New(
-                        bcs::to_bytes(&source_data).map_err(|_| common_error.clone())?,
-                    )
-                } else {
-                    MoveStorageOp::Modify(
-                        bcs::to_bytes(&source_data).map_err(|_| common_error.clone())?,
-                    )
-                };
-                resource_group_change_set
-                    .add_resource_op(addr, resource_tag, op)
-                    .map_err(|_| common_error.clone())?;
-            }
-        }
-
-        Ok((change_set_filtered, resource_group_change_set))
-    }
-
-    pub fn convert_change_set<C: AccessPathCache>(
+    fn convert_change_set<C: AccessPathCache>(
         change_set: MoveChangeSet,
         resource_group_change_set: MoveChangeSet,
         events: Vec<MoveEvent>,
@@ -261,44 +264,45 @@ where
         aggregator_change_set: AggregatorChangeSet,
         ap_cache: &mut C,
         configs: &ChangeSetConfigs,
-    ) -> Result<ChangeSetExt, VMStatus> {
-        let mut write_set_mut = WriteSetMut::new(Vec::new());
-        let mut delta_change_set = DeltaChangeSet::empty();
+    ) -> Result<AptosChangeSet, VMStatus> {
+        let mut writes = ChangeSet::empty();
+        let mut deltas = ChangeSet::empty();
 
-        for (addr, account_changeset) in change_set.into_inner() {
-            let (modules, resources) = account_changeset.into_inner();
-            for (struct_tag, blob_op) in resources {
+        for (addr, account_change_set) in change_set.into_inner() {
+            let (modules, resources) = account_change_set.into_inner();
+            for (struct_tag, resource_op) in resources {
                 let state_key = StateKey::access_path(ap_cache.get_resource_path(addr, struct_tag));
-                let op = Self::convert_write_op(
-                    blob_op,
+                let op = Self::convert_resource_op(
+                    resource_op,
                     configs.legacy_resource_creation_as_modification(),
                 );
-                write_set_mut.insert((state_key, op))
+                writes.insert((state_key, op))
             }
 
             for (name, blob_op) in modules {
                 let state_key =
                     StateKey::access_path(ap_cache.get_module_path(ModuleId::new(addr, name)));
-                let op = Self::convert_write_op(blob_op, false);
-                write_set_mut.insert((state_key, op))
+                let op = Self::convert_module_op(blob_op, false);
+                writes.insert((state_key, op))
             }
         }
 
-        for (addr, account_changeset) in resource_group_change_set.into_inner() {
-            let (_, resources) = account_changeset.into_inner();
-            for (struct_tag, blob_op) in resources {
+        for (addr, account_change_set) in resource_group_change_set.into_inner() {
+            let (_, resources) = account_change_set.into_inner();
+            for (struct_tag, resource_op) in resources {
                 let state_key =
                     StateKey::access_path(ap_cache.get_resource_group_path(addr, struct_tag));
-                let op = Self::convert_write_op(blob_op, false);
-                write_set_mut.insert((state_key, op))
+                let op = Self::convert_resource_op(resource_op, false);
+                writes.insert((state_key, op))
             }
         }
 
         for (handle, change) in table_change_set.changes {
-            for (key, value_op) in change.entries {
+            for (key, blob_op) in change.entries {
                 let state_key = StateKey::table_item(handle.into(), key);
-                let op = Self::convert_write_op(value_op, false);
-                write_set_mut.insert((state_key, op))
+                let value_op = blob_op.map(Resource::from_blob);
+                let op = Self::convert_resource_op(value_op, false);
+                writes.insert((state_key, op))
             }
         }
 
@@ -309,20 +313,13 @@ where
 
             match change {
                 AggregatorChange::Write(value) => {
-                    let write_op = WriteOp::Modification(serialize(&value));
-                    write_set_mut.insert((state_key, write_op));
+                    let write_op = Op::Modification(AptosWrite::AggregatorValue(value));
+                    writes.insert((state_key, write_op));
                 },
-                AggregatorChange::Merge(delta_op) => delta_change_set.insert((state_key, delta_op)),
-                AggregatorChange::Delete => {
-                    let write_op = WriteOp::Deletion;
-                    write_set_mut.insert((state_key, write_op));
-                },
+                AggregatorChange::Merge(delta_op) => deltas.insert((state_key, delta_op)),
+                AggregatorChange::Delete => writes.insert((state_key, Op::Deletion)),
             }
         }
-
-        let write_set = write_set_mut
-            .freeze()
-            .map_err(|_| VMStatus::Error(StatusCode::DATA_FORMAT_ERROR, None))?;
 
         let events = events
             .into_iter()
@@ -333,31 +330,49 @@ where
             })
             .collect::<Result<Vec<_>, VMStatus>>()?;
 
-        let change_set = ChangeSet::new(write_set, events, configs)?;
-        Ok(ChangeSetExt::new(
-            delta_change_set,
-            change_set,
-            Arc::new(configs.clone()),
-        ))
+        // TODO: should pass configs and have a checker there.
+        let change_set = AptosChangeSet::new(writes, deltas, events);
+        change_set.check(configs)?;
+        Ok(change_set)
     }
 
-    fn convert_write_op(
+    fn convert_resource_op(
+        move_storage_op: MoveStorageOp<Resource>,
+        creation_as_modification: bool,
+    ) -> Op<AptosWrite> {
+        use MoveStorageOp::*;
+        use Op::*;
+
+        match move_storage_op {
+            Delete => Deletion,
+            New(resource) => {
+                if creation_as_modification {
+                    Modification(AptosWrite::Standard(resource))
+                } else {
+                    Creation(AptosWrite::Standard(resource))
+                }
+            },
+            Modify(resource) => Modification(AptosWrite::Standard(resource)),
+        }
+    }
+
+    fn convert_module_op(
         move_storage_op: MoveStorageOp<Vec<u8>>,
         creation_as_modification: bool,
-    ) -> WriteOp {
+    ) -> Op<AptosWrite> {
         use MoveStorageOp::*;
-        use WriteOp::*;
+        use Op::*;
 
         match move_storage_op {
             Delete => Deletion,
             New(blob) => {
                 if creation_as_modification {
-                    Modification(blob)
+                    Modification(AptosWrite::Module(blob))
                 } else {
-                    Creation(blob)
+                    Creation(AptosWrite::Module(blob))
                 }
             },
-            Modify(blob) => Modification(blob),
+            Modify(blob) => Modification(AptosWrite::Module(blob)),
         }
     }
 }

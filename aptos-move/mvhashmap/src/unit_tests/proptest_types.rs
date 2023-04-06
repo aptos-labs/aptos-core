@@ -63,6 +63,10 @@ impl<V: Into<Vec<u8>> + Clone> TransactionWrite for Value<V> {
     fn as_state_value(&self) -> Option<StateValue> {
         unimplemented!()
     }
+
+    fn as_aptos_resource(&self) -> Option<aptos_types::resource::AptosResource> {
+        unimplemented!()
+    }
 }
 
 enum Data<V> {

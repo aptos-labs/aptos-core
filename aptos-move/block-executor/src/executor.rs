@@ -22,7 +22,6 @@ use aptos_mvhashmap::{
 };
 use aptos_types::{
     executable::ExecutableTestType, // TODO: fix up with the proper generics.
-    write_set::WriteOp,
 };
 use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
 use num_cpus;
@@ -32,7 +31,8 @@ use std::{
     marker::PhantomData,
     sync::atomic::{AtomicBool, Ordering},
 };
-use aptos_vm_view::types::TStateViewWithRemoteCache;
+use aptos_vm_types::remote_cache::TStateViewWithRemoteCache;
+use aptos_vm_types::write::{AptosWrite, Op};
 
 pub static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
@@ -267,7 +267,7 @@ where
         executor_initial_arguments: E::Argument,
         signature_verified_block: &Vec<T>,
         base_view: &S,
-    ) -> Result<Vec<(E::Output, Vec<(T::Key, WriteOp)>)>, E::Error> {
+    ) -> Result<Vec<(E::Output, Vec<(T::Key, Op<AptosWrite>)>)>, E::Error> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         assert!(self.concurrency_level > 1, "Must use sequential execution");
 
@@ -352,7 +352,7 @@ where
         executor_arguments: E::Argument,
         signature_verified_block: &[T],
         base_view: &S,
-    ) -> Result<Vec<(E::Output, Vec<(T::Key, WriteOp)>)>, E::Error> {
+    ) -> Result<Vec<(E::Output, Vec<(T::Key, Op<AptosWrite>)>)>, E::Error> {
         let num_txns = signature_verified_block.len();
         let executor = E::init(executor_arguments);
         let mut data_map = BTreeMap::new();
@@ -401,7 +401,7 @@ where
         executor_arguments: E::Argument,
         signature_verified_block: Vec<T>,
         base_view: &S,
-    ) -> Result<Vec<(E::Output, Vec<(T::Key, WriteOp)>)>, E::Error> {
+    ) -> Result<Vec<(E::Output, Vec<(T::Key, Op<AptosWrite>)>)>, E::Error> {
         let mut ret = if self.concurrency_level > 1 {
             self.execute_transactions_parallel(
                 executor_arguments,

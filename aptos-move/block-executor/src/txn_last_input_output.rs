@@ -5,7 +5,6 @@ use crate::{
     errors::Error,
     task::{ExecutionStatus, Transaction, TransactionOutput},
 };
-use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_mvhashmap::types::{Incarnation, TxnIndex, Version};
 use aptos_types::{access_path::AccessPath, executable::ModulePath};
 use arc_swap::ArcSwapOption;
@@ -18,6 +17,7 @@ use std::{
         Arc,
     },
 };
+use aptos_vm_types::delta::DeltaOp;
 
 type TxnInput<K> = Vec<ReadDescriptor<K>>;
 type TxnOutput<T, E> = ExecutionStatus<T, Error<E>>;

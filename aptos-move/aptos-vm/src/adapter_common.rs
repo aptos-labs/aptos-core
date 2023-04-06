@@ -4,7 +4,6 @@
 
 use crate::move_vm_ext::{MoveResolverExt, SessionExt, SessionId};
 use anyhow::Result;
-use aptos_aggregator::transaction::TransactionOutputExt;
 use aptos_types::{
     block_metadata::BlockMetadata,
     transaction::{
@@ -15,6 +14,8 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
+use aptos_vm_types::change_set::ChangeSet;
+use aptos_vm_types::transaction_output::VMTransactionOutput;
 
 /// This trait describes the VM adapter's interface.
 /// TODO: bring more of the execution logic in aptos_vm into this file.
@@ -45,7 +46,7 @@ pub trait VMAdapter {
     ) -> Result<(), VMStatus>;
 
     /// TODO: maybe remove this after more refactoring of execution logic.
-    fn should_restart_execution(output: &TransactionOutput) -> bool;
+    fn should_restart_execution(output: &VMTransactionOutput) -> bool;
 
     /// Execute a single transaction.
     fn execute_single_transaction<S: MoveResolverExt>(
@@ -53,7 +54,7 @@ pub trait VMAdapter {
         txn: &PreprocessedTransaction,
         data_cache: &S,
         log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, TransactionOutputExt, Option<String>), VMStatus>;
+    ) -> Result<(VMStatus, VMTransactionOutput, Option<String>), VMStatus>;
 
     fn validate_signature_checked_transaction<S: MoveResolverExt, SS: MoveResolverExt>(
         &self,
@@ -110,7 +111,7 @@ pub(crate) fn preprocess_transaction<A: VMAdapter>(txn: Transaction) -> Preproce
     }
 }
 
-pub(crate) fn discard_error_vm_status(err: VMStatus) -> (VMStatus, TransactionOutputExt) {
+pub(crate) fn discard_error_vm_status(err: VMStatus) -> (VMStatus, VMTransactionOutput) {
     let vm_status = err.clone();
     let error_code = match err.keep_or_discard() {
         Ok(_) => {
@@ -122,12 +123,13 @@ pub(crate) fn discard_error_vm_status(err: VMStatus) -> (VMStatus, TransactionOu
     (vm_status, discard_error_output(error_code))
 }
 
-pub(crate) fn discard_error_output(err: StatusCode) -> TransactionOutputExt {
+pub(crate) fn discard_error_output(err: StatusCode) -> VMTransactionOutput {
     // Since this transaction will be discarded, no writeset will be included.
-    TransactionOutputExt::from(TransactionOutput::new(
-        WriteSet::default(),
+    VMTransactionOutput::new(
+        ChangeSet::empty(),
+        ChangeSet::empty(),
         vec![],
         0,
         TransactionStatus::Discard(err),
-    ))
+    )
 }

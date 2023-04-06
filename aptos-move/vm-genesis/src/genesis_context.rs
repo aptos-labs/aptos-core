@@ -15,7 +15,7 @@ use aptos_types::{
 use move_core_types::language_storage::ModuleId;
 use std::collections::HashMap;
 use aptos_types::resource::AptosResource;
-use aptos_vm_view::types::{TRemoteCache, TStateViewWithRemoteCache};
+use aptos_vm_types::remote_cache::{TRemoteCache, TStateViewWithRemoteCache};
 
 // `StateView` has no data given we are creating the genesis
 pub(crate) struct GenesisStateView {

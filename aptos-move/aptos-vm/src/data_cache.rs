@@ -23,7 +23,7 @@ use move_table_extension::{TableHandle, TableResolver};
 use move_vm_runtime::move_vm::MoveVM;
 use move_vm_types::resolver::{Resource, ResourceResolverV2};
 use std::ops::{Deref, DerefMut};
-use aptos_vm_view::types::StateViewWithRemoteCache;
+use aptos_vm_types::remote_cache::StateViewWithRemoteCache;
 
 pub struct MoveResolverWithVMMetadata<'a, 'm, S> {
     move_resolver: &'a S,

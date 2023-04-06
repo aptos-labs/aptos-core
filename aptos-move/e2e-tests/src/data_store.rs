@@ -27,7 +27,7 @@ use move_table_extension::{TableHandle, TableResolver};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use aptos_vm_view::types::{TRemoteCache, TStateViewWithRemoteCache};
+use aptos_vm_types::remote_cache::{TRemoteCache, TStateViewWithRemoteCache};
 
 /// Dummy genesis ChangeSet for testing
 pub static GENESIS_CHANGE_SET_HEAD: Lazy<ChangeSet> =

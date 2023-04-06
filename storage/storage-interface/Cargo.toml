@@ -21,6 +21,7 @@ aptos-scratchpad = { workspace = true }
 aptos-secure-net = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
+aptos-vm-types = { workspace = true }
 aptos-vm = { workspace = true }
 bcs = { workspace = true }
 crossbeam-channel = { workspace = true }

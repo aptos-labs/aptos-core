@@ -5,7 +5,7 @@ use crate::{
     counters, scheduler::Scheduler, task::Transaction, txn_last_input_output::ReadDescriptor,
 };
 use anyhow::Result;
-use aptos_aggregator::delta_change_set::{deserialize, serialize, DeltaOp};
+use aptos_aggregator::delta_change_set::{deserialize, serialize};
 use aptos_logger::error;
 use aptos_mvhashmap::{
     types::{MVCodeError, MVCodeOutput, MVDataError, MVDataOutput, TxnIndex},
@@ -22,7 +22,8 @@ use move_binary_format::errors::Location;
 use std::{cell::RefCell, collections::BTreeMap, hash::Hash, sync::Arc};
 use claims::assert_none;
 use aptos_types::resource::{AptosResource, TransactionWrite};
-use aptos_vm_view::types::{TRemoteCache, TStateViewWithRemoteCache};
+use aptos_vm_types::delta::DeltaOp;
+use aptos_vm_types::remote_cache::{TRemoteCache, TStateViewWithRemoteCache};
 
 /// A struct that is always used by a single thread performing an execution task. The struct is
 /// passed to the VM and acts as a proxy to resolve reads first in the shared multi-version

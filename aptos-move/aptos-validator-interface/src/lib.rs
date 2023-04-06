@@ -17,12 +17,13 @@ use aptos_types::{
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
-    transaction::{Transaction, TransactionInfo, Version},
+    transaction::{Transaction, TransactionInfo, Version}, resource::AptosResource,
 };
 use lru::LruCache;
 use move_binary_format::file_format::CompiledModule;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
+use aptos_vm_types::remote_cache::{TRemoteCache, TStateViewWithRemoteCache};
 
 // TODO(skedia) Clean up this interfact to remove account specific logic and move to state store
 // key-value interface with fine grained storage project
@@ -199,4 +200,20 @@ impl TStateView for DebuggerStateView {
     fn get_usage(&self) -> Result<StateStorageUsage> {
         unimplemented!()
     }
+}
+
+impl TRemoteCache for DebuggerStateView {
+    type Key = StateKey;
+
+    fn get_cached_module(&self, state_key: &Self::Key) -> Result<Option<Vec<u8>>> {
+        todo!()
+    }
+
+    fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosResource>> {
+        todo!()
+    }
+}
+
+impl TStateViewWithRemoteCache for DebuggerStateView {
+    type CommonKey = StateKey;
 }

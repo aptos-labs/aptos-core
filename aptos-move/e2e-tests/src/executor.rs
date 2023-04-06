@@ -47,6 +47,7 @@ use aptos_vm::{
     AptosVM, VMExecutor, VMValidator,
 };
 use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
+use aptos_vm_types::change_set::AptosChangeSet;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
@@ -609,14 +610,15 @@ impl FakeExecutor {
                         e.into_vm_status()
                     )
                 });
-            let change_set_ext = session
+            let change_set = session
                 .finish(
                     &mut (),
                     &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
                 )
                 .expect("Failed to generate txn effects");
-            let (_delta_change_set, change_set) = change_set_ext.into_inner();
-            let (write_set, _events) = change_set.into_inner();
+            
+            let (writes, _deltas, _events) = change_set.into_inner();
+            let write_set = AptosChangeSet::into_write_set(writes).expect("should not fail");
             write_set
         };
         self.data_store.add_write_set(&write_set);
@@ -652,15 +654,15 @@ impl FakeExecutor {
             )
             .map_err(|e| e.into_vm_status())?;
 
-        let change_set_ext = session
+        let change_set = session
             .finish(
                 &mut (),
                 &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
             )
             .expect("Failed to generate txn effects");
         // TODO: Support deltas in fake executor.
-        let (_delta_change_set, change_set) = change_set_ext.into_inner();
-        let (writeset, _events) = change_set.into_inner();
-        Ok(writeset)
+        let (writes, _deltas, _events) = change_set.into_inner();
+        let write_set = AptosChangeSet::into_write_set(writes).expect("should not fail");
+        Ok(write_set)
     }
 }
