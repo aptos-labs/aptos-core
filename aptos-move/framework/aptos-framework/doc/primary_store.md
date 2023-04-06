@@ -7,7 +7,7 @@ This defines the module for interacting with primary stores of accounts/objects,
 
 
 -  [Resource `DeriveRefPod`](#0x1_primary_store_DeriveRefPod)
--  [Function `add_derived_ref_pod`](#0x1_primary_store_add_derived_ref_pod)
+-  [Function `create_primary_wallet_enabled_fungible_asset`](#0x1_primary_store_create_primary_wallet_enabled_fungible_asset)
 -  [Function `ensure_primary_store_exists`](#0x1_primary_store_ensure_primary_store_exists)
 -  [Function `create_primary_store`](#0x1_primary_store_create_primary_store)
 -  [Function `primary_store_address`](#0x1_primary_store_primary_store_address)
@@ -21,10 +21,10 @@ This defines the module for interacting with primary stores of accounts/objects,
 -  [Specification](#@Specification_0)
 
 
-<pre><code><b>use</b> <a href="create_signer.md#0x1_create_signer">0x1::create_signer</a>;
-<b>use</b> <a href="fungible_asset.md#0x1_fungible_asset">0x1::fungible_asset</a>;
+<pre><code><b>use</b> <a href="fungible_asset.md#0x1_fungible_asset">0x1::fungible_asset</a>;
 <b>use</b> <a href="object.md#0x1_object">0x1::object</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 </code></pre>
 
 
@@ -57,15 +57,15 @@ Resource stored on the fungible asset metadata object to allow creating primary 
 
 </details>
 
-<a name="0x1_primary_store_add_derived_ref_pod"></a>
+<a name="0x1_primary_store_create_primary_wallet_enabled_fungible_asset"></a>
 
-## Function `add_derived_ref_pod`
+## Function `create_primary_wallet_enabled_fungible_asset`
 
 Creators of fungible assets can call this to enable support for creating primary (deterministic) stores for
 their users.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="primary_store.md#0x1_primary_store_add_derived_ref_pod">add_derived_ref_pod</a>(constructor_ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="primary_store.md#0x1_primary_store_create_primary_wallet_enabled_fungible_asset">create_primary_wallet_enabled_fungible_asset</a>(constructor_ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>, maximum_supply: u64, name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, symbol: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, decimals: u8)
 </code></pre>
 
 
@@ -74,7 +74,14 @@ their users.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="primary_store.md#0x1_primary_store_add_derived_ref_pod">add_derived_ref_pod</a>(constructor_ref: &ConstructorRef) {
+<pre><code><b>public</b> <b>fun</b> <a href="primary_store.md#0x1_primary_store_create_primary_wallet_enabled_fungible_asset">create_primary_wallet_enabled_fungible_asset</a>(
+    constructor_ref: &ConstructorRef,
+    maximum_supply: u64,
+    name: String,
+    symbol: String,
+    decimals: u8,
+) {
+    <a href="fungible_asset.md#0x1_fungible_asset_add_fungibility">fungible_asset::add_fungibility</a>(constructor_ref, maximum_supply, name, symbol, decimals);
     <b>let</b> metadata_obj = &<a href="object.md#0x1_object_generate_signer">object::generate_signer</a>(constructor_ref);
     <b>move_to</b>(metadata_obj, <a href="primary_store.md#0x1_primary_store_DeriveRefPod">DeriveRefPod</a> {
         metadata_derive_ref: <a href="object.md#0x1_object_generate_derive_ref">object::generate_derive_ref</a>(constructor_ref),
@@ -106,9 +113,10 @@ their users.
     metadata: Object&lt;T&gt;,
 ): Object&lt;FungibleAssetStore&gt; <b>acquires</b> <a href="primary_store.md#0x1_primary_store_DeriveRefPod">DeriveRefPod</a> {
     <b>if</b> (!<a href="primary_store.md#0x1_primary_store_primary_store_exists">primary_store_exists</a>(owner, metadata)) {
-        <a href="primary_store.md#0x1_primary_store_create_primary_store">create_primary_store</a>(owner, metadata);
-    };
-    <a href="primary_store.md#0x1_primary_store">primary_store</a>(owner, metadata)
+        <a href="primary_store.md#0x1_primary_store_create_primary_store">create_primary_store</a>(owner, metadata)
+    } <b>else</b> {
+        <a href="primary_store.md#0x1_primary_store">primary_store</a>(owner, metadata)
+    }
 }
 </code></pre>
 
@@ -136,10 +144,9 @@ Create a primary store object to hold fungible asset for the given address.
     owner_addr: <b>address</b>,
     metadata: Object&lt;T&gt;,
 ): Object&lt;FungibleAssetStore&gt; <b>acquires</b> <a href="primary_store.md#0x1_primary_store_DeriveRefPod">DeriveRefPod</a> {
-    <b>let</b> owner = &<a href="create_signer.md#0x1_create_signer_create_signer">create_signer::create_signer</a>(owner_addr);
     <b>let</b> metadata_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(&metadata);
     <b>let</b> derive_ref = &<b>borrow_global</b>&lt;<a href="primary_store.md#0x1_primary_store_DeriveRefPod">DeriveRefPod</a>&gt;(metadata_addr).metadata_derive_ref;
-    <b>let</b> constructor_ref = &<a href="object.md#0x1_object_create_user_derived_object">object::create_user_derived_object</a>(owner, derive_ref);
+    <b>let</b> constructor_ref = &<a href="object.md#0x1_object_create_user_derived_object">object::create_user_derived_object</a>(owner_addr, derive_ref);
 
     // Disable ungated transfer <b>as</b> deterministic stores shouldn't be transferrable.
     <b>let</b> transfer_ref = &<a href="object.md#0x1_object_generate_transfer_ref">object::generate_transfer_ref</a>(constructor_ref);
@@ -273,7 +280,11 @@ Return whether the given account's primary store can do direct transfers.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="primary_store.md#0x1_primary_store_ungated_transfer_allowed">ungated_transfer_allowed</a>&lt;T: key&gt;(<a href="account.md#0x1_account">account</a>: <b>address</b>, metadata: Object&lt;T&gt;): bool {
-    <a href="fungible_asset.md#0x1_fungible_asset_ungated_transfer_allowed">fungible_asset::ungated_transfer_allowed</a>(<a href="primary_store.md#0x1_primary_store">primary_store</a>(<a href="account.md#0x1_account">account</a>, metadata))
+    <b>if</b> (<a href="primary_store.md#0x1_primary_store_primary_store_exists">primary_store_exists</a>(<a href="account.md#0x1_account">account</a>, metadata)) {
+        <a href="fungible_asset.md#0x1_fungible_asset_ungated_transfer_allowed">fungible_asset::ungated_transfer_allowed</a>(<a href="primary_store.md#0x1_primary_store">primary_store</a>(<a href="account.md#0x1_account">account</a>, metadata))
+    } <b>else</b> {
+        <b>true</b>
+    }
 }
 </code></pre>
 
@@ -288,7 +299,7 @@ Return whether the given account's primary store can do direct transfers.
 Withdraw <code>amount</code> of fungible asset from <code>store</code> by the owner.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="primary_store.md#0x1_primary_store_withdraw">withdraw</a>&lt;T: key&gt;(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, amount: u64): <a href="fungible_asset.md#0x1_fungible_asset_FuungibleAsset">fungible_asset::FuungibleAsset</a>
+<pre><code><b>public</b> <b>fun</b> <a href="primary_store.md#0x1_primary_store_withdraw">withdraw</a>&lt;T: key&gt;(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, amount: u64): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>
 </code></pre>
 
 
@@ -297,7 +308,7 @@ Withdraw <code>amount</code> of fungible asset from <code>store</code> by the ow
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="primary_store.md#0x1_primary_store_withdraw">withdraw</a>&lt;T: key&gt;(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, metadata: Object&lt;T&gt;, amount: u64): FuungibleAsset {
+<pre><code><b>public</b> <b>fun</b> <a href="primary_store.md#0x1_primary_store_withdraw">withdraw</a>&lt;T: key&gt;(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, metadata: Object&lt;T&gt;, amount: u64): FungibleAsset {
     <b>let</b> store = <a href="primary_store.md#0x1_primary_store">primary_store</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner), metadata);
     <a href="fungible_asset.md#0x1_fungible_asset_withdraw">fungible_asset::withdraw</a>(owner, store, amount)
 }
@@ -314,7 +325,7 @@ Withdraw <code>amount</code> of fungible asset from <code>store</code> by the ow
 Deposit <code>amount</code> of fungible asset to the given account's primary store.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="primary_store.md#0x1_primary_store_deposit">deposit</a>(owner: <b>address</b>, fa: <a href="fungible_asset.md#0x1_fungible_asset_FuungibleAsset">fungible_asset::FuungibleAsset</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="primary_store.md#0x1_primary_store_deposit">deposit</a>(owner: <b>address</b>, fa: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>)
 </code></pre>
 
 
@@ -323,7 +334,7 @@ Deposit <code>amount</code> of fungible asset to the given account's primary sto
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="primary_store.md#0x1_primary_store_deposit">deposit</a>(owner: <b>address</b>, fa: FuungibleAsset) <b>acquires</b> <a href="primary_store.md#0x1_primary_store_DeriveRefPod">DeriveRefPod</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="primary_store.md#0x1_primary_store_deposit">deposit</a>(owner: <b>address</b>, fa: FungibleAsset) <b>acquires</b> <a href="primary_store.md#0x1_primary_store_DeriveRefPod">DeriveRefPod</a> {
     <b>let</b> metadata = <a href="fungible_asset.md#0x1_fungible_asset_asset_metadata">fungible_asset::asset_metadata</a>(&fa);
     <b>let</b> store = <a href="primary_store.md#0x1_primary_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(owner, metadata);
     <a href="fungible_asset.md#0x1_fungible_asset_deposit">fungible_asset::deposit</a>(store, fa);
