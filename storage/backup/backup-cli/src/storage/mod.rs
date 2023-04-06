@@ -153,7 +153,8 @@ pub trait BackupStorage: Send + Sync {
         &self,
         file_handle: &FileHandleRef,
     ) -> Result<Box<dyn AsyncRead + Send + Unpin>>;
-    /// Asks to save a metadata entry. A metadata entry is one line of text.
+    /// Asks to save a metadata entry and return the File handle of the saved file.
+    /// A metadata entry is one line of text.
     /// The backup system doesn't expect a metadata entry to exclusively map to a single file
     /// handle, or the same file handle when accessed later, so there's no need to return one. This
     /// also means a local cache must download each metadata file from remote at least once, to
@@ -161,7 +162,11 @@ pub trait BackupStorage: Send + Sync {
     /// Behavior on duplicated names is undefined, overwriting the content upon an existing name
     /// is straightforward and acceptable.
     /// See `list_metadata_files`.
-    async fn save_metadata_line(&self, name: &ShellSafeName, content: &TextLine) -> Result<()> {
+    async fn save_metadata_line(
+        &self,
+        name: &ShellSafeName,
+        content: &TextLine,
+    ) -> Result<FileHandle> {
         self.save_metadata_lines(name, &[content.clone()]).await
     }
     /// The backup system always asks for all metadata files and cache and build index on top of
@@ -173,8 +178,13 @@ pub trait BackupStorage: Send + Sync {
     async fn list_metadata_files(&self) -> Result<Vec<FileHandle>>;
     /// Move a metadata file to the metadata file backup folder.
     async fn backup_metadata_file(&self, file_handle: &FileHandleRef) -> Result<()>;
-    /// Save a vector of metadata lines to file. If the file exists, this will overwrite
-    async fn save_metadata_lines(&self, name: &ShellSafeName, lines: &[TextLine]) -> Result<()>;
+    /// Save a vector of metadata lines to file and return the file handle of saved file.
+    /// If the file exists, this will overwrite
+    async fn save_metadata_lines(
+        &self,
+        name: &ShellSafeName,
+        lines: &[TextLine],
+    ) -> Result<FileHandle>;
 }
 
 #[derive(Parser)]
