@@ -35,7 +35,7 @@ import {
   AnyNumber,
 } from "../bcs";
 import { Ed25519PublicKey, MultiEd25519PublicKey } from "../aptos_types";
-import { VERSION } from "../version";
+import { ProviderUtil } from "./utils";
 
 export interface OptionalTransactionArgs {
   maxGasAmount?: Uint64;
@@ -86,7 +86,7 @@ export class AptosClient {
     } else {
       conf.WITH_CREDENTIALS = true;
     }
-    conf.HEADERS = { ...conf.HEADERS, "User-Agent": `aptos-ts-sdk/${VERSION}` };
+    conf.HEADERS = { ...conf.HEADERS, "User-Agent": ProviderUtil.getUserAgent() };
 
     this.client = new Gen.AptosGeneratedClient(conf);
   }

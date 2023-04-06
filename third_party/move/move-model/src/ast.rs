@@ -281,6 +281,8 @@ pub struct Spec {
     pub properties: PropertyBag,
     // If this is a function, specs associated with individual code points.
     pub on_impl: BTreeMap<CodeOffset, Spec>,
+    // The map to store ghost variable update statements inlined in the function body
+    pub update_map: BTreeMap<NodeId, Condition>,
 }
 
 impl Spec {

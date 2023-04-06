@@ -26,7 +26,6 @@ use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::network_id::{NetworkContext, PeerNetworkId};
 use aptos_logger::prelude::*;
 use aptos_netcore::transport::{ConnectionOrigin, Transport};
-use aptos_rate_limiter::rate_limit::TokenBucketRateLimiter;
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{network_address::NetworkAddress, PeerId};
@@ -39,7 +38,6 @@ use futures::{
 use std::{
     collections::{hash_map::Entry, HashMap},
     marker::PhantomData,
-    net::{IpAddr, Ipv4Addr},
     sync::Arc,
     time::Duration,
 };
@@ -64,8 +62,6 @@ use aptos_config::config::PeerRole;
 use aptos_types::account_address::AccountAddress;
 pub use senders::*;
 pub use types::*;
-
-pub type IpAddrTokenBucketLimiter = TokenBucketRateLimiter<IpAddr>;
 
 /// Responsible for handling and maintaining connections to other Peers
 pub struct PeerManager<TTransport, TSocket>
@@ -123,10 +119,6 @@ where
     max_message_size: usize,
     /// Inbound connection limit separate of outbound connections
     inbound_connection_limit: usize,
-    /// Keyed storage of all inbound rate limiters
-    inbound_rate_limiters: IpAddrTokenBucketLimiter,
-    /// Keyed storage of all outbound rate limiters
-    outbound_rate_limiters: IpAddrTokenBucketLimiter,
 }
 
 impl<TTransport, TSocket> PeerManager<TTransport, TSocket>
@@ -155,8 +147,6 @@ where
         max_frame_size: usize,
         max_message_size: usize,
         inbound_connection_limit: usize,
-        inbound_rate_limiters: IpAddrTokenBucketLimiter,
-        outbound_rate_limiters: IpAddrTokenBucketLimiter,
     ) -> Self {
         let (transport_notifs_tx, transport_notifs_rx) = aptos_channels::new(
             channel_size,
@@ -199,8 +189,6 @@ where
             max_frame_size,
             max_message_size,
             inbound_connection_limit,
-            inbound_rate_limiters,
-            outbound_rate_limiters,
         }
     }
 
@@ -332,11 +320,6 @@ where
                     }
                 }
 
-                let ip_addr = lost_conn_metadata
-                    .addr
-                    .find_ip_addr()
-                    .unwrap_or(IpAddr::V4(Ipv4Addr::UNSPECIFIED));
-
                 // Notify upstream if there's still no active connection. This might be redundant,
                 // but does not affect correctness.
                 if !self.active_peers.contains_key(&peer_id) {
@@ -347,11 +330,6 @@ where
                     );
                     self.send_conn_notification(peer_id, notif);
                 }
-
-                // Garbage collect unused rate limit buckets
-                self.inbound_rate_limiters.try_garbage_collect_key(&ip_addr);
-                self.outbound_rate_limiters
-                    .try_garbage_collect_key(&ip_addr);
             },
         }
     }
@@ -689,14 +667,6 @@ where
             }
         }
 
-        let ip_addr = connection
-            .metadata
-            .addr
-            .find_ip_addr()
-            .unwrap_or(IpAddr::V4(Ipv4Addr::UNSPECIFIED));
-        let inbound_rate_limiter = self.inbound_rate_limiters.bucket(ip_addr);
-        let outbound_rate_limiter = self.outbound_rate_limiters.bucket(ip_addr);
-
         // TODO: Add label for peer.
         let (peer_reqs_tx, peer_reqs_rx) = aptos_channel::new(
             QueueStyle::FIFO,
@@ -724,8 +694,6 @@ where
             constants::MAX_CONCURRENT_OUTBOUND_RPCS,
             self.max_frame_size,
             self.max_message_size,
-            Some(inbound_rate_limiter),
-            Some(outbound_rate_limiter),
         );
         self.executor.spawn(peer.start());
 

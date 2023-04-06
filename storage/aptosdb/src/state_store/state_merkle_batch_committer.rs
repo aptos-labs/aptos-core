@@ -54,8 +54,10 @@ impl StateMerkleBatchCommitter {
                     let _timer = OTHER_TIMERS_SECONDS
                         .with_label_values(&["commit_jellyfish_merkle_nodes"])
                         .start_timer();
+                    // TODO(grao): Support sharding here.
                     self.state_db
                         .state_merkle_db
+                        .metadata_db()
                         .write_schemas(batch)
                         .expect("State merkle batch commit failed.");
                     if self.state_db.state_merkle_db.cache_enabled() {
@@ -106,6 +108,7 @@ impl StateMerkleBatchCommitter {
         let leaf_count_from_jmt = self
             .state_db
             .state_merkle_db
+            .metadata_db()
             .get::<JellyfishMerkleNodeSchema>(&NodeKey::new_empty_path(version))?
             .ok_or_else(|| anyhow!("Root node missing at version {}", version))?
             .leaf_count();

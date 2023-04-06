@@ -22,6 +22,8 @@ use std::sync::Arc;
 pub type StateComputerCommitCallBackType =
     Box<dyn FnOnce(&[Arc<ExecutedBlock>], LedgerInfoWithSignatures) + Send + Sync>;
 
+/// Clients can pull information about transactions from the mempool and return
+/// the retrieved information as a `Payload`.
 #[async_trait::async_trait]
 pub trait PayloadClient: Send + Sync {
     async fn pull_payload(
