@@ -182,17 +182,26 @@
   "templating": {
     "list": [
       {
-        "current": { "selected": true, "text": "VictoriaMetrics Global", "value": "VictoriaMetrics Global" },
+        "allFormat": "",
+        "allValue": "",
+        "current": {
+          "selected": true,
+          "text": "VictoriaMetrics Global (Non-mainnet)",
+          "value": "VictoriaMetrics Global (Non-mainnet)"
+        },
         "hide": 0,
         "includeAll": false,
+        "label": "",
         "multi": false,
+        "multiFormat": "",
         "name": "Datasource",
         "options": [],
         "query": "prometheus",
         "queryValue": "",
         "refresh": 1,
-        "regex": "",
+        "regex": ".*Prometheus.*|.*Victoria.*|.*Telemetry.*",
         "skipUrlSync": false,
+        "sort": 0,
         "type": "datasource"
       },
       {
@@ -238,8 +247,8 @@
   "time": { "from": "now-6h", "to": "now" },
   "timepicker": {},
   "timezone": "",
-  "title": "Node System Info",
+  "title": "node-system-info",
   "uid": "w9MxpDaVz",
-  "version": 9,
+  "version": 2,
   "weekStart": ""
 }
