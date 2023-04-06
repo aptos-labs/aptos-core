@@ -32,7 +32,7 @@ use fail::fail_point;
 use std::{marker::PhantomData, sync::Arc};
 
 // todo: read from on-chain config
-const PER_BLOCK_GAS_LIMIT: u64 = 3000000;
+const PER_BLOCK_GAS_LIMIT: u64 = 300000;
 
 pub trait TransactionBlockExecutor<T>: Send + Sync {
     fn execute_transaction_block(
