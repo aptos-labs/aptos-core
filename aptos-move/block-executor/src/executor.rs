@@ -218,7 +218,6 @@ where
         scheduler: &Scheduler,
         base_view: &S,
         committing: bool,
-        has_reconfiguration: &AtomicBool,
     ) {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
@@ -244,8 +243,6 @@ where
                     match last_input_output.success_gas(txn_idx) {
                         Ok(gas) => accumulated_gas += gas,
                         _ => {
-                            // To distinguish the early halt caused by reconfiguration or Abort
-                            has_reconfiguration.store(true, Ordering::Relaxed);
                             debug!("[BlockSTM]: Early halted due to Abort or SkipRest txn.");
                             scheduler.halt();
                             break;
@@ -327,10 +324,6 @@ where
         let num_txns = signature_verified_block.len() as u32;
         let last_input_output = TxnLastInputOutput::new(num_txns);
         let committing = AtomicBool::new(true);
-        // Both reconfiguration and per-block gas limit uses SkipRest to end the block earlier.
-        // But we only add back the StateCheckpoint to the end of the block for per-block gas limit.
-        // So we use this atomic boolean variable to distinguish these two cases.
-        let has_reconfiguration = AtomicBool::new(false);
         let scheduler = Scheduler::new(num_txns);
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
@@ -345,7 +338,6 @@ where
                         &scheduler,
                         base_view,
                         committing.swap(false, Ordering::SeqCst),
-                        &has_reconfiguration,
                     );
                 });
             }
