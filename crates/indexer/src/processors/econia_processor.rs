@@ -34,7 +34,6 @@ pub const NAME: &str = "econia_processor";
 #[derive(Debug, Deserialize, Clone)]
 struct RedisConfig {
     url: String,
-    open_orders: String,
     book_prefix: String,
     order_prefix: String,
     markets: String,
@@ -388,6 +387,21 @@ impl EconiaRedisCacher {
         order
     }
 
+    fn send_order_update(
+        conn: &mut redis::Connection,
+        order_prefix: &str,
+        mkt_id: u64,
+        order: &Order,
+    ) -> anyhow::Result<()> {
+        let channel_name = format!("{}:{}", order_prefix, mkt_id);
+        let message = serde_json::to_string(order)?;
+        let message = serde_json::to_string(&message)?;
+        let mut cmd = redis::cmd("PUBLISH");
+        cmd.arg(&channel_name).arg(&message);
+        cmd.query::<usize>(conn)?;
+        Ok(())
+    }
+
     fn send_price_level_update(
         conn: &mut redis::Connection,
         book_prefix: &str,
@@ -433,7 +447,7 @@ impl EconiaRedisCacher {
                     order.side,
                     order.price,
                 )?;
-                // todo send order event here to redis
+                Self::send_order_update(conn, &self.config.order_prefix, e.market_id, &order)?;
             },
             MakerEventType::Change => {
                 let pop_and_reinsert = {
@@ -476,7 +490,9 @@ impl EconiaRedisCacher {
                         e.price,
                     )?;
                 }
-                // todo send order event here to redis
+
+                let order = Self::get_order(book, e.market_order_id);
+                Self::send_order_update(conn, &self.config.order_prefix, e.market_id, order)?;
             },
             MakerEventType::Evict => {
                 let mut order = Self::remove_order(book, e.market_order_id);
@@ -489,7 +505,7 @@ impl EconiaRedisCacher {
                     order.side,
                     order.price,
                 )?;
-                // todo send order event here to redis
+                Self::send_order_update(conn, &self.config.order_prefix, e.market_id, &order)?;
             },
             MakerEventType::Place => {
                 let side = e.side.into();
@@ -505,7 +521,7 @@ impl EconiaRedisCacher {
                     created_at: *CURRENT_BLOCK_TIME.read().unwrap(),
                 };
 
-                Self::add_order(book, o);
+                Self::add_order(book, o.clone());
                 Self::send_price_level_update(
                     conn,
                     &self.config.book_prefix,
@@ -514,7 +530,7 @@ impl EconiaRedisCacher {
                     side,
                     e.price,
                 )?;
-                // todo send order event here to redis
+                Self::send_order_update(conn, &self.config.order_prefix, e.market_id, &o)?;
             },
         };
         Ok(())
@@ -669,7 +685,7 @@ impl EconiaTransactionProcessor {
         conn.build_transaction()
             .read_write()
             .run::<_, Error, _>(|pg_conn| {
-                self.insert_events(pg_conn, events, &block_to_time)?;
+                self.insert_events(pg_conn, events, block_to_time)?;
                 Ok(())
             })?;
         Ok(())
