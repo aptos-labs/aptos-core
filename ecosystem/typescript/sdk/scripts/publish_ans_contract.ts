@@ -18,6 +18,7 @@ const APTOS_INVOCATION = process.env.APTOS_INVOCATION || "aptos";
 const APTOS_NODE_URL = process.env.APTOS_NODE_URL;
 const APTOS_FAUCET_URL = process.env.APTOS_FAUCET_URL;
 // ans account we use to publish the contract
+const ANS_REPO_LOCATION = process.env.ANS_REPO_LOCATION || "/tmp/ans";
 const ANS_TEST_ACCOUNT_PRIVATE_KEY = process.env.ANS_TEST_ACCOUNT_PRIVATE_KEY;
 const ANS_TEST_ACCOUNT_ADDRESS = process.env.ANS_TEST_ACCOUNT_ADDRESS;
 
@@ -25,9 +26,9 @@ try {
   deleteAnsFolder();
   // 1. Clone ANS repository into the current directory
   console.log("---clone ANS repository---");
-  execSync("git clone https://github.com/aptos-labs/aptos-names-contracts.git /tmp/ans", { stdio: "inherit" });
+  execSync(`git clone https://github.com/aptos-labs/aptos-names-contracts.git ${ANS_REPO_LOCATION}`, { stdio: "inherit" });
 
-  // Debugging: Confirm code was mounted in correctly
+  // Debugging: Confirm code dir was mounted correctly
   const blah = APTOS_INVOCATION.slice(0, APTOS_INVOCATION.length - 5);
   console.log(blah);
   execSync(`${blah} ls -la /tmp`, { stdio: "inherit" });
