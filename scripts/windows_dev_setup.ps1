@@ -18,7 +18,7 @@ $global:protoc_version = "21.4"
 $global:cvc5_version = "0.0.8"
 $global:dotnet_version = "6.0.407"
 $global:z3_version = "4.11.2"
-$global:boogie_version = "2.16.3"
+$global:boogie_version = "2.15.8"
 
 
 function welcome_message {
