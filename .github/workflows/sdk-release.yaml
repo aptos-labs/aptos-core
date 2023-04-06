@@ -100,8 +100,12 @@ jobs:
       - run: echo "FAUCET_AUTH_TOKEN=$FAUCET_AUTH_TOKEN" >> ./ecosystem/typescript/sdk/.env
       - run: echo "ANS_TEST_ACCOUNT_PRIVATE_KEY=$ANS_TEST_ACCOUNT_PRIVATE_KEY" >> ./ecosystem/typescript/sdk/.env
       - run: echo "ANS_TEST_ACCOUNT_ADDRESS=$ANS_TEST_ACCOUNT_ADDRESS" >> ./ecosystem/typescript/sdk/.env
+
+      # These two have to be defined here and not in the env section because the runner
+      # context is only available here.
       - run: echo "APTOS_INVOCATION='docker run -v ${{ runner.temp }}/ans:/tmp/ans --network host ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos'" >> ./ecosystem/typescript/sdk/.env
       - run: echo "ANS_REPO_LOCATION=${{ runner.temp }}/ans" >> ./ecosystem/typescript/sdk/.env
+
       - run: cp ./ecosystem/typescript/sdk/.env ./ecosystem/typescript/sdk/examples/typescript/.env
       - run: cp ./ecosystem/typescript/sdk/.env ./ecosystem/typescript/sdk/examples/javascript/.env
 

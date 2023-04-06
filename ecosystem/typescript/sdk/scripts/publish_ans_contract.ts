@@ -26,14 +26,9 @@ try {
   deleteAnsFolder();
   // 1. Clone ANS repository into the current directory
   console.log("---clone ANS repository---");
-  execSync(`git clone https://github.com/aptos-labs/aptos-names-contracts.git ${ANS_REPO_LOCATION}`, { stdio: "inherit" });
-
-  // Debugging: Confirm code dir was mounted correctly
-  const blah = APTOS_INVOCATION.slice(0, APTOS_INVOCATION.length - 5);
-  console.log(blah);
-  execSync(`${blah} ls -la /tmp`, { stdio: "inherit" });
-  execSync(`${blah} ls -la /tmp/ans`, { stdio: "inherit" });
-  execSync(`${blah} ls -la /tmp/ans/core`, { stdio: "inherit" });
+  execSync(`git clone https://github.com/aptos-labs/aptos-names-contracts.git ${ANS_REPO_LOCATION}`, {
+    stdio: "inherit",
+  });
 
   // 2. fund ans account
   console.log("---funding account---");
