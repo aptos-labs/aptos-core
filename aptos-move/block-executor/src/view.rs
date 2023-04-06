@@ -22,7 +22,7 @@ use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::{
     delta::DeltaOp,
     remote_cache::{TRemoteCache, TStateViewWithRemoteCache},
-    write::AptosWrite,
+    write::{AptosWrite, Op},
 };
 use claims::assert_none;
 use move_binary_format::errors::Location;
@@ -35,8 +35,8 @@ use std::{cell::RefCell, collections::BTreeMap, hash::Hash, sync::Arc};
 /// TODO(issue 10177): MvHashMapView currently needs to be sync due to trait bounds, but should
 /// not be. In this case, the read_dependency member can have a RefCell<bool> type and the
 /// captured_reads member can have RefCell<Vec<ReadDescriptor<K>>> type.
-pub(crate) struct MVHashMapView<'a, K, V: TransactionWrite> {
-    versioned_map: &'a MVHashMap<K, V, ExecutableTestType>, // TODO: proper generic type
+pub(crate) struct MVHashMapView<'a, K> {
+    versioned_map: &'a MVHashMap<K, ExecutableTestType>, // TODO: proper generic type x2
     scheduler: &'a Scheduler,
     captured_reads: RefCell<Vec<ReadDescriptor<K>>>,
 }
@@ -44,9 +44,9 @@ pub(crate) struct MVHashMapView<'a, K, V: TransactionWrite> {
 /// A struct which describes the result of the read from the proxy. The client
 /// can interpret these types to further resolve the reads.
 #[derive(Debug)]
-pub(crate) enum ReadResult<V> {
+pub(crate) enum ReadResult {
     // Successful read of a value.
-    Value(Arc<V>),
+    Value(Arc<Op<AptosWrite>>),
     // Similar to above, but the value was aggregated and is an integer.
     U128(u128),
     // Read failed while resolving a delta.
@@ -55,14 +55,9 @@ pub(crate) enum ReadResult<V> {
     None,
 }
 
-impl<
-        'a,
-        K: ModulePath + PartialOrd + Ord + Send + Clone + Hash + Eq,
-        V: TransactionWrite + Send + Sync,
-    > MVHashMapView<'a, K, V>
-{
+impl<'a, K: ModulePath + PartialOrd + Ord + Send + Clone + Hash + Eq> MVHashMapView<'a, K> {
     pub(crate) fn new(
-        versioned_map: &'a MVHashMap<K, V, ExecutableTestType>,
+        versioned_map: &'a MVHashMap<K, ExecutableTestType>,
         scheduler: &'a Scheduler,
     ) -> Self {
         Self {
@@ -82,7 +77,7 @@ impl<
         &self,
         key: &K,
         txn_idx: TxnIndex,
-    ) -> anyhow::Result<MVCodeOutput<V, ExecutableTestType>, MVCodeError> {
+    ) -> anyhow::Result<MVCodeOutput<ExecutableTestType>, MVCodeError> {
         // Add a fake read from storage to register in reads for now in order
         // for the read / write path intersection fallback for modules to still work.
         self.captured_reads
@@ -93,7 +88,7 @@ impl<
     }
 
     /// Captures a read from the VM execution.
-    fn fetch_data(&self, key: &K, txn_idx: TxnIndex) -> ReadResult<V> {
+    fn fetch_data(&self, key: &K, txn_idx: TxnIndex) -> ReadResult {
         use MVDataError::*;
         use MVDataOutput::*;
 
@@ -167,8 +162,8 @@ impl<
 }
 
 enum ViewMapKind<'a, T: Transaction> {
-    MultiVersion(&'a MVHashMapView<'a, T::Key, T::Value>),
-    BTree(&'a BTreeMap<T::Key, T::Value>),
+    MultiVersion(&'a MVHashMapView<'a, T::Key>),
+    BTree(&'a BTreeMap<T::Key, Op<AptosWrite>>),
 }
 
 pub(crate) struct LatestView<'a, T: Transaction, S: TStateViewWithRemoteCache<CommonKey = T::Key>> {
@@ -186,7 +181,7 @@ impl<'a, T: Transaction, S: TStateViewWithRemoteCache<CommonKey = T::Key>> TStat
 impl<'a, T: Transaction, S: TStateViewWithRemoteCache<CommonKey = T::Key>> LatestView<'a, T, S> {
     pub(crate) fn new_mv_view(
         base_view: &'a S,
-        map: &'a MVHashMapView<'a, T::Key, T::Value>,
+        map: &'a MVHashMapView<'a, T::Key>,
         txn_idx: TxnIndex,
     ) -> LatestView<'a, T, S> {
         LatestView {
@@ -198,7 +193,7 @@ impl<'a, T: Transaction, S: TStateViewWithRemoteCache<CommonKey = T::Key>> Lates
 
     pub(crate) fn new_btree_view(
         base_view: &'a S,
-        map: &'a BTreeMap<T::Key, T::Value>,
+        map: &'a BTreeMap<T::Key, Op<AptosWrite>>,
         txn_idx: TxnIndex,
     ) -> LatestView<'a, T, S> {
         LatestView {
@@ -236,6 +231,7 @@ impl<'a, T: Transaction, S: TStateViewWithRemoteCache<CommonKey = T::Key>> TStat
 
     // TODO: This should not be called, instead one should call `get_cached_resource` for resources.
     fn get_state_value(&self, state_key: &T::Key) -> anyhow::Result<Option<StateValue>> {
+        panic!("{}", format!("get_state_value at {:?}", *state_key));
         match self.latest_view {
             ViewMapKind::MultiVersion(map) => match state_key.module_path() {
                 Some(_) => {
@@ -291,34 +287,33 @@ impl<'a, T: Transaction, S: TStateViewWithRemoteCache<CommonKey = T::Key>> TRemo
 {
     type Key = T::Key;
 
-    fn get_cached_module(&self, state_key: &Self::Key) -> Result<Option<Vec<u8>>> {
-        todo!()
+    fn get_cached_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<AptosWrite>> {
+        let blob = self.get_state_value_bytes(state_key);
+        blob.map(|maybe_bytes| maybe_bytes.map(|bytes| AptosWrite::Module(bytes)))
     }
 
     fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosWrite>> {
-        todo!()
-        // assert_none!(state_key.module_path());
-        //
-        // match self.latest_view {
-        //     ViewMapKind::MultiVersion(map) => match map.fetch_data(state_key, self.txn_idx) {
-        //         ReadResult::Value(v) => Ok(v.as_aptos_resource()),
-        //         ReadResult::U128(v) => Ok(Some(AptosResource::Aggregator(v))),
-        //         ReadResult::Unresolved(delta) => {
-        //             let from_storage = self.base_view.get_state_value_bytes(state_key)?.map_or(
-        //                 Err(VMStatus::Error(StatusCode::STORAGE_ERROR, None)),
-        //                 |bytes| Ok(deserialize(&bytes)),
-        //             )?;
-        //             let result = delta
-        //                 .apply_to(from_storage)
-        //                 .map_err(|pe| pe.finish(Location::Undefined).into_vm_status())?;
-        //             Ok(Some(AptosResource::Aggregator(result)))
-        //         },
-        //         ReadResult::None => self.base_view.get_cached_resource(state_key),
-        //     },
-        //     ViewMapKind::BTree(map) => map.get(state_key).map_or_else(
-        //         || self.base_view.get_cached_resource(state_key),
-        //         |v| Ok(v.as_aptos_resource()),
-        //     ),
-        // }
+        assert_none!(state_key.module_path());
+        match self.latest_view {
+            ViewMapKind::MultiVersion(map) => match map.fetch_data(state_key, self.txn_idx) {
+                ReadResult::Value(v) => Ok(v.as_value()),
+                ReadResult::U128(v) => Ok(Some(AptosWrite::AggregatorValue(v))),
+                ReadResult::Unresolved(delta) => {
+                    let from_storage = self.base_view.get_cached_resource(state_key)?.map_or(
+                        Err(VMStatus::Error(StatusCode::STORAGE_ERROR, None)),
+                        |aw| Ok(aw.as_aggregator_value().expect("should not fail")),
+                    )?;
+                    let result = delta
+                        .apply_to(from_storage)
+                        .map_err(|pe| pe.finish(Location::Undefined).into_vm_status())?;
+                    Ok(Some(AptosWrite::AggregatorValue(result)))
+                },
+                ReadResult::None => self.base_view.get_cached_resource(state_key),
+            },
+            ViewMapKind::BTree(map) => map.get(state_key).map_or_else(
+                || self.base_view.get_cached_resource(state_key),
+                |v| Ok(v.as_value()),
+            ),
+        }
     }
 }

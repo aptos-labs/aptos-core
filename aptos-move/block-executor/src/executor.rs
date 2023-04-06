@@ -74,7 +74,7 @@ where
         version: Version,
         signature_verified_block: &[T],
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Value, ExecutableTestType>,
+        versioned_cache: &MVHashMap<T::Key, ExecutableTestType>,
         scheduler: &Scheduler,
         executor: &E,
         base_view: &S,
@@ -150,7 +150,7 @@ where
         version_to_validate: Version,
         validation_wave: Wave,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Value, ExecutableTestType>,
+        versioned_cache: &MVHashMap<T::Key, ExecutableTestType>,
         scheduler: &Scheduler,
     ) -> SchedulerTask {
         use MVDataError::*;
@@ -204,7 +204,7 @@ where
         executor_arguments: &E::Argument,
         block: &[T],
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Value, ExecutableTestType>,
+        versioned_cache: &MVHashMap<T::Key, ExecutableTestType>,
         scheduler: &Scheduler,
         base_view: &S,
         committing: bool,

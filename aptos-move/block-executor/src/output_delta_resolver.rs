@@ -10,11 +10,11 @@ use aptos_vm_types::{
 };
 
 pub(crate) struct OutputDeltaResolver<T: Transaction> {
-    versioned_outputs: VersionedData<T::Key, T::Value>,
+    versioned_outputs: VersionedData<T::Key>,
 }
 
 impl<T: Transaction> OutputDeltaResolver<T> {
-    pub fn new(versioned_outputs: VersionedData<T::Key, T::Value>) -> Self {
+    pub fn new(versioned_outputs: VersionedData<T::Key>) -> Self {
         Self { versioned_outputs }
     }
 

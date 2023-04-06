@@ -25,12 +25,19 @@ pub enum AptosWrite {
 }
 
 impl AptosWrite {
+    pub fn is_module(&self) -> bool {
+        match self {
+            AptosWrite::Module(_) => true,
+            _ => false,
+        }
+    }
+
     pub fn as_bytes(&self) -> Option<Vec<u8>> {
         match self {
             AptosWrite::AggregatorValue(value) => bcs::to_bytes(value).ok(),
             AptosWrite::Module(blob) => Some(blob.clone()),
             AptosWrite::Standard(resource) => resource.serialize(),
-            AptosWrite::Group(wgroup) => {
+            AptosWrite::Group(group) => {
                 // TODO: Fix this!
                 // let serialized_group: BTreeMap<StructTag, Option<Vec<u8>>> = group.clone().into_iter().map(|(tag, r)| (tag, &r.serialize())).collect();
                 // bcs::to_bytes(&serialized_group).ok()
@@ -72,7 +79,7 @@ impl AsBytes for Op<AptosWrite> {
 }
 
 // TODO: use as bytes instead!
-impl<T: Debug + AsBytes> TransactionWrite for Op<T> {
+impl<T: Clone + Debug + AsBytes> TransactionWrite for Op<T> {
     fn extract_raw_bytes(&self) -> Option<Vec<u8>> {
         match self {
             Op::Creation(write) => write.as_bytes(),
@@ -92,13 +99,13 @@ impl<T: Debug + AsBytes> TransactionWrite for Op<T> {
 
 /// Represents a write op at the VM level.
 #[derive(Clone, PartialEq, Eq)]
-pub enum Op<T: Debug + AsBytes> {
+pub enum Op<T: Clone + Debug + AsBytes> {
     Creation(T),
     Modification(T),
     Deletion,
 }
 
-impl<T: Debug + AsBytes> Op<T> {
+impl<T: Clone + Debug + AsBytes> Op<T> {
     /// Converts this op into a write op which can be used by the storage.
     pub fn into_write_op(self) -> PartialVMResult<WriteOp> {
         match self {
@@ -111,6 +118,13 @@ impl<T: Debug + AsBytes> Op<T> {
                 .map(WriteOp::Modification)
                 .ok_or(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)),
             Op::Deletion => Ok(WriteOp::Deletion),
+        }
+    }
+
+    pub fn as_value(&self) -> Option<T> {
+        match self {
+            Op::Creation(v) | Op::Modification(v) => Some(v.clone()),
+            Op::Deletion => None,
         }
     }
 
@@ -141,7 +155,7 @@ impl<T: Debug + AsBytes> Op<T> {
     }
 }
 
-impl<T: Debug + AsBytes> Debug for Op<T> {
+impl<T: Clone + Debug + AsBytes> Debug for Op<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             Op::Modification(value) => write!(f, "Modification({:?})", value),

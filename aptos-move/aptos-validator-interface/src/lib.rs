@@ -208,7 +208,7 @@ impl TStateView for DebuggerStateView {
 impl TRemoteCache for DebuggerStateView {
     type Key = StateKey;
 
-    fn get_cached_module(&self, state_key: &Self::Key) -> Result<Option<Vec<u8>>> {
+    fn get_cached_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<AptosWrite>> {
         todo!()
     }
 

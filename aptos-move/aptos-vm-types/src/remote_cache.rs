@@ -14,7 +14,8 @@ pub trait TRemoteCache {
 
     /// Gets the module for a given state key.
     /// TODO: Change to a new Move type when available instead of a blob.
-    fn get_cached_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<Vec<u8>>>;
+    /// TODO: Remove from AptosWrite because it is a module!
+    fn get_cached_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<AptosWrite>>;
 
     /// Gets the resource for a given state key.
     fn get_cached_resource(&self, state_key: &Self::Key) -> anyhow::Result<Option<AptosWrite>>;
@@ -31,7 +32,7 @@ where
 {
     type Key = K;
 
-    fn get_cached_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<Vec<u8>>> {
+    fn get_cached_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<AptosWrite>> {
         self.deref().get_cached_module(state_key)
     }
 

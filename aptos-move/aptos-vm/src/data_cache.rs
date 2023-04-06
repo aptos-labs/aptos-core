@@ -12,18 +12,28 @@ use aptos_types::{
     on_chain_config::ConfigStorage,
     state_store::{state_key::StateKey, state_storage_usage::StateStorageUsage},
 };
-use aptos_vm_types::remote_cache::StateViewWithRemoteCache;
+use aptos_vm_types::{
+    remote_cache::{StateViewWithRemoteCache, TRemoteCache},
+    write::AptosWrite,
+};
 use move_binary_format::{errors::*, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, StructTag},
     resolver::{ModuleResolver, ResourceResolver},
+    value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 use move_table_extension::{TableHandle, TableResolver};
 use move_vm_runtime::move_vm::MoveVM;
-use move_vm_types::resolver::{Resource, ResourceResolverV2};
-use std::ops::{Deref, DerefMut};
+use move_vm_types::{
+    resolver::{Resource, ResourceResolverV2},
+    values::FrozenValue,
+};
+use std::{
+    collections::BTreeMap,
+    ops::{Deref, DerefMut},
+};
 
 pub struct MoveResolverWithVMMetadata<'a, 'm, S> {
     move_resolver: &'a S,
@@ -48,7 +58,7 @@ impl<'a, 'm, S: MoveResolverExt> MoveResolverExt for MoveResolverWithVMMetadata<
         &self,
         address: &AccountAddress,
         resource_group: &StructTag,
-    ) -> Result<Option<Vec<u8>>, VMError> {
+    ) -> Result<Option<AptosWrite>, VMError> {
         self.move_resolver
             .get_resource_group_data(address, resource_group)
     }
@@ -57,7 +67,7 @@ impl<'a, 'm, S: MoveResolverExt> MoveResolverExt for MoveResolverWithVMMetadata<
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, VMError> {
+    ) -> Result<Option<AptosWrite>, VMError> {
         self.move_resolver
             .get_standard_resource(address, struct_tag)
     }
@@ -80,6 +90,14 @@ impl<'a, 'm, S: MoveResolverExt> ResourceResolver for MoveResolverWithVMMetadata
         struct_tag: &StructTag,
     ) -> Result<Option<Vec<u8>>, Self::Error> {
         self.get_any_resource(address, struct_tag)
+            .map(|maybe_write| {
+                maybe_write.map(|write| match write {
+                    AptosWrite::AggregatorValue(v) => bcs::to_bytes(&v).expect("should not fail"),
+                    AptosWrite::Module(_) => unreachable!(),
+                    AptosWrite::Standard(r) => r.serialize().expect("should not fail"),
+                    AptosWrite::Group(_) => unreachable!(),
+                })
+            })
     }
 }
 
@@ -91,9 +109,17 @@ impl<'a, 'm, S: MoveResolverExt> ResourceResolverV2 for MoveResolverWithVMMetada
         address: &AccountAddress,
         struct_tag: &StructTag,
     ) -> Result<Option<Resource>, Self::Error> {
-        // TODO: switch to Move values.
-        let resource_blob = self.get_any_resource(address, struct_tag);
-        resource_blob.map(|opt| opt.map(Resource::from_blob))
+        self.get_any_resource(address, struct_tag)
+            .map(|maybe_write| {
+                maybe_write.map(|write| match write {
+                    AptosWrite::AggregatorValue(v) => {
+                        Resource::from_value_layout(FrozenValue::U128(v), MoveTypeLayout::U128)
+                    },
+                    AptosWrite::Module(_) => unreachable!(),
+                    AptosWrite::Standard(r) => r,
+                    AptosWrite::Group(_) => unreachable!(),
+                })
+            })
     }
 }
 
@@ -137,7 +163,13 @@ impl<'a, S: StateViewWithRemoteCache> StorageAdapter<'a, S> {
         Self(state_store)
     }
 
-    pub fn get(&self, access_path: AccessPath) -> PartialVMResult<Option<Vec<u8>>> {
+    pub fn get_r(&self, access_path: AccessPath) -> PartialVMResult<Option<AptosWrite>> {
+        self.0
+            .get_cached_resource(&StateKey::access_path(access_path))
+            .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))
+    }
+
+    pub fn get_m(&self, access_path: AccessPath) -> PartialVMResult<Option<Vec<u8>>> {
         self.0
             .get_state_value_bytes(&StateKey::access_path(access_path))
             .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))
@@ -155,20 +187,26 @@ impl<'a, S: StateViewWithRemoteCache> MoveResolverExt for StorageAdapter<'a, S> 
         &self,
         address: &AccountAddress,
         resource_group: &StructTag,
-    ) -> Result<Option<Vec<u8>>, VMError> {
+    ) -> Result<Option<AptosWrite>, VMError> {
         let ap = AccessPath::resource_group_access_path(*address, resource_group.clone());
-        self.get(ap).map_err(|e| e.finish(Location::Undefined))
+        let data = self.get_r(ap).map_err(|e| e.finish(Location::Undefined));
+        // TODO: fix groups
+        Ok(None)
+        // data.and_then(|maybe_blob| maybe_blob.and_then(|blob| {
+        //     let group_data: BTreeMap<StructTag, Vec<u8>> = bcs::from_bytes(blob);
+        //     group_data.into_iter().map(|(t, b)| (t, Res))
+        // }))
     }
 
     fn get_standard_resource(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, VMError> {
+    ) -> Result<Option<AptosWrite>, VMError> {
         let ap = AccessPath::resource_access_path(*address, struct_tag.clone()).map_err(|_| {
             PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).finish(Location::Undefined)
         })?;
-        self.get(ap).map_err(|e| e.finish(Location::Undefined))
+        self.get_r(ap).map_err(|e| e.finish(Location::Undefined))
     }
 }
 
@@ -178,7 +216,7 @@ impl<'a, S: StateViewWithRemoteCache> ModuleResolver for StorageAdapter<'a, S> {
     fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
         // REVIEW: cache this?
         let ap = AccessPath::from(module_id);
-        self.get(ap).map_err(|e| e.finish(Location::Undefined))
+        self.get_m(ap).map_err(|e| e.finish(Location::Undefined))
     }
 }
 
@@ -190,7 +228,16 @@ impl<'a, S: StateViewWithRemoteCache> ResourceResolver for StorageAdapter<'a, S>
         address: &AccountAddress,
         struct_tag: &StructTag,
     ) -> Result<Option<Vec<u8>>, Self::Error> {
+        panic!("Called get_resource but should not!");
         self.get_any_resource(address, struct_tag)
+            .map(|maybe_write| {
+                maybe_write.map(|write| match write {
+                    AptosWrite::AggregatorValue(v) => unreachable!(),
+                    AptosWrite::Module(_) => unreachable!(),
+                    AptosWrite::Standard(r) => r.serialize().expect("should not fail"),
+                    AptosWrite::Group(_) => unreachable!(),
+                })
+            })
     }
 }
 
@@ -202,9 +249,15 @@ impl<'a, S: StateViewWithRemoteCache> ResourceResolverV2 for StorageAdapter<'a, 
         address: &AccountAddress,
         struct_tag: &StructTag,
     ) -> Result<Option<Resource>, Self::Error> {
-        // TODO: switch to Move values.
-        let resource_blob = self.get_any_resource(address, struct_tag);
-        resource_blob.map(|opt| opt.map(Resource::from_blob))
+        self.get_any_resource(address, struct_tag)
+            .map(|maybe_write| {
+                maybe_write.map(|write| match write {
+                    AptosWrite::AggregatorValue(v) => unreachable!(),
+                    AptosWrite::Module(_) => unreachable!(),
+                    AptosWrite::Standard(r) => r,
+                    AptosWrite::Group(_) => unreachable!(),
+                })
+            })
     }
 }
 
@@ -220,7 +273,11 @@ impl<'a, S: StateViewWithRemoteCache> TableResolver for StorageAdapter<'a, S> {
 
 impl<'a, S: StateViewWithRemoteCache> ConfigStorage for StorageAdapter<'a, S> {
     fn fetch_config(&self, access_path: AccessPath) -> Option<Vec<u8>> {
-        self.get(access_path).ok()?
+        let maybe_write = self.get_r(access_path).ok()?;
+        maybe_write.map(|write| match write {
+            AptosWrite::Standard(r) => r.serialize().expect("should not fail"),
+            _ => unreachable!(),
+        })
     }
 }
 
@@ -284,7 +341,7 @@ impl<S: StateViewWithRemoteCache> MoveResolverExt for StorageAdapterOwned<S> {
         &self,
         address: &AccountAddress,
         resource_group: &StructTag,
-    ) -> Result<Option<Vec<u8>>, VMError> {
+    ) -> Result<Option<AptosWrite>, VMError> {
         self.as_move_resolver()
             .get_resource_group_data(address, resource_group)
     }
@@ -293,7 +350,7 @@ impl<S: StateViewWithRemoteCache> MoveResolverExt for StorageAdapterOwned<S> {
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, VMError> {
+    ) -> Result<Option<AptosWrite>, VMError> {
         self.as_move_resolver()
             .get_standard_resource(address, struct_tag)
     }

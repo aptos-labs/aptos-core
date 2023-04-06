@@ -23,7 +23,7 @@ use aptos_types::{
         ApprovedExecutionHashes, ConfigurationResource, FeatureFlag, Features, GasSchedule,
         GasScheduleV2, OnChainConfig, StorageGasSchedule, TimedFeatures, Version,
     },
-    transaction::{AbortInfo, ExecutionStatus, Multisig, TransactionOutput, TransactionStatus},
+    transaction::{AbortInfo, ExecutionStatus, Multisig, TransactionStatus},
     vm_status::{StatusCode, VMStatus},
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
@@ -39,7 +39,7 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
 };
 use move_vm_runtime::logging::expect_no_verification_errors;
-use move_vm_types::gas::UnmeteredGasMeter;
+use move_vm_types::{gas::UnmeteredGasMeter, resolver::ResourceResolverV2};
 use std::sync::Arc;
 
 pub const MAXIMUM_APPROVED_TRANSACTION_SIZE: u64 = 1024 * 1024;
@@ -182,14 +182,14 @@ impl AptosVMImpl {
     }
 
     // TODO: Move this to an on-chain config once those are a part of the core framework
-    fn get_transaction_validation<S: ResourceResolver>(
+    fn get_transaction_validation<S: ResourceResolverV2>(
         remote_cache: &S,
     ) -> Option<TransactionValidation> {
         match remote_cache
-            .get_resource(&CORE_CODE_ADDRESS, &TransactionValidation::struct_tag())
+            .get_resource_v2(&CORE_CODE_ADDRESS, &TransactionValidation::struct_tag())
             .ok()?
         {
-            Some(blob) => bcs::from_bytes::<TransactionValidation>(&blob).ok(),
+            Some(r) => bcs::from_bytes::<TransactionValidation>(&r.serialize().expect("should not fail")).ok(),
             _ => None,
         }
     }
@@ -246,11 +246,11 @@ impl AptosVMImpl {
         // The transaction is too large.
         if txn_data.transaction_size > txn_gas_params.max_transaction_size_in_bytes {
             let data =
-                storage.get_resource(&CORE_CODE_ADDRESS, &ApprovedExecutionHashes::struct_tag());
+                storage.get_resource_v2(&CORE_CODE_ADDRESS, &ApprovedExecutionHashes::struct_tag());
 
-            let valid = if let Ok(Some(data)) = data {
+            let valid = if let Ok(Some(resource)) = data {
                 let approved_execution_hashes =
-                    bcs::from_bytes::<ApprovedExecutionHashes>(&data).ok();
+                    bcs::from_bytes::<ApprovedExecutionHashes>(&resource.serialize().expect("should not fail")).ok();
                 let valid = approved_execution_hashes
                     .map(|aeh| {
                         aeh.entries

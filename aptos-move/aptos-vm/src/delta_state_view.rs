@@ -67,14 +67,26 @@ where
 {
     type Key = StateKey;
 
-    fn get_cached_module(&self, state_key: &Self::Key) -> Result<Option<Vec<u8>>> {
-        todo!()
+    fn get_cached_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<AptosWrite>> {
+        match self.writes.get(state_key) {
+            Some(write_op) => Ok(match write_op {
+                Op::Creation(write) | Op::Modification(write) => {
+                    assert!(write.is_module());
+                    Some(write.clone())
+                },
+                Op::Deletion => None,
+            }),
+            None => self.base.get_cached_module(state_key),
+        }
     }
 
     fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosWrite>> {
         match self.writes.get(state_key) {
             Some(write_op) => Ok(match write_op {
-                Op::Creation(write) | Op::Modification(write) => Some(write.clone()),
+                Op::Creation(write) | Op::Modification(write) => {
+                    assert!(!write.is_module());
+                    Some(write.clone())
+                },
                 Op::Deletion => None,
             }),
             None => self.base.get_cached_resource(state_key),

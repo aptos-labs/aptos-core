@@ -39,7 +39,7 @@ use std::time::Instant;
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Key = StateKey;
-    type Value = Op<AptosWrite>;
+    // type Value = Op<AptosWrite>;
 }
 
 // Wrapper to avoid orphan rule

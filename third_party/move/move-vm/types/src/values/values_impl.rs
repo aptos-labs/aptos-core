@@ -552,6 +552,10 @@ impl FrozenValue {
     pub fn unfreeze(&self) -> PartialVMResult<Value> {
         Ok(Value(self.0.unfreeze()?))
     }
+
+    pub fn U128(v: u128) -> Self {
+        Self(FrozenValueImpl::U128(v))
+    }
 }
 
 impl ValueImpl {

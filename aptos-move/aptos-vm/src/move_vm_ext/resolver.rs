@@ -3,7 +3,7 @@
 
 use aptos_framework::{natives::state_storage::StateStorageUsageResolver, RuntimeModuleMetadataV1};
 use aptos_types::on_chain_config::ConfigStorage;
-use aptos_vm_types::remote_cache::StateViewWithRemoteCache;
+use aptos_vm_types::{remote_cache::StateViewWithRemoteCache, write::AptosWrite};
 use move_binary_format::errors::{Location, PartialVMError, VMError};
 use move_core_types::{
     account_address::AccountAddress,
@@ -27,19 +27,19 @@ pub trait MoveResolverExt:
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, VMError>;
+    ) -> Result<Option<AptosWrite>, VMError>;
 
     fn get_standard_resource(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, VMError>;
+    ) -> Result<Option<AptosWrite>, VMError>;
 
     fn get_any_resource(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, VMError> {
+    ) -> Result<Option<AptosWrite>, VMError> {
         let metadata = self.get_module_metadata(struct_tag.module_id());
         let resource_group = Self::get_resource_group_from_metadata(struct_tag, metadata);
         if let Some(resource_group) = resource_group {
@@ -54,15 +54,13 @@ pub trait MoveResolverExt:
         address: &AccountAddress,
         struct_tag: &StructTag,
         resource_group: &StructTag,
-    ) -> Result<Option<Vec<u8>>, VMError> {
+    ) -> Result<Option<AptosWrite>, VMError> {
         let group_data = self.get_resource_group_data(address, resource_group)?;
-        if let Some(group_data) = group_data {
-            let mut group_data: BTreeMap<StructTag, Vec<u8>> = bcs::from_bytes(&group_data)
-                .map_err(|_| {
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .finish(Location::Undefined)
-                })?;
-            Ok(group_data.remove(struct_tag))
+        if let Some(AptosWrite::Group(group_data)) = group_data {
+            Ok(group_data
+                .get(struct_tag)
+                .cloned()
+                .map(AptosWrite::Standard))
         } else {
             Ok(None)
         }

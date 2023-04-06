@@ -142,12 +142,19 @@ impl TStateView for FakeDataStore {
 impl TRemoteCache for FakeDataStore {
     type Key = StateKey;
 
-    fn get_cached_module(&self, state_key: &Self::Key) -> Result<Option<Vec<u8>>> {
-        todo!()
+    fn get_cached_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<AptosWrite>> {
+        let data = self.get_state_value_bytes(state_key);
+        data.map(|maybe_bytes| maybe_bytes.map(|bytes| AptosWrite::Module(bytes)))
     }
 
     fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosWrite>> {
-        todo!()
+        let data = self.get_state_value_bytes(state_key);
+        // TODO: How does it work with groups?
+        data.map(|maybe_bytes| {
+            maybe_bytes.map(|bytes| {
+                AptosWrite::Standard(move_vm_types::resolver::Resource::from_blob(bytes))
+            })
+        })
     }
 }
 

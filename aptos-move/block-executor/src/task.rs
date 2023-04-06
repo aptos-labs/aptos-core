@@ -4,7 +4,11 @@
 
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{executable::ModulePath, write_set::TransactionWrite};
-use aptos_vm_types::{delta::DeltaOp, remote_cache::TStateViewWithRemoteCache};
+use aptos_vm_types::{
+    delta::DeltaOp,
+    remote_cache::TStateViewWithRemoteCache,
+    write::{AptosWrite, Op},
+};
 use std::{fmt::Debug, hash::Hash};
 
 /// The execution result of a transaction
@@ -24,7 +28,7 @@ pub enum ExecutionStatus<T, E> {
 /// transaction will write to a key value storage as their side effect.
 pub trait Transaction: Sync + Send + 'static {
     type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug;
-    type Value: Send + Sync + TransactionWrite;
+    // type Value: Send + Sync + TransactionWrite;
 }
 
 /// Inference result of a transaction.
@@ -72,7 +76,7 @@ pub trait TransactionOutput: Send + Sync {
         &self,
     ) -> Vec<(
         <Self::Txn as Transaction>::Key,
-        <Self::Txn as Transaction>::Value,
+        Op<AptosWrite>, // <Self::Txn as Transaction>::Value,
     )>;
 
     /// Get the deltas of a transaction from its output.

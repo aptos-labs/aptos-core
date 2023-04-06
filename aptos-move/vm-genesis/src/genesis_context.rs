@@ -62,12 +62,19 @@ impl TStateView for GenesisStateView {
 impl TRemoteCache for GenesisStateView {
     type Key = StateKey;
 
-    fn get_cached_module(&self, state_key: &Self::Key) -> Result<Option<Vec<u8>>> {
-        todo!()
+    fn get_cached_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<AptosWrite>> {
+        let data = self.state_data.get(state_key).cloned();
+        let write = data.map(AptosWrite::Module);
+        Ok(write)
     }
 
     fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosWrite>> {
-        todo!()
+        let data = self.state_data.get(state_key).cloned();
+        // Will not be an aggregator, and ...
+        // TODO: should not be a group either?
+        let write = data
+            .map(|blob| AptosWrite::Standard(move_vm_types::resolver::Resource::from_blob(blob)));
+        Ok(write)
     }
 }
 

@@ -5,7 +5,10 @@ use crate::types::{Incarnation, MVDataError, MVDataOutput, TxnIndex, Version};
 use aptos_aggregator::{delta_change_set::deserialize, transaction::AggregatorValue};
 use aptos_infallible::Mutex;
 use aptos_types::write_set::TransactionWrite;
-use aptos_vm_types::delta::DeltaOp;
+use aptos_vm_types::{
+    delta::DeltaOp,
+    write::{AptosWrite, Op},
+};
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
 use std::{
@@ -22,23 +25,23 @@ const FLAG_ESTIMATE: usize = 1;
 
 /// Every entry in shared multi-version data-structure has an "estimate" flag
 /// and some content.
-struct Entry<V> {
+struct Entry {
     /// Used to mark the entry as a "write estimate". Even though the entry
     /// lives inside the DashMap and the entry access will have barriers, we
     /// still make the flag Atomic to provide acq/rel semantics on its own.
     flag: AtomicUsize,
 
     /// Actual contents.
-    pub cell: EntryCell<V>,
+    pub cell: EntryCell,
 }
 
 /// Represents the content of a single entry in multi-version data-structure.
-enum EntryCell<V> {
+enum EntryCell {
     /// Recorded in the shared multi-version data-structure for each write. It
     /// has: 1) Incarnation number of the transaction that wrote the entry (note
     /// that TxnIndex is part of the key and not recorded here), 2) actual data
     /// stored in a shared pointer (to ensure ownership and avoid clones).
-    Write(Incarnation, Arc<V>),
+    Write(Incarnation, Arc<Op<AptosWrite>>),
 
     /// Recorded in the shared multi-version data-structure for each delta.
     Delta(DeltaOp),
@@ -46,8 +49,8 @@ enum EntryCell<V> {
 
 /// A VersionedValue internally contains a BTreeMap from indices of transactions
 /// that update the given access path alongside the corresponding entries.
-struct VersionedValue<V> {
-    versioned_map: BTreeMap<TxnIndex, CachePadded<Entry<V>>>,
+struct VersionedValue {
+    versioned_map: BTreeMap<TxnIndex, CachePadded<Entry>>,
 
     // Note: this can cache base (storage) value in Option<u128> to facilitate
     // aggregator validation & reading in the future, if needed.
@@ -55,20 +58,20 @@ struct VersionedValue<V> {
 }
 
 /// Maps each key (access path) to an interal VersionedValue.
-pub struct VersionedData<K, V> {
-    values: DashMap<K, VersionedValue<V>>,
+pub struct VersionedData<K> {
+    values: DashMap<K, VersionedValue>,
     delta_keys: Mutex<Vec<K>>,
 }
 
-impl<V> Entry<V> {
-    pub fn new_write_from(flag: usize, incarnation: Incarnation, data: V) -> Entry<V> {
+impl Entry {
+    pub fn new_write_from(flag: usize, incarnation: Incarnation, data: Op<AptosWrite>) -> Entry {
         Entry {
             flag: AtomicUsize::new(flag),
             cell: EntryCell::Write(incarnation, Arc::new(data)),
         }
     }
 
-    pub fn new_delta_from(flag: usize, data: DeltaOp) -> Entry<V> {
+    pub fn new_delta_from(flag: usize, data: DeltaOp) -> Entry {
         Entry {
             flag: AtomicUsize::new(flag),
             cell: EntryCell::Delta(data),
@@ -84,7 +87,7 @@ impl<V> Entry<V> {
     }
 }
 
-impl<V: TransactionWrite> VersionedValue<V> {
+impl VersionedValue {
     pub fn new() -> Self {
         Self {
             versioned_map: BTreeMap::new(),
@@ -93,13 +96,13 @@ impl<V: TransactionWrite> VersionedValue<V> {
     }
 }
 
-impl<V: TransactionWrite> Default for VersionedValue<V> {
+impl Default for VersionedValue {
     fn default() -> Self {
         VersionedValue::new()
     }
 }
 
-impl<K: Hash + Clone + Eq, V: TransactionWrite> VersionedData<K, V> {
+impl<K: Hash + Clone + Eq> VersionedData<K> {
     pub(crate) fn new() -> Self {
         Self {
             values: DashMap::new(),
@@ -189,7 +192,7 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite> VersionedData<K, V> {
         &self,
         key: &K,
         txn_idx: TxnIndex,
-    ) -> anyhow::Result<MVDataOutput<V>, MVDataError> {
+    ) -> anyhow::Result<MVDataOutput, MVDataError> {
         use MVDataError::*;
         use MVDataOutput::*;
 
@@ -276,7 +279,7 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite> VersionedData<K, V> {
         }
     }
 
-    pub(crate) fn write(&self, key: &K, version: Version, data: V) {
+    pub(crate) fn write(&self, key: &K, version: Version, data: Op<AptosWrite>) {
         let (txn_idx, incarnation) = version;
 
         let mut v = self.values.entry(key.clone()).or_default();
