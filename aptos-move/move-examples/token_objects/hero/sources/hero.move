@@ -136,7 +136,7 @@ module token_objects::hero {
             weapon_type,
             weight,
         };
-				move_to(&token_signer, weapon);
+        move_to(&token_signer, weapon);
 
         object::address_to_object(signer::address_of(&token_signer))
     }
