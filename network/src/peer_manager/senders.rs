@@ -13,6 +13,7 @@ use crate::{
 use aptos_channels::{self, aptos_channel};
 use aptos_types::{network_address::NetworkAddress, PeerId};
 use bytes::Bytes;
+use fail::fail_point;
 use futures::channel::oneshot;
 use std::time::Duration;
 
@@ -47,6 +48,10 @@ impl PeerManagerRequestSender {
         protocol_id: ProtocolId,
         mdata: Bytes,
     ) -> Result<(), PeerManagerError> {
+        fail_point!("network::send::any", |_| {
+            // to look like it all went well
+            Ok(())
+        });
         self.inner.push(
             (peer_id, protocol_id),
             PeerManagerRequest::SendDirectSend(peer_id, Message { protocol_id, mdata }),
@@ -73,6 +78,11 @@ impl PeerManagerRequestSender {
     ) -> Result<(), PeerManagerError> {
         let msg = Message { protocol_id, mdata };
         for recipient in recipients {
+            // Make failure independent for each destination
+            fail_point!("network::send::any", |_| {
+                // to look like it all went well
+                Ok(())
+            });
             // We return `Err` early here if the send fails. Since sending will
             // only fail if the queue is unexpectedly shutdown (i.e., receiver
             // dropped early), we know that we can't make further progress if
@@ -100,6 +110,10 @@ impl PeerManagerRequestSender {
             res_tx,
             timeout,
         };
+        fail_point!("network::send::any", |_| {
+            std::thread::sleep(timeout);
+            Err(RpcError::TimedOut)
+        });
         self.inner.push(
             (peer_id, protocol_id),
             PeerManagerRequest::SendRpc(peer_id, request),

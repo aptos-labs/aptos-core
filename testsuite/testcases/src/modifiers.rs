@@ -146,7 +146,7 @@ impl NetworkLoadTest for NetworkUnreliabilityTest {
                 );
                 validator
                     .set_failpoint(
-                        "consensus::send::any".to_string(),
+                        "network::send::any".to_string(),
                         format!("{}%return", drop_percentage),
                     )
                     .await
@@ -171,7 +171,7 @@ impl NetworkLoadTest for NetworkUnreliabilityTest {
         runtime.block_on(async {
             for (name, validator) in validators {
                 validator
-                    .set_failpoint("consensus::send::any".to_string(), "off".to_string())
+                    .set_failpoint("network::send::any".to_string(), "off".to_string())
                     .await
                     .map_err(|e| {
                         anyhow::anyhow!(
