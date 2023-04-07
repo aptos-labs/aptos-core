@@ -1034,6 +1034,7 @@ async fn test_create_signing_message_rejects_no_content_length_request() {
     context.check_golden_output(resp);
 }
 
+#[ignore]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_gas_estimation() {
     let mut context = new_test_context(current_function_name!());

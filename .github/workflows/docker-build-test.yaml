@@ -69,15 +69,15 @@ permissions:
 # Note on the job-level `if` conditions:
 # This workflow is designed such that:
 # 1. Run ALL jobs when a 'push', 'workflow_dispatch' triggered the workflow or on 'pull_request's which have set auto_merge=true or have the label "CICD:run-e2e-tests".
-# 2. Run ONLY the docker image building jobs on PRs with the "CICD:build[-<PROFILE/FEATURE>]-images" label.
+# 2. Run ONLY the docker image building jobs on PRs with the "CICD:build-images" label.
 # 3. Run NOTHING when neither 1. or 2.'s conditions are satisfied.
 jobs:
   permission-check:
     if: |
       github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' ||
-      contains(join(github.event.pull_request.labels.*.name, ','), 'CICD:build-') ||
-      contains(join(github.event.pull_request.labels.*.name, ','), 'CICD:run-') ||
+      contains(github.event.pull_request.labels.*.name, 'CICD:build-images') ||
+      contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
       github.event.pull_request.auto_merge != null ||
       contains(github.event.pull_request.body, '#e2e')
     runs-on: ubuntu-latest
@@ -114,10 +114,6 @@ jobs:
   rust-images-indexer:
     needs: [permission-check, determine-docker-build-metadata]
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
-    if: |
-      github.event_name == 'push' ||
-      github.event_name == 'workflow_dispatch' ||
-      contains(github.event.pull_request.labels.*.name, 'CICD:build-indexer-images')
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -129,10 +125,6 @@ jobs:
   rust-images-failpoints:
     needs: [permission-check, determine-docker-build-metadata]
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
-    if: |
-      github.event_name == 'push' ||
-      github.event_name == 'workflow_dispatch' ||
-      contains(github.event.pull_request.labels.*.name, 'CICD:build-failpoints-images')
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -144,10 +136,6 @@ jobs:
   rust-images-performance:
     needs: [permission-check, determine-docker-build-metadata]
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
-    if: |
-      github.event_name == 'push' ||
-      github.event_name == 'workflow_dispatch' ||
-      contains(github.event.pull_request.labels.*.name, 'CICD:build-performance-images')
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -169,48 +157,14 @@ jobs:
       FEATURES: consensus-only-perf-test
       BUILD_ADDL_TESTING_IMAGES: true
 
-  rust-images-all:
-    needs:
-      [
-        determine-docker-build-metadata,
-        rust-images,
-        rust-images-indexer,
-        rust-images-failpoints,
-        rust-images-performance,
-        rust-images-consensus-only-perf-test,
-      ]
-    if: always() # this ensures that the job will run even if the previous jobs were skipped
-    runs-on: ubuntu-latest
-    steps:
-      - name: fail if rust-images job failed
-        if: ${{ needs.rust-images.result == 'failure' }}
-        run: exit 1
-      - name: fail if rust-images-indexer job failed
-        if: ${{ needs.rust-images-indexer.result == 'failure' }}
-        run: exit 1
-      - name: fail if rust-images-failpoints job failed
-        if: ${{ needs.rust-images-failpoints.result == 'failure' }}
-        run: exit 1
-      - name: fail if rust-images-performance job failed
-        if: ${{ needs.rust-images-performance.result == 'failure' }}
-        run: exit 1
-      - name: fail if rust-images-consensus-only-perf-test job failed
-        if: ${{ needs.rust-images-consensus-only-perf-test.result == 'failure' }}
-        run: exit 1
-    outputs:
-      rustImagesResult: ${{ needs.rust-images.result }}
-      rustImagesIndexerResult: ${{ needs.rust-images-indexer.result }}
-      rustImagesFailpointsResult: ${{ needs.rust-images-failpoints.result }}
-      rustImagesPerformanceResult: ${{ needs.rust-images-performance.result }}
-      rustImagesConsensusOnlyPerfTestResult: ${{ needs.rust-images-consensus-only-perf-test.result }}
-
   sdk-release:
-    needs: [rust-images-all]
+    needs: [rust-images, determine-docker-build-metadata]
     if: |
-      (github.event_name == 'push' && github.ref_name != 'main') ||
+      !contains(github.event.pull_request.labels.*.name, 'CICD:skip-sdk-integration-test') && (
+      github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' ||
       contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
-      github.event.pull_request.auto_merge != null ||
+      github.event.pull_request.auto_merge != null) ||
       contains(github.event.pull_request.body, '#e2e')
     uses: ./.github/workflows/sdk-release.yaml
     secrets: inherit
@@ -232,7 +186,8 @@ jobs:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
 
   forge-e2e-test:
-    needs: [rust-images-all, determine-docker-build-metadata]
+    needs:
+      [rust-images, rust-images-failpoints, determine-docker-build-metadata]
     if: |
       !contains(github.event.pull_request.labels.*.name, 'CICD:skip-forge-e2e-test') && (
         (github.event_name == 'push' && github.ref_name != 'main') ||
@@ -245,9 +200,6 @@ jobs:
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
-      FORGE_TEST_SUITE: land_blocking
-      IMAGE_TAG: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
-      FORGE_RUNNER_DURATION_SECS: 480
       COMMENT_HEADER: forge-e2e
       # Use the cache ID as the Forge namespace so we can limit Forge test concurrency on k8s, since Forge
       # test lifecycle is separate from that of GHA. This protects us from the case where many Forge tests are triggered
@@ -256,45 +208,57 @@ jobs:
 
   # Run e2e compat test against testnet branch
   forge-compat-test:
-    needs: [rust-images-all, determine-docker-build-metadata]
+    needs:
+      [rust-images, rust-images-failpoints, determine-docker-build-metadata]
     if: |
-      (github.event_name == 'push' && github.ref_name != 'main') ||
-      github.event_name == 'workflow_dispatch' ||
-      contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
-      github.event.pull_request.auto_merge != null ||
-      contains(github.event.pull_request.body, '#e2e')
-
+      !contains(github.event.pull_request.labels.*.name, 'CICD:skip-forge-e2e-test') && (
+        (github.event_name == 'push' && github.ref_name != 'main') ||
+        github.event_name == 'workflow_dispatch' ||
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
+        github.event.pull_request.auto_merge != null ||
+        contains(github.event.pull_request.body, '#e2e')
+      )
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_TEST_SUITE: compat
-      IMAGE_TAG: testnet_2d8b1b57553d869190f61df1aaf7f31a8fc19a7b # test against a previous testnet release
+      IMAGE_TAG: testnet_2d8b1b57553d869190f61df1aaf7f31a8fc19a7b # test against the latest build on testnet branch
       FORGE_RUNNER_DURATION_SECS: 300
       COMMENT_HEADER: forge-compat
+      # Use the cache ID as the Forge namespace so we can limit Forge test concurrency on k8s, since Forge
+      # test lifecycle is separate from that of GHA. This protects us from the case where many Forge tests are triggered
+      # by this GHA. If there is a Forge namespace collision, Forge will pre-empt the existing test running in the namespace.
       FORGE_NAMESPACE: forge-compat-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
-
+  
   # Run forge framework upgradability test
   forge-framework-upgrade-test:
-    needs: [rust-images-all, determine-docker-build-metadata]
+    needs:
+      [rust-images, rust-images-failpoints, determine-docker-build-metadata]
     if: |
-      (github.event_name == 'push' && github.ref_name != 'main') ||
-      github.event_name == 'workflow_dispatch' ||
-      contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
-      github.event.pull_request.auto_merge != null ||
-      contains(github.event.pull_request.body, '#e2e')
+      !contains(github.event.pull_request.labels.*.name, 'CICD:skip-forge-e2e-test') && (
+        (github.event_name == 'push' && github.ref_name != 'main') ||
+        github.event_name == 'workflow_dispatch' ||
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
+        github.event.pull_request.auto_merge != null ||
+        contains(github.event.pull_request.body, '#e2e')
+      )
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_TEST_SUITE: framework_upgrade
-      IMAGE_TAG: aptos-node-v1.3.0_3fc3d42b6cfe27460004f9a0326451bcda840a60 # This workflow will test the upgradability from the current tip of the release branch to the current main branch.
+      IMAGE_TAG: aptos-node-v1.3.0_3fc3d42b6cfe27460004f9a0326451bcda840a60  # This workflow will test the upgradability from the current tip of the release branch to the current main branch.
       FORGE_RUNNER_DURATION_SECS: 300
       COMMENT_HEADER: forge-framework-upgrade
+      # Use the cache ID as the Forge namespace so we can limit Forge test concurrency on k8s, since Forge
+      # test lifecycle is separate from that of GHA. This protects us from the case where many Forge tests are triggered
+      # by this GHA. If there is a Forge namespace collision, Forge will pre-empt the existing test running in the namespace.
       FORGE_NAMESPACE: forge-framework-upgrade-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
 
   forge-consensus-only-perf-test:
-    needs: [rust-images-all, determine-docker-build-metadata]
+    needs:
+      [rust-images-consensus-only-perf-test, determine-docker-build-metadata]
     if: |
       contains(github.event.pull_request.labels.*.name, 'CICD:run-consensus-only-perf-test')
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
@@ -305,4 +269,7 @@ jobs:
       IMAGE_TAG: consensus_only_perf_test_${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_RUNNER_DURATION_SECS: 300
       COMMENT_HEADER: forge-consensus-only-perf-test
+      # Use the cache ID as the Forge namespace so we can limit Forge test concurrency on k8s, since Forge
+      # test lifecycle is separate from that of GHA. This protects us from the case where many Forge tests are triggered
+      # by this GHA. If there is a Forge namespace collision, Forge will pre-empt the existing test running in the namespace.
       FORGE_NAMESPACE: forge-consensus-only-perf-test-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}

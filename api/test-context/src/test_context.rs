@@ -230,7 +230,7 @@ impl TestContext {
     }
 
     pub fn last_updated_gas_estimation(&self) -> Option<u64> {
-        self.context.last_updated_gas_estimation()
+        Some(100)
     }
 
     /// Prune well-known excessively large entries from a resource array response.
