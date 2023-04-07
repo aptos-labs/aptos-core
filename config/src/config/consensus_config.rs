@@ -59,6 +59,7 @@ pub struct ConsensusConfig {
     // must match one of the CHAIN_HEALTH_WINDOW_SIZES values.
     pub window_for_chain_health: usize,
     pub chain_health_backoff: Vec<ChainHealthBackoffValues>,
+    pub use_compression: bool, // compress messages for the network
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -136,6 +137,7 @@ impl Default for ConsensusConfig {
                     max_sending_block_bytes_override: 25 * 1024,
                 },
             ],
+            use_compression: true,
         }
     }
 }

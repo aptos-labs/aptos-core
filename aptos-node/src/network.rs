@@ -48,7 +48,15 @@ struct ApplicationNetworkHandle<T> {
 /// TODO: make this configurable (e.g., for compression)
 /// Returns the network application config for the consensus client and service
 pub fn consensus_network_configuration(node_config: &NodeConfig) -> NetworkApplicationConfig {
-    let direct_send_protocols: Vec<ProtocolId> = DIRECT_SEND.into();
+    let direct_send_protocols: Vec<ProtocolId> = if node_config.consensus.use_compression {
+        DIRECT_SEND.into()
+    } else {
+        DIRECT_SEND
+            .iter()
+            .filter(|&&x| x != ProtocolId::ConsensusDirectSendCompressed)
+            .copied()
+            .collect()
+    };
     let rpc_protocols: Vec<ProtocolId> = RPC.into();
 
     let network_client_config =
@@ -380,5 +388,29 @@ fn create_network_interfaces<
     ApplicationNetworkInterfaces {
         network_client,
         network_service_events,
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_consensus_network_configuration() {
+        let mut nc: NodeConfig = NodeConfig::default_for_validator();
+
+        nc.consensus.use_compression = true;
+        let nac1 = consensus_network_configuration(&nc);
+        assert!(nac1
+            .network_service_config
+            .direct_send_protocols_and_preferences
+            .contains(&ProtocolId::ConsensusDirectSendCompressed));
+
+        nc.consensus.use_compression = false;
+        let nac2 = consensus_network_configuration(&nc);
+        assert!(!nac2
+            .network_service_config
+            .direct_send_protocols_and_preferences
+            .contains(&ProtocolId::ConsensusDirectSendCompressed));
     }
 }
