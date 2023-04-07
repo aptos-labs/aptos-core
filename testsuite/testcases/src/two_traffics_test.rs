@@ -8,7 +8,7 @@ use crate::{
 use anyhow::{bail, Ok};
 use aptos_forge::{
     success_criteria::{LatencyType, SuccessCriteriaChecker},
-    EmitJobMode, EmitJobRequest, NetworkContext, NetworkTest, Result, Swarm, Test,
+    EmitJobMode, EmitJobRequest, NetworkContext, NetworkTest, Result, Swarm, Test, SwarmExt,
 };
 use aptos_logger::info;
 use rand::{rngs::OsRng, Rng, SeedableRng};
@@ -39,6 +39,10 @@ impl NetworkLoadTest for TwoTrafficsTest {
         );
         let nodes_to_send_load_to = LoadDestination::AllFullnodes.get_destination_nodes(swarm);
         let rng = ::rand::rngs::StdRng::from_seed(OsRng.gen());
+
+        // make sure all nodes have seen the account minting from outer txn emitter
+        // (so root_account sequence number is correct when fetched here)
+        swarm.wait_for_all_nodes_to_catchup(Duration::from_secs(30)).await?;
 
         let (emitter, emit_job_request) = create_emitter_and_request(
             swarm,
