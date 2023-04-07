@@ -21,6 +21,7 @@ pub mod errors;
 pub mod metrics;
 pub mod schema;
 pub mod state_restore;
+pub mod utils;
 
 mod db_options;
 mod event_store;
@@ -31,7 +32,6 @@ mod state_kv_db;
 mod state_merkle_db;
 mod state_store;
 mod transaction_store;
-mod utils;
 mod versioned_node_cache;
 
 #[cfg(test)]
@@ -2072,7 +2072,7 @@ impl DbWriter for AptosDB {
 
             // Create a single change set for all further write operations
             let mut batch = SchemaBatch::new();
-
+            let mut sharded_kv_batch = new_sharded_kv_schema_batch();
             // Save the target transactions, outputs, infos and events
             let (transactions, outputs): (Vec<Transaction>, Vec<TransactionOutput>) =
                 output_with_proof
@@ -2089,17 +2089,20 @@ impl DbWriter for AptosDB {
                 .map(|output| output.write_set().clone())
                 .collect();
             let transaction_infos = output_with_proof.proof.transaction_infos;
+            // We should not save the key value since the value is already recovered for this version
             restore_utils::save_transactions(
                 self.ledger_db.clone(),
                 self.ledger_store.clone(),
                 self.transaction_store.clone(),
                 self.event_store.clone(),
+                self.state_store.clone(),
                 version,
                 &transactions,
                 &transaction_infos,
                 &events,
                 wsets,
                 Some(&mut batch),
+                Some(&mut sharded_kv_batch), // we don't need to commit this batch since the key value should already be recovered from the snapshot
             )?;
 
             // Save the epoch ending ledger infos

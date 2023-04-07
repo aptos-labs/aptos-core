@@ -17,6 +17,7 @@ use crate::{
     utils::{unix_timestamp_sec, GlobalRestoreOptions, RestoreRunMode, TrustedWaypointOpt},
 };
 use anyhow::Result;
+use aptos_db::state_restore::StateSnapshotRestoreMode;
 use aptos_executor_types::VerifyExecutionMode;
 use aptos_logger::prelude::*;
 use aptos_types::transaction::Version;
@@ -131,6 +132,7 @@ impl VerifyCoordinator {
                     manifest_handle: backup.manifest,
                     version: backup.version,
                     validate_modules: self.validate_modules,
+                    restore_mode: StateSnapshotRestoreMode::Default,
                 },
                 global_opt.clone(),
                 Arc::clone(&self.storage),
@@ -149,6 +151,7 @@ impl VerifyCoordinator {
             epoch_history,
             VerifyExecutionMode::NoVerify,
             self.output_transaction_analysis,
+            None,
         )
         .run()
         .await?;

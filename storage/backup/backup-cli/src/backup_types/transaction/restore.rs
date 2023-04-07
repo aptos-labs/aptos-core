@@ -195,6 +195,7 @@ impl TransactionRestoreController {
             epoch_history,
             verify_execution_mode,
             None,
+            None,
         );
 
         Self { inner }
@@ -216,6 +217,7 @@ pub struct TransactionRestoreBatchController {
     epoch_history: Option<Arc<EpochHistory>>,
     verify_execution_mode: VerifyExecutionMode,
     output_transaction_analysis: Option<PathBuf>,
+    first_version: Option<Version>,
 }
 
 impl TransactionRestoreBatchController {
@@ -227,6 +229,7 @@ impl TransactionRestoreBatchController {
         epoch_history: Option<Arc<EpochHistory>>,
         verify_execution_mode: VerifyExecutionMode,
         output_transaction_analysis: Option<PathBuf>,
+        first_version: Option<Version>,
     ) -> Self {
         Self {
             global_opt,
@@ -236,6 +239,7 @@ impl TransactionRestoreBatchController {
             epoch_history,
             verify_execution_mode,
             output_transaction_analysis,
+            first_version,
         }
     }
 
@@ -259,9 +263,11 @@ impl TransactionRestoreBatchController {
         }
 
         let mut loaded_chunk_stream = self.loaded_chunk_stream();
-        let first_version = self
-            .confirm_or_save_frozen_subtrees(&mut loaded_chunk_stream)
-            .await?;
+        // first_version determines the start version for saving txns
+        let first_version = self.first_version.unwrap_or(
+            self.confirm_or_save_frozen_subtrees(&mut loaded_chunk_stream)
+                .await?,
+        );
 
         if let RestoreRunMode::Restore { restore_handler } = self.global_opt.run_mode.as_ref() {
             ensure!(
@@ -374,6 +380,7 @@ impl TransactionRestoreBatchController {
             impl Stream<Item = Result<(Transaction, TransactionInfo, WriteSet, Vec<ContractEvent>)>>,
         >,
     > {
+        // get the next expected transaction version of the current aptos db from txn_info CF
         let next_expected_version = self
             .global_opt
             .run_mode
@@ -382,10 +389,8 @@ impl TransactionRestoreBatchController {
 
         let restore_handler_clone = restore_handler.clone();
         // DB doesn't allow replaying anything before what's in DB already.
-        //
-        // TODO: notice that ideally we detect and avoid calling rh.save_transactions() for txns
-        //       before `first_to_replay` calculated below, but we don't deal with it for now,
-        //       because unlike replaying, that's allowed by the DB. Need to follow up later.
+        // self.replay_from_version is from cli argument. However, in fact, we either not replay or replay
+        // after current DB's version.
         let first_to_replay = max(
             self.replay_from_version.unwrap_or(Version::MAX),
             next_expected_version,
@@ -396,10 +401,11 @@ impl TransactionRestoreBatchController {
             .and_then(move |chunk| {
                 let restore_handler = restore_handler_clone.clone();
                 future::ok(async move {
-                    let first_version = chunk.manifest.first_version;
+                    let mut first_version = chunk.manifest.first_version;
                     let mut last_version = chunk.manifest.last_version;
                     let (mut txns, mut txn_infos, mut event_vecs, mut write_sets) = chunk.unpack();
 
+                    // remove the txns that exceeds the target_version to be restored
                     if target_version < last_version {
                         let num_to_keep = (target_version - first_version + 1) as usize;
                         txns.drain(num_to_keep..);
@@ -409,6 +415,17 @@ impl TransactionRestoreBatchController {
                         last_version = target_version;
                     }
 
+                    // remove the txns that are before the global_first_version
+                    if global_first_version > first_version {
+                        let num_to_remove = (global_first_version - first_version) as usize;
+                        txns.drain(..num_to_remove);
+                        txn_infos.drain(..num_to_remove);
+                        event_vecs.drain(..num_to_remove);
+                        write_sets.drain(..num_to_remove);
+                        first_version = global_first_version;
+                    }
+
+                    // identify txn that to be saved before the first_to_replay version
                     if first_version < first_to_replay {
                         let num_to_save =
                             (min(first_to_replay, last_version + 1) - first_version) as usize;
@@ -437,7 +454,7 @@ impl TransactionRestoreBatchController {
                             "Transactions saved."
                         );
                     }
-
+                    // create iterator of txn and its outputs to be replayed after the snapshot.
                     Ok(stream::iter(
                         izip!(txns, txn_infos, write_sets, event_vecs)
                             .into_iter()
@@ -474,7 +491,7 @@ impl TransactionRestoreBatchController {
         let replay_start = Instant::now();
         let db = DbReaderWriter::from_arc(Arc::clone(&restore_handler.aptosdb));
         let chunk_replayer = Arc::new(ChunkExecutor::<AptosVM>::new(db));
-
+        // Use stream to update the kv and SMT buffered state separately with a long buffer.
         let db_commit_stream = txns_to_execute_stream
             .try_chunks(BATCH_SIZE)
             .err_into::<anyhow::Error>()

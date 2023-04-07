@@ -894,10 +894,13 @@ dependencies = [
  "aptos-executor-types",
  "aptos-logger",
  "aptos-push-metrics",
+ "aptos-state-view",
+ "aptos-storage-interface",
  "aptos-temppath",
  "aptos-types",
  "async-trait",
  "clap 3.2.23",
+ "itertools",
  "owo-colors",
  "tokio",
 ]
