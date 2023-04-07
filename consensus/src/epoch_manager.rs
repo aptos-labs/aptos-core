@@ -844,49 +844,48 @@ impl EpochManager {
         if let Some(unverified_event) = maybe_unverified_event {
             // filter out quorum store messages if quorum store has not been enabled
             match self.filter_quorum_store_events(peer_id, &unverified_event) {
-                Ok(true) => {
-                    // same epoch -> run well-formedness + signature check
-                    let epoch_state = self.epoch_state.clone().unwrap();
-                    let quorum_store_enabled = self.quorum_store_enabled;
-                    let quorum_store_msg_tx = self.quorum_store_msg_tx.clone();
-                    let buffer_manager_msg_tx = self.buffer_manager_msg_tx.clone();
-                    let round_manager_tx = self.round_manager_tx.clone();
-                    let my_peer_id = self.author;
-                    self.bounded_executor
-                        .spawn(async move {
-                            match monitor!(
-                                "verify_message",
-                                unverified_event.clone().verify(
-                                    peer_id,
-                                    &epoch_state.verifier,
-                                    quorum_store_enabled,
-                                    peer_id == my_peer_id,
-                                )
-                            ) {
-                                Ok(verified_event) => {
-                                    Self::forward_event(
-                                        quorum_store_msg_tx,
-                                        buffer_manager_msg_tx,
-                                        round_manager_tx,
-                                        peer_id,
-                                        verified_event,
-                                    );
-                                },
-                                Err(e) => {
-                                    error!(
-                                        SecurityEvent::ConsensusInvalidMessage,
-                                        remote_peer = peer_id,
-                                        error = ?e,
-                                        unverified_event = unverified_event
-                                    );
-                                },
-                            }
-                        })
-                        .await;
-                },
-                Ok(false) => {}, // This occurs when the quorum store is not enabled, but the recovery mode is enabled. We filter out the messages, but don't raise any error.
+                Ok(true) => (),
+                Ok(false) => return Ok(()), // This occurs when the quorum store is not enabled, but the recovery mode is enabled. We filter out the messages, but don't raise any error.
                 Err(err) => return Err(err),
             }
+            // same epoch -> run well-formedness + signature check
+            let epoch_state = self.epoch_state.clone().unwrap();
+            let quorum_store_enabled = self.quorum_store_enabled;
+            let quorum_store_msg_tx = self.quorum_store_msg_tx.clone();
+            let buffer_manager_msg_tx = self.buffer_manager_msg_tx.clone();
+            let round_manager_tx = self.round_manager_tx.clone();
+            let my_peer_id = self.author;
+            self.bounded_executor
+                .spawn(async move {
+                    match monitor!(
+                        "verify_message",
+                        unverified_event.clone().verify(
+                            peer_id,
+                            &epoch_state.verifier,
+                            quorum_store_enabled,
+                            peer_id == my_peer_id,
+                        )
+                    ) {
+                        Ok(verified_event) => {
+                            Self::forward_event(
+                                quorum_store_msg_tx,
+                                buffer_manager_msg_tx,
+                                round_manager_tx,
+                                peer_id,
+                                verified_event,
+                            );
+                        },
+                        Err(e) => {
+                            error!(
+                                SecurityEvent::ConsensusInvalidMessage,
+                                remote_peer = peer_id,
+                                error = ?e,
+                                unverified_event = unverified_event
+                            );
+                        },
+                    }
+                })
+                .await;
         }
         Ok(())
     }
