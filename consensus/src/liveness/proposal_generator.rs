@@ -94,9 +94,9 @@ impl ChainHealthBackoffConfig {
 /// round.
 /// ProposalGenerator is the one choosing the branch to extend:
 /// - round is given by the caller (typically determined by RoundState).
-/// The transactions for the proposed block are delivered by TxnManager.
+/// The transactions for the proposed block are delivered by PayloadClient.
 ///
-/// TxnManager should be aware of the pending transactions in the branch that it is extending,
+/// PayloadClient should be aware of the pending transactions in the branch that it is extending,
 /// such that it will filter them out to avoid transaction duplication.
 pub struct ProposalGenerator {
     // The account address of this validator
@@ -171,9 +171,9 @@ impl ProposalGenerator {
     }
 
     /// The function generates a new proposal block: the returned future is fulfilled when the
-    /// payload is delivered by the TxnManager implementation.  At most one proposal can be
+    /// payload is delivered by the PayloadClient implementation.  At most one proposal can be
     /// generated per round (no proposal equivocation allowed).
-    /// Errors returned by the TxnManager implementation are propagated to the caller.
+    /// Errors returned by the PayloadClient implementation are propagated to the caller.
     /// The logic for choosing the branch to extend is as follows:
     /// 1. The function gets the highest head of a one-chain from block tree.
     /// The new proposal must extend hqc to ensure optimistic responsiveness.

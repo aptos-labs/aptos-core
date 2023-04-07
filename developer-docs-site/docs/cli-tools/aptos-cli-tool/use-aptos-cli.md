@@ -651,7 +651,7 @@ $ aptos account transfer --account superuser --amount 100
 
 ### Generating a key
 
-To allow generating private keys, you can use the `aptos key generate command`.  You can generate
+To allow generating private keys, you can use the `aptos key generate` command.  You can generate
 either `x25519` or `ed25519` keys.
 ```bash
 $ aptos key generate --key-type ed25519 --output-file output.key
