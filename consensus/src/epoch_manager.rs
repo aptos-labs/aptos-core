@@ -844,7 +844,7 @@ impl EpochManager {
         if let Some(unverified_event) = maybe_unverified_event {
             // filter out quorum store messages if quorum store has not been enabled
             match self.filter_quorum_store_events(peer_id, &unverified_event) {
-                Ok(true) => (),
+                Ok(true) => {},
                 Ok(false) => return Ok(()), // This occurs when the quorum store is not enabled, but the recovery mode is enabled. We filter out the messages, but don't raise any error.
                 Err(err) => return Err(err),
             }
