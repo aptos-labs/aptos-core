@@ -51,8 +51,11 @@ impl ApplyChunkOutput {
             let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
                 .with_label_values(&["sort_transactions"])
                 .start_timer();
-            // Separate transactions with different VM statuses.
-            Self::sort_transactions(
+            // Separate transactions with different VM statuses, i.e., Keep, Discard and Retry.
+            // Will return transactions with Retry txns sorted after Keep/Discard txns.
+            // If the transactions contain no reconfiguration txn, will insert the StateCheckpoint txn
+            // at the boundary of Keep/Discard txns and Retry txns.
+            Self::sort_transactions_with_state_checkpoint(
                 transactions,
                 transaction_outputs,
                 append_state_checkpoint_to_block,
@@ -92,7 +95,7 @@ impl ApplyChunkOutput {
         ))
     }
 
-    fn sort_transactions(
+    fn sort_transactions_with_state_checkpoint(
         mut transactions: Vec<Transaction>,
         transaction_outputs: Vec<TransactionOutput>,
         append_state_checkpoint_to_block: Option<HashValue>,
@@ -103,7 +106,6 @@ impl ApplyChunkOutput {
         Vec<Transaction>,
         Vec<Transaction>,
     )> {
-        let num_txns = transactions.len();
         let mut transaction_outputs: Vec<ParsedTransactionOutput> =
             transaction_outputs.into_iter().map(Into::into).collect();
         // N.B. off-by-1 intentionally, for exclusive index
@@ -128,28 +130,16 @@ impl ApplyChunkOutput {
             vec![]
         };
 
-        let status: Vec<TransactionStatus> =
-            if append_state_checkpoint_to_block.is_some() && new_epoch_marker.is_none() {
-                // Append the StateCheckpoint transaction to status
-                transaction_outputs
-                    .iter()
-                    .map(|t| t.status())
-                    .cloned()
-                    .chain(once(TransactionStatus::Keep(ExecutionStatus::Success)))
-                    .chain(repeat(TransactionStatus::Retry))
-                    .take(num_txns + 1)
-                    .collect()
-            } else {
-                // For state sync execution or epoch change,
-                // no StateCheckpoint transaction is appended
-                transaction_outputs
-                    .iter()
-                    .map(|t| t.status())
-                    .cloned()
-                    .chain(repeat(TransactionStatus::Retry))
-                    .take(num_txns)
-                    .collect()
-            };
+        let state_checkpoint_to_add = new_epoch_marker.map_or_else(|| append_state_checkpoint_to_block, |_| None);
+
+        let keeps_and_discards = transaction_outputs.iter().map(|t| t.status()).cloned();
+        let retries = repeat(TransactionStatus::Retry).take(to_retry.len());
+
+        let status = if state_checkpoint_to_add.is_some() {
+            keeps_and_discards.chain(once(TransactionStatus::Keep(ExecutionStatus::Success))).chain(retries).collect()
+        } else {
+            keeps_and_discards.chain(retries).collect()
+        };
 
         // Separate transactions with the Keep status out.
         let (mut to_keep, to_discard) =
@@ -159,18 +149,16 @@ impl ApplyChunkOutput {
                 });
 
         // Append the StateCheckpoint transaction to the end of to_keep
-        if let Some(block_id) = append_state_checkpoint_to_block {
-            if new_epoch_marker.is_none() {
-                let state_checkpoint_txn = Transaction::StateCheckpoint(block_id);
-                let state_checkpoint_txn_output: ParsedTransactionOutput =
-                    Into::into(TransactionOutput::new(
-                        WriteSet::default(),
-                        Vec::new(),
-                        0,
-                        TransactionStatus::Keep(ExecutionStatus::Success),
-                    ));
-                to_keep.push((state_checkpoint_txn, state_checkpoint_txn_output));
-            }
+        if let Some(block_id) = state_checkpoint_to_add {
+            let state_checkpoint_txn = Transaction::StateCheckpoint(block_id);
+            let state_checkpoint_txn_output: ParsedTransactionOutput =
+                Into::into(TransactionOutput::new(
+                    WriteSet::default(),
+                    Vec::new(),
+                    0,
+                    TransactionStatus::Keep(ExecutionStatus::Success),
+                ));
+            to_keep.push((state_checkpoint_txn, state_checkpoint_txn_output));
         }
 
         // Sanity check transactions with the Discard status:

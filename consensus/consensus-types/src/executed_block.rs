@@ -117,19 +117,13 @@ impl ExecutedBlock {
 
         let mut txns_with_state_checkpoint = self.block.transactions_to_execute(validators, txns);
         if !self.state_compute_result.has_reconfiguration() {
-            // Insert state checkpoint to the last txn with status Keep
-            let last_pos_with_status_keep = self
-                .state_compute_result
-                .compute_status()
-                .iter()
-                .enumerate()
-                .rev()
-                .find_map(|(i, status)| match status.status() {
-                    Ok(_) => Some(i),
-                    _ => None,
-                });
-            if let Some(pos) = last_pos_with_status_keep {
+            // Insert state checkpoint at the position
+            // 1) after last txn if there is no Retry
+            // 2) before the first Retry
+            if let Some(pos) = self.state_compute_result.compute_status().iter().position(|s| s.is_retry()) {
                 txns_with_state_checkpoint.insert(pos, Transaction::StateCheckpoint(self.id()));
+            } else {
+                txns_with_state_checkpoint.push(Transaction::StateCheckpoint(self.id()));
             }
         }
 
