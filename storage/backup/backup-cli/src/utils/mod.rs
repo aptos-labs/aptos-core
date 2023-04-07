@@ -20,7 +20,8 @@ use aptos_crypto::HashValue;
 use aptos_db::{
     backup::restore_handler::RestoreHandler,
     state_restore::{
-        StateSnapshotProgress, StateSnapshotRestore, StateValueBatch, StateValueWriter,
+        StateSnapshotProgress, StateSnapshotRestore, StateSnapshotRestoreMode, StateValueBatch,
+        StateValueWriter,
     },
     AptosDB, GetRestoreHandler,
 };
@@ -207,11 +208,14 @@ impl RestoreRunMode {
         &self,
         version: Version,
         expected_root_hash: HashValue,
+        restore_mode: StateSnapshotRestoreMode,
     ) -> Result<StateSnapshotRestore<StateKey, StateValue>> {
         match self {
-            Self::Restore { restore_handler } => {
-                restore_handler.get_state_restore_receiver(version, expected_root_hash)
-            },
+            Self::Restore { restore_handler } => restore_handler.get_state_restore_receiver(
+                version,
+                expected_root_hash,
+                restore_mode,
+            ),
             Self::Verify => {
                 let mock_store = Arc::new(MockStore);
                 StateSnapshotRestore::new_overwrite(
@@ -219,6 +223,7 @@ impl RestoreRunMode {
                     &mock_store,
                     version,
                     expected_root_hash,
+                    restore_mode,
                 )
             },
         }

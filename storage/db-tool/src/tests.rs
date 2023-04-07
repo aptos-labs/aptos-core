@@ -2,7 +2,28 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::DBTool;
+use aptos_backup_cli::{
+    coordinators::backup::BackupCompactor,
+    metadata,
+    metadata::{cache::MetadataCacheOpt, view::MetadataView},
+    storage::{local_fs::LocalFs, BackupStorage},
+};
+use aptos_backup_service::start_backup_service;
+use aptos_config::config::RocksdbConfigs;
+use aptos_db::AptosDB;
+use aptos_executor_test_helpers::integration_test_impl::test_execution_with_storage_impl;
+use aptos_temppath::TempPath;
+use aptos_types::{
+    state_store::{state_key::StateKeyTag::AccessPath, state_key_prefix::StateKeyPrefix},
+    transaction::Version,
+};
 use clap::Parser;
+use std::{
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    ops::Deref,
+    sync::Arc,
+    time::Duration,
+};
 
 #[test]
 fn test_various_cmd_parsing() {
@@ -252,4 +273,217 @@ mod compaction_tests {
         assert_metadata_view_eq(&old_metaview, &new_metaview);
         rt.shutdown_timeout(Duration::from_secs(1));
     }
+}
+
+#[cfg(test)]
+fn db_restore_test_setup(start: Version, end: Version) {
+    use aptos_db::utils::iterators::PrefixedStateValueIterator;
+    use aptos_storage_interface::DbReader;
+    use itertools::zip_eq;
+    let db = test_execution_with_storage_impl();
+    let backup_dir = TempPath::new();
+    backup_dir.create_as_dir().unwrap();
+    let rt = start_backup_service(
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 6186),
+        Arc::clone(&db),
+    );
+
+    // Backup the local_test DB
+    rt.block_on(
+        DBTool::try_parse_from([
+            "aptos-db-tool",
+            "backup",
+            "oneoff",
+            "epoch-ending",
+            "--start-epoch",
+            "0",
+            "--end-epoch",
+            "1",
+            "--local-fs-dir",
+            backup_dir.path().to_str().unwrap(),
+        ])
+        .unwrap()
+        .run(),
+    )
+    .unwrap();
+
+    rt.block_on(
+        DBTool::try_parse_from([
+            "aptos-db-tool",
+            "backup",
+            "oneoff",
+            "epoch-ending",
+            "--start-epoch",
+            "1",
+            "--end-epoch",
+            "2",
+            "--local-fs-dir",
+            backup_dir.path().to_str().unwrap(),
+        ])
+        .unwrap()
+        .run(),
+    )
+    .unwrap();
+
+    rt.block_on(
+        DBTool::try_parse_from([
+            "aptos-db-tool",
+            "backup",
+            "oneoff",
+            "state-snapshot",
+            "--state-snapshot-epoch",
+            "0",
+            "--local-fs-dir",
+            backup_dir.path().to_str().unwrap(),
+        ])
+        .unwrap()
+        .run(),
+    )
+    .unwrap();
+
+    rt.block_on(
+        DBTool::try_parse_from([
+            "aptos-db-tool",
+            "backup",
+            "oneoff",
+            "state-snapshot",
+            "--state-snapshot-epoch",
+            "1",
+            "--local-fs-dir",
+            backup_dir.path().to_str().unwrap(),
+        ])
+        .unwrap()
+        .run(),
+    )
+    .unwrap();
+
+    rt.block_on(
+        DBTool::try_parse_from([
+            "aptos-db-tool",
+            "backup",
+            "oneoff",
+            "state-snapshot",
+            "--state-snapshot-epoch",
+            "2",
+            "--local-fs-dir",
+            backup_dir.path().to_str().unwrap(),
+        ])
+        .unwrap()
+        .run(),
+    )
+    .unwrap();
+    rt.block_on(
+        DBTool::try_parse_from([
+            "aptos-db-tool",
+            "backup",
+            "oneoff",
+            "transaction",
+            "--start-version",
+            "0",
+            "--num_transactions",
+            "15",
+            "--local-fs-dir",
+            backup_dir.path().to_str().unwrap(),
+        ])
+        .unwrap()
+        .run(),
+    )
+    .unwrap();
+    rt.block_on(
+        DBTool::try_parse_from([
+            "aptos-db-tool",
+            "backup",
+            "oneoff",
+            "transaction",
+            "--start-version",
+            "15",
+            "--num_transactions",
+            "15",
+            "--local-fs-dir",
+            backup_dir.path().to_str().unwrap(),
+        ])
+        .unwrap()
+        .run(),
+    )
+    .unwrap();
+    // boostrap a historical DB starting from version 1 to version 12
+    let new_db_dir = TempPath::new();
+    rt.block_on(
+        DBTool::try_parse_from([
+            "aptos-db-tool",
+            "restore",
+            "bootstrap-db",
+            //"--ledger-history-start-version",
+            // format!("{}", start).as_str(),
+            "--target-version",
+            format!("{}", end).as_str(),
+            "--target-db-dir",
+            new_db_dir.path().to_str().unwrap(),
+            "--local-fs-dir",
+            backup_dir.path().to_str().unwrap(),
+        ])
+        .unwrap()
+        .run(),
+    )
+    .unwrap();
+
+    // verify the new DB has the same data as the original DB
+    let (ledger_db, tree_db, _) = AptosDB::open_dbs(
+        new_db_dir.path().to_path_buf(),
+        RocksdbConfigs::default(),
+        true,
+        0,
+    )
+    .unwrap();
+
+    // assert the kv are the same in db and new_db
+    // current all the kv are still stored in the ledger db
+    for ver in start..=end {
+        let new_iter = PrefixedStateValueIterator::new(
+            ledger_db.deref(),
+            StateKeyPrefix::new(AccessPath, b"".to_vec()),
+            None,
+            ver,
+        )
+        .unwrap();
+        let old_iter = db
+            .deref()
+            .get_prefixed_state_value_iterator(
+                &StateKeyPrefix::new(AccessPath, b"".to_vec()),
+                None,
+                ver,
+            )
+            .unwrap();
+
+        zip_eq(new_iter, old_iter).for_each(|(new, old)| {
+            let (new_key, new_value) = new.unwrap();
+            let (old_key, old_value) = old.unwrap();
+            assert_eq!(new_key, old_key);
+            assert_eq!(new_value, old_value);
+        });
+    }
+    // first snapshot tree recovered
+    assert!(
+        tree_db.get_root_hash(0).is_err(),
+        "tree at version 0 should not be restored"
+    );
+    // second snapshot tree recovered
+    let second_snapshot_version: Version = 13;
+    assert!(
+        tree_db.get_root_hash(second_snapshot_version).is_ok(),
+        "root hash at version {} doesn't exist",
+        second_snapshot_version,
+    );
+
+    rt.shutdown_timeout(Duration::from_secs(1));
+}
+#[test]
+fn test_restore_db_with_replay() {
+    // Test the basic db boostrap that replays from previous snapshot to the target version
+    db_restore_test_setup(16, 16);
+}
+#[test]
+fn test_restore_archive_db() {
+    // Test the db boostrap in some historical range with all the kvs restored
+    db_restore_test_setup(1, 16);
 }

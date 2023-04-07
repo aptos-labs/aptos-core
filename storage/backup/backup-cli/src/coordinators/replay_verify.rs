@@ -142,6 +142,7 @@ impl ReplayVerifyCoordinator {
                     manifest_handle: backup.manifest,
                     version: backup.version,
                     validate_modules: self.validate_modules,
+                    restore_mode: Default::default(),
                 },
                 global_opt.clone(),
                 Arc::clone(&self.storage),
@@ -159,6 +160,7 @@ impl ReplayVerifyCoordinator {
             Some(replay_transactions_from_version), /* replay_from_version */
             None,                                   /* epoch_history */
             self.verify_execution_mode.clone(),
+            None,
             None,
         )
         .run()

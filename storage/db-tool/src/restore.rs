@@ -60,6 +60,16 @@ pub enum Oneoff {
         #[clap(flatten)]
         global: GlobalRestoreOpt,
     },
+    /// Restore the db in a historical time frame with [ledger-history-start-version, target-version]
+    /// The restored the DB has both key-value and write sets restored
+    Bundle {
+        #[clap(flatten)]
+        storage: DBToolStorageOpt,
+        #[clap(flatten)]
+        opt: RestoreCoordinatorOpt,
+        #[clap(flatten)]
+        global: GlobalRestoreOpt,
+    },
 }
 
 impl Command {
@@ -105,6 +115,19 @@ impl Command {
                             storage.init_storage().await?,
                             None, /* epoch_history */
                             VerifyExecutionMode::NoVerify,
+                        )
+                        .run()
+                        .await?;
+                    },
+                    Oneoff::Bundle {
+                        storage,
+                        opt,
+                        global,
+                    } => {
+                        RestoreCoordinator::new(
+                            opt,
+                            global.try_into()?,
+                            storage.init_storage().await?,
                         )
                         .run()
                         .await?;
