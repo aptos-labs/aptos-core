@@ -60,6 +60,7 @@ impl RestoreHandler {
         &self,
         version: Version,
         expected_root_hash: HashValue,
+        kv_only: bool,
     ) -> Result<StateSnapshotRestore<StateKey, StateValue>> {
         StateSnapshotRestore::new(
             &self.state_store.state_merkle_db,
@@ -67,6 +68,7 @@ impl RestoreHandler {
             version,
             expected_root_hash,
             true, /* async_commit */
+            kv_only,
         )
     }
 

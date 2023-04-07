@@ -142,6 +142,7 @@ impl ReplayVerifyCoordinator {
                     manifest_handle: backup.manifest,
                     version: backup.version,
                     validate_modules: self.validate_modules,
+                    kv_only: false,
                 },
                 global_opt.clone(),
                 Arc::clone(&self.storage),

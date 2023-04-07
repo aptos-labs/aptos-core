@@ -204,10 +204,11 @@ impl RestoreRunMode {
         &self,
         version: Version,
         expected_root_hash: HashValue,
+        kv_only: bool,
     ) -> Result<StateSnapshotRestore<StateKey, StateValue>> {
         match self {
             Self::Restore { restore_handler } => {
-                restore_handler.get_state_restore_receiver(version, expected_root_hash)
+                restore_handler.get_state_restore_receiver(version, expected_root_hash, kv_only)
             },
             Self::Verify => {
                 let mock_store = Arc::new(MockStore);
@@ -216,6 +217,7 @@ impl RestoreRunMode {
                     &mock_store,
                     version,
                     expected_root_hash,
+                    kv_only,
                 )
             },
         }

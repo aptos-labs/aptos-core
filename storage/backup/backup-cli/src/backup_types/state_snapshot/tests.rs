@@ -78,6 +78,7 @@ fn end_to_end() {
                 manifest_handle,
                 version,
                 validate_modules: false,
+                kv_only: false,
             },
             GlobalRestoreOpt {
                 dry_run: false,

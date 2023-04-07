@@ -134,6 +134,7 @@ fn test_end_to_end_impl(d: TestData) {
                     manifest_handle: state_snapshot_manifest.unwrap(),
                     version,
                     validate_modules: false,
+                    kv_only: false,
                 },
                 global_restore_opt.clone(),
                 Arc::clone(&store),

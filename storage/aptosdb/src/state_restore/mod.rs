@@ -115,6 +115,7 @@ impl<K: Key + CryptoHash + Eq + Hash, V: Value> StateValueRestore<K, V> {
 pub struct StateSnapshotRestore<K, V> {
     tree_restore: Arc<Mutex<Option<JellyfishMerkleRestore<K>>>>,
     kv_restore: Arc<Mutex<Option<StateValueRestore<K, V>>>>,
+    kv_only: bool,
 }
 
 impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotRestore<K, V> {
@@ -124,6 +125,7 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotRestore<K, V> {
         version: Version,
         expected_root_hash: HashValue,
         async_commit: bool,
+        kv_only: bool,
     ) -> Result<Self> {
         Ok(Self {
             tree_restore: Arc::new(Mutex::new(Some(JellyfishMerkleRestore::new(
@@ -136,6 +138,7 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotRestore<K, V> {
                 Arc::clone(value_store),
                 version,
             )))),
+            kv_only,
         })
     }
 
@@ -144,6 +147,7 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotRestore<K, V> {
         value_store: &Arc<S>,
         version: Version,
         expected_root_hash: HashValue,
+        kv_only: bool,
     ) -> Result<Self> {
         Ok(Self {
             tree_restore: Arc::new(Mutex::new(Some(JellyfishMerkleRestore::new_overwrite(
@@ -155,6 +159,7 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotRestore<K, V> {
                 Arc::clone(value_store),
                 version,
             )))),
+            kv_only,
         })
     }
 
@@ -208,14 +213,19 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotReceiver<K, V>
                     .add_chunk(chunk.clone())
             },
             || {
-                let _timer = OTHER_TIMERS_SECONDS
-                    .with_label_values(&["jmt_add_chunk"])
-                    .start_timer();
-                self.tree_restore
-                    .lock()
-                    .as_mut()
-                    .unwrap()
-                    .add_chunk_impl(chunk.iter().map(|(k, v)| (k, v.hash())).collect(), proof)
+                // bypass tree restore if kv_only
+                if self.kv_only {
+                    Ok(())
+                } else {
+                    let _timer = OTHER_TIMERS_SECONDS
+                        .with_label_values(&["jmt_add_chunk"])
+                        .start_timer();
+                    self.tree_restore
+                        .lock()
+                        .as_mut()
+                        .unwrap()
+                        .add_chunk_impl(chunk.iter().map(|(k, v)| (k, v.hash())).collect(), proof)
+                }
             },
         );
         r1?;
@@ -225,11 +235,19 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotReceiver<K, V>
 
     fn finish(self) -> Result<()> {
         self.kv_restore.lock().take().unwrap().finish()?;
-        self.tree_restore.lock().take().unwrap().finish_impl()
+        if !self.kv_only {
+            self.tree_restore.lock().take().unwrap().finish_impl()
+        } else {
+            Ok(())
+        }
     }
 
     fn finish_box(self: Box<Self>) -> Result<()> {
         self.kv_restore.lock().take().unwrap().finish()?;
-        self.tree_restore.lock().take().unwrap().finish_impl()
+        if !self.kv_only {
+            self.tree_restore.lock().take().unwrap().finish_impl()
+        } else {
+            Ok(())
+        }
     }
 }

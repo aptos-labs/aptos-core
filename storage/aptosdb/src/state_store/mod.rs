@@ -840,6 +840,7 @@ impl StateStore {
             version,
             expected_root_hash,
             false, /* async_commit */
+            false,
         )?))
     }
 

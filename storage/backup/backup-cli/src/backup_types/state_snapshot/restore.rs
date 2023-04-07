@@ -53,6 +53,8 @@ pub struct StateSnapshotRestoreOpt {
     pub version: Version,
     #[clap(long)]
     pub validate_modules: bool,
+    #[clap(long, default_value = "false")]
+    pub kv_only: bool,
 }
 
 pub struct StateSnapshotRestoreController {
@@ -67,6 +69,7 @@ pub struct StateSnapshotRestoreController {
     epoch_history: Option<Arc<EpochHistory>>,
     concurrent_downloads: usize,
     validate_modules: bool,
+    kv_only: bool,
 }
 
 impl StateSnapshotRestoreController {
@@ -85,6 +88,7 @@ impl StateSnapshotRestoreController {
             epoch_history,
             concurrent_downloads: global_opt.concurrent_downloads,
             validate_modules: opt.validate_modules,
+            kv_only: opt.kv_only,
         }
     }
 
@@ -133,10 +137,11 @@ impl StateSnapshotRestoreController {
             epoch_history.verify_ledger_info(&li)?;
         }
 
-        let receiver = Arc::new(Mutex::new(Some(
-            self.run_mode
-                .get_state_restore_receiver(self.version, manifest.root_hash)?,
-        )));
+        let receiver = Arc::new(Mutex::new(Some(self.run_mode.get_state_restore_receiver(
+            self.version,
+            manifest.root_hash,
+            self.kv_only,
+        )?)));
 
         let (ver_gauge, tgt_leaf_idx, leaf_idx) = if self.run_mode.is_verify() {
             (

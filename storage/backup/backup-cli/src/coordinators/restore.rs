@@ -169,6 +169,7 @@ impl RestoreCoordinator {
                 manifest_handle: state_snapshot_backup.manifest,
                 version,
                 validate_modules: false,
+                kv_only: false,
             },
             self.global_opt.clone(),
             Arc::clone(&self.storage),
