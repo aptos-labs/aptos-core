@@ -6,14 +6,15 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
+## 1.8.2 (2023-04-06)
+
 - Introduce `AnsClient` class to support ANS (Aptos Names Service) data fetching queries
-- Add `User-Agent` header to `AptosClient` queries
+- Add `User-Agent` header to `AptosClient` and `IndexerClient` queries
 - Add Indexer queries to `IndexerClient` - `getAccountCoinsData`, `getAccountTokensCount`, `getAccountTransactionsCount`, `getAccountTransactionsData`, `getCurrentDelegatorBalancesCount`, `getDelegatedStakingActivities`, `getTokensActivitiesCount`, `getTokenData`, `getTokenOwnersData`, `getTopUserTransactions`, `getUserTransactions`
 - Add convertion layer to `IndexerClient` queries to handle missing `0x`
 - Add validation layer to `IndexerClient` to validate queried account address is in the long format, i.e 66 chars long (0x<64 chars>)
 - Change `queryIndexer` function in `IndexerClient` class visibility to public
-- Add mint Aptos Name funciton `mintAptosName()` to `AnsClient` class
-
+- Add mint Aptos Name function `mintAptosName()` to `AnsClient` class
 
 ## 1.7.2 (2023-03-13)
 

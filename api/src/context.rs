@@ -48,7 +48,6 @@ use aptos_vm::{
     move_vm_ext::MoveResolverExt,
 };
 use futures::{channel::oneshot, SinkExt};
-use itertools::Itertools;
 use move_core_types::language_storage::{ModuleId, StructTag};
 use std::{
     collections::HashMap,
@@ -62,7 +61,6 @@ pub struct Context {
     pub db: Arc<dyn DbReader>,
     mp_sender: MempoolClientSender,
     pub node_config: NodeConfig,
-    gas_estimation: Arc<RwLock<GasEstimationCache>>,
     gas_schedule_cache: Arc<RwLock<GasScheduleCache>>,
 }
 
@@ -84,13 +82,6 @@ impl Context {
             db,
             mp_sender,
             node_config,
-            gas_estimation: Arc::new(RwLock::new(GasEstimationCache {
-                last_updated_version: None,
-                last_updated_epoch: None,
-                deprioritized_gas_price: 0,
-                median_gas_price: 0,
-                prioritized_gas_price: 0,
-            })),
             gas_schedule_cache: Arc::new(RwLock::new(GasScheduleCache {
                 last_updated_epoch: None,
                 gas_schedule_params: None,
@@ -809,127 +800,28 @@ impl Context {
         &self,
         ledger_info: &LedgerInfo,
     ) -> Result<GasEstimation, E> {
-        // The search size
-        const SEARCH_SIZE: u64 = 100_000;
-        let oldest_search_version = std::cmp::max(
-            ledger_info.ledger_version.0.saturating_sub(SEARCH_SIZE),
-            ledger_info.oldest_ledger_version.0,
-        );
-
-        // If it's cached, let's use that
+        let min_gas_unit_price = self.min_gas_unit_price(ledger_info)?;
+        let second_bucket = match self
+            .node_config
+            .mempool
+            .broadcast_buckets
+            .iter()
+            .enumerate()
+            .nth(1)
         {
-            let gas_estimation = self.gas_estimation.read().unwrap();
-            let (last_updated_epoch, _) = self.get_gas_schedule(ledger_info)?;
+            Some(bucket) => *bucket.1,
+            None => min_gas_unit_price,
+        };
+        Ok(GasEstimation {
+            deprioritized_gas_estimate: Some(min_gas_unit_price),
+            gas_estimate: min_gas_unit_price,
+            prioritized_gas_estimate: Some(second_bucket),
+        })
+    }
 
-            // Cache includes if there was an update on the gas schedule due to epoch changes
-            if gas_estimation.last_updated_version.is_some()
-                && gas_estimation.last_updated_version.unwrap() > oldest_search_version
-                && last_updated_epoch == gas_estimation.last_updated_epoch.unwrap_or_default()
-            {
-                return Ok(gas_estimation.gas_estimate());
-            }
-        }
-
-        // Otherwise, get the estimated amount from storage
-        {
-            let mut gas_estimation = self.gas_estimation.write().unwrap();
-            let (last_updated_epoch, gas_schedule) = self.get_gas_schedule(ledger_info)?;
-
-            // If this has been updated by a different thread, use that instead
-            if gas_estimation.last_updated_version.is_some()
-                && gas_estimation.last_updated_version.unwrap() > oldest_search_version
-                && last_updated_epoch == gas_estimation.last_updated_epoch.unwrap_or_default()
-            {
-                return Ok(gas_estimation.gas_estimate());
-            }
-            let mut gas_prices: Vec<u64> = self
-                .db
-                .get_gas_prices(
-                    oldest_search_version,
-                    SEARCH_SIZE,
-                    ledger_info.ledger_version.0,
-                )
-                .map_err(|err| {
-                    E::internal_with_code(err, AptosErrorCode::InternalError, ledger_info)
-                })?;
-
-            // When there's no gas prices in the last 100k transactions, we're going to set it to
-            // the lowest gas price because the transaction should get through with any amount
-            gas_estimation.last_updated_version = Some(ledger_info.ledger_version.0);
-            gas_estimation.last_updated_epoch = Some(last_updated_epoch);
-            let min_gas_price = gas_schedule.txn.min_price_per_gas_unit.into();
-            let max_gas_price = gas_schedule.txn.max_price_per_gas_unit.into();
-
-            let observed_gas_median = if gas_prices.is_empty() {
-                // This will make it always pick the minimum gas price
-                0
-            } else {
-                // Sort and take the median of the gas prices
-                gas_prices.sort();
-
-                // Median is the center if it's odd, average of the two middle if even
-                let mid = gas_prices.len() / 2;
-                if gas_prices.len() % 2 == 0 {
-                    let lower = gas_prices.get(mid.saturating_sub(1)).unwrap();
-                    let upper = gas_prices.get(mid).unwrap();
-
-                    upper.saturating_add(*lower).saturating_div(2)
-                } else {
-                    *gas_prices.get(mid).unwrap()
-                }
-            };
-
-            // Ensure the price is within the min/max bounds
-            gas_estimation.median_gas_price = std::cmp::min(
-                max_gas_price,
-                std::cmp::max(min_gas_price, observed_gas_median),
-            );
-
-            // Handle prices for "prioritized" and "deprioritized"
-            // There must be at least 1 buckets
-            assert!(!self.node_config.mempool.broadcast_buckets.is_empty());
-            let median_gas_price = gas_estimation.median_gas_price;
-
-            // TODO: Buckets are assumed to be ordered
-            let bucket_index = self
-                .node_config
-                .mempool
-                .broadcast_buckets
-                .iter()
-                .sorted()
-                .enumerate()
-                .find_map(|(index, current_bucket)| {
-                    if median_gas_price >= *current_bucket {
-                        Some(index)
-                    } else {
-                        None
-                    }
-                })
-                .unwrap_or_default();
-
-            // Previous bucket could be the same as the minimum price (if too low)
-            let previous_bucket_price = self
-                .node_config
-                .mempool
-                .broadcast_buckets
-                .get(bucket_index.saturating_sub(1))
-                .copied()
-                .unwrap_or(min_gas_price);
-            // Next bucket could be the same as the current gas price, but we increase by 1 for the estimation
-            let next_bucket_price = self
-                .node_config
-                .mempool
-                .broadcast_buckets
-                .get(bucket_index.saturating_add(1))
-                .copied()
-                .unwrap_or_else(|| median_gas_price.saturating_add(1));
-            // Ensure that bucket prices are within the bounds
-            gas_estimation.deprioritized_gas_price =
-                std::cmp::max(min_gas_price, previous_bucket_price);
-            gas_estimation.prioritized_gas_price = std::cmp::min(max_gas_price, next_bucket_price);
-
-            Ok(gas_estimation.gas_estimate())
-        }
+    fn min_gas_unit_price<E: InternalError>(&self, ledger_info: &LedgerInfo) -> Result<u64, E> {
+        let (_, gas_schedule) = self.get_gas_schedule(ledger_info)?;
+        Ok(gas_schedule.txn.min_price_per_gas_unit.into())
     }
 
     pub fn get_gas_schedule<E: InternalError>(
@@ -1028,28 +920,6 @@ impl Context {
 
     pub fn last_updated_gas_schedule(&self) -> Option<u64> {
         self.gas_schedule_cache.read().unwrap().last_updated_epoch
-    }
-
-    pub fn last_updated_gas_estimation(&self) -> Option<u64> {
-        self.gas_estimation.read().unwrap().last_updated_version
-    }
-}
-
-pub struct GasEstimationCache {
-    last_updated_version: Option<u64>,
-    last_updated_epoch: Option<u64>,
-    deprioritized_gas_price: u64,
-    median_gas_price: u64,
-    prioritized_gas_price: u64,
-}
-
-impl GasEstimationCache {
-    pub fn gas_estimate(&self) -> GasEstimation {
-        GasEstimation {
-            deprioritized_gas_estimate: Some(self.deprioritized_gas_price),
-            gas_estimate: self.median_gas_price,
-            prioritized_gas_estimate: Some(self.prioritized_gas_price),
-        }
     }
 }
 

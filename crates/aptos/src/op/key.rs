@@ -4,9 +4,13 @@
 use crate::{
     common::{
         types::{
-            CliError, CliTypedResult, EncodingOptions, EncodingType, KeyType, RngArgs, SaveFile,
+            account_address_from_public_key, CliError, CliTypedResult, EncodingOptions,
+            EncodingType, KeyType, RngArgs, SaveFile, VanityPrefix,
         },
-        utils::{append_file_extension, check_if_file_exists, write_to_file},
+        utils::{
+            append_file_extension, check_if_file_exists, generate_vanity_account_ed25519,
+            write_to_file,
+        },
     },
     CliCommand, CliResult,
 };
@@ -171,6 +175,8 @@ pub struct GenerateKey {
     pub rng_args: RngArgs,
     #[clap(flatten)]
     pub(crate) save_params: SaveKey,
+    #[clap(flatten)]
+    pub vanity_prefix: VanityPrefix,
 }
 
 #[async_trait]
@@ -182,7 +188,14 @@ impl CliCommand<HashMap<&'static str, PathBuf>> for GenerateKey {
     async fn execute(self) -> CliTypedResult<HashMap<&'static str, PathBuf>> {
         self.save_params.check_key_file()?;
         let mut keygen = self.rng_args.key_generator()?;
-
+        // Verify key type is Ed25519 if a vanity prefix is specified.
+        if self.vanity_prefix.vanity_prefix.is_some() && !matches!(self.key_type, KeyType::Ed25519)
+        {
+            return Err(CliError::CommandArgumentError(format!(
+                "Vanity prefixes are only accepted for {} keys",
+                KeyType::Ed25519
+            )));
+        }
         match self.key_type {
             KeyType::X25519 => {
                 let private_key = keygen.generate_x25519_private_key().map_err(|err| {
@@ -194,8 +207,28 @@ impl CliCommand<HashMap<&'static str, PathBuf>> for GenerateKey {
                 self.save_params.save_key(&private_key, "x25519")
             },
             KeyType::Ed25519 => {
-                let private_key = keygen.generate_ed25519_private_key();
-                self.save_params.save_key(&private_key, "ed25519")
+                // If no vanity prefix specified, generate a standard Ed25519 private key.
+                let private_key = if self.vanity_prefix.vanity_prefix.is_none() {
+                    keygen.generate_ed25519_private_key()
+                } else {
+                    // If a vanity prefix is specified, generate vanity Ed25519 account from it.
+                    generate_vanity_account_ed25519(
+                        self.vanity_prefix.vanity_prefix.clone().unwrap().as_str(),
+                    )?
+                };
+                // Store CLI result map from key save operation, to append vanity address if needed.
+                let mut result_map = self.save_params.save_key(&private_key, "ed25519").unwrap();
+                // If a vanity prefix was specified:
+                if self.vanity_prefix.vanity_prefix.is_some() {
+                    // Get account address.
+                    let account_address = account_address_from_public_key(
+                        &ed25519::Ed25519PublicKey::from(&private_key),
+                    )
+                    .to_hex_literal();
+                    // Put account address in PathBuf so it can be displayed from typed CLI result.
+                    result_map.insert("Account Address:", PathBuf::from(account_address));
+                }
+                return Ok(result_map);
             },
             KeyType::Bls12381 => {
                 let private_key = keygen.generate_bls12381_private_key();

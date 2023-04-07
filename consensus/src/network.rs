@@ -139,7 +139,7 @@ impl NetworkSender {
     /// Tries to retrieve num of blocks backwards starting from id from the given peer: the function
     /// returns a future that is fulfilled with BlockRetrievalResponse.
     pub async fn request_block(
-        &mut self,
+        &self,
         retrieval_request: BlockRetrievalRequest,
         from: Author,
         timeout: Duration,

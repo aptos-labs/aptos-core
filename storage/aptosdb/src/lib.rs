@@ -189,8 +189,13 @@ static ROCKSDB_PROPERTY_MAP: Lazy<HashMap<&str, String>> = Lazy::new(|| {
 });
 
 type ShardedStateKvSchemaBatch = [SchemaBatch; NUM_STATE_SHARDS];
+type ShardedStateMerkleSchemaBatch = [SchemaBatch; NUM_STATE_SHARDS];
 
-pub(crate) fn new_sharded_schema_batch() -> ShardedStateKvSchemaBatch {
+pub(crate) fn new_sharded_kv_schema_batch() -> ShardedStateKvSchemaBatch {
+    arr![SchemaBatch::new(); 16]
+}
+
+pub(crate) fn new_sharded_merkle_schema_batch() -> ShardedStateMerkleSchemaBatch {
     arr![SchemaBatch::new(); 16]
 }
 
@@ -1697,7 +1702,7 @@ impl DbWriter for AptosDB {
 
             // Gather db mutations to `batch`.
             let ledger_batch = SchemaBatch::new();
-            let sharded_state_kv_batches = new_sharded_schema_batch();
+            let sharded_state_kv_batches = new_sharded_kv_schema_batch();
 
             let new_root_hash = self.save_transactions_impl(
                 txns_to_commit,
