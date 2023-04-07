@@ -27,7 +27,7 @@ jobs:
           NETWORK: devnet
           GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
   run-tests-testnet:
-    runs-on: ubuntu-latest
+    runs-on: high-perf-docker
     permissions:
       contents: read
       id-token: write

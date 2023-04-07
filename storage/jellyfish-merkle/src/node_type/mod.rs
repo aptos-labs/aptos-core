@@ -143,6 +143,15 @@ impl NodeKey {
     pub fn unpack(self) -> (Version, NibblePath) {
         (self.version, self.nibble_path)
     }
+
+    // Returns the shard_id of the NodeKey, or None if it is root.
+    pub fn get_shard_id(&self) -> Option<u8> {
+        if self.nibble_path().num_nibbles() > 0 {
+            Some(u8::from(self.nibble_path().get_nibble(0)))
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

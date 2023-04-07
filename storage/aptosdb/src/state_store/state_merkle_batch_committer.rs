@@ -8,7 +8,7 @@ use crate::{
     metrics::LATEST_SNAPSHOT_VERSION,
     state_store::{buffered_state::CommitMessage, StateDb},
     version_data::VersionDataSchema,
-    PrunerManager, OTHER_TIMERS_SECONDS,
+    PrunerManager, ShardedStateMerkleSchemaBatch, OTHER_TIMERS_SECONDS,
 };
 use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::HashValue;
@@ -20,7 +20,8 @@ use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use std::sync::{mpsc::Receiver, Arc};
 
 pub struct StateMerkleBatch {
-    pub batch: SchemaBatch,
+    pub top_levels_batch: SchemaBatch,
+    pub sharded_batch: ShardedStateMerkleSchemaBatch,
     pub root_hash: HashValue,
     pub state_delta: Arc<StateDelta>,
 }
@@ -46,20 +47,24 @@ impl StateMerkleBatchCommitter {
             match msg {
                 CommitMessage::Data(state_merkle_batch) => {
                     let StateMerkleBatch {
-                        batch,
+                        top_levels_batch,
+                        sharded_batch,
                         root_hash,
                         state_delta,
                     } = state_merkle_batch;
+
+                    let current_version = state_delta
+                        .current_version
+                        .expect("Current version should not be None");
+
                     // commit jellyfish merkle nodes
                     let _timer = OTHER_TIMERS_SECONDS
                         .with_label_values(&["commit_jellyfish_merkle_nodes"])
                         .start_timer();
-                    // TODO(grao): Support sharding here.
                     self.state_db
                         .state_merkle_db
-                        .metadata_db()
-                        .write_schemas(batch)
-                        .expect("State merkle batch commit failed.");
+                        .commit(current_version, top_levels_batch, sharded_batch)
+                        .expect("State merkle nodes commit failed.");
                     if self.state_db.state_merkle_db.cache_enabled() {
                         self.state_db
                             .state_merkle_db
@@ -67,14 +72,11 @@ impl StateMerkleBatchCommitter {
                             .maybe_evict_version(self.state_db.state_merkle_db.lru_cache());
                     }
                     info!(
-                        version = state_delta.current_version,
+                        version = current_version,
                         base_version = state_delta.base_version,
                         root_hash = root_hash,
                         "State snapshot committed."
                     );
-                    let current_version = state_delta
-                        .current_version
-                        .expect("Current version should not be None");
                     LATEST_SNAPSHOT_VERSION.set(current_version as i64);
                     self.state_db
                         .state_merkle_pruner

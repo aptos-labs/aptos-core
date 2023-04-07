@@ -35,11 +35,12 @@ pub fn aptos_natives(
     timed_features: TimedFeatures,
     features: Arc<Features>,
 ) -> NativeFunctionTable {
-    aptos_move_stdlib::natives::all_natives(CORE_CODE_ADDRESS, gas_params.move_stdlib)
+    aptos_move_stdlib::natives::all_natives(CORE_CODE_ADDRESS, gas_params.move_stdlib.clone())
         .into_iter()
         .filter(|(_, name, _, _)| name.as_str() != "vector")
         .chain(aptos_framework::natives::all_natives(
             CORE_CODE_ADDRESS,
+            gas_params.move_stdlib,
             gas_params.aptos_framework,
             timed_features,
             features,

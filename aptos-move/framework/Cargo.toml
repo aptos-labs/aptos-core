@@ -17,6 +17,7 @@ anyhow = { workspace = true }
 aptos-aggregator = { workspace = true }
 aptos-crypto = { workspace = true, features = ["fuzzing"] }
 aptos-gas-algebra-ext =  { workspace = true }
+aptos-move-stdlib = { workspace = true }
 aptos-sdk-builder = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
@@ -65,6 +66,7 @@ serde_bytes = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 sha2 = { workspace = true }
+sha2_0_10_6 = { workspace = true }
 sha3 = { workspace = true }
 siphasher = { workspace = true }
 smallvec = { workspace = true }
