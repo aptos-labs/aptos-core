@@ -62,7 +62,8 @@ pub struct ConsensusConfig {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct ConsensusBackpressureValues {
-    pub back_pressure_limit: u64,
+    // pub back_pressure_round_limit: u64,
+    pub back_pressure_duration_limit: u64,
     pub max_sending_block_txns_override: u64,
     pub max_sending_block_bytes_override: u64,
 }
@@ -112,28 +113,39 @@ impl Default for ConsensusConfig {
             quorum_store_configs: QuorumStoreConfig::default(),
             consensus_backpressure: vec![
                 ConsensusBackpressureValues {
-                    back_pressure_limit: 6,
+                    // back_pressure_limit: 6,
+                    back_pressure_duration_limit: 1500,
+                    max_sending_block_txns_override: 2000,
+                    max_sending_block_bytes_override: 500 * 1024,
+                },
+                ConsensusBackpressureValues {
+                    // back_pressure_limit: 6,
+                    back_pressure_duration_limit: 2000,
                     max_sending_block_txns_override: 1000,
                     max_sending_block_bytes_override: 250 * 1024,
                 },
                 ConsensusBackpressureValues {
-                    back_pressure_limit: 7,
-                    max_sending_block_txns_override: 400,
+                    // back_pressure_limit: 7,
+                    back_pressure_duration_limit: 2500,
+                    max_sending_block_txns_override: 500,
                     max_sending_block_bytes_override: 100 * 1024,
                 },
                 ConsensusBackpressureValues {
-                    back_pressure_limit: 8,
+                    // back_pressure_limit: 8,
+                    back_pressure_duration_limit: 3000,
                     // stop reducing size, so 100k transactions can still go through
+                    max_sending_block_txns_override: 300,
+                    max_sending_block_bytes_override: 100 * 1024,
+                },
+                ConsensusBackpressureValues {
+                    // back_pressure_limit: 10,
+                    back_pressure_duration_limit: 3500,
                     max_sending_block_txns_override: 100,
                     max_sending_block_bytes_override: 100 * 1024,
                 },
                 ConsensusBackpressureValues {
-                    back_pressure_limit: 10,
-                    max_sending_block_txns_override: 50,
-                    max_sending_block_bytes_override: 100 * 1024,
-                },
-                ConsensusBackpressureValues {
-                    back_pressure_limit: 12,
+                    // back_pressure_limit: 12,
+                    back_pressure_duration_limit: 4000,
                     // in practice, latencies make it such that 2-4 blocks/s is max,
                     // meaning that most aggressively we limit to ~40-80 TPS
                     max_sending_block_txns_override: 20,

@@ -99,7 +99,7 @@ impl ConsensusBackpressureConfig {
         let original_len = backoffs.len();
         let backoffs = backoffs
             .into_iter()
-            .map(|v| (v.back_pressure_limit, v))
+            .map(|v| (v.back_pressure_duration_limit, v))
             .collect::<BTreeMap<_, _>>();
         assert_eq!(original_len, backoffs.len());
         Self { backoffs }
@@ -114,21 +114,22 @@ impl ConsensusBackpressureConfig {
 
     pub fn get_backoff(
         &self,
-        consensus_pending_rounds: Round,
+        // consensus_pending_rounds: Round,
+        consensus_pending_duration: Duration,
     ) -> Option<&ConsensusBackpressureValues> {
         if self.backoffs.is_empty() {
             return None;
         }
 
         self.backoffs
-            .range(..consensus_pending_rounds)
+            .range(..u64::try_from(consensus_pending_duration.as_millis()).unwrap())
             .last()
             .map(|(_, v)| {
                 sample!(
                     SampleRate::Duration(Duration::from_secs(10)),
                     warn!(
-                        "Using consensus backpressure config for {} pending rounds: {:?}",
-                        consensus_pending_rounds, v
+                        "Using consensus backpressure config for {}ms pending duration: {:?}",
+                        consensus_pending_duration.as_millis(), v
                     )
                 );
                 v
@@ -288,9 +289,10 @@ impl ProposalGenerator {
             let chain_health_backoff = self
                 .chain_health_backoff_config
                 .get_backoff(round, proposer_election);
+
             let consensus_backpressure = self
                 .consensus_backpressure_config
-                .get_backoff(self.block_store.proposal_back_pressure());
+                .get_backoff(self.block_store.proposal_back_pressure(timestamp).1);
             if let Some(value) = chain_health_backoff {
                 values_max_block_txns.push(value.max_sending_block_txns_override);
                 values_max_block_bytes.push(value.max_sending_block_bytes_override);
@@ -318,6 +320,7 @@ impl ProposalGenerator {
                     consensus_backpressure.is_some(),
                     chain_health_backoff.is_some(),
                 );
+                tokio::time::sleep(Duration::from_millis(150)).await;
             }
 
             let max_pending_block_len = pending_blocks

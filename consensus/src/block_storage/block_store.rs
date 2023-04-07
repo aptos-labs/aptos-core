@@ -504,19 +504,33 @@ impl BlockStore {
         false
     }
 
-    pub fn proposal_back_pressure(&self) -> Round {
+    pub fn proposal_back_pressure(&self, proposal_timestamp: Duration) -> (Round, Duration) {
         #[cfg(any(test, feature = "fuzzing"))]
         {
             if self.back_pressure_for_test.load(Ordering::Relaxed) {
-                return 100;
+                return (100, Duration::from_secs(100));
             }
         }
-        let commit_round = self.commit_root().round();
-        let ordered_round = self.ordered_root().round();
-        counters::OP_COUNTERS
-            .gauge("back_pressure")
-            .set((ordered_round - commit_round) as i64);
-        ordered_round.saturating_sub(commit_round)
+
+        let pending_rounds = self.ordered_root().round().checked_sub(self.commit_root().round()).unwrap();
+        let ordered_timestamp = Duration::from_micros(self.ordered_root().timestamp_usecs());
+        let committed_timestamp = Duration::from_micros(self.commit_root().timestamp_usecs());
+
+        info!(
+            "On proposal, {} pending rounds, {}ms gap to ordered, {}ms gap to committed",
+            pending_rounds,
+            (proposal_timestamp - ordered_timestamp).as_millis(),
+            (proposal_timestamp - committed_timestamp).as_millis());
+
+        let pending_duration = proposal_timestamp
+            .checked_sub(committed_timestamp).unwrap();
+
+        counters::CONSENSUS_PROPOSAL_PENDING_ROUNDS.observe(pending_rounds as f64);
+        counters::CONSENSUS_PROPOSAL_PENDING_DURATION.observe(pending_duration.as_secs_f64());
+        (
+            pending_rounds,
+            pending_duration
+        )
     }
 }
 
@@ -583,8 +597,8 @@ impl BlockReader for BlockStore {
         self.vote_back_pressure()
     }
 
-    fn proposal_back_pressure(&self) -> Round {
-        self.proposal_back_pressure()
+    fn proposal_back_pressure(&self, proposal_timestamp: Duration) -> (Round, Duration) {
+        self.proposal_back_pressure(proposal_timestamp)
     }
 }
 

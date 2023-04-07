@@ -207,7 +207,7 @@ fn main() -> Result<()> {
     logger.build();
 
     let args = Args::from_args();
-    let duration = Duration::from_secs(6 * 420); // args.duration_secs as u64);
+    let duration = Duration::from_secs(6 * 900); // args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
 
     let suite_name = if suite_name == "land_blocking" {
@@ -876,33 +876,34 @@ fn three_region_sim_graceful_overload(config: ForgeConfig) -> ForgeConfig {
             //     //     }
             //     // },
             // },
-            test: &LoadVsPerfBenchmark {
-                test: &PerformanceBenchmark,
-                workloads: Workloads::TPS(&[
-                    200, 1000, 2000, 3000, 4000, 5000
-                ]),
-            },
-            // test: &TwoTrafficsTest {
-            //     inner_tps: 5000,
-            //     inner_gas_price: aptos_global_constants::GAS_UNIT_PRICE,
-            //     inner_init_gas_price_multiplier: 20,
-            //     // because it is static, cannot use ::default_account_creation() method
-            //     inner_transaction_type: TransactionType::AccountGeneration {
-            //         add_created_accounts_to_pool: true,
-            //         max_account_working_set: 1_000_000,
-            //         creation_balance: 0,
-            //     },
-            //     // Additionally - we are not really gracefully handling overlaods,
-            //     // setting limits based on current reality, to make sure they
-            //     // don't regress, but something to investigate
-            //     avg_tps: 3000,
-            //     latency_thresholds: &[],
+            // test: &LoadVsPerfBenchmark {
+            //     test: &PerformanceBenchmark,
+            //     workloads: Workloads::TPS(&[
+            //         // 200, 1000,
+            //         2000, 3000, 4000, 5000, 6000, 8000
+            //     ]),
             // },
+            test: &TwoTrafficsTest {
+                inner_tps: 4500,
+                inner_gas_price: aptos_global_constants::GAS_UNIT_PRICE,
+                inner_init_gas_price_multiplier: 20,
+                // because it is static, cannot use ::default_account_creation() method
+                inner_transaction_type: TransactionType::AccountGeneration {
+                    add_created_accounts_to_pool: true,
+                    max_account_working_set: 1_000_000,
+                    creation_balance: 0,
+                },
+                // Additionally - we are not really gracefully handling overlaods,
+                // setting limits based on current reality, to make sure they
+                // don't regress, but something to investigate
+                avg_tps: 3000,
+                latency_thresholds: &[],
+            },
         }])
         // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
         .with_emit_job(
             EmitJobRequest::default()
-                .mode(EmitJobMode::ConstTps { tps: 1000 })
+                .mode(EmitJobMode::ConstTps { tps: 500 })
                 .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE),
         )
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {

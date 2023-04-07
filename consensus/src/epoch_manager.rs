@@ -707,12 +707,13 @@ impl EpochManager {
             state_computer,
             self.config.max_pruned_blocks_in_mem,
             Arc::clone(&self.time_service),
-            self.config
-                .consensus_backpressure
-                .iter()
-                .map(|v| v.back_pressure_limit)
-                .max()
-                .unwrap(),
+            10,
+            // self.config
+            //     .consensus_backpressure
+            //     .iter()
+            //     .map(|v| v.back_pressure_limit)
+            //     .max()
+            //     .unwrap(),
             payload_manager.clone(),
         ));
 

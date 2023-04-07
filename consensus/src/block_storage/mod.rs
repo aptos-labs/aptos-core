@@ -8,7 +8,7 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 pub use block_store::{sync_manager::BlockRetriever, BlockStore};
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 mod block_store;
 mod block_tree;
@@ -61,5 +61,5 @@ pub trait BlockReader: Send + Sync {
     /// Return if the consensus is backpressured
     fn vote_back_pressure(&self) -> bool;
 
-    fn proposal_back_pressure(&self) -> Round;
+    fn proposal_back_pressure(&self, proposal_timestamp: Duration) -> (Round, Duration);
 }
