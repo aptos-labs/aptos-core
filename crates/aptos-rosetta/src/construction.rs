@@ -235,19 +235,22 @@ async fn fill_in_operator(
                     .get_account_resource_bcs::<Store>(op.owner, "0x1::staking_contract::Store")
                     .await?
                     .into_inner();
-                if store.staking_contracts.len() != 1 {
-                    let operators: Vec<_> = store.staking_contracts.keys().collect();
+                let staking_contracts = store.staking_contracts;
+                if staking_contracts.len() != 1 {
+                    let operators: Vec<_> = staking_contracts
+                        .iter()
+                        .map(|(address, _)| *address)
+                        .collect();
                     return Err(ApiError::InvalidInput(Some(format!(
                         "Account has more than one operator, operator must be specified from: {:?}",
                         operators
                     ))));
                 } else {
+                    // Take the only staking contract
                     op.old_operator = Some(
-                        *store
-                            .staking_contracts
-                            .iter()
-                            .next()
-                            .map(|inner| inner.0)
+                        staking_contracts
+                            .first()
+                            .map(|(address, _)| *address)
                             .unwrap(),
                     );
                 }
@@ -260,19 +263,22 @@ async fn fill_in_operator(
                     .get_account_resource_bcs::<Store>(op.owner, "0x1::staking_contract::Store")
                     .await?
                     .into_inner();
-                if store.staking_contracts.len() != 1 {
-                    let operators: Vec<_> = store.staking_contracts.keys().collect();
+                let staking_contracts = store.staking_contracts;
+                if staking_contracts.len() != 1 {
+                    let operators: Vec<_> = staking_contracts
+                        .iter()
+                        .map(|(address, _)| address)
+                        .collect();
                     return Err(ApiError::InvalidInput(Some(format!(
                         "Account has more than one operator, operator must be specified from: {:?}",
                         operators
                     ))));
                 } else {
+                    // Take the only staking contract
                     op.operator = Some(
-                        *store
-                            .staking_contracts
-                            .iter()
-                            .next()
-                            .map(|inner| inner.0)
+                        staking_contracts
+                            .first()
+                            .map(|(address, _)| *address)
                             .unwrap(),
                     );
                 }
