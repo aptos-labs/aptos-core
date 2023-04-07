@@ -22,25 +22,15 @@ use std::collections::BTreeMap;
 pub static PROPOSAL_SCRIPTS: Lazy<BTreeMap<String, Vec<u8>>> = Lazy::new(build_scripts);
 
 fn build_scripts() -> BTreeMap<String, Vec<u8>> {
-    let mut scripts = BTreeMap::new();
-    let package_names = [
+    let package_folder = "transaction_fee.data";
+    let package_names = vec![
         "initialize_collection",
         "enable_collection",
         "disable_collection",
         "upgrade_burn_percentage",
         "remove_validator",
     ];
-    for package_name in package_names {
-        let script = aptos_framework::BuiltPackage::build(
-            common::test_dir_path(format!("transaction_fee.data/{}", package_name).as_str()),
-            aptos_framework::BuildOptions::default(),
-        )
-        .expect("building packages with scripts must succeed")
-        .extract_script_code()[0]
-            .clone();
-        scripts.insert(package_name.to_string(), script);
-    }
-    scripts
+    common::build_scripts(package_folder, package_names)
 }
 
 // Constants for calculating rewards for validators at the end of each epoch.
