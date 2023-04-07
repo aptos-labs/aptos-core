@@ -33,6 +33,11 @@ module aptos_std::elgamal {
 	ristretto255::point_decompress(&pubkey.point)
     }
 
+    /// Given a public key, returns the underlying CompressedRistretto representing that key
+    public fun get_compressed_point_from_pubkey(pubkey: &Pubkey): CompressedRistretto {
+	pubkey.point
+    }
+
     /// Creates a new public key from a serialized RistrettoPoint
     public fun new_pubkey_from_bytes(bytes: vector<u8>): Option<Pubkey> {
 	assert!(vector::length(&bytes) == 32, EWRONG_BYTE_LENGTH);
