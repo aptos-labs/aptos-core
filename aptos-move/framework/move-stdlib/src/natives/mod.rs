@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod bcs;
-pub mod debug;
 pub mod hash;
 pub mod signer;
 pub mod string;
@@ -118,45 +117,6 @@ pub fn all_natives(
     {
         add_natives!("unit_test", unit_test::make_all(gas_params.unit_test));
     }
-
-    make_table_from_iter(move_std_addr, natives)
-}
-
-#[derive(Debug, Clone)]
-pub struct NurseryGasParameters {
-    debug: debug::GasParameters,
-}
-
-impl NurseryGasParameters {
-    pub fn zeros() -> Self {
-        Self {
-            debug: debug::GasParameters {
-                print: debug::PrintGasParameters {
-                    base_cost: 0.into(),
-                },
-                print_stack_trace: debug::PrintStackTraceGasParameters {
-                    base_cost: 0.into(),
-                },
-            },
-        }
-    }
-}
-
-pub fn nursery_natives(
-    move_std_addr: AccountAddress,
-    gas_params: NurseryGasParameters,
-) -> NativeFunctionTable {
-    let mut natives = vec![];
-
-    macro_rules! add_natives {
-        ($module_name:expr, $natives:expr) => {
-            natives.extend(
-                $natives.map(|(func_name, func)| ($module_name.to_string(), func_name, func)),
-            );
-        };
-    }
-
-    add_natives!("debug", debug::make_all(gas_params.debug, move_std_addr));
 
     make_table_from_iter(move_std_addr, natives)
 }

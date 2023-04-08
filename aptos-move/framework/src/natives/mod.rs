@@ -8,6 +8,7 @@ pub mod any;
 pub mod code;
 pub mod create_signer;
 pub mod cryptography;
+pub mod debug;
 pub mod event;
 pub mod hash;
 mod helpers;
@@ -54,6 +55,7 @@ pub struct GasParameters {
     pub aggregator: aggregator::GasParameters,
     pub aggregator_factory: aggregator_factory::GasParameters,
     pub object: object::GasParameters,
+    pub debug: debug::GasParameters,
     pub string_utils: string_utils::GasParameters,
 }
 
@@ -196,6 +198,14 @@ impl GasParameters {
                     base: 0.into(),
                     per_byte_loaded: 0.into(),
                     per_item_loaded: 0.into(),
+                },
+            },
+            debug: debug::GasParameters {
+                print: debug::PrintGasParameters {
+                    base_cost: 0.into(),
+                },
+                print_stack_trace: debug::PrintStackTraceGasParameters {
+                    base_cost: 0.into(),
                 },
             },
             string_utils: string_utils::GasParameters {
@@ -364,6 +374,7 @@ pub fn all_natives(
         "object",
         object::make_all(gas_params.object, timed_features.clone(), features.clone())
     );
+    add_natives_from_module!("debug", debug::make_all(gas_params.debug));
     add_natives_from_module!(
         "string_utils",
         string_utils::make_all(gas_params.string_utils, timed_features, features)

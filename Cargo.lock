@@ -1257,6 +1257,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-gas",
  "aptos-gas-algebra-ext",
+ "aptos-move-stdlib",
  "aptos-sdk-builder",
  "aptos-state-view",
  "aptos-types",

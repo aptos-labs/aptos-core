@@ -17,6 +17,9 @@ use move_vm_types::{
     values::{Value, VectorRef},
 };
 use std::{collections::VecDeque, sync::Arc};
+use smallvec::smallvec;
+use move_core_types::language_storage::CORE_CODE_ADDRESS;
+use move_vm_types::values::{Reference, Struct};
 
 // The implementation approach delegates all utf8 handling to Rust.
 // This is possible without copying of bytes because (a) we can
