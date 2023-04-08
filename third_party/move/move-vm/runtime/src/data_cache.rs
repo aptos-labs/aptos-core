@@ -208,9 +208,11 @@ impl<'r, 'l, S: MoveResolverV2> DataStore for TransactionDataCache<'r, 'l, S> {
                         Resource::Cached(frozen_val, _) => {
                             // Data was not serialized and should not be charged for loading.
                             load_res = Some(None);
-                            // TODO: instead of unfreezing the value here, we can store its frozen
-                            // version and only unfreeze on modification.
-                            GlobalValue::cached(frozen_val.unfreeze()?)?
+
+                            // TODO: instead of unfreezing the value here (i.e. making a copy), we
+                            // can store its frozen version and only unfreeze on modification,
+                            // basically doing copy/clone-on-write.
+                            GlobalValue::cached(frozen_val.unfreeze())?
                         },
                     }
                 },

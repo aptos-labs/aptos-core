@@ -189,7 +189,10 @@ impl AptosVMImpl {
             .get_resource_v2(&CORE_CODE_ADDRESS, &TransactionValidation::struct_tag())
             .ok()?
         {
-            Some(r) => bcs::from_bytes::<TransactionValidation>(&r.serialize().expect("should not fail")).ok(),
+            Some(r) => {
+                bcs::from_bytes::<TransactionValidation>(&r.serialize().expect("should not fail"))
+                    .ok()
+            },
             _ => None,
         }
     }
@@ -249,8 +252,10 @@ impl AptosVMImpl {
                 storage.get_resource_v2(&CORE_CODE_ADDRESS, &ApprovedExecutionHashes::struct_tag());
 
             let valid = if let Ok(Some(resource)) = data {
-                let approved_execution_hashes =
-                    bcs::from_bytes::<ApprovedExecutionHashes>(&resource.serialize().expect("should not fail")).ok();
+                let approved_execution_hashes = bcs::from_bytes::<ApprovedExecutionHashes>(
+                    &resource.serialize().expect("should not fail"),
+                )
+                .ok();
                 let valid = approved_execution_hashes
                     .map(|aeh| {
                         aeh.entries

@@ -113,7 +113,7 @@ impl<'a, 'm, S: MoveResolverExt> ResourceResolverV2 for MoveResolverWithVMMetada
             .map(|maybe_write| {
                 maybe_write.map(|write| match write {
                     AptosWrite::AggregatorValue(v) => {
-                        Resource::from_value_layout(FrozenValue::U128(v), MoveTypeLayout::U128)
+                        Resource::from_value_layout(FrozenValue::u128(v), MoveTypeLayout::U128)
                     },
                     AptosWrite::Module(_) => unreachable!(),
                     AptosWrite::Standard(r) => r,

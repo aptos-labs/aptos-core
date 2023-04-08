@@ -23,7 +23,6 @@ use std::{
     fmt::{self, Debug, Display},
     iter,
     rc::Rc,
-    sync::Arc,
 };
 
 /***************************************************************************************
@@ -57,7 +56,7 @@ enum ValueImpl {
 }
 
 /// Internal representation of immutable Move value.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 enum FrozenValueImpl {
     U8(u8),
     U16(u16),
@@ -73,23 +72,23 @@ enum FrozenValueImpl {
 /// Same as `Container` but immutable and only used for values that can be
 /// stored in global storage (i.e. no `Locals`). Can be shared between multiple
 /// threads.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 enum FrozenContainer {
-    Vec(Arc<Vec<FrozenValueImpl>>),
-    Struct(Arc<Vec<FrozenValueImpl>>),
-    VecU8(Arc<Vec<u8>>),
-    VecU64(Arc<Vec<u64>>),
-    VecU128(Arc<Vec<u128>>),
-    VecBool(Arc<Vec<bool>>),
-    VecAddress(Arc<Vec<AccountAddress>>),
-    VecU16(Arc<Vec<u16>>),
-    VecU32(Arc<Vec<u32>>),
-    VecU256(Arc<Vec<u256::U256>>),
+    Vec(Vec<FrozenValueImpl>),
+    Struct(Vec<FrozenValueImpl>),
+    VecU8(Vec<u8>),
+    VecU64(Vec<u64>),
+    VecU128(Vec<u128>),
+    VecBool(Vec<bool>),
+    VecAddress(Vec<AccountAddress>),
+    VecU16(Vec<u16>),
+    VecU32(Vec<u32>),
+    VecU256(Vec<u256::U256>),
 }
 
 /// Immutable Move struct.
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct FrozenStruct {
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FrozenStruct {
     fields: Vec<FrozenValueImpl>,
 }
 
@@ -174,7 +173,7 @@ enum ReferenceImpl {
 pub struct Value(ValueImpl);
 
 /// Same as `Value` but immutable and can be shared between threads.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FrozenValue(FrozenValueImpl);
 
 /// An integer value in Move.
@@ -491,8 +490,8 @@ impl Value {
  **************************************************************************************/
 
 impl FrozenValueImpl {
-    fn unfreeze(&self) -> PartialVMResult<ValueImpl> {
-        Ok(match self {
+    fn unfreeze(&self) -> ValueImpl {
+        match self {
             Self::U8(x) => ValueImpl::U8(*x),
             Self::U16(x) => ValueImpl::U16(*x),
             Self::U32(x) => ValueImpl::U32(*x),
@@ -501,75 +500,50 @@ impl FrozenValueImpl {
             Self::U256(x) => ValueImpl::U256(*x),
             Self::Bool(x) => ValueImpl::Bool(*x),
             Self::Address(x) => ValueImpl::Address(*x),
-            Self::Container(c) => ValueImpl::Container(c.unfreeze()?),
-        })
+            Self::Container(c) => ValueImpl::Container(c.unfreeze()),
+        }
     }
 }
 
 impl FrozenContainer {
-    fn unfreeze(&self) -> PartialVMResult<Container> {
-        let unfreeze_vec_val = |r: &Arc<Vec<FrozenValueImpl>>| {
-            Ok(Rc::new(RefCell::new(
-                r.as_ref()
-                    .iter()
-                    .map(|v| v.unfreeze())
-                    .collect::<PartialVMResult<_>>()?,
-            )))
+    fn unfreeze(&self) -> Container {
+        let unfreeze_vec = |vec: &Vec<FrozenValueImpl>| {
+            Rc::new(RefCell::new(vec.iter().map(|v| v.unfreeze()).collect()))
         };
 
-        Ok(match self {
-            Self::Vec(r) => Container::Vec(unfreeze_vec_val(r)?),
-            FrozenContainer::Struct(r) => Container::Struct(unfreeze_vec_val(r)?),
-            FrozenContainer::VecU8(r) => {
-                Container::VecU8(Rc::new(RefCell::new(r.as_ref().clone())))
-            },
-            FrozenContainer::VecU16(r) => {
-                Container::VecU16(Rc::new(RefCell::new(r.as_ref().clone())))
-            },
-            FrozenContainer::VecU32(r) => {
-                Container::VecU32(Rc::new(RefCell::new(r.as_ref().clone())))
-            },
-            FrozenContainer::VecU64(r) => {
-                Container::VecU64(Rc::new(RefCell::new(r.as_ref().clone())))
-            },
-            FrozenContainer::VecU128(r) => {
-                Container::VecU128(Rc::new(RefCell::new(r.as_ref().clone())))
-            },
-            FrozenContainer::VecU256(r) => {
-                Container::VecU256(Rc::new(RefCell::new(r.as_ref().clone())))
-            },
-            FrozenContainer::VecBool(r) => {
-                Container::VecBool(Rc::new(RefCell::new(r.as_ref().clone())))
-            },
-            FrozenContainer::VecAddress(r) => {
-                Container::VecAddress(Rc::new(RefCell::new(r.as_ref().clone())))
-            },
-        })
+        match self {
+            Self::Vec(v) => Container::Vec(unfreeze_vec(v)),
+            Self::Struct(v) => Container::Struct(unfreeze_vec(v)),
+            Self::VecU8(v) => Container::VecU8(Rc::new(RefCell::new(v.clone()))),
+            Self::VecU16(v) => Container::VecU16(Rc::new(RefCell::new(v.clone()))),
+            Self::VecU32(v) => Container::VecU32(Rc::new(RefCell::new(v.clone()))),
+            Self::VecU64(v) => Container::VecU64(Rc::new(RefCell::new(v.clone()))),
+            Self::VecU128(v) => Container::VecU128(Rc::new(RefCell::new(v.clone()))),
+            Self::VecU256(v) => Container::VecU256(Rc::new(RefCell::new(v.clone()))),
+            Self::VecBool(v) => Container::VecBool(Rc::new(RefCell::new(v.clone()))),
+            Self::VecAddress(v) => Container::VecAddress(Rc::new(RefCell::new(v.clone()))),
+        }
     }
 }
 
 impl FrozenValue {
-    pub fn unfreeze(&self) -> PartialVMResult<Value> {
-        Ok(Value(self.0.unfreeze()?))
-    }
-
-    pub fn U128(v: u128) -> Self {
-        Self(FrozenValueImpl::U128(v))
+    pub fn unfreeze(&self) -> Value {
+        Value(self.0.unfreeze())
     }
 }
 
 impl ValueImpl {
     fn freeze(self) -> PartialVMResult<FrozenValueImpl> {
         Ok(match self {
-            ValueImpl::U8(x) => FrozenValueImpl::U8(x),
-            ValueImpl::U16(x) => FrozenValueImpl::U16(x),
-            ValueImpl::U32(x) => FrozenValueImpl::U32(x),
-            ValueImpl::U64(x) => FrozenValueImpl::U64(x),
-            ValueImpl::U128(x) => FrozenValueImpl::U128(x),
-            ValueImpl::U256(x) => FrozenValueImpl::U256(x),
-            ValueImpl::Bool(x) => FrozenValueImpl::Bool(x),
-            ValueImpl::Address(x) => FrozenValueImpl::Address(x),
-            ValueImpl::Container(c) => FrozenValueImpl::Container(c.freeze()?),
+            Self::U8(x) => FrozenValueImpl::U8(x),
+            Self::U16(x) => FrozenValueImpl::U16(x),
+            Self::U32(x) => FrozenValueImpl::U32(x),
+            Self::U64(x) => FrozenValueImpl::U64(x),
+            Self::U128(x) => FrozenValueImpl::U128(x),
+            Self::U256(x) => FrozenValueImpl::U256(x),
+            Self::Bool(x) => FrozenValueImpl::Bool(x),
+            Self::Address(x) => FrozenValueImpl::Address(x),
+            Self::Container(c) => FrozenValueImpl::Container(c.freeze()?),
             _ => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -582,29 +556,25 @@ impl ValueImpl {
 
 impl Container {
     fn freeze(self) -> PartialVMResult<FrozenContainer> {
-        let freeze_vec_val = |r: Rc<RefCell<Vec<ValueImpl>>>| {
-            Ok(Arc::new(
-                take_unique_ownership(r)?
-                    .into_iter()
-                    .map(|v| v.freeze())
-                    .collect::<PartialVMResult<_>>()?,
-            ))
+        let freeze_vec = |r: Rc<RefCell<Vec<ValueImpl>>>| {
+            Ok(take_unique_ownership(r)?
+                .into_iter()
+                .map(|v| v.freeze())
+                .collect::<PartialVMResult<_>>()?)
         };
 
         Ok(match self {
-            Container::Vec(r) => FrozenContainer::Vec(freeze_vec_val(r)?),
-            Container::Struct(r) => FrozenContainer::Struct(freeze_vec_val(r)?),
-            Container::VecU8(r) => FrozenContainer::VecU8(Arc::new(take_unique_ownership(r)?)),
-            Container::VecU16(r) => FrozenContainer::VecU16(Arc::new(take_unique_ownership(r)?)),
-            Container::VecU32(r) => FrozenContainer::VecU32(Arc::new(take_unique_ownership(r)?)),
-            Container::VecU64(r) => FrozenContainer::VecU64(Arc::new(take_unique_ownership(r)?)),
-            Container::VecU128(r) => FrozenContainer::VecU128(Arc::new(take_unique_ownership(r)?)),
-            Container::VecU256(r) => FrozenContainer::VecU256(Arc::new(take_unique_ownership(r)?)),
-            Container::VecBool(r) => FrozenContainer::VecBool(Arc::new(take_unique_ownership(r)?)),
-            Container::VecAddress(r) => {
-                FrozenContainer::VecAddress(Arc::new(take_unique_ownership(r)?))
-            },
-            Container::Locals(_) => {
+            Self::Vec(r) => FrozenContainer::Vec(freeze_vec(r)?),
+            Self::Struct(r) => FrozenContainer::Struct(freeze_vec(r)?),
+            Self::VecU8(r) => FrozenContainer::VecU8(take_unique_ownership(r)?),
+            Self::VecU16(r) => FrozenContainer::VecU16(take_unique_ownership(r)?),
+            Self::VecU32(r) => FrozenContainer::VecU32(take_unique_ownership(r)?),
+            Self::VecU64(r) => FrozenContainer::VecU64(take_unique_ownership(r)?),
+            Self::VecU128(r) => FrozenContainer::VecU128(take_unique_ownership(r)?),
+            Self::VecU256(r) => FrozenContainer::VecU256(take_unique_ownership(r)?),
+            Self::VecBool(r) => FrozenContainer::VecBool(take_unique_ownership(r)?),
+            Self::VecAddress(r) => FrozenContainer::VecAddress(take_unique_ownership(r)?),
+            Self::Locals(_) => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                         .with_message("cannot freeze Locals container".to_string()),
@@ -1368,53 +1338,50 @@ impl Value {
  *
  * Constructors For Frozen Values
  *
- *   Since frozen values are only constructed inside the VM, we do not want to make
- *   the API public.
- *
  **************************************************************************************/
 
 impl FrozenValue {
-    fn u8(x: u8) -> Self {
+    pub fn u8(x: u8) -> Self {
         Self(FrozenValueImpl::U8(x))
     }
 
-    fn u16(x: u16) -> Self {
+    pub fn u16(x: u16) -> Self {
         Self(FrozenValueImpl::U16(x))
     }
 
-    fn u32(x: u32) -> Self {
+    pub fn u32(x: u32) -> Self {
         Self(FrozenValueImpl::U32(x))
     }
 
-    fn u64(x: u64) -> Self {
+    pub fn u64(x: u64) -> Self {
         Self(FrozenValueImpl::U64(x))
     }
 
-    fn u128(x: u128) -> Self {
+    pub fn u128(x: u128) -> Self {
         Self(FrozenValueImpl::U128(x))
     }
 
-    fn u256(x: u256::U256) -> Self {
+    pub fn u256(x: u256::U256) -> Self {
         Self(FrozenValueImpl::U256(x))
     }
 
-    fn bool(x: bool) -> Self {
+    pub fn bool(x: bool) -> Self {
         Self(FrozenValueImpl::Bool(x))
     }
 
-    fn address(x: AccountAddress) -> Self {
+    pub fn address(x: AccountAddress) -> Self {
         Self(FrozenValueImpl::Address(x))
     }
 
-    fn signer(x: AccountAddress) -> Self {
-        Self(FrozenValueImpl::Container(FrozenContainer::Struct(
-            Arc::new(vec![FrozenValueImpl::Address(x)]),
-        )))
+    pub fn signer(x: AccountAddress) -> Self {
+        Self(FrozenValueImpl::Container(FrozenContainer::Struct(vec![
+            FrozenValueImpl::Address(x),
+        ])))
     }
 
-    fn struct_(s: FrozenStruct) -> Self {
+    pub fn struct_(s: FrozenStruct) -> Self {
         Self(FrozenValueImpl::Container(FrozenContainer::Struct(
-            Arc::new(s.fields),
+            s.fields,
         )))
     }
 }
@@ -3297,7 +3264,7 @@ impl<'a, 'b> serde::Serialize for AnnotatedValue<'a, 'b, MoveTypeLayout, FrozenV
                 FrozenValueImpl::Container(FrozenContainer::Struct(r)),
             ) => (AnnotatedValue {
                 layout: struct_layout,
-                val: r.as_ref(),
+                val: r,
             })
             .serialize(serializer),
 
@@ -3485,21 +3452,19 @@ impl<'d> serde::de::DeserializeSeed<'d> for FrozenSeedWrapper<&MoveTypeLayout> {
 
             L::Vector(layout) => {
                 let container = match &**layout {
-                    L::U8 => FrozenContainer::VecU8(Arc::new(Vec::deserialize(deserializer)?)),
-                    L::U16 => FrozenContainer::VecU16(Arc::new(Vec::deserialize(deserializer)?)),
-                    L::U32 => FrozenContainer::VecU32(Arc::new(Vec::deserialize(deserializer)?)),
-                    L::U64 => FrozenContainer::VecU64(Arc::new(Vec::deserialize(deserializer)?)),
-                    L::U128 => FrozenContainer::VecU128(Arc::new(Vec::deserialize(deserializer)?)),
-                    L::U256 => FrozenContainer::VecU256(Arc::new(Vec::deserialize(deserializer)?)),
-                    L::Bool => FrozenContainer::VecBool(Arc::new(Vec::deserialize(deserializer)?)),
-                    L::Address => {
-                        FrozenContainer::VecAddress(Arc::new(Vec::deserialize(deserializer)?))
-                    },
+                    L::U8 => FrozenContainer::VecU8(Vec::deserialize(deserializer)?),
+                    L::U16 => FrozenContainer::VecU16(Vec::deserialize(deserializer)?),
+                    L::U32 => FrozenContainer::VecU32(Vec::deserialize(deserializer)?),
+                    L::U64 => FrozenContainer::VecU64(Vec::deserialize(deserializer)?),
+                    L::U128 => FrozenContainer::VecU128(Vec::deserialize(deserializer)?),
+                    L::U256 => FrozenContainer::VecU256(Vec::deserialize(deserializer)?),
+                    L::Bool => FrozenContainer::VecBool(Vec::deserialize(deserializer)?),
+                    L::Address => FrozenContainer::VecAddress(Vec::deserialize(deserializer)?),
                     layout => {
-                        let v = deserializer.deserialize_seq(ImmutableVectorElementVisitor(
+                        let v = deserializer.deserialize_seq(FrozenVectorElementVisitor(
                             FrozenSeedWrapper { layout },
                         ))?;
-                        FrozenContainer::Vec(Arc::new(v))
+                        FrozenContainer::Vec(v)
                     },
                 };
                 Ok(FrozenValue(FrozenValueImpl::Container(container)))
@@ -3531,10 +3496,7 @@ impl<'d> serde::de::DeserializeSeed<'d> for FrozenSeedWrapper<&MoveStructLayout>
     ) -> Result<Self::Value, D::Error> {
         let field_layouts = self.layout.fields();
         let fields = deserializer
-            .deserialize_tuple(
-                field_layouts.len(),
-                ImmutableStructFieldVisitor(field_layouts),
-            )?
+            .deserialize_tuple(field_layouts.len(), FrozenStructFieldVisitor(field_layouts))?
             .into_iter()
             .map(|v| v.0)
             .collect();
@@ -3543,7 +3505,7 @@ impl<'d> serde::de::DeserializeSeed<'d> for FrozenSeedWrapper<&MoveStructLayout>
 }
 
 struct VectorElementVisitor<'a>(SeedWrapper<&'a MoveTypeLayout>);
-struct ImmutableVectorElementVisitor<'a>(FrozenSeedWrapper<&'a MoveTypeLayout>);
+struct FrozenVectorElementVisitor<'a>(FrozenSeedWrapper<&'a MoveTypeLayout>);
 
 impl<'d, 'a> serde::de::Visitor<'d> for VectorElementVisitor<'a> {
     type Value = Vec<ValueImpl>;
@@ -3564,7 +3526,7 @@ impl<'d, 'a> serde::de::Visitor<'d> for VectorElementVisitor<'a> {
     }
 }
 
-impl<'d, 'a> serde::de::Visitor<'d> for ImmutableVectorElementVisitor<'a> {
+impl<'d, 'a> serde::de::Visitor<'d> for FrozenVectorElementVisitor<'a> {
     type Value = Vec<FrozenValueImpl>;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -3584,7 +3546,7 @@ impl<'d, 'a> serde::de::Visitor<'d> for ImmutableVectorElementVisitor<'a> {
 }
 
 struct StructFieldVisitor<'a>(&'a [MoveTypeLayout]);
-struct ImmutableStructFieldVisitor<'a>(&'a [MoveTypeLayout]);
+struct FrozenStructFieldVisitor<'a>(&'a [MoveTypeLayout]);
 
 impl<'d, 'a> serde::de::Visitor<'d> for StructFieldVisitor<'a> {
     type Value = Vec<Value>;
@@ -3611,7 +3573,7 @@ impl<'d, 'a> serde::de::Visitor<'d> for StructFieldVisitor<'a> {
     }
 }
 
-impl<'d, 'a> serde::de::Visitor<'d> for ImmutableStructFieldVisitor<'a> {
+impl<'d, 'a> serde::de::Visitor<'d> for FrozenStructFieldVisitor<'a> {
     type Value = Vec<FrozenValue>;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
