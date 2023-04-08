@@ -391,7 +391,7 @@ impl Default for NetworkMonitoringConfig {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct NodeMonitoringConfig {
     pub node_info_request_interval_ms: u64, // The interval (ms) between node info requests
