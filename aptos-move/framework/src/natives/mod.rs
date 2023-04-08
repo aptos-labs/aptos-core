@@ -201,10 +201,10 @@ impl GasParameters {
                 },
             },
             debug: debug::GasParameters {
-                print: debug::PrintGasParameters {
+                native_print: debug::PrintGasParameters {
                     base_cost: 0.into(),
                 },
-                print_stack_trace: debug::PrintStackTraceGasParameters {
+                native_stack_trace: debug::StackTraceGasParameters {
                     base_cost: 0.into(),
                 },
             },

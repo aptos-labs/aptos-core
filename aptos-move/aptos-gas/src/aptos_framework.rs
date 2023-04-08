@@ -120,6 +120,8 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     // These are dummy value, they copied from storage gas in aptos-core/aptos-vm/src/aptos_vm_impl.rs
     [.object.exists_at.per_byte_loaded, { 7.. => "object.exists_at.per_byte_loaded" }, 1000],
     [.object.exists_at.per_item_loaded, { 7.. => "object.exists_at.per_item_loaded" }, 8000],
+    [.debug.native_print.base_cost, {8.. => "debug.native_print.base_cost"}, MUL],
+    [.debug.native_stack_trace.base_cost, {8.. => "debug.native_stack_trace.base_cost"}, MUL],
     [.string_utils.base, {8.. => "string_utils.format.base"}, 300 * MUL],
     [.string_utils.per_byte, {8.. =>"string_utils.format.per_byte"}, MUL],
 ]);

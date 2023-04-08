@@ -17,7 +17,7 @@ use move_core_types::{
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
-    values::{Reference, Struct, Value, Vector},
+    values::{Reference, Struct, Value, Vector, VectorRef},
 };
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, fmt::Write, ops::Deref, sync::Arc};
@@ -83,7 +83,7 @@ impl MoveLayout for MoveFieldLayout {
 }
 
 impl MoveLayout for MoveTypeLayout {
-    fn write_name(&self, out: &mut String) {}
+    fn write_name(&self, _out: &mut String) {}
 
     fn get_layout(&self) -> &MoveTypeLayout {
         &self
@@ -241,7 +241,7 @@ fn native_format_impl(
                 return Ok(());
             }
             if context.type_tag {
-                write!(out, "{} {{", TypeTag::from(type_.clone()));
+                write!(out, "{} {{", TypeTag::from(type_.clone())).unwrap();
             } else {
                 write!(out, "{} {{", type_.name.as_str()).unwrap();
             };
@@ -338,14 +338,13 @@ fn native_format_list(
         .read_ref()
         .map_err(SafeNativeError::InvariantViolation)?;
 
-    let fmt = safely_pop_arg!(arguments, Reference);
-    let fmt = fmt
-        .read_ref()
-        .map_err(SafeNativeError::InvariantViolation)?
-        .value_as::<Vec<u8>>()?;
-    let fmt = std::str::from_utf8(&fmt).map_err(|_| SafeNativeError::Abort {
-        abort_code: invalid_fmt,
-    })?;
+    let fmt_ref = safely_pop_arg!(arguments, VectorRef);
+    let fmt_ref2 = fmt_ref.as_bytes_ref();
+    // Could use unsafe here, but it's forbidden in this crate.
+    let fmt =
+        std::str::from_utf8(fmt_ref2.as_slice()).map_err(|_| SafeNativeError::Abort {
+            abort_code: invalid_fmt,
+        })?;
 
     context.charge(gas_params.per_byte * GasQuantity::from(fmt.len() as u64))?;
 

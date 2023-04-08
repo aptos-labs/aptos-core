@@ -67,14 +67,14 @@ pub fn make_native_print(gas_params: PrintGasParameters) -> NativeFunction {
  *   gas cost: base_cost
  **************************************************************************************************/
 #[derive(Debug, Clone)]
-pub struct PrintStackTraceGasParameters {
+pub struct StackTraceGasParameters {
     pub base_cost: InternalGas,
 }
 
 #[allow(unused_variables)]
 #[inline]
 fn native_stack_trace(
-    gas_params: &PrintStackTraceGasParameters,
+    gas_params: &StackTraceGasParameters,
     context: &mut NativeContext,
     ty_args: Vec<Type>,
     args: VecDeque<Value>,
@@ -90,11 +90,10 @@ fn native_stack_trace(
     }
 
     let move_str = Value::struct_(Struct::pack(vec![Value::vector_u8(s.into_bytes())]));
-    //Ok(smallvec![move_str])
     Ok(NativeResult::ok(gas_params.base_cost, smallvec![move_str]))
 }
 
-pub fn make_native_stack_trace(gas_params: PrintStackTraceGasParameters) -> NativeFunction {
+pub fn make_native_stack_trace(gas_params: StackTraceGasParameters) -> NativeFunction {
     Arc::new(
         move |context, ty_args, args| -> PartialVMResult<NativeResult> {
             native_stack_trace(&gas_params, context, ty_args, args)
@@ -107,16 +106,16 @@ pub fn make_native_stack_trace(gas_params: PrintStackTraceGasParameters) -> Nati
  **************************************************************************************************/
 #[derive(Debug, Clone)]
 pub struct GasParameters {
-    pub print: PrintGasParameters,
-    pub print_stack_trace: PrintStackTraceGasParameters,
+    pub native_print: PrintGasParameters,
+    pub native_stack_trace: StackTraceGasParameters,
 }
 
 pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {
     let natives = [
-        ("native_print", make_native_print(gas_params.print)),
+        ("native_print", make_native_print(gas_params.native_print)),
         (
             "native_stack_trace",
-            make_native_stack_trace(gas_params.print_stack_trace),
+            make_native_stack_trace(gas_params.native_stack_trace),
         ),
     ];
 
