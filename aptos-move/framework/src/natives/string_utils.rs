@@ -61,10 +61,7 @@ fn print_space_or_newline(newline: bool, out: &mut String, depth: usize) {
 }
 
 fn primitive_type(ty: &MoveTypeLayout) -> bool {
-    match ty {
-        MoveTypeLayout::Vector(_) | MoveTypeLayout::Struct(_) => false,
-        _ => true,
-    }
+    !matches!(ty, MoveTypeLayout::Vector(_) | MoveTypeLayout::Struct(_))
 }
 
 trait MoveLayout {
@@ -86,7 +83,7 @@ impl MoveLayout for MoveTypeLayout {
     fn write_name(&self, _out: &mut String) {}
 
     fn get_layout(&self) -> &MoveTypeLayout {
-        &self
+        self
     }
 }
 
@@ -108,7 +105,7 @@ fn format_vector<'a>(
     print_space_or_newline(newline, out, depth + 1);
     for (i, (ty, val)) in fields.zip(values.into_iter()).enumerate() {
         if i > 0 {
-            out.push_str(",");
+            out.push(',');
             print_space_or_newline(newline, out, depth + 1);
         }
         if i >= context.max_len {

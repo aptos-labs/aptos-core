@@ -35,7 +35,7 @@ fn native_print(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    debug_assert!(ty_args.len() == 0);
+    debug_assert!(ty_args.is_empty());
     debug_assert!(args.len() == 1);
 
     // No-op if the feature flag is not present.
