@@ -331,7 +331,7 @@ module aptos_token_objects::token {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
-        collection::create_untracked_collection(
+        collection::create_unlimited_collection(
             creator,
             string::utf8(b"collection description"),
             collection_name,
