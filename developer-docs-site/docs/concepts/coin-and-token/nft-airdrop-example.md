@@ -1,11 +1,11 @@
 ---
-title: "Airdrop Aptos Tokens"
-id: "airdrop-aptos-tokens"
+title: "NFT Airdrop Example"
+id: "nft-airdrop-example"
 ---
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Airdrop Aptos Tokens
+# NFT Airdrop Example
 
 We support [different ways](./aptos-token.md#token-transfer) of transferring tokens in the Aptos token standard. In this example, we use the two-step process to airdrop to a list of addresses since this method doesn't require the receiver to opt-in to direct transfer.
 
@@ -40,5 +40,3 @@ public entry fun airdrop(whitelist: vector<address>) acquires ModuleData {
 
 After offering the token, the wallet receiver (eg: [Petra](https://petra.app/)) would see the offer as shown below:
 ![petra_screenshot.png](../../../static/img/token-airdrop.png)
-
-This completes the Aptos token airdrop example.
