@@ -341,10 +341,9 @@ fn native_format_list(
     let fmt_ref = safely_pop_arg!(arguments, VectorRef);
     let fmt_ref2 = fmt_ref.as_bytes_ref();
     // Could use unsafe here, but it's forbidden in this crate.
-    let fmt =
-        std::str::from_utf8(fmt_ref2.as_slice()).map_err(|_| SafeNativeError::Abort {
-            abort_code: invalid_fmt,
-        })?;
+    let fmt = std::str::from_utf8(fmt_ref2.as_slice()).map_err(|_| SafeNativeError::Abort {
+        abort_code: invalid_fmt,
+    })?;
 
     context.charge(gas_params.per_byte * GasQuantity::from(fmt.len() as u64))?;
 
