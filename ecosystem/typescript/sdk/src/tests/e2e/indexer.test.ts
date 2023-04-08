@@ -6,6 +6,8 @@ import { IndexerClient } from "../../providers/indexer";
 import { TokenClient } from "../../plugins/token_client";
 import { FAUCET_AUTH_TOKEN, longTestTimeout } from "../unit/test_helper.test";
 import { Network, NetworkToIndexerAPI, NetworkToNodeAPI, sleep } from "../../utils";
+import axios from "axios";
+import { ProviderUtil } from "../../providers/utils";
 
 const aptosClient = new AptosClient(NetworkToNodeAPI[Network.TESTNET]);
 const faucetClient = new FaucetClient(
@@ -190,6 +192,21 @@ describe("Indexer", () => {
     test("gets indexer ledger info", async () => {
       const ledgerInfo = await indexerClient.getIndexerLedgerInfo();
       expect(ledgerInfo.ledger_infos[0].chain_id).toBeGreaterThan(1);
+    });
+
+    test("make sure queryIndexer post call with correct User-Agent header", async () => {
+      let mockHeaders: any = {};
+
+      // spy on axios.post and mock the response
+      jest.spyOn(axios, "post").mockImplementation((url, query, config) => {
+        mockHeaders["User-Agent"] = config?.headers?.["User-Agent"];
+        return Promise.resolve({ data: { data: {}, errors: null } });
+      });
+
+      // Call queryIndexer and expect it to make a request with the expected User-Agent header
+      const expectedUserAgent = ProviderUtil.getUserAgent();
+      await indexerClient.queryIndexer({ query: "{ mockQuery }" });
+      expect(mockHeaders["User-Agent"]).toEqual(expectedUserAgent);
     });
   });
 });

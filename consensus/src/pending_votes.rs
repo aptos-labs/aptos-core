@@ -155,14 +155,9 @@ impl PendingVotes {
         counters::CONSENSUS_CURRENT_ROUND_QUORUM_VOTING_POWER
             .set(validator_verifier.quorum_voting_power() as f64);
 
-        let hash_index_str = if *hash_index <= 2 {
-            (*hash_index).to_string()
-        } else {
-            "other".to_string()
-        };
         if !vote.is_timeout() {
             counters::CONSENSUS_CURRENT_ROUND_VOTED_POWER
-                .with_label_values(&[&vote.author().to_string(), &hash_index_str])
+                .with_label_values(&[&vote.author().to_string(), &hash_index_to_str(*hash_index)])
                 .set(validator_voting_power as f64);
             counters::CONSENSUS_LAST_VOTE_EPOCH
                 .with_label_values(&[&vote.author().to_string()])
@@ -268,10 +263,11 @@ impl PendingVotes {
         Vec<(HashValue, LedgerInfoWithPartialSignatures)>,
         Option<TwoChainTimeoutWithPartialSignatures>,
     ) {
-        for (i, _) in self.li_digest_to_votes.values() {
+        for (hash_index, _) in self.li_digest_to_votes.values() {
+            let hash_index_str = hash_index_to_str(*hash_index);
             for author in self.author_to_vote.keys() {
                 counters::CONSENSUS_CURRENT_ROUND_VOTED_POWER
-                    .with_label_values(&[&author.to_string(), &(*i.to_string())])
+                    .with_label_values(&[&author.to_string(), &hash_index_str])
                     .set(0_f64);
             }
         }
@@ -290,6 +286,14 @@ impl PendingVotes {
                 .collect(),
             self.maybe_partial_2chain_tc.take(),
         )
+    }
+}
+
+fn hash_index_to_str(hash_index: usize) -> String {
+    if hash_index <= 2 {
+        hash_index.to_string()
+    } else {
+        "other".to_string()
     }
 }
 

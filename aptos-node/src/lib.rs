@@ -422,6 +422,7 @@ pub fn setup_environment_and_start_node(
     let peer_monitoring_service_runtime = services::start_peer_monitoring_service(
         &node_config,
         peer_monitoring_service_network_interfaces,
+        db_rw.reader.clone(),
     );
 
     // Start state sync and get the notification endpoints for mempool and consensus

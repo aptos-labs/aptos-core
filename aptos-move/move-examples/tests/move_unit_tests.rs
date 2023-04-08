@@ -86,6 +86,11 @@ fn test_defi() {
 }
 
 #[test]
+fn test_groth16() {
+    test_common("groth16_example");
+}
+
+#[test]
 fn test_hello_blockchain() {
     test_common("hello_blockchain");
 }

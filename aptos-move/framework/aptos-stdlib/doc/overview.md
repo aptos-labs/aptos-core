@@ -12,15 +12,15 @@ This is the reference documentation of the Aptos standard library.
 ## Index
 
 
--  [`0x1::algebra`](algebra.md#0x1_algebra)
--  [`0x1::algebra_bls12381`](algebra_bls12381.md#0x1_algebra_bls12381)
 -  [`0x1::any`](any.md#0x1_any)
 -  [`0x1::aptos_hash`](hash.md#0x1_aptos_hash)
 -  [`0x1::big_vector`](big_vector.md#0x1_big_vector)
 -  [`0x1::bls12381`](bls12381.md#0x1_bls12381)
+-  [`0x1::bls12381_algebra`](bls12381_algebra.md#0x1_bls12381_algebra)
 -  [`0x1::capability`](capability.md#0x1_capability)
 -  [`0x1::comparator`](comparator.md#0x1_comparator)
 -  [`0x1::copyable_any`](copyable_any.md#0x1_copyable_any)
+-  [`0x1::crypto_algebra`](crypto_algebra.md#0x1_crypto_algebra)
 -  [`0x1::debug`](debug.md#0x1_debug)
 -  [`0x1::ed25519`](ed25519.md#0x1_ed25519)
 -  [`0x1::fixed_point64`](fixed_point64.md#0x1_fixed_point64)

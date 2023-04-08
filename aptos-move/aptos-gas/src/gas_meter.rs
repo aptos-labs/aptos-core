@@ -33,6 +33,8 @@ use move_vm_types::{
 use std::collections::BTreeMap;
 
 // Change log:
+// - V8
+//   - Added BLS12-381 operations.
 // - V7
 //   - Native support for exists<T>
 //   - New formulae for storage fees based on fixed APT costs

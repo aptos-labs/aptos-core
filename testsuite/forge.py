@@ -112,10 +112,7 @@ def envoption(name: str, default: Optional[Any] = None) -> Any:
 
 
 # o11y resources
-GRAFANA_BASE_URL = (
-    "https://o11y.aptosdev.com/grafana/d/overview/overview?orgId=1&refresh=10s&"
-    "var-Datasource=VictoriaMetrics%20Global"
-)
+GRAFANA_BASE_URL = "https://aptoslabs.grafana.net/d/overview/overview?orgId=1&refresh=10s&var-Datasource=VictoriaMetrics%20Global%20%28Non-mainnet%29&var-BigQuery=Google%20BigQuery"
 PYROSCOPE_BASE_URL = "https://pyroscope.o11y.aptosdev.com"
 
 # helm chart default override values
