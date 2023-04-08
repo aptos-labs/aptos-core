@@ -90,8 +90,8 @@ impl OnChainConfig for OnChainConsensusConfig {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct ConsensusConfigV1 {
     pub decoupled_execution: bool,
-    // Deprecated
-    back_pressure_limit: u64,
+    // Deprecated and unused, cannot be renamed easily, due to yaml on framework_upgrade test
+    pub back_pressure_limit: u64,
     pub exclude_round: u64,
     pub proposer_election_type: ProposerElectionType,
     pub max_failed_authors_to_store: usize,

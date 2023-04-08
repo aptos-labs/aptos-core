@@ -86,7 +86,7 @@ impl NetworkTest for ReconfigurationTest {
     //             let upgrade_config = OnChainConsensusConfig::V2(ConsensusConfigV2 {
     //                 two_chain: true,
     //                 decoupled_execution: true,
-    //                 _back_pressure_limit: 10,
+    //                 back_pressure_limit: 10,
     //                 exclude_round: 20,
     //             });
     //             let downgrade_config = OnChainConsensusConfig::default();
