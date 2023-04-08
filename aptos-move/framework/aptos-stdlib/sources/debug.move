@@ -1,10 +1,6 @@
 /// Module providing debug functionality.
 module aptos_std::debug {
-    use std::string;
     use std::string::String;
-
-    native fun native_print(x: String);
-    native fun native_stack_trace(): String;
 
     public fun print<T>(x: &T) {
         native_print(format(x));
@@ -14,9 +10,12 @@ module aptos_std::debug {
         native_print(native_stack_trace());
     }
 
-    fun format<T>(x: &T): String {
-        return aptos_std::string_utils::debug_string(x)
+    inline fun format<T>(x: &T): String {
+        aptos_std::string_utils::debug_string(x)
     }
+
+    native fun native_print(x: String);
+    native fun native_stack_trace(): String;
 
     #[test_only]
     use std::vector;
@@ -45,22 +44,22 @@ module aptos_std::debug {
         addr: address,
         number: u8,
         bytes: vector<u8>,
-        name: string::String,
+        name: String,
         vec: vector<TestInner>,
     }
 
     #[test_only]
     fun assert_equal<T>(x: &T, expected: vector<u8>) {
-        if (string::bytes(&format(x)) != &expected) {
+        if (std::string::bytes(&format(x)) != &expected) {
             print(&format(x));
-            print(&string::utf8(expected));
+            print(&std::string::utf8(expected));
             assert!(false, 1);
         };
     }
 
     #[test_only]
     fun assert_string_equal(x: vector<u8>, expected: vector<u8>) {
-        assert!(string::bytes(&format(&string::utf8(x))) == &expected, 1);
+        assert!(std::string::bytes(&format(&std::string::utf8(x))) == &expected, 1);
     }
 
     #[test]
@@ -90,7 +89,7 @@ module aptos_std::debug {
 
         assert_equal(&str_bytes, b"0x48656c6c6f2c2073616e65204d6f766520646562756767696e6721");
 
-        let str = string::utf8(str_bytes);
+        let str = std::string::utf8(str_bytes);
         assert_equal(&str, b"\"Hello, sane Move debugging!\"");
     }
 
@@ -98,7 +97,7 @@ module aptos_std::debug {
     fun test_print_quoted_string() {
         let str_bytes = b"Can you say \"Hel\\lo\"?";
 
-        let str = string::utf8(str_bytes);
+        let str = std::string::utf8(str_bytes);
         assert_equal(&str, b"\"Can you say \\\"Hel\\\\lo\\\"?\"");
     }
 
@@ -251,7 +250,7 @@ module aptos_std::debug {
             addr: @0x1,
             number: 255u8,
             bytes: x"c0ffee",
-            name: string::utf8(b"He\"llo"),
+            name: std::string::utf8(b"He\"llo"),
             vec: vector[
                 TestInner { val: 1, vec: vector[130u128, 131u128], msgs: vector[] },
                 TestInner { val: 2, vec: vector[132u128, 133u128], msgs: vector[] }

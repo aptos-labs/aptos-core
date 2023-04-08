@@ -21,6 +21,9 @@
 -  [Function `debug_string`](#0x1_string_utils_debug_string)
 -  [Function `native_format`](#0x1_string_utils_native_format)
 -  [Function `native_format_list`](#0x1_string_utils_native_format_list)
+-  [Specification](#@Specification_1)
+    -  [Function `native_format`](#@Specification_1_native_format)
+    -  [Function `native_format_list`](#@Specification_1_native_format_list)
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
@@ -437,6 +440,41 @@ fmt must be utf8 encoded and must contain the same number of "{}" as the number 
 
 
 </details>
+
+<a name="@Specification_1"></a>
+
+## Specification
+
+
+<a name="@Specification_1_native_format"></a>
+
+### Function `native_format`
+
+
+<pre><code><b>fun</b> <a href="string_utils.md#0x1_string_utils_native_format">native_format</a>&lt;T&gt;(s: &T, type_tag: bool, canonicalize: bool, single_line: bool, include_int_types: bool): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a name="@Specification_1_native_format_list"></a>
+
+### Function `native_format_list`
+
+
+<pre><code><b>fun</b> <a href="string_utils.md#0x1_string_utils_native_format_list">native_format_list</a>&lt;T&gt;(fmt: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, val: &T): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
