@@ -27,7 +27,6 @@ TODO:
 -  [Function `creator`](#0x4_token_creator)
 -  [Function `collection`](#0x4_token_collection)
 -  [Function `collection_object`](#0x4_token_collection_object)
--  [Function `creation_name`](#0x4_token_creation_name)
 -  [Function `description`](#0x4_token_description)
 -  [Function `name`](#0x4_token_name)
 -  [Function `uri`](#0x4_token_uri)
@@ -92,13 +91,6 @@ Represents the common fields to all tokens.
 <dd>
  The name of the token, which should be unique within the collection; the length of name
  should be smaller than 128, characters, eg: "Aptos Animal #1234"
-</dd>
-<dt>
-<code>creation_name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;</code>
-</dt>
-<dd>
- The creation name of the token. Since tokens are created with the name as part of the
- object id generation.
 </dd>
 <dt>
 <code>uri: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
@@ -284,7 +276,6 @@ Creates a new token object and returns the ConstructorRef for additional special
         collection_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_get_with_default">option::get_with_default</a>(&<b>mut</b> id, 0),
         description,
         name,
-        creation_name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
         uri,
         mutation_events: <a href="../../aptos-framework/doc/object.md#0x1_object_new_event_handle">object::new_event_handle</a>(&object_signer),
     };
@@ -513,35 +504,6 @@ Extracts the tokens address from a BurnRef.
 
 </details>
 
-<a name="0x4_token_creation_name"></a>
-
-## Function `creation_name`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_creation_name">creation_name</a>&lt;T: key&gt;(<a href="token.md#0x4_token">token</a>: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_creation_name">creation_name</a>&lt;T: key&gt;(<a href="token.md#0x4_token">token</a>: Object&lt;T&gt;): String <b>acquires</b> <a href="token.md#0x4_token_Token">Token</a> {
-    <b>let</b> <a href="token.md#0x4_token">token</a> = borrow(&<a href="token.md#0x4_token">token</a>);
-    <b>if</b> (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&<a href="token.md#0x4_token">token</a>.creation_name)) {
-        *<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&<a href="token.md#0x4_token">token</a>.creation_name)
-    } <b>else</b> {
-        <a href="token.md#0x4_token">token</a>.name
-    }
-}
-</code></pre>
-
-
-
-</details>
-
 <a name="0x4_token_description"></a>
 
 ## Function `description`
@@ -682,7 +644,6 @@ Extracts the tokens address from a BurnRef.
         collection_id,
         description: _,
         name: _,
-        creation_name: _,
         uri: _,
         mutation_events,
     } = <b>move_from</b>&lt;<a href="token.md#0x4_token_Token">Token</a>&gt;(addr);
@@ -742,9 +703,6 @@ Extracts the tokens address from a BurnRef.
 
 <pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_set_name">set_name</a>(mutator_ref: &<a href="token.md#0x4_token_MutatorRef">MutatorRef</a>, name: String) <b>acquires</b> <a href="token.md#0x4_token_Token">Token</a> {
     <b>let</b> <a href="token.md#0x4_token">token</a> = borrow_mut(mutator_ref);
-    <b>if</b> (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(&<a href="token.md#0x4_token">token</a>.creation_name)) {
-        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_fill">option::fill</a>(&<b>mut</b> <a href="token.md#0x4_token">token</a>.creation_name, <a href="token.md#0x4_token">token</a>.name)
-    };
     <a href="token.md#0x4_token">token</a>.name = name;
     <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>(
         &<b>mut</b> <a href="token.md#0x4_token">token</a>.mutation_events,
