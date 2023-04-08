@@ -38,9 +38,6 @@ module aptos_token_objects::token {
         /// The name of the token, which should be unique within the collection; the length of name
         /// should be smaller than 128, characters, eg: "Aptos Animal #1234"
         name: String,
-        /// The creation name of the token. Since tokens are created with the name as part of the
-        /// object id generation.
-        creation_name: Option<String>,
         /// The Uniform Resource Identifier (uri) pointing to the JSON file stored in off-chain
         /// storage; the URL length will likely need a maximum any suggestions?
         uri: String,
@@ -91,7 +88,6 @@ module aptos_token_objects::token {
             collection_id: option::get_with_default(&mut id, 0),
             description,
             name,
-            creation_name: option::none(),
             uri,
             mutation_events: object::new_event_handle(&object_signer),
         };
@@ -170,16 +166,6 @@ module aptos_token_objects::token {
     }
 
     #[view]
-    public fun creation_name<T: key>(token: Object<T>): String acquires Token {
-        let token = borrow(&token);
-        if (option::is_some(&token.creation_name)) {
-            *option::borrow(&token.creation_name)
-        } else {
-            token.name
-        }
-    }
-
-    #[view]
     public fun description<T: key>(token: Object<T>): String acquires Token {
         borrow(&token).description
     }
@@ -238,7 +224,6 @@ module aptos_token_objects::token {
             collection_id,
             description: _,
             name: _,
-            creation_name: _,
             uri: _,
             mutation_events,
         } = move_from<Token>(addr);
@@ -258,9 +243,6 @@ module aptos_token_objects::token {
 
     public fun set_name(mutator_ref: &MutatorRef, name: String) acquires Token {
         let token = borrow_mut(mutator_ref);
-        if (option::is_none(&token.creation_name)) {
-            option::fill(&mut token.creation_name, token.name)
-        };
         token.name = name;
         event::emit_event(
             &mut token.mutation_events,
@@ -406,13 +388,8 @@ module aptos_token_objects::token {
 
         let name = string::utf8(b"no fail");
         assert!(name != name(token), 0);
-        {
-            let token = borrow_global<Token>(object::object_address(&token));
-            assert!(option::is_none(&token.creation_name), 1);
-        };
         set_name(&mutator_ref, *&name);
         assert!(name == name(token), 2);
-        assert!(token_name == creation_name(token), 3);
     }
 
     #[test(creator = @0x123)]
