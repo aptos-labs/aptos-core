@@ -90,7 +90,8 @@ impl OnChainConfig for OnChainConsensusConfig {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct ConsensusConfigV1 {
     pub decoupled_execution: bool,
-    pub _back_pressure_limit: u64,
+    // Deprecated
+    back_pressure_limit: u64,
     pub exclude_round: u64,
     pub proposer_election_type: ProposerElectionType,
     pub max_failed_authors_to_store: usize,
@@ -100,7 +101,7 @@ impl Default for ConsensusConfigV1 {
     fn default() -> Self {
         Self {
             decoupled_execution: true,
-            _back_pressure_limit: 10,
+            back_pressure_limit: 10,
             exclude_round: 40,
             max_failed_authors_to_store: 10,
             proposer_election_type: ProposerElectionType::LeaderReputation(
