@@ -517,7 +517,8 @@ impl BlockStore {
         let pending_rounds = ordered_round.checked_sub(commit_round).unwrap();
         let ordered_timestamp = Duration::from_micros(self.ordered_root().timestamp_usecs());
         let committed_timestamp = Duration::from_micros(self.commit_root().timestamp_usecs());
-        let commit_cert_timestamp = Duration::from_micros(self.highest_commit_cert().commit_info().timestamp_usecs());
+        let commit_cert_timestamp =
+            Duration::from_micros(self.highest_commit_cert().commit_info().timestamp_usecs());
 
         fn latency_from_proposal(proposal_timestamp: Duration, timestamp: Duration) -> Duration {
             if timestamp.is_zero() {
@@ -534,9 +535,11 @@ impl BlockStore {
             pending_rounds = pending_rounds,
             ordered_round = ordered_round,
             commit_round = commit_round,
-            latency_to_ordered_ms = latency_from_proposal(proposal_timestamp, ordered_timestamp).as_millis() as u64,
+            latency_to_ordered_ms =
+                latency_from_proposal(proposal_timestamp, ordered_timestamp).as_millis() as u64,
             latency_to_committed_ms = latency_to_committed.as_millis() as u64,
-            latency_to_commit_cert_ms = latency_from_proposal(proposal_timestamp, commit_cert_timestamp).as_millis() as u64,
+            latency_to_commit_cert_ms =
+                latency_from_proposal(proposal_timestamp, commit_cert_timestamp).as_millis() as u64,
             "Pipeline pending latency on proposal creation",
         );
 

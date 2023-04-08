@@ -359,7 +359,7 @@ fn create_single_node_test_config(
 
     // Set the correct poll count for mempool
     if enable_lazy_mode {
-        node_config.consensus.quorum_store_poll_count = u64::MAX;
+        node_config.consensus.quorum_store_poll_time_ms = 3_600_000;
     }
 
     node_config

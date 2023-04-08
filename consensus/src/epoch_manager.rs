@@ -681,7 +681,6 @@ impl EpochManager {
 
         let payload_client = QuorumStoreClient::new(
             consensus_to_quorum_store_tx,
-            self.config.quorum_store_poll_count, // TODO: consider moving it to a quorum store config in later PRs.
             self.config.quorum_store_pull_timeout_ms,
             self.config.wait_for_full_blocks_above_recent_fill_threshold,
             self.config.wait_for_full_blocks_above_pending_blocks,
@@ -726,12 +725,12 @@ impl EpochManager {
             block_store.clone(),
             Arc::new(payload_client),
             self.time_service.clone(),
+            Duration::from_millis(self.config.quorum_store_poll_time_ms),
             self.config
                 .max_sending_block_txns(self.quorum_store_enabled),
             self.config
                 .max_sending_block_bytes(self.quorum_store_enabled),
             onchain_consensus_config.max_failed_authors_to_store(),
-            Duration::from_millis(self.config.backpressure_proposal_delay_ms),
             pipeline_backpressure_config,
             chain_health_backoff_config,
             self.quorum_store_enabled,
