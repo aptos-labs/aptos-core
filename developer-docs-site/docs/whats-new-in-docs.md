@@ -106,7 +106,7 @@ This page shows the key updates to the developer documentation on this site. Not
 
 - Added instructions for [working with `PropertyMap` off-chain](concepts/coin-and-token/propertymap-offchain.md) via the Aptos TypeScript SDK, enabling reading and writing of Binary Canonical Serialization (BCS) data in your app.
 
-- Provided an [example of a token airdrop](concepts/coin-and-token/token-airdrop-example.md) using the two-step transfer process.
+- Provided an [example of an NFT airdrop](concepts/coin-and-token/nft-airdrop-example.md) using the two-step transfer process.
 
 ## 31 January 2023
 
