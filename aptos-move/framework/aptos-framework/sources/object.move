@@ -152,6 +152,11 @@ module aptos_framework::object {
         Object<T>{ inner: object }
     }
 
+    /// Returns true if there exists an object or the remnants of an object.
+    public fun is_object(object: address): bool {
+        exists<ObjectCore>(object)
+    }
+
     /// Derives an object address from source material: sha3_256([creator address | seed | 0xFE]).
     public fun create_object_address(source: &address, seed: vector<u8>): address {
         let bytes = bcs::to_bytes(source);
