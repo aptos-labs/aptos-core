@@ -18,7 +18,7 @@ TODO:
 -  [Struct `MutatorRef`](#0x4_token_MutatorRef)
 -  [Struct `MutationEvent`](#0x4_token_MutationEvent)
 -  [Constants](#@Constants_0)
--  [Function `create`](#0x4_token_create)
+-  [Function `create_named_token`](#0x4_token_create_named_token)
 -  [Function `create_from_account`](#0x4_token_create_from_account)
 -  [Function `create_token_address`](#0x4_token_create_token_address)
 -  [Function `create_token_seed`](#0x4_token_create_token_seed)
@@ -238,15 +238,15 @@ The provided signer is not the creator
 
 
 
-<a name="0x4_token_create"></a>
+<a name="0x4_token_create_named_token"></a>
 
-## Function `create`
+## Function `create_named_token`
 
 Creates a new token object from a token name and returns the ConstructorRef for
 additional specialization.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_create">create</a>(creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, collection_name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, description: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, <a href="royalty.md#0x4_royalty">royalty</a>: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="royalty.md#0x4_royalty_Royalty">royalty::Royalty</a>&gt;, uri: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="../../aptos-framework/doc/object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_create_named_token">create_named_token</a>(creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, collection_name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, description: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, <a href="royalty.md#0x4_royalty">royalty</a>: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="royalty.md#0x4_royalty_Royalty">royalty::Royalty</a>&gt;, uri: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="../../aptos-framework/doc/object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>
 </code></pre>
 
 
@@ -255,7 +255,7 @@ additional specialization.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_create">create</a>(
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_create_named_token">create_named_token</a>(
     creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     collection_name: String,
     description: String,
@@ -267,7 +267,7 @@ additional specialization.
     <b>let</b> seed = <a href="token.md#0x4_token_create_token_seed">create_token_seed</a>(&collection_name, &name);
 
     <b>let</b> constructor_ref = <a href="../../aptos-framework/doc/object.md#0x1_object_create_named_object">object::create_named_object</a>(creator, seed);
-    inline_create(&constructor_ref, creator_address, collection_name, description, name, <a href="royalty.md#0x4_royalty">royalty</a>, uri);
+    create_common(&constructor_ref, creator_address, collection_name, description, name, <a href="royalty.md#0x4_royalty">royalty</a>, uri);
     constructor_ref
 }
 </code></pre>
@@ -303,7 +303,7 @@ additional specialization.
 ): ConstructorRef {
     <b>let</b> creator_address = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(creator);
     <b>let</b> constructor_ref = <a href="../../aptos-framework/doc/object.md#0x1_object_create_object_from_account">object::create_object_from_account</a>(creator);
-    inline_create(&constructor_ref, creator_address, collection_name, description, name, <a href="royalty.md#0x4_royalty">royalty</a>, uri);
+    create_common(&constructor_ref, creator_address, collection_name, description, name, <a href="royalty.md#0x4_royalty">royalty</a>, uri);
     constructor_ref
 }
 </code></pre>
