@@ -173,6 +173,14 @@ module aptos_framework::object {
         from_bcs::to_address(hash::sha3_256(bytes))
     }
 
+    /// Derives an object from an Account GUID.
+    public fun create_guid_object_address(source: address, creation_num: u64): address {
+        let id = guid::create_id(source, creation_num);
+        let bytes = bcs::to_bytes(&id);
+        vector::push_back(&mut bytes, OBJECT_FROM_GUID_ADDRESS_SCHEME);
+        from_bcs::to_address(hash::sha3_256(bytes))
+    }
+
     native fun exists_at<T: key>(object: address): bool;
 
     /// Returns the address of within an ObjectId.

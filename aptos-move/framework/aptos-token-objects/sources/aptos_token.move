@@ -201,7 +201,7 @@ module aptos_token_objects::aptos_token {
         property_types: vector<String>,
         property_values: vector<vector<u8>>,
     ): ConstructorRef acquires AptosCollection {
-        let constructor_ref = token::create_named_token(
+        let constructor_ref = token::create_from_account(
             creator,
             collection,
             description,
@@ -594,14 +594,9 @@ module aptos_token_objects::aptos_token {
     // Tests
 
     #[test_only]
-    inline fun token_object(creator: &signer, collection: &String, name: &String): Object<AptosToken> {
-        let token_addr = token::create_token_address(&signer::address_of(creator), collection, name);
-        object::address_to_object<AptosToken>(token_addr)
-    }
-
-
-    #[test_only]
     use std::string;
+    #[test_only]
+    use aptos_framework::account;
 
     #[test(creator = @0x123)]
     fun test_create_and_transfer(creator: &signer) acquires AptosCollection, AptosToken {
@@ -623,6 +618,11 @@ module aptos_token_objects::aptos_token {
         let token_name = string::utf8(b"token name");
 
         create_collection_helper(creator, collection_name, false);
+
+        let creator_addr = signer::address_of(creator);
+        account::create_account_for_test(creator_addr);
+        let token_creation_num = account::get_guid_next_creation_num(creator_addr);
+
         mint_soul_bound(
             creator,
             collection_name,
@@ -635,11 +635,7 @@ module aptos_token_objects::aptos_token {
             signer::address_of(bob),
         );
 
-        let token_addr = token::create_token_address(
-            &signer::address_of(creator),
-            &collection_name,
-            &token_name,
-        );
+        let token_addr = object::create_guid_object_address(creator_addr, token_creation_num);
         let token = object::address_to_object<AptosToken>(token_addr);
         object::transfer(bob, token, @0x345);
     }
@@ -824,8 +820,8 @@ module aptos_token_objects::aptos_token {
 
         create_collection_helper(creator, collection_name, true);
         let token = mint_helper(creator, collection_name, token_name);
+        let token_addr = object::object_address(&token);
 
-        let token_addr = token::create_token_address(&signer::address_of(creator), &collection_name, &token_name);
         assert!(exists<AptosToken>(token_addr), 0);
         burn(creator, token);
         assert!(!exists<AptosToken>(token_addr), 1);
@@ -1029,6 +1025,10 @@ module aptos_token_objects::aptos_token {
         collection_name: String,
         token_name: String,
     ): Object<AptosToken> acquires AptosCollection, AptosToken {
+        let creator_addr = signer::address_of(creator);
+        account::create_account_for_test(creator_addr);
+        let token_creation_num = account::get_guid_next_creation_num(creator_addr);
+
         mint(
             creator,
             collection_name,
@@ -1039,7 +1039,6 @@ module aptos_token_objects::aptos_token {
             vector[string::utf8(b"bool")],
             vector[vector[0x01]],
         );
-
-        token_object(creator, &collection_name, &token_name)
+        object::address_to_object<AptosToken>(object::create_guid_object_address(creator_addr, token_creation_num))
     }
 }
