@@ -1,3 +1,4 @@
+/// A module for formatting move values as strings.
 module aptos_std::string_utils {
     use std::string::String;
 
@@ -6,34 +7,13 @@ module aptos_std::string_utils {
     /// The format string is not valid.
     const EINVALID_FORMAT: u64 = 2;
 
-    struct Cons<T, N> has copy, drop, store {
-        car: T,
-        cdr: N,
-    }
-
-    struct NIL has copy, drop, store {}
-
-    /// Create a pair of values.
-    public fun cons<T, N>(car: T, cdr: N): Cons<T, N> { Cons { car, cdr } }
-
-    /// Create a nil value.
-    public fun nil(): NIL { NIL {} }
-
-    /// Specialized versions of format_list for 1, 2, 3 and 4 values as a convenience.
-    public fun format1<T0: drop>(fmt: &vector<u8>, a: T0): String {
-        native_format_list(fmt, &list1(a))
-    }
-    public fun format2<T0: drop, T1: drop>(fmt: &vector<u8>, a: T0, b: T1): String {
-        native_format_list(fmt, &list2(a, b))
-    }
-    public fun format3<T0: drop, T1: drop, T2: drop>(fmt: &vector<u8>, a: T0, b: T1, c: T2): String {
-        native_format_list(fmt, &list3(a, b, c))
-    }
-    public fun format4<T0: drop, T1: drop, T2: drop, T3: drop>(fmt: &vector<u8>, a: T0, b: T1, c: T2, d: T3): String {
-        native_format_list(fmt, &list4(a, b, c, d))
-    }
-
-    /// Format a move value as a human readable string.
+    /// Format a move value as a human readable string,
+    /// eg. `to_string(&1u64) == "1"`, `to_string(&false) == "false"`, `to_string(&@0x1) == "@0x1"`.
+    /// For vectors and structs the format is similar to rust, eg.
+    /// `to_string(&cons(1,2)) == "Cons { car: 1, cdr: 2 }"` and `to_string(&vector[1, 2, 3]) == "[ 1, 2, 3 ]"`
+    /// For vectors of u8 the output is hex encoded, eg. `to_string(&vector[1u8, 2u8, 3u8]) == "0x010203"`
+    /// For std::string::String the output is the string itself including quotes, eg.
+    /// `to_string(&std::string::utf8(b"My string")) == "\"My string\""`
     public fun to_string<T>(s: &T): String {
         native_format(s, false, false, true, false)
     }
@@ -48,24 +28,48 @@ module aptos_std::string_utils {
         native_format(s, false, true, true, false)
     }
 
-    /// Format vectors and structs with newlines
+    /// Format vectors and structs with newlines and indentation.
     public fun debug_string<T>(s: &T): String {
         native_format(s, true, false, false, false)
     }
 
-    /// Format a move value as a human readable string.
-    /// eg. `format(&1u64) == "1"`, `format(&false) == "false"` and `format(&cons(1,2)) == "Cons { car: 1, cdr: 2 }"`
-    native fun native_format<T>(s: &T, type_tag: bool, canonicalize: bool, single_line: bool, include_int_types: bool): String;
+    /// Formatting with a rust-like format string, eg. `format2(&b"a = {}, b = {}", 1, 2) == "a = 1, b = 2"`.
+    public fun format1<T0: drop>(fmt: &vector<u8>, a: T0): String {
+        native_format_list(fmt, &list1(a))
+    }
+    public fun format2<T0: drop, T1: drop>(fmt: &vector<u8>, a: T0, b: T1): String {
+        native_format_list(fmt, &list2(a, b))
+    }
+    public fun format3<T0: drop, T1: drop, T2: drop>(fmt: &vector<u8>, a: T0, b: T1, c: T2): String {
+        native_format_list(fmt, &list3(a, b, c))
+    }
+    public fun format4<T0: drop, T1: drop, T2: drop, T3: drop>(fmt: &vector<u8>, a: T0, b: T1, c: T2, d: T3): String {
+        native_format_list(fmt, &list4(a, b, c, d))
+    }
 
-    /// Format a list of move values as a human readable string with rust-like format string.
-    /// eg. `format_list(&b"a = {} b = {} c = {}", &cons(1, cons(2, cons(3, nil())))) == "a = 1 b = 2 c = 3"`
-    /// fmt must be utf8 encoded and must contain the same number of "{}" as the number of values in the list.
-    native fun native_format_list<T>(fmt: &vector<u8>, val: &T): String;
+    // Helper struct to allow passing a generic heterogeneous list of values to native_format_list.
+    struct Cons<T, N> has copy, drop, store {
+        car: T,
+        cdr: N,
+    }
 
+    struct NIL has copy, drop, store {}
+
+    // Create a pair of values.
+    fun cons<T, N>(car: T, cdr: N): Cons<T, N> { Cons { car, cdr } }
+
+    // Create a nil value.
+    fun nil(): NIL { NIL {} }
+
+    // Create a list of values.
     inline fun list1<T0>(a: T0): Cons<T0, NIL> { cons(a, nil()) }
     inline fun list2<T0, T1>(a: T0, b: T1): Cons<T0, Cons<T1, NIL>> { cons(a, list1(b)) }
     inline fun list3<T0, T1, T2>(a: T0, b: T1, c: T2): Cons<T0, Cons<T1, Cons<T2, NIL>>> { cons(a, list2(b, c)) }
     inline fun list4<T0, T1, T2, T3>(a: T0, b: T1, c: T2, d: T3): Cons<T0, Cons<T1, Cons<T2, Cons<T3, NIL>>>> { cons(a, list3(b, c, d)) }
+
+    // Native functions
+    native fun native_format<T>(s: &T, type_tag: bool, canonicalize: bool, single_line: bool, include_int_types: bool): String;
+    native fun native_format_list<T>(fmt: &vector<u8>, val: &T): String;
 
     #[test]
     fun test_format() {
