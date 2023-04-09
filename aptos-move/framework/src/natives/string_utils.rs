@@ -366,60 +366,62 @@ fn native_format_list(
     };
 
     let mut out = String::new();
-    let mut in_braces = false;
-    let mut in_escape = false;
+    let mut in_braces = 0;
     for c in fmt.chars() {
-        if !in_escape && c == '\\' {
-            in_escape = true;
+        if in_braces == 1 {
+            in_braces = 0;
+            if c == '}' {
+                // verify`that the type is a list
+                match_list_ty(context, list_ty, "Cons")?;
+
+                // We know that the type is a list, so we can safely unwrap
+                let ty_args = if let Type::StructInstantiation(_, ty_args) = list_ty {
+                    ty_args
+                } else {
+                    unreachable!()
+                };
+                let mut it = val.value_as::<Struct>()?.unpack()?;
+                let car = it.next().unwrap();
+                val = it.next().unwrap();
+                list_ty = &ty_args[1];
+
+                let ty = context
+                    .type_to_fully_annotated_layout(&ty_args[0])?
+                    .unwrap();
+                let mut format_context = FormatContext {
+                    context,
+                    base_gas: gas_params.base,
+                    max_depth: usize::MAX,
+                    max_len: usize::MAX,
+                    type_tag: true,
+                    canonicalize: false,
+                    single_line: true,
+                    include_int_type: false,
+                };
+                native_format_impl(&mut format_context, &ty, car, 0, &mut out)?;
+                continue;
+            } else if c != '{' {
+                return Err(SafeNativeError::Abort {
+                    abort_code: invalid_fmt,
+                });
+            }
+        } else if in_braces == -1 {
+            in_braces = 0;
+            if c != '}' {
+                return Err(SafeNativeError::Abort {
+                    abort_code: invalid_fmt,
+                });
+            }
+        } else if c == '{' {
+            in_braces = 1;
             continue;
-        } else if !in_escape && c == '{' {
-            if in_braces {
-                return Err(SafeNativeError::Abort {
-                    abort_code: invalid_fmt,
-                });
-            }
-            in_braces = true;
-        } else if !in_escape && c == '}' {
-            if !in_braces {
-                return Err(SafeNativeError::Abort {
-                    abort_code: invalid_fmt,
-                });
-            }
-            in_braces = false;
-            // verify`that the type is a list
-            match_list_ty(context, list_ty, "Cons")?;
-
-            // We know that the type is a list, so we can safely unwrap
-            let ty_args = if let Type::StructInstantiation(_, ty_args) = list_ty {
-                ty_args
-            } else {
-                unreachable!()
-            };
-            let mut it = val.value_as::<Struct>()?.unpack()?;
-            let car = it.next().unwrap();
-            val = it.next().unwrap();
-            list_ty = &ty_args[1];
-
-            let ty = context
-                .type_to_fully_annotated_layout(&ty_args[0])?
-                .unwrap();
-            let mut format_context = FormatContext {
-                context,
-                base_gas: gas_params.base,
-                max_depth: usize::MAX,
-                max_len: usize::MAX,
-                type_tag: true,
-                canonicalize: false,
-                single_line: true,
-                include_int_type: false,
-            };
-            native_format_impl(&mut format_context, &ty, car, 0, &mut out)?;
-        } else if !in_braces {
-            out.push(c);
+        } else if c == '}' {
+            in_braces = -1;
+            continue;
         }
-        in_escape = false;
+        out.push(c);
     }
-    if in_escape || in_braces {
+    if in_braces != 0 {
         return Err(SafeNativeError::Abort {
             abort_code: invalid_fmt,
         });

@@ -118,12 +118,6 @@ module aptos_std::string_utils {
 
     #[test]
     #[expected_failure(abort_code = EINVALID_FORMAT)]
-    fun test_format_trailing_escape() {
-        format3(&b"a = {} b = {} c = {}\\", 1, 2, 3);
-    }
-
-    #[test]
-    #[expected_failure(abort_code = EINVALID_FORMAT)]
     fun test_format_unclosed_braces() {
         format3(&b"a = {} b = {} c = {", 1, 2 ,3);
     }
@@ -141,14 +135,8 @@ module aptos_std::string_utils {
     }
 
     #[test]
-    fun test_format_escape_escape_works() {
-        let s = format3(&b"a = {} \\\\ b = {} c = {}", 1, 2, 3);
-        assert!(s == std::string::utf8(b"a = 1 \\ b = 2 c = 3"), 1);
-    }
-
-    #[test]
     fun test_format_escape_braces_works() {
-        let s = format3(&b"\\{a = {} b = {} c = {}\\}", 1, 2, 3);
+        let s = format3(&b"{{a = {} b = {} c = {}}}", 1, 2, 3);
         assert!(s == std::string::utf8(b"{a = 1 b = 2 c = 3}"), 1);
     }
 }
