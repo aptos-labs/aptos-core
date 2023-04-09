@@ -7,11 +7,10 @@ use anyhow::Result;
 use aptos_types::{
     block_metadata::BlockMetadata,
     transaction::{
-        SignatureCheckedTransaction, SignedTransaction, Transaction, TransactionOutput,
-        TransactionStatus, WriteSetPayload,
+        SignatureCheckedTransaction, SignedTransaction, Transaction, TransactionStatus,
+        WriteSetPayload,
     },
     vm_status::{StatusCode, VMStatus},
-    write_set::WriteSet,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::{change_set::ChangeSet, transaction_output::VMTransactionOutput};

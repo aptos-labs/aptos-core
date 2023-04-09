@@ -25,7 +25,7 @@ use move_core_types::{
 };
 use move_prover_test_utils::{baseline_test::verify_or_update_baseline, extract_test_directives};
 use move_vm_test_utils::gas_schedule::GasStatus;
-use move_vm_types::resolver::{Resource, ResourceResolverV2};
+use move_vm_types::resolver::{FrozenResourceResolver, Resource};
 use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet, VecDeque},
@@ -407,10 +407,10 @@ impl<'a> ResourceResolver for HarnessProxy<'a> {
     }
 }
 
-impl<'a> ResourceResolverV2 for HarnessProxy<'a> {
+impl<'a> FrozenResourceResolver for HarnessProxy<'a> {
     type Error = ();
 
-    fn get_resource_v2(
+    fn get_frozen_resource(
         &self,
         address: &AccountAddress,
         typ: &StructTag,

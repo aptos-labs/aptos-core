@@ -574,10 +574,10 @@ impl Container {
             Self::VecU256(r) => FrozenContainer::VecU256(take_unique_ownership(r)?),
             Self::VecBool(r) => FrozenContainer::VecBool(take_unique_ownership(r)?),
             Self::VecAddress(r) => FrozenContainer::VecAddress(take_unique_ownership(r)?),
-            Self::Locals(_) => {
+            _ => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message("cannot freeze Locals container".to_string()),
+                        .with_message(format!("cannot freeze {:?}", self).to_string()),
                 )
             },
         })

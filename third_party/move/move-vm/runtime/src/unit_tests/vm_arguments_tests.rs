@@ -24,9 +24,9 @@ use move_core_types::{
 };
 use move_vm_types::{
     gas::UnmeteredGasMeter,
-    resolver::{Resource, ResourceResolverV2},
+    resolver::{FrozenModuleResolver, FrozenResourceResolver, Module, Resource},
 };
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 // make a script with a given signature for main.
 fn make_script(parameters: Signature) -> Vec<u8> {
@@ -232,7 +232,7 @@ fn make_script_function(signature: Signature) -> (CompiledModule, Identifier) {
 }
 
 struct RemoteStore {
-    modules: HashMap<ModuleId, Vec<u8>>,
+    modules: HashMap<ModuleId, Arc<Module>>,
 }
 
 impl RemoteStore {
@@ -250,34 +250,22 @@ impl RemoteStore {
     }
 }
 
-impl ModuleResolver for RemoteStore {
+impl FrozenModuleResolver for RemoteStore {
     type Error = VMError;
 
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
+    fn get_frozen_module(&self, module_id: &ModuleId) -> Result<Option<Arc<Module>>, Self::Error> {
         Ok(self.modules.get(module_id).cloned())
     }
 }
 
-impl ResourceResolver for RemoteStore {
+impl FrozenResourceResolver for RemoteStore {
     type Error = VMError;
 
-    fn get_resource(
+    fn get_frozen_resource(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, Self::Error> {
-        Ok(None)
-    }
-}
-
-impl ResourceResolverV2 for RemoteStore {
-    type Error = VMError;
-
-    fn get_resource_v2(
-        &self,
-        _address: &AccountAddress,
-        _tag: &StructTag,
-    ) -> Result<Option<Resource>, Self::Error> {
+    ) -> Result<Option<Arc<Resource>>, Self::Error> {
         Ok(None)
     }
 }

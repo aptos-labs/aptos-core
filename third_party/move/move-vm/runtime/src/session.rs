@@ -13,17 +13,17 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{ChangeSet, Event},
+    effects::{ChangeSet as LegacyChangeSet, Event},
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
     value::MoveTypeLayout,
 };
 use move_vm_types::{
     data_store::DataStore,
-    effects::ChangeSetV2,
+    effects::ChangeSet,
     gas::GasMeter,
     loaded_data::runtime_types::{CachedStructIndex, StructType, Type},
-    resolver::MoveResolverV2,
+    resolver::FrozenMoveResolver,
 };
 use std::{borrow::Borrow, sync::Arc};
 
@@ -44,7 +44,7 @@ pub struct SerializedReturnValues {
     pub return_values: Vec<(Vec<u8>, MoveTypeLayout)>,
 }
 
-impl<'r, 'l, S: MoveResolverV2> Session<'r, 'l, S> {
+impl<'r, 'l, S: FrozenMoveResolver> Session<'r, 'l, S> {
     /// Execute a Move function with the given arguments. This is mainly designed for an external
     /// environment to invoke system logic written in Move.
     ///
@@ -257,13 +257,12 @@ impl<'r, 'l, S: MoveResolverV2> Session<'r, 'l, S> {
     /// This function should always succeed with no user errors returned, barring invariant violations.
     ///
     /// This MUST NOT be called if there is a previous invocation that failed with an invariant violation.
-    pub fn finish(self) -> VMResult<(ChangeSet, Vec<Event>)> {
-        let (change_set_v2, events) = self.pause()?;
-        Ok((change_set_v2.into_change_set()?, events))
+    pub fn finish(self) -> VMResult<(LegacyChangeSet, Vec<Event>)> {
+        let (change_set, events) = self.freeze()?;
+        Ok((change_set.into_legacy_change_set()?, events))
     }
 
-    /// Same as `finish` but avoids deserialization of values.
-    pub fn pause(self) -> VMResult<(ChangeSetV2, Vec<Event>)> {
+    pub fn freeze(self) -> VMResult<(ChangeSet, Vec<Event>)> {
         self.data_cache
             .into_effects()
             .map_err(|e| e.finish(Location::Undefined))
@@ -272,15 +271,18 @@ impl<'r, 'l, S: MoveResolverV2> Session<'r, 'l, S> {
     /// Same like `finish`, but also extracts the native context extensions from the session.
     pub fn finish_with_extensions(
         self,
-    ) -> VMResult<(ChangeSet, Vec<Event>, NativeContextExtensions<'r>)> {
-        let (change_set_v2, events, native_extensions) = self.pause_with_extensions()?;
-        Ok((change_set_v2.into_change_set()?, events, native_extensions))
+    ) -> VMResult<(LegacyChangeSet, Vec<Event>, NativeContextExtensions<'r>)> {
+        let (change_set, events, native_extensions) = self.freeze_with_extensions()?;
+        Ok((
+            change_set.into_legacy_change_set()?,
+            events,
+            native_extensions,
+        ))
     }
 
-    /// Same as `finish_with_extensions` but avoids deserialization of values.
-    pub fn pause_with_extensions(
+    pub fn freeze_with_extensions(
         self,
-    ) -> VMResult<(ChangeSetV2, Vec<Event>, NativeContextExtensions<'r>)> {
+    ) -> VMResult<(ChangeSet, Vec<Event>, NativeContextExtensions<'r>)> {
         let Session {
             data_cache,
             native_extensions,

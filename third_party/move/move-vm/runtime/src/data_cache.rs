@@ -15,9 +15,9 @@ use move_core_types::{
 };
 use move_vm_types::{
     data_store::DataStore,
-    effects::{AccountChangeSetV2, ChangeSetV2},
+    effects::{AccountChangeSet, ChangeSet},
     loaded_data::runtime_types::Type,
-    resolver::{MoveResolverV2, Resource},
+    resolver::{FrozenMoveResolver, Module, Resource},
     values::{GlobalValue, Value},
 };
 use std::collections::btree_map::BTreeMap;
@@ -56,7 +56,7 @@ pub(crate) struct TransactionDataCache<'r, 'l, S> {
     event_data: Vec<(Vec<u8>, u64, Type, MoveTypeLayout, Value)>,
 }
 
-impl<'r, 'l, S: MoveResolverV2> TransactionDataCache<'r, 'l, S> {
+impl<'r, 'l, S: FrozenMoveResolver> TransactionDataCache<'r, 'l, S> {
     /// Create a `TransactionDataCache` with a `RemoteCache` that provides access to data
     /// not updated in the transaction.
     pub(crate) fn new(remote: &'r S, loader: &'l Loader) -> Self {
@@ -72,15 +72,16 @@ impl<'r, 'l, S: MoveResolverV2> TransactionDataCache<'r, 'l, S> {
     /// published modules.
     ///
     /// Gives all proper guarantees on lifetime of global data as well.
-    pub(crate) fn into_effects(self) -> PartialVMResult<(ChangeSetV2, Vec<Event>)> {
-        let mut change_set = ChangeSetV2::new();
+    pub(crate) fn into_effects(self) -> PartialVMResult<(ChangeSet, Vec<Event>)> {
+        let mut change_set = ChangeSet::new();
         for (addr, account_data_cache) in self.account_map.into_iter() {
             let mut modules = BTreeMap::new();
             for (module_name, (module_blob, is_republishing)) in account_data_cache.module_map {
+                // TODO: `account_map` should contain deserialized modules.
                 let op = if is_republishing {
-                    Op::Modify(module_blob)
+                    Op::Modify(Module::from_blob(module_blob))
                 } else {
-                    Op::New(module_blob)
+                    Op::New(Module::from_blob(module_blob))
                 };
                 modules.insert(module_name, op);
             }
@@ -99,12 +100,10 @@ impl<'r, 'l, S: MoveResolverV2> TransactionDataCache<'r, 'l, S> {
 
                 match op {
                     Op::New(val) => {
-                        // let resource = Resource::from_blob(val.freeze()?.simple_serialize(&layout).expect("should succeed"));
                         let resource = Resource::from_value_layout(val.freeze()?, layout);
                         resources.insert(struct_tag, Op::New(resource));
                     },
                     Op::Modify(val) => {
-                        // let resource = Resource::from_blob(val.freeze()?.simple_serialize(&layout).expect("should succeed"));
                         let resource = Resource::from_value_layout(val.freeze()?, layout);
                         resources.insert(struct_tag, Op::Modify(resource));
                     },
@@ -117,7 +116,7 @@ impl<'r, 'l, S: MoveResolverV2> TransactionDataCache<'r, 'l, S> {
                 change_set
                     .add_account_changeset(
                         addr,
-                        AccountChangeSetV2::from_modules_resources(modules, resources),
+                        AccountChangeSet::from_modules_resources(modules, resources),
                     )
                     .expect("accounts should be unique");
             }
@@ -160,7 +159,7 @@ impl<'r, 'l, S: MoveResolverV2> TransactionDataCache<'r, 'l, S> {
 }
 
 // `DataStore` implementation for the `TransactionDataCache`
-impl<'r, 'l, S: MoveResolverV2> DataStore for TransactionDataCache<'r, 'l, S> {
+impl<'r, 'l, S: FrozenMoveResolver> DataStore for TransactionDataCache<'r, 'l, S> {
     // Retrieve data from the local cache or loads it from the remote cache into the local cache.
     // All operations on the global data are based on this API and they all load the data
     // into the cache.
@@ -186,9 +185,9 @@ impl<'r, 'l, S: MoveResolverV2> DataStore for TransactionDataCache<'r, 'l, S> {
             // TODO(Gas): Shall we charge for this?
             let ty_layout = self.loader.type_to_type_layout(ty)?;
 
-            let gv = match self.remote.get_resource_v2(&addr, &ty_tag) {
+            let gv = match self.remote.get_frozen_resource(&addr, &ty_tag) {
                 Ok(Some(resource)) => {
-                    match resource {
+                    match resource.as_ref() {
                         Resource::Serialized(blob) => {
                             load_res = Some(Some(NumBytes::new(blob.len() as u64)));
                             let val = match Value::simple_deserialize(&blob, &ty_layout) {
@@ -250,8 +249,16 @@ impl<'r, 'l, S: MoveResolverV2> DataStore for TransactionDataCache<'r, 'l, S> {
                 return Ok(blob.clone());
             }
         }
-        match self.remote.get_module(module_id) {
-            Ok(Some(bytes)) => Ok(bytes),
+        match self.remote.get_frozen_module(module_id) {
+            // TODO: This should avoid deserializing the module by default when more enum variants are supported.
+            Ok(Some(module)) => {
+                let module_blob = module.as_ref().as_bytes().ok_or(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message("Cannot deserialize the module".to_string())
+                        .finish(Location::Undefined),
+                )?;
+                Ok(module_blob)
+            },
             Ok(None) => Err(PartialVMError::new(StatusCode::LINKER_ERROR)
                 .with_message(format!("Cannot find {:?} in data cache", module_id))
                 .finish(Location::Undefined)),
@@ -292,7 +299,7 @@ impl<'r, 'l, S: MoveResolverV2> DataStore for TransactionDataCache<'r, 'l, S> {
         }
         Ok(self
             .remote
-            .get_module(module_id)
+            .get_frozen_module(module_id)
             .map_err(|_| {
                 PartialVMError::new(StatusCode::STORAGE_ERROR).finish(Location::Undefined)
             })?

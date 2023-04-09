@@ -24,6 +24,7 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
+    resolver::MoveResolver,
     value::MoveValue,
 };
 use move_resource_viewer::MoveValueAnnotator;
@@ -35,7 +36,6 @@ use move_vm_runtime::{
     session::{SerializedReturnValues, Session},
 };
 use move_vm_test_utils::{gas_schedule::GasStatus, InMemoryStorage};
-use move_vm_types::resolver::MoveResolverV2;
 use once_cell::sync::Lazy;
 use std::{collections::BTreeMap, path::Path};
 
@@ -48,7 +48,7 @@ struct SimpleVMTestAdapter<'a> {
 }
 
 pub fn view_resource_in_move_storage(
-    storage: &impl MoveResolverV2,
+    storage: &impl MoveResolver,
     address: AccountAddress,
     module: &ModuleId,
     resource: &IdentStr,
@@ -60,13 +60,9 @@ pub fn view_resource_in_move_storage(
         name: resource.to_owned(),
         type_params: type_args,
     };
-    match storage.get_resource_v2(&address, &tag).unwrap() {
+    match storage.get_resource(&address, &tag).unwrap() {
         None => Ok("[No Resource Exists]".to_owned()),
-        Some(resource) => {
-            // Serialize value to blob in order to avoid implementing annotator APIs for `Resource`.
-            let blob = resource
-                .serialize()
-                .expect("serialization of a resource should succeed");
+        Some(blob) => {
             let annotated = MoveValueAnnotator::new(storage).view_resource(&tag, &blob)?;
             Ok(format!("{}", annotated))
         },
@@ -368,7 +364,7 @@ impl<'a> SimpleVMTestAdapter<'a> {
 
         // save changeset
         // TODO support events
-        let (changeset, _events) = session.pause()?;
+        let (changeset, _events) = session.freeze()?;
         self.storage.apply(changeset).unwrap();
         Ok(res)
     }

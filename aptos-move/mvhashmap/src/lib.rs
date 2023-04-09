@@ -7,10 +7,7 @@ use crate::{
     versioned_code::VersionedCode,
     versioned_data::VersionedData,
 };
-use aptos_types::{
-    executable::{Executable, ExecutableDescriptor, ModulePath},
-    write_set::TransactionWrite,
-};
+use aptos_types::executable::{Executable, ExecutableDescriptor, ModulePath};
 use aptos_vm_types::{
     delta::DeltaOp,
     write::{AptosWrite, Op},

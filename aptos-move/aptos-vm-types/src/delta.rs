@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    remote_cache::{StateViewWithRemoteCache, TRemoteCache},
+    remote_cache::StateViewWithRemoteCache,
     write::{AptosWrite, Op},
 };
-use aptos_state_view::StateView;
 use aptos_types::state_store::state_key::StateKey;
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult};
 use move_core_types::{
@@ -215,7 +214,7 @@ impl DeltaOp {
                     },
                     Some(AptosWrite::Standard(resource)) => {
                         // TODO: We technically should match on resource as well!
-                        let base = bcs::from_bytes(&resource.serialize().expect("should not fail"))
+                        let base = bcs::from_bytes(&resource.as_bytes().expect("should not fail"))
                             .expect("unexpected deserialization error in aggregator");
                         self.apply_to(base)
                             .map_err(|partial_error| {

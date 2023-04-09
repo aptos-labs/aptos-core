@@ -21,11 +21,12 @@ use move_core_types::{
 use move_disassembler::disassembler::Disassembler;
 use move_ir_types::location::Spanned;
 use move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue, MoveValueAnnotator};
-use move_vm_types::resolver::{Resource, ResourceResolverV2};
+use move_vm_types::resolver::{FrozenModuleResolver, FrozenResourceResolver, Module, Resource};
 use std::{
     convert::{TryFrom, TryInto},
     fs,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 type Event = (Vec<u8>, u64, TypeTag, Vec<u8>);
@@ -421,17 +422,25 @@ impl ResourceResolver for OnDiskStateView {
     }
 }
 
-impl ResourceResolverV2 for OnDiskStateView {
+impl FrozenModuleResolver for OnDiskStateView {
     type Error = anyhow::Error;
 
-    fn get_resource_v2(
+    fn get_frozen_module(&self, module_id: &ModuleId) -> Result<Option<Arc<Module>>, Self::Error> {
+        let module_bytes = self.get_module_bytes(module_id);
+        module_bytes.map(|mb| mb.map(|b| Arc::new(Module::from_blob(b))))
+    }
+}
+
+impl FrozenResourceResolver for OnDiskStateView {
+    type Error = anyhow::Error;
+
+    fn get_frozen_resource(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-    ) -> Result<Option<Resource>, Self::Error> {
-        // Simply wrap bytes read in a `Resource`.
-        self.get_resource_bytes(*address, struct_tag.clone())
-            .map(|maybe_bytes| maybe_bytes.map(Resource::from_blob))
+    ) -> Result<Option<Arc<Resource>>, Self::Error> {
+        let resource_bytes = self.get_resource_bytes(*address, struct_tag.clone());
+        resource_bytes.map(|mb| mb.map(|b| Arc::new(Resource::from_blob(b))))
     }
 }
 

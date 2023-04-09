@@ -12,7 +12,7 @@ use aptos_types::{
     transaction::CheckChangeSet,
     write_set::{WriteSet, WriteSetMut},
 };
-use move_binary_format::errors::{Location, PartialVMResult};
+use move_binary_format::errors::Location;
 use move_core_types::vm_status::VMStatus;
 use std::collections::{
     btree_map::{
@@ -216,7 +216,7 @@ impl AptosChangeSet {
         for (key, other_op) in other_writes.into_iter() {
             match writes.entry(key) {
                 Occupied(mut entry) => {
-                    let mut op = entry.get_mut();
+                    let op = entry.get_mut();
                     if !op.squash(other_op)? {
                         entry.remove();
                     }

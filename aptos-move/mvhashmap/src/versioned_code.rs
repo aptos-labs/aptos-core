@@ -68,7 +68,7 @@ impl Entry {
 
         Entry {
             flag: AtomicUsize::new(flag),
-            module: module,
+            module,
             hash,
         }
     }
@@ -91,10 +91,7 @@ impl<X: Executable> VersionedValue<X> {
         }
     }
 
-    fn read(
-        &self,
-        txn_idx: TxnIndex,
-    ) -> anyhow::Result<(Op<AptosWrite>, HashValue), MVCodeError> {
+    fn read(&self, txn_idx: TxnIndex) -> anyhow::Result<(Op<AptosWrite>, HashValue), MVCodeError> {
         use MVCodeError::*;
 
         if let Some((idx, entry)) = self.versioned_map.range(0..txn_idx).next_back() {

@@ -27,13 +27,10 @@ use move_core_types::{
 use move_table_extension::{TableHandle, TableResolver};
 use move_vm_runtime::move_vm::MoveVM;
 use move_vm_types::{
-    resolver::{Resource, ResourceResolverV2},
+    resolver::{FrozenResourceResolver, Resource},
     values::FrozenValue,
 };
-use std::{
-    collections::BTreeMap,
-    ops::{Deref, DerefMut},
-};
+use std::ops::{Deref, DerefMut};
 
 pub struct MoveResolverWithVMMetadata<'a, 'm, S> {
     move_resolver: &'a S,
@@ -101,10 +98,10 @@ impl<'a, 'm, S: MoveResolverExt> ResourceResolver for MoveResolverWithVMMetadata
     }
 }
 
-impl<'a, 'm, S: MoveResolverExt> ResourceResolverV2 for MoveResolverWithVMMetadata<'a, 'm, S> {
+impl<'a, 'm, S: MoveResolverExt> FrozenResourceResolver for MoveResolverWithVMMetadata<'a, 'm, S> {
     type Error = VMError;
 
-    fn get_resource_v2(
+    fn get_frozen_resource(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
@@ -241,10 +238,10 @@ impl<'a, S: StateViewWithRemoteCache> ResourceResolver for StorageAdapter<'a, S>
     }
 }
 
-impl<'a, S: StateViewWithRemoteCache> ResourceResolverV2 for StorageAdapter<'a, S> {
+impl<'a, S: StateViewWithRemoteCache> FrozenResourceResolver for StorageAdapter<'a, S> {
     type Error = VMError;
 
-    fn get_resource_v2(
+    fn get_frozen_resource(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
@@ -368,15 +365,16 @@ impl<S: StateViewWithRemoteCache> ResourceResolver for StorageAdapterOwned<S> {
     }
 }
 
-impl<S: StateViewWithRemoteCache> ResourceResolverV2 for StorageAdapterOwned<S> {
+impl<S: StateViewWithRemoteCache> FrozenResourceResolver for StorageAdapterOwned<S> {
     type Error = VMError;
 
-    fn get_resource_v2(
+    fn get_frozen_resource(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
     ) -> Result<Option<Resource>, Self::Error> {
-        self.as_move_resolver().get_resource_v2(address, struct_tag)
+        self.as_move_resolver()
+            .get_frozen_resource(address, struct_tag)
     }
 }
 

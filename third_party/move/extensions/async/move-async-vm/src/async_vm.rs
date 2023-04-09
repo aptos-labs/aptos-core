@@ -24,7 +24,7 @@ use move_vm_runtime::{
 };
 use move_vm_test_utils::gas_schedule::{Gas, GasStatus};
 use move_vm_types::{
-    resolver::MoveResolverV2,
+    resolver::FrozenMoveResolver,
     values::{Reference, Value},
 };
 use std::{
@@ -79,7 +79,7 @@ impl AsyncVM {
     }
 
     /// Creates a new session.
-    pub fn new_session<'r, 'l, S: MoveResolverV2>(
+    pub fn new_session<'r, 'l, S: FrozenMoveResolver>(
         &'l self,
         for_actor: AccountAddress,
         virtual_time: u128,
@@ -94,7 +94,7 @@ impl AsyncVM {
     }
 
     /// Creates a new session.
-    pub fn new_session_with_extensions<'r, 'l, S: MoveResolverV2>(
+    pub fn new_session_with_extensions<'r, 'l, S: FrozenMoveResolver>(
         &'l self,
         for_actor: AccountAddress,
         virtual_time: u128,
@@ -159,7 +159,7 @@ pub struct AsyncError {
 /// Result type for operations of an AsyncSession.
 pub type AsyncResult<'r> = Result<AsyncSuccess<'r>, AsyncError>;
 
-impl<'r, 'l, S: MoveResolverV2> AsyncSession<'r, 'l, S> {
+impl<'r, 'l, S: FrozenMoveResolver> AsyncSession<'r, 'l, S> {
     /// Get the underlying Move VM session.
     pub fn get_move_session(&mut self) -> &mut Session<'r, 'l, S> {
         &mut self.vm_session

@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::types::{Incarnation, MVDataError, MVDataOutput, TxnIndex, Version};
-use aptos_aggregator::{delta_change_set::deserialize, transaction::AggregatorValue};
 use aptos_infallible::Mutex;
 use aptos_types::write_set::TransactionWrite;
 use aptos_vm_types::{
@@ -14,10 +13,7 @@ use dashmap::DashMap;
 use std::{
     collections::btree_map::BTreeMap,
     hash::Hash,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
+    sync::atomic::{AtomicUsize, Ordering},
 };
 
 const FLAG_DONE: usize = 0;
@@ -227,7 +223,9 @@ impl<K: Hash + Clone + Eq> VersionedData<K> {
 
                             // None if data represents deletion. Otherwise, panics if the
                             // data can't be resolved to an aggregator value.
-                            let maybe_value = AggregatorValue::from_write(data);
+                            let maybe_value = data
+                                .as_value()
+                                .map(|w| w.as_aggregator_value().expect("should be an aggregator"));
 
                             if maybe_value.is_none() {
                                 // Resolve to the write if the WriteOp was deletion

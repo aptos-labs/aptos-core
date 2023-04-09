@@ -36,8 +36,8 @@ impl AptosWrite {
         match self {
             AptosWrite::AggregatorValue(value) => bcs::to_bytes(value).ok(),
             AptosWrite::Module(blob) => Some(blob.clone()),
-            AptosWrite::Standard(resource) => resource.serialize(),
-            AptosWrite::Group(group) => {
+            AptosWrite::Standard(resource) => resource.as_bytes(),
+            AptosWrite::Group(_group) => {
                 // TODO: Fix this!
                 // let serialized_group: BTreeMap<StructTag, Option<Vec<u8>>> = group.clone().into_iter().map(|(tag, r)| (tag, &r.serialize())).collect();
                 // bcs::to_bytes(&serialized_group).ok()

@@ -3,28 +3,25 @@
 
 //! Defines serialization-free data types produced by the VM session.
 
-use crate::resolver::Resource;
+use crate::resolver::{Module, Resource};
 use anyhow::{bail, Result};
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{AccountChangeSet, ChangeSet, Op},
+    effects::{AccountChangeSet as LegacyAccountChangeSet, ChangeSet as LegacyChangeSet, Op},
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
     vm_status::StatusCode,
 };
 use std::collections::{btree_map::Entry, BTreeMap};
 
-/// A collection of changes to resources and modules for an account (not serialized).
 #[derive(Default, Debug, Clone)]
-pub struct AccountChangeSetV2 {
-    // TODO: Avoid module serialization.
-    modules: BTreeMap<Identifier, Op<Vec<u8>>>,
+pub struct AccountChangeSet {
+    modules: BTreeMap<Identifier, Op<Module>>,
     resources: BTreeMap<StructTag, Op<Resource>>,
 }
 
-impl AccountChangeSetV2 {
-    /// Creates an empty change set for an account.
+impl AccountChangeSet {
     pub fn new() -> Self {
         Self {
             modules: BTreeMap::new(),
@@ -32,16 +29,14 @@ impl AccountChangeSetV2 {
         }
     }
 
-    /// Creates a change set for an account from the given resources and modules.
     pub fn from_modules_resources(
-        modules: BTreeMap<Identifier, Op<Vec<u8>>>,
+        modules: BTreeMap<Identifier, Op<Module>>,
         resources: BTreeMap<StructTag, Op<Resource>>,
     ) -> Self {
         Self { modules, resources }
     }
 
-    /// Adds a change to account's modules.
-    pub fn add_module_op(&mut self, name: Identifier, op: Op<Vec<u8>>) -> Result<()> {
+    pub fn add_module_op(&mut self, name: Identifier, op: Op<Module>) -> Result<()> {
         match self.modules.entry(name) {
             Entry::Occupied(entry) => bail!("Module {} already exists", entry.key()),
             Entry::Vacant(entry) => {
@@ -51,7 +46,6 @@ impl AccountChangeSetV2 {
         Ok(())
     }
 
-    /// Adds a change to account's resources.
     pub fn add_resource_op(&mut self, struct_tag: StructTag, op: Op<Resource>) -> Result<()> {
         match self.resources.entry(struct_tag) {
             Entry::Occupied(entry) => bail!("Resource {} already exists", entry.key()),
@@ -65,55 +59,58 @@ impl AccountChangeSetV2 {
     pub fn into_inner(
         self,
     ) -> (
-        BTreeMap<Identifier, Op<Vec<u8>>>,
+        BTreeMap<Identifier, Op<Module>>,
         BTreeMap<StructTag, Op<Resource>>,
     ) {
         (self.modules, self.resources)
     }
 
-    /// Returns module changes for this account.
-    pub fn modules(&self) -> &BTreeMap<Identifier, Op<Vec<u8>>> {
+    pub fn modules(&self) -> &BTreeMap<Identifier, Op<Module>> {
         &self.modules
     }
 
-    /// Returns resource changes for this account.
     pub fn resources(&self) -> &BTreeMap<StructTag, Op<Resource>> {
         &self.resources
     }
 
-    /// Returns true if this account has no changes.
     pub fn is_empty(&self) -> bool {
         self.modules.is_empty() && self.resources.is_empty()
     }
 
-    /// Converts all changes to this account into blobs. Used for backwards compatibility
-    /// with `AccountBlobChangeSet` which operates solely on bytes.
-    fn into_account_change_set(self) -> PartialVMResult<AccountChangeSet> {
+    fn into_legacy_account_change_set(self) -> PartialVMResult<LegacyAccountChangeSet> {
         let (modules, resources) = self.into_inner();
-        let mut resource_blobs = BTreeMap::new();
-        for (struct_tag, op) in resources {
-            let new_op = op.and_then(|resource| {
-                resource
-                    .serialize()
-                    .ok_or_else(|| PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR))
-            })?;
-            resource_blobs.insert(struct_tag, new_op);
+
+        macro_rules! into_blobs {
+            ($new_changes:ident, $old_changes:ident) => {{
+                for (key, op) in $old_changes {
+                    let new_op = op.and_then(|change| {
+                        change
+                            .into_bytes()
+                            .ok_or_else(|| PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR))
+                    })?;
+                    $new_changes.insert(key, new_op);
+                }
+            }};
         }
-        Ok(AccountChangeSet::from_modules_resources(
-            modules,
-            resource_blobs,
+
+        let mut modules_as_blobs = BTreeMap::new();
+        into_blobs!(modules_as_blobs, modules);
+        let mut resources_as_blobs = BTreeMap::new();
+        into_blobs!(resources_as_blobs, resources);
+
+        Ok(LegacyAccountChangeSet::from_modules_resources(
+            modules_as_blobs,
+            resources_as_blobs,
         ))
     }
 }
 
-/// A collection of non-serialized changes to the blockchain state.
 #[derive(Default, Debug, Clone)]
-pub struct ChangeSetV2 {
-    accounts: BTreeMap<AccountAddress, AccountChangeSetV2>,
+pub struct ChangeSet {
+    accounts: BTreeMap<AccountAddress, AccountChangeSet>,
 }
 
-impl ChangeSetV2 {
-    /// Creates an empty change set.
+impl ChangeSet {
     pub fn new() -> Self {
         Self {
             accounts: BTreeMap::new(),
@@ -124,7 +121,7 @@ impl ChangeSetV2 {
     pub fn add_account_changeset(
         &mut self,
         addr: AccountAddress,
-        account_change_set: AccountChangeSetV2,
+        account_change_set: AccountChangeSet,
     ) -> Result<()> {
         match self.accounts.entry(addr) {
             Entry::Occupied(_) => bail!(
@@ -138,26 +135,22 @@ impl ChangeSetV2 {
         Ok(())
     }
 
-    /// Returns accounts with changes.
-    pub fn accounts(&self) -> &BTreeMap<AccountAddress, AccountChangeSetV2> {
+    pub fn accounts(&self) -> &BTreeMap<AccountAddress, AccountChangeSet> {
         &self.accounts
     }
 
-    pub fn into_inner(self) -> BTreeMap<AccountAddress, AccountChangeSetV2> {
+    pub fn into_inner(self) -> BTreeMap<AccountAddress, AccountChangeSet> {
         self.accounts
     }
 
-    fn get_or_insert_account_change_set(
-        &mut self,
-        addr: AccountAddress,
-    ) -> &mut AccountChangeSetV2 {
+    fn get_or_insert_account_change_set(&mut self, addr: AccountAddress) -> &mut AccountChangeSet {
         match self.accounts.entry(addr) {
             Entry::Occupied(entry) => entry.into_mut(),
-            Entry::Vacant(entry) => entry.insert(AccountChangeSetV2::new()),
+            Entry::Vacant(entry) => entry.insert(AccountChangeSet::new()),
         }
     }
 
-    pub fn add_module_op(&mut self, module_id: ModuleId, op: Op<Vec<u8>>) -> Result<()> {
+    pub fn add_module_op(&mut self, module_id: ModuleId, op: Op<Module>) -> Result<()> {
         let account = self.get_or_insert_account_change_set(*module_id.address());
         account.add_module_op(module_id.name().to_owned(), op)
     }
@@ -172,17 +165,15 @@ impl ChangeSetV2 {
         account.add_resource_op(struct_tag, op)
     }
 
-    /// Converts all resources and modules in this change set to blobs. This ensures
-    /// backwards compatibility with `BlobChangeSet` and legacy resolvers.
-    pub fn into_change_set(self) -> VMResult<ChangeSet> {
+    pub fn into_legacy_change_set(self) -> VMResult<LegacyChangeSet> {
         let accounts = self.into_inner();
-        let mut change_set = ChangeSet::new();
+        let mut change_set = LegacyChangeSet::new();
         for (addr, account_change_set) in accounts {
             change_set
                 .add_account_changeset(
                     addr,
                     account_change_set
-                        .into_account_change_set()
+                        .into_legacy_account_change_set()
                         .map_err(|e: PartialVMError| e.finish(Location::Undefined))?,
                 )
                 .expect("accounts should be unique");

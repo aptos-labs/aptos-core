@@ -33,14 +33,13 @@ use move_core_types::{
 use move_table_extension::{NativeTableContext, TableChangeSet};
 use move_vm_runtime::{move_vm::MoveVM, session::Session};
 use move_vm_types::{
-    effects::{AccountChangeSetV2 as AccountChangeSet, ChangeSetV2 as MoveChangeSet},
+    effects::{AccountChangeSet, ChangeSet as MoveChangeSet},
     resolver::Resource,
 };
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
     ops::{Deref, DerefMut},
-    sync::Arc,
 };
 
 #[derive(BCSCryptoHash, CryptoHasher, Deserialize, Serialize)]

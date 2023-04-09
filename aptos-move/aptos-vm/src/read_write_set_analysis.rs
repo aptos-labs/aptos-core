@@ -4,7 +4,6 @@
 
 use crate::{
     adapter_common::PreprocessedTransaction,
-    move_vm_ext::MoveResolverExt,
     system_module_names::{BLOCK_MODULE, BLOCK_PROLOGUE, SCRIPT_PROLOGUE_NAME, USER_EPILOGUE_NAME},
 };
 use anyhow::{anyhow, bail, Result};
@@ -17,7 +16,7 @@ use move_core_types::{
     ident_str,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, ResourceKey, StructTag, TypeTag},
-    resolver::ModuleResolver,
+    resolver::{ModuleResolver, MoveResolver},
     value::{serialize_values, MoveValue},
 };
 use once_cell::sync::Lazy;
@@ -55,7 +54,7 @@ pub fn add_on_functions_list() -> Vec<(ModuleId, Identifier)> {
     ]
 }
 
-impl<'a, R: MoveResolverExt> ReadWriteSetAnalysis<'a, R> {
+impl<'a, R: MoveResolver> ReadWriteSetAnalysis<'a, R> {
     /// Create a Aptos transaction read/write set analysis from a generic Move module read/write set
     /// analysis and a view of the current blockchain for module fetching and access concretization.
     pub fn new(rw: &'a NormalizedReadWriteSetAnalysis, blockchain_view: &'a R) -> Self {
@@ -280,7 +279,7 @@ impl<'a, R: MoveResolverExt> ReadWriteSetAnalysis<'a, R> {
     }
 }
 
-impl<'a, R: MoveResolverExt> Deref for ReadWriteSetAnalysis<'a, R> {
+impl<'a, R: MoveResolver> Deref for ReadWriteSetAnalysis<'a, R> {
     type Target = NormalizedReadWriteSetAnalysis;
 
     fn deref(&self) -> &Self::Target {

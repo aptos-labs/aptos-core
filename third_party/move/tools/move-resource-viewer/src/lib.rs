@@ -17,11 +17,11 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
+    resolver::MoveResolver,
     u256,
     value::{MoveStruct, MoveTypeLayout, MoveValue},
     vm_status::VMStatus,
 };
-use move_vm_types::resolver::MoveResolverV2;
 use serde::ser::{SerializeMap, SerializeSeq};
 use std::{
     convert::{TryFrom, TryInto},
@@ -83,7 +83,7 @@ pub struct MoveValueAnnotator<'a, T: ?Sized> {
     cache: Resolver<'a, T>,
 }
 
-impl<'a, T: MoveResolverV2 + ?Sized> MoveValueAnnotator<'a, T> {
+impl<'a, T: MoveResolver + ?Sized> MoveValueAnnotator<'a, T> {
     pub fn new(view: &'a T) -> Self {
         Self {
             cache: Resolver::new(view),

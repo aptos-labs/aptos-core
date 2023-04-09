@@ -16,9 +16,9 @@ use move_core_types::{
 use move_vm_runtime::move_vm::MoveVM;
 use move_vm_test_utils::{DeltaStorage, InMemoryStorage};
 use move_vm_types::{
-    effects::ChangeSetV2,
+    effects::ChangeSet,
     gas::UnmeteredGasMeter,
-    resolver::{Resource, ResourceResolverV2},
+    resolver::{FrozenResourceResolver, Resource},
 };
 
 const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGTH]);
@@ -531,10 +531,10 @@ impl ResourceResolver for BogusStorage {
     }
 }
 
-impl ResourceResolverV2 for BogusStorage {
+impl FrozenResourceResolver for BogusStorage {
     type Error = VMError;
 
-    fn get_resource_v2(
+    fn get_frozen_resource(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
@@ -613,7 +613,7 @@ fn test_storage_returns_bogus_error_when_loading_resource() {
     let mut s_blob = vec![];
     m.serialize(&mut m_blob).unwrap();
     s.serialize(&mut s_blob).unwrap();
-    let mut delta = ChangeSetV2::new();
+    let mut delta = ChangeSet::new();
     delta.add_module_op(m.self_id(), Op::New(m_blob)).unwrap();
     delta.add_module_op(s.self_id(), Op::New(s_blob)).unwrap();
 

@@ -35,7 +35,7 @@ use move_core_types::{
 };
 use move_vm_runtime::move_vm::MoveVM;
 use move_vm_test_utils::{DeltaStorage, InMemoryStorage};
-use move_vm_types::{effects::ChangeSetV2, gas::UnmeteredGasMeter, resolver::MoveResolverV2};
+use move_vm_types::{effects::ChangeSet, gas::UnmeteredGasMeter, resolver::FrozenMoveResolver};
 use once_cell::sync::Lazy;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::{fs, io::Write, panic, thread};
@@ -125,7 +125,7 @@ fn execute_function_in_module(
     idx: FunctionDefinitionIndex,
     ty_args: Vec<TypeTag>,
     args: Vec<Vec<u8>>,
-    storage: &impl MoveResolverV2,
+    storage: &impl FrozenMoveResolver,
 ) -> Result<(), VMStatus> {
     let module_id = module.self_id();
     let entry_name = {
@@ -140,7 +140,7 @@ fn execute_function_in_module(
         ))
         .unwrap();
 
-        let mut changeset = ChangeSetV2::new();
+        let mut changeset = ChangeSet::new();
         let mut blob = vec![];
         module.serialize(&mut blob).unwrap();
         changeset
