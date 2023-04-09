@@ -64,20 +64,16 @@ module aptos_token_objects::token {
         mutated_field_name: String,
     }
 
-    /// Creates a new token object and returns the ConstructorRef for additional specialization.
-    public fun create(
-        creator: &signer,
+    inline fun inline_create(
+        constructor_ref: &ConstructorRef,
+        creator_address: address,
         collection_name: String,
         description: String,
         name: String,
         royalty: Option<Royalty>,
         uri: String,
-    ): ConstructorRef {
-        let creator_address = signer::address_of(creator);
-        let seed = create_token_seed(&collection_name, &name);
-
-        let constructor_ref = object::create_named_object(creator, seed);
-        let object_signer = object::generate_signer(&constructor_ref);
+    ) {
+        let object_signer = object::generate_signer(constructor_ref);
 
         let collection_addr = collection::create_collection_address(&creator_address, &collection_name);
         let collection = object::address_to_object<Collection>(collection_addr);
@@ -94,8 +90,41 @@ module aptos_token_objects::token {
         move_to(&object_signer, token);
 
         if (option::is_some(&royalty)) {
-            royalty::init(&constructor_ref, option::extract(&mut royalty))
+            royalty::init(constructor_ref, option::extract(&mut royalty))
         };
+    }
+
+    /// Creates a new token object from a token name and returns the ConstructorRef for
+    /// additional specialization.
+    public fun create(
+        creator: &signer,
+        collection_name: String,
+        description: String,
+        name: String,
+        royalty: Option<Royalty>,
+        uri: String,
+    ): ConstructorRef {
+        let creator_address = signer::address_of(creator);
+        let seed = create_token_seed(&collection_name, &name);
+
+        let constructor_ref = object::create_named_object(creator, seed);
+        inline_create(&constructor_ref, creator_address, collection_name, description, name, royalty, uri);
+        constructor_ref
+    }
+
+    /// Creates a new token object from an account GUID and returns the ConstructorRef for
+    /// additional specialization.
+    public fun create_from_account(
+        creator: &signer,
+        collection_name: String,
+        description: String,
+        name: String,
+        royalty: Option<Royalty>,
+        uri: String,
+    ): ConstructorRef {
+        let creator_address = signer::address_of(creator);
+        let constructor_ref = object::create_object_from_account(creator);
+        inline_create(&constructor_ref, creator_address, collection_name, description, name, royalty, uri);
         constructor_ref
     }
 
@@ -453,6 +482,32 @@ module aptos_token_objects::token {
         burn(burn_ref);
         assert!(!exists<Token>(token_addr), 2);
         assert!(!royalty::exists_at(token_addr), 3);
+        assert!(object::is_object(token_addr), 4);
+    }
+
+    #[test(creator = @0x123)]
+    fun test_burn_and_delete(creator: &signer) acquires Token {
+        use aptos_framework::account;
+
+        let collection_name = string::utf8(b"collection name");
+        let token_name = string::utf8(b"token name");
+
+        create_collection_helper(creator, *&collection_name, 1);
+        account::create_account_for_test(signer::address_of(creator));
+        let constructor_ref = create_from_account(
+            creator,
+            collection_name,
+            string::utf8(b"token description"),
+            token_name,
+            option::none(),
+            string::utf8(b"token uri"),
+        );
+        let burn_ref = generate_burn_ref(&constructor_ref);
+        let token_addr = object::address_from_constructor_ref(&constructor_ref);
+        assert!(exists<Token>(token_addr), 0);
+        burn(burn_ref);
+        assert!(!exists<Token>(token_addr), 1);
+        assert!(!object::is_object(token_addr), 2);
     }
 
     #[test_only]
