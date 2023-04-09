@@ -64,7 +64,7 @@ module aptos_token_objects::token {
         mutated_field_name: String,
     }
 
-    inline fun inline_create(
+    inline fun create_common(
         constructor_ref: &ConstructorRef,
         creator_address: address,
         collection_name: String,
@@ -96,7 +96,7 @@ module aptos_token_objects::token {
 
     /// Creates a new token object from a token name and returns the ConstructorRef for
     /// additional specialization.
-    public fun create(
+    public fun create_named_token(
         creator: &signer,
         collection_name: String,
         description: String,
@@ -108,7 +108,7 @@ module aptos_token_objects::token {
         let seed = create_token_seed(&collection_name, &name);
 
         let constructor_ref = object::create_named_object(creator, seed);
-        inline_create(&constructor_ref, creator_address, collection_name, description, name, royalty, uri);
+        create_common(&constructor_ref, creator_address, collection_name, description, name, royalty, uri);
         constructor_ref
     }
 
@@ -124,7 +124,7 @@ module aptos_token_objects::token {
     ): ConstructorRef {
         let creator_address = signer::address_of(creator);
         let constructor_ref = object::create_object_from_account(creator);
-        inline_create(&constructor_ref, creator_address, collection_name, description, name, royalty, uri);
+        create_common(&constructor_ref, creator_address, collection_name, description, name, royalty, uri);
         constructor_ref
     }
 
@@ -323,7 +323,7 @@ module aptos_token_objects::token {
             string::utf8(b"collection uri"),
         );
 
-        create(
+        create_named_token(
             creator,
             collection_name,
             string::utf8(b"token description"),
@@ -350,7 +350,7 @@ module aptos_token_objects::token {
             string::utf8(b"collection uri"),
         );
 
-        create(
+        create_named_token(
             creator,
             collection_name,
             string::utf8(b"token description"),
@@ -444,7 +444,7 @@ module aptos_token_objects::token {
         let token_name = string::utf8(b"token name");
 
         create_collection_helper(creator, *&collection_name, 1);
-        let constructor_ref = create(
+        let constructor_ref = create_named_token(
             creator,
             collection_name,
             string::utf8(b"token description"),
@@ -467,7 +467,7 @@ module aptos_token_objects::token {
         let token_name = string::utf8(b"token name");
 
         create_collection_helper(creator, *&collection_name, 1);
-        let constructor_ref = create(
+        let constructor_ref = create_named_token(
             creator,
             collection_name,
             string::utf8(b"token description"),
@@ -524,7 +524,7 @@ module aptos_token_objects::token {
 
     #[test_only]
     fun create_token_helper(creator: &signer, collection_name: String, token_name: String): ConstructorRef {
-        create(
+        create_named_token(
             creator,
             collection_name,
             string::utf8(b"token description"),

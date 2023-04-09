@@ -82,7 +82,7 @@ module token_objects::hero {
         uri: String,
     ): ConstructorRef acquires OnChainConfig {
         let on_chain_config = borrow_global<OnChainConfig>(signer::address_of(creator));
-        token::create(
+        token::create_named_token(
             creator,
             *&on_chain_config.collection,
             description,
