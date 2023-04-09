@@ -26,7 +26,7 @@ use aptos_vm_types::{
 };
 use claims::assert_none;
 use move_binary_format::errors::Location;
-use std::{cell::RefCell, collections::BTreeMap, hash::Hash, sync::Arc};
+use std::{cell::RefCell, collections::BTreeMap, hash::Hash};
 
 /// A struct that is always used by a single thread performing an execution task. The struct is
 /// passed to the VM and acts as a proxy to resolve reads first in the shared multi-version
@@ -46,7 +46,7 @@ pub(crate) struct MVHashMapView<'a, K> {
 #[derive(Debug)]
 pub(crate) enum ReadResult {
     // Successful read of a value.
-    Value(Arc<Op<AptosWrite>>),
+    Value(Op<AptosWrite>),
     // Similar to above, but the value was aggregated and is an integer.
     U128(u128),
     // Read failed while resolving a delta.

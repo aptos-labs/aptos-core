@@ -43,7 +43,7 @@ pub enum MVDataOutput {
     Resolved(u128),
     /// Information from the last versioned-write. Note that the version is returned
     /// and not the data to avoid copying big values around.
-    Versioned(Version, Arc<Op<AptosWrite>>),
+    Versioned(Version, Op<AptosWrite>),
 }
 
 /// Returned as Ok(..) when read successfully from the multi-version data-structure.
@@ -56,5 +56,5 @@ pub enum MVCodeOutput<X> {
     /// this can't be a storage-level module, as it's from multi-versioned code map.
     /// The Option can be None if HashValue can't be computed, currently may happen
     /// if the latest entry corresponded to the module deletion.
-    Module((Arc<Op<AptosWrite>>, HashValue)),
+    Module((Op<AptosWrite>, HashValue)),
 }

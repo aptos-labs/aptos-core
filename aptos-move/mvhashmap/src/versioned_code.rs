@@ -33,7 +33,7 @@ struct Entry {
     /// The contents of the module as produced by the VM (can be WriteOp based on a
     /// blob or CompiledModule, but must satisfy TransactionWrite to be able to
     /// generate the hash below.
-    module: Arc<Op<AptosWrite>>,
+    module: Op<AptosWrite>,
     /// The hash of the blob, used instead of incarnation for validation purposes,
     /// and also for uniquely identifying associated executables.
     hash: HashValue,
@@ -68,7 +68,7 @@ impl Entry {
 
         Entry {
             flag: AtomicUsize::new(flag),
-            module: Arc::new(module),
+            module: module,
             hash,
         }
     }
@@ -94,7 +94,7 @@ impl<X: Executable> VersionedValue<X> {
     fn read(
         &self,
         txn_idx: TxnIndex,
-    ) -> anyhow::Result<(Arc<Op<AptosWrite>>, HashValue), MVCodeError> {
+    ) -> anyhow::Result<(Op<AptosWrite>, HashValue), MVCodeError> {
         use MVCodeError::*;
 
         if let Some((idx, entry)) = self.versioned_map.range(0..txn_idx).next_back() {

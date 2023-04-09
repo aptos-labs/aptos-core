@@ -99,10 +99,12 @@ impl<'r, 'l, S: MoveResolverV2> TransactionDataCache<'r, 'l, S> {
 
                 match op {
                     Op::New(val) => {
+                        // let resource = Resource::from_blob(val.freeze()?.simple_serialize(&layout).expect("should succeed"));
                         let resource = Resource::from_value_layout(val.freeze()?, layout);
                         resources.insert(struct_tag, Op::New(resource));
                     },
                     Op::Modify(val) => {
+                        // let resource = Resource::from_blob(val.freeze()?.simple_serialize(&layout).expect("should succeed"));
                         let resource = Resource::from_value_layout(val.freeze()?, layout);
                         resources.insert(struct_tag, Op::Modify(resource));
                     },

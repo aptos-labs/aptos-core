@@ -41,7 +41,7 @@ enum EntryCell {
     /// has: 1) Incarnation number of the transaction that wrote the entry (note
     /// that TxnIndex is part of the key and not recorded here), 2) actual data
     /// stored in a shared pointer (to ensure ownership and avoid clones).
-    Write(Incarnation, Arc<Op<AptosWrite>>),
+    Write(Incarnation, Op<AptosWrite>),
 
     /// Recorded in the shared multi-version data-structure for each delta.
     Delta(DeltaOp),
@@ -67,7 +67,7 @@ impl Entry {
     pub fn new_write_from(flag: usize, incarnation: Incarnation, data: Op<AptosWrite>) -> Entry {
         Entry {
             flag: AtomicUsize::new(flag),
-            cell: EntryCell::Write(incarnation, Arc::new(data)),
+            cell: EntryCell::Write(incarnation, data),
         }
     }
 
@@ -227,7 +227,7 @@ impl<K: Hash + Clone + Eq> VersionedData<K> {
 
                             // None if data represents deletion. Otherwise, panics if the
                             // data can't be resolved to an aggregator value.
-                            let maybe_value = AggregatorValue::from_write(data.as_ref());
+                            let maybe_value = AggregatorValue::from_write(data);
 
                             if maybe_value.is_none() {
                                 // Resolve to the write if the WriteOp was deletion
