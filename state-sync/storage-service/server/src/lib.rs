@@ -55,10 +55,10 @@ pub struct StorageServiceServer<T> {
     // A set of active subscriptions for peers waiting for new data
     data_subscriptions: Arc<Mutex<HashMap<PeerNetworkId, DataSubscriptionRequest>>>,
 
-    // An LRU cache for commonly requested data items. This is separate
-    // from the cached storage summary because these responses should
-    // never change while the storage summary changes over time.
-    lru_storage_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
+    // An LRU cache for commonly requested data items.
+    // Note: This is not just a database cache because it contains
+    // responses that have already been serialized and compressed.
+    lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
 }
 
 impl<T: StorageReaderInterface> StorageServiceServer<T> {
@@ -73,7 +73,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
             BoundedExecutor::new(config.max_concurrent_requests as usize, executor);
         let cached_storage_server_summary = Arc::new(RwLock::new(StorageServerSummary::default()));
         let data_subscriptions = Arc::new(Mutex::new(HashMap::new()));
-        let lru_storage_cache = Arc::new(Mutex::new(LruCache::new(
+        let lru_response_cache = Arc::new(Mutex::new(LruCache::new(
             config.max_lru_cache_size as usize,
         )));
 
@@ -85,7 +85,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
             time_service,
             cached_storage_server_summary,
             data_subscriptions,
-            lru_storage_cache,
+            lru_response_cache,
         }
     }
 
@@ -130,7 +130,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
         let cached_storage_server_summary = self.cached_storage_server_summary.clone();
         let config = self.config;
         let data_subscriptions = self.data_subscriptions.clone();
-        let lru_storage_cache = self.lru_storage_cache.clone();
+        let lru_response_cache = self.lru_response_cache.clone();
         let storage = self.storage.clone();
         let time_service = self.time_service.clone();
 
@@ -151,7 +151,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
                         cached_storage_server_summary.clone(),
                         config,
                         data_subscriptions.clone(),
-                        lru_storage_cache.clone(),
+                        lru_response_cache.clone(),
                         storage.clone(),
                         time_service.clone(),
                     )
@@ -187,14 +187,14 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
             let storage = self.storage.clone();
             let cached_storage_server_summary = self.cached_storage_server_summary.clone();
             let data_subscriptions = self.data_subscriptions.clone();
-            let lru_storage_cache = self.lru_storage_cache.clone();
+            let lru_response_cache = self.lru_response_cache.clone();
             let time_service = self.time_service.clone();
             self.bounded_executor
                 .spawn_blocking(move || {
                     Handler::new(
                         cached_storage_server_summary,
                         data_subscriptions,
-                        lru_storage_cache,
+                        lru_response_cache,
                         storage,
                         time_service,
                     )
