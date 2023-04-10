@@ -34,7 +34,7 @@ use move_table_extension::{NativeTableContext, TableChangeSet};
 use move_vm_runtime::{move_vm::MoveVM, session::Session};
 use move_vm_types::{
     effects::{AccountChangeSet, ChangeSet as MoveChangeSet},
-    resolver::Resource,
+    resolver::{Module, Resource},
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -114,7 +114,7 @@ where
         ap_cache: &mut C,
         configs: &ChangeSetConfigs,
     ) -> VMResult<AptosChangeSet> {
-        let (change_set, events, mut extensions) = self.inner.pause_with_extensions()?;
+        let (change_set, events, mut extensions) = self.inner.freeze_with_extensions()?;
 
         // TODO: Fix resource groups :(
         let (change_set, resource_group_change_set) = (change_set, MoveChangeSet::new());
@@ -356,22 +356,23 @@ where
     }
 
     fn convert_module_op(
-        move_storage_op: MoveStorageOp<Vec<u8>>,
+        move_storage_op: MoveStorageOp<Module>,
         creation_as_modification: bool,
     ) -> Op<AptosWrite> {
         use MoveStorageOp::*;
         use Op::*;
 
+        // TODO: Fix this
         match move_storage_op {
             Delete => Deletion,
-            New(blob) => {
+            New(m) => {
                 if creation_as_modification {
-                    Modification(AptosWrite::Module(blob))
+                    Modification(AptosWrite::Module(m.into_bytes().expect("should not fail")))
                 } else {
-                    Creation(AptosWrite::Module(blob))
+                    Creation(AptosWrite::Module(m.into_bytes().expect("should not fail")))
                 }
             },
-            Modify(blob) => Modification(AptosWrite::Module(blob)),
+            Modify(m) => Modification(AptosWrite::Module(m.into_bytes().expect("should not fail"))),
         }
     }
 }

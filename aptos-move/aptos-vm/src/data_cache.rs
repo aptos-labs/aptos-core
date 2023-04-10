@@ -20,17 +20,19 @@ use move_binary_format::{errors::*, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, StructTag},
-    resolver::{ModuleResolver, ResourceResolver},
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 use move_table_extension::{TableHandle, TableResolver};
 use move_vm_runtime::move_vm::MoveVM;
 use move_vm_types::{
-    resolver::{FrozenResourceResolver, Resource},
+    resolver::{FrozenModuleResolver, FrozenResourceResolver, Module, Resource},
     values::FrozenValue,
 };
-use std::ops::{Deref, DerefMut};
+use std::{
+    ops::{Deref, DerefMut},
+    sync::Arc,
+};
 
 pub struct MoveResolverWithVMMetadata<'a, 'm, S> {
     move_resolver: &'a S,
@@ -70,31 +72,11 @@ impl<'a, 'm, S: MoveResolverExt> MoveResolverExt for MoveResolverWithVMMetadata<
     }
 }
 
-impl<'a, 'm, S: MoveResolverExt> ModuleResolver for MoveResolverWithVMMetadata<'a, 'm, S> {
+impl<'a, 'm, S: MoveResolverExt> FrozenModuleResolver for MoveResolverWithVMMetadata<'a, 'm, S> {
     type Error = VMError;
 
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
-        self.move_resolver.get_module(module_id)
-    }
-}
-
-impl<'a, 'm, S: MoveResolverExt> ResourceResolver for MoveResolverWithVMMetadata<'a, 'm, S> {
-    type Error = VMError;
-
-    fn get_resource(
-        &self,
-        address: &AccountAddress,
-        struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, Self::Error> {
-        self.get_any_resource(address, struct_tag)
-            .map(|maybe_write| {
-                maybe_write.map(|write| match write {
-                    AptosWrite::AggregatorValue(v) => bcs::to_bytes(&v).expect("should not fail"),
-                    AptosWrite::Module(_) => unreachable!(),
-                    AptosWrite::Standard(r) => r.serialize().expect("should not fail"),
-                    AptosWrite::Group(_) => unreachable!(),
-                })
-            })
+    fn get_frozen_module(&self, module_id: &ModuleId) -> Result<Option<Arc<Module>>, Self::Error> {
+        self.move_resolver.get_frozen_module(module_id)
     }
 }
 
@@ -105,15 +87,17 @@ impl<'a, 'm, S: MoveResolverExt> FrozenResourceResolver for MoveResolverWithVMMe
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-    ) -> Result<Option<Resource>, Self::Error> {
+    ) -> Result<Option<Arc<Resource>>, Self::Error> {
         self.get_any_resource(address, struct_tag)
             .map(|maybe_write| {
                 maybe_write.map(|write| match write {
-                    AptosWrite::AggregatorValue(v) => {
-                        Resource::from_value_layout(FrozenValue::u128(v), MoveTypeLayout::U128)
-                    },
+                    AptosWrite::AggregatorValue(v) => Arc::new(Resource::from_blob(
+                        bcs::to_bytes(&v).expect("should not fail"),
+                    )),
                     AptosWrite::Module(_) => unreachable!(),
-                    AptosWrite::Standard(r) => r,
+                    AptosWrite::Standard(r) => Arc::new(Resource::from_blob(
+                        r.into_bytes().expect("should not fail"),
+                    )),
                     AptosWrite::Group(_) => unreachable!(),
                 })
             })
@@ -175,7 +159,9 @@ impl<'a, S: StateViewWithRemoteCache> StorageAdapter<'a, S> {
 
 impl<'a, S: StateViewWithRemoteCache> MoveResolverExt for StorageAdapter<'a, S> {
     fn get_module_metadata(&self, module_id: ModuleId) -> Option<RuntimeModuleMetadataV1> {
-        let module_bytes = self.get_module(&module_id).ok()??;
+        let module_tmp = self.get_frozen_module(&module_id).ok()??;
+        // TODO: Fix this!
+        let module_bytes = module_tmp.as_ref().as_bytes()?;
         let module = CompiledModule::deserialize(&module_bytes).ok()?;
         aptos_framework::get_metadata_from_compiled_module(&module)
     }
@@ -207,34 +193,15 @@ impl<'a, S: StateViewWithRemoteCache> MoveResolverExt for StorageAdapter<'a, S> 
     }
 }
 
-impl<'a, S: StateViewWithRemoteCache> ModuleResolver for StorageAdapter<'a, S> {
+impl<'a, S: StateViewWithRemoteCache> FrozenModuleResolver for StorageAdapter<'a, S> {
     type Error = VMError;
 
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
+    fn get_frozen_module(&self, module_id: &ModuleId) -> Result<Option<Arc<Module>>, Self::Error> {
         // REVIEW: cache this?
         let ap = AccessPath::from(module_id);
-        self.get_m(ap).map_err(|e| e.finish(Location::Undefined))
-    }
-}
-
-impl<'a, S: StateViewWithRemoteCache> ResourceResolver for StorageAdapter<'a, S> {
-    type Error = VMError;
-
-    fn get_resource(
-        &self,
-        address: &AccountAddress,
-        struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, Self::Error> {
-        panic!("Called get_resource but should not!");
-        self.get_any_resource(address, struct_tag)
-            .map(|maybe_write| {
-                maybe_write.map(|write| match write {
-                    AptosWrite::AggregatorValue(v) => unreachable!(),
-                    AptosWrite::Module(_) => unreachable!(),
-                    AptosWrite::Standard(r) => r.serialize().expect("should not fail"),
-                    AptosWrite::Group(_) => unreachable!(),
-                })
-            })
+        let blob = self.get_m(ap).map_err(|e| e.finish(Location::Undefined));
+        // TODO: Revisit this.
+        blob.map(|b| b.map(|bb| Arc::new(Module::from_blob(bb))))
     }
 }
 
@@ -245,13 +212,13 @@ impl<'a, S: StateViewWithRemoteCache> FrozenResourceResolver for StorageAdapter<
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-    ) -> Result<Option<Resource>, Self::Error> {
+    ) -> Result<Option<Arc<Resource>>, Self::Error> {
         self.get_any_resource(address, struct_tag)
             .map(|maybe_write| {
                 maybe_write.map(|write| match write {
                     AptosWrite::AggregatorValue(v) => unreachable!(),
                     AptosWrite::Module(_) => unreachable!(),
-                    AptosWrite::Standard(r) => r,
+                    AptosWrite::Standard(r) => Arc::new(r),
                     AptosWrite::Group(_) => unreachable!(),
                 })
             })
@@ -272,7 +239,7 @@ impl<'a, S: StateViewWithRemoteCache> ConfigStorage for StorageAdapter<'a, S> {
     fn fetch_config(&self, access_path: AccessPath) -> Option<Vec<u8>> {
         let maybe_write = self.get_r(access_path).ok()?;
         maybe_write.map(|write| match write {
-            AptosWrite::Standard(r) => r.serialize().expect("should not fail"),
+            AptosWrite::Standard(r) => r.into_bytes().expect("should not fail"),
             _ => unreachable!(),
         })
     }
@@ -321,11 +288,11 @@ impl<S> DerefMut for StorageAdapterOwned<S> {
     }
 }
 
-impl<S: StateViewWithRemoteCache> ModuleResolver for StorageAdapterOwned<S> {
+impl<S: StateViewWithRemoteCache> FrozenModuleResolver for StorageAdapterOwned<S> {
     type Error = VMError;
 
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
-        self.as_move_resolver().get_module(module_id)
+    fn get_frozen_module(&self, module_id: &ModuleId) -> Result<Option<Arc<Module>>, Self::Error> {
+        self.as_move_resolver().get_frozen_module(module_id)
     }
 }
 
@@ -353,18 +320,6 @@ impl<S: StateViewWithRemoteCache> MoveResolverExt for StorageAdapterOwned<S> {
     }
 }
 
-impl<S: StateViewWithRemoteCache> ResourceResolver for StorageAdapterOwned<S> {
-    type Error = VMError;
-
-    fn get_resource(
-        &self,
-        address: &AccountAddress,
-        struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, Self::Error> {
-        self.as_move_resolver().get_resource(address, struct_tag)
-    }
-}
-
 impl<S: StateViewWithRemoteCache> FrozenResourceResolver for StorageAdapterOwned<S> {
     type Error = VMError;
 
@@ -372,7 +327,7 @@ impl<S: StateViewWithRemoteCache> FrozenResourceResolver for StorageAdapterOwned
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-    ) -> Result<Option<Resource>, Self::Error> {
+    ) -> Result<Option<Arc<Resource>>, Self::Error> {
         self.as_move_resolver()
             .get_frozen_resource(address, struct_tag)
     }

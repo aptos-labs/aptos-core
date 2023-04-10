@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::values::FrozenValue;
+use move_binary_format::CompiledModule;
 use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, StructTag},
@@ -11,10 +12,7 @@ use std::{fmt::Debug, sync::Arc};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Resource {
-    // Resource is stored as a blob.
     Serialized(Vec<u8>),
-    // Resource is stored as a Move value and is not serialized yet. This type is
-    // useful to cache outputs of VM session and avoid unnecessary deserialization.
     Cached(FrozenValue, MoveTypeLayout),
 }
 
@@ -66,8 +64,8 @@ impl<T: FrozenResourceResolver + ?Sized> FrozenResourceResolver for &T {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Module {
-    // Module is stored as a blob.
     Serialized(Vec<u8>),
+    Cached(CompiledModule),
 }
 
 impl Module {
@@ -78,14 +76,26 @@ impl Module {
     pub fn as_bytes(&self) -> Option<Vec<u8>> {
         match self {
             Self::Serialized(blob) => Some(blob.clone()),
+            Self::Cached(compiled_module) => {
+                let mut binary = vec![];
+                compiled_module.serialize(&mut binary).ok()?;
+                Some(binary)
+            },
         }
     }
 
     pub fn into_bytes(self) -> Option<Vec<u8>> {
         match self {
             Self::Serialized(blob) => Some(blob),
+            Self::Cached(compiled_module) => {
+                let mut binary = vec![];
+                compiled_module.serialize(&mut binary).ok()?;
+                Some(binary)
+            },
         }
     }
+
+    // TODO: conversion to compiled module.
 }
 
 pub trait FrozenModuleResolver {

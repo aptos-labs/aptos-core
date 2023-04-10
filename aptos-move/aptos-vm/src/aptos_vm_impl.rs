@@ -189,7 +189,7 @@ impl AptosVMImpl {
             .ok()?
         {
             Some(r) => {
-                bcs::from_bytes::<TransactionValidation>(&r.serialize().expect("should not fail"))
+                bcs::from_bytes::<TransactionValidation>(&r.as_bytes().expect("should not fail"))
                     .ok()
             },
             _ => None,
@@ -252,7 +252,7 @@ impl AptosVMImpl {
 
             let valid = if let Ok(Some(resource)) = data {
                 let approved_execution_hashes = bcs::from_bytes::<ApprovedExecutionHashes>(
-                    &resource.serialize().expect("should not fail"),
+                    &resource.as_bytes().expect("should not fail"),
                 )
                 .ok();
                 let valid = approved_execution_hashes
