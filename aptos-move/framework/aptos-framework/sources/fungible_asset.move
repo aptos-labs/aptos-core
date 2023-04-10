@@ -62,7 +62,7 @@ module aptos_framework::fungible_asset {
         /// The balance of the fungible metadata.
         balance: u64,
         /// Fungible Assets transferring is a common operation, this allows for freezing/unfreezing accounts.
-        allow_ungated_transfer: bool,
+        allow_ungated_balance_transfer: bool,
     }
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
@@ -226,7 +226,7 @@ module aptos_framework::fungible_asset {
     /// If the store has not been created, we default to returning true as deposits can be sent to it.
     public fun ungated_transfer_allowed<T: key>(store: Object<T>): bool acquires FungibleStore {
         !store_exists(object::object_address(&store)) ||
-            borrow_store_resource(&store).allow_ungated_transfer
+            borrow_store_resource(&store).allow_ungated_balance_transfer
     }
 
     public fun asset_metadata(fa: &FungibleAsset): Object<Metadata> {
@@ -271,7 +271,7 @@ module aptos_framework::fungible_asset {
         move_to(store_obj, FungibleStore {
             metadata,
             balance: 0,
-            allow_ungated_transfer: true,
+            allow_ungated_balance_transfer: true,
         });
         move_to(store_obj,
             FungibleAssetEvents {
@@ -333,7 +333,7 @@ module aptos_framework::fungible_asset {
             error::invalid_argument(ETRANSFER_REF_AND_STORE_MISMATCH),
         );
         let store_addr = object::object_address(&store);
-        borrow_global_mut<FungibleStore>(store_addr).allow_ungated_transfer = allow;
+        borrow_global_mut<FungibleStore>(store_addr).allow_ungated_balance_transfer = allow;
 
         let events = borrow_global_mut<FungibleAssetEvents>(store_addr);
         event::emit_event(&mut events.set_ungated_transfer_events, SetUngatedTransferEvent { transfer_allowed: allow });
