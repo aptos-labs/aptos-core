@@ -190,17 +190,16 @@ export class StructTag {
    * @returns
    */
   static fromString(structTag: string): StructTag {
-    // Type args are not supported in string literal
-    if (structTag.includes("<")) {
-      throw new Error("Not implemented");
-    }
+    // Use the TypeTagParser to parse the string literal into a TypeTagStruct
+    const typeTagStruct = new TypeTagParser(structTag).parseTypeTag() as TypeTagStruct;
 
-    const parts = structTag.split("::");
-    if (parts.length !== 3) {
-      throw new Error("Invalid struct tag string literal.");
-    }
-
-    return new StructTag(AccountAddress.fromHex(parts[0]), new Identifier(parts[1]), new Identifier(parts[2]), []);
+    // Convert and return as a StructTag
+    return new StructTag(
+      typeTagStruct.value.address,
+      typeTagStruct.value.module_name,
+      typeTagStruct.value.name,
+      typeTagStruct.value.type_args,
+    );
   }
 
   serialize(serializer: Serializer): void {
