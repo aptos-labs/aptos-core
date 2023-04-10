@@ -56,7 +56,7 @@ module aptos_framework::fungible_asset {
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// The store object that holds fungible assets of a specific type associated with an account.
-    struct FungibleAssetStore has key {
+    struct FungibleStore has key {
         /// The address of the base metadata object.
         metadata: Object<Metadata>,
         /// The balance of the fungible metadata.
@@ -192,7 +192,7 @@ module aptos_framework::fungible_asset {
     #[view]
     /// Return whether the provided address has a store initialized.
     public fun store_exists(store: address): bool {
-        exists<FungibleAssetStore>(store)
+        exists<FungibleStore>(store)
     }
 
     /// Return the underlying metadata object
@@ -202,7 +202,7 @@ module aptos_framework::fungible_asset {
 
     #[view]
     /// Return the underlying metadata object.
-    public fun store_metadata<T: key>(store: Object<T>): Object<Metadata> acquires FungibleAssetStore {
+    public fun store_metadata<T: key>(store: Object<T>): Object<Metadata> acquires FungibleStore {
         borrow_store_resource(&store).metadata
     }
 
@@ -213,7 +213,7 @@ module aptos_framework::fungible_asset {
 
     #[view]
     /// Get the balance of a given store.
-    public fun balance<T: key>(store: Object<T>): u64 acquires FungibleAssetStore {
+    public fun balance<T: key>(store: Object<T>): u64 acquires FungibleStore {
         if (store_exists(object::object_address(&store))) {
             borrow_store_resource(&store).balance
         } else {
@@ -224,7 +224,7 @@ module aptos_framework::fungible_asset {
     #[view]
     /// Return whether a store can freely send or receive fungible assets.
     /// If the store has not been created, we default to returning true as deposits can be sent to it.
-    public fun ungated_transfer_allowed<T: key>(store: Object<T>): bool acquires FungibleAssetStore {
+    public fun ungated_transfer_allowed<T: key>(store: Object<T>): bool acquires FungibleStore {
         !store_exists(object::object_address(&store)) ||
             borrow_store_resource(&store).allow_ungated_transfer
     }
@@ -255,7 +255,7 @@ module aptos_framework::fungible_asset {
         from: Object<T>,
         to: Object<T>,
         amount: u64,
-    ) acquires FungibleAssetStore, FungibleAssetEvents {
+    ) acquires FungibleStore, FungibleAssetEvents {
         let fa = withdraw(sender, from, amount);
         deposit(to, fa);
     }
@@ -265,10 +265,10 @@ module aptos_framework::fungible_asset {
     public fun create_store<T: key>(
         constructor_ref: &ConstructorRef,
         metadata: Object<T>,
-    ): Object<FungibleAssetStore> {
+    ): Object<FungibleStore> {
         let store_obj = &object::generate_signer(constructor_ref);
         let metadata = object::convert<T, Metadata>(metadata);
-        move_to(store_obj, FungibleAssetStore {
+        move_to(store_obj, FungibleStore {
             metadata,
             balance: 0,
             allow_ungated_transfer: true,
@@ -281,7 +281,7 @@ module aptos_framework::fungible_asset {
             }
         );
 
-        object::object_from_constructor_ref<FungibleAssetStore>(constructor_ref)
+        object::object_from_constructor_ref<FungibleStore>(constructor_ref)
     }
 
     /// Withdraw `amount` of fungible asset from `store` by the owner.
@@ -289,14 +289,14 @@ module aptos_framework::fungible_asset {
         owner: &signer,
         store: Object<T>,
         amount: u64,
-    ): FungibleAsset acquires FungibleAssetStore, FungibleAssetEvents {
+    ): FungibleAsset acquires FungibleStore, FungibleAssetEvents {
         assert!(object::owns(store, signer::address_of(owner)), error::permission_denied(ENOT_STORE_OWNER));
         assert!(ungated_transfer_allowed(store), error::invalid_argument(EUNGATED_TRANSFER_IS_NOT_ALLOWED));
         withdraw_internal(object::object_address(&store), amount)
     }
 
     /// Deposit `amount` of fungible asset to `store`.
-    public fun deposit<T: key>(store: Object<T>, fa: FungibleAsset) acquires FungibleAssetStore, FungibleAssetEvents {
+    public fun deposit<T: key>(store: Object<T>, fa: FungibleAsset) acquires FungibleStore, FungibleAssetEvents {
         assert!(ungated_transfer_allowed(store), error::invalid_argument(EUNGATED_TRANSFER_IS_NOT_ALLOWED));
         deposit_internal(store, fa);
     }
@@ -318,7 +318,7 @@ module aptos_framework::fungible_asset {
         ref: &MintRef,
         store: Object<T>,
         amount: u64,
-    ) acquires Metadata, FungibleAssetStore, FungibleAssetEvents {
+    ) acquires Metadata, FungibleStore, FungibleAssetEvents {
         deposit(store, mint(ref, amount));
     }
 
@@ -327,13 +327,13 @@ module aptos_framework::fungible_asset {
         ref: &TransferRef,
         store: Object<T>,
         allow: bool,
-    ) acquires FungibleAssetStore, FungibleAssetEvents {
+    ) acquires FungibleStore, FungibleAssetEvents {
         assert!(
             ref.metadata == store_metadata(store),
             error::invalid_argument(ETRANSFER_REF_AND_STORE_MISMATCH),
         );
         let store_addr = object::object_address(&store);
-        borrow_global_mut<FungibleAssetStore>(store_addr).allow_ungated_transfer = allow;
+        borrow_global_mut<FungibleStore>(store_addr).allow_ungated_transfer = allow;
 
         let events = borrow_global_mut<FungibleAssetEvents>(store_addr);
         event::emit_event(&mut events.set_ungated_transfer_events, SetUngatedTransferEvent { transfer_allowed: allow });
@@ -353,7 +353,7 @@ module aptos_framework::fungible_asset {
         ref: &BurnRef,
         store: Object<T>,
         amount: u64
-    ) acquires Metadata, FungibleAssetStore, FungibleAssetEvents {
+    ) acquires Metadata, FungibleStore, FungibleAssetEvents {
         let metadata = ref.metadata;
         assert!(metadata == store_metadata(store), error::invalid_argument(EBURN_REF_AND_STORE_MISMATCH));
         let store_addr = object::object_address(&store);
@@ -365,7 +365,7 @@ module aptos_framework::fungible_asset {
         ref: &TransferRef,
         store: Object<T>,
         amount: u64
-    ): FungibleAsset acquires FungibleAssetStore, FungibleAssetEvents {
+    ): FungibleAsset acquires FungibleStore, FungibleAssetEvents {
         assert!(
             ref.metadata == store_metadata(store),
             error::invalid_argument(ETRANSFER_REF_AND_STORE_MISMATCH),
@@ -378,7 +378,7 @@ module aptos_framework::fungible_asset {
         ref: &TransferRef,
         store: Object<T>,
         fa: FungibleAsset
-    ) acquires FungibleAssetStore, FungibleAssetEvents {
+    ) acquires FungibleStore, FungibleAssetEvents {
         assert!(
             ref.metadata == fa.metadata,
             error::invalid_argument(ETRANSFER_REF_AND_FUNGIBLE_ASSET_MISMATCH)
@@ -392,7 +392,7 @@ module aptos_framework::fungible_asset {
         from: Object<T>,
         to: Object<T>,
         amount: u64,
-    ) acquires FungibleAssetStore, FungibleAssetEvents {
+    ) acquires FungibleStore, FungibleAssetEvents {
         let fa = withdraw_with_ref(transfer_ref, from, amount);
         deposit_with_ref(transfer_ref, to, fa);
     }
@@ -420,12 +420,12 @@ module aptos_framework::fungible_asset {
         assert!(amount == 0, error::invalid_argument(EAMOUNT_IS_NOT_ZERO));
     }
 
-    fun deposit_internal<T: key>(store: Object<T>, fa: FungibleAsset) acquires FungibleAssetStore, FungibleAssetEvents {
+    fun deposit_internal<T: key>(store: Object<T>, fa: FungibleAsset) acquires FungibleStore, FungibleAssetEvents {
         let FungibleAsset { metadata, amount } = fa;
         let store_metadata = store_metadata(store);
         assert!(metadata == store_metadata, error::invalid_argument(EFUNGIBLE_ASSET_AND_STORE_MISMATCH));
         let store_addr = object::object_address(&store);
-        let store = borrow_global_mut<FungibleAssetStore>(store_addr);
+        let store = borrow_global_mut<FungibleStore>(store_addr);
         store.balance = store.balance + amount;
 
         let events = borrow_global_mut<FungibleAssetEvents>(store_addr);
@@ -436,9 +436,9 @@ module aptos_framework::fungible_asset {
     fun withdraw_internal(
         store_addr: address,
         amount: u64,
-    ): FungibleAsset acquires FungibleAssetStore, FungibleAssetEvents {
+    ): FungibleAsset acquires FungibleStore, FungibleAssetEvents {
         assert!(amount != 0, error::invalid_argument(EAMOUNT_CANNOT_BE_ZERO));
-        let store = borrow_global_mut<FungibleAssetStore>(store_addr);
+        let store = borrow_global_mut<FungibleStore>(store_addr);
         assert!(store.balance >= amount, error::invalid_argument(EINSUFFICIENT_BALANCE));
         store.balance = store.balance - amount;
 
@@ -482,8 +482,8 @@ module aptos_framework::fungible_asset {
         borrow_global_mut<Metadata>(addr)
     }
 
-    inline fun borrow_store_resource<T: key>(store: &Object<T>): &FungibleAssetStore acquires FungibleAssetStore {
-        borrow_global<FungibleAssetStore>(object::object_address(store))
+    inline fun borrow_store_resource<T: key>(store: &Object<T>): &FungibleStore acquires FungibleStore {
+        borrow_global<FungibleStore>(object::object_address(store))
     }
 
     #[test_only]
@@ -531,7 +531,7 @@ module aptos_framework::fungible_asset {
     }
 
     #[test_only]
-    public fun create_test_store<T: key>(owner: &signer, metadata: Object<T>): Object<FungibleAssetStore> {
+    public fun create_test_store<T: key>(owner: &signer, metadata: Object<T>): Object<FungibleStore> {
         let owner_addr = signer::address_of(owner);
         if (!account::exists_at(owner_addr)) {
             account::create_account_for_test(owner_addr);
@@ -575,7 +575,7 @@ module aptos_framework::fungible_asset {
     fun test_e2e_basic_flow(
         creator: &signer,
         aaron: &signer,
-    ) acquires Metadata, FungibleAssetStore, FungibleAssetEvents {
+    ) acquires Metadata, FungibleStore, FungibleAssetEvents {
         let (mint_ref, transfer_ref, burn_ref, test_token) = create_fungible_asset(creator);
         let metadata = mint_ref.metadata;
         let creator_store = create_test_store(creator, metadata);
@@ -607,7 +607,7 @@ module aptos_framework::fungible_asset {
     #[expected_failure(abort_code = 0x10003, location = Self)]
     fun test_ungated_transfer(
         creator: &signer
-    ) acquires Metadata, FungibleAssetStore, FungibleAssetEvents {
+    ) acquires Metadata, FungibleStore, FungibleAssetEvents {
         let (mint_ref, transfer_ref, _burn_ref, _) = create_fungible_asset(creator);
 
         let creator_store = create_test_store(creator, mint_ref.metadata);
@@ -620,7 +620,7 @@ module aptos_framework::fungible_asset {
     fun test_transfer_with_ref(
         creator: &signer,
         aaron: &signer,
-    ) acquires Metadata, FungibleAssetStore, FungibleAssetEvents {
+    ) acquires Metadata, FungibleStore, FungibleAssetEvents {
         let (mint_ref, transfer_ref, _burn_ref, _) = create_fungible_asset(creator);
         let metadata = mint_ref.metadata;
         let creator_store = create_test_store(creator, metadata);
