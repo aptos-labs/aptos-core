@@ -10,6 +10,7 @@ pub mod derive_resource_account;
 pub mod fund;
 pub mod key_rotation;
 pub mod list;
+pub mod multisig_account;
 pub mod transfer;
 
 /// Tool for interacting with accounts
@@ -39,6 +40,30 @@ impl AccountTool {
             AccountTool::LookupAddress(tool) => tool.execute_serialized().await,
             AccountTool::RotateKey(tool) => tool.execute_serialized().await,
             AccountTool::Transfer(tool) => tool.execute_serialized().await,
+        }
+    }
+}
+
+/// Tool for interacting with multisig accounts
+#[derive(Debug, Subcommand)]
+pub enum MultisigAccountTool {
+    Approve(multisig_account::Approve),
+    Create(multisig_account::Create),
+    CreateTransaction(multisig_account::CreateTransaction),
+    Execute(multisig_account::Execute),
+    ExecuteReject(multisig_account::ExecuteReject),
+    Reject(multisig_account::Reject),
+}
+
+impl MultisigAccountTool {
+    pub async fn execute(self) -> CliResult {
+        match self {
+            MultisigAccountTool::Approve(tool) => tool.execute_serialized().await,
+            MultisigAccountTool::Create(tool) => tool.execute_serialized().await,
+            MultisigAccountTool::CreateTransaction(tool) => tool.execute_serialized().await,
+            MultisigAccountTool::Execute(tool) => tool.execute_serialized().await,
+            MultisigAccountTool::ExecuteReject(tool) => tool.execute_serialized().await,
+            MultisigAccountTool::Reject(tool) => tool.execute_serialized().await,
         }
     }
 }
