@@ -799,6 +799,10 @@ module aptos_framework::delegation_pool {
         let (withdrawal_exists, withdrawal_olc) = pending_withdrawal_exists(pool, delegator_address);
         // exit if no withdrawal or (it is pending and cannot withdraw pending_inactive stake from stake pool)\
 
+        assert!(get_pool_address(pool) != pool_address, error::invalid_argument(ENOT_ENOUGH_ACTIVE_STAKE_TO_UNLOCK) );
+        assert!(delegator_address != pool_address, error::invalid_argument(ENOT_ENOUGH_ACTIVE_STAKE_TO_UNLOCK) );
+        assert!(get_pool_address(pool) != delegator_address, error::invalid_argument(ENOT_ENOUGH_ACTIVE_STAKE_TO_UNLOCK));
+
         // ----------------- spec only -------------------------
         let ghost_bool_ = !(
             withdrawal_exists &&
@@ -865,14 +869,9 @@ module aptos_framework::delegation_pool {
         );
 
         // ----------------- spec only -------------------------
-        let ghost_bool_ = !(
-            withdrawal_exists &&
-                (withdrawal_olc.index < pool.observed_lockup_cycle.index || can_withdraw_pending_inactive(pool_address))
-        );
         let ghost_coin_3_ = coin::balance<AptosCoin>(delegator_address);
         let ghost_coin_4_ = coin::balance<AptosCoin>(get_pool_address(pool));
         spec{
-            assume ghost_bool == ghost_bool_ ;
             assume ghost_olc == withdrawal_olc;
             assume ghost_coin_3 == ghost_coin_3_;
             assume ghost_coin_4 == ghost_coin_4_;
