@@ -62,6 +62,8 @@ impl Pool {
     /// Allocates a contiguous array of buckets on the heap. As strings are
     /// inserted into the pool, buckets in this array are filled with an entry.
     pub(crate) fn new() -> Self {
+        // Using const INIT, works around the fact that [None; NB_BUCKETS] not being possible
+        // because Bucket is not Copy.
         const INIT: Bucket = None;
         Self(Box::new([INIT; NB_BUCKETS]))
     }
