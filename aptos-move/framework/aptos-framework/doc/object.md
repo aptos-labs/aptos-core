@@ -70,6 +70,7 @@ make it so that a reference to a global object can be returned from a function.
 -  [Function `transfer_raw`](#0x1_object_transfer_raw)
 -  [Function `transfer_to_object`](#0x1_object_transfer_to_object)
 -  [Function `verify_ungated_and_descendant`](#0x1_object_verify_ungated_and_descendant)
+-  [Function `ungated_transfer_allowed`](#0x1_object_ungated_transfer_allowed)
 -  [Function `owner`](#0x1_object_owner)
 -  [Function `is_owner`](#0x1_object_is_owner)
 -  [Function `owns`](#0x1_object_owns)
@@ -1651,11 +1652,40 @@ objects may have cyclic dependencies.
 
 </details>
 
+<a name="0x1_object_ungated_transfer_allowed"></a>
+
+## Function `ungated_transfer_allowed`
+
+Accessors
+Return true if ungated transfer is allowed.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_ungated_transfer_allowed">ungated_transfer_allowed</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_ungated_transfer_allowed">ungated_transfer_allowed</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;): bool <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+    <b>assert</b>!(
+        <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>.inner),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="object.md#0x1_object_EOBJECT_DOES_NOT_EXIST">EOBJECT_DOES_NOT_EXIST</a>),
+    );
+    <b>borrow_global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>.inner).allow_ungated_transfer
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_object_owner"></a>
 
 ## Function `owner`
 
-Accessors
 Return the current owner.
 
 

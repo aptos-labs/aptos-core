@@ -2,7 +2,7 @@
 /// metadata object can be any object that equipped with `Metadata` resource.
 module aptos_framework::fungible_asset {
     use aptos_framework::event;
-    use aptos_framework::object::{Self, Object, ConstructorRef};
+    use aptos_framework::object::{Self, Object, ConstructorRef, DeleteRef};
 
     use std::error;
     use std::option::{Self, Option};
@@ -35,6 +35,8 @@ module aptos_framework::fungible_asset {
     const EAMOUNT_IS_NOT_ZERO: u64 = 12;
     /// Burn ref and fungible asset do not match.
     const EBURN_REF_AND_FUNGIBLE_ASSET_MISMATCH: u64 = 13;
+    /// Cannot destroy fungible stores with non-zero balance.
+    const EBALANCE_IS_NOT_ZERO: u64 = 14;
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Define the metadata required of an metadata to be fungible.
@@ -224,7 +226,7 @@ module aptos_framework::fungible_asset {
     #[view]
     /// Return whether a store can freely send or receive fungible assets.
     /// If the store has not been created, we default to returning true as deposits can be sent to it.
-    public fun ungated_transfer_allowed<T: key>(store: Object<T>): bool acquires FungibleStore {
+    public fun ungated_balance_transfer_allowed<T: key>(store: Object<T>): bool acquires FungibleStore {
         !store_exists(object::object_address(&store)) ||
             borrow_store_resource(&store).allow_ungated_balance_transfer
     }
@@ -284,6 +286,22 @@ module aptos_framework::fungible_asset {
         object::object_from_constructor_ref<FungibleStore>(constructor_ref)
     }
 
+    public fun remove_store(delete_ref: &DeleteRef) acquires FungibleStore, FungibleAssetEvents {
+        let store = &object::object_from_delete_ref<FungibleStore>(delete_ref);
+        let addr = object::object_address(store);
+        let FungibleStore { metadata: _, balance, allow_ungated_balance_transfer: _ }
+            = move_from<FungibleStore>(addr);
+        assert!(balance == 0, error::permission_denied(EBALANCE_IS_NOT_ZERO));
+        let FungibleAssetEvents {
+            deposit_events,
+            withdraw_events,
+            set_ungated_transfer_events,
+        } = move_from<FungibleAssetEvents>(addr);
+        event::destroy_handle(deposit_events);
+        event::destroy_handle(withdraw_events);
+        event::destroy_handle(set_ungated_transfer_events);
+    }
+
     /// Withdraw `amount` of fungible asset from `store` by the owner.
     public fun withdraw<T: key>(
         owner: &signer,
@@ -291,13 +309,13 @@ module aptos_framework::fungible_asset {
         amount: u64,
     ): FungibleAsset acquires FungibleStore, FungibleAssetEvents {
         assert!(object::owns(store, signer::address_of(owner)), error::permission_denied(ENOT_STORE_OWNER));
-        assert!(ungated_transfer_allowed(store), error::invalid_argument(EUNGATED_TRANSFER_IS_NOT_ALLOWED));
+        assert!(ungated_balance_transfer_allowed(store), error::invalid_argument(EUNGATED_TRANSFER_IS_NOT_ALLOWED));
         withdraw_internal(object::object_address(&store), amount)
     }
 
     /// Deposit `amount` of fungible asset to `store`.
     public fun deposit<T: key>(store: Object<T>, fa: FungibleAsset) acquires FungibleStore, FungibleAssetEvents {
-        assert!(ungated_transfer_allowed(store), error::invalid_argument(EUNGATED_TRANSFER_IS_NOT_ALLOWED));
+        assert!(ungated_balance_transfer_allowed(store), error::invalid_argument(EUNGATED_TRANSFER_IS_NOT_ALLOWED));
         deposit_internal(store, fa);
     }
 
@@ -571,6 +589,15 @@ module aptos_framework::fungible_asset {
         decrease_supply(&asset, 1);
     }
 
+    #[test(creator = @0xcafe)]
+    fun test_create_and_remove_store(creator: &signer) acquires FungibleStore, FungibleAssetEvents {
+        let (_, _, _, asset) = create_fungible_asset(creator);
+        let creator_ref = object::create_object_from_account(creator);
+        create_store(&creator_ref, asset);
+        let delete_ref = object::generate_delete_ref(&creator_ref);
+        remove_store(&delete_ref);
+    }
+
     #[test(creator = @0xcafe, aaron = @0xface)]
     fun test_e2e_basic_flow(
         creator: &signer,
@@ -600,7 +627,7 @@ module aptos_framework::fungible_asset {
         assert!(balance(aaron_store) == 60, 6);
 
         set_ungated_transfer(&transfer_ref, aaron_store, false);
-        assert!(!ungated_transfer_allowed(aaron_store), 7);
+        assert!(!ungated_balance_transfer_allowed(aaron_store), 7);
     }
 
     #[test(creator = @0xcafe)]
@@ -633,8 +660,8 @@ module aptos_framework::fungible_asset {
         transfer_with_ref(&transfer_ref, creator_store, aaron_store, 80);
         assert!(balance(creator_store) == 20, 1);
         assert!(balance(aaron_store) == 80, 2);
-        assert!(!ungated_transfer_allowed(creator_store), 3);
-        assert!(!ungated_transfer_allowed(aaron_store), 4);
+        assert!(!ungated_balance_transfer_allowed(creator_store), 3);
+        assert!(!ungated_balance_transfer_allowed(aaron_store), 4);
     }
 
     #[test(creator = @0xcafe)]

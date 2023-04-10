@@ -485,6 +485,14 @@ module aptos_framework::object {
     }
 
     /// Accessors
+    /// Return true if ungated transfer is allowed.
+    public fun ungated_transfer_allowed<T: key>(object: Object<T>): bool acquires ObjectCore {
+        assert!(
+            exists<ObjectCore>(object.inner),
+            error::not_found(EOBJECT_DOES_NOT_EXIST),
+        );
+        borrow_global<ObjectCore>(object.inner).allow_ungated_transfer
+    }
 
     /// Return the current owner.
     public fun owner<T: key>(object: Object<T>): address acquires ObjectCore {
