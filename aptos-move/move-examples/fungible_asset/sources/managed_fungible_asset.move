@@ -26,7 +26,7 @@ module fungible_asset::managed_fungible_asset {
     /// Initialize metadata object and store the refs.
     fun init_module(admin: &signer) {
         let constructor_ref = &object::create_named_object(admin, ASSET_SYMBOL);
-        primary_store::create_primary_wallet_enabled_fungible_asset(
+        primary_store::create_primary_store_enabled_fungible_asset(
             constructor_ref,
             0, /* maximum_supply. 0 means no maximum */
             utf8(b"Aptos Token"), /* name */

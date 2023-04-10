@@ -1,6 +1,6 @@
 /// This defines the module for interacting with primary stores of accounts/objects, which have deterministic addresses
 module aptos_framework::primary_store {
-    use aptos_framework::fungible_asset::{Self, FungibleAsset, FungibleAssetStore};
+    use aptos_framework::fungible_asset::{Self, FungibleAsset, FungibleStore};
     use aptos_framework::object::{Self, Object, ConstructorRef, DeriveRef};
 
     use std::signer;
@@ -14,7 +14,7 @@ module aptos_framework::primary_store {
 
     /// Creators of fungible assets can call this to enable support for creating primary (deterministic) stores for
     /// their users.
-    public fun create_primary_wallet_enabled_fungible_asset(
+    public fun create_primary_store_enabled_fungible_asset(
         constructor_ref: &ConstructorRef,
         maximum_supply: u64,
         name: String,
@@ -31,7 +31,7 @@ module aptos_framework::primary_store {
     public fun ensure_primary_store_exists<T: key>(
         owner: address,
         metadata: Object<T>,
-    ): Object<FungibleAssetStore> acquires DeriveRefPod {
+    ): Object<FungibleStore> acquires DeriveRefPod {
         if (!primary_store_exists(owner, metadata)) {
             create_primary_store(owner, metadata)
         } else {
@@ -43,7 +43,7 @@ module aptos_framework::primary_store {
     public fun create_primary_store<T: key>(
         owner_addr: address,
         metadata: Object<T>,
-    ): Object<FungibleAssetStore> acquires DeriveRefPod {
+    ): Object<FungibleStore> acquires DeriveRefPod {
         let metadata_addr = object::object_address(&metadata);
         let derive_ref = &borrow_global<DeriveRefPod>(metadata_addr).metadata_derive_ref;
         let constructor_ref = &object::create_user_derived_object(owner_addr, derive_ref);
@@ -62,9 +62,9 @@ module aptos_framework::primary_store {
     }
 
     #[view]
-    public fun primary_store<T: key>(owner: address, metadata: Object<T>): Object<FungibleAssetStore> {
+    public fun primary_store<T: key>(owner: address, metadata: Object<T>): Object<FungibleStore> {
         let store = primary_store_address(owner, metadata);
-        object::address_to_object<FungibleAssetStore>(store)
+        object::address_to_object<FungibleStore>(store)
     }
 
     #[view]
@@ -126,7 +126,7 @@ module aptos_framework::primary_store {
     public fun init_test_metadata_with_primary_store_enabled(
         constructor_ref: &ConstructorRef
     ): (MintRef, TransferRef, BurnRef) {
-        create_primary_wallet_enabled_fungible_asset(
+        create_primary_store_enabled_fungible_asset(
             constructor_ref,
             100 /* max supply */,
             string::utf8(b"USDA"),
