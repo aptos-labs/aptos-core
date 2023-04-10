@@ -100,7 +100,7 @@ where
             .map(|txn_gen| txn_gen.materialize(&key_universe, (false, false)))
             .collect();
 
-        let expected_output = ExpectedOutput::generate_baseline(&transactions, None);
+        let expected_output = ExpectedOutput::generate_baseline(&transactions, None, None);
 
         Self {
             transactions,

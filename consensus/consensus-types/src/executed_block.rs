@@ -120,7 +120,12 @@ impl ExecutedBlock {
             // Insert state checkpoint at the position
             // 1) after last txn if there is no Retry
             // 2) before the first Retry
-            if let Some(pos) = self.state_compute_result.compute_status().iter().position(|s| s.is_retry()) {
+            if let Some(pos) = self
+                .state_compute_result
+                .compute_status()
+                .iter()
+                .position(|s| s.is_retry())
+            {
                 txns_with_state_checkpoint.insert(pos, Transaction::StateCheckpoint(self.id()));
             } else {
                 txns_with_state_checkpoint.push(Transaction::StateCheckpoint(self.id()));

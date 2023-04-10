@@ -37,7 +37,7 @@ where
     .execute_transactions_parallel((), &transactions, &data_view)
     .map(|zipped| zipped.into_iter().map(|(res, _)| res).collect());
 
-    let baseline = ExpectedOutput::generate_baseline(&transactions, None);
+    let baseline = ExpectedOutput::generate_baseline(&transactions, None, None);
 
     baseline.assert_output(&output);
 }

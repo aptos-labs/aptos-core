@@ -130,13 +130,17 @@ impl ApplyChunkOutput {
             vec![]
         };
 
-        let state_checkpoint_to_add = new_epoch_marker.map_or_else(|| append_state_checkpoint_to_block, |_| None);
+        let state_checkpoint_to_add =
+            new_epoch_marker.map_or_else(|| append_state_checkpoint_to_block, |_| None);
 
         let keeps_and_discards = transaction_outputs.iter().map(|t| t.status()).cloned();
         let retries = repeat(TransactionStatus::Retry).take(to_retry.len());
 
         let status = if state_checkpoint_to_add.is_some() {
-            keeps_and_discards.chain(once(TransactionStatus::Keep(ExecutionStatus::Success))).chain(retries).collect()
+            keeps_and_discards
+                .chain(once(TransactionStatus::Keep(ExecutionStatus::Success)))
+                .chain(retries)
+                .collect()
         } else {
             keeps_and_discards.chain(retries).collect()
         };

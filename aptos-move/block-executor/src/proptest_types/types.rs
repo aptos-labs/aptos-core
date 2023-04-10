@@ -489,7 +489,7 @@ where
     }
 
     fn gas_used(&self) -> u64 {
-        0
+        1
     }
 }
 
@@ -503,6 +503,7 @@ pub enum ExpectedOutput<V> {
     SkipRest(usize, Vec<Vec<(Option<V>, Option<u128>)>>),
     Success(Vec<Vec<(Option<V>, Option<u128>)>>),
     DeltaFailure(usize, Vec<Vec<(Option<V>, Option<u128>)>>),
+    ExceedBlockGasLimit(usize, Vec<Vec<(Option<V>, Option<u128>)>>),
 }
 
 impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
@@ -510,12 +511,14 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
     pub fn generate_baseline<K: Hash + Clone + Eq>(
         txns: &[Transaction<K, V>],
         resolved_deltas: Option<Vec<Vec<(K, WriteOp)>>>,
+        maybe_gas_limit: Option<u64>,
     ) -> Self {
         let mut current_world = HashMap::new();
         // Delta world stores the latest u128 value of delta aggregator. When empty, the
         // value is derived based on deserializing current_world, or falling back to
         // STORAGE_AGGREGATOR_VAL.
         let mut delta_world = HashMap::new();
+        let mut accumulated_gas = 0;
 
         let mut result_vec = vec![];
         for (idx, txn) in txns.iter().enumerate() {
@@ -608,7 +611,15 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
                         }
                     }
 
-                    result_vec.push(result)
+                    result_vec.push(result);
+
+                    // In unit tests, the gas_used of any txn is set to be 1.
+                    accumulated_gas += 1;
+                    if let Some(block_gas_limit) = maybe_gas_limit {
+                        if accumulated_gas >= block_gas_limit {
+                            return Self::ExceedBlockGasLimit(idx, result_vec);
+                        }
+                    }
                 },
                 Transaction::SkipRest => return Self::SkipRest(idx, result_vec),
             }
@@ -662,6 +673,21 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
                 results
                     .iter()
                     .skip(*skip_at)
+                    .for_each(|Output(_, _, result)| assert!(result.is_empty()))
+            },
+            (Self::ExceedBlockGasLimit(last_committed, expected_results), Ok(results)) => {
+                // Check_result asserts internally, so no need to return a bool.
+                results
+                    .iter()
+                    .take(*last_committed + 1)
+                    .zip(expected_results.iter())
+                    .for_each(|(Output(_, _, result), expected_results)| {
+                        Self::check_result(expected_results, result)
+                    });
+
+                results
+                    .iter()
+                    .skip(*last_committed + 1)
                     .for_each(|Output(_, _, result)| assert!(result.is_empty()))
             },
             (Self::DeltaFailure(fail_idx, expected_results), Ok(results)) => {
