@@ -332,11 +332,8 @@ module aptos_framework::fungible_asset {
     }
 
     /// Mint the specified `amount` of fungible asset to a destination store.
-    public fun mint_to<T: key>(
-        ref: &MintRef,
-        store: Object<T>,
-        amount: u64,
-    ) acquires Metadata, FungibleStore, FungibleAssetEvents {
+    public fun mint_to<T: key>(ref: &MintRef, store: Object<T>, amount: u64)
+    acquires Metadata, FungibleStore, FungibleAssetEvents {
         deposit(store, mint(ref, amount));
     }
 
