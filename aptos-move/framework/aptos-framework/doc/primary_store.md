@@ -7,7 +7,7 @@ This defines the module for interacting with primary stores of accounts/objects,
 
 
 -  [Resource `DeriveRefPod`](#0x1_primary_store_DeriveRefPod)
--  [Function `create_primary_wallet_enabled_fungible_asset`](#0x1_primary_store_create_primary_wallet_enabled_fungible_asset)
+-  [Function `create_primary_store_enabled_fungible_asset`](#0x1_primary_store_create_primary_store_enabled_fungible_asset)
 -  [Function `ensure_primary_store_exists`](#0x1_primary_store_ensure_primary_store_exists)
 -  [Function `create_primary_store`](#0x1_primary_store_create_primary_store)
 -  [Function `primary_store_address`](#0x1_primary_store_primary_store_address)
@@ -57,15 +57,15 @@ Resource stored on the fungible asset metadata object to allow creating primary 
 
 </details>
 
-<a name="0x1_primary_store_create_primary_wallet_enabled_fungible_asset"></a>
+<a name="0x1_primary_store_create_primary_store_enabled_fungible_asset"></a>
 
-## Function `create_primary_wallet_enabled_fungible_asset`
+## Function `create_primary_store_enabled_fungible_asset`
 
 Creators of fungible assets can call this to enable support for creating primary (deterministic) stores for
 their users.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="primary_store.md#0x1_primary_store_create_primary_wallet_enabled_fungible_asset">create_primary_wallet_enabled_fungible_asset</a>(constructor_ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>, maximum_supply: u64, name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, symbol: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, decimals: u8)
+<pre><code><b>public</b> <b>fun</b> <a href="primary_store.md#0x1_primary_store_create_primary_store_enabled_fungible_asset">create_primary_store_enabled_fungible_asset</a>(constructor_ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>, maximum_supply: u64, name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, symbol: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, decimals: u8)
 </code></pre>
 
 
@@ -74,7 +74,7 @@ their users.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="primary_store.md#0x1_primary_store_create_primary_wallet_enabled_fungible_asset">create_primary_wallet_enabled_fungible_asset</a>(
+<pre><code><b>public</b> <b>fun</b> <a href="primary_store.md#0x1_primary_store_create_primary_store_enabled_fungible_asset">create_primary_store_enabled_fungible_asset</a>(
     constructor_ref: &ConstructorRef,
     maximum_supply: u64,
     name: String,
@@ -99,7 +99,7 @@ their users.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="primary_store.md#0x1_primary_store_ensure_primary_store_exists">ensure_primary_store_exists</a>&lt;T: key&gt;(owner: <b>address</b>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetStore">fungible_asset::FungibleAssetStore</a>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="primary_store.md#0x1_primary_store_ensure_primary_store_exists">ensure_primary_store_exists</a>&lt;T: key&gt;(owner: <b>address</b>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">fungible_asset::FungibleStore</a>&gt;
 </code></pre>
 
 
@@ -111,7 +111,7 @@ their users.
 <pre><code><b>public</b> <b>fun</b> <a href="primary_store.md#0x1_primary_store_ensure_primary_store_exists">ensure_primary_store_exists</a>&lt;T: key&gt;(
     owner: <b>address</b>,
     metadata: Object&lt;T&gt;,
-): Object&lt;FungibleAssetStore&gt; <b>acquires</b> <a href="primary_store.md#0x1_primary_store_DeriveRefPod">DeriveRefPod</a> {
+): Object&lt;FungibleStore&gt; <b>acquires</b> <a href="primary_store.md#0x1_primary_store_DeriveRefPod">DeriveRefPod</a> {
     <b>if</b> (!<a href="primary_store.md#0x1_primary_store_primary_store_exists">primary_store_exists</a>(owner, metadata)) {
         <a href="primary_store.md#0x1_primary_store_create_primary_store">create_primary_store</a>(owner, metadata)
     } <b>else</b> {
@@ -131,7 +131,7 @@ their users.
 Create a primary store object to hold fungible asset for the given address.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="primary_store.md#0x1_primary_store_create_primary_store">create_primary_store</a>&lt;T: key&gt;(owner_addr: <b>address</b>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetStore">fungible_asset::FungibleAssetStore</a>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="primary_store.md#0x1_primary_store_create_primary_store">create_primary_store</a>&lt;T: key&gt;(owner_addr: <b>address</b>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">fungible_asset::FungibleStore</a>&gt;
 </code></pre>
 
 
@@ -143,7 +143,7 @@ Create a primary store object to hold fungible asset for the given address.
 <pre><code><b>public</b> <b>fun</b> <a href="primary_store.md#0x1_primary_store_create_primary_store">create_primary_store</a>&lt;T: key&gt;(
     owner_addr: <b>address</b>,
     metadata: Object&lt;T&gt;,
-): Object&lt;FungibleAssetStore&gt; <b>acquires</b> <a href="primary_store.md#0x1_primary_store_DeriveRefPod">DeriveRefPod</a> {
+): Object&lt;FungibleStore&gt; <b>acquires</b> <a href="primary_store.md#0x1_primary_store_DeriveRefPod">DeriveRefPod</a> {
     <b>let</b> metadata_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(&metadata);
     <b>let</b> derive_ref = &<b>borrow_global</b>&lt;<a href="primary_store.md#0x1_primary_store_DeriveRefPod">DeriveRefPod</a>&gt;(metadata_addr).metadata_derive_ref;
     <b>let</b> constructor_ref = &<a href="object.md#0x1_object_create_user_derived_object">object::create_user_derived_object</a>(owner_addr, derive_ref);
@@ -191,7 +191,7 @@ Create a primary store object to hold fungible asset for the given address.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="primary_store.md#0x1_primary_store">primary_store</a>&lt;T: key&gt;(owner: <b>address</b>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetStore">fungible_asset::FungibleAssetStore</a>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="primary_store.md#0x1_primary_store">primary_store</a>&lt;T: key&gt;(owner: <b>address</b>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">fungible_asset::FungibleStore</a>&gt;
 </code></pre>
 
 
@@ -200,9 +200,9 @@ Create a primary store object to hold fungible asset for the given address.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="primary_store.md#0x1_primary_store">primary_store</a>&lt;T: key&gt;(owner: <b>address</b>, metadata: Object&lt;T&gt;): Object&lt;FungibleAssetStore&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="primary_store.md#0x1_primary_store">primary_store</a>&lt;T: key&gt;(owner: <b>address</b>, metadata: Object&lt;T&gt;): Object&lt;FungibleStore&gt; {
     <b>let</b> store = <a href="primary_store.md#0x1_primary_store_primary_store_address">primary_store_address</a>(owner, metadata);
-    <a href="object.md#0x1_object_address_to_object">object::address_to_object</a>&lt;FungibleAssetStore&gt;(store)
+    <a href="object.md#0x1_object_address_to_object">object::address_to_object</a>&lt;FungibleStore&gt;(store)
 }
 </code></pre>
 
@@ -281,7 +281,7 @@ Return whether the given account's primary store can do direct transfers.
 
 <pre><code><b>public</b> <b>fun</b> <a href="primary_store.md#0x1_primary_store_ungated_transfer_allowed">ungated_transfer_allowed</a>&lt;T: key&gt;(<a href="account.md#0x1_account">account</a>: <b>address</b>, metadata: Object&lt;T&gt;): bool {
     <b>if</b> (<a href="primary_store.md#0x1_primary_store_primary_store_exists">primary_store_exists</a>(<a href="account.md#0x1_account">account</a>, metadata)) {
-        <a href="fungible_asset.md#0x1_fungible_asset_ungated_transfer_allowed">fungible_asset::ungated_transfer_allowed</a>(<a href="primary_store.md#0x1_primary_store">primary_store</a>(<a href="account.md#0x1_account">account</a>, metadata))
+        <a href="fungible_asset.md#0x1_fungible_asset_ungated_balance_transfer_allowed">fungible_asset::ungated_balance_transfer_allowed</a>(<a href="primary_store.md#0x1_primary_store">primary_store</a>(<a href="account.md#0x1_account">account</a>, metadata))
     } <b>else</b> {
         <b>true</b>
     }
