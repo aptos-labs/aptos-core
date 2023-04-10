@@ -31,6 +31,7 @@ if [ "$PROFILE" = "release" ]; then
 else
   # Builds for profiles other than "release" should be tagged with their profile name
   profile_prefix="${PROFILE}_"
+  exit 1 # force a failure
 fi
 
 if [ -n "$CUSTOM_IMAGE_TAG_PREFIX" ]; then
@@ -41,6 +42,7 @@ fi
 
 if [ -n "$FEATURES" ]; then
   export IMAGE_TAG_PREFIX="${IMAGE_TAG_PREFIX}${profile_prefix}${NORMALIZED_FEATURES_LIST}_"
+  exit 1 # force a failure
 else
   export IMAGE_TAG_PREFIX="${IMAGE_TAG_PREFIX}${profile_prefix}"
 fi
