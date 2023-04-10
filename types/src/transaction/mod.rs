@@ -141,8 +141,6 @@ impl RawTransaction {
     }
 
     /// Create a new `RawTransaction` with an entry function.
-    ///
-    /// A script transaction contains only code to execute. No publishing is allowed in scripts.
     pub fn new_entry_function(
         sender: AccountAddress,
         sequence_number: u64,

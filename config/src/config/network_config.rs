@@ -325,7 +325,7 @@ impl NetworkConfig {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct PeerMonitoringServiceConfig {
     pub enable_peer_monitoring_client: bool, // Whether or not to spawn the monitoring client
@@ -335,6 +335,7 @@ pub struct PeerMonitoringServiceConfig {
     pub max_request_jitter_ms: u64, // Max amount of jitter (ms) that a request will be delayed for
     pub metadata_update_interval_ms: u64, // The interval (ms) between metadata updates
     pub network_monitoring: NetworkMonitoringConfig,
+    pub node_monitoring: NodeMonitoringConfig,
     pub peer_monitor_interval_ms: u64, // The interval (ms) between peer monitor executions
 }
 
@@ -348,12 +349,13 @@ impl Default for PeerMonitoringServiceConfig {
             max_request_jitter_ms: 1000, // Monitoring requests are very infrequent
             metadata_update_interval_ms: 5000,
             network_monitoring: NetworkMonitoringConfig::default(),
+            node_monitoring: NodeMonitoringConfig::default(),
             peer_monitor_interval_ms: 1000,
         }
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct LatencyMonitoringConfig {
     pub latency_ping_interval_ms: u64, // The interval (ms) between latency pings for each peer
@@ -373,7 +375,7 @@ impl Default for LatencyMonitoringConfig {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct NetworkMonitoringConfig {
     pub network_info_request_interval_ms: u64, // The interval (ms) between network info requests
@@ -385,6 +387,22 @@ impl Default for NetworkMonitoringConfig {
         Self {
             network_info_request_interval_ms: 60_000, // 1 minute
             network_info_request_timeout_ms: 10_000,  // 10 seconds
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct NodeMonitoringConfig {
+    pub node_info_request_interval_ms: u64, // The interval (ms) between node info requests
+    pub node_info_request_timeout_ms: u64,  // The timeout (ms) for each node info request
+}
+
+impl Default for NodeMonitoringConfig {
+    fn default() -> Self {
+        Self {
+            node_info_request_interval_ms: 20_000, // 20 seconds
+            node_info_request_timeout_ms: 10_000,  // 10 seconds
         }
     }
 }
@@ -464,7 +482,7 @@ pub struct IdentityFromFile {
     pub path: PathBuf,
 }
 
-#[derive(Copy, Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct RateLimitConfig {
     /// Maximum number of bytes/s for an IP
