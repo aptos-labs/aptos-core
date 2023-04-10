@@ -117,7 +117,7 @@ And also create a `Task` struct that holds:
 On the `todolist.move` file, update the content in the module with:
 
 ```rust
-...
+
 struct TodoList has key {
     tasks: Table<u64, Task>,
     set_task_event: event::EventHandle<Task>,
@@ -130,7 +130,7 @@ struct Task has store, drop, copy {
     content: String,
     completed: bool,
   }
-...
+
 ```
 
 **What did we just add?**
@@ -168,11 +168,11 @@ We have some errors on `Unbound type`- this is happening because we used some ty
 3. On the top of the module, import those types by adding:
 
 ```rust
-...
+
 use aptos_framework::event;
 use std::string::String;
 use aptos_std::table::Table;
-...
+
 ```
 
 That will tell the compiler where it can get those types from.
@@ -221,10 +221,10 @@ That means to create the `TodoList` resource, we need to assign it to an account
 
 The `create_list` function can handle that `TodoList` resource creation.
 
-2. Add the following to the `create_list` function
-
+2. Update  the   content with `create_list` function
+ 
 ```rust
-public entry fun create_list(account: &signer){
+
   let tasks_holder = TodoList {
     tasks: table::new(),
     set_task_event: account::new_event_handle<Task>(account),
@@ -232,7 +232,7 @@ public entry fun create_list(account: &signer){
   };
   // move the TodoList resource under the signer account
   move_to(account, tasks_holder);
-}
+
 ```
 
 This function takes in a `signer`, creates a new `TodoList` resource, and uses `move_to` to have the resource stored in the provided signer account.
