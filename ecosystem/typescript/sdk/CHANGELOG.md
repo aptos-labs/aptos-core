@@ -6,6 +6,8 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
+- Add `publish-ans-contract` script and pnpm command for tests
+
 ## 1.8.2 (2023-04-06)
 
 - Introduce `AnsClient` class to support ANS (Aptos Names Service) data fetching queries
