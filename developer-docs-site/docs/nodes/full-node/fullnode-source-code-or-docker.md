@@ -49,35 +49,11 @@ This document describes how to configure your public fullnode using both methods
 
 ### Method 1: Building and running from source
 
-1. Clone the Aptos repo.
+See [Building Aptos From Source](../../guides/building-from-source.md)
 
-    ```bash
-    git clone https://github.com/aptos-labs/aptos-core.git
-    ```
+1. Check out the `mainnet` branch using `git checkout --track origin/mainnet`; remember, you may instead use `devnet` or `testnet`.
 
-2. `cd` into `aptos-core` directory.
-
-    ```bash
-    cd aptos-core
-    ```
-
-3. Run the `scripts/dev_setup.sh` Bash script as shown below. This will prepare your developer environment.
-
-    ```bash
-    ./scripts/dev_setup.sh
-    ```
-
-4. Update your current shell environment.
-
-    ```bash
-    source ~/.cargo/env
-    ```
-
-With your development environment ready, now you can start to setup your fullnode.
-
-5. Check out the `mainnet` branch using `git checkout --track origin/mainnet`; remember, you may instead use `devnet` or `testnet`.
-
-6. Make sure your current working directory is `aptos-core`.
+1. Make sure your current working directory is `aptos-core`.
 
    Run:
    ```bash
@@ -89,7 +65,7 @@ With your development environment ready, now you can start to setup your fullnod
     - Synchronizes correctly with the mainnet, by using the checkpoint file `waypoint.txt` published by the mainnet. 
     - Stores the mainnet database at a location of your choice on your local machine.
 
-7. Make sure your current working directory is `aptos-core`. The Aptos mainnet publishes the `genesis.blob` and `waypoint.txt` files. Download them:
+1. Make sure your current working directory is `aptos-core`. The Aptos mainnet publishes the `genesis.blob` and `waypoint.txt` files. Download them:
 
     - Run the below command on your terminal to download the file:
       ```bash
@@ -107,7 +83,7 @@ With your development environment ready, now you can start to setup your fullnod
     and waypoint pointed to by the `curl` commands above.
     :::
 
-8. Edit the `fullnode.yaml` file in your current working directory as follows.
+1. Edit the `fullnode.yaml` file in your current working directory as follows.
 
     - Specify the correct path to the `waypoint.txt` you just downloaded by editing the `base.waypoint.from_file` in the `fullnode.yaml`. By default it points to `waypoint.txt` in the current working directory.
 
@@ -130,7 +106,7 @@ With your development environment ready, now you can start to setup your fullnod
       data_dir: "</path/to/my/homedir/my-full-node/data>"
       ```
 
-9. Start your local public fullnode by running the below command:
+1. Start your local public fullnode by running the below command:
 
   ```bash
   cargo run -p aptos-node --release -- -f ./fullnode.yaml
