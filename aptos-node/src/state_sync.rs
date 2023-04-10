@@ -21,7 +21,7 @@ use aptos_state_sync_driver::{
 use aptos_storage_interface::DbReaderWriter;
 use aptos_storage_service_client::StorageServiceClient;
 use aptos_storage_service_server::{
-    network::StorageServiceNetworkEvents, StorageReader, StorageServiceServer,
+    network::StorageServiceNetworkEvents, storage::StorageReader, StorageServiceServer,
 };
 use aptos_storage_service_types::StorageServiceMessage;
 use aptos_time_service::TimeService;
