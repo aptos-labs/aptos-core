@@ -12,7 +12,6 @@ use crate::{
 };
 use anyhow::Context;
 use aptos_api_types::Transaction;
-use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
 use bigdecimal::{BigDecimal, ToPrimitive};
 use chrono::{DateTime, Utc};
@@ -20,14 +19,18 @@ use crossbeam::channel;
 use dashmap::DashMap;
 use diesel::{result::Error, PgConnection};
 use econia_db::models::{self, events::MakerEventType, market::MarketEventType, IntoInsertable};
-use econia_types::order::{Fill, Order, OrderState, Side};
+use econia_types::{
+    book::{OrderBook, PriceLevel},
+    events::{MakerEvent, TakerEvent},
+    message::Update,
+    order::{Fill, Order, OrderState, Side},
+};
 use field_count::FieldCount;
 use once_cell::sync::Lazy;
+use redis::Commands;
 use serde::Deserialize;
-use std::{
-    collections::{BTreeMap, HashMap},
-    sync::RwLock,
-};
+use serde_json::{json, Value};
+use std::collections::HashMap;
 
 pub const NAME: &str = "econia_processor";
 
@@ -67,63 +70,6 @@ static EVENT_TYPES: Lazy<Vec<String>> = Lazy::new(|| {
     ]
 });
 
-static CURRENT_BLOCK_TIME: Lazy<RwLock<DateTime<Utc>>> =
-    Lazy::new(|| RwLock::new(DateTime::<Utc>::MIN_UTC));
-
-#[derive(Debug, Deserialize, Clone)]
-struct TakerEvent {
-    market_id: u64,
-    side: bool,
-    market_order_id: u64,
-    maker: AccountAddress,
-    custodian_id: Option<u64>,
-    size: u64,
-    price: u64,
-}
-
-impl From<TakerEvent> for models::events::TakerEvent {
-    fn from(e: TakerEvent) -> Self {
-        Self {
-            market_id: e.market_id.into(),
-            side: e.side.into(),
-            market_order_id: e.market_order_id.into(),
-            maker: e.maker.to_hex_literal(),
-            custodian_id: e.custodian_id.map(|c| c.into()),
-            size: e.size.into(),
-            price: e.price.into(),
-            time: *CURRENT_BLOCK_TIME.read().unwrap(),
-        }
-    }
-}
-
-#[derive(Debug, Deserialize, Clone)]
-struct MakerEvent {
-    market_id: u64,
-    side: bool,
-    market_order_id: u64,
-    user_address: AccountAddress,
-    custodian_id: Option<u64>,
-    event_type: u8,
-    size: u64,
-    price: u64,
-}
-
-impl From<MakerEvent> for models::events::MakerEvent {
-    fn from(e: MakerEvent) -> Self {
-        Self {
-            market_id: e.market_id.into(),
-            side: e.side.into(),
-            market_order_id: e.market_order_id.into(),
-            user_address: e.user_address.to_hex_literal(),
-            custodian_id: e.custodian_id.map(|c| c.into()),
-            event_type: e.event_type.try_into().unwrap(),
-            size: e.size.into(),
-            price: e.price.into(),
-            time: *CURRENT_BLOCK_TIME.read().unwrap(),
-        }
-    }
-}
-
 #[derive(Debug, Deserialize, Clone)]
 struct MarketRegistrationEvent {
     market_id: u64,
@@ -134,13 +80,14 @@ struct MarketRegistrationEvent {
     tick_size: u64,
     min_size: u64,
     underwriter_id: u64,
+    time: DateTime<Utc>,
 }
 
 impl From<MarketRegistrationEvent> for models::market::MarketRegistrationEvent {
     fn from(e: MarketRegistrationEvent) -> Self {
         Self {
             market_id: e.market_id.into(),
-            time: *CURRENT_BLOCK_TIME.read().unwrap(),
+            time: e.time,
             base_account_address: Some(e.base_type.account_address),
             base_module_name: Some(e.base_type.module_name),
             base_struct_name: Some(e.base_type.struct_name),
@@ -178,6 +125,7 @@ struct RecognizedMarketInfo {
 struct RecognizedMarketEvent {
     trading_pair: TradingPair,
     recognized_market_info: Option<RecognizedMarketInfo>,
+    time: DateTime<Utc>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -220,36 +168,6 @@ enum MarketAction {
     Remove(BigDecimal),
 }
 
-struct OrderBook {
-    asks: BTreeMap<u64, Vec<Order>>,
-    bids: BTreeMap<u64, Vec<Order>>,
-    orders_to_price_level: HashMap<u64, (Side, u64)>,
-}
-
-impl OrderBook {
-    fn new() -> Self {
-        Self {
-            asks: BTreeMap::new(),
-            bids: BTreeMap::new(),
-            orders_to_price_level: HashMap::new(),
-        }
-    }
-
-    fn get_side(&self, side: Side) -> &BTreeMap<u64, Vec<Order>> {
-        match side {
-            Side::Ask => &self.asks,
-            Side::Bid => &self.bids,
-        }
-    }
-
-    fn get_side_mut(&mut self, side: Side) -> &mut BTreeMap<u64, Vec<Order>> {
-        match side {
-            Side::Ask => &mut self.asks,
-            Side::Bid => &mut self.bids,
-        }
-    }
-}
-
 struct EconiaRedisCacher {
     redis_client: redis::Client,
     config: RedisConfig,
@@ -280,9 +198,7 @@ impl EconiaRedisCacher {
         conn: &mut redis::Connection,
         mkt_id: BigDecimal,
     ) -> anyhow::Result<()> {
-        let mut cmd = redis::cmd("HSET");
-        cmd.arg(&self.config.markets).arg(mkt_id.to_string()).arg(1);
-        cmd.query::<usize>(conn)?;
+        conn.hset(&self.config.markets, mkt_id.to_string(), 1)?;
         let mkt_id = mkt_id.to_u64().expect("failed to convert to u64");
 
         if self.books.get(&mkt_id).is_none() {
@@ -297,9 +213,7 @@ impl EconiaRedisCacher {
         conn: &mut redis::Connection,
         mkt_id: &BigDecimal,
     ) -> anyhow::Result<()> {
-        let mut cmd = redis::cmd("HDEL");
-        cmd.arg(&self.config.markets).arg(mkt_id.to_string());
-        cmd.query::<usize>(conn)?;
+        conn.hdel(&self.config.markets, mkt_id.to_string())?;
         let mkt_id = mkt_id.to_u64().expect("failed to convert to u64");
         self.books.remove(&mkt_id);
         Ok(())
@@ -316,134 +230,42 @@ impl EconiaRedisCacher {
         Ok(())
     }
 
-    fn get_book_side_price_level(book: &OrderBook, order_id: u64) -> (Side, u64) {
-        let (side, price) = book
-            .orders_to_price_level
-            .get(&order_id)
-            .expect("invalid state, order is missing");
-        (*side, *price)
-    }
-
-    fn get_order(book: &OrderBook, order_id: u64) -> &Order {
-        let (side, price) = Self::get_book_side_price_level(book, order_id);
-        let book_side = book.get_side(side);
-        let orders = book_side
-            .get(&price)
-            .expect("invalid state, price level is missing");
-        let order = orders
-            .iter()
-            .find(|o| o.market_order_id == order_id)
-            .expect("invalid state, order is missing");
-        order
-    }
-
-    fn get_order_mut(book: &mut OrderBook, order_id: u64) -> &mut Order {
-        let (side, price) = Self::get_book_side_price_level(book, order_id);
-        let book_side = book.get_side_mut(side);
-        let orders = book_side
-            .get_mut(&price)
-            .expect("invalid state, price level is missing");
-        let order = orders
-            .iter_mut()
-            .find(|o| o.market_order_id == order_id)
-            .expect("invalid state, order is missing");
-        order
-    }
-
-    fn add_order(book: &mut OrderBook, order: Order) {
-        let market_order_id = order.market_order_id;
-        let side = order.side;
-        let price = order.price;
-
-        if side == Side::Ask {
-            book.asks.entry(price).or_default().push(order);
-        } else {
-            book.bids.entry(price).or_default().push(order);
-        }
-
-        book.orders_to_price_level
-            .insert(market_order_id, (side, price));
-    }
-
-    fn remove_order(book: &mut OrderBook, order_id: u64) -> Order {
-        book.orders_to_price_level.remove(&order_id);
-        let (side, price) = Self::get_book_side_price_level(book, order_id);
-        let book_side = book.get_side_mut(side);
-        let level = book_side
-            .get_mut(&price)
-            .expect("invalid state, price level missing");
-
-        let order = level
-            .iter()
-            .position(|o| o.market_order_id == order_id)
-            .map(|i| level.remove(i))
-            .expect("invalid state, order missing");
-
-        if level.is_empty() {
-            book_side.remove(&price);
-        }
-
-        order
-    }
-
-    fn send_order_update(
-        conn: &mut redis::Connection,
-        order_prefix: &str,
-        order: &Order,
-    ) -> anyhow::Result<()> {
-        let channel_name = format!("{}:{}", order_prefix, order.market_id);
-        let message = serde_json::to_string(order)?;
-        let mut cmd = redis::cmd("PUBLISH");
-        cmd.arg(&channel_name).arg(&message);
-        cmd.query::<usize>(conn)?;
+    fn send_order_update(&self, conn: &mut redis::Connection, order: &Order) -> anyhow::Result<()> {
+        let channel_name = format!("{}:{}", &self.config.order_prefix, order.market_id);
+        let update = Update::Orders(order.clone());
+        let message = serde_json::to_string(&update)?;
+        conn.publish(channel_name, message)?;
         Ok(())
     }
 
-    fn send_fill(
-        conn: &mut redis::Connection,
-        fill_prefix: &str,
-        taker_event: &TakerEvent,
-        order: &Order,
-    ) -> anyhow::Result<()> {
-        let fill = Fill {
-            market_id: taker_event.market_id,
-            maker_order_id: taker_event.market_order_id,
-            maker: taker_event.maker.to_hex_literal(),
-            maker_side: order.side,
-            custodian_id: order.custodian_id,
-            size: taker_event.size,
-            price: taker_event.price,
-            time: *CURRENT_BLOCK_TIME.read().unwrap(),
-        };
-        let channel_name = format!("{}:{}", fill_prefix, taker_event.market_id);
-        let message = serde_json::to_string(&fill)?;
-        let mut cmd = redis::cmd("PUBLISH");
-        cmd.arg(&channel_name).arg(&message);
-        cmd.query::<usize>(conn)?;
+    fn send_fill(&self, conn: &mut redis::Connection, fill: &Fill) -> anyhow::Result<()> {
+        let channel_name = format!("{}:{}", &self.config.fill_prefix, fill.market_id);
+        let update = Update::Fills(fill.clone());
+        let message = serde_json::to_string(&update)?;
+        conn.publish(channel_name, message)?;
         Ok(())
     }
 
     fn send_price_level_update(
+        &self,
         conn: &mut redis::Connection,
-        book_prefix: &str,
         mkt_id: u64,
-        book: &OrderBook,
         side: Side,
         price: u64,
     ) -> anyhow::Result<()> {
+        let book = self.books.get(&mkt_id).expect("book has gone missing?");
         let cum_size = book
             .get_side(side)
             .get(&price)
             .map_or(0, |v| v.iter().fold(0, |i, s: &Order| i + s.size));
-        let channel_name = format!("{}:{}", book_prefix, mkt_id);
-        let message = serde_json::json!({
-            "price": price,
-            "size": cum_size
+        let channel_name = format!("{}:{}", &self.config.book_prefix, mkt_id);
+        let update = Update::PriceLevels(PriceLevel {
+            market_id: mkt_id,
+            price,
+            size: cum_size,
         });
-        let message = serde_json::to_string(&message)?;
-        let mut cmd = redis::cmd("PUBLISH");
-        cmd.arg(&channel_name).arg(&message);
-        cmd.query::<usize>(conn)?;
+        let message = serde_json::to_string(&update)?;
+        conn.publish(channel_name, message)?;
         Ok(())
     }
 
@@ -452,109 +274,79 @@ impl EconiaRedisCacher {
         conn: &mut redis::Connection,
         e: MakerEvent,
     ) -> anyhow::Result<()> {
-        let Some(book) = self.books.get_mut(&e.market_id) else {
+        if !self.books.contains_key(&e.market_id) {
             panic!("invalid state, market is missing")
         };
 
-        match MakerEventType::try_from(e.event_type)? {
+        let removed_order = match MakerEventType::try_from(e.event_type)? {
             MakerEventType::Cancel => {
-                let mut order = Self::remove_order(book, e.market_order_id);
+                let book = self.books.get_mut(&e.market_id).unwrap();
+                let mut order = book
+                    .remove_order(e.market_order_id)
+                    .expect("order not found");
                 order.order_state = OrderState::Cancelled;
-                Self::send_price_level_update(
-                    conn,
-                    &self.config.book_prefix,
-                    e.market_id,
-                    book,
-                    order.side,
-                    order.price,
-                )?;
-                Self::send_order_update(conn, &self.config.order_prefix, &order)?;
+                Some(order)
             },
             MakerEventType::Change => {
                 let pop_and_reinsert = {
-                    let order = Self::get_order(book, e.market_order_id);
+                    let book = self.books.get(&e.market_id).unwrap();
+                    let order = book.get_order(e.market_order_id).expect("order not found");
                     (order.price != e.price) || (e.size > order.size)
                 };
                 if pop_and_reinsert {
-                    let mut order = Self::remove_order(book, e.market_order_id);
-                    let side = order.side;
-                    Self::send_price_level_update(
-                        conn,
-                        &self.config.book_prefix,
-                        e.market_id,
-                        book,
-                        side,
-                        order.price,
-                    )?;
+                    let book = self.books.get_mut(&e.market_id).unwrap();
+                    let mut order = book
+                        .remove_order(e.market_order_id)
+                        .expect("order not found");
+                    let old_price = order.price;
                     order.size = e.size;
                     order.price = e.price;
-                    Self::add_order(book, order);
-                    Self::send_price_level_update(
-                        conn,
-                        &self.config.book_prefix,
-                        e.market_id,
-                        book,
-                        side,
-                        e.price,
-                    )?;
+                    book.add_order(order);
+                    self.send_price_level_update(conn, e.market_id, e.side, old_price)?;
                 } else {
-                    let order = Self::get_order_mut(book, e.market_order_id);
-                    let side = order.side;
+                    let book = self.books.get_mut(&e.market_id).unwrap();
+                    let order = book
+                        .get_order_mut(e.market_order_id)
+                        .expect("order not found");
                     order.size = e.size;
                     order.price = e.price;
-                    Self::send_price_level_update(
-                        conn,
-                        &self.config.book_prefix,
-                        e.market_id,
-                        book,
-                        side,
-                        e.price,
-                    )?;
                 }
 
-                let order = Self::get_order(book, e.market_order_id);
-                Self::send_order_update(conn, &self.config.order_prefix, order)?;
+                None
             },
             MakerEventType::Evict => {
-                let mut order = Self::remove_order(book, e.market_order_id);
+                let book = self.books.get_mut(&e.market_id).unwrap();
+                let mut order = book
+                    .remove_order(e.market_order_id)
+                    .expect("order not found");
                 order.order_state = OrderState::Evicted;
-                Self::send_price_level_update(
-                    conn,
-                    &self.config.book_prefix,
-                    e.market_id,
-                    book,
-                    order.side,
-                    order.price,
-                )?;
-                Self::send_order_update(conn, &self.config.order_prefix, &order)?;
+                Some(order)
             },
             MakerEventType::Place => {
-                let side = e.side.into();
                 let o = Order {
                     market_order_id: e.market_order_id,
                     market_id: e.market_id,
-                    side,
+                    side: e.side,
                     size: e.size,
                     price: e.price,
-                    user_address: e.user_address.to_hex_literal(),
+                    user_address: e.user_address,
                     custodian_id: e.custodian_id,
                     order_state: OrderState::Open,
-                    created_at: *CURRENT_BLOCK_TIME.read().unwrap(),
+                    created_at: e.time,
                 };
 
-                Self::add_order(book, o.clone());
-                Self::send_price_level_update(
-                    conn,
-                    &self.config.book_prefix,
-                    e.market_id,
-                    book,
-                    side,
-                    e.price,
-                )?;
-                Self::send_order_update(conn, &self.config.order_prefix, &o)?;
+                let book = self.books.get_mut(&e.market_id).unwrap();
+                book.add_order(o);
+                None
             },
         };
-        Ok(())
+
+        let book = self.books.get(&e.market_id).unwrap();
+        let order = removed_order
+            .as_ref()
+            .unwrap_or_else(|| book.get_order(e.market_order_id).expect("order not found"));
+        self.send_order_update(conn, order)?;
+        self.send_price_level_update(conn, e.market_id, order.side, order.price)
     }
 
     fn handle_taker_event(
@@ -562,36 +354,42 @@ impl EconiaRedisCacher {
         conn: &mut redis::Connection,
         e: TakerEvent,
     ) -> anyhow::Result<()> {
-        let Some(book) = self.books.get_mut(&e.market_id) else {
+        if !self.books.contains_key(&e.market_id) {
             panic!("invalid state, market is missing")
         };
 
-        let remove_order = {
-            let order = Self::get_order_mut(book, e.market_order_id);
-            Self::send_fill(conn, &self.config.fill_prefix, &e, order)?;
-            order.size = order.size.checked_sub(e.size).unwrap_or_default();
-            let remove_order = order.size == 0;
-            if remove_order {
-                order.order_state = OrderState::Filled;
-            }
-            Self::send_order_update(conn, &self.config.order_prefix, order)?;
-            remove_order
+        let book = self.books.get_mut(&e.market_id).unwrap();
+        let order = book
+            .get_order_mut(e.market_order_id)
+            .expect("order not found");
+
+        order.size = order.size.checked_sub(e.size).unwrap_or_default();
+
+        let fill = Fill {
+            market_id: e.market_id,
+            maker_order_id: e.market_order_id,
+            maker: e.maker.clone(),
+            maker_side: order.side,
+            custodian_id: order.custodian_id,
+            size: e.size,
+            price: e.price,
+            time: e.time,
         };
 
-        if remove_order {
-            Self::remove_order(book, e.market_order_id);
+        if order.size == 0 {
+            order.order_state = OrderState::Filled;
+            let order = book
+                .remove_order(e.market_order_id)
+                .expect("order not found");
+            self.send_order_update(conn, &order)?;
+        } else {
+            let book = self.books.get(&e.market_id).unwrap();
+            let order = book.get_order(e.market_order_id).expect("order not found");
+            self.send_order_update(conn, order)?;
         }
 
-        Self::send_price_level_update(
-            conn,
-            &self.config.book_prefix,
-            e.market_id,
-            book,
-            e.side.into(),
-            e.price,
-        )?;
-
-        Ok(())
+        self.send_fill(conn, &fill)?;
+        self.send_price_level_update(conn, e.market_id, e.side, e.price)
     }
 
     fn start(&mut self, books: Vec<BigDecimal>) {
@@ -740,12 +538,12 @@ impl EconiaTransactionProcessor {
                 .expect("block height not found in block_to_time map");
 
             let utc_time = chrono::TimeZone::from_utc_datetime(&Utc, current_time);
-            if utc_time != *CURRENT_BLOCK_TIME.read().expect("failed to lock") {
-                let mut current_block_time = CURRENT_BLOCK_TIME.write().expect("failed to lock");
-                *current_block_time = utc_time;
-            }
 
-            let event_wrapper: EventWrapper = serde_json::from_value(e.data.clone())
+            let mut event_wrapper = serde_json::from_value::<Value>(e.data.clone())
+                .map_err(|e| Error::DeserializationError(Box::new(e)))?;
+            let obj_map = event_wrapper.as_object_mut().unwrap();
+            obj_map.insert("time".to_string(), json!(utc_time));
+            let event_wrapper = serde_json::from_value::<EventWrapper>(event_wrapper)
                 .map_err(|e| Error::DeserializationError(Box::new(e)))?;
 
             match event_wrapper {
@@ -868,7 +666,7 @@ impl EconiaTransactionProcessor {
                 let new_min_size = BigDecimal::from(r.min_size);
                 events.push(models::market::RecognizedMarketEvent {
                     market_id: mkt.market_id.clone(),
-                    time: *CURRENT_BLOCK_TIME.read().unwrap(),
+                    time: e.time,
                     event_type: if mkt.lot_size == new_lot_size
                         && mkt.tick_size == new_tick_size
                         && mkt.min_size == new_min_size
@@ -893,7 +691,7 @@ impl EconiaTransactionProcessor {
                 let mkt_id = self.base_quote_to_market_id.get(&key).unwrap();
                 events.push(models::market::RecognizedMarketEvent {
                     market_id: mkt_id.clone(),
-                    time: *CURRENT_BLOCK_TIME.read().unwrap(),
+                    time: e.time,
                     event_type: MarketEventType::Remove,
                     lot_size: None,
                     tick_size: None,
