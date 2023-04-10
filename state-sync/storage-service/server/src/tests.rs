@@ -130,13 +130,13 @@ async fn test_peers_with_ready_subscriptions() {
 
     // Create test data with an empty storage server summary
     let cached_storage_server_summary = Arc::new(RwLock::new(StorageServerSummary::default()));
-    let lru_storage_cache = Arc::new(Mutex::new(LruCache::new(0)));
+    let lru_response_cache = Arc::new(Mutex::new(LruCache::new(0)));
 
     // Verify that there are no peers with ready subscriptions
     let peers_with_ready_subscriptions = get_peers_with_ready_subscriptions(
         cached_storage_server_summary.clone(),
         data_subscriptions.clone(),
-        lru_storage_cache.clone(),
+        lru_response_cache.clone(),
         storage_reader.clone(),
         time_service.clone(),
     )
@@ -153,7 +153,7 @@ async fn test_peers_with_ready_subscriptions() {
     let peers_with_ready_subscriptions = get_peers_with_ready_subscriptions(
         cached_storage_server_summary.clone(),
         data_subscriptions.clone(),
-        lru_storage_cache.clone(),
+        lru_response_cache.clone(),
         storage_reader.clone(),
         time_service.clone(),
     )
@@ -177,7 +177,7 @@ async fn test_peers_with_ready_subscriptions() {
     let peers_with_ready_subscriptions = get_peers_with_ready_subscriptions(
         cached_storage_server_summary,
         data_subscriptions,
-        lru_storage_cache,
+        lru_response_cache,
         storage_reader,
         time_service,
     )

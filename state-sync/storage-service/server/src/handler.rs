@@ -41,7 +41,7 @@ const SUMMARY_LOG_FREQUENCY_SECS: u64 = 5;
 pub struct Handler<T> {
     cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
     data_subscriptions: Arc<Mutex<HashMap<PeerNetworkId, DataSubscriptionRequest>>>,
-    lru_storage_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
+    lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
     storage: T,
     time_service: TimeService,
 }
@@ -50,7 +50,7 @@ impl<T: StorageReaderInterface> Handler<T> {
     pub fn new(
         cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
         data_subscriptions: Arc<Mutex<HashMap<PeerNetworkId, DataSubscriptionRequest>>>,
-        lru_storage_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
+        lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
         storage: T,
         time_service: TimeService,
     ) -> Self {
@@ -58,7 +58,7 @@ impl<T: StorageReaderInterface> Handler<T> {
             storage,
             cached_storage_server_summary,
             data_subscriptions,
-            lru_storage_cache,
+            lru_response_cache,
             time_service,
         }
     }
@@ -197,7 +197,7 @@ impl<T: StorageReaderInterface> Handler<T> {
         increment_counter(&metrics::LRU_CACHE_EVENT, protocol, LRU_CACHE_PROBE.into());
 
         // Check if the response is already in the cache
-        if let Some(response) = self.lru_storage_cache.lock().get(request) {
+        if let Some(response) = self.lru_response_cache.lock().get(request) {
             increment_counter(&metrics::LRU_CACHE_EVENT, protocol, LRU_CACHE_HIT.into());
             return Ok(response.clone());
         }
@@ -231,7 +231,7 @@ impl<T: StorageReaderInterface> Handler<T> {
 
         // Cache the response before returning
         let _ = self
-            .lru_storage_cache
+            .lru_response_cache
             .lock()
             .put(request.clone(), storage_response.clone());
 
