@@ -165,7 +165,7 @@ pub(crate) fn handle_active_data_subscriptions<T: StorageReaderInterface>(
     cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
     config: StorageServiceConfig,
     data_subscriptions: Arc<Mutex<HashMap<PeerNetworkId, DataSubscriptionRequest>>>,
-    lru_storage_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
+    lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
     storage: T,
     time_service: TimeService,
 ) {
@@ -176,7 +176,7 @@ pub(crate) fn handle_active_data_subscriptions<T: StorageReaderInterface>(
     let peers_with_ready_subscriptions = match get_peers_with_ready_subscriptions(
         cached_storage_server_summary.clone(),
         data_subscriptions.clone(),
-        lru_storage_cache.clone(),
+        lru_response_cache.clone(),
         storage.clone(),
         time_service.clone(),
     ) {
@@ -195,7 +195,7 @@ pub(crate) fn handle_active_data_subscriptions<T: StorageReaderInterface>(
                 cached_storage_server_summary.clone(),
                 config,
                 data_subscriptions.clone(),
-                lru_storage_cache.clone(),
+                lru_response_cache.clone(),
                 storage.clone(),
                 time_service.clone(),
                 data_subscription,
@@ -214,7 +214,7 @@ pub(crate) fn handle_active_data_subscriptions<T: StorageReaderInterface>(
 pub(crate) fn get_peers_with_ready_subscriptions<T: StorageReaderInterface>(
     cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
     data_subscriptions: Arc<Mutex<HashMap<PeerNetworkId, DataSubscriptionRequest>>>,
-    lru_storage_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
+    lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
     storage: T,
     time_service: TimeService,
 ) -> aptos_storage_service_types::Result<Vec<(PeerNetworkId, LedgerInfoWithSignatures)>, Error> {
@@ -240,7 +240,7 @@ pub(crate) fn get_peers_with_ready_subscriptions<T: StorageReaderInterface>(
                     cached_storage_server_summary.clone(),
                     data_subscriptions.clone(),
                     highest_known_epoch,
-                    lru_storage_cache.clone(),
+                    lru_response_cache.clone(),
                     data_subscription.protocol,
                     storage.clone(),
                     time_service.clone(),
@@ -280,7 +280,7 @@ fn get_epoch_ending_ledger_info<T: StorageReaderInterface>(
     cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
     data_subscriptions: Arc<Mutex<HashMap<PeerNetworkId, DataSubscriptionRequest>>>,
     epoch: u64,
-    lru_storage_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
+    lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
     protocol: ProtocolId,
     storage: T,
     time_service: TimeService,
@@ -299,7 +299,7 @@ fn get_epoch_ending_ledger_info<T: StorageReaderInterface>(
     let handler = Handler::new(
         cached_storage_server_summary,
         data_subscriptions,
-        lru_storage_cache,
+        lru_response_cache,
         storage,
         time_service,
     );
@@ -334,7 +334,7 @@ fn notify_peer_of_new_data<T: StorageReaderInterface>(
     cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
     config: StorageServiceConfig,
     data_subscriptions: Arc<Mutex<HashMap<PeerNetworkId, DataSubscriptionRequest>>>,
-    lru_storage_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
+    lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
     storage: T,
     time_service: TimeService,
     subscription: DataSubscriptionRequest,
@@ -347,7 +347,7 @@ fn notify_peer_of_new_data<T: StorageReaderInterface>(
             let handler = Handler::new(
                 cached_storage_server_summary,
                 data_subscriptions,
-                lru_storage_cache,
+                lru_response_cache,
                 storage,
                 time_service,
             );
