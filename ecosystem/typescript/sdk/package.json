@@ -23,14 +23,15 @@
     "_build:node": "tsup --format cjs,esm --dts",
     "lint": "eslint \"**/*.ts\"",
     "test": "jest",
-    "_fmt": "prettier 'src/**/*.ts' 'examples/**/*.js' 'examples/**/*.ts' '.eslintrc.js'",
+    "_fmt": "prettier 'scripts/**/*.ts' 'src/**/*.ts' 'examples/**/*.js' 'examples/**/*.ts' '.eslintrc.js'",
     "fmt": "pnpm _fmt --write",
     "fmt:check": "pnpm _fmt --check",
     "cov:clean": "rm -rf coverage",
     "generate-client": "openapi -i ../../../api/doc/spec.yaml -o ./src/generated -c axios --name AptosGeneratedClient --exportSchemas true",
     "checked-publish": "scripts/checked_publish.sh",
     "generate-ts-docs": "scripts/generate_ts_docs.sh",
-    "indexer-codegen": "graphql-codegen --config ./src/indexer/codegen.yml"
+    "indexer-codegen": "graphql-codegen --config ./src/indexer/codegen.yml",
+    "publish-ans-contract": "ts-node ./scripts/publish_ans_contract.ts"
   },
   "repository": {
     "type": "git",
