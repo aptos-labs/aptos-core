@@ -84,7 +84,7 @@ module aptos_framework::primary_store {
 
     #[view]
     /// Return whether the given account's primary store can do direct transfers.
-    public fun ungated_transfer_allowed<T: key>(account: address, metadata: Object<T>): bool {
+    public fun ungated_balance_transfer_allowed<T: key>(account: address, metadata: Object<T>): bool {
         if (primary_store_exists(account, metadata)) {
             fungible_asset::ungated_balance_transfer_allowed(primary_store(account, metadata))
         } else {
@@ -149,8 +149,8 @@ module aptos_framework::primary_store {
         assert!(!primary_store_exists(aaron_address, metadata), 2);
         assert!(balance(creator_address, metadata) == 0, 3);
         assert!(balance(aaron_address, metadata) == 0, 4);
-        assert!(ungated_transfer_allowed(creator_address, metadata), 5);
-        assert!(ungated_transfer_allowed(aaron_address, metadata), 6);
+        assert!(ungated_balance_transfer_allowed(creator_address, metadata), 5);
+        assert!(ungated_balance_transfer_allowed(aaron_address, metadata), 6);
         ensure_primary_store_exists(creator_address, metadata);
         ensure_primary_store_exists(aaron_address, metadata);
         assert!(primary_store_exists(creator_address, metadata), 7);
