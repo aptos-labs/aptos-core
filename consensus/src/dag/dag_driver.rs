@@ -29,6 +29,7 @@ use tokio::{
     sync::{mpsc::Sender, Mutex},
     time,
 };
+use crate::util::time_service::TimeService;
 
 pub struct DagDriver {
     epoch: u64,
@@ -43,6 +44,7 @@ pub struct DagDriver {
     bullshark: Arc<Mutex<Bullshark>>,
     rb_tx: Sender<ReliableBroadcastCommand>,
     network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
+    time_service: Arc<dyn TimeService>,
 }
 
 impl DagDriver {
@@ -58,8 +60,8 @@ impl DagDriver {
         network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
         payload_manager: Arc<PayloadManager>,
         state_computer: Arc<dyn StateComputer>,
+        time_service: Arc<dyn TimeService>,
     ) -> Self {
-        // let (dag_bullshark_tx, dag_bullshark_rx) = tokio::sync::mpsc::channel(config.channel_size);
         let (rb_tx, rb_rx) = tokio::sync::mpsc::channel(config.channel_size);
 
         let rb = ReliableBroadcast::new(
@@ -72,6 +74,7 @@ impl DagDriver {
 
         let proposer_election = Arc::new(RoundRobinAnchorElection::new(&verifier));
         let bullshark = Arc::new(Mutex::new(Bullshark::new(
+            author,
             state_computer,
             proposer_election.clone(),
             verifier.clone(),
@@ -99,6 +102,7 @@ impl DagDriver {
             bullshark,
             rb_tx,
             network_msg_rx,
+            time_service,
         }
     }
 
@@ -135,7 +139,10 @@ impl DagDriver {
             )
             .await
             .expect("DAG: fail to retrieve payload");
-        Node::new(self.epoch, self.round, self.author, payload, parents)
+
+        let timestamp = self.time_service.get_current_timestamp().as_micros() as u64;
+
+        Node::new(self.epoch, self.round, self.author, payload, parents, timestamp)
     }
 
     async fn try_advance_round(&mut self) -> Option<Node> {

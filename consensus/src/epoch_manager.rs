@@ -747,6 +747,7 @@ impl EpochManager {
             dag_driver_msg_rx,
             payload_manager,
             state_computer,
+            self.time_service.clone(),
         );
 
         tokio::spawn(dag_driver.start());

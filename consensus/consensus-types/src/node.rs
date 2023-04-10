@@ -119,15 +119,17 @@ pub struct NodeMetaData {
     round: u64,
     source: PeerId,
     digest: HashValue,
+    timestamp: u64,
 }
 
 impl NodeMetaData {
-    pub fn new(epoch: u64, round: u64, source: PeerId, digest: HashValue) -> Self {
+    pub fn new(epoch: u64, round: u64, source: PeerId, digest: HashValue, timestamp: u64) -> Self {
         Self {
             epoch,
             round,
             source,
             digest,
+            timestamp,
         }
     }
 
@@ -150,6 +152,8 @@ impl NodeMetaData {
     pub fn digest(&self) -> HashValue {
         self.digest
     }
+
+    pub fn timestamp(&self) -> u64 { self.timestamp }
 }
 
 fn compute_node_digest(
@@ -196,9 +200,10 @@ impl Node {
         source: PeerId,
         payload: Payload,
         parents: HashSet<NodeMetaData>,
+        timestamp: u64,
     ) -> Self {
         let digest = compute_node_digest(epoch, round, source, &payload, &parents);
-        let metadata = NodeMetaData::new(epoch, round, source, digest);
+        let metadata = NodeMetaData::new(epoch, round, source, digest, timestamp);
 
         Self {
             metadata,
@@ -296,6 +301,8 @@ impl Node {
     pub fn take_payload(self) -> Payload {
         self.consensus_payload
     }
+
+    pub fn timestamp(&self) -> u64 { self.metadata.timestamp }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

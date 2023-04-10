@@ -194,6 +194,28 @@ impl Block {
         }
     }
 
+    pub fn new_proposal_for_dag(
+        payload: Payload,
+        round: Round,
+        timestamp_usecs: u64,
+        quorum_cert: QuorumCert,
+        author: PeerId,
+        validator_signer: &ValidatorSigner,
+        failed_authors: Vec<(Round, Author)>,
+    ) -> anyhow::Result<Self> {
+        let block_data = BlockData::new_proposal(
+            payload,
+            author,
+            failed_authors,
+            round,
+            timestamp_usecs,
+            quorum_cert,
+        );
+
+        Self::new_proposal_from_block_data(block_data, validator_signer)
+    }
+
+
     pub fn new_proposal(
         payload: Payload,
         round: Round,

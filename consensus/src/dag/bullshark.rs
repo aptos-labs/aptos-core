@@ -31,6 +31,7 @@ use std::{collections::HashMap, hash::Hash, iter::Extend, sync::Arc};
 use std::collections::BTreeMap;
 
 pub struct Bullshark {
+    my_id: PeerId,
     state_computer: Arc<dyn StateComputer>,
     dag: Vec<HashMap<PeerId, Node>>,
     lowest_unordered_anchor_wave: u64,
@@ -41,11 +42,13 @@ pub struct Bullshark {
 
 impl Bullshark {
     pub fn new(
+        my_id: PeerId,
         state_computer: Arc<dyn StateComputer>,
         proposer_election: Arc<dyn AnchorElection>,
         verifier: ValidatorVerifier,
     ) -> Self {
         Self {
+            my_id,
             state_computer,
             dag: Vec::new(),
             lowest_unordered_anchor_wave: 0,
@@ -203,6 +206,7 @@ impl Bullshark {
         let mut payload = Payload::empty(false);
         // let mut payload = ordered_history[0].maybe_payload().unwrap().clone();
         let round = ordered_history[0].round();
+        let timestamp = ordered_history[0].timestamp();
 
             ordered_history
                 .into_iter()
@@ -213,10 +217,10 @@ impl Bullshark {
 
 
         let block = ExecutedBlock::new(
-            Block::new_proposal(
+            Block::new_proposal_for_dag(
                 payload,
                 round,
-                0,
+                timestamp,
                 QuorumCert::new(
                     VoteData::new(BlockInfo::empty(), BlockInfo::empty()),
                     LedgerInfoWithSignatures::new(
@@ -224,6 +228,7 @@ impl Bullshark {
                         AggregateSignature::empty(),
                     ),
                 ),
+                self.my_id,
                 &ValidatorSigner::random(None),
                 Vec::new(),
             )

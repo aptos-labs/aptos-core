@@ -14,6 +14,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, fmt, fmt::Write, sync::Arc};
 use tokio::sync::oneshot;
+use crate::common::DataStatus::Cached;
 
 /// The round of a block is a consensus-internal counter, which starts with 0 and increases
 /// monotonically. It is used for the protocol safety and liveness (please see the detailed
@@ -52,6 +53,25 @@ pub enum DataStatus {
     ),
 }
 
+impl DataStatus {
+    pub fn extend(&mut self, other: DataStatus) {
+        match (self, other) {
+            (DataStatus::Requested(v1), DataStatus::Requested(v2)) => v1.extend(v2.into_iter()),
+            (_, _) => unreachable!(),
+        }
+    }
+
+    pub fn take(&mut self) -> DataStatus {
+        std::mem::replace(self, DataStatus::default())
+    }
+}
+
+impl Default for DataStatus {
+    fn default() -> Self {
+        DataStatus::Requested(Vec::new())
+    }
+}
+
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct ProofWithData {
     pub proofs: Vec<ProofOfStore>,
@@ -73,6 +93,11 @@ impl ProofWithData {
             proofs,
             status: Arc::new(Mutex::new(None)),
         }
+    }
+
+    pub fn extend(&mut self, other: ProofWithData) {
+        self.proofs.extend(other.proofs);
+        self.status.lock().as_mut().unwrap().extend(other.status.lock().as_mut().unwrap().take());
     }
 }
 
@@ -130,10 +155,11 @@ impl Payload {
         }
     }
 
-    pub fn extend(&mut self, payload: Payload) {
-        match (self, payload) {
-            (Payload::DirectMempool(v1), Payload::DirectMempool(v2)) => v1.extend(v2.into_iter()),
-            (Payload::InQuorumStore(p1), Payload::InQuorumStore(p2)) => todo!(),
+    // When payload is InQuorumStore, can be called only when status is Requested.
+    pub fn extend(&mut self, other: Payload) {
+        match (self, other) {
+            (Payload::DirectMempool(v1), Payload::DirectMempool(v2)) => v1.extend(v2),
+            (Payload::InQuorumStore(p1), Payload::InQuorumStore(p2)) => p1.extend(p2),
             (_, _) => unreachable!(),
         }
     }
