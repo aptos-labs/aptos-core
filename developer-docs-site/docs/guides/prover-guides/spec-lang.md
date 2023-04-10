@@ -4,21 +4,13 @@
 
 [PRE_POST_REFERENCE]: https://en.wikipedia.org/wiki/Design_by_contract
 
+[APTOS_FRAMEWORK]: https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/overview.md
+
 # Move Specification Language
 
 **version 1.4**
 
-This document describes the *Move specification language*, a subset of the Move language which
-supports specification of the behavior of Move programs. Throughout this document, we abbreviate
-this subset of Move
-*MSL*.
-
-MSL plays together with the [Move Prover][PROVER], a tool which can statically verify the
-correctness of MSL specifications against Move programs. In contrast to traditional testing,
-verification of MSL is exhaustive and holds for all possible inputs and global states of a Move
-module or transaction script. At the same time, it is fast and automated enough that it can be used
-at a similar place in the developer workflow where tests are (for example, for qualification of pull
-requests in continuous integration).
+This document describes the *Move specification language (MSL)*, a subset of the Move language which supports specification of the behavior of Move programs. MSL plays together with the [Move Prover][PROVER], a tool which can statically verify the correctness of MSL specifications against Move programs. In contrast to traditional testing, verification of MSL is exhaustive and holds for all possible inputs and global states of a Move module or transaction script. At the same time, it is fast and automated enough that it can be used at a similar place in the developer workflow where tests are (for example, for qualification of pull requests in continuous integration).
 
 While the Move programming language at this point is stable, the subset represented by MSL should be
 considered evolving. This has no impact on platform stability, since MSL is not running in
@@ -29,7 +21,7 @@ This document describes the language only; see [here][PROVER_USAGE] for how to u
 tool. The reader is expected to have basic knowledge of the Move language, as well as basic
 principles of pre/post condition specifications
 (see e.g. [this article][PRE_POST_REFERENCE]). For examples of specifications, we refer to
-the [Diem framework documentation][FRAMEWORK] which has specifications embedded.
+the [Aptos framework documentation][APTOS_FRAMEWORK] which has specifications embedded.
 
 ---
 
@@ -342,8 +334,8 @@ can appear as module members and inside Move functions. The various types of spe
 below, and will be discussed in subsequent sections.
 
 ```move
-module M {
-    resource struct Counter {
+module addr::M {
+    struct Counter has key {
         value: u8,
     }
 
@@ -393,10 +385,10 @@ Instead of putting specifications into the same module as the regular Move defin
 put them into a separate "specification" module, which can live in the same or a different file:
 
 ```move
-module M {
+module addr::M {
     ...
 }
-spec M {
+spec addr::M {
     spec increment { .. }
 }
 ```
@@ -758,7 +750,7 @@ annotation itself comprises a list of global access expressions. It is specifica
 with [opaque function specifications](#opaque-specifications).
 
 ```move
-resource struct S {
+struct S has key {
     x: u64
 }
 
@@ -875,7 +867,7 @@ states that a `Counter`
 resource stored at any given address can never be zero:
 
 ```move
-module M {
+module addr::M {
     invariant forall a: addr where exists<Counter>(a): global<Counter>(a).value > 0;
 }
 ```
@@ -919,7 +911,7 @@ fn setup() {
 where `publish1` and `publish2` publish two different structs, `T1` and `T2` at address `a`.
 
 ```move
-module M {
+module addr::M {
     invariant [global] exists<T1>(a) == exists<T2>(a)
 }
 ```
@@ -1012,7 +1004,7 @@ between [pre-state and post-state](#pre-and-post-state) of a global state update
 following invariant states that the counter must decrease monotonically whenever it is updated:
 
 ```move
-module M {
+module addr::M {
     invariant update [global] forall a: addr where old(exists<Counter>(a)) && exists<Counter>(addr):
         global<Counter>(a).value <= old(global<Counter>(a));
 }
@@ -1038,7 +1030,7 @@ modules. Consider a situation where module `M1` uses module `M2`, and `M1` conta
 invariant, with the helper function `condition` referring to global state of each respective module:
 
 ```move
-module M1 {
+module addr::M1 {
     invariant M1::condition() ==> M2::condition();
 }
 ```
@@ -1387,8 +1379,7 @@ prover.
 ## Documentation Generation
 
 The organization of specification blocks in a file is relevant for documentation generation -- even
-though it is not for the semantics. See discussion
-of [organization of specification blocks](docgen.md#organization-of-specification-blocks).
+though it is not for the semantics. 
 
 # Expressiveness
 

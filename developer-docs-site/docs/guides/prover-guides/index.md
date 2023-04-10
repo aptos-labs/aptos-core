@@ -19,4 +19,3 @@ For more information, refer to the documentation:
 
 -  [Move Prover User Guide](prover-guide.md)
 -  [Move Specification Language](spec-lang.md)
--  [Installation](install.md)
