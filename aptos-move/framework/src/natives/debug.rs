@@ -6,7 +6,6 @@
 
 use crate::natives::helpers::make_module_natives;
 use move_binary_format::errors::PartialVMResult;
-use move_core_types::gas_algebra::InternalGas;
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
 #[allow(unused_imports)]
 use move_vm_types::{
@@ -21,17 +20,9 @@ use std::{collections::VecDeque, sync::Arc};
 /***************************************************************************************************
  * native fun print
  *
- *   gas cost: base_cost
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct PrintGasParameters {
-    pub base_cost: InternalGas,
-}
-
 #[inline]
 fn native_print(
-    gas_params: &PrintGasParameters,
-    _context: &mut NativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
@@ -48,13 +39,13 @@ fn native_print(
         );
     }
 
-    Ok(NativeResult::ok(gas_params.base_cost, smallvec![]))
+    Ok(NativeResult::ok(0.into(), smallvec![]))
 }
 
-pub fn make_native_print(gas_params: PrintGasParameters) -> NativeFunction {
+pub fn make_native_print() -> NativeFunction {
     Arc::new(
-        move |context, ty_args, args| -> PartialVMResult<NativeResult> {
-            native_print(&gas_params, context, ty_args, args)
+        move |_context, ty_args, args| -> PartialVMResult<NativeResult> {
+            native_print(ty_args, args)
         },
     )
 }
@@ -62,17 +53,10 @@ pub fn make_native_print(gas_params: PrintGasParameters) -> NativeFunction {
 /***************************************************************************************************
  * native fun print_stack_trace
  *
- *   gas cost: base_cost
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct StackTraceGasParameters {
-    pub base_cost: InternalGas,
-}
-
 #[allow(unused_variables)]
 #[inline]
 fn native_stack_trace(
-    gas_params: &StackTraceGasParameters,
     context: &mut NativeContext,
     ty_args: Vec<Type>,
     args: VecDeque<Value>,
@@ -87,13 +71,21 @@ fn native_stack_trace(
     }
 
     let move_str = Value::struct_(Struct::pack(vec![Value::vector_u8(s.into_bytes())]));
-    Ok(NativeResult::ok(gas_params.base_cost, smallvec![move_str]))
+    Ok(NativeResult::ok(0.into(), smallvec![move_str]))
 }
 
-pub fn make_native_stack_trace(gas_params: StackTraceGasParameters) -> NativeFunction {
+pub fn make_native_stack_trace() -> NativeFunction {
     Arc::new(
         move |context, ty_args, args| -> PartialVMResult<NativeResult> {
-            native_stack_trace(&gas_params, context, ty_args, args)
+            native_stack_trace(context, ty_args, args)
+        },
+    )
+}
+
+pub fn make_dummy() -> NativeFunction {
+    Arc::new(
+        move |_context, _ty_args, _args| -> PartialVMResult<NativeResult> {
+            Ok(NativeResult::ok(0.into(), smallvec![]))
         },
     )
 }
@@ -101,19 +93,13 @@ pub fn make_native_stack_trace(gas_params: StackTraceGasParameters) -> NativeFun
 /***************************************************************************************************
  * module
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct GasParameters {
-    pub native_print: PrintGasParameters,
-    pub native_stack_trace: StackTraceGasParameters,
-}
-
-pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {
+pub fn make_all() -> impl Iterator<Item = (String, NativeFunction)> {
     let natives = [
-        ("native_print", make_native_print(gas_params.native_print)),
-        (
-            "native_stack_trace",
-            make_native_stack_trace(gas_params.native_stack_trace),
-        ),
+        ("native_print", make_native_print()),
+        ("native_stack_trace", make_native_stack_trace()),
+        // For replayability on-chain we need dummy implementations of these functions
+        ("print", make_dummy()),
+        ("print_stack_trace", make_dummy()),
     ];
 
     make_module_natives(natives)

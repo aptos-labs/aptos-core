@@ -25,6 +25,7 @@ use std::{collections::VecDeque, fmt::Write, ops::Deref, sync::Arc};
 struct FormatContext<'a, 'b, 'c, 'd> {
     context: &'d mut SafeNativeContext<'a, 'b, 'c>,
     base_gas: InternalGas,
+    per_byte_gas: InternalGas,
     max_depth: usize,
     max_len: usize,
     type_tag: bool,
@@ -206,6 +207,7 @@ fn native_format_impl(
                 && type_.address == AccountAddress::ONE
             {
                 let v = strct.unpack()?.next().unwrap().value_as::<Vec<u8>>()?;
+                context.context.charge(GasQuantity::from(v.len() as u64) * context.per_byte_gas)?;
                 write!(
                     out,
                     "\"{}\"",
@@ -306,6 +308,7 @@ fn native_format(
     let mut format_context = FormatContext {
         context,
         base_gas: gas_params.base,
+        per_byte_gas: gas_params.per_byte,
         max_depth: usize::MAX,
         max_len: usize::MAX,
         type_tag,
@@ -391,6 +394,7 @@ fn native_format_list(
                 let mut format_context = FormatContext {
                     context,
                     base_gas: gas_params.base,
+                    per_byte_gas: gas_params.per_byte,
                     max_depth: usize::MAX,
                     max_len: usize::MAX,
                     type_tag: true,

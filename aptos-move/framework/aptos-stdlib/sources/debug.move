@@ -66,6 +66,7 @@ module aptos_std::debug {
     public fun test()  {
         let x = 42;
         assert_equal(&x, b"42");
+        print(&x);
 
         let v = vector::empty();
         vector::push_back(&mut v, 100);
