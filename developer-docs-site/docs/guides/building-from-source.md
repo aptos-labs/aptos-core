@@ -20,7 +20,6 @@ Aptos can be built on various operating systems, including Linux, macOS. and Win
 
 ## Clone the Aptos-core repo
 
-As described in [Workflows](#workflows), you may interact with Aptos using only the CLI. For more advanced users, if you need the source you may clone the `aptos-core` GitHub repo from [GitHub](https://github.com/aptos-labs/aptos-core).
 
 1. Install [Git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git). Git is required to clone the aptos-core repo, and will be need to be installed prior to continuing.  You can install it with the instructions on the official [Git website](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git).
 
