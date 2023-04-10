@@ -5,8 +5,13 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    get_peers_with_ready_subscriptions, metrics, network::StorageServiceNetworkEvents,
-    remove_expired_data_subscriptions, DataSubscriptionRequest, ResponseSender, StorageReader,
+    metrics,
+    network::{ResponseSender, StorageServiceNetworkEvents},
+    storage::StorageReader,
+    subscription::{
+        get_peers_with_ready_subscriptions, remove_expired_data_subscriptions,
+        DataSubscriptionRequest,
+    },
     StorageServiceServer,
 };
 use anyhow::{format_err, Result};
