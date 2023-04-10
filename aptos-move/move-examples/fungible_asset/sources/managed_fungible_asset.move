@@ -46,15 +46,15 @@ module fungible_asset::managed_fungible_asset {
     }
 
     #[view]
-    /// Return the address of the managed fungible asset that's created when this module is deployed.
-    public fun get_asset(): Object<Metadata> {
-        let asset_address = object::create_object_address(&@fungible_asset, ASSET_SYMBOL);
-        object::address_to_object<Metadata>(asset_address)
+    /// Return the address of the metadata that's created when this module is deployed.
+    public fun get_metadata(): Object<Metadata> {
+        let metadata_address = object::create_object_address(&@fungible_asset, ASSET_SYMBOL);
+        object::address_to_object<Metadata>(metadata_address)
     }
 
     /// Mint as the owner of metadata object.
     public entry fun mint(admin: &signer, amount: u64, to: address) acquires ManagedFungibleAsset {
-        let asset = get_asset();
+        let asset = get_metadata();
         let managed_fungible_asset = authorized_borrow_refs(admin, asset);
         let to_wallet = primary_store::ensure_primary_store_exists(to, asset);
         let fa = fungible_asset::mint(&managed_fungible_asset.mint_ref, amount);
@@ -63,7 +63,7 @@ module fungible_asset::managed_fungible_asset {
 
     /// Transfer as the owner of metadata object ignoring `allow_ungated_transfer` field.
     public entry fun transfer(admin: &signer, from: address, to: address, amount: u64) acquires ManagedFungibleAsset {
-        let asset = get_asset();
+        let asset = get_metadata();
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
         let from_wallet = primary_store::ensure_primary_store_exists(from, asset);
         let to_wallet = primary_store::ensure_primary_store_exists(to, asset);
@@ -72,7 +72,7 @@ module fungible_asset::managed_fungible_asset {
 
     /// Burn fungible assets as the owner of metadata object.
     public entry fun burn(admin: &signer, from: address, amount: u64) acquires ManagedFungibleAsset {
-        let asset = get_asset();
+        let asset = get_metadata();
         let burn_ref = &authorized_borrow_refs(admin, asset).burn_ref;
         let from_wallet = primary_store::ensure_primary_store_exists(from, asset);
         fungible_asset::burn_from(burn_ref, from_wallet, amount);
@@ -80,7 +80,7 @@ module fungible_asset::managed_fungible_asset {
 
     /// Freeze an account so it cannot transfer or receive fungible assets.
     public entry fun freeze_account(admin: &signer, account: address) acquires ManagedFungibleAsset {
-        let asset = get_asset();
+        let asset = get_metadata();
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
         let wallet = primary_store::ensure_primary_store_exists(account, asset);
         fungible_asset::set_ungated_transfer(transfer_ref, wallet, false);
@@ -88,7 +88,7 @@ module fungible_asset::managed_fungible_asset {
 
     /// Unfreeze an account so it can transfer or receive fungible assets.
     public entry fun unfreeze_account(admin: &signer, account: address) acquires ManagedFungibleAsset {
-        let asset = get_asset();
+        let asset = get_metadata();
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
         let wallet = primary_store::ensure_primary_store_exists(account, asset);
         fungible_asset::set_ungated_transfer(transfer_ref, wallet, true);
@@ -96,7 +96,7 @@ module fungible_asset::managed_fungible_asset {
 
     /// Withdraw as the owner of metadata object ignoring `allow_ungated_transfer` field.
     public fun withdraw(admin: &signer, amount: u64, from: address): FungibleAsset acquires ManagedFungibleAsset {
-        let asset = get_asset();
+        let asset = get_metadata();
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
         let from_wallet = primary_store::ensure_primary_store_exists(from, asset);
         fungible_asset::withdraw_with_ref(transfer_ref, from_wallet, amount)
@@ -104,7 +104,7 @@ module fungible_asset::managed_fungible_asset {
 
     /// Deposit as the owner of metadata object ignoring `allow_ungated_transfer` field.
     public fun deposit(admin: &signer, to: address, fa: FungibleAsset) acquires ManagedFungibleAsset {
-        let asset = get_asset();
+        let asset = get_metadata();
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
         let to_wallet = primary_store::ensure_primary_store_exists(to, asset);
         fungible_asset::deposit_with_ref(transfer_ref, to_wallet, fa);
@@ -129,15 +129,15 @@ module fungible_asset::managed_fungible_asset {
         let aaron_address = @0xface;
 
         mint(creator, 100, creator_address);
-        let asset = get_asset();
+        let asset = get_metadata();
         assert!(primary_store::balance(creator_address, asset) == 100, 4);
         freeze_account(creator, creator_address);
-        assert!(!primary_store::ungated_transfer_allowed(creator_address, asset), 5);
+        assert!(!primary_store::ungated_balance_transfer_allowed(creator_address, asset), 5);
         transfer(creator, creator_address, aaron_address, 10);
         assert!(primary_store::balance(aaron_address, asset) == 10, 6);
 
         unfreeze_account(creator, creator_address);
-        assert!(primary_store::ungated_transfer_allowed(creator_address, asset), 7);
+        assert!(primary_store::ungated_balance_transfer_allowed(creator_address, asset), 7);
         burn(creator, creator_address, 90);
     }
 
