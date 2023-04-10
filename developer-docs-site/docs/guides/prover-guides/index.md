@@ -5,15 +5,14 @@ slug: "move-prover"
 
 # Move Prover
 
-The Move Prover supports formal specification and verification of Move code. It can automatically prove
-logical properties of Move smart contracts, while providing a user experience similar to a type checker or linter.
-It's purpose is to make contracts more *trustworthy*, specifically:
+The Move Prover supports formal [specification](./spec-lang.md) and [verification](./prover-guide.md) of Move code. The Move Prover can automatically validate logical properties of Move smart contracts while offering a user experience similar to a type checker or linter.
 
-- Protect massive assets managed by the Diem blockchain from smart contract bugs
-- Protect against well-resourced adversaries
-- Anticipate justified regulator scrutiny and compliance requirements
-- Allow domain experts with mathematical background, but not necessarily software engineering background, to
-  understand what smart contracts do
+The Move Prover exists to make contracts more *trustworthy*; it:
+
+- Protects massive assets managed by the Aptos blockchain from smart contract bugs
+- Protects against well-resourced adversaries
+- Anticipates justified regulator scrutiny and compliance requirements
+- Allows domain experts with a mathematical background, but not necessarily a software engineering background, to understand what smart contracts do
 
 For more information, refer to the documentation:
 
