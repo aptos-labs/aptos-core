@@ -6,7 +6,10 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
+## 1.8.3 (2023-04-10)
+
 - Add `publish-ans-contract` script and pnpm command for tests
+- Revert User-Agent header from both `AptosClient` and `IndexerClient` due to a browser error
 
 ## 1.8.2 (2023-04-06)
 
