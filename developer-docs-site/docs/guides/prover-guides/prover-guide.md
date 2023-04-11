@@ -146,7 +146,7 @@ error: abort not covered by any of the `aborts_if` clauses
 }
 ```
 
-The Move Prover has generated an example counter that leads to an overflow when adding 1 to the value of 255 for an `u8`. This overflow occurs if the function specification calls for abort behavior, but the condition under which the function is aborting is not covered by the specification. And in fact, with `aborts_if !exists<Counter>(a)`, we only cover the abortion caused by the absence of the resource, but not the abortion caused by the arithmetic overflow.
+The Move Prover has generated an example counter that leads to an overflow when adding 1 to the value of 255 for an `u8`. This overflow occurs if the function specification calls for abort behavior, but the condition under which the function is aborting is not covered by the specification. And in fact, with `aborts_if !exists<Counter>(a)`, we only cover the abort caused by the absence of the resource, but not the abort caused by the arithmetic overflow.
 
 Let's fix the above and add the following condition:
 
