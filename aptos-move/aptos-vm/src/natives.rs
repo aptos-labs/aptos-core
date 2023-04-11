@@ -50,17 +50,6 @@ pub fn aptos_natives(
             CORE_CODE_ADDRESS,
             gas_params.table,
         ))
-        // TODO(Gas): this isn't quite right yet...
-        .chain(
-            aptos_move_stdlib::natives::nursery_natives(
-                CORE_CODE_ADDRESS,
-                aptos_move_stdlib::natives::NurseryGasParameters::zeros(),
-            )
-            .into_iter()
-            .filter(|(addr, module_name, _, _)| {
-                !(*addr == CORE_CODE_ADDRESS && module_name.as_str() == "event")
-            }),
-        )
         .collect()
 }
 
