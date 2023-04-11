@@ -36,7 +36,7 @@ The type system of MSL is similar to that of Move, with the following difference
   needing to worry about overflow or underflow.
   Different from `num`, `bv` cannot and does not need to be explicitly used in specifications: if an integer is involved in bitwise operations such as `&`, `|` or `^`, it will be automatically encoded as `bv`at the backend.
   Moreover, a `bv` integer has a fixed precision, which is consistent with its precision in Move (`bv8`, `bv16`, `bv32`, `bv64`, `bv128` and `bv256`).
-  Note that, in general using `bv` is not so efficient as `num` in the SMT solver. Consequently,
+  Note that, in general using `bv` is not so efficient as `num` in the SMT solver such as [Z3](https://github.com/Z3Prover/z3). Consequently,
   the Move Prover has some restrictions when using bitwise operations, which are stated in detail below.
 - The Move types `&T`, `&mut T`, and `T` are considered equivalent for MSL. Equality is interpreted
   as value equality. There is no need to worry about dereferencing a reference from the Move
@@ -618,8 +618,6 @@ spec get_one_off {
 }
 ```
 
-> TODO: `[check]` property is currently not longer implemented
-
 ## Requires condition
 
 The `requires` condition is a spec block member that postulates a pre-condition for a function. The
@@ -791,7 +789,7 @@ fun decrement_ad(addr: address) acquires Counter {
 #### Disabling invariants
 
 There are times when a global invariant holds almost everywhere, except for a brief interval inside a function. In current Move code, this often occurs when something (e.g. an account) is being set up and
-several structs are published together. Almost everywhere, an invariant holds that all of the structs are published or none of them are. But the code that publishes the structs must do so sequentially. While the structs are being published, there will be a point where some are published and others are not.
+several structs are published together. Almost everywhere, an invariant holds that all the structs are published or none of them are. But the code that publishes the structs must do so sequentially. While the structs are being published, there will be a point where some are published and others are not.
 
 In order to verify invariants that hold except during small regions, there is a feature to allow users to disable invariants temporarily. Consider the following code fragment:
 
@@ -875,12 +873,9 @@ where there are many global invariants, but they have no direct influence on ver
 
 #### Modular verification and global invariants
 
-Certain usage of global invariants leads to verification problems that cannot be checked in a
-modular fashion. "Modular" here means that a module can be verified standalone and proven to be universally correct in all usage contexts (if preconditions are met).
+Certain usage of global invariants leads to verification problems that cannot be checked in a modular fashion. "Modular" here means that a module can be verified standalone and proven to be universally correct in all usage contexts (if preconditions are met).
 
-A non-modular verification problem may arise if a global invariant refers to state from multiple
-modules. Consider a situation where module `M1` uses module `M2`, and `M1` contains the following
-invariant, with the helper function `condition` referring to global state of each respective module:
+A non-modular verification problem may arise if a global invariant refers to state from multiple modules. Consider a situation where module `M1` uses module `M2`, and `M1` contains the following invariant, with the helper function `condition` referring to global state of each respective module:
 
 ```move
 module addr::M1 {
@@ -888,10 +883,7 @@ module addr::M1 {
 }
 ```
 
-When we verify `M1` standalone, the Move Prover will determine that it also needs to verify
-functions in `M2`, namely those which update the M2 memory such that the invariant in M1 can fail.
-
-> TODO: document mechanism and pragmas to defer invariant verification for code sections
+When we verify `M1` standalone, the Move Prover will determine that it also needs to verify functions in `M2`, namely those which update the M2 memory such that the invariant in M1 can fail.
 
 ## Assume and assert conditions in code
 
@@ -1204,7 +1196,7 @@ spec fun abstract_hash(v: vector<u8>): u64; // uninterpreted function
 The soundness of the abstraction is the responsibility of the specifier and not verified by the
 Move Prover.
 
-> NOTE: The abstract/concrete properties should only be used with opaque specifications, but the Move Prover will currently not generate an error if not.
+> NOTE: The abstract/concrete properties should only be used with opaque specifications, but the Move Prover will currently not generate an error message even though they are not used with opaque specifications.
 
 > NOTE: The `modifies` clause does not currently support abstract/concrete. Also, if no modifies is given, the modified state will be computed from the implementation anyway, possibly conflicting with `[abstract]` properties.
 
