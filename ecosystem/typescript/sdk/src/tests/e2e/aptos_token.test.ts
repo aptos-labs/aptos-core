@@ -1,6 +1,7 @@
 import { AptosAccount } from "../../account";
 import { AptosToken } from "../../plugins";
 import { Provider } from "../../providers";
+import { APTOS_COIN } from "../../utils";
 import { NODE_URL, getFaucetClient, longTestTimeout } from "../unit/test_helper.test";
 
 const provider = new Provider({ fullnodeUrl: NODE_URL, indexerUrl: NODE_URL });
@@ -203,6 +204,21 @@ describe("token objects", () => {
   );
 
   test(
+    "transfer token ownership",
+    async () => {
+      await provider.waitForTransaction(
+        await aptosToken.transferTokenOwnership(
+          alice,
+          AptosAccount.getTokenObjectAddress(alice.address().hex(), collectionName, tokenName),
+          bob.address(),
+        ),
+        { checkSuccess: true },
+      );
+    },
+    longTestTimeout,
+  );
+
+  test(
     "burn token",
     async () => {
       await provider.waitForTransaction(
@@ -211,6 +227,28 @@ describe("token objects", () => {
           AptosAccount.getTokenObjectAddress(alice.address().hex(), collectionName, tokenName),
         ),
         { checkSuccess: true },
+      );
+    },
+    longTestTimeout,
+  );
+
+  test(
+    "transfer token amount",
+    async () => {
+      // create moon coin
+      // alice to mint a coin
+      // alice to transfer 1 moin coin to bob
+      await provider.waitForTransaction(
+        await aptosToken.transferTokenAmount(
+          alice,
+          "0x0000000000000000000000000000000000000000000000000000000000000001",
+          bob.address(),
+          1,
+          APTOS_COIN,
+        ),
+        {
+          checkSuccess: true,
+        },
       );
     },
     longTestTimeout,
