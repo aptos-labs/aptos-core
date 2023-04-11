@@ -62,8 +62,8 @@ pub fn view_resource_in_move_storage(
     };
     match storage.get_resource(&address, &tag).unwrap() {
         None => Ok("[No Resource Exists]".to_owned()),
-        Some(blob) => {
-            let annotated = MoveValueAnnotator::new(storage).view_resource(&tag, &blob)?;
+        Some(data) => {
+            let annotated = MoveValueAnnotator::new(storage).view_resource(&tag, &data)?;
             Ok(format!("{}", annotated))
         },
     }
@@ -364,7 +364,7 @@ impl<'a> SimpleVMTestAdapter<'a> {
 
         // save changeset
         // TODO support events
-        let (changeset, _events) = session.freeze()?;
+        let (changeset, _events) = session.pause()?;
         self.storage.apply(changeset).unwrap();
         Ok(res)
     }

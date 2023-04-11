@@ -35,7 +35,11 @@ use move_core_types::{
 };
 use move_vm_runtime::move_vm::MoveVM;
 use move_vm_test_utils::{DeltaStorage, InMemoryStorage};
-use move_vm_types::{effects::ChangeSet, gas::UnmeteredGasMeter, resolver::FrozenMoveResolver};
+use move_vm_types::{
+    effects::ChangeSet,
+    gas::UnmeteredGasMeter,
+    resolver::{Module, ModuleRef, MoveRefResolver},
+};
 use once_cell::sync::Lazy;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::{fs, io::Write, panic, thread};
@@ -125,7 +129,7 @@ fn execute_function_in_module(
     idx: FunctionDefinitionIndex,
     ty_args: Vec<TypeTag>,
     args: Vec<Vec<u8>>,
-    storage: &impl FrozenMoveResolver,
+    storage: &impl MoveRefResolver,
 ) -> Result<(), VMStatus> {
     let module_id = module.self_id();
     let entry_name = {
@@ -141,10 +145,11 @@ fn execute_function_in_module(
         .unwrap();
 
         let mut changeset = ChangeSet::new();
-        let mut blob = vec![];
-        module.serialize(&mut blob).unwrap();
         changeset
-            .add_module_op(module_id.clone(), Op::New(blob))
+            .add_module_op(
+                module_id.clone(),
+                Op::New(Module::from_compiled_module(module)),
+            )
             .unwrap();
         let delta_storage = DeltaStorage::new(storage, &changeset);
         let mut sess = vm.new_session(&delta_storage);

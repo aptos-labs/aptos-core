@@ -10,15 +10,40 @@ use move_core_types::{
 };
 use std::{fmt::Debug, sync::Arc};
 
+/// Reference to any Move data. It encapsulates implementation details about
+/// how data is managed internally and should be efficiently cloneable.
+#[derive(Clone, Debug)]
+pub struct MoveRef<T>(Arc<T>);
+
+impl<T> MoveRef<T> {
+    pub fn new(data: T) -> Self {
+        Self(Arc::new(data))
+    }
+}
+
+impl<T> AsRef<T> for MoveRef<T> {
+    fn as_ref(&self) -> &T {
+        self.0.as_ref()
+    }
+}
+
+pub type ModuleRef = MoveRef<Module>;
+pub type ResourceRef = MoveRef<Resource>;
+
+/// Wrapper around any Move resource.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Resource {
+    /// Resource serialized as bytes.
     Serialized(Vec<u8>),
-    Cached(FrozenValue, MoveTypeLayout),
+    /// Non-serialized resource, with a type layout and its size in bytes.
+    Cached(FrozenValue, MoveTypeLayout, usize),
 }
 
 impl Resource {
     pub fn from_value_layout(value: FrozenValue, layout: MoveTypeLayout) -> Self {
-        Self::Cached(value, layout)
+        // TODO: FrozenValue should carry the size (we know it during construction), and so
+        // we can pass it here.
+        Self::Cached(value, layout, 1)
     }
 
     pub fn from_blob(blob: Vec<u8>) -> Self {
@@ -28,43 +53,53 @@ impl Resource {
     pub fn as_bytes(&self) -> Option<Vec<u8>> {
         match self {
             Self::Serialized(blob) => Some(blob.clone()),
-            Self::Cached(value, layout) => value.simple_serialize(layout),
+            Self::Cached(value, layout, _) => value.simple_serialize(layout),
         }
     }
 
     pub fn into_bytes(self) -> Option<Vec<u8>> {
         match self {
             Self::Serialized(blob) => Some(blob),
-            Self::Cached(value, layout) => value.simple_serialize(&layout),
+            Self::Cached(value, layout, _) => value.simple_serialize(&layout),
+        }
+    }
+
+    pub fn num_bytes(&self) -> usize {
+        match self {
+            Self::Serialized(blob) => blob.len(),
+            Self::Cached(_, _, num_bytes) => *num_bytes,
         }
     }
 }
 
-pub trait FrozenResourceResolver {
+pub trait ResourceRefResolver {
     type Error: Debug;
 
-    fn get_frozen_resource(
+    fn get_resource_ref(
         &self,
         address: &AccountAddress,
         typ: &StructTag,
-    ) -> Result<Option<Arc<Resource>>, Self::Error>;
+    ) -> Result<Option<ResourceRef>, Self::Error>;
 }
 
-impl<T: FrozenResourceResolver + ?Sized> FrozenResourceResolver for &T {
+impl<T: ResourceRefResolver + ?Sized> ResourceRefResolver for &T {
     type Error = T::Error;
 
-    fn get_frozen_resource(
+    fn get_resource_ref(
         &self,
         address: &AccountAddress,
         tag: &StructTag,
-    ) -> Result<Option<Arc<Resource>>, Self::Error> {
-        (**self).get_frozen_resource(address, tag)
+    ) -> Result<Option<ResourceRef>, Self::Error> {
+        (**self).get_resource_ref(address, tag)
     }
 }
 
+/// Wrapper around any Move module.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Module {
+    // Module serialized as blob.
     Serialized(Vec<u8>),
+    // Non-serialized module representation.
     Cached(CompiledModule),
 }
 
@@ -73,6 +108,10 @@ impl Module {
         Self::Serialized(blob)
     }
 
+    pub fn from_compiled_module(compiled_module: CompiledModule) -> Self {
+        Self::Cached(compiled_module)
+    }
+
     pub fn as_bytes(&self) -> Option<Vec<u8>> {
         match self {
             Self::Serialized(blob) => Some(blob.clone()),
@@ -94,32 +133,30 @@ impl Module {
             },
         }
     }
-
-    // TODO: conversion to compiled module.
 }
 
-pub trait FrozenModuleResolver {
+pub trait ModuleRefResolver {
     type Error: Debug;
 
-    fn get_frozen_module(&self, id: &ModuleId) -> Result<Option<Arc<Module>>, Self::Error>;
+    fn get_module_ref(&self, id: &ModuleId) -> Result<Option<ModuleRef>, Self::Error>;
 }
 
-impl<T: FrozenModuleResolver + ?Sized> FrozenModuleResolver for &T {
+impl<T: ModuleRefResolver + ?Sized> ModuleRefResolver for &T {
     type Error = T::Error;
 
-    fn get_frozen_module(&self, module_id: &ModuleId) -> Result<Option<Arc<Module>>, Self::Error> {
-        (**self).get_frozen_module(module_id)
+    fn get_module_ref(&self, module_id: &ModuleId) -> Result<Option<ModuleRef>, Self::Error> {
+        (**self).get_module_ref(module_id)
     }
 }
 
-pub trait FrozenMoveResolver:
-    FrozenModuleResolver<Error = Self::Err> + FrozenResourceResolver<Error = Self::Err>
+pub trait MoveRefResolver:
+    ModuleRefResolver<Error = Self::Err> + ResourceRefResolver<Error = Self::Err>
 {
     type Err: Debug;
 }
 
-impl<E: Debug, T: FrozenModuleResolver<Error = E> + FrozenResourceResolver<Error = E> + ?Sized>
-    FrozenMoveResolver for T
+impl<E: Debug, T: ModuleRefResolver<Error = E> + ResourceRefResolver<Error = E> + ?Sized>
+    MoveRefResolver for T
 {
     type Err = E;
 }

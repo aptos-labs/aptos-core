@@ -17,16 +17,15 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
-    resolver::{ModuleResolver, ResourceResolver},
     u256::U256,
     value::{serialize_values, MoveValue},
     vm_status::{StatusCode, StatusType},
 };
 use move_vm_types::{
     gas::UnmeteredGasMeter,
-    resolver::{FrozenModuleResolver, FrozenResourceResolver, Module, Resource},
+    resolver::{Module, ModuleRef, ModuleRefResolver, ResourceRef, ResourceRefResolver},
 };
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 // make a script with a given signature for main.
 fn make_script(parameters: Signature) -> Vec<u8> {
@@ -232,7 +231,7 @@ fn make_script_function(signature: Signature) -> (CompiledModule, Identifier) {
 }
 
 struct RemoteStore {
-    modules: HashMap<ModuleId, Arc<Module>>,
+    modules: HashMap<ModuleId, ModuleRef>,
 }
 
 impl RemoteStore {
@@ -244,28 +243,29 @@ impl RemoteStore {
 
     fn add_module(&mut self, compiled_module: CompiledModule) {
         let id = compiled_module.self_id();
-        let mut bytes = vec![];
-        compiled_module.serialize(&mut bytes).unwrap();
-        self.modules.insert(id, bytes);
+        self.modules.insert(
+            id,
+            ModuleRef::new(Module::from_compiled_module(compiled_module)),
+        );
     }
 }
 
-impl FrozenModuleResolver for RemoteStore {
+impl ModuleRefResolver for RemoteStore {
     type Error = VMError;
 
-    fn get_frozen_module(&self, module_id: &ModuleId) -> Result<Option<Arc<Module>>, Self::Error> {
+    fn get_module_ref(&self, module_id: &ModuleId) -> Result<Option<ModuleRef>, Self::Error> {
         Ok(self.modules.get(module_id).cloned())
     }
 }
 
-impl FrozenResourceResolver for RemoteStore {
+impl ResourceRefResolver for RemoteStore {
     type Error = VMError;
 
-    fn get_frozen_resource(
+    fn get_resource_ref(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
-    ) -> Result<Option<Arc<Resource>>, Self::Error> {
+    ) -> Result<Option<ResourceRef>, Self::Error> {
         Ok(None)
     }
 }

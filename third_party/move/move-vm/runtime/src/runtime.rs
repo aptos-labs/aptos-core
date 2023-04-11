@@ -30,7 +30,7 @@ use move_vm_types::{
     data_store::DataStore,
     gas::GasMeter,
     loaded_data::runtime_types::Type,
-    resolver::FrozenMoveResolver,
+    resolver::MoveRefResolver,
     values::{Locals, Reference, VMValueCast, Value},
 };
 use std::{borrow::Borrow, collections::BTreeSet, sync::Arc};
@@ -51,11 +51,11 @@ impl VMRuntime {
         })
     }
 
-    pub fn new_session<'r, S: FrozenMoveResolver>(&self, remote: &'r S) -> Session<'r, '_, S> {
+    pub fn new_session<'r, S: MoveRefResolver>(&self, remote: &'r S) -> Session<'r, '_, S> {
         self.new_session_with_extensions(remote, NativeContextExtensions::default())
     }
 
-    pub fn new_session_with_extensions<'r, S: FrozenMoveResolver>(
+    pub fn new_session_with_extensions<'r, S: MoveRefResolver>(
         &self,
         remote: &'r S,
         native_extensions: NativeContextExtensions<'r>,

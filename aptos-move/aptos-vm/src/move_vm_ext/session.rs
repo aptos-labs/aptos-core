@@ -114,7 +114,7 @@ where
         ap_cache: &mut C,
         configs: &ChangeSetConfigs,
     ) -> VMResult<AptosChangeSet> {
-        let (change_set, events, mut extensions) = self.inner.freeze_with_extensions()?;
+        let (change_set, events, mut extensions) = self.inner.pause_with_extensions()?;
 
         // TODO: Fix resource groups :(
         let (change_set, resource_group_change_set) = (change_set, MoveChangeSet::new());

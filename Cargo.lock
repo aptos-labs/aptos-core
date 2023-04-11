@@ -3080,7 +3080,6 @@ dependencies = [
  "itertools",
  "move-core-types",
  "move-table-extension",
- "move-vm-types",
  "num-derive",
  "num-traits 0.2.15",
  "once_cell",
@@ -8356,7 +8355,6 @@ dependencies = [
  "move-binary-format",
  "move-bytecode-utils",
  "move-core-types",
- "move-vm-types",
  "once_cell",
  "serde 1.0.149",
 ]
@@ -10181,7 +10179,6 @@ dependencies = [
  "move-bytecode-utils",
  "move-core-types",
  "move-read-write-set-types",
- "move-vm-types",
 ]
 
 [[package]]

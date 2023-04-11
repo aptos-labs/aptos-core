@@ -13,13 +13,13 @@ use move_core_types::{
 use move_vm_types::{
     effects::{AccountChangeSet, ChangeSet},
     resolver::{
-        FrozenModuleResolver, FrozenMoveResolver, FrozenResourceResolver, Module, Resource,
+        Module, ModuleRef, ModuleRefResolver, MoveRefResolver, Resource, ResourceRef,
+        ResourceRefResolver,
     },
 };
 use std::{
     collections::{btree_map, BTreeMap},
     fmt::Debug,
-    sync::Arc,
 };
 #[cfg(feature = "table-extension")]
 use {
@@ -37,22 +37,22 @@ impl BlankStorage {
     }
 }
 
-impl FrozenModuleResolver for BlankStorage {
+impl ModuleRefResolver for BlankStorage {
     type Error = ();
 
-    fn get_frozen_module(&self, _module_id: &ModuleId) -> Result<Option<Arc<Module>>, Self::Error> {
+    fn get_module_ref(&self, _module_id: &ModuleId) -> Result<Option<ModuleRef>, Self::Error> {
         Ok(None)
     }
 }
 
-impl FrozenResourceResolver for BlankStorage {
+impl ResourceRefResolver for BlankStorage {
     type Error = ();
 
-    fn get_frozen_resource(
+    fn get_resource_ref(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
-    ) -> Result<Option<Arc<Resource>>, Self::Error> {
+    ) -> Result<Option<ResourceRef>, Self::Error> {
         Ok(None)
     }
 }
@@ -76,35 +76,37 @@ pub struct DeltaStorage<'a, 'b, S> {
     delta: &'b ChangeSet,
 }
 
-impl<'a, 'b, S: FrozenModuleResolver> FrozenModuleResolver for DeltaStorage<'a, 'b, S> {
+impl<'a, 'b, S: ModuleRefResolver> ModuleRefResolver for DeltaStorage<'a, 'b, S> {
     type Error = S::Error;
 
-    fn get_frozen_module(&self, module_id: &ModuleId) -> Result<Option<Arc<Module>>, Self::Error> {
+    fn get_module_ref(&self, module_id: &ModuleId) -> Result<Option<ModuleRef>, Self::Error> {
         if let Some(account_storage) = self.delta.accounts().get(module_id.address()) {
             if let Some(module_op) = account_storage.modules().get(module_id.name()) {
-                return Ok(module_op.clone().ok().map(Arc::new));
+                // TODO: Avoid clone here.
+                return Ok(module_op.clone().ok().map(ModuleRef::new));
             }
         }
 
-        self.base.get_frozen_module(module_id)
+        self.base.get_module_ref(module_id)
     }
 }
 
-impl<'a, 'b, S: FrozenResourceResolver> FrozenResourceResolver for DeltaStorage<'a, 'b, S> {
+impl<'a, 'b, S: ResourceRefResolver> ResourceRefResolver for DeltaStorage<'a, 'b, S> {
     type Error = S::Error;
 
-    fn get_frozen_resource(
+    fn get_resource_ref(
         &self,
         address: &AccountAddress,
         tag: &StructTag,
-    ) -> Result<Option<Arc<Resource>>, S::Error> {
+    ) -> Result<Option<ResourceRef>, S::Error> {
         if let Some(account_storage) = self.delta.accounts().get(address) {
             if let Some(resource_op) = account_storage.resources().get(tag) {
-                return Ok(resource_op.as_ref().ok().cloned().map(Arc::new));
+                // TODO: Avoid clone here.
+                return Ok(resource_op.clone().ok().map(ResourceRef::new));
             }
         }
 
-        self.base.get_frozen_resource(address, tag)
+        self.base.get_resource_ref(address, tag)
     }
 }
 
@@ -120,7 +122,7 @@ impl<'a, 'b, S: TableResolver> TableResolver for DeltaStorage<'a, 'b, S> {
     }
 }
 
-impl<'a, 'b, S: FrozenMoveResolver> DeltaStorage<'a, 'b, S> {
+impl<'a, 'b, S: MoveRefResolver> DeltaStorage<'a, 'b, S> {
     pub fn new(base: &'a S, delta: &'b ChangeSet) -> Self {
         Self { base, delta }
     }
@@ -129,8 +131,8 @@ impl<'a, 'b, S: FrozenMoveResolver> DeltaStorage<'a, 'b, S> {
 /// Simple in-memory storage for modules and resources under an account.
 #[derive(Debug, Clone)]
 struct InMemoryAccountStorage {
-    resources: BTreeMap<StructTag, Arc<Resource>>,
-    modules: BTreeMap<Identifier, Arc<Module>>,
+    resources: BTreeMap<StructTag, ResourceRef>,
+    modules: BTreeMap<Identifier, ModuleRef>,
 }
 
 /// Simple in-memory storage that can be used as a Move VM storage backend for testing purposes.
@@ -195,11 +197,13 @@ impl InMemoryAccountStorage {
         let (modules, resources) = account_changeset.into_inner();
         apply_changes(
             &mut self.modules,
-            modules.into_iter().map(|(i, m)| (i, m.map(Arc::new))),
+            modules.into_iter().map(|(i, m)| (i, m.map(ModuleRef::new))),
         )?;
         apply_changes(
             &mut self.resources,
-            resources.into_iter().map(|(st, r)| (st, r.map(Arc::new))),
+            resources
+                .into_iter()
+                .map(|(s, r)| (s, r.map(ResourceRef::new))),
         )?;
         Ok(())
     }
@@ -284,7 +288,7 @@ impl InMemoryStorage {
         });
         account.modules.insert(
             module_id.name().to_owned(),
-            Arc::new(Module::from_blob(blob)),
+            ModuleRef::new(Module::from_blob(blob)),
         );
     }
 
@@ -297,14 +301,14 @@ impl InMemoryStorage {
         let account = get_or_insert(&mut self.accounts, addr, InMemoryAccountStorage::new);
         account
             .resources
-            .insert(struct_tag, Arc::new(Resource::from_blob(blob)));
+            .insert(struct_tag, ResourceRef::new(Resource::from_blob(blob)));
     }
 }
 
-impl FrozenModuleResolver for InMemoryStorage {
+impl ModuleRefResolver for InMemoryStorage {
     type Error = ();
 
-    fn get_frozen_module(&self, module_id: &ModuleId) -> Result<Option<Arc<Module>>, Self::Error> {
+    fn get_module_ref(&self, module_id: &ModuleId) -> Result<Option<ModuleRef>, Self::Error> {
         if let Some(account_storage) = self.accounts.get(module_id.address()) {
             return Ok(account_storage.modules.get(module_id.name()).cloned());
         }
@@ -312,14 +316,14 @@ impl FrozenModuleResolver for InMemoryStorage {
     }
 }
 
-impl FrozenResourceResolver for InMemoryStorage {
+impl ResourceRefResolver for InMemoryStorage {
     type Error = ();
 
-    fn get_frozen_resource(
+    fn get_resource_ref(
         &self,
         address: &AccountAddress,
         tag: &StructTag,
-    ) -> Result<Option<Arc<Resource>>, Self::Error> {
+    ) -> Result<Option<ResourceRef>, Self::Error> {
         if let Some(account_storage) = self.accounts.get(address) {
             return Ok(account_storage.resources.get(tag).cloned());
         }
@@ -327,6 +331,7 @@ impl FrozenResourceResolver for InMemoryStorage {
     }
 }
 
+// Required by MoveValueAnnotator.
 impl ModuleResolver for InMemoryStorage {
     type Error = ();
 
@@ -335,13 +340,14 @@ impl ModuleResolver for InMemoryStorage {
             return Ok(account_storage.modules.get(module_id.name()).map(|m| {
                 m.as_ref()
                     .as_bytes()
-                    .expect("serialization of module should succeed")
+                    .expect("module serialization should succeed")
             }));
         }
         Ok(None)
     }
 }
 
+// Required by MoveValueAnnotator.
 impl ResourceResolver for InMemoryStorage {
     type Error = ();
 
@@ -354,7 +360,7 @@ impl ResourceResolver for InMemoryStorage {
             return Ok(account_storage.resources.get(tag).map(|r| {
                 r.as_ref()
                     .as_bytes()
-                    .expect("serialization of resource should succeed")
+                    .expect("resource serialization should succeed")
             }));
         }
         Ok(None)

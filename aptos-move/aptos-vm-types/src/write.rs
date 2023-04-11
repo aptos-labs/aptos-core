@@ -20,7 +20,7 @@ use std::{
 pub enum AptosWrite {
     AggregatorValue(u128),
     Module(Vec<u8>),
-    Standard(Resource), // TODO: This has to be Arced!, Then MVHashmap doesn't store arc.
+    Standard(Resource),
     Group(BTreeMap<StructTag, Resource>),
 }
 

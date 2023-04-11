@@ -23,7 +23,7 @@ use move_vm_types::{
     effects::ChangeSet,
     gas::GasMeter,
     loaded_data::runtime_types::{CachedStructIndex, StructType, Type},
-    resolver::FrozenMoveResolver,
+    resolver::MoveRefResolver,
 };
 use std::{borrow::Borrow, sync::Arc};
 
@@ -44,7 +44,7 @@ pub struct SerializedReturnValues {
     pub return_values: Vec<(Vec<u8>, MoveTypeLayout)>,
 }
 
-impl<'r, 'l, S: FrozenMoveResolver> Session<'r, 'l, S> {
+impl<'r, 'l, S: MoveRefResolver> Session<'r, 'l, S> {
     /// Execute a Move function with the given arguments. This is mainly designed for an external
     /// environment to invoke system logic written in Move.
     ///
@@ -258,11 +258,11 @@ impl<'r, 'l, S: FrozenMoveResolver> Session<'r, 'l, S> {
     ///
     /// This MUST NOT be called if there is a previous invocation that failed with an invariant violation.
     pub fn finish(self) -> VMResult<(LegacyChangeSet, Vec<Event>)> {
-        let (change_set, events) = self.freeze()?;
+        let (change_set, events) = self.pause()?;
         Ok((change_set.into_legacy_change_set()?, events))
     }
 
-    pub fn freeze(self) -> VMResult<(ChangeSet, Vec<Event>)> {
+    pub fn pause(self) -> VMResult<(ChangeSet, Vec<Event>)> {
         self.data_cache
             .into_effects()
             .map_err(|e| e.finish(Location::Undefined))
@@ -272,7 +272,7 @@ impl<'r, 'l, S: FrozenMoveResolver> Session<'r, 'l, S> {
     pub fn finish_with_extensions(
         self,
     ) -> VMResult<(LegacyChangeSet, Vec<Event>, NativeContextExtensions<'r>)> {
-        let (change_set, events, native_extensions) = self.freeze_with_extensions()?;
+        let (change_set, events, native_extensions) = self.pause_with_extensions()?;
         Ok((
             change_set.into_legacy_change_set()?,
             events,
@@ -280,7 +280,7 @@ impl<'r, 'l, S: FrozenMoveResolver> Session<'r, 'l, S> {
         ))
     }
 
-    pub fn freeze_with_extensions(
+    pub fn pause_with_extensions(
         self,
     ) -> VMResult<(ChangeSet, Vec<Event>, NativeContextExtensions<'r>)> {
         let Session {
@@ -288,10 +288,10 @@ impl<'r, 'l, S: FrozenMoveResolver> Session<'r, 'l, S> {
             native_extensions,
             ..
         } = self;
-        let (change_set_v2, events) = data_cache
+        let (change_set, events) = data_cache
             .into_effects()
             .map_err(|e| e.finish(Location::Undefined))?;
-        Ok((change_set_v2, events, native_extensions))
+        Ok((change_set, events, native_extensions))
     }
 
     /// Load a script and all of its types into cache

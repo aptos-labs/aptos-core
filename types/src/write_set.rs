@@ -17,15 +17,6 @@ use std::{
     ops::Deref,
 };
 
-// TODO: Deprecate this trait!
-pub trait TransactionWrite {
-    // We do not need this anymore!
-    fn extract_raw_bytes(&self) -> Option<Vec<u8>>;
-
-    // We do not need this anymore!
-    fn as_state_value(&self) -> Option<StateValue>;
-}
-
 #[derive(Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub enum WriteOp {
     Creation(#[serde(with = "serde_bytes")] Vec<u8>),
@@ -172,6 +163,12 @@ impl WriteOp {
             | DeletionWithMetadata { metadata, .. } => Some(metadata),
         }
     }
+}
+
+pub trait TransactionWrite {
+    fn extract_raw_bytes(&self) -> Option<Vec<u8>>;
+
+    fn as_state_value(&self) -> Option<StateValue>;
 }
 
 impl TransactionWrite for WriteOp {

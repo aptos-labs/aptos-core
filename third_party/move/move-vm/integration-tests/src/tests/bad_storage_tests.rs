@@ -18,7 +18,7 @@ use move_vm_test_utils::{DeltaStorage, InMemoryStorage};
 use move_vm_types::{
     effects::ChangeSet,
     gas::UnmeteredGasMeter,
-    resolver::{FrozenResourceResolver, Resource},
+    resolver::{Module, ModuleRef, ModuleRefResolver, ResourceRef, ResourceRefResolver},
 };
 
 const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGTH]);
@@ -519,6 +519,14 @@ impl ModuleResolver for BogusStorage {
     }
 }
 
+impl ModuleRefResolver for BogusStorage {
+    type Error = VMError;
+
+    fn get_module_ref(&self, _module_id: &ModuleId) -> Result<Option<ModuleRef>, Self::Error> {
+        Err(PartialVMError::new(self.bad_status_code).finish(Location::Undefined))
+    }
+}
+
 impl ResourceResolver for BogusStorage {
     type Error = VMError;
 
@@ -531,14 +539,14 @@ impl ResourceResolver for BogusStorage {
     }
 }
 
-impl FrozenResourceResolver for BogusStorage {
+impl ResourceRefResolver for BogusStorage {
     type Error = VMError;
 
-    fn get_frozen_resource(
+    fn get_resource_ref(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
-    ) -> Result<Option<Resource>, Self::Error> {
+    ) -> Result<Option<ResourceRef>, Self::Error> {
         Err(PartialVMError::new(self.bad_status_code).finish(Location::Undefined))
     }
 }
@@ -608,16 +616,17 @@ fn test_storage_returns_bogus_error_when_loading_resource() {
 
     let mut units = compile_units(&code).unwrap();
     let m = as_module(units.pop().unwrap());
-    let s = as_module(units.pop().unwrap());
-    let mut m_blob = vec![];
-    let mut s_blob = vec![];
-    m.serialize(&mut m_blob).unwrap();
-    s.serialize(&mut s_blob).unwrap();
-    let mut delta = ChangeSet::new();
-    delta.add_module_op(m.self_id(), Op::New(m_blob)).unwrap();
-    delta.add_module_op(s.self_id(), Op::New(s_blob)).unwrap();
-
     let m_id = m.self_id();
+    let s = as_module(units.pop().unwrap());
+
+    let mut delta = ChangeSet::new();
+    delta
+        .add_module_op(m.self_id(), Op::New(Module::from_compiled_module(m)))
+        .unwrap();
+    delta
+        .add_module_op(s.self_id(), Op::New(Module::from_compiled_module(s)))
+        .unwrap();
+
     let foo_name = Identifier::new("foo").unwrap();
     let bar_name = Identifier::new("bar").unwrap();
 

@@ -17,7 +17,7 @@ use move_vm_types::{
     data_store::DataStore,
     effects::{AccountChangeSet, ChangeSet},
     loaded_data::runtime_types::Type,
-    resolver::{FrozenMoveResolver, Module, Resource},
+    resolver::{Module, MoveRefResolver, Resource},
     values::{GlobalValue, Value},
 };
 use std::collections::btree_map::BTreeMap;
@@ -56,7 +56,7 @@ pub(crate) struct TransactionDataCache<'r, 'l, S> {
     event_data: Vec<(Vec<u8>, u64, Type, MoveTypeLayout, Value)>,
 }
 
-impl<'r, 'l, S: FrozenMoveResolver> TransactionDataCache<'r, 'l, S> {
+impl<'r, 'l, S: MoveRefResolver> TransactionDataCache<'r, 'l, S> {
     /// Create a `TransactionDataCache` with a `RemoteCache` that provides access to data
     /// not updated in the transaction.
     pub(crate) fn new(remote: &'r S, loader: &'l Loader) -> Self {
@@ -159,7 +159,7 @@ impl<'r, 'l, S: FrozenMoveResolver> TransactionDataCache<'r, 'l, S> {
 }
 
 // `DataStore` implementation for the `TransactionDataCache`
-impl<'r, 'l, S: FrozenMoveResolver> DataStore for TransactionDataCache<'r, 'l, S> {
+impl<'r, 'l, S: MoveRefResolver> DataStore for TransactionDataCache<'r, 'l, S> {
     // Retrieve data from the local cache or loads it from the remote cache into the local cache.
     // All operations on the global data are based on this API and they all load the data
     // into the cache.
@@ -185,12 +185,12 @@ impl<'r, 'l, S: FrozenMoveResolver> DataStore for TransactionDataCache<'r, 'l, S
             // TODO(Gas): Shall we charge for this?
             let ty_layout = self.loader.type_to_type_layout(ty)?;
 
-            let gv = match self.remote.get_frozen_resource(&addr, &ty_tag) {
+            let gv = match self.remote.get_resource_ref(&addr, &ty_tag) {
                 Ok(Some(resource)) => {
                     match resource.as_ref() {
                         Resource::Serialized(blob) => {
                             load_res = Some(Some(NumBytes::new(blob.len() as u64)));
-                            let val = match Value::simple_deserialize(&blob, &ty_layout) {
+                            let val = match Value::simple_deserialize(blob, &ty_layout) {
                                 Some(val) => val,
                                 None => {
                                     let msg = format!(
@@ -206,7 +206,7 @@ impl<'r, 'l, S: FrozenMoveResolver> DataStore for TransactionDataCache<'r, 'l, S
 
                             GlobalValue::cached(val)?
                         },
-                        Resource::Cached(frozen_val, _) => {
+                        Resource::Cached(frozen_val, _layout, _num_bytes) => {
                             // Data was not serialized and should not be charged for loading.
                             load_res = Some(None);
 
@@ -249,9 +249,9 @@ impl<'r, 'l, S: FrozenMoveResolver> DataStore for TransactionDataCache<'r, 'l, S
                 return Ok(blob.clone());
             }
         }
-        match self.remote.get_frozen_module(module_id) {
-            // TODO: This should avoid deserializing the module by default when more enum variants are supported.
+        match self.remote.get_module_ref(module_id) {
             Ok(Some(module)) => {
+                // TODO: Fix this! Currently we deserialize in order not to change the API too much.
                 let module_blob = module.as_ref().as_bytes().ok_or(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                         .with_message("Cannot deserialize the module".to_string())
@@ -299,7 +299,7 @@ impl<'r, 'l, S: FrozenMoveResolver> DataStore for TransactionDataCache<'r, 'l, S
         }
         Ok(self
             .remote
-            .get_frozen_module(module_id)
+            .get_module_ref(module_id)
             .map_err(|_| {
                 PartialVMError::new(StatusCode::STORAGE_ERROR).finish(Location::Undefined)
             })?
