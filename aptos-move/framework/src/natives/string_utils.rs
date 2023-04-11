@@ -207,7 +207,9 @@ fn native_format_impl(
                 && type_.address == AccountAddress::ONE
             {
                 let v = strct.unpack()?.next().unwrap().value_as::<Vec<u8>>()?;
-                context.context.charge(GasQuantity::from(v.len() as u64) * context.per_byte_gas)?;
+                context
+                    .context
+                    .charge(GasQuantity::from(v.len() as u64) * context.per_byte_gas)?;
                 write!(
                     out,
                     "\"{}\"",
