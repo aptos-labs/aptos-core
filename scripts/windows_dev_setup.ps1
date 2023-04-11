@@ -33,7 +33,7 @@ function welcome_message {
 
 function build_tools_message {
     $message = "`nYou selected option 't'.
-    `nThe following dependencies needed to build Aptos Core will be downloaded and installed if not found on your system:
+    `nThis script will download and install the following dependencies needed to build Aptos Core if not found on your system:
     * Rust (and necessary components)
       * rust-fmt
       * clippy
@@ -62,7 +62,7 @@ function build_tools_message {
 
 function move_prover_message {
     $message = "`nYou selected option 'y'.
-    `nThe following dependencies needed to use the Move Prover will be downloaded and installed if not found on your system:
+    `nThis script will download and install the following dependencies needed to use the Move Prover if not found on your system:
     * Dotnet
     * Z3
     * Boogie
