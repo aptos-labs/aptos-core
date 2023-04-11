@@ -29,7 +29,13 @@ module shared_account::SharedAccount {
     const EINSUFFICIENT_BALANCE: u64 = 2;
 
     // Create and initialize a shared account
-    public entry fun initialize(source: &signer, seed: vector<u8>, addresses: vector<address>, numerators: vector<u64>) {
+    public entry fun initialize(
+        source: &signer,
+        seed: vector<u8>,
+        addresses: vector<address>,
+        numerators: vector<u64>
+    ) {
+        let i = 0;
         let total = 0;
         let share_record = vector::empty<Share>();
 
@@ -79,13 +85,24 @@ module shared_account::SharedAccount {
     }
 
     #[test_only]
-    public entry fun set_up(user: signer, test_user1: signer, test_user2: signer) : address acquires SharedAccountEvent {
+    use aptos_framework::aptos_coin::{Self, AptosCoin};
+    #[test_only]
+    use aptos_framework::coin::{MintCapability, BurnCapability};
+
+    #[test_only]
+    public entry fun set_up(
+        core_framework: &signer,
+        user: &signer,
+        test_user1: &signer,
+        test_user2: &signer,
+    ): (address, MintCapability<AptosCoin>, BurnCapability<AptosCoin>) acquires SharedAccountEvent {
+        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(core_framework);
         let addresses = vector::empty<address>();
         let numerators = vector::empty<u64>();
         let seed = x"01";
-        let user_addr = signer::address_of(&user);
-        let user_addr1 = signer::address_of(&test_user1);
-        let user_addr2 = signer::address_of(&test_user2);
+        let user_addr = signer::address_of(user);
+        let user_addr1 = signer::address_of(test_user1);
+        let user_addr2 = signer::address_of(test_user2);
 
         aptos_framework::aptos_account::create_account(user_addr);
         aptos_framework::aptos_account::create_account(user_addr1);
@@ -97,23 +114,27 @@ module shared_account::SharedAccount {
         vector::push_back(&mut numerators, 1);
         vector::push_back(&mut numerators, 4);
 
-        initialize(&user, seed, addresses, numerators);
+        initialize(user, seed, addresses, numerators);
 
         assert!(exists<SharedAccountEvent>(user_addr), error::not_found(EACCOUNT_NOT_FOUND));
-        borrow_global<SharedAccountEvent>(user_addr).resource_addr
+        let resource_addr = borrow_global<SharedAccountEvent>(user_addr).resource_addr;
+        (resource_addr, mint_cap, burn_cap)
     }
 
     #[test(user = @0x1111, test_user1 = @0x1112, test_user2 = @0x1113, core_framework = @aptos_framework)]
-    public entry fun test_disperse(user: signer, test_user1: signer, test_user2: signer, core_framework: signer) acquires SharedAccount, SharedAccountEvent {
-        use aptos_framework::aptos_coin::{Self, AptosCoin};
-        let user_addr1 = signer::address_of(&test_user1);
-        let user_addr2 = signer::address_of(&test_user2);
-        let resource_addr = set_up(user, test_user1, test_user2);
-        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(&core_framework);
+    public entry fun test_disperse(
+        user: &signer,
+        test_user1: &signer,
+        test_user2: &signer,
+        core_framework: &signer,
+    ) acquires SharedAccount, SharedAccountEvent {
+        let user_addr1 = signer::address_of(test_user1);
+        let user_addr2 = signer::address_of(test_user2);
+        let (resource_addr, mint_cap, burn_cap) = set_up(core_framework, user, test_user1, test_user2);
 
         let shared_account = borrow_global<SharedAccount>(resource_addr);
-        let resource_signer = account::create_signer_with_capability(&shared_account.signer_capability);
-        coin::register<AptosCoin>(&resource_signer);
+        let resource_signer = &account::create_signer_with_capability(&shared_account.signer_capability);
+        coin::register<AptosCoin>(resource_signer);
         coin::deposit(resource_addr, coin::mint(1000, &mint_cap));
         disperse<AptosCoin>(resource_addr);
         coin::destroy_mint_cap<AptosCoin>(mint_cap);
@@ -123,14 +144,22 @@ module shared_account::SharedAccount {
         assert!(coin::balance<AptosCoin>(user_addr2) == 800, 1);
     }
 
-    #[test(user = @0x1111, test_user1 = @0x1112, test_user2 = @0x1113)]
-    #[expected_failure]
-    public entry fun test_disperse_insufficient_balance(user: signer, test_user1: signer, test_user2: signer) acquires SharedAccount, SharedAccountEvent {
+    #[test(user = @0x1111, test_user1 = @0x1112, test_user2 = @0x1113, core_framework = @aptos_framework)]
+    #[expected_failure(abort_code = 0x20002, location = Self)]
+    public entry fun test_disperse_insufficient_balance(
+        user: &signer,
+        test_user1: &signer,
+        test_user2: &signer,
+        core_framework: &signer,
+    ) acquires SharedAccount, SharedAccountEvent {
         use aptos_framework::aptos_coin::AptosCoin;
-        let resource_addr = set_up(user, test_user1, test_user2);
+        let (resource_addr, mint_cap, burn_cap) = set_up(core_framework, user, test_user1, test_user2);
+        coin::destroy_mint_cap<AptosCoin>(mint_cap);
+        coin::destroy_burn_cap<AptosCoin>(burn_cap);
+
         let shared_account = borrow_global<SharedAccount>(resource_addr);
-        let resource_signer = account::create_signer_with_capability(&shared_account.signer_capability);
-        coin::register<AptosCoin>(&resource_signer);
+        let resource_signer = &account::create_signer_with_capability(&shared_account.signer_capability);
+        coin::register<AptosCoin>(resource_signer);
         disperse<AptosCoin>(resource_addr);
     }
 }

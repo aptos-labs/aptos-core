@@ -536,6 +536,8 @@ module aptos_framework::coin {
     }
 
     public fun register<CoinType>(account: &signer) {
+        assert!(is_coin_initialized<CoinType>(), error::invalid_argument(ECOIN_INFO_NOT_PUBLISHED));
+
         let account_addr = signer::address_of(account);
         // Short-circuit and do nothing if account is already registered for CoinType.
         if (is_account_registered<CoinType>(account_addr)) {
@@ -618,6 +620,9 @@ module aptos_framework::coin {
     }
 
     #[test_only]
+    use std::string::String;
+
+    #[test_only]
     struct FakeMoney {}
 
     #[test_only]
@@ -674,6 +679,12 @@ module aptos_framework::coin {
             freeze_cap,
             mint_cap,
         });
+    }
+
+    #[test(account = @0x123)]
+    #[expected_failure(abort_code = 0x10003, location = Self)]
+    fun register_uninitialized_coin_should_fail(account: &signer) {
+        register<String>(account);
     }
 
     #[test(source = @0x1, destination = @0x2)]
