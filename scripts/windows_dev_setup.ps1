@@ -328,7 +328,7 @@ function install_pnpm {
 	winget install pnpm.pnpm --silent
 	}
   else {
-    winget upgrade --id LLVM.LLVM
+    winget upgrade --id pnpm.pnpm
   }
 }
 
