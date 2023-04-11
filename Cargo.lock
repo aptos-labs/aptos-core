@@ -2090,7 +2090,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-node"
-version = "0.1.0"
+version = "1.4.0"
 dependencies = [
  "anyhow",
  "aptos-api",
