@@ -50,7 +50,6 @@ module aptos_std::bulletproofs {
 
     /// Deserializes a range proof from a sequence of bytes.
     public fun range_proof_from_bytes(bytes: vector<u8>): RangeProof {
-        // TODO: Can we do any pre-validation here?
         RangeProof {
             bytes
         }
@@ -62,9 +61,9 @@ module aptos_std::bulletproofs {
     }
 
     /// Verifies a zero-knowledge range proof that the value `v` committed in `com` (under the default Bulletproofs
-    /// commitment; see `pedersen::new_commitment_for_bulletproof`) satisfies $v \in [0, 2^{num_bits})$. Only works
+    /// commitment key; see `pedersen::new_commitment_for_bulletproof`) satisfies $v \in [0, 2^{num_bits})$. Only works
     /// for `num_bits` \in {8, 16, 32, 64}.
-    public fun verify_range_proof(com: &pedersen::Commitment, proof: &RangeProof, num_bits: u64, dst: vector<u8>): bool {
+    public fun verify_range_proof_pedersen(com: &pedersen::Commitment, proof: &RangeProof, num_bits: u64, dst: vector<u8>): bool {
         if(!features::bulletproofs_enabled()) {
             abort(std::error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE))
         };
@@ -77,12 +76,10 @@ module aptos_std::bulletproofs {
         )
     }
 
-    /// Verifies a zero-knowledge range proof that the value `v` encrypted by `ct` satisfies $v \in [0, 2^{num_bits})$. Only works
+    /// Verifies a zero-knowledge range proof that the value `v` encrypted by `ct` with ElGamal public key `pubkey` satisfies $v \in [0, 2^{num_bits})$. Only works
     /// for `num_bits` \in {8, 16, 32, 64}.
     public fun verify_range_proof_elgamal(ct: &elgamal::Ciphertext, proof: &RangeProof, pubkey: &elgamal::Pubkey, num_bits: u64, dst: vector<u8>): bool {
-        if(!features::bulletproofs_enabled()) {
-            abort(std::error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE))
-        };
+        assert!(features::bulletproofs_enabled(), E_NATIVE_FUN_NOT_AVAILABLE);
 
         verify_range_proof_custom_ck_internal(
             ristretto255::point_to_bytes(&elgamal::get_value_component_compressed(ct)),
@@ -95,35 +92,15 @@ module aptos_std::bulletproofs {
 
     /// Verifies a zero-knowledge range proof that the value `v` committed in `com` (as v * val_base + r * rand_base,
     /// for some randomness `r`) satisfies $v \in [0, 2^{num_bits})$. Only works for `num_bits` \in {8, 16, 32, 64}.
-    public fun verify_range_proof_custom_ck(
+    public fun verify_range_proof(
         com: &pedersen::Commitment,
         val_base: &RistrettoPoint, rand_base: &RistrettoPoint,
         proof: &RangeProof, num_bits: u64, dst: vector<u8>): bool
     {
-        if(!features::bulletproofs_enabled()) {
-            abort (std::error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE))
-        };
+        assert!(features::bulletproofs_enabled(), E_NATIVE_FUN_NOT_AVAILABLE);
 
         verify_range_proof_custom_ck_internal(
             ristretto255::point_to_bytes(&pedersen::commitment_as_compressed_point(com)),
-            val_base, rand_base,
-            proof.bytes, num_bits, dst
-        )
-    }
-
-    /// Verifies a zero-knowledge range proof that the value `v` encrypted by `ct` (as v * val_base + r * rand_base,
-    /// for some randomness `r`) satisfies $v \in [0, 2^{num_bits})$. Only works for `num_bits` \in {8, 16, 32, 64}.
-    public fun verify_range_proof_custom_valbase_elgamal(
-        ct: &elgamal::Ciphertext,
-        val_base: &RistrettoPoint, rand_base: &RistrettoPoint,
-        proof: &RangeProof, num_bits: u64, dst: vector<u8>): bool
-    {
-        if(!features::bulletproofs_enabled()) {
-            abort (std::error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE))
-        };
-
-        verify_range_proof_custom_ck_internal(
-            ristretto255::point_to_bytes(&elgamal::get_value_component_compressed(ct)),
             val_base, rand_base,
             proof.bytes, num_bits, dst
         )
@@ -133,7 +110,7 @@ module aptos_std::bulletproofs {
     /// Computes a range proof for the Pedersen commitment to 'val' with 'randomness', under the default Bulletproofs
     /// commitment key; see `pedersen::new_commitment_for_bulletproof`. Returns the said commitment too.
     ///  Only works for `num_bits` \in {8, 16, 32, 64}.
-    public fun prove_range(val: &Scalar, r: &Scalar, num_bits: u64, dst: vector<u8>): (RangeProof, pedersen::Commitment) {
+    public fun prove_range_pedersen(val: &Scalar, r: &Scalar, num_bits: u64, dst: vector<u8>): (RangeProof, pedersen::Commitment) {
         let (bytes, compressed_comm) = prove_range_internal(scalar_to_bytes(val), scalar_to_bytes(r), num_bits, dst);
         let point = ristretto255::new_compressed_point_from_bytes(compressed_comm);
         let point = &std::option::extract(&mut point);

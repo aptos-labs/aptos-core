@@ -68,7 +68,7 @@ module veiled_coin::veiled_coin {
     //
 
     // TODO: Describe in comment
-    struct VeiledWithdrawalProof<phantom Cointype> has drop {
+    struct VeiledWithdrawalProof<phantom CoinType> has drop {
 	x1: RistrettoPoint,
 	x2: RistrettoPoint, 
 	x3: RistrettoPoint,
@@ -158,7 +158,7 @@ module veiled_coin::veiled_coin {
         private_value: Ciphertext,
     }
 
-    /// A holder of a specific coin types and associated event handles.
+    /// A holder of a specific coin type and its associated event handles.
     /// These are kept in a single resource to ensure locality of data.
     struct VeiledCoinStore<phantom CoinType> has key {
         /// A ElGamal ciphertext of a value v \in [0, 2^{32}), an invariant that is enforced throughout the code.
@@ -208,14 +208,21 @@ module veiled_coin::veiled_coin {
     // Entry functions
     //
 
+    /// Initializes a veiled coin store for the specified account. Requires an ElGamal public
+    /// encryption key to be provided. The user must retain their corresponding secret key. 
+    public entry fun register<CoinType>(sender: &signer, pubkey: vector<u8>) {
+	let pubkey = elgamal::new_pubkey_from_bytes(pubkey);	
+	register_internal<CoinType>(sender, std::option::extract(&mut pubkey));
+    }
+
     /// Takes `amount` of `coin::Coin<CoinType>` coins from `sender`, wraps them inside a `VeiledCoin<CoinType>` and
     /// sends them back to `sender`.
     public entry fun wrap<CoinType>(sender: &signer, amount: u64) acquires VeiledCoinMinter, VeiledCoinStore {
         wrap_to<CoinType>(sender, signer::address_of(sender), amount)
     }
 
-    /// Takes `amount` of `coin::Coin<CoinType>` coins from `sender`, wraps them inside a `VeiledCoin<CoinType>` and\
-    /// sends to `recipient`.
+    /// Takes `amount` of `coin::Coin<CoinType>` coins from `sender`, wraps them inside a `VeiledCoin<CoinType>` and
+    /// sends to `recipient`. Note that the returned veiled coin will not actually be private yet, since the amount is public here.
     public entry fun wrap_to<CoinType>(sender: &signer, recipient: address, amount: u64) acquires VeiledCoinMinter, VeiledCoinStore {
         let c = coin::withdraw<CoinType>(sender, amount);
 
@@ -225,8 +232,8 @@ module veiled_coin::veiled_coin {
     }
 
     /// Takes `amount` of `VeiledCoin<CoinType>` coins from `sender`, unwraps them to a coin::Coin<CoinType>,
-    /// and sends them back to `sender`.`amount_ct` must be an el-gamal ciphertext encrypting `amount`
-    /// with no randomness. It is not possible for this function to be made private. Requires a range
+    /// and sends them back to `sender`.`amount_ct` must be an ElGamal ciphertext encrypting `amount`
+    /// with no randomness. Note that this function inherently leaks `amount`. Privacy of the remaining balance is maintained. Requires a range
     /// proof on the new balance of the sender, to ensure the sender has enough money to send, in addition to a 
     /// range proof on the transferred amount.  
     public entry fun unwrap<CoinType>(
@@ -240,7 +247,7 @@ module veiled_coin::veiled_coin {
     }
 
     /// Takes `amount` of `VeiledCoin<CoinType>` coins from `sender`, unwraps them to a coin::Coin<CoinType>,
-    /// and sends them to `recipient`.`amount_ct` must be an el-gamal ciphertext encrypting `amount`
+    /// and sends them to `recipient`.`amount_ct` must be an ElGamal ciphertext encrypting `amount`
     /// with no randomness. It is not possible for this function to be made private. Requires a range
     /// proof on the new balance of the sender, to ensure the sender has enough money to send, in addition to a 
     /// range proof on the transferred amount.  
@@ -318,123 +325,6 @@ module veiled_coin::veiled_coin {
     /// Used internally to drop veiled coins that were split or joined.
     fun drop_veiled_coin<CoinType>(c: VeiledCoin<CoinType>) {
         let VeiledCoin<CoinType> { private_value: _ } = c;
-    }
-
-    //
-    // Public functions.
-    //
-
-    /// Returns `true` if `account_addr` is registered to receive veiled coins of `CoinType`.
-    public fun has_veiled_coin_store<CoinType>(account_addr: address): bool {
-        exists<VeiledCoinStore<CoinType>>(account_addr)
-    }
-
-    /// Returns the ciphertext of the value of `coin`.
-    public fun private_value<CoinType>(coin: &VeiledCoin<CoinType>): &Ciphertext {
-        &coin.private_value
-    }
-
-    /// Initializes a veiled coin store for the specified account. Requires an el-gamal public
-    /// encryption key to be provided. The user must retain their corresponding secret key. 
-    public entry fun register<CoinType>(sender: &signer, pubkey: vector<u8>) {
-	let pubkey = elgamal::new_pubkey_from_bytes(pubkey);	
-	register_internal<CoinType>(sender, std::option::extract(&mut pubkey));
-    }
-
-    /// Initializes a veiled coin store for the specified account. Requires an el-gamal public
-    /// encryption key to be provided. The user must retain their corresponding secret key. 
-    public fun register_internal<CoinType>(account: &signer, pubkey: elgamal::Pubkey) {
-        let account_addr = signer::address_of(account);
-        assert!(
-            !has_veiled_coin_store<CoinType>(account_addr),
-            error::already_exists(EVEILED_COIN_STORE_ALREADY_PUBLISHED),
-        );
-
-        let coin_store = VeiledCoinStore<CoinType> {
-            private_balance: elgamal::new_ciphertext_from_compressed(ristretto255::point_identity_compressed(), ristretto255::point_identity_compressed()),
-            deposit_events: account::new_event_handle<DepositEvent>(account),
-            withdraw_events: account::new_event_handle<WithdrawEvent>(account),
-	    pubkey: pubkey,
-        };
-        move_to(account, coin_store);
-    }
-
-    /// Mints a veiled coin from a normal coin, shelving the normal coin into the resource account's coin store.
-    ///
-    /// WARNING: Fundamentally, there is no way to hide the value of the coin being minted here.
-    public fun wrap_from_coin<CoinType>(c: Coin<CoinType>): VeiledCoin<CoinType> acquires VeiledCoinMinter {
-        // If there is no CoinStore<CoinType> yet, create one.
-        let rsrc_acc_signer = get_resource_account_signer();
-        let rsrc_acc_addr = signer::address_of(&rsrc_acc_signer);
-        if(!coin::is_account_registered<CoinType>(rsrc_acc_addr)) {
-            coin::register<CoinType>(&rsrc_acc_signer);
-        };
-
-        // Move the traditional coin into the coin store, so we can mint a veiled coin.
-        // (There is no other way to drop a traditional coin, for safety reasons, so moving it into a coin store is
-        //  the only option.)
-        let value = new_scalar_from_u64(coin::value(&c));
-        coin::deposit(rsrc_acc_addr, c);
-
-        VeiledCoin<CoinType> {
-            private_value: elgamal::new_ciphertext_no_randomness(&value)
-        }
-    }
-
-    /// Removes `amount` coins from the VeiledCoinStore balance of `sender`, by subtracting `amount_ct` from
-    /// their VeiledCoinStore balance. `amount_ct` must be an el-gamal ciphertext encrypting `amount`
-    /// with no randomness. It is not possible for this function to be made private. Requires a range
-    /// proof on the new balance of the sender, to ensure the sender has enough money to send, in addition to a 
-    /// range proof on the transferred amount.
-    public fun unwrap_to_coin<CoinType>(
-	sender: &signer, 
-	amount_ct: Ciphertext, 
-	amount: u64,
-	range_proof_updated_balance: &RangeProof,
-	range_proof_transferred_amount: &RangeProof): Coin<CoinType> acquires VeiledCoinStore, VeiledCoinMinter {
-	// resource account signer should exist as wrap_to_coin should already have been called
-	let rsrc_acc_signer = get_resource_account_signer();
-	let scalar_amount = new_scalar_from_u64(amount);
-	let computed_ct = elgamal::new_ciphertext_no_randomness(&scalar_amount);
-	assert!(elgamal::ciphertext_equals(&amount_ct, &computed_ct), ECIPHERTEXT_WRONG_VALUE);
-
-	let sender_addr = signer::address_of(sender);
-	let sender_coin_store = borrow_global_mut<VeiledCoinStore<CoinType>>(sender_addr);
-
-	withdraw(sender, amount_ct, sender_coin_store, range_proof_updated_balance, range_proof_transferred_amount);
-	let c = coin::withdraw(&rsrc_acc_signer, amount);
-	c
-    }
-
-    /// Sends the specified private amount to `recipient` and updates the private balance of `sender`. Requires a range
-    /// proof on the new balance of the sender, to ensure the sender has enough money to send, in addition to a 
-    /// range proof on the transferred amount. Also requires a sigma protocol to prove that 
-    /// 'private_withdraw_amount' encrypts the same value using the same randomness as 'private_deposit_amount'. 
-    /// This value is the amount being transferred. These two ciphertexts are required as we need to update 
-    /// both the sender's and the recipient's balances, which use different public keys and so must be updated 
-    /// with ciphertexts encrypted with their respective public keys. 
-    public fun transfer_privately_to<CoinType>(
-        sender: &signer,
-        recipient_addr: address,
-        private_withdraw_amount: Ciphertext,
-	private_deposit_amount: Ciphertext,
-        range_proof_updated_balance: &RangeProof,
-	range_proof_transferred_amount: &RangeProof,
-	proof: &VeiledWithdrawalProof<CoinType>)
-    acquires VeiledCoinStore {
-	let sender_addr = signer::address_of(sender);
-
-	// get_pubkey_from_addr checks if each account has a VeiledCoinStore published
-	let sender_pubkey = get_pubkey_from_addr<CoinType>(sender_addr);
-	let recipient_pubkey = get_pubkey_from_addr<CoinType>(recipient_addr);
-	let sender_coin_store = borrow_global_mut<VeiledCoinStore<CoinType>>(sender_addr);
-
-	verify_withdrawal_sigma_protocol(&sender_pubkey, &recipient_pubkey, &elgamal::decompress_ciphertext(&sender_coin_store.private_balance), &private_withdraw_amount, &private_deposit_amount, proof);
-
-        withdraw<CoinType>(sender, private_withdraw_amount, sender_coin_store, range_proof_updated_balance, range_proof_transferred_amount);
-	let vc = VeiledCoin<CoinType> { private_value: private_deposit_amount };
-
-        deposit(recipient_addr, vc);
     }
 
     /// Given an address, returns the public key in the VeiledCoinStore associated with that address
@@ -538,6 +428,115 @@ module veiled_coin::veiled_coin {
 	let g_alpha4 = ristretto255::basepoint_mul(&proof.alpha4);
 	ristretto255::point_add_assign(&mut neg_D, &g_alpha4);
 	assert!(ristretto255::point_equals(&neg_C, &neg_D), ESIGMA_PROTOCOL_VERIFY_FAILED);
+    }
+
+    //
+    // Public functions.
+    //
+
+    /// Returns `true` if `account_addr` is registered to receive veiled coins of `CoinType`.
+    public fun has_veiled_coin_store<CoinType>(account_addr: address): bool {
+        exists<VeiledCoinStore<CoinType>>(account_addr)
+    }
+
+    /// Returns the ciphertext of the value of `coin`.
+    public fun private_value<CoinType>(coin: &VeiledCoin<CoinType>): &Ciphertext {
+        &coin.private_value
+    }
+
+    /// Initializes a veiled coin store for the specified account. Requires an ElGamal public
+    /// encryption key to be provided. The user must retain their corresponding secret key. 
+    public fun register_internal<CoinType>(account: &signer, pubkey: elgamal::Pubkey) {
+        let account_addr = signer::address_of(account);
+        assert!(
+            !has_veiled_coin_store<CoinType>(account_addr),
+            error::already_exists(EVEILED_COIN_STORE_ALREADY_PUBLISHED),
+        );
+
+        let coin_store = VeiledCoinStore<CoinType> {
+            private_balance: elgamal::new_ciphertext_from_compressed(ristretto255::point_identity_compressed(), ristretto255::point_identity_compressed()),
+            deposit_events: account::new_event_handle<DepositEvent>(account),
+            withdraw_events: account::new_event_handle<WithdrawEvent>(account),
+	    pubkey: pubkey,
+        };
+        move_to(account, coin_store);
+    }
+
+    /// Mints a veiled coin from a normal coin, shelving the normal coin into the resource account's coin store.
+    ///
+    /// WARNING: Fundamentally, there is no way to hide the value of the coin being minted here.
+    public fun wrap_from_coin<CoinType>(c: Coin<CoinType>): VeiledCoin<CoinType> acquires VeiledCoinMinter {
+        // If there is no CoinStore<CoinType> yet, create one.
+        let rsrc_acc_signer = get_resource_account_signer();
+        let rsrc_acc_addr = signer::address_of(&rsrc_acc_signer);
+        if(!coin::is_account_registered<CoinType>(rsrc_acc_addr)) {
+            coin::register<CoinType>(&rsrc_acc_signer);
+        };
+
+        // Move the traditional coin into the coin store, so we can mint a veiled coin.
+        // (There is no other way to drop a traditional coin, for safety reasons, so moving it into a coin store is
+        //  the only option.)
+        let value = new_scalar_from_u64(coin::value(&c));
+        coin::deposit(rsrc_acc_addr, c);
+
+        VeiledCoin<CoinType> {
+            private_value: elgamal::new_ciphertext_no_randomness(&value)
+        }
+    }
+
+    /// Removes `amount` coins from the VeiledCoinStore balance of `sender`, by subtracting `amount_ct` from
+    /// their VeiledCoinStore balance. `amount_ct` must be an ElGamal ciphertext encrypting `amount`
+    /// with no randomness. It is not possible for this function to be made private. Requires a range
+    /// proof on the new balance of the sender, to ensure the sender has enough money to send, in addition to a 
+    /// range proof on the transferred amount.
+    public fun unwrap_to_coin<CoinType>(
+	sender: &signer, 
+	amount_ct: Ciphertext, 
+	amount: u64,
+	range_proof_updated_balance: &RangeProof,
+	range_proof_transferred_amount: &RangeProof): Coin<CoinType> acquires VeiledCoinStore, VeiledCoinMinter {
+	// resource account signer should exist as wrap_to_coin should already have been called
+	let rsrc_acc_signer = get_resource_account_signer();
+	let scalar_amount = new_scalar_from_u64(amount);
+	let computed_ct = elgamal::new_ciphertext_no_randomness(&scalar_amount);
+	assert!(elgamal::ciphertext_equals(&amount_ct, &computed_ct), ECIPHERTEXT_WRONG_VALUE);
+
+	let sender_addr = signer::address_of(sender);
+	let sender_coin_store = borrow_global_mut<VeiledCoinStore<CoinType>>(sender_addr);
+
+	withdraw(sender, amount_ct, sender_coin_store, range_proof_updated_balance, range_proof_transferred_amount);
+	coin::withdraw(&rsrc_acc_signer, amount)
+    }
+
+    /// Sends the specified private amount to `recipient` and updates the private balance of `sender`. Requires a range
+    /// proof on the new balance of the sender, to ensure the sender has enough money to send, in addition to a 
+    /// range proof on the transferred amount. Also requires a sigma protocol to prove that 
+    /// 'private_withdraw_amount' encrypts the same value using the same randomness as 'private_deposit_amount'. 
+    /// This value is the amount being transferred. These two ciphertexts are required as we need to update 
+    /// both the sender's and the recipient's balances, which use different public keys and so must be updated 
+    /// with ciphertexts encrypted with their respective public keys. 
+    public fun transfer_privately_to<CoinType>(
+        sender: &signer,
+        recipient_addr: address,
+        private_withdraw_amount: Ciphertext,
+	private_deposit_amount: Ciphertext,
+        range_proof_updated_balance: &RangeProof,
+	range_proof_transferred_amount: &RangeProof,
+	proof: &VeiledWithdrawalProof<CoinType>)
+    acquires VeiledCoinStore {
+	let sender_addr = signer::address_of(sender);
+
+	// get_pubkey_from_addr checks if each account has a VeiledCoinStore published
+	let sender_pubkey = get_pubkey_from_addr<CoinType>(sender_addr);
+	let recipient_pubkey = get_pubkey_from_addr<CoinType>(recipient_addr);
+	let sender_coin_store = borrow_global_mut<VeiledCoinStore<CoinType>>(sender_addr);
+
+	verify_withdrawal_sigma_protocol(&sender_pubkey, &recipient_pubkey, &elgamal::decompress_ciphertext(&sender_coin_store.private_balance), &private_withdraw_amount, &private_deposit_amount, proof);
+
+        withdraw<CoinType>(sender, private_withdraw_amount, sender_coin_store, range_proof_updated_balance, range_proof_transferred_amount);
+	let vc = VeiledCoin<CoinType> { private_value: private_deposit_amount };
+
+        deposit(recipient_addr, vc);
     }
 
     /// Deposits a veiled coin at address `to_addr`.
