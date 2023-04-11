@@ -36,7 +36,7 @@ The type system of MSL is similar to that of Move, with the following difference
   needing to worry about overflow or underflow.
   Different from `num`, `bv` cannot and does not need to be explicitly used in specifications: if an integer is involved in bitwise operations such as `&`, `|` or `^`, it will be automatically encoded as `bv`at the backend.
   Moreover, a `bv` integer has a fixed precision, which is consistent with its precision in Move (`bv8`, `bv16`, `bv32`, `bv64`, `bv128` and `bv256`).
-  Note that, in general using `bv` is not so efficient as `num` in the SMT solver such as [Z3](https://github.com/Z3Prover/z3). Consequently,
+  Note that, in general using `bv` is not so efficient as `num` in the [SMT](https://en.wikipedia.org/wiki/Satisfiability_modulo_theories) solver such as [Z3](https://github.com/Z3Prover/z3). Consequently,
   the Move Prover has some restrictions when using bitwise operations, which are stated in detail below.
 - The Move types `&T`, `&mut T`, and `T` are considered equivalent for MSL. Equality is interpreted
   as value equality. There is no need to worry about dereferencing a reference from the Move
