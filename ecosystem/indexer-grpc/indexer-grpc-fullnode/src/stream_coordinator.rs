@@ -337,8 +337,6 @@ impl IndexerStreamCoordinator {
                         txn
                     )
                 });
-                // let encoded_proto_data = base64::encode(buf);
-                // let encoded_proto_data = bcs::to_bytes(txn);
                 TransactionOutput {
                     encoded_proto_data,
                     version: txn.version,
