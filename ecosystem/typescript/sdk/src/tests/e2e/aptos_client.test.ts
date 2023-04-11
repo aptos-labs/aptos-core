@@ -14,7 +14,7 @@ import { HexString } from "../../utils";
 import { getFaucetClient, longTestTimeout, NODE_URL } from "../unit/test_helper.test";
 import { bcsSerializeUint64, bcsToBytes } from "../../bcs";
 import { Ed25519PublicKey } from "../../aptos_types";
-import { ProviderUtil } from "../../providers/utils";
+import { VERSION } from "../../version";
 
 const account = "0x1::account::Account";
 
@@ -32,7 +32,7 @@ test("node url empty", () => {
 test("call should include user-agent header", async () => {
   const client = new AptosClient(NODE_URL, { HEADERS: { my: "header" } });
   const heders = client.client.request.config.HEADERS;
-  expect(heders).toHaveProperty("User-Agent", ProviderUtil.getUserAgent());
+  expect(heders).toHaveProperty("User-Agent", `aptos-ts-sdk/${VERSION}`);
   expect(heders).toHaveProperty("my", "header");
 });
 
