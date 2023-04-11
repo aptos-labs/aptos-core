@@ -6,7 +6,7 @@ use crate::utils;
 use aptos_logger::{Level, CHANNEL_SIZE};
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct LoggerConfig {
     // channel size for the asynchronous channel for node logging.

@@ -2646,6 +2646,27 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 exp,
                 additional_exps,
             });
+
+            // If a formal argument is bound to an expression that contains a name
+            // that conflicts with variables defined in the condition, return an error
+            for bound_expr in argument_map.values() {
+                let exp_loc = self.parent.env.get_node_loc(bound_expr.node_id());
+                for loc_sym in bound_expr.free_local_vars_with_node_id().keys() {
+                    match kind {
+                        ConditionKind::LetPost(name) | ConditionKind::LetPre(name) => {
+                            if name == loc_sym {
+                                self.parent.error(
+                                    &exp_loc,
+                                    &format!("Variable `{}` conflicts with a specification variable in the schema {}", name.display(self.symbol_pool()),
+                                             schema_name.display(self.symbol_pool()))
+                                );
+                            }
+                        },
+                        _ => {},
+                    }
+                }
+            }
+
             match kind {
                 ConditionKind::LetPost(name) | ConditionKind::LetPre(name) => {
                     // If a let name is introduced by this condition, remove it from argument_map

@@ -503,6 +503,13 @@ impl EncodingType {
 }
 
 #[derive(Clone, Debug, Parser)]
+pub struct VanityPrefix {
+    /// Vanity prefix that resultant account address should start with, e.g. 0xaceface or d00d
+    #[clap(long)]
+    pub vanity_prefix: Option<String>,
+}
+
+#[derive(Clone, Debug, Parser)]
 pub struct RngArgs {
     /// The seed used for key generation, should be a 64 character hex string and only used for testing
     ///
@@ -993,6 +1000,11 @@ pub fn load_account_arg(str: &str) -> Result<AccountAddress, CliError> {
             CliError::CommandArgumentError(format!("Failed to parse AccountAddress {}", err))
         })
     } else if let Ok(account_address) = AccountAddress::from_str(str) {
+        Ok(account_address)
+    } else if let Some(Some(account_address)) =
+        CliConfig::load_profile(Some(str), ConfigSearchMode::CurrentDirAndParents)?
+            .map(|p| p.account)
+    {
         Ok(account_address)
     } else if let Some(Some(private_key)) =
         CliConfig::load_profile(Some(str), ConfigSearchMode::CurrentDirAndParents)?

@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::types::{CliError, CliTypedResult, PromptOptions},
+    common::types::{account_address_from_public_key, CliError, CliTypedResult, PromptOptions},
     config::GlobalConfig,
     CliResult,
 };
 use aptos_build_info::build_information;
+use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
+use aptos_keygen::KeyGen;
 use aptos_logger::{debug, Level};
 use aptos_rest_client::{aptos_api_types::HashValue, Account, Client, State};
 use aptos_telemetry::service::telemetry_is_disabled;
@@ -304,6 +306,47 @@ where
         map.insert(key, value);
     }
     Ok(map)
+}
+
+/// Generate a vanity account for Ed25519 single signer scheme.
+///
+/// The default authentication key for an Ed25519 account is the same as the account address. Hence
+/// this function generates Ed25519 private keys until finding one that has an authentication key
+/// that begins with the given vanity prefix. Note that while a valid hex string must have an even
+/// number of characters, a vanity prefix can have an odd number of characters since
+/// account addresses are human-readable.
+///
+/// `vanity_prefix_ref` is a reference to a hex string vanity prefix, optionally prefixed with "0x".
+/// For example "0xaceface" or "d00d".
+pub fn generate_vanity_account_ed25519(
+    vanity_prefix_ref: &str,
+) -> CliTypedResult<Ed25519PrivateKey> {
+    // Optionally strip leading 0x from input string.
+    let vanity_prefix_ref = vanity_prefix_ref
+        .strip_prefix("0x")
+        .unwrap_or(vanity_prefix_ref);
+    // Get string instance to check if vanity prefix is valid hex (may need to add a 0 at end).
+    let mut to_check_if_is_hex = String::from(vanity_prefix_ref);
+    // If an odd number of characters append a 0 for verifying that prefix contains valid hex.
+    if to_check_if_is_hex.len() % 2 != 0 {
+        to_check_if_is_hex += "0"
+    };
+    hex::decode(to_check_if_is_hex).  // Check that the vanity prefix can be decoded into hex.
+        map_err(|error| CliError::CommandArgumentError(format!(
+            "The vanity prefix could not be decoded to hex: {}", error)))?;
+    // Create a random key generator based on OS random number generator.
+    let mut key_generator = KeyGen::from_os_rng();
+    // Randomly generate a new Ed25519 private key.
+    let mut private_key = key_generator.generate_ed25519_private_key();
+    // While the account address does not start with the vanity prefix:
+    while !account_address_from_public_key(&Ed25519PublicKey::from(&private_key))
+        .short_str_lossless()
+        .starts_with(vanity_prefix_ref)
+    {
+        // Generate a new account.
+        private_key = key_generator.generate_ed25519_private_key();
+    }
+    Ok(private_key) // Return the resulting private key.
 }
 
 pub fn current_dir() -> CliTypedResult<PathBuf> {

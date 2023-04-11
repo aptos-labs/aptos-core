@@ -54,17 +54,21 @@ async fn test_full_node_bootstrap_state_snapshot() {
 
     let inspection_client = swarm.fullnode(vfn_peer_id).unwrap().inspection_client();
     let state_merkle_pruner_version = inspection_client
-        .get_node_metric_i64("aptos_pruner_min_readable_version{pruner_name=state_merkle_pruner}")
+        .get_node_metric_i64(
+            "aptos_pruner_versions{pruner_name=state_merkle_pruner,tag=min_readable}",
+        )
         .await
         .unwrap()
         .unwrap();
     let epoch_snapshot_pruner_version = inspection_client
-        .get_node_metric_i64("aptos_pruner_min_readable_version{pruner_name=epoch_snapshot_pruner}")
+        .get_node_metric_i64(
+            "aptos_pruner_versions{pruner_name=epoch_snapshot_pruner,tag=min_readable}",
+        )
         .await
         .unwrap()
         .unwrap();
     let ledger_pruner_version = inspection_client
-        .get_node_metric_i64("aptos_pruner_min_readable_version{pruner_name=ledger_pruner}")
+        .get_node_metric_i64("aptos_pruner_versions{pruner_name=ledger_pruner,tag=min_readable}")
         .await
         .unwrap()
         .unwrap();

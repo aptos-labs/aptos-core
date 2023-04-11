@@ -13,7 +13,7 @@ const MAX_STATE_CHUNK_SIZE: u64 = 4000;
 const MAX_TRANSACTION_CHUNK_SIZE: u64 = 2000;
 const MAX_TRANSACTION_OUTPUT_CHUNK_SIZE: u64 = 1000;
 
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct StateSyncConfig {
     pub data_streaming_service: DataStreamingServiceConfig,
@@ -24,7 +24,7 @@ pub struct StateSyncConfig {
 
 /// The bootstrapping mode determines how the node will bootstrap to the latest
 /// blockchain state, e.g., directly download the latest states.
-#[derive(Copy, Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub enum BootstrappingMode {
     ApplyTransactionOutputsFromGenesis, // Applies transaction outputs (starting at genesis)
     DownloadLatestStates, // Downloads the state keys and values (at the latest version)
@@ -50,7 +50,7 @@ impl BootstrappingMode {
 /// The continuous syncing mode determines how the node will stay up-to-date
 /// once it has bootstrapped and the blockchain continues to grow, e.g.,
 /// continuously executing all transactions.
-#[derive(Copy, Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub enum ContinuousSyncingMode {
     ApplyTransactionOutputs, // Applies transaction outputs to stay up-to-date
     ExecuteTransactions,     // Executes transactions to stay up-to-date
@@ -69,7 +69,7 @@ impl ContinuousSyncingMode {
     }
 }
 
-#[derive(Copy, Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct StateSyncDriverConfig {
     pub bootstrapping_mode: BootstrappingMode, // The mode by which to bootstrap
@@ -107,7 +107,7 @@ impl Default for StateSyncDriverConfig {
     }
 }
 
-#[derive(Copy, Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct StorageServiceConfig {
     pub max_concurrent_requests: u64, // Max num of concurrent storage server tasks
@@ -139,7 +139,7 @@ impl Default for StorageServiceConfig {
     }
 }
 
-#[derive(Copy, Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct DataStreamingServiceConfig {
     // The interval (milliseconds) at which to refresh the global data summary.
@@ -182,7 +182,7 @@ impl Default for DataStreamingServiceConfig {
     }
 }
 
-#[derive(Copy, Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct AptosDataClientConfig {
     pub max_epoch_chunk_size: u64, // Max num of epoch ending ledger infos per chunk

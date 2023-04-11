@@ -148,7 +148,7 @@ Lifetime: transient
 
 <a name="0x1_features_CRYPTOGRAPHY_ALGEBRA_NATIVES"></a>
 
-Whether generic algebra basic operation support in <code>algebra.<b>move</b></code> are enabled.
+Whether generic algebra basic operation support in <code>crypto_algebra.<b>move</b></code> are enabled.
 
 Lifetime: transient
 
