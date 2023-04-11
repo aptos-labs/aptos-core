@@ -165,25 +165,6 @@ function check_package { # Checks for packages installed with winget or typical 
   }
 }
 
-function check_non_winget_or_installer_package {  # Checks for packages that were manually installed via an archive/zip file
-    param(
-      [string]$package
-    )
-
-    $env_var = [Environment]::GetEnvironmentVariable("PATH", "User").Split(";")
-
-    foreach ($dir in $env_var) {
-        if ($dir -like "*$package*") {
-            Write-Host "$package is already installed"
-            return $true
-        }
-        else {
-            Write-Host "Installing $package..."
-            return $false
-        }
-    }
-}
-
 function install_msvc_build_tools {  # Installs C++ build tools, CMake, and Windows 10/11 SDK
   $result = check_package "Visual Studio Build Tools"
   if ($result) {
@@ -355,12 +336,12 @@ function existing_package {
 }
 
 function install_git {
-  if (Get-Command git -ErrorAction SilentlyContinue) {
+  if (!(Get-Command git -ErrorAction SilentlyContinue)) {
     Write-Host "Installing Git..."
     winget install Git.Git --silent
   } 
   else {
-    winget upgrade --id Git.Git
+    Write-Host "Git is already installed."
   }
 }
 
