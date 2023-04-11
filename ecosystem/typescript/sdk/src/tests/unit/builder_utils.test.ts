@@ -14,6 +14,7 @@ import {
   TransactionArgumentU8Vector,
   TypeTagAddress,
   TypeTagBool,
+  TypeTagParser,
   TypeTagStruct,
   TypeTagU128,
   TypeTagU16,
@@ -26,7 +27,6 @@ import {
 import { Serializer } from "../../bcs";
 import {
   argToTransactionArgument,
-  TypeTagParser,
   serializeArg,
   ensureBoolean,
   ensureNumber,
