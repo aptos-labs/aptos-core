@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import difflib
 import json
+import logging
 import os
 import random
 import re
@@ -49,6 +50,29 @@ VALIDATOR_IMAGE_NAME = "aptos/validator"
 VALIDATOR_TESTING_IMAGE_NAME = "aptos/validator-testing"
 FORGE_IMAGE_NAME = "aptos/forge"
 
+DEFAULT_CONFIG = "forge-wrapper-config"
+DEFAULT_CONFIG_KEY = "forge-wrapper-config.json"
+
+
+# Decorator that injects the global "log" into a function scope.
+def logger(func):
+    func.__globals__["log"] = logging.getLogger("")
+    return func
+
+
+def init_logging(logger: logging.Logger, print_metadata: bool) -> None:
+    """Initialize logging."""
+    logger.setLevel(logging.INFO)
+    sh = logging.StreamHandler(sys.stdout)
+    if print_metadata:
+        sh.setFormatter(
+            logging.Formatter(
+                "[%(asctime)s] %(levelname)s [%(filename)s.%(funcName)s:%(lineno)d] %(message)s",
+                datefmt="%a, %d %b %Y %H:%M:%S",
+            )
+        )
+    logger.addHandler(sh)
+
 
 @dataclass
 class RunResult:
@@ -72,14 +96,13 @@ def get_prompt_answer(prompt: str, answer: Optional[str] = None) -> bool:
 
 
 def install_dependency(dependency: str) -> None:
-    print(f"{dependency} is not currently installed")
+    log.info(f"{dependency} is not currently installed")
     answer = os.getenv("FORGE_INSTALL_DEPENDENCIES") or os.getenv("CI")
     if get_prompt_answer("Would you like to install it now?", answer):
-        shell = LocalShell(True)
+        shell = LocalShell()
         shell.run(["pip3", "install", dependency], stream_output=True).unwrap()
     else:
-        print(f"Please install click (pip install {dependency}) and try again")
-        exit(1)
+        log.fatal(f"Please install click (pip install {dependency}) and try again")
 
 
 try:
@@ -96,11 +119,18 @@ except ImportError:
 
 
 @click.group()
-def main() -> None:
+@click.option(
+    "--log-metadata/--no-log-metadata",
+    default=True,
+)
+@logger
+def main(log_metadata: bool) -> None:
+    # if sys.stdout.isatty():
+    #     log_metadata = True
+    init_logging(logger=log, print_metadata=log_metadata)
     # Check that the current directory is the root of the repository.
     if not os.path.exists(".git"):
-        print("This script must be run from the root of the repository.")
-        raise SystemExit(1)
+        log.fatal("This script must be run from the root of the repository.")
 
 
 def envoption(name: str, default: Optional[Any] = None) -> Any:
@@ -259,9 +289,9 @@ class ForgeContext:
     def report(self, result: ForgeResult, outputs: List[ForgeFormatter]) -> None:
         for formatter in outputs:
             output = formatter.format(self, result)
-            print(f"=== Start {formatter} ===")
-            print(output)
-            print(f"=== End {formatter} ===")
+            log.info(f"=== Start {formatter} ===")
+            log.info(output)
+            log.info(f"=== End {formatter} ===")
             self.filesystem.write(formatter.filename, output.encode())
 
     @property
@@ -1103,7 +1133,7 @@ async def run_multiple(
                 )
             )
             pending_suites.append((suite, new_namespace))
-    print("\n".join(pending_comment))
+    log.info("\n".join(pending_comment))
     if forge_runner_mode == "pre-forge":
         if forge_pre_comment:
             context.filesystem.write(
@@ -1128,7 +1158,7 @@ async def run_multiple(
                 disabled = " (disabled)" if suite in disabled_suites else ""
                 final_forge_comment.append(f"{suite} failed{disabled}")
         final_forge_comment.append(f"Run {'failed' if failed else 'succeeded'}")
-        print("\n".join(final_forge_comment))
+        log.info("\n".join(final_forge_comment))
         if forge_comment:
             context.filesystem.write(
                 forge_comment, "\n".join(final_forge_comment).encode()
@@ -1147,7 +1177,8 @@ async def run_multiple(
 @envoption("FORGE_COMMENT")
 @envoption("GITHUB_STEP_SUMMARY")
 # cluster auth
-@envoption("CLOUD", "aws")
+# FIXME: Remove (deprecated).
+@envoption("CLOUD")
 @envoption("AWS_REGION", "us-west-2")
 @envoption("GCP_ZONE", "us-central1-c")
 # forge test runner customization
@@ -1224,13 +1255,17 @@ def test(
 ) -> None:
     """Run a forge test"""
 
+    if verbose:
+        log.setLevel(logging.DEBUG)
+
     ### XXX: hack these arguments to force Forge to run with overrides
-    # cloud = "gcp"
     # forge_cluster_name = "aptos-forge-0"
     # forge_enable_performance = "true"
 
+    log.debug("Initializing backends...")
+
     # Initialize all configs
-    shell = LocalShell(verbose == "true")
+    shell = LocalShell()
     git = Git(shell)
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
@@ -1239,10 +1274,10 @@ def test(
     config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
     config.init()
 
+    log.debug("Finished sourcing configs")
+
     # XXX: manual override testing in CI
-    # # for GCP
     # forge_cluster_name = "aptos-forge-0"
-    # cloud = "gcp"
 
     # # for performance
     # forge_enable_performance = "true"
@@ -1275,7 +1310,7 @@ def test(
     disabled_resolved_suites = set(all_resolved_suites) - set(enabled_resolved_suites)
 
     if len(all_resolved_suites) == 0:
-        print("No tests to run")
+        log.info("No tests to run")
         return
     elif len(all_resolved_suites) == 1:
         forge_test_suite = enabled_resolved_suites[0]
@@ -1298,7 +1333,7 @@ def test(
     try:
         aws_account_num = get_aws_account_num(shell)
     except Exception as e:
-        print(f"Warning: failed to get AWS account number: {e}")
+        log.warning(f"Warning: failed to get AWS account number: {e}")
 
     # Perform cluster selection
     if not forge_cluster_name or balance_clusters:
@@ -1308,14 +1343,16 @@ def test(
     assert forge_cluster_name, "Forge cluster name is required"
 
     # cloud
-    if cloud.upper() == "AWS":
+    if cloud is not None:
+        log.warning(
+            "Explicitly setting the cloud is deprecated. The cloud is now inferred from the cluster name."
+        )
+    if "big" in forge_cluster_name:
         cloud_enum = Cloud.AWS
-    elif cloud.upper() == "GCP":
-        cloud_enum = Cloud.GCP
     else:
-        raise Exception(f"Unknown cloud: {cloud}")
+        cloud_enum = Cloud.GCP
 
-    print(f"Using cluster: {forge_cluster_name} in cloud: {cloud_enum.value}")
+    log.info(f"Using cluster: {forge_cluster_name} in cloud: {cloud_enum.value}")
     temp = context.filesystem.mkstemp()
     forge_cluster = ForgeCluster(forge_cluster_name, temp, cloud=cloud_enum)
     asyncio.run(forge_cluster.write(context.shell))
@@ -1375,10 +1412,10 @@ def test(
     assert forge_image_tag is not None, "Forge image tag is required"
     assert upgrade_image_tag is not None, "Upgrade image tag is required"
 
-    print("Using the following image tags:")
-    print("\tforge: ", forge_image_tag)
-    print("\tswarm: ", image_tag)
-    print("\tswarm upgrade (if applicable): ", upgrade_image_tag)
+    log.info("Using the following image tags:")
+    log.info(f"\tforge:  {forge_image_tag}")
+    log.info(f"\tswarm:  {image_tag}")
+    log.info(f"\tswarm upgrade (if applicable):  {upgrade_image_tag}")
 
     # finally, whether we've derived the image tags or used the user-inputted ones, check if they exist
     assert image_exists(
@@ -1407,6 +1444,8 @@ def test(
         forge_cli_args=forge_cli_args,
         test_args=test_args,
     )
+
+    log.debug("forge_args: %s", forge_args)
 
     forge_context = ForgeContext(
         shell=shell,
@@ -1444,7 +1483,7 @@ def test(
             [ForgeFormatter(forge_pre_comment, lambda *_: pre_comment)],
         )
     else:
-        print(pre_comment)
+        log.info(pre_comment)
 
     if forge_runner_mode == "pre-forge":
         return
@@ -1459,16 +1498,16 @@ def test(
         if forge_report:
             outputs.append(ForgeFormatter(forge_report, format_report))
         else:
-            print(format_report(forge_context, result))
+            log.info(format_report(forge_context, result))
         if forge_comment:
             outputs.append(ForgeFormatter(forge_comment, format_comment))
         else:
-            print(format_comment(forge_context, result))
+            log.info(format_comment(forge_context, result))
         if github_step_summary:
             outputs.append(ForgeFormatter(github_step_summary, format_comment))
         forge_context.report(result, outputs)
 
-        print(result.format(forge_context))
+        log.info(result.format(forge_context))
 
         if not result.succeeded() and forge_blocking == "true":
             raise SystemExit(1)
@@ -1503,7 +1542,7 @@ async def get_all_forge_jobs(
             tempfiles.append(temp)
             all_jobs.extend(await config.get_jobs(context.shell))
         except Exception as e:
-            print(f"Failed to get jobs from cluster: {cluster}: {e}")
+            log.info(f"Failed to get jobs from cluster: {cluster}: {e}")
 
     def unlink_tempfiles():
         for temp in tempfiles:
@@ -1600,10 +1639,6 @@ def tail(
         ],
         stream_output=True,
     ).unwrap()
-
-
-DEFAULT_CONFIG = "forge-wrapper-config"
-DEFAULT_CONFIG_KEY = "forge-wrapper-config.json"
 
 
 class TestConfig(TypedDict):
@@ -1819,7 +1854,7 @@ def create_config() -> None:
 @click.argument("key", type=str, required=False)
 def get_config(key: Optional[str]) -> None:
     """Print the forge configuration"""
-    shell = LocalShell(True)
+    shell = LocalShell()
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
     time = SystemTime()
@@ -1836,7 +1871,7 @@ def get_config(key: Optional[str]) -> None:
 
     # print the config as JSON so it looks nicer
     config_string = json.dumps(val, indent=2)
-    print(config_string)
+    log.info(config_string)
 
 
 def keyword_argument(value: str) -> Tuple[str, str]:
@@ -1882,18 +1917,18 @@ def set_config(
         config.set(k, v, validate=not force)
 
     d = get_forge_config_diff(old_config, config.dump())
-    print("\n".join(d))
+    log.info("\n".join(d))
     if y or get_prompt_answer("Would you like to apply the config change now?"):
         config.flush()
     else:
-        print("Config not updated")
+        log.info("Config not updated")
 
 
 @config.command("edit")
 @click.pass_context
 def config_edit(ctx: click.Context) -> None:
     """Edit forge configuration via interactive text editor"""
-    shell = LocalShell(True)
+    shell = LocalShell()
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
     context = SystemContext(shell, filesystem, processes, SystemTime())
@@ -1935,7 +1970,7 @@ def helm_config_get(chart: str) -> None:
     default_helm_values = config.get("default_helm_values").get(chart)
     if not default_helm_values:
         raise Exception(f"No helm values found for chart {chart}")
-    print(json.dumps(default_helm_values, indent=2))
+    log.info(json.dumps(default_helm_values, indent=2))
 
 
 @helm_config.command("set")
@@ -1983,11 +2018,11 @@ def helm_config_set(
     config.set("default_helm_values", new_default_helm_values, validate=not force)
 
     d = get_forge_config_diff(old_config, config.dump())
-    print("\n".join(d))
+    log.info("\n".join(d))
     if y or get_prompt_answer("Would you like to apply the config change now?"):
         config.flush()
     else:
-        print("Config not updated")
+        log.info("Config not updated")
 
 
 @config.group("cluster")
@@ -2027,11 +2062,11 @@ def cluster_config_delete(
     config.set("all_clusters", all_clusters)
 
     d = get_forge_config_diff(old_config, config.dump())
-    print("\n".join(d))
+    log.info("\n".join(d))
     if y or get_prompt_answer("Would you like to apply the config change now?"):
         config.flush()
     else:
-        print("Config not updated")
+        log.info("Config not updated")
 
 
 @cluster_config.command("add")
@@ -2055,11 +2090,11 @@ def cluster_config_add(cluster: str, y: bool) -> None:
     config.set("all_clusters", all_clusters)
 
     d = get_forge_config_diff(old_config, config.dump())
-    print("\n".join(d))
+    log.info("\n".join(d))
     if y or get_prompt_answer("Would you like to apply the config change now?"):
         config.flush()
     else:
-        print("Config not updated")
+        log.info("Config not updated")
 
 
 @cluster_config.command("enable")
@@ -2083,11 +2118,11 @@ def cluster_config_enable(cluster: str, y: bool) -> None:
     config.set("enabled_clusters", enabled_clusters)
 
     d = get_forge_config_diff(old_config, config.dump())
-    print("\n".join(d))
+    log.info("\n".join(d))
     if y or get_prompt_answer("Would you like to apply the config change now?"):
         config.flush()
     else:
-        print("Config not updated")
+        log.info("Config not updated")
 
 
 @cluster_config.command("disable")
@@ -2112,11 +2147,11 @@ def cluster_config_disable(
     config.set("enabled_clusters", enabled_clusters)
 
     d = get_forge_config_diff(old_config, config.dump())
-    print("\n".join(d))
+    log.info("\n".join(d))
     if y or get_prompt_answer("Would you like to apply the config change now?"):
         config.flush()
     else:
-        print("Config not updated")
+        log.info("Config not updated")
 
 
 @cluster_config.command("list")
@@ -2194,11 +2229,11 @@ def test_config_add(
     config.set("test_suites", suites)
 
     d = get_forge_config_diff(old_config, config.dump())
-    print("\n".join(d))
+    log.info("\n".join(d))
     if y or get_prompt_answer("Would you like to apply the config change now?"):
         config.flush()
     else:
-        print("Config not updated")
+        log.info("Config not updated")
 
 
 @test_config.command("show")
@@ -2217,7 +2252,7 @@ def test_config_show(
 
     test_suites = config.get("test_suites")
     for suite_name in test_suites:
-        print(suite_name)
+        log.info(f"suite: {suite_name}")
         if suite and suite_name != suite:
             continue
         suite_config = test_suites[suite_name]
@@ -2246,7 +2281,7 @@ def test_config_list() -> None:
     test_suites = config.get("test_suites")
 
     for suite_name in test_suites:
-        print(suite_name)
+        log.info(f"suite: {suite_name}")
 
 
 @test_config.command("delete")
@@ -2282,11 +2317,11 @@ def test_config_delete(
     config.set("test_suites", suites)
 
     d = get_forge_config_diff(old_config, config.dump())
-    print("\n".join(d))
+    log.info("\n".join(d))
     if y or get_prompt_answer("Would you like to apply the config change now?"):
         config.flush()
     else:
-        print("Config not updated")
+        log.info("Config not updated")
 
 
 @test_config.command("enable")
@@ -2324,11 +2359,11 @@ def test_config_enable(
     config.set("test_suites", suites)
 
     d = get_forge_config_diff(old_config, config.dump())
-    print("\n".join(d))
+    log.info("\n".join(d))
     if y or get_prompt_answer("Would you like to apply the config change now?"):
         config.flush()
     else:
-        print("Config not updated")
+        log.info("Config not updated")
 
 
 @test_config.command("disable")
@@ -2365,11 +2400,11 @@ def test_config_disable(
 
     config.set("test_suites", suites)
     d = get_forge_config_diff(old_config, config.dump())
-    print("\n".join(d))
+    log.info("\n".join(d))
     if y or get_prompt_answer("Would you like to apply the config change now?"):
         config.flush()
     else:
-        print("Config not updated")
+        log.info("Config not updated")
 
 
 if __name__ == "__main__":

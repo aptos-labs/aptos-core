@@ -135,6 +135,8 @@ pub struct EpochManager {
     batch_retrieval_tx:
         Option<aptos_channel::Sender<AccountAddress, IncomingBatchRetrievalRequest>>,
     bounded_executor: BoundedExecutor,
+    // recovery_mode is set to true when the recovery manager is spawned
+    recovery_mode: bool,
 }
 
 impl EpochManager {
@@ -180,6 +182,7 @@ impl EpochManager {
             quorum_store_storage,
             batch_retrieval_tx: None,
             bounded_executor,
+            recovery_mode: false,
         }
     }
 
@@ -799,6 +802,7 @@ impl EpochManager {
                 let consensus_config = onchain_consensus_config.unwrap_or_default();
                 let execution_config = onchain_execution_config.unwrap_or_default();
                 self.quorum_store_enabled = self.enable_quorum_store(&consensus_config);
+                self.recovery_mode = false;
                 self.start_round_manager(
                     initial_data,
                     epoch_state,
@@ -808,6 +812,7 @@ impl EpochManager {
                 .await
             },
             LivenessStorageData::PartialRecoveryData(ledger_data) => {
+                self.recovery_mode = true;
                 self.start_recovery_manager(ledger_data, epoch_state).await
             },
         }
@@ -838,8 +843,11 @@ impl EpochManager {
 
         if let Some(unverified_event) = maybe_unverified_event {
             // filter out quorum store messages if quorum store has not been enabled
-            self.filter_quorum_store_events(peer_id, &unverified_event)?;
-
+            match self.filter_quorum_store_events(peer_id, &unverified_event) {
+                Ok(true) => {},
+                Ok(false) => return Ok(()), // This occurs when the quorum store is not enabled, but the recovery mode is enabled. We filter out the messages, but don't raise any error.
+                Err(err) => return Err(err),
+            }
             // same epoch -> run well-formedness + signature check
             let epoch_state = self.epoch_state.clone().unwrap();
             let quorum_store_enabled = self.quorum_store_enabled;
@@ -946,13 +954,15 @@ impl EpochManager {
         &mut self,
         peer_id: AccountAddress,
         event: &UnverifiedEvent,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<bool> {
         match event {
             UnverifiedEvent::BatchMsg(_)
             | UnverifiedEvent::SignedBatchInfo(_)
             | UnverifiedEvent::ProofOfStoreMsg(_) => {
                 if self.quorum_store_enabled {
-                    Ok(())
+                    Ok(true) // This states that we shouldn't filter out the event
+                } else if self.recovery_mode {
+                    Ok(false) // This states that we should filter out the event, but without an error
                 } else {
                     Err(anyhow::anyhow!(
                         "Quorum store is not enabled locally, but received msg from sender: {}",
@@ -960,7 +970,7 @@ impl EpochManager {
                     ))
                 }
             },
-            _ => Ok(()),
+            _ => Ok(true), // This states that we shouldn't filter out the event
         }
     }
 

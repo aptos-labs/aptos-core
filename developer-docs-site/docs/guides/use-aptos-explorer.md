@@ -201,7 +201,17 @@ The *Resources* tab presents a view of all types used by the account. Use the *C
 
 #### Modules
 
-The *Modules* tab displays the bytecode and ABI used by the account. As with Payload, click the down arrow at the bottom of the ABI code block to expand it and see all contents.
+The *Modules* tab displays the source code and ABI used by the account. Select different modules on the left sidebar to view Move source code and ABI of a specific module. Use the expand button at the top right of the source code to expand the code for better readability.
+
+<center>
+<ThemedImage
+alt="Aptos Explorer Modules tab"
+sources={{
+    light: useBaseUrl('/img/docs/10-explorer-modules.png'),
+    dark: useBaseUrl('/img/docs/10-explorer-modules-dark.png'),
+  }}
+/>
+</center>
 
 #### Info
 
