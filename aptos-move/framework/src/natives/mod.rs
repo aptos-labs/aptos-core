@@ -8,11 +8,13 @@ pub mod any;
 pub mod code;
 pub mod create_signer;
 pub mod cryptography;
+pub mod debug;
 pub mod event;
 pub mod hash;
 mod helpers;
 pub mod object;
 pub mod state_storage;
+pub mod string_utils;
 pub mod transaction_context;
 pub mod type_info;
 pub mod util;
@@ -53,6 +55,7 @@ pub struct GasParameters {
     pub aggregator: aggregator::GasParameters,
     pub aggregator_factory: aggregator_factory::GasParameters,
     pub object: object::GasParameters,
+    pub string_utils: string_utils::GasParameters,
 }
 
 impl GasParameters {
@@ -258,6 +261,10 @@ impl GasParameters {
                     per_item_loaded: 0.into(),
                 },
             },
+            string_utils: string_utils::GasParameters {
+                base: 0.into(),
+                per_byte: 0.into(),
+            },
         }
     }
 }
@@ -420,7 +427,12 @@ pub fn all_natives(
     );
     add_natives_from_module!(
         "object",
-        object::make_all(gas_params.object, timed_features, features)
+        object::make_all(gas_params.object, timed_features.clone(), features.clone())
+    );
+    add_natives_from_module!("debug", debug::make_all());
+    add_natives_from_module!(
+        "string_utils",
+        string_utils::make_all(gas_params.string_utils, timed_features, features)
     );
 
     make_table_from_iter(framework_addr, natives)

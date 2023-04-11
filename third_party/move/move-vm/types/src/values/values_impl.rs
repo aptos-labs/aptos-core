@@ -2207,8 +2207,7 @@ impl Vector {
         Self::pack(type_param, vec![])
     }
 
-    pub fn unpack(self, type_param: &Type, expected_num: u64) -> PartialVMResult<Vec<Value>> {
-        check_elem_layout(type_param, &self.0)?;
+    pub fn unpack_unchecked(self) -> PartialVMResult<Vec<Value>> {
         let elements: Vec<_> = match self.0 {
             Container::VecU8(r) => take_unique_ownership(r)?
                 .into_iter()
@@ -2245,6 +2244,12 @@ impl Vector {
             Container::Vec(r) => take_unique_ownership(r)?.into_iter().map(Value).collect(),
             Container::Locals(_) | Container::Struct(_) => unreachable!(),
         };
+        Ok(elements)
+    }
+
+    pub fn unpack(self, type_param: &Type, expected_num: u64) -> PartialVMResult<Vec<Value>> {
+        check_elem_layout(type_param, &self.0)?;
+        let elements = self.unpack_unchecked()?;
         if expected_num as usize == elements.len() {
             Ok(elements)
         } else {
