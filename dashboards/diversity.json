@@ -587,8 +587,11 @@
       {
         "allFormat": "",
         "allValue": "",
-        "current": { "text": ["VictoriaMetrics Mainnet US"], "value": "VictoriaMetrics Mainnet US" },
-        "datasource": null,
+        "current": {
+          "selected": true,
+          "text": "VictoriaMetrics Global (Non-mainnet)",
+          "value": "VictoriaMetrics Global (Non-mainnet)"
+        },
         "hide": 0,
         "includeAll": false,
         "label": "",
@@ -597,8 +600,10 @@
         "name": "Datasource",
         "options": [],
         "query": "prometheus",
+        "queryValue": "",
         "refresh": 1,
-        "regex": "",
+        "regex": ".*Prometheus.*|.*Victoria.*|.*Telemetry.*",
+        "skipUrlSync": false,
         "sort": 0,
         "type": "datasource"
       },
@@ -712,7 +717,7 @@
   "time": { "from": "now-24h", "to": "now" },
   "timepicker": { "refresh_intervals": null, "time_options": null },
   "timezone": "",
-  "title": "Diversity",
+  "title": "diversity",
   "uid": "diversity",
-  "version": 4
+  "version": 2
 }

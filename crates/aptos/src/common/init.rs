@@ -7,7 +7,7 @@ use crate::common::{
         ConfigSearchMode, EncodingOptions, PrivateKeyInputOptions, ProfileConfig, ProfileOptions,
         PromptOptions, RngArgs, DEFAULT_PROFILE,
     },
-    utils::{fund_account, prompt_yes_with_override, read_line},
+    utils::{fund_account, prompt_yes_with_override, read_line, wait_for_transactions},
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, ValidCryptoMaterialStringExt};
 use aptos_rest_client::{
@@ -195,7 +195,15 @@ impl CliCommand<()> for InitTool {
                 }
             },
         };
-        if let Some(ref faucet_url) = profile_config.faucet_url {
+
+        // If you want to create a private key, but not fund the account, skipping the faucet is still possible
+        let maybe_faucet_url = if self.skip_faucet {
+            None
+        } else {
+            profile_config.faucet_url.as_ref()
+        };
+
+        if let Some(faucet_url) = maybe_faucet_url {
             if account_exists {
                 eprintln!("Account {} has been already found onchain", address);
             } else {
@@ -203,21 +211,22 @@ impl CliCommand<()> for InitTool {
                     "Account {} doesn't exist, creating it and funding it with {} Octas",
                     address, NUM_DEFAULT_OCTAS
                 );
-                fund_account(
+                let hashes = fund_account(
                     Url::parse(faucet_url)
                         .map_err(|err| CliError::UnableToParse("rest_url", err.to_string()))?,
                     NUM_DEFAULT_OCTAS,
                     address,
                 )
                 .await?;
+                wait_for_transactions(&client, hashes).await?;
                 eprintln!("Account {} funded successfully", address);
             }
         } else if account_exists {
             eprintln!("Account {} has been already found onchain", address);
         } else if network == Network::Mainnet {
-            eprintln!("Account {} does not exist, you will need to create and fund the account through a faucet or by transferring funds from another account", address);
+            eprintln!("Account {} does not exist, you will need to create and fund the account by transferring funds from another account", address);
         } else {
-            eprintln!("Account {} has been initialized locally, but you must have coins transferred to it to create the account onchain", address);
+            eprintln!("Account {} has been initialized locally, but you must transfer coins to it to create the account onchain", address);
         }
 
         // Ensure the loaded config has profiles setup for a possible empty file

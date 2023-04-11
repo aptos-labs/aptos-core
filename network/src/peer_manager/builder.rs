@@ -5,7 +5,6 @@
 use crate::{
     application::storage::PeersAndMetadata,
     counters,
-    counters::NETWORK_RATE_LIMIT_METRICS,
     noise::{stream::NoiseStream, HandshakeAuthMode},
     peer_manager::{
         conn_notifs_channel, ConnectionRequest, ConnectionRequestSender, PeerManager,
@@ -19,10 +18,7 @@ use crate::{
     ProtocolId,
 };
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
-use aptos_config::{
-    config::{RateLimitConfig, HANDSHAKE_VERSION},
-    network_id::NetworkContext,
-};
+use aptos_config::{config::HANDSHAKE_VERSION, network_id::NetworkContext};
 use aptos_crypto::x25519;
 use aptos_logger::prelude::*;
 #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
@@ -31,10 +27,9 @@ use aptos_netcore::transport::{
     tcp::{TCPBufferCfg, TcpSocket, TcpTransport},
     Transport,
 };
-use aptos_rate_limiter::rate_limit::TokenBucketRateLimiter;
 use aptos_time_service::TimeService;
 use aptos_types::{chain_id::ChainId, network_address::NetworkAddress, PeerId};
-use std::{clone::Clone, collections::HashMap, fmt::Debug, net::IpAddr, sync::Arc};
+use std::{clone::Clone, collections::HashMap, fmt::Debug, sync::Arc};
 use tokio::runtime::Handle;
 
 /// Inbound and Outbound connections are always secured with NoiseIK.  The dialer
@@ -83,8 +78,6 @@ struct PeerManagerContext {
     max_frame_size: usize,
     max_message_size: usize,
     inbound_connection_limit: usize,
-    inbound_rate_limit_config: Option<RateLimitConfig>,
-    outbound_rate_limit_config: Option<RateLimitConfig>,
     tcp_buffer_cfg: TCPBufferCfg,
 }
 
@@ -108,8 +101,6 @@ impl PeerManagerContext {
         max_frame_size: usize,
         max_message_size: usize,
         inbound_connection_limit: usize,
-        inbound_rate_limit_config: Option<RateLimitConfig>,
-        outbound_rate_limit_config: Option<RateLimitConfig>,
         tcp_buffer_cfg: TCPBufferCfg,
     ) -> Self {
         Self {
@@ -127,8 +118,6 @@ impl PeerManagerContext {
             max_frame_size,
             max_message_size,
             inbound_connection_limit,
-            inbound_rate_limit_config,
-            outbound_rate_limit_config,
             tcp_buffer_cfg,
         }
     }
@@ -187,8 +176,6 @@ impl PeerManagerBuilder {
         max_message_size: usize,
         enable_proxy_protocol: bool,
         inbound_connection_limit: usize,
-        inbound_rate_limit_config: Option<RateLimitConfig>,
-        outbound_rate_limit_config: Option<RateLimitConfig>,
         tcp_buffer_cfg: TCPBufferCfg,
     ) -> Self {
         // Setup channel to send requests to peer manager.
@@ -224,8 +211,6 @@ impl PeerManagerBuilder {
                 max_frame_size,
                 max_message_size,
                 inbound_connection_limit,
-                inbound_rate_limit_config,
-                outbound_rate_limit_config,
                 tcp_buffer_cfg,
             )),
             peer_manager: None,
@@ -343,16 +328,6 @@ impl PeerManagerBuilder {
             .peer_manager_context
             .take()
             .expect("PeerManager can only be built once");
-        let inbound_rate_limiters = token_bucket_rate_limiter(
-            &self.network_context,
-            "inbound",
-            pm_context.inbound_rate_limit_config,
-        );
-        let outbound_rate_limiters = token_bucket_rate_limiter(
-            &self.network_context,
-            "outbound",
-            pm_context.outbound_rate_limit_config,
-        );
         let peer_mgr = PeerManager::new(
             executor.clone(),
             self.time_service.clone(),
@@ -371,8 +346,6 @@ impl PeerManagerBuilder {
             pm_context.max_frame_size,
             pm_context.max_message_size,
             pm_context.inbound_connection_limit,
-            inbound_rate_limiters,
-            outbound_rate_limiters,
         );
 
         // PeerManager constructor appends a public key to the listen_address.
@@ -468,25 +441,4 @@ impl PeerManagerBuilder {
 
         (network_notifs_rx, connection_notifs_rx)
     }
-}
-
-/// Builds a token bucket rate limiter with attached metrics
-fn token_bucket_rate_limiter(
-    network_context: &NetworkContext,
-    label: &'static str,
-    input: Option<RateLimitConfig>,
-) -> TokenBucketRateLimiter<IpAddr> {
-    if let Some(config) = input {
-        if config.enabled {
-            return TokenBucketRateLimiter::new(
-                label,
-                network_context.to_string(),
-                config.initial_bucket_fill_percentage,
-                config.ip_byte_bucket_size,
-                config.ip_byte_bucket_rate,
-                Some(NETWORK_RATE_LIMIT_METRICS.clone()),
-            );
-        }
-    }
-    TokenBucketRateLimiter::open(label)
 }

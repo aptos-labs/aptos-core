@@ -16,7 +16,10 @@ use std::fmt;
 // TODO: add a test
 pub const MAX_BLOCKS_PER_REQUEST: u64 = 10;
 
-pub const MAX_FAILED_ATTEMPTS: u32 = 4;
+pub const NUM_RETRIES: usize = 5;
+pub const NUM_PEERS_PER_RETRY: usize = 3;
+pub const RETRY_INTERVAL_MSEC: u64 = 500;
+pub const RPC_TIMEOUT_MSEC: u64 = 5000;
 
 /// RPC to get a chain of block of the given length starting from the given block id.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]

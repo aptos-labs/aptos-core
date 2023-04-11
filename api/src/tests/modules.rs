@@ -25,17 +25,46 @@ async fn test_abi() {
     let modules = context
         .get(format!("/accounts/{}/modules", account.address(),).as_str())
         .await;
-    let expose_functions: Vec<&str> = modules.as_array().unwrap()[0]["abi"]["exposed_functions"]
+
+    let exposed_functions = modules.as_array().unwrap()[0]["abi"]["exposed_functions"]
         .as_array()
-        .unwrap()
+        .unwrap();
+
+    let exposed_function_names: Vec<&str> = exposed_functions
         .iter()
         .map(|f| f["name"].as_str().unwrap())
         .collect();
+
     // All entry (including private entry) and public functions should be in the ABI.
     // Private (non-entry) functions should not be included.
-    assert_eq!(expose_functions, [
+    assert_eq!(exposed_function_names, [
         "private_entry_function",
         "public_entry_function",
-        "public_function"
+        "public_function",
+        "view_function",
     ]);
+
+    // Confirm that the view function is reported as a view function.
+    let view_function = exposed_functions
+        .iter()
+        .find(|f| f["name"].as_str().unwrap() == "view_function")
+        .unwrap();
+
+    assert_eq!(view_function["is_view"], true);
+
+    // Confirm that the other functions are not reported as view functions.
+    for name in [
+        "private_entry_function",
+        "public_entry_function",
+        "public_function",
+    ]
+    .iter()
+    {
+        let function = exposed_functions
+            .iter()
+            .find(|f| &f["name"].as_str().unwrap() == name)
+            .unwrap();
+
+        assert_eq!(function["is_view"], false);
+    }
 }

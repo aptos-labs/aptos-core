@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import subprocess
 import sys
 import tempfile
@@ -35,14 +36,13 @@ class Shell:
 
 @dataclass
 class LocalShell(Shell):
-    verbose: bool = False
+    logger: logging.Logger = logging.getLogger("")
 
     def run(self, command: Sequence[str], stream_output: bool = False) -> RunResult:
         # Write to a temp file, stream to stdout
         tmpname = tempfile.mkstemp()[1]
         with open(tmpname, "wb") as writer, open(tmpname, "rb") as reader:
-            if self.verbose:
-                print(f"+ {' '.join(command)}")
+            self.logger.debug(f"+ {' '.join(command)}")
             process = subprocess.Popen(command, stdout=writer, stderr=writer)
             output = b""
             while process.poll() is None:
@@ -60,8 +60,7 @@ class LocalShell(Shell):
         # Write to a temp file, stream to stdout
         tmpname = tempfile.mkstemp()[1]
         with open(tmpname, "wb") as writer, open(tmpname, "rb") as reader:
-            if self.verbose:
-                print(f"+ {' '.join(command)}")
+            self.logger.debug(f"+ {' '.join(command)}")
             try:
                 process = await asyncio.create_subprocess_exec(
                     command[0], *command[1:], stdout=writer, stderr=writer

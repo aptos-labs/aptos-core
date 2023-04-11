@@ -140,7 +140,7 @@ module std::features {
         is_enabled(DELEGATION_POOLS)
     }
 
-    /// Whether generic algebra basic operation support in `algebra.move` are enabled.
+    /// Whether generic algebra basic operation support in `crypto_algebra.move` are enabled.
     ///
     /// Lifetime: transient
     const CRYPTOGRAPHY_ALGEBRA_NATIVES: u64 = 12;
@@ -166,6 +166,14 @@ module std::features {
     ///
     /// Lifetime: transient
     const STRUCT_CONSTRUCTORS: u64 = 15;
+
+    /// Whether reward rate decreases periodically.
+    /// Lifetime: transient
+    const PERIODICAL_REWARD_RATE_DECREASE: u64 = 16;
+    public fun get_periodical_reward_rate_decrease_feature(): u64 { PERIODICAL_REWARD_RATE_DECREASE }
+    public fun periodical_reward_rate_decrease_enabled(): bool acquires Features {
+        is_enabled(PERIODICAL_REWARD_RATE_DECREASE)
+    }
 
     // ============================================================================================
     // Feature Flag Implementation

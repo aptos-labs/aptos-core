@@ -85,7 +85,6 @@ export class AptosClient {
     } else {
       conf.WITH_CREDENTIALS = true;
     }
-
     this.client = new Gen.AptosGeneratedClient(conf);
   }
 

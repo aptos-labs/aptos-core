@@ -875,6 +875,7 @@ class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
             result = runner.invoke(
                 main,
                 [
+                    "--no-log-metadata",
                     "test",
                     "--forge-cluster-name",
                     "forge-big-1",
@@ -1264,17 +1265,17 @@ class ForgeConfigTests(unittest.TestCase):
             )
             result_helm_config_not_present: Result = runner.invoke(
                 main,
-                ["config", "helm", "get", "aptos-node"],
+                ["--no-log-metadata", "config", "helm", "get", "aptos-node"],
                 catch_exceptions=True,
             )
             result_helm_config_present_missing = runner.invoke(
                 main,
-                ["config", "helm", "get", "aptos-genesis"],
+                ["--no-log-metadata", "config", "helm", "get", "aptos-genesis"],
                 catch_exceptions=True,
             )
             result_helm_config_present_complete = runner.invoke(
                 main,
-                ["config", "helm", "get", "aptos-node"],
+                ["--no-log-metadata", "config", "helm", "get", "aptos-node"],
                 catch_exceptions=True,
             )
             # assert all commands and filesystem calls are correct
@@ -1465,6 +1466,7 @@ class ForgeConfigTests(unittest.TestCase):
             ret = runner.invoke(
                 main,
                 [
+                    "--no-log-metadata",
                     "config",
                     "helm",
                     "set",

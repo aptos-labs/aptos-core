@@ -51,14 +51,19 @@ where
     (db, executor)
 }
 
-fn create_checkpoint(source_dir: impl AsRef<Path>, checkpoint_dir: impl AsRef<Path>) {
+fn create_checkpoint(
+    source_dir: impl AsRef<Path>,
+    checkpoint_dir: impl AsRef<Path>,
+    use_sharded_state_merkle_db: bool,
+) {
     // Create rocksdb checkpoint.
     if checkpoint_dir.as_ref().exists() {
         fs::remove_dir_all(checkpoint_dir.as_ref()).unwrap_or(());
     }
     std::fs::create_dir_all(checkpoint_dir.as_ref()).unwrap();
 
-    AptosDB::create_checkpoint(source_dir, checkpoint_dir).expect("db checkpoint creation fails.");
+    AptosDB::create_checkpoint(source_dir, checkpoint_dir, use_sharded_state_merkle_db)
+        .expect("db checkpoint creation fails.");
 }
 
 /// Runs the benchmark with given parameters.
@@ -71,15 +76,21 @@ pub fn run_benchmark<V>(
     verify_sequence_numbers: bool,
     pruner_config: PrunerConfig,
     use_state_kv_db: bool,
+    use_sharded_state_merkle_db: bool,
 ) where
     V: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
 {
-    create_checkpoint(source_dir.as_ref(), checkpoint_dir.as_ref());
+    create_checkpoint(
+        source_dir.as_ref(),
+        checkpoint_dir.as_ref(),
+        use_sharded_state_merkle_db,
+    );
 
     let (mut config, genesis_key) = aptos_genesis::test_utils::test_config();
     config.storage.dir = checkpoint_dir.as_ref().to_path_buf();
     config.storage.storage_pruner_config = pruner_config;
     config.storage.rocksdb_configs.use_state_kv_db = use_state_kv_db;
+    config.storage.rocksdb_configs.use_sharded_state_merkle_db = use_sharded_state_merkle_db;
 
     let (db, executor) = init_db_and_executor::<V>(&config);
     let version = db.reader.get_latest_version().unwrap();
@@ -117,11 +128,16 @@ pub fn add_accounts<V>(
     pruner_config: PrunerConfig,
     verify_sequence_numbers: bool,
     use_state_kv_db: bool,
+    use_sharded_state_merkle_db: bool,
 ) where
     V: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
 {
     assert!(source_dir.as_ref() != checkpoint_dir.as_ref());
-    create_checkpoint(source_dir.as_ref(), checkpoint_dir.as_ref());
+    create_checkpoint(
+        source_dir.as_ref(),
+        checkpoint_dir.as_ref(),
+        use_sharded_state_merkle_db,
+    );
     add_accounts_impl::<V>(
         num_new_accounts,
         init_account_balance,
@@ -131,6 +147,7 @@ pub fn add_accounts<V>(
         pruner_config,
         verify_sequence_numbers,
         use_state_kv_db,
+        use_sharded_state_merkle_db,
     );
 }
 
@@ -143,6 +160,7 @@ fn add_accounts_impl<V>(
     pruner_config: PrunerConfig,
     verify_sequence_numbers: bool,
     use_state_kv_db: bool,
+    use_sharded_state_merkle_db: bool,
 ) where
     V: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
 {
@@ -150,6 +168,7 @@ fn add_accounts_impl<V>(
     config.storage.dir = output_dir.as_ref().to_path_buf();
     config.storage.storage_pruner_config = pruner_config;
     config.storage.rocksdb_configs.use_state_kv_db = use_state_kv_db;
+    config.storage.rocksdb_configs.use_sharded_state_merkle_db = use_sharded_state_merkle_db;
     let (db, executor) = init_db_and_executor::<V>(&config);
 
     let version = db.reader.get_latest_version().unwrap();
@@ -228,6 +247,7 @@ mod tests {
             NO_OP_STORAGE_PRUNER_CONFIG, /* prune_window */
             true,
             false,
+            false,
         );
 
         super::run_benchmark::<AptosVM>(
@@ -238,6 +258,7 @@ mod tests {
             checkpoint_dir,
             true,
             NO_OP_STORAGE_PRUNER_CONFIG,
+            false,
             false,
         );
     }

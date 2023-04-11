@@ -64,7 +64,8 @@ pub async fn main() -> Result<()> {
         TxnEmitterCommand::EmitTx(args) => {
             let stats = emit_transactions(&args.cluster_args, &args.emit_args)
                 .await
-                .context("Emit transactions failed")?;
+                .map_err(|e| panic!("Emit transactions failed {:?}", e))
+                .unwrap();
             println!("Total stats: {}", stats);
             println!("Average rate: {}", stats.rate());
             Ok(())

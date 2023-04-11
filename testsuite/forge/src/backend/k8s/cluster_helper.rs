@@ -17,7 +17,7 @@ use aptos_logger::{info, warn};
 use aptos_sdk::types::PeerId;
 use k8s_openapi::api::{
     apps::v1::{Deployment, StatefulSet},
-    batch::{v1::Job, v1beta1::CronJob},
+    batch::v1::Job,
     core::v1::{ConfigMap, Namespace, PersistentVolume, PersistentVolumeClaim, Pod, Secret},
 };
 use kube::{
@@ -196,7 +196,6 @@ pub(crate) async fn delete_k8s_resources(client: K8sClient, kube_namespace: &str
     let stateful_sets: Api<StatefulSet> = Api::namespaced(client.clone(), kube_namespace);
     let pvcs: Api<PersistentVolumeClaim> = Api::namespaced(client.clone(), kube_namespace);
     let jobs: Api<Job> = Api::namespaced(client.clone(), kube_namespace);
-    let cronjobs: Api<CronJob> = Api::namespaced(client.clone(), kube_namespace);
     // service deletion by label selector is not supported in this version of k8s api
     // let services: Api<Service> = Api::namespaced(client.clone(), kube_namespace);
 
@@ -210,7 +209,9 @@ pub(crate) async fn delete_k8s_resources(client: K8sClient, kube_namespace: &str
         delete_k8s_collection(stateful_sets.clone(), "StatefulSets", selector).await?;
         delete_k8s_collection(pvcs.clone(), "PersistentVolumeClaims", selector).await?;
         delete_k8s_collection(jobs.clone(), "Jobs", selector).await?;
-        delete_k8s_collection(cronjobs.clone(), "CronJobs", selector).await?;
+        // This is causing problem on gcp forge for some reason?!
+        // HACK remove to unblock
+        // delete_k8s_collection(cronjobs.clone(), "CronJobs", selector).await?;
         // delete_k8s_collection(services.clone(), "Services", selector).await?;
     }
 

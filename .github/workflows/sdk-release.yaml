@@ -38,6 +38,8 @@ jobs:
       APTOS_NODE_URL: http://127.0.0.1:8080/v1
       APTOS_FAUCET_URL: http://127.0.0.1:8081
       FAUCET_AUTH_TOKEN: ${{ secrets.DEVNET_TAP_AUTH_TOKEN }}
+      ANS_TEST_ACCOUNT_PRIVATE_KEY: "0x37368b46ce665362562c6d1d4ec01a08c8644c488690df5a17e13ba163e20221"
+      ANS_TEST_ACCOUNT_ADDRESS: "585fc9f0f0c54183b039ffc770ca282ebd87307916c215a3e692f2f8e4305e82"
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
         with:
@@ -93,9 +95,17 @@ jobs:
       - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines ${{ runner.temp }}/specs/spec.json api/doc/spec.json
 
       # Set up dotenv file for tests (jest doesn't read env vars properly).
-      - run: echo 'APTOS_NODE_URL="http://127.0.0.1:8080/v1"' >> ./ecosystem/typescript/sdk/.env
-      - run: echo 'APTOS_FAUCET_URL="http://127.0.0.1:8081"' >> ./ecosystem/typescript/sdk/.env
+      - run: echo "APTOS_NODE_URL=$APTOS_NODE_URL" >> ./ecosystem/typescript/sdk/.env
+      - run: echo "APTOS_FAUCET_URL=$APTOS_FAUCET_URL" >> ./ecosystem/typescript/sdk/.env
       - run: echo "FAUCET_AUTH_TOKEN=$FAUCET_AUTH_TOKEN" >> ./ecosystem/typescript/sdk/.env
+      - run: echo "ANS_TEST_ACCOUNT_PRIVATE_KEY=$ANS_TEST_ACCOUNT_PRIVATE_KEY" >> ./ecosystem/typescript/sdk/.env
+      - run: echo "ANS_TEST_ACCOUNT_ADDRESS=$ANS_TEST_ACCOUNT_ADDRESS" >> ./ecosystem/typescript/sdk/.env
+
+      # These two have to be defined here and not in the env section because the runner
+      # context is only available here.
+      - run: echo "APTOS_INVOCATION='docker run -v ${{ runner.temp }}/ans:/tmp/ans --network host ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos'" >> ./ecosystem/typescript/sdk/.env
+      - run: echo "ANS_REPO_LOCATION=${{ runner.temp }}/ans" >> ./ecosystem/typescript/sdk/.env
+
       - run: cp ./ecosystem/typescript/sdk/.env ./ecosystem/typescript/sdk/examples/typescript/.env
       - run: cp ./ecosystem/typescript/sdk/.env ./ecosystem/typescript/sdk/examples/javascript/.env
 
@@ -117,18 +127,18 @@ jobs:
       - run: wait-on -t 60000 --httpTimeout 60000 http-get://127.0.0.1:8080/v1
       - run: wait-on -t 60000 --httpTimeout 60000 http-get://127.0.0.1:8081
 
-      # Confirm the Rust API client examples pass.
-      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
-      - run: cargo run -p aptos-rest-client --example account -- --api-url http://127.0.01:8080
-
-      # Test and build.
+      # Run the TS SDK tests and confirm the build works.
       - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
         name: sdk-pnpm-test
         with:
           max_attempts: 3
-          timeout_minutes: 15
+          timeout_minutes: 20
           command: cd ./ecosystem/typescript/sdk && pnpm test
       - run: cd ./ecosystem/typescript/sdk && pnpm build
+
+      # Confirm the Rust API client examples pass.
+      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+      - run: cargo run -p aptos-rest-client --example account -- --api-url http://127.0.01:8080
 
       - name: Print docker-compose testnet logs on failure
         if: ${{ failure() }}
