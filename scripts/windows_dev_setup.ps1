@@ -13,12 +13,12 @@ $global:user_selection = $null
 $global:os = $null
 $global:architecture = $null
 $global:msvcpath = $null
-$global:grcov_version = "0.8.2"
-$global:protoc_version = "21.4"
 $global:cvc5_version = "0.0.8"
-$global:dotnet_version = "6.0.407"
-$global:z3_version = "4.11.2"
-$global:boogie_version = "2.15.8"
+$global:grcov_version = "GRCOV_VERSION="
+$global:protoc_version = "PROTOC_VERSION="
+$global:dotnet_version = "DOTNET_VERSION="
+$global:z3_version = "Z3_VERSION="
+$global:boogie_version = "BOOGIE_VERSION="
 
 
 function welcome_message {
@@ -68,6 +68,56 @@ function move_prover_message {
     * Boogie
     * CVC5"
     return $message
+}
+
+function update_versions {
+  try {    
+    # URL of the Unix script
+    $url = "https://raw.githubusercontent.com/aptos-labs/aptos-core/main/scripts/dev_setup.sh"
+    
+    # Retrieve the content of the file and store it in a variable
+    $content = (Invoke-WebRequest -Uri $url | Select-Object -ExpandProperty Content -First 50) -join "`n"
+
+    $packages = @($global:grcov_version, $global:protoc_version, $global:dotnet_version, $global:z3_version, $global:boogie_version)
+    
+    foreach ($package in $packages) {
+      $index = $content.IndexOf($package)
+
+      # If the search pattern was found, extract the matching line of text
+      if ($index -ge 0) {
+          # Find the end of the line by searching for the next newline character
+          $end_index = $content.IndexOf("`n", $index)
+
+          # Extract the line of text that matches the search pattern
+          if ($end_index -ge 0) {
+            $matching_line = $content.Substring($index, $end_index - $index)
+          } else {
+            $matching_line = $content.Substring($index)
+          }
+          # Extract the version number from the line of text
+          $matching_text = $matching_line.Split('=')[1].Trim()
+
+          $package_name = $package.TrimEnd('=')
+          # Update global variable with the extract version
+          Set-Variable -Name ($package_name) -Value $matching_text -Scope Global -Force
+
+          if ($matching_text -notmatch '\d+\.\d+(\.\d+)?') {
+            Write-Error "$package_name cannot be read due to a formatting problem in the source file."
+          }
+        } 
+      else {
+        Write-Error "Updated $package_name not found."
+      }
+    }
+  catch {
+    Write-Error "Unable to check for updated version numbers for some dependencies due to an error: $($_.Exception.Message)"
+    Write-Host "Installation will continue with the current versions..."
+    $global:grcov_version = "0.8.2"
+    $global:protoc_version = "21.4"
+    $global:dotnet_version = "6.0.407"
+    $global:z3_version = "4.11.2"
+    $global:boogie_version = "2.15.8"
+  }
 }
 
 function verify_architecture {  # Checks whether the Windows machine is 32-bit or 64-bit
