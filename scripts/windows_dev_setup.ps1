@@ -334,12 +334,20 @@ function install_pnpm {
 
 function install_postgresql {
   $result = check_package "PostgreSQL"
+  $psql_version = winget show -e PostgreSQL | Select-String Version
+  $psql_version = $psql_version.Split(':')[1].Split('.')[0].Trim()
+  $psql_path = "$env:PATH;$env:PROGRAMFILES\PostgreSQL\$psql_version\bin"
+  
   if ($result) {
-	winget install PostgreSQL.PostgreSQL --silent
-	}
+    winget install PostgreSQL.PostgreSQL --silent
+    [Environment]::SetEnvironmentVariable("PATH", $psql_path, "User")
+  }
+  elseif (!(Get-Command psql -ErrorAction SilentlyContinue)) {
+    [Environment]::SetEnvironmentVariable("PATH", $psql_path, "User")
+  }
   else {
-	winget upgrade --id LLVM.LLVM
-   }
+    winget upgrade --id PostgreSQL.PostgreSQL
+  }
 }
 
 function existing_package {
