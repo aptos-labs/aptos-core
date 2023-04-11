@@ -143,7 +143,7 @@ function check_for_winget {
     Write-Host "WinGet is already installed."
     } 
     else {
-    Write-Host "Installing WinGet..."
+    Write-Host "Installing WinGet before continuing with the script..."
     install_winget
     }
 }
@@ -414,8 +414,6 @@ function install_boogie {
 
 function install_build_tools {
   Write-Host (build_tools_message)
-  verify_architecture
-  check_os
   install_msvc_build_tools
   install_llvm
   install_openssl
@@ -431,8 +429,6 @@ function install_build_tools {
 
 function install_move_prover {
   Write-Host (move_prover_message)
-  verify_architecture
-  check_os
   install_cvc5
   install_dotnet
   install_z3
@@ -440,6 +436,10 @@ function install_move_prover {
   install_git
   Write-Host "Installation complete. Open a new PowerShell session to update the environment variables."
 }
+
+verify_architecture
+check_os
+check_for_winget
 
 if ($t -or $y) {
     if ($t) {
