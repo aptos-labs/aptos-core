@@ -245,7 +245,7 @@ impl BatchMsg {
     }
 
     pub fn verify(&self, peer_id: PeerId) -> anyhow::Result<()> {
-        ensure!(!self.batches.is_empty(), "No batches in message");
+        ensure!(!self.batches.is_empty(), "Empty message");
         let mut epoch = None;
         for batch in self.batches.iter() {
             ensure!(

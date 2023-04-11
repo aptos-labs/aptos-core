@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{bail, Context};
+use anyhow::{bail, ensure, Context};
 use aptos_crypto::{bls12381, CryptoMaterialError, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
@@ -145,6 +145,7 @@ impl SignedBatchInfoMsg {
     }
 
     pub fn verify(&self, sender: PeerId, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+        ensure!(!self.signed_infos.is_empty(), "Empty message");
         for signed_info in &self.signed_infos {
             signed_info.verify(sender, validator)?
         }
@@ -232,6 +233,7 @@ impl ProofOfStoreMsg {
     }
 
     pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+        ensure!(!self.proofs.is_empty(), "Empty message");
         for proof in &self.proofs {
             proof.verify(validator)?
         }
