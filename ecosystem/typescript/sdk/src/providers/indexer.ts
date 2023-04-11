@@ -34,7 +34,6 @@ import {
   GetTopUserTransactions,
   GetUserTransactions,
 } from "../indexer/generated/queries";
-import { ProviderUtil } from "./utils";
 
 /**
  * Controls the number of results that are returned and the starting position of those results.
@@ -48,10 +47,6 @@ interface PaginationArgs {
   offset?: AnyNumber;
   limit?: number;
 }
-
-const headers = {
-  "User-Agent": ProviderUtil.getUserAgent(),
-};
 
 type GraphqlQuery = {
   query: string;
@@ -89,7 +84,7 @@ export class IndexerClient {
    * @param graphqlQuery A GraphQL query to pass in the `data` axios call.
    */
   async queryIndexer<T>(graphqlQuery: GraphqlQuery): Promise<T> {
-    const { data } = await axios.post(this.endpoint, graphqlQuery, { headers });
+    const { data } = await axios.post(this.endpoint, graphqlQuery);
     if (data.errors) {
       throw new Error(`Indexer data error ${JSON.stringify(data.errors, null, " ")}`);
     }
