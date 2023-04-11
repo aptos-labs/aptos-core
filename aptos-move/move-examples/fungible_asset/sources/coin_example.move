@@ -1,3 +1,4 @@
+/// A coin example using managed_fungible_asset.
 module fungible_asset_extension::coin_example {
     use aptos_framework::object;
     use aptos_framework::fungible_asset::{Metadata, FungibleAsset};
