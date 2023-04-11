@@ -3,6 +3,7 @@ module aptos_framework::primary_store {
     use aptos_framework::fungible_asset::{Self, FungibleAsset, FungibleStore};
     use aptos_framework::object::{Self, Object, ConstructorRef, DeriveRef};
 
+    use std::option::Option;
     use std::signer;
     use std::string::String;
 
@@ -16,12 +17,12 @@ module aptos_framework::primary_store {
     /// their users.
     public fun create_primary_store_enabled_fungible_asset(
         constructor_ref: &ConstructorRef,
-        maximum_supply: u64,
+        monitoring_supply_with_maximum: Option<Option<u128>>,
         name: String,
         symbol: String,
         decimals: u8,
     ) {
-        fungible_asset::add_fungibility(constructor_ref, maximum_supply, name, symbol, decimals);
+        fungible_asset::add_fungibility(constructor_ref, monitoring_supply_with_maximum, name, symbol, decimals);
         let metadata_obj = &object::generate_signer(constructor_ref);
         move_to(metadata_obj, DeriveRefPod {
             metadata_derive_ref: object::generate_derive_ref(constructor_ref),
@@ -121,6 +122,8 @@ module aptos_framework::primary_store {
     use aptos_framework::fungible_asset::{create_test_token, mint, generate_mint_ref, generate_burn_ref, MintRef, TransferRef, BurnRef, generate_transfer_ref};
     #[test_only]
     use std::string;
+    #[test_only]
+    use std::option;
 
     #[test_only]
     public fun init_test_metadata_with_primary_store_enabled(
@@ -128,7 +131,7 @@ module aptos_framework::primary_store {
     ): (MintRef, TransferRef, BurnRef) {
         create_primary_store_enabled_fungible_asset(
             constructor_ref,
-            100 /* max supply */,
+            option::some(option::some(100)) /* max supply */,
             string::utf8(b"USDA"),
             string::utf8(b"$$$"),
             0
