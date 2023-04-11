@@ -1,6 +1,5 @@
-/// By deploying this module, the deployer will be creating a new managed fungible asset with the hardcoded
-/// maximum supply, name, symbol, and decimals. The address of the asset can be obtained via get_asset().
-/// The deployer will also become the initial admin and can mint/burn/freeze/unfreeze accounts.
+/// By deploying this module, the deployer provide an extension layer upon fungible asset that helps manage
+/// the refs for the deployer, who is set to be the initial admin that can mint/burn/freeze/unfreeze accounts.
 /// The admin can transfer the asset via object::transfer() at any point to set a new admin.
 module fungible_asset_extension::managed_fungible_asset {
     use aptos_framework::fungible_asset::{Self, MintRef, TransferRef, BurnRef, FungibleAsset, Metadata};
