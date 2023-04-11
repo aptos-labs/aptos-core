@@ -38,13 +38,19 @@ module aptos_framework::fungible_asset {
     /// Cannot destroy fungible stores with non-zero balance.
     const EBALANCE_IS_NOT_ZERO: u64 = 14;
 
+    /// Maximum possible coin supply.
+    const MAX_U128: u128 = 340282366920938463463374607431768211455;
+
+    struct Supply has store {
+        current: OptionalAggregator,
+        maximum: Option<u128>,
+    }
+
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Define the metadata required of an metadata to be fungible.
     struct Metadata has key {
         /// The current supply of the fungible asset.
-        supply: u64,
-        /// The maximum supply limit where `option::none()` means no limit.
-        maximum: Option<u64>,
+        supply: Option<Supply>,
         /// Name of the fungible metadata, i.e., "USDT".
         name: String,
         /// Symbol of the fungible metadata, usually a shorter version of the name.
@@ -116,21 +122,21 @@ module aptos_framework::fungible_asset {
     /// This returns the capabilities to mint, burn, and transfer.
     public fun add_fungibility(
         constructor_ref: &ConstructorRef,
-        maximum_supply: u64,
+        monitoring_supply_with_maximum: Option<Option<u128>>,
         name: String,
         symbol: String,
         decimals: u8,
     ): Object<Metadata> {
         let metadata_object_signer = &object::generate_signer(constructor_ref);
-        let converted_maximum = if (maximum_supply == 0) {
-            option::none()
-        } else {
-            option::some(maximum_supply)
-        };
+        let supply = option::map(monitoring_supply_with_maximum, |maximum| {
+            Supply {
+                current: optional_aggregator::new(MAX_U128, false),
+                maximum
+            }
+        });
         move_to(metadata_object_signer,
             Metadata {
-                supply: 0,
-                maximum: converted_maximum,
+                supply,
                 name,
                 symbol,
                 decimals,
@@ -163,14 +169,26 @@ module aptos_framework::fungible_asset {
 
     #[view]
     /// Get the current supply from `metadata`.
-    public fun supply<T: key>(metadata: Object<T>): u64 acquires Metadata {
-        borrow_fungible_metadata(&metadata).supply
+    public fun supply<T: key>(metadata: Object<T>): Option<u128> acquires Metadata {
+        let supply_opt = &borrow_fungible_metadata(&metadata).supply;
+        if (option::is_none(supply_opt)) {
+            option::none()
+        } else {
+            let supply = option::borrow(supply_opt);
+            option::some(optional_aggregator::read(&supply.current))
+        }
     }
 
     #[view]
     /// Get the maximum supply from `metadata`.
-    public fun maximum<T: key>(metadata: Object<T>): Option<u64> acquires Metadata {
-        borrow_fungible_metadata(&metadata).maximum
+    public fun maximum<T: key>(metadata: Object<T>): Option<u128> acquires Metadata {
+        let supply_opt = &borrow_fungible_metadata(&metadata).supply;
+        if (option::is_none(supply_opt)) {
+            option::none()
+        } else {
+            let supply = option::borrow(supply_opt);
+            supply.maximum
+        }
     }
 
     #[view]
@@ -468,19 +486,33 @@ module aptos_framework::fungible_asset {
     fun increase_supply<T: key>(metadata: &Object<T>, amount: u64) acquires Metadata {
         assert!(amount != 0, error::invalid_argument(EAMOUNT_CANNOT_BE_ZERO));
         let fungible_metadata = borrow_fungible_metadata_mut(metadata);
-        if (option::is_some(&fungible_metadata.maximum)) {
-            let max = *option::borrow(&fungible_metadata.maximum);
-            assert!(max - fungible_metadata.supply >= amount, error::invalid_argument(EMAX_SUPPLY_EXCEEDED))
+        if (option::is_some(&fungible_metadata.supply)) {
+            let supply = option::borrow_mut(&mut fungible_metadata.supply);
+            if (option::is_some(&supply.maximum)) {
+                let max = *option::borrow_mut(&mut supply.maximum);
+                assert!(
+                    max - optional_aggregator::read(&supply.current) >= (amount as u128),
+                    error::invalid_argument(EMAX_SUPPLY_EXCEEDED)
+                )
+            };
+            optional_aggregator::add(&mut supply.current, (amount as u128))
         };
-        fungible_metadata.supply = fungible_metadata.supply + amount;
     }
 
     /// Decrease the supply of a fungible metadata by burning.
     fun decrease_supply<T: key>(metadata: &Object<T>, amount: u64) acquires Metadata {
         assert!(amount != 0, error::invalid_argument(EAMOUNT_CANNOT_BE_ZERO));
         let fungible_metadata = borrow_fungible_metadata_mut(metadata);
-        assert!(fungible_metadata.supply >= amount, error::invalid_argument(ESUPPLY_UNDERFLOW));
-        fungible_metadata.supply = fungible_metadata.supply - amount;
+        if (option::is_some(&fungible_metadata.supply)) {
+            let supply = option::borrow_mut(&mut fungible_metadata.supply);
+            if (option::is_some(&supply.maximum)) {
+                assert!(
+                    optional_aggregator::read(&supply.current) >= (amount as u128),
+                    error::invalid_argument(ESUPPLY_UNDERFLOW)
+                )
+            };
+            optional_aggregator::sub(&mut supply.current, (amount as u128))
+        };
     }
 
     inline fun borrow_fungible_metadata<T: key>(
@@ -505,6 +537,8 @@ module aptos_framework::fungible_asset {
     use std::string;
     #[test_only]
     use aptos_framework::account;
+    use aptos_framework::optional_aggregator::OptionalAggregator;
+    use aptos_framework::optional_aggregator;
 
     #[test_only]
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
@@ -525,7 +559,7 @@ module aptos_framework::fungible_asset {
     public fun init_test_metadata(constructor_ref: &ConstructorRef): (MintRef, TransferRef, BurnRef) {
         add_fungibility(
             constructor_ref,
-            100 /* max supply */,
+            option::some(option::some(100)) /* max supply */,
             string::utf8(b"USDA"),
             string::utf8(b"$$$"),
             0
@@ -558,16 +592,16 @@ module aptos_framework::fungible_asset {
     fun test_metadata_basic_flow(creator: &signer) acquires Metadata {
         let (creator_ref, asset) = create_test_token(creator);
         init_test_metadata(&creator_ref);
-        assert!(supply(asset) == 0, 1);
+        assert!(supply(asset) == option::some(0), 1);
         assert!(maximum(asset) == option::some(100), 2);
         assert!(name(asset) == string::utf8(b"USDA"), 3);
         assert!(symbol(asset) == string::utf8(b"$$$"), 4);
         assert!(decimals(asset) == 0, 5);
 
         increase_supply(&asset, 50);
-        assert!(supply(asset) == 50, 6);
+        assert!(supply(asset) == option::some(50), 6);
         decrease_supply(&asset, 30);
-        assert!(supply(asset) == 20, 7);
+        assert!(supply(asset) == option::some(20), 7);
     }
 
     #[test(creator = @0xcafe)]
@@ -605,19 +639,19 @@ module aptos_framework::fungible_asset {
         let creator_store = create_test_store(creator, metadata);
         let aaron_store = create_test_store(aaron, metadata);
 
-        assert!(supply(test_token) == 0, 1);
+        assert!(supply(test_token) == option::some(0), 1);
         // Mint
         let fa = mint(&mint_ref, 100);
-        assert!(supply(test_token) == 100, 2);
+        assert!(supply(test_token) == option::some(100), 2);
         // Deposit
         deposit(creator_store, fa);
         // Withdraw
         let fa = withdraw(creator, creator_store, 80);
-        assert!(supply(test_token) == 100, 3);
+        assert!(supply(test_token) == option::some(100), 3);
         deposit(aaron_store, fa);
         // Burn
         burn_from(&burn_ref, aaron_store, 30);
-        assert!(supply(test_token) == 70, 4);
+        assert!(supply(test_token) == option::some(70), 4);
         // Transfer
         transfer(creator, creator_store, aaron_store, 10);
         assert!(balance(creator_store) == 10, 5);
