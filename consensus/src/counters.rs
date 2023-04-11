@@ -11,6 +11,10 @@ use aptos_metrics_core::{
 };
 use once_cell::sync::Lazy;
 
+pub const TXN_COMMIT_SUCCESS: &str = "success";
+pub const TXN_COMMIT_FAILED: &str = "failed";
+pub const TXN_COMMIT_RETRY: &str = "retry";
+
 //////////////////////
 // HEALTH COUNTERS
 //////////////////////
