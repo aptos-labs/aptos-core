@@ -408,21 +408,15 @@ function install_z3 {
     $uri = "z3-$global:z3_version"
     $z3_zip = "z3-$global:z3_version-x$global:architecture-win.zip"
     $z3_filepath = "$env:USERPROFILE\$z3_zip"
-    # Download and extract the 64-bit version of Protoc
+    
+    # Download and extract Z3
     Invoke-WebRequest -Uri "https://github.com/Z3Prover/z3/releases/download/$uri/$z3_zip" -OutFile (New-Item -Path "$z3_filepath" -Force) -ErrorAction SilentlyContinue
-    if ($global:architecture -eq "64") {
-      while ((Get-Item "$z3_filepath").Length -lt 52MB) {
-        Start-Sleep -Seconds 1
-      }
-    }
-    else {
-      while ((Get-Item "$z3_filepath").Length -lt 40MB) {
-        Start-Sleep -Seconds 1
-      }
-    }
-    Expand-Archive "$z3_filepath" -ErrorAction SilentlyContinue
-    $z3_exe = "$env:USERPROFILE\z3-$global:z3_version-x$global:architecture-win\z3-$global:z3_version-x$global:architecture-win\bin\z3.exe"
-    [Environment]::SetEnvironmentVariable("Z3_EXE", "$z3_exe", "User")    
+    Expand-Archive $z3_filepath -DestinationPath "$env:USERPROFILE" -ErrorAction SilentlyContinue
+    Remove-Item $z3_filepath
+
+    # Create a user environment variable for Z3
+    $z3_exe_path = "$env:USERPROFILE\z3-$global:z3_version-x$global:architecture-win\z3-$global:z3_version-x$global:architecture-win\bin\z3.exe"
+    [Environment]::SetEnvironmentVariable("Z3_EXE", "$z3_exe_path", "User")    
     Write-Host "User environment variable set for Z3"
     }
   else {
