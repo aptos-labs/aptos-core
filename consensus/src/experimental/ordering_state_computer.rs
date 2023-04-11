@@ -125,6 +125,7 @@ impl StateComputer for OrderingStateComputer {
         _: &EpochState,
         _payload_manager: Arc<PayloadManager>,
         _: Arc<dyn TransactionShuffler>,
+        _: Option<u64>,
     ) {
     }
 

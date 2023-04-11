@@ -21,7 +21,6 @@ use std::{collections::HashMap, fmt, sync::Arc};
 mod approved_execution_hashes;
 mod aptos_features;
 mod aptos_version;
-mod block_gas_limit_config;
 mod chain_id;
 mod consensus_config;
 mod execution_config;

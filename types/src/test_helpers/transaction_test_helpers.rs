@@ -10,7 +10,7 @@ use crate::{
         Script, SignedTransaction, Transaction, TransactionPayload,
     },
 };
-use aptos_crypto::{ed25519::*, traits::*};
+use aptos_crypto::{ed25519::*, traits::*, HashValue};
 
 const MAX_GAS_AMOUNT: u64 = 1_000_000;
 const TEST_GAS_PRICE: u64 = 100;
@@ -239,7 +239,9 @@ pub fn get_test_txn_with_chain_id(
     SignedTransaction::new(raw_txn, public_key, signature)
 }
 
-pub fn block(user_txns: Vec<Transaction>) -> Vec<Transaction> {
-    // user_txns.push(Transaction::StateCheckpoint(HashValue::random()));
+pub fn block(mut user_txns: Vec<Transaction>, maybe_gas_limit: Option<u64>) -> Vec<Transaction> {
+    if maybe_gas_limit.is_none() {
+        user_txns.push(Transaction::StateCheckpoint(HashValue::random()));
+    }
     user_txns
 }
