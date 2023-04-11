@@ -118,6 +118,9 @@ impl BatchGenerator {
         self.batches_in_progress.insert(batch_id, txn_summaries);
         self.batch_expirations.add_item(batch_id, expiry_time);
 
+        counters::CREATED_BATCHES_COUNT.inc();
+        counters::num_txn_per_batch(bucket_start.to_string().as_str(), txns.len());
+
         Batch::new(
             batch_id,
             txns,
@@ -167,10 +170,8 @@ impl BatchGenerator {
         }
 
         // Quorum store metrics
-        counters::CREATED_BATCHES_COUNT.inc();
         let duration = self.last_end_batch_time.elapsed().as_secs_f64();
         counters::BATCH_CREATION_DURATION.observe_duration(Duration::from_secs_f64(duration));
-        counters::NUM_TXN_PER_BATCH.observe(pulled_txns.len() as f64);
 
         let expiry_time = aptos_infallible::duration_since_epoch().as_micros() as u64
             + self.config.batch_expiry_gap_when_init_usecs;

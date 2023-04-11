@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    exponential_buckets, op_counters::DurationHistogram, register_avg_counter, register_histogram,
-    register_histogram_vec, register_int_counter, register_int_counter_vec, Histogram,
-    HistogramVec, IntCounter, IntCounterVec,
+    exponential_buckets, histogram_opts, op_counters::DurationHistogram, register_avg_counter,
+    register_histogram, register_histogram_vec, register_int_counter, register_int_counter_vec,
+    Histogram, HistogramVec, IntCounter, IntCounterVec,
 };
 use once_cell::sync::Lazy;
 use std::time::Duration;
@@ -17,6 +17,8 @@ pub const REQUEST_SUCCESS_LABEL: &str = "success";
 
 pub const CALLBACK_FAIL_LABEL: &str = "callback_fail";
 pub const CALLBACK_SUCCESS_LABEL: &str = "callback_success";
+
+pub const UNKNOWN_BUCKET: &str = "unknown";
 
 static TRANSACTION_COUNT_BUCKETS: Lazy<Vec<f64>> = Lazy::new(|| {
     exponential_buckets(
@@ -81,14 +83,20 @@ pub static NUM_BATCH_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
 });
 
 /// Histogram for the number of transactions per batch.
-pub static NUM_TXN_PER_BATCH: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
+static NUM_TXN_PER_BATCH: Lazy<HistogramVec> = Lazy::new(|| {
+    let histogram_opts = histogram_opts!(
         "quorum_store_num_txn_per_batch",
         "Histogram for the number of transanctions per batch.",
-        // exponential_buckets(/*start=*/ 100.0, /*factor=*/ 1.1, /*count=*/ 100).unwrap(),
-    )
-    .unwrap()
+        TRANSACTION_COUNT_BUCKETS.to_vec(),
+    );
+    register_histogram_vec!(histogram_opts, &["bucket"]).unwrap()
 });
+
+pub fn num_txn_per_batch(bucket_start: &str, num: usize) {
+    NUM_TXN_PER_BATCH
+        .with_label_values(&[bucket_start])
+        .observe(num as f64)
+}
 
 /// Histogram for the number of transactions per block when pulled for consensus.
 pub static BLOCK_SIZE_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
@@ -160,23 +168,40 @@ pub static GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_TIME_WHEN_PULL_PROOFS: Lazy<
     .unwrap()
     });
 
-pub static POS_TO_PULL: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
+static POS_TO_PULL: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
         "quorum_store_pos_to_pull",
         "Histogram for how long it took a PoS to go from inserted to pulled into a proposed block",
-        // exponential_buckets(/*start=*/ 100.0, /*factor=*/ 1.1, /*count=*/ 100).unwrap(),
+        &["bucket"],
     )
     .unwrap()
 });
 
-pub static POS_TO_COMMIT: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
+pub fn pos_to_pull(bucket_start: u64, secs: f64) {
+    POS_TO_PULL
+        .with_label_values(&[bucket_start.to_string().as_str()])
+        .observe(secs)
+}
+
+static POS_TO_COMMIT: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
         "quorum_store_pos_to_commit",
         "Histogram for how long it took a PoS to go from inserted to commit notified",
-        // exponential_buckets(/*start=*/ 100.0, /*factor=*/ 1.1, /*count=*/ 100).unwrap(),
+        &["bucket"],
     )
     .unwrap()
 });
+
+pub fn pos_to_commit(bucket_start: Option<u64>, secs: f64) {
+    match bucket_start {
+        None => POS_TO_COMMIT
+            .with_label_values(&[UNKNOWN_BUCKET])
+            .observe(secs),
+        Some(bucket) => POS_TO_COMMIT
+            .with_label_values(&[bucket.to_string().as_str()])
+            .observe(secs),
+    }
+}
 
 /// Histogram for the number of total txns left after cleaning up commit notifications.
 pub static NUM_TOTAL_TXNS_LEFT_ON_COMMIT: Lazy<Histogram> = Lazy::new(|| {
@@ -253,22 +278,32 @@ pub static CREATED_EMPTY_BATCHES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
 });
 
 /// Count of the created proof-of-store (PoS) since last restart.
-pub static LOCAL_POS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!(
+static LOCAL_POS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
         "quorum_store_local_PoS_count",
-        "Count of the locally created PoS since last restart."
+        "Count of the locally created PoS since last restart.",
+        &["bucket"]
     )
     .unwrap()
 });
 
+pub fn inc_local_pos_count(bucket_start: &str) {
+    LOCAL_POS_COUNT.with_label_values(&[bucket_start]).inc()
+}
+
 /// Count of the created proof-of-store (PoS) since last restart.
-pub static REMOTE_POS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!(
+static REMOTE_POS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
         "quorum_store_remote_PoS_count",
-        "Count of the received PoS since last restart."
+        "Count of the received PoS since last restart.",
+        &["bucket"]
     )
     .unwrap()
 });
+
+pub fn inc_remote_pos_count(bucket_start: &str) {
+    REMOTE_POS_COUNT.with_label_values(&[bucket_start]).inc()
+}
 
 /// Count of the received batches since last restart.
 pub static RECEIVED_REMOTE_BATCHES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
