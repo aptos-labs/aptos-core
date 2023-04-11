@@ -576,6 +576,9 @@ impl ResolvingGraph {
                     git_url,
                 )?;
 
+                // Confirm git is available.
+                confirm_git_available()?;
+
                 // If the cached folder does not exist, download and clone accordingly
                 Command::new("git")
                     .args(["clone", git_url, git_path])
@@ -594,6 +597,9 @@ impl ResolvingGraph {
                         )
                     })?;
             } else if !skip_fetch_latest_git_deps {
+                // Confirm git is available.
+                confirm_git_available()?;
+
                 // Update the git dependency
                 // Check first that it isn't a git rev (if it doesn't work, just continue with the fetch)
                 if let Ok(rev) = Command::new("git")
@@ -962,5 +968,24 @@ impl ResolvedPackage {
         } else {
             self.source_package.dependencies.keys().copied().collect()
         }
+    }
+}
+
+fn confirm_git_available() -> Result<()> {
+    match Command::new("git").arg("--version").output() {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            if let std::io::ErrorKind::NotFound = e.kind() {
+                bail!(
+                    "git was not found, confirm you have git installed and it is on your PATH. \
+                    Alternatively, skip with --skip-fetch-latest-git-deps"
+                );
+            } else {
+                bail!(
+                    "Unexpected error occured when checking for presence of `git`: {:#}",
+                    e
+                );
+            }
+        },
     }
 }
