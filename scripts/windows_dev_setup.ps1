@@ -252,28 +252,23 @@ function install_rustup {
 }
 
 function install_protoc {
-    $exists = check_non_winget_or_installer_package "Protoc"
-    if (!$exists) {
-        if ($global:os -eq "64") {
-            # Download and extract the 64-bit version of Protoc
-            Invoke-WebRequest -Uri "https://github.com/protocolbuffers/protobuf/releases/download/v$global:protoc_version/protoc-$global:protoc_version-win64.zip" -OutFile "protoc-$global:protoc_version-win64.zip" -ErrorAction SilentlyContinue
-            while ((Get-Item "protoc-$global:protoc_version-win64.zip").Length -lt 2MB) {
-                Start-Sleep -Seconds 1
-            }
-            Expand-Archive -Path "protoc-$global:protoc_version-win64.zip" -DestinationPath "$env:USERPROFILE\protoc-$global:protoc_version-win64" -ErrorAction SilentlyContinue
-        }
-        else {
-            # Download and extract the 32-bit version of Protoc
-            Invoke-WebRequest -Uri "https://github.com/protocolbuffers/protobuf/releases/download/v$global:protoc_version/protoc-$global:protoc_version-win32.zip" -OutFile "protoc-$global:protoc_version-win32.zip" -ErrorAction SilentlyContinue
-            while ((Get-Item "protoc-$global:protoc_version-win32.zip").Length -lt 2MB) {
-                Start-Sleep -Seconds 1
-            }
-            Expand-Archive -Path "protoc-$global:protoc_version-win32.zip" -DestinationPath "$env:USERPROFILE\protoc-$global:protoc_version-win32" -ErrorAction SilentlyContinue
-        }
-        
-        # Add the Protoc installation directory to the user's PATH environment variable
-        [Environment]::SetEnvironmentVariable("PATH", "$env:PATH;$env:USERPROFILE\protoc-$global:protoc_version-win64\bin", "User")
-    }
+  if (!(Get-Command protoc -ErrorAction SilentlyContinue)) {
+      
+    $protoc_zip = "protoc-$global:protoc_version-win$global:architecture.zip"
+    $protoc_folder = "protoc-$global:protoc_version-win$global:architecture"
+    $protoc_url = "https://github.com/protocolbuffers/protobuf/releases/download/v$global:protoc_version/$protoc_zip"
+     
+    # Download and extract Protoc
+    Invoke-WebRequest -Uri $protoc_url -OutFile (New-Item -Path "$env:USERPROFILE\Downloads\$protoc_zip" -Force) -ErrorAction SilentlyContinue
+    Expand-Archive -Path "$env:USERPROFILE\Downloads\$protoc_zip" -DestinationPath "$env:USERPROFILE\$protoc_folder" -ErrorAction SilentlyContinue
+    Remove-Item "$env:USERPROFILE\Downloads\$protoc_zip"
+      
+    # Add Protoc installation directory to user PATH environment variable
+    [Environment]::SetEnvironmentVariable("PATH", "$env:PATH;$env:USERPROFILE\$protoc_folder\bin", "User")
+  }
+  else {
+    Write-Host "Protoc is already installed."
+  }
 }
 
 function install_cargo_plugins {  # Installs Grcov, protoc components, and cargo components
