@@ -177,7 +177,7 @@ module aptos_std::bulletproofs {
         let comm = std::option::extract(&mut comm);
         let comm = pedersen::new_commitment_from_point(comm);
 
-        assert!(verify_range_proof(
+        assert!(verify_range_proof_pedersen(
             &comm,
             &range_proof_from_bytes(A_RANGE_PROOF_VALID), 10, A_DST), 1);
     }
@@ -191,12 +191,12 @@ module aptos_std::bulletproofs {
         let r = std::option::extract(&mut r);
         let num_bits = 8;
 
-        let (proof, comm) = prove_range(&v, &r, num_bits, A_DST);
+        let (proof, comm) = prove_range_pedersen(&v, &r, num_bits, A_DST);
 
-        assert!(verify_range_proof(&comm, &proof, 64, A_DST) == false, 1);
-        assert!(verify_range_proof(&comm, &proof, 32, A_DST) == false, 1);
-        assert!(verify_range_proof(&comm, &proof, 16, A_DST) == false, 1);
-        assert!(verify_range_proof(&comm, &proof, num_bits, A_DST), 1);
+        assert!(verify_range_proof_pedersen(&comm, &proof, 64, A_DST) == false, 1);
+        assert!(verify_range_proof_pedersen(&comm, &proof, 32, A_DST) == false, 1);
+        assert!(verify_range_proof_pedersen(&comm, &proof, 16, A_DST) == false, 1);
+        assert!(verify_range_proof_pedersen(&comm, &proof, num_bits, A_DST), 1);
     }
 
     #[test(fx = @std)]
@@ -212,7 +212,7 @@ module aptos_std::bulletproofs {
         );
 
         // This will fail with error::invalid_argument(E_DESERIALIZE_RANGE_PROOF)
-        verify_range_proof(&com, proof, num_bits, A_DST);
+        verify_range_proof_pedersen(&com, proof, num_bits, A_DST);
     }
 
     #[test(fx = @std)]
@@ -223,7 +223,7 @@ module aptos_std::bulletproofs {
         let comm = std::option::extract(&mut comm);
         let comm = pedersen::new_commitment_from_point(comm);
 
-        assert!(verify_range_proof(
+        assert!(verify_range_proof_pedersen(
             &comm,
             &range_proof_from_bytes(A_RANGE_PROOF_VALID), MAX_RANGE_BITS, A_DST), 1);
     }
@@ -243,7 +243,7 @@ module aptos_std::bulletproofs {
         let expected_comm = std::option::extract(&mut ristretto255::new_point_from_bytes(A_COMM));
         assert!(point_equals(pedersen::commitment_as_point(&comm), &expected_comm), 1);
 
-        assert!(verify_range_proof(
+        assert!(verify_range_proof_pedersen(
             &comm,
             &range_proof_from_bytes(A_RANGE_PROOF_VALID), MAX_RANGE_BITS, A_DST), 1);
     }
@@ -264,7 +264,7 @@ module aptos_std::bulletproofs {
         let byte = std::vector::borrow_mut(&mut range_proof_invalid, pos);
         *byte = *byte + 1;
 
-        assert!(verify_range_proof(
+        assert!(verify_range_proof_pedersen(
             &comm,
             &range_proof_from_bytes(range_proof_invalid), MAX_RANGE_BITS, A_DST) == false, 1);
     }

@@ -232,40 +232,34 @@ module veiled_coin::veiled_coin {
     }
 
     /// Takes `amount` of `VeiledCoin<CoinType>` coins from `sender`, unwraps them to a coin::Coin<CoinType>,
-    /// and sends them back to `sender`.`amount_ct` must be an ElGamal ciphertext encrypting `amount`
-    /// with no randomness. Note that this function inherently leaks `amount`. Privacy of the remaining balance is maintained. Requires a range
+    /// and sends them back to `sender`. Note that this function inherently leaks `amount`. Privacy of the remaining balance is maintained. Requires a range
     /// proof on the new balance of the sender, to ensure the sender has enough money to send, in addition to a 
     /// range proof on the transferred amount.  
+    // TODO: Remove range proof on transferred amount
     public entry fun unwrap<CoinType>(
 	sender: &signer, 
 	amount: u64, 
-	amount_ct_bytes: vector<u8>, 
 	range_proof_updated_balance: vector<u8>, 
 	range_proof_transferred_amount: vector<u8>) acquires VeiledCoinStore, VeiledCoinMinter
     {
-	unwrap_to<CoinType>(sender, signer::address_of(sender), amount, amount_ct_bytes, range_proof_updated_balance, range_proof_transferred_amount)
+	unwrap_to<CoinType>(sender, signer::address_of(sender), amount, range_proof_updated_balance, range_proof_transferred_amount)
     }
 
     /// Takes `amount` of `VeiledCoin<CoinType>` coins from `sender`, unwraps them to a coin::Coin<CoinType>,
-    /// and sends them to `recipient`.`amount_ct` must be an ElGamal ciphertext encrypting `amount`
-    /// with no randomness. It is not possible for this function to be made private. Requires a range
+    /// and sends them to `recipient`. It is not possible for this function to be made private. Requires a range
     /// proof on the new balance of the sender, to ensure the sender has enough money to send, in addition to a 
     /// range proof on the transferred amount.  
     public entry fun unwrap_to<CoinType>(
 	sender: &signer, 
 	recipient: address, 
 	amount: u64, 
-	amount_ct_bytes: vector<u8>, 
 	range_proof_updated_balance_bytes: vector<u8>, 
 	range_proof_transferred_amount_bytes: vector<u8>) acquires VeiledCoinStore, VeiledCoinMinter
     {
-	let amount_ct = elgamal::new_ciphertext_from_bytes(amount_ct_bytes);
-	assert!(std::option::is_some(&amount_ct), EDESERIALIZATION_FAILED);	
-
 	let range_proof_updated_balance = bulletproofs::range_proof_from_bytes(range_proof_updated_balance_bytes);
 	let range_proof_transferred_amount = bulletproofs::range_proof_from_bytes(range_proof_transferred_amount_bytes);
 	
-	let c = unwrap_to_coin<CoinType>(sender, std::option::extract(&mut amount_ct), amount, &range_proof_updated_balance, &range_proof_transferred_amount);
+	let c = unwrap_to_coin<CoinType>(sender, amount, &range_proof_updated_balance, &range_proof_transferred_amount);
 	coin::deposit<CoinType>(recipient, c);
     }
 
@@ -485,13 +479,11 @@ module veiled_coin::veiled_coin {
     }
 
     /// Removes `amount` coins from the VeiledCoinStore balance of `sender`, by subtracting `amount_ct` from
-    /// their VeiledCoinStore balance. `amount_ct` must be an ElGamal ciphertext encrypting `amount`
-    /// with no randomness. It is not possible for this function to be made private. Requires a range
+    /// their VeiledCoinStore balance. It is not possible for this function to be made private. Requires a range
     /// proof on the new balance of the sender, to ensure the sender has enough money to send, in addition to a 
     /// range proof on the transferred amount.
     public fun unwrap_to_coin<CoinType>(
 	sender: &signer, 
-	amount_ct: Ciphertext, 
 	amount: u64,
 	range_proof_updated_balance: &RangeProof,
 	range_proof_transferred_amount: &RangeProof): Coin<CoinType> acquires VeiledCoinStore, VeiledCoinMinter {
@@ -499,12 +491,11 @@ module veiled_coin::veiled_coin {
 	let rsrc_acc_signer = get_resource_account_signer();
 	let scalar_amount = new_scalar_from_u64(amount);
 	let computed_ct = elgamal::new_ciphertext_no_randomness(&scalar_amount);
-	assert!(elgamal::ciphertext_equals(&amount_ct, &computed_ct), ECIPHERTEXT_WRONG_VALUE);
 
 	let sender_addr = signer::address_of(sender);
 	let sender_coin_store = borrow_global_mut<VeiledCoinStore<CoinType>>(sender_addr);
 
-	withdraw(sender, amount_ct, sender_coin_store, range_proof_updated_balance, range_proof_transferred_amount);
+	withdraw(sender, computed_ct, sender_coin_store, range_proof_updated_balance, range_proof_transferred_amount);
 	coin::withdraw(&rsrc_acc_signer, amount)
     }
 
