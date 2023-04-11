@@ -11,7 +11,9 @@ use crate::{
 };
 use aptos_config::config::NodeConfig;
 use aptos_crypto::HashValue;
-use aptos_types::{mempool_status::MempoolStatusCode, transaction::SignedTransaction};
+use aptos_types::{
+    mempool_status::MempoolStatusCode, transaction::SignedTransaction, vm_status::DiscardedVMStatus,
+};
 use itertools::Itertools;
 use std::{
     collections::HashSet,
@@ -197,6 +199,7 @@ fn test_reject_transaction() {
         &TestTransaction::get_address(0),
         0,
         &txns[1].clone().committed_hash(), // hash of other txn
+        &DiscardedVMStatus::MALFORMED,
     );
     assert!(pool
         .get_transaction_store()
@@ -206,6 +209,30 @@ fn test_reject_transaction() {
         &TestTransaction::get_address(0),
         1,
         &txns[0].clone().committed_hash(), // hash of other txn
+        &DiscardedVMStatus::MALFORMED,
+    );
+    assert!(pool
+        .get_transaction_store()
+        .get(&TestTransaction::get_address(0), 1)
+        .is_some());
+
+    // reject with sequence number too new should have no effect
+    // reject with wrong hash should have no effect
+    pool.reject_transaction(
+        &TestTransaction::get_address(0),
+        0,
+        &txns[0].clone().committed_hash(),
+        &DiscardedVMStatus::SEQUENCE_NUMBER_TOO_NEW,
+    );
+    assert!(pool
+        .get_transaction_store()
+        .get(&TestTransaction::get_address(0), 0)
+        .is_some());
+    pool.reject_transaction(
+        &TestTransaction::get_address(0),
+        1,
+        &txns[1].clone().committed_hash(),
+        &DiscardedVMStatus::SEQUENCE_NUMBER_TOO_NEW,
     );
     assert!(pool
         .get_transaction_store()
@@ -217,6 +244,7 @@ fn test_reject_transaction() {
         &TestTransaction::get_address(0),
         0,
         &txns[0].clone().committed_hash(),
+        &DiscardedVMStatus::MALFORMED,
     );
     assert!(pool
         .get_transaction_store()
@@ -226,6 +254,7 @@ fn test_reject_transaction() {
         &TestTransaction::get_address(0),
         1,
         &txns[1].clone().committed_hash(),
+        &DiscardedVMStatus::MALFORMED,
     );
     assert!(pool
         .get_transaction_store()
@@ -286,8 +315,18 @@ fn test_reset_sequence_number_on_failure() {
     ]);
 
     // Notify mempool about failure in arbitrary order
-    pool.reject_transaction(&TestTransaction::get_address(1), 0, &hashes[0]);
-    pool.reject_transaction(&TestTransaction::get_address(1), 1, &hashes[1]);
+    pool.reject_transaction(
+        &TestTransaction::get_address(1),
+        0,
+        &hashes[0],
+        &DiscardedVMStatus::MALFORMED,
+    );
+    pool.reject_transaction(
+        &TestTransaction::get_address(1),
+        1,
+        &hashes[1],
+        &DiscardedVMStatus::MALFORMED,
+    );
 
     // Verify that new transaction for this account can be added.
     assert!(add_txn(&mut pool, TestTransaction::new(1, 0, 1)).is_ok());
@@ -730,7 +769,12 @@ fn test_transaction_store_remove_account_if_empty() {
     add_signed_txn(&mut pool, txn).unwrap();
     assert_eq!(pool.get_transaction_store().get_transactions().len(), 1);
 
-    pool.reject_transaction(&TestTransaction::get_address(2), 2, &hash);
+    pool.reject_transaction(
+        &TestTransaction::get_address(2),
+        2,
+        &hash,
+        &DiscardedVMStatus::MALFORMED,
+    );
     assert_eq!(pool.get_transaction_store().get_transactions().len(), 0);
 }
 
