@@ -104,47 +104,38 @@ function check_os {
 }
 
 function install_winget {
-    # Download and extract XAML dependency
-    Invoke-WebRequest -Uri "https://www.nuget.org/api/v2/package/Microsoft.UI.Xaml/2.7.1" -OutFile "Microsoft.UI.Xaml.2.7.1.nupkg.zip" -ErrorAction SilentlyContinue
-    while ((Get-Item "Microsoft.UI.Xaml.2.7.1.nupkg.zip").Length -lt 18MB) {
-        Start-Sleep -Seconds 1
-    }
-    Expand-Archive "Microsoft.UI.Xaml.2.7.1.nupkg.zip" -ErrorAction SilentlyContinue
+  $xaml_url = "https://www.nuget.org/api/v2/package/Microsoft.UI.Xaml/2.7.1"
+  $xaml_downloadpath = "Microsoft.UI.Xaml.2.7.1.nupkg.zip"
+  $xaml_filepath = "Microsoft.UI.Xaml.2.7.1.nupkg\tools\AppX\x64\Release\Microsoft.UI.Xaml.2.7.appx"
 
-    if ($global:architecture -eq "64") {
-        # Install x64 dependencies (VCLibs and XAML)
-        Invoke-WebRequest -Uri "https://aka.ms/Microsoft.VCLibs.x64.14.00.Desktop.appx" -OutFile "Microsoft.VCLibs.x64.14.00.Desktop.appx" -ErrorAction SilentlyContinue
-        while ((Get-Item "Microsoft.VCLibs.x64.14.00.Desktop.appx").Length -lt 6MB) {
-            Start-Sleep -Seconds 1
-        }
-        Add-AppxPackage "Microsoft.VCLibs.x64.14.00.Desktop.appx" -ErrorAction SilentlyContinue
-        Add-AppxPackage "Microsoft.UI.Xaml.2.7.1.nupkg\tools\AppX\x64\Release\Microsoft.UI.Xaml.2.7.appx" -ErrorAction SilentlyContinue
-    }
-    elseif ($global:architecture -eq "86") {
-        # Install x86 dependencies (VCLibs and XAML)
-        Invoke-WebRequest -Uri "https://aka.ms/Microsoft.VCLibs.x86.14.00.Desktop.appx" -OutFile "Microsoft.VCLibs.x86.14.00.Desktop.appx" -ErrorAction SilentlyContinue
-        while ((Get-Item "Microsoft.VCLibs.x86.14.00.Desktop.appx").Length -lt 5.5MB) {
-            Start-Sleep -Seconds 1
-        }
-        Add-AppxPackage "Microsoft.VCLibs.x86.14.00.Desktop.appx" -ErrorAction SilentlyContinue
-        Add-AppxPackage "Microsoft.UI.Xaml.2.7.1.nupkg\tools\AppX\x86\Release\Microsoft.UI.Xaml.2.7.appx" -ErrorAction SilentlyContinue
-    }
+  $vclib_url = "https://aka.ms/Microsoft.VCLibs.x$global:architecture.14.00.Desktop.appx"
+  $vclib_file = "Microsoft.VCLibs.x$global:architecture.14.00.Desktop.appx"
 
-    # Install WinGet
-    Invoke-WebRequest -Uri "https://github.com/microsoft/winget-cli/releases/download/v1.4.10173/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle" -OutFile "msftwinget.msixbundle" -ErrorAction SilentlyContinue
-    while ((Get-Item "msftwinget.msixbundle").Length -lt 13.5MB) {
-        Start-Sleep -Seconds 1
-    }
-    Invoke-WebRequest -Uri "https://github.com/microsoft/winget-cli/releases/download/v1.4.10173/3463fe9ad25e44f28630526aa9ad5648_License1.xml" -OutFile "license.xml" -ErrorAction SilentlyContinue
-    while ((Get-Item "license.xml").Length -lt 1KB) {
-        Start-Sleep -Seconds 1
-    }
-    Add-AppxProvisionedPackage -Online -PackagePath "msftwinget.msixbundle" -LicensePath "license.xml" -ErrorAction SilentlyContinue
+  $installer_url = "https://github.com/microsoft/winget-cli/releases/download/v1.4.10173/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle"
+  $installer_downloadpath = "msftwinget.msixbundle"
 
-    # Add WinGet directory to the user's PATH environment variable
-    [Environment]::SetEnvironmentVariable("PATH", "$env:PATH;$env:%LOCALAPPDATA%\Microsoft\WindowsApps", "User")
+  $license_url = "https://github.com/microsoft/winget-cli/releases/download/v1.4.10173/3463fe9ad25e44f28630526aa9ad5648_License1.xml"  
+  $license_downloadpath = "license.xml"
+  
+  # Download and extract XAML (dependency)
+  Invoke-WebRequest -Uri $xaml_url -OutFile $xaml_downloadpath -ErrorAction SilentlyContinue
+  Expand-Archive $xaml_downloadpath -ErrorAction SilentlyContinue
 
-    Write-Host "Please restart your system to ensure WinGet is setup correctly. Afterward, re-run the script."
+  # Download and install VCLibs and XAML (dependencies)
+  Invoke-WebRequest -Uri $vclib_url -OutFile $vclib_file -ErrorAction SilentlyContinue
+  Add-AppxPackage $vclib_file -ErrorAction SilentlyContinue
+  Add-AppxPackage $xaml_filepath -ErrorAction SilentlyContinue
+
+  # Download and install WinGet
+  Invoke-WebRequest -Uri $installer_url -OutFile $installer_downloadpath -ErrorAction SilentlyContinue
+  Invoke-WebRequest -Uri $license_url -OutFile $license_downloadpath -ErrorAction SilentlyContinue
+  Add-AppxProvisionedPackage -Online -PackagePath $installer_downloadpath -LicensePath $license_downloadpath -ErrorAction SilentlyContinue
+
+  # Add WinGet directory to user PATH environment variable
+  [Environment]::SetEnvironmentVariable("PATH", "$env:PATH;$env:LOCALAPPDATA\Microsoft\WindowsApps", "User")
+
+  Write-Host "Winget has been installed. Please restart your system to ensure WinGet is setup correctly. Afterward, re-run the script."
+  Exit
 }
 
 function check_for_winget {
