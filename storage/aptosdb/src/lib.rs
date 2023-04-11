@@ -1788,38 +1788,44 @@ impl DbWriter for AptosDB {
                 }
 
                 let mut end_with_reconfig = false;
-                let updates_until_latest_checkpoint_since_current = if let Some(
-                    latest_checkpoint_version,
-                ) =
-                    latest_in_memory_state.base_version
-                {
-                    if latest_checkpoint_version >= first_version {
-                        let idx = (latest_checkpoint_version - first_version) as usize;
-                        ensure!(
+                let updates_until_latest_checkpoint_since_current = {
+                    let _timer = OTHER_TIMERS_SECONDS
+                        .with_label_values(&["updates_until_next_checkpoint_since_current"])
+                        .start_timer();
+                    if let Some(latest_checkpoint_version) = latest_in_memory_state.base_version {
+                        if latest_checkpoint_version >= first_version {
+                            let idx = (latest_checkpoint_version - first_version) as usize;
+                            ensure!(
                             txns_to_commit[idx].is_state_checkpoint(),
                             "The new latest snapshot version passed in {:?} does not match with the last checkpoint version in txns_to_commit {:?}",
                             latest_checkpoint_version,
                             first_version + idx as u64
                         );
-                        end_with_reconfig = txns_to_commit[idx].is_reconfig();
-                        Some(
-                            txns_to_commit[..=idx]
-                                .iter()
-                                .flat_map(|txn_to_commit| txn_to_commit.state_updates().clone())
-                                .collect(),
-                        )
+                            end_with_reconfig = txns_to_commit[idx].is_reconfig();
+                            Some(
+                                txns_to_commit[..=idx]
+                                    .iter()
+                                    .flat_map(|txn_to_commit| txn_to_commit.state_updates().clone())
+                                    .collect(),
+                            )
+                        } else {
+                            None
+                        }
                     } else {
                         None
                     }
-                } else {
-                    None
                 };
 
-                buffered_state.update(
-                    updates_until_latest_checkpoint_since_current,
-                    latest_in_memory_state,
-                    end_with_reconfig || sync_commit,
-                )?;
+                {
+                    let _timer = OTHER_TIMERS_SECONDS
+                        .with_label_values(&["buffered_state___update"])
+                        .start_timer();
+                    buffered_state.update(
+                        updates_until_latest_checkpoint_since_current,
+                        latest_in_memory_state,
+                        end_with_reconfig || sync_commit,
+                    )?;
+                }
             }
 
             // If commit succeeds and there are at least one transaction written to the storage, we
