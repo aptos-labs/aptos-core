@@ -145,6 +145,9 @@ async fn test_peers_with_ready_subscriptions() {
 
     // Update the storage server summary so that there is new data for subscription 1
     let mut storage_server_summary = StorageServerSummary::default();
+    storage_server_summary
+        .data_summary
+        .epoch_ending_ledger_infos = Some(CompleteDataRange::new(0, 1).unwrap());
     let synced_ledger_info = create_test_ledger_info_with_sigs(1, 2);
     storage_server_summary.data_summary.synced_ledger_info = Some(synced_ledger_info.clone());
     *cached_storage_server_summary.write() = storage_server_summary;
@@ -169,6 +172,9 @@ async fn test_peers_with_ready_subscriptions() {
     // Update the storage server summary so that there is new data for subscription 2,
     // but the subscription is invalid because it doesn't respect an epoch boundary.
     let mut storage_server_summary = StorageServerSummary::default();
+    storage_server_summary
+        .data_summary
+        .epoch_ending_ledger_infos = Some(CompleteDataRange::new(0, 2).unwrap());
     let synced_ledger_info = create_test_ledger_info_with_sigs(2, 100);
     storage_server_summary.data_summary.synced_ledger_info = Some(synced_ledger_info);
     *cached_storage_server_summary.write() = storage_server_summary;
@@ -298,7 +304,8 @@ async fn test_cachable_requests_compression() {
     }
 
     // Create the storage client and server
-    let (mut mock_client, service, _) = MockClient::new(Some(db_reader), None);
+    let (mut mock_client, mut service, _) = MockClient::new(Some(db_reader), None);
+    update_storage_server_summary(&mut service, end_version, 10);
     tokio::spawn(service.start());
 
     // Repeatedly fetch the data and verify the responses
@@ -367,7 +374,8 @@ async fn test_cachable_requests_eviction() {
     }
 
     // Create the storage client and server
-    let (mut mock_client, service, _) = MockClient::new(Some(db_reader), None);
+    let (mut mock_client, mut service, _) = MockClient::new(Some(db_reader), None);
+    update_storage_server_summary(&mut service, version + 10, 10);
     tokio::spawn(service.start());
 
     // Process a request to fetch a state chunk. This should cache and serve the response.
@@ -424,7 +432,8 @@ async fn test_cachable_requests_data_versions() {
     }
 
     // Create the storage client and server
-    let (mut mock_client, service, _) = MockClient::new(Some(db_reader), None);
+    let (mut mock_client, mut service, _) = MockClient::new(Some(db_reader), None);
+    update_storage_server_summary(&mut service, end_version, 10);
     tokio::spawn(service.start());
 
     // Repeatedly fetch the data and verify the responses
@@ -510,7 +519,8 @@ async fn test_get_states_with_proof() {
         );
 
         // Create the storage client and server
-        let (mut mock_client, service, _) = MockClient::new(Some(db_reader), None);
+        let (mut mock_client, mut service, _) = MockClient::new(Some(db_reader), None);
+        update_storage_server_summary(&mut service, version, 10);
         tokio::spawn(service.start());
 
         // Process a request to fetch a states chunk with a proof
@@ -556,7 +566,8 @@ async fn test_get_states_with_proof_chunk_limit() {
     );
 
     // Create the storage client and server
-    let (mut mock_client, service, _) = MockClient::new(Some(db_reader), None);
+    let (mut mock_client, mut service, _) = MockClient::new(Some(db_reader), None);
+    update_storage_server_summary(&mut service, version, 10);
     tokio::spawn(service.start());
 
     // Process a request to fetch a states chunk with a proof
@@ -583,6 +594,32 @@ async fn test_get_states_with_proof_network_limit() {
     // Test different byte limits
     for network_limit_bytes in [1, 512, 1024, 10 * 1024] {
         get_states_with_proof_network_limit(network_limit_bytes).await;
+    }
+}
+
+#[tokio::test]
+async fn test_get_states_with_proof_not_serviceable() {
+    // Test small and large chunk requests
+    let max_state_chunk_size = StorageServiceConfig::default().max_state_chunk_size;
+    for chunk_size in [1, 100, max_state_chunk_size] {
+        // Create test data
+        let version = 101;
+        let start_index = 100;
+        let end_index = start_index + chunk_size - 1;
+
+        // Create the storage client and server (that cannot service the request)
+        let (mut mock_client, mut service, _) = MockClient::new(None, None);
+        update_storage_server_summary(&mut service, version - 1, 10);
+        tokio::spawn(service.start());
+
+        // Process a request to fetch a states chunk with a proof
+        let response =
+            get_state_values_with_proof(&mut mock_client, version, start_index, end_index, false)
+                .await
+                .unwrap_err();
+
+        // Verify the request is not serviceable
+        assert_matches!(response, StorageServiceError::InvalidRequest(_));
     }
 }
 
@@ -1592,7 +1629,8 @@ async fn test_get_number_of_states_at_version() {
         .returning(move |_| Ok(number_of_states as usize));
 
     // Create the storage client and server
-    let (mut mock_client, service, _) = MockClient::new(Some(db_reader), None);
+    let (mut mock_client, mut service, _) = MockClient::new(Some(db_reader), None);
+    update_storage_server_summary(&mut service, version, 10);
     tokio::spawn(service.start());
 
     // Process a request to fetch the number of states at a version
@@ -1609,6 +1647,25 @@ async fn test_get_number_of_states_at_version() {
 }
 
 #[tokio::test]
+async fn test_get_number_of_states_at_version_not_serviceable() {
+    // Create test data
+    let version = 101;
+
+    // Create the storage client and server (that cannot service the request)
+    let (mut mock_client, mut service, _) = MockClient::new(None, None);
+    update_storage_server_summary(&mut service, version - 1, 10);
+    tokio::spawn(service.start());
+
+    // Process a request to fetch the number of states at a version
+    let response = get_number_of_states(&mut mock_client, version, false)
+        .await
+        .unwrap_err();
+
+    // Verify the request is not serviceable
+    assert_matches!(response, StorageServiceError::InvalidRequest(_));
+}
+
+#[tokio::test]
 async fn test_get_number_of_states_at_version_invalid() {
     // Create test data
     let version = 1;
@@ -1622,7 +1679,8 @@ async fn test_get_number_of_states_at_version_invalid() {
         .returning(move |_| Err(format_err!("Version does not exist!")));
 
     // Create the storage client and server
-    let (mut mock_client, service, _) = MockClient::new(Some(db_reader), None);
+    let (mut mock_client, mut service, _) = MockClient::new(Some(db_reader), None);
+    update_storage_server_summary(&mut service, version, 10);
     tokio::spawn(service.start());
 
     // Process a request to fetch the number of states at a version
@@ -1688,6 +1746,7 @@ async fn test_get_storage_server_summary() {
     let response = get_storage_server_summary(&mut mock_client, true)
         .await
         .unwrap();
+
     // Verify the response is correct (after the cache update)
     let default_storage_config = StorageServiceConfig::default();
     let expected_server_summary = StorageServerSummary {
@@ -1754,7 +1813,8 @@ async fn test_get_transactions_with_proof() {
             );
 
             // Create the storage client and server
-            let (mut mock_client, service, _) = MockClient::new(Some(db_reader), None);
+            let (mut mock_client, mut service, _) = MockClient::new(Some(db_reader), None);
+            update_storage_server_summary(&mut service, proof_version, 10);
             tokio::spawn(service.start());
 
             // Create a request to fetch transactions with a proof
@@ -1809,7 +1869,8 @@ async fn test_get_transactions_with_chunk_limit() {
         );
 
         // Create the storage client and server
-        let (mut mock_client, service, _) = MockClient::new(Some(db_reader), None);
+        let (mut mock_client, mut service, _) = MockClient::new(Some(db_reader), None);
+        update_storage_server_summary(&mut service, proof_version + chunk_size, 10);
         tokio::spawn(service.start());
 
         // Create a request to fetch transactions with a proof
@@ -1831,6 +1892,41 @@ async fn test_get_transactions_with_chunk_limit() {
             },
             _ => panic!("Expected transactions with proof but got: {:?}", response),
         };
+    }
+}
+
+#[tokio::test]
+async fn test_get_transactions_with_proof_not_serviceable() {
+    // Test small and large chunk requests
+    let max_transaction_chunk_size = StorageServiceConfig::default().max_transaction_chunk_size;
+    for chunk_size in [2, 100, max_transaction_chunk_size] {
+        // Test event inclusion
+        for include_events in [true, false] {
+            // Create test data
+            let start_version = 0;
+            let end_version = start_version + chunk_size - 1;
+            let proof_version = end_version;
+
+            // Create the storage client and server (that cannot service the request)
+            let (mut mock_client, mut service, _) = MockClient::new(None, None);
+            update_storage_server_summary(&mut service, proof_version - 1, 10);
+            tokio::spawn(service.start());
+
+            // Create a request to fetch transactions with a proof
+            let response = get_transactions_with_proof(
+                &mut mock_client,
+                start_version,
+                end_version,
+                proof_version,
+                include_events,
+                true,
+            )
+            .await
+            .unwrap_err();
+
+            // Verify the request is not serviceable
+            assert_matches!(response, StorageServiceError::InvalidRequest(_));
+        }
     }
 }
 
@@ -1888,7 +1984,8 @@ async fn test_get_transaction_outputs_with_proof() {
         );
 
         // Create the storage client and server
-        let (mut mock_client, service, _) = MockClient::new(Some(db_reader), None);
+        let (mut mock_client, mut service, _) = MockClient::new(Some(db_reader), None);
+        update_storage_server_summary(&mut service, proof_version + 100, 10);
         tokio::spawn(service.start());
 
         // Create a request to fetch transactions outputs with a proof
@@ -1937,7 +2034,8 @@ async fn test_get_transaction_outputs_with_proof_chunk_limit() {
     );
 
     // Create the storage client and server
-    let (mut mock_client, service, _) = MockClient::new(Some(db_reader), None);
+    let (mut mock_client, mut service, _) = MockClient::new(Some(db_reader), None);
+    update_storage_server_summary(&mut service, proof_version + chunk_size, 10);
     tokio::spawn(service.start());
 
     // Create a request to fetch transactions outputs with a proof
@@ -1961,6 +2059,37 @@ async fn test_get_transaction_outputs_with_proof_chunk_limit() {
             response
         ),
     };
+}
+
+#[tokio::test]
+async fn test_get_transaction_outputs_with_proof_not_serviceable() {
+    // Test small and large chunk requests
+    let max_output_chunk_size = StorageServiceConfig::default().max_transaction_output_chunk_size;
+    for chunk_size in [2, 100, max_output_chunk_size] {
+        // Create test data
+        let start_version = 0;
+        let end_version = start_version + chunk_size - 1;
+        let proof_version = end_version;
+
+        // Create the storage client and server (that cannot service the request)
+        let (mut mock_client, mut service, _) = MockClient::new(None, None);
+        update_storage_server_summary(&mut service, proof_version - 1, 10);
+        tokio::spawn(service.start());
+
+        // Create a request to fetch transactions outputs with a proof
+        let response = get_outputs_with_proof(
+            &mut mock_client,
+            start_version,
+            end_version,
+            end_version,
+            true,
+        )
+        .await
+        .unwrap_err();
+
+        // Verify the request is not serviceable
+        assert_matches!(response, StorageServiceError::InvalidRequest(_));
+    }
 }
 
 #[tokio::test]
@@ -2042,8 +2171,9 @@ async fn test_get_transactions_or_outputs_with_proof() {
                 &output_list_with_proof,
                 &transaction_list_with_proof,
             );
-            let (mut mock_client, service, _) =
+            let (mut mock_client, mut service, _) =
                 MockClient::new(Some(db_reader), Some(storage_config));
+            update_storage_server_summary(&mut service, proof_version + 100, 10);
             tokio::spawn(service.start());
 
             // Create a request to fetch transactions or outputs with a proof
@@ -2067,6 +2197,39 @@ async fn test_get_transactions_or_outputs_with_proof() {
                 &response,
             );
         }
+    }
+}
+
+#[tokio::test]
+async fn test_get_transactions_or_outputs_with_proof_not_serviceable() {
+    // Test small and large chunk requests
+    let max_output_chunk_size = StorageServiceConfig::default().max_transaction_output_chunk_size;
+    for chunk_size in [2, 100, max_output_chunk_size] {
+        // Create test data
+        let start_version = 0;
+        let end_version = start_version + chunk_size - 1;
+        let proof_version = end_version;
+
+        // Create the storage client and server (that cannot service the request)
+        let (mut mock_client, mut service, _) = MockClient::new(None, None);
+        update_storage_server_summary(&mut service, proof_version - 1, 10);
+        tokio::spawn(service.start());
+
+        // Create a request to fetch transactions or outputs with a proof
+        let response = get_transactions_or_outputs_with_proof(
+            &mut mock_client,
+            start_version,
+            end_version,
+            end_version,
+            false,
+            5,
+            true,
+        )
+        .await
+        .unwrap_err();
+
+        // Verify the request is not serviceable
+        assert_matches!(response, StorageServiceError::InvalidRequest(_));
     }
 }
 
@@ -2145,7 +2308,9 @@ async fn test_get_transactions_or_outputs_with_proof_chunk_limit() {
             &output_list_with_proof,
             &transaction_list_with_proof,
         );
-        let (mut mock_client, service, _) = MockClient::new(Some(db_reader), Some(storage_config));
+        let (mut mock_client, mut service, _) =
+            MockClient::new(Some(db_reader), Some(storage_config));
+        update_storage_server_summary(&mut service, proof_version + chunk_size, 10);
         tokio::spawn(service.start());
 
         // Create a request to fetch transactions outputs with a proof
@@ -2197,7 +2362,8 @@ async fn test_get_epoch_ending_ledger_infos() {
         );
 
         // Create the storage client and server
-        let (mut mock_client, service, _) = MockClient::new(Some(db_reader), None);
+        let (mut mock_client, mut service, _) = MockClient::new(Some(db_reader), None);
+        update_storage_server_summary(&mut service, 1000, expected_end_epoch);
         tokio::spawn(service.start());
 
         // Create a request to fetch epoch ending ledger infos
@@ -2241,16 +2407,18 @@ async fn test_get_epoch_ending_ledger_infos_chunk_limit() {
         epoch_change_proof.clone(),
     );
 
-    // Create the storage client and server
-    let (mut mock_client, service, _) = MockClient::new(Some(db_reader), None);
-    tokio::spawn(service.start());
-
     // Create a request to fetch epoch ending ledger infos
+    let expected_end_epoch = start_epoch + chunk_size - 1;
     let data_request = DataRequest::GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest {
         start_epoch,
-        expected_end_epoch: start_epoch + chunk_size - 1,
+        expected_end_epoch,
     });
     let storage_request = StorageServiceRequest::new(data_request, true);
+
+    // Create the storage client and server
+    let (mut mock_client, mut service, _) = MockClient::new(Some(db_reader), None);
+    update_storage_server_summary(&mut service, 1000, expected_end_epoch);
+    tokio::spawn(service.start());
 
     // Process the request
     let response = mock_client.process_request(storage_request).await.unwrap();
@@ -2262,6 +2430,38 @@ async fn test_get_epoch_ending_ledger_infos_chunk_limit() {
         },
         _ => panic!("Expected epoch ending ledger infos but got: {:?}", response),
     };
+}
+
+#[tokio::test]
+async fn test_get_epoch_ending_ledger_infos_not_serviceable() {
+    // Test small and large chunk requests
+    let max_epoch_chunk_size = StorageServiceConfig::default().max_epoch_chunk_size;
+    for chunk_size in [1, 100, max_epoch_chunk_size] {
+        // Create test data
+        let start_epoch = 11;
+        let expected_end_epoch = start_epoch + chunk_size - 1;
+
+        // Create the storage client and server (that cannot service the request)
+        let (mut mock_client, mut service, _) = MockClient::new(None, None);
+        update_storage_server_summary(&mut service, 1000, expected_end_epoch - 1);
+        tokio::spawn(service.start());
+
+        // Create a request to fetch epoch ending ledger infos
+        let data_request = DataRequest::GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest {
+            start_epoch,
+            expected_end_epoch,
+        });
+        let storage_request = StorageServiceRequest::new(data_request, true);
+
+        // Process the request
+        let response = mock_client
+            .process_request(storage_request)
+            .await
+            .unwrap_err();
+
+        // Verify the request is not serviceable
+        assert_matches!(response, StorageServiceError::InvalidRequest(_));
+    }
 }
 
 #[tokio::test]
@@ -2428,6 +2628,7 @@ async fn get_epoch_ending_ledger_infos_network_limit(network_limit_bytes: u64) {
         let max_epoch_chunk_size = StorageServiceConfig::default().max_epoch_chunk_size;
         let min_bytes_per_ledger_info = 5000;
         let start_epoch = 98754;
+        let expected_end_epoch = start_epoch + max_epoch_chunk_size - 1;
 
         // Create the mock db reader
         let mut db_reader = create_mock_db_reader();
@@ -2456,13 +2657,15 @@ async fn get_epoch_ending_ledger_infos_network_limit(network_limit_bytes: u64) {
         };
 
         // Create the storage client and server
-        let (mut mock_client, service, _) = MockClient::new(Some(db_reader), Some(storage_config));
+        let (mut mock_client, mut service, _) =
+            MockClient::new(Some(db_reader), Some(storage_config));
+        update_storage_server_summary(&mut service, 1000, expected_end_epoch);
         tokio::spawn(service.start());
 
         // Process a request to fetch epoch ending ledger infos
         let data_request = DataRequest::GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest {
             start_epoch,
-            expected_end_epoch: start_epoch + max_epoch_chunk_size - 1,
+            expected_end_epoch,
         });
         let storage_request = StorageServiceRequest::new(data_request, use_compression);
         let response = mock_client.process_request(storage_request).await.unwrap();
@@ -2528,7 +2731,9 @@ async fn get_states_with_proof_network_limit(network_limit_bytes: u64) {
         };
 
         // Create the storage client and server
-        let (mut mock_client, service, _) = MockClient::new(Some(db_reader), Some(storage_config));
+        let (mut mock_client, mut service, _) =
+            MockClient::new(Some(db_reader), Some(storage_config));
+        update_storage_server_summary(&mut service, version, 10);
         tokio::spawn(service.start());
 
         // Process a request to fetch a states chunk with a proof
@@ -2593,7 +2798,9 @@ async fn get_outputs_with_proof_network_limit(network_limit_bytes: u64) {
         };
 
         // Create the storage client and server
-        let (mut mock_client, service, _) = MockClient::new(Some(db_reader), Some(storage_config));
+        let (mut mock_client, mut service, _) =
+            MockClient::new(Some(db_reader), Some(storage_config));
+        update_storage_server_summary(&mut service, proof_version, 10);
         tokio::spawn(service.start());
 
         // Process a request to fetch outputs with a proof
@@ -2668,8 +2875,9 @@ async fn get_transactions_with_proof_network_limit(network_limit_bytes: u64) {
             };
 
             // Create the storage client and server
-            let (mut mock_client, service, _) =
+            let (mut mock_client, mut service, _) =
                 MockClient::new(Some(db_reader), Some(storage_config));
+            update_storage_server_summary(&mut service, proof_version + 1, 10);
             tokio::spawn(service.start());
 
             // Process a request to fetch transactions with a proof
@@ -2759,8 +2967,9 @@ async fn get_transactions_or_outputs_with_proof_network_limit(network_limit_byte
                 max_network_chunk_bytes: network_limit_bytes,
                 ..Default::default()
             };
-            let (mut mock_client, service, _) =
+            let (mut mock_client, mut service, _) =
                 MockClient::new(Some(db_reader), Some(storage_config));
+            update_storage_server_summary(&mut service, proof_version + 100, 10);
             tokio::spawn(service.start());
 
             // Process a request to fetch transactions or outputs with a proof
@@ -3630,6 +3839,36 @@ pub fn initialize_logger() {
         .is_async(false)
         .level(Level::Debug)
         .build();
+}
+
+/// Updates the storage server summary with the specified data
+fn update_storage_server_summary(
+    storage_server: &mut StorageServiceServer<StorageReader>,
+    highest_synced_version: u64,
+    highest_synced_epoch: Epoch,
+) {
+    // Create a storage server summary
+    let mut storage_server_summary = StorageServerSummary::default();
+
+    // Set the highest synced ledger info
+    let mut data_summary = &mut storage_server_summary.data_summary;
+    data_summary.synced_ledger_info = Some(create_epoch_ending_ledger_info(
+        highest_synced_epoch,
+        highest_synced_version,
+    ));
+
+    // Set the epoch ending ledger info range
+    let data_range = CompleteDataRange::new(0, highest_synced_epoch).unwrap();
+    data_summary.epoch_ending_ledger_infos = Some(data_range);
+
+    // Set the transaction and state ranges
+    let data_range = CompleteDataRange::new(0, highest_synced_version).unwrap();
+    data_summary.states = Some(data_range);
+    data_summary.transactions = Some(data_range);
+    data_summary.transaction_outputs = Some(data_range);
+
+    // Update the storage server summary
+    *storage_server.cached_storage_server_summary.write() = storage_server_summary;
 }
 
 /// Returns a random network ID

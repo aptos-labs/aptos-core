@@ -108,23 +108,8 @@ impl<T: StorageReaderInterface> Handler<T> {
             request.get_label(),
         );
 
-        // Process the request
-        let response = match &request.data_request {
-            DataRequest::GetServerProtocolVersion => {
-                let data_response = self.get_server_protocol_version();
-                StorageServiceResponse::new(data_response, request.use_compression)
-                    .map_err(|error| error.into())
-            },
-            DataRequest::GetStorageServerSummary => {
-                let data_response = self.get_storage_server_summary();
-                StorageServiceResponse::new(data_response, request.use_compression)
-                    .map_err(|error| error.into())
-            },
-            _ => self.process_cachable_request(protocol, &request),
-        };
-
-        // Process the response and handle any errors
-        match response {
+        // Process the request and handle any errors
+        match self.sanity_check_and_handle_request(protocol, &request) {
             Err(error) => {
                 // Log the error and update the counters
                 increment_counter(
@@ -151,6 +136,38 @@ impl<T: StorageReaderInterface> Handler<T> {
                 );
                 Ok(response)
             },
+        }
+    }
+
+    /// Sanity check the request (i.e., verify that it can be serviced)
+    /// and handle the request.
+    fn sanity_check_and_handle_request(
+        &self,
+        protocol: ProtocolId,
+        request: &StorageServiceRequest,
+    ) -> Result<StorageServiceResponse, Error> {
+        // Sanity check the request and verify that it can be serviced
+        let storage_server_summary = self.cached_storage_server_summary.read().clone();
+        if !storage_server_summary.can_service(request) {
+            return Err(Error::InvalidRequest(format!(
+                "The given request cannot be satisfied. Request: {:?}, storage summary: {:?}",
+                request, storage_server_summary
+            )));
+        }
+
+        // Process the request
+        match &request.data_request {
+            DataRequest::GetServerProtocolVersion => {
+                let data_response = self.get_server_protocol_version();
+                StorageServiceResponse::new(data_response, request.use_compression)
+                    .map_err(|error| error.into())
+            },
+            DataRequest::GetStorageServerSummary => {
+                let data_response = self.get_storage_server_summary();
+                StorageServiceResponse::new(data_response, request.use_compression)
+                    .map_err(|error| error.into())
+            },
+            _ => self.process_cachable_request(protocol, request),
         }
     }
 
