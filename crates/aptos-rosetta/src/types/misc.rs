@@ -8,14 +8,14 @@ use crate::{
     AccountAddress, ApiResult,
 };
 use aptos_types::stake_pool::StakePool;
+use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{
     convert::TryFrom,
     fmt::{Display, Formatter},
     str::FromStr,
+    time::Duration,
 };
-use chrono::{DateTime, NaiveDateTime, Utc};
-use std::time::Duration;
 
 /// Errors that can be returned by the API
 ///
@@ -293,11 +293,11 @@ pub async fn get_stake_balances(
         }
 
         if let Some(balance) = requested_balance {
-            Ok(Some(BalanceResult{
+            Ok(Some(BalanceResult {
                 balance: Some(Amount {
-                        value: balance,
-                        currency: native_coin(),
-                    }),
+                    value: balance,
+                    currency: native_coin(),
+                }),
                 lockup_expiration,
             }))
         } else {
@@ -308,12 +308,13 @@ pub async fn get_stake_balances(
     }
 }
 
-async fn get_lockup_expiration_time(
-    locked_until_secs: u64,
-) -> DateTime<Utc> {
+async fn get_lockup_expiration_time(locked_until_secs: u64) -> DateTime<Utc> {
     let lock_duration = Duration::from_secs(locked_until_secs);
 
-    let date_time =
-        NaiveDateTime::from_timestamp_opt(lock_duration.as_secs() as i64, lock_duration.subsec_nanos()).unwrap();
+    let date_time = NaiveDateTime::from_timestamp_opt(
+        lock_duration.as_secs() as i64,
+        lock_duration.subsec_nanos(),
+    )
+    .unwrap();
     DateTime::from_utc(date_time, Utc)
 }

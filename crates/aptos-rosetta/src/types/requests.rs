@@ -14,12 +14,12 @@ use aptos_types::{
     chain_id::ChainId,
     transaction::{RawTransaction, SignedTransaction},
 };
+use chrono::{DateTime, Utc};
 use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     fmt::{Display, Formatter},
     str::FromStr,
 };
-use chrono::{DateTime, Utc};
 
 /// Request for an account's currency balance either now, or historically
 ///

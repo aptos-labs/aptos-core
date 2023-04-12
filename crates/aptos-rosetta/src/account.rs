@@ -20,9 +20,9 @@ use aptos_types::{
     account_address::AccountAddress,
     account_config::{AccountResource, CoinStoreResource},
 };
+use chrono::{DateTime, Utc};
 use std::{collections::HashSet, str::FromStr};
 use warp::Filter;
-use chrono::{DateTime, Utc};
 
 /// Account routes e.g. balance
 pub fn routes(
@@ -93,7 +93,12 @@ async fn get_balances(
     account: AccountIdentifier,
     version: u64,
     maybe_filter_currencies: Option<Vec<Currency>>,
-) -> ApiResult<(u64, Option<Vec<AccountAddress>>, Vec<Amount>, Option<DateTime<Utc>>)> {
+) -> ApiResult<(
+    u64,
+    Option<Vec<AccountAddress>>,
+    Vec<Amount>,
+    Option<DateTime<Utc>>,
+)> {
     let owner_address = account.account_address()?;
     // Retrieve all account resources
     if let Ok(response) = rest_client
@@ -155,7 +160,8 @@ async fn get_balances(
                                 if let Some(balance) = balance_result.balance {
                                     total_requested_balance = Some(
                                         total_requested_balance.unwrap_or_default()
-                                            + u64::from_str(&balance.value).unwrap_or_default());
+                                            + u64::from_str(&balance.value).unwrap_or_default(),
+                                    );
                                 }
                                 lockup_expiration = Some(balance_result.lockup_expiration);
                             },
@@ -222,11 +228,21 @@ async fn get_balances(
         }
 
         // Retrieve balances
-        Ok((sequence_number, maybe_operators, balances, lockup_expiration))
+        Ok((
+            sequence_number,
+            maybe_operators,
+            balances,
+            lockup_expiration,
+        ))
     } else {
-        Ok((0, None, vec![Amount {
-            value: 0.to_string(),
-            currency: native_coin(),
-        }], None))
+        Ok((
+            0,
+            None,
+            vec![Amount {
+                value: 0.to_string(),
+                currency: native_coin(),
+            }],
+            None,
+        ))
     }
 }
