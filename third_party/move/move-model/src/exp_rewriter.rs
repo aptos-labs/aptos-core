@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    ast::{Exp, ExpData, LocalVarDecl, MemoryLabel, Operation, TempIndex, Value},
+    ast::{Exp, ExpData, LocalVarDecl, MemoryLabel, Operation, Pattern, TempIndex, Value},
     model::{GlobalEnv, ModuleId, NodeId, SpecVarId},
     symbol::Symbol,
     ty::Type,
@@ -138,6 +138,9 @@ pub trait ExpRewriterFunctions {
         None
     }
     fn rewrite_block(&mut self, id: NodeId, vars: &[LocalVarDecl], body: &Exp) -> Option<Exp> {
+        None
+    }
+    fn rewrite_pattern(&mut self, pat: &Pattern) -> Option<Pattern> {
         None
     }
     fn rewrite_quant(
@@ -349,9 +352,27 @@ pub trait ExpRewriterFunctions {
                     exp
                 }
             },
+            Assign(id, lhs, rhs) => {
+                let (id_changed, new_id) = self.internal_rewrite_id(id);
+                let (lhs_changed, new_lhs) = self.internal_rewrite_pattern(lhs);
+                let (rhs_changed, new_rhs) = self.internal_rewrite_exp(rhs);
+                if id_changed || lhs_changed || rhs_changed {
+                    Assign(new_id, new_lhs, new_rhs).into_exp()
+                } else {
+                    exp
+                }
+            },
             // This can happen since we are calling the rewriter during type checking, and
             // we may have encountered an error which is represented as an Invalid expression.
             Invalid(id) => Invalid(*id).into_exp(),
+        }
+    }
+
+    fn internal_rewrite_pattern(&mut self, pat: &Pattern) -> (bool, Pattern) {
+        if let Some(new_pat) = self.rewrite_pattern(pat) {
+            (true, new_pat)
+        } else {
+            (false, pat.clone())
         }
     }
 
