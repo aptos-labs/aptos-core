@@ -20,7 +20,7 @@
 ## auto_merge).
 
 name: "Build+Test Docker Images"
-on: # build on main branch OR when a PR is labeled with `CICD:build-images`
+on: # build on main branch OR when a PR is labeled with `CICD:build-*images`
   # Allow us to run this specific workflow without a PR
   workflow_dispatch:
   pull_request_target:
