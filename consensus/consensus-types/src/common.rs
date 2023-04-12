@@ -8,7 +8,7 @@ use aptos_executor_types::Error;
 use aptos_infallible::Mutex;
 use aptos_types::{
     account_address::AccountAddress, transaction::SignedTransaction,
-    validator_verifier::ValidatorVerifier,
+    validator_verifier::ValidatorVerifier, vm_status::DiscardedVMStatus,
 };
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -39,6 +39,7 @@ pub struct RejectedTransactionSummary {
     pub sender: AccountAddress,
     pub sequence_number: u64,
     pub hash: HashValue,
+    pub reason: DiscardedVMStatus,
 }
 
 #[derive(Debug)]

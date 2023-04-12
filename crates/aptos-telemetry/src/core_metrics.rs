@@ -25,7 +25,8 @@ const STATE_SYNC_SYNCED_VERSION: &str = "state_sync_synced_version";
 const STATE_SYNC_SYNCED_EPOCH: &str = "state_sync_synced_epoch";
 const STORAGE_LEDGER_VERSION: &str = "storage_ledger_version";
 const STORAGE_MIN_READABLE_LEDGER_VERSION: &str = "storage_min_readable_ledger_version";
-const STORAGE_MIN_READABLE_STATE_VERSION: &str = "storage_min_readable_state_version";
+const STORAGE_MIN_READABLE_STATE_MERKLE_VERSION: &str = "storage_min_readable_state_merkle_version";
+const STORAGE_MIN_READABLE_STATE_KV_VERSION: &str = "storage_min_readable_state_kv_version";
 const TELEMETRY_FAILURE_COUNT: &str = "telemetry_failure_count";
 const TELEMETRY_SUCCESS_COUNT: &str = "telemetry_success_count";
 
@@ -148,15 +149,22 @@ fn collect_storage_metrics(core_metrics: &mut BTreeMap<String, String>) {
     );
     core_metrics.insert(
         STORAGE_MIN_READABLE_LEDGER_VERSION.into(),
-        aptos_db::metrics::PRUNER_LEAST_READABLE_VERSION
-            .with_label_values(&["ledger_pruner"])
+        aptos_db::metrics::PRUNER_VERSIONS
+            .with_label_values(&["ledger_pruner", "min_readable"])
             .get()
             .to_string(),
     );
     core_metrics.insert(
-        STORAGE_MIN_READABLE_STATE_VERSION.into(),
-        aptos_db::metrics::PRUNER_LEAST_READABLE_VERSION
-            .with_label_values(&["state_store"])
+        STORAGE_MIN_READABLE_STATE_MERKLE_VERSION.into(),
+        aptos_db::metrics::PRUNER_VERSIONS
+            .with_label_values(&["state_merkle_pruner", "min_readable"])
+            .get()
+            .to_string(),
+    );
+    core_metrics.insert(
+        STORAGE_MIN_READABLE_STATE_KV_VERSION.into(),
+        aptos_db::metrics::PRUNER_VERSIONS
+            .with_label_values(&["state_kv_pruner", "min_readable"])
             .get()
             .to_string(),
     );

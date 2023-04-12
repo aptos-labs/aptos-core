@@ -1,9 +1,9 @@
 spec aptos_std::debug {
-    spec print {
+    spec native_print {
         pragma opaque;
     }
 
-    spec print_stack_trace {
+    spec native_stack_trace {
         pragma opaque;
     }
 }

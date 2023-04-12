@@ -28,6 +28,7 @@ use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::TransactionStatus};
 use futures::executor::block_on;
+use move_core_types::vm_status::DiscardedVMStatus;
 #[cfg(test)]
 use std::collections::VecDeque;
 #[cfg(any(test, feature = "fuzzing"))]
@@ -60,23 +61,20 @@ pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<ExecutedBloc
         quorum_store::counters::NUM_BATCH_PER_BLOCK.observe(block.block().payload_size() as f64);
 
         for status in txn_status.iter() {
-            match status {
-                TransactionStatus::Keep(_) => {
-                    counters::COMMITTED_TXNS_COUNT
-                        .with_label_values(&["success"])
-                        .inc();
+            let commit_status = match status {
+                TransactionStatus::Keep(_) => counters::TXN_COMMIT_SUCCESS_LABEL,
+                TransactionStatus::Discard(reason) => {
+                    if reason == &DiscardedVMStatus::SEQUENCE_NUMBER_TOO_NEW {
+                        counters::TXN_COMMIT_RETRY_LABEL
+                    } else {
+                        counters::TXN_COMMIT_FAILED_LABEL
+                    }
                 },
-                TransactionStatus::Discard(_) => {
-                    counters::COMMITTED_TXNS_COUNT
-                        .with_label_values(&["failed"])
-                        .inc();
-                },
-                TransactionStatus::Retry => {
-                    counters::COMMITTED_TXNS_COUNT
-                        .with_label_values(&["retry"])
-                        .inc();
-                },
-            }
+                TransactionStatus::Retry => counters::TXN_COMMIT_RETRY_LABEL,
+            };
+            counters::COMMITTED_TXNS_COUNT
+                .with_label_values(&[commit_status])
+                .inc();
         }
     }
 }

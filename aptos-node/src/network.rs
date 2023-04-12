@@ -30,11 +30,6 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 use tokio::runtime::Runtime;
 
-// TODO: should the applications not make these configurable?
-// Application network channel sizes
-const CONSENSUS_NETWORK_CHANNEL_BUFFER_SIZE: usize = 1024;
-const MEMPOOL_NETWORK_CHANNEL_BUFFER_SIZE: usize = 1024;
-
 /// A simple struct that holds both the network client
 /// and receiving interfaces for an application.
 pub struct ApplicationNetworkInterfaces<T> {
@@ -52,7 +47,7 @@ struct ApplicationNetworkHandle<T> {
 
 /// TODO: make this configurable (e.g., for compression)
 /// Returns the network application config for the consensus client and service
-pub fn consensus_network_configuration() -> NetworkApplicationConfig {
+pub fn consensus_network_configuration(node_config: &NodeConfig) -> NetworkApplicationConfig {
     let direct_send_protocols: Vec<ProtocolId> = DIRECT_SEND.into();
     let rpc_protocols: Vec<ProtocolId> = RPC.into();
 
@@ -61,7 +56,7 @@ pub fn consensus_network_configuration() -> NetworkApplicationConfig {
     let network_service_config = NetworkServiceConfig::new(
         direct_send_protocols,
         rpc_protocols,
-        aptos_channel::Config::new(CONSENSUS_NETWORK_CHANNEL_BUFFER_SIZE)
+        aptos_channel::Config::new(node_config.consensus.max_network_channel_size)
             .queue_style(QueueStyle::FIFO)
             .counters(&aptos_consensus::counters::PENDING_CONSENSUS_NETWORK_EVENTS),
     );
@@ -69,7 +64,7 @@ pub fn consensus_network_configuration() -> NetworkApplicationConfig {
 }
 
 /// Returns the network application config for the mempool client and service
-pub fn mempool_network_configuration() -> NetworkApplicationConfig {
+pub fn mempool_network_configuration(node_config: &NodeConfig) -> NetworkApplicationConfig {
     let direct_send_protocols = vec![ProtocolId::MempoolDirectSend];
     let rpc_protocols = vec![]; // Mempool does not use RPC
 
@@ -78,7 +73,7 @@ pub fn mempool_network_configuration() -> NetworkApplicationConfig {
     let network_service_config = NetworkServiceConfig::new(
         direct_send_protocols,
         rpc_protocols,
-        aptos_channel::Config::new(MEMPOOL_NETWORK_CHANNEL_BUFFER_SIZE)
+        aptos_channel::Config::new(node_config.mempool.max_network_channel_size)
             .queue_style(QueueStyle::KLAST) // TODO: why is this not FIFO?
             .counters(&aptos_mempool::counters::PENDING_MEMPOOL_NETWORK_EVENTS),
     );
@@ -212,7 +207,7 @@ pub fn setup_networks_and_get_interfaces(
                 consensus_network_handle = Some(register_client_and_service_with_network(
                     &mut network_builder,
                     network_id,
-                    consensus_network_configuration(),
+                    consensus_network_configuration(node_config),
                 ));
             }
         }
@@ -221,7 +216,7 @@ pub fn setup_networks_and_get_interfaces(
         let mempool_network_handle = register_client_and_service_with_network(
             &mut network_builder,
             network_id,
-            mempool_network_configuration(),
+            mempool_network_configuration(node_config),
         );
         mempool_network_handles.push(mempool_network_handle);
 
@@ -323,13 +318,13 @@ fn transform_network_handles_into_interfaces(
     let consensus_interfaces = consensus_network_handle.map(|consensus_network_handle| {
         create_network_interfaces(
             vec![consensus_network_handle],
-            consensus_network_configuration(),
+            consensus_network_configuration(node_config),
             peers_and_metadata.clone(),
         )
     });
     let mempool_interfaces = create_network_interfaces(
         mempool_network_handles,
-        mempool_network_configuration(),
+        mempool_network_configuration(node_config),
         peers_and_metadata.clone(),
     );
     let peer_monitoring_service_interfaces = create_network_interfaces(
