@@ -110,6 +110,6 @@ The simulation steps for finding the correct amount of gas for a transaction are
     2. `max_gas_amount` as the minimum of the `gas_used` * `a safety factor` or the `max_gas_amount` from the transaction.
 6. If you feel the need to prioritize or deprioritize your transaction, adjust the `gas_unit_price` of the transaction. Increase the value for higher priority, and decrease the value for lower priority.
 
-::: tip
+:::tip
 Prioritization is based upon buckets of `gas_unit_price`. The buckets are defined in [`mempool_config.rs`](https://github.com/aptos-labs/aptos-core/blob/30b385bf38d3dc8c4e8ee0ff045bc5d0d2f67a85/config/src/config/mempool_config.rs#L8). The current buckets are `[0, 150, 300, 500, 1000, 3000, 5000, 10000, 100000, 1000000]`. Therefore, a `gas_unit_price` of 150 and 299 would be priortized nearly the same.
 :::
