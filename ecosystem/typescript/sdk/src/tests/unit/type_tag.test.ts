@@ -1,4 +1,4 @@
-import { StructTag, TypeTagParser, TypeTagStruct } from "../../aptos_types/type_tag";
+import { StructTag, TypeTagParser, TypeTagParserError, TypeTagStruct } from "../../aptos_types/type_tag";
 
 const expectedTypeTag = {
   string: "0x0000000000000000000000000000000000000000000000000000000000000001::aptos_coin::AptosCoin",
@@ -37,10 +37,17 @@ describe("StructTag", () => {
 });
 
 describe("TypeTagParser", () => {
-  test("make sure parseTypeTag throws 'Invalid type tag' if invalid format", () => {
+  test("make sure parseTypeTag throws TypeTagParserError 'Invalid type tag' if invalid format", () => {
     let typeTag = "0x000";
     let parser = new TypeTagParser(typeTag);
-    expect(() => parser.parseTypeTag()).toThrowError("Invalid type tag.");
+
+    try {
+      parser.parseTypeTag();
+    } catch (error) {
+      expect(error).toBeInstanceOf(TypeTagParserError);
+      const typeTagError = error as TypeTagParserError;
+      expect(typeTagError.message).toEqual("Invalid type tag.");
+    }
 
     typeTag = "0x1::aptos_coin::AptosCoin<0x1>";
     parser = new TypeTagParser(typeTag);

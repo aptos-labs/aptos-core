@@ -407,7 +407,7 @@ export class TypeTagParser {
   }
 }
 
-class TypeTagParserError extends Error {
+export class TypeTagParserError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "TypeTagParserError";
