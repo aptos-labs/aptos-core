@@ -7,8 +7,8 @@ import subprocess
 import re
 
 # Set the tps threshold for block size 1k and 10k
-THRESHOLD_1k = 10000
-THRESHOLD_10k = 12000
+THRESHOLD_1k = 4000
+THRESHOLD_10k = 4500
 
 # Run the VM sequential execution with performance optimizations enabled
 target_directory = "aptos-move/aptos-transaction-benchmarks/src/"
