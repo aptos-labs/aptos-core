@@ -14,6 +14,7 @@ pub mod property_map;
 pub mod signatures;
 pub mod stake_models;
 pub mod token_models;
+pub mod vault_models;
 pub mod transactions;
 pub mod user_transactions;
 pub mod write_set_changes;

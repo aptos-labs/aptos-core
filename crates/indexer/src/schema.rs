@@ -489,6 +489,20 @@ diesel::table! {
 }
 
 diesel::table! {
+    user_infos (transaction_version, user_address, type_hash) {
+        user_address -> Varchar,
+        type_hash -> Varchar,
+        collateral_type -> Varchar,
+        borrow_type -> Varchar,
+        user_collateral -> Numeric,
+        user_borrow_part -> Numeric,
+        transaction_timestamp -> Timestamp,
+        transaction_version -> Int8,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     user_transactions (version) {
         version -> Int8,
         block_height -> Int8,
@@ -502,6 +516,57 @@ diesel::table! {
         entry_function_id_str -> Text,
         inserted_at -> Timestamp,
         epoch -> Int8,
+    }
+}
+
+diesel::table! {
+    vault_activities (transaction_version, event_creation_number, event_sequence_number) {
+        transaction_version -> Int8,
+        event_creation_number -> Int8,
+        event_sequence_number -> Int8,
+        event_index -> Int8,
+        type_hash -> Varchar,
+        event_type -> Varchar,
+        collateral_type -> Varchar,
+        borrow_type -> Varchar,
+        collateral_amount -> Nullable<Numeric>,
+        borrow_amount -> Nullable<Numeric>,
+        user_addr -> Nullable<Varchar>,
+        withdraw_addr -> Nullable<Varchar>,
+        liquidator_addr -> Nullable<Varchar>,
+        accrued_amount -> Nullable<Numeric>,
+        rate -> Nullable<Numeric>,
+        fees_earned -> Nullable<Numeric>,
+        old_interest_per_second -> Nullable<Numeric>,
+        new_interest_per_second -> Nullable<Numeric>,
+        transaction_timestamp -> Timestamp,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    vaults (transaction_version, type_hash) {
+        type_hash -> Varchar,
+        collateral_type -> Varchar,
+        borrow_type -> Varchar,
+        total_collateral -> Numeric,
+        borrow_elastic -> Numeric,
+        borrow_base -> Numeric,
+        last_fees_accrue_time -> Numeric,
+        fees_accrued -> Numeric,
+        interest_per_second -> Numeric,
+        collateralization_rate -> Numeric,
+        liquidation_multiplier -> Numeric,
+        borrow_fee -> Numeric,
+        distribution_part -> Numeric,
+        fee_to -> Varchar,
+        cached_exchange_rate -> Numeric,
+        last_interest_update -> Numeric,
+        is_emergency -> Bool,
+        dev_cut -> Numeric,
+        transaction_timestamp -> Timestamp,
+        transaction_version -> Int8,
+        inserted_at -> Timestamp,
     }
 }
 
@@ -551,6 +616,9 @@ diesel::allow_tables_to_appear_in_same_query!(
     token_ownerships,
     tokens,
     transactions,
+    user_infos,
     user_transactions,
+    vault_activities,
+    vaults,
     write_set_changes,
 );
