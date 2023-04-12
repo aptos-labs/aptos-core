@@ -85,7 +85,7 @@ impl Default for ExecutionConfigV2 {
             transaction_shuffler_type: TransactionShufflerType::NoShuffling,
             // block_gas_limit: None,
             // Just for testing
-            block_gas_limit: Some(1000),
+            block_gas_limit: Some(1000000),
         }
     }
 }

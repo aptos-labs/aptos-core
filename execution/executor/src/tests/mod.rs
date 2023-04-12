@@ -80,7 +80,7 @@ impl TestExecutor {
         let waypoint = generate_waypoint::<MockVM>(&db, &genesis).unwrap();
         maybe_bootstrap::<MockVM>(&db, &genesis, waypoint).unwrap();
         let executor = BlockExecutor::new(db.clone());
-        executor.update_block_gas_limit(Some(1000));    // Can comment out this line to test without gas limit
+        executor.update_block_gas_limit(Some(1000)); // Can comment out this line to test without gas limit
 
         TestExecutor {
             _path: path,

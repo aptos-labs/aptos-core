@@ -145,3 +145,21 @@ pub static SEQUENTIAL_PER_BLOCK_GAS: Lazy<Histogram> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static PARALLEL_PER_TXN_GAS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_execution_par_per_txn_gas",
+        "The per-txn consumed gas in parallel execution (Block STM)",
+        exponential_buckets(/*start=*/ 1.0, /*factor=*/ 1.5, /*count=*/ 30).unwrap(),
+    )
+    .unwrap()
+});
+
+pub static SEQUENTIAL_PER_TXN_GAS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_execution_seq_per_txn_gas",
+        "The per-txn consumed gas in sequential execution",
+        exponential_buckets(/*start=*/ 1.0, /*factor=*/ 1.5, /*count=*/ 30).unwrap(),
+    )
+    .unwrap()
+});
