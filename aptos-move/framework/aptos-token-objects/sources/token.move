@@ -32,7 +32,7 @@ module aptos_token_objects::token {
         /// The collection from which this token resides.
         collection: Object<Collection>,
         /// Unique identifier within the collection, optional, 0 means unassigned
-        collection_id: u64,
+        index: u64,
         /// A brief description of the token.
         description: String,
         /// The name of the token, which should be unique within the collection; the length of name
@@ -62,6 +62,8 @@ module aptos_token_objects::token {
     /// directly understand the behavior in a writeset.
     struct MutationEvent has drop, store {
         mutated_field_name: String,
+        old_value: String,
+        new_value: String
     }
 
     inline fun create_common(
@@ -81,7 +83,7 @@ module aptos_token_objects::token {
 
         let token = Token {
             collection,
-            collection_id: option::get_with_default(&mut id, 0),
+            index: option::get_with_default(&mut id, 0),
             description,
             name,
             uri,
@@ -170,7 +172,7 @@ module aptos_token_objects::token {
 
     // Accessors
 
-    inline fun borrow<T: key>(token: &Object<T>): &Token {
+    inline fun borrow<T: key>(token: &Object<T>): &Token acquires Token {
         let token_address = object::object_address(token);
         assert!(
             exists<Token>(token_address),
@@ -185,7 +187,7 @@ module aptos_token_objects::token {
     }
 
     #[view]
-    public fun collection<T: key>(token: Object<T>): String acquires Token {
+    public fun collection_name<T: key>(token: Object<T>): String acquires Token {
         collection::name(borrow(&token).collection)
     }
 
@@ -217,7 +219,7 @@ module aptos_token_objects::token {
             royalty
         } else {
             let creator = creator(token);
-            let collection_name = collection(token);
+            let collection_name = collection_name(token);
             let collection_address = collection::create_collection_address(&creator, &collection_name);
             let collection = object::address_to_object<collection::Collection>(collection_address);
             royalty::get(collection)
@@ -226,7 +228,7 @@ module aptos_token_objects::token {
 
     // Mutators
 
-    inline fun borrow_mut(mutator_ref: &MutatorRef): &mut Token {
+    inline fun borrow_mut(mutator_ref: &MutatorRef): &mut Token acquires Token {
         assert!(
             exists<Token>(mutator_ref.self),
             error::not_found(ETOKEN_DOES_NOT_EXIST),
@@ -250,7 +252,7 @@ module aptos_token_objects::token {
 
         let Token {
             collection,
-            collection_id,
+            index,
             description: _,
             name: _,
             uri: _,
@@ -258,34 +260,46 @@ module aptos_token_objects::token {
         } = move_from<Token>(addr);
 
         event::destroy_handle(mutation_events);
-        collection::decrement_supply(&collection, addr, option::some(collection_id));
+        collection::decrement_supply(&collection, addr, option::some(index));
     }
 
     public fun set_description(mutator_ref: &MutatorRef, description: String) acquires Token {
         let token = borrow_mut(mutator_ref);
-        token.description = description;
         event::emit_event(
             &mut token.mutation_events,
-            MutationEvent { mutated_field_name: string::utf8(b"description") },
+            MutationEvent {
+                mutated_field_name: string::utf8(b"description"),
+                old_value: token.description,
+                new_value: description
+            },
         );
+        token.description = description;
     }
 
     public fun set_name(mutator_ref: &MutatorRef, name: String) acquires Token {
         let token = borrow_mut(mutator_ref);
-        token.name = name;
         event::emit_event(
             &mut token.mutation_events,
-            MutationEvent { mutated_field_name: string::utf8(b"name") },
+            MutationEvent {
+                mutated_field_name: string::utf8(b"name"),
+                old_value: token.name,
+                new_value: name
+            },
         );
+        token.name = name;
     }
 
     public fun set_uri(mutator_ref: &MutatorRef, uri: String) acquires Token {
         let token = borrow_mut(mutator_ref);
-        token.uri = uri;
         event::emit_event(
             &mut token.mutation_events,
-            MutationEvent { mutated_field_name: string::utf8(b"uri") },
+            MutationEvent {
+                mutated_field_name: string::utf8(b"uri"),
+                old_value: token.uri,
+                new_value: uri,
+            },
         );
+        token.uri = uri;
     }
 
     #[test(creator = @0x123, trader = @0x456)]
