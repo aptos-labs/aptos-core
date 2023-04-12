@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::config::{Error, RootPath};
+use crate::config::{utils::RootPath, Error};
 use aptos_types::transaction::Transaction;
 use serde::{Deserialize, Serialize};
 use std::{

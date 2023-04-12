@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::pruner::{db_pruner::DBPruner, state_kv_pruner::StateKvPruner};
-use aptos_config::config::StateKvPrunerConfig;
+use aptos_config::config::LedgerPrunerConfig;
 use aptos_logger::{
     error,
     prelude::{sample, SampleRate},
@@ -34,7 +34,7 @@ pub struct StateKvPrunerWorker {
 impl StateKvPrunerWorker {
     pub(crate) fn new(
         state_kv_pruner: Arc<StateKvPruner>,
-        state_kv_pruner_config: StateKvPrunerConfig,
+        state_kv_pruner_config: LedgerPrunerConfig,
     ) -> Self {
         Self {
             pruning_time_interval_in_ms: if cfg!(test) { 100 } else { 1 },

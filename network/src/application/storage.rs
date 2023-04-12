@@ -5,7 +5,7 @@
 use crate::{
     application::{
         error::Error,
-        metadata::{ConnectionState, PeerMetadata, PeerMonitoringMetadata},
+        metadata::{ConnectionState, PeerMetadata},
     },
     transport::{ConnectionId, ConnectionMetadata},
     ProtocolId,
@@ -15,6 +15,7 @@ use aptos_config::{
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_infallible::RwLock;
+use aptos_peer_monitoring_service_types::PeerMonitoringMetadata;
 use aptos_types::PeerId;
 use std::{
     collections::{hash_map::Entry, HashMap},

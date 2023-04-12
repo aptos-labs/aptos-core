@@ -4,9 +4,9 @@
 use crate::{
     network::{NetworkSender, QuorumStoreSender},
     quorum_store::{
-        batch_store::{BatchStore, PersistRequest},
+        batch_store::BatchStore,
         counters,
-        types::Batch,
+        types::{Batch, PersistedValue},
     },
 };
 use aptos_logger::prelude::*;
@@ -42,7 +42,7 @@ impl BatchCoordinator {
         }
     }
 
-    async fn handle_batch(&mut self, batch: Batch) -> Option<PersistRequest> {
+    async fn handle_batch(&mut self, batch: Batch) -> Option<PersistedValue> {
         let source = batch.author();
         let batch_id = batch.batch_id();
         trace!(
@@ -59,16 +59,15 @@ impl BatchCoordinator {
             );
             return None;
         }
-        let persist_request = batch.into();
-        Some(persist_request)
+        Some(batch.into())
     }
 
-    fn persist_and_send_digest(&self, persist_request: PersistRequest) {
+    fn persist_and_send_digest(&self, persist_request: PersistedValue) {
         let batch_store = self.batch_store.clone();
         let network_sender = self.network_sender.clone();
         let my_peer_id = self.my_peer_id;
         tokio::spawn(async move {
-            let peer_id = persist_request.value.author();
+            let peer_id = persist_request.author();
             if let Some(signed_batch_info) = batch_store.persist(persist_request) {
                 if my_peer_id != peer_id {
                     counters::RECEIVED_REMOTE_BATCHES_COUNT.inc();

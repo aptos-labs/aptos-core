@@ -12,6 +12,7 @@ use crate::{
     models::stake_models::{
         delegator_activities::DelegatedStakingActivity,
         delegator_balances::{CurrentDelegatorBalance, CurrentDelegatorBalanceMap},
+        delegator_pools::{DelegatorPool, DelegatorPoolMap},
         proposal_votes::ProposalVote,
         staking_pool_voter::{CurrentStakingPoolVoter, StakingPoolVoterMap},
     },
@@ -51,11 +52,13 @@ fn insert_to_db_impl(
     proposal_votes: &[ProposalVote],
     delegator_actvities: &[DelegatedStakingActivity],
     delegator_balances: &[CurrentDelegatorBalance],
+    delegator_pools: &[DelegatorPool],
 ) -> Result<(), diesel::result::Error> {
     insert_current_stake_pool_voter(conn, current_stake_pool_voters)?;
     insert_proposal_votes(conn, proposal_votes)?;
     insert_delegator_activities(conn, delegator_actvities)?;
     insert_delegator_balances(conn, delegator_balances)?;
+    insert_delegator_pools(conn, delegator_pools)?;
     Ok(())
 }
 
@@ -68,6 +71,7 @@ fn insert_to_db(
     proposal_votes: Vec<ProposalVote>,
     delegator_actvities: Vec<DelegatedStakingActivity>,
     delegator_balances: Vec<CurrentDelegatorBalance>,
+    delegator_pools: Vec<DelegatorPool>,
 ) -> Result<(), diesel::result::Error> {
     aptos_logger::trace!(
         name = name,
@@ -85,6 +89,7 @@ fn insert_to_db(
                 &proposal_votes,
                 &delegator_actvities,
                 &delegator_balances,
+                &delegator_pools,
             )
         }) {
         Ok(_) => Ok(()),
@@ -96,6 +101,7 @@ fn insert_to_db(
                 let proposal_votes = clean_data_for_db(proposal_votes, true);
                 let delegator_actvities = clean_data_for_db(delegator_actvities, true);
                 let delegator_balances = clean_data_for_db(delegator_balances, true);
+                let delegator_pools = clean_data_for_db(delegator_pools, true);
 
                 insert_to_db_impl(
                     pg_conn,
@@ -103,6 +109,7 @@ fn insert_to_db(
                     &proposal_votes,
                     &delegator_actvities,
                     &delegator_balances,
+                    &delegator_pools,
                 )
             }),
     }
@@ -127,6 +134,7 @@ fn insert_current_stake_pool_voter(
                     voter_address.eq(excluded(voter_address)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
                     inserted_at.eq(excluded(inserted_at)),
+                    operator_address.eq(excluded(operator_address)),
                 )),
             Some(
                 " WHERE current_staking_pool_voter.last_transaction_version <= EXCLUDED.last_transaction_version ",
@@ -207,6 +215,32 @@ fn insert_delegator_balances(
     Ok(())
 }
 
+fn insert_delegator_pools(
+    conn: &mut PgConnection,
+    item_to_insert: &[DelegatorPool],
+) -> Result<(), diesel::result::Error> {
+    use schema::delegated_staking_pools::dsl::*;
+
+    let chunks = get_chunks(item_to_insert.len(), DelegatorPool::field_count());
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::delegated_staking_pools::table)
+                .values(&item_to_insert[start_ind..end_ind])
+                .on_conflict(staking_pool_address)
+                .do_update()
+                .set((
+                    first_transaction_version.eq(excluded(first_transaction_version)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )),
+            Some(
+                " WHERE delegated_staking_pools.first_transaction_version >= EXCLUDED.first_transaction_version ",
+            ),
+        )?;
+    }
+    Ok(())
+}
+
 #[async_trait]
 impl TransactionProcessor for StakeTransactionProcessor {
     fn name(&self) -> &'static str {
@@ -223,6 +257,7 @@ impl TransactionProcessor for StakeTransactionProcessor {
         let mut all_proposal_votes = vec![];
         let mut all_delegator_activities = vec![];
         let mut all_delegator_balances: CurrentDelegatorBalanceMap = HashMap::new();
+        let mut all_delegator_pools: DelegatorPoolMap = HashMap::new();
 
         for txn in &transactions {
             // Add votes data
@@ -238,6 +273,10 @@ impl TransactionProcessor for StakeTransactionProcessor {
             // Add delegator balances
             let delegator_balances = CurrentDelegatorBalance::from_transaction(txn).unwrap();
             all_delegator_balances.extend(delegator_balances);
+
+            // Add delegator pools
+            let delegator_pools = DelegatorPool::from_transaction(txn).unwrap();
+            all_delegator_pools.extend(delegator_pools);
         }
 
         // Getting list of values and sorting by pk in order to avoid postgres deadlock since we're doing multi threaded db writes
@@ -247,12 +286,13 @@ impl TransactionProcessor for StakeTransactionProcessor {
         let mut all_delegator_balances = all_delegator_balances
             .into_values()
             .collect::<Vec<CurrentDelegatorBalance>>();
+        let mut all_delegator_pools = all_delegator_pools
+            .into_values()
+            .collect::<Vec<DelegatorPool>>();
 
         // Sort by PK
         all_current_stake_pool_voters
             .sort_by(|a, b| a.staking_pool_address.cmp(&b.staking_pool_address));
-
-        // Sort by PK
         all_delegator_balances.sort_by(|a, b| {
             (&a.delegator_address, &a.pool_address, &a.pool_type).cmp(&(
                 &b.delegator_address,
@@ -260,6 +300,7 @@ impl TransactionProcessor for StakeTransactionProcessor {
                 &b.pool_type,
             ))
         });
+        all_delegator_pools.sort_by(|a, b| a.staking_pool_address.cmp(&b.staking_pool_address));
 
         let mut conn = self.get_conn();
         let tx_result = insert_to_db(
@@ -271,6 +312,7 @@ impl TransactionProcessor for StakeTransactionProcessor {
             all_proposal_votes,
             all_delegator_activities,
             all_delegator_balances,
+            all_delegator_pools,
         );
         match tx_result {
             Ok(_) => Ok(ProcessingResult::new(

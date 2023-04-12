@@ -98,6 +98,7 @@ const config = {
           {
             type: "dropdown",
             label: "Start",
+            to: "whats-new-in-docs",
             position: "left",
             items: [
               {
@@ -135,6 +136,7 @@ const config = {
           {
             type: "dropdown",
             label: "Apps",
+            to: "concepts/coin-and-token/index",
             position: "left",
             items: [
               {
@@ -172,6 +174,7 @@ const config = {
           {
             type: "dropdown",
             label: "Move",
+            to: "guides/move-guides/aptos-move-guides",
             position: "left",
             items: [
               {
@@ -188,6 +191,11 @@ const config = {
                 label: "Move Structure",
                 type: "doc",
                 docId: "guides/move-guides/move-structure",
+              },
+              {
+                label: "Move Scripts",
+                type: "doc",
+                docId: "guides/move-guides/move-scripts",
               },
               {
                 label: "Bytecode for Dependencies",
@@ -219,6 +227,7 @@ const config = {
           {
             type: "dropdown",
             label: "Tokens",
+            to: "/category/nft",
             position: "left",
             items: [
               {
@@ -254,13 +263,14 @@ const config = {
               {
                 type: "doc",
                 label: "Airdrop Aptos Tokens",
-                docId: "concepts/coin-and-token/airdrop-aptos-tokens",
+                docId: "concepts/coin-and-token/nft-airdrop-example",
               },
             ],
           },
           {
             type: "dropdown",
             label: "Nodes",
+            to: "nodes/nodes-landing",
             position: "left",
             items: [
               {
@@ -303,6 +313,7 @@ const config = {
           {
             type: "dropdown",
             label: "Reference",
+            to: "reference/aptos-ref-docs",
             position: "left",
             items: [
               {
@@ -340,6 +351,7 @@ const config = {
           {
             type: "dropdown",
             label: "Community",
+            to: "community/help-index",
             position: "left",
             items: [
               {

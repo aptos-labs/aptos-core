@@ -129,10 +129,12 @@ FROM debian-base AS tools
 RUN echo "deb http://deb.debian.org/debian bullseye main" > /etc/apt/sources.list.d/bullseye.list && \
     echo "Package: *\nPin: release n=bullseye\nPin-Priority: 50" > /etc/apt/preferences.d/bullseye
 
-RUN apt-get update && apt-get --no-install-recommends -y \
+RUN apt-get update && apt-get --no-install-recommends --allow-downgrades -y \
     install \
     wget \
     curl \
+    perl-base=5.32.1-4+deb11u1 \
+    git \
     libssl1.1 \
     ca-certificates \
     socat \

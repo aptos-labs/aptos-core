@@ -26,7 +26,7 @@ To create a delegation pool and obtain information about it, [connect to the Apt
 You can use the following CLI commands to obtain the delegation pool address depending on where you are in the process:
 - Before you create the delegation pool:  
     ```bash
-    aptos account derive-resource-account-address --seed "aptos_framework::delegation_pool<SEED>" --seed-encoding utf8
+    aptos account derive-resource-account-address --address <owner_address> --seed "aptos_framework::delegation_pool<SEED>" --seed-encoding utf8
     ```  
 - After you create the delegation pool: 
     ```bash
@@ -46,7 +46,7 @@ Now initialize a delegation pool by following these steps:
     Where `--args`:
   
     - `u64:1000` represents `operator_commission_percentage` - 1000 is equivalent to 10% and 10000 is 100%.
-    - `string:00` represents `delegation_pool_creation_seed` - a number chosen by you to create a resource account associated with your owner address; this account is used to host the delegation pool resource.
+    - `string:00` represents `delegation_pool_creation_seed` - a number chosen by you to create a resource account associated with your owner address; this account is used to host the delegation pool resource. You should use the same number here as the `--seed` you used in the previous step to create the delegation pool. 
 
     Note that once `operator_commission_percentage` is set, it cannot be changed.
 

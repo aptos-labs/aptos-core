@@ -31,6 +31,7 @@ fn remove_first_aborts_if_since(spec: &Spec, pos: usize) -> (Spec, bool) {
         conditions,
         properties,
         on_impl,
+        update_map,
     } = spec.clone();
 
     let mut new_conditions = vec![];
@@ -48,6 +49,7 @@ fn remove_first_aborts_if_since(spec: &Spec, pos: usize) -> (Spec, bool) {
         conditions: new_conditions,
         properties,
         on_impl,
+        update_map,
     };
     (new_spec, changed)
 }
