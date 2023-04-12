@@ -23,6 +23,8 @@ pub enum FeatureFlag {
     BLS12_381_STRUCTURES = 13,
     ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH = 14,
     STRUCT_CONSTRUCTORS = 15,
+    PERIODICAL_REWARD_RATE_DECREASE = 16,
+    PARTIAL_GOVERNANCE_VOTING = 17,
 }
 
 /// Representation of features on chain as a bitset.

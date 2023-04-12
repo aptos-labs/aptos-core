@@ -12,7 +12,8 @@ use aptos_network::application::{
     storage::PeersAndMetadata,
 };
 use aptos_peer_monitoring_service_types::{
-    PeerMonitoringServiceMessage, PeerMonitoringServiceRequest, PeerMonitoringServiceResponse,
+    request::PeerMonitoringServiceRequest, response::PeerMonitoringServiceResponse,
+    PeerMonitoringServiceMessage,
 };
 use std::{sync::Arc, time::Duration};
 

@@ -11,6 +11,13 @@ use aptos_metrics_core::{
 };
 use once_cell::sync::Lazy;
 
+/// Transaction commit was successful
+pub const TXN_COMMIT_SUCCESS_LABEL: &str = "success";
+/// Transaction commit failed (will not be retried)
+pub const TXN_COMMIT_FAILED_LABEL: &str = "failed";
+/// Transaction commit was unsuccessful, but will be retried
+pub const TXN_COMMIT_RETRY_LABEL: &str = "retry";
+
 //////////////////////
 // HEALTH COUNTERS
 //////////////////////

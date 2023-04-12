@@ -60,8 +60,8 @@ module "validator" {
   validator_instance_type = var.validator_instance_type
 
   # addons
-  enable_monitoring      = true
-  enable_node_exporter   = true
+  enable_monitoring      = var.enable_monitoring
+  enable_node_exporter   = var.enable_node_exporter
   monitoring_helm_values = var.monitoring_helm_values
 }
 

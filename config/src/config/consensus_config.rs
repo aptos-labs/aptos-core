@@ -11,6 +11,8 @@ pub(crate) const MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE: u64 = 4000;
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ConsensusConfig {
+    // length of inbound queue of messages
+    pub max_network_channel_size: usize,
     // Use getters to read the correct value with/without quorum store.
     pub max_sending_block_txns: u64,
     pub max_sending_block_txns_quorum_store_override: u64,
@@ -70,6 +72,7 @@ pub struct ChainHealthBackoffValues {
 impl Default for ConsensusConfig {
     fn default() -> ConsensusConfig {
         ConsensusConfig {
+            max_network_channel_size: 1024,
             max_sending_block_txns: 2500,
             max_sending_block_txns_quorum_store_override:
                 MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE,

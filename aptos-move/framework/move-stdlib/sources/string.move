@@ -77,14 +77,13 @@ module std::string {
             j <= l && i <= j && internal_is_char_boundary(bytes, i) && internal_is_char_boundary(bytes, j),
             EINVALID_INDEX
         );
-        String{bytes: internal_sub_string(bytes, i, j)}
+        String { bytes: internal_sub_string(bytes, i, j) }
     }
 
     /// Computes the index of the first occurrence of a string. Returns `length(s)` if no occurrence found.
     public fun index_of(s: &String, r: &String): u64 {
         internal_index_of(&s.bytes, &r.bytes)
     }
-
 
     // Native API
     public native fun internal_check_utf8(v: &vector<u8>): bool;

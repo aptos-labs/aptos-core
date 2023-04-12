@@ -93,7 +93,6 @@ async fn get_balances(
     maybe_filter_currencies: Option<Vec<Currency>>,
 ) -> ApiResult<(u64, Option<Vec<AccountAddress>>, Vec<Amount>)> {
     let owner_address = account.account_address()?;
-
     // Retrieve all account resources
     if let Ok(response) = rest_client
         .get_account_resources_at_version_bcs(owner_address, version)

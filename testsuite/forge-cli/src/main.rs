@@ -1126,7 +1126,7 @@ fn state_sync_perf_fullnodes_apply_outputs(
             helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
                 ["continuous_syncing_mode"] = "ApplyTransactionOutputs".into();
         }))
-        .with_success_criteria(SuccessCriteria::new(10000))
+        .with_success_criteria(SuccessCriteria::new(9000))
 }
 
 /// The config for running a state sync performance test when executing

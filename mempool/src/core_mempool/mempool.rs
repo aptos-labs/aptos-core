@@ -22,6 +22,7 @@ use aptos_types::{
     account_address::AccountAddress,
     mempool_status::{MempoolStatus, MempoolStatusCode},
     transaction::SignedTransaction,
+    vm_status::DiscardedVMStatus,
 };
 use std::{
     collections::HashSet,
@@ -65,28 +66,43 @@ impl Mempool {
             .commit_transaction(sender, sequence_number);
     }
 
+    fn log_reject_transaction(
+        &self,
+        sender: &AccountAddress,
+        sequence_number: u64,
+        reason_label: &'static str,
+    ) {
+        trace!(
+            LogSchema::new(LogEntry::RemoveTxn).txns(TxnsLog::new_txn(*sender, sequence_number)),
+            is_rejected = true,
+            label = reason_label,
+        );
+        self.log_latency(*sender, sequence_number, reason_label);
+        if let Some(ranking_score) = self.transactions.get_ranking_score(sender, sequence_number) {
+            counters::core_mempool_txn_ranking_score(
+                REMOVE_LABEL,
+                reason_label,
+                self.transactions.get_bucket(ranking_score),
+                ranking_score,
+            );
+        }
+    }
+
     pub(crate) fn reject_transaction(
         &mut self,
         sender: &AccountAddress,
         sequence_number: u64,
         hash: &HashValue,
+        reason: &DiscardedVMStatus,
     ) {
-        trace!(
-            LogSchema::new(LogEntry::RemoveTxn).txns(TxnsLog::new_txn(*sender, sequence_number)),
-            is_rejected = true
-        );
-        self.log_latency(*sender, sequence_number, counters::COMMIT_REJECTED_LABEL);
-        if let Some(ranking_score) = self.transactions.get_ranking_score(sender, sequence_number) {
-            counters::core_mempool_txn_ranking_score(
-                REMOVE_LABEL,
-                counters::COMMIT_REJECTED_LABEL,
-                self.transactions.get_bucket(ranking_score),
-                ranking_score,
-            );
+        if *reason == DiscardedVMStatus::SEQUENCE_NUMBER_TOO_NEW {
+            self.log_reject_transaction(sender, sequence_number, counters::COMMIT_IGNORED_LABEL);
+            // Do not remove the transaction from mempool
+        } else {
+            self.log_reject_transaction(sender, sequence_number, counters::COMMIT_REJECTED_LABEL);
+            self.transactions
+                .reject_transaction(sender, sequence_number, hash);
         }
-
-        self.transactions
-            .reject_transaction(sender, sequence_number, hash);
     }
 
     fn log_latency(&self, account: AccountAddress, sequence_number: u64, stage: &'static str) {

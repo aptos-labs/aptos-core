@@ -46,10 +46,7 @@ pub mod db_debugger;
 use crate::{
     backup::{backup_handler::BackupHandler, restore_handler::RestoreHandler, restore_utils},
     db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
-    db_options::{
-        gen_ledger_cfds, ledger_db_column_families, state_kv_db_column_families,
-        state_merkle_db_column_families,
-    },
+    db_options::{gen_ledger_cfds, ledger_db_column_families, state_merkle_db_column_families},
     errors::AptosDbError,
     event_store::EventStore,
     ledger_store::LedgerStore,
@@ -192,8 +189,13 @@ static ROCKSDB_PROPERTY_MAP: Lazy<HashMap<&str, String>> = Lazy::new(|| {
 });
 
 type ShardedStateKvSchemaBatch = [SchemaBatch; NUM_STATE_SHARDS];
+type ShardedStateMerkleSchemaBatch = [SchemaBatch; NUM_STATE_SHARDS];
 
-pub(crate) fn new_sharded_schema_batch() -> ShardedStateKvSchemaBatch {
+pub(crate) fn new_sharded_kv_schema_batch() -> ShardedStateKvSchemaBatch {
+    arr![SchemaBatch::new(); 16]
+}
+
+pub(crate) fn new_sharded_merkle_schema_batch() -> ShardedStateMerkleSchemaBatch {
     arr![SchemaBatch::new(); 16]
 }
 
@@ -669,49 +671,35 @@ impl AptosDB {
     }
 
     /// Creates new physical DB checkpoint in directory specified by `path`.
-    pub fn create_checkpoint(db_path: impl AsRef<Path>, cp_path: impl AsRef<Path>) -> Result<()> {
+    pub fn create_checkpoint(
+        db_path: impl AsRef<Path>,
+        cp_path: impl AsRef<Path>,
+        use_sharded_state_merkle_db: bool,
+    ) -> Result<()> {
         let start = Instant::now();
         let ledger_db_path = db_path.as_ref().join(LEDGER_DB_NAME);
         let ledger_cp_path = cp_path.as_ref().join(LEDGER_DB_NAME);
-        let state_merkle_db_path = db_path.as_ref().join(STATE_MERKLE_DB_NAME);
-        let state_merkle_cp_path = cp_path.as_ref().join(STATE_MERKLE_DB_NAME);
-        let state_kv_db_path = db_path.as_ref().join(STATE_KV_DB_NAME);
-        let state_kv_cp_path = cp_path.as_ref().join(STATE_KV_DB_NAME);
+
+        info!("Creating ledger_db checkpoint at: {ledger_cp_path:?}");
 
         std::fs::remove_dir_all(&ledger_cp_path).unwrap_or(());
-        std::fs::remove_dir_all(&state_merkle_cp_path).unwrap_or(());
-        std::fs::remove_dir_all(&state_kv_cp_path).unwrap_or(());
 
         // Weird enough, checkpoint doesn't work with readonly or secondary mode (gets stuck).
         // https://github.com/facebook/rocksdb/issues/11167
-        {
-            let ledger_db = aptos_schemadb::DB::open(
-                ledger_db_path,
-                LEDGER_DB_NAME,
-                ledger_db_column_families(),
-                &aptos_schemadb::Options::default(),
-            )?;
-            ledger_db.create_checkpoint(ledger_cp_path)?;
-        }
-        {
-            let state_merkle_db = aptos_schemadb::DB::open(
-                state_merkle_db_path,
-                STATE_MERKLE_DB_NAME,
-                state_merkle_db_column_families(),
-                &aptos_schemadb::Options::default(),
-            )?;
-            state_merkle_db.create_checkpoint(state_merkle_cp_path)?;
-        }
-        {
-            if let Ok(state_kv_db) = aptos_schemadb::DB::open(
-                state_kv_db_path,
-                STATE_KV_DB_NAME,
-                state_kv_db_column_families(),
-                &aptos_schemadb::Options::default(),
-            ) {
-                state_kv_db.create_checkpoint(state_kv_cp_path)?;
-            }
-        }
+        let ledger_db = aptos_schemadb::DB::open(
+            ledger_db_path,
+            LEDGER_DB_NAME,
+            ledger_db_column_families(),
+            &aptos_schemadb::Options::default(),
+        )?;
+        ledger_db.create_checkpoint(ledger_cp_path)?;
+
+        StateKvDb::create_checkpoint(db_path.as_ref(), cp_path.as_ref())?;
+        StateMerkleDb::create_checkpoint(
+            db_path.as_ref(),
+            cp_path.as_ref(),
+            use_sharded_state_merkle_db,
+        )?;
 
         info!(
             db_path = db_path.as_ref(),
@@ -1714,7 +1702,7 @@ impl DbWriter for AptosDB {
 
             // Gather db mutations to `batch`.
             let ledger_batch = SchemaBatch::new();
-            let sharded_state_kv_batches = new_sharded_schema_batch();
+            let sharded_state_kv_batches = new_sharded_kv_schema_batch();
 
             let new_root_hash = self.save_transactions_impl(
                 txns_to_commit,
@@ -1800,38 +1788,44 @@ impl DbWriter for AptosDB {
                 }
 
                 let mut end_with_reconfig = false;
-                let updates_until_latest_checkpoint_since_current = if let Some(
-                    latest_checkpoint_version,
-                ) =
-                    latest_in_memory_state.base_version
-                {
-                    if latest_checkpoint_version >= first_version {
-                        let idx = (latest_checkpoint_version - first_version) as usize;
-                        ensure!(
+                let updates_until_latest_checkpoint_since_current = {
+                    let _timer = OTHER_TIMERS_SECONDS
+                        .with_label_values(&["updates_until_next_checkpoint_since_current"])
+                        .start_timer();
+                    if let Some(latest_checkpoint_version) = latest_in_memory_state.base_version {
+                        if latest_checkpoint_version >= first_version {
+                            let idx = (latest_checkpoint_version - first_version) as usize;
+                            ensure!(
                             txns_to_commit[idx].is_state_checkpoint(),
                             "The new latest snapshot version passed in {:?} does not match with the last checkpoint version in txns_to_commit {:?}",
                             latest_checkpoint_version,
                             first_version + idx as u64
                         );
-                        end_with_reconfig = txns_to_commit[idx].is_reconfig();
-                        Some(
-                            txns_to_commit[..=idx]
-                                .iter()
-                                .flat_map(|txn_to_commit| txn_to_commit.state_updates().clone())
-                                .collect(),
-                        )
+                            end_with_reconfig = txns_to_commit[idx].is_reconfig();
+                            Some(
+                                txns_to_commit[..=idx]
+                                    .iter()
+                                    .flat_map(|txn_to_commit| txn_to_commit.state_updates().clone())
+                                    .collect(),
+                            )
+                        } else {
+                            None
+                        }
                     } else {
                         None
                     }
-                } else {
-                    None
                 };
 
-                buffered_state.update(
-                    updates_until_latest_checkpoint_since_current,
-                    latest_in_memory_state,
-                    end_with_reconfig || sync_commit,
-                )?;
+                {
+                    let _timer = OTHER_TIMERS_SECONDS
+                        .with_label_values(&["buffered_state___update"])
+                        .start_timer();
+                    buffered_state.update(
+                        updates_until_latest_checkpoint_since_current,
+                        latest_in_memory_state,
+                        end_with_reconfig || sync_commit,
+                    )?;
+                }
             }
 
             // If commit succeeds and there are at least one transaction written to the storage, we

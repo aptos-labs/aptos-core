@@ -41,6 +41,8 @@ spec:
           name: prometheus-read-only
           key: token
           optional: true
+    - name: RUST_BACKTRACE
+      value: "1"
     # - name: RUST_LOG
     #   value: debug
   affinity:

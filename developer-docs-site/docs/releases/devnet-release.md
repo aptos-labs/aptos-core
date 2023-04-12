@@ -23,4 +23,5 @@ Aptos SDK Release v1.7.2
 
 |Devnet Branch Commit | Docker Image Tag | Docker Image Digest | genesis.blob SHA-256 | Waypoint | Chain ID|
 |---|---|---|---|---|---|
-|`8d04ee24fe8ba6455cdd5aa2ef0ae360f113b950`| `devnet_8d04ee24fe8ba6455cdd5aa2ef0ae360f113b950` | `sha256:dd407bc7cbde9a1fbc612178da5fe3c2915b9b876c12cad3cea6787c8b9409fd` | `sha256: 48d3511e63ae9cb6c640ff509ba968b27e8b7fc5ff1b9bd2ff9903c8e094e216`| `0:48ef610331343df8f048c1c2e2058167d376c435850383597416d824a86ae4b0` | 48 |
+|`21c142b1ef3417208ed9a2b921153213c0dbfafe`| `devnet_21c142b1ef3417208ed9a2b921153213c0dbfafe` | `sha256:02be92c539989d3e502a22ed3e6462ce31e72b6e9aa8c6d7dfbcbf43612c0a86` | `sha256: 69febfff73c918b474176c44b1c20fb797d0f780def53e55c63367f3cfd72c4f`| `0:4345790585d17676c807f6e7f9807cc80e79f337b04848da877c7bd6ce1f1aba
+` | 52 |

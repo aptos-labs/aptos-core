@@ -75,6 +75,16 @@ class AccountAddress:
         return AccountAddress(hasher.digest())
 
     @staticmethod
+    def for_guid_object(creator: AccountAddress, creation_num: int) -> AccountAddress:
+        hasher = hashlib.sha3_256()
+        serializer = Serializer()
+        serializer.u64(creation_num)
+        hasher.update(serializer.output())
+        hasher.update(creator.address)
+        hasher.update(AuthKeyScheme.DeriveObjectAddressFromGuid)
+        return AccountAddress(hasher.digest())
+
+    @staticmethod
     def for_named_object(creator: AccountAddress, seed: bytes) -> AccountAddress:
         hasher = hashlib.sha3_256()
         hasher.update(creator.address)

@@ -549,6 +549,7 @@ pub(crate) fn process_rejected_transactions(
             &transaction.sender,
             transaction.sequence_number,
             &transaction.hash,
+            &transaction.reason,
         );
     }
 }
