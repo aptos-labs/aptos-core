@@ -2479,7 +2479,6 @@ dependencies = [
  "aptos-types",
  "aptos-warp-webserver",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
- "chrono",
  "clap 3.2.23",
  "futures",
  "hex",

@@ -92,12 +92,7 @@ async fn get_balances(
     account: AccountIdentifier,
     version: u64,
     maybe_filter_currencies: Option<Vec<Currency>>,
-) -> ApiResult<(
-    u64,
-    Option<Vec<AccountAddress>>,
-    Vec<Amount>,
-    u64,
-)> {
+) -> ApiResult<(u64, Option<Vec<AccountAddress>>, Vec<Amount>, u64)> {
     let owner_address = account.account_address()?;
     // Retrieve all account resources
     if let Ok(response) = rest_client
