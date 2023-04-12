@@ -76,7 +76,7 @@ function update_versions {
     $url = "https://raw.githubusercontent.com/aptos-labs/aptos-core/main/scripts/dev_setup.sh"
     
     # Retrieve the content of the file and store it in a variable
-    $content = (Invoke-WebRequest -Uri $url | Select-Object -ExpandProperty Content -First 50) -join "`n"
+    $content = (Invoke-WebRequest -Uri $url -UseBasicParsing | Select-Object -ExpandProperty Content -First 50) -join "`n"
 
     $packages = @($global:grcov_version, $global:protoc_version, $global:dotnet_version, $global:z3_version, $global:boogie_version)
     
@@ -109,6 +109,7 @@ function update_versions {
         Write-Error "Updated $package_name not found."
       }
     }
+   }
   catch {
     Write-Error "Unable to check for updated version numbers for some dependencies due to an error: $($_.Exception.Message)"
     Write-Host "Installation will continue with the current versions..."
@@ -180,6 +181,8 @@ function install_winget {
   # Add WinGet directory to user PATH environment variable
   [Environment]::SetEnvironmentVariable("PATH", "$env:PATH;$env:LOCALAPPDATA\Microsoft\WindowsApps", "User")
 
+  # Reload the PATH environment variables for this session
+  $env:Path = [System.Environment]::GetEnvironmentVariable("PATH", "User") + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "Machine")
   Write-Host "Winget has been installed. Please restart your system to ensure WinGet is setup correctly. Afterward, re-run the script."
   Exit
 }
@@ -424,6 +427,9 @@ function install_dotnet {
     winget install "Microsoft.DotNet.SDK.6" --accept-source-agreements --silent
     [Environment]::SetEnvironmentVariable("DOTNET_ROOT", "$env:PROGRAMFILES\dotnet", "User")
     [Environment]::SetEnvironmentVariable("PATH", "$env:PATH;$env:PROGRAMFILES\dotnet\sdk\$global:dotnet_version\DotnetTools;$env:USERPROFILE\.dotnet\tools", "User")
+    
+    # Reload the PATH environment variables for this session
+    $env:Path = [System.Environment]::GetEnvironmentVariable("PATH", "User") + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "Machine")
     Write-Host "User environment variables set for DotNet"
   } 
   else {
@@ -444,8 +450,8 @@ function install_z3 {
     Remove-Item $z3_filepath
 
     # Create a user environment variable for Z3
-    $z3_exe_path = "$env:USERPROFILE\z3-$global:z3_version-x$global:architecture-win\z3-$global:z3_version-x$global:architecture-win\bin\z3.exe"
-    [Environment]::SetEnvironmentVariable("Z3_EXE", "$z3_exe_path", "User")    
+    $z3_exe_path = "$env:USERPROFILE\z3-$global:z3_version-x$global:architecture-win\bin\z3.exe"
+    [Environment]::SetEnvironmentVariable("Z3_EXE", "$z3_exe_path", "User")   
     Write-Host "User environment variable set for Z3"
     }
   else {
@@ -485,8 +491,8 @@ function install_move_prover {
   Write-Host (move_prover_message)
   install_cvc5
   install_dotnet
-  install_z3
   install_boogie
+  install_z3
   install_git
   Write-Host "Installation complete. Open a new PowerShell session to update the environment variables."
 }
