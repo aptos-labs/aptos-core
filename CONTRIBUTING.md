@@ -11,7 +11,7 @@ Our goal is to make contributing to Aptos Core easy and transparent. See [Aptos 
 
 To contribute to the Aptos Core implementation, first start with the proper development copy.
 You may want to use the GitHub interface to fork [aptos-core](https://github.com/aptos-labs/aptos-core) and check out your fork.
-For development environment setup and first build, see [Building Aptos From Source](developer-docs-site/docs/guides/building-from-source.md)
+For development environment setup and first build, see [Building Aptos From Source](https://aptos.dev/guides/building-from-source)
 
 ## Our Development Process
 
