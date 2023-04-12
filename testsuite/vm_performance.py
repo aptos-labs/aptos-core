@@ -21,7 +21,9 @@ tps_1k = int(re.findall(r"Avg Sequential TPS = (\d+)", output)[0])
 tps_10k = int(re.findall(r"Avg Sequential TPS = (\d+)", output)[1])
 
 print(f"Average Sequential TPS for 1k block: {tps_1k}, Threshold TPS: {THRESHOLD_1k}")
-print(f"Average Sequential TPS for 10k block: {tps_10k}, Threshold TPS: {THRESHOLD_10k}")
+print(
+    f"Average Sequential TPS for 10k block: {tps_10k}, Threshold TPS: {THRESHOLD_10k}"
+)
 
 # Check if any threshold is not met
 if tps_1k < THRESHOLD_1k or tps_10k < THRESHOLD_10k:
