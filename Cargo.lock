@@ -2397,6 +2397,7 @@ dependencies = [
  "clap 3.2.23",
  "futures",
  "git2 0.16.1",
+ "handlebars",
  "hex",
  "move-binary-format",
  "move-core-types",
@@ -11213,6 +11214,7 @@ dependencies = [
  "aptos-types",
  "aptos-vault-client",
  "aptos-vm",
+ "aptos-vm-genesis",
  "aptos-writeset-generator",
  "async-trait",
  "base64 0.13.0",
@@ -11231,6 +11233,7 @@ dependencies = [
  "serde_yaml 0.8.26",
  "tokio",
  "url",
+ "walkdir",
 ]
 
 [[package]]

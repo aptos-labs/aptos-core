@@ -12,11 +12,13 @@ use aptos_types::{
     on_chain_config::{GasScheduleV2, OnChainConfig, OnChainConsensusConfig, Version},
 };
 use futures::executor::block_on;
+use handlebars::Handlebars;
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::HashMap,
     fs::File,
     io::{Read, Write},
-    path::Path,
+    path::{Path, PathBuf},
 };
 use url::Url;
 
@@ -29,11 +31,31 @@ pub mod version;
 
 #[derive(Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct ReleaseConfig {
-    pub testnet: bool,
     pub remote_endpoint: Option<Url>,
-    #[serde(default)]
-    pub is_multi_step: bool,
+    pub proposals: Vec<Proposal>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Eq, PartialEq)]
+pub struct Proposal {
+    pub name: String,
+    pub metadata: ProposalMetadata,
+    pub execution_mode: ExecutionMode,
     pub update_sequence: Vec<ReleaseEntry>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Default, Eq, PartialEq)]
+pub struct ProposalMetadata {
+    title: String,
+    description: String,
+    source_code_url: String,
+    discussion_url: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Eq, PartialEq)]
+pub enum ExecutionMode {
+    MultiStep,
+    SingleStep,
+    RootSigner,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
@@ -44,6 +66,7 @@ pub enum ReleaseEntry {
     Version(Version),
     FeatureFlag(Features),
     Consensus(OnChainConsensusConfig),
+    RawScript(PathBuf),
 }
 
 impl ReleaseEntry {
@@ -51,9 +74,13 @@ impl ReleaseEntry {
         &self,
         client: Option<&Client>,
         result: &mut Vec<(String, String)>,
-        is_testnet: bool,
-        is_multi_step: bool,
+        execution_mode: ExecutionMode,
     ) -> Result<()> {
+        let (is_testnet, is_multi_step) = match execution_mode {
+            ExecutionMode::MultiStep => (false, true),
+            ExecutionMode::SingleStep => (false, false),
+            ExecutionMode::RootSigner => (true, false),
+        };
         match self {
             ReleaseEntry::Framework(framework_release) => {
                 result.append(
@@ -150,6 +177,47 @@ impl ReleaseEntry {
                     )?);
                 }
             },
+            ReleaseEntry::RawScript(script_path) => {
+                let base_path =
+                    PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join(script_path.as_path());
+                let file_name = base_path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .ok_or_else(|| {
+                        anyhow!("Unable to obtain file name for proposal: {:?}", script_path)
+                    })?
+                    .to_string();
+                let file_content = std::fs::read_to_string(base_path)?;
+
+                if let ExecutionMode::MultiStep = execution_mode {
+                    // Render the hash for multi step proposal.
+                    // {{ script_hash }} in the provided move file will be replaced with the real hash.
+
+                    let mut handlebars = Handlebars::new();
+                    handlebars
+                        .register_template_string("move_template", file_content.as_str())
+                        .unwrap();
+
+                    let execution_hash = get_execution_hash(result);
+                    let mut hash_string = "vector[".to_string();
+                    for b in execution_hash.iter() {
+                        hash_string.push_str(format!("{}u8,", b).as_str());
+                    }
+                    hash_string.push(']');
+
+                    let mut data = HashMap::new();
+                    data.insert("script_hash", hash_string);
+
+                    result.push((
+                        file_name,
+                        handlebars
+                            .render("move_template", &data)
+                            .map_err(|err| anyhow!("Fail to render string: {:?}", err))?,
+                    ));
+                } else {
+                    result.push((file_name, file_content));
+                }
+            },
         }
         Ok(())
     }
@@ -158,6 +226,7 @@ impl ReleaseEntry {
         let client_opt = Some(client);
         match self {
             ReleaseEntry::Framework(_) => (),
+            ReleaseEntry::RawScript(_) => (),
             ReleaseEntry::CustomGas(gas_schedule) => {
                 if !fetch_and_equals(client_opt, gas_schedule)? {
                     bail!("Gas schedule config mismatch: Expected {:?}", gas_schedule);
@@ -233,43 +302,74 @@ fn fetch_and_equals<T: OnChainConfig + PartialEq>(
 
 impl ReleaseConfig {
     pub fn generate_release_proposal_scripts(&self, base_path: &Path) -> Result<()> {
-        let mut result: Vec<(String, String)> = vec![];
         let client = self
             .remote_endpoint
             .as_ref()
             .map(|url| Client::new(url.clone()));
 
+        // Create directories for source and metadata.
+        let mut source_dir = base_path.to_path_buf();
+        source_dir.push("sources");
+
+        std::fs::create_dir(source_dir.as_path())
+            .map_err(|err| anyhow!("Fail to create folder for source: {:?}", err))?;
+
+        let mut metadata_dir = base_path.to_path_buf();
+        metadata_dir.push("metadata");
+
+        std::fs::create_dir(metadata_dir.as_path())
+            .map_err(|err| anyhow!("Fail to create folder for metadata: {:?}", err))?;
+
         // If we are generating multi-step proposal files, we generate the files in reverse order,
         // since we need to pass in the hash of the next file to the previous file.
-        if self.is_multi_step {
-            for entry in self.update_sequence.iter().rev() {
-                entry.generate_release_script(
-                    client.as_ref(),
-                    &mut result,
-                    self.testnet,
-                    self.is_multi_step,
-                )?;
-            }
-            result.reverse();
-        } else {
-            for entry in self.update_sequence.iter() {
-                entry.generate_release_script(
-                    client.as_ref(),
-                    &mut result,
-                    self.testnet,
-                    self.is_multi_step,
-                )?;
-            }
-        }
+        for proposal in &self.proposals {
+            let mut proposal_dir = base_path.to_path_buf();
+            proposal_dir.push("sources");
+            proposal_dir.push(proposal.name.as_str());
 
-        for (idx, (script_name, script)) in result.into_iter().enumerate() {
-            let mut script_path = base_path.to_path_buf();
-            let proposal_name = format!("{}-{}", idx, script_name);
-            script_path.push(&proposal_name);
-            script_path.set_extension("move");
+            std::fs::create_dir(proposal_dir.as_path())
+                .map_err(|err| anyhow!("Fail to create folder for proposal: {:?}", err))?;
 
-            std::fs::write(script_path.as_path(), append_script_hash(script).as_bytes())
-                .map_err(|err| anyhow!("Failed to write to file: {:?}", err))?;
+            let mut result: Vec<(String, String)> = vec![];
+            if let ExecutionMode::MultiStep = &proposal.execution_mode {
+                for entry in proposal.update_sequence.iter().rev() {
+                    entry.generate_release_script(
+                        client.as_ref(),
+                        &mut result,
+                        proposal.execution_mode,
+                    )?;
+                }
+                result.reverse();
+            } else {
+                for entry in proposal.update_sequence.iter() {
+                    entry.generate_release_script(
+                        client.as_ref(),
+                        &mut result,
+                        proposal.execution_mode,
+                    )?;
+                }
+            }
+
+            for (idx, (script_name, script)) in result.into_iter().enumerate() {
+                let mut script_path = proposal_dir.clone();
+                let proposal_name = format!("{}-{}", idx, script_name);
+                script_path.push(&proposal_name);
+                script_path.set_extension("move");
+
+                std::fs::write(script_path.as_path(), append_script_hash(script).as_bytes())
+                    .map_err(|err| anyhow!("Failed to write to file: {:?}", err))?;
+            }
+
+            let mut metadata_path = base_path.to_path_buf();
+            metadata_path.push("metadata");
+            metadata_path.push(proposal.name.as_str());
+            metadata_path.set_extension("json");
+
+            std::fs::write(
+                metadata_path.as_path(),
+                serde_json::to_string_pretty(&proposal.metadata)?,
+            )
+            .map_err(|err| anyhow!("Failed to write to file: {:?}", err))?;
         }
 
         Ok(())
@@ -315,8 +415,10 @@ impl ReleaseConfig {
     // Fetch all configs from a remote rest endpoint and assert all the configs are the same as the ones specified locally.
     pub fn validate_upgrade(&self, endpoint: Url) -> Result<()> {
         let client = Client::new(endpoint);
-        for entry in &self.update_sequence {
-            entry.validate_upgrade(&client)?;
+        for proposal in &self.proposals {
+            for entry in &proposal.update_sequence {
+                entry.validate_upgrade(&client)?;
+            }
         }
         Ok(())
     }
@@ -325,23 +427,49 @@ impl ReleaseConfig {
 impl Default for ReleaseConfig {
     fn default() -> Self {
         ReleaseConfig {
-            testnet: true,
-            is_multi_step: false,
             remote_endpoint: None,
-            update_sequence: vec![
-                ReleaseEntry::Framework(FrameworkReleaseConfig {
-                    bytecode_version: 6, // TODO: remove explicit bytecode version from sources
-                    git_hash: None,
-                }),
-                ReleaseEntry::DefaultGas,
-                ReleaseEntry::FeatureFlag(Features {
-                    enabled: aptos_vm_genesis::default_features()
-                        .into_iter()
-                        .map(crate::components::feature_flags::FeatureFlag::from)
-                        .collect(),
-                    disabled: vec![],
-                }),
-                ReleaseEntry::Consensus(OnChainConsensusConfig::default()),
+            proposals: vec![
+                Proposal {
+                    execution_mode: ExecutionMode::SingleStep,
+                    metadata: ProposalMetadata::default(),
+                    name: "custom".to_string(),
+                    update_sequence: vec![ReleaseEntry::RawScript(PathBuf::from(
+                        "data/proposals/empty.move",
+                    ))],
+                },
+                Proposal {
+                    execution_mode: ExecutionMode::MultiStep,
+                    metadata: ProposalMetadata::default(),
+                    name: "framework".to_string(),
+                    update_sequence: vec![ReleaseEntry::Framework(FrameworkReleaseConfig {
+                        bytecode_version: 6, // TODO: remove explicit bytecode version from sources
+                        git_hash: None,
+                    })],
+                },
+                Proposal {
+                    execution_mode: ExecutionMode::MultiStep,
+                    metadata: ProposalMetadata::default(),
+                    name: "gas".to_string(),
+                    update_sequence: vec![ReleaseEntry::DefaultGas],
+                },
+                Proposal {
+                    execution_mode: ExecutionMode::MultiStep,
+                    metadata: ProposalMetadata::default(),
+                    name: "feature_flags".to_string(),
+                    update_sequence: vec![
+                        ReleaseEntry::FeatureFlag(Features {
+                            enabled: aptos_vm_genesis::default_features()
+                                .into_iter()
+                                .map(crate::components::feature_flags::FeatureFlag::from)
+                                .collect(),
+                            disabled: vec![],
+                        }),
+                        ReleaseEntry::Consensus(OnChainConsensusConfig::default()),
+                        ReleaseEntry::RawScript(PathBuf::from(
+                            "data/proposals/empty_multi_step.move",
+                        )),
+                    ],
+                },
             ],
         }
     }
