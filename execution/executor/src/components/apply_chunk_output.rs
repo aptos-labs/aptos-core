@@ -118,8 +118,8 @@ impl ApplyChunkOutput {
             .iter()
             .position(|o| matches!(o.status(), TransactionStatus::Retry));
 
-        // Transactions after the epoch ending are all to be retried.
-        // Transactions after exceedng per-block gas limit are also to be retried.
+        // Transactions after the epoch ending txn are all to be retried.
+        // Transactions after the txn that exceeded per-block gas limit are also to be retried.
         let to_retry = if let Some(pos) = new_epoch_marker {
             transaction_outputs.drain(pos..);
             transactions.drain(pos..).collect()

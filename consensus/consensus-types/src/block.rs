@@ -357,8 +357,8 @@ impl Block {
             .chain(txns.into_iter().map(Transaction::UserTransaction))
             .collect()
         } else {
-            // Without per-block gas limit, StateCheckpoint txn
-            // is inserted here for compatibility
+            // Before the per-block gas limit change, StateCheckpoint txn
+            // is inserted here for compatibility.
             once(Transaction::BlockMetadata(
                 self.new_block_metadata(validators),
             ))

@@ -235,6 +235,8 @@ where
                     // Committed the last transaction, BlockSTM finishes execution.
                     if txn_idx as usize + 1 == block.len() {
                         scheduler_task = SchedulerTask::Done;
+
+                        counters::PARALLEL_PER_BLOCK_GAS.observe(accumulated_gas as f64);
                         break;
                     }
 
@@ -243,8 +245,10 @@ where
                     match last_input_output.success_gas(txn_idx) {
                         Ok(gas) => accumulated_gas += gas,
                         _ => {
-                            debug!("[BlockSTM]: Early halted due to Abort or SkipRest txn.");
                             scheduler.halt();
+
+                            counters::PARALLEL_PER_BLOCK_GAS.observe(accumulated_gas as f64);
+                            debug!("[BlockSTM]: Early halted due to Abort or SkipRest txn.");
                             break;
                         },
                     };
@@ -443,7 +447,6 @@ where
                 // When the accumulated gas of the committed txns
                 // exceeds per_block_gas_limit, halt sequential execution.
                 if accumulated_gas >= per_block_gas_limit {
-                    counters::SEQUENTIAL_PER_BLOCK_GAS.observe(accumulated_gas as f64);
                     counters::SEQUENTIAL_EXCEED_PER_BLOCK_GAS_LIMIT_COUNT.inc();
                     debug!("[Execution]: Sequential execution early halted due to accumulated_gas {} >= PER_BLOCK_GAS_LIMIT {}.", accumulated_gas, per_block_gas_limit);
                     break;
@@ -451,6 +454,7 @@ where
             }
         }
 
+        counters::SEQUENTIAL_PER_BLOCK_GAS.observe(accumulated_gas as f64);
         ret.resize_with(num_txns, E::Output::skip_output);
         Ok(ret.into_iter().map(|out| (out, vec![])).collect())
     }
@@ -461,14 +465,6 @@ where
         signature_verified_block: Vec<T>,
         base_view: &S,
     ) -> Result<Vec<(E::Output, Vec<(T::Key, WriteOp)>)>, E::Error> {
-        // The last txn must be StateCheckpoint in production. We let the executor
-        // executes all but the last txn first, and then add back the output of the
-        // StateCheckpoint txn if there is no reconfiguration txn.
-        // The reason is that with per-block gas limit, the parallel / sequential execution
-        // may early halt and mark all remaining txns as Discard, so we need to add back
-        // the StateCheckpoint output to satisfy the invariant checks.
-        // let state_checkpoint_txn = signature_verified_block.pop();
-
         let mut ret = if self.concurrency_level > 1 {
             self.execute_transactions_parallel(
                 executor_arguments,

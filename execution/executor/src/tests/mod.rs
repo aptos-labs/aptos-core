@@ -80,7 +80,7 @@ impl TestExecutor {
         let waypoint = generate_waypoint::<MockVM>(&db, &genesis).unwrap();
         maybe_bootstrap::<MockVM>(&db, &genesis, waypoint).unwrap();
         let executor = BlockExecutor::new(db.clone());
-        executor.update_block_gas_limit(Some(1000));
+        executor.update_block_gas_limit(Some(1000));    // Can comment out this line to test without gas limit
 
         TestExecutor {
             _path: path,
@@ -367,6 +367,9 @@ fn create_transaction_chunks(
     for i in 1..(chunk_ranges.last().unwrap().end - 1) {
         let txn = encode_mint_transaction(gen_address(i), 100);
         txns.push(txn);
+    }
+    if executor.get_block_gas_limit().is_none() {
+        txns.push(Transaction::StateCheckpoint(HashValue::random()));
     }
     let id = gen_block_id(1);
 

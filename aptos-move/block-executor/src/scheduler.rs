@@ -541,7 +541,7 @@ impl Scheduler {
     /// 1. There is a module publishing txn that has read/write intersection with any txns even during speculative execution.
     /// 2. There is a txn with VM execution status Abort.
     /// 3. There is a txn with VM execution status SkipRest.
-    /// 4. The committed txns have exceeds the PER_BLOCK_GAS_LIMIT.
+    /// 4. The committed txns have exceeded the PER_BLOCK_GAS_LIMIT.
     ///
     /// For scenarios 1 and 2, only the error will be returned as the output of the block execution.
     /// For scenarios 3 and 4, the execution outputs of the committed txn prefix will be returned.

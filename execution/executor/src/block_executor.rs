@@ -295,7 +295,7 @@ where
 
             output
         };
-        // output.ensure_ends_with_state_checkpoint()?;
+        output.ensure_ends_with_state_checkpoint()?;
 
         let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
             .with_label_values(&["as_state_compute_result"])
