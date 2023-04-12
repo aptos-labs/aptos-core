@@ -62,15 +62,15 @@ pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<ExecutedBloc
 
         for status in txn_status.iter() {
             let commit_status = match status {
-                TransactionStatus::Keep(_) => counters::TXN_COMMIT_SUCCESS,
+                TransactionStatus::Keep(_) => counters::TXN_COMMIT_SUCCESS_LABEL,
                 TransactionStatus::Discard(reason) => {
                     if reason == &DiscardedVMStatus::SEQUENCE_NUMBER_TOO_NEW {
-                        counters::TXN_COMMIT_RETRY
+                        counters::TXN_COMMIT_RETRY_LABEL
                     } else {
-                        counters::TXN_COMMIT_FAILED
+                        counters::TXN_COMMIT_FAILED_LABEL
                     }
                 },
-                TransactionStatus::Retry => counters::TXN_COMMIT_RETRY,
+                TransactionStatus::Retry => counters::TXN_COMMIT_RETRY_LABEL,
             };
             counters::COMMITTED_TXNS_COUNT
                 .with_label_values(&[commit_status])

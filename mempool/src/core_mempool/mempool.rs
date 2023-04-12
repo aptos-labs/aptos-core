@@ -66,7 +66,6 @@ impl Mempool {
             .commit_transaction(sender, sequence_number);
     }
 
-    #[inline]
     fn log_reject_transaction(
         &self,
         sender: &AccountAddress,
