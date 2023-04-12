@@ -27,8 +27,8 @@ pub fn validator_swarm(
     let mut rng = StdRng::from_seed(seed);
     let mut nodes = Vec::new();
 
-    for index in 0..count {
-        let mut node = NodeConfig::random_with_template(index as u32, template, &mut rng);
+    for _ in 0..count {
+        let mut node = NodeConfig::generate_random_config_with_template(template, &mut rng);
         if randomize_ports {
             node.randomize_ports();
         }
