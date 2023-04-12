@@ -3,7 +3,7 @@
 
 use crate::common::{
     types::{
-        account_address_from_public_key, CliCommand, CliConfig, CliError, CliTypedResult,
+        CliCommand, CliConfig, CliError, CliTypedResult,
         ConfigSearchMode, EncodingOptions, PrivateKeyInputOptions, ProfileConfig, ProfileOptions,
         PromptOptions, RngArgs, DEFAULT_PROFILE,
     },
@@ -19,6 +19,8 @@ use clap::Parser;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, str::FromStr};
+use crate::account::key_rotation::LookupAddress;
+use crate::common::types::{PublicKeyInputOptions, RestOptions};
 
 /// 1 APT (might not actually get that much, depending on the faucet)
 const NUM_DEFAULT_OCTAS: u64 = 100000000;
@@ -154,7 +156,17 @@ impl CliCommand<()> for InitTool {
             }
         };
         let public_key = private_key.public_key();
-        let address = account_address_from_public_key(&public_key);
+
+        // lookup the address from onchain instead of deriving it
+        // if this is the rotated key, deriving it will outputs an incorrect address
+        let rest_url = Url::parse(&*profile_config.rest_url.clone().unwrap());
+        let address = LookupAddress {
+            encoding_options: Default::default(),
+            public_key_options: PublicKeyInputOptions::from_key(&public_key),
+            profile_options: Default::default(),
+            rest_options: RestOptions::new(Option::from(rest_url.unwrap()), None),
+        }.execute().await?;
+
         profile_config.private_key = Some(private_key);
         profile_config.public_key = Some(public_key);
         profile_config.account = Some(address);
