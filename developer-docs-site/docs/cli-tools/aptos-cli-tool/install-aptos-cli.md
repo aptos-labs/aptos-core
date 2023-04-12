@@ -71,7 +71,7 @@ These instructions have been tested on Ubuntu 20.04.
 ## Windows 10, 11 and Windows Server 2022+
 
 :::tip
-These instructions have been tested on Windows 11 and Windows Server 2022. Windows support is new and some features may be not complete. Open [Github issues](https://github.com/aptos-labs/aptos-core/issues) for bugs.
+These instructions have been tested on Windows 11 and Windows Server 2022. Windows support is new and some features may be not complete. Open [GitHub issues](https://github.com/aptos-labs/aptos-core/issues) for bugs.
 :::
 
 1. Go to the [Aptos CLI release page](https://github.com/aptos-labs/aptos-core/releases?q=cli&expanded=true).
