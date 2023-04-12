@@ -36,6 +36,20 @@ fn main() {
         );
         println!(
             "cargo:rerun-if-changed={}",
+            prev_dir
+                .join("aptos-token-objects")
+                .join("sources")
+                .display()
+        );
+        println!(
+            "cargo:rerun-if-changed={}",
+            prev_dir
+                .join("aptos-token-objects")
+                .join("Move.toml")
+                .display()
+        );
+        println!(
+            "cargo:rerun-if-changed={}",
             prev_dir.join("aptos-framework").join("sources").display()
         );
         println!(
