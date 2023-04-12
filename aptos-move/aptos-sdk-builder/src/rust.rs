@@ -39,6 +39,7 @@ pub fn output(out: &mut dyn Write, abis: &[EntryABI], local_types: bool) -> Resu
     emitter.output_preamble()?;
     writeln!(emitter.out, "#![allow(dead_code)]")?;
     writeln!(emitter.out, "#![allow(unused_imports)]")?;
+    writeln!(emitter.out, "#![allow(clippy::too_many_arguments)]")?;
 
     emitter.output_script_call_enum_with_imports(abis)?;
 
