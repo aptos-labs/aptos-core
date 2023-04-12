@@ -8,12 +8,12 @@ use crate::{
         ConsensusConfig, Error, ExecutionConfig, IndexerConfig, IndexerGrpcConfig,
         InspectionServiceConfig, LoggerConfig, MempoolConfig, NetworkConfig,
         PeerMonitoringServiceConfig, RoleType, SafetyRulesTestConfig, StateSyncConfig,
-        StorageConfig, TestConfig, DEFAULT_BATCH_SIZE, DEFAULT_FETCH_TASKS,
-        DEFAULT_PROCESSOR_TASKS,
+        StorageConfig, DEFAULT_BATCH_SIZE, DEFAULT_FETCH_TASKS, DEFAULT_PROCESSOR_TASKS,
     },
     network_id::NetworkId,
 };
 use aptos_crypto::x25519;
+use aptos_temppath::TempPath;
 use aptos_types::account_address::AccountAddress as PeerId;
 use rand::{prelude::StdRng, SeedableRng};
 use serde::{Deserialize, Serialize};
@@ -57,8 +57,6 @@ pub struct NodeConfig {
     pub state_sync: StateSyncConfig,
     #[serde(default)]
     pub storage: StorageConfig,
-    #[serde(default)]
-    pub test: Option<TestConfig>,
     #[serde(default)]
     pub validator_network: Option<NetworkConfig>,
 }
@@ -267,12 +265,9 @@ impl NodeConfig {
     }
 
     fn random_internal(&mut self, rng: &mut StdRng) {
-        let mut test = TestConfig::new_with_temp_dir(None);
-
+        // Randomize the internal values
         if self.base.role == RoleType::Validator {
-            test.random_account_key(rng);
-            let peer_id = test.auth_key.unwrap().derived_address();
-
+            let peer_id = PeerId::random();
             if self.validator_network.is_none() {
                 let network_config = NetworkConfig::network_with_id(NetworkId::Validator);
                 self.validator_network = Some(network_config);
@@ -280,8 +275,6 @@ impl NodeConfig {
 
             let validator_network = self.validator_network.as_mut().unwrap();
             validator_network.random_with_peer_id(rng, Some(peer_id));
-            // We want to produce this key twice
-            test.random_execution_key(rng);
 
             let mut safety_rules_test_config = SafetyRulesTestConfig::new(peer_id);
             safety_rules_test_config.random_consensus_key(rng);
@@ -296,8 +289,17 @@ impl NodeConfig {
                 network.random(rng);
             }
         }
-        self.set_data_dir(test.temp_dir().unwrap().to_path_buf());
-        self.test = Some(test);
+
+        // Create and use a temp directory for the data directory
+        let temp_dir = TempPath::new();
+        temp_dir.create_as_dir().unwrap_or_else(|error| {
+            panic!(
+                "Failed to create a temporary directory at {}! Error: {:?}",
+                temp_dir.path().display(),
+                error
+            )
+        });
+        self.set_data_dir(temp_dir.path().to_path_buf());
     }
 
     fn default_config(serialized: &str, path: &'static str) -> Self {
