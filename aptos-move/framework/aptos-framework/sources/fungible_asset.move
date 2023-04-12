@@ -3,6 +3,8 @@
 module aptos_framework::fungible_asset {
     use aptos_framework::event;
     use aptos_framework::object::{Self, Object, ConstructorRef, DeleteRef};
+    use aptos_framework::optional_aggregator::{Self, OptionalAggregator};
+    use std::string;
 
     use std::error;
     use std::option::{Self, Option};
@@ -37,6 +39,17 @@ module aptos_framework::fungible_asset {
     const EBURN_REF_AND_FUNGIBLE_ASSET_MISMATCH: u64 = 13;
     /// Cannot destroy fungible stores with non-zero balance.
     const EBALANCE_IS_NOT_ZERO: u64 = 14;
+    /// Name of the fungible asset metadata is too long
+    const ENAME_TOO_LONG: u64 = 15;
+    /// Symbol of the fungible asset metadata is too long
+    const ESYMBOL_TOO_LONG: u64 = 16;
+
+    //
+    // Constants
+    //
+
+    const MAX_NAME_LENGTH: u64 = 32;
+    const MAX_SYMBOL_LENGTH: u64 = 10;
 
     /// Maximum possible coin supply.
     const MAX_U128: u128 = 340282366920938463463374607431768211455;
@@ -134,6 +147,14 @@ module aptos_framework::fungible_asset {
                 maximum
             }
         });
+        assert!(
+            string::length(&name) <= MAX_NAME_LENGTH,
+            error::invalid_argument(ENAME_TOO_LONG)
+        );
+        assert!(
+            string::length(&symbol) <= MAX_SYMBOL_LENGTH,
+            error::invalid_argument(ESYMBOL_TOO_LONG)
+        );
         move_to(metadata_object_signer,
             Metadata {
                 supply,
@@ -534,11 +555,7 @@ module aptos_framework::fungible_asset {
     }
 
     #[test_only]
-    use std::string;
-    #[test_only]
     use aptos_framework::account;
-    use aptos_framework::optional_aggregator::OptionalAggregator;
-    use aptos_framework::optional_aggregator;
 
     #[test_only]
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
