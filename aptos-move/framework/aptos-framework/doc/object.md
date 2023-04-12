@@ -70,6 +70,7 @@ make it so that a reference to a global object can be returned from a function.
 -  [Function `transfer_raw`](#0x1_object_transfer_raw)
 -  [Function `transfer_to_object`](#0x1_object_transfer_to_object)
 -  [Function `verify_ungated_and_descendant`](#0x1_object_verify_ungated_and_descendant)
+-  [Function `ungated_transfer_allowed`](#0x1_object_ungated_transfer_allowed)
 -  [Function `owner`](#0x1_object_owner)
 -  [Function `is_owner`](#0x1_object_is_owner)
 -  [Function `owns`](#0x1_object_owns)
@@ -583,7 +584,7 @@ Produces an ObjectId from the given address. This is not verified.
 <pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_to_object">address_to_object</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <b>address</b>): <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt; {
     <b>assert</b>!(<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="object.md#0x1_object_EOBJECT_DOES_NOT_EXIST">EOBJECT_DOES_NOT_EXIST</a>));
     <b>assert</b>!(<a href="object.md#0x1_object_exists_at">exists_at</a>&lt;T&gt;(<a href="object.md#0x1_object">object</a>), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="object.md#0x1_object_ERESOURCE_DOES_NOT_EXIST">ERESOURCE_DOES_NOT_EXIST</a>));
-    <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;{ inner: <a href="object.md#0x1_object">object</a> }
+    <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt; { inner: <a href="object.md#0x1_object">object</a> }
 }
 </code></pre>
 
@@ -808,7 +809,7 @@ Create a new object whose address is derived based on the creator account addres
 Derivde objects, similar to named objects, cannot be deleted.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_create_user_derived_object">create_user_derived_object</a>(creator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, derive_ref: &<a href="object.md#0x1_object_DeriveRef">object::DeriveRef</a>): <a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="object.md#0x1_object_create_user_derived_object">create_user_derived_object</a>(creator_address: <b>address</b>, derive_ref: &<a href="object.md#0x1_object_DeriveRef">object::DeriveRef</a>): <a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>
 </code></pre>
 
 
@@ -817,8 +818,7 @@ Derivde objects, similar to named objects, cannot be deleted.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_create_user_derived_object">create_user_derived_object</a>(creator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, derive_ref: &<a href="object.md#0x1_object_DeriveRef">DeriveRef</a>): <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> {
-    <b>let</b> creator_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(creator);
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="object.md#0x1_object_create_user_derived_object">create_user_derived_object</a>(creator_address: <b>address</b>, derive_ref: &<a href="object.md#0x1_object_DeriveRef">DeriveRef</a>): <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> {
     <b>let</b> obj_addr = <a href="object.md#0x1_object_create_user_derived_object_address">create_user_derived_object_address</a>(creator_address, derive_ref.self);
     <a href="object.md#0x1_object_create_object_internal">create_object_internal</a>(creator_address, obj_addr, <b>false</b>)
 }
@@ -1652,11 +1652,40 @@ objects may have cyclic dependencies.
 
 </details>
 
+<a name="0x1_object_ungated_transfer_allowed"></a>
+
+## Function `ungated_transfer_allowed`
+
+Accessors
+Return true if ungated transfer is allowed.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_ungated_transfer_allowed">ungated_transfer_allowed</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_ungated_transfer_allowed">ungated_transfer_allowed</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;): bool <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+    <b>assert</b>!(
+        <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>.inner),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="object.md#0x1_object_EOBJECT_DOES_NOT_EXIST">EOBJECT_DOES_NOT_EXIST</a>),
+    );
+    <b>borrow_global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>.inner).allow_ungated_transfer
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_object_owner"></a>
 
 ## Function `owner`
 
-Accessors
 Return the current owner.
 
 
