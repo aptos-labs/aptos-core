@@ -20,7 +20,6 @@ use aptos_types::{
     account_address::AccountAddress,
     account_config::{AccountResource, CoinStoreResource},
 };
-use chrono::{DateTime, Utc};
 use std::{collections::HashSet, str::FromStr};
 use warp::Filter;
 
@@ -81,7 +80,7 @@ async fn account_balance(
         metadata: AccountBalanceMetadata {
             sequence_number: sequence_number.into(),
             operators,
-            lockup_expiration_time_utc: lockup_expiration,
+            lockup_expiration_time_utc: aptos_rest_client::aptos_api_types::U64(lockup_expiration),
         },
     })
 }
@@ -97,7 +96,7 @@ async fn get_balances(
     u64,
     Option<Vec<AccountAddress>>,
     Vec<Amount>,
-    Option<DateTime<Utc>>,
+    u64,
 )> {
     let owner_address = account.account_address()?;
     // Retrieve all account resources
@@ -109,7 +108,7 @@ async fn get_balances(
         let mut maybe_sequence_number = None;
         let mut maybe_operators = None;
         let mut balances = vec![];
-        let mut lockup_expiration: Option<DateTime<Utc>> = None;
+        let mut lockup_expiration: u64 = 0;
 
         // Iterate through resources, converting balances
         for (struct_tag, bytes) in resources {
@@ -163,7 +162,7 @@ async fn get_balances(
                                             + u64::from_str(&balance.value).unwrap_or_default(),
                                     );
                                 }
-                                lockup_expiration = Some(balance_result.lockup_expiration);
+                                lockup_expiration = balance_result.lockup_expiration;
                             },
                             result => {
                                 warn!(
@@ -242,7 +241,7 @@ async fn get_balances(
                 value: 0.to_string(),
                 currency: native_coin(),
             }],
-            None,
+            0,
         ))
     }
 }

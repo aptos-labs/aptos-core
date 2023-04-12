@@ -8,13 +8,11 @@ use crate::{
     AccountAddress, ApiResult,
 };
 use aptos_types::stake_pool::StakePool;
-use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{
     convert::TryFrom,
     fmt::{Display, Formatter},
     str::FromStr,
-    time::Duration,
 };
 
 /// Errors that can be returned by the API
@@ -87,7 +85,7 @@ pub struct Version {
 pub struct BalanceResult {
     pub balance: Option<Amount>,
     /// Time at which the lockup expires and pending_inactive balance becomes inactive
-    pub lockup_expiration: DateTime<Utc>,
+    pub lockup_expiration: u64,
 }
 
 /// An internal enum to support Operation typing
@@ -278,7 +276,7 @@ pub async fn get_stake_balances(
 
         // Any stake pools that match, retrieve that.
         let mut requested_balance: Option<String> = None;
-        let lockup_expiration = get_lockup_expiration_time(stake_pool.locked_until_secs).await;
+        let lockup_expiration = stake_pool.locked_until_secs;
 
         if owner_account.is_active_stake() {
             requested_balance = Some(stake_pool.active.to_string());
@@ -306,15 +304,4 @@ pub async fn get_stake_balances(
     } else {
         Ok(None)
     }
-}
-
-async fn get_lockup_expiration_time(locked_until_secs: u64) -> DateTime<Utc> {
-    let lock_duration = Duration::from_secs(locked_until_secs);
-
-    let date_time = NaiveDateTime::from_timestamp_opt(
-        lock_duration.as_secs() as i64,
-        lock_duration.subsec_nanos(),
-    )
-    .unwrap();
-    DateTime::from_utc(date_time, Utc)
 }
