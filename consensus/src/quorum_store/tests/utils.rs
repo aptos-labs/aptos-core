@@ -37,7 +37,7 @@ fn create_transaction(gas_unit_price: u64) -> Transaction {
 
 pub(crate) fn create_vec_signed_transactions(size: u64) -> Vec<SignedTransaction> {
     (0..size)
-        .map(|_| match create_transaction(0) {
+        .map(|_| match create_transaction(1) {
             Transaction::UserTransaction(inner) => inner,
             _ => panic!("Not a user transaction."),
         })

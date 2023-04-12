@@ -20,6 +20,7 @@ use move_core_types::account_address::AccountAddress;
 use std::{sync::Arc, time::Duration};
 use tokio::{sync::mpsc::channel as TokioChannel, time::timeout};
 
+#[allow(clippy::needless_collect)]
 async fn queue_mempool_batch_response(
     txns: Vec<SignedTransaction>,
     max_size: usize,
@@ -41,7 +42,7 @@ async fn queue_mempool_batch_response(
         let mut size = 0;
         let mut sorted_txns = txns.clone();
         sorted_txns.sort_by_key(|txn| txn.gas_unit_price());
-        let ret = sorted_txns
+        let chosen_txns: Vec<_> = sorted_txns
             .into_iter()
             .rev()
             .take_while(|txn| {
@@ -49,6 +50,7 @@ async fn queue_mempool_batch_response(
                 size <= max_size
             })
             .collect();
+        let ret: Vec<_> = chosen_txns.into_iter().rev().collect();
         callback
             .send(Ok(QuorumStoreResponse::GetBatchResponse(ret)))
             .unwrap();
@@ -291,6 +293,62 @@ async fn test_bucketed_batch_creation() {
             .await
             .unwrap();
     }
+    timeout(Duration::from_millis(10_000), join_handle)
+        .await
+        .unwrap()
+        .unwrap();
+}
+
+#[tokio::test]
+async fn test_max_batch_txns() {
+    let (quorum_store_to_mempool_tx, mut quorum_store_to_mempool_rx) = channel(1_024);
+    let (batch_coordinator_cmd_tx, mut batch_coordinator_cmd_rx) = TokioChannel(100);
+
+    let config = QuorumStoreConfig {
+        max_batch_txns: 10,
+        ..Default::default()
+    };
+    let max_batch_bytes = config.max_batch_bytes;
+
+    let mut batch_generator = BatchGenerator::new(
+        0,
+        AccountAddress::random(),
+        config,
+        Arc::new(MockQuorumStoreDB::new()),
+        quorum_store_to_mempool_tx,
+        1000,
+    );
+
+    let join_handle = tokio::spawn(async move {
+        let signed_txns = create_vec_signed_transactions(25);
+        queue_mempool_batch_response(
+            signed_txns.clone(),
+            max_batch_bytes,
+            &mut quorum_store_to_mempool_rx,
+        )
+        .await;
+
+        let quorum_store_command = batch_coordinator_cmd_rx.recv().await.unwrap();
+        if let BatchCoordinatorCommand::NewBatch(result) = quorum_store_command {
+            assert_eq!(result.len(), 3);
+            assert_eq!(result[0].num_txns(), 10);
+            assert_eq!(result[1].num_txns(), 10);
+            assert_eq!(result[2].num_txns(), 5);
+
+            assert_eq!(&result[0].clone().into_transactions(), &signed_txns[0..10]);
+            assert_eq!(&result[1].clone().into_transactions(), &signed_txns[10..20]);
+            assert_eq!(&result[2].clone().into_transactions(), &signed_txns[20..]);
+        } else {
+            panic!("Unexpected variant")
+        }
+    });
+
+    let result = batch_generator.handle_scheduled_pull(300).await;
+    batch_coordinator_cmd_tx
+        .send(BatchCoordinatorCommand::NewBatch(result))
+        .await
+        .unwrap();
+
     timeout(Duration::from_millis(10_000), join_handle)
         .await
         .unwrap()

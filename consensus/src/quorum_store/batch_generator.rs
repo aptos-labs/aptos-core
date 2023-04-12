@@ -131,6 +131,26 @@ impl BatchGenerator {
         )
     }
 
+    /// Push num_txns from txns into batches. If num_txns is larger than max size, then multiple
+    /// batches are pushed.
+    fn push_to_batches(
+        &mut self,
+        batches: &mut Vec<Batch>,
+        txns: &mut Vec<SignedTransaction>,
+        num_txns: usize,
+        expiry_time: u64,
+        bucket_start: u64,
+    ) {
+        let mut remaining_txns = num_txns;
+        while remaining_txns > 0 {
+            let num_batch_txns = std::cmp::min(self.config.max_batch_txns, remaining_txns);
+            let batch_txns: Vec<_> = txns.drain(0..num_batch_txns).collect();
+            let batch = self.create_new_batch(batch_txns, expiry_time, bucket_start);
+            batches.push(batch);
+            remaining_txns -= num_batch_txns;
+        }
+    }
+
     pub(crate) async fn handle_scheduled_pull(&mut self, max_count: u64) -> Vec<Batch> {
         let exclude_txns: Vec<_> = self
             .batches_in_progress
@@ -193,16 +213,25 @@ impl BatchGenerator {
                 continue;
             }
 
-            let txns: Vec<_> = pulled_txns.drain(0..split_index).collect();
-            let batch = self.create_new_batch(txns, expiry_time, bucket_start);
-            batches.push(batch);
+            self.push_to_batches(
+                &mut batches,
+                &mut pulled_txns,
+                split_index,
+                expiry_time,
+                bucket_start,
+            );
         }
         if !pulled_txns.is_empty() {
             let last_index = self.config.batch_buckets.len() - 1;
             let bucket_start = self.config.batch_buckets[last_index];
 
-            let batch = self.create_new_batch(pulled_txns, expiry_time, bucket_start);
-            batches.push(batch);
+            self.push_to_batches(
+                &mut batches,
+                &mut pulled_txns,
+                last_index,
+                expiry_time,
+                bucket_start,
+            );
         }
 
         self.last_end_batch_time = Instant::now();
