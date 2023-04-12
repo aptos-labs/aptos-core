@@ -32,11 +32,7 @@ async fn test_txn_broadcast() {
 
     let validator = validator_peer_ids[1];
     let vfn = swarm
-        .add_validator_fullnode(
-            &version,
-            NodeConfig::default_for_validator_full_node(),
-            validator,
-        )
+        .add_validator_fullnode(&version, NodeConfig::get_default_vfn_config(), validator)
         .unwrap();
 
     for fullnode in swarm.full_nodes_mut() {
