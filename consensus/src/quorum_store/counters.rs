@@ -461,7 +461,6 @@ pub static BATCH_CREATION_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
         register_histogram!(
             "quorum_store_batch_creation_duration",
             "Histogram of the time durations for batch creation.",
-            // exponential_buckets(/*start=*/ 100.0, /*factor=*/ 1.1, /*count=*/ 100).unwrap(),
         )
         .unwrap(),
     )
@@ -473,7 +472,17 @@ pub static EMPTY_BATCH_CREATION_DURATION: Lazy<DurationHistogram> = Lazy::new(||
         register_histogram!(
             "quorum_store_empty_batch_creation_duration",
             "Histogram of the time durations for empty batch creation.",
-            // exponential_buckets(/*start=*/ 100.0, /*factor=*/ 1.1, /*count=*/ 100).unwrap(),
+        )
+        .unwrap(),
+    )
+});
+
+/// Histogram of the time it takes to compute bucketed batches after txns are pulled from mempool.
+pub static BATCH_CREATION_COMPUTE_LATENCY: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "quorum_store_batch_creation_compute_latency",
+            "Histogram of the time it takes to compute bucketed batches after txns are pulled from mempool.",
         )
         .unwrap(),
     )

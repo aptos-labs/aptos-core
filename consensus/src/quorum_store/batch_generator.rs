@@ -38,6 +38,12 @@ pub struct BackPressure {
     pub proof_count: bool,
 }
 
+#[derive(Clone)]
+struct TransactionInProgress {
+    pub summary: TransactionSummary,
+    pub gas_unit_price: u64,
+}
+
 pub struct BatchGenerator {
     epoch: u64,
     my_peer_id: PeerId,
@@ -45,7 +51,7 @@ pub struct BatchGenerator {
     db: Arc<dyn QuorumStoreStorage>,
     config: QuorumStoreConfig,
     mempool_proxy: MempoolProxy,
-    batches_in_progress: HashMap<BatchId, Vec<TransactionSummary>>,
+    batches_in_progress: HashMap<BatchId, Vec<TransactionInProgress>>,
     batch_expirations: TimeExpirations<BatchId>,
     latest_block_timestamp: u64,
     last_end_batch_time: Instant,
@@ -108,14 +114,17 @@ impl BatchGenerator {
             .save_batch_id(self.epoch, self.batch_id)
             .expect("Could not save to db");
 
-        let txn_summaries: Vec<_> = txns
+        let txns_in_progress: Vec<_> = txns
             .iter()
-            .map(|txn| TransactionSummary {
-                sender: txn.sender(),
-                sequence_number: txn.sequence_number(),
+            .map(|txn| TransactionInProgress {
+                summary: TransactionSummary {
+                    sender: txn.sender(),
+                    sequence_number: txn.sequence_number(),
+                },
+                gas_unit_price: txn.gas_unit_price(),
             })
             .collect();
-        self.batches_in_progress.insert(batch_id, txn_summaries);
+        self.batches_in_progress.insert(batch_id, txns_in_progress);
         self.batch_expirations.add_item(batch_id, expiry_time);
 
         counters::CREATED_BATCHES_COUNT.inc();
@@ -151,12 +160,36 @@ impl BatchGenerator {
         }
     }
 
+    fn build_account_min_gas(
+        exclude_txns: &[TransactionInProgress],
+        pulled_txns: &[SignedTransaction],
+    ) -> HashMap<PeerId, u64> {
+        let mut account_min_gas = HashMap::new();
+        for txn in exclude_txns {
+            let current_min = account_min_gas
+                .entry(txn.summary.sender)
+                .or_insert(txn.gas_unit_price);
+            if txn.gas_unit_price < *current_min {
+                *current_min = txn.gas_unit_price
+            }
+        }
+        for txn in pulled_txns {
+            let current_min = account_min_gas
+                .entry(txn.sender())
+                .or_insert_with(|| txn.gas_unit_price());
+            if txn.gas_unit_price() < *current_min {
+                *current_min = txn.gas_unit_price()
+            }
+        }
+        account_min_gas
+    }
+
     pub(crate) async fn handle_scheduled_pull(&mut self, max_count: u64) -> Vec<Batch> {
         let exclude_txns: Vec<_> = self
             .batches_in_progress
             .values()
             .flatten()
-            .cloned()
+            .map(|txn| txn.summary.clone())
             .collect();
 
         trace!("QS: excluding txs len: {:?}", exclude_txns.len());
@@ -178,25 +211,34 @@ impl BatchGenerator {
             // Quorum store metrics
             counters::CREATED_EMPTY_BATCHES_COUNT.inc();
 
-            let duration = self.last_end_batch_time.elapsed().as_secs_f64();
             counters::EMPTY_BATCH_CREATION_DURATION
-                .observe_duration(Duration::from_secs_f64(duration));
-
+                .observe_duration(self.last_end_batch_time.elapsed());
             self.last_end_batch_time = Instant::now();
             return vec![];
         } else {
             counters::PULLED_TXNS_COUNT.inc();
             counters::PULLED_TXNS_NUM.observe(pulled_txns.len() as f64);
         }
+        counters::BATCH_CREATION_DURATION.observe_duration(self.last_end_batch_time.elapsed());
 
-        // Quorum store metrics
-        let duration = self.last_end_batch_time.elapsed().as_secs_f64();
-        counters::BATCH_CREATION_DURATION.observe_duration(Duration::from_secs_f64(duration));
+        // Compute bucketed batches
+        let bucket_compute_start = Instant::now();
 
+        let exclude_txns_with_gas: Vec<_> = self
+            .batches_in_progress
+            .values()
+            .flatten()
+            .cloned()
+            .collect();
+        let account_min_gas = Self::build_account_min_gas(&exclude_txns_with_gas, &pulled_txns);
         let expiry_time = aptos_infallible::duration_since_epoch().as_micros() as u64
             + self.config.batch_expiry_gap_when_init_usecs;
 
-        pulled_txns.sort_by_key(|txn| txn.gas_unit_price());
+        pulled_txns.sort_by_cached_key(|txn| {
+            *account_min_gas
+                .get(&txn.sender())
+                .expect("Account min gas must exist")
+        });
         let mut batches = vec![];
         let buckets = self.config.batch_buckets.clone();
         for (&bucket_start, &bucket_end) in buckets.iter().tuple_windows() {
@@ -206,7 +248,12 @@ impl BatchGenerator {
 
             let split_index = pulled_txns
                 .iter()
-                .find_position(|txn| txn.gas_unit_price() >= bucket_end)
+                .find_position(|txn| {
+                    *account_min_gas
+                        .get(&txn.sender())
+                        .expect("Account min gas must exist")
+                        >= bucket_end
+                })
                 .map(|(index, _)| index)
                 .unwrap_or(pulled_txns.len());
             if split_index == 0 {
@@ -234,7 +281,9 @@ impl BatchGenerator {
             );
         }
 
+        counters::BATCH_CREATION_COMPUTE_LATENCY.observe_duration(bucket_compute_start.elapsed());
         self.last_end_batch_time = Instant::now();
+
         batches
     }
 
