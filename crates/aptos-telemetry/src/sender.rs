@@ -35,7 +35,7 @@ struct AuthContext {
 impl AuthContext {
     fn new(node_config: &NodeConfig) -> Self {
         Self {
-            noise_config: node_config.identity_key().map(NoiseConfig::new),
+            noise_config: node_config.get_identity_key().map(NoiseConfig::new),
             token: RwLock::new(None),
             server_public_key: Mutex::new(None),
         }
@@ -78,7 +78,7 @@ impl TelemetrySender {
             base_url,
             version_path_base,
             chain_id,
-            peer_id: node_config.peer_id().unwrap_or(PeerId::ZERO),
+            peer_id: node_config.get_peer_id().unwrap_or(PeerId::ZERO),
             role_type: node_config.base.role,
             client,
             auth_context: Arc::new(AuthContext::new(node_config)),

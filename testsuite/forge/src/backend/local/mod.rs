@@ -153,7 +153,7 @@ impl LocalFactory {
                     version,
                     vfn_config
                         .clone()
-                        .unwrap_or_else(NodeConfig::default_for_validator_full_node),
+                        .unwrap_or_else(NodeConfig::get_default_vfn_config),
                     *validator_peer_id,
                 )
                 .unwrap();

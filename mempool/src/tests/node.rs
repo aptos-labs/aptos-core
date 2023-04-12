@@ -238,9 +238,11 @@ impl NodeInfoTrait for FullNodeInfo {
 }
 
 /// Provides a `NodeInfo` and `NodeConfig` for a validator
-pub fn validator_config(rng: &mut StdRng, account_idx: u32) -> (ValidatorNodeInfo, NodeConfig) {
-    let config =
-        NodeConfig::random_with_template(account_idx, &NodeConfig::default_for_validator(), rng);
+pub fn validator_config(rng: &mut StdRng) -> (ValidatorNodeInfo, NodeConfig) {
+    let config = NodeConfig::generate_random_config_with_template(
+        &NodeConfig::get_default_validator_config(),
+        rng,
+    );
 
     let peer_id = config
         .validator_network
@@ -254,14 +256,9 @@ pub fn validator_config(rng: &mut StdRng, account_idx: u32) -> (ValidatorNodeInf
 }
 
 /// Provides a `NodeInfo` and `NodeConfig` for a ValidatorFullNode
-pub fn vfn_config(
-    rng: &mut StdRng,
-    account_idx: u32,
-    peer_id: PeerId,
-) -> (ValidatorFullNodeInfo, NodeConfig) {
-    let mut vfn_config = NodeConfig::random_with_template(
-        account_idx,
-        &NodeConfig::default_for_validator_full_node(),
+pub fn vfn_config(rng: &mut StdRng, peer_id: PeerId) -> (ValidatorFullNodeInfo, NodeConfig) {
+    let mut vfn_config = NodeConfig::generate_random_config_with_template(
+        &NodeConfig::get_default_vfn_config(),
         rng,
     );
 
@@ -294,12 +291,10 @@ pub fn vfn_config(
 /// Provides a `NodeInfo` and `NodeConfig` for a public full node
 pub fn public_full_node_config(
     rng: &mut StdRng,
-    account_idx: u32,
     peer_role: PeerRole,
 ) -> (FullNodeInfo, NodeConfig) {
-    let fn_config = NodeConfig::random_with_template(
-        account_idx,
-        &NodeConfig::default_for_public_full_node(),
+    let fn_config = NodeConfig::generate_random_config_with_template(
+        &NodeConfig::get_default_pfn_config(),
         rng,
     );
 

@@ -33,11 +33,7 @@ async fn test_aptos_node_after_get_bin() {
 
     let validator = validator_peer_ids[0];
     let _vfn = swarm
-        .add_validator_fullnode(
-            &version,
-            NodeConfig::default_for_validator_full_node(),
-            validator,
-        )
+        .add_validator_fullnode(&version, NodeConfig::get_default_vfn_config(), validator)
         .unwrap();
 
     for fullnode in swarm.full_nodes_mut() {

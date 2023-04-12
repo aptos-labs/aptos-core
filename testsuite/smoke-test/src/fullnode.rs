@@ -19,13 +19,13 @@ async fn test_indexer() {
 
     let version = swarm.versions().max().unwrap();
     let fullnode_peer_id = swarm
-        .add_full_node(&version, NodeConfig::default_for_public_full_node())
+        .add_full_node(&version, NodeConfig::get_default_pfn_config())
         .unwrap();
     let validator_peer_id = swarm.validators().next().unwrap().peer_id();
     let _vfn_peer_id = swarm
         .add_validator_full_node(
             &version,
-            NodeConfig::default_for_validator_full_node(),
+            NodeConfig::get_default_vfn_config(),
             validator_peer_id,
         )
         .unwrap();

@@ -269,7 +269,7 @@ fn try_spawn_log_sender(
 /// Returns the peer id given the node config.
 /// Returns UNKNOWN otherwise.
 fn fetch_peer_id(node_config: &NodeConfig) -> String {
-    match node_config.peer_id() {
+    match node_config.get_peer_id() {
         Some(peer_id) => peer_id.to_string(),
         None => UNKNOWN_METRIC_VALUE.into(),
     }

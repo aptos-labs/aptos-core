@@ -2,6 +2,8 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+#[cfg(test)]
+use crate::config::persistable_config::PersistableConfig;
 use crate::{
     config::{IdentityBlob, LoggerConfig, SecureBackend, WaypointConfig},
     keys::ConfigKey,
@@ -50,6 +52,18 @@ impl SafetyRulesConfig {
         } else if let SecureBackend::RocksDbStorage(backend) = &mut self.backend {
             backend.set_data_dir(data_dir);
         }
+    }
+
+    #[cfg(test)]
+    /// Returns the default safety rules config for a validator
+    pub fn get_default_config() -> Self {
+        let contents = include_str!("test_data/safety_rules.yaml");
+        SafetyRulesConfig::parse_serialized_config(contents).unwrap_or_else(|error| {
+            panic!(
+                "Failed to parse default safety rules config! Error: {}",
+                error
+            )
+        })
     }
 }
 

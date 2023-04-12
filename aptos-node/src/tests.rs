@@ -22,7 +22,7 @@ impl DbWriter for MockDatabase {}
 fn test_mutual_authentication_validators() {
     // Create a default node config for the validator
     let temp_path = TempPath::new();
-    let mut node_config = NodeConfig::default_for_validator();
+    let mut node_config = NodeConfig::get_default_validator_config();
     node_config.set_data_dir(temp_path.path().to_path_buf());
     node_config.base.waypoint = WaypointConfig::FromConfig(Waypoint::default());
 
