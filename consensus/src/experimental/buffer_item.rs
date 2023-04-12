@@ -379,11 +379,13 @@ impl BufferItem {
         let signature = vote.signature().clone();
         match self {
             Self::Ordered(ordered) => {
+                info!("dag: ordered");
                 if ordered
                     .ordered_proof
                     .commit_info()
                     .match_ordered_only(target_commit_info)
                 {
+                    info!("dag: adding_sig");
                     // we optimistically assume the vote will be valid in the future.
                     // when advancing to executed item, we will check if the sigs are valid.
                     // each author at most stores a single sig for each item,
@@ -395,7 +397,9 @@ impl BufferItem {
                 }
             },
             Self::Executed(executed) => {
+                info!("dag: executed");
                 if executed.commit_info == *target_commit_info {
+                    info!("dag: adding_sig");
                     executed
                         .partial_commit_proof
                         .add_signature(author, signature);
@@ -403,15 +407,19 @@ impl BufferItem {
                 }
             },
             Self::Signed(signed) => {
+                info!("dag: signed");
                 if signed.partial_commit_proof.commit_info() == target_commit_info {
+                    info!("dag: adding_sig");
                     signed.partial_commit_proof.add_signature(author, signature);
                     return Ok(());
                 }
             },
             Self::Aggregated(aggregated) => {
+                info!("dag: aggregated");
                 // we do not need to do anything for aggregated
                 // but return true is helpful to stop the outer loop early
                 if aggregated.commit_proof.commit_info() == target_commit_info {
+                    info!("dag: adding_sig");
                     return Ok(());
                 }
             },

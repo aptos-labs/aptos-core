@@ -151,6 +151,14 @@ impl BlockInfo {
         self.has_reconfiguration() && self.timestamp_usecs >= timestamp
     }
 
+    pub fn set_id(&mut self, id: HashValue) {
+        self.id = id;
+    }
+
+    pub fn set_epoch(&mut self, epoch: u64) {
+        self.epoch = epoch;
+    }
+
     pub fn epoch(&self) -> u64 {
         self.epoch
     }

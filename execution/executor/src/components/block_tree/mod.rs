@@ -58,7 +58,7 @@ impl Block {
     }
 }
 
-fn epoch_genesis_block_id(ledger_info: &LedgerInfo) -> HashValue {
+pub fn epoch_genesis_block_id(ledger_info: &LedgerInfo) -> HashValue {
     ConsensusBlock::make_genesis_block_from_ledger_info(ledger_info).id()
 }
 

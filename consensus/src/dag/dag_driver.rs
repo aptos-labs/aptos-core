@@ -29,6 +29,7 @@ use tokio::{
     sync::{mpsc::Sender, Mutex},
     time,
 };
+use aptos_crypto::HashValue;
 use crate::util::time_service::TimeService;
 
 pub struct DagDriver {
@@ -61,6 +62,7 @@ impl DagDriver {
         payload_manager: Arc<PayloadManager>,
         state_computer: Arc<dyn StateComputer>,
         time_service: Arc<dyn TimeService>,
+        genesis_block_id: HashValue,
     ) -> Self {
         let (rb_tx, rb_rx) = tokio::sync::mpsc::channel(config.channel_size);
 
@@ -74,10 +76,12 @@ impl DagDriver {
 
         let proposer_election = Arc::new(RoundRobinAnchorElection::new(&verifier));
         let bullshark = Arc::new(Mutex::new(Bullshark::new(
+            epoch,
             author,
             state_computer,
             proposer_election.clone(),
             verifier.clone(),
+            genesis_block_id,
         )));
 
         spawn_named!("reliable_broadcast", rb.start(rb_network_msg_rx, rb_rx));

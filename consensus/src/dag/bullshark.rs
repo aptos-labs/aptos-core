@@ -29,8 +29,11 @@ use claims::assert_some;
 use itertools::Itertools;
 use std::{collections::HashMap, hash::Hash, iter::Extend, sync::Arc};
 use std::collections::BTreeMap;
+use aptos_executor::components::block_tree::epoch_genesis_block_id;
 
 pub struct Bullshark {
+    epoch: u64,
+    prev_execution_block_id: HashValue,
     my_id: PeerId,
     state_computer: Arc<dyn StateComputer>,
     dag: Vec<HashMap<PeerId, Node>>,
@@ -42,12 +45,17 @@ pub struct Bullshark {
 
 impl Bullshark {
     pub fn new(
+        epoch: u64,
         my_id: PeerId,
         state_computer: Arc<dyn StateComputer>,
         proposer_election: Arc<dyn AnchorElection>,
         verifier: ValidatorVerifier,
+        prev_execution_block_id: HashValue,
     ) -> Self {
+
         Self {
+            epoch,
+            prev_execution_block_id,
             my_id,
             state_computer,
             dag: Vec::new(),
@@ -201,12 +209,13 @@ impl Bullshark {
         }
     }
 
-    async fn push_to_execution(&self, ordered_history: Vec<Node>) {
+    async fn push_to_execution(&mut self, ordered_history: Vec<Node>) {
 
         let mut payload = Payload::empty(false);
         // let mut payload = ordered_history[0].maybe_payload().unwrap().clone();
         let round = ordered_history[0].round();
         let timestamp = ordered_history[0].timestamp();
+        let author = ordered_history[0].source();
 
             ordered_history
                 .into_iter()
@@ -216,33 +225,40 @@ impl Bullshark {
                 });
 
 
+        let mut parent = BlockInfo::empty();
+        parent.set_id(self.prev_execution_block_id);
+        parent.set_epoch(self.epoch);
         let block = ExecutedBlock::new(
             Block::new_proposal_for_dag(
                 payload,
                 round,
                 timestamp,
                 QuorumCert::new(
-                    VoteData::new(BlockInfo::empty(), BlockInfo::empty()),
+                    VoteData::new(parent, BlockInfo::empty()),
                     LedgerInfoWithSignatures::new(
                         LedgerInfo::new(BlockInfo::empty(), HashValue::zero()),
                         AggregateSignature::empty(),
                     ),
                 ),
-                self.my_id,
-                &ValidatorSigner::random(None),
+                author,
+                &ValidatorSigner::from_int(0),
                 Vec::new(),
             )
                 .unwrap(),
             StateComputeResult::new_dummy(),
         );
+        let block_id = block.id();
+        let block_info = block.block_info();
         let mut blocks: Vec<Arc<ExecutedBlock>> = Vec::new();
         blocks.push(Arc::new(block));
+
+        self.prev_execution_block_id = block_id;
 
         self.state_computer
             .commit(
                 &blocks,
                 LedgerInfoWithSignatures::new(
-                    LedgerInfo::new(BlockInfo::empty(), HashValue::zero()),
+                    LedgerInfo::new(block_info, HashValue::zero()),
                     AggregateSignature::empty(),
                 ),
                 Box::new(|_, _| {}),

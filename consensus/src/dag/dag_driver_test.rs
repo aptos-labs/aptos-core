@@ -39,6 +39,7 @@ use futures::{channel::mpsc, stream::select, FutureExt, Stream, StreamExt};
 use maplit::hashmap;
 use std::{iter::FromIterator, sync::Arc};
 use tokio::runtime::Runtime;
+use aptos_crypto::HashValue;
 use crate::util::time_service::ClockTimeService;
 
 /// Auxiliary struct that is setting up node environment for the test.
@@ -163,6 +164,7 @@ impl NodeSetup {
             Arc::from(PayloadManager::DirectMempool),
             mock_state_computer.clone(),
             time_service,
+            HashValue::zero(),
         );
 
         Self {

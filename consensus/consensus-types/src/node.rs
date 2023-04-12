@@ -119,7 +119,7 @@ pub struct NodeMetaData {
     round: u64,
     source: PeerId,
     digest: HashValue,
-    timestamp: u64,
+    timestamp: u64, // TODO: maybe move it out to save space on the network.
 }
 
 impl NodeMetaData {
@@ -160,24 +160,28 @@ fn compute_node_digest(
     epoch: u64,
     round: u64,
     source: PeerId,
+    timestamp: u64,
     payload: &Payload,
     parents: &HashSet<NodeMetaData>,
 ) -> HashValue {
     #[derive(Serialize)]
-    struct NodeWithoutDigest<'a> {
+    // struct NodeWithoutDigest<'a> {
+    struct NodeWithoutDigest {
         epoch: u64,
         round: u64,
         source: PeerId,
-        payload: &'a Payload,
-        parents: &'a HashSet<NodeMetaData>,
+        timestamp: u64,
+        // payload: &'a Payload, TODO: fix this.
+        // parents: &'a HashSet<NodeMetaData>,
     }
 
     let node_without_digest = NodeWithoutDigest {
         epoch,
         round,
         source,
-        payload,
-        parents,
+        timestamp,
+        // payload,
+        // parents,
     };
 
     let mut hasher = DefaultHasher::new(b"Node");
@@ -202,7 +206,7 @@ impl Node {
         parents: HashSet<NodeMetaData>,
         timestamp: u64,
     ) -> Self {
-        let digest = compute_node_digest(epoch, round, source, &payload, &parents);
+        let digest = compute_node_digest(epoch, round, source, timestamp, &payload, &parents);
         let metadata = NodeMetaData::new(epoch, round, source, digest, timestamp);
 
         Self {
@@ -225,6 +229,7 @@ impl Node {
             self.epoch(),
             self.round(),
             self.source(),
+            self.timestamp(),
             &self.consensus_payload,
             &self.parents,
         );

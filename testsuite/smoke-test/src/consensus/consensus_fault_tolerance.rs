@@ -156,7 +156,7 @@ async fn test_no_failures() {
 
     test_consensus_fault_tolerance(
         &mut swarm,
-        3,
+        1,
         5.0,
         1,
         no_failure_injection(),

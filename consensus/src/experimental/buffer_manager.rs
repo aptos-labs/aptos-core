@@ -272,6 +272,7 @@ impl BufferManager {
                 observe_block(block.timestamp_usecs(), BlockStage::COMMIT_CERTIFIED);
                 // if we're the proposer for the block, we're responsible to broadcast the commit decision.
                 if block.author() == Some(self.author) {
+                    info!("broadcast_commit_proof");
                     self.commit_msg_tx
                         .broadcast_commit_proof(aggregated_item.commit_proof.clone())
                         .await;
@@ -408,9 +409,11 @@ impl BufferManager {
             .buffer
             .find_elem_by_key(self.signing_root, commit_ledger_info.commit_info().id());
         if current_cursor.is_some() {
+            info!("dag: current_cursor.is_some()");
             let item = self.buffer.take(&current_cursor);
             // it is possible that we already signed this buffer item (double check after the final integration)
             if item.is_executed() {
+                info!("dag: item.is_executed()");
                 // we have found the buffer item
                 let signed_item = item.advance_to_signed(self.author, signature);
                 let maybe_proposer = signed_item
@@ -424,10 +427,12 @@ impl BufferManager {
 
                 self.buffer.set(&current_cursor, signed_item);
                 if let Some(proposer) = maybe_proposer {
+                    info!("dag: vote sent");
                     self.commit_msg_tx
                         .send_commit_vote(commit_vote, proposer)
                         .await;
                 } else {
+                    info!("dag: vote broadcast");
                     self.commit_msg_tx.broadcast_commit_vote(commit_vote).await;
                 }
             } else {
@@ -451,6 +456,7 @@ impl BufferManager {
                     .buffer
                     .find_elem_by_key(*self.buffer.head_cursor(), target_block_id);
                 if current_cursor.is_some() {
+                    info!("dag:  current_cursor.is_some()");
                     let mut item = self.buffer.take(&current_cursor);
                     let new_item = match item.add_signature_if_matched(*vote) {
                         Ok(()) => item.try_advance_to_aggregated(&self.verifier),
@@ -466,6 +472,7 @@ impl BufferManager {
                     };
                     self.buffer.set(&current_cursor, new_item);
                     if self.buffer.get(&current_cursor).is_aggregated() {
+                        info!{"dag: commit is aggregated"};
                         return Some(target_block_id);
                     }
                 }

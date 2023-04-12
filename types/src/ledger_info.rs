@@ -36,7 +36,7 @@ use std::{
 /// gathered on the same ledger info that represents a Quorum Certificate (QC) on the consensus
 /// data.
 ///
-/// Combining these two concepts, when a validator votes on a block, B it votes for a
+/// Combining these two concepts, when a validator votes on a block B, it votes for a
 /// LedgerInfo with the `version` being the latest version that will be committed if B gets 2f+1
 /// votes. It sets `consensus_data_hash` to represent B so that if those 2f+1 votes are gathered a
 /// QC is formed on B.

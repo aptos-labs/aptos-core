@@ -83,7 +83,7 @@ use futures::{
     },
     SinkExt, StreamExt,
 };
-use itertools::Itertools;
+use itertools::{equal, Itertools};
 use std::{
     cmp::Ordering,
     collections::HashMap,
@@ -91,6 +91,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use aptos_executor::components::block_tree::epoch_genesis_block_id;
 
 /// Range of rounds (window) that we might be calling proposer election
 /// functions with at any given time, in addition to the proposer history length.
@@ -734,6 +735,13 @@ impl EpochManager {
         self.dag_driver_tx = Some(dag_driver_msg_tx);
         self.rb_tx = Some(rb_msg_tx);
 
+
+
+
+        let ledger_info_with_sigs = self.storage.aptos_db().get_latest_ledger_info().expect("could not latest ledger info");
+        let ledger_info = ledger_info_with_sigs.ledger_info();
+        let genesis_block_id = epoch_genesis_block_id(&ledger_info);
+
         //TODO:  add ordering_state_computer (pass to bullshark) and payload manager (for pre-fetching).
         let dag_driver = DagDriver::new(
             self.epoch(),
@@ -748,6 +756,7 @@ impl EpochManager {
             payload_manager,
             state_computer,
             self.time_service.clone(),
+            genesis_block_id,
         );
 
         tokio::spawn(dag_driver.start());
@@ -990,6 +999,10 @@ impl EpochManager {
             Err(anyhow::anyhow!("Injected error in process_message"))
         });
 
+        if let ConsensusMsg::CommitVoteMsg(_) = consensus_msg.clone() {
+            info!("dag: received commit message");
+        }
+
         if let ConsensusMsg::ProposalMsg(proposal) = &consensus_msg {
             observe_block(
                 proposal.proposal().timestamp_usecs(),
@@ -1002,6 +1015,10 @@ impl EpochManager {
         if let Some(unverified_event) = maybe_unverified_event {
             // filter out quorum store messages if quorum store has not been enabled
             self.filter_quorum_store_events(peer_id, &unverified_event)?;
+
+            if let UnverifiedEvent::CommitVote(_) = unverified_event.clone() {
+                info!("dag: CommitVote 1");
+            }
 
             // same epoch -> run well-formedness + signature check
             let verified_event = monitor!(
@@ -1052,8 +1069,14 @@ impl EpochManager {
             | ConsensusMsg::CertifiedNodeRequestMsg(_) => {
                 let event: UnverifiedEvent = msg.into();
                 if event.epoch() == self.epoch() {
+                    if let UnverifiedEvent::CommitVote(_) = event.clone() {
+                        info!("dag: CommitVote epoch check pass");
+                    }
                     return Ok(Some(event));
                 } else {
+                    if let UnverifiedEvent::CommitVote(vote) = event.clone() {
+                        info!("dag: CommitVote epoch check failed. vote epoch {}, local epoch {}", vote.epoch() ,self.epoch());
+                    }
                     monitor!(
                         "process_different_epoch_consensus_msg",
                         self.process_different_epoch(event.epoch(), peer_id)
@@ -1154,6 +1177,7 @@ impl EpochManager {
             buffer_manager_event @ (VerifiedEvent::CommitVote(_)
             | VerifiedEvent::CommitDecision(_)) => {
                 if let Some(sender) = &mut self.buffer_manager_msg_tx {
+                    info!("dag: received Commit Message (CommitVote/CommitDecision): {:?}", buffer_manager_event);
                     sender.push(peer_id, buffer_manager_event)?;
                 } else {
                     bail!("Commit Phase not started but received Commit Message (CommitVote/CommitDecision)");
