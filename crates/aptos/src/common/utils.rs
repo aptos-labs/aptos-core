@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::types::{account_address_from_public_key, CliError, CliTypedResult, PromptOptions},
+    common::types::{
+        account_address_from_public_key, CliError, CliTypedResult, PromptOptions,
+        TransactionOptions, TransactionSummary,
+    },
     config::GlobalConfig,
     CliResult,
 };
@@ -12,7 +15,10 @@ use aptos_keygen::KeyGen;
 use aptos_logger::{debug, Level};
 use aptos_rest_client::{aptos_api_types::HashValue, Account, Client, State};
 use aptos_telemetry::service::telemetry_is_disabled;
-use aptos_types::{chain_id::ChainId, transaction::authenticator::AuthenticationKey};
+use aptos_types::{
+    chain_id::ChainId,
+    transaction::{authenticator::AuthenticationKey, TransactionPayload},
+};
 use itertools::Itertools;
 use move_core_types::account_address::AccountAddress;
 use reqwest::Url;
@@ -442,4 +448,21 @@ pub fn start_logger() {
     let mut logger = aptos_logger::Logger::new();
     logger.channel_size(1000).is_async(false).level(Level::Warn);
     logger.build();
+}
+
+/// For transaction payload and options, either get gas profile or submit for execution.
+pub async fn profile_or_submit(
+    payload: TransactionPayload,
+    txn_options_ref: &TransactionOptions,
+) -> CliTypedResult<TransactionSummary> {
+    // Profile gas if needed.
+    if txn_options_ref.profile_gas {
+        txn_options_ref.profile_gas(payload).await
+    } else {
+        // Otherwise submit the transaction.
+        txn_options_ref
+            .submit_transaction(payload)
+            .await
+            .map(TransactionSummary::from)
+    }
 }
