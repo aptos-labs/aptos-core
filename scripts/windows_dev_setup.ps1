@@ -128,24 +128,20 @@ function verify_architecture {  # Checks whether the Windows machine is 32-bit o
 		}
 	else {
 		$global:architecture = "86"
-		Write-Host "32-bit system detected"
+		Write-Host "32-bit system detected. You may not be able to install some dependencies."
 		}
 }
 
 function check_os {
 	$osName = (Get-WMIObject win32_operatingsystem).name
 	if ($osName.Contains("Windows 10")) {
-		Write-Host "Supported Windows OS detected"
 		$global:os = "Windows 10"
 	}
 	elseif ($osName.Contains("Windows 11")) {
-		Write-Host "Supported Windows OS detected"
 		$global:os = "Windows 11"
 	}
 	elseif ($osName.Contains("Windows Server 2022")) {
-		Write-Host "Supported Windows OS detected"
 		$global:os = "Windows Server 2022"
-		check_for_winget
 	}
 	else {
 		Write-Host "Unsupported Windows OS detected. Stopping script..."
@@ -189,51 +185,57 @@ function install_winget {
 }
 
 function check_for_winget {
-    if (Get-Command "winget" -ErrorAction SilentlyContinue) {
+  if (Get-Command winget -ErrorAction SilentlyContinue) {
     Write-Host "WinGet is already installed."
-    } 
-    else {
+  } 
+  elseif (Test-Path "$env:LOCALAPPDATA\Microsoft\WindowsApps\winget.exe") {
+    [Environment]::SetEnvironmentVariable("PATH", "$env:PATH;$env:LOCALAPPDATA\Microsoft\WindowsApps", "User")
+    Write-Host "Winget was found but not set in user PATH environment variable."
+    Write-Host "Variable has been set. Open a new PowerShell session and re-run the script."
+    Exit
+  }
+  else {
     Write-Host "Installing WinGet before continuing with the script..."
     install_winget
-    }
+  }
 }
 
 function check_package { # Checks for packages installed with winget or typical installers
   param(
     [string]$package
   )
-  if ((winget list --name $package --accept-source-agreements) -match 'No installed package found matching input criteria.') {
+  if ((winget list --name $package) -match 'No installed package found matching input criteria.') {
     Write-Host "Installing $package..."
     return $true
   }   
   elseif ((winget upgrade | Out-String).Contains($package)) {
     Write-Host "$package is already installed, but an update is available."
-	return $false
+    return $false
   }
   else {
-	Write-Host "$package is already installed and up-to-date."
+    Write-Host "$package is already installed and up-to-date."
   }
 }
 
 function install_msvc_build_tools {  # Installs C++ build tools, CMake, and Windows 10/11 SDK
   $result = check_package "Visual Studio Build Tools"
   if ($result) {
-	select_msvc_variant
+    select_msvc_variant
     set_msvc_env_variables
 	}
   else {
-	Write-Host "Installing update..."
-	winget upgrade --id Microsoft.VisualStudio.2022.BuildTools
+    Write-Host "Installing update..."
+    winget upgrade --id Microsoft.VisualStudio.2022.BuildTools
   }
 }
 
 function select_msvc_variant {  # Decides between the Windows 10 SDK and Windows 11 SDK based on your OS
 	if ($global:os -eq "Windows 11") {
 		winget install Microsoft.VisualStudio.2022.BuildTools --accept-source-agreements --silent --override "--wait --quiet --add ProductLang En-us --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 --add Microsoft.VisualStudio.Component.Windows11SDK.22621 --add Microsoft.VisualStudio.Component.VC.CMake.Project --includeRecommended"
-		}
+	}
 	else {
 		winget install Microsoft.VisualStudio.2022.BuildTools --accept-source-agreements --silent --override "--wait --quiet --add ProductLang En-us --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 --add Microsoft.VisualStudio.Component.Windows10SDK.20348 --add Microsoft.VisualStudio.Component.VC.CMake.Project --includeRecommended"
-		}
+	}
 }
 
 function get_msvc_install_path {
@@ -242,37 +244,38 @@ function get_msvc_install_path {
 }
 
 function get_msvc_version {  # Finds the MSVC version number and creates a valid filepath to add as an environment variable
-    $global:msvcpath = get_msvc_install_path
+  $global:msvcpath = get_msvc_install_path
 	$pathpattern = "$msvcpath\VC\Tools\MSVC\*\bin\Hostx64\x64\link.exe"
 
-    # Get the file path that matches the pattern
-    $filepath = Get-ChildItem -Path $pathpattern -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+  # Get the file path that matches the pattern
+  $filepath = Get-ChildItem -Path $pathpattern -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
 
-    if ($filepath) {
-        # Extract the version number from the file path using regex
-        $msvcversion = $filepath.FullName -replace ".*MSVC\\(\d+\.\d+\.\d+)\\.*", '$1'
-		return $msvcversion
-    } else {
-        Write-Warning "MSVC not found: $pathpattern"
-        return $null
-    }
+  if ($filepath) {
+    # Extract the version number from the file path using regex
+    $msvcversion = $filepath.FullName -replace ".*MSVC\\(\d+\.\d+\.\d+)\\.*", '$1'
+    return $msvcversion
+  } 
+  else {
+    Write-Warning "MSVC not found: $pathpattern"
+    return $null
+  }
 }
 
 function set_msvc_env_variables {  # Sets the environment variables based on the architecture and MSVC version
   $msvcversion = get_msvc_version
   $filepath = "$global:msvcpath\VC\Tools\MSVC\$msvcversion\bin\Hostx$global:architecture\x$global:architecture"
 	[Environment]::SetEnvironmentVariable("PATH", "$env:PATH;$filepath\link.exe;$filepath\cl.exe", "User")
-	Write-Host "Environment variables set"
+	Write-Host "MSVC added to user PATH environment variable"
 }
 
 function install_rustup {
   $result = check_package "Rustup"
   if ($result) {
-	winget install Rustlang.Rustup --silent
-	Exit
+    winget install Rustlang.Rustup --silent
+    Exit
 	}
   else {
-	winget upgrade --id Rustlang.Rustup
+    winget upgrade --id Rustlang.Rustup
   }
   Write-Host "Configuring Rustup..."
   rustup update
@@ -303,51 +306,51 @@ function install_protoc {
 }
 
 function install_cargo_plugins {  # Installs Grcov, protoc components, and cargo components
-    cargo install protoc-gen-prost --locked
-    cargo install protoc-gen-prost-serde --locked
-    cargo install protoc-gen-prost-crate --locked
-    cargo install grcov --version $global:grcov_version --locked
-    cargo install cargo-sort --locked
-    cargo install cargo-nextest --locked
+  cargo install protoc-gen-prost --locked
+  cargo install protoc-gen-prost-serde --locked
+  cargo install protoc-gen-prost-crate --locked
+  cargo install grcov --version $global:grcov_version --locked
+  cargo install cargo-sort --locked
+  cargo install cargo-nextest --locked
 }
 
 function install_llvm {
   $result = check_package "LLVM"
   if ($result) {
-	winget install LLVM.LLVM --silent
+    winget install LLVM.LLVM --silent
 	}
   else {
-	winget upgrade --id LLVM.LLVM
+    winget upgrade --id LLVM.LLVM
   }
 }
 
 function install_openssl {
   $result = check_package "OpenSSL"
   if ($result) {
-	winget install ShiningLight.OpenSSL --silent
+    winget install ShiningLight.OpenSSL --silent
 	}
   else {
-	winget upgrade --id ShiningLight.OpenSSL --silent
+    winget upgrade --id ShiningLight.OpenSSL --silent
   }
 }
 
 function install_nodejs {
   $result = check_package "Node.js"
   if ($result) {
-	winget install OpenJS.NodeJS --silent
+    winget install OpenJS.NodeJS --silent
 	}
   else {
-	winget upgrade --id OpenJS.NodeJS --silent
+    winget upgrade --id OpenJS.NodeJS --silent
   }
 }
 
 function install_python {
   $result = check_package "Python"
   if ($result) {
-	winget install Python.Python.3.11 --silent
+    winget install Python.Python.3.11 --silent
 	}
   else {
-	winget upgrade --id Python.Python.3.11 --silent
+    winget upgrade --id Python.Python.3.11 --silent
   }
   python -m pip install --upgrade pip
   python -m pip install schemathesis
@@ -356,7 +359,7 @@ function install_python {
 function install_pnpm {
   $result = check_package "pnpm"
   if ($result) {
-	winget install pnpm.pnpm --silent
+    winget install pnpm.pnpm --silent
 	}
   else {
     winget upgrade --id pnpm.pnpm
@@ -414,6 +417,7 @@ function install_cvc5 { # Downloads the 64-bit version of CVC5 and adds it to PA
   }
 }
 
+
 function install_dotnet {
   if (![System.IO.Path]::IsPathRooted($env:DOTNET_ROOT)) {
     Write-Host "Installing Microsoft DotNet..."
@@ -450,16 +454,16 @@ function install_z3 {
 }
 
 function install_boogie {
-    if (![System.IO.Path]::IsPathRooted($env:BOOGIE_EXE)) {
-      Write-Host "Installing boogie..."
-      dotnet tool install --global Boogie --version $global:boogie_version
-      $boogie_exe = "$env:USERPROFILE\.dotnet\tools\boogie.exe"
-      [Environment]::SetEnvironmentVariable("BOOGIE_EXE", $boogie_exe, "User")
-      Write-Host "User environment variables set for Boogie"
-    } 
-    else {
-      Write-Host "Boogie is already installed."
-    }
+  if (![System.IO.Path]::IsPathRooted($env:BOOGIE_EXE)) {
+    Write-Host "Installing Boogie..."
+    dotnet tool install --global Boogie --version $global:boogie_version
+    $boogie_exe_path = "$env:USERPROFILE\.dotnet\tools\boogie.exe"
+    [Environment]::SetEnvironmentVariable("BOOGIE_EXE", $boogie_exe_path, "User")
+    Write-Host "User environment variables set for Boogie"
+  } 
+  else {
+    Write-Host "Boogie is already installed."
+  }
 }
 
 function install_build_tools {
@@ -490,6 +494,7 @@ function install_move_prover {
 verify_architecture
 check_os
 check_for_winget
+update_versions
 
 if ($t -or $y) {
     if ($t) {
@@ -501,12 +506,12 @@ if ($t -or $y) {
       install_move_prover
     }
 } else {
-    $selection = Read-Host -Prompt (welcome_message)
-    $global:user_selection = $selection
-    switch ($selection) {
-        't' { install_build_tools }
-        'y' { install_move_prover }
-        default { Write-Host "Invalid option selected. Please enter 't' or 'y'." }
-    }
+  $selection = Read-Host -Prompt (welcome_message)
+  $global:user_selection = $selection
+  switch ($selection) {
+    't' { install_build_tools }
+    'y' { install_move_prover }
+    default { Write-Host "Invalid option selected. Please enter 't' or 'y'." }
+  }
 }
 Write-Host "Finished..."
