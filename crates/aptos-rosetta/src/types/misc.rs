@@ -14,6 +14,8 @@ use std::{
     fmt::{Display, Formatter},
     str::FromStr,
 };
+use chrono::{DateTime, NaiveDateTime, Utc};
+use std::time::Duration;
 
 /// Errors that can be returned by the API
 ///
@@ -78,6 +80,14 @@ pub struct Version {
     pub node_version: String,
     /// Middleware version, this should be the version of this software
     pub middleware_version: String,
+}
+
+/// Represents the result of the balance retrieval
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct BalanceResult {
+    pub balance: Option<Amount>,
+    /// Time at which the lockup expires and pending_inactive balance becomes inactive
+    pub lockup_expiration: DateTime<Utc>,
 }
 
 /// An internal enum to support Operation typing
@@ -242,7 +252,7 @@ pub async fn get_stake_balances(
     owner_account: &AccountIdentifier,
     pool_address: AccountAddress,
     version: u64,
-) -> ApiResult<Option<Amount>> {
+) -> ApiResult<Option<BalanceResult>> {
     const STAKE_POOL: &str = "0x1::stake::StakePool";
     if let Ok(response) = rest_client
         .get_account_resource_at_version_bcs::<StakePool>(pool_address, STAKE_POOL, version)
@@ -268,6 +278,7 @@ pub async fn get_stake_balances(
 
         // Any stake pools that match, retrieve that.
         let mut requested_balance: Option<String> = None;
+        let lockup_expiration = get_lockup_expiration_time(stake_pool.locked_until_secs).await;
 
         if owner_account.is_active_stake() {
             requested_balance = Some(stake_pool.active.to_string());
@@ -282,9 +293,12 @@ pub async fn get_stake_balances(
         }
 
         if let Some(balance) = requested_balance {
-            Ok(Some(Amount {
-                value: balance,
-                currency: native_coin(),
+            Ok(Some(BalanceResult{
+                balance: Some(Amount {
+                        value: balance,
+                        currency: native_coin(),
+                    }),
+                lockup_expiration: lockup_expiration,
             }))
         } else {
             Ok(None)
@@ -292,4 +306,16 @@ pub async fn get_stake_balances(
     } else {
         Ok(None)
     }
+}
+
+async fn get_lockup_expiration_time(
+    locked_until_secs: u64,
+) -> DateTime<Utc> {
+    let lock_duration = Duration::from_secs(locked_until_secs);
+
+    let date_time =
+        NaiveDateTime::from_timestamp_opt(lock_duration.as_secs() as i64, lock_duration.subsec_nanos()).unwrap();
+    let utc_time = DateTime::from_utc(date_time, Utc);
+
+    return utc_time
 }

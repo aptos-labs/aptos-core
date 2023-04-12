@@ -22,6 +22,7 @@ use aptos_types::{
 };
 use std::{collections::HashSet, str::FromStr};
 use warp::Filter;
+use chrono::{DateTime, Utc};
 
 /// Account routes e.g. balance
 pub fn routes(
@@ -66,7 +67,7 @@ async fn account_balance(
         .await?;
     let balance_version = block_info.last_version;
 
-    let (sequence_number, operators, balances) = get_balances(
+    let (sequence_number, operators, balances, lockup_expiration) = get_balances(
         &rest_client,
         request.account_identifier,
         balance_version,
@@ -80,6 +81,7 @@ async fn account_balance(
         metadata: AccountBalanceMetadata {
             sequence_number: sequence_number.into(),
             operators,
+            lockup_expiration_time_utc: lockup_expiration,
         },
     })
 }
@@ -91,7 +93,7 @@ async fn get_balances(
     account: AccountIdentifier,
     version: u64,
     maybe_filter_currencies: Option<Vec<Currency>>,
-) -> ApiResult<(u64, Option<Vec<AccountAddress>>, Vec<Amount>)> {
+) -> ApiResult<(u64, Option<Vec<AccountAddress>>, Vec<Amount>, Option<DateTime<Utc>>)> {
     let owner_address = account.account_address()?;
     // Retrieve all account resources
     if let Ok(response) = rest_client
@@ -102,6 +104,7 @@ async fn get_balances(
         let mut maybe_sequence_number = None;
         let mut maybe_operators = None;
         let mut balances = vec![];
+        let mut lockup_expiration: Option<DateTime<Utc>> = None;
 
         // Iterate through resources, converting balances
         for (struct_tag, bytes) in resources {
@@ -148,11 +151,13 @@ async fn get_balances(
                         )
                         .await
                         {
-                            Ok(Some(balance)) => {
-                                total_requested_balance = Some(
-                                    total_requested_balance.unwrap_or_default()
-                                        + u64::from_str(&balance.value).unwrap_or_default(),
-                                );
+                            Ok(Some(balance_result)) => {
+                                if let Some(balance) = balance_result.balance {
+                                    total_requested_balance = Some(
+                                        total_requested_balance.unwrap_or_default()
+                                            + u64::from_str(&balance.value).unwrap_or_default());
+                                }
+                                lockup_expiration = Some(balance_result.lockup_expiration);
                             },
                             result => {
                                 warn!(
@@ -217,11 +222,11 @@ async fn get_balances(
         }
 
         // Retrieve balances
-        Ok((sequence_number, maybe_operators, balances))
+        Ok((sequence_number, maybe_operators, balances, lockup_expiration))
     } else {
         Ok((0, None, vec![Amount {
             value: 0.to_string(),
             currency: native_coin(),
-        }]))
+        }], None))
     }
 }

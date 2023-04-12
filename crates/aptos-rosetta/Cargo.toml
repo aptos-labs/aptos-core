@@ -26,6 +26,7 @@ aptos-sdk = { workspace = true }
 aptos-types = { workspace = true }
 aptos-warp-webserver = { workspace = true }
 bcs = { workspace = true }
+chrono = { workspace = true }
 clap = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
