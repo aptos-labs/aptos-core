@@ -105,4 +105,12 @@ module 0xCAFE::test {
         std::vector::reverse(&mut s);
         std::string::utf8(s)
     }
+
+    #[view]
+    public fun get_state<T: key>(o: Object<T>): String acquires ModuleData {
+        let addr = aptos_std::object::object_address(&o);
+        let any = aptos_stdlib::copyable_any::pack(*borrow_global<ModuleData>(addr).state);
+        let md = aptos_stdlib::copyable_any::unpack<ModuleData>(any);
+        md.state
+    }
 }

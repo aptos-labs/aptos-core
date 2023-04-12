@@ -56,6 +56,38 @@ fn success_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<Vec<u8>>, &str)>
     }
 }
 
+fn success_generic_view(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<Vec<u8>>, &str)>) {
+    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::STRUCT_CONSTRUCTORS], vec![]);
+
+    // Load the code
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    assert_success!(h.publish_package(&acc, &common::test_dir_path("constructor_args.data/pack")));
+
+    let module_data = parse_struct_tag("0xCAFE::test::ModuleData").unwrap();
+
+    // Check in initial state, resource does not exist.
+    assert!(!h.exists_resource(acc.address(), module_data.clone()));
+
+    for (entry, args, expected_change) in tests {
+        assert_success!(h.evaluate_entry_function_gas(
+            &acc,
+            str::parse(entry).unwrap(),
+            ty_args.clone(),
+            args,
+        ));
+        assert_eq!(
+            String::from_utf8(
+                h.read_resource::<ModuleData>(&OBJECT_ADDRESS, module_data.clone())
+                    .unwrap()
+                    .state
+            )
+                .unwrap(),
+            expected_change,
+        );
+    }
+}
+
+
 type Closure = Box<dyn FnOnce(TransactionStatus) -> bool>;
 
 fn fail(tests: Vec<(&str, Vec<Vec<u8>>, Closure)>) {
