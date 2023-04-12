@@ -87,9 +87,9 @@ pub static SYSTEM_TRANSACTIONS_EXECUTED: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
-const NUM_BLOCK_TRANSACTIONS_BUCKETS: [f64; 23] = [
+const NUM_BLOCK_TRANSACTIONS_BUCKETS: [f64; 20] = [
     5.0, 10.0, 20.0, 40.0, 75.0, 100.0, 125.0, 150.0, 175.0, 200.0, 250.0, 300.0, 350.0, 400.0,
-    450.0, 500.0, 600.0, 700.0, 800.0, 900.0, 1000.0, 1500.0, 2000.0,
+    450.0, 500.0, 750.0, 1000.0, 1500.0, 2000.0,
 ];
 
 pub static BLOCK_TRANSACTION_COUNT: Lazy<Histogram> = Lazy::new(|| {
