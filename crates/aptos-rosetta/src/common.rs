@@ -281,18 +281,6 @@ pub fn to_hex_lower<T: LowerHex>(obj: &T) -> String {
     format!("{:x}", obj)
 }
 
-/// Retrieves the currency from the given parameters
-/// TODO: What do do about the type params?
-pub fn parse_currency(address: AccountAddress, module: &str, name: &str) -> ApiResult<Currency> {
-    match (address, module, name) {
-        (AccountAddress::ONE, APTOS_COIN_MODULE, APTOS_COIN_RESOURCE) => Ok(native_coin()),
-        _ => Err(ApiError::TransactionParseError(Some(format!(
-            "Invalid coin for transfer {}::{}::{}",
-            address, module, name
-        )))),
-    }
-}
-
 #[cfg(test)]
 mod test {
     use crate::common::BlockHash;

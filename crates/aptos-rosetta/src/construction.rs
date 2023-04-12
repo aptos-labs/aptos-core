@@ -27,7 +27,7 @@
 use crate::{
     common::{
         check_network, decode_bcs, decode_key, encode_bcs, get_account, handle_request,
-        native_coin, parse_currency, with_context,
+        native_coin, with_context,
     },
     error::{ApiError, ApiResult},
     types::{InternalOperation, *},
@@ -39,10 +39,7 @@ use aptos_crypto::{
 };
 use aptos_global_constants::adjust_gas_headroom;
 use aptos_logger::debug;
-use aptos_sdk::{
-    move_types::language_storage::{StructTag, TypeTag},
-    transaction_builder::TransactionFactory,
-};
+use aptos_sdk::{move_types::language_storage::TypeTag, transaction_builder::TransactionFactory};
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
@@ -531,11 +528,15 @@ async fn construction_parse(
                 function_name.as_str(),
             ) {
                 (AccountAddress::ONE, COIN_MODULE, TRANSFER_FUNCTION) => {
-                    parse_transfer_operation(sender, &type_args, &args)?
+                    parse_transfer_operation(&server_context, sender, &type_args, &args)?
+                },
+                (AccountAddress::ONE, APTOS_ACCOUNT_MODULE, TRANSFER_COINS_FUNCTION) => {
+                    parse_transfer_operation(&server_context, sender, &type_args, &args)?
                 },
                 (AccountAddress::ONE, APTOS_ACCOUNT_MODULE, TRANSFER_FUNCTION) => {
                     parse_account_transfer_operation(sender, &type_args, &args)?
                 },
+                // FIXME: Add fungible assets
                 (AccountAddress::ONE, APTOS_ACCOUNT_MODULE, CREATE_ACCOUNT_FUNCTION) => {
                     parse_create_account_operation(sender, &type_args, &args)?
                 },
@@ -577,7 +578,7 @@ async fn construction_parse(
             return Err(ApiError::TransactionParseError(Some(format!(
                 "Unsupported transaction payload type {:?}",
                 payload
-            ))))
+            ))));
         },
     };
 
@@ -619,28 +620,37 @@ fn parse_create_account_operation(
 }
 
 fn parse_transfer_operation(
+    server_context: &RosettaContext,
     sender: AccountAddress,
     type_args: &[TypeTag],
     args: &[Vec<u8>],
 ) -> ApiResult<Vec<Operation>> {
     let mut operations = Vec::new();
 
-    // FIXME(fungible): Support fungible assets
     let currency = match type_args.first() {
         Some(TypeTag::Struct(struct_tag)) => {
-            let StructTag {
-                address,
-                module,
-                name,
-                ..
-            } = &**struct_tag;
+            let coin_struct = struct_tag.to_canonical_string();
 
-            parse_currency(*address, module.as_str(), name.as_str())?
+            // Search known currencies, and copy the correct one out
+            if let Some(currency) = server_context.supported_currencies.iter().find(|currency| {
+                currency
+                    .metadata
+                    .as_ref()
+                    .and_then(|inner| inner.move_type.as_ref())
+                    .map_or(false, |move_type| move_type == &coin_struct)
+            }) {
+                currency.clone()
+            } else {
+                return Err(ApiError::TransactionParseError(Some(format!(
+                    "Invalid coin for transfer {}",
+                    coin_struct
+                ))));
+            }
         },
         _ => {
             return Err(ApiError::TransactionParseError(Some(
                 "No coin type in transfer".to_string(),
-            )))
+            )));
         },
     };
 

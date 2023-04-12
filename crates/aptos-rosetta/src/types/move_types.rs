@@ -27,6 +27,7 @@ pub const VESTING_RESOURCE: &str = "Vesting";
 
 pub const CREATE_ACCOUNT_FUNCTION: &str = "create_account";
 pub const TRANSFER_FUNCTION: &str = "transfer";
+pub const TRANSFER_COINS_FUNCTION: &str = "transfer_coins";
 pub const RESET_LOCKUP_FUNCTION: &str = "reset_lockup";
 pub const CREATE_STAKING_CONTRACT_FUNCTION: &str = "create_staking_contract";
 pub const SWITCH_OPERATOR_WITH_SAME_COMMISSION_FUNCTION: &str =
