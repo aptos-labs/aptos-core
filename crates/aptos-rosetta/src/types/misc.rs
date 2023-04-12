@@ -298,7 +298,7 @@ pub async fn get_stake_balances(
                         value: balance,
                         currency: native_coin(),
                     }),
-                lockup_expiration: lockup_expiration,
+                lockup_expiration,
             }))
         } else {
             Ok(None)
@@ -315,7 +315,5 @@ async fn get_lockup_expiration_time(
 
     let date_time =
         NaiveDateTime::from_timestamp_opt(lock_duration.as_secs() as i64, lock_duration.subsec_nanos()).unwrap();
-    let utc_time = DateTime::from_utc(date_time, Utc);
-
-    return utc_time
+    DateTime::from_utc(date_time, Utc)
 }
