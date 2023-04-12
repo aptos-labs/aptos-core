@@ -161,14 +161,14 @@ To discover the available options and the process for making an `aptos move view
 
 
 ## Compute delegation pool rewards earned
-We've come up with a forumla to calculate "rewards earned" for `active` and `pending_inactive` staking. This formula is built with the assumption that different stake operations like `unlock` and `reactivate` takes out the "principals" first, then "rewards". Therefore, "rewards earned" could vary based on how formula is constructed.
+Use this formula to calculate *rewards earned* for `active` and `pending_inactive` staking. This formula assumes that different stake operations such as `unlock` and `reactivate` take out the *principals* first and then *rewards*. Therefore, *rewards earned* may vary based upon how the formula you use is constructed:
 
-1. Get the amount of `active` and `pending_inactive` staking from [`get_stake`](https://github.com/aptos-labs/aptos-core/blob/ed63ab756cda61439287304ed89bbb156fcbeaed/aptos-move/framework/aptos-framework/sources/delegation_pool.move#L321) view function.
+1. Get the amount of `active` and `pending_inactive` staking from the [`get_stake`](https://github.com/aptos-labs/aptos-core/blob/ed63ab756cda61439287304ed89bbb156fcbeaed/aptos-move/framework/aptos-framework/sources/delegation_pool.move#L321) view function.
 
-2. Calculate "principal"
+2. Calculate principal:
     - "active principal" = **AddStakeEvent** - **UnlockStakeEvent** + **ReactivateStakeEvent**. If at any point during the iteration, "active principal" < 0, reset to 0. Negative principal could happen when the amount users `unlock` or `reactivate` include rewards earned from staking.
     - "pending inactive principal" = **UnlockStakeEvent** - **ReactivateStakeEvent**. If at any point during the iteration, "pending inactive principal" < 0, reset to 0. Negative principal could happen when the amount users `unlock` or `reactivate` include rewards earned from staking.
 
-3. Compute "rewards earned"
-    - active_rewards = `active` - "active principal".
+3. Compute rewards earned:
+    - active_rewards = `active` - *active principal*.
     - pending_inactive_rewards = `pending_inactive` - "pending inactive principal".
