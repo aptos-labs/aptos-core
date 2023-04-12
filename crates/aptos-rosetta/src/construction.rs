@@ -291,6 +291,7 @@ async fn fill_in_operator(
 }
 
 async fn simulate_transaction(
+    server_context: &RosettaContext,
     rest_client: &aptos_rest_client::Client,
     chain_id: ChainId,
     options: &MetadataOptions,
@@ -334,7 +335,7 @@ async fn simulate_transaction(
     }
 
     // Build up the transaction
-    let (txn_payload, sender) = internal_operation.payload()?;
+    let (txn_payload, sender) = internal_operation.payload(server_context)?;
     let unsigned_transaction = transaction_factory
         .payload(txn_payload)
         .sender(sender)
@@ -459,6 +460,7 @@ async fn construction_metadata(
 
     // If both are present, we skip simulation
     let (suggested_fee, gas_unit_price, max_gas_amount) = simulate_transaction(
+        &server_context,
         rest_client.as_ref(),
         server_context.chain_id,
         &request.options,
@@ -623,8 +625,7 @@ fn parse_transfer_operation(
 ) -> ApiResult<Vec<Operation>> {
     let mut operations = Vec::new();
 
-    // Check coin is the native coin
-
+    // FIXME(fungible): Support fungible assets
     let currency = match type_args.first() {
         Some(TypeTag::Struct(struct_tag)) => {
             let StructTag {
@@ -898,7 +899,7 @@ async fn construction_payloads(
     check_network(request.network_identifier, &server_context)?;
 
     // Retrieve the real operation we're doing
-    let mut operation = InternalOperation::extract(&request.operations)?;
+    let mut operation = InternalOperation::extract(&server_context, &request.operations)?;
     let metadata = if let Some(ref metadata) = request.metadata {
         metadata
     } else {
@@ -1021,7 +1022,7 @@ async fn construction_payloads(
     }
 
     // Encode operation
-    let (txn_payload, sender) = operation.payload()?;
+    let (txn_payload, sender) = operation.payload(&server_context)?;
 
     // Build the transaction and make it ready for signing
     let transaction_factory = TransactionFactory::new(server_context.chain_id)
@@ -1070,7 +1071,7 @@ async fn construction_preprocess(
     debug!("/construction/preprocess {:?}", request);
     check_network(request.network_identifier, &server_context)?;
 
-    let internal_operation = InternalOperation::extract(&request.operations)?;
+    let internal_operation = InternalOperation::extract(&server_context, &request.operations)?;
     let required_public_keys = vec![AccountIdentifier::base_account(internal_operation.sender())];
 
     if let Some(max_gas) = request

@@ -6,7 +6,7 @@
 //! [Spec](https://www.rosetta-api.org/docs/api_objects.html)
 
 use crate::{
-    common::{is_native_coin, native_coin, native_coin_tag},
+    common::{native_coin, native_coin_tag},
     construction::{
         parse_create_stake_pool_operation, parse_distribute_staking_rewards_operation,
         parse_reset_lockup_operation, parse_set_operator_operation, parse_set_voter_operation,
@@ -35,6 +35,7 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet},
 };
 use itertools::Itertools;
+use move_core_types::{language_storage::TypeTag, parser::parse_type_tag};
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
@@ -137,9 +138,61 @@ pub struct Currency {
     pub metadata: Option<CurrencyMetadata>,
 }
 
+impl Currency {
+    pub fn is_native_coin_v1(&self) -> bool {
+        self == &native_coin()
+    }
+
+    pub fn is_fungible_asset(&self) -> ApiResult<bool> {
+        if let Some(ref metadata) = self.metadata {
+            if metadata.move_type.is_some() && metadata.metadata_address.is_none() {
+                return Ok(false);
+            } else if metadata.move_type.is_none() && metadata.metadata_address.is_some() {
+                return Ok(true);
+            }
+        }
+
+        Err(ApiError::InvalidOperations(Some(
+            "Invalid Currency".to_string(),
+        )))
+    }
+
+    pub fn coin_v1_type(&self) -> ApiResult<TypeTag> {
+        if let Some(move_type) = self
+            .metadata
+            .as_ref()
+            .and_then(|inner| inner.move_type.as_ref())
+        {
+            parse_type_tag(move_type)
+                .map_err(|err| ApiError::InvalidOperations(Some(err.to_string())))
+        } else {
+            Err(ApiError::InvalidOperations(Some(
+                "Invalid coin v1 currency".to_string(),
+            )))
+        }
+    }
+
+    pub fn coin_v2_type(&self) -> ApiResult<AccountAddress> {
+        if let Some(address) = self
+            .metadata
+            .as_ref()
+            .and_then(|inner| inner.metadata_address)
+        {
+            Ok(address)
+        } else {
+            Err(ApiError::InvalidOperations(Some(
+                "Invalid coin v2 currency".to_string(),
+            )))
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct CurrencyMetadata {
-    pub move_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub move_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata_address: Option<AccountAddress>,
 }
 
 /// Various signing curves supported by Rosetta.  We only use [`CurveType::Edwards25519`]
@@ -744,12 +797,13 @@ fn parse_failed_operations_from_txn_payload(
             inner.module().name().as_str(),
             inner.function().as_str(),
         ) {
+            // FIXME(fungible): Add aptos_account::transfer_coins
             (AccountAddress::ONE, COIN_MODULE, TRANSFER_FUNCTION) => {
                 // Only put the transfer in if we can understand the currency
                 if let Some(type_tag) = inner.ty_args().first() {
                     // We don't want to do lookups on failures for currencies that don't exist,
                     // so we only look up cached info not new info
-                    // TODO: If other coins are supported, this will need to be updated to handle more coins
+                    // FIXME(fungible): If other coins are supported, this will need to be updated to handle more coins
                     if type_tag == &native_coin_tag() {
                         operations = parse_transfer_from_txn_payload(
                             inner,
@@ -958,9 +1012,10 @@ async fn parse_operations_from_write_set(
             parse_staking_contract_resource_changes(address, data, events, operation_index, changes)
                 .await
         },
+        // FIXME(fungible): Handle fungible store
         (AccountAddress::ONE, COIN_MODULE, COIN_STORE_RESOURCE, 1) => {
             if let Some(type_tag) = struct_tag.type_params.first() {
-                // TODO: This will need to be updated to support more coins
+                // FIXME(fungible): This will need to be updated to support more coins
                 if type_tag == &native_coin_tag() {
                     parse_coinstore_changes(
                         native_coin(),
@@ -1479,7 +1534,10 @@ pub enum InternalOperation {
 
 impl InternalOperation {
     /// Pulls the [`InternalOperation`] from the set of [`Operation`]
-    pub fn extract(operations: &Vec<Operation>) -> ApiResult<InternalOperation> {
+    pub fn extract(
+        server_context: &RosettaContext,
+        operations: &Vec<Operation>,
+    ) -> ApiResult<InternalOperation> {
         match operations.len() {
             1 => {
                 if let Some(operation) = operations.first() {
@@ -1648,7 +1706,10 @@ impl InternalOperation {
                     operations
                 ))))
             },
-            2 => Ok(Self::Transfer(Transfer::extract_transfer(operations)?)),
+            2 => Ok(Self::Transfer(Transfer::extract_transfer(
+                server_context,
+                operations,
+            )?)),
             _ => Err(ApiError::InvalidOperations(Some(format!(
                 "Unrecognized operation combination {:?}",
                 operations
@@ -1672,6 +1733,7 @@ impl InternalOperation {
 
     pub fn payload(
         &self,
+        server_context: &RosettaContext,
     ) -> ApiResult<(aptos_types::transaction::TransactionPayload, AccountAddress)> {
         Ok(match self {
             InternalOperation::CreateAccount(create_account) => (
@@ -1679,11 +1741,29 @@ impl InternalOperation {
                 create_account.sender,
             ),
             InternalOperation::Transfer(transfer) => {
-                is_native_coin(&transfer.currency)?;
-                (
-                    aptos_stdlib::aptos_account_transfer(transfer.receiver, transfer.amount.0),
-                    transfer.sender,
-                )
+                server_context.is_supported_coin(&transfer.currency)?;
+
+                if transfer.currency.is_fungible_asset()? {
+                    // FIXME(fungible): add transfer function for fungible asset
+                    return Err(ApiError::UnsupportedCurrency(Some(
+                        "Fungible assets not supported".to_string(),
+                    )));
+                } else if transfer.currency.is_native_coin_v1() {
+                    (
+                        aptos_stdlib::aptos_account_transfer(transfer.receiver, transfer.amount.0),
+                        transfer.sender,
+                    )
+                } else {
+                    // This is a coin v1, non-APT
+                    (
+                        aptos_stdlib::aptos_account_transfer_coins(
+                            transfer.currency.coin_v1_type()?,
+                            transfer.receiver,
+                            transfer.amount.0,
+                        ),
+                        transfer.sender,
+                    )
+                }
             },
             InternalOperation::SetOperator(set_operator) => {
                 if set_operator.old_operator.is_none() {
@@ -1762,7 +1842,10 @@ pub struct Transfer {
 }
 
 impl Transfer {
-    pub fn extract_transfer(operations: &Vec<Operation>) -> ApiResult<Transfer> {
+    pub fn extract_transfer(
+        server_context: &RosettaContext,
+        operations: &Vec<Operation>,
+    ) -> ApiResult<Transfer> {
         // Only support 1:1 P2P transfer
         // This is composed of a Deposit and a Withdraw operation
         if operations.len() != 2 {
@@ -1812,6 +1895,7 @@ impl Transfer {
                 if account.is_base_account() {
                     (account.account_address()?, amount)
                 } else {
+                    // TODO(fungible): Support secondary fungible asset stores here
                     return Err(ApiError::InvalidInput(Some(
                         "Transferring stake amounts is not supported".to_string(),
                     )));
@@ -1828,6 +1912,7 @@ impl Transfer {
         };
 
         // Currencies have to be the same
+        // TODO(fungible): With fungible assets, it may be possible to migrate between types (if known)
         if withdraw_amount.currency != deposit_amount.currency {
             return Err(ApiError::InvalidTransferOperations(Some(
                 "Currency mismatch between withdraw and deposit",
@@ -1835,8 +1920,7 @@ impl Transfer {
         }
 
         // Check that the currency is supported
-        // TODO: in future use currency, since there's more than just 1
-        is_native_coin(&withdraw_amount.currency)?;
+        server_context.is_supported_coin(&withdraw_amount.currency)?;
 
         let withdraw_value = i128::from_str(&withdraw_amount.value)
             .map_err(|_| ApiError::InvalidTransferOperations(Some("Withdraw amount is invalid")))?;

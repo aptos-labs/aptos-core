@@ -11,6 +11,7 @@ use aptos_sdk::move_types::account_address::AccountAddress;
 use aptos_types::chain_id::ChainId;
 use clap::Parser;
 use std::{
+    collections::HashSet,
     fs::read_to_string,
     net::SocketAddr,
     path::PathBuf,
@@ -90,6 +91,8 @@ async fn main() {
         args.api_config(),
         args.rest_client(),
         args.owner_addresses(),
+        // TODO(fungible): Add ability to add new supported currencies in input configs
+        HashSet::new(),
     )
     .expect("aptos-rosetta: Should bootstrap rosetta server");
 

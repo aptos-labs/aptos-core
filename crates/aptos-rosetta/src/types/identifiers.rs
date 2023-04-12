@@ -163,6 +163,7 @@ fn str_to_account_address(address: &str) -> Result<AccountAddress, ApiError> {
 /// There are two types of SubAccountIdentifiers
 /// 1. `stake` which is the total stake
 /// 2. `stake-<operator>` which is the stake on the operator
+/// FIXME(fungible): Add secondary fungible-store identifier `fungible-<address>`
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SubAccountIdentifier {
     /// Hex encoded AccountAddress beginning with 0x

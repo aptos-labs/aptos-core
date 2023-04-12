@@ -144,7 +144,8 @@ pub fn native_coin() -> Currency {
         symbol: DEFAULT_COIN.to_string(),
         decimals: DEFAULT_DECIMALS,
         metadata: Some(CurrencyMetadata {
-            move_type: native_coin_tag().to_string(),
+            move_type: Some(native_coin_tag().to_string()),
+            metadata_address: None,
         }),
     }
 }

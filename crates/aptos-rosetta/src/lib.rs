@@ -7,15 +7,19 @@
 
 use crate::{
     block::BlockRetriever,
-    common::{handle_request, with_context},
+    common::{handle_request, native_coin, with_context},
     error::{ApiError, ApiResult},
-    types::Store,
+    types::{Currency, Store},
 };
 use aptos_config::config::ApiConfig;
 use aptos_logger::{debug, warn};
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use aptos_warp_webserver::{logger, Error, WebServer};
-use std::{collections::BTreeMap, convert::Infallible, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashSet},
+    convert::Infallible,
+    sync::Arc,
+};
 use tokio::task::JoinHandle;
 use warp::{
     http::{HeaderValue, Method, StatusCode},
@@ -46,6 +50,7 @@ pub struct RosettaContext {
     pub block_cache: Option<Arc<BlockRetriever>>,
     pub owner_addresses: Vec<AccountAddress>,
     pub pool_address_to_owner: BTreeMap<AccountAddress, AccountAddress>,
+    pub supported_currencies: HashSet<Currency>,
 }
 
 impl RosettaContext {
@@ -54,6 +59,7 @@ impl RosettaContext {
         chain_id: ChainId,
         block_cache: Option<Arc<BlockRetriever>>,
         owner_addresses: Vec<AccountAddress>,
+        mut supported_currencies: HashSet<Currency>,
     ) -> Self {
         let mut pool_address_to_owner = BTreeMap::new();
         if let Some(ref rest_client) = rest_client {
@@ -81,12 +87,25 @@ impl RosettaContext {
             }
         }
 
+        // Ensure supported currencies contains native coin
+        supported_currencies.insert(native_coin());
+
         RosettaContext {
             rest_client,
             chain_id,
             block_cache,
             owner_addresses,
             pool_address_to_owner,
+            supported_currencies,
+        }
+    }
+
+    pub fn is_supported_coin(&self, currency: &Currency) -> ApiResult<()> {
+        if !self.supported_currencies.contains(currency) {
+            // TODO(fungible): Probably add more context, since the symbol isn't just the defining factor between coin v1 and coin v2
+            Err(ApiError::UnsupportedCurrency(Some(currency.symbol.clone())))
+        } else {
+            Ok(())
         }
     }
 
@@ -113,6 +132,7 @@ pub fn bootstrap(
     api_config: ApiConfig,
     rest_client: Option<aptos_rest_client::Client>,
     owner_addresses: Vec<AccountAddress>,
+    supported_currencies: HashSet<Currency>,
 ) -> anyhow::Result<tokio::runtime::Runtime> {
     let runtime = aptos_runtimes::spawn_named_runtime("rosetta".into(), None);
 
@@ -123,6 +143,7 @@ pub fn bootstrap(
         api_config,
         rest_client,
         owner_addresses,
+        supported_currencies,
     ));
     Ok(runtime)
 }
@@ -133,6 +154,7 @@ pub async fn bootstrap_async(
     api_config: ApiConfig,
     rest_client: Option<aptos_rest_client::Client>,
     owner_addresses: Vec<AccountAddress>,
+    supported_currencies: HashSet<Currency>,
 ) -> anyhow::Result<JoinHandle<()>> {
     debug!("Starting up Rosetta server with {:?}", api_config);
 
@@ -160,8 +182,14 @@ pub async fn bootstrap_async(
             ))
         });
 
-        let context =
-            RosettaContext::new(rest_client.clone(), chain_id, block_cache, owner_addresses).await;
+        let context = RosettaContext::new(
+            rest_client.clone(),
+            chain_id,
+            block_cache,
+            owner_addresses,
+            supported_currencies,
+        )
+        .await;
         api.serve(routes(context)).await;
     });
     Ok(handle)

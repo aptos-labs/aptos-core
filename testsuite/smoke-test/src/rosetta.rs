@@ -26,8 +26,8 @@ use aptos_rosetta::{
     common::{native_coin, BlockHash, BLOCKCHAIN, Y2K_MS},
     types::{
         AccountBalanceRequest, AccountBalanceResponse, AccountIdentifier, BlockIdentifier,
-        BlockRequest, BlockResponse, NetworkIdentifier, NetworkRequest, Operation,
-        OperationStatusType, OperationType, PartialBlockIdentifier, TransactionType,
+        BlockRequest, BlockResponse, Currency, CurrencyMetadata, NetworkIdentifier, NetworkRequest,
+        Operation, OperationStatusType, OperationType, PartialBlockIdentifier, TransactionType,
         STAKING_CONTRACT_MODULE, SWITCH_OPERATOR_WITH_SAME_COMMISSION_FUNCTION,
     },
     ROSETTA_VERSION,
@@ -86,6 +86,19 @@ pub async fn setup_test(
         ..Default::default()
     };
 
+    let mut supported_currencies = HashSet::new();
+    let other_coin = Currency {
+        symbol: "Other".to_string(),
+        decimals: 6,
+        metadata: Some(CurrencyMetadata {
+            move_type: Some("".to_string()),
+            metadata_address: None,
+        }),
+    };
+    supported_currencies.insert(other_coin);
+
+    // FIXME: publish a coin first before starting Rosetta, and add the type tag to the above currency
+
     // Start the server
     let _rosetta = aptos_rosetta::bootstrap_async(
         swarm.chain_id(),
@@ -94,6 +107,7 @@ pub async fn setup_test(
             validator.rest_api_endpoint(),
         )),
         cli.addresses(),
+        supported_currencies,
     )
     .await
     .unwrap();
@@ -145,6 +159,7 @@ async fn test_block_transactions() {
             validator.rest_api_endpoint(),
         )),
         cli.addresses(),
+        HashSet::new(),
     )
     .await
     .unwrap();
