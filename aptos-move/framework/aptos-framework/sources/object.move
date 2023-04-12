@@ -152,6 +152,11 @@ module aptos_framework::object {
         Object<T>{ inner: object }
     }
 
+    /// Returns true if there exists an object or the remnants of an object.
+    public fun is_object(object: address): bool {
+        exists<ObjectCore>(object)
+    }
+
     /// Derives an object address from source material: sha3_256([creator address | seed | 0xFE]).
     public fun create_object_address(source: &address, seed: vector<u8>): address {
         let bytes = bcs::to_bytes(source);
@@ -165,6 +170,14 @@ module aptos_framework::object {
         let bytes = bcs::to_bytes(&source);
         vector::append(&mut bytes, bcs::to_bytes(&derive_from));
         vector::push_back(&mut bytes, OBJECT_DERIVED_SCHEME);
+        from_bcs::to_address(hash::sha3_256(bytes))
+    }
+
+    /// Derives an object from an Account GUID.
+    public fun create_guid_object_address(source: address, creation_num: u64): address {
+        let id = guid::create_id(source, creation_num);
+        let bytes = bcs::to_bytes(&id);
+        vector::push_back(&mut bytes, OBJECT_FROM_GUID_ADDRESS_SCHEME);
         from_bcs::to_address(hash::sha3_256(bytes))
     }
 

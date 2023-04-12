@@ -38,9 +38,6 @@ module aptos_token_objects::token {
         /// The name of the token, which should be unique within the collection; the length of name
         /// should be smaller than 128, characters, eg: "Aptos Animal #1234"
         name: String,
-        /// The creation name of the token. Since tokens are created with the name as part of the
-        /// object id generation.
-        creation_name: Option<String>,
         /// The Uniform Resource Identifier (uri) pointing to the JSON file stored in off-chain
         /// storage; the URL length will likely need a maximum any suggestions?
         uri: String,
@@ -67,8 +64,39 @@ module aptos_token_objects::token {
         mutated_field_name: String,
     }
 
-    /// Creates a new token object and returns the ConstructorRef for additional specialization.
-    public fun create(
+    inline fun create_common(
+        constructor_ref: &ConstructorRef,
+        creator_address: address,
+        collection_name: String,
+        description: String,
+        name: String,
+        royalty: Option<Royalty>,
+        uri: String,
+    ) {
+        let object_signer = object::generate_signer(constructor_ref);
+
+        let collection_addr = collection::create_collection_address(&creator_address, &collection_name);
+        let collection = object::address_to_object<Collection>(collection_addr);
+        let id = collection::increment_supply(&collection, signer::address_of(&object_signer));
+
+        let token = Token {
+            collection,
+            collection_id: option::get_with_default(&mut id, 0),
+            description,
+            name,
+            uri,
+            mutation_events: object::new_event_handle(&object_signer),
+        };
+        move_to(&object_signer, token);
+
+        if (option::is_some(&royalty)) {
+            royalty::init(constructor_ref, option::extract(&mut royalty))
+        };
+    }
+
+    /// Creates a new token object from a token name and returns the ConstructorRef for
+    /// additional specialization.
+    public fun create_named_token(
         creator: &signer,
         collection_name: String,
         description: String,
@@ -79,27 +107,24 @@ module aptos_token_objects::token {
         let creator_address = signer::address_of(creator);
         let seed = create_token_seed(&collection_name, &name);
 
-        let collection_addr = collection::create_collection_address(&creator_address, &collection_name);
-        let collection = object::address_to_object<Collection>(collection_addr);
-        let id = collection::increment_supply(&collection);
-
         let constructor_ref = object::create_named_object(creator, seed);
-        let object_signer = object::generate_signer(&constructor_ref);
+        create_common(&constructor_ref, creator_address, collection_name, description, name, royalty, uri);
+        constructor_ref
+    }
 
-        let token = Token {
-            collection,
-            collection_id: option::get_with_default(&mut id, 0),
-            description,
-            name,
-            creation_name: option::none(),
-            uri,
-            mutation_events: object::new_event_handle(&object_signer),
-        };
-        move_to(&object_signer, token);
-
-        if (option::is_some(&royalty)) {
-            royalty::init(&constructor_ref, option::extract(&mut royalty))
-        };
+    /// Creates a new token object from an account GUID and returns the ConstructorRef for
+    /// additional specialization.
+    public fun create_from_account(
+        creator: &signer,
+        collection_name: String,
+        description: String,
+        name: String,
+        royalty: Option<Royalty>,
+        uri: String,
+    ): ConstructorRef {
+        let creator_address = signer::address_of(creator);
+        let constructor_ref = object::create_object_from_account(creator);
+        create_common(&constructor_ref, creator_address, collection_name, description, name, royalty, uri);
         constructor_ref
     }
 
@@ -170,16 +195,6 @@ module aptos_token_objects::token {
     }
 
     #[view]
-    public fun creation_name<T: key>(token: Object<T>): String acquires Token {
-        let token = borrow(&token);
-        if (option::is_some(&token.creation_name)) {
-            *option::borrow(&token.creation_name)
-        } else {
-            token.name
-        }
-    }
-
-    #[view]
     public fun description<T: key>(token: Object<T>): String acquires Token {
         borrow(&token).description
     }
@@ -235,16 +250,15 @@ module aptos_token_objects::token {
 
         let Token {
             collection,
-            collection_id: _,
+            collection_id,
             description: _,
             name: _,
-            creation_name: _,
             uri: _,
             mutation_events,
         } = move_from<Token>(addr);
 
         event::destroy_handle(mutation_events);
-        collection::decrement_supply(&collection);
+        collection::decrement_supply(&collection, addr, option::some(collection_id));
     }
 
     public fun set_description(mutator_ref: &MutatorRef, description: String) acquires Token {
@@ -258,9 +272,6 @@ module aptos_token_objects::token {
 
     public fun set_name(mutator_ref: &MutatorRef, name: String) acquires Token {
         let token = borrow_mut(mutator_ref);
-        if (option::is_none(&token.creation_name)) {
-            option::fill(&mut token.creation_name, token.name)
-        };
         token.name = name;
         event::emit_event(
             &mut token.mutation_events,
@@ -312,7 +323,7 @@ module aptos_token_objects::token {
             string::utf8(b"collection uri"),
         );
 
-        create(
+        create_named_token(
             creator,
             collection_name,
             string::utf8(b"token description"),
@@ -331,7 +342,7 @@ module aptos_token_objects::token {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
-        collection::create_untracked_collection(
+        collection::create_unlimited_collection(
             creator,
             string::utf8(b"collection description"),
             collection_name,
@@ -339,7 +350,7 @@ module aptos_token_objects::token {
             string::utf8(b"collection uri"),
         );
 
-        create(
+        create_named_token(
             creator,
             collection_name,
             string::utf8(b"token description"),
@@ -406,13 +417,8 @@ module aptos_token_objects::token {
 
         let name = string::utf8(b"no fail");
         assert!(name != name(token), 0);
-        {
-            let token = borrow_global<Token>(object::object_address(&token));
-            assert!(option::is_none(&token.creation_name), 1);
-        };
         set_name(&mutator_ref, *&name);
         assert!(name == name(token), 2);
-        assert!(token_name == creation_name(token), 3);
     }
 
     #[test(creator = @0x123)]
@@ -438,7 +444,7 @@ module aptos_token_objects::token {
         let token_name = string::utf8(b"token name");
 
         create_collection_helper(creator, *&collection_name, 1);
-        let constructor_ref = create(
+        let constructor_ref = create_named_token(
             creator,
             collection_name,
             string::utf8(b"token description"),
@@ -461,7 +467,7 @@ module aptos_token_objects::token {
         let token_name = string::utf8(b"token name");
 
         create_collection_helper(creator, *&collection_name, 1);
-        let constructor_ref = create(
+        let constructor_ref = create_named_token(
             creator,
             collection_name,
             string::utf8(b"token description"),
@@ -476,6 +482,32 @@ module aptos_token_objects::token {
         burn(burn_ref);
         assert!(!exists<Token>(token_addr), 2);
         assert!(!royalty::exists_at(token_addr), 3);
+        assert!(object::is_object(token_addr), 4);
+    }
+
+    #[test(creator = @0x123)]
+    fun test_burn_and_delete(creator: &signer) acquires Token {
+        use aptos_framework::account;
+
+        let collection_name = string::utf8(b"collection name");
+        let token_name = string::utf8(b"token name");
+
+        create_collection_helper(creator, *&collection_name, 1);
+        account::create_account_for_test(signer::address_of(creator));
+        let constructor_ref = create_from_account(
+            creator,
+            collection_name,
+            string::utf8(b"token description"),
+            token_name,
+            option::none(),
+            string::utf8(b"token uri"),
+        );
+        let burn_ref = generate_burn_ref(&constructor_ref);
+        let token_addr = object::address_from_constructor_ref(&constructor_ref);
+        assert!(exists<Token>(token_addr), 0);
+        burn(burn_ref);
+        assert!(!exists<Token>(token_addr), 1);
+        assert!(!object::is_object(token_addr), 2);
     }
 
     #[test_only]
@@ -492,7 +524,7 @@ module aptos_token_objects::token {
 
     #[test_only]
     fun create_token_helper(creator: &signer, collection_name: String, token_name: String): ConstructorRef {
-        create(
+        create_named_token(
             creator,
             collection_name,
             string::utf8(b"token description"),
