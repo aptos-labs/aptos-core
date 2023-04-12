@@ -124,11 +124,6 @@ impl BackupStorage for CommandAdapter {
         Ok(Box::new(child.into_data_source()))
     }
 
-    async fn save_metadata_line(&self, name: &ShellSafeName, content: &TextLine) -> Result<()> {
-        let txt = TextLine::new(content.as_ref().trim_end_matches('\n'))?;
-        self.save_metadata_lines(name, vec![txt].as_slice()).await
-    }
-
     async fn save_metadata_lines(&self, name: &ShellSafeName, lines: &[TextLine]) -> Result<()> {
         let mut child = self
             .cmd(&self.config.commands.save_metadata_line, vec![

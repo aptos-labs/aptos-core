@@ -113,11 +113,6 @@ impl BackupStorage for LocalFs {
         Ok(Box::new(file))
     }
 
-    async fn save_metadata_line(&self, name: &ShellSafeName, content: &TextLine) -> Result<()> {
-        let txt = TextLine::new(content.as_ref().trim_end_matches('\n'))?;
-        self.save_metadata_lines(name, vec![txt].as_slice()).await
-    }
-
     async fn list_metadata_files(&self) -> Result<Vec<FileHandle>> {
         let dir = self.metadata_dir();
         let rel_path = Path::new(Self::METADATA_DIR);
