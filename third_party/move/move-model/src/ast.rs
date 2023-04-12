@@ -411,6 +411,8 @@ pub enum ExpData {
 
     // ---------------------------------------------------------
     // Subsequent expressions only appear in imperative context
+    /// Represents the return from a function
+    Return(NodeId, Exp),
     /// Represents a sequence of effects, the last value also being the result.
     Sequence(NodeId, Vec<Exp>),
     /// Represents a loop, with a body expression.
@@ -418,8 +420,8 @@ pub enum ExpData {
     /// Represents a loop continuation for the enclosing loop. The bool indicates whether the
     /// loop is continued (true) or broken (false).
     LoopCont(NodeId, bool),
-    /// Represents the return from a function
-    Return(NodeId, Exp),
+    /// Assignment to a pattern. Can be a tuple pattern and a tuple expression.
+    Assign(NodeId, Pattern, Exp),
 }
 
 /// An internalized expression. We do use a wrapper around the underlying internement implementation
@@ -510,7 +512,8 @@ impl ExpData {
             | Sequence(node_id, ..)
             | Loop(node_id, ..)
             | LoopCont(node_id, ..)
-            | Return(node_id, ..) => *node_id,
+            | Return(node_id, ..)
+            | Assign(node_id, ..) => *node_id,
         }
     }
 
@@ -715,6 +718,7 @@ impl ExpData {
                     e.visit_pre_post(visitor)
                 }
             },
+            Assign(_, _, e) => e.visit_pre_post(visitor),
             // Explicitly list all enum variants
             LoopCont(..) | Value(..) | LocalVar(..) | Temporary(..) | Invalid(..) => {},
         }
@@ -980,11 +984,46 @@ pub enum Operation {
 /// A label used for referring to a specific memory in Global and Exists expressions.
 pub type MemoryLabel = GlobalId;
 
+/// Declaration of local variable with an optional binding. The type is annotated at the
+/// declaration.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct LocalVarDecl {
     pub id: NodeId,
     pub name: Symbol,
     pub binding: Option<Exp>,
+}
+
+/// A pattern, either a variable, a tuple, or a struct instantiation applied to a sequence of patterns.
+/// Carries a node_id which has (at least) a type and location.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Pattern {
+    Var(NodeId, Symbol),
+    Wildcard(NodeId),
+    Tuple(NodeId, Vec<Pattern>),
+    Struct(NodeId, QualifiedInstId<StructId>, Vec<Pattern>),
+    Error(NodeId),
+}
+
+impl Pattern {
+    /// Returns the variables in this pattern, per node_id and name.
+    pub fn vars(&self) -> Vec<(NodeId, Symbol)> {
+        let mut result = vec![];
+        Self::collect_vars(&mut result, self);
+        result
+    }
+
+    fn collect_vars(r: &mut Vec<(NodeId, Symbol)>, p: &Pattern) {
+        use Pattern::*;
+        match p {
+            Struct(_, _, args) | Tuple(_, args) => {
+                for arg in args {
+                    Self::collect_vars(r, arg)
+                }
+            },
+            Var(id, name) => r.push((*id, *name)),
+            _ => {},
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
@@ -1341,23 +1380,72 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
             LoopCont(_, true) => write!(f, "continue"),
             LoopCont(_, false) => write!(f, "break"),
             Return(_, e) => write!(f, "return {}", e.display(self.env)),
+            Assign(_, lhs, rhs) => {
+                write!(f, "{} = {}", self.fmt_pattern(lhs), rhs.display(self.env))
+            },
         }
     }
 }
 
 impl<'a> ExpDisplay<'a> {
     fn fmt_decls(&self, decls: &[LocalVarDecl]) -> String {
-        decls
-            .iter()
-            .map(|decl| {
-                let binding = if let Some(exp) = &decl.binding {
-                    format!(" = {}", exp.display(self.env))
+        decls.iter().map(|decl| self.fmt_decl(decl)).join(", ")
+    }
+
+    fn fmt_decl(&self, decl: &LocalVarDecl) -> String {
+        let binding = if let Some(exp) = &decl.binding {
+            format!(" = {}", exp.display(self.env))
+        } else {
+            "".to_string()
+        };
+        format!("{}{}", decl.name.display(self.env.symbol_pool()), binding)
+    }
+
+    fn fmt_patterns(&self, patterns: &[Pattern]) -> String {
+        patterns.iter().map(|pat| self.fmt_pattern(pat)).join(", ")
+    }
+
+    pub fn fmt_pattern(&self, pat: &Pattern) -> String {
+        match pat {
+            Pattern::Var(_, name) => {
+                format!("{}", name.display(self.env.symbol_pool()))
+            },
+            Pattern::Tuple(_, args) => format!("({})", self.fmt_patterns(args)),
+            Pattern::Struct(_, struct_id, args) => {
+                let tctx = self.env.get_type_display_ctx();
+                let inst_str = if !struct_id.inst.is_empty() {
+                    format!(
+                        "<{}>",
+                        struct_id.inst.iter().map(|ty| ty.display(&tctx)).join(", ")
+                    )
                 } else {
                     "".to_string()
                 };
-                format!("{}{}", decl.name.display(self.env.symbol_pool()), binding)
-            })
-            .join(", ")
+                let struct_env = self.env.get_struct(struct_id.to_qualified_id());
+                let field_names = struct_env.get_fields().map(|f| f.get_name());
+                let args_str = args
+                    .iter()
+                    .zip(field_names)
+                    .map(|(pat, sym)| {
+                        let field_name = self.env.symbol_pool().string(sym);
+                        let pattern_str = self.fmt_pattern(pat);
+                        if &pattern_str != field_name.as_ref() {
+                            format!("{}: {}", field_name.as_ref(), self.fmt_pattern(pat))
+                        } else {
+                            pattern_str
+                        }
+                    })
+                    .join(", ");
+                format!(
+                    "{}{}{{ {} }}",
+                    struct_env.get_full_name_str(),
+                    inst_str,
+                    args_str
+                )
+            },
+            Pattern::Wildcard(_) => "_".to_string(),
+            Pattern::Error(_) => "<error>".to_string(),
+        }
     }
 
     fn fmt_quant_decls(&self, decls: &[(LocalVarDecl, Exp)]) -> String {
