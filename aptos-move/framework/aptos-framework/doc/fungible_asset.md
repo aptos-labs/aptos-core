@@ -542,6 +542,16 @@ The mint ref and the the store do not match.
 
 
 
+<a name="0x1_fungible_asset_ENAME_TOO_LONG"></a>
+
+Name of the fungible asset metadata is too long
+
+
+<pre><code><b>const</b> <a href="fungible_asset.md#0x1_fungible_asset_ENAME_TOO_LONG">ENAME_TOO_LONG</a>: u64 = 15;
+</code></pre>
+
+
+
 <a name="0x1_fungible_asset_ENOT_STORE_OWNER"></a>
 
 Account is not the store's owner.
@@ -558,6 +568,16 @@ More tokens than remaining supply are being burnt.
 
 
 <pre><code><b>const</b> <a href="fungible_asset.md#0x1_fungible_asset_ESUPPLY_UNDERFLOW">ESUPPLY_UNDERFLOW</a>: u64 = 6;
+</code></pre>
+
+
+
+<a name="0x1_fungible_asset_ESYMBOL_TOO_LONG"></a>
+
+Symbol of the fungible asset metadata is too long
+
+
+<pre><code><b>const</b> <a href="fungible_asset.md#0x1_fungible_asset_ESYMBOL_TOO_LONG">ESYMBOL_TOO_LONG</a>: u64 = 16;
 </code></pre>
 
 
@@ -588,6 +608,24 @@ Account cannot transfer or receive fungible assets.
 
 
 <pre><code><b>const</b> <a href="fungible_asset.md#0x1_fungible_asset_EUNGATED_TRANSFER_IS_NOT_ALLOWED">EUNGATED_TRANSFER_IS_NOT_ALLOWED</a>: u64 = 3;
+</code></pre>
+
+
+
+<a name="0x1_fungible_asset_MAX_NAME_LENGTH"></a>
+
+
+
+<pre><code><b>const</b> <a href="fungible_asset.md#0x1_fungible_asset_MAX_NAME_LENGTH">MAX_NAME_LENGTH</a>: u64 = 32;
+</code></pre>
+
+
+
+<a name="0x1_fungible_asset_MAX_SYMBOL_LENGTH"></a>
+
+
+
+<pre><code><b>const</b> <a href="fungible_asset.md#0x1_fungible_asset_MAX_SYMBOL_LENGTH">MAX_SYMBOL_LENGTH</a>: u64 = 10;
 </code></pre>
 
 
@@ -623,6 +661,14 @@ This returns the capabilities to mint, burn, and transfer.
             maximum
         }
     });
+    <b>assert</b>!(
+        <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_length">string::length</a>(&name) &lt;= <a href="fungible_asset.md#0x1_fungible_asset_MAX_NAME_LENGTH">MAX_NAME_LENGTH</a>,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_ENAME_TOO_LONG">ENAME_TOO_LONG</a>)
+    );
+    <b>assert</b>!(
+        <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_length">string::length</a>(&symbol) &lt;= <a href="fungible_asset.md#0x1_fungible_asset_MAX_SYMBOL_LENGTH">MAX_SYMBOL_LENGTH</a>,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_ESYMBOL_TOO_LONG">ESYMBOL_TOO_LONG</a>)
+    );
     <b>move_to</b>(metadata_object_signer,
         <a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a> {
             supply,
