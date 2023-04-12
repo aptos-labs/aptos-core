@@ -6,7 +6,7 @@
 //! [Spec](https://www.rosetta-api.org/docs/api_objects.html)
 
 use crate::{
-    common::{native_coin, native_coin_tag},
+    common::native_coin,
     construction::{
         parse_create_stake_pool_operation, parse_distribute_staking_rewards_operation,
         parse_reset_lockup_operation, parse_set_operator_operation, parse_set_voter_operation,
@@ -742,6 +742,7 @@ impl Transaction {
             // Parse all failed operations from the payload
             if let Some(user_txn) = maybe_user_txn {
                 let mut ops = parse_failed_operations_from_txn_payload(
+                    server_context,
                     operation_index,
                     user_txn.sender(),
                     user_txn.payload(),
@@ -786,6 +787,7 @@ impl Transaction {
 /// This case only occurs if the transaction failed, and that's because it's less accurate
 /// than just following the state changes
 fn parse_failed_operations_from_txn_payload(
+    server_context: &RosettaContext,
     operation_index: u64,
     sender: AccountAddress,
     payload: &TransactionPayload,
@@ -797,23 +799,37 @@ fn parse_failed_operations_from_txn_payload(
             inner.module().name().as_str(),
             inner.function().as_str(),
         ) {
-            // FIXME(fungible): Add aptos_account::transfer_coins
             (AccountAddress::ONE, COIN_MODULE, TRANSFER_FUNCTION) => {
                 // Only put the transfer in if we can understand the currency
                 if let Some(type_tag) = inner.ty_args().first() {
-                    // We don't want to do lookups on failures for currencies that don't exist,
-                    // so we only look up cached info not new info
-                    // FIXME(fungible): If other coins are supported, this will need to be updated to handle more coins
-                    if type_tag == &native_coin_tag() {
+                    if let Ok(currency) =
+                        server_context.get_coin_v1_from_type_tag(&type_tag.to_canonical_string())
+                    {
                         operations = parse_transfer_from_txn_payload(
                             inner,
-                            native_coin(),
+                            currency,
                             sender,
                             operation_index,
                         )
                     }
                 }
             },
+            (AccountAddress::ONE, APTOS_ACCOUNT_MODULE, TRANSFER_COINS_FUNCTION) => {
+                // Only put the transfer in if we can understand the currency
+                if let Some(type_tag) = inner.ty_args().first() {
+                    if let Ok(currency) =
+                        server_context.get_coin_v1_from_type_tag(&type_tag.to_canonical_string())
+                    {
+                        operations = parse_transfer_from_txn_payload(
+                            inner,
+                            currency,
+                            sender,
+                            operation_index,
+                        )
+                    }
+                }
+            },
+            // FIXME: Add fungible assets functions
             (AccountAddress::ONE, APTOS_ACCOUNT_MODULE, TRANSFER_FUNCTION) => {
                 // We could add a create here as well, but we don't know if it will actually happen
                 operations =
@@ -1015,10 +1031,11 @@ async fn parse_operations_from_write_set(
         // FIXME(fungible): Handle fungible store
         (AccountAddress::ONE, COIN_MODULE, COIN_STORE_RESOURCE, 1) => {
             if let Some(type_tag) = struct_tag.type_params.first() {
-                // FIXME(fungible): This will need to be updated to support more coins
-                if type_tag == &native_coin_tag() {
+                if let Ok(currency) =
+                    server_context.get_coin_v1_from_type_tag(&type_tag.to_canonical_string())
+                {
                     parse_coinstore_changes(
-                        native_coin(),
+                        currency,
                         version,
                         address,
                         data,
@@ -1431,6 +1448,7 @@ async fn parse_staking_contract_resource_changes(
 
     Ok(operations)
 }
+
 async fn parse_coinstore_changes(
     currency: Currency,
     version: u64,
@@ -1508,6 +1526,7 @@ fn filter_events<F: Fn(&EventKey, &ContractEvent) -> Option<T>, T>(
         .filter_map(|event| parser(event_key, event))
         .collect()
 }
+
 /// An enum for processing which operation is in a transaction
 pub enum OperationDetails {
     CreateAccount,

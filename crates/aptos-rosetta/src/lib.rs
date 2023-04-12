@@ -109,6 +109,40 @@ impl RosettaContext {
         }
     }
 
+    pub fn get_coin_v1_from_type_tag(&self, type_tag: &str) -> ApiResult<Currency> {
+        if let Some(currency) = self.supported_currencies.iter().find(|currency| {
+            currency
+                .metadata
+                .as_ref()
+                .and_then(|inner| inner.move_type.as_ref())
+                .map_or(false, |move_type| move_type == type_tag)
+        }) {
+            Ok(currency.clone())
+        } else {
+            Err(ApiError::TransactionParseError(Some(format!(
+                "Invalid coin for transfer {}",
+                type_tag
+            ))))
+        }
+    }
+
+    pub fn get_coin_v2_from_type_tag(&self, address: AccountAddress) -> ApiResult<Currency> {
+        if let Some(currency) = self.supported_currencies.iter().find(|currency| {
+            currency
+                .metadata
+                .as_ref()
+                .and_then(|inner| inner.metadata_address.as_ref())
+                .map_or(false, |metadata_address| metadata_address == &address)
+        }) {
+            Ok(currency.clone())
+        } else {
+            Err(ApiError::TransactionParseError(Some(format!(
+                "Invalid coin for transfer {}",
+                address
+            ))))
+        }
+    }
+
     fn rest_client(&self) -> ApiResult<Arc<aptos_rest_client::Client>> {
         if let Some(ref client) = self.rest_client {
             Ok(client.clone())
