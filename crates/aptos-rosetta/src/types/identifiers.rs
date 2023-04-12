@@ -163,7 +163,7 @@ fn str_to_account_address(address: &str) -> Result<AccountAddress, ApiError> {
 /// There are two types of SubAccountIdentifiers
 /// 1. `stake` which is the total stake
 /// 2. `stake-<operator>` which is the stake on the operator
-/// FIXME(fungible): Add secondary fungible-store identifier `fungible-<address>`
+/// 3. `fungible-<address>` which is for secondary fungible stores (for future use)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SubAccountIdentifier {
     /// Hex encoded AccountAddress beginning with 0x
@@ -176,6 +176,7 @@ const ACTIVE_STAKE: &str = "active_stake";
 const PENDING_INACTIVE_STAKE: &str = "pending_inactive_stake";
 const INACTIVE_STAKE: &str = "inactive_stake";
 const ACCOUNT_SEPARATOR: char = '-';
+const FUNGIBLE: &str = "fungible";
 
 impl SubAccountIdentifier {
     pub fn new_total_stake() -> SubAccountIdentifier {
@@ -241,6 +242,29 @@ impl SubAccountIdentifier {
             if stake == STAKE {
                 if let Some(operator) = parts.next() {
                     return str_to_account_address(operator);
+                }
+            }
+        }
+
+        Err(ApiError::InvalidInput(Some(format!(
+            "Sub account isn't an operator address {:?}",
+            self
+        ))))
+    }
+
+    pub fn new_fungible_store(address: AccountAddress) -> SubAccountIdentifier {
+        SubAccountIdentifier {
+            address: format!("{}-{}", FUNGIBLE, to_hex_lower(&address)),
+        }
+    }
+
+    pub fn fungible_store_address(&self) -> ApiResult<AccountAddress> {
+        let mut parts = self.address.split(ACCOUNT_SEPARATOR);
+
+        if let Some(fungible) = parts.next() {
+            if fungible == FUNGIBLE {
+                if let Some(address) = parts.next() {
+                    return str_to_account_address(address);
                 }
             }
         }
