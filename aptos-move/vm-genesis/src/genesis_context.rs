@@ -14,7 +14,7 @@ use aptos_types::{
 };
 use aptos_vm_types::{
     remote_cache::{TRemoteCache, TStateViewWithRemoteCache},
-    write::AptosWrite,
+    write::{AptosModuleRef, AptosResourceRef},
 };
 use move_core_types::language_storage::ModuleId;
 use std::collections::HashMap;
@@ -62,19 +62,24 @@ impl TStateView for GenesisStateView {
 impl TRemoteCache for GenesisStateView {
     type Key = StateKey;
 
-    fn get_cached_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<AptosWrite>> {
-        let data = self.state_data.get(state_key).cloned();
-        let write = data.map(AptosWrite::Module);
-        Ok(write)
+    fn get_cached_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<AptosModuleRef>> {
+        Ok(None)
+        // let data = self.state_data.get(state_key).cloned();
+        // let write = data.map(AptosWrite::Module);
+        // Ok(write)
     }
 
-    fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosWrite>> {
-        let data = self.state_data.get(state_key).cloned();
+    fn get_cached_resource(
+        &self,
+        state_key: &Self::Key,
+    ) -> anyhow::Result<Option<AptosResourceRef>> {
+        Ok(None)
+        // let data = self.state_data.get(state_key).cloned();
         // Will not be an aggregator, and ...
         // TODO: should not be a group either?
-        let write = data
-            .map(|blob| AptosWrite::Standard(move_vm_types::resolver::Resource::from_blob(blob)));
-        Ok(write)
+        // let write = data
+        //     .map(|blob| AptosWrite::Standard(move_vm_types::resolver::Resource::from_blob(blob)));
+        // Ok(write)
     }
 }
 

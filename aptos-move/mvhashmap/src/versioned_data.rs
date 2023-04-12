@@ -4,16 +4,16 @@
 use crate::types::{Incarnation, MVDataError, MVDataOutput, TxnIndex, Version};
 use aptos_infallible::Mutex;
 use aptos_types::write_set::TransactionWrite;
-use aptos_vm_types::{
-    delta::DeltaOp,
-    write::{AptosWrite, Op},
-};
+use aptos_vm_types::delta::DeltaOp;
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
 use std::{
     collections::btree_map::BTreeMap,
     hash::Hash,
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
 };
 
 const FLAG_DONE: usize = 0;
@@ -21,23 +21,23 @@ const FLAG_ESTIMATE: usize = 1;
 
 /// Every entry in shared multi-version data-structure has an "estimate" flag
 /// and some content.
-struct Entry {
+struct Entry<V> {
     /// Used to mark the entry as a "write estimate". Even though the entry
     /// lives inside the DashMap and the entry access will have barriers, we
     /// still make the flag Atomic to provide acq/rel semantics on its own.
     flag: AtomicUsize,
 
     /// Actual contents.
-    pub cell: EntryCell,
+    pub cell: EntryCell<V>,
 }
 
 /// Represents the content of a single entry in multi-version data-structure.
-enum EntryCell {
+enum EntryCell<V> {
     /// Recorded in the shared multi-version data-structure for each write. It
     /// has: 1) Incarnation number of the transaction that wrote the entry (note
     /// that TxnIndex is part of the key and not recorded here), 2) actual data
     /// stored in a shared pointer (to ensure ownership and avoid clones).
-    Write(Incarnation, Op<AptosWrite>),
+    Write(Incarnation, Arc<V>),
 
     /// Recorded in the shared multi-version data-structure for each delta.
     Delta(DeltaOp),
@@ -45,8 +45,8 @@ enum EntryCell {
 
 /// A VersionedValue internally contains a BTreeMap from indices of transactions
 /// that update the given access path alongside the corresponding entries.
-struct VersionedValue {
-    versioned_map: BTreeMap<TxnIndex, CachePadded<Entry>>,
+struct VersionedValue<V> {
+    versioned_map: BTreeMap<TxnIndex, CachePadded<Entry<V>>>,
 
     // Note: this can cache base (storage) value in Option<u128> to facilitate
     // aggregator validation & reading in the future, if needed.
@@ -54,20 +54,20 @@ struct VersionedValue {
 }
 
 /// Maps each key (access path) to an interal VersionedValue.
-pub struct VersionedData<K> {
-    values: DashMap<K, VersionedValue>,
+pub struct VersionedData<K, V> {
+    values: DashMap<K, VersionedValue<V>>,
     delta_keys: Mutex<Vec<K>>,
 }
 
-impl Entry {
-    pub fn new_write_from(flag: usize, incarnation: Incarnation, data: Op<AptosWrite>) -> Entry {
+impl<V> Entry<V> {
+    pub fn new_write_from(flag: usize, incarnation: Incarnation, data: V) -> Entry<V> {
         Entry {
             flag: AtomicUsize::new(flag),
-            cell: EntryCell::Write(incarnation, data),
+            cell: EntryCell::Write(incarnation, Arc::new(data)),
         }
     }
 
-    pub fn new_delta_from(flag: usize, data: DeltaOp) -> Entry {
+    pub fn new_delta_from(flag: usize, data: DeltaOp) -> Entry<V> {
         Entry {
             flag: AtomicUsize::new(flag),
             cell: EntryCell::Delta(data),
@@ -83,7 +83,7 @@ impl Entry {
     }
 }
 
-impl VersionedValue {
+impl<V> VersionedValue<V> {
     pub fn new() -> Self {
         Self {
             versioned_map: BTreeMap::new(),
@@ -92,13 +92,13 @@ impl VersionedValue {
     }
 }
 
-impl Default for VersionedValue {
+impl<V> Default for VersionedValue<V> {
     fn default() -> Self {
         VersionedValue::new()
     }
 }
 
-impl<K: Hash + Clone + Eq> VersionedData<K> {
+impl<K: Hash + Clone + Eq, V> VersionedData<K, V> {
     pub(crate) fn new() -> Self {
         Self {
             values: DashMap::new(),
@@ -132,8 +132,8 @@ impl<K: Hash + Clone + Eq> VersionedData<K> {
             .filter_map(|(idx, entry)| {
                 match &entry.cell {
                     EntryCell::Write(_, data) => {
-                        latest_value = data
-                            .extract_raw_bytes()
+                        latest_value = Some(vec![])//data
+                            //.extract_raw_bytes()
                             .map(|bytes| bcs::from_bytes(&bytes).expect("should not fail"));
                         None
                     },
@@ -188,7 +188,7 @@ impl<K: Hash + Clone + Eq> VersionedData<K> {
         &self,
         key: &K,
         txn_idx: TxnIndex,
-    ) -> anyhow::Result<MVDataOutput, MVDataError> {
+    ) -> anyhow::Result<MVDataOutput<V>, MVDataError> {
         use MVDataError::*;
         use MVDataOutput::*;
 
@@ -223,9 +223,7 @@ impl<K: Hash + Clone + Eq> VersionedData<K> {
 
                             // None if data represents deletion. Otherwise, panics if the
                             // data can't be resolved to an aggregator value.
-                            let maybe_value = data
-                                .as_value()
-                                .map(|w| w.as_aggregator_value().expect("should be an aggregator"));
+                            let maybe_value: Option<u128> = None;
 
                             if maybe_value.is_none() {
                                 // Resolve to the write if the WriteOp was deletion
@@ -277,7 +275,7 @@ impl<K: Hash + Clone + Eq> VersionedData<K> {
         }
     }
 
-    pub(crate) fn write(&self, key: &K, version: Version, data: Op<AptosWrite>) {
+    pub(crate) fn write(&self, key: &K, version: Version, data: V) {
         let (txn_idx, incarnation) = version;
 
         let mut v = self.values.entry(key.clone()).or_default();

@@ -1,36 +1,22 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    change_set::ChangeSet,
-    delta::DeltaOp,
-    write::{AptosWrite, Op},
-};
+use crate::change_set::{DeltaChangeSet, WriteChangeSet};
 use aptos_types::{contract_event::ContractEvent, transaction::TransactionStatus};
 
-/// Output of a transaction at VM level.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct VMTransactionOutput {
-    /// The list of writes this transaction intends to do.
-    writes: ChangeSet<Op<AptosWrite>>,
-
-    /// The list of deltas this transaction intends to apply
-    deltas: ChangeSet<DeltaOp>,
-
-    /// The list of events emitted during this transaction.
+#[derive(Clone, Debug)]
+pub struct TransactionOutput {
+    writes: WriteChangeSet,
+    deltas: DeltaChangeSet,
     events: Vec<ContractEvent>,
-
-    /// The amount of gas used during execution.
     gas_used: u64,
-
-    /// The execution status.
     status: TransactionStatus,
 }
 
-impl VMTransactionOutput {
+impl TransactionOutput {
     pub fn new(
-        writes: ChangeSet<Op<AptosWrite>>,
-        deltas: ChangeSet<DeltaOp>,
+        writes: WriteChangeSet,
+        deltas: DeltaChangeSet,
         events: Vec<ContractEvent>,
         gas_used: u64,
         status: TransactionStatus,
@@ -44,21 +30,25 @@ impl VMTransactionOutput {
         }
     }
 
-    pub fn into(
-        self,
-    ) -> (
-        ChangeSet<Op<AptosWrite>>,
-        ChangeSet<DeltaOp>,
-        Vec<ContractEvent>,
-    ) {
+    pub fn empty_with_status(status: TransactionStatus) -> Self {
+        Self {
+            writes: WriteChangeSet::empty(),
+            deltas: DeltaChangeSet::empty(),
+            events: vec![],
+            gas_used: 0,
+            status,
+        }
+    }
+
+    pub fn into(self) -> (WriteChangeSet, DeltaChangeSet, Vec<ContractEvent>) {
         (self.writes, self.deltas, self.events)
     }
 
     pub fn unpack(
         self,
     ) -> (
-        ChangeSet<Op<AptosWrite>>,
-        ChangeSet<DeltaOp>,
+        WriteChangeSet,
+        DeltaChangeSet,
         Vec<ContractEvent>,
         u64,
         TransactionStatus,
@@ -72,11 +62,11 @@ impl VMTransactionOutput {
         )
     }
 
-    pub fn writes(&self) -> &ChangeSet<Op<AptosWrite>> {
+    pub fn writes(&self) -> &WriteChangeSet {
         &self.writes
     }
 
-    pub fn deltas(&self) -> &ChangeSet<DeltaOp> {
+    pub fn deltas(&self) -> &DeltaChangeSet {
         &self.deltas
     }
 

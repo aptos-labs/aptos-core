@@ -16,7 +16,7 @@ use aptos_types::{
 };
 use aptos_vm_types::{
     remote_cache::{TRemoteCache, TStateViewWithRemoteCache},
-    write::AptosWrite,
+    write::{AptosModuleRef, AptosResourceRef, AptosWrite},
 };
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
@@ -226,11 +226,14 @@ impl TStateView for CachedStateView {
 impl TRemoteCache for CachedStateView {
     type Key = StateKey;
 
-    fn get_cached_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<AptosWrite>> {
+    fn get_cached_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<AptosModuleRef>> {
         todo!()
     }
 
-    fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosWrite>> {
+    fn get_cached_resource(
+        &self,
+        state_key: &Self::Key,
+    ) -> anyhow::Result<Option<AptosResourceRef>> {
         todo!()
     }
 }
@@ -287,11 +290,14 @@ impl TStateView for CachedDbStateView {
 impl TRemoteCache for CachedDbStateView {
     type Key = StateKey;
 
-    fn get_cached_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<AptosWrite>> {
+    fn get_cached_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<AptosModuleRef>> {
         todo!()
     }
 
-    fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosWrite>> {
+    fn get_cached_resource(
+        &self,
+        state_key: &Self::Key,
+    ) -> anyhow::Result<Option<AptosResourceRef>> {
         todo!()
     }
 }

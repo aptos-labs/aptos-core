@@ -28,7 +28,7 @@ use aptos_types::{
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::{
-    remote_cache::StateViewWithRemoteCache, transaction_output::VMTransactionOutput,
+    remote_cache::StateViewWithRemoteCache, transaction_output::TransactionOutput,
 };
 use fail::fail_point;
 use move_binary_format::{errors::VMResult, CompiledModule};
@@ -38,7 +38,7 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
 };
 use move_vm_runtime::logging::expect_no_verification_errors;
-use move_vm_types::{gas::UnmeteredGasMeter, resolver::FrozenResourceResolver};
+use move_vm_types::{gas::UnmeteredGasMeter, resolver::ResourceRefResolver};
 use std::sync::Arc;
 
 pub const MAXIMUM_APPROVED_TRANSACTION_SIZE: u64 = 1024 * 1024;
@@ -181,16 +181,17 @@ impl AptosVMImpl {
     }
 
     // TODO: Move this to an on-chain config once those are a part of the core framework
-    fn get_transaction_validation<S: FrozenResourceResolver>(
+    fn get_transaction_validation<S: ResourceRefResolver>(
         remote_cache: &S,
     ) -> Option<TransactionValidation> {
         match remote_cache
-            .get_frozen_resource(&CORE_CODE_ADDRESS, &TransactionValidation::struct_tag())
+            .get_resource_ref(&CORE_CODE_ADDRESS, &TransactionValidation::struct_tag())
             .ok()?
         {
             Some(r) => {
-                bcs::from_bytes::<TransactionValidation>(&r.as_bytes().expect("should not fail"))
-                    .ok()
+                None
+                // bcs::from_bytes::<TransactionValidation>(&r.as_bytes().expect("should not fail"))
+                //     .ok()
             },
             _ => None,
         }
@@ -248,13 +249,14 @@ impl AptosVMImpl {
         // The transaction is too large.
         if txn_data.transaction_size > txn_gas_params.max_transaction_size_in_bytes {
             let data = storage
-                .get_frozen_resource(&CORE_CODE_ADDRESS, &ApprovedExecutionHashes::struct_tag());
+                .get_resource_ref(&CORE_CODE_ADDRESS, &ApprovedExecutionHashes::struct_tag());
 
             let valid = if let Ok(Some(resource)) = data {
-                let approved_execution_hashes = bcs::from_bytes::<ApprovedExecutionHashes>(
-                    &resource.as_bytes().expect("should not fail"),
-                )
-                .ok();
+                let approved_execution_hashes: Option<ApprovedExecutionHashes> = None;
+                // let approved_execution_hashes = bcs::from_bytes::<ApprovedExecutionHashes>(
+                //     &resource.as_bytes().expect("should not fail"),
+                // )
+                // .ok();
                 let valid = approved_execution_hashes
                     .map(|aeh| {
                         aeh.entries
@@ -671,7 +673,7 @@ pub(crate) fn get_transaction_output<A: AccessPathCache, S: MoveResolverExt>(
     txn_data: &TransactionMetadata,
     status: ExecutionStatus,
     change_set_configs: &ChangeSetConfigs,
-) -> Result<VMTransactionOutput, VMStatus> {
+) -> Result<TransactionOutput, VMStatus> {
     let gas_used = txn_data
         .max_gas_amount()
         .checked_sub(gas_left)
@@ -682,7 +684,7 @@ pub(crate) fn get_transaction_output<A: AccessPathCache, S: MoveResolverExt>(
         .map_err(|e| e.into_vm_status())?;
     let (writes, deltas, events) = change_set.into_inner();
 
-    Ok(VMTransactionOutput::new(
+    Ok(TransactionOutput::new(
         writes,
         deltas,
         events,

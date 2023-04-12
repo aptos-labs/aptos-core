@@ -618,7 +618,7 @@ impl FakeExecutor {
                 .expect("Failed to generate txn effects");
 
             let (writes, _deltas, _events) = change_set.into_inner();
-            let write_set = AptosChangeSet::into_write_set(writes).expect("should not fail");
+            let write_set = writes.into_write_set().expect("should not fail");
             write_set
         };
         self.data_store.add_write_set(&write_set);
@@ -662,7 +662,7 @@ impl FakeExecutor {
             .expect("Failed to generate txn effects");
         // TODO: Support deltas in fake executor.
         let (writes, _deltas, _events) = change_set.into_inner();
-        let write_set = AptosChangeSet::into_write_set(writes).expect("should not fail");
+        let write_set = writes.into_write_set().expect("should not fail");
         Ok(write_set)
     }
 }

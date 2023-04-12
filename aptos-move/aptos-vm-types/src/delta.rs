@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    effects::Op,
     remote_cache::StateViewWithRemoteCache,
-    write::{AptosWrite, Op},
+    write::{AptosResource, WriteOp},
 };
 use aptos_types::state_store::state_key::StateKey;
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult};
@@ -195,43 +196,44 @@ impl DeltaOp {
         self,
         state_view: &impl StateViewWithRemoteCache,
         state_key: &StateKey,
-    ) -> anyhow::Result<Op<AptosWrite>, VMStatus> {
-        state_view
-            .get_cached_resource(state_key)
-            .map_err(|_| VMStatus::Error(StatusCode::STORAGE_ERROR, None))
-            .and_then(|maybe_bytes| {
-                match maybe_bytes {
-                    Some(AptosWrite::AggregatorValue(base)) => {
-                        self.apply_to(base)
-                            .map_err(|partial_error| {
-                                // If delta application fails, transform partial VM
-                                // error into an appropriate VM status.
-                                partial_error
-                                    .finish(Location::Module(AGGREGATOR_MODULE.clone()))
-                                    .into_vm_status()
-                            })
-                            .map(|result| Op::Modification(AptosWrite::AggregatorValue(result)))
-                    },
-                    Some(AptosWrite::Standard(resource)) => {
-                        // TODO: We technically should match on resource as well!
-                        let base = bcs::from_bytes(&resource.as_bytes().expect("should not fail"))
-                            .expect("unexpected deserialization error in aggregator");
-                        self.apply_to(base)
-                            .map_err(|partial_error| {
-                                // If delta application fails, transform partial VM
-                                // error into an appropriate VM status.
-                                partial_error
-                                    .finish(Location::Module(AGGREGATOR_MODULE.clone()))
-                                    .into_vm_status()
-                            })
-                            .map(|result| Op::Modification(AptosWrite::AggregatorValue(result)))
-                    },
-                    Some(_) => unreachable!(),
-                    // Something is wrong, the value to which we apply delta should
-                    // always exist. Guard anyway.
-                    None => Err(VMStatus::Error(StatusCode::STORAGE_ERROR, None)),
-                }
-            })
+    ) -> anyhow::Result<Op<AptosResource>, VMStatus> {
+        Ok(Op::Creation(AptosResource::AggregatorValue(0)))
+        // state_view
+        //     .get_cached_resource(state_key)
+        //     .map_err(|_| VMStatus::Error(StatusCode::STORAGE_ERROR, None))
+        //     .and_then(|maybe_bytes| {
+        //         match maybe_bytes {
+        //             Some(AptosResource::AggregatorValue(base)) => {
+        //                 self.apply_to(base)
+        //                     .map_err(|partial_error| {
+        //                         // If delta application fails, transform partial VM
+        //                         // error into an appropriate VM status.
+        //                         partial_error
+        //                             .finish(Location::Module(AGGREGATOR_MODULE.clone()))
+        //                             .into_vm_status()
+        //                     })
+        //                     .map(|result| Op::Modification(AptosResource::AggregatorValue(result)))
+        //             },
+        //             Some(AptosResource::Standard(resource)) => {
+        //                 // TODO: We technically should match on resource as well!
+        //                 let base = bcs::from_bytes(&resource.as_bytes().expect("should not fail"))
+        //                     .expect("unexpected deserialization error in aggregator");
+        //                 self.apply_to(base)
+        //                     .map_err(|partial_error| {
+        //                         // If delta application fails, transform partial VM
+        //                         // error into an appropriate VM status.
+        //                         partial_error
+        //                             .finish(Location::Module(AGGREGATOR_MODULE.clone()))
+        //                             .into_vm_status()
+        //                     })
+        //                     .map(|result| Op::Modification(AptosResource::AggregatorValue(result)))
+        //             },
+        //             Some(_) => unreachable!(),
+        //             // Something is wrong, the value to which we apply delta should
+        //             // always exist. Guard anyway.
+        //             None => Err(VMStatus::Error(StatusCode::STORAGE_ERROR, None)),
+        //         }
+        //     })
     }
 }
 

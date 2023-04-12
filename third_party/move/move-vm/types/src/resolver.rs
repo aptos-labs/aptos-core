@@ -31,7 +31,7 @@ pub type ModuleRef = MoveRef<Module>;
 pub type ResourceRef = MoveRef<Resource>;
 
 /// Wrapper around any Move resource.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub enum Resource {
     /// Resource serialized as bytes.
     Serialized(Vec<u8>),
@@ -42,7 +42,7 @@ pub enum Resource {
 impl Resource {
     pub fn from_value_layout(value: FrozenValue, layout: MoveTypeLayout) -> Self {
         // TODO: FrozenValue should carry the size (we know it during construction), and so
-        // we can pass it here.
+        // we can pass it here. For now, use arbitrary value.
         Self::Cached(value, layout, 1)
     }
 
@@ -95,7 +95,7 @@ impl<T: ResourceRefResolver + ?Sized> ResourceRefResolver for &T {
 }
 
 /// Wrapper around any Move module.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub enum Module {
     // Module serialized as blob.
     Serialized(Vec<u8>),

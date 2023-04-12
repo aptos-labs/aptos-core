@@ -3,10 +3,7 @@
 
 use aptos_crypto::hash::HashValue;
 use aptos_types::executable::ExecutableDescriptor;
-use aptos_vm_types::{
-    delta::DeltaOp,
-    write::{AptosWrite, Op},
-};
+use aptos_vm_types::delta::DeltaOp;
 use std::sync::Arc;
 
 pub type TxnIndex = u32;
@@ -36,19 +33,19 @@ pub enum MVCodeError {
 
 /// Returned as Ok(..) when read successfully from the multi-version data-structure.
 #[derive(Debug, PartialEq, Eq)]
-pub enum MVDataOutput {
+pub enum MVDataOutput<V> {
     /// Result of resolved delta op, always u128. Unlike with `Version`, we return
     /// actual data because u128 is cheap to copy and validation can be done correctly
     /// on values as well (ABA is not a problem).
     Resolved(u128),
     /// Information from the last versioned-write. Note that the version is returned
     /// and not the data to avoid copying big values around.
-    Versioned(Version, Op<AptosWrite>),
+    Versioned(Version, Arc<V>),
 }
 
 /// Returned as Ok(..) when read successfully from the multi-version data-structure.
 #[derive(Debug, PartialEq, Eq)]
-pub enum MVCodeOutput<X> {
+pub enum MVCodeOutput<M, X> {
     /// Arc to the executable corresponding to the latest module, and a descriptor
     /// with either the module hash or indicator that the module is from storage.
     Executable((Arc<X>, ExecutableDescriptor)),
@@ -56,5 +53,5 @@ pub enum MVCodeOutput<X> {
     /// this can't be a storage-level module, as it's from multi-versioned code map.
     /// The Option can be None if HashValue can't be computed, currently may happen
     /// if the latest entry corresponded to the module deletion.
-    Module((Op<AptosWrite>, HashValue)),
+    Module((Arc<M>, HashValue)),
 }

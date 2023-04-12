@@ -29,7 +29,7 @@ use aptos_vm::{
     AptosVM, VMExecutor,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
-use aptos_vm_types::{change_set::AptosChangeSet, transaction_output::VMTransactionOutput};
+use aptos_vm_types::transaction_output::TransactionOutput as IntermediateOutput;
 use move_binary_format::errors::VMResult;
 use std::{path::Path, sync::Arc};
 
@@ -66,7 +66,7 @@ impl AptosDebugger {
         &self,
         version: Version,
         txn: SignedTransaction,
-    ) -> Result<(VMStatus, VMTransactionOutput, TransactionGasLog)> {
+    ) -> Result<(VMStatus, IntermediateOutput, TransactionGasLog)> {
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
         let txn = txn
@@ -100,6 +100,7 @@ impl AptosDebugger {
                 },
             )?;
 
+        // No need to convert intermediate output to the final `TransactionOutput` here.
         Ok((status, output, gas_profiler.finish()))
     }
 
@@ -243,11 +244,13 @@ impl AptosDebugger {
                 &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
             )
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
-        let (writes, _deltas, events) = change_set.into_inner();
 
-        let write_set = AptosChangeSet::into_write_set(writes).expect("should not fail");
-        let legacy_change_set = ChangeSet::new_no_check(write_set, events);
-        Ok(legacy_change_set)
+        // Reconstruct the legacy version of a change set with blobs.
+        // TODO: Should we return AptosChangeSet here? This function is not called anywhere.
+        // TODO: Should we materialize deltas as well?
+        let (writes, _deltas, events) = change_set.into_inner();
+        // TODO: Switch to `new` when check is done on AptosChangeSet!
+        Ok(ChangeSet::new_no_check(writes.into_write_set()?, events))
     }
 }
 

@@ -8,10 +8,7 @@ use crate::{
     versioned_data::VersionedData,
 };
 use aptos_types::executable::{Executable, ExecutableDescriptor, ModulePath};
-use aptos_vm_types::{
-    delta::DeltaOp,
-    write::{AptosWrite, Op},
-};
+use aptos_vm_types::delta::DeltaOp;
 use std::hash::Hash;
 
 pub mod types;
@@ -31,24 +28,24 @@ mod unit_tests;
 /// TODO: separate V into different generic types for data and modules / code (currently
 /// both WriteOp for executor, and use extract_raw_bytes. data for aggregators, and
 /// code for computing the module hash.
-pub struct MVHashMap<K, X: Executable> {
-    data: VersionedData<K>,
-    code: VersionedCode<K, X>,
+pub struct MVHashMap<K, V, X: Executable> {
+    data: VersionedData<K, V>,
+    code: VersionedCode<K, V, X>,
 }
 
-impl<K: ModulePath + Hash + Clone + Eq, X: Executable> MVHashMap<K, X> {
+impl<K: ModulePath + Hash + Clone + Eq, V, X: Executable> MVHashMap<K, V, X> {
     // -----------------------------------
     // Functions shared for data and code.
 
     // Option<VersionedCode> is passed to allow re-using code cache between blocks.
-    pub fn new(code_cache: Option<VersionedCode<K, X>>) -> MVHashMap<K, X> {
+    pub fn new(code_cache: Option<VersionedCode<K, V, X>>) -> MVHashMap<K, V, X> {
         MVHashMap {
             data: VersionedData::new(),
             code: code_cache.unwrap_or_default(),
         }
     }
 
-    pub fn take(self) -> (VersionedData<K>, VersionedCode<K, X>) {
+    pub fn take(self) -> (VersionedData<K, V>, VersionedCode<K, V, X>) {
         (self.data, self.code)
     }
 
@@ -72,7 +69,7 @@ impl<K: ModulePath + Hash + Clone + Eq, X: Executable> MVHashMap<K, X> {
     }
 
     /// Add a versioned write at a specified key, in code or data map according to the key.
-    pub fn write(&self, key: &K, version: Version, value: Op<AptosWrite>) {
+    pub fn write(&self, key: &K, version: Version, value: V) {
         match key.module_path() {
             Some(_) => self.code.write(key, version.0, value),
             None => self.data.write(key, version, value),
@@ -97,7 +94,7 @@ impl<K: ModulePath + Hash + Clone + Eq, X: Executable> MVHashMap<K, X> {
         &self,
         key: &K,
         txn_idx: TxnIndex,
-    ) -> anyhow::Result<MVDataOutput, MVDataError> {
+    ) -> anyhow::Result<MVDataOutput<V>, MVDataError> {
         self.data.fetch_data(key, txn_idx)
     }
 
@@ -115,12 +112,12 @@ impl<K: ModulePath + Hash + Clone + Eq, X: Executable> MVHashMap<K, X> {
         &self,
         key: &K,
         txn_idx: TxnIndex,
-    ) -> anyhow::Result<MVCodeOutput<X>, MVCodeError> {
+    ) -> anyhow::Result<MVCodeOutput<V, X>, MVCodeError> {
         self.code.fetch_code(key, txn_idx)
     }
 }
 
-impl<K: ModulePath + Hash + Clone + Eq, X: Executable> Default for MVHashMap<K, X> {
+impl<K: ModulePath + Hash + Clone + Eq, V, X: Executable> Default for MVHashMap<K, V, X> {
     fn default() -> Self {
         Self::new(None)
     }

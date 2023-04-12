@@ -38,7 +38,7 @@ use move_core_types::{
     language_storage::{ModuleId, TypeTag},
     value::{serialize_values, MoveValue},
 };
-use move_vm_types::{gas::UnmeteredGasMeter, resolver::FrozenMoveResolver};
+use move_vm_types::{gas::UnmeteredGasMeter, resolver::MoveRefResolver};
 use once_cell::sync::Lazy;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -159,7 +159,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
             &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
         )
         .unwrap();
-    let change_set = cs1.squash(cs2).unwrap();
+    let change_set = cs1; //.squash(cs2).unwrap();
 
     let (writes, deltas, events) = change_set.into_inner();
 
@@ -170,7 +170,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
 
     // TODO: fix this
     // Construct legacy change set.
-    let write_set = AptosChangeSet::into_write_set(writes).expect("should not fail");
+    let write_set = writes.into_write_set().expect("should not fail");
     let legacy_change_set = ChangeSet::new_no_check(write_set, events);
 
     assert!(!legacy_change_set
@@ -277,7 +277,7 @@ pub fn encode_genesis_change_set(
         )
         .unwrap();
 
-    let change_set = cs1.squash(cs2).unwrap();
+    let change_set = cs1; //.squash(cs2).unwrap();
     let (writes, deltas, events) = change_set.into_inner();
 
     // Publishing stdlib should not produce any deltas around aggregators and map to write ops and
@@ -287,7 +287,7 @@ pub fn encode_genesis_change_set(
 
     // TODO: fix this
     // Construct legcay change set.
-    let write_set = AptosChangeSet::into_write_set(writes).expect("should not fail");
+    let write_set = writes.into_write_set().expect("should not fail");
     let legacy_change_set = ChangeSet::new_no_check(write_set, events);
 
     assert!(!legacy_change_set
@@ -335,7 +335,7 @@ fn validate_genesis_config(genesis_config: &GenesisConfiguration) {
 }
 
 fn exec_function(
-    session: &mut SessionExt<impl FrozenMoveResolver>,
+    session: &mut SessionExt<impl MoveRefResolver>,
     module_name: &str,
     function_name: &str,
     ty_args: Vec<TypeTag>,
@@ -364,7 +364,7 @@ fn exec_function(
 }
 
 fn initialize(
-    session: &mut SessionExt<impl FrozenMoveResolver>,
+    session: &mut SessionExt<impl MoveRefResolver>,
     chain_id: ChainId,
     genesis_config: &GenesisConfiguration,
     consensus_config: &OnChainConsensusConfig,
@@ -427,7 +427,7 @@ pub fn default_features() -> Vec<FeatureFlag> {
     ]
 }
 
-fn initialize_features(session: &mut SessionExt<impl FrozenMoveResolver>) {
+fn initialize_features(session: &mut SessionExt<impl MoveRefResolver>) {
     let features: Vec<u64> = default_features()
         .into_iter()
         .map(|feature| feature as u64)
@@ -446,7 +446,7 @@ fn initialize_features(session: &mut SessionExt<impl FrozenMoveResolver>) {
     );
 }
 
-fn initialize_aptos_coin(session: &mut SessionExt<impl FrozenMoveResolver>) {
+fn initialize_aptos_coin(session: &mut SessionExt<impl MoveRefResolver>) {
     exec_function(
         session,
         GENESIS_MODULE_NAME,
@@ -456,7 +456,7 @@ fn initialize_aptos_coin(session: &mut SessionExt<impl FrozenMoveResolver>) {
     );
 }
 
-fn set_genesis_end(session: &mut SessionExt<impl FrozenMoveResolver>) {
+fn set_genesis_end(session: &mut SessionExt<impl MoveRefResolver>) {
     exec_function(
         session,
         GENESIS_MODULE_NAME,
@@ -467,7 +467,7 @@ fn set_genesis_end(session: &mut SessionExt<impl FrozenMoveResolver>) {
 }
 
 fn initialize_core_resources_and_aptos_coin(
-    session: &mut SessionExt<impl FrozenMoveResolver>,
+    session: &mut SessionExt<impl MoveRefResolver>,
     core_resources_key: &Ed25519PublicKey,
 ) {
     let core_resources_auth_key = AuthenticationKey::ed25519(core_resources_key);
@@ -485,7 +485,7 @@ fn initialize_core_resources_and_aptos_coin(
 
 /// Create and initialize Association and Core Code accounts.
 fn initialize_on_chain_governance(
-    session: &mut SessionExt<impl FrozenMoveResolver>,
+    session: &mut SessionExt<impl MoveRefResolver>,
     genesis_config: &GenesisConfiguration,
 ) {
     exec_function(
@@ -502,7 +502,7 @@ fn initialize_on_chain_governance(
     );
 }
 
-fn create_accounts(session: &mut SessionExt<impl FrozenMoveResolver>, accounts: &[AccountBalance]) {
+fn create_accounts(session: &mut SessionExt<impl MoveRefResolver>, accounts: &[AccountBalance]) {
     let accounts_bytes = bcs::to_bytes(accounts).expect("AccountMaps can be serialized");
     let mut serialized_values = serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]);
     serialized_values.push(accounts_bytes);
@@ -516,7 +516,7 @@ fn create_accounts(session: &mut SessionExt<impl FrozenMoveResolver>, accounts: 
 }
 
 fn create_employee_validators(
-    session: &mut SessionExt<impl FrozenMoveResolver>,
+    session: &mut SessionExt<impl MoveRefResolver>,
     employees: &[EmployeePool],
     genesis_config: &GenesisConfiguration,
 ) {
@@ -540,7 +540,7 @@ fn create_employee_validators(
 /// the required accounts, sets the validator operators for each validator owner, and sets the
 /// validator config on-chain.
 fn create_and_initialize_validators(
-    session: &mut SessionExt<impl FrozenMoveResolver>,
+    session: &mut SessionExt<impl MoveRefResolver>,
     validators: &[Validator],
 ) {
     let validators_bytes = bcs::to_bytes(validators).expect("Validators can be serialized");
@@ -556,7 +556,7 @@ fn create_and_initialize_validators(
 }
 
 fn create_and_initialize_validators_with_commission(
-    session: &mut SessionExt<impl FrozenMoveResolver>,
+    session: &mut SessionExt<impl MoveRefResolver>,
     validators: &[ValidatorWithCommissionRate],
 ) {
     let validators_bytes = bcs::to_bytes(validators).expect("Validators can be serialized");
@@ -574,7 +574,7 @@ fn create_and_initialize_validators_with_commission(
     );
 }
 
-fn allow_core_resources_to_set_version(session: &mut SessionExt<impl FrozenMoveResolver>) {
+fn allow_core_resources_to_set_version(session: &mut SessionExt<impl MoveRefResolver>) {
     exec_function(
         session,
         VERSION_MODULE_NAME,
@@ -585,14 +585,14 @@ fn allow_core_resources_to_set_version(session: &mut SessionExt<impl FrozenMoveR
 }
 
 /// Publish the framework release bundle.
-fn publish_framework(session: &mut SessionExt<impl FrozenMoveResolver>, framework: &ReleaseBundle) {
+fn publish_framework(session: &mut SessionExt<impl MoveRefResolver>, framework: &ReleaseBundle) {
     for pack in &framework.packages {
         publish_package(session, pack)
     }
 }
 
 /// Publish the given package.
-fn publish_package(session: &mut SessionExt<impl FrozenMoveResolver>, pack: &ReleasePackage) {
+fn publish_package(session: &mut SessionExt<impl MoveRefResolver>, pack: &ReleasePackage) {
     let modules = pack.sorted_code_and_modules();
     let addr = *modules.first().unwrap().1.self_id().address();
     let code = modules
@@ -620,7 +620,7 @@ fn publish_package(session: &mut SessionExt<impl FrozenMoveResolver>, pack: &Rel
 }
 
 /// Trigger a reconfiguration. This emits an event that will be passed along to the storage layer.
-fn emit_new_block_and_epoch_event(session: &mut SessionExt<impl FrozenMoveResolver>) {
+fn emit_new_block_and_epoch_event(session: &mut SessionExt<impl MoveRefResolver>) {
     exec_function(
         session,
         "block",

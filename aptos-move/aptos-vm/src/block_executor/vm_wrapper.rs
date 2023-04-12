@@ -13,9 +13,8 @@ use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::{
-    change_set::{AptosChangeSet, ChangeSet},
-    remote_cache::StateViewWithRemoteCache,
-    transaction_output::VMTransactionOutput,
+    change_set::DeltaChangeSet, remote_cache::StateViewWithRemoteCache,
+    transaction_output::TransactionOutput,
 };
 use move_core_types::{
     ident_str,
@@ -72,33 +71,34 @@ impl<'a, S: 'a + StateViewWithRemoteCache + Sync> ExecutorTask for AptosExecutor
             .vm
             .execute_single_transaction(txn, &view.as_move_resolver(), &log_context)
         {
-            Ok((vm_status, mut vm_output, sender)) => {
+            Ok((vm_status, mut output, sender)) => {
                 if materialize_deltas {
-                    // Keep TransactionOutputExt type for wrapper.
+                    // TODO: Here we assume materialization does not fail. If it does we have to rerun
+                    // the transaction. For now, this is not critical because deltas are used in the
+                    // cases when they never fail.
+                    let (mut writes, deltas, events, gas_used, status) = output.unpack();
+                    let materialized_writes = deltas
+                        .try_materialize(view)
+                        .expect("failed to apply aggregator delta outputs");
 
-                    // TODO: Add API to materialize.
-                    let (mut writes, deltas, events, gas_used, status) = vm_output.unpack();
-                    let materialized_writes = AptosChangeSet::try_materialize_deltas(deltas, view)
-                        .expect("should not fail");
+                    // This is guaranteed to succeed because state keys for deltas and writes will be
+                    // different, and so merging is equivalent to simply adding more elements to the
+                    // change set.
+                    writes
+                        .merge_writes(materialized_writes)
+                        .expect("failed to merge materialized aggregator deltas");
 
-                    // This is safe because state keys will be different!
-                    AptosChangeSet::extend_with_writes(
-                        &mut writes,
-                        &mut ChangeSet::empty(),
-                        materialized_writes,
-                    )
-                    .expect("should not fail");
-
-                    vm_output = VMTransactionOutput::new(
+                    // Reconstruct the output but without deltas.
+                    output = TransactionOutput::new(
                         writes,
-                        ChangeSet::empty(),
+                        DeltaChangeSet::empty(),
                         events,
                         gas_used,
                         status,
                     );
                 }
 
-                if vm_output.status().is_discarded() {
+                if output.status().is_discarded() {
                     match sender {
                         Some(s) => speculative_trace!(
                             &log_context,
@@ -115,14 +115,14 @@ impl<'a, S: 'a + StateViewWithRemoteCache + Sync> ExecutorTask for AptosExecutor
                         },
                     };
                 }
-                if AptosVM::should_restart_execution(&vm_output) {
+                if AptosVM::should_restart_execution(&output) {
                     speculative_info!(
                         &log_context,
                         "Reconfiguration occurred: restart required".into()
                     );
-                    ExecutionStatus::SkipRest(AptosTransactionOutput::new(vm_output))
+                    ExecutionStatus::SkipRest(AptosTransactionOutput::new(output))
                 } else {
-                    ExecutionStatus::Success(AptosTransactionOutput::new(vm_output))
+                    ExecutionStatus::Success(AptosTransactionOutput::new(output))
                 }
             },
             Err(err) => ExecutionStatus::Abort(err),

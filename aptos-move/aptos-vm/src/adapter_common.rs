@@ -13,7 +13,10 @@ use aptos_types::{
     vm_status::{StatusCode, VMStatus},
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
-use aptos_vm_types::{change_set::ChangeSet, transaction_output::VMTransactionOutput};
+use aptos_vm_types::{
+    change_set::{DeltaChangeSet, WriteChangeSet},
+    transaction_output::TransactionOutput,
+};
 
 /// This trait describes the VM adapter's interface.
 /// TODO: bring more of the execution logic in aptos_vm into this file.
@@ -44,7 +47,7 @@ pub trait VMAdapter {
     ) -> Result<(), VMStatus>;
 
     /// TODO: maybe remove this after more refactoring of execution logic.
-    fn should_restart_execution(output: &VMTransactionOutput) -> bool;
+    fn should_restart_execution(output: &TransactionOutput) -> bool;
 
     /// Execute a single transaction.
     fn execute_single_transaction<S: MoveResolverExt>(
@@ -52,7 +55,7 @@ pub trait VMAdapter {
         txn: &PreprocessedTransaction,
         data_cache: &S,
         log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, VMTransactionOutput, Option<String>), VMStatus>;
+    ) -> Result<(VMStatus, TransactionOutput, Option<String>), VMStatus>;
 
     fn validate_signature_checked_transaction<S: MoveResolverExt, SS: MoveResolverExt>(
         &self,
@@ -109,7 +112,7 @@ pub(crate) fn preprocess_transaction<A: VMAdapter>(txn: Transaction) -> Preproce
     }
 }
 
-pub(crate) fn discard_error_vm_status(err: VMStatus) -> (VMStatus, VMTransactionOutput) {
+pub(crate) fn discard_error_vm_status(err: VMStatus) -> (VMStatus, TransactionOutput) {
     let vm_status = err.clone();
     let error_code = match err.keep_or_discard() {
         Ok(_) => {
@@ -121,13 +124,7 @@ pub(crate) fn discard_error_vm_status(err: VMStatus) -> (VMStatus, VMTransaction
     (vm_status, discard_error_output(error_code))
 }
 
-pub(crate) fn discard_error_output(err: StatusCode) -> VMTransactionOutput {
-    // Since this transaction will be discarded, no writeset will be included.
-    VMTransactionOutput::new(
-        ChangeSet::empty(),
-        ChangeSet::empty(),
-        vec![],
-        0,
-        TransactionStatus::Discard(err),
-    )
+pub(crate) fn discard_error_output(err: StatusCode) -> TransactionOutput {
+    // Since this transaction will be discarded, no writes/deltas/events will be included.
+    TransactionOutput::empty_with_status(TransactionStatus::Discard(err))
 }

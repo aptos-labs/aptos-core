@@ -23,7 +23,7 @@ use aptos_vm_genesis::{
 };
 use aptos_vm_types::{
     remote_cache::{TRemoteCache, TStateViewWithRemoteCache},
-    write::AptosWrite,
+    write::{AptosModuleRef, AptosResourceRef},
 };
 use move_core_types::language_storage::ModuleId;
 use move_table_extension::{TableHandle, TableResolver};
@@ -142,19 +142,24 @@ impl TStateView for FakeDataStore {
 impl TRemoteCache for FakeDataStore {
     type Key = StateKey;
 
-    fn get_cached_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<AptosWrite>> {
-        let data = self.get_state_value_bytes(state_key);
-        data.map(|maybe_bytes| maybe_bytes.map(|bytes| AptosWrite::Module(bytes)))
+    fn get_cached_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<AptosModuleRef>> {
+        Ok(None)
+        // let data = self.get_state_value_bytes(state_key);
+        // data.map(|maybe_bytes| maybe_bytes.map(|bytes| AptosWrite::Module(bytes)))
     }
 
-    fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosWrite>> {
-        let data = self.get_state_value_bytes(state_key);
+    fn get_cached_resource(
+        &self,
+        state_key: &Self::Key,
+    ) -> anyhow::Result<Option<AptosResourceRef>> {
+        Ok(None)
+        // let data = self.get_state_value_bytes(state_key);
         // TODO: How does it work with groups?
-        data.map(|maybe_bytes| {
-            maybe_bytes.map(|bytes| {
-                AptosWrite::Standard(move_vm_types::resolver::Resource::from_blob(bytes))
-            })
-        })
+        // data.map(|maybe_bytes| {
+        //     maybe_bytes.map(|bytes| {
+        //         AptosWrite::Standard(move_vm_types::resolver::Resource::from_blob(bytes))
+        //     })
+        // })
     }
 }
 

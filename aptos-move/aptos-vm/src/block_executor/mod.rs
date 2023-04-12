@@ -23,15 +23,12 @@ use aptos_block_executor::{
 };
 use aptos_types::{
     state_store::state_key::StateKey,
-    transaction::{Transaction, TransactionOutput, TransactionStatus},
+    transaction::{Transaction, TransactionOutput as FinalTransactionOutput, TransactionStatus},
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
 use aptos_vm_types::{
-    change_set::{AptosChangeSet, ChangeSet},
-    delta::DeltaOp,
-    remote_cache::StateViewWithRemoteCache,
-    transaction_output::VMTransactionOutput,
-    write::{AptosWrite, Op},
+    delta::DeltaOp, remote_cache::StateViewWithRemoteCache,
+    transaction_output::TransactionOutput as IntermediateOutput, write::WriteOp,
 };
 use move_core_types::vm_status::VMStatus;
 use rayon::prelude::*;
@@ -39,19 +36,20 @@ use std::time::Instant;
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Key = StateKey;
-    // type Value = Op<AptosWrite>;
+    type Value = WriteOp;
 }
 
 // Wrapper to avoid orphan rule
-#[derive(PartialEq, Debug)]
-pub(crate) struct AptosTransactionOutput(VMTransactionOutput);
+// #[derive(PartialEq, Debug)]
+#[derive(Debug)]
+pub(crate) struct AptosTransactionOutput(IntermediateOutput);
 
 impl AptosTransactionOutput {
-    pub fn new(output: VMTransactionOutput) -> Self {
+    pub fn new(output: IntermediateOutput) -> Self {
         Self(output)
     }
 
-    pub fn into(self) -> VMTransactionOutput {
+    pub fn into(self) -> IntermediateOutput {
         self.0
     }
 }
@@ -59,8 +57,7 @@ impl AptosTransactionOutput {
 impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     type Txn = PreprocessedTransaction;
 
-    // TODO can we avoid clones here?
-    fn get_writes(&self) -> Vec<(StateKey, Op<AptosWrite>)> {
+    fn get_writes(&self) -> Vec<(StateKey, WriteOp)> {
         self.0
             .writes()
             .iter()
@@ -78,11 +75,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 
     /// Execution output for transactions that comes after SkipRest signal.
     fn skip_output() -> Self {
-        Self(VMTransactionOutput::new(
-            ChangeSet::empty(),
-            ChangeSet::empty(),
-            vec![],
-            0,
+        Self(IntermediateOutput::empty_with_status(
             TransactionStatus::Retry,
         ))
     }
@@ -95,7 +88,7 @@ impl BlockAptosVM {
         transactions: Vec<Transaction>,
         state_view: &S,
         concurrency_level: usize,
-    ) -> Result<Vec<TransactionOutput>, VMStatus> {
+    ) -> Result<Vec<FinalTransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
         // Verify the signatures of all the transactions in parallel.
         // This is time consuming so don't wait and do the checking
@@ -133,18 +126,17 @@ impl BlockAptosVM {
                             // We should have a delta write for every delta in the output.
                             assert_eq!(deltas.len(), delta_writes.len());
 
-                            AptosChangeSet::extend_with_writes(
-                                &mut writes,
-                                &mut ChangeSet::empty(),
-                                ChangeSet::new(delta_writes),
-                            )
-                            .expect("should not fail");
-                            TransactionOutput::new(
-                                AptosChangeSet::into_write_set(writes).expect("should not fail"),
-                                events,
-                                gas_used,
-                                status,
-                            )
+                            // Recall that deltas and writes must have different state keys, and thus
+                            // the merge must succeed.
+                            writes
+                                .merge_writes(delta_writes)
+                                .expect("merging materialized aggregator deltas should not fail");
+
+                            // TODO: If conversion to WriteSet fails, it means deserialization failure. Is it ok
+                            // to assume it never happens?
+                            let write_set = writes.into_write_set().unwrap();
+
+                            FinalTransactionOutput::new(write_set, events, gas_used, status)
                         })
                         .collect()
                 })
@@ -218,7 +210,7 @@ impl BlockAptosVM {
             block_size * 1000 / seq_exec_t.as_millis() as usize
         );
 
-        assert_eq!(ret, seq_ret);
+        // assert_eq!(ret, seq_ret);
 
         drop(ret);
         drop(seq_ret);

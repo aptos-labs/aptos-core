@@ -37,6 +37,7 @@ impl ChangeSet {
         Ok(myself)
     }
 
+    // TODO: We can drop the check in constructor when `AptosChangeSet` is checked instead.
     pub fn new_no_check(write_set: WriteSet, events: Vec<ContractEvent>) -> Self {
         Self { write_set, events }
     }

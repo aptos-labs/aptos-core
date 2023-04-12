@@ -20,12 +20,9 @@ use aptos_mvhashmap::{
     types::{MVDataError, MVDataOutput, TxnIndex, Version},
     MVHashMap,
 };
-use aptos_types::executable::ExecutableTestType;
+use aptos_types::{executable::ExecutableTestType};
 use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
-use aptos_vm_types::{
-    remote_cache::TStateViewWithRemoteCache,
-    write::{AptosWrite, Op},
-};
+use aptos_vm_types::remote_cache::TStateViewWithRemoteCache;
 use num_cpus;
 use once_cell::sync::Lazy;
 use std::{
@@ -33,6 +30,7 @@ use std::{
     marker::PhantomData,
     sync::atomic::{AtomicBool, Ordering},
 };
+use aptos_vm_types::write::WriteOp;
 
 pub static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
@@ -74,7 +72,7 @@ where
         version: Version,
         signature_verified_block: &[T],
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, ExecutableTestType>,
+        versioned_cache: &MVHashMap<T::Key, T::Value, ExecutableTestType>,
         scheduler: &Scheduler,
         executor: &E,
         base_view: &S,
@@ -150,7 +148,7 @@ where
         version_to_validate: Version,
         validation_wave: Wave,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, ExecutableTestType>,
+        versioned_cache: &MVHashMap<T::Key, T::Value, ExecutableTestType>,
         scheduler: &Scheduler,
     ) -> SchedulerTask {
         use MVDataError::*;
@@ -204,7 +202,7 @@ where
         executor_arguments: &E::Argument,
         block: &[T],
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, ExecutableTestType>,
+        versioned_cache: &MVHashMap<T::Key, T::Value, ExecutableTestType>,
         scheduler: &Scheduler,
         base_view: &S,
         committing: bool,
@@ -267,7 +265,7 @@ where
         executor_initial_arguments: E::Argument,
         signature_verified_block: &Vec<T>,
         base_view: &S,
-    ) -> Result<Vec<(E::Output, Vec<(T::Key, Op<AptosWrite>)>)>, E::Error> {
+    ) -> Result<Vec<(E::Output, Vec<(T::Key, WriteOp)>)>, E::Error> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         assert!(self.concurrency_level > 1, "Must use sequential execution");
 
@@ -352,7 +350,7 @@ where
         executor_arguments: E::Argument,
         signature_verified_block: &[T],
         base_view: &S,
-    ) -> Result<Vec<(E::Output, Vec<(T::Key, Op<AptosWrite>)>)>, E::Error> {
+    ) -> Result<Vec<(E::Output, Vec<(T::Key, WriteOp)>)>, E::Error> {
         let num_txns = signature_verified_block.len();
         let executor = E::init(executor_arguments);
         let mut data_map = BTreeMap::new();
@@ -401,7 +399,7 @@ where
         executor_arguments: E::Argument,
         signature_verified_block: Vec<T>,
         base_view: &S,
-    ) -> Result<Vec<(E::Output, Vec<(T::Key, Op<AptosWrite>)>)>, E::Error> {
+    ) -> Result<Vec<(E::Output, Vec<(T::Key, WriteOp)>)>, E::Error> {
         let mut ret = if self.concurrency_level > 1 {
             self.execute_transactions_parallel(
                 executor_arguments,

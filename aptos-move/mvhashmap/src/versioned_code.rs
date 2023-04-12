@@ -3,11 +3,7 @@
 
 use crate::types::{MVCodeError, MVCodeOutput, TxnIndex};
 use aptos_crypto::hash::{DefaultHasher, HashValue};
-use aptos_types::{
-    executable::{Executable, ExecutableDescriptor},
-    write_set::TransactionWrite,
-};
-use aptos_vm_types::write::{AptosWrite, Op};
+use aptos_types::executable::{Executable, ExecutableDescriptor};
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
 use std::{
@@ -24,7 +20,7 @@ const FLAG_ESTIMATE: usize = 1;
 
 /// Every entry in shared multi-version data-structure has an "estimate" flag
 /// and some content.
-struct Entry {
+struct Entry<V> {
     /// Used to mark the entry as a "write estimate". Even though the entry
     /// lives inside the DashMap and the entry access will have barriers, we
     /// still make the flag Atomic to provide acq/rel semantics on its own.
@@ -33,7 +29,7 @@ struct Entry {
     /// The contents of the module as produced by the VM (can be WriteOp based on a
     /// blob or CompiledModule, but must satisfy TransactionWrite to be able to
     /// generate the hash below.
-    module: Op<AptosWrite>,
+    module: Arc<V>,
     /// The hash of the blob, used instead of incarnation for validation purposes,
     /// and also for uniquely identifying associated executables.
     hash: HashValue,
@@ -41,8 +37,8 @@ struct Entry {
 
 /// A VersionedValue internally contains a BTreeMap from indices of transactions
 /// that update the given access path alongside the corresponding entries.
-struct VersionedValue<X: Executable> {
-    versioned_map: BTreeMap<TxnIndex, CachePadded<Entry>>,
+struct VersionedValue<V, X: Executable> {
+    versioned_map: BTreeMap<TxnIndex, CachePadded<Entry<V>>>,
 
     /// Executable based on the storage version of the module.
     base_executable: Option<Arc<X>>,
@@ -51,14 +47,14 @@ struct VersionedValue<X: Executable> {
 }
 
 /// Maps each key (access path) to an interal VersionedValue.
-pub struct VersionedCode<K, X: Executable> {
-    values: DashMap<K, VersionedValue<X>>,
+pub struct VersionedCode<K, V, X: Executable> {
+    values: DashMap<K, VersionedValue<V, X>>,
 }
 
-impl Entry {
-    pub fn new_write_from(flag: usize, module: Op<AptosWrite>) -> Entry {
-        let hash = module
-            .extract_raw_bytes()
+impl<V> Entry<V> {
+    pub fn new_write_from(flag: usize, module: V) -> Entry<V> {
+        let hash = Some(vec![]) //module
+            //.extract_raw_bytes()
             .map(|bytes| {
                 let mut hasher = DefaultHasher::new(b"Module");
                 hasher.update(&bytes);
@@ -68,7 +64,7 @@ impl Entry {
 
         Entry {
             flag: AtomicUsize::new(flag),
-            module,
+            module: Arc::new(module),
             hash,
         }
     }
@@ -82,7 +78,7 @@ impl Entry {
     }
 }
 
-impl<X: Executable> VersionedValue<X> {
+impl<V, X: Executable> VersionedValue<V, X> {
     pub fn new() -> Self {
         Self {
             versioned_map: BTreeMap::new(),
@@ -91,7 +87,7 @@ impl<X: Executable> VersionedValue<X> {
         }
     }
 
-    fn read(&self, txn_idx: TxnIndex) -> anyhow::Result<(Op<AptosWrite>, HashValue), MVCodeError> {
+    fn read(&self, txn_idx: TxnIndex) -> anyhow::Result<(Arc<V>, HashValue), MVCodeError> {
         use MVCodeError::*;
 
         if let Some((idx, entry)) = self.versioned_map.range(0..txn_idx).next_back() {
@@ -110,13 +106,13 @@ impl<X: Executable> VersionedValue<X> {
     }
 }
 
-impl<X: Executable> Default for VersionedValue<X> {
+impl<V, X: Executable> Default for VersionedValue<V, X> {
     fn default() -> Self {
         VersionedValue::new()
     }
 }
 
-impl<K: Hash + Clone + Eq, X: Executable> VersionedCode<K, X> {
+impl<K: Hash + Clone + Eq, V, X: Executable> VersionedCode<K, V, X> {
     pub(crate) fn new() -> Self {
         Self {
             values: DashMap::new(),
@@ -131,7 +127,7 @@ impl<K: Hash + Clone + Eq, X: Executable> VersionedCode<K, X> {
             .mark_estimate();
     }
 
-    pub(crate) fn write(&self, key: &K, txn_idx: TxnIndex, data: Op<AptosWrite>) {
+    pub(crate) fn write(&self, key: &K, txn_idx: TxnIndex, data: V) {
         let mut v = self.values.entry(key.clone()).or_default();
         v.versioned_map.insert(
             txn_idx,
@@ -162,7 +158,7 @@ impl<K: Hash + Clone + Eq, X: Executable> VersionedCode<K, X> {
         &self,
         key: &K,
         txn_idx: TxnIndex,
-    ) -> anyhow::Result<MVCodeOutput<X>, MVCodeError> {
+    ) -> anyhow::Result<MVCodeOutput<V, X>, MVCodeError> {
         use MVCodeError::*;
         use MVCodeOutput::*;
 
@@ -193,7 +189,7 @@ impl<K: Hash + Clone + Eq, X: Executable> VersionedCode<K, X> {
     }
 }
 
-impl<K: Hash + Clone + Eq, X: Executable> Default for VersionedCode<K, X> {
+impl<K: Hash + Clone + Eq, V, X: Executable> Default for VersionedCode<K, V, X> {
     fn default() -> Self {
         VersionedCode::new()
     }

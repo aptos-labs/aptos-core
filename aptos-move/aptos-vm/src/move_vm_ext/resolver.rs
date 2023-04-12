@@ -3,17 +3,18 @@
 
 use aptos_framework::{natives::state_storage::StateStorageUsageResolver, RuntimeModuleMetadataV1};
 use aptos_types::on_chain_config::ConfigStorage;
-use aptos_vm_types::{remote_cache::StateViewWithRemoteCache, write::AptosWrite};
+use aptos_vm_types::{remote_cache::StateViewWithRemoteCache};
+use aptos_vm_types::write::AptosResourceRef;
 use move_binary_format::errors::VMError;
 use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, StructTag},
 };
 use move_table_extension::TableResolver;
-use move_vm_types::resolver::FrozenMoveResolver;
+use move_vm_types::resolver::MoveRefResolver;
 
 pub trait MoveResolverExt:
-    FrozenMoveResolver<Err = VMError>
+    MoveRefResolver<Err = VMError>
     + TableResolver
     + StateStorageUsageResolver
     + ConfigStorage
@@ -25,19 +26,19 @@ pub trait MoveResolverExt:
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-    ) -> Result<Option<AptosWrite>, VMError>;
+    ) -> Result<Option<AptosResourceRef>, VMError>;
 
     fn get_standard_resource(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-    ) -> Result<Option<AptosWrite>, VMError>;
+    ) -> Result<Option<AptosResourceRef>, VMError>;
 
     fn get_any_resource(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-    ) -> Result<Option<AptosWrite>, VMError> {
+    ) -> Result<Option<AptosResourceRef>, VMError> {
         let metadata = self.get_module_metadata(struct_tag.module_id());
         let resource_group = Self::get_resource_group_from_metadata(struct_tag, metadata);
         if let Some(resource_group) = resource_group {
@@ -52,16 +53,17 @@ pub trait MoveResolverExt:
         address: &AccountAddress,
         struct_tag: &StructTag,
         resource_group: &StructTag,
-    ) -> Result<Option<AptosWrite>, VMError> {
-        let group_data = self.get_resource_group_data(address, resource_group)?;
-        if let Some(AptosWrite::Group(group_data)) = group_data {
-            Ok(group_data
-                .get(struct_tag)
-                .cloned()
-                .map(AptosWrite::Standard))
-        } else {
-            Ok(None)
-        }
+    ) -> Result<Option<AptosResourceRef>, VMError> {
+        Ok(None)
+        // let group_data = self.get_resource_group_data(address, resource_group)?;
+        // if let Some(AptosWrite::Group(group_data)) = group_data {
+        //     Ok(group_data
+        //         .get(struct_tag)
+        //         .cloned()
+        //         .map(AptosWrite::Standard))
+        // } else {
+        //     Ok(None)
+        // }
     }
 
     fn get_resource_group(&self, struct_tag: &StructTag) -> Result<Option<StructTag>, VMError> {

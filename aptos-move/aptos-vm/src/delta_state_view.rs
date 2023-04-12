@@ -10,19 +10,20 @@ use aptos_types::{
     write_set::TransactionWrite,
 };
 use aptos_vm_types::{
-    change_set::ChangeSet,
+    change_set::WriteChangeSet,
+    effects::Op,
     remote_cache::{TRemoteCache, TStateViewWithRemoteCache},
-    write::{AptosWrite, Op},
+    write::{AptosModuleRef, AptosResourceRef},
 };
 
 pub struct DeltaStateView<'a, 'b, S> {
     base: &'a S,
-    writes: &'b ChangeSet<Op<AptosWrite>>,
+    writes: &'b WriteChangeSet,
     // TODO: add deltas here!
 }
 
 impl<'a, 'b, S> DeltaStateView<'a, 'b, S> {
-    pub fn new(base: &'a S, writes: &'b ChangeSet<Op<AptosWrite>>) -> Self {
+    pub fn new(base: &'a S, writes: &'b WriteChangeSet) -> Self {
         Self { base, writes }
     }
 }
@@ -67,28 +68,27 @@ where
 {
     type Key = StateKey;
 
-    fn get_cached_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<AptosWrite>> {
+    fn get_cached_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<AptosModuleRef>> {
         match self.writes.get(state_key) {
-            Some(write_op) => Ok(match write_op {
-                Op::Creation(write) | Op::Modification(write) => {
-                    assert!(write.is_module());
-                    Some(write.clone())
-                },
-                Op::Deletion => None,
-            }),
+            Some(_) => Ok(None),
+            // Some(write_op) => Ok(match write_op {
+            //     Op::Creation(write) | Op::Modification(write) => None,
+            //     Op::Deletion => None,
+            // }),
             None => self.base.get_cached_module(state_key),
         }
     }
 
-    fn get_cached_resource(&self, state_key: &Self::Key) -> Result<Option<AptosWrite>> {
+    fn get_cached_resource(
+        &self,
+        state_key: &Self::Key,
+    ) -> anyhow::Result<Option<AptosResourceRef>> {
         match self.writes.get(state_key) {
-            Some(write_op) => Ok(match write_op {
-                Op::Creation(write) | Op::Modification(write) => {
-                    assert!(!write.is_module());
-                    Some(write.clone())
-                },
-                Op::Deletion => None,
-            }),
+            Some(_) => Ok(None),
+            // Some(write_op) => Ok(match write_op {
+            //     Op::Creation(write) | Op::Modification(write) => None,
+            //     Op::Deletion => None,
+            // }),
             None => self.base.get_cached_resource(state_key),
         }
     }
