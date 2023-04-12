@@ -75,6 +75,7 @@ members = [
     "crates/aptos-telemetry-service",
     "crates/aptos-temppath",
     "crates/aptos-time-service",
+    "crates/aptos-type-accessor",
     "crates/aptos-warp-webserver",
     "crates/bounded-executor",
     "crates/channel",
@@ -252,6 +253,7 @@ aptos-aggregator = { path = "aptos-move/aptos-aggregator" }
 aptos-api = { path = "api" }
 aptos-api-test-context = { path = "api/test-context" }
 aptos-api-types = { path = "api/types" }
+aptos-type-accessor = { path = "crates/aptos-type-accessor" }
 aptos-backup-cli = { path = "storage/backup/backup-cli" }
 aptos-backup-service = { path = "storage/backup/backup-service" }
 aptos-bounded-executor = { path = "crates/bounded-executor" }

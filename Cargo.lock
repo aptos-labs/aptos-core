@@ -3378,6 +3378,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-type-accessor"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "aptos-api-types",
+ "aptos-framework",
+ "aptos-rest-client",
+ "aptos-types",
+ "move-binary-format",
+ "move-core-types",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "aptos-types"
 version = "0.0.3"
 dependencies = [
