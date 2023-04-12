@@ -219,7 +219,7 @@ export class StructTag {
 }
 
 function bail(message: string) {
-  throw new Error(message);
+  throw new TypeTagParserError(message);
 }
 
 function isWhiteSpace(c: string): boolean {
@@ -404,5 +404,12 @@ export class TypeTagParser {
     }
 
     throw new Error("Invalid type tag.");
+  }
+}
+
+class TypeTagParserError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TypeTagParserError";
   }
 }
