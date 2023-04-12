@@ -421,6 +421,8 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::DELEGATION_POOLS,
         FeatureFlag::ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH,
         FeatureFlag::STRUCT_CONSTRUCTORS,
+        FeatureFlag::CRYPTOGRAPHY_ALGEBRA_NATIVES,
+        FeatureFlag::BLS12_381_STRUCTURES,
     ]
 }
 
