@@ -106,10 +106,11 @@ jobs:
   release-binaries:
     name: "Release binaries"
     needs:
-      - build-ubuntu20-binary
-      - build-ubuntu22-binary
-      - build-os-x-binary
-      - build-windows-binary
+      # - build-ubuntu20-binary
+      # - build-ubuntu22-binary
+      # - build-os-x-binary
+      # - build-windows-binary
+      - build-arm64-ubuntu22-binary
     runs-on: ubuntu-latest
     permissions:
       contents: "write"
