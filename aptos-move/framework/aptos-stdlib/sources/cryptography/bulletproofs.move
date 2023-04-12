@@ -70,6 +70,7 @@ module aptos_std::bulletproofs {
 
         verify_range_proof_internal(
             ristretto255::point_to_bytes(&pedersen::commitment_as_compressed_point(com)),
+            &ristretto255::basepoint(), &ristretto255::hash_to_point_base(),
             proof.bytes,
             num_bits,
             dst
@@ -81,7 +82,7 @@ module aptos_std::bulletproofs {
     public fun verify_range_proof_elgamal(ct: &elgamal::Ciphertext, proof: &RangeProof, pubkey: &elgamal::Pubkey, num_bits: u64, dst: vector<u8>): bool {
         assert!(features::bulletproofs_enabled(), E_NATIVE_FUN_NOT_AVAILABLE);
 
-        verify_range_proof_custom_ck_internal(
+        verify_range_proof_internal(
             ristretto255::point_to_bytes(&elgamal::get_value_component_compressed(ct)),
 	    &ristretto255::basepoint(), &elgamal::get_point_from_pubkey(pubkey),
             proof.bytes,
@@ -93,14 +94,14 @@ module aptos_std::bulletproofs {
     /// Verifies a zero-knowledge range proof that the value `v` committed in `com` (as v * val_base + r * rand_base,
     /// for some randomness `r`) satisfies $v \in [0, 2^{num_bits})$. Only works for `num_bits` \in {8, 16, 32, 64}.
     public fun verify_range_proof(
-        com: &pedersen::Commitment,
+        com: &RistrettoPoint,
         val_base: &RistrettoPoint, rand_base: &RistrettoPoint,
         proof: &RangeProof, num_bits: u64, dst: vector<u8>): bool
     {
         assert!(features::bulletproofs_enabled(), E_NATIVE_FUN_NOT_AVAILABLE);
 
-        verify_range_proof_custom_ck_internal(
-            ristretto255::point_to_bytes(&pedersen::commitment_as_compressed_point(com)),
+        verify_range_proof_internal(
+            ristretto255::point_to_bytes(&ristretto255::point_compress(com)),
             val_base, rand_base,
             proof.bytes, num_bits, dst
         )
@@ -126,12 +127,6 @@ module aptos_std::bulletproofs {
     //
 
     native fun verify_range_proof_internal(
-        com: vector<u8>,
-        proof: vector<u8>,
-        num_bits: u64,
-        dst: vector<u8>): bool;
-
-    native fun verify_range_proof_custom_ck_internal(
         com: vector<u8>,
         val_base: &RistrettoPoint,
         rand_base: &RistrettoPoint,

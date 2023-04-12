@@ -129,6 +129,12 @@ module aptos_std::ristretto255 {
         }
     }
 
+    /// Returns the hash-to-point result of serializing the basepoint of the Ristretto255 group.
+    /// For use as the random value basepoint in Pedersen commitments
+    public fun hash_to_point_base(): RistrettoPoint {
+        new_point_from_sha2_512(basepoint_compressed().data)
+    }
+
     /// Returns the basepoint (generator) of the Ristretto255 group
     public fun basepoint(): RistrettoPoint {
         let (handle, _) = point_decompress_internal(BASE_POINT);

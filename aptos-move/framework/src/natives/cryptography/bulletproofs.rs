@@ -57,7 +57,7 @@ static PEDERSEN_GENERATORS: Lazy<PedersenGens> = Lazy::new(PedersenGens::default
 static BULLETPROOF_GENERATORS: Lazy<BulletproofGens> =
     Lazy::new(|| BulletproofGens::new(MAX_RANGE_BITS, 1));
 
-fn native_verify_range_proof_custom_ck(
+fn native_verify_range_proof(
     gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
@@ -96,38 +96,6 @@ fn native_verify_range_proof_custom_ck(
     };
 
     gas_params.verify_range_proof(context, &comm_point, &pg, &proof_bytes[..], num_bits, dst)
-}
-
-fn native_verify_range_proof(
-    gas_params: &GasParameters,
-    context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
-) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    debug_assert!(_ty_args.is_empty());
-    debug_assert!(args.len() == 4);
-
-    let dst = safely_pop_arg!(args, Vec<u8>);
-    let num_bits = safely_pop_arg!(args, u64) as usize;
-
-    if !is_supported_number_of_bits(num_bits) {
-        return Err(SafeNativeError::Abort {
-            abort_code: abort_codes::NFE_RANGE_NOT_SUPPORTED,
-        });
-    }
-
-    let proof_bytes = safely_pop_arg!(args, Vec<u8>);
-    let comm_bytes = safely_pop_arg!(args, Vec<u8>);
-    let comm_point = CompressedRistretto::from_slice(comm_bytes.as_slice());
-
-    gas_params.verify_range_proof(
-        context,
-        &comm_point,
-        &PEDERSEN_GENERATORS,
-        &proof_bytes[..],
-        num_bits,
-        dst,
-    )
 }
 
 #[cfg(feature = "testing")]
@@ -245,7 +213,7 @@ pub fn make_all(gas_params: GasParameters, timed_features: TimedFeatures, featur
     natives.append(&mut vec![
         (
             "verify_range_proof_custom_ck_internal",
-            make_safe_native(gas_params.clone(), timed_features.clone(), features.clone(), native_verify_range_proof_custom_ck),
+            make_safe_native(gas_params.clone(), timed_features.clone(), features.clone(), native_verify_range_proof),
         ),
         (
             "verify_range_proof_internal",
