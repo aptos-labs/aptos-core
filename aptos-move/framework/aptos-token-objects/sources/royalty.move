@@ -4,20 +4,22 @@
 module aptos_token_objects::royalty {
     use std::error;
     use std::option::{Self, Option};
-
     use aptos_framework::object::{Self, ConstructorRef, ExtendRef, Object};
 
     friend aptos_token_objects::token;
 
-    // Enforce that the royalty is between 0 and 1
-    const EROYALTY_EXCEEDS_MAXIMUM: u64 = 1;
-    // Enforce that the denominator of a royalty is not 0
-    const EROYALTY_DENOMINATOR_IS_ZERO: u64 = 2;
-    // Royalty does not exist within global storage
-    const EROYALTY_DOES_NOT_EXIST: u64 = 3;
+    /// Royalty does not exist
+    const EROYALTY_DOES_NOT_EXIST: u64 = 1;
+    /// The royalty cannot be greater than 100%
+    const EROYALTY_EXCEEDS_MAXIMUM: u64 = 2;
+    /// The royalty denominator cannot be 0
+    const EROYALTY_DENOMINATOR_IS_ZERO: u64 = 3;
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
-    /// The royalty of a token within this collection -- this optional
+    /// The royalty of a token within this collection
+    ///
+    /// Royalties are optional for a collection.  Royalty percentage is calculated
+    /// by (numerator / denominator) * 100%
     struct Royalty has copy, drop, key {
         numerator: u64,
         denominator: u64,
@@ -26,7 +28,7 @@ module aptos_token_objects::royalty {
         payee_address: address,
     }
 
-    /// This enables creating or overwriting a MutatorRef.
+    /// This enables creating or overwriting a `MutatorRef`.
     struct MutatorRef has drop, store {
         inner: ExtendRef,
     }
@@ -48,6 +50,7 @@ module aptos_token_objects::royalty {
         move_to(&signer, royalty);
     }
 
+    /// Creates a new royalty, verifying that it is a valid percentage
     public fun create(numerator: u64, denominator: u64, payee_address: address): Royalty {
         assert!(denominator != 0, error::out_of_range(EROYALTY_DENOMINATOR_IS_ZERO));
         assert!(numerator <= denominator, error::out_of_range(EROYALTY_EXCEEDS_MAXIMUM));
@@ -104,11 +107,17 @@ module aptos_token_objects::royalty {
         let init_royalty = create(1, 2, @0x123);
         init(&constructor_ref, init_royalty);
         assert!(option::some(init_royalty) == get(object), 0);
+        assert!(numerator(&init_royalty) == 1, 1);
+        assert!(denominator(&init_royalty) == 2, 2);
+        assert!(payee_address(&init_royalty) == @0x123, 3);
 
         let mutator_ref = generate_mutator_ref(object::generate_extend_ref(&constructor_ref));
-        let update_royalty = create(1, 5, @0x123);
+        let update_royalty = create(2, 5, @0x456);
         update(&mutator_ref, update_royalty);
-        assert!(option::some(update_royalty) == get(object), 1);
+        assert!(option::some(update_royalty) == get(object), 4);
+        assert!(numerator(&update_royalty) == 2, 5);
+        assert!(denominator(&update_royalty) == 5, 6);
+        assert!(payee_address(&update_royalty) == @0x456, 7);
     }
 
     #[test(creator = @0x123)]
@@ -124,13 +133,19 @@ module aptos_token_objects::royalty {
     }
 
     #[test]
-    #[expected_failure(abort_code = 0x20001, location = Self)]
+    #[expected_failure(abort_code = 0x60001, location = Self)]
+    fun test_does_not_exist() acquires Royalty {
+        delete(@0x1);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 0x20002, location = Self)]
     fun test_exceeds_maximum() {
         create(6, 5, @0x1);
     }
 
     #[test]
-    #[expected_failure(abort_code = 0x20002, location = Self)]
+    #[expected_failure(abort_code = 0x20003, location = Self)]
     fun test_invalid_denominator() {
         create(6, 0, @0x1);
     }
