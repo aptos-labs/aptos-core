@@ -25,8 +25,6 @@ export class AuthenticationKey {
 
   static readonly DERIVE_RESOURCE_ACCOUNT_SCHEME: number = 255;
 
-  static readonly COLON: number = 58;
-
   readonly bytes: Bytes;
 
   constructor(bytes: Bytes) {
