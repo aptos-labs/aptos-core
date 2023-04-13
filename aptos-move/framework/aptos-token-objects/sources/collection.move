@@ -9,23 +9,18 @@
 /// * Addressed by a global identifier of creator's address and collection name, thus collections
 ///   cannot be deleted as a restriction of the object model.
 /// * Optional support for collection-wide royalties
-/// * Optional support for tracking of supply
-///
-/// This collection does not directly support:
-/// * Events on mint or burn -- that's left to the collection creator.
+/// * Optional support for tracking of supply with events on mint or burn
 ///
 /// TODO:
 /// * Consider supporting changing the name of the collection with the MutatorRef. This would
 ///   require adding the field original_name.
 /// * Consider supporting changing the aspects of supply with the MutatorRef.
 /// * Add aggregator support when added to framework
-/// * Update Object<T> to be viable input as a transaction arg and then update all readers as view.
 module aptos_token_objects::collection {
     use std::error;
     use std::option::{Self, Option};
     use std::signer;
     use std::string::{Self, String};
-
     use aptos_framework::event;
     use aptos_framework::object::{Self, ConstructorRef, Object};
 
@@ -33,10 +28,20 @@ module aptos_token_objects::collection {
 
     friend aptos_token_objects::token;
 
-    /// The collections supply is at its maximum amount
-    const EEXCEEDS_MAX_SUPPLY: u64 = 1;
     /// The collection does not exist
-    const ECOLLECTION_DOES_NOT_EXIST: u64 = 2;
+    const ECOLLECTION_DOES_NOT_EXIST: u64 = 1;
+    /// The collection has reached its supply and no more tokens can be minted
+    const ETOO_MANY_TOKENS: u64 = 2;
+    /// The collection name is over the maximum length
+    const ECOLLECTION_NAME_TOO_LONG: u64 = 3;
+    /// The URI is over the maximum length
+    const EURI_TOO_LONG: u64 = 4;
+    /// The description is over the maximum length
+    const EDESCRIPTION_TOO_LONG: u64 = 5;
+
+    const MAX_COLLECTION_NAME_LENGTH: u64 = 128;
+    const MAX_URI_LENGTH: u64 = 512;
+    const MAX_DESCRIPTION_LENGTH: u64 = 2048;
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Represents the common fields for a collection.
@@ -69,6 +74,7 @@ module aptos_token_objects::collection {
     /// Fixed supply tracker, this is useful for ensuring that a limited number of tokens are minted.
     /// and adding events and supply tracking to a collection.
     struct FixedSupply has key {
+        /// Total minted - total burned
         current_supply: u64,
         max_supply: u64,
         total_minted: u64,
@@ -199,6 +205,10 @@ module aptos_token_objects::collection {
         uri: String,
         supply: Option<Supply>,
     ): ConstructorRef {
+        assert!(string::length(&name) < MAX_COLLECTION_NAME_LENGTH, ECOLLECTION_NAME_TOO_LONG);
+        assert!(string::length(&uri) < MAX_URI_LENGTH, EURI_TOO_LONG);
+        assert!(string::length(&description) < MAX_DESCRIPTION_LENGTH, EDESCRIPTION_TOO_LONG);
+
         let object_signer = object::generate_signer(&constructor_ref);
 
         let collection = Collection {
@@ -233,6 +243,7 @@ module aptos_token_objects::collection {
 
     /// Named objects are derived from a seed, the collection's seed is its name.
     public fun create_collection_seed(name: &String): vector<u8> {
+        assert!(string::length(name) < MAX_COLLECTION_NAME_LENGTH, ECOLLECTION_NAME_TOO_LONG);
         *string::bytes(name)
     }
 
@@ -248,7 +259,7 @@ module aptos_token_objects::collection {
             supply.total_minted = supply.total_minted + 1;
             assert!(
                 supply.current_supply <= supply.max_supply,
-                error::out_of_range(EEXCEEDS_MAX_SUPPLY),
+                error::out_of_range(ETOO_MANY_TOKENS),
             );
             event::emit_event(&mut supply.mint_events,
                 MintEvent {
@@ -312,22 +323,24 @@ module aptos_token_objects::collection {
 
     // Accessors
 
-    inline fun borrow<T: key>(collection: &Object<T>): &Collection {
-        let collection_address = object::object_address(collection);
+    inline fun check_collection_exists(addr: address) {
         assert!(
-            exists<Collection>(collection_address),
+            exists<Collection>(addr),
             error::not_found(ECOLLECTION_DOES_NOT_EXIST),
         );
+    }
+
+    inline fun borrow<T: key>(collection: &Object<T>): &Collection {
+        let collection_address = object::object_address(collection);
+        check_collection_exists(collection_address);
         borrow_global<Collection>(collection_address)
     }
 
     #[view]
+    /// Provides the count of the current selection if supply tracking is used
     public fun count<T: key>(collection: Object<T>): Option<u64> acquires FixedSupply, UnlimitedSupply {
         let collection_address = object::object_address(&collection);
-        assert!(
-            exists<Collection>(collection_address),
-            error::not_found(ECOLLECTION_DOES_NOT_EXIST),
-        );
+        check_collection_exists(collection_address);
 
         if (exists<FixedSupply>(collection_address)) {
             let supply = borrow_global_mut<FixedSupply>(collection_address);
@@ -363,14 +376,12 @@ module aptos_token_objects::collection {
     // Mutators
 
     inline fun borrow_mut(mutator_ref: &MutatorRef): &mut Collection {
-        assert!(
-            exists<Collection>(mutator_ref.self),
-            error::not_found(ECOLLECTION_DOES_NOT_EXIST),
-        );
+        check_collection_exists(mutator_ref.self);
         borrow_global_mut<Collection>(mutator_ref.self)
     }
 
     public fun set_description(mutator_ref: &MutatorRef, description: String) acquires Collection {
+        assert!(string::length(&description) < MAX_DESCRIPTION_LENGTH, EDESCRIPTION_TOO_LONG);
         let collection = borrow_mut(mutator_ref);
         collection.description = description;
         event::emit_event(
@@ -380,6 +391,7 @@ module aptos_token_objects::collection {
     }
 
     public fun set_uri(mutator_ref: &MutatorRef, uri: String) acquires Collection {
+        assert!(string::length(&uri) < MAX_URI_LENGTH, EURI_TOO_LONG);
         let collection = borrow_mut(mutator_ref);
         collection.uri = uri;
         event::emit_event(
