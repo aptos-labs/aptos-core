@@ -59,7 +59,7 @@ WELLDONE Wallet can be used with the Remix IDE plugin now, with support for [Pet
 
 This steps assumes you are using the WELLDONE Wallet. Follow [the manual](https://docs.welldonestudio.io/wallet/manual/) to install the wallet and create an account for the Aptos blockchain. Once that is done, follow these steps:
 
-1. Choose a network (e.g. devnet) in the dropdown at the top of the main tab.
+1. Choose a network (e.g. devnet) in the dropdown menu at the top of the main tab.
 1. Go into the **Settings** tab of your wallet and activate **Developer Mode**.
 
 Now in the Remix UI click the **Connect to WELLDONE** button to connect to the **WELLDONE Wallet**. 
