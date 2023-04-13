@@ -18,16 +18,16 @@ TODO:
 -  [Struct `MutatorRef`](#0x4_token_MutatorRef)
 -  [Struct `MutationEvent`](#0x4_token_MutationEvent)
 -  [Constants](#@Constants_0)
--  [Function `create`](#0x4_token_create)
+-  [Function `create_named_token`](#0x4_token_create_named_token)
+-  [Function `create_from_account`](#0x4_token_create_from_account)
 -  [Function `create_token_address`](#0x4_token_create_token_address)
 -  [Function `create_token_seed`](#0x4_token_create_token_seed)
 -  [Function `generate_mutator_ref`](#0x4_token_generate_mutator_ref)
 -  [Function `generate_burn_ref`](#0x4_token_generate_burn_ref)
 -  [Function `address_from_burn_ref`](#0x4_token_address_from_burn_ref)
 -  [Function `creator`](#0x4_token_creator)
--  [Function `collection`](#0x4_token_collection)
+-  [Function `collection_name`](#0x4_token_collection_name)
 -  [Function `collection_object`](#0x4_token_collection_object)
--  [Function `creation_name`](#0x4_token_creation_name)
 -  [Function `description`](#0x4_token_description)
 -  [Function `name`](#0x4_token_name)
 -  [Function `uri`](#0x4_token_uri)
@@ -75,7 +75,7 @@ Represents the common fields to all tokens.
  The collection from which this token resides.
 </dd>
 <dt>
-<code>collection_id: u64</code>
+<code>index: u64</code>
 </dt>
 <dd>
  Unique identifier within the collection, optional, 0 means unassigned
@@ -92,13 +92,6 @@ Represents the common fields to all tokens.
 <dd>
  The name of the token, which should be unique within the collection; the length of name
  should be smaller than 128, characters, eg: "Aptos Animal #1234"
-</dd>
-<dt>
-<code>creation_name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;</code>
-</dt>
-<dd>
- The creation name of the token. Since tokens are created with the name as part of the
- object id generation.
 </dd>
 <dt>
 <code>uri: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
@@ -206,6 +199,18 @@ directly understand the behavior in a writeset.
 <dd>
 
 </dd>
+<dt>
+<code>old_value: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>new_value: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
+</dt>
+<dd>
+
+</dd>
 </dl>
 
 
@@ -245,14 +250,15 @@ The provided signer is not the creator
 
 
 
-<a name="0x4_token_create"></a>
+<a name="0x4_token_create_named_token"></a>
 
-## Function `create`
+## Function `create_named_token`
 
-Creates a new token object and returns the ConstructorRef for additional specialization.
+Creates a new token object from a token name and returns the ConstructorRef for
+additional specialization.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_create">create</a>(creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, collection_name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, description: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, <a href="royalty.md#0x4_royalty">royalty</a>: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="royalty.md#0x4_royalty_Royalty">royalty::Royalty</a>&gt;, uri: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="../../aptos-framework/doc/object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_create_named_token">create_named_token</a>(creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, collection_name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, description: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, <a href="royalty.md#0x4_royalty">royalty</a>: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="royalty.md#0x4_royalty_Royalty">royalty::Royalty</a>&gt;, uri: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="../../aptos-framework/doc/object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>
 </code></pre>
 
 
@@ -261,7 +267,7 @@ Creates a new token object and returns the ConstructorRef for additional special
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_create">create</a>(
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_create_named_token">create_named_token</a>(
     creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     collection_name: String,
     description: String,
@@ -272,27 +278,44 @@ Creates a new token object and returns the ConstructorRef for additional special
     <b>let</b> creator_address = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(creator);
     <b>let</b> seed = <a href="token.md#0x4_token_create_token_seed">create_token_seed</a>(&collection_name, &name);
 
-    <b>let</b> collection_addr = <a href="collection.md#0x4_collection_create_collection_address">collection::create_collection_address</a>(&creator_address, &collection_name);
-    <b>let</b> <a href="collection.md#0x4_collection">collection</a> = <a href="../../aptos-framework/doc/object.md#0x1_object_address_to_object">object::address_to_object</a>&lt;Collection&gt;(collection_addr);
-    <b>let</b> id = <a href="collection.md#0x4_collection_increment_supply">collection::increment_supply</a>(&<a href="collection.md#0x4_collection">collection</a>);
-
     <b>let</b> constructor_ref = <a href="../../aptos-framework/doc/object.md#0x1_object_create_named_object">object::create_named_object</a>(creator, seed);
-    <b>let</b> object_signer = <a href="../../aptos-framework/doc/object.md#0x1_object_generate_signer">object::generate_signer</a>(&constructor_ref);
+    create_common(&constructor_ref, creator_address, collection_name, description, name, <a href="royalty.md#0x4_royalty">royalty</a>, uri);
+    constructor_ref
+}
+</code></pre>
 
-    <b>let</b> <a href="token.md#0x4_token">token</a> = <a href="token.md#0x4_token_Token">Token</a> {
-        <a href="collection.md#0x4_collection">collection</a>,
-        collection_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_get_with_default">option::get_with_default</a>(&<b>mut</b> id, 0),
-        description,
-        name,
-        creation_name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
-        uri,
-        mutation_events: <a href="../../aptos-framework/doc/object.md#0x1_object_new_event_handle">object::new_event_handle</a>(&object_signer),
-    };
-    <b>move_to</b>(&object_signer, <a href="token.md#0x4_token">token</a>);
 
-    <b>if</b> (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&<a href="royalty.md#0x4_royalty">royalty</a>)) {
-        <a href="royalty.md#0x4_royalty_init">royalty::init</a>(&constructor_ref, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> <a href="royalty.md#0x4_royalty">royalty</a>))
-    };
+
+</details>
+
+<a name="0x4_token_create_from_account"></a>
+
+## Function `create_from_account`
+
+Creates a new token object from an account GUID and returns the ConstructorRef for
+additional specialization.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_create_from_account">create_from_account</a>(creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, collection_name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, description: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, <a href="royalty.md#0x4_royalty">royalty</a>: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="royalty.md#0x4_royalty_Royalty">royalty::Royalty</a>&gt;, uri: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="../../aptos-framework/doc/object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_create_from_account">create_from_account</a>(
+    creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    collection_name: String,
+    description: String,
+    name: String,
+    <a href="royalty.md#0x4_royalty">royalty</a>: Option&lt;Royalty&gt;,
+    uri: String,
+): ConstructorRef {
+    <b>let</b> creator_address = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(creator);
+    <b>let</b> constructor_ref = <a href="../../aptos-framework/doc/object.md#0x1_object_create_object_from_account">object::create_object_from_account</a>(creator);
+    create_common(&constructor_ref, creator_address, collection_name, description, name, <a href="royalty.md#0x4_royalty">royalty</a>, uri);
     constructor_ref
 }
 </code></pre>
@@ -465,13 +488,13 @@ Extracts the tokens address from a BurnRef.
 
 </details>
 
-<a name="0x4_token_collection"></a>
+<a name="0x4_token_collection_name"></a>
 
-## Function `collection`
+## Function `collection_name`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="collection.md#0x4_collection">collection</a>&lt;T: key&gt;(<a href="token.md#0x4_token">token</a>: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_collection_name">collection_name</a>&lt;T: key&gt;(<a href="token.md#0x4_token">token</a>: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
@@ -480,7 +503,7 @@ Extracts the tokens address from a BurnRef.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="collection.md#0x4_collection">collection</a>&lt;T: key&gt;(<a href="token.md#0x4_token">token</a>: Object&lt;T&gt;): String <b>acquires</b> <a href="token.md#0x4_token_Token">Token</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_collection_name">collection_name</a>&lt;T: key&gt;(<a href="token.md#0x4_token">token</a>: Object&lt;T&gt;): String <b>acquires</b> <a href="token.md#0x4_token_Token">Token</a> {
     <a href="collection.md#0x4_collection_name">collection::name</a>(borrow(&<a href="token.md#0x4_token">token</a>).<a href="collection.md#0x4_collection">collection</a>)
 }
 </code></pre>
@@ -506,35 +529,6 @@ Extracts the tokens address from a BurnRef.
 
 <pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_collection_object">collection_object</a>&lt;T: key&gt;(<a href="token.md#0x4_token">token</a>: Object&lt;T&gt;): Object&lt;Collection&gt; <b>acquires</b> <a href="token.md#0x4_token_Token">Token</a> {
     borrow(&<a href="token.md#0x4_token">token</a>).<a href="collection.md#0x4_collection">collection</a>
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x4_token_creation_name"></a>
-
-## Function `creation_name`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_creation_name">creation_name</a>&lt;T: key&gt;(<a href="token.md#0x4_token">token</a>: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_creation_name">creation_name</a>&lt;T: key&gt;(<a href="token.md#0x4_token">token</a>: Object&lt;T&gt;): String <b>acquires</b> <a href="token.md#0x4_token_Token">Token</a> {
-    <b>let</b> <a href="token.md#0x4_token">token</a> = borrow(&<a href="token.md#0x4_token">token</a>);
-    <b>if</b> (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&<a href="token.md#0x4_token">token</a>.creation_name)) {
-        *<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&<a href="token.md#0x4_token">token</a>.creation_name)
-    } <b>else</b> {
-        <a href="token.md#0x4_token">token</a>.name
-    }
 }
 </code></pre>
 
@@ -636,7 +630,7 @@ Extracts the tokens address from a BurnRef.
         <a href="royalty.md#0x4_royalty">royalty</a>
     } <b>else</b> {
         <b>let</b> creator = <a href="token.md#0x4_token_creator">creator</a>(<a href="token.md#0x4_token">token</a>);
-        <b>let</b> collection_name = <a href="collection.md#0x4_collection">collection</a>(<a href="token.md#0x4_token">token</a>);
+        <b>let</b> collection_name = <a href="token.md#0x4_token_collection_name">collection_name</a>(<a href="token.md#0x4_token">token</a>);
         <b>let</b> collection_address = <a href="collection.md#0x4_collection_create_collection_address">collection::create_collection_address</a>(&creator, &collection_name);
         <b>let</b> <a href="collection.md#0x4_collection">collection</a> = <a href="../../aptos-framework/doc/object.md#0x1_object_address_to_object">object::address_to_object</a>&lt;<a href="collection.md#0x4_collection_Collection">collection::Collection</a>&gt;(collection_address);
         <a href="royalty.md#0x4_royalty_get">royalty::get</a>(<a href="collection.md#0x4_collection">collection</a>)
@@ -679,16 +673,15 @@ Extracts the tokens address from a BurnRef.
 
     <b>let</b> <a href="token.md#0x4_token_Token">Token</a> {
         <a href="collection.md#0x4_collection">collection</a>,
-        collection_id: _,
+        index,
         description: _,
         name: _,
-        creation_name: _,
         uri: _,
         mutation_events,
     } = <b>move_from</b>&lt;<a href="token.md#0x4_token_Token">Token</a>&gt;(addr);
 
     <a href="../../aptos-framework/doc/event.md#0x1_event_destroy_handle">event::destroy_handle</a>(mutation_events);
-    <a href="collection.md#0x4_collection_decrement_supply">collection::decrement_supply</a>(&<a href="collection.md#0x4_collection">collection</a>);
+    <a href="collection.md#0x4_collection_decrement_supply">collection::decrement_supply</a>(&<a href="collection.md#0x4_collection">collection</a>, addr, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(index));
 }
 </code></pre>
 
@@ -713,11 +706,15 @@ Extracts the tokens address from a BurnRef.
 
 <pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_set_description">set_description</a>(mutator_ref: &<a href="token.md#0x4_token_MutatorRef">MutatorRef</a>, description: String) <b>acquires</b> <a href="token.md#0x4_token_Token">Token</a> {
     <b>let</b> <a href="token.md#0x4_token">token</a> = borrow_mut(mutator_ref);
-    <a href="token.md#0x4_token">token</a>.description = description;
     <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>(
         &<b>mut</b> <a href="token.md#0x4_token">token</a>.mutation_events,
-        <a href="token.md#0x4_token_MutationEvent">MutationEvent</a> { mutated_field_name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"description") },
+        <a href="token.md#0x4_token_MutationEvent">MutationEvent</a> {
+            mutated_field_name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"description"),
+            old_value: <a href="token.md#0x4_token">token</a>.description,
+            new_value: description
+        },
     );
+    <a href="token.md#0x4_token">token</a>.description = description;
 }
 </code></pre>
 
@@ -742,14 +739,15 @@ Extracts the tokens address from a BurnRef.
 
 <pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_set_name">set_name</a>(mutator_ref: &<a href="token.md#0x4_token_MutatorRef">MutatorRef</a>, name: String) <b>acquires</b> <a href="token.md#0x4_token_Token">Token</a> {
     <b>let</b> <a href="token.md#0x4_token">token</a> = borrow_mut(mutator_ref);
-    <b>if</b> (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(&<a href="token.md#0x4_token">token</a>.creation_name)) {
-        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_fill">option::fill</a>(&<b>mut</b> <a href="token.md#0x4_token">token</a>.creation_name, <a href="token.md#0x4_token">token</a>.name)
-    };
-    <a href="token.md#0x4_token">token</a>.name = name;
     <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>(
         &<b>mut</b> <a href="token.md#0x4_token">token</a>.mutation_events,
-        <a href="token.md#0x4_token_MutationEvent">MutationEvent</a> { mutated_field_name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"name") },
+        <a href="token.md#0x4_token_MutationEvent">MutationEvent</a> {
+            mutated_field_name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"name"),
+            old_value: <a href="token.md#0x4_token">token</a>.name,
+            new_value: name
+        },
     );
+    <a href="token.md#0x4_token">token</a>.name = name;
 }
 </code></pre>
 
@@ -774,11 +772,15 @@ Extracts the tokens address from a BurnRef.
 
 <pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_set_uri">set_uri</a>(mutator_ref: &<a href="token.md#0x4_token_MutatorRef">MutatorRef</a>, uri: String) <b>acquires</b> <a href="token.md#0x4_token_Token">Token</a> {
     <b>let</b> <a href="token.md#0x4_token">token</a> = borrow_mut(mutator_ref);
-    <a href="token.md#0x4_token">token</a>.uri = uri;
     <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>(
         &<b>mut</b> <a href="token.md#0x4_token">token</a>.mutation_events,
-        <a href="token.md#0x4_token_MutationEvent">MutationEvent</a> { mutated_field_name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"uri") },
+        <a href="token.md#0x4_token_MutationEvent">MutationEvent</a> {
+            mutated_field_name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"uri"),
+            old_value: <a href="token.md#0x4_token">token</a>.uri,
+            new_value: uri,
+        },
     );
+    <a href="token.md#0x4_token">token</a>.uri = uri;
 }
 </code></pre>
 

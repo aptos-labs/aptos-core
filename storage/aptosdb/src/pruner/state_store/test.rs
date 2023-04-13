@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    new_sharded_schema_batch,
+    new_sharded_kv_schema_batch,
     pruner::{state_merkle_pruner_worker::StateMerklePrunerWorker, *},
     stale_node_index::StaleNodeIndexSchema,
     stale_state_value_index::StaleStateValueIndexSchema,
@@ -48,7 +48,7 @@ fn put_value_set(
         .unwrap();
 
     let ledger_batch = SchemaBatch::new();
-    let sharded_state_kv_batches = new_sharded_schema_batch();
+    let sharded_state_kv_batches = new_sharded_kv_schema_batch();
     state_store
         .put_value_sets(
             vec![&value_set],

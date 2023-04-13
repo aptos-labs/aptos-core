@@ -8,8 +8,8 @@ use aptos_network::{
     ProtocolId,
 };
 use aptos_peer_monitoring_service_types::{
-    PeerMonitoringServiceMessage, PeerMonitoringServiceRequest, PeerMonitoringServiceResponse,
-    Result,
+    request::PeerMonitoringServiceRequest, response::PeerMonitoringServiceResponse,
+    PeerMonitoringServiceMessage, Result,
 };
 use bytes::Bytes;
 use futures::{

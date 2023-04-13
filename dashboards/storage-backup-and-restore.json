@@ -52,7 +52,7 @@
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "showUnfilled": true
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.4.7",
       "repeatDirection": "h",
       "targets": [
         {
@@ -100,7 +100,7 @@
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "showUnfilled": true
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.4.7",
       "repeatDirection": "h",
       "targets": [
         {
@@ -231,7 +231,7 @@
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "showUnfilled": true
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.4.7",
       "repeatDirection": "h",
       "targets": [
         {
@@ -362,7 +362,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.4.7",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -417,7 +417,7 @@
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "showUnfilled": true
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.4.7",
       "repeatDirection": "h",
       "targets": [
         {
@@ -548,7 +548,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.4.7",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -672,7 +672,7 @@
           "color": { "mode": "continuous-RdYlGr" },
           "links": [],
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] },
           "unit": "none"
         },
         "overrides": []
@@ -834,7 +834,7 @@
           "color": { "mode": "continuous-RdYlGr" },
           "links": [],
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] },
           "unit": "none"
         },
         "overrides": []
@@ -996,7 +996,7 @@
           "color": { "mode": "continuous-RdYlGr" },
           "links": [],
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] },
           "unit": "none"
         },
         "overrides": []
@@ -1119,13 +1119,7 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
           "unit": "dateTimeAsLocal"
         },
         "overrides": [
@@ -2138,30 +2132,40 @@
     }
   ],
   "refresh": "10s",
-  "schemaVersion": 37,
+  "revision": 1,
+  "schemaVersion": 38,
   "style": "dark",
   "tags": ["aptos-core"],
   "templating": {
     "list": [
       {
-        "current": { "selected": false, "text": "VictoriaMetrics Mainnet US", "value": "VictoriaMetrics Mainnet US" },
+        "allFormat": "",
+        "allValue": "",
+        "current": {
+          "selected": false,
+          "text": "VictoriaMetrics Global (Non-mainnet)",
+          "value": "VictoriaMetrics Global (Non-mainnet)"
+        },
         "hide": 0,
         "includeAll": false,
+        "label": "",
         "multi": false,
+        "multiFormat": "",
         "name": "Datasource",
         "options": [],
         "query": "prometheus",
         "queryValue": "",
         "refresh": 1,
-        "regex": "",
+        "regex": ".*Prometheus.*|.*Victoria.*|.*Telemetry.*",
         "skipUrlSync": false,
+        "sort": 0,
         "type": "datasource"
       },
       {
         "allFormat": "",
         "allValue": ".*",
         "current": { "selected": false, "text": "vmagent", "value": "vmagent" },
-        "datasource": { "type": "prometheus", "uid": "Zu4MxH4Vk" },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
         "definition": "label_values(node_process_start_time{}, metrics_source)",
         "hide": 0,
         "includeAll": false,
@@ -2183,7 +2187,7 @@
       {
         "allFormat": "",
         "allValue": "",
-        "current": { "selected": false, "text": "mainnet", "value": "mainnet" },
+        "current": { "selected": true, "text": "testnet", "value": "testnet" },
         "datasource": { "type": "prometheus", "uid": "${Datasource}" },
         "definition": "",
         "hide": 0,
@@ -2207,7 +2211,7 @@
         "allFormat": "",
         "allValue": ".*",
         "current": { "selected": false, "text": "All", "value": "$__all" },
-        "datasource": { "type": "prometheus", "uid": "Zu4MxH4Vk" },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
         "definition": "",
         "hide": 0,
         "includeAll": true,
@@ -2273,7 +2277,7 @@
         "type": "query"
       },
       {
-        "current": { "selected": false, "text": ["fullnode"], "value": ["fullnode"] },
+        "current": { "selected": true, "text": ["fullnode"], "value": ["fullnode"] },
         "hide": 0,
         "includeAll": true,
         "multi": true,
@@ -2312,11 +2316,11 @@
       }
     ]
   },
-  "time": { "from": "now-24h", "to": "now" },
+  "time": { "from": "now-12h", "to": "now" },
   "timepicker": {},
   "timezone": "",
-  "title": "Storage Backup and Restore",
+  "title": "storage-backup-and-restore",
   "uid": "9oXpx4n4z",
-  "version": 66,
+  "version": 4,
   "weekStart": ""
 }

@@ -19,7 +19,7 @@ use crate::{
         },
         utils::{
             check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
-            prompt_yes_with_override, write_to_file,
+            profile_or_submit, prompt_yes_with_override, write_to_file,
         },
     },
     governance::CompileScriptFunction,
@@ -744,14 +744,7 @@ impl CliCommand<TransactionSummary> for PublishPackage {
                 MAX_PUBLISH_PACKAGE_SIZE, size
             )));
         }
-        if txn_options.profile_gas {
-            txn_options.profile_gas(payload).await
-        } else {
-            txn_options
-                .submit_transaction(payload)
-                .await
-                .map(TransactionSummary::from)
-        }
+        profile_or_submit(payload, &txn_options).await
     }
 }
 
@@ -1144,14 +1137,7 @@ impl CliCommand<TransactionSummary> for RunFunction {
             args,
         ));
 
-        if self.txn_options.profile_gas {
-            self.txn_options.profile_gas(payload).await
-        } else {
-            self.txn_options
-                .submit_transaction(payload)
-                .await
-                .map(TransactionSummary::from)
-        }
+        profile_or_submit(payload, &self.txn_options).await
     }
 }
 
@@ -1255,14 +1241,7 @@ impl CliCommand<TransactionSummary> for RunScript {
 
         let payload = TransactionPayload::Script(Script::new(bytecode, type_args, args));
 
-        if self.txn_options.profile_gas {
-            self.txn_options.profile_gas(payload).await
-        } else {
-            self.txn_options
-                .submit_transaction(payload)
-                .await
-                .map(TransactionSummary::from)
-        }
+        profile_or_submit(payload, &self.txn_options).await
     }
 }
 

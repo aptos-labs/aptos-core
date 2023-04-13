@@ -102,6 +102,7 @@ impl Arbitrary for ShellSafeName {
 }
 
 #[cfg_attr(test, derive(Debug, Hash, Eq, Ord, PartialEq, PartialOrd))]
+#[derive(Clone)]
 pub struct TextLine(String);
 
 impl TextLine {
@@ -160,7 +161,9 @@ pub trait BackupStorage: Send + Sync {
     /// Behavior on duplicated names is undefined, overwriting the content upon an existing name
     /// is straightforward and acceptable.
     /// See `list_metadata_files`.
-    async fn save_metadata_line(&self, name: &ShellSafeName, content: &TextLine) -> Result<()>;
+    async fn save_metadata_line(&self, name: &ShellSafeName, content: &TextLine) -> Result<()> {
+        self.save_metadata_lines(name, &[content.clone()]).await
+    }
     /// The backup system always asks for all metadata files and cache and build index on top of
     /// the content of them. This means:
     ///   1. The storage is free to reorganise the metadata files, like combining multiple ones to

@@ -408,6 +408,18 @@ pub enum ExpData {
     Block(NodeId, Vec<LocalVarDecl>, Exp),
     /// Represents a conditional.
     IfElse(NodeId, Exp, Exp, Exp),
+
+    // ---------------------------------------------------------
+    // Subsequent expressions only appear in imperative context
+    /// Represents a sequence of effects, the last value also being the result.
+    Sequence(NodeId, Vec<Exp>),
+    /// Represents a loop, with a body expression.
+    Loop(NodeId, Exp),
+    /// Represents a loop continuation for the enclosing loop. The bool indicates whether the
+    /// loop is continued (true) or broken (false).
+    LoopCont(NodeId, bool),
+    /// Represents the return from a function
+    Return(NodeId, Exp),
 }
 
 /// An internalized expression. We do use a wrapper around the underlying internement implementation
@@ -465,6 +477,17 @@ impl ExpData {
         self.into()
     }
 
+    /// Determines whether this is an imperative expression construct
+    pub fn is_imperative_construct(&self) -> bool {
+        matches!(
+            self,
+            ExpData::Sequence(_, _)
+                | ExpData::Loop(_, _)
+                | ExpData::LoopCont(_, _)
+                | ExpData::Return(_, _)
+        )
+    }
+
     pub fn ptr_eq(e1: &Exp, e2: &Exp) -> bool {
         // For the internement based implementations, we can just test equality. Other
         // representations may need different measures.
@@ -483,7 +506,11 @@ impl ExpData {
             | Lambda(node_id, ..)
             | Quant(node_id, ..)
             | Block(node_id, ..)
-            | IfElse(node_id, ..) => *node_id,
+            | IfElse(node_id, ..)
+            | Sequence(node_id, ..)
+            | Loop(node_id, ..)
+            | LoopCont(node_id, ..)
+            | Return(node_id, ..) => *node_id,
         }
     }
 
@@ -681,8 +708,15 @@ impl ExpData {
                 t.visit_pre_post(visitor);
                 e.visit_pre_post(visitor);
             },
+            Loop(_, e) => e.visit_pre_post(visitor),
+            Return(_, e) => e.visit_pre_post(visitor),
+            Sequence(_, es) => {
+                for e in es {
+                    e.visit_pre_post(visitor)
+                }
+            },
             // Explicitly list all enum variants
-            Value(..) | LocalVar(..) | Temporary(..) | Invalid(..) => {},
+            LoopCont(..) | Value(..) | LocalVar(..) | Temporary(..) | Invalid(..) => {},
         }
         visitor(true, self);
     }
@@ -1292,6 +1326,21 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
                     else_exp.display(self.env)
                 )
             },
+            Sequence(_, es) => {
+                for (i, e) in es.iter().enumerate() {
+                    if i > 0 {
+                        writeln!(f, ";")?
+                    }
+                    write!(f, "{}", e.display(self.env))?
+                }
+                Ok(())
+            },
+            Loop(_, e) => {
+                write!(f, "loop {{\n{}\n}}", e.display(self.env))
+            },
+            LoopCont(_, true) => write!(f, "continue"),
+            LoopCont(_, false) => write!(f, "break"),
+            Return(_, e) => write!(f, "return {}", e.display(self.env)),
         }
     }
 }
