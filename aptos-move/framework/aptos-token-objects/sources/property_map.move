@@ -1,5 +1,5 @@
-/// PropertyMap provides generic metadata support for AptosToken. It is a  specialization of
-/// SimpleMap that enforces strict typing with minimal storage use by using constant u64 to
+/// `PropertyMap` provides generic metadata support for `AptosToken`. It is a specialization of
+/// `SimpleMap` that enforces strict typing with minimal storage use by using constant u64 to
 /// represent types and storing values in bcs format.
 module aptos_token_objects::property_map {
     use std::bcs;
@@ -9,30 +9,30 @@ module aptos_token_objects::property_map {
     use aptos_std::from_bcs;
     use aptos_std::simple_map::{Self, SimpleMap};
     use aptos_std::type_info;
-
     use aptos_framework::object::{Self, ConstructorRef, Object};
 
     // Errors
-
+    /// The property map does not exist
+    const EPROPERTY_MAP_DOES_NOT_EXIST: u64 = 1;
     /// The property key already exists
-    const EKEY_AREADY_EXIST_IN_PROPERTY_MAP: u64 = 1;
-    /// The number of property exceeds the limit
-    const EPROPERTY_NUMBER_EXCEEDS_LIMIT: u64 = 2;
+    const EKEY_ALREADY_EXISTS_IN_PROPERTY_MAP: u64 = 2;
+    /// The number of properties exceeds the maximum
+    const ETOO_MANY_PROPERTIES: u64 = 3;
     /// Property key and value counts do not match
-    const EKEY_VALUE_COUNT_MISMATCH: u64 = 3;
-    /// Property key and type count do not match
-    const EKEY_TYPE_COUNT_MISMATCH: u64 = 4;
-    /// Property type does not match
-    const ETYPE_MISMATCH: u64 = 5;
-    /// The name (key) of the property is too long
-    const EPROPERTY_MAP_NAME_TOO_LONG: u64 = 6;
-    /// The property map does not exist within global storage
-    const EPROPERTY_MAP_DOES_NOT_EXIST: u64 = 7;
-    /// Invalid type specified
-    const ETYPE_INVALID: u64 = 8;
+    const EKEY_VALUE_COUNT_MISMATCH: u64 = 4;
+    /// Property key and type counts do not match
+    const EKEY_TYPE_COUNT_MISMATCH: u64 = 5;
+    /// Property value does not match expected type
+    const ETYPE_MISMATCH: u64 = 6;
+    /// Invalid value type specified
+    const ETYPE_INVALID: u64 = 7;
+    /// The key of the property is too long
+    const EPROPERTY_MAP_KEY_TOO_LONG: u64 = 8;
 
     // Constants
+    /// Maximum number of items in a `PropertyMap`
     const MAX_PROPERTY_MAP_SIZE: u64 = 1000;
+    /// Maximum number of characters in a property name
     const MAX_PROPERTY_NAME_LENGTH: u64 = 128;
 
     // PropertyValue::type
@@ -48,17 +48,20 @@ module aptos_token_objects::property_map {
     const STRING: u8 = 9;
 
     // Structs
-
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    /// A Map for typed key to value mapping, the contract using it
+    /// should keep track of what keys are what types, and parse them accordingly.
     struct PropertyMap has drop, key {
         inner: SimpleMap<String, PropertyValue>,
     }
 
+    /// A typed value for the `PropertyMap` to ensure that typing is always consistent
     struct PropertyValue has drop, store {
         type: u8,
         value: vector<u8>,
     }
 
+    /// A mutator ref that allows for mutation of the property map
     struct MutatorRef has drop, store {
         self: address,
     }
@@ -68,6 +71,7 @@ module aptos_token_objects::property_map {
         move_to(&signer, container);
     }
 
+    /// Burns the entire property map
     public fun burn(ref: MutatorRef) acquires PropertyMap {
         move_from<PropertyMap>(ref.self);
     }
@@ -79,7 +83,7 @@ module aptos_token_objects::property_map {
         values: vector<vector<u8>>,
     ): PropertyMap {
         let length = vector::length(&keys);
-        assert!(length <= MAX_PROPERTY_MAP_SIZE, error::invalid_argument(EPROPERTY_NUMBER_EXCEEDS_LIMIT));
+        assert!(length <= MAX_PROPERTY_MAP_SIZE, error::invalid_argument(ETOO_MANY_PROPERTIES));
         assert!(length == vector::length(&values), error::invalid_argument(EKEY_VALUE_COUNT_MISMATCH));
         assert!(length == vector::length(&types), error::invalid_argument(EKEY_TYPE_COUNT_MISMATCH));
 
@@ -88,7 +92,7 @@ module aptos_token_objects::property_map {
             let key = vector::pop_back(&mut keys);
             assert!(
                 string::length(&key) <= MAX_PROPERTY_NAME_LENGTH,
-                error::invalid_argument(EPROPERTY_MAP_NAME_TOO_LONG),
+                error::invalid_argument(EPROPERTY_MAP_KEY_TOO_LONG),
             );
 
             let value = vector::pop_back(&mut values);
@@ -103,6 +107,7 @@ module aptos_token_objects::property_map {
         PropertyMap { inner: container }
     }
 
+    /// Maps `String` representation of types from their `u8` representation
     inline fun to_external_type(type: u8): String {
         if (type == BOOL) {
             string::utf8(b"bool")
@@ -125,10 +130,11 @@ module aptos_token_objects::property_map {
         } else if (type == STRING) {
             string::utf8(b"0x1::string::String")
         } else {
-            abort(error::invalid_argument(ETYPE_INVALID))
+            abort (error::invalid_argument(ETYPE_INVALID))
         }
     }
 
+    /// Maps the `String` representation of types to `u8`
     inline fun to_internal_type(type: String): u8 {
         if (type == string::utf8(b"bool")) {
             BOOL
@@ -151,37 +157,17 @@ module aptos_token_objects::property_map {
         } else if (type == string::utf8(b"0x1::string::String")) {
             STRING
         } else {
-            abort(error::invalid_argument(ETYPE_INVALID))
+            abort (error::invalid_argument(ETYPE_INVALID))
         }
     }
 
+    /// Maps Move type to `u8` representation
     inline fun type_info_to_internal_type<T>(): u8 {
         let type = type_info::type_name<T>();
-        if (type == string::utf8(b"bool")) {
-            BOOL
-        } else if (type == string::utf8(b"u8")) {
-            U8
-        } else if (type == string::utf8(b"u16")) {
-            U16
-        } else if (type == string::utf8(b"u32")) {
-            U32
-        } else if (type == string::utf8(b"u64")) {
-            U64
-        } else if (type == string::utf8(b"u128")) {
-            U128
-        } else if (type == string::utf8(b"u256")) {
-            U256
-        } else if (type == string::utf8(b"address")) {
-            ADDRESS
-        } else if (type == string::utf8(b"vector<u8>")) {
-            BYTE_VECTOR
-        } else if (type == string::utf8(b"0x1::string::String")) {
-            STRING
-        } else {
-            abort(error::invalid_argument(ETYPE_INVALID))
-        }
+        to_internal_type(type)
     }
 
+    /// Validates property value type against its expected type
     inline fun validate_type(type: u8, value: vector<u8>) {
         if (type == BOOL) {
             from_bcs::to_bool(value);
@@ -204,7 +190,7 @@ module aptos_token_objects::property_map {
         } else if (type == STRING) {
             from_bcs::to_string(value);
         } else {
-            abort(error::invalid_argument(ETYPE_INVALID))
+            abort (error::invalid_argument(ETYPE_MISMATCH))
         };
     }
 
@@ -215,34 +201,36 @@ module aptos_token_objects::property_map {
     // Accessors
 
     public fun contains_key<T: key>(object: &Object<T>, key: &String): bool acquires PropertyMap {
-        assert!(
-            exists<PropertyMap>(object::object_address(object)),
-            error::not_found(EPROPERTY_MAP_DOES_NOT_EXIST),
-        );
+        assert_exists(object::object_address(object));
         let property_map = borrow_global<PropertyMap>(object::object_address(object));
         simple_map::contains_key(&property_map.inner, key)
     }
 
     public fun length<T: key>(object: &Object<T>): u64 acquires PropertyMap {
-        assert!(
-            exists<PropertyMap>(object::object_address(object)),
-            error::not_found(EPROPERTY_MAP_DOES_NOT_EXIST),
-        );
+        assert_exists(object::object_address(object));
         let property_map = borrow_global<PropertyMap>(object::object_address(object));
         simple_map::length(&property_map.inner)
     }
 
+    /// Read the property and get it's external type in it's bcs encoded format
+    ///
+    /// The preferred method is to use `read_<type>` where the type is already known.
     public fun read<T: key>(object: &Object<T>, key: &String): (String, vector<u8>) acquires PropertyMap {
-        assert!(
-            exists<PropertyMap>(object::object_address(object)),
-            error::not_found(EPROPERTY_MAP_DOES_NOT_EXIST),
-        );
+        assert_exists(object::object_address(object));
         let property_map = borrow_global<PropertyMap>(object::object_address(object));
         let property_value = simple_map::borrow(&property_map.inner, key);
         let new_type = to_external_type(property_value.type);
         (new_type, property_value.value)
     }
 
+    inline fun assert_exists(object: address) {
+        assert!(
+            exists<PropertyMap>(object),
+            error::not_found(EPROPERTY_MAP_DOES_NOT_EXIST),
+        );
+    }
+
+    /// Read a type and verify that the type is correct
     inline fun read_typed<T: key, V>(object: &Object<T>, key: &String): vector<u8> acquires PropertyMap {
         let (type, value) = read(object, key);
         assert!(
@@ -292,7 +280,7 @@ module aptos_token_objects::property_map {
         from_bcs::to_address(value)
     }
 
-    public fun read_bytes<T: key>(object: &Object<T>, key: &String): vector<u8>acquires PropertyMap {
+    public fun read_bytes<T: key>(object: &Object<T>, key: &String): vector<u8> acquires PropertyMap {
         let value = read_typed<T, vector<u8>>(object, key);
         from_bcs::to_bytes(value)
     }
@@ -303,50 +291,53 @@ module aptos_token_objects::property_map {
     }
 
     // Mutators
-
+    /// Add a property, already bcs encoded as a `vector<u8>`
     public fun add(ref: &MutatorRef, key: String, type: String, value: vector<u8>) acquires PropertyMap {
         let new_type = to_internal_type(type);
         validate_type(new_type, value);
         add_internal(ref, key, new_type, value);
     }
 
+    /// Add a property that isn't already encoded as a `vector<u8>`
     public fun add_typed<T: drop>(ref: &MutatorRef, key: String, value: T) acquires PropertyMap {
         let type = type_info_to_internal_type<T>();
         add_internal(ref, key, type, bcs::to_bytes(&value));
     }
 
-    fun add_internal(ref: &MutatorRef, key: String, type: u8, value: vector<u8>) acquires PropertyMap {
-        assert!(exists<PropertyMap>(ref.self), error::not_found(EPROPERTY_MAP_DOES_NOT_EXIST));
+    inline fun add_internal(ref: &MutatorRef, key: String, type: u8, value: vector<u8>) acquires PropertyMap {
+        assert_exists(ref.self);
         let property_map = borrow_global_mut<PropertyMap>(ref.self);
         simple_map::add(&mut property_map.inner, key, PropertyValue { type, value });
     }
 
+    /// Updates a property in place already bcs encoded
     public fun update(ref: &MutatorRef, key: &String, type: String, value: vector<u8>) acquires PropertyMap {
         let new_type = to_internal_type(type);
         validate_type(new_type, value);
         update_internal(ref, key, new_type, value);
     }
 
+    /// Updates a property in place that is not already bcs encoded
     public fun update_typed<T: drop>(ref: &MutatorRef, key: &String, value: T) acquires PropertyMap {
         let type = type_info_to_internal_type<T>();
         update_internal(ref, key, type, bcs::to_bytes(&value));
     }
 
-    fun update_internal(ref: &MutatorRef, key: &String, type: u8, value: vector<u8>) acquires PropertyMap {
-        assert!(exists<PropertyMap>(ref.self), error::not_found(EPROPERTY_MAP_DOES_NOT_EXIST));
+    inline fun update_internal(ref: &MutatorRef, key: &String, type: u8, value: vector<u8>) acquires PropertyMap {
+        assert_exists(ref.self);
         let property_map = borrow_global_mut<PropertyMap>(ref.self);
         let old_value = simple_map::borrow_mut(&mut property_map.inner, key);
         *old_value = PropertyValue { type, value };
     }
 
+    /// Removes a property from the map, ensuring that it does in fact exist
     public fun remove(ref: &MutatorRef, key: &String) acquires PropertyMap {
-        assert!(exists<PropertyMap>(ref.self), error::not_found(EPROPERTY_MAP_DOES_NOT_EXIST));
+        assert_exists(ref.self);
         let property_map = borrow_global_mut<PropertyMap>(ref.self);
         simple_map::remove(&mut property_map.inner, key);
     }
 
     // Tests
-
     #[test(creator = @0x123)]
     fun test_end_to_end(creator: &signer) acquires PropertyMap {
         let constructor_ref = object::create_named_object(creator, b"");
@@ -396,7 +387,13 @@ module aptos_token_objects::property_map {
         assert!(read_u32(&object, &string::utf8(b"u32")) == 0x12345678, 3);
         assert!(read_u64(&object, &string::utf8(b"u64")) == 0x1234567812345678, 4);
         assert!(read_u128(&object, &string::utf8(b"u128")) == 0x12345678123456781234567812345678, 5);
-        assert!(read_u256(&object, &string::utf8(b"u256")) == 0x1234567812345678123456781234567812345678123456781234567812345678, 6);
+        assert!(
+            read_u256(
+                &object,
+                &string::utf8(b"u256")
+            ) == 0x1234567812345678123456781234567812345678123456781234567812345678,
+            6
+        );
         assert!(read_bytes(&object, &string::utf8(b"vector<u8>")) == vector[0x01], 7);
         assert!(read_string(&object, &string::utf8(b"0x1::string::String")) == string::utf8(b"a"), 8);
 
@@ -475,10 +472,30 @@ module aptos_token_objects::property_map {
         add(&mutator, string::utf8(b"u16"), string::utf8(b"u16"), bcs::to_bytes<u16>(&0x1234));
         add(&mutator, string::utf8(b"u32"), string::utf8(b"u32"), bcs::to_bytes<u32>(&0x12345678));
         add(&mutator, string::utf8(b"u64"), string::utf8(b"u64"), bcs::to_bytes<u64>(&0x1234567812345678));
-        add(&mutator, string::utf8(b"u128"), string::utf8(b"u128"), bcs::to_bytes<u128>(&0x12345678123456781234567812345678));
-        add(&mutator, string::utf8(b"u256"), string::utf8(b"u256"), bcs::to_bytes<u256>(&0x1234567812345678123456781234567812345678123456781234567812345678));
-        add(&mutator, string::utf8(b"vector<u8>"), string::utf8(b"vector<u8>"), bcs::to_bytes<vector<u8>>(&vector[0x01]));
-        add(&mutator, string::utf8(b"0x1::string::String"), string::utf8(b"0x1::string::String"), bcs::to_bytes<String>(&string::utf8(b"a")));
+        add(
+            &mutator,
+            string::utf8(b"u128"),
+            string::utf8(b"u128"),
+            bcs::to_bytes<u128>(&0x12345678123456781234567812345678)
+        );
+        add(
+            &mutator,
+            string::utf8(b"u256"),
+            string::utf8(b"u256"),
+            bcs::to_bytes<u256>(&0x1234567812345678123456781234567812345678123456781234567812345678)
+        );
+        add(
+            &mutator,
+            string::utf8(b"vector<u8>"),
+            string::utf8(b"vector<u8>"),
+            bcs::to_bytes<vector<u8>>(&vector[0x01])
+        );
+        add(
+            &mutator,
+            string::utf8(b"0x1::string::String"),
+            string::utf8(b"0x1::string::String"),
+            bcs::to_bytes<String>(&string::utf8(b"a"))
+        );
 
         assert!(read_bool(&object, &string::utf8(b"bool")), 32);
         assert!(read_u8(&object, &string::utf8(b"u8")) == 0x12, 33);
@@ -486,7 +503,13 @@ module aptos_token_objects::property_map {
         assert!(read_u32(&object, &string::utf8(b"u32")) == 0x12345678, 35);
         assert!(read_u64(&object, &string::utf8(b"u64")) == 0x1234567812345678, 36);
         assert!(read_u128(&object, &string::utf8(b"u128")) == 0x12345678123456781234567812345678, 37);
-        assert!(read_u256(&object, &string::utf8(b"u256")) == 0x1234567812345678123456781234567812345678123456781234567812345678, 38);
+        assert!(
+            read_u256(
+                &object,
+                &string::utf8(b"u256")
+            ) == 0x1234567812345678123456781234567812345678123456781234567812345678,
+            38
+        );
         assert!(read_bytes(&object, &string::utf8(b"vector<u8>")) == vector[0x01], 39);
         assert!(read_string(&object, &string::utf8(b"0x1::string::String")) == string::utf8(b"a"), 40);
 
@@ -499,8 +522,18 @@ module aptos_token_objects::property_map {
         update(&mutator, &string::utf8(b"u64"), string::utf8(b"u64"), bcs::to_bytes<u64>(&0x24));
         update(&mutator, &string::utf8(b"u128"), string::utf8(b"u128"), bcs::to_bytes<u128>(&0x25));
         update(&mutator, &string::utf8(b"u256"), string::utf8(b"u256"), bcs::to_bytes<u256>(&0x26));
-        update(&mutator, &string::utf8(b"vector<u8>"), string::utf8(b"vector<u8>"), bcs::to_bytes<vector<u8>>(&vector[0x02]));
-        update(&mutator, &string::utf8(b"0x1::string::String"), string::utf8(b"0x1::string::String"), bcs::to_bytes<String>(&string::utf8(b"ha")));
+        update(
+            &mutator,
+            &string::utf8(b"vector<u8>"),
+            string::utf8(b"vector<u8>"),
+            bcs::to_bytes<vector<u8>>(&vector[0x02])
+        );
+        update(
+            &mutator,
+            &string::utf8(b"0x1::string::String"),
+            string::utf8(b"0x1::string::String"),
+            bcs::to_bytes<String>(&string::utf8(b"ha"))
+        );
 
         assert!(!read_bool(&object, &string::utf8(b"bool")), 10);
         assert!(read_u8(&object, &string::utf8(b"u8")) == 0x21, 11);
@@ -527,7 +560,7 @@ module aptos_token_objects::property_map {
     }
 
     #[test(creator = @0x123)]
-    #[expected_failure(abort_code = 0x10003, location = Self)]
+    #[expected_failure(abort_code = 0x10004, location = Self)]
     fun test_init_wrong_values(creator: &signer) {
         let constructor_ref = object::create_named_object(creator, b"");
 
@@ -540,7 +573,7 @@ module aptos_token_objects::property_map {
     }
 
     #[test(creator = @0x123)]
-    #[expected_failure(abort_code = 0x10004, location = Self)]
+    #[expected_failure(abort_code = 0x10005, location = Self)]
     fun test_init_wrong_types(creator: &signer) {
         let constructor_ref = object::create_named_object(creator, b"");
 
@@ -585,7 +618,7 @@ module aptos_token_objects::property_map {
     }
 
     #[test(creator = @0x123)]
-    #[expected_failure(abort_code = 0x10005, location = Self)]
+    #[expected_failure(abort_code = 0x10006, location = Self)]
     fun test_invalid_read(creator: &signer) acquires PropertyMap {
         let constructor_ref = object::create_named_object(creator, b"");
         let object = object::object_from_constructor_ref<object::ObjectCore>(&constructor_ref);
