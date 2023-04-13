@@ -131,7 +131,6 @@ export class AptosAccount {
    * @param collectionName The collection name
    * @returns The collection object address
    */
-
   static getCollectionObjectAddress(creator: MaybeHexString, collectionName: string): HexString {
     const source = bcsToBytes(AccountAddress.fromHex(creator));
     const seed = new TextEncoder().encode(collectionName);
