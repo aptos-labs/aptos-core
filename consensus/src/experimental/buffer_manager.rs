@@ -40,8 +40,8 @@ use std::{sync::{
 use tokio::time::{Duration, Instant, self};
 
 pub const COMMIT_VOTE_REBROADCAST_INTERVAL_MS: u64 = 1500;
-pub const RAND_SHARE_REBROADCAST_INTERVAL_MS: u64 = 3000;
-pub const RAND_DECISION_REBROADCAST_INTERVAL_MS: u64 = 3000;
+pub const RAND_SHARE_REBROADCAST_INTERVAL_MS: u64 = 30000;
+pub const RAND_DECISION_REBROADCAST_INTERVAL_MS: u64 = 30000;
 
 pub const LOOP_INTERVAL_MS: u64 = 1500;
 
@@ -235,12 +235,12 @@ impl BufferManager {
                     self.new_log(LogEvent::SendRandToLeader)
                         .remote_peer(leader)
                         .item_id(item_hash),
-                    "item id {}, item size {}", item.get_hash(), item.get_blocks().len()
+                    "item id {} send to leader {}, item size {}", item_hash, leader, item.get_blocks().len()
                 );
                 for block in item.get_blocks() {
                     observe_block(block.timestamp_usecs(), BlockStage::RAND_SENT);
                 }
-                // println!("[rand debug] {} send share {} to leader {}", self.author, rand_shares.item_id(), proposer);
+                println!("[rand debug] share {} sent by {} to leader {}", rand_shares.item_id(), self.author, leader);
                 self.rand_msg_tx
                 .send_rand_shares(rand_shares.clone(), leader)
                 .await;
@@ -268,9 +268,9 @@ impl BufferManager {
                     self.new_log(LogEvent::LeaderReceiveRand)
                         .remote_peer(rand_shares.author())
                         .item_id(item_id),
-                    "item id {}, rand size {}", item_id, rand_shares.shares().len()
+                    "item id {} from node {}, rand size {}", item_id, rand_shares.author(), rand_shares.shares().len()
                 );
-                // println!("[rand debug] {} receive share {} from node {}", self.author, rand_shares.item_id(), rand_shares.author());
+                println!("[rand debug] share {} from {} by leader {}", rand_shares.item_id(), rand_shares.author(), self.author);
 
                 // todo: verify rand message, ignore invalid ones
 
@@ -297,7 +297,7 @@ impl BufferManager {
                             if item.get_k_leaders(self.verifier.len(), &self.verifier).contains(&self.author) {
                                 info!(
                                     self.new_log(LogEvent::LeaderBCastRand).item_id(item_id),
-                                    "item id {}, item size {}", item_id, item.get_blocks().len()
+                                    "item id {} broadcast by {}, item size {}", item_id, self.author, item.get_blocks().len()
                                 );
                                 for block in item.get_blocks() {
                                     observe_block(block.timestamp_usecs(), BlockStage::RAND_AGGREGATED);
@@ -339,6 +339,8 @@ impl BufferManager {
                                 //     })
                                 // });
 
+                                println!("[rand debug] share {} decision broadcasted by leader {}", rand_shares.item_id(), self.author);
+
                                 self.rand_msg_tx
                                     .broadcast_rand_decisions(rand_decisions)
                                     .await;
@@ -352,7 +354,8 @@ impl BufferManager {
             },
             VerifiedEvent::RandDecisionMsg(rand_decisions) => {
                 let item_id = rand_decisions.item_id();
-                info!("Receive random decision for item {:?}", item_id);
+                // info!("Receive random decision for item {:?}", item_id);
+                println!("[rand debug] share {} decision received at node {}", rand_decisions.item_id(), self.author);
 
                 info!(
                     self.new_log(LogEvent::ReceiveRand).item_id(item_id),
