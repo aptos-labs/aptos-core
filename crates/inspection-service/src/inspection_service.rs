@@ -25,8 +25,10 @@ use std::{
 // Useful string constants
 const CONTENT_TYPE_JSON: &str = "application/json";
 const CONTENT_TYPE_TEXT: &str = "text/plain";
-const DISABLED_ENDPOINT_MESSAGE: &str =
-    "This endpoint is disabled! Enable it in the InspectionServiceConfig.";
+const CONFIGURATION_DISABLED_MESSAGE: &str =
+    "This endpoint is disabled! Enable it in node.yaml inspection_service.expose_configuration: true";
+const SYSINFO_DISABLED_MESSAGE: &str =
+    "This endpoint is disabled! Enable it in node.yaml inspection_service.expose_system_information: true";
 const HEADER_CONTENT_TYPE: &str = "Content-Type";
 const INVALID_ENDPOINT_MESSAGE: &str = "The requested endpoint is invalid!";
 const UNEXPECTED_ERROR_MESSAGE: &str = "An unexpected error was encountered!";
@@ -110,7 +112,7 @@ async fn serve_requests(
             } else {
                 (
                     StatusCode::FORBIDDEN,
-                    Body::from(DISABLED_ENDPOINT_MESSAGE),
+                    Body::from(CONFIGURATION_DISABLED_MESSAGE),
                     CONTENT_TYPE_TEXT,
                 )
             }
@@ -153,7 +155,7 @@ async fn serve_requests(
             } else {
                 (
                     StatusCode::FORBIDDEN,
-                    Body::from(DISABLED_ENDPOINT_MESSAGE),
+                    Body::from(SYSINFO_DISABLED_MESSAGE),
                     CONTENT_TYPE_TEXT,
                 )
             }
@@ -230,4 +232,86 @@ pub fn start_inspection_service(node_config: NodeConfig) {
             })
             .unwrap();
     });
+}
+
+mod test {
+    use std::io::read_to_string;
+    use futures::executor::block_on;
+    use hyper::body;
+    use once_cell::sync::Lazy;
+    use prometheus::{IntCounter, register_int_counter};
+    use super::*;
+
+    const INT_COUNTER_NAME: &str = "INT_COUNTER";
+    pub static INT_COUNTER: Lazy<IntCounter> =
+        Lazy::new(|| register_int_counter!(INT_COUNTER_NAME, "An integer counter").unwrap());
+
+    #[test]
+    fn test_inspect_configuration() {
+        let mut config = NodeConfig::default_for_validator();
+        config.inspection_service.expose_configuration = false;
+        let r1f = serve_requests(
+            Request::builder().uri("http://127.0.0.1:9201/configuration").method(Method::GET).body(Body::from("")).unwrap(),
+            config.clone(),
+        );
+        let mut r1 = block_on(r1f).unwrap();
+        assert_eq!(r1.status(), StatusCode::FORBIDDEN);
+        let r1body = block_on(body::to_bytes(r1.body_mut())).unwrap();
+        assert_eq!(r1body, CONFIGURATION_DISABLED_MESSAGE);
+
+        config.inspection_service.expose_configuration = true;
+        let mut r2 = block_on(serve_requests(
+            Request::builder().uri("http://127.0.0.1:9201/configuration").method(Method::GET).body(Body::from("")).unwrap(),
+            config
+        )).unwrap();
+        assert_eq!(r2.status(), StatusCode::OK);
+        let r2body = block_on(body::to_bytes(r2.body_mut())).unwrap();
+        let r2bs = read_to_string(r2body.as_ref()).unwrap();
+        assert!(r2bs.contains("NodeConfig"));
+        assert!(r2bs.contains("InspectionServiceConfig"));
+        assert!(r2bs.contains("expose_configuration: true"));
+    }
+
+    #[test]
+    fn test_inspect_system() {
+        let mut config = NodeConfig::default_for_validator();
+        config.inspection_service.expose_system_information = false;
+        let r1f = serve_requests(
+            Request::builder().uri("http://127.0.0.1:9201/system_information").method(Method::GET).body(Body::from("")).unwrap(),
+            config.clone(),
+        );
+        let mut r1 = block_on(r1f).unwrap();
+        assert_eq!(r1.status(), StatusCode::FORBIDDEN);
+        let r1body = block_on(body::to_bytes(r1.body_mut())).unwrap();
+        assert_eq!(r1body, SYSINFO_DISABLED_MESSAGE);
+
+        config.inspection_service.expose_system_information = true;
+        let mut r2 = block_on(serve_requests(
+            Request::builder().uri("http://127.0.0.1:9201/system_information").method(Method::GET).body(Body::from("")).unwrap(),
+            config
+        )).unwrap();
+        assert_eq!(r2.status(), StatusCode::OK);
+        let r2body = block_on(body::to_bytes(r2.body_mut())).unwrap();
+        let r2bs = read_to_string(r2body.as_ref()).unwrap();
+        assert!(r2bs.contains("build_commit_hash"));
+        assert!(r2bs.contains("cpu_count"));
+        assert!(r2bs.contains("memory_available"));
+    }
+
+    #[test]
+    fn test_inspect_metrics() {
+        INT_COUNTER.inc();
+
+        let config = NodeConfig::default_for_validator();
+        let mut r1 = block_on(serve_requests(
+            Request::builder().uri("http://127.0.0.1:9201/metrics").method(Method::GET).body(Body::from("")).unwrap(),
+            config
+        )).unwrap();
+        assert_eq!(r1.status(), StatusCode::OK);
+        let r1body = block_on(body::to_bytes(r1.body_mut())).unwrap();
+        let r1bs = read_to_string(r1body.as_ref()).unwrap();
+        let linecount = r1bs.lines().count();
+        assert_eq!(3, linecount, "Expected one counter to generate 3 lines, but this could change reasonably if metrics formatting changes");
+        assert!(r1bs.contains(INT_COUNTER_NAME));
+    }
 }
