@@ -125,11 +125,9 @@ function verify_architecture {  # Checks whether the Windows machine is 32-bit o
 	$result = Get-WmiObject -Class Win32_Processor | Select-Object AddressWidth |ConvertTo-Json -Compress
 	if ($result.Contains("64")) {
 		$global:architecture = "64"
-		Write-Host "64-bit system detected"
 		}
 	else {
 		$global:architecture = "86"
-		Write-Host "32-bit system detected. You may not be able to install some dependencies."
 		}
 }
 
@@ -183,19 +181,17 @@ function install_winget {
 
   # Reload the PATH environment variables for this session
   $env:Path = [System.Environment]::GetEnvironmentVariable("PATH", "User") + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "Machine")
-  Write-Host "Winget has been installed. Please restart your system to ensure WinGet is setup correctly. Afterward, re-run the script."
-  Exit
+  Write-Host "WinGet has been installed. We recommend stopping the script and restarting your system to ensure WinGet has been set up correctly before continuing."
 }
 
 function check_for_winget {
   if (Get-Command winget -ErrorAction SilentlyContinue) {
-    Write-Host "WinGet is already installed."
+    return
   } 
   elseif (Test-Path "$env:LOCALAPPDATA\Microsoft\WindowsApps\winget.exe") {
     [Environment]::SetEnvironmentVariable("PATH", "$env:PATH;$env:LOCALAPPDATA\Microsoft\WindowsApps", "User")
-    Write-Host "Winget was found but not set in user PATH environment variable."
-    Write-Host "Variable has been set. Open a new PowerShell session and re-run the script."
-    Exit
+    # Reload the PATH environment variables for this session
+    $env:Path = [System.Environment]::GetEnvironmentVariable("PATH", "User") + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "Machine")
   }
   else {
     Write-Host "Installing WinGet before continuing with the script..."
@@ -351,6 +347,8 @@ function install_python {
   $result = check_package "Python"
   if ($result) {
     winget install Python.Python.3.11 --silent
+    # Reload the PATH environment variables for this session
+    $env:Path = [System.Environment]::GetEnvironmentVariable("PATH", "User") + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "Machine")
 	}
   else {
     winget upgrade --id Python.Python.3.11 --silent
@@ -369,7 +367,7 @@ function install_pnpm {
   }
 }
 
-function install_postgresql {
+function install_postgresql { 
   $result = check_package "PostgreSQL"
   $psql_version = winget show -e PostgreSQL | Select-String Version
   $psql_version = $psql_version.Split(':')[1].Split('.')[0].Trim()
@@ -499,8 +497,8 @@ function install_move_prover {
 
 verify_architecture
 check_os
-check_for_winget
 update_versions
+check_for_winget
 
 if ($t -or $y) {
     if ($t) {
