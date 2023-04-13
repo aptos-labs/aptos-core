@@ -115,7 +115,7 @@ function update_versions {
     Write-Host "Installation will continue with the current versions..."
     $global:grcov_version = "0.8.2"
     $global:protoc_version = "21.4"
-    $global:dotnet_version = "6.0.407"
+    $global:dotnet_version = "6.0"
     $global:z3_version = "4.11.2"
     $global:boogie_version = "2.15.8"
   }
@@ -276,6 +276,8 @@ function install_rustup {
   else {
     winget upgrade --id Rustlang.Rustup
   }
+  # Reload the PATH environment variables for this session
+  $env:Path = [System.Environment]::GetEnvironmentVariable("PATH", "User") + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "Machine")
   Write-Host "Configuring Rustup..."
   rustup update
   rustup component add rustfmt
@@ -370,7 +372,7 @@ function install_pnpm {
 function install_postgresql { 
   $result = check_package "PostgreSQL"
   $psql_version = winget show -e PostgreSQL | Select-String Version
-  $psql_version = $psql_version.Split(':')[1].Split('.')[0].Trim()
+  $psql_version = $psql_version.Line.Split(':')[1].Split('.')[0].Trim()
   $psql_path = "$env:PATH;$env:PROGRAMFILES\PostgreSQL\$psql_version\bin"
   
   if ($result) {
@@ -421,10 +423,14 @@ function install_cvc5 { # Downloads the 64-bit version of CVC5 and adds it to PA
 
 function install_dotnet {
   if (![System.IO.Path]::IsPathRooted($env:DOTNET_ROOT)) {
+    $dotnet_version = $global:dotnet_version.Split('.')[0].Trim()
     Write-Host "Installing Microsoft DotNet..."
-    winget install "Microsoft.DotNet.SDK.6" --accept-source-agreements --silent
+    winget install "Microsoft.DotNet.SDK.$dotnet_version" --accept-source-agreements --silent
+
+    $dotnet_version = winget show -e "Microsoft.DotNet.SDK.$dotnet_version" | Select-String Version
+    $dotnet_version = $dotnet_version.Line.Split(':')[1].Trim()
     [Environment]::SetEnvironmentVariable("DOTNET_ROOT", "$env:PROGRAMFILES\dotnet", "User")
-    [Environment]::SetEnvironmentVariable("PATH", "$env:PATH;$env:PROGRAMFILES\dotnet\sdk\$global:dotnet_version\DotnetTools;$env:USERPROFILE\.dotnet\tools", "User")
+    [Environment]::SetEnvironmentVariable("PATH", "$env:PATH;$env:PROGRAMFILES\dotnet\sdk\$dotnet_version\DotnetTools;$env:USERPROFILE\.dotnet\tools", "User")
     
     # Reload the PATH environment variables for this session
     $env:Path = [System.Environment]::GetEnvironmentVariable("PATH", "User") + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "Machine")
