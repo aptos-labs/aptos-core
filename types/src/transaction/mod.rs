@@ -183,9 +183,6 @@ impl RawTransaction {
     }
 
     /// Create a new `RawTransaction` with a module to publish.
-    ///
-    /// A module transaction is the only way to publish code. Only one module per transaction
-    /// can be published.
     pub fn new_module(
         sender: AccountAddress,
         sequence_number: u64,
@@ -208,8 +205,7 @@ impl RawTransaction {
 
     /// Create a new `RawTransaction` with a list of modules to publish.
     ///
-    /// A module transaction is the only way to publish code. Multiple modules per transaction
-    /// can be published.
+    /// Multiple modules per transaction can be published.
     pub fn new_module_bundle(
         sender: AccountAddress,
         sequence_number: u64,
