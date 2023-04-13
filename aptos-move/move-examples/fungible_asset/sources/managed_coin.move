@@ -13,7 +13,7 @@ module fungible_asset_extension::managed_coin {
     /// Only fungible asset metadata owner can make changes.
     const ENOT_OWNER: u64 = 1;
 
-    const ASSET_SYMBOL: vector<u8> = b"APT";
+    const ASSET_SYMBOL: vector<u8> = b"LBR";
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Hold refs to control the minting, transfer and burning of fungible assets.
@@ -29,7 +29,7 @@ module fungible_asset_extension::managed_coin {
         primary_store::create_primary_store_enabled_fungible_asset(
             constructor_ref,
             option::some(option::none()),
-            utf8(b"Aptos Token"), /* name */
+            utf8(b"Libra Coin"), /* name */
             utf8(ASSET_SYMBOL), /* symbol */
             8, /* decimals */
         );
