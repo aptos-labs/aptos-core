@@ -30,8 +30,8 @@ module aptos_token_objects::collection {
 
     /// The collection does not exist
     const ECOLLECTION_DOES_NOT_EXIST: u64 = 1;
-    /// The collection has reached its supply and no more tokens can be minted
-    const ETOO_MANY_TOKENS: u64 = 2;
+    /// The collection has reached its supply and no more tokens can be minted, unless some are burned
+    const ECOLLECTION_SUPPLY_EXCEEDED: u64 = 2;
     /// The collection name is over the maximum length
     const ECOLLECTION_NAME_TOO_LONG: u64 = 3;
     /// The URI is over the maximum length
@@ -259,7 +259,7 @@ module aptos_token_objects::collection {
             supply.total_minted = supply.total_minted + 1;
             assert!(
                 supply.current_supply <= supply.max_supply,
-                error::out_of_range(ETOO_MANY_TOKENS),
+                error::out_of_range(ECOLLECTION_SUPPLY_EXCEEDED),
             );
             event::emit_event(&mut supply.mint_events,
                 MintEvent {
