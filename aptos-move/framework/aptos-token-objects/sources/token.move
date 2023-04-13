@@ -4,8 +4,6 @@
 /// * Explicit data model for token metadata via adjacent resources
 /// * Extensible framework for tokens
 ///
-/// TODO:
-/// * Update Object<T> to be a viable input as a transaction arg and then update all readers as view.
 module aptos_token_objects::token {
     use std::error;
     use std::option::{Self, Option};
@@ -21,8 +19,18 @@ module aptos_token_objects::token {
     const ETOKEN_DOES_NOT_EXIST: u64 = 1;
     /// The provided signer is not the creator
     const ENOT_CREATOR: u64 = 2;
-    /// Attempted to mutate an immutable field
+    /// The field being changed is not mutable
     const EFIELD_NOT_MUTABLE: u64 = 3;
+    /// The token name is over the maximum length
+    const ETOKEN_NAME_TOO_LONG: u64 = 4;
+    /// The URI is over the maximum length
+    const EURI_TOO_LONG: u64 = 5;
+    /// The description is over the maximum length
+    const EDESCRIPTION_TOO_LONG: u64 = 6;
+
+    const MAX_TOKEN_NAME_LENGTH: u64 = 128;
+    const MAX_URI_LENGTH: u64 = 512;
+    const MAX_DESCRIPTION_LENGTH: u64 = 2048;
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Represents the common fields to all tokens.
@@ -73,6 +81,10 @@ module aptos_token_objects::token {
         royalty: Option<Royalty>,
         uri: String,
     ) {
+        assert!(string::length(&name) < MAX_TOKEN_NAME_LENGTH, ETOKEN_NAME_TOO_LONG);
+        assert!(string::length(&description) < MAX_DESCRIPTION_LENGTH, EDESCRIPTION_TOO_LONG);
+        assert!(string::length(&uri) < MAX_URI_LENGTH, EURI_TOO_LONG);
+
         let object_signer = object::generate_signer(constructor_ref);
 
         let collection_addr = collection::create_collection_address(&creator_address, &collection_name);
@@ -135,6 +147,7 @@ module aptos_token_objects::token {
 
     /// Named objects are derived from a seed, the collection's seed is its name.
     public fun create_token_seed(collection: &String, name: &String): vector<u8> {
+        assert!(string::length(name) < MAX_TOKEN_NAME_LENGTH, ETOKEN_NAME_TOO_LONG);
         let seed = *string::bytes(collection);
         vector::append(&mut seed, b"::");
         vector::append(&mut seed, *string::bytes(name));
@@ -262,6 +275,7 @@ module aptos_token_objects::token {
     }
 
     public fun set_description(mutator_ref: &MutatorRef, description: String) acquires Token {
+        assert!(string::length(&description) < MAX_DESCRIPTION_LENGTH, EDESCRIPTION_TOO_LONG);
         let token = borrow_mut(mutator_ref);
         event::emit_event(
             &mut token.mutation_events,
@@ -275,6 +289,7 @@ module aptos_token_objects::token {
     }
 
     public fun set_name(mutator_ref: &MutatorRef, name: String) acquires Token {
+        assert!(string::length(&name) < MAX_TOKEN_NAME_LENGTH, ETOKEN_NAME_TOO_LONG);
         let token = borrow_mut(mutator_ref);
         event::emit_event(
             &mut token.mutation_events,
@@ -288,6 +303,7 @@ module aptos_token_objects::token {
     }
 
     public fun set_uri(mutator_ref: &MutatorRef, uri: String) acquires Token {
+        assert!(string::length(&uri) < MAX_URI_LENGTH, EURI_TOO_LONG);
         let token = borrow_mut(mutator_ref);
         event::emit_event(
             &mut token.mutation_events,
