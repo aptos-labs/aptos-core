@@ -214,7 +214,7 @@ impl RunConfig {
         }
 
         println!(
-            "Faucet is running. Faucet endpoint: {}:{}",
+            "Faucet is running. Faucet endpoint: http://{}:{}",
             self.server_config.listen_address, self.server_config.listen_port
         );
 
