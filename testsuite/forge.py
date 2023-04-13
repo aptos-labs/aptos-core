@@ -30,6 +30,7 @@ from typing import (
     Union,
 )
 from urllib.parse import ParseResult, urlunparse, urlencode
+from applogging import logger, init_logging
 from forge_wrapper_core.filesystem import Filesystem, LocalFilesystem
 from forge_wrapper_core.git import Git
 from forge_wrapper_core.process import Processes, SystemProcesses
@@ -52,26 +53,6 @@ FORGE_IMAGE_NAME = "aptos/forge"
 
 DEFAULT_CONFIG = "forge-wrapper-config"
 DEFAULT_CONFIG_KEY = "forge-wrapper-config.json"
-
-
-# Decorator that injects the global "log" into a function scope.
-def logger(func):
-    func.__globals__["log"] = logging.getLogger("")
-    return func
-
-
-def init_logging(logger: logging.Logger, print_metadata: bool) -> None:
-    """Initialize logging."""
-    logger.setLevel(logging.INFO)
-    sh = logging.StreamHandler(sys.stdout)
-    if print_metadata:
-        sh.setFormatter(
-            logging.Formatter(
-                "[%(asctime)s] %(levelname)s [%(filename)s.%(funcName)s:%(lineno)d] %(message)s",
-                datefmt="%a, %d %b %Y %H:%M:%S",
-            )
-        )
-    logger.addHandler(sh)
 
 
 @dataclass
@@ -125,8 +106,6 @@ except ImportError:
 )
 @logger
 def main(log_metadata: bool) -> None:
-    # if sys.stdout.isatty():
-    #     log_metadata = True
     init_logging(logger=log, print_metadata=log_metadata)
     # Check that the current directory is the root of the repository.
     if not os.path.exists(".git"):
