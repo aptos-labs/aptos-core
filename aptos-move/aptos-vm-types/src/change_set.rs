@@ -1,7 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{delta::DeltaOp, remote_cache::StateViewWithRemoteCache, write::WriteOp};
+use crate::{
+    delta::DeltaOp,
+    effects::Op,
+    remote_cache::StateViewWithRemoteCache,
+    write::{squash_writes, AptosResource, WriteOp},
+};
+use anyhow::bail;
 use aptos_types::{
     contract_event::ContractEvent,
     state_store::state_key::StateKey,
@@ -18,7 +24,6 @@ use std::{
         },
         BTreeMap,
     },
-    sync::Arc,
 };
 
 /// Container to hold arbitrary changes to the global state.
@@ -50,26 +55,32 @@ impl<T> ChangeSet<T> {
         self.inner.is_empty()
     }
 
+    #[inline]
     pub fn insert(&mut self, change: (StateKey, T)) {
         self.inner.insert(change.0, change.1);
     }
 
+    #[inline]
     pub fn get(&self, key: &StateKey) -> Option<&T> {
         self.inner.get(key)
     }
 
+    #[inline]
     pub fn get_mut(&mut self, key: &StateKey) -> Option<&mut T> {
         self.inner.get_mut(key)
     }
 
+    #[inline]
     pub fn entry(&mut self, key: StateKey) -> Entry<'_, StateKey, T> {
         self.inner.entry(key)
     }
 
+    #[inline]
     pub fn extend<I: IntoIterator<Item = (StateKey, T)>>(&mut self, iter: I) {
         self.inner.extend(iter)
     }
 
+    #[inline]
     pub fn remove(&mut self, key: &StateKey) -> Option<T> {
         self.inner.remove(key)
     }
@@ -98,10 +109,14 @@ impl<T> IntoIterator for ChangeSet<T> {
     }
 }
 
+/// Syntactic sugar for deltas and writes.
 pub type DeltaChangeSet = ChangeSet<DeltaOp>;
 pub type WriteChangeSet = ChangeSet<WriteOp>;
 
 impl WriteChangeSet {
+    /// Converts the set of writes produced by the VM into storage-friendly
+    /// write set containing blobs. Returns an error if serialization of one
+    /// of the writes fails.
     pub fn into_write_set(self) -> anyhow::Result<WriteSet, VMStatus> {
         let mut write_set_mut = WriteSetMut::default();
         for (key, write) in self {
@@ -114,6 +129,8 @@ impl WriteChangeSet {
         Ok(write_set)
     }
 
+    /// Merges two set of writes. Returns an error if an error occurred
+    /// while squashing the writes.
     pub fn merge_writes(
         &mut self,
         writes: impl IntoIterator<Item = (StateKey, WriteOp)>,
@@ -122,7 +139,8 @@ impl WriteChangeSet {
             match self.entry(key) {
                 // The write is overwriting the previous one.
                 Occupied(mut entry) => {
-                    if !entry.get_mut().squash(write)? {
+                    if !(squash_writes(entry.get_mut(), write)?) {
+                        // No-op.
                         entry.remove();
                     }
                 },
@@ -135,6 +153,8 @@ impl WriteChangeSet {
         Ok(())
     }
 
+    /// Materializes a set of deltas and merges it with a set of writes. If materialization
+    /// was not successful, an error is returned.
     pub fn merge_deltas(
         &mut self,
         deltas: DeltaChangeSet,
@@ -152,15 +172,16 @@ impl WriteChangeSet {
 }
 
 impl DeltaChangeSet {
+    /// Materializes a set of deltas into writes, returning an error when delta application
+    /// fails.
     pub fn try_materialize(
         self,
         state_view: &impl StateViewWithRemoteCache,
     ) -> anyhow::Result<WriteChangeSet, VMStatus> {
         let mut materialized_set = WriteChangeSet::empty();
-        for (state_key, delta_op) in self {
-            // let write = delta_op.try_materialize(state_view, &state_key)?;
-            let write = WriteOp;
-            materialized_set.insert((state_key, write));
+        for (state_key, delta) in self {
+            let write = delta.try_materialize(state_view, &state_key)?;
+            materialized_set.insert((state_key, WriteOp::ResourceWrite(write)));
         }
 
         // All deltas are applied successfully.
@@ -196,74 +217,72 @@ impl AptosChangeSet {
         (self.writes, self.deltas, self.events)
     }
 
-    //
-    // fn extend_with_deltas(
-    //     writes: &mut ChangeSet<Op<AptosWrite>>,
-    //     deltas: &mut ChangeSet<DeltaOp>,
-    //     other_deltas: ChangeSet<DeltaOp>,
-    // ) -> anyhow::Result<()> {
-    //     for (key, mut delta_op) in other_deltas.into_iter() {
-    //         if let Some(r) = writes.get_mut(&key) {
-    //             match r {
-    //                 Op::Creation(write) | Op::Modification(write) => {
-    //                     let value: u128 = write.as_aggregator_value()?;
-    //                     *write = AptosWrite::AggregatorValue(delta_op.apply_to(value)?);
-    //                 },
-    //                 Op::Deletion => {
-    //                     anyhow::bail!(format!(
-    //                         "Failed to apply aggregator delta {:?} because the value is already deleted", delta_op,
-    //                     ));
-    //                 },
-    //             }
-    //         } else {
-    //             match deltas.entry(key) {
-    //                 Occupied(entry) => {
-    //                     // In this case, we need to merge the new incoming `op` to the existing
-    //                     // delta, ensuring the strict ordering.
-    //                     delta_op.merge_onto(*entry.get())?;
-    //                     *entry.into_mut() = delta_op;
-    //                 },
-    //                 Vacant(entry) => {
-    //                     entry.insert(delta_op);
-    //                 },
-    //             }
-    //         }
-    //     }
-    //     Ok(())
-    // }
-    //
-    // pub fn extend_with_writes(
-    //     writes: &mut ChangeSet<Op<AptosWrite>>,
-    //     deltas: &mut ChangeSet<DeltaOp>,
-    //     other_writes: ChangeSet<Op<AptosWrite>>,
-    // ) -> anyhow::Result<()> {
-    //     for (key, other_op) in other_writes.into_iter() {
-    //         match writes.entry(key) {
-    //             Occupied(mut entry) => {
-    //                 let op = entry.get_mut();
-    //                 if !op.squash(other_op)? {
-    //                     entry.remove();
-    //                 }
-    //             },
-    //             Vacant(entry) => {
-    //                 deltas.remove(entry.key());
-    //                 entry.insert(other_op);
-    //             },
-    //         }
-    //     }
-    //     Ok(())
-    // }
+    pub fn squash(self, other: Self) -> anyhow::Result<Self> {
+        // Unpack the change sets.
+        let (mut writes, mut deltas, mut events) = self.into_inner();
+        let (other_writes, other_deltas, other_events) = other.into_inner();
 
-    // pub fn squash(self, other: Self) -> anyhow::Result<Self> {
-    //     let (mut writes, mut deltas, mut events) = self.into_inner();
-    //     let (other_writes, other_deltas, other_events) = other.into_inner();
-    //     Self::extend_with_writes(&mut writes, &mut deltas, other_writes)?;
-    //     // TODO: check writes here?
-    //     Self::extend_with_deltas(&mut writes, &mut deltas, other_deltas)?;
-    //     // TODO: check writes here?
-    //     events.extend(other_events);
-    //     // TODO: check events here?
-    //     let s = Self::new(writes, deltas, events Arc::clone(&other.checker))?;
-    //     Ok(s)
-    // }
+        extend_with_writes(&mut writes, &mut deltas, other_writes)?;
+        extend_with_deltas(&mut writes, &mut deltas, other_deltas)?;
+        events.extend(other_events);
+
+        Ok(Self::new(writes, deltas, events))
+    }
+}
+
+fn extend_with_deltas(
+    writes: &mut WriteChangeSet,
+    deltas: &mut DeltaChangeSet,
+    other_deltas: DeltaChangeSet,
+) -> anyhow::Result<()> {
+    for (key, mut delta) in other_deltas.into_iter() {
+        if let Some(write) = writes.get_mut(&key) {
+            // Delta can only be applied to resources.
+            if let WriteOp::ResourceWrite(op) = write {
+                match op {
+                    Op::Creation(r) | Op::Modification(r) => {
+                        let value: u128 = r.as_aggregator_value()?;
+                        *r = AptosResource::AggregatorValue(value);
+                    },
+                    Op::Deletion => {
+                        bail!(format!("Failed to apply aggregator delta {:?} because the value is already deleted", delta));
+                    },
+                }
+            }
+        } else {
+            match deltas.entry(key) {
+                Occupied(entry) => {
+                    // In this case, we need to merge the new incoming delta to the existing
+                    // delta, ensuring the strict ordering.
+                    delta.merge_onto(*entry.get())?;
+                    *entry.into_mut() = delta;
+                },
+                Vacant(entry) => {
+                    entry.insert(delta);
+                },
+            }
+        }
+    }
+    Ok(())
+}
+
+fn extend_with_writes(
+    writes: &mut WriteChangeSet,
+    deltas: &mut DeltaChangeSet,
+    other_writes: WriteChangeSet,
+) -> anyhow::Result<()> {
+    for (key, other_write) in other_writes.into_iter() {
+        match writes.entry(key) {
+            Occupied(mut entry) => {
+                if !(squash_writes(entry.get_mut(), other_write)?) {
+                    entry.remove();
+                }
+            },
+            Vacant(entry) => {
+                deltas.remove(entry.key());
+                entry.insert(other_write);
+            },
+        }
+    }
+    Ok(())
 }

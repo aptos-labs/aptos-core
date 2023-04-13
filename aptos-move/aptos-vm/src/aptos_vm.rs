@@ -74,6 +74,8 @@ use std::{
         Arc,
     },
 };
+use aptos_vm_types::change_set::{DeltaChangeSet, WriteChangeSet};
+use aptos_vm_types::write::WriteOp;
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
@@ -317,9 +319,9 @@ impl AptosVM {
         let epilogue_change_set = session
             .finish(&mut (), change_set_configs)
             .map_err(|e| e.into_vm_status())?;
-        let change_set = user_txn_change_set;
-        //    .squash(epilogue_change_set)
-        //    .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, None))?;
+        let change_set = user_txn_change_set
+            .squash(epilogue_change_set)
+            .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, None))?;
 
         let (writes, deltas, events) = change_set.into_inner();
 
@@ -445,11 +447,12 @@ impl AptosVM {
             let change_set = session
                 .finish(&mut (), change_set_configs)
                 .map_err(|e| e.into_vm_status())?;
-            // TODO: re-enable with new types!
+
+            // TODO: Implement these on new types.
             // gas_meter.charge_io_gas_for_write_set(change_set.writes().iter())?;
             // gas_meter.charge_storage_fee_for_all(
-            //     change_set_ext.write_set().iter(),
-            //     change_set_ext.change_set().events(),
+            //     change_set.writes().iter(),
+            //     change_set.events(),
             //     txn_data.transaction_size,
             //     txn_data.gas_unit_price,
             // )?;
@@ -648,11 +651,11 @@ impl AptosVM {
             .finish(&mut (), change_set_configs)
             .map_err(|e| e.into_vm_status())?;
 
-        // TODO: re-enable
-        // gas_meter.charge_io_gas_for_write_set(inner_function_change_set_ext.write_set().iter())?;
+        // TODO: Implement these with new types.
+        // gas_meter.charge_io_gas_for_write_set(inner_function_change_set.writes().iter())?;
         // gas_meter.charge_storage_fee_for_all(
-        //     inner_function_change_set_ext.write_set().iter(),
-        //     inner_function_change_set_ext.change_set().events(),
+        //     inner_function_change_set.writes().iter(),
+        //     inner_function_change_set.events(),
         //     txn_data.transaction_size,
         //     txn_data.gas_unit_price,
         // )?;
@@ -678,10 +681,9 @@ impl AptosVM {
             .finish(&mut (), change_set_configs)
             .map_err(|e| e.into_vm_status())?;
         // Merge the inner function writeset with cleanup writeset.
-        Ok(inner_function_change_set)
-        // inner_function_change_set
-        //     .squash(cleanup_change_set)
-        //     .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, None))
+        inner_function_change_set
+            .squash(cleanup_change_set)
+            .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, None))
     }
 
     fn failure_multisig_payload_cleanup<S: MoveResolverExt + StateViewWithRemoteCache>(
@@ -871,11 +873,11 @@ impl AptosVM {
             .finish(&mut (), change_set_configs)
             .map_err(|e| e.into_vm_status())?;
 
-        // TODO: Re-enable gs charging!
-        // gas_meter.charge_io_gas_for_write_set(change_set_ext.write_set().iter())?;
+        // TODO: Implement these for new types.
+        // gas_meter.charge_io_gas_for_write_set(change_set.writes().iter())?;
         // gas_meter.charge_storage_fee_for_all(
-        //     change_set_ext.write_set().iter(),
-        //     change_set_ext.change_set().events(),
+        //     change_set_ext.writes().iter(),
+        //     change_set_ext.events(),
         //     txn_data.transaction_size,
         //     txn_data.gas_unit_price,
         // )?;
@@ -1190,13 +1192,11 @@ impl AptosVM {
 
         Ok(match writeset_payload {
             WriteSetPayload::Direct(legacy_change_set) => {
-                // let (write_ops, events) = legacy_change_set.into_inner();
+                // TODO: Fix this by converting WriteSet as into WriteChangeSet.
                 AptosChangeSet::new(
-                    // TODO: convert write ops to resource(bytes)
-                    ChangeSet::empty(),
-                    ChangeSet::empty(),
-                    legacy_change_set.events().clone().into(),
-                    // Arc::new(change_set_configs),
+                    WriteChangeSet::empty(),
+                    DeltaChangeSet::empty(),
+                    vec![],
                 )
             },
             WriteSetPayload::Script { script, execute_as } => {
@@ -1661,13 +1661,7 @@ impl VMAdapter for AptosVM {
                 (vm_status, output, None)
             },
             PreprocessedTransaction::StateCheckpoint => {
-                let output = TransactionOutput::new(
-                    ChangeSet::empty(),
-                    ChangeSet::empty(),
-                    vec![],
-                    0,
-                    TransactionStatus::Keep(ExecutionStatus::Success),
-                );
+                let output = TransactionOutput::empty_with_status(TransactionStatus::Keep(ExecutionStatus::Success));
                 (VMStatus::Executed, output, Some("state_checkpoint".into()))
             },
         })
@@ -1785,13 +1779,11 @@ impl AptosSimulationVM {
                                         .finish(&mut (), &storage_gas_params.change_set_configs)
                                         .map_err(|e| e.into_vm_status())?;
 
-                                    // TODO: Charge gas!
-                                    // gas_meter.charge_io_gas_for_write_set(
-                                    //     change_set_ext.write_set().iter(),
-                                    // )?;
+                                    // TODO: Implement these for new types.
+                                    // gas_meter.charge_io_gas_for_write_set(change_set.writes().iter())?;
                                     // gas_meter.charge_storage_fee_for_all(
-                                    //     change_set_ext.write_set().iter(),
-                                    //     change_set_ext.change_set().events(),
+                                    //     change_set.writes().iter(),
+                                    //     change_set.events(),
                                     //     txn_data.transaction_size,
                                     //     txn_data.gas_unit_price,
                                     // )?;

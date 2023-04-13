@@ -41,6 +41,8 @@ use std::{
     collections::BTreeMap,
     ops::{Deref, DerefMut},
 };
+use aptos_vm_types::effects::Op;
+use aptos_vm_types::write::{AptosModule, AptosResource};
 
 #[derive(BCSCryptoHash, CryptoHasher, Deserialize, Serialize)]
 pub enum SessionId {
@@ -271,19 +273,17 @@ where
             let (modules, resources) = account_change_set.into_inner();
             for (struct_tag, resource_op) in resources {
                 let state_key = StateKey::access_path(ap_cache.get_resource_path(addr, struct_tag));
-                // let op = Self::convert_resource_op(
-                //     resource_op,
-                //     configs.legacy_resource_creation_as_modification(),
-                // );
-                let op = WriteOp;
+                let op = Self::convert_resource_op(
+                    resource_op,
+                    configs.legacy_resource_creation_as_modification(),
+                );
                 writes.insert((state_key, op))
             }
 
             for (name, blob_op) in modules {
                 let state_key =
                     StateKey::access_path(ap_cache.get_module_path(ModuleId::new(addr, name)));
-                // let op = Self::convert_module_op(blob_op, false);
-                let op = WriteOp;
+                let op = Self::convert_module_op(blob_op, false);
                 writes.insert((state_key, op))
             }
         }
@@ -293,8 +293,7 @@ where
             for (struct_tag, resource_op) in resources {
                 let state_key =
                     StateKey::access_path(ap_cache.get_resource_group_path(addr, struct_tag));
-                // let op = Self::convert_resource_op(resource_op, false);
-                let op = WriteOp;
+                let op = Self::convert_resource_op(resource_op, false);
                 writes.insert((state_key, op))
             }
         }
@@ -302,9 +301,7 @@ where
         for (handle, change) in table_change_set.changes {
             for (key, blob_op) in change.entries {
                 let state_key = StateKey::table_item(handle.into(), key);
-                let value_op = blob_op.map(Resource::from_blob);
-                // let op = Self::convert_resource_op(value_op, false);
-                let op = WriteOp;
+                let op = Self::convert_resource_op(blob_op.map(Resource::from_blob), false);
                 writes.insert((state_key, op))
             }
         }
@@ -316,13 +313,11 @@ where
 
             match change {
                 AggregatorChange::Write(value) => {
-                    // let op = Op::Modification(AptosWrite::AggregatorValue(value));
-                    let op = WriteOp;
+                    let op = WriteOp::ResourceWrite(Op::Modification(AptosResource::AggregatorValue(value)));
                     writes.insert((state_key, op));
                 },
                 AggregatorChange::Merge(delta_op) => deltas.insert((state_key, delta_op)),
-                // AggregatorChange::Delete => writes.insert((state_key, Op::Deletion)),
-                AggregatorChange::Delete => writes.insert((state_key, WriteOp)),
+                AggregatorChange::Delete => writes.insert((state_key, WriteOp::ResourceWrite(Op::Deletion))),
             }
         }
 
@@ -335,9 +330,8 @@ where
             })
             .collect::<Result<Vec<_>, VMStatus>>()?;
 
-        // TODO: should pass configs and have a checker there.
+        // TODO: check change set using `configs` here.
         let change_set = AptosChangeSet::new(writes, deltas, events);
-        // change_set.check(configs)?;
         Ok(change_set)
     }
 
@@ -345,37 +339,38 @@ where
         move_storage_op: MoveStorageOp<Resource>,
         creation_as_modification: bool,
     ) -> WriteOp {
-        // match move_storage_op {
-        //     Delete => Deletion,
-        //     New(resource) => {
-        //         if creation_as_modification {
-        //             Modification(AptosWrite::Standard(resource))
-        //         } else {
-        //             Creation(AptosWrite::Standard(resource))
-        //         }
-        //     },
-        //     Modify(resource) => Modification(AptosWrite::Standard(resource)),
-        // }
-        WriteOp
+        use MoveStorageOp::*;
+        use Op::*;
+        WriteOp::ResourceWrite(match move_storage_op {
+            Delete => Deletion,
+            New(resource) => {
+                if creation_as_modification {
+                    Modification(AptosResource::Standard(resource))
+                } else {
+                    Creation(AptosResource::Standard(resource))
+                }
+            },
+            Modify(resource) => Modification(AptosResource::Standard(resource)),
+        })
     }
 
     fn convert_module_op(
         move_storage_op: MoveStorageOp<Module>,
         creation_as_modification: bool,
     ) -> WriteOp {
-        // // TODO: Fix this
-        // match move_storage_op {
-        //     Delete => Deletion,
-        //     New(m) => {
-        //         if creation_as_modification {
-        //             Modification(AptosWrite::Module(m.into_bytes().expect("should not fail")))
-        //         } else {
-        //             Creation(AptosWrite::Module(m.into_bytes().expect("should not fail")))
-        //         }
-        //     },
-        //     Modify(m) => Modification(AptosWrite::Module(m.into_bytes().expect("should not fail"))),
-        // }
-        WriteOp
+        use MoveStorageOp::*;
+        use Op::*;
+        WriteOp::ModuleWrite(match move_storage_op {
+            Delete => Deletion,
+            New(m) => {
+                if creation_as_modification {
+                    Modification(AptosModule::new(m))
+                } else {
+                    Creation(AptosModule::new(m))
+                }
+            },
+            Modify(m) => Modification(AptosModule::new(m)),
+        })
     }
 }
 

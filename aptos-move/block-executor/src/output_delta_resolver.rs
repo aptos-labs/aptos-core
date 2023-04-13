@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{executor::RAYON_EXEC_POOL, task::Transaction};
-use aptos_aggregator::delta_change_set::{deserialize, serialize};
+use aptos_aggregator::delta_change_set::deserialize;
 use aptos_mvhashmap::versioned_data::VersionedData;
 use aptos_vm_types::{remote_cache::TStateViewWithRemoteCache, write::WriteOp};
+use aptos_vm_types::effects::Op;
+use aptos_vm_types::write::AptosResource;
 
 pub(crate) struct OutputDeltaResolver<T: Transaction> {
     versioned_outputs: VersionedData<T::Key, T::Value>,
@@ -34,8 +36,7 @@ impl<T: Transaction> OutputDeltaResolver<T> {
                     .ok() // Was anything found in storage
                     .and_then(|value| value.map(|bytes| deserialize(&bytes))),
             ) {
-                ret[idx as usize].push((key.clone(), WriteOp));
-                // ret[idx as usize].push((key.clone(), WriteOp::Modification(serialize(&value))));
+                ret[idx as usize].push((key.clone(), WriteOp::ResourceWrite(Op::Modification(AptosResource::AggregatorValue(value)))));
             }
         }
 
