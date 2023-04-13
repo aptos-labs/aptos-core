@@ -7,25 +7,31 @@ use crate::{
     logging::{LogEntry, LogSchema},
     metrics::{increment_counter, start_timer},
     network::PeerMonitoringServiceNetworkEvents,
+    storage::StorageReaderInterface,
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::config::{BaseConfig, NodeConfig, RoleType};
 use aptos_logger::prelude::*;
 use aptos_network::{application::storage::PeersAndMetadata, ProtocolId};
 use aptos_peer_monitoring_service_types::{
-    LatencyPingRequest, LatencyPingResponse, NetworkInformationResponse,
-    PeerMonitoringServiceError, PeerMonitoringServiceRequest, PeerMonitoringServiceResponse,
-    Result, ServerProtocolVersionResponse, MAX_DISTANCE_FROM_VALIDATORS,
+    request::{LatencyPingRequest, PeerMonitoringServiceRequest},
+    response::{
+        ConnectionMetadata, LatencyPingResponse, NetworkInformationResponse,
+        NodeInformationResponse, PeerMonitoringServiceResponse, ServerProtocolVersionResponse,
+    },
+    PeerMonitoringServiceError, Result, MAX_DISTANCE_FROM_VALIDATORS,
 };
+use aptos_time_service::{TimeService, TimeServiceTrait};
 use error::Error;
 use futures::stream::StreamExt;
-use std::{cmp::min, sync::Arc};
+use std::{cmp::min, sync::Arc, time::Instant};
 use tokio::runtime::Handle;
 
 mod error;
 mod logging;
 pub mod metrics;
 pub mod network;
+pub mod storage;
 
 #[cfg(test)]
 mod tests;
@@ -34,31 +40,40 @@ mod tests;
 pub const PEER_MONITORING_SERVER_VERSION: u64 = 1;
 
 /// The server-side actor for the peer monitoring service
-pub struct PeerMonitoringServiceServer {
+pub struct PeerMonitoringServiceServer<T> {
     base_config: BaseConfig,
     bounded_executor: BoundedExecutor,
     network_requests: PeerMonitoringServiceNetworkEvents,
     peers_and_metadata: Arc<PeersAndMetadata>,
+    start_time: Instant,
+    storage: T,
+    time_service: TimeService,
 }
 
-impl PeerMonitoringServiceServer {
+impl<T: StorageReaderInterface> PeerMonitoringServiceServer<T> {
     pub fn new(
         node_config: NodeConfig,
         executor: Handle,
         network_requests: PeerMonitoringServiceNetworkEvents,
         peers_and_metadata: Arc<PeersAndMetadata>,
+        storage: T,
+        time_service: TimeService,
     ) -> Self {
         let base_config = node_config.base;
         let bounded_executor = BoundedExecutor::new(
             node_config.peer_monitoring_service.max_concurrent_requests as usize,
             executor,
         );
+        let start_time = time_service.now();
 
         Self {
             base_config,
             bounded_executor,
             network_requests,
             peers_and_metadata,
+            start_time,
+            storage,
+            time_service,
         }
     }
 
@@ -82,10 +97,19 @@ impl PeerMonitoringServiceServer {
             // to spawn on the blocking thread pool.
             let base_config = self.base_config.clone();
             let peers_and_metadata = self.peers_and_metadata.clone();
+            let start_time = self.start_time;
+            let storage = self.storage.clone();
+            let time_service = self.time_service.clone();
             self.bounded_executor
                 .spawn_blocking(move || {
-                    let response = Handler::new(base_config, peers_and_metadata)
-                        .call(protocol_id, peer_monitoring_service_request);
+                    let response = Handler::new(
+                        base_config,
+                        peers_and_metadata,
+                        start_time,
+                        storage,
+                        time_service,
+                    )
+                    .call(protocol_id, peer_monitoring_service_request);
                     log_monitoring_service_response(&response);
                     response_sender.send(response);
                 })
@@ -98,16 +122,28 @@ impl PeerMonitoringServiceServer {
 /// necessary context and state needed to construct a response to an inbound
 /// request. We usually clone/create a new handler for every request.
 #[derive(Clone)]
-pub struct Handler {
+pub struct Handler<T> {
     base_config: BaseConfig,
     peers_and_metadata: Arc<PeersAndMetadata>,
+    start_time: Instant,
+    storage: T,
+    time_service: TimeService,
 }
 
-impl Handler {
-    pub fn new(base_config: BaseConfig, peers_and_metadata: Arc<PeersAndMetadata>) -> Self {
+impl<T: StorageReaderInterface> Handler<T> {
+    pub fn new(
+        base_config: BaseConfig,
+        peers_and_metadata: Arc<PeersAndMetadata>,
+        start_time: Instant,
+        storage: T,
+        time_service: TimeService,
+    ) -> Self {
         Self {
             base_config,
             peers_and_metadata,
+            start_time,
+            storage,
+            time_service,
         }
     }
 
@@ -136,6 +172,7 @@ impl Handler {
             PeerMonitoringServiceRequest::GetServerProtocolVersion => {
                 self.get_server_protocol_version()
             },
+            PeerMonitoringServiceRequest::GetNodeInformation => self.get_node_information(),
             PeerMonitoringServiceRequest::LatencyPing(request) => self.handle_latency_ping(request),
         };
 
@@ -178,14 +215,24 @@ impl Handler {
             self.peers_and_metadata.get_connected_peers_and_metadata()?;
         let connected_peers = connected_peers_and_metadata
             .into_iter()
-            .map(|(peer, metadata)| (peer, metadata.get_connection_metadata()))
+            .map(|(peer, metadata)| {
+                let connection_metadata = metadata.get_connection_metadata();
+                (
+                    peer,
+                    ConnectionMetadata::new(
+                        connection_metadata.addr,
+                        connection_metadata.remote_peer_id,
+                        connection_metadata.role,
+                    ),
+                )
+            })
             .collect();
 
         // Get the distance from the validators
         let distance_from_validators =
             get_distance_from_validators(&self.base_config, self.peers_and_metadata.clone());
 
-        // Create and send the response
+        // Create and return the response
         let network_information_response = NetworkInformationResponse {
             connected_peers,
             distance_from_validators,
@@ -201,6 +248,30 @@ impl Handler {
         };
         Ok(PeerMonitoringServiceResponse::ServerProtocolVersion(
             server_protocol_version_response,
+        ))
+    }
+
+    fn get_node_information(&self) -> Result<PeerMonitoringServiceResponse, Error> {
+        // Get the node information
+        let git_hash = aptos_build_info::get_git_hash();
+        let current_time: Instant = self.time_service.now();
+        let uptime = current_time.duration_since(self.start_time);
+        let (highest_synced_epoch, highest_synced_version) =
+            self.storage.get_highest_synced_epoch_and_version()?;
+        let ledger_timestamp_usecs = self.storage.get_ledger_timestamp_usecs()?;
+        let lowest_available_version = self.storage.get_lowest_available_version()?;
+
+        // Create and return the response
+        let node_information_response = NodeInformationResponse {
+            git_hash,
+            highest_synced_epoch,
+            highest_synced_version,
+            ledger_timestamp_usecs,
+            lowest_available_version,
+            uptime,
+        };
+        Ok(PeerMonitoringServiceResponse::NodeInformation(
+            node_information_response,
         ))
     }
 
@@ -231,12 +302,14 @@ fn get_distance_from_validators(
                     // Go through our peers, find the min, and return a distance relative to the min
                     let mut min_peer_distance_from_validators = MAX_DISTANCE_FROM_VALIDATORS;
                     for peer_metadata in peers_and_metadata.values() {
-                        if let Some(distance_from_validators) = peer_metadata
+                        if let Some(latest_network_info_response) = peer_metadata
                             .get_peer_monitoring_metadata()
-                            .distance_from_validators
+                            .latest_network_info_response
                         {
-                            min_peer_distance_from_validators =
-                                min(min_peer_distance_from_validators, distance_from_validators);
+                            min_peer_distance_from_validators = min(
+                                min_peer_distance_from_validators,
+                                latest_network_info_response.distance_from_validators,
+                            );
                         }
                     }
 

@@ -75,7 +75,7 @@ impl StateSnapshotCommitter {
                     let version = delta_to_commit.current_version.expect("Cannot be empty");
                     let base_version = delta_to_commit.base_version;
 
-                    let (batch, root_hash) = self
+                    let (top_levels_batch, sharded_batch, root_hash) = self
                         .state_db
                         .state_merkle_db
                         .merklize_value_set(
@@ -91,7 +91,8 @@ impl StateSnapshotCommitter {
                         .expect("Error writing snapshot");
                     self.state_merkle_batch_commit_sender
                         .send(CommitMessage::Data(StateMerkleBatch {
-                            batch,
+                            top_levels_batch,
+                            sharded_batch,
                             root_hash,
                             state_delta: delta_to_commit,
                         }))

@@ -67,9 +67,9 @@ module "validator" {
   validator_instance_type = var.validator_instance_type
 
   # addons
-  enable_monitoring               = true
-  enable_prometheus_node_exporter = true
-  enable_kube_state_metrics       = true
+  enable_monitoring               = var.enable_monitoring
+  enable_prometheus_node_exporter = var.enable_prometheus_node_exporter
+  enable_kube_state_metrics       = var.enable_kube_state_metrics
   monitoring_helm_values          = var.monitoring_helm_values
   logger_helm_values              = var.logger_helm_values
 }

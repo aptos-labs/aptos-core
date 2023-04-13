@@ -3,16 +3,20 @@
 
 use super::RETRY_POLICY;
 use anyhow::{Context, Result};
-use aptos_logger::{sample, sample::SampleRate, warn};
+use aptos_logger::{debug, sample, sample::SampleRate, warn};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     move_types::account_address::AccountAddress, types::transaction::SignedTransaction,
 };
-use aptos_transaction_generator_lib::TransactionExecutor;
+use aptos_transaction_generator_lib::{CounterState, TransactionExecutor};
 use async_trait::async_trait;
 use futures::future::join_all;
 use rand::{rngs::StdRng, seq::SliceRandom, thread_rng, Rng, SeedableRng};
-use std::{sync::atomic::AtomicUsize, time::Duration};
+use std::{
+    collections::HashMap,
+    sync::atomic::AtomicUsize,
+    time::{Duration, Instant},
+};
 
 // Reliable/retrying transaction executor, used for initializing
 pub struct RestApiTransactionExecutor {
@@ -37,10 +41,18 @@ impl RestApiTransactionExecutor {
     async fn submit_check_and_retry(
         &self,
         txn: &SignedTransaction,
-        failure_counter: &[AtomicUsize],
+        counters: &CounterState,
         run_seed: u64,
     ) -> Result<()> {
         for i in 0..self.max_retries {
+            sample!(
+                SampleRate::Duration(Duration::from_secs(60)),
+                debug!(
+                    "Running reliable/retriable fetching, current state: {}",
+                    counters.show_detailed()
+                )
+            );
+
             // All transactions from the same sender, need to be submitted to the same client
             // in the same retry round, so that they are not placed in parking lot.
             // Do so by selecting a client via seeded random selection.
@@ -52,16 +64,54 @@ impl RestApiTransactionExecutor {
             .concat();
             let mut seeded_rng = StdRng::from_seed(*aptos_crypto::HashValue::sha3_256_of(&seed));
             let rest_client = self.random_rest_client_from_rng(&mut seeded_rng);
-            if submit_and_check(
+            let mut failed_submit = false;
+            let mut failed_wait = false;
+            let result = submit_and_check(
                 rest_client,
                 txn,
                 self.retry_after,
-                &failure_counter[(i * 2).min(failure_counter.len() - 1)],
-                &failure_counter[(i * 2 + 1).min(failure_counter.len() - 1)],
+                &mut failed_submit,
+                &mut failed_wait,
             )
-            .await
-            .is_ok()
-            {
+            .await;
+
+            if failed_submit {
+                counters.submit_failures[i.min(counters.submit_failures.len() - 1)]
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                if !counters.by_client.is_empty() {
+                    counters
+                        .by_client
+                        .get(&rest_client.path_prefix_string())
+                        .map(|(_, submit_failures, _)| {
+                            submit_failures.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+                        });
+                }
+            }
+            if failed_wait {
+                counters.wait_failures[i.min(counters.wait_failures.len() - 1)]
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                if !counters.by_client.is_empty() {
+                    counters
+                        .by_client
+                        .get(&rest_client.path_prefix_string())
+                        .map(|(_, _, wait_failures)| {
+                            wait_failures.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+                        });
+                }
+            }
+
+            if result.is_ok() {
+                counters
+                    .successes
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                if !counters.by_client.is_empty() {
+                    counters
+                        .by_client
+                        .get(&rest_client.path_prefix_string())
+                        .map(|(successes, _, _)| {
+                            successes.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+                        });
+                }
                 return Ok(());
             };
         }
@@ -71,6 +121,9 @@ impl RestApiTransactionExecutor {
             .wait_for_signed_transaction_bcs(txn)
             .await?;
 
+        counters
+            .successes
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         Ok(())
     }
 }
@@ -79,9 +132,10 @@ async fn submit_and_check(
     rest_client: &RestClient,
     txn: &SignedTransaction,
     wait_duration: Duration,
-    submit_failure_counter: &AtomicUsize,
-    wait_failure_counter: &AtomicUsize,
+    failed_submit: &mut bool,
+    failed_wait: &mut bool,
 ) -> Result<()> {
+    let start = Instant::now();
     if let Err(err) = rest_client.submit_bcs(txn).await {
         sample!(
             SampleRate::Duration(Duration::from_secs(60)),
@@ -91,7 +145,7 @@ async fn submit_and_check(
                 err,
             )
         );
-        submit_failure_counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        *failed_submit = true;
         // even if txn fails submitting, it might get committed, so wait to see if that is the case.
     }
     if let Err(err) = rest_client
@@ -99,7 +153,7 @@ async fn submit_and_check(
             txn.clone().committed_hash(),
             txn.expiration_timestamp_secs(),
             None,
-            Some(wait_duration),
+            Some(wait_duration.saturating_sub(start.elapsed())),
         )
         .await
     {
@@ -111,7 +165,7 @@ async fn submit_and_check(
                 err,
             )
         );
-        wait_failure_counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        *failed_wait = true;
         Err(err)?;
     }
     Ok(())
@@ -139,32 +193,63 @@ impl TransactionExecutor for RestApiTransactionExecutor {
     }
 
     async fn execute_transactions(&self, txns: &[SignedTransaction]) -> Result<()> {
-        self.execute_transactions_with_counter(txns, &[AtomicUsize::new(0)])
-            .await
+        self.execute_transactions_with_counter(txns, &CounterState {
+            submit_failures: vec![AtomicUsize::new(0)],
+            wait_failures: vec![AtomicUsize::new(0)],
+            successes: AtomicUsize::new(0),
+            by_client: HashMap::new(),
+        })
+        .await
     }
 
     async fn execute_transactions_with_counter(
         &self,
         txns: &[SignedTransaction],
-        failure_counter: &[AtomicUsize],
+        counters: &CounterState,
     ) -> Result<()> {
         let run_seed: u64 = thread_rng().gen();
 
         join_all(
             txns.iter()
-                .map(|txn| self.submit_check_and_retry(txn, failure_counter, run_seed)),
+                .map(|txn| self.submit_check_and_retry(txn, counters, run_seed)),
         )
         .await
         .into_iter()
         .collect::<Result<Vec<()>, anyhow::Error>>()
         .with_context(|| {
             format!(
-                "Tried executing {} txns, failed by call by retry: {:?}",
+                "Tried executing {} txns, request counters: {:?}",
                 txns.len(),
-                failure_counter
+                counters.show_detailed()
             )
         })?;
 
         Ok(())
+    }
+
+    fn create_counter_state(&self) -> CounterState {
+        CounterState {
+            submit_failures: std::iter::repeat_with(|| AtomicUsize::new(0))
+                .take(self.max_retries)
+                .collect(),
+            wait_failures: std::iter::repeat_with(|| AtomicUsize::new(0))
+                .take(self.max_retries)
+                .collect(),
+            successes: AtomicUsize::new(0),
+            by_client: self
+                .rest_clients
+                .iter()
+                .map(|client| {
+                    (
+                        client.path_prefix_string(),
+                        (
+                            AtomicUsize::new(0),
+                            AtomicUsize::new(0),
+                            AtomicUsize::new(0),
+                        ),
+                    )
+                })
+                .collect(),
+        }
     }
 }

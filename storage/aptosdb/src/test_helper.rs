@@ -64,7 +64,7 @@ pub(crate) fn update_store(
             )
             .unwrap();
         let ledger_batch = SchemaBatch::new();
-        let sharded_state_kv_batches = new_sharded_schema_batch();
+        let sharded_state_kv_batches = new_sharded_kv_schema_batch();
         store
             .put_value_sets(
                 vec![&value_state_set],
