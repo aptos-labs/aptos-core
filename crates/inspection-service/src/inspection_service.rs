@@ -20,8 +20,6 @@ use std::{
     thread,
 };
 
-// TODO: we need to write tests for this service!
-
 // Useful string constants
 const CONTENT_TYPE_JSON: &str = "application/json";
 const CONTENT_TYPE_TEXT: &str = "text/plain";
@@ -234,13 +232,14 @@ pub fn start_inspection_service(node_config: NodeConfig) {
     });
 }
 
+#[cfg(test)]
 mod test {
-    use std::io::read_to_string;
+    use super::*;
     use futures::executor::block_on;
     use hyper::body;
     use once_cell::sync::Lazy;
-    use prometheus::{IntCounter, register_int_counter};
-    use super::*;
+    use prometheus::{register_int_counter, IntCounter};
+    use std::io::read_to_string;
 
     const INT_COUNTER_NAME: &str = "INT_COUNTER";
     pub static INT_COUNTER: Lazy<IntCounter> =
@@ -251,7 +250,11 @@ mod test {
         let mut config = NodeConfig::default_for_validator();
         config.inspection_service.expose_configuration = false;
         let r1f = serve_requests(
-            Request::builder().uri("http://127.0.0.1:9201/configuration").method(Method::GET).body(Body::from("")).unwrap(),
+            Request::builder()
+                .uri("http://127.0.0.1:9201/configuration")
+                .method(Method::GET)
+                .body(Body::from(""))
+                .unwrap(),
             config.clone(),
         );
         let mut r1 = block_on(r1f).unwrap();
@@ -261,9 +264,14 @@ mod test {
 
         config.inspection_service.expose_configuration = true;
         let mut r2 = block_on(serve_requests(
-            Request::builder().uri("http://127.0.0.1:9201/configuration").method(Method::GET).body(Body::from("")).unwrap(),
-            config
-        )).unwrap();
+            Request::builder()
+                .uri("http://127.0.0.1:9201/configuration")
+                .method(Method::GET)
+                .body(Body::from(""))
+                .unwrap(),
+            config,
+        ))
+        .unwrap();
         assert_eq!(r2.status(), StatusCode::OK);
         let r2body = block_on(body::to_bytes(r2.body_mut())).unwrap();
         let r2bs = read_to_string(r2body.as_ref()).unwrap();
@@ -277,7 +285,11 @@ mod test {
         let mut config = NodeConfig::default_for_validator();
         config.inspection_service.expose_system_information = false;
         let r1f = serve_requests(
-            Request::builder().uri("http://127.0.0.1:9201/system_information").method(Method::GET).body(Body::from("")).unwrap(),
+            Request::builder()
+                .uri("http://127.0.0.1:9201/system_information")
+                .method(Method::GET)
+                .body(Body::from(""))
+                .unwrap(),
             config.clone(),
         );
         let mut r1 = block_on(r1f).unwrap();
@@ -287,9 +299,14 @@ mod test {
 
         config.inspection_service.expose_system_information = true;
         let mut r2 = block_on(serve_requests(
-            Request::builder().uri("http://127.0.0.1:9201/system_information").method(Method::GET).body(Body::from("")).unwrap(),
-            config
-        )).unwrap();
+            Request::builder()
+                .uri("http://127.0.0.1:9201/system_information")
+                .method(Method::GET)
+                .body(Body::from(""))
+                .unwrap(),
+            config,
+        ))
+        .unwrap();
         assert_eq!(r2.status(), StatusCode::OK);
         let r2body = block_on(body::to_bytes(r2.body_mut())).unwrap();
         let r2bs = read_to_string(r2body.as_ref()).unwrap();
@@ -304,9 +321,14 @@ mod test {
 
         let config = NodeConfig::default_for_validator();
         let mut r1 = block_on(serve_requests(
-            Request::builder().uri("http://127.0.0.1:9201/metrics").method(Method::GET).body(Body::from("")).unwrap(),
-            config
-        )).unwrap();
+            Request::builder()
+                .uri("http://127.0.0.1:9201/metrics")
+                .method(Method::GET)
+                .body(Body::from(""))
+                .unwrap(),
+            config,
+        ))
+        .unwrap();
         assert_eq!(r1.status(), StatusCode::OK);
         let r1body = block_on(body::to_bytes(r1.body_mut())).unwrap();
         let r1bs = read_to_string(r1body.as_ref()).unwrap();
