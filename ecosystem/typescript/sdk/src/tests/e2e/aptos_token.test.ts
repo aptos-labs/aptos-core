@@ -1,7 +1,7 @@
 import { AptosAccount } from "../../account";
+import { UserTransaction } from "../../generated";
 import { AptosToken } from "../../plugins";
 import { Provider } from "../../providers";
-import { APTOS_COIN } from "../../utils";
 import { NODE_URL, getFaucetClient, longTestTimeout } from "../unit/test_helper.test";
 
 const provider = new Provider({ fullnodeUrl: NODE_URL, indexerUrl: NODE_URL });
@@ -13,12 +13,12 @@ const bob = new AptosAccount();
 
 const collectionName = "AliceCollection";
 const tokenName = "Alice Token";
+let tokenAddress = "";
 
 describe("token objects", () => {
   beforeAll(async () => {
     // Fund Alice's Account
     await faucetClient.fundAccount(alice.address(), 100000000);
-    console.log(alice);
   }, longTestTimeout);
 
   test(
@@ -43,7 +43,7 @@ describe("token objects", () => {
   test(
     "mint",
     async () => {
-      await provider.waitForTransaction(
+      const txn = await provider.waitForTransactionWithResult(
         await aptosToken.mint(
           alice,
           collectionName,
@@ -56,6 +56,7 @@ describe("token objects", () => {
         ),
         { checkSuccess: true },
       );
+      tokenAddress = (txn as UserTransaction).events[0].data.token;
     },
     longTestTimeout,
   );
@@ -84,13 +85,9 @@ describe("token objects", () => {
   test(
     "freeze transfer",
     async () => {
-      await provider.waitForTransaction(
-        await aptosToken.freezeTokenTransafer(
-          alice,
-          AptosAccount.getTokenObjectAddress(alice.address().hex(), collectionName, tokenName),
-        ),
-        { checkSuccess: true },
-      );
+      await provider.waitForTransaction(await aptosToken.freezeTokenTransafer(alice, tokenAddress), {
+        checkSuccess: true,
+      });
     },
     longTestTimeout,
   );
@@ -98,13 +95,9 @@ describe("token objects", () => {
   test(
     "unfreeze token transfer",
     async () => {
-      await provider.waitForTransaction(
-        await aptosToken.unfreezeTokenTransafer(
-          alice,
-          AptosAccount.getTokenObjectAddress(alice.address().hex(), collectionName, tokenName),
-        ),
-        { checkSuccess: true },
-      );
+      await provider.waitForTransaction(await aptosToken.unfreezeTokenTransafer(alice, tokenAddress), {
+        checkSuccess: true,
+      });
     },
     longTestTimeout,
   );
@@ -113,11 +106,7 @@ describe("token objects", () => {
     "set token description",
     async () => {
       await provider.waitForTransaction(
-        await aptosToken.setTokenDescription(
-          alice,
-          AptosAccount.getTokenObjectAddress(alice.address().hex(), collectionName, tokenName),
-          "my updated token description",
-        ),
+        await aptosToken.setTokenDescription(alice, tokenAddress, "my updated token description"),
         { checkSuccess: true },
       );
     },
@@ -127,14 +116,9 @@ describe("token objects", () => {
   test(
     "set token name",
     async () => {
-      await provider.waitForTransaction(
-        await aptosToken.setTokenName(
-          alice,
-          AptosAccount.getTokenObjectAddress(alice.address().hex(), collectionName, tokenName),
-          "my updated token name",
-        ),
-        { checkSuccess: true },
-      );
+      await provider.waitForTransaction(await aptosToken.setTokenName(alice, tokenAddress, "my updated token name"), {
+        checkSuccess: true,
+      });
     },
     longTestTimeout,
   );
@@ -143,11 +127,7 @@ describe("token objects", () => {
     "set token uri",
     async () => {
       await provider.waitForTransaction(
-        await aptosToken.setTokenName(
-          alice,
-          AptosAccount.getTokenObjectAddress(alice.address().hex(), collectionName, tokenName),
-          "https://aptos.dev/img/hero.jpg",
-        ),
+        await aptosToken.setTokenName(alice, tokenAddress, "https://aptos.dev/img/hero.jpg"),
         { checkSuccess: true },
       );
     },
@@ -158,13 +138,7 @@ describe("token objects", () => {
     "add token property",
     async () => {
       await provider.waitForTransaction(
-        await aptosToken.addTokenProperty(
-          alice,
-          AptosAccount.getTokenObjectAddress(alice.address().hex(), collectionName, tokenName),
-          "newKey",
-          "bool",
-          "true",
-        ),
+        await aptosToken.addTokenProperty(alice, tokenAddress, "newKey", "bool", "true"),
         { checkSuccess: true },
       );
     },
@@ -175,13 +149,7 @@ describe("token objects", () => {
     "update token property",
     async () => {
       await provider.waitForTransaction(
-        await aptosToken.updateTokenProperty(
-          alice,
-          AptosAccount.getTokenObjectAddress(alice.address().hex(), collectionName, tokenName),
-          "newKey",
-          "u64",
-          "0",
-        ),
+        await aptosToken.updateTokenProperty(alice, tokenAddress, "newKey", "u64", "0"),
         { checkSuccess: true },
       );
     },
@@ -191,14 +159,9 @@ describe("token objects", () => {
   test(
     "remove token property",
     async () => {
-      await provider.waitForTransaction(
-        await aptosToken.removeTokenProperty(
-          alice,
-          AptosAccount.getTokenObjectAddress(alice.address().hex(), collectionName, tokenName),
-          "newKey",
-        ),
-        { checkSuccess: true },
-      );
+      await provider.waitForTransaction(await aptosToken.removeTokenProperty(alice, tokenAddress, "newKey"), {
+        checkSuccess: true,
+      });
     },
     longTestTimeout,
   );
@@ -206,14 +169,9 @@ describe("token objects", () => {
   test(
     "transfer token ownership",
     async () => {
-      await provider.waitForTransaction(
-        await aptosToken.transferTokenOwnership(
-          alice,
-          AptosAccount.getTokenObjectAddress(alice.address().hex(), collectionName, tokenName),
-          bob.address(),
-        ),
-        { checkSuccess: true },
-      );
+      await provider.waitForTransaction(await aptosToken.transferTokenOwnership(alice, tokenAddress, bob.address()), {
+        checkSuccess: true,
+      });
     },
     longTestTimeout,
   );
@@ -221,35 +179,7 @@ describe("token objects", () => {
   test(
     "burn token",
     async () => {
-      await provider.waitForTransaction(
-        await aptosToken.burnToken(
-          alice,
-          AptosAccount.getTokenObjectAddress(alice.address().hex(), collectionName, tokenName),
-        ),
-        { checkSuccess: true },
-      );
-    },
-    longTestTimeout,
-  );
-
-  test(
-    "transfer token amount",
-    async () => {
-      // create moon coin
-      // alice to mint a coin
-      // alice to transfer 1 moin coin to bob
-      await provider.waitForTransaction(
-        await aptosToken.transferTokenAmount(
-          alice,
-          "0x0000000000000000000000000000000000000000000000000000000000000001",
-          bob.address(),
-          1,
-          APTOS_COIN,
-        ),
-        {
-          checkSuccess: true,
-        },
-      );
+      await provider.waitForTransaction(await aptosToken.burnToken(alice, tokenAddress), { checkSuccess: true });
     },
     longTestTimeout,
   );

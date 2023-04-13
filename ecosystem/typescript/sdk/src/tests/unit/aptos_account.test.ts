@@ -93,13 +93,3 @@ test("Gets the collection object address", () => {
     "0xe74374a411c3db7991608d3cfb06501f6c90852ffee35da4bb2fa4839a947047",
   );
 });
-
-test("Gets the token object address", () => {
-  const creator = "0xe10674d895b75c8192add21d0ef08b0e1bb2481b741074d1d41c1986d8e14915";
-  const collectionName = "AliceCollection";
-  const tokenName = "Alice Token";
-
-  expect(AptosAccount.getTokenObjectAddress(creator, collectionName, tokenName).hex()).toBe(
-    "0x9f402496db3ee295f45d2873e47cd81372743b919efbb8171f56a1c695c5164f",
-  );
-});
