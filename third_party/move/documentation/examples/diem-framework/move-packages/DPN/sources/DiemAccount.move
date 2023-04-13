@@ -829,9 +829,13 @@ module DiemFramework::DiemAccount {
     spec pay_from {
         pragma opaque;
 
-        let payer = cap.account_address;
-        include PayFromWithoutDualAttestation<Token>;
-        include DualAttestation::AssertPaymentOkAbortsIf<Token>{value: amount};
+        include PayFromWithoutDualAttestation<Token>{
+            payer: cap.account_address
+        };
+        include DualAttestation::AssertPaymentOkAbortsIf<Token>{
+            payer: cap.account_address,
+            value: amount
+        };
     }
 
     spec pay_by_signers {
