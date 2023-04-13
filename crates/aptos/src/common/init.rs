@@ -161,7 +161,6 @@ impl CliCommand<()> for InitTool {
 
         // lookup the address from onchain instead of deriving it
         // if this is the rotated key, deriving it will outputs an incorrect address
-        // let rest_url = Url::parse(&*profile_config.rest_url.clone().unwrap());
         let address = if let Some(rest_url) = &profile_config.rest_url {
             LookupAddress {
                 encoding_options: Default::default(),
