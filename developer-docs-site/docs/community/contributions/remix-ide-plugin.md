@@ -62,7 +62,7 @@ This steps assumes you are using the WELLDONE Wallet. Follow [the manual](https
 1. Choose a network (e.g. devnet) in the dropdown at the top of the main tab.
 1. Go into the **Settings** tab of your wallet and activate **Developer Mode**.
 
-Now in the Remix UI click the `Connect to WELLDONE` button to connect to the **WELLDONE Wallet.** 
+Now in the Remix UI click the **Connect to WELLDONE** button to connect to the **WELLDONE Wallet**. 
 
 Click the **Refresh** button in the upper right corner of the plug-in to apply changes to your wallet.
 
