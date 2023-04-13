@@ -81,9 +81,9 @@ module aptos_token_objects::token {
         royalty: Option<Royalty>,
         uri: String,
     ) {
-        assert!(string::length(&name) < MAX_TOKEN_NAME_LENGTH, error::out_of_range(ETOKEN_NAME_TOO_LONG));
-        assert!(string::length(&description) < MAX_DESCRIPTION_LENGTH, error::out_of_range(EDESCRIPTION_TOO_LONG));
-        assert!(string::length(&uri) < MAX_URI_LENGTH, error::out_of_range(EURI_TOO_LONG));
+        assert!(string::length(&name) <= MAX_TOKEN_NAME_LENGTH, error::out_of_range(ETOKEN_NAME_TOO_LONG));
+        assert!(string::length(&description) <= MAX_DESCRIPTION_LENGTH, error::out_of_range(EDESCRIPTION_TOO_LONG));
+        assert!(string::length(&uri) <= MAX_URI_LENGTH, error::out_of_range(EURI_TOO_LONG));
 
         let object_signer = object::generate_signer(constructor_ref);
 
@@ -147,7 +147,7 @@ module aptos_token_objects::token {
 
     /// Named objects are derived from a seed, the collection's seed is its name.
     public fun create_token_seed(collection: &String, name: &String): vector<u8> {
-        assert!(string::length(name) < MAX_TOKEN_NAME_LENGTH, error::out_of_range(ETOKEN_NAME_TOO_LONG));
+        assert!(string::length(name) <= MAX_TOKEN_NAME_LENGTH, error::out_of_range(ETOKEN_NAME_TOO_LONG));
         let seed = *string::bytes(collection);
         vector::append(&mut seed, b"::");
         vector::append(&mut seed, *string::bytes(name));
@@ -275,7 +275,7 @@ module aptos_token_objects::token {
     }
 
     public fun set_description(mutator_ref: &MutatorRef, description: String) acquires Token {
-        assert!(string::length(&description) < MAX_DESCRIPTION_LENGTH, error::out_of_range(EDESCRIPTION_TOO_LONG));
+        assert!(string::length(&description) <= MAX_DESCRIPTION_LENGTH, error::out_of_range(EDESCRIPTION_TOO_LONG));
         let token = borrow_mut(mutator_ref);
         event::emit_event(
             &mut token.mutation_events,
@@ -289,7 +289,7 @@ module aptos_token_objects::token {
     }
 
     public fun set_name(mutator_ref: &MutatorRef, name: String) acquires Token {
-        assert!(string::length(&name) < MAX_TOKEN_NAME_LENGTH, error::out_of_range(ETOKEN_NAME_TOO_LONG));
+        assert!(string::length(&name) <= MAX_TOKEN_NAME_LENGTH, error::out_of_range(ETOKEN_NAME_TOO_LONG));
         let token = borrow_mut(mutator_ref);
         event::emit_event(
             &mut token.mutation_events,
@@ -303,7 +303,7 @@ module aptos_token_objects::token {
     }
 
     public fun set_uri(mutator_ref: &MutatorRef, uri: String) acquires Token {
-        assert!(string::length(&uri) < MAX_URI_LENGTH, error::out_of_range(EURI_TOO_LONG));
+        assert!(string::length(&uri) <= MAX_URI_LENGTH, error::out_of_range(EURI_TOO_LONG));
         let token = borrow_mut(mutator_ref);
         event::emit_event(
             &mut token.mutation_events,
