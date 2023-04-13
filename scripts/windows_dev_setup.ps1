@@ -154,7 +154,7 @@ function install_winget {
   $xaml_filepath = "Microsoft.UI.Xaml.2.7.1.nupkg\tools\AppX\x64\Release\Microsoft.UI.Xaml.2.7.appx"
 
   $vclib_url = "https://aka.ms/Microsoft.VCLibs.x$global:architecture.14.00.Desktop.appx"
-  $vclib_file = "Microsoft.VCLibs.x$global:architecture.14.00.Desktop.appx"
+  $vclib_downloadpath = "Microsoft.VCLibs.x$global:architecture.14.00.Desktop.appx"
 
   $installer_url = "https://github.com/microsoft/winget-cli/releases/download/v1.4.10173/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle"
   $installer_downloadpath = "msftwinget.msixbundle"
@@ -167,14 +167,20 @@ function install_winget {
   Expand-Archive $xaml_downloadpath -ErrorAction SilentlyContinue
 
   # Download and install VCLibs and XAML (dependencies)
-  Invoke-WebRequest -Uri $vclib_url -OutFile $vclib_file -ErrorAction SilentlyContinue
-  Add-AppxPackage $vclib_file -ErrorAction SilentlyContinue
+  Invoke-WebRequest -Uri $vclib_url -OutFile $vclib_downloadpath -ErrorAction SilentlyContinue
+  Add-AppxPackage $vclib_downloadpath -ErrorAction SilentlyContinue
   Add-AppxPackage $xaml_filepath -ErrorAction SilentlyContinue
 
   # Download and install WinGet
   Invoke-WebRequest -Uri $installer_url -OutFile $installer_downloadpath -ErrorAction SilentlyContinue
   Invoke-WebRequest -Uri $license_url -OutFile $license_downloadpath -ErrorAction SilentlyContinue
   Add-AppxProvisionedPackage -Online -PackagePath $installer_downloadpath -LicensePath $license_downloadpath -ErrorAction SilentlyContinue
+
+  # Cleanup
+  Remove-Item $xaml_filepath
+  Remove-Item $vclib_downloadpath 
+  Remove-Item $installer_downloadpath 
+  Remove-Item $license_downloadpath
 
   # Add WinGet directory to user PATH environment variable
   [Environment]::SetEnvironmentVariable("PATH", "$env:PATH;$env:LOCALAPPDATA\Microsoft\WindowsApps", "User")
@@ -385,10 +391,6 @@ function install_postgresql {
   else {
     winget upgrade --id PostgreSQL.PostgreSQL
   }
-}
-
-function existing_package {
-	Write-Host "This package is already installed."
 }
 
 function install_git {
