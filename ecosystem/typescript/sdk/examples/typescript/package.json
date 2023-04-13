@@ -10,8 +10,7 @@
     "simple_nft": "ts-node simple_nft.ts",
     "transfer_coin": "ts-node transfer_coin.ts",
     "test": "run-s bcs_transaction multisig_transaction simple_nft transfer_coin",
-    "your_coin": "ts-node your_coin.ts",
-    "fungible_asset": "ts-node fungible_asset.ts"
+    "your_coin": "ts-node your_coin.ts"
   },
   "keywords": [],
   "author": "",
