@@ -15,13 +15,13 @@ module aptos_framework::fungible_asset {
     const EAMOUNT_CANNOT_BE_ZERO: u64 = 1;
     /// The transfer ref and the fungible asset do not match.
     const ETRANSFER_REF_AND_FUNGIBLE_ASSET_MISMATCH: u64 = 2;
-    /// Account cannot transfer or receive fungible assets.
+    /// Store is disabled from sending and receiving this fungible asset.
     const EUNGATED_TRANSFER_IS_NOT_ALLOWED: u64 = 3;
     /// Insufficient balance to withdraw or transfer.
     const EINSUFFICIENT_BALANCE: u64 = 4;
     /// The fungible asset's supply has exceeded maximum.
     const EMAX_SUPPLY_EXCEEDED: u64 = 5;
-    /// More tokens than remaining supply are being burnt.
+    /// Cannot burn more tokens than the remaining supply.
     const ESUPPLY_UNDERFLOW: u64 = 6;
     /// The mint ref and the the store do not match.
     const EMINT_REF_AND_STORE_MISMATCH: u64 = 7;
@@ -37,12 +37,14 @@ module aptos_framework::fungible_asset {
     const EAMOUNT_IS_NOT_ZERO: u64 = 12;
     /// Burn ref and fungible asset do not match.
     const EBURN_REF_AND_FUNGIBLE_ASSET_MISMATCH: u64 = 13;
-    /// Cannot destroy fungible stores with non-zero balance.
+    /// Cannot destroy fungible stores with a non-zero balance.
     const EBALANCE_IS_NOT_ZERO: u64 = 14;
     /// Name of the fungible asset metadata is too long
     const ENAME_TOO_LONG: u64 = 15;
     /// Symbol of the fungible asset metadata is too long
     const ESYMBOL_TOO_LONG: u64 = 16;
+    /// Decimals is over the maximum of 32
+    const EDECIMALS_TOO_LARGE: u64 = 17;
 
     //
     // Constants
@@ -50,6 +52,7 @@ module aptos_framework::fungible_asset {
 
     const MAX_NAME_LENGTH: u64 = 32;
     const MAX_SYMBOL_LENGTH: u64 = 10;
+    const MAX_DECIMALS: u8 = 32;
 
     /// Maximum possible coin supply.
     const MAX_U128: u128 = 340282366920938463463374607431768211455;
@@ -60,9 +63,9 @@ module aptos_framework::fungible_asset {
     }
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
-    /// Define the metadata required of an metadata to be fungible.
+    /// Metadata of a Fungible asset
     struct Metadata has key {
-        /// The current supply of the fungible asset.
+        /// Optional tracking of the current supply of the fungible asset.
         supply: Option<Supply>,
         /// Name of the fungible metadata, i.e., "USDT".
         name: String,
@@ -94,7 +97,7 @@ module aptos_framework::fungible_asset {
     }
 
     /// FungibleAsset can be passed into function for type safety and to guarantee a specific amount.
-    /// FungibleAsset is ephermeral that it cannot be stored directly and will have to be deposited back into a store.
+    /// FungibleAsset is ephermeral and cannot be stored directly. It must be deposited back into a store.
     struct FungibleAsset {
         metadata: Object<Metadata>,
         amount: u64,
@@ -126,7 +129,7 @@ module aptos_framework::fungible_asset {
         amount: u64,
     }
 
-    /// Emitted when a store's ungated (owner) transfer permission is updated.
+    /// Emitted when a store's ungated transfer permission is updated.
     struct SetUngatedTransferEvent has drop, store {
         transfer_allowed: bool,
     }
@@ -154,6 +157,10 @@ module aptos_framework::fungible_asset {
         assert!(
             string::length(&symbol) <= MAX_SYMBOL_LENGTH,
             error::invalid_argument(ESYMBOL_TOO_LONG)
+        );
+        assert!(
+            decimals <= MAX_DECIMALS,
+            error::invalid_argument(EDECIMALS_TOO_LARGE)
         );
         move_to(metadata_object_signer,
             Metadata {
@@ -189,7 +196,7 @@ module aptos_framework::fungible_asset {
     }
 
     #[view]
-    /// Get the current supply from `metadata`.
+    /// Get the current supply from the `metadata` object.
     public fun supply<T: key>(metadata: Object<T>): Option<u128> acquires Metadata {
         let supply_opt = &borrow_fungible_metadata(&metadata).supply;
         if (option::is_none(supply_opt)) {
@@ -201,7 +208,7 @@ module aptos_framework::fungible_asset {
     }
 
     #[view]
-    /// Get the maximum supply from `metadata`.
+    /// Get the maximum supply from the `metadata` object.
     public fun maximum<T: key>(metadata: Object<T>): Option<u128> acquires Metadata {
         let supply_opt = &borrow_fungible_metadata(&metadata).supply;
         if (option::is_none(supply_opt)) {
@@ -213,19 +220,19 @@ module aptos_framework::fungible_asset {
     }
 
     #[view]
-    /// Get the name of the fungible asset from `metadata`.
+    /// Get the name of the fungible asset from the `metadata` object.
     public fun name<T: key>(metadata: Object<T>): String acquires Metadata {
         borrow_fungible_metadata(&metadata).name
     }
 
     #[view]
-    /// Get the symbol of the fungible asset from `metadata`.
+    /// Get the symbol of the fungible asset from the `metadata` object.
     public fun symbol<T: key>(metadata: Object<T>): String acquires Metadata {
         borrow_fungible_metadata(&metadata).symbol
     }
 
     #[view]
-    /// Get the decimals from `metadata`.
+    /// Get the decimals from the `metadata` object.
     public fun decimals<T: key>(metadata: Object<T>): u8 acquires Metadata {
         borrow_fungible_metadata(&metadata).decimals
     }
@@ -247,7 +254,7 @@ module aptos_framework::fungible_asset {
         borrow_store_resource(&store).metadata
     }
 
-    /// Return `amount` of a given fungible asset.
+    /// Return the `amount` of a given fungible asset.
     public fun amount(fa: &FungibleAsset): u64 {
         fa.amount
     }
@@ -264,7 +271,8 @@ module aptos_framework::fungible_asset {
 
     #[view]
     /// Return whether a store can freely send or receive fungible assets.
-    /// If the store has not been created, we default to returning true as deposits can be sent to it.
+    ///
+    /// If the store has not been created, we default to returning true so deposits can be sent to it.
     public fun ungated_balance_transfer_allowed<T: key>(store: Object<T>): bool acquires FungibleStore {
         !store_exists(object::object_address(&store)) ||
             borrow_store_resource(&store).allow_ungated_balance_transfer
@@ -274,22 +282,22 @@ module aptos_framework::fungible_asset {
         fa.metadata
     }
 
-    /// Get the underlying metadata object from `MintRef`.
+    /// Get the underlying metadata object from the `MintRef`.
     public fun mint_ref_metadata(ref: &MintRef): Object<Metadata> {
         ref.metadata
     }
 
-    /// Get the underlying metadata object from `TransferRef`.
+    /// Get the underlying metadata object from the `TransferRef`.
     public fun transfer_ref_metadata(ref: &TransferRef): Object<Metadata> {
         ref.metadata
     }
 
-    /// Get the underlying metadata object from `BurnRef`.
+    /// Get the underlying metadata object from the `BurnRef`.
     public fun burn_ref_metadata(ref: &BurnRef): Object<Metadata> {
         ref.metadata
     }
 
-    /// Transfer `amount` of fungible asset from `from_store`, which should be owned by `sender`, to `receiver`.
+    /// Transfer an `amount` of fungible asset from `from_store`, which should be owned by `sender`, to `receiver`.
     /// Note: it does not move the underlying object.
     public entry fun transfer<T: key>(
         sender: &signer,
@@ -325,6 +333,7 @@ module aptos_framework::fungible_asset {
         object::object_from_constructor_ref<FungibleStore>(constructor_ref)
     }
 
+    /// Used to delete a store.  Requires the store to be completely empty prior to removing it
     public fun remove_store(delete_ref: &DeleteRef) acquires FungibleStore, FungibleAssetEvents {
         let store = &object::object_from_delete_ref<FungibleStore>(delete_ref);
         let addr = object::object_address(store);
@@ -341,7 +350,7 @@ module aptos_framework::fungible_asset {
         event::destroy_handle(set_ungated_transfer_events);
     }
 
-    /// Withdraw `amount` of fungible asset from `store` by the owner.
+    /// Withdraw `amount` of the fungible asset from `store` by the owner.
     public fun withdraw<T: key>(
         owner: &signer,
         store: Object<T>,
@@ -352,13 +361,13 @@ module aptos_framework::fungible_asset {
         withdraw_internal(object::object_address(&store), amount)
     }
 
-    /// Deposit `amount` of fungible asset to `store`.
+    /// Deposit `amount` of the fungible asset to `store`.
     public fun deposit<T: key>(store: Object<T>, fa: FungibleAsset) acquires FungibleStore, FungibleAssetEvents {
         assert!(ungated_balance_transfer_allowed(store), error::invalid_argument(EUNGATED_TRANSFER_IS_NOT_ALLOWED));
         deposit_internal(store, fa);
     }
 
-    /// Mint the specified `amount` of fungible asset.
+    /// Mint the specified `amount` of the fungible asset.
     public fun mint(ref: &MintRef, amount: u64): FungibleAsset acquires Metadata {
         assert!(amount > 0, error::invalid_argument(EAMOUNT_CANNOT_BE_ZERO));
         let metadata = ref.metadata;
@@ -370,13 +379,13 @@ module aptos_framework::fungible_asset {
         }
     }
 
-    /// Mint the specified `amount` of fungible asset to a destination store.
+    /// Mint the specified `amount` of the fungible asset to a destination store.
     public fun mint_to<T: key>(ref: &MintRef, store: Object<T>, amount: u64)
     acquires Metadata, FungibleStore, FungibleAssetEvents {
         deposit(store, mint(ref, amount));
     }
 
-    /// Enable/disable a store's ability to do direct transfers of fungible asset.
+    /// Enable/disable a store's ability to do direct transfers of the fungible asset.
     public fun set_ungated_transfer<T: key>(
         ref: &TransferRef,
         store: Object<T>,
@@ -393,6 +402,7 @@ module aptos_framework::fungible_asset {
         event::emit_event(&mut events.set_ungated_transfer_events, SetUngatedTransferEvent { transfer_allowed: allow });
     }
 
+    /// Burns a fungible asset
     public fun burn(ref: &BurnRef, fa: FungibleAsset) acquires Metadata {
         let FungibleAsset {
             metadata,
@@ -402,7 +412,7 @@ module aptos_framework::fungible_asset {
         decrease_supply(&metadata, amount);
     }
 
-    /// Burn the `amount` of fungible metadata from the given store.
+    /// Burn the `amount` of the fungible asset from the given store.
     public fun burn_from<T: key>(
         ref: &BurnRef,
         store: Object<T>,
@@ -414,7 +424,7 @@ module aptos_framework::fungible_asset {
         burn(ref, withdraw_internal(store_addr, amount));
     }
 
-    /// Withdraw `amount` of fungible metadata from `store` ignoring `allow_ungated_transfer`.
+    /// Withdraw `amount` of the fungible asset from the `store` ignoring `allow_ungated_transfer`.
     public fun withdraw_with_ref<T: key>(
         ref: &TransferRef,
         store: Object<T>,
@@ -427,7 +437,7 @@ module aptos_framework::fungible_asset {
         withdraw_internal(object::object_address(&store), amount)
     }
 
-    /// Deposit fungible asset into `store` ignoring `allow_ungated_transfer`.
+    /// Deposit the fungible asset into the `store` ignoring `allow_ungated_transfer`.
     public fun deposit_with_ref<T: key>(
         ref: &TransferRef,
         store: Object<T>,
@@ -440,7 +450,7 @@ module aptos_framework::fungible_asset {
         deposit_internal(store, fa);
     }
 
-    /// Transfer `ammount` of  fungible metadata with `TransferRef` even ungated transfer is disabled.
+    /// Transfer `amount` of the fungible asset with `TransferRef` even ungated transfer is disabled.
     public fun transfer_with_ref<T: key>(
         transfer_ref: &TransferRef,
         from: Object<T>,
@@ -461,8 +471,8 @@ module aptos_framework::fungible_asset {
         }
     }
 
-    /// "Merges" the two given fungible assets. The coin passed in as `dst_fungible_asset` will have a value equal
-    /// to the sum of the two (`dst_fungible_asset` and `src_fungible_asset`).
+    /// "Merges" the two given fungible assets. The fungible asset passed in as `dst_fungible_asset` will have a value
+    /// equal to the sum of the two (`dst_fungible_asset` and `src_fungible_asset`).
     public fun merge(dst_fungible_asset: &mut FungibleAsset, src_fungible_asset: FungibleAsset) {
         let FungibleAsset { metadata: _, amount } = src_fungible_asset;
         dst_fungible_asset.amount = dst_fungible_asset.amount + amount;
@@ -486,7 +496,7 @@ module aptos_framework::fungible_asset {
         event::emit_event(&mut events.deposit_events, DepositEvent { amount });
     }
 
-    /// Extract `amount` of fungible asset from `store`.
+    /// Extract `amount` of the fungible asset from `store`.
     fun withdraw_internal(
         store_addr: address,
         amount: u64,
@@ -503,7 +513,7 @@ module aptos_framework::fungible_asset {
         FungibleAsset { metadata, amount }
     }
 
-    /// Increase the supply of a fungible metadata by minting.
+    /// Increase the supply of a fungible asset by minting.
     fun increase_supply<T: key>(metadata: &Object<T>, amount: u64) acquires Metadata {
         assert!(amount != 0, error::invalid_argument(EAMOUNT_CANNOT_BE_ZERO));
         let fungible_metadata = borrow_fungible_metadata_mut(metadata);
@@ -520,7 +530,7 @@ module aptos_framework::fungible_asset {
         };
     }
 
-    /// Decrease the supply of a fungible metadata by burning.
+    /// Decrease the supply of a fungible asset by burning.
     fun decrease_supply<T: key>(metadata: &Object<T>, amount: u64) acquires Metadata {
         assert!(amount != 0, error::invalid_argument(EAMOUNT_CANNOT_BE_ZERO));
         let fungible_metadata = borrow_fungible_metadata_mut(metadata);
