@@ -403,26 +403,6 @@ function install_git {
   }
 }
 
-function install_cvc5 { # Downloads the 64-bit version of CVC5 and adds it to PATH
-  if ($global:architecture -eq "64" -and (![System.IO.Path]::IsPathRooted($env:CVC5_EXE))) {
-    Write-Host "Installing CVC5..."
-    
-    $cvc5_url = "https://github.com/cvc5/cvc5/releases/download/cvc5-$global:cvc5_version/cvc5-Win$global:architecture.exe"
-    $cvc5_exe_path = "$env:USERPROFILE\cvc5-$global:cvc5_version\cvc5-Win$global:architecture.exe"
-
-    Invoke-WebRequest -Uri $cvc5_url -OutFile (New-Item -Path "$cvc5_exe_path" -Force) -ErrorAction SilentlyContinue
-    [Environment]::SetEnvironmentVariable("CVC5_EXE", "$cvc5_exe_path", "User") 
-    Write-Host "User environment variable set for CVC5"
-  }
-  elseif ($global:architecture -eq "86") {
-    Write-Host "Unable to install CVC5 on a 32-bit system"
-  }
-  else {
-    Write-Host "CVC5 is already installed."
-  }
-}
-
-
 function install_dotnet {
   if (![System.IO.Path]::IsPathRooted($env:DOTNET_ROOT)) {
     $dotnet_version = $global:dotnet_version.Split('.')[0].Trim()
@@ -490,17 +470,14 @@ function install_build_tools {
   install_protoc
   install_rustup
   install_cargo_plugins
-  Write-Host "Installation complete. Open a new PowerShell session to update the environment variables."
 }
 
 function install_move_prover {
   Write-Host (move_prover_message)
-  install_cvc5
   install_dotnet
   install_boogie
   install_z3
   install_git
-  Write-Host "Installation complete. Open a new PowerShell session to update the environment variables."
 }
 
 verify_architecture
@@ -526,4 +503,5 @@ if ($t -or $y) {
     default { Write-Host "Invalid option selected. Please enter 't' or 'y'." }
   }
 }
-Write-Host "Finished..."
+
+Write-Host "Installation complete. Open a new PowerShell session to update the environment variables."
