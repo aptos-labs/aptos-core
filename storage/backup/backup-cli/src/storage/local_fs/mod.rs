@@ -151,7 +151,11 @@ impl BackupStorage for LocalFs {
         Ok(())
     }
 
-    async fn save_metadata_lines(&self, name: &ShellSafeName, lines: &[TextLine]) -> Result<()> {
+    async fn save_metadata_lines(
+        &self,
+        name: &ShellSafeName,
+        lines: &[TextLine],
+    ) -> Result<FileHandle> {
         let dir = self.metadata_dir();
         create_dir_all(&dir).await.err_notes(name)?; // in case not yet created
         let content = lines
@@ -176,6 +180,6 @@ impl BackupStorage for LocalFs {
             _ => bail!("Unexpected Error in saving metadata file {}", name.as_ref()),
         }
 
-        Ok(())
+        Ok(path.to_string_lossy().into_owned())
     }
 }

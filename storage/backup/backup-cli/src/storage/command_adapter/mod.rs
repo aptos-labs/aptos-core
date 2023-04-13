@@ -124,26 +124,6 @@ impl BackupStorage for CommandAdapter {
         Ok(Box::new(child.into_data_source()))
     }
 
-    async fn save_metadata_lines(&self, name: &ShellSafeName, lines: &[TextLine]) -> Result<()> {
-        let mut child = self
-            .cmd(&self.config.commands.save_metadata_line, vec![
-                EnvVar::file_name(name.as_ref()),
-            ])
-            .spawn()?;
-        let content = lines
-            .iter()
-            .map(|e| e.as_ref())
-            .collect::<Vec<&str>>()
-            .join("");
-        child
-            .stdin()
-            .write_all(content.as_bytes())
-            .await
-            .err_notes(name)?;
-        child.join().await?;
-        Ok(())
-    }
-
     async fn list_metadata_files(&self) -> Result<Vec<FileHandle>> {
         let child = self
             .cmd(&self.config.commands.list_metadata_files, vec![])
@@ -166,7 +146,6 @@ impl BackupStorage for CommandAdapter {
             .file_name()
             .and_then(OsStr::to_str)
             .ok_or_else(|| format_err!("cannot extract filename from {}", file_handle))?;
-
         let child = self
             .cmd(
                 self.config
@@ -179,5 +158,36 @@ impl BackupStorage for CommandAdapter {
             .spawn()?;
         child.join().await?;
         Ok(())
+    }
+
+    async fn save_metadata_lines(
+        &self,
+        name: &ShellSafeName,
+        lines: &[TextLine],
+    ) -> Result<FileHandle> {
+        let mut child = self
+            .cmd(&self.config.commands.save_metadata_line, vec![
+                EnvVar::file_name(name.as_ref()),
+            ])
+            .spawn()?;
+        let mut file_handle = FileHandle::new();
+        child
+            .stdout()
+            .read_to_string(&mut file_handle)
+            .await
+            .err_notes(name)?;
+        let content = lines
+            .iter()
+            .map(|e| e.as_ref())
+            .collect::<Vec<&str>>()
+            .join("");
+        child
+            .stdin()
+            .write_all(content.as_bytes())
+            .await
+            .err_notes(name)?;
+        child.join().await?;
+        file_handle.truncate(file_handle.trim_end().len());
+        Ok(file_handle)
     }
 }
