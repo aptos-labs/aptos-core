@@ -55,13 +55,14 @@ width="50%"
 
 ## Step 3: Install a wallet
 
-This steps assumes you are using the [WELLDONE Wallet](https://docs.welldonestudio.io/wallet/manual/). following that manual to install and create a wallet and then create an account for the selected chain.
+WELLDONE Wallet can be used with the Remix IDE plugin now, with support for [Petra wallet](https://petra.app/) coming soon. See the list of [Aptos wallets](https://github.com/aptos-foundation/ecosystem-projects#wallets) available in the ecosystem.
 
-[Petra wallet](https://petra.app/) will be supported soon, and WELLDONE Wallet can be used with the Remix IDE plugin now. See the list of [Aptos wallets](https://github.com/aptos-foundation/ecosystem-projects#wallets) available in the ecosystem.
+This steps assumes you are using the WELLDONE Wallet. Follow [the manual]((https://docs.welldonestudio.io/wallet/manual/)) to install the wallet and create an account for the Aptos blockchain. Once that is done, follow these steps:
+
+1. Choose a network (e.g. devnet) in the dropdown at the top of the main screen.
+1. Go into the *Settings* tab of your wallet and activate **Developer Mode**.
 
 After choosing a chain, click the `Connect to WELLDONE` button to connect to the **WELLDONE Wallet.** 
-
-Now go into the *Settings* tab of your wallet and activate **Developer Mode**.
 
 Click the **Refresh** button in the upper right corner of the plug-in to apply changes to your wallet.
 
