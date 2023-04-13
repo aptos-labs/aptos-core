@@ -302,7 +302,9 @@ impl AptosVM {
         // rather ugly and has a lot of legacy code. This makes proper error
         // handling quite challenging.
         let deltas = user_txn_change_set.deltas().clone();
-        let materialized_deltas = deltas.try_materialize(storage).expect("something terrible happened when applying aggregator deltas");
+        let materialized_deltas = deltas
+            .try_materialize(storage)
+            .expect("something terrible happened when applying aggregator deltas");
         let storage_with_changes =
             DeltaStateView::new(&storage_with_changes, &materialized_deltas).into_move_resolver();
 
@@ -656,7 +658,11 @@ impl AptosVM {
         // )?;
 
         let storage_with_changes = DeltaStateView::new(storage, inner_function_change_set.writes());
-        let materialized_deltas = inner_function_change_set.deltas().clone().try_materialize(storage).expect("something terrible happened when applying aggregator deltas");
+        let materialized_deltas = inner_function_change_set
+            .deltas()
+            .clone()
+            .try_materialize(storage)
+            .expect("something terrible happened when applying aggregator deltas");
         let storage_with_changes =
             DeltaStateView::new(&storage_with_changes, &materialized_deltas).into_move_resolver();
         let resolver = self.0.new_move_resolver(&storage_with_changes);

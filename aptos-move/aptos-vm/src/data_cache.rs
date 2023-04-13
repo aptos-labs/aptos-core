@@ -14,6 +14,7 @@ use aptos_types::{
 };
 use aptos_vm_types::{
     remote_cache::{StateViewWithRemoteCache, TRemoteCache},
+    write::{AptosResource, AptosResourceRef},
 };
 use move_binary_format::{errors::*, CompiledModule};
 use move_core_types::{
@@ -24,14 +25,13 @@ use move_core_types::{
 };
 use move_table_extension::{TableHandle, TableResolver};
 use move_vm_runtime::move_vm::MoveVM;
-use move_vm_types::{
-    resolver::{Module, ModuleRef, Resource, ResourceRef, ResourceRefResolver, ModuleRefResolver},
+use move_vm_types::resolver::{
+    Module, ModuleRef, ModuleRefResolver, Resource, ResourceRef, ResourceRefResolver,
 };
 use std::{
     ops::{Deref, DerefMut},
     sync::Arc,
 };
-use aptos_vm_types::write::{AptosResource, AptosResourceRef};
 
 pub struct MoveResolverWithVMMetadata<'a, 'm, S> {
     move_resolver: &'a S,

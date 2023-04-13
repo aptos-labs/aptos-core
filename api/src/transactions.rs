@@ -18,7 +18,7 @@ use crate::{
     },
     ApiTags,
 };
-use anyhow::{anyhow, Context as AnyhowContext};
+use anyhow::{anyhow, bail, Context as AnyhowContext};
 use aptos_api_types::{
     verify_function_identifier, verify_module_identifier, Address, AptosError, AptosErrorCode,
     AsConverter, EncodeSubmissionRequest, GasEstimation, GasEstimationBcs, HashValue,
@@ -40,7 +40,6 @@ use aptos_types::{
     vm_status::StatusCode,
 };
 use aptos_vm::AptosVM;
-use aptos_vm_types::change_set::{AptosChangeSet, ChangeSet};
 use poem_openapi::{
     param::{Path, Query},
     payload::Json,
@@ -1175,26 +1174,20 @@ impl TransactionsApi {
 
         // Simulate transaction
         let move_resolver = self.context.move_resolver_poem(&ledger_info)?;
-        let (_, vm_output) = AptosVM::simulate_signed_transaction(&txn, &move_resolver);
-        let version = ledger_info.version();
+        let (_, output) = AptosVM::simulate_signed_transaction(&txn, &move_resolver);
+        let (mut writes, deltas, events, gas_used, status) = output.unpack();
 
-        // Apply transaction outputs to build up a transaction
-        // TODO: while `into_transaction_output_with_status()` should never fail
-        // to apply deltas, we should propagate errors properly. Fix this when
-        // VM error handling is fixed.
-
-        // TODO: Make this nicer!
-        let (mut writes, deltas, events, gas_used, status) = vm_output.unpack();
-        let materialized_writes = AptosChangeSet::try_materialize_deltas(deltas, &move_resolver)
-            .expect("should not fail");
-        AptosChangeSet::extend_with_writes(
-            &mut writes,
-            &mut ChangeSet::empty(),
-            materialized_writes,
-        )
-        .expect("should not fail");
-        let write_set = AptosChangeSet::into_write_set(writes).expect("should not fail");
-
+        // Materialize deltas and merge them into writes.
+        if let Err(_) = writes.merge_deltas(deltas, &move_resolver) {
+            // TODO: This should re-simulate the transaction but with materialized aggregators.
+            // After re-simulation, we get a new set of writes, empty deltas, and a new set of
+            // events. We have to be careful about gas: do we consider previous non-materialized
+            // simulation?
+            bail!("Application of aggregator deltas failed during transaction simulation")
+        }
+        let write_set = writes
+            .into_write_set()
+            .context("Conversion of writes to blobs failed after transaction simulation")?;
         let output = TransactionOutput::new(write_set, events, gas_used, status);
 
         // Ensure that all known statuses return their values in the output (even if they aren't supposed to)
@@ -1216,6 +1209,7 @@ impl TransactionsApi {
             output.gas_used(),
             exe_status,
         );
+        let version = ledger_info.version();
         let simulated_txn = TransactionOnChainData {
             version,
             transaction: txn,

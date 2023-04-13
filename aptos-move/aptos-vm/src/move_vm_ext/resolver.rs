@@ -3,8 +3,7 @@
 
 use aptos_framework::{natives::state_storage::StateStorageUsageResolver, RuntimeModuleMetadataV1};
 use aptos_types::on_chain_config::ConfigStorage;
-use aptos_vm_types::{remote_cache::StateViewWithRemoteCache};
-use aptos_vm_types::write::AptosResourceRef;
+use aptos_vm_types::{remote_cache::StateViewWithRemoteCache, write::AptosResourceRef};
 use move_binary_format::errors::VMError;
 use move_core_types::{
     account_address::AccountAddress,

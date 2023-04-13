@@ -4,8 +4,7 @@
 use crate::{executor::RAYON_EXEC_POOL, task::Transaction};
 use aptos_aggregator::delta_change_set::{deserialize, serialize};
 use aptos_mvhashmap::versioned_data::VersionedData;
-use aptos_vm_types::remote_cache::TStateViewWithRemoteCache;
-use aptos_vm_types::write::WriteOp;
+use aptos_vm_types::{remote_cache::TStateViewWithRemoteCache, write::WriteOp};
 
 pub(crate) struct OutputDeltaResolver<T: Transaction> {
     versioned_outputs: VersionedData<T::Key, T::Value>,

@@ -66,6 +66,10 @@ impl<T> ChangeSet<T> {
         self.inner.entry(key)
     }
 
+    pub fn extend<I: IntoIterator<Item = (StateKey, T)>>(&mut self, iter: I) {
+        self.inner.extend(iter)
+    }
+
     pub fn remove(&mut self, key: &StateKey) -> Option<T> {
         self.inner.remove(key)
     }
@@ -128,6 +132,21 @@ impl WriteChangeSet {
                 },
             }
         }
+        Ok(())
+    }
+
+    pub fn merge_deltas(
+        &mut self,
+        deltas: DeltaChangeSet,
+        view: &impl StateViewWithRemoteCache,
+    ) -> anyhow::Result<(), VMStatus> {
+        // Make sure we assert state keys are indeed disjoint.
+        assert!(self.inner.keys().all(|k| !deltas.inner.contains_key(k)));
+        let materialized_deltas = deltas.try_materialize(view)?;
+
+        // It is safe to simply extend writes because writes and deltas have different
+        // state keys within a single transaction.
+        self.extend(materialized_deltas);
         Ok(())
     }
 }

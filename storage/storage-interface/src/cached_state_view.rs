@@ -16,7 +16,7 @@ use aptos_types::{
 };
 use aptos_vm_types::{
     remote_cache::{TRemoteCache, TStateViewWithRemoteCache},
-    write::{AptosModuleRef, AptosResourceRef, AptosWrite},
+    write::{AptosModuleRef, AptosResourceRef},
 };
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
