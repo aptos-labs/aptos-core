@@ -8,16 +8,16 @@ slug: "staking-pool-operations"
 This document describes how to perform [staking](../../../concepts/staking.md) pool operations. Note that you can stake only when you meet the minimal staking requirement. See also the related [Delegation Pool Operations](./delegation-pool-operations.md) instructions.
 
 :::tip Minimum staking requirement
-The current required minimum for staking is 1 million APT tokens.
+The current required minimum for staking is 1 million APT.
 :::
 
 ## Connect to Aptos network
 
-[Connect to the Aptos](./connect-to-aptos-network.md) and start your node has with `validator-identity` and `validator-fullnode-identity` addresses using your staking pool address.
+[Connect to the Aptos network](./connect-to-aptos-network.md) and start your node with `validator-identity` and `validator-fullnode-identity` addresses using your staking pool address.
 
 ## Initializing the stake pool
 
-Make sure that this initializing the stake pool step was performed by the owner. See [Initialize staking pool](../../validator-node/owner/index.md#initialize-staking-pool) in the owner documentation section.
+Make sure that this step is performed by the owner. See [Initialize staking pool](../../validator-node/owner/index.md#initialize-staking-pool) in the owner documentation section.
 
 ## Joining validator set
 
@@ -46,7 +46,7 @@ The `account_private_key` for the operator can be found in the `private-keys.yam
 
 ### 2. Check your validator account balance 
 
-Make sure you have enough APT coins to pay for gas. You can check for this either on the Aptos Explorer or using the CLI:
+Make sure you have enough APT to pay for gas. You can check for this either on the Aptos Explorer or using the CLI:
 
 - On the Aptos Explorer `https://explorer.aptoslabs.com/account/<account-address>?network=Mainnet`, or 
 - Use the CLI:
