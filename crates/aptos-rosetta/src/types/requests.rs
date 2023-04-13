@@ -56,6 +56,7 @@ pub struct AccountBalanceMetadata {
     pub sequence_number: U64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub operators: Option<Vec<AccountAddress>>,
+    pub lockup_expiration_time_utc: U64,
 }
 /// Reqyest a block (version) on the account
 ///

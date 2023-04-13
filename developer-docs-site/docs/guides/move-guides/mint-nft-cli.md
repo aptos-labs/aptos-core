@@ -337,7 +337,7 @@ We prepare the module for production by:
 
 * adding a `TokenMintingEvent` to emit a custom event for tracking minting of tokens from this module.
 * enabling signature verification and ntroducing the concept of a proof challenge to prevent bot spamming.
-* including [unit tests](https://move-language.github.io/move/unit-testing.html) to make sure our code works as expected.
+* including [unit tests](./book/unit-testing.md) to make sure our code works as expected.
 
 
 ### Publish the module under a resource account

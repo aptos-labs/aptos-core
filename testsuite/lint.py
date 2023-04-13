@@ -15,7 +15,7 @@ def main() -> None:
 @main.command()
 @click.argument("paths", nargs=-1)
 def helm(paths: Tuple[str]) -> None:
-    shell = LocalShell(True)
+    shell = LocalShell()
 
     error = False
     for path in paths:

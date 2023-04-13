@@ -1,13 +1,17 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::{
-    types::{
-        account_address_from_public_key, CliCommand, CliConfig, CliError, CliTypedResult,
-        ConfigSearchMode, EncodingOptions, PrivateKeyInputOptions, ProfileConfig, ProfileOptions,
-        PromptOptions, RngArgs, DEFAULT_PROFILE,
+use crate::{
+    account::key_rotation::LookupAddress,
+    common::{
+        types::{
+            account_address_from_public_key, CliCommand, CliConfig, CliError, CliTypedResult,
+            ConfigSearchMode, EncodingOptions, PrivateKeyInputOptions, ProfileConfig,
+            ProfileOptions, PromptOptions, PublicKeyInputOptions, RestOptions, RngArgs,
+            DEFAULT_PROFILE,
+        },
+        utils::{fund_account, prompt_yes_with_override, read_line, wait_for_transactions},
     },
-    utils::{fund_account, prompt_yes_with_override, read_line, wait_for_transactions},
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, ValidCryptoMaterialStringExt};
 use aptos_rest_client::{
@@ -154,7 +158,25 @@ impl CliCommand<()> for InitTool {
             }
         };
         let public_key = private_key.public_key();
-        let address = account_address_from_public_key(&public_key);
+
+        // lookup the address from onchain instead of deriving it
+        // if this is the rotated key, deriving it will outputs an incorrect address
+        let address = if let Some(rest_url) = &profile_config.rest_url {
+            LookupAddress {
+                encoding_options: Default::default(),
+                public_key_options: PublicKeyInputOptions::from_key(&public_key),
+                profile_options: Default::default(),
+                rest_options: RestOptions::new(
+                    Option::from(Url::parse(rest_url).expect("Failed to parse url")),
+                    None,
+                ),
+            }
+            .execute()
+            .await?
+        } else {
+            account_address_from_public_key(&public_key)
+        };
+
         profile_config.private_key = Some(private_key);
         profile_config.public_key = Some(public_key);
         profile_config.account = Some(address);
