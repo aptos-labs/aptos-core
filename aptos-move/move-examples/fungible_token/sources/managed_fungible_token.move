@@ -1,19 +1,20 @@
-/// A 2-in-1 module that combines managed_fungible_asset and coin_example into one module that when deployed, the
-/// deployer will be creating a new managed fungible asset with the hardcoded supply config, name, symbol, and decimals.
-/// The address of the asset can be obtained via get_metadata().
-module fungible_asset_extension::managed_coin {
+/// An example combining fungible assets with token as fungible token. In this example, a token object is used as
+/// metadata to create fungible units, aka, fungible tokens.
+module fungible_token::managed_fungible_token {
     use aptos_framework::fungible_asset::{Self, MintRef, TransferRef, BurnRef, Metadata, FungibleAsset};
     use aptos_framework::object::{Self, Object};
-    use aptos_framework::primary_store;
+    use aptos_framework::primary_fungible_store;
     use std::error;
     use std::signer;
-    use std::string::utf8;
+    use std::string::{utf8, String};
     use std::option;
+    use aptos_token_objects::token::{create_named_token, create_token_seed};
+    use aptos_token_objects::collection::create_fixed_collection;
 
     /// Only fungible asset metadata owner can make changes.
     const ENOT_OWNER: u64 = 1;
 
-    const ASSET_SYMBOL: vector<u8> = b"APT";
+    const ASSET_SYMBOL: vector<u8> = b"TEST";
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Hold refs to control the minting, transfer and burning of fungible assets.
@@ -25,13 +26,30 @@ module fungible_asset_extension::managed_coin {
 
     /// Initialize metadata object and store the refs.
     fun init_module(admin: &signer) {
-        let constructor_ref = &object::create_named_object(admin, ASSET_SYMBOL);
-        primary_store::create_primary_store_enabled_fungible_asset(
+        let collection_name: String = utf8(b"test collection name");
+        let token_name: String = utf8(b"test token name");
+        create_fixed_collection(
+            admin,
+            utf8(b"test collection description"),
+            1,
+            collection_name,
+            option::none(),
+            utf8(b"http://aptoslabs.com/collection"),
+        );
+        let constructor_ref = &create_named_token(admin,
+            collection_name,
+            utf8(b"test token description"),
+            token_name,
+            option::none(),
+            utf8(b"http://aptoslabs.com/token"),
+        );
+
+        primary_fungible_store::create_primary_store_enabled_fungible_asset(
             constructor_ref,
             option::some(option::none()),
-            utf8(b"Aptos Token"), /* name */
+            utf8(b"test fungible asset name"), /* name */
             utf8(ASSET_SYMBOL), /* symbol */
-            8, /* decimals */
+            2, /* decimals */
         );
 
         // Create mint/burn/transfer refs to allow creator to manage the fungible asset.
@@ -48,7 +66,12 @@ module fungible_asset_extension::managed_coin {
     #[view]
     /// Return the address of the managed fungible asset that's created when this module is deployed.
     public fun get_metadata(): Object<Metadata> {
-        let asset_address = object::create_object_address(&@fungible_asset_extension, ASSET_SYMBOL);
+        let collection_name: String = utf8(b"test collection name");
+        let token_name: String = utf8(b"test token name");
+        let asset_address = object::create_object_address(
+            &@fungible_token,
+            create_token_seed(&collection_name, &token_name)
+        );
         object::address_to_object<Metadata>(asset_address)
     }
 
@@ -56,7 +79,7 @@ module fungible_asset_extension::managed_coin {
     public entry fun mint(admin: &signer, amount: u64, to: address) acquires ManagedFungibleAsset {
         let asset = get_metadata();
         let managed_fungible_asset = authorized_borrow_refs(admin, asset);
-        let to_wallet = primary_store::ensure_primary_store_exists(to, asset);
+        let to_wallet = primary_fungible_store::ensure_primary_store_exists(to, asset);
         let fa = fungible_asset::mint(&managed_fungible_asset.mint_ref, amount);
         fungible_asset::deposit_with_ref(&managed_fungible_asset.transfer_ref, to_wallet, fa);
     }
@@ -65,8 +88,8 @@ module fungible_asset_extension::managed_coin {
     public entry fun transfer(admin: &signer, from: address, to: address, amount: u64) acquires ManagedFungibleAsset {
         let asset = get_metadata();
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
-        let from_wallet = primary_store::ensure_primary_store_exists(from, asset);
-        let to_wallet = primary_store::ensure_primary_store_exists(to, asset);
+        let from_wallet = primary_fungible_store::ensure_primary_store_exists(from, asset);
+        let to_wallet = primary_fungible_store::ensure_primary_store_exists(to, asset);
         fungible_asset::transfer_with_ref(transfer_ref, from_wallet, to_wallet, amount);
     }
 
@@ -74,7 +97,7 @@ module fungible_asset_extension::managed_coin {
     public entry fun burn(admin: &signer, from: address, amount: u64) acquires ManagedFungibleAsset {
         let asset = get_metadata();
         let burn_ref = &authorized_borrow_refs(admin, asset).burn_ref;
-        let from_wallet = primary_store::ensure_primary_store_exists(from, asset);
+        let from_wallet = primary_fungible_store::ensure_primary_store_exists(from, asset);
         fungible_asset::burn_from(burn_ref, from_wallet, amount);
     }
 
@@ -82,23 +105,23 @@ module fungible_asset_extension::managed_coin {
     public entry fun freeze_account(admin: &signer, account: address) acquires ManagedFungibleAsset {
         let asset = get_metadata();
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
-        let wallet = primary_store::ensure_primary_store_exists(account, asset);
-        fungible_asset::set_ungated_transfer(transfer_ref, wallet, false);
+        let wallet = primary_fungible_store::ensure_primary_store_exists(account, asset);
+        fungible_asset::set_frozen_flag(transfer_ref, wallet, true);
     }
 
     /// Unfreeze an account so it can transfer or receive fungible assets.
     public entry fun unfreeze_account(admin: &signer, account: address) acquires ManagedFungibleAsset {
         let asset = get_metadata();
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
-        let wallet = primary_store::ensure_primary_store_exists(account, asset);
-        fungible_asset::set_ungated_transfer(transfer_ref, wallet, true);
+        let wallet = primary_fungible_store::ensure_primary_store_exists(account, asset);
+        fungible_asset::set_frozen_flag(transfer_ref, wallet, false);
     }
 
     /// Withdraw as the owner of metadata object ignoring `allow_ungated_transfer` field.
     public fun withdraw(admin: &signer, amount: u64, from: address): FungibleAsset acquires ManagedFungibleAsset {
         let asset = get_metadata();
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
-        let from_wallet = primary_store::ensure_primary_store_exists(from, asset);
+        let from_wallet = primary_fungible_store::ensure_primary_store_exists(from, asset);
         fungible_asset::withdraw_with_ref(transfer_ref, from_wallet, amount)
     }
 
@@ -106,7 +129,7 @@ module fungible_asset_extension::managed_coin {
     public fun deposit(admin: &signer, to: address, fa: FungibleAsset) acquires ManagedFungibleAsset {
         let asset = get_metadata();
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
-        let to_wallet = primary_store::ensure_primary_store_exists(to, asset);
+        let to_wallet = primary_fungible_store::ensure_primary_store_exists(to, asset);
         fungible_asset::deposit_with_ref(transfer_ref, to_wallet, fa);
     }
 
@@ -120,7 +143,7 @@ module fungible_asset_extension::managed_coin {
         borrow_global<ManagedFungibleAsset>(object::object_address(&asset))
     }
 
-    #[test(creator = @0xcafe)]
+    #[test(creator = @fungible_token)]
     fun test_basic_flow(
         creator: &signer,
     ) acquires ManagedFungibleAsset {
@@ -130,18 +153,18 @@ module fungible_asset_extension::managed_coin {
 
         mint(creator, 100, creator_address);
         let asset = get_metadata();
-        assert!(primary_store::balance(creator_address, asset) == 100, 4);
+        assert!(primary_fungible_store::balance(creator_address, asset) == 100, 4);
         freeze_account(creator, creator_address);
-        assert!(!primary_store::ungated_balance_transfer_allowed(creator_address, asset), 5);
+        assert!(primary_fungible_store::is_frozen(creator_address, asset), 5);
         transfer(creator, creator_address, aaron_address, 10);
-        assert!(primary_store::balance(aaron_address, asset) == 10, 6);
+        assert!(primary_fungible_store::balance(aaron_address, asset) == 10, 6);
 
         unfreeze_account(creator, creator_address);
-        assert!(primary_store::ungated_balance_transfer_allowed(creator_address, asset), 7);
+        assert!(!primary_fungible_store::is_frozen(creator_address, asset), 7);
         burn(creator, creator_address, 90);
     }
 
-    #[test(creator = @0xcafe, aaron = @0xface)]
+    #[test(creator = @fungible_token, aaron = @0xface)]
     #[expected_failure(abort_code = 0x50001, location = Self)]
     fun test_permission_denied(
         creator: &signer,
