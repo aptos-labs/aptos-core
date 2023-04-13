@@ -1,6 +1,6 @@
 /// This defines an object-based Token. The key differentiating features from the Aptos standard
 /// token are:
-/// * Decouple token ownership from token data.
+/// * Decoupled token ownership from token data.
 /// * Explicit data model for token metadata via adjacent resources
 /// * Extensible framework for tokens
 ///
@@ -12,14 +12,12 @@ module aptos_token_objects::token {
     use std::string::{Self, String};
     use std::signer;
     use std::vector;
-
     use aptos_framework::event;
     use aptos_framework::object::{Self, ConstructorRef, Object};
-
     use aptos_token_objects::collection::{Self, Collection};
     use aptos_token_objects::royalty::{Self, Royalty};
 
-    // The token does not exist
+    /// The token does not exist
     const ETOKEN_DOES_NOT_EXIST: u64 = 1;
     /// The provided signer is not the creator
     const ENOT_CREATOR: u64 = 2;
@@ -380,7 +378,7 @@ module aptos_token_objects::token {
     }
 
     #[test(creator = @0x123)]
-    #[expected_failure(abort_code = 0x20001, location = aptos_token_objects::collection)]
+    #[expected_failure(abort_code = 0x20002, location = aptos_token_objects::collection)]
     fun test_too_many_tokens(creator: &signer) {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
