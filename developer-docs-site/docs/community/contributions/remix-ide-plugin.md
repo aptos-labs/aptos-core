@@ -122,7 +122,6 @@ AptosFramework = { git = "https://github.com/aptos-labs/aptos-core.git", subdir 
 4. When the compilation is complete, a compiled binary file is returned in the `aptos/<YOUR_PROJECT_NAME>/out` directory.
 
 If you need to revise the contract and compile again, delete the `out` directory and click **Compile** once more.
-:::
 
 5. Once you have compiled contract code, the `Deploy` button will be activated.
 
