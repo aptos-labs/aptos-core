@@ -434,7 +434,7 @@ export class AptosToken {
   }
 
   /**
-   * Transfer a token amount
+   * Transfer a token amount from the sender primary_store to the recipient primary_store
    *
    * @param sender The sender account
    * @param token The token address - For example if you’re transferring USDT, this would be the USDT address
@@ -454,7 +454,7 @@ export class AptosToken {
       ...extraArgs,
     });
     const rawTxn = await builder.build(
-      `0x1::primary_wallet::transfer`,
+      `0x1::primary_store::transfer`,
       [tokenType || this.tokenType],
       [HexString.ensure(token).hex(), HexString.ensure(recipient).hex(), amount],
     );

@@ -148,34 +148,6 @@ export class AptosAccount {
   }
 
   /**
-   * Takes creator address, collection name and token name and returns the token object address.
-   * Token object addresses are generated as sha256 hash of (creator address + `collection's name + :: + token name`)
-   *
-   * @param creator Creator address
-   * @param collectionName The collection name
-   * @param tokenName The token name
-   * @returns The token object address
-   */
-
-  static getTokenObjectAddress(creator: MaybeHexString, collectionName: string, tokenName: string): HexString {
-    const source = bcsToBytes(AccountAddress.fromHex(creator));
-    const collectionBytes = new TextEncoder().encode(collectionName);
-    const tokenBytes = new TextEncoder().encode(tokenName);
-
-    const seed = new Uint8Array(collectionBytes.length + 2 + tokenBytes.length);
-    seed.set(collectionBytes);
-    seed.set([AuthenticationKey.COLON, AuthenticationKey.COLON], collectionBytes.length);
-    seed.set(tokenBytes, collectionBytes.length + 2);
-
-    const bytes = new Uint8Array([...source, ...seed, AuthenticationKey.DERIVE_OBJECT_FROM_SEED_SCHEME]);
-
-    const hash = sha3Hash.create();
-    hash.update(bytes);
-
-    return HexString.fromUint8Array(hash.digest());
-  }
-
-  /**
    * This key is generated with Ed25519 scheme.
    * Public key is used to check a signature of transaction, signed by given account
    * @returns The public key for the associated account

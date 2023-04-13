@@ -386,6 +386,12 @@ export class TypeTagParser {
         bail("Invalid type tag.");
       }
 
+      // an Object `0x1::object::Object<T>` doesn't hold a real type, it points to an address
+      // therefore, we parse it as an address and dont need to care/parse the `T` type
+      if (module === "object" && name === "Object") {
+        return new TypeTagAddress();
+      }
+
       let tyTags: TypeTag[] = [];
       // Check if the struct has ty args
       if (this.tokens.length > 0 && this.tokens[0][1] === "<") {
