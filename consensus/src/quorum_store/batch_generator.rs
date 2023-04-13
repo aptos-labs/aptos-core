@@ -271,11 +271,12 @@ impl BatchGenerator {
         if !pulled_txns.is_empty() {
             let last_index = self.config.batch_buckets.len() - 1;
             let bucket_start = self.config.batch_buckets[last_index];
+            let num_txns = pulled_txns.len();
 
             self.push_to_batches(
                 &mut batches,
                 &mut pulled_txns,
-                last_index,
+                num_txns,
                 expiry_time,
                 bucket_start,
             );

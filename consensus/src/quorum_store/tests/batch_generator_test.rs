@@ -12,7 +12,6 @@ use crate::quorum_store::{
 };
 use aptos_config::config::QuorumStoreConfig;
 use aptos_consensus_types::{common::TransactionSummary, proof_of_store::BatchId};
-use aptos_global_constants::DEFAULT_BUCKETS;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use aptos_types::transaction::SignedTransaction;
 use futures::{
@@ -171,8 +170,6 @@ async fn test_batch_creation() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_bucketed_batch_creation() {
-    let buckets = DEFAULT_BUCKETS.to_vec();
-
     let (quorum_store_to_mempool_tx, mut quorum_store_to_mempool_rx) = channel(1_024);
     let (batch_coordinator_cmd_tx, mut batch_coordinator_cmd_rx) = TokioChannel(100);
 
@@ -183,6 +180,7 @@ async fn test_bucketed_batch_creation() {
         max_batch_bytes: max_size,
         ..Default::default()
     };
+    let buckets = config.batch_buckets.clone();
 
     let mut batch_generator = BatchGenerator::new(
         0,
@@ -404,6 +402,66 @@ async fn test_bucketed_batches_use_account_min_gas() {
 
             assert_eq!(&result[0].clone().into_transactions(), &signed_txns[0..2]);
             assert_eq!(&result[1].clone().into_transactions(), &signed_txns[2..]);
+        } else {
+            panic!("Unexpected variant")
+        }
+    });
+
+    let result = batch_generator.handle_scheduled_pull(300).await;
+    batch_coordinator_cmd_tx
+        .send(BatchCoordinatorCommand::NewBatch(result))
+        .await
+        .unwrap();
+
+    timeout(Duration::from_millis(10_000), join_handle)
+        .await
+        .unwrap()
+        .unwrap();
+}
+
+#[tokio::test]
+async fn test_last_bucketed_batch() {
+    let (quorum_store_to_mempool_tx, mut quorum_store_to_mempool_rx) = channel(1_024);
+    let (batch_coordinator_cmd_tx, mut batch_coordinator_cmd_rx) = TokioChannel(100);
+
+    let config = QuorumStoreConfig {
+        max_batch_txns: 10,
+        ..Default::default()
+    };
+    let max_batch_bytes = config.max_batch_bytes;
+    let buckets = config.batch_buckets.clone();
+
+    let mut batch_generator = BatchGenerator::new(
+        0,
+        AccountAddress::random(),
+        config,
+        Arc::new(MockQuorumStoreDB::new()),
+        quorum_store_to_mempool_tx,
+        1000,
+    );
+
+    let join_handle = tokio::spawn(async move {
+        let low_gas_txn = create_signed_transaction(1);
+        let high_gas_txn_other_account = create_signed_transaction(u64::MAX);
+        let signed_txns = vec![low_gas_txn, high_gas_txn_other_account];
+
+        queue_mempool_batch_response(
+            signed_txns.clone(),
+            max_batch_bytes,
+            &mut quorum_store_to_mempool_rx,
+        )
+        .await;
+
+        let quorum_store_command = batch_coordinator_cmd_rx.recv().await.unwrap();
+        if let BatchCoordinatorCommand::NewBatch(result) = quorum_store_command {
+            assert_eq!(result.len(), 2);
+            assert_eq!(result[0].num_txns(), 1);
+            assert_eq!(result[1].num_txns(), 1);
+            assert_eq!(result[0].gas_bucket_start(), 0);
+            assert_eq!(result[1].gas_bucket_start(), buckets[buckets.len() - 1]);
+
+            assert_eq!(&result[0].clone().into_transactions(), &signed_txns[0..1]);
+            assert_eq!(&result[1].clone().into_transactions(), &signed_txns[1..]);
         } else {
             panic!("Unexpected variant")
         }
