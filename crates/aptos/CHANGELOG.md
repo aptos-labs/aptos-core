@@ -6,6 +6,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 ### Fixed
 * If `aptos init` is run with a faucet URL specified (which happens by default when using the local, devnet, or testnet network options) and funding the account fails, the account creation is considered a failure and nothing is persisted. Previously it would report success despite the account not being created on chain.
 * When specifying a profile where the `AuthenticationKey` has been rotated, now the `AccountAddress` is properly used from the config file
+* Update `aptos init` to fix an incorrect account address issue, when trying to init with a rotated private key. Right now it does an actual account lookup instead of deriving from public key
 
 ### Added
 * Updates to prover and framework specs
