@@ -27,6 +27,8 @@ module aptos_framework::object {
     use aptos_framework::from_bcs;
     use aptos_framework::guid;
 
+    friend aptos_framework::primary_store;
+
     /// An object already exists at this address
     const EOBJECT_EXISTS: u64 = 1;
     /// An object does not exist at this address
@@ -93,7 +95,7 @@ module aptos_framework::object {
 
     #[resource_group(scope = global)]
     /// A shared resource group for storing object resources together in storage.
-    struct ObjectGroup { }
+    struct ObjectGroup {}
 
     /// A pointer to an object -- these can only provide guarantees based upon the underlying data
     /// type, that is the validity of T existing at an address is something that cannot be verified
@@ -149,7 +151,12 @@ module aptos_framework::object {
     public fun address_to_object<T: key>(object: address): Object<T> {
         assert!(exists<ObjectCore>(object), error::not_found(EOBJECT_DOES_NOT_EXIST));
         assert!(exists_at<T>(object), error::not_found(ERESOURCE_DOES_NOT_EXIST));
-        Object<T>{ inner: object }
+        Object<T> { inner: object }
+    }
+
+    /// Returns true if there exists an object or the remnants of an object.
+    public fun is_object(object: address): bool {
+        exists<ObjectCore>(object)
     }
 
     /// Derives an object address from source material: sha3_256([creator address | seed | 0xFE]).
@@ -165,6 +172,14 @@ module aptos_framework::object {
         let bytes = bcs::to_bytes(&source);
         vector::append(&mut bytes, bcs::to_bytes(&derive_from));
         vector::push_back(&mut bytes, OBJECT_DERIVED_SCHEME);
+        from_bcs::to_address(hash::sha3_256(bytes))
+    }
+
+    /// Derives an object from an Account GUID.
+    public fun create_guid_object_address(source: address, creation_num: u64): address {
+        let id = guid::create_id(source, creation_num);
+        let bytes = bcs::to_bytes(&id);
+        vector::push_back(&mut bytes, OBJECT_FROM_GUID_ADDRESS_SCHEME);
         from_bcs::to_address(hash::sha3_256(bytes))
     }
 
@@ -190,8 +205,7 @@ module aptos_framework::object {
 
     /// Create a new object whose address is derived based on the creator account address and another object.
     /// Derivde objects, similar to named objects, cannot be deleted.
-    public fun create_user_derived_object(creator: &signer, derive_ref: &DeriveRef): ConstructorRef {
-        let creator_address = signer::address_of(creator);
+    public(friend) fun create_user_derived_object(creator_address: address, derive_ref: &DeriveRef): ConstructorRef {
         let obj_addr = create_user_derived_object_address(creator_address, derive_ref.self);
         create_object_internal(creator_address, obj_addr, false)
     }
@@ -471,6 +485,14 @@ module aptos_framework::object {
     }
 
     /// Accessors
+    /// Return true if ungated transfer is allowed.
+    public fun ungated_transfer_allowed<T: key>(object: Object<T>): bool acquires ObjectCore {
+        assert!(
+            exists<ObjectCore>(object.inner),
+            error::not_found(EOBJECT_DOES_NOT_EXIST),
+        );
+        borrow_global<ObjectCore>(object.inner).allow_ungated_transfer
+    }
 
     /// Return the current owner.
     public fun owner<T: key>(object: Object<T>): address acquires ObjectCore {
@@ -537,7 +559,7 @@ module aptos_framework::object {
 
     #[test_only]
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
-    struct Weapon has key { }
+    struct Weapon has key {}
 
     #[test_only]
     public fun create_hero(creator: &signer): (ConstructorRef, Object<Hero>) acquires ObjectCore {
@@ -560,7 +582,7 @@ module aptos_framework::object {
     public fun create_weapon(creator: &signer): (ConstructorRef, Object<Weapon>) {
         let weapon_constructor_ref = create_named_object(creator, b"weapon");
         let weapon_signer = generate_signer(&weapon_constructor_ref);
-        move_to(&weapon_signer, Weapon { });
+        move_to(&weapon_signer, Weapon {});
         let weapon = object_from_constructor_ref<Weapon>(&weapon_constructor_ref);
         (weapon_constructor_ref, weapon)
     }

@@ -14,11 +14,39 @@ fn main() {
         prev_dir.pop();
         println!(
             "cargo:rerun-if-changed={}",
+            prev_dir
+                .join("aptos-token-objects")
+                .join("Move.toml")
+                .display()
+        );
+        println!(
+            "cargo:rerun-if-changed={}",
+            prev_dir
+                .join("aptos-token-objects")
+                .join("sources")
+                .display()
+        );
+        println!(
+            "cargo:rerun-if-changed={}",
             prev_dir.join("aptos-token").join("sources").display()
         );
         println!(
             "cargo:rerun-if-changed={}",
             prev_dir.join("aptos-token").join("Move.toml").display()
+        );
+        println!(
+            "cargo:rerun-if-changed={}",
+            prev_dir
+                .join("aptos-token-objects")
+                .join("sources")
+                .display()
+        );
+        println!(
+            "cargo:rerun-if-changed={}",
+            prev_dir
+                .join("aptos-token-objects")
+                .join("Move.toml")
+                .display()
         );
         println!(
             "cargo:rerun-if-changed={}",

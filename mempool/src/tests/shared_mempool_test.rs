@@ -9,7 +9,7 @@ use crate::{
 };
 use aptos_consensus_types::common::RejectedTransactionSummary;
 use aptos_mempool_notifications::MempoolNotificationSender;
-use aptos_types::transaction::Transaction;
+use aptos_types::{transaction::Transaction, vm_status::DiscardedVMStatus};
 use futures::{channel::oneshot, executor::block_on, sink::SinkExt};
 
 #[test]
@@ -37,6 +37,7 @@ fn test_consensus_events_rejected_txns() {
         sender: rejected_txn.sender(),
         sequence_number: rejected_txn.sequence_number(),
         hash: rejected_txn.committed_hash(),
+        reason: DiscardedVMStatus::MALFORMED,
     }];
     let (callback, callback_rcv) = oneshot::channel();
     let req = QuorumStoreRequest::RejectNotification(transactions, callback);

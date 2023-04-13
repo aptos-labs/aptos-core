@@ -35,6 +35,8 @@ the Move stdlib, the Aptos stdlib, and the Aptos framework.
 -  [Function `bls12_381_structures_enabled`](#0x1_features_bls12_381_structures_enabled)
 -  [Function `get_periodical_reward_rate_decrease_feature`](#0x1_features_get_periodical_reward_rate_decrease_feature)
 -  [Function `periodical_reward_rate_decrease_enabled`](#0x1_features_periodical_reward_rate_decrease_enabled)
+-  [Function `get_partial_governance_voting`](#0x1_features_get_partial_governance_voting)
+-  [Function `partial_governance_voting_enabled`](#0x1_features_partial_governance_voting_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -42,6 +44,7 @@ the Move stdlib, the Aptos stdlib, and the Aptos framework.
 -  [Specification](#@Specification_1)
     -  [Resource `Features`](#@Specification_1_Features)
     -  [Function `periodical_reward_rate_decrease_enabled`](#@Specification_1_periodical_reward_rate_decrease_enabled)
+    -  [Function `partial_governance_voting_enabled`](#@Specification_1_partial_governance_voting_enabled)
     -  [Function `change_feature_flags`](#@Specification_1_change_feature_flags)
     -  [Function `is_enabled`](#@Specification_1_is_enabled)
     -  [Function `set`](#@Specification_1_set)
@@ -208,6 +211,17 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_MULTI_ED25519_PK_VALIDATE_V2_NATIVES">MULTI_ED25519_PK_VALIDATE_V2_NATIVES</a>: u64 = 7;
+</code></pre>
+
+
+
+<a name="0x1_features_PARTIAL_GOVERNANCE_VOTING"></a>
+
+Whether enable paritial governance voting.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_PARTIAL_GOVERNANCE_VOTING">PARTIAL_GOVERNANCE_VOTING</a>: u64 = 17;
 </code></pre>
 
 
@@ -881,6 +895,52 @@ Lifetime: transient
 
 </details>
 
+<a name="0x1_features_get_partial_governance_voting"></a>
+
+## Function `get_partial_governance_voting`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_partial_governance_voting">get_partial_governance_voting</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_partial_governance_voting">get_partial_governance_voting</a>(): u64 { <a href="features.md#0x1_features_PARTIAL_GOVERNANCE_VOTING">PARTIAL_GOVERNANCE_VOTING</a> }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_partial_governance_voting_enabled"></a>
+
+## Function `partial_governance_voting_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_partial_governance_voting_enabled">partial_governance_voting_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_partial_governance_voting_enabled">partial_governance_voting_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_PARTIAL_GOVERNANCE_VOTING">PARTIAL_GOVERNANCE_VOTING</a>)
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_features_change_feature_flags"></a>
 
 ## Function `change_feature_flags`
@@ -1055,6 +1115,35 @@ Helper to check whether a feature flag is enabled.
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> [abstract] <b>false</b>;
 <b>ensures</b> [abstract] result == <a href="features.md#0x1_features_spec_reward_rate_decrease_enabled">spec_reward_rate_decrease_enabled</a>();
+</code></pre>
+
+
+
+
+<a name="0x1_features_spec_partial_governance_voting_enabled"></a>
+
+
+<pre><code><b>fun</b> <a href="features.md#0x1_features_spec_partial_governance_voting_enabled">spec_partial_governance_voting_enabled</a>(): bool {
+   <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(<a href="features.md#0x1_features_PARTIAL_GOVERNANCE_VOTING">PARTIAL_GOVERNANCE_VOTING</a>)
+}
+</code></pre>
+
+
+
+<a name="@Specification_1_partial_governance_voting_enabled"></a>
+
+### Function `partial_governance_voting_enabled`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_partial_governance_voting_enabled">partial_governance_voting_enabled</a>(): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> [abstract] result == <a href="features.md#0x1_features_spec_partial_governance_voting_enabled">spec_partial_governance_voting_enabled</a>();
 </code></pre>
 
 

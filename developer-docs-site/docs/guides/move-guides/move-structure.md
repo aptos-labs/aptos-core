@@ -13,7 +13,7 @@ Once published, the definition of a struct in Move is immutable. Structs themsel
 
 ## Abilities
 
-[Structures](https://move-language.github.io/move/structs-and-resources.html) in Move can be given different [abilities](https://move-language.github.io/move/abilities.html) that describe what can be done with that type. There are four different abilities that allow:
+[Structures](./book/structs-and-resources.md) in Move can be given different [abilities](./book/abilities.md) that describe what can be done with that type. There are four different abilities that allow:
 
 * copy: values of types with this ability to be copied. A geographic ID would be a good use case. NFTs should not have this ability.
 * drop: values of types with this ability to be popped/dropped.
