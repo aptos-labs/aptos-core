@@ -60,7 +60,7 @@ The owner is the owner of the funds. For example, Bob creates an account on the 
 As an owner:
 
 - Bob owns the funds that will be used for staking.
-- Only Bob can add or unlock or withdraw funds.
+- Only Bob can add, unlock or withdraw funds.
 - Only Bob can extend the lockup period.
 - Bob can change the node operator Alice to some other node operator anytime Bob wishes to do so.
 - The reward will be deposited into Bob's (owner's) account.
@@ -74,7 +74,7 @@ As an operator:
 - Alice has permissions only to join or leave the validator set.
 - As a validator, Alice will perform the validating function.
 - Alice has the permissions to change the consensus key and network addresses. The consensus key is used by Alice to participate in the validator consensus process, i.e., to vote and propose a block. Alice is allowed to change ("rotate") this key in case this key is compromised.
-- However, Alice cannot move funds (unless Alice is the owner, i.e., Alice has the `OwnerCapability` resource.
+- However, Alice cannot move funds (unless Alice is the owner, i.e., Alice has the `OwnerCapability` resource).
 
 ### Voter
 
@@ -90,7 +90,7 @@ Throughout the duration of an epoch, the following flow of events occurs several
 
 - A validator leader is selected by a deterministic formula based on the validator reputation determined by validator's performance (including whether the validator has voted in the past or not) and stake. **This leader selection is not done by voting.**
 - The selected leader sends a proposal containing the collected quorum votes of the previous proposal and the leader's proposed order of transactions for the new block. 
-- All the validators from the validator set will vote on the leader's proposal for the new block. Once consensus is reached, the block can be finalized. Hence, the actual list of votes to achieve consensus is a subset of all the validators in the validator set. This leader validator is rewarded. **Rewards are given only to the leader validators, not to the voter validators.**
+- All the validators from the validator set will vote on the leader's proposal for the new block. Once consensus is reached, the block can be finalized. Hence, the actual list of votes to achieve consensus is a subset of all the validators in the validator set. This leader validator is rewarded. **Rewards are given only to the leader validator, not to the voter validators.**
 - The above flow repeats with the selection of another validator leader and repeating the steps for the next new block. Rewards are given at the end of the epoch. 
 
 ## Validator state and stake state
