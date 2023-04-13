@@ -205,9 +205,9 @@ module aptos_token_objects::collection {
         uri: String,
         supply: Option<Supply>,
     ): ConstructorRef {
-        assert!(string::length(&name) < MAX_COLLECTION_NAME_LENGTH, ECOLLECTION_NAME_TOO_LONG);
-        assert!(string::length(&uri) < MAX_URI_LENGTH, EURI_TOO_LONG);
-        assert!(string::length(&description) < MAX_DESCRIPTION_LENGTH, EDESCRIPTION_TOO_LONG);
+        assert!(string::length(&name) < MAX_COLLECTION_NAME_LENGTH, error::out_of_range(ECOLLECTION_NAME_TOO_LONG));
+        assert!(string::length(&uri) < MAX_URI_LENGTH, error::out_of_range(EURI_TOO_LONG));
+        assert!(string::length(&description) < MAX_DESCRIPTION_LENGTH, error::out_of_range(EDESCRIPTION_TOO_LONG));
 
         let object_signer = object::generate_signer(&constructor_ref);
 
@@ -243,7 +243,7 @@ module aptos_token_objects::collection {
 
     /// Named objects are derived from a seed, the collection's seed is its name.
     public fun create_collection_seed(name: &String): vector<u8> {
-        assert!(string::length(name) < MAX_COLLECTION_NAME_LENGTH, ECOLLECTION_NAME_TOO_LONG);
+        assert!(string::length(name) < MAX_COLLECTION_NAME_LENGTH, error::out_of_range(ECOLLECTION_NAME_TOO_LONG));
         *string::bytes(name)
     }
 
@@ -381,7 +381,7 @@ module aptos_token_objects::collection {
     }
 
     public fun set_description(mutator_ref: &MutatorRef, description: String) acquires Collection {
-        assert!(string::length(&description) < MAX_DESCRIPTION_LENGTH, EDESCRIPTION_TOO_LONG);
+        assert!(string::length(&description) < MAX_DESCRIPTION_LENGTH, error::out_of_range(EDESCRIPTION_TOO_LONG));
         let collection = borrow_mut(mutator_ref);
         collection.description = description;
         event::emit_event(
@@ -391,7 +391,7 @@ module aptos_token_objects::collection {
     }
 
     public fun set_uri(mutator_ref: &MutatorRef, uri: String) acquires Collection {
-        assert!(string::length(&uri) < MAX_URI_LENGTH, EURI_TOO_LONG);
+        assert!(string::length(&uri) < MAX_URI_LENGTH, error::out_of_range(EURI_TOO_LONG));
         let collection = borrow_mut(mutator_ref);
         collection.uri = uri;
         event::emit_event(
