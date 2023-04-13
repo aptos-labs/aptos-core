@@ -47,6 +47,9 @@ impl MoveVmExt {
             };
 
         let treat_friend_as_private = features.is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE);
+        let enable_invariant_violation_check_in_swap_loc =
+            !timed_features.is_enabled(TimedFeatureFlag::DisableInvariantViolationCheckInSwapLoc);
+        let type_size_limit = timed_features.is_enabled(TimedFeatureFlag::EntryTypeSizeLimit);
 
         Ok(Self {
             inner: MoveVM::new_with_config(
@@ -61,6 +64,8 @@ impl MoveVmExt {
                     verifier: verifier_config(treat_friend_as_private, &timed_features),
                     max_binary_format_version,
                     paranoid_type_checks: crate::AptosVM::get_paranoid_checks(),
+                    enable_invariant_violation_check_in_swap_loc,
+                    type_size_limit,
                 },
             )?,
             chain_id,
