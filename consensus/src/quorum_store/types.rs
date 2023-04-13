@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{bail, ensure};
+use anyhow::ensure;
 use aptos_consensus_types::proof_of_store::{BatchId, BatchInfo};
 use aptos_crypto::{
     hash::{CryptoHash, CryptoHasher},
@@ -246,33 +246,35 @@ impl BatchMsg {
 
     pub fn verify(&self, peer_id: PeerId) -> anyhow::Result<()> {
         ensure!(!self.batches.is_empty(), "Empty message");
-        let mut epoch = None;
         for batch in self.batches.iter() {
             ensure!(
                 batch.author() == peer_id,
                 "Batch author doesn't match sender"
             );
-            match epoch {
-                Some(epoch) => ensure!(epoch == batch.epoch(), "Epoch mismatch within batches"),
-                None => epoch = Some(batch.epoch()),
-            }
             batch.verify()?
         }
         Ok(())
     }
 
     pub fn epoch(&self) -> anyhow::Result<u64> {
-        match self.batches.first() {
-            Some(batch) => Ok(batch.epoch()),
-            None => bail!("Empty message"),
+        ensure!(!self.batches.is_empty(), "Empty message");
+        let epoch = self.batches[0].epoch();
+        for batch in self.batches.iter() {
+            ensure!(
+                batch.epoch() == epoch,
+                "Epoch mismatch: {} != {}",
+                batch.epoch(),
+                epoch
+            );
         }
+        Ok(epoch)
     }
 
     pub fn author(&self) -> PeerId {
         self.batches[0].author()
     }
 
-    pub fn unpack(self) -> Vec<Batch> {
+    pub fn take(self) -> Vec<Batch> {
         self.batches
     }
 }

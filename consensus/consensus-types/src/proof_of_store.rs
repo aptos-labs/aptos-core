@@ -153,13 +153,20 @@ impl SignedBatchInfoMsg {
     }
 
     pub fn epoch(&self) -> anyhow::Result<u64> {
-        match self.signed_infos.first() {
-            Some(signed_info) => Ok(signed_info.epoch()),
-            None => bail!("Empty message"),
+        ensure!(!self.signed_infos.is_empty(), "Empty message");
+        let epoch = self.signed_infos[0].epoch();
+        for info in self.signed_infos.iter() {
+            ensure!(
+                info.epoch() == epoch,
+                "Epoch mismatch: {} != {}",
+                info.epoch(),
+                epoch
+            );
         }
+        Ok(epoch)
     }
 
-    pub fn unpack(self) -> Vec<SignedBatchInfo> {
+    pub fn take(self) -> Vec<SignedBatchInfo> {
         self.signed_infos
     }
 }
@@ -241,13 +248,20 @@ impl ProofOfStoreMsg {
     }
 
     pub fn epoch(&self) -> anyhow::Result<u64> {
-        match self.proofs.first() {
-            Some(proof) => Ok(proof.epoch()),
-            None => bail!("Empty message"),
+        ensure!(!self.proofs.is_empty(), "Empty message");
+        let epoch = self.proofs[0].epoch();
+        for proof in self.proofs.iter() {
+            ensure!(
+                proof.epoch() == epoch,
+                "Epoch mismatch: {} != {}",
+                proof.epoch(),
+                epoch
+            );
         }
+        Ok(epoch)
     }
 
-    pub fn unpack(self) -> Vec<ProofOfStore> {
+    pub fn take(self) -> Vec<ProofOfStore> {
         self.proofs
     }
 }

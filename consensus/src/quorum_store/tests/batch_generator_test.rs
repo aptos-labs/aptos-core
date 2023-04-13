@@ -96,7 +96,7 @@ async fn test_batch_creation() {
         .await;
         // Expect Batch for 1 txn
         let quorum_store_command = batch_coordinator_cmd_rx.recv().await.unwrap();
-        if let BatchCoordinatorCommand::NewBatch(data) = quorum_store_command {
+        if let BatchCoordinatorCommand::NewBatches(data) = quorum_store_command {
             assert_eq!(1, data.len());
             let data = data[0].clone();
             assert_eq!(data.batch_id(), BatchId::new_for_test(1));
@@ -119,7 +119,7 @@ async fn test_batch_creation() {
         assert_eq!(exclude_txns.len(), num_txns);
         // Expect Batch for 9 (due to size limit).
         let quorum_store_command = batch_coordinator_cmd_rx.recv().await.unwrap();
-        if let BatchCoordinatorCommand::NewBatch(data) = quorum_store_command {
+        if let BatchCoordinatorCommand::NewBatches(data) = quorum_store_command {
             assert_eq!(1, data.len());
             let data = data[0].clone();
             assert_eq!(data.batch_id(), BatchId::new_for_test(2));
@@ -143,7 +143,7 @@ async fn test_batch_creation() {
         assert_eq!(exclude_txns.len(), num_txns);
         // Expect AppendBatch for 9 txns
         let quorum_store_command = batch_coordinator_cmd_rx.recv().await.unwrap();
-        if let BatchCoordinatorCommand::NewBatch(data) = quorum_store_command {
+        if let BatchCoordinatorCommand::NewBatches(data) = quorum_store_command {
             assert_eq!(1, data.len());
             let data = data[0].clone();
             assert_eq!(data.batch_id(), BatchId::new_for_test(3));
@@ -158,7 +158,7 @@ async fn test_batch_creation() {
     for _ in 0..3 {
         let result = batch_generator.handle_scheduled_pull(300).await;
         batch_coordinator_cmd_tx
-            .send(BatchCoordinatorCommand::NewBatch(result))
+            .send(BatchCoordinatorCommand::NewBatches(result))
             .await
             .unwrap();
     }
@@ -204,7 +204,7 @@ async fn test_bucketed_batch_creation() {
 
         // Expect Batch for 1 txn
         let quorum_store_command = batch_coordinator_cmd_rx.recv().await.unwrap();
-        if let BatchCoordinatorCommand::NewBatch(data) = quorum_store_command {
+        if let BatchCoordinatorCommand::NewBatches(data) = quorum_store_command {
             assert_eq!(1, data.len());
             let data = data[0].clone();
             assert_eq!(data.batch_id(), BatchId::new_for_test(1));
@@ -233,7 +233,7 @@ async fn test_bucketed_batch_creation() {
         assert_eq!(exclude_txns.len(), num_txns);
         // Expect Batch for 9 (due to size limit).
         let quorum_store_command = batch_coordinator_cmd_rx.recv().await.unwrap();
-        if let BatchCoordinatorCommand::NewBatch(batches) = quorum_store_command {
+        if let BatchCoordinatorCommand::NewBatches(batches) = quorum_store_command {
             assert_eq!(3, batches.len());
 
             let data = batches[0].clone();
@@ -272,7 +272,7 @@ async fn test_bucketed_batch_creation() {
         assert_eq!(exclude_txns.len(), num_txns);
         // Expect AppendBatch for 9 txns
         let quorum_store_command = batch_coordinator_cmd_rx.recv().await.unwrap();
-        if let BatchCoordinatorCommand::NewBatch(data) = quorum_store_command {
+        if let BatchCoordinatorCommand::NewBatches(data) = quorum_store_command {
             assert_eq!(1, data.len());
             let data = data[0].clone();
             assert_eq!(data.batch_id(), BatchId::new_for_test(5));
@@ -290,7 +290,7 @@ async fn test_bucketed_batch_creation() {
     for _ in 0..3 {
         let result = batch_generator.handle_scheduled_pull(300).await;
         batch_coordinator_cmd_tx
-            .send(BatchCoordinatorCommand::NewBatch(result))
+            .send(BatchCoordinatorCommand::NewBatches(result))
             .await
             .unwrap();
     }
@@ -330,7 +330,7 @@ async fn test_max_batch_txns() {
         .await;
 
         let quorum_store_command = batch_coordinator_cmd_rx.recv().await.unwrap();
-        if let BatchCoordinatorCommand::NewBatch(result) = quorum_store_command {
+        if let BatchCoordinatorCommand::NewBatches(result) = quorum_store_command {
             assert_eq!(result.len(), 3);
             assert_eq!(result[0].num_txns(), 10);
             assert_eq!(result[1].num_txns(), 10);
@@ -346,7 +346,7 @@ async fn test_max_batch_txns() {
 
     let result = batch_generator.handle_scheduled_pull(300).await;
     batch_coordinator_cmd_tx
-        .send(BatchCoordinatorCommand::NewBatch(result))
+        .send(BatchCoordinatorCommand::NewBatches(result))
         .await
         .unwrap();
 
@@ -393,7 +393,7 @@ async fn test_bucketed_batches_use_account_min_gas() {
         .await;
 
         let quorum_store_command = batch_coordinator_cmd_rx.recv().await.unwrap();
-        if let BatchCoordinatorCommand::NewBatch(result) = quorum_store_command {
+        if let BatchCoordinatorCommand::NewBatches(result) = quorum_store_command {
             assert_eq!(result.len(), 2);
             assert_eq!(result[0].num_txns(), 2);
             assert_eq!(result[1].num_txns(), 1);
@@ -409,7 +409,7 @@ async fn test_bucketed_batches_use_account_min_gas() {
 
     let result = batch_generator.handle_scheduled_pull(300).await;
     batch_coordinator_cmd_tx
-        .send(BatchCoordinatorCommand::NewBatch(result))
+        .send(BatchCoordinatorCommand::NewBatches(result))
         .await
         .unwrap();
 
@@ -453,7 +453,7 @@ async fn test_last_bucketed_batch() {
         .await;
 
         let quorum_store_command = batch_coordinator_cmd_rx.recv().await.unwrap();
-        if let BatchCoordinatorCommand::NewBatch(result) = quorum_store_command {
+        if let BatchCoordinatorCommand::NewBatches(result) = quorum_store_command {
             assert_eq!(result.len(), 2);
             assert_eq!(result[0].num_txns(), 1);
             assert_eq!(result[1].num_txns(), 1);
@@ -469,7 +469,7 @@ async fn test_last_bucketed_batch() {
 
     let result = batch_generator.handle_scheduled_pull(300).await;
     batch_coordinator_cmd_tx
-        .send(BatchCoordinatorCommand::NewBatch(result))
+        .send(BatchCoordinatorCommand::NewBatches(result))
         .await
         .unwrap();
 

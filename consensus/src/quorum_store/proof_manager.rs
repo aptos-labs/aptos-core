@@ -178,7 +178,7 @@ impl ProofManager {
                                 break;
                             },
                             ProofManagerCommand::ReceiveProofs(proofs) => {
-                                self.receive_proofs(proofs.unpack());
+                                self.receive_proofs(proofs.take());
                             },
                             ProofManagerCommand::CommitNotification(block_timestamp, digests) => {
                                 self.handle_commit_notification(block_timestamp, digests);

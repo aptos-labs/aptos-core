@@ -76,6 +76,6 @@ async fn test_proof_coordinator_basic() {
     };
     // check normal path
     assert!(proof_msg.verify(&verifier).is_ok());
-    let proofs = proof_msg.unpack();
+    let proofs = proof_msg.take();
     assert_eq!(proofs[0].digest(), digest);
 }

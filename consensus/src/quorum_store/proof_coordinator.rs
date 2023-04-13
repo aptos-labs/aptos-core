@@ -268,7 +268,7 @@ impl ProofCoordinator {
                         },
                         ProofCoordinatorCommand::AppendSignature(signed_batch_infos) => {
                             let mut proofs = vec![];
-                            for signed_batch_info in signed_batch_infos.unpack().into_iter() {
+                            for signed_batch_info in signed_batch_infos.take().into_iter() {
                                 let peer_id = signed_batch_info.signer();
                                 let digest = *signed_batch_info.digest();
                                 match self.add_signature(signed_batch_info, &validator_verifier) {

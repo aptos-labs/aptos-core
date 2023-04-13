@@ -59,7 +59,7 @@ impl NetworkListener {
                     },
                     VerifiedEvent::BatchMsg(batch_msg) => {
                         let author = batch_msg.author();
-                        let batches = batch_msg.unpack();
+                        let batches = batch_msg.take();
                         counters::RECEIVED_BATCH_MSG_COUNT.inc();
 
                         let idx =
@@ -71,7 +71,7 @@ impl NetworkListener {
                             idx
                         );
                         self.remote_batch_coordinator_tx[idx]
-                            .send(BatchCoordinatorCommand::NewBatch(batches))
+                            .send(BatchCoordinatorCommand::NewBatches(batches))
                             .await
                             .expect("Could not send remote batch");
                     },

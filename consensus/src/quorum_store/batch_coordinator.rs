@@ -17,7 +17,7 @@ use tokio::sync::{mpsc::Receiver, oneshot};
 #[derive(Debug)]
 pub enum BatchCoordinatorCommand {
     Shutdown(oneshot::Sender<()>),
-    NewBatch(Vec<Batch>),
+    NewBatches(Vec<Batch>),
 }
 
 pub struct BatchCoordinator {
@@ -93,7 +93,7 @@ impl BatchCoordinator {
                         .expect("Failed to send shutdown ack to QuorumStoreCoordinator");
                     break;
                 },
-                BatchCoordinatorCommand::NewBatch(batches) => {
+                BatchCoordinatorCommand::NewBatches(batches) => {
                     let mut persist_requests = vec![];
                     for batch in batches.into_iter() {
                         if let Some(persist_request) = self.handle_batch(batch).await {
