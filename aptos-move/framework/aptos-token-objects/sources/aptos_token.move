@@ -11,26 +11,24 @@ module aptos_token_objects::aptos_token {
     use std::option::{Self, Option};
     use std::string::String;
     use std::signer;
-
     use aptos_framework::object::{Self, ConstructorRef, Object};
-
     use aptos_token_objects::collection;
     use aptos_token_objects::property_map;
     use aptos_token_objects::royalty;
     use aptos_token_objects::token;
 
-    // The token does not exist
-    const ETOKEN_DOES_NOT_EXIST: u64 = 1;
+    /// The collection does not exist
+    const ECOLLECTION_DOES_NOT_EXIST: u64 = 1;
+    /// The token does not exist
+    const ETOKEN_DOES_NOT_EXIST: u64 = 2;
     /// The provided signer is not the creator
-    const ENOT_CREATOR: u64 = 2;
-    /// Attempted to mutate an immutable field
-    const EFIELD_NOT_MUTABLE: u64 = 3;
-    /// Attempted to burn a non-burnable token
-    const ETOKEN_NOT_BURNABLE: u64 = 4;
-    /// Attempted to mutate a property map that is not mutable
-    const EPROPERTIES_NOT_MUTABLE: u64 = 5;
-    // The collection does not exist
-    const ECOLLECTION_DOES_NOT_EXIST: u64 = 6;
+    const ENOT_CREATOR: u64 = 3;
+    /// The field being changed is not mutable
+    const EFIELD_NOT_MUTABLE: u64 = 4;
+    /// The token being burned is not burnable
+    const ETOKEN_NOT_BURNABLE: u64 = 5;
+    /// The property map being mutated is not mutable
+    const EPROPERTIES_NOT_MUTABLE: u64 = 6;
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Storage state for managing the no-code Collection.
@@ -665,7 +663,7 @@ module aptos_token_objects::aptos_token {
     }
 
     #[test(creator = @0x123, another = @0x456)]
-    #[expected_failure(abort_code = 0x50002, location = Self)]
+    #[expected_failure(abort_code = 0x50003, location = Self)]
     fun test_noncreator_freeze(creator: &signer, another: &signer) acquires AptosCollection, AptosToken {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
@@ -676,7 +674,7 @@ module aptos_token_objects::aptos_token {
     }
 
     #[test(creator = @0x123, another = @0x456)]
-    #[expected_failure(abort_code = 0x50002, location = Self)]
+    #[expected_failure(abort_code = 0x50003, location = Self)]
     fun test_noncreator_unfreeze(creator: &signer, another: &signer) acquires AptosCollection, AptosToken {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
@@ -702,7 +700,7 @@ module aptos_token_objects::aptos_token {
     }
 
     #[test(creator = @0x123)]
-    #[expected_failure(abort_code = 0x50003, location = Self)]
+    #[expected_failure(abort_code = 0x50004, location = Self)]
     fun test_set_immutable_description(creator: &signer) acquires AptosCollection, AptosToken {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
@@ -714,7 +712,7 @@ module aptos_token_objects::aptos_token {
     }
 
     #[test(creator = @0x123, noncreator = @0x456)]
-    #[expected_failure(abort_code = 0x50002, location = Self)]
+    #[expected_failure(abort_code = 0x50003, location = Self)]
     fun test_set_description_non_creator(
         creator: &signer,
         noncreator: &signer,
@@ -744,7 +742,7 @@ module aptos_token_objects::aptos_token {
     }
 
     #[test(creator = @0x123)]
-    #[expected_failure(abort_code = 0x50003, location = Self)]
+    #[expected_failure(abort_code = 0x50004, location = Self)]
     fun test_set_immutable_name(creator: &signer) acquires AptosCollection, AptosToken {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
@@ -756,7 +754,7 @@ module aptos_token_objects::aptos_token {
     }
 
     #[test(creator = @0x123, noncreator = @0x456)]
-    #[expected_failure(abort_code = 0x50002, location = Self)]
+    #[expected_failure(abort_code = 0x50003, location = Self)]
     fun test_set_name_non_creator(
         creator: &signer,
         noncreator: &signer,
@@ -786,7 +784,7 @@ module aptos_token_objects::aptos_token {
     }
 
     #[test(creator = @0x123)]
-    #[expected_failure(abort_code = 0x50003, location = Self)]
+    #[expected_failure(abort_code = 0x50004, location = Self)]
     fun test_set_immutable_uri(creator: &signer) acquires AptosCollection, AptosToken {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
@@ -798,7 +796,7 @@ module aptos_token_objects::aptos_token {
     }
 
     #[test(creator = @0x123, noncreator = @0x456)]
-    #[expected_failure(abort_code = 0x50002, location = Self)]
+    #[expected_failure(abort_code = 0x50003, location = Self)]
     fun test_set_uri_non_creator(
         creator: &signer,
         noncreator: &signer,
@@ -828,7 +826,7 @@ module aptos_token_objects::aptos_token {
     }
 
     #[test(creator = @0x123)]
-    #[expected_failure(abort_code = 0x50004, location = Self)]
+    #[expected_failure(abort_code = 0x50005, location = Self)]
     fun test_not_burnable(creator: &signer) acquires AptosCollection, AptosToken {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
@@ -840,7 +838,7 @@ module aptos_token_objects::aptos_token {
     }
 
     #[test(creator = @0x123, noncreator = @0x456)]
-    #[expected_failure(abort_code = 0x50002, location = Self)]
+    #[expected_failure(abort_code = 0x50003, location = Self)]
     fun test_burn_non_creator(
         creator: &signer,
         noncreator: &signer,
@@ -865,7 +863,7 @@ module aptos_token_objects::aptos_token {
     }
 
     #[test(creator = @0x123)]
-    #[expected_failure(abort_code = 0x50003, location = Self)]
+    #[expected_failure(abort_code = 0x50004, location = Self)]
     fun test_set_immutable_collection_description(creator: &signer) acquires AptosCollection {
         let collection_name = string::utf8(b"collection name");
         let collection = create_collection_helper(creator, collection_name, false);
@@ -873,7 +871,7 @@ module aptos_token_objects::aptos_token {
     }
 
     #[test(creator = @0x123, noncreator = @0x456)]
-    #[expected_failure(abort_code = 0x50002, location = Self)]
+    #[expected_failure(abort_code = 0x50003, location = Self)]
     fun test_set_collection_description_non_creator(
         creator: &signer,
         noncreator: &signer,
@@ -894,7 +892,7 @@ module aptos_token_objects::aptos_token {
     }
 
     #[test(creator = @0x123)]
-    #[expected_failure(abort_code = 0x50003, location = Self)]
+    #[expected_failure(abort_code = 0x50004, location = Self)]
     fun test_set_immutable_collection_uri(creator: &signer) acquires AptosCollection {
         let collection_name = string::utf8(b"collection name");
         let collection = create_collection_helper(creator, collection_name, false);
@@ -902,7 +900,7 @@ module aptos_token_objects::aptos_token {
     }
 
     #[test(creator = @0x123, noncreator = @0x456)]
-    #[expected_failure(abort_code = 0x50002, location = Self)]
+    #[expected_failure(abort_code = 0x50003, location = Self)]
     fun test_set_collection_uri_non_creator(
         creator: &signer,
         noncreator: &signer,

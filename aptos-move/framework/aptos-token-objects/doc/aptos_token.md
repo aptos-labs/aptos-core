@@ -200,19 +200,20 @@ Storage state for managing the no-code Token.
 
 <a name="0x4_aptos_token_ECOLLECTION_DOES_NOT_EXIST"></a>
 
+The collection does not exist
 
 
-<pre><code><b>const</b> <a href="aptos_token.md#0x4_aptos_token_ECOLLECTION_DOES_NOT_EXIST">ECOLLECTION_DOES_NOT_EXIST</a>: u64 = 6;
+<pre><code><b>const</b> <a href="aptos_token.md#0x4_aptos_token_ECOLLECTION_DOES_NOT_EXIST">ECOLLECTION_DOES_NOT_EXIST</a>: u64 = 1;
 </code></pre>
 
 
 
 <a name="0x4_aptos_token_EFIELD_NOT_MUTABLE"></a>
 
-Attempted to mutate an immutable field
+The field being changed is not mutable
 
 
-<pre><code><b>const</b> <a href="aptos_token.md#0x4_aptos_token_EFIELD_NOT_MUTABLE">EFIELD_NOT_MUTABLE</a>: u64 = 3;
+<pre><code><b>const</b> <a href="aptos_token.md#0x4_aptos_token_EFIELD_NOT_MUTABLE">EFIELD_NOT_MUTABLE</a>: u64 = 4;
 </code></pre>
 
 
@@ -222,36 +223,37 @@ Attempted to mutate an immutable field
 The provided signer is not the creator
 
 
-<pre><code><b>const</b> <a href="aptos_token.md#0x4_aptos_token_ENOT_CREATOR">ENOT_CREATOR</a>: u64 = 2;
+<pre><code><b>const</b> <a href="aptos_token.md#0x4_aptos_token_ENOT_CREATOR">ENOT_CREATOR</a>: u64 = 3;
 </code></pre>
 
 
 
 <a name="0x4_aptos_token_ETOKEN_DOES_NOT_EXIST"></a>
 
+The token does not exist
 
 
-<pre><code><b>const</b> <a href="aptos_token.md#0x4_aptos_token_ETOKEN_DOES_NOT_EXIST">ETOKEN_DOES_NOT_EXIST</a>: u64 = 1;
+<pre><code><b>const</b> <a href="aptos_token.md#0x4_aptos_token_ETOKEN_DOES_NOT_EXIST">ETOKEN_DOES_NOT_EXIST</a>: u64 = 2;
 </code></pre>
 
 
 
 <a name="0x4_aptos_token_EPROPERTIES_NOT_MUTABLE"></a>
 
-Attempted to mutate a property map that is not mutable
+The property map being mutated is not mutable
 
 
-<pre><code><b>const</b> <a href="aptos_token.md#0x4_aptos_token_EPROPERTIES_NOT_MUTABLE">EPROPERTIES_NOT_MUTABLE</a>: u64 = 5;
+<pre><code><b>const</b> <a href="aptos_token.md#0x4_aptos_token_EPROPERTIES_NOT_MUTABLE">EPROPERTIES_NOT_MUTABLE</a>: u64 = 6;
 </code></pre>
 
 
 
 <a name="0x4_aptos_token_ETOKEN_NOT_BURNABLE"></a>
 
-Attempted to burn a non-burnable token
+The token being burned is not burnable
 
 
-<pre><code><b>const</b> <a href="aptos_token.md#0x4_aptos_token_ETOKEN_NOT_BURNABLE">ETOKEN_NOT_BURNABLE</a>: u64 = 4;
+<pre><code><b>const</b> <a href="aptos_token.md#0x4_aptos_token_ETOKEN_NOT_BURNABLE">ETOKEN_NOT_BURNABLE</a>: u64 = 5;
 </code></pre>
 
 
