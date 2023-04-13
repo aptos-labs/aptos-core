@@ -5,7 +5,7 @@
 
 This defines an object-based Token. The key differentiating features from the Aptos standard
 token are:
-* Decouple token ownership from token data.
+* Decoupled token ownership from token data.
 * Explicit data model for token metadata via adjacent resources
 * Extensible framework for tokens
 
@@ -243,6 +243,7 @@ The provided signer is not the creator
 
 <a name="0x4_token_ETOKEN_DOES_NOT_EXIST"></a>
 
+The token does not exist
 
 
 <pre><code><b>const</b> <a href="token.md#0x4_token_ETOKEN_DOES_NOT_EXIST">ETOKEN_DOES_NOT_EXIST</a>: u64 = 1;

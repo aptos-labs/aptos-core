@@ -14,17 +14,13 @@ supports:
 * Addressed by a global identifier of creator's address and collection name, thus collections
 cannot be deleted as a restriction of the object model.
 * Optional support for collection-wide royalties
-* Optional support for tracking of supply
-
-This collection does not directly support:
-* Events on mint or burn -- that's left to the collection creator.
+* Optional support for tracking of supply with events on mint or burn
 
 TODO:
 * Consider supporting changing the name of the collection with the MutatorRef. This would
 require adding the field original_name.
 * Consider supporting changing the aspects of supply with the MutatorRef.
 * Add aggregator support when added to framework
-* Update Object<T> to be viable input as a transaction arg and then update all readers as view.
 
 
 -  [Resource `Collection`](#0x4_collection_Collection)
@@ -195,7 +191,7 @@ and adding events and supply tracking to a collection.
 <code>current_supply: u64</code>
 </dt>
 <dd>
-
+ Total minted - total burned
 </dd>
 <dt>
 <code>max_supply: u64</code>
@@ -348,17 +344,74 @@ Unlimited supply tracker, this is useful for adding events and supply tracking t
 The collection does not exist
 
 
-<pre><code><b>const</b> <a href="collection.md#0x4_collection_ECOLLECTION_DOES_NOT_EXIST">ECOLLECTION_DOES_NOT_EXIST</a>: u64 = 2;
+<pre><code><b>const</b> <a href="collection.md#0x4_collection_ECOLLECTION_DOES_NOT_EXIST">ECOLLECTION_DOES_NOT_EXIST</a>: u64 = 1;
 </code></pre>
 
 
 
-<a name="0x4_collection_EEXCEEDS_MAX_SUPPLY"></a>
+<a name="0x4_collection_ECOLLECTION_NAME_TOO_LONG"></a>
 
-The collections supply is at its maximum amount
+The collection name is over the maximum length
 
 
-<pre><code><b>const</b> <a href="collection.md#0x4_collection_EEXCEEDS_MAX_SUPPLY">EEXCEEDS_MAX_SUPPLY</a>: u64 = 1;
+<pre><code><b>const</b> <a href="collection.md#0x4_collection_ECOLLECTION_NAME_TOO_LONG">ECOLLECTION_NAME_TOO_LONG</a>: u64 = 3;
+</code></pre>
+
+
+
+<a name="0x4_collection_EDESCRIPTION_TOO_LONG"></a>
+
+The description is over the maximum length
+
+
+<pre><code><b>const</b> <a href="collection.md#0x4_collection_EDESCRIPTION_TOO_LONG">EDESCRIPTION_TOO_LONG</a>: u64 = 5;
+</code></pre>
+
+
+
+<a name="0x4_collection_ETOO_MANY_TOKENS"></a>
+
+The collection has reached its supply and no more tokens can be minted
+
+
+<pre><code><b>const</b> <a href="collection.md#0x4_collection_ETOO_MANY_TOKENS">ETOO_MANY_TOKENS</a>: u64 = 2;
+</code></pre>
+
+
+
+<a name="0x4_collection_EURI_TOO_LONG"></a>
+
+The URI is over the maximum length
+
+
+<pre><code><b>const</b> <a href="collection.md#0x4_collection_EURI_TOO_LONG">EURI_TOO_LONG</a>: u64 = 4;
+</code></pre>
+
+
+
+<a name="0x4_collection_MAX_COLLECTION_NAME_LENGTH"></a>
+
+
+
+<pre><code><b>const</b> <a href="collection.md#0x4_collection_MAX_COLLECTION_NAME_LENGTH">MAX_COLLECTION_NAME_LENGTH</a>: u64 = 128;
+</code></pre>
+
+
+
+<a name="0x4_collection_MAX_DESCRIPTION_LENGTH"></a>
+
+
+
+<pre><code><b>const</b> <a href="collection.md#0x4_collection_MAX_DESCRIPTION_LENGTH">MAX_DESCRIPTION_LENGTH</a>: u64 = 2048;
+</code></pre>
+
+
+
+<a name="0x4_collection_MAX_URI_LENGTH"></a>
+
+
+
+<pre><code><b>const</b> <a href="collection.md#0x4_collection_MAX_URI_LENGTH">MAX_URI_LENGTH</a>: u64 = 512;
 </code></pre>
 
 
@@ -556,6 +609,7 @@ Named objects are derived from a seed, the collection's seed is its name.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="collection.md#0x4_collection_create_collection_seed">create_collection_seed</a>(name: &String): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    <b>assert</b>!(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_length">string::length</a>(name) &lt; <a href="collection.md#0x4_collection_MAX_COLLECTION_NAME_LENGTH">MAX_COLLECTION_NAME_LENGTH</a>, <a href="collection.md#0x4_collection_ECOLLECTION_NAME_TOO_LONG">ECOLLECTION_NAME_TOO_LONG</a>);
     *<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_bytes">string::bytes</a>(name)
 }
 </code></pre>
@@ -591,7 +645,7 @@ Called by token on mint to increment supply if there's an appropriate Supply str
         supply.total_minted = supply.total_minted + 1;
         <b>assert</b>!(
             supply.current_supply &lt;= supply.max_supply,
-            <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="collection.md#0x4_collection_EEXCEEDS_MAX_SUPPLY">EEXCEEDS_MAX_SUPPLY</a>),
+            <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="collection.md#0x4_collection_ETOO_MANY_TOKENS">ETOO_MANY_TOKENS</a>),
         );
         <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>(&<b>mut</b> supply.mint_events,
             <a href="collection.md#0x4_collection_MintEvent">MintEvent</a> {
@@ -702,6 +756,7 @@ Creates a MutatorRef, which gates the ability to mutate any fields that support 
 
 ## Function `count`
 
+Provides the count of the current selection if supply tracking is used
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="collection.md#0x4_collection_count">count</a>&lt;T: key&gt;(<a href="collection.md#0x4_collection">collection</a>: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
@@ -715,10 +770,7 @@ Creates a MutatorRef, which gates the ability to mutate any fields that support 
 
 <pre><code><b>public</b> <b>fun</b> <a href="collection.md#0x4_collection_count">count</a>&lt;T: key&gt;(<a href="collection.md#0x4_collection">collection</a>: Object&lt;T&gt;): Option&lt;u64&gt; <b>acquires</b> <a href="collection.md#0x4_collection_FixedSupply">FixedSupply</a>, <a href="collection.md#0x4_collection_UnlimitedSupply">UnlimitedSupply</a> {
     <b>let</b> collection_address = <a href="../../aptos-framework/doc/object.md#0x1_object_object_address">object::object_address</a>(&<a href="collection.md#0x4_collection">collection</a>);
-    <b>assert</b>!(
-        <b>exists</b>&lt;<a href="collection.md#0x4_collection_Collection">Collection</a>&gt;(collection_address),
-        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="collection.md#0x4_collection_ECOLLECTION_DOES_NOT_EXIST">ECOLLECTION_DOES_NOT_EXIST</a>),
-    );
+    check_collection_exists(collection_address);
 
     <b>if</b> (<b>exists</b>&lt;<a href="collection.md#0x4_collection_FixedSupply">FixedSupply</a>&gt;(collection_address)) {
         <b>let</b> supply = <b>borrow_global_mut</b>&lt;<a href="collection.md#0x4_collection_FixedSupply">FixedSupply</a>&gt;(collection_address);
@@ -848,6 +900,7 @@ Creates a MutatorRef, which gates the ability to mutate any fields that support 
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="collection.md#0x4_collection_set_description">set_description</a>(mutator_ref: &<a href="collection.md#0x4_collection_MutatorRef">MutatorRef</a>, description: String) <b>acquires</b> <a href="collection.md#0x4_collection_Collection">Collection</a> {
+    <b>assert</b>!(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_length">string::length</a>(&description) &lt; <a href="collection.md#0x4_collection_MAX_DESCRIPTION_LENGTH">MAX_DESCRIPTION_LENGTH</a>, <a href="collection.md#0x4_collection_EDESCRIPTION_TOO_LONG">EDESCRIPTION_TOO_LONG</a>);
     <b>let</b> <a href="collection.md#0x4_collection">collection</a> = borrow_mut(mutator_ref);
     <a href="collection.md#0x4_collection">collection</a>.description = description;
     <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>(
@@ -877,6 +930,7 @@ Creates a MutatorRef, which gates the ability to mutate any fields that support 
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="collection.md#0x4_collection_set_uri">set_uri</a>(mutator_ref: &<a href="collection.md#0x4_collection_MutatorRef">MutatorRef</a>, uri: String) <b>acquires</b> <a href="collection.md#0x4_collection_Collection">Collection</a> {
+    <b>assert</b>!(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_length">string::length</a>(&uri) &lt; <a href="collection.md#0x4_collection_MAX_URI_LENGTH">MAX_URI_LENGTH</a>, <a href="collection.md#0x4_collection_EURI_TOO_LONG">EURI_TOO_LONG</a>);
     <b>let</b> <a href="collection.md#0x4_collection">collection</a> = borrow_mut(mutator_ref);
     <a href="collection.md#0x4_collection">collection</a>.uri = uri;
     <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>(
