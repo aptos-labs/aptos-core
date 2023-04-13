@@ -19,6 +19,8 @@ update_sequence:
         - resource_groups
         - multisig_accounts
         - delegation_pools
+        - cryptography_algebra_natives
+        - bls12381_structures
         - ed25519_pubkey_validate_return_false_wrong_length
       disabled: []
   - Consensus:
