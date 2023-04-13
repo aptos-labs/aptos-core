@@ -17,6 +17,7 @@ import { getPropertyValueRaw, getSinglePropertyValueRaw } from "../utils/propert
  */
 export class AptosToken {
   provider: Provider;
+
   tokenType: string = "0x4::token::Token";
 
   /**
@@ -424,7 +425,7 @@ export class AptosToken {
       ...extraArgs,
     });
     const rawTxn = await builder.build(
-      `0x1::object::transfer`,
+      "0x1::object::transfer",
       [tokenType || this.tokenType],
       [HexString.ensure(token).hex(), HexString.ensure(recipient).hex()],
     );
@@ -454,7 +455,7 @@ export class AptosToken {
       ...extraArgs,
     });
     const rawTxn = await builder.build(
-      `0x1::primary_store::transfer`,
+      "0x1::primary_store::transfer",
       [tokenType || this.tokenType],
       [HexString.ensure(token).hex(), HexString.ensure(recipient).hex(), amount],
     );
