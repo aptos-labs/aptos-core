@@ -59,10 +59,10 @@ WELLDONE Wallet can be used with the Remix IDE plugin now, with support for [Pet
 
 This steps assumes you are using the WELLDONE Wallet. Follow [the manual](https://docs.welldonestudio.io/wallet/manual/) to install the wallet and create an account for the Aptos blockchain. Once that is done, follow these steps:
 
-1. Choose a network (e.g. devnet) in the dropdown at the top of the main screen.
-1. Go into the *Settings* tab of your wallet and activate **Developer Mode**.
+1. Choose a network (e.g. devnet) in the dropdown at the top of the main tab.
+1. Go into the **Settings** tab of your wallet and activate **Developer Mode**.
 
-After choosing a chain, click the `Connect to WELLDONE` button to connect to the **WELLDONE Wallet.** 
+Now in the Remix UI click the `Connect to WELLDONE` button to connect to the **WELLDONE Wallet.** 
 
 Click the **Refresh** button in the upper right corner of the plug-in to apply changes to your wallet.
 
@@ -125,7 +125,7 @@ If you need to revise the contract and compile again, delete the `out` directo
 
 5. Once you have compiled contract code, the `Deploy` button will be activated.
 
-## Step 6: Interact with a Move module.
+## Step 6: Interact with a Move module
 
 :::info
 There are two ways to import contracts.
