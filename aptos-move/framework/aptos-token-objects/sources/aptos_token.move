@@ -139,6 +139,19 @@ module aptos_token_objects::aptos_token {
         property_types: vector<String>,
         property_values: vector<vector<u8>>,
     ) acquires AptosCollection, AptosToken {
+        mint_inner(creator, collection, description, name, uri, property_keys, property_types, property_values);
+    }
+
+    public fun mint_inner(
+        creator: &signer,
+        collection: String,
+        description: String,
+        name: String,
+        uri: String,
+        property_keys: vector<String>,
+        property_types: vector<String>,
+        property_values: vector<vector<u8>>,
+    ): ConstructorRef acquires AptosCollection, AptosToken {
         let constructor_ref = mint_internal(
             creator,
             collection,
@@ -153,13 +166,14 @@ module aptos_token_objects::aptos_token {
         let collection = collection_object(creator, &collection);
         let freezable_by_creator = are_collection_tokens_freezable(collection);
         if (!freezable_by_creator) {
-            return
+            return constructor_ref
         };
 
         let aptos_token_addr = object::address_from_constructor_ref(&constructor_ref);
         let aptos_token = borrow_global_mut<AptosToken>(aptos_token_addr);
         let transfer_ref = object::generate_transfer_ref(&constructor_ref);
         option::fill(&mut aptos_token.transfer_ref, transfer_ref);
+        constructor_ref
     }
 
     /// With an existing collection, directly mint a soul bound token into the recipient's account.
@@ -174,6 +188,30 @@ module aptos_token_objects::aptos_token {
         property_values: vector<vector<u8>>,
         soul_bound_to: address,
     ) acquires AptosCollection {
+        mint_soul_bound_inner(
+            creator,
+            collection,
+            description,
+            name,
+            uri,
+            property_keys,
+            property_types,
+            property_values,
+            soul_bound_to
+        );
+    }
+
+    public fun mint_soul_bound_inner(
+        creator: &signer,
+        collection: String,
+        description: String,
+        name: String,
+        uri: String,
+        property_keys: vector<String>,
+        property_types: vector<String>,
+        property_values: vector<vector<u8>>,
+        soul_bound_to: address,
+    ): ConstructorRef acquires AptosCollection {
         let constructor_ref = mint_internal(
             creator,
             collection,
@@ -189,6 +227,7 @@ module aptos_token_objects::aptos_token {
         let linear_transfer_ref = object::generate_linear_transfer_ref(&transfer_ref);
         object::transfer_with_ref(linear_transfer_ref, soul_bound_to);
         object::disable_ungated_transfer(&transfer_ref);
+        constructor_ref
     }
 
     fun mint_internal(
@@ -217,8 +256,8 @@ module aptos_token_objects::aptos_token {
 
         let mutator_ref = if (
             collection.mutable_token_description
-            || collection.mutable_token_name
-            || collection.mutable_token_uri
+                || collection.mutable_token_name
+                || collection.mutable_token_uri
         ) {
             option::some(token::generate_mutator_ref(&constructor_ref))
         } else {
@@ -331,7 +370,10 @@ module aptos_token_objects::aptos_token {
         object::disable_ungated_transfer(option::borrow(&aptos_token.transfer_ref));
     }
 
-    public entry fun unfreeze_transfer<T: key>(creator: &signer, token: Object<T>) acquires AptosCollection, AptosToken {
+    public entry fun unfreeze_transfer<T: key>(
+        creator: &signer,
+        token: Object<T>
+    ) acquires AptosCollection, AptosToken {
         let aptos_token = authorized_borrow(&token, signer::address_of(creator));
         assert!(
             are_collection_tokens_freezable(token::collection_object(token))
