@@ -26,6 +26,10 @@ const OBJECT_ADDRESS: AccountAddress = AccountAddress::new([
     0x90, 0x71, 0xAA, 0x3F, 0xBD, 0x2A, 0xB9, 0x51, 0x37, 0xF7, 0xCB, 0xAD, 0x13, 0x6F, 0x09, 0x2B,
 ]);
 
+fn module_data() -> StructTag {
+    parse_struct_tag("0xCAFE::test::ModuleData").unwrap()
+}
+
 fn success(h: &mut MoveHarness, tests: Vec<(&str, Vec<Vec<u8>>, &str)>) {
     success_generic(h, vec![], tests)
 }
@@ -37,12 +41,11 @@ fn success_generic(
 ) {
     // Load the code
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+
     assert_success!(h.publish_package(&acc, &common::test_dir_path("constructor_args.data/pack")));
 
-    let module_data = parse_struct_tag("0xCAFE::test::ModuleData").unwrap();
-
     // Check in initial state, resource does not exist.
-    assert!(!h.exists_resource(acc.address(), module_data.clone()));
+    assert!(!h.exists_resource(acc.address(), module_data()));
 
     for (entry, args, expected_change) in tests {
         assert_success!(h.run_entry_function(
@@ -53,7 +56,7 @@ fn success_generic(
         ));
         assert_eq!(
             String::from_utf8(
-                h.read_resource::<ModuleData>(&OBJECT_ADDRESS, module_data.clone())
+                h.read_resource::<ModuleData>(&OBJECT_ADDRESS, module_data())
                     .unwrap()
                     .state
             )
@@ -72,10 +75,8 @@ fn success_generic_view(
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
     assert_success!(h.publish_package(&acc, &common::test_dir_path("constructor_args.data/pack")));
 
-    let module_data = parse_struct_tag("0xCAFE::test::ModuleData").unwrap();
-
     // Check in initial state, resource does not exist.
-    assert!(!h.exists_resource(acc.address(), module_data.clone()));
+    assert!(!h.exists_resource(acc.address(), module_data()));
 
     for (entry, args, expected) in tests {
         let res = h.execute_view_function(str::parse(entry).unwrap(), ty_args.clone(), args);
@@ -99,10 +100,8 @@ fn fail_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<Vec<u8>>, Closure)>
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
     assert_success!(h.publish_package(&acc, &common::test_dir_path("constructor_args.data/pack")));
 
-    let module_data = parse_struct_tag("0xCAFE::test::ModuleData").unwrap();
-
     // Check in initial state, resource does not exist.
-    assert!(!h.exists_resource(acc.address(), module_data));
+    assert!(!h.exists_resource(acc.address(), module_data()));
 
     for (entry, args, err) in tests {
         // Now send hi transaction, after that resource should exist and carry value
@@ -190,13 +189,7 @@ fn view_constructor_args() {
         vec![bcs::to_bytes(&OBJECT_ADDRESS).unwrap()],
         "hi",
     )];
-    let module_data_struct = StructTag {
-        address: AccountAddress::from_hex_literal("0xcafe").expect("valid address"),
-        module: Identifier::new("test").expect("valid identifier"),
-        name: Identifier::new("ModuleData").expect("valid identifier"),
-        type_params: vec![],
-    };
-    let module_data_type = TypeTag::Struct(Box::new(module_data_struct));
+    let module_data_type = TypeTag::Struct(Box::new(module_data()));
     success_generic_view(&mut h, vec![module_data_type], view);
 }
 
