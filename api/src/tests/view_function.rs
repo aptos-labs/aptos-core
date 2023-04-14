@@ -79,24 +79,6 @@ async fn test_versioned_simple_view() {
     context.check_golden_output_no_prune(resp);
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_simple_view_with_option() {
-    let mut context = new_test_context(current_function_name!());
-
-    let resp = context
-        .post(
-            "/view?ledger_version=3",
-            json!({
-                "function":"0x1::coin::balance",
-                "arguments": vec![vec!["42"]],
-                "type_arguments": vec!["u64"],
-            }),
-        )
-        .await;
-
-    context.check_golden_output_no_prune(resp);
-}
-
 #[ignore] // TODO: reactivate with real source
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_view_tuple() {

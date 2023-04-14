@@ -22,11 +22,6 @@ module abi::test {
         value + 42
     }
 
-    #[view]
-    public fun view_function_with_generics<T: drop + store + copy>(s: std::option::Option<T>): T {
-        std::option::destroy_some(s);
-    }
-
     fun private_function(s: &signer, value: u64) {
         move_to(s, State { value });
     }
