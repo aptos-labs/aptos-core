@@ -1,4 +1,4 @@
-/// A coin example using managed_fungible_asset.
+/// A coin example using managed_fungible_asset to create a fungible "coin".
 module fungible_asset_extension::coin_example {
     use aptos_framework::object;
     use aptos_framework::fungible_asset::{Metadata, FungibleAsset};
@@ -6,7 +6,7 @@ module fungible_asset_extension::coin_example {
     use fungible_asset_extension::managed_fungible_asset;
     use std::string::utf8;
 
-    const ASSET_SYMBOL: vector<u8> = b"APT";
+    const ASSET_SYMBOL: vector<u8> = b"YOLO";
 
     /// Initialize metadata object and store the refs.
     fun init_module(admin: &signer) {
@@ -15,7 +15,7 @@ module fungible_asset_extension::coin_example {
             constructor_ref,
             false,
             0, /* maximum_supply. 0 means no maximum */
-            utf8(b"Aptos Token"), /* name */
+            utf8(b"You only live once"), /* name */
             utf8(ASSET_SYMBOL), /* symbol */
             8, /* decimals */
         );
