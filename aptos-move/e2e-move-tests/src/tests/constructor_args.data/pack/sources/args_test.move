@@ -8,7 +8,7 @@ module 0xCAFE::test {
     use aptos_framework::object::{create_object_from_account, generate_signer};
     use aptos_framework::object;
 
-    struct ModuleData has key, store, drop {
+    struct ModuleData has key, store {
         state: String,
     }
 
