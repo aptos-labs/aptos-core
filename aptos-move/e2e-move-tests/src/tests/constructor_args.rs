@@ -8,7 +8,6 @@ use aptos_types::{
     transaction::{ExecutionStatus, TransactionStatus},
 };
 use move_core_types::{
-    identifier::Identifier,
     language_storage::{StructTag, TypeTag},
     parser::parse_struct_tag,
     vm_status::StatusCode,
