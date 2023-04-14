@@ -1,5 +1,5 @@
 /// This defines the module for interacting with primary stores of accounts/objects, which have deterministic addresses
-module aptos_framework::primary_store {
+module aptos_framework::primary_fungible_store {
     use aptos_framework::fungible_asset::{Self, FungibleAsset, FungibleStore};
     use aptos_framework::object::{Self, Object, ConstructorRef, DeriveRef};
 
