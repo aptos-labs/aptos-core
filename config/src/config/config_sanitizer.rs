@@ -1,10 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::config::{
-    ApiConfig, BaseConfig, ConsensusConfig, Error, ExecutionConfig, IndexerConfig,
-    IndexerGrpcConfig, InspectionServiceConfig, LoggerConfig, MempoolConfig, NodeConfig,
-    PeerMonitoringServiceConfig, RoleType, StateSyncConfig, StorageConfig,
+use crate::{
+    config::{
+        ApiConfig, BaseConfig, ConsensusConfig, Error, ExecutionConfig, IndexerConfig,
+        IndexerGrpcConfig, InspectionServiceConfig, LoggerConfig, MempoolConfig, NodeConfig,
+        PeerMonitoringServiceConfig, RoleType, StateSyncConfig, StorageConfig,
+    },
+    network_id::NetworkId,
 };
 use aptos_types::chain_id::ChainId;
 use cfg_if::cfg_if;
@@ -190,21 +193,25 @@ fn sanitize_validator_network_config(
     if let Some(validator_network_config) = validator_network {
         let network_id = validator_network_config.network_id;
         if !network_id.is_validator_network() {
+            // TODO: improve the defaults!
+            // We must override the network ID to be a validator
+            // network ID as the config defaults to a public network ID.
+            validator_network_config.network_id = NetworkId::Validator;
+        }
+
+        // Verify that the node is a validator
+        if !node_role.is_validator() {
             return Err(Error::ConfigSanitizerFailed(
                 sanitizer_name,
-                format!(
-                    "Validator network config must have a validator network ID! Found ID: {}",
-                    network_id
-                ),
+                "The validator network config cannot be set for non-validators!".into(),
             ));
         }
 
-        // Verify that mutual authentication is enabled
+        // Ensure that mutual authentication is enabled
         if !validator_network_config.mutual_authentication {
-            return Err(Error::ConfigSanitizerFailed(
-                sanitizer_name,
-                "Mutual authentication must be enabled for the validator network!".into(),
-            ));
+            // TODO: improve the defaults!
+            // We must enable mutual authentication for validators
+            validator_network_config.mutual_authentication = true;
         }
 
         // Prepare the network id
@@ -212,4 +219,141 @@ fn sanitize_validator_network_config(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{config::NetworkConfig, network_id::NetworkId};
+
+    #[test]
+    fn test_sanitize_missing_fullnode_network_configs() {
+        // Create a fullnode config with empty fullnode network configs
+        let mut node_config = NodeConfig {
+            full_node_networks: vec![],
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error = sanitize_fullnode_network_configs(
+            &mut node_config,
+            RoleType::FullNode,
+            ChainId::testnet(),
+        )
+        .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_sanitize_validator_network_for_fullnode() {
+        // Create a fullnode config that includes a validator network
+        let mut node_config = NodeConfig {
+            full_node_networks: vec![NetworkConfig {
+                network_id: NetworkId::Validator,
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error = sanitize_fullnode_network_configs(
+            &mut node_config,
+            RoleType::FullNode,
+            ChainId::testnet(),
+        )
+        .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_sanitize_duplicate_fullnode_network_configs() {
+        // Create a node config with multiple fullnode network configs with the same network id
+        let mut node_config = NodeConfig {
+            full_node_networks: vec![
+                NetworkConfig {
+                    network_id: NetworkId::Public,
+                    ..Default::default()
+                },
+                NetworkConfig {
+                    network_id: NetworkId::Public,
+                    ..Default::default()
+                },
+            ],
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error = sanitize_fullnode_network_configs(
+            &mut node_config,
+            RoleType::FullNode,
+            ChainId::testnet(),
+        )
+        .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_sanitize_missing_validator_network_config() {
+        // Create a node config with an empty validator network config
+        let mut node_config = NodeConfig {
+            validator_network: None,
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error = sanitize_validator_network_config(
+            &mut node_config,
+            RoleType::Validator,
+            ChainId::testnet(),
+        )
+        .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_sanitize_validator_network_fullnode() {
+        // Create a validator network config
+        let mut node_config = NodeConfig {
+            validator_network: Some(NetworkConfig {
+                network_id: NetworkId::Validator,
+                mutual_authentication: true,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        // Sanitize the config (for a fullnode) and verify that it fails
+        let error = sanitize_validator_network_config(
+            &mut node_config,
+            RoleType::FullNode,
+            ChainId::testnet(),
+        )
+        .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_sanitize_validator_disabled_authentication() {
+        // Create a validator config with disabled mutual authentication
+        let mut node_config = NodeConfig {
+            validator_network: Some(NetworkConfig {
+                network_id: NetworkId::Validator,
+                mutual_authentication: false,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        // Sanitize the config
+        sanitize_validator_network_config(
+            &mut node_config,
+            RoleType::Validator,
+            ChainId::testnet(),
+        )
+        .unwrap();
+
+        // Verify that mutual authentication is now enabled
+        let validator_network = node_config.validator_network.unwrap();
+        assert!(validator_network.mutual_authentication);
+    }
 }

@@ -174,6 +174,38 @@ mod test {
     use super::*;
 
     #[test]
+    fn test_sanitize_valid_base_config() {
+        // Create a node config with a waypoint
+        let mut node_config = NodeConfig {
+            base: BaseConfig {
+                waypoint: WaypointConfig::FromConfig(Waypoint::default()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it passes
+        BaseConfig::sanitize(&mut node_config, RoleType::Validator, ChainId::mainnet()).unwrap();
+    }
+
+    #[test]
+    fn test_sanitize_missing_waypoint() {
+        // Create a node config with a missing waypoint
+        let mut node_config = NodeConfig {
+            base: BaseConfig {
+                waypoint: WaypointConfig::None,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails because of the missing waypoint
+        let error = BaseConfig::sanitize(&mut node_config, RoleType::Validator, ChainId::mainnet())
+            .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
     fn verify_role_type_conversion() {
         // Verify relationship between RoleType and as_string() is reflexive
         let validator = RoleType::Validator;

@@ -80,6 +80,11 @@ impl ConfigSanitizer for SafetyRulesConfig {
         let sanitizer_name = Self::get_sanitizer_name();
         let safety_rules_config = &node_config.consensus.safety_rules;
 
+        // If the node is not a validator, there's nothing to be done
+        if !node_role.is_validator() {
+            return Ok(());
+        }
+
         // Verify that the secure backend is appropriate for mainnet validators
         if chain_id.is_mainnet()? && node_role.is_validator() {
             if safety_rules_config.backend.is_github() {
@@ -97,10 +102,10 @@ impl ConfigSanitizer for SafetyRulesConfig {
         }
 
         // Verify that the safety rules service is set to local for optimal performance
-        if !safety_rules_config.service.is_local() {
+        if chain_id.is_mainnet()? && !safety_rules_config.service.is_local() {
             return Err(Error::ConfigSanitizerFailed(
                 sanitizer_name,
-                format!("The safety rules service should be set to local for optimal performance! Given config: {:?}", &safety_rules_config.service)
+                format!("The safety rules service should be set to local in mainnet for optimal performance! Given config: {:?}", &safety_rules_config.service)
             ));
         }
 
@@ -224,5 +229,114 @@ impl SafetyRulesTestConfig {
     pub fn random_consensus_key(&mut self, rng: &mut StdRng) {
         let privkey = bls12381::PrivateKey::generate(rng);
         self.consensus_key = Some(ConfigKey::<bls12381::PrivateKey>::new(privkey));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::ConsensusConfig;
+
+    #[test]
+    fn test_sanitize_invalid_backend_for_mainnet() {
+        // Create a node config with an invalid backend for mainnet
+        let mut node_config = NodeConfig {
+            consensus: ConsensusConfig {
+                safety_rules: SafetyRulesConfig {
+                    backend: SecureBackend::InMemoryStorage,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Verify that the config sanitizer fails
+        let error =
+            SafetyRulesConfig::sanitize(&mut node_config, RoleType::Validator, ChainId::mainnet())
+                .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_sanitize_backend_for_mainnet_fullnodes() {
+        // Create a node config with an invalid backend for mainnet validators
+        let mut node_config = NodeConfig {
+            consensus: ConsensusConfig {
+                safety_rules: SafetyRulesConfig {
+                    backend: SecureBackend::InMemoryStorage,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Verify that the config sanitizer passes because the node is a fullnode
+        SafetyRulesConfig::sanitize(&mut node_config, RoleType::FullNode, ChainId::mainnet())
+            .unwrap();
+    }
+
+    #[test]
+    fn test_sanitize_invalid_service_for_mainnet() {
+        // Create a node config with a non-local service
+        let mut node_config = NodeConfig {
+            consensus: ConsensusConfig {
+                safety_rules: SafetyRulesConfig {
+                    service: SafetyRulesService::Serializer,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Verify that the config sanitizer fails
+        let error =
+            SafetyRulesConfig::sanitize(&mut node_config, RoleType::Validator, ChainId::mainnet())
+                .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_sanitize_test_config_on_mainnet() {
+        // Create a node config with a test config
+        let mut node_config = NodeConfig {
+            consensus: ConsensusConfig {
+                safety_rules: SafetyRulesConfig {
+                    test: Some(SafetyRulesTestConfig::new(PeerId::random())),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Verify that the config sanitizer fails
+        let error =
+            SafetyRulesConfig::sanitize(&mut node_config, RoleType::Validator, ChainId::mainnet())
+                .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_sanitize_missing_initial_safety_rules() {
+        // Create a node config with a test config
+        let mut node_config = NodeConfig {
+            consensus: ConsensusConfig {
+                safety_rules: SafetyRulesConfig {
+                    test: Some(SafetyRulesTestConfig::new(PeerId::random())),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Verify that the config sanitizer fails
+        let error =
+            SafetyRulesConfig::sanitize(&mut node_config, RoleType::Validator, ChainId::mainnet())
+                .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
     }
 }
