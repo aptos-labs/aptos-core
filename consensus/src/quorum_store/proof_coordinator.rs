@@ -183,6 +183,12 @@ impl ProofCoordinator {
         self.digest_to_time
             .entry(*signed_batch_info.digest())
             .or_insert(chrono::Utc::now().naive_utc().timestamp_micros() as u64);
+
+        info!(
+            "BCHO: init_proof: {}, at {}",
+            signed_batch_info.digest(),
+            self.digest_to_time.get(signed_batch_info.digest()).unwrap()
+        );
         Ok(())
     }
 
@@ -203,11 +209,13 @@ impl ProofCoordinator {
             if !value.completed && value.ready(validator_verifier) {
                 let proof = value.take(validator_verifier);
                 // quorum store measurements
-                let duration = chrono::Utc::now().naive_utc().timestamp_micros() as u64
+                let now = chrono::Utc::now().naive_utc().timestamp_micros() as u64;
+                let duration = now
                     - self
                         .digest_to_time
                         .remove(&digest)
                         .expect("Batch created without recording the time!");
+                info!("BCHO: BATCH_TO_POS_DURATION: {}, at {}", duration, now);
                 counters::BATCH_TO_POS_DURATION.observe_duration(Duration::from_micros(duration));
                 return Ok(Some(proof));
             }
