@@ -30,7 +30,7 @@ See [How Base Gas Works](./base-gas.md) for a detailed description of gas fee ty
 
 ## Gas price and prioritizing transactions
 
-In the Aptos network, the Aptos governance sets the absolute minimum gas unit price. However, the market determines the actual minimum gas unit price. See [Ethereum Gas Tracker](https://etherscan.io/gastracker), for example, which shows the market price movements of Ethereum gas price.
+In the Aptos network, the Aptos governance sets the absolute minimum gas unit price. However, the market determines how quickly a transaction with a particular gas unit price is processed. See [Ethereum Gas Tracker](https://etherscan.io/gastracker), for example, which shows the market price movements of Ethereum gas price.
 
 By specifying a higher gas unit price than the current market price, you can **increase** the priority level for your transaction on the blockchain by paying a larger processing fee. As part of consensus, when the leader selects transactions from its mempool to propose as part of the next block, it will prioritize selecting transactions with a higher gas unit price. While in most cases this is unnecessary, if the network is under load this measure can ensure your transaction is processed more quickly. See the `gas_unit_price` entry under [Estimating the gas units via simulation](#estimating-the-gas-units-via-simulation) for details.
 
