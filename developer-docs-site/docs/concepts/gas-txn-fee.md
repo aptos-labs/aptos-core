@@ -24,14 +24,18 @@ Transactions can range from simple and inexpensive to complicated based upon the
 
 See [How Base Gas Works](./base-gas.md) for a detailed description of gas fee types and available optimizations.
 
-## Gas price and prioritizing transactions
-
-In the Aptos network, the Aptos governance sets the minimum gas unit price. However, the market determines the actual minimum gas unit price. See [Ethereum Gas Tracker](https://etherscan.io/gastracker), for example, which shows the market price movements of Ethereum gas price.
-
-By specifying a higher gas unit price than the current market price, you can **increase** the priority level for your transaction on the blockchain by paying a larger processing fee. While in most cases this is unnecessary, if the network is under load this measure can ensure your transaction is processed more quickly. See the `gas_unit_price` entry under [Estimating the gas units via simulation](#estimating-the-gas-units-via-simulation) for details.
-
 :::tip Unit of gas
 👉 A **unit of gas** is a dimensionless number, expressed as an integer. The total gas units consumed by your transaction depends on the complexity of your transaction. The **gas price**, on the other hand, is expressed in terms of Aptos blockchain’s native coin (Octas). Also see [Transactions and States](txns-states.md) for how a transaction submitted to the Aptos blockchain looks like.
+:::
+
+## Gas price and prioritizing transactions
+
+In the Aptos network, the Aptos governance sets the absolute minimum gas unit price. However, the market determines the actual minimum gas unit price. See [Ethereum Gas Tracker](https://etherscan.io/gastracker), for example, which shows the market price movements of Ethereum gas price.
+
+By specifying a higher gas unit price than the current market price, you can **increase** the priority level for your transaction on the blockchain by paying a larger processing fee. As part of consensus, when the leader selects transactions from its mempool to propose as part of the next block, it will prioritize selecting transactions with a higher gas unit price. While in most cases this is unnecessary, if the network is under load this measure can ensure your transaction is processed more quickly. See the `gas_unit_price` entry under [Estimating the gas units via simulation](#estimating-the-gas-units-via-simulation) for details.
+
+:::caution Transaction prioritzation
+👉 Specifying a higher gas unit price only influences propagation and selecting which transactions go into the next block, it does not influence the ordering of transactions _within_ a block.
 :::
 
 ## Specifying gas fees within a transaction
