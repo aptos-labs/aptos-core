@@ -143,3 +143,63 @@ impl ConfigSanitizer for ApiConfig {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sanitize_disabled_api() {
+        // Create a node config with the API disabled
+        let mut node_config = NodeConfig {
+            api: ApiConfig {
+                enabled: false,
+                failpoints_enabled: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it succeeds
+        ApiConfig::sanitize(&mut node_config, RoleType::Validator, ChainId::mainnet()).unwrap();
+    }
+
+    #[test]
+    fn test_sanitize_failpoints_on_mainnet() {
+        // Create a node config with failpoints enabled
+        let mut node_config = NodeConfig {
+            api: ApiConfig {
+                enabled: true,
+                failpoints_enabled: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails because
+        // failpoints are not supported on mainnet.
+        let error = ApiConfig::sanitize(&mut node_config, RoleType::Validator, ChainId::mainnet())
+            .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_sanitize_invalid_workers() {
+        // Create a node config with failpoints enabled
+        let mut node_config = NodeConfig {
+            api: ApiConfig {
+                enabled: true,
+                max_runtime_workers: None,
+                runtime_worker_multiplier: 0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails because
+        // the runtime worker multiplier is invalid.
+        let error = ApiConfig::sanitize(&mut node_config, RoleType::Validator, ChainId::mainnet())
+            .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+}

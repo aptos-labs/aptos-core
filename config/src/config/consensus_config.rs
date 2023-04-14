@@ -7,6 +7,7 @@ use crate::config::{
     SafetyRulesConfig,
 };
 use aptos_types::chain_id::ChainId;
+use cfg_if::cfg_if;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -251,10 +252,29 @@ impl ConfigSanitizer for ConsensusConfig {
         chain_id: ChainId,
     ) -> Result<(), Error> {
         // Verify that the safety rules config is valid
+        let sanitizer_name = Self::get_sanitizer_name();
         SafetyRulesConfig::sanitize(node_config, node_role, chain_id)?;
 
-        // TODO: should we add further verifications for consensus?
+        // Verify that the consensus-only feature is not enabled in mainnet
+        if chain_id.is_mainnet()? && is_consensus_only_perf_test_enabled() {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "consensus-only-perf-test should not be enabled in mainnet!".to_string(),
+            ));
+        }
+
         Ok(())
+    }
+}
+
+/// Returns true iff consensus-only-perf-test is enabled
+fn is_consensus_only_perf_test_enabled() -> bool {
+    cfg_if! {
+        if #[cfg(feature = "consensus-only-perf-test")] {
+            true
+        } else {
+            false
+        }
     }
 }
 

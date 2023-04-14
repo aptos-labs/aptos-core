@@ -157,6 +157,61 @@ mod test {
     };
 
     #[test]
+    fn test_sanitize_valid_execution_config() {
+        // Create a node config with a valid execution config
+        let mut node_config = NodeConfig {
+            execution: ExecutionConfig {
+                paranoid_hot_potato_verification: true,
+                paranoid_type_verification: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it succeeds
+        ExecutionConfig::sanitize(&mut node_config, RoleType::Validator, ChainId::mainnet())
+            .unwrap();
+    }
+
+    #[test]
+    fn test_sanitize_hot_potato_mainnet() {
+        // Create a node config with missing paranoid_hot_potato_verification on mainnet
+        let mut node_config = NodeConfig {
+            execution: ExecutionConfig {
+                paranoid_hot_potato_verification: false,
+                paranoid_type_verification: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error =
+            ExecutionConfig::sanitize(&mut node_config, RoleType::Validator, ChainId::mainnet())
+                .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_sanitize_paranoid_type_mainnet() {
+        // Create a node config with missing paranoid_type_verification on mainnet
+        let mut node_config = NodeConfig {
+            execution: ExecutionConfig {
+                paranoid_hot_potato_verification: true,
+                paranoid_type_verification: false,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error =
+            ExecutionConfig::sanitize(&mut node_config, RoleType::Validator, ChainId::mainnet())
+                .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
     fn test_no_genesis() {
         let (mut config, path) = generate_config();
         assert_eq!(config.genesis, None);

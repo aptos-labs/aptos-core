@@ -60,3 +60,45 @@ impl ConfigSanitizer for InspectionServiceConfig {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sanitize_valid_service_config() {
+        // Create an inspection service config with the configuration endpoint enabled
+        let mut node_config = NodeConfig {
+            inspection_service: InspectionServiceConfig {
+                expose_configuration: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Verify that the configuration is sanitized successfully
+        InspectionServiceConfig::sanitize(&mut node_config, RoleType::FullNode, ChainId::mainnet())
+            .unwrap()
+    }
+
+    #[test]
+    fn test_sanitize_config_mainnet() {
+        // Create an inspection service config with the configuration endpoint enabled
+        let mut node_config = NodeConfig {
+            inspection_service: InspectionServiceConfig {
+                expose_configuration: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Verify that sanitization fails for mainnet
+        let error = InspectionServiceConfig::sanitize(
+            &mut node_config,
+            RoleType::Validator,
+            ChainId::mainnet(),
+        )
+        .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+}

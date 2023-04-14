@@ -62,8 +62,13 @@ impl LocalNode {
         account_private_key: Option<ConfigKey<Ed25519PrivateKey>>,
     ) -> Result<Self> {
         let config_path = directory.join("node.yaml");
-        let config = NodeConfig::load_from_path(&config_path)
-            .with_context(|| format!("Failed to load NodeConfig from file: {:?}", config_path))?;
+        let config = NodeConfig::load_from_path(&config_path).map_err(|error| {
+            anyhow!(
+                "Failed to load NodeConfig from file: {:?}. Error: {:?}",
+                config_path,
+                error
+            )
+        })?;
         let peer_id = config
             .get_peer_id()
             .ok_or_else(|| anyhow!("unable to retrieve PeerId from config"))?;

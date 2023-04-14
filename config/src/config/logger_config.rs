@@ -74,13 +74,19 @@ impl ConfigSanitizer for LoggerConfig {
                 "The tokio-console feature is enabled but the tokio console port is not set!"
                     .into(),
             ));
+        } else if !is_tokio_console_enabled() && logger_config.tokio_console_port.is_some() {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "The tokio-console feature is not enabled but the tokio console port is set!"
+                    .into(),
+            ));
         }
 
         Ok(())
     }
 }
 
-/// Returns true if the tokio-console feature is enabled
+/// Returns true iff the tokio-console feature is enabled
 fn is_tokio_console_enabled() -> bool {
     cfg_if! {
         if #[cfg(feature = "tokio-console")] {
@@ -88,5 +94,28 @@ fn is_tokio_console_enabled() -> bool {
         } else {
             false
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sanitize_missing_feature() {
+        // Create a logger config with the tokio console port set
+        let mut node_config = NodeConfig {
+            logger: LoggerConfig {
+                tokio_console_port: Some(100),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Verify that the config fails sanitization (the tokio-console feature is missing!)
+        let error =
+            LoggerConfig::sanitize(&mut node_config, RoleType::Validator, ChainId::testnet())
+                .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
     }
 }

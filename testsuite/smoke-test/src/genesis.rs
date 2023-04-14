@@ -13,7 +13,7 @@ use crate::{
     workspace_builder::workspace_root,
 };
 use anyhow::anyhow;
-use aptos_config::config::NodeConfig;
+use aptos_config::config::{InitialSafetyRulesConfig, NodeConfig};
 use aptos_forge::{get_highest_synced_version, LocalNode, Node, NodeExt, SwarmExt, Validator};
 use aptos_logger::prelude::*;
 use aptos_temppath::TempPath;
@@ -206,6 +206,10 @@ async fn test_genesis_transaction_flow() {
     for (expected_to_connect, node) in env.validators_mut().take(3).enumerate() {
         let mut node_config = node.config().clone();
         insert_waypoint(&mut node_config, waypoint);
+        node_config
+            .consensus
+            .safety_rules
+            .initial_safety_rules_config = InitialSafetyRulesConfig::None;
         node_config.execution.genesis = Some(genesis_transaction.clone());
         // reset the sync_only flag to false
         node_config.consensus.sync_only = false;

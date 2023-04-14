@@ -110,3 +110,37 @@ impl ConfigSanitizer for PeerMonitoringServiceConfig {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sanitize_enabled_monitoring_config() {
+        // Create a monitoring config with an enabled monitoring client
+        let mut node_config = NodeConfig {
+            peer_monitoring_service: PeerMonitoringServiceConfig {
+                enable_peer_monitoring_client: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Verify the config passes sanitization for testnet
+        PeerMonitoringServiceConfig::sanitize(
+            &mut node_config,
+            RoleType::FullNode,
+            ChainId::testnet(),
+        )
+        .unwrap();
+
+        // Verify the config fails sanitization for mainnet
+        let error = PeerMonitoringServiceConfig::sanitize(
+            &mut node_config,
+            RoleType::FullNode,
+            ChainId::mainnet(),
+        )
+        .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+}

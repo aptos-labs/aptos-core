@@ -52,7 +52,13 @@ impl<P: AsRef<Path>> NodeConfigLoader<P> {
 fn sanitize_node_config(node_config: &mut NodeConfig) -> Result<(), Error> {
     // Get the role and chain_id for the node
     let node_role = node_config.base.role;
-    let chain_id = get_chain_id(node_config)?;
+    let chain_id = match get_chain_id(node_config) {
+        Ok(chain_id) => chain_id,
+        Err(error) => {
+            println!("Failed to get the chain ID from the genesis blob! Skipping config sanitization. Error: {:?}", error);
+            return Ok(());
+        },
+    };
 
     // Sanitize the node config
     NodeConfig::sanitize(node_config, node_role, chain_id)
