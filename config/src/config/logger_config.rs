@@ -17,11 +17,10 @@ pub struct LoggerConfig {
     pub is_async: bool,
     // The default logging level for slog.
     pub level: Level,
-    // tokio-console port
-    pub console_port: Option<u16>,
     pub enable_telemetry_remote_log: bool,
     pub enable_telemetry_flush: bool,
     pub telemetry_level: Level,
+    pub tokio_console_port: Option<u16>,
 }
 
 impl Default for LoggerConfig {
@@ -31,25 +30,24 @@ impl Default for LoggerConfig {
             enable_backtrace: false,
             is_async: true,
             level: Level::Info,
-            // This is the default port used by tokio-console
-            // setting console_port to None will disable tokio console even if aptos-console
-            // feature is enabled
-            console_port: Some(6669),
             enable_telemetry_remote_log: true,
             enable_telemetry_flush: true,
             telemetry_level: Level::Error,
+
+            // This is the default port used by tokio-console.
+            // Setting this to None will disable tokio-console
+            // even if the "tokio-console" feature is enabled.
+            tokio_console_port: None,
         }
     }
 }
 
 impl LoggerConfig {
-    pub fn disable_console(&mut self) {
-        self.console_port = None;
+    pub fn disable_tokio_console(&mut self) {
+        self.tokio_console_port = None;
     }
-}
 
-impl LoggerConfig {
     pub fn randomize_ports(&mut self) {
-        self.console_port = Some(utils::get_available_port());
+        self.tokio_console_port = Some(utils::get_available_port());
     }
 }
