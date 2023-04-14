@@ -8,7 +8,7 @@ module 0xCAFE::test {
     use aptos_framework::object::{create_object_from_account, generate_signer};
     use aptos_framework::object;
 
-    struct ModuleData has key, store {
+    struct ModuleData has key, store, drop {
         state: String,
     }
 
@@ -109,8 +109,6 @@ module 0xCAFE::test {
     #[view]
     public fun get_state<T: key>(o: Object<T>): String acquires ModuleData {
         let addr = aptos_std::object::object_address(&o);
-        let any = aptos_stdlib::copyable_any::pack(*borrow_global<ModuleData>(addr).state);
-        let md = aptos_stdlib::copyable_any::unpack<ModuleData>(any);
-        md.state
+        borrow_global<ModuleData>(addr).state
     }
 }
