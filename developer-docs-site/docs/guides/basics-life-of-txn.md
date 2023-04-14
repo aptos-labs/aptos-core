@@ -219,7 +219,7 @@ Mempool is a shared buffer that holds the transactions that are “waiting” to
 
 ### 1. REST Service → Mempool
 
-* After receiving a transaction from the client, the REST service sends the transaction to its own mempool, which then shares the transaction with the mempool of a validator fullnode.
+* After receiving a transaction from the client, the REST service sends the transaction to its own mempool, which then shares the transaction with the mempool of a validator fullnode. The mempool on the validator fullnode then shares the transaction with the mempool of a validator.
 * The mempool for validator node V<sub>X</sub> accepts transaction T<sub>N</sub> for the sender's account only if the sequence number of T<sub>N</sub> is greater than or equal to the current sequence number of the sender's account.
 
 ### 2. Mempool → Other validator nodes
