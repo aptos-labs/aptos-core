@@ -2,11 +2,11 @@
 
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## Unreleased
+## [1.0.11] - 2023/04/14
 ### Fixed
 * Fixed creating a new test account with `aptos init` would fail if the account didn't already exist
 
-## [1.0.10]
+## [1.0.10] - 2023/04/13
 ### Fixed
 * If `aptos init` is run with a faucet URL specified (which happens by default when using the local, devnet, or testnet network options) and funding the account fails, the account creation is considered a failure and nothing is persisted. Previously it would report success despite the account not being created on chain.
 * When specifying a profile where the `AuthenticationKey` has been rotated, now the `AccountAddress` is properly used from the config file
