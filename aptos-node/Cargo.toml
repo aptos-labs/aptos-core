@@ -76,9 +76,10 @@ url = { workspace = true }
 jemallocator = { workspace = true }
 
 [features]
-default = []
 assert-private-keys-not-cloneable = ["aptos-crypto/assert-private-keys-not-cloneable"]
-failpoints = ["fail/failpoints", "aptos-consensus/failpoints", "aptos-executor/failpoints", "aptos-mempool/failpoints", "aptos-api/failpoints"]
-indexer = ["aptos-indexer"]
 check-vm-features = []
 consensus-only-perf-test = ["aptos-executor/consensus-only-perf-test", "aptos-mempool/consensus-only-perf-test", "aptos-db/consensus-only-perf-test"]
+default = []
+failpoints = ["fail/failpoints", "aptos-consensus/failpoints", "aptos-executor/failpoints", "aptos-mempool/failpoints", "aptos-api/failpoints"]
+indexer = ["aptos-indexer"]
+tokio-console = ["aptos-logger/tokio-console"]

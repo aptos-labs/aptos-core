@@ -263,7 +263,7 @@ impl NodeConfig {
         self.api.randomize_ports();
         self.inspection_service.randomize_ports();
         self.storage.randomize_ports();
-        self.logger.disable_console();
+        self.logger.disable_tokio_console();
 
         // Randomize the ports for the networks
         if let Some(network) = self.validator_network.as_mut() {
