@@ -36,7 +36,7 @@ This is the reference documentation of the Aptos framework.
 -  [`0x1::multisig_account`](multisig_account.md#0x1_multisig_account)
 -  [`0x1::object`](object.md#0x1_object)
 -  [`0x1::optional_aggregator`](optional_aggregator.md#0x1_optional_aggregator)
--  [`0x1::primary_store`](primary_store.md#0x1_primary_store)
+-  [`0x1::primary_fungible_store`](primary_fungible_store.md#0x1_primary_fungible_store)
 -  [`0x1::reconfiguration`](reconfiguration.md#0x1_reconfiguration)
 -  [`0x1::resource_account`](resource_account.md#0x1_resource_account)
 -  [`0x1::stake`](stake.md#0x1_stake)

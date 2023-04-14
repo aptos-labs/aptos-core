@@ -64,7 +64,7 @@ module fungible_asset_extension::coin_example {
     }
 
     #[test_only]
-    use aptos_framework::primary_store;
+    use aptos_framework::primary_fungible_store;
     #[test_only]
     use std::signer;
 
@@ -76,14 +76,14 @@ module fungible_asset_extension::coin_example {
 
         mint(creator, 100, creator_address);
         let metadata = get_metadata();
-        assert!(primary_store::balance(creator_address, metadata) == 100, 4);
+        assert!(primary_fungible_store::balance(creator_address, metadata) == 100, 4);
         freeze_account(creator, creator_address);
-        assert!(!primary_store::ungated_balance_transfer_allowed(creator_address, metadata), 5);
+        assert!(!primary_fungible_store::ungated_balance_transfer_allowed(creator_address, metadata), 5);
         transfer(creator, creator_address, aaron_address, 10);
-        assert!(primary_store::balance(aaron_address, metadata) == 10, 6);
+        assert!(primary_fungible_store::balance(aaron_address, metadata) == 10, 6);
 
         unfreeze_account(creator, creator_address);
-        assert!(primary_store::ungated_balance_transfer_allowed(creator_address, metadata), 7);
+        assert!(primary_fungible_store::ungated_balance_transfer_allowed(creator_address, metadata), 7);
         burn(creator, creator_address, 90);
     }
 

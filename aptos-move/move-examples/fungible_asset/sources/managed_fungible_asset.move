@@ -4,7 +4,7 @@
 module fungible_asset_extension::managed_fungible_asset {
     use aptos_framework::fungible_asset::{Self, MintRef, TransferRef, BurnRef, FungibleAsset, Metadata};
     use aptos_framework::object::{Self, Object, ConstructorRef};
-    use aptos_framework::primary_store;
+    use aptos_framework::primary_fungible_store;
     use std::error;
     use std::signer;
     use std::string::String;
@@ -30,7 +30,7 @@ module fungible_asset_extension::managed_fungible_asset {
         symbol: String,
         decimals: u8
     ) {
-        primary_store::create_primary_store_enabled_fungible_asset(
+        primary_fungible_store::create_primary_store_enabled_fungible_asset(
             constructor_ref,
             if (monitoring_supply) {
                 option::some(if (maximum_supply != 0) {
@@ -65,7 +65,7 @@ module fungible_asset_extension::managed_fungible_asset {
         to: address
     ) acquires ManagedFungibleAsset {
         let managed_fungible_asset = authorized_borrow_refs(admin, metadata);
-        let to_wallet = primary_store::ensure_primary_store_exists(to, metadata);
+        let to_wallet = primary_fungible_store::ensure_primary_store_exists(to, metadata);
         let fa = fungible_asset::mint(&managed_fungible_asset.mint_ref, amount);
         fungible_asset::deposit_with_ref(&managed_fungible_asset.transfer_ref, to_wallet, fa);
     }
@@ -79,8 +79,8 @@ module fungible_asset_extension::managed_fungible_asset {
         amount: u64
     ) acquires ManagedFungibleAsset {
         let transfer_ref = &authorized_borrow_refs(admin, metadata).transfer_ref;
-        let from_wallet = primary_store::ensure_primary_store_exists(from, metadata);
-        let to_wallet = primary_store::ensure_primary_store_exists(to, metadata);
+        let from_wallet = primary_fungible_store::ensure_primary_store_exists(from, metadata);
+        let to_wallet = primary_fungible_store::ensure_primary_store_exists(to, metadata);
         fungible_asset::transfer_with_ref(transfer_ref, from_wallet, to_wallet, amount);
     }
 
@@ -92,7 +92,7 @@ module fungible_asset_extension::managed_fungible_asset {
         amount: u64
     ) acquires ManagedFungibleAsset {
         let burn_ref = &authorized_borrow_refs(admin, metadata).burn_ref;
-        let from_wallet = primary_store::ensure_primary_store_exists(from, metadata);
+        let from_wallet = primary_fungible_store::ensure_primary_store_exists(from, metadata);
         fungible_asset::burn_from(burn_ref, from_wallet, amount);
     }
 
@@ -103,7 +103,7 @@ module fungible_asset_extension::managed_fungible_asset {
         account: address
     ) acquires ManagedFungibleAsset {
         let transfer_ref = &authorized_borrow_refs(admin, metadata).transfer_ref;
-        let wallet = primary_store::ensure_primary_store_exists(account, metadata);
+        let wallet = primary_fungible_store::ensure_primary_store_exists(account, metadata);
         fungible_asset::set_ungated_transfer(transfer_ref, wallet, false);
     }
 
@@ -112,7 +112,7 @@ module fungible_asset_extension::managed_fungible_asset {
                                       metadata: Object<Metadata>,
                                       account: address) acquires ManagedFungibleAsset {
         let transfer_ref = &authorized_borrow_refs(admin, metadata).transfer_ref;
-        let wallet = primary_store::ensure_primary_store_exists(account, metadata);
+        let wallet = primary_fungible_store::ensure_primary_store_exists(account, metadata);
         fungible_asset::set_ungated_transfer(transfer_ref, wallet, true);
     }
 
@@ -121,7 +121,7 @@ module fungible_asset_extension::managed_fungible_asset {
                         metadata: Object<Metadata>,
                         amount: u64, from: address): FungibleAsset acquires ManagedFungibleAsset {
         let transfer_ref = &authorized_borrow_refs(admin, metadata).transfer_ref;
-        let from_wallet = primary_store::ensure_primary_store_exists(from, metadata);
+        let from_wallet = primary_fungible_store::ensure_primary_store_exists(from, metadata);
         fungible_asset::withdraw_with_ref(transfer_ref, from_wallet, amount)
     }
 
@@ -130,7 +130,7 @@ module fungible_asset_extension::managed_fungible_asset {
                        metadata: Object<Metadata>,
                        to: address, fa: FungibleAsset) acquires ManagedFungibleAsset {
         let transfer_ref = &authorized_borrow_refs(admin, metadata).transfer_ref;
-        let to_wallet = primary_store::ensure_primary_store_exists(to, metadata);
+        let to_wallet = primary_fungible_store::ensure_primary_store_exists(to, metadata);
         fungible_asset::deposit_with_ref(transfer_ref, to_wallet, fa);
     }
 
@@ -172,14 +172,14 @@ module fungible_asset_extension::managed_fungible_asset {
         let aaron_address = @0xface;
 
         mint(creator, metadata, 100, creator_address);
-        assert!(primary_store::balance(creator_address, metadata) == 100, 4);
+        assert!(primary_fungible_store::balance(creator_address, metadata) == 100, 4);
         freeze_account(creator, metadata, creator_address);
-        assert!(!primary_store::ungated_balance_transfer_allowed(creator_address, metadata), 5);
+        assert!(!primary_fungible_store::ungated_balance_transfer_allowed(creator_address, metadata), 5);
         transfer(creator, metadata, creator_address, aaron_address, 10);
-        assert!(primary_store::balance(aaron_address, metadata) == 10, 6);
+        assert!(primary_fungible_store::balance(aaron_address, metadata) == 10, 6);
 
         unfreeze_account(creator, metadata, creator_address);
-        assert!(primary_store::ungated_balance_transfer_allowed(creator_address, metadata), 7);
+        assert!(primary_fungible_store::ungated_balance_transfer_allowed(creator_address, metadata), 7);
         burn(creator, metadata, creator_address, 90);
     }
 
