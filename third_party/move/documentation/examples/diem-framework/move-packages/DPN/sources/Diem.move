@@ -804,12 +804,12 @@ module DiemFramework::Diem {
     spec schema PreburnToEnsures<CoinType> {
         account: signer;
         amount: u64;
-        let account_addr = signer::address_of(account);
+        let account_addr_for_preburn = signer::address_of(account);
         /// Removes the preburn resource if it exists
-        modifies global<Preburn<CoinType>>(account_addr);
+        modifies global<Preburn<CoinType>>(account_addr_for_preburn);
         /// Publishes if it doesn't exists. Updates its state either way.
-        modifies global<PreburnQueue<CoinType>>(account_addr);
-        ensures exists<PreburnQueue<CoinType>>(account_addr);
+        modifies global<PreburnQueue<CoinType>>(account_addr_for_preburn);
+        ensures exists<PreburnQueue<CoinType>>(account_addr_for_preburn);
         // The preburn amount in the currency info can be updated.
         modifies global<CurrencyInfo<CoinType>>(@CurrencyInfo);
         include PreburnEnsures<CoinType>{preburn: spec_make_preburn(amount)};

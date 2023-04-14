@@ -140,7 +140,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "1.0.9"
+version = "1.0.11"
 dependencies = [
  "anyhow",
  "aptos-backup-cli",
@@ -403,6 +403,7 @@ dependencies = [
  "serde_json",
  "serde_yaml 0.8.26",
  "tokio",
+ "tokio-io-timeout",
  "tokio-stream",
  "tokio-util 0.7.3",
  "warp",
@@ -10916,6 +10917,7 @@ name = "serializer-tests"
 version = "0.1.0"
 dependencies = [
  "move-binary-format",
+ "move-core-types",
  "proptest",
  "proptest-derive",
 ]
