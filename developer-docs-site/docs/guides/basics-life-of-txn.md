@@ -157,11 +157,11 @@ A client submits a transaction to the REST service of an Aptos fullnode.
 
 ### 2. REST Service → Mempool
 
-The REST service of the fullnode puts the transaction in its mempool.
+The REST service of the fullnode puts the transaction in its mempool. After mempool does some initial checks, REST Service will return a status to the client whether the transaction was accepted or rejected. For example, out-of-date transactions will be rejected: mempool will accept the transaction T<sub>N</sub> only if the sequence number of T<sub>N</sub> is greater than or equal to the current sequence number of the sender's account.
 
 ### 3. Mempool -> Mempool
 
-The mempool on the fullnode sends the transaction to the mempool of a validator fullnode, which then sends it to validator node V<sub>X</sub>'s mempool. The mempool will accept the transaction T<sub>N</sub> only if the sequence number of T<sub>N</sub> is greater than or equal to the current sequence number of the sender's account (note that the transaction will not be passed to consensus until the sequence number matches the sequence number of the sender’s account).
+The mempool on the fullnode sends the transaction to the mempool of a validator fullnode, which then sends it to validator node V<sub>X</sub>'s mempool.  Note that the transaction will not be sent to the next mempool (or passed to consensus) until the sequence number matches the sequence number of the sender’s account.
 
 ### 4. REST Service → Storage
 
