@@ -18,6 +18,7 @@
 *.txt text eol=lf 
 *.yaml text eol=lf 
 *.yml text eol=lf 
+*.ps1 text eol=crlf
 
 # Use Move syntax highlighter for Move IR code
 *.mvir linguist-language=Move
