@@ -21,8 +21,8 @@ fn main() {
 
     let bencher = TransactionBencher::new(any_with::<P2PTransferGen>((1_000, 1_000_000)));
 
-    let acts = [1000];
-    let txns = [1000, 10000];
+    let acts = [10000];
+    let txns = [1000, 10000, 50000];
     let num_warmups = 2;
     let num_runs = 10;
 
