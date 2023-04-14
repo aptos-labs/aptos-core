@@ -5,17 +5,8 @@ use aptos_api_types::{MoveModule, MoveType};
 use move_core_types::{identifier::Identifier, language_storage::ModuleId};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
-/// Defines functions common to all `TypeAccessorBuilder`s.
-pub trait TypeAccessorBuilderTrait {
-    /// Add modules that we have already retrieved.
-    fn add_modules(self, modules: Vec<MoveModule>) -> Self;
-
-    /// Add a module that we have already retreived.
-    fn add_module(self, module: MoveModule) -> Self;
-}
-
 pub(crate) fn parse_module(
-    module: MoveModule,
+    module: &MoveModule,
 ) -> (
     // The map of struct to field to field type.
     BTreeMap<Identifier, BTreeMap<Identifier, MoveType>>,
@@ -27,16 +18,16 @@ pub(crate) fn parse_module(
 
     // For each struct in the module look through the types of the fields and
     // determine any more modules we need to look up.
-    for struc in module.structs.into_iter() {
+    for struc in &module.structs {
         let mut types_to_resolve = Vec::new();
         let mut types_seen = HashSet::new();
 
-        for field in struc.fields {
+        for field in &struc.fields {
             types_to_resolve.push(field.typ.clone());
             structs_info
                 .entry(struc.name.clone().into())
                 .or_insert_with(BTreeMap::new)
-                .insert(field.name.into(), field.typ);
+                .insert(field.name.clone().into(), field.typ.clone());
         }
 
         // Go through the types recursively until we hit leaf types. As we do so,

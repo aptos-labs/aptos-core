@@ -3386,6 +3386,8 @@ dependencies = [
  "aptos-framework",
  "aptos-rest-client",
  "aptos-types",
+ "async-trait",
+ "enum_dispatch",
  "move-binary-format",
  "move-core-types",
  "tokio",

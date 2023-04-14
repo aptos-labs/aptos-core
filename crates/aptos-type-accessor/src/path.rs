@@ -14,7 +14,7 @@ use std::str::FromStr;
 /// ```
 /// would be parsed into:
 /// ```
-/// # use aptos_type_accessor::PathComponent;
+/// # use aptos_type_accessor::path::PathComponent;
 /// # use move_core_types::identifier::Identifier;
 /// #
 /// [
@@ -33,7 +33,7 @@ use std::str::FromStr;
 /// ```
 /// would be parsed into:
 /// ```
-/// # use aptos_type_accessor::PathComponent;
+/// # use aptos_type_accessor::path::PathComponent;
 /// # use move_core_types::identifier::Identifier;
 /// #
 /// [

@@ -17,6 +17,8 @@ anyhow = { workspace = true }
 aptos-api-types = { workspace = true }
 aptos-rest-client = { workspace = true }
 aptos-types = { workspace = true }
+async-trait = { workspace = true }
+enum_dispatch = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 

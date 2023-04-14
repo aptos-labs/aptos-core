@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::common::{parse_module, TypeAccessorBuilderTrait};
+use super::{common::parse_module, TypeAccessorBuilderTrait};
 use crate::accessor::TypeAccessor;
 use anyhow::{bail, Result};
 use aptos_api_types::{MoveModule, MoveType};
@@ -11,20 +11,20 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 /// This builder operates only with modules provided to it directly. It is not able to
 /// look up modules, so `build` will fail if it encounters a module that wasn't
 /// registered in advance. If you want a TypeAccessorBuilder that can look up modules
-/// as it encounters them, use [`crate::TypeAccessorBuilderRemote`].
+/// as it encounters them, use [`crate::RemoteTypeAccessorBuilder`].
 #[derive(Clone, Debug)]
-pub struct TypeAccessorBuilderLocal {
+pub struct LocalTypeAccessorBuilder {
     modules: BTreeMap<ModuleId, MoveModule>,
 }
 
-impl TypeAccessorBuilderLocal {
+impl LocalTypeAccessorBuilder {
     pub fn new() -> Self {
         Self {
             modules: BTreeMap::new(),
         }
     }
 
-    pub fn build(mut self) -> Result<TypeAccessor> {
+    pub fn build(&mut self) -> Result<TypeAccessor> {
         if self.modules.is_empty() {
             bail!("Cannot build TypeAccessor without any modules to lookup or add");
         }
@@ -36,41 +36,53 @@ impl TypeAccessorBuilderLocal {
 
         let mut modules_processed = BTreeSet::new();
 
-        while let Some((module_id, module)) = self.modules.pop_first() {
-            if modules_processed.contains(&module_id) {
-                continue;
-            }
-            modules_processed.insert(module_id.clone());
-            let (structs_info, modules_to_retrieve) = parse_module(module);
+        loop {
+            let modules_to_process = self
+                .modules
+                .iter()
+                .filter(|(module_id, _)| !modules_processed.contains(*module_id))
+                .collect::<BTreeMap<_, _>>();
 
-            // Filter out modules we already have / have processed.
-            let modules_to_retrieve: HashSet<_> = modules_to_retrieve
-                .into_iter()
-                .filter(|module_id| {
-                    !self.modules.contains_key(module_id) && !modules_processed.contains(module_id)
-                })
-                .collect();
-
-            if !modules_to_retrieve.is_empty() {
-                bail!(
-                    "While processing {} references to modules not available \
-                    to the builder were found: {:?}. This makes it impossible \
-                    to comprehensively resolve types, and this builder is \
-                    unable to look up new modules, so it is impossible to \
-                    build a complete TypeAccessor.",
-                    module_id,
-                    modules_to_retrieve
-                );
+            // If there are no modules to process we're done.
+            if modules_to_process.is_empty() {
+                break;
             }
 
-            field_info.insert(module_id, structs_info);
+            // If there are modules to process, do so.
+            for (module_id, module) in modules_to_process {
+                let (structs_info, modules_to_retrieve) = parse_module(module);
+
+                // Filter out modules we already have / have processed.
+                let modules_to_retrieve: HashSet<_> = modules_to_retrieve
+                    .into_iter()
+                    .filter(|module_id| {
+                        !self.modules.contains_key(module_id)
+                            && !modules_processed.contains(module_id)
+                    })
+                    .collect();
+
+                if !modules_to_retrieve.is_empty() {
+                    bail!(
+                        "While processing {} references to modules not available \
+                        to the builder were found: {:?}. This makes it impossible \
+                        to comprehensively resolve types, and this builder is \
+                        unable to look up new modules, so it is impossible to \
+                        build a complete TypeAccessor.",
+                        module_id,
+                        modules_to_retrieve
+                    );
+                }
+
+                modules_processed.insert(module_id.clone());
+                field_info.insert(module_id.clone(), structs_info);
+            }
         }
 
         Ok(TypeAccessor::new(field_info))
     }
 }
 
-impl TypeAccessorBuilderTrait for TypeAccessorBuilderLocal {
+impl TypeAccessorBuilderTrait for LocalTypeAccessorBuilder {
     fn add_modules(mut self, modules: Vec<MoveModule>) -> Self {
         for module in modules {
             self.modules.insert(
@@ -86,7 +98,7 @@ impl TypeAccessorBuilderTrait for TypeAccessorBuilderLocal {
     }
 }
 
-impl Default for TypeAccessorBuilderLocal {
+impl Default for LocalTypeAccessorBuilder {
     fn default() -> Self {
         Self::new()
     }
@@ -109,7 +121,7 @@ mod tests {
         // while the TypeAccessorBuilder is building it will find references to
         // modules that it doesn't know about and because it is in DoNotLookup mode,
         // it will return an error.
-        let type_accessor_result = TypeAccessorBuilderLocal::new()
+        let type_accessor_result = LocalTypeAccessorBuilder::new()
             .add_modules(food_modules.clone())
             .build();
         assert!(
@@ -127,7 +139,7 @@ mod tests {
         modules.extend(compile_package(PathBuf::try_from("move/food").unwrap())?);
 
         // Build a new type accessor with all of those modules, which we expect to succeed.
-        TypeAccessorBuilderLocal::new()
+        LocalTypeAccessorBuilder::new()
             .add_modules(modules)
             .build()
             .context("Failed to build TypeAccessor with all the modules")?;

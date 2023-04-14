@@ -166,7 +166,8 @@ impl TypeAccessor {
 mod tests {
     use super::*;
     use crate::{
-        builder::TypeAccessorBuilderTrait, test_helpers::compile_package, TypeAccessorBuilderLocal,
+        builder::{LocalTypeAccessorBuilder, TypeAccessorBuilderTrait},
+        test_helpers::compile_package,
     };
     use aptos_types::account_address::AccountAddress;
     use std::path::PathBuf;
@@ -182,7 +183,7 @@ mod tests {
         modules.extend(compile_package(PathBuf::try_from("move/food").unwrap())?);
 
         // Build the TypeAccessor.
-        let type_accessor = TypeAccessorBuilderLocal::new()
+        let type_accessor = LocalTypeAccessorBuilder::new()
             .add_modules(modules)
             .build()
             .context("Failed to build TypeAccessor with all the modules")?;

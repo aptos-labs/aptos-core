@@ -63,7 +63,8 @@
 //! use aptos_api_types::MoveStructTag;
 //! use aptos_rest_client::Client as RestClient;
 //! use aptos_types::account_address::AccountAddress;
-//! use aptos_type_accessor::TypeAccessorBuilderRemote;
+//! use aptos_type_accessor::builder::RemoteTypeAccessorBuilder;
+//! use aptos_type_accessor::module_retriever::{ModuleRetriever, ApiModuleRetriever};
 //! use move_core_types::{identifier::Identifier, language_storage::ModuleId};
 //! use std::sync::Arc;
 //! # use std::str::FromStr;
@@ -72,11 +73,12 @@
 //! async fn main() -> anyhow::Result<()> {
 //!     # let url = url::Url::from_str("https://fullnode.mainnet.aptoslabs.com").unwrap();
 //!     let aptos_client = Arc::new(RestClient::new(url));
+//!     let module_retriever = ModuleRetriever::from(ApiModuleRetriever::new(aptos_client));
 //!
 //!     let account_address = AccountAddress::from_hex_literal("0x123")?;
 //!     let module_name = Identifier::new("food")?;
 //!     let module_id = ModuleId::new(account_address, module_name);
-//!     let type_accessor = TypeAccessorBuilderRemote::new(aptos_client)
+//!     let type_accessor = RemoteTypeAccessorBuilder::new(module_retriever)
 //!         .lookup_module(module_id.clone())
 //!         .build()
 //!         .await?;
@@ -146,9 +148,9 @@
 //! #
 //! # use aptos_types::account_address::AccountAddress;
 //! # use move_core_types::{identifier::Identifier, language_storage::ModuleId};
-//! # use aptos_type_accessor::TypeAccessorBuilderLocal;
+//! # use aptos_type_accessor::builder::LocalTypeAccessorBuilder;
 //! #
-//! # let type_accessor = TypeAccessorBuilderLocal::new().build()?;
+//! # let type_accessor = LocalTypeAccessorBuilder::new().build()?;
 //! #
 //! # let account_address = AccountAddress::from_hex_literal("0x123")?;
 //! # let module_name = Identifier::new("food")?;
@@ -170,7 +172,7 @@
 //! In its raw format, a path is defined as a vec of [`PathComponent`].
 //!
 //! ```
-//! # use aptos_type_accessor::PathComponent;
+//! # use aptos_type_accessor::path::PathComponent;
 //! # use move_core_types::identifier::Identifier;
 //! #
 //! let path = vec![
@@ -195,7 +197,7 @@
 //! # ()
 //! ```
 //! ```
-//! # use aptos_type_accessor::PathComponent;
+//! # use aptos_type_accessor::path::PathComponent;
 //! # use move_core_types::identifier::Identifier;
 //! #
 //! vec![
@@ -212,7 +214,7 @@
 //! # ()
 //! ```
 //! ```
-//! # use aptos_type_accessor::PathComponent;
+//! # use aptos_type_accessor::path::PathComponent;
 //! # use move_core_types::identifier::Identifier;
 //! #
 //! vec![
@@ -227,20 +229,22 @@
 //! ## Builder Types
 //!
 //! This crate offers two types of builders for building a [`TypeAccessor`]:
-//! - [`TypeAccessorBuilderLocal`]: Use this when you have all the modules you need
+//! - [`LocalTypeAccessorBuilder`]: Use this when you have all the modules you need
 //! locally already.
-//! - [`TypeAccessorBuilderRemote`]: Use this when you want to fetch modules from the
+//! - [`RemoteTypeAccessorBuilder`]: Use this when you want to fetch modules from the
 //! API as part of building the TypeAccessor.
 //!
 //! The documentation for each of these builders will help you decide which one is
 //! appropriate for your use case.
 
-mod accessor;
-mod builder;
-mod path;
+pub mod accessor;
+pub mod builder;
+pub mod module_retriever;
+pub mod path;
 #[cfg(test)]
 mod test_helpers;
 
-pub use accessor::TypeAccessor;
-pub use builder::{TypeAccessorBuilderLocal, TypeAccessorBuilderRemote, TypeAccessorBuilderTrait};
-pub use path::{parse_path, PathComponent};
+// The TypeAccessor lookup methods should have an error that returns any modules that
+// were missing or incomplete if the lookup fails. Then we can have a manager on top
+// that holds on to the builder, and the builder can be told to refetch those modules
+// and then rebuild.
