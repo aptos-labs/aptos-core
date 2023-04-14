@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    exponential_buckets, histogram_opts, register_histogram, register_int_counter, register_int_counter_vec,
-    register_int_gauge, Histogram, IntCounter, IntCounterVec, IntGauge,
+    exponential_buckets, histogram_opts, register_histogram, register_int_counter,
+    register_int_counter_vec, register_int_gauge, Histogram, IntCounter, IntCounterVec, IntGauge,
 };
 use once_cell::sync::Lazy;
 
@@ -83,8 +83,9 @@ pub static SYSTEM_TRANSACTIONS_EXECUTED: Lazy<IntCounter> = Lazy::new(|| {
 });
 
 const NUM_BLOCK_TRANSACTIONS_BUCKETS: [f64; 30] = [
-    5.0, 10.0, 20.0, 40.0, 75.0, 100.0, 200.0, 400.0, 800.0,
-    1200.0, 1800.0, 2500.0, 3300.0, 4000.0, 4700.0, 5500.0, 6500.0, 7500.0, 9000.0, 11500.0, 13000.0, 14500.0, 16500.0, 18500.0, 21000.0, 24000.0, 27000.0, 30000.0, 35000.0, 40000.0
+    5.0, 10.0, 20.0, 40.0, 75.0, 100.0, 200.0, 400.0, 800.0, 1200.0, 1800.0, 2500.0, 3300.0,
+    4000.0, 4700.0, 5500.0, 6500.0, 7500.0, 9000.0, 11500.0, 13000.0, 14500.0, 16500.0, 18500.0,
+    21000.0, 24000.0, 27000.0, 30000.0, 35000.0, 40000.0,
 ];
 
 pub static BLOCK_TRANSACTION_COUNT: Lazy<Histogram> = Lazy::new(|| {
@@ -125,7 +126,7 @@ pub static TXN_VALIDATION_SECONDS: Lazy<Histogram> = Lazy::new(|| {
 });
 
 const TXN_GAS_USAGE_BUCKETS: [f64; 14] = [
-    2.0, 4.0, 6.0, 8.0, 10.0, 12.5, 15.0, 20.0, 25.0, 35.0, 50.0, 70.0, 90.0, 120.0
+    2.0, 4.0, 6.0, 8.0, 10.0, 12.5, 15.0, 20.0, 25.0, 35.0, 50.0, 70.0, 90.0, 120.0,
 ];
 
 pub static TXN_GAS_USAGE: Lazy<Histogram> = Lazy::new(|| {
