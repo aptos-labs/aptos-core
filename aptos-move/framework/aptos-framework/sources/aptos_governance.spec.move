@@ -48,6 +48,16 @@ spec aptos_framework::aptos_governance {
         ensures exists<ApprovedExecutionHashes>(addr);
     }
 
+    /// Signer address must be @aptos_framework.
+    /// Abort if structs have already been created.
+    spec initialize_partial_voting(
+        aptos_framework: &signer,
+    ) {
+        let addr = signer::address_of(aptos_framework);
+        aborts_if addr != @aptos_framework;
+        aborts_if exists<VotingRecordsV2>(@aptos_framework);
+    }
+
     spec schema InitializeAbortIf {
         aptos_framework: &signer;
         min_voting_threshold: u128;
@@ -101,6 +111,16 @@ spec aptos_framework::aptos_governance {
 
     spec schema AbortsIfNotGovernanceConfig {
         aborts_if !exists<GovernanceConfig>(@aptos_framework);
+    }
+
+    spec has_entirely_voted(stake_pool: address, proposal_id: u64): bool {
+        aborts_if !exists<VotingRecords>(@aptos_framework);
+    }
+
+    spec get_remaining_voting_power(stake_pool: address, proposal_id: u64): u64 {
+        // TODO: The calculation uses function `get_voting_power`, which has already stated that it cannot be fully verified,
+        pragma aborts_if_is_partial;
+        include VotingInitializationAbortIfs;
     }
 
     /// The same as spec of `create_proposal_v2()`.
@@ -172,7 +192,6 @@ spec aptos_framework::aptos_governance {
         proposal_id: u64,
         should_pass: bool,
     ) {
-        use aptos_framework::stake;
         use aptos_framework::chain_status;
 
         // TODO: The variable `voting_power` is the return value of the function `get_voting_power`.
@@ -182,6 +201,56 @@ spec aptos_framework::aptos_governance {
         pragma aborts_if_is_partial;
 
         requires chain_status::is_operating();
+        include VoteAbortIf;
+    }
+
+    /// stake_pool must exist StakePool.
+    /// The delegated voter under the resource StakePool of the stake_pool must be the voter address.
+    /// Address @aptos_framework must exist VotingRecords and GovernanceProposal.
+    /// Address @aptos_framework must exist VotingRecordsV2 if partial_governance_voting flag is enabled.
+    spec partial_vote (
+        voter: &signer,
+        stake_pool: address,
+        proposal_id: u64,
+        voting_power: u64,
+        should_pass: bool,
+    ) {
+        use aptos_framework::chain_status;
+
+        // TODO: The variable `voting_power` is the return value of the function `get_voting_power`.
+        // `get_voting_power` has already stated that it cannot be completely verified,
+        // so the value of `voting_power` cannot be obtained in the spec,
+        // and the `aborts_if` of `voting_power` cannot be written.
+        pragma aborts_if_is_partial;
+
+        requires chain_status::is_operating();
+        include VoteAbortIf;
+    }
+
+    spec vote_internal (
+        voter: &signer,
+        stake_pool: address,
+        proposal_id: u64,
+        voting_power: u64,
+        should_pass: bool,
+    ) {
+        use aptos_framework::chain_status;
+
+        // TODO: The variable `voting_power` is the return value of the function `get_voting_power`.
+        // `get_voting_power` has already stated that it cannot be completely verified,
+        // so the value of `voting_power` cannot be obtained in the spec,
+        // and the `aborts_if` of `voting_power` cannot be written.
+        pragma aborts_if_is_partial;
+
+        requires chain_status::is_operating();
+        include VoteAbortIf;
+    }
+
+    spec schema VoteAbortIf {
+        voter: &signer;
+        stake_pool: address;
+        proposal_id: u64;
+        should_pass: bool;
 
         let voter_address = signer::address_of(voter);
         let stake_pool_res = global<stake::StakePool>(stake_pool);
@@ -196,6 +265,9 @@ spec aptos_framework::aptos_governance {
         let proposal_expiration = proposal.expiration_secs;
         let locked_until_secs = global<stake::StakePool>(stake_pool).locked_until_secs;
         aborts_if proposal_expiration > locked_until_secs;
+        aborts_if features::spec_partial_governance_voting_enabled() && !exists<VotingRecordsV2>(@aptos_framework);
+
+        // TODO: the changes inside VotingRecordsV2 cannot be verified because the calculation involves the function `get_voting_power`.
     }
 
     spec add_approved_script_hash(proposal_id: u64) {
@@ -338,5 +410,13 @@ spec aptos_framework::aptos_governance {
         aborts_if !string::spec_internal_check_utf8(b"IS_MULTI_STEP_PROPOSAL_IN_EXECUTION");
         aborts_if aptos_framework::transaction_context::spec_get_script_hash() != proposal.execution_hash;
         include GetSignerAbortsIf;
+    }
+
+    spec assert_voting_initialization() {
+        include VotingInitializationAbortIfs;
+    }
+
+    spec schema VotingInitializationAbortIfs {
+        aborts_if features::spec_partial_governance_voting_enabled() && !exists<VotingRecordsV2>(@aptos_framework);
     }
 }

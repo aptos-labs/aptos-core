@@ -216,7 +216,15 @@ pub enum EntryFunctionCall {
         is_multi_step_proposal: bool,
     },
 
-    /// Vote on proposal with `proposal_id` and voting power from `stake_pool`.
+    /// Vote on proposal with `proposal_id` and specified voting power from `stake_pool`.
+    AptosGovernancePartialVote {
+        stake_pool: AccountAddress,
+        proposal_id: u64,
+        voting_power: u64,
+        should_pass: bool,
+    },
+
+    /// Vote on proposal with `proposal_id` and all voting power from `stake_pool`.
     AptosGovernanceVote {
         stake_pool: AccountAddress,
         proposal_id: u64,
@@ -883,6 +891,12 @@ impl EntryFunctionCall {
                 metadata_hash,
                 is_multi_step_proposal,
             ),
+            AptosGovernancePartialVote {
+                stake_pool,
+                proposal_id,
+                voting_power,
+                should_pass,
+            } => aptos_governance_partial_vote(stake_pool, proposal_id, voting_power, should_pass),
             AptosGovernanceVote {
                 stake_pool,
                 proposal_id,
@@ -1695,7 +1709,33 @@ pub fn aptos_governance_create_proposal_v2(
     ))
 }
 
-/// Vote on proposal with `proposal_id` and voting power from `stake_pool`.
+/// Vote on proposal with `proposal_id` and specified voting power from `stake_pool`.
+pub fn aptos_governance_partial_vote(
+    stake_pool: AccountAddress,
+    proposal_id: u64,
+    voting_power: u64,
+    should_pass: bool,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("aptos_governance").to_owned(),
+        ),
+        ident_str!("partial_vote").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&stake_pool).unwrap(),
+            bcs::to_bytes(&proposal_id).unwrap(),
+            bcs::to_bytes(&voting_power).unwrap(),
+            bcs::to_bytes(&should_pass).unwrap(),
+        ],
+    ))
+}
+
+/// Vote on proposal with `proposal_id` and all voting power from `stake_pool`.
 pub fn aptos_governance_vote(
     stake_pool: AccountAddress,
     proposal_id: u64,
@@ -3683,6 +3723,21 @@ mod decoder {
         }
     }
 
+    pub fn aptos_governance_partial_vote(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AptosGovernancePartialVote {
+                stake_pool: bcs::from_bytes(script.args().get(0)?).ok()?,
+                proposal_id: bcs::from_bytes(script.args().get(1)?).ok()?,
+                voting_power: bcs::from_bytes(script.args().get(2)?).ok()?,
+                should_pass: bcs::from_bytes(script.args().get(3)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn aptos_governance_vote(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AptosGovernanceVote {
@@ -4782,6 +4837,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "aptos_governance_create_proposal_v2".to_string(),
             Box::new(decoder::aptos_governance_create_proposal_v2),
+        );
+        map.insert(
+            "aptos_governance_partial_vote".to_string(),
+            Box::new(decoder::aptos_governance_partial_vote),
         );
         map.insert(
             "aptos_governance_vote".to_string(),
