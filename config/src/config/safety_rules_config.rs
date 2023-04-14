@@ -5,11 +5,14 @@
 #[cfg(test)]
 use crate::config::persistable_config::PersistableConfig;
 use crate::{
-    config::{IdentityBlob, LoggerConfig, SecureBackend, WaypointConfig},
+    config::{
+        config_sanitizer::ConfigSanitizer, Error, IdentityBlob, LoggerConfig, NodeConfig, RoleType,
+        SecureBackend, WaypointConfig,
+    },
     keys::ConfigKey,
 };
 use aptos_crypto::{bls12381, Uniform};
-use aptos_types::{network_address::NetworkAddress, waypoint::Waypoint, PeerId};
+use aptos_types::{chain_id::ChainId, network_address::NetworkAddress, waypoint::Waypoint, PeerId};
 use rand::rngs::StdRng;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -55,7 +58,7 @@ impl SafetyRulesConfig {
     }
 
     #[cfg(test)]
-    /// Returns the default safety rules config for a validator
+    /// Returns the default safety rules config for a validator (only used by tests)
     pub fn get_default_config() -> Self {
         let contents = include_str!("test_data/safety_rules.yaml");
         SafetyRulesConfig::parse_serialized_config(contents).unwrap_or_else(|error| {
@@ -64,6 +67,63 @@ impl SafetyRulesConfig {
                 error
             )
         })
+    }
+}
+
+impl ConfigSanitizer for SafetyRulesConfig {
+    /// Validate and process the safety rules config according to the given node role and chain ID
+    fn sanitize(
+        node_config: &mut NodeConfig,
+        node_role: RoleType,
+        chain_id: ChainId,
+    ) -> Result<(), Error> {
+        let sanitizer_name = Self::get_sanitizer_name();
+        let safety_rules_config = &node_config.consensus.safety_rules;
+
+        // Verify that the secure backend is appropriate for mainnet validators
+        if chain_id.is_mainnet()? && node_role.is_validator() {
+            if safety_rules_config.backend.is_github() {
+                return Err(Error::ConfigSanitizerFailed(
+                    sanitizer_name,
+                    "The secure backend should not be set to GitHub in mainnet!".to_string(),
+                ));
+            } else if safety_rules_config.backend.is_in_memory() {
+                return Err(Error::ConfigSanitizerFailed(
+                    sanitizer_name,
+                    "The secure backend should not be set to in memory storage in mainnet!"
+                        .to_string(),
+                ));
+            }
+        }
+
+        // Verify that the safety rules service is set to local for optimal performance
+        if !safety_rules_config.service.is_local() {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                format!("The safety rules service should be set to local for optimal performance! Given config: {:?}", &safety_rules_config.service)
+            ));
+        }
+
+        // Verify that the safety rules test config is not enabled in mainnet
+        if chain_id.is_mainnet()? && safety_rules_config.test.is_some() {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "The safety rules test config should not be used in mainnet!".to_string(),
+            ));
+        }
+
+        // Verify that the initial safety rules config is set for validators
+        if node_role.is_validator() {
+            if let InitialSafetyRulesConfig::None = safety_rules_config.initial_safety_rules_config
+            {
+                return Err(Error::ConfigSanitizerFailed(
+                    sanitizer_name,
+                    "The initial safety rules config must be set for validators!".to_string(),
+                ));
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -116,6 +176,13 @@ pub enum SafetyRulesService {
     Serializer,
     /// This creates a separate thread to run safety rules, it is similar to a fork / exec style
     Thread,
+}
+
+impl SafetyRulesService {
+    /// Returns true iff the service is local
+    fn is_local(&self) -> bool {
+        matches!(self, SafetyRulesService::Local)
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]

@@ -31,7 +31,7 @@ use std::{
 fn update_node_config_restart(validator: &mut LocalNode, mut config: NodeConfig) {
     validator.stop();
     let node_path = validator.config_path();
-    config.save(node_path).unwrap();
+    config.save_to_path(node_path).unwrap();
     validator.start().unwrap();
 }
 
@@ -259,7 +259,7 @@ async fn test_genesis_transaction_flow() {
     node.stop();
     let mut node_config = node.config().clone();
     node_config.consensus.sync_only = false;
-    node_config.save(node.config_path()).unwrap();
+    node_config.save_to_path(node.config_path()).unwrap();
 
     let db_dir = node.config().storage.dir();
     fs::remove_dir_all(&db_dir).unwrap();

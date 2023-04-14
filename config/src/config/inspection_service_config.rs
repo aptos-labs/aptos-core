@@ -1,7 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::utils;
+use crate::{
+    config::{config_sanitizer::ConfigSanitizer, Error, NodeConfig, RoleType},
+    utils,
+};
+use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -27,5 +31,32 @@ impl Default for InspectionServiceConfig {
 impl InspectionServiceConfig {
     pub fn randomize_ports(&mut self) {
         self.port = utils::get_available_port();
+    }
+}
+
+impl ConfigSanitizer for InspectionServiceConfig {
+    /// Validate and process the inspection service config according to the given node role and chain ID
+    fn sanitize(
+        node_config: &mut NodeConfig,
+        node_role: RoleType,
+        chain_id: ChainId,
+    ) -> Result<(), Error> {
+        let sanitizer_name = Self::get_sanitizer_name();
+        let inspection_service_config = &node_config.inspection_service;
+
+        // Verify that mainnet validators do not expose the configuration
+        if node_role.is_validator()
+            && chain_id.is_mainnet()?
+            && inspection_service_config.expose_configuration
+        {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "Mainnet validators should not expose the node configuration!".to_string(),
+            ));
+        }
+
+        // TODO: Verify that system information is not exposed for mainnet validators
+
+        Ok(())
     }
 }

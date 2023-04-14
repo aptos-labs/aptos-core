@@ -2,7 +2,11 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::utils;
+use crate::{
+    config::{config_sanitizer::ConfigSanitizer, Error, NodeConfig, RoleType},
+    utils,
+};
+use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
@@ -269,6 +273,17 @@ impl StorageConfig {
     pub fn randomize_ports(&mut self) {
         self.backup_service_address
             .set_port(utils::get_available_port());
+    }
+}
+
+impl ConfigSanitizer for StorageConfig {
+    /// Validate and process the storage config according to the given node role and chain ID
+    fn sanitize(
+        _node_config: &mut NodeConfig,
+        _node_role: RoleType,
+        _chain_id: ChainId,
+    ) -> Result<(), Error> {
+        Ok(()) // TODO: add validation of higher-level properties once we have variable configs
     }
 }
 
