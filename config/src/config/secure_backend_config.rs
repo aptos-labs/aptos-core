@@ -48,6 +48,16 @@ impl SecureBackend {
             SecureBackend::InMemoryStorage => {},
         }
     }
+
+    /// Returns true iff the backend is in memory
+    pub fn is_in_memory(&self) -> bool {
+        matches!(self, SecureBackend::InMemoryStorage)
+    }
+
+    /// Returns true iff the backend is github
+    pub fn is_github(&self) -> bool {
+        matches!(self, SecureBackend::GitHub(_))
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]

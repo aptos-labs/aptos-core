@@ -2,7 +2,11 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::utils;
+use crate::{
+    config::{config_sanitizer::ConfigSanitizer, Error, NodeConfig, RoleType},
+    utils,
+};
+use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
@@ -103,5 +107,39 @@ impl ApiConfig {
             Some(v) => v,
             None => DEFAULT_REQUEST_CONTENT_LENGTH_LIMIT,
         }
+    }
+}
+
+impl ConfigSanitizer for ApiConfig {
+    fn sanitize(
+        node_config: &mut NodeConfig,
+        _node_role: RoleType,
+        chain_id: ChainId,
+    ) -> Result<(), Error> {
+        let sanitizer_name = Self::get_sanitizer_name();
+        let api_config = &node_config.api;
+
+        // If the API is disabled, we don't need to do anything
+        if !api_config.enabled {
+            return Ok(());
+        }
+
+        // Verify that failpoints are not enabled in mainnet
+        if chain_id.is_mainnet()? && api_config.failpoints_enabled {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "Failpoints are not supported on mainnet nodes!".into(),
+            ));
+        }
+
+        // Validate basic runtime properties
+        if api_config.max_runtime_workers.is_none() && api_config.runtime_worker_multiplier == 0 {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "runtime_worker_multiplier must be greater than 0!".into(),
+            ));
+        }
+
+        Ok(())
     }
 }

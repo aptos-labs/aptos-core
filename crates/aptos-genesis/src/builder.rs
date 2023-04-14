@@ -168,7 +168,7 @@ impl ValidatorNodeConfig {
     }
 
     fn save_config(&mut self) -> anyhow::Result<()> {
-        Ok(self.config.save(self.dir.join(CONFIG_FILE))?)
+        Ok(self.config.save_to_path(self.dir.join(CONFIG_FILE))?)
     }
 }
 
@@ -365,7 +365,9 @@ impl FullnodeNodeConfig {
     }
 
     fn save_config(&mut self) -> anyhow::Result<()> {
-        self.config.save(self.config_path()).map_err(Into::into)
+        self.config
+            .save_to_path(self.config_path())
+            .map_err(Into::into)
     }
 }
 

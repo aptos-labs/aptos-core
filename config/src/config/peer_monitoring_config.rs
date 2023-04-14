@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::config::{config_sanitizer::ConfigSanitizer, Error, NodeConfig, RoleType};
+use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -84,5 +86,27 @@ impl Default for NodeMonitoringConfig {
             node_info_request_interval_ms: 20_000, // 20 seconds
             node_info_request_timeout_ms: 10_000,  // 10 seconds
         }
+    }
+}
+
+impl ConfigSanitizer for PeerMonitoringServiceConfig {
+    /// Validate and process the peer monitoring config according to the given node role and chain ID
+    fn sanitize(
+        node_config: &mut NodeConfig,
+        _node_role: RoleType,
+        chain_id: ChainId,
+    ) -> Result<(), Error> {
+        let sanitizer_name = Self::get_sanitizer_name();
+        let peer_monitoring_config = &node_config.peer_monitoring_service;
+
+        // Verify the peer monitoring service is not enabled in mainnet
+        if chain_id.is_mainnet()? && peer_monitoring_config.enable_peer_monitoring_client {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "The peer monitoring service is not enabled in mainnet!".to_string(),
+            ));
+        };
+
+        Ok(())
     }
 }

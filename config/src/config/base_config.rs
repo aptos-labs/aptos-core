@@ -1,9 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::config::SecureBackend;
+use crate::config::{config_sanitizer::ConfigSanitizer, Error, NodeConfig, SecureBackend};
 use aptos_secure_storage::{KVStorage, Storage};
-use aptos_types::waypoint::Waypoint;
+use aptos_types::{chain_id::ChainId, waypoint::Waypoint};
 use poem_openapi::Enum as PoemEnum;
 use serde::{Deserialize, Serialize};
 use std::{fmt, fs, path::PathBuf, str::FromStr};
@@ -26,6 +26,27 @@ impl Default for BaseConfig {
             role: RoleType::Validator,
             waypoint: WaypointConfig::None,
         }
+    }
+}
+
+impl ConfigSanitizer for BaseConfig {
+    fn sanitize(
+        node_config: &mut NodeConfig,
+        _node_role: RoleType,
+        _chain_id: ChainId,
+    ) -> Result<(), Error> {
+        let sanitizer_name = Self::get_sanitizer_name();
+        let base_config = &node_config.base;
+
+        // Verify the waypoint is not None
+        if let WaypointConfig::None = base_config.waypoint {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "The waypoint config must be set in the base config!".into(),
+            ));
+        }
+
+        Ok(())
     }
 }
 
