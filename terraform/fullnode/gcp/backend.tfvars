@@ -1,2 +1,0 @@
-# bucket = ""
-# prefix = "state/fullnode"

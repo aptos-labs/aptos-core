@@ -1,7 +1,0 @@
-Unresolved addresses found: [
-Named address 'A' in package 'test'
-]
-To fix this, add an entry for each unresolved address to the [addresses] section of tests/test_sources/resolution/basic_no_deps_address_not_assigned/Move.toml: e.g.,
-[addresses]
-Std = "0x1"
-Alternatively, you can also define [dev-addresses] and call with the -d flag

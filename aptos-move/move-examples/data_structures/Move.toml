@@ -1,9 +1,0 @@
-[package]
-name = "DataStructure"
-version = "0.0.1"
-
-[dependencies]
-AptosStdlib = { local = "../../framework/aptos-stdlib" }
-
-[addresses]
-std = "0x1"

@@ -1,2 +1,0 @@
-# config file for https://github.com/nektos/act
--P ubuntu-latest=catthehacker/ubuntu:full-latest
