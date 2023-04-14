@@ -34,8 +34,8 @@ In the Aptos network, the Aptos governance sets the absolute minimum gas unit pr
 
 By specifying a higher gas unit price than the current market price, you can **increase** the priority level for your transaction on the blockchain by paying a larger processing fee. As part of consensus, when the leader selects transactions from its mempool to propose as part of the next block, it will prioritize selecting transactions with a higher gas unit price. While in most cases this is unnecessary, if the network is under load this measure can ensure your transaction is processed more quickly. See the `gas_unit_price` entry under [Estimating the gas units via simulation](#estimating-the-gas-units-via-simulation) for details.
 
-:::caution Transaction prioritzation
-👉 Specifying a higher gas unit price only influences propagation and selecting which transactions go into the next block, it does not influence the ordering of transactions _within_ a block.
+:::caution Increasing gas unit price with in-flight transactions
+👉 If you are increasing gas unit price, but have in-flight (uncommitted) transactions for the same account, you should resubmit all of those transactions with the higher gas unit price. This is because transactions within the same account always have to respect sequence number, so effectively the higher gas unit price transaction will only increase priority after the in-flight transactions are included in a block.
 :::
 
 ## Specifying gas fees within a transaction
@@ -115,5 +115,5 @@ The simulation steps for finding the correct amount of gas for a transaction are
 6. If you feel the need to prioritize or deprioritize your transaction, adjust the `gas_unit_price` of the transaction. Increase the value for higher priority, and decrease the value for lower priority.
 
 :::tip
-Prioritization is based upon buckets of `gas_unit_price`. The buckets are defined in [`mempool_config.rs`](https://github.com/aptos-labs/aptos-core/blob/30b385bf38d3dc8c4e8ee0ff045bc5d0d2f67a85/config/src/config/mempool_config.rs#L8). The current buckets are `[0, 150, 300, 500, 1000, 3000, 5000, 10000, 100000, 1000000]`. Therefore, a `gas_unit_price` of 150 and 299 would be priortized nearly the same.
+Prioritization is based upon buckets of `gas_unit_price`. The buckets are defined in [`mempool_config.rs`](https://github.com/aptos-labs/aptos-core/blob/30b385bf38d3dc8c4e8ee0ff045bc5d0d2f67a85/config/src/config/mempool_config.rs#L8). The current buckets are `[0, 150, 300, 500, 1000, 3000, 5000, 10000, 100000, 1000000]`. Therefore, a `gas_unit_price` of 150 and 299 would be prioritized nearly the same.
 :::
