@@ -23,7 +23,9 @@ class HelmLintTestCase(unittest.TestCase):
         with patch.object(lint, "LocalShell", lambda *_: shell):
             runner = CliRunner()
             result = runner.invoke(
-                main, ["helm", "testsuite/fixtures/helm"], catch_exceptions=False
+                main,
+                ["--no-log-metadata", "helm", "testsuite/fixtures/helm"],
+                catch_exceptions=False,
             )
 
         shell.assert_commands(self)
