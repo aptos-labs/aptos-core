@@ -70,6 +70,7 @@ impl IncrementalProofState {
         match validator_verifier.get_voting_power(&signed_batch_info.signer()) {
             Some(voting_power) => {
                 let signer = signed_batch_info.signer();
+                let digest = signed_batch_info.digest().clone();
                 if self
                     .aggregated_signature
                     .insert(signer, signed_batch_info.signature())
@@ -79,6 +80,10 @@ impl IncrementalProofState {
                     if signer == self.info.author() {
                         self.self_voted = true;
                     }
+                    info!(
+                        "BCHO: add_signature: from {}, digest {}, power {}, aggregated {}",
+                        signer, digest, voting_power, self.aggregated_voting_power
+                    );
                 } else {
                     error!(
                         "Author already in aggregated_signatures right after rechecking: {}",
@@ -104,6 +109,11 @@ impl IncrementalProofState {
             if recheck.is_err() {
                 error!("Unexpected discrepancy: aggregated_voting_power is {}, while rechecking we get {:?}", self.aggregated_voting_power, recheck);
             }
+            info!(
+                "BCHO: ready: power {} >= voting power {}",
+                self.aggregated_voting_power,
+                validator_verifier.quorum_voting_power()
+            );
             recheck.is_ok()
         } else {
             false
@@ -215,7 +225,10 @@ impl ProofCoordinator {
                         .digest_to_time
                         .remove(&digest)
                         .expect("Batch created without recording the time!");
-                info!("BCHO: BATCH_TO_POS_DURATION: {}, at {}", duration, now);
+                info!(
+                    "BCHO: BATCH_TO_POS_DURATION: {}, for {}, at {}",
+                    duration, digest, now
+                );
                 counters::BATCH_TO_POS_DURATION.observe_duration(Duration::from_micros(duration));
                 return Ok(Some(proof));
             }
