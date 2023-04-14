@@ -1491,8 +1491,8 @@ impl ArgWithType {
             FunctionArgType::Bool => serde_json::to_value(bcs::from_bytes::<bool>(&self.arg)?),
             FunctionArgType::Hex => serde_json::to_value(bcs::from_bytes::<Vec<u8>>(&self.arg)?),
             FunctionArgType::String => serde_json::to_value(bcs::from_bytes::<String>(&self.arg)?),
-            FunctionArgType::U8 => serde_json::to_value(bcs::from_bytes::<u32>(&self.arg)?),
-            FunctionArgType::U16 => serde_json::to_value(bcs::from_bytes::<u32>(&self.arg)?),
+            FunctionArgType::U8 => serde_json::to_value(bcs::from_bytes::<u8>(&self.arg)?),
+            FunctionArgType::U16 => serde_json::to_value(bcs::from_bytes::<u16>(&self.arg)?),
             FunctionArgType::U32 => serde_json::to_value(bcs::from_bytes::<u32>(&self.arg)?),
             FunctionArgType::U64 => {
                 serde_json::to_value(bcs::from_bytes::<u64>(&self.arg)?.to_string())
