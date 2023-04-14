@@ -209,6 +209,30 @@ pub static WAIT_FOR_FULL_BLOCKS_TRIGGERED: Lazy<Histogram> = Lazy::new(|| {
     )
 });
 
+/// Counts when chain_health backoff is triggered
+pub static PIPELINE_BACKPRESSURE_ON_PROPOSAL_TRIGGERED: Lazy<Histogram> = Lazy::new(|| {
+    register_avg_counter(
+        "aptos_pipeline_backpressure_on_proposal_triggered",
+        "Counts when chain_health backoff is triggered",
+    )
+});
+
+/// number of rounds pending when creating proposal
+pub static CONSENSUS_PROPOSAL_PENDING_ROUNDS: Lazy<Histogram> = Lazy::new(|| {
+    register_avg_counter(
+        "aptos_consensus_proposal_pending_rounds",
+        "number of rounds pending when creating proposal",
+    )
+});
+
+/// duration pending when creating proposal
+pub static CONSENSUS_PROPOSAL_PENDING_DURATION: Lazy<Histogram> = Lazy::new(|| {
+    register_avg_counter(
+        "aptos_consensus_proposal_pending_duration",
+        "duration pending when creating proposal",
+    )
+});
+
 /// How many pending blocks are there, when we make a proposal
 pub static PROPOSER_PENDING_BLOCKS_COUNT: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
