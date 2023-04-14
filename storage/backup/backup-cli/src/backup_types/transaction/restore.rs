@@ -269,6 +269,9 @@ impl TransactionRestoreBatchController {
                 "Bug: requested to output transaction output sizing info in restore mode.",
             );
             AptosVM::set_concurrency_level_once(self.global_opt.replay_concurrency_level);
+            AptosVM::set_executable_cache_size_once(
+                self.global_opt.replay_executable_cache_size as u64,
+            );
             let txns_to_execute_stream = self
                 .save_before_replay_version(first_version, loaded_chunk_stream, restore_handler)
                 .await?;

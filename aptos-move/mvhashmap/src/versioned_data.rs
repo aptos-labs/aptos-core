@@ -45,7 +45,7 @@ struct VersionedValue<V> {
 }
 
 /// Maps each key (access path) to an interal VersionedValue.
-pub struct VersionedData<K, V> {
+pub struct VersionedData<K: Hash + Clone + Eq + Send + Sync + Debug, V> {
     values: DashMap<K, VersionedValue<V>>,
 }
 
@@ -203,7 +203,7 @@ impl<V: TransactionWrite> Default for VersionedValue<V> {
     }
 }
 
-impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
+impl<K: Hash + Clone + Debug + Eq + Send + Sync, V: TransactionWrite> VersionedData<K, V> {
     pub(crate) fn new() -> Self {
         Self {
             values: DashMap::new(),

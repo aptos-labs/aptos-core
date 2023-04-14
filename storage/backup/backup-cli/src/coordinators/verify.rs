@@ -101,6 +101,7 @@ impl VerifyCoordinator {
             run_mode: Arc::new(RestoreRunMode::Verify),
             concurrent_downloads: self.concurrent_downloads,
             replay_concurrency_level: 0, // won't replay, doesn't matter
+            replay_executable_cache_size: 0, // won't replay, doesn't matter
         };
 
         let epoch_history = if self.skip_epoch_endings {

@@ -15,6 +15,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_crypto::HashValue;
+use aptos_executable_store::ExecutableStore;
 use aptos_executor_types::{BlockExecutorTrait, Error, StateComputeResult};
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
@@ -24,7 +25,9 @@ use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView, DbReaderWriter,
 };
 use aptos_types::{
-    ledger_info::LedgerInfoWithSignatures, state_store::state_value::StateValue,
+    executable::ExecutableTestType,
+    ledger_info::LedgerInfoWithSignatures,
+    state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Transaction,
 };
 use aptos_vm::AptosVM;
@@ -35,6 +38,7 @@ pub trait TransactionBlockExecutor<T>: Send + Sync {
     fn execute_transaction_block(
         transactions: Vec<T>,
         state_view: CachedStateView,
+        executable_cache: Arc<ExecutableStore<StateKey, ExecutableTestType>>,
     ) -> Result<ChunkOutput>;
 }
 
@@ -42,8 +46,9 @@ impl TransactionBlockExecutor<Transaction> for AptosVM {
     fn execute_transaction_block(
         transactions: Vec<Transaction>,
         state_view: CachedStateView,
+        executable_cache: Arc<ExecutableStore<StateKey, ExecutableTestType>>,
     ) -> Result<ChunkOutput> {
-        ChunkOutput::by_transaction_execution::<AptosVM>(transactions, state_view)
+        ChunkOutput::by_transaction_execution::<AptosVM>(transactions, state_view, executable_cache)
     }
 }
 
@@ -133,6 +138,7 @@ where
 struct BlockExecutorInner<V, T> {
     db: DbReaderWriter,
     block_tree: BlockTree,
+    executables: Arc<ExecutableStore<StateKey, ExecutableTestType>>,
     phantom: PhantomData<(V, T)>,
 }
 
@@ -146,6 +152,7 @@ where
         Ok(Self {
             db,
             block_tree,
+            executables: Arc::new(ExecutableStore::default()),
             phantom: PhantomData,
         })
     }
@@ -225,7 +232,14 @@ where
                         "Injected error in vm_execute_block"
                     )))
                 });
-                V::execute_transaction_block(transactions, state_view)?
+                self.executables.check_ready(parent_block_id);
+                let ret = V::execute_transaction_block(
+                    transactions,
+                    state_view,
+                    self.executables.clone(),
+                )?;
+                self.executables.mark_ready(block_id);
+                ret
             };
             chunk_output.trace_log_transaction_status();
 

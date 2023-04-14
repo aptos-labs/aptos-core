@@ -9,6 +9,8 @@ use crate::{
         TransactionGenParams, ValueType,
     },
 };
+use aptos_executable_store::ExecutableStore;
+use aptos_types::executable::ExecutableTestType;
 use criterion::{BatchSize, Bencher as CBencher};
 use num_cpus;
 use proptest::{
@@ -18,7 +20,7 @@ use proptest::{
     strategy::{Strategy, ValueTree},
     test_runner::TestRunner,
 };
-use std::{fmt::Debug, hash::Hash, marker::PhantomData};
+use std::{fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc};
 
 pub struct Bencher<K, V> {
     transaction_size: usize,
@@ -117,8 +119,14 @@ where
             Transaction<KeyType<K>, ValueType<V>>,
             Task<KeyType<K>, ValueType<V>>,
             EmptyDataView<KeyType<K>, ValueType<V>>,
+            ExecutableTestType,
         >::new(num_cpus::get())
-        .execute_transactions_parallel((), &self.transactions, &data_view);
+        .execute_transactions_parallel(
+            (),
+            &self.transactions,
+            &data_view,
+            Arc::new(ExecutableStore::<KeyType<K>, ExecutableTestType>::default()),
+        );
 
         self.expected_output.assert_output(&output);
     }

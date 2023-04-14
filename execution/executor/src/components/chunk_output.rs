@@ -6,6 +6,7 @@
 
 use crate::{components::apply_chunk_output::ApplyChunkOutput, metrics};
 use anyhow::Result;
+use aptos_executable_store::ExecutableStore;
 use aptos_executor_types::{ExecutedBlock, ExecutedChunk};
 use aptos_logger::{sample, sample::SampleRate, trace, warn};
 use aptos_storage_interface::{
@@ -14,12 +15,14 @@ use aptos_storage_interface::{
 };
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
+    executable::ExecutableTestType,
+    state_store::state_key::StateKey,
     transaction::{ExecutionStatus, Transaction, TransactionOutput, TransactionStatus},
 };
 use aptos_vm::{AptosVM, VMExecutor};
 use fail::fail_point;
 use move_core_types::vm_status::StatusCode;
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 pub struct ChunkOutput {
     /// Input transactions.
@@ -36,8 +39,10 @@ impl ChunkOutput {
     pub fn by_transaction_execution<V: VMExecutor>(
         transactions: Vec<Transaction>,
         state_view: CachedStateView,
+        executable_cache: Arc<ExecutableStore<StateKey, ExecutableTestType>>,
     ) -> Result<Self> {
-        let transaction_outputs = Self::execute_block::<V>(transactions.clone(), &state_view)?;
+        let transaction_outputs =
+            Self::execute_block::<V>(transactions.clone(), &state_view, executable_cache)?;
 
         // to print txn output for debugging, uncomment:
         // println!("{:?}", transaction_outputs.iter().map(|t| t.status() ).collect::<Vec<_>>());
@@ -117,8 +122,13 @@ impl ChunkOutput {
     fn execute_block<V: VMExecutor>(
         transactions: Vec<Transaction>,
         state_view: &CachedStateView,
+        executable_cache: Arc<ExecutableStore<StateKey, ExecutableTestType>>,
     ) -> Result<Vec<TransactionOutput>> {
-        Ok(V::execute_block(transactions, &state_view)?)
+        Ok(V::execute_block(
+            transactions,
+            &state_view,
+            executable_cache,
+        )?)
     }
 
     /// In consensus-only mode, executes the block of [Transaction]s using the
@@ -129,13 +139,16 @@ impl ChunkOutput {
     fn execute_block<V: VMExecutor>(
         transactions: Vec<Transaction>,
         state_view: &CachedStateView,
+        executable_cache: Arc<ExecutableStore<StateKey, ExecutableTestType>>,
     ) -> Result<Vec<TransactionOutput>> {
         use aptos_state_view::{StateViewId, TStateView};
         use aptos_types::write_set::WriteSet;
 
         let transaction_outputs = match state_view.id() {
             // this state view ID implies a genesis block in non-test cases.
-            StateViewId::Miscellaneous => V::execute_block(transactions, &state_view)?,
+            StateViewId::Miscellaneous => {
+                V::execute_block(transactions, &state_view, executable_cache)?
+            },
             _ => transactions
                 .iter()
                 .map(|_| {

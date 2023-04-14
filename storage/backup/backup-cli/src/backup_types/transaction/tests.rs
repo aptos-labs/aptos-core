@@ -12,7 +12,7 @@ use crate::{
         backup_service_client::BackupServiceClient,
         test_utils::{start_local_backup_service, tmp_db_with_random_content},
         ConcurrentDownloadsOpt, GlobalBackupOpt, GlobalRestoreOpt, ReplayConcurrencyLevelOpt,
-        RocksdbOpt, TrustedWaypointOpt,
+        ReplayExecutableCacheSizeOpt, RocksdbOpt, TrustedWaypointOpt,
     },
 };
 use aptos_db::AptosDB;
@@ -101,6 +101,7 @@ fn end_to_end() {
                 rocksdb_opt: RocksdbOpt::default(),
                 concurrent_downloads: ConcurrentDownloadsOpt::default(),
                 replay_concurrency_level: ReplayConcurrencyLevelOpt::default(),
+                replay_executable_cache_size: ReplayExecutableCacheSizeOpt::default(),
             }
             .try_into()
             .unwrap(),

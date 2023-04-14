@@ -6,9 +6,9 @@ use crate::{
     state_store::state_key::{StateKey, StateKeyInner},
 };
 use aptos_crypto::HashValue;
-use std::sync::Arc;
+use std::hash::Hash;
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone, Hash)]
 pub enum ExecutableDescriptor {
     /// Possibly speculative, based on code published during the block.
     Published(HashValue),
@@ -37,22 +37,27 @@ impl ModulePath for StateKey {
 /// For the executor to manage memory consumption, executables should provide size.
 /// Note: explore finer-grained eviction mechanisms, e.g. LRU-based, or having
 /// different ownership for the arena / memory.
-pub trait Executable {
-    fn size(&self) -> usize;
+///
+/// The provided executable type is assumed to be effciently clonable, and in the
+/// beginning, would probably be an Arc<> containing the actual executable data.
+pub trait Executable: Clone + Send + Sync {
+    fn size_bytes(&self) -> usize;
 }
 
+#[derive(Clone)]
 pub struct ExecutableTestType(());
 
 impl Executable for ExecutableTestType {
-    fn size(&self) -> usize {
+    fn size_bytes(&self) -> usize {
         0
     }
 }
 
+/// Provided Executable type is assumed to be efficiently clonable
 pub enum FetchedModule<X: Executable> {
-    Blob(Option<Vec<u8>>),
+    Blob(Vec<u8>),
     // TODO: compiled module when available to avoid deserialization.
-    Executable(Arc<X>),
+    Executable(X),
 }
 
 /// View for the VM for interacting with the multi-versioned executable cache.
@@ -69,6 +74,15 @@ pub trait ExecutableView {
     /// This may occur much later leading to work duplication (producing the same
     /// executable by other sessions) in the common case when the executable isn't
     /// based on the module published by the transaction itself.
+    ///
+    /// We currently make no assumption about where the actual executable is stored,
+    /// i.e. the provided Executable here can be the actual data, or just meta-data.
+    /// This gives us flexibility to implement the executable arena either on the
+    /// executor / adapter / MVHashMap side, or within Move-VM (populated during
+    /// executable construction). In the later case, Executable would be meta-data
+    /// and we would have to support re-using the arena from the Move-VM. For now,
+    /// the Executable is just an Arc containing the executable data, providing
+    /// ownership on the executor side and simplifying re-using across the blocks.
     fn store_executable(
         &self,
         key: &Self::Key,

@@ -17,6 +17,7 @@ use crate::{
     },
 };
 use anyhow::Result;
+use aptos_executable_store::ExecutableStore;
 use aptos_executor_types::{
     ChunkCommitNotification, ChunkExecutorTrait, ExecutedChunk, ParsedTransactionOutput,
     TransactionReplayer, VerifyExecutionMode,
@@ -30,7 +31,9 @@ use aptos_storage_interface::{
 };
 use aptos_types::{
     contract_event::ContractEvent,
+    executable::ExecutableTestType,
     ledger_info::LedgerInfoWithSignatures,
+    state_store::state_key::StateKey,
     transaction::{
         Transaction, TransactionInfo, TransactionListWithProof, TransactionOutput,
         TransactionOutputListWithProof, TransactionStatus, Version,
@@ -109,6 +112,7 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
     }
 }
 
+// TODO: consider adding executables cache here as well and re-using across chunk_executions.
 struct ChunkExecutorInner<V> {
     db: DbReaderWriter,
     commit_queue: Mutex<ChunkCommitQueue>,
@@ -203,7 +207,11 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         let state_view = self.state_view(&latest_view)?;
         let chunk_output = {
             let _timer = APTOS_EXECUTOR_VM_EXECUTE_CHUNK_SECONDS.start_timer();
-            ChunkOutput::by_transaction_execution::<V>(transactions, state_view)?
+            ChunkOutput::by_transaction_execution::<V>(
+                transactions,
+                state_view,
+                Arc::new(ExecutableStore::<StateKey, ExecutableTestType>::default()),
+            )?
         };
         let executed_chunk = Self::apply_chunk_output_for_state_sync(
             verified_target_li,
@@ -526,7 +534,11 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             .cloned()
             .collect();
 
-        let chunk_output = ChunkOutput::by_transaction_execution::<V>(txns, state_view)?;
+        let chunk_output = ChunkOutput::by_transaction_execution::<V>(
+            txns,
+            state_view,
+            Arc::new(ExecutableStore::<StateKey, ExecutableTestType>::default()),
+        )?;
         // not `zip_eq`, deliberately
         for (version, txn_out, txn_info, write_set, events) in multizip((
             begin_version..end_version,

@@ -4,6 +4,7 @@
 
 use aptos_bitvec::BitVec;
 use aptos_crypto::HashValue;
+use aptos_executable_store::ExecutableStore;
 use aptos_language_e2e_tests::{
     account_universe::{AUTransactionGen, AccountUniverseGen},
     executor::FakeExecutor,
@@ -11,7 +12,9 @@ use aptos_language_e2e_tests::{
 };
 use aptos_types::{
     block_metadata::BlockMetadata,
+    executable::ExecutableTestType,
     on_chain_config::{OnChainConfig, ValidatorSet},
+    state_store::state_key::StateKey,
     transaction::Transaction,
 };
 use aptos_vm::{block_executor::BlockAptosVM, data_cache::AsMoveResolver};
@@ -21,6 +24,7 @@ use proptest::{
     strategy::{Strategy, ValueTree},
     test_runner::TestRunner,
 };
+use std::sync::Arc;
 
 /// Benchmarking support for transactions.
 #[derive(Clone, Debug)]
@@ -225,8 +229,14 @@ impl TransactionBenchState {
     fn execute(self) {
         // The output is ignored here since we're just testing transaction performance, not trying
         // to assert correctness.
-        BlockAptosVM::execute_block(self.transactions, self.executor.get_state_view(), 1)
-            .expect("VM should not fail to start");
+        BlockAptosVM::execute_block(
+            self.transactions,
+            self.executor.get_state_view(),
+            1,
+            // TODO: consider benchmarks w. populated executable cache.
+            Arc::new(ExecutableStore::<StateKey, ExecutableTestType>::default()),
+        )
+        .expect("VM should not fail to start");
     }
 
     /// Executes this state in a single block via parallel execution.
@@ -237,6 +247,8 @@ impl TransactionBenchState {
             self.transactions,
             self.executor.get_state_view(),
             num_cpus::get(),
+            // TODO: consider benchmarks w. populated executable cache.
+            Arc::new(ExecutableStore::<StateKey, ExecutableTestType>::default()),
         )
         .expect("VM should not fail to start");
     }
@@ -253,6 +265,8 @@ impl TransactionBenchState {
             concurrency_level,
             run_par,
             run_seq,
+            // TODO: consider benchmarks w. populated executable cache.
+            Arc::new(ExecutableStore::<StateKey, ExecutableTestType>::default()),
         )
     }
 }

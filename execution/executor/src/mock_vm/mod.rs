@@ -8,6 +8,7 @@ mod mock_vm_test;
 use crate::{block_executor::TransactionBlockExecutor, components::chunk_output::ChunkOutput};
 use anyhow::Result;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
+use aptos_executable_store::ExecutableStore;
 use aptos_state_view::StateView;
 use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
@@ -17,6 +18,7 @@ use aptos_types::{
     chain_id::ChainId,
     contract_event::ContractEvent,
     event::EventKey,
+    executable::ExecutableTestType,
     on_chain_config::{
         access_path_for_config, new_epoch_event_key, ConfigurationResource, OnChainConfig,
         ValidatorSet,
@@ -33,7 +35,7 @@ use aptos_types::{
 use aptos_vm::VMExecutor;
 use move_core_types::{language_storage::TypeTag, move_resource::MoveResource};
 use once_cell::sync::Lazy;
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 #[derive(Debug)]
 enum MockVMTransaction {
@@ -61,8 +63,9 @@ impl TransactionBlockExecutor<Transaction> for MockVM {
     fn execute_transaction_block(
         transactions: Vec<Transaction>,
         state_view: CachedStateView,
+        executable_cache: Arc<ExecutableStore<StateKey, ExecutableTestType>>,
     ) -> Result<ChunkOutput> {
-        ChunkOutput::by_transaction_execution::<MockVM>(transactions, state_view)
+        ChunkOutput::by_transaction_execution::<MockVM>(transactions, state_view, executable_cache)
     }
 }
 
@@ -70,6 +73,7 @@ impl VMExecutor for MockVM {
     fn execute_block(
         transactions: Vec<Transaction>,
         state_view: &impl StateView,
+        _executable_cache: Arc<ExecutableStore<StateKey, ExecutableTestType>>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         if state_view.is_genesis() {
             assert_eq!(

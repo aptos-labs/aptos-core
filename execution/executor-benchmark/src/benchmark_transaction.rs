@@ -2,12 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
+use aptos_executable_store::ExecutableStore;
 use aptos_executor::{
     block_executor::TransactionBlockExecutor, components::chunk_output::ChunkOutput,
 };
 use aptos_storage_interface::cached_state_view::CachedStateView;
-use aptos_types::{account_address::AccountAddress, transaction::Transaction};
+use aptos_types::{
+    account_address::AccountAddress, executable::ExecutableTestType,
+    state_store::state_key::StateKey, transaction::Transaction,
+};
 use aptos_vm::AptosVM;
+use std::sync::Arc;
 
 pub struct TransferInfo {
     pub sender: AccountAddress,
@@ -73,6 +78,7 @@ impl TransactionBlockExecutor<BenchmarkTransaction> for AptosVM {
     fn execute_transaction_block(
         transactions: Vec<BenchmarkTransaction>,
         state_view: CachedStateView,
+        executable_cache: Arc<ExecutableStore<StateKey, ExecutableTestType>>,
     ) -> Result<ChunkOutput> {
         AptosVM::execute_transaction_block(
             transactions
@@ -80,6 +86,7 @@ impl TransactionBlockExecutor<BenchmarkTransaction> for AptosVM {
                 .map(|txn| txn.transaction)
                 .collect(),
             state_view,
+            executable_cache,
         )
     }
 }

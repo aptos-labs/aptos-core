@@ -28,13 +28,7 @@ pub enum ExecutionStatus<T, E> {
 /// transaction will write to a key value storage as their side effect.
 pub trait Transaction: Sync + Send + 'static {
     type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug;
-    type Value: Send + Sync + TransactionWrite;
-}
-
-/// Inference result of a transaction.
-pub struct Accesses<K> {
-    pub keys_read: Vec<K>,
-    pub keys_written: Vec<K>,
+    type Value: Clone + Send + Sync + TransactionWrite;
 }
 
 /// Trait for single threaded transaction executor.

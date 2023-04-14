@@ -11,29 +11,28 @@ use crate::{
     errors::*,
     scheduler::{Scheduler, SchedulerTask, Wave},
     task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
-    txn_last_input_output::TxnLastInputOutput,
+    txn_last_input_output::{ReadDescriptor, TxnLastInputOutput},
     view::{LatestView, MVHashMapView},
 };
 use aptos_aggregator::delta_change_set::{deserialize, serialize};
-use aptos_logger::debug;
+use aptos_executable_store::ExecutableStore;
+use aptos_logger::{debug, info};
 use aptos_mvhashmap::{
-    types::{MVDataError, MVDataOutput, TxnIndex, Version},
+    types::{MVCodeError, MVCodeOutput, MVDataError, MVDataOutput, TxnIndex, Version},
+    unsync_map::UnsyncMap,
     MVHashMap,
 };
 use aptos_state_view::TStateView;
-use aptos_types::{
-    executable::ExecutableTestType, // TODO: fix up with the proper generics.
-    write_set::WriteOp,
-};
+use aptos_types::{executable::Executable, write_set::WriteOp};
 use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
 use num_cpus;
 use once_cell::sync::Lazy;
 use std::{
-    collections::btree_map::BTreeMap,
     marker::PhantomData,
     sync::{
         mpsc,
         mpsc::{Receiver, Sender},
+        Arc,
     },
 };
 
@@ -51,18 +50,19 @@ pub static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
         .unwrap()
 });
 
-pub struct BlockExecutor<T, E, S> {
+pub struct BlockExecutor<T, E, S, X> {
     // number of active concurrent tasks, corresponding to the maximum number of rayon
     // threads that may be concurrently participating in parallel execution.
     concurrency_level: usize,
-    phantom: PhantomData<(T, E, S)>,
+    phantom: PhantomData<(T, E, S, X)>,
 }
 
-impl<T, E, S> BlockExecutor<T, E, S>
+impl<T, E, S, X> BlockExecutor<T, E, S, X>
 where
     T: Transaction,
     E: ExecutorTask<Txn = T>,
     S: TStateView<Key = T::Key> + Sync,
+    X: Executable + Send + Sync + 'static,
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.
@@ -83,7 +83,7 @@ where
         version: Version,
         signature_verified_block: &[T],
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Value, ExecutableTestType>,
+        versioned_cache: &MVHashMap<T::Key, T::Value, X>,
         scheduler: &Scheduler,
         executor: &E,
         base_view: &S,
@@ -96,7 +96,7 @@ where
 
         // VM execution.
         let execute_result = executor.execute_transaction(
-            &LatestView::<T, S>::new_mv_view(base_view, &speculative_view, idx_to_execute),
+            &LatestView::<T, S, X>::new_mv_view(base_view, &speculative_view, idx_to_execute),
             txn,
             idx_to_execute,
             false,
@@ -122,6 +122,10 @@ where
                 }
                 versioned_cache.add_delta(&k, idx_to_execute, d);
             }
+            // TODO: get module writes separately (required anyway when we have different types
+            // for intermediate representations, e.g. MoveValues), and write to the MV data
+            // structure without any dynamic dispatching on access_path (expensive as well).
+            // We can also assert that modules can't be deleted (here or earlier).
         };
 
         let result = match execute_result {
@@ -150,7 +154,8 @@ where
             versioned_cache.delete(&k, idx_to_execute);
         }
 
-        last_input_output.record(idx_to_execute, speculative_view.take_reads(), result);
+        let (captured_reads, captured_executables) = speculative_view.take_captured_inputs();
+        last_input_output.record(idx_to_execute, captured_reads, captured_executables, result);
         scheduler.finish_execution(idx_to_execute, incarnation, updates_outside)
     }
 
@@ -159,7 +164,7 @@ where
         version_to_validate: Version,
         validation_wave: Wave,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Value, ExecutableTestType>,
+        versioned_cache: &MVHashMap<T::Key, T::Value, X>,
         scheduler: &Scheduler,
     ) -> SchedulerTask {
         use MVDataError::*;
@@ -167,28 +172,38 @@ where
 
         let _timer = TASK_VALIDATE_SECONDS.start_timer();
         let (idx_to_validate, incarnation) = version_to_validate;
-        let read_set = last_input_output
-            .read_set(idx_to_validate)
-            .expect("Prior read-set must be recorded");
+        let inputs = last_input_output.inputs(idx_to_validate);
 
-        let valid = read_set.iter().all(|r| {
-            match versioned_cache.fetch_data(r.path(), idx_to_validate) {
-                Ok(Versioned(version, _)) => r.validate_version(version),
-                Ok(Resolved(value)) => r.validate_resolved(value),
+        let mut valid = inputs.reads().iter().all(|(k, r)| {
+            match versioned_cache.fetch_data(k, idx_to_validate) {
+                Ok(Versioned(version, _)) => *r == ReadDescriptor::Version(version.0, version.1),
+                Ok(Resolved(value)) => *r == ReadDescriptor::Resolved(value),
                 // Dependency implies a validation failure, and if the original read were to
                 // observe an unresolved delta, it would set the aggregator base value in the
                 // multi-versioned data-structure, resolve, and record the resolved value.
                 Err(Dependency(_)) | Err(Unresolved(_)) => false,
-                Err(NotFound) => r.validate_storage(),
+                Err(NotFound) => *r == ReadDescriptor::Storage,
                 // We successfully validate when read (again) results in a delta application
                 // failure. If the failure is speculative, a later validation will fail due to
                 // a read without this error. However, if the failure is real, passing
                 // validation here allows to avoid infinitely looping and instead panic when
                 // materializing deltas as writes in the final output preparation state. Panic
                 // is also preferrable as it allows testing for this scenario.
-                Err(DeltaApplicationFailure) => r.validate_delta_application_failure(),
+                Err(DeltaApplicationFailure) => *r == ReadDescriptor::DeltaApplicationFailure,
             }
         });
+
+        valid = valid
+            && inputs.executables().iter().all(|(k, r)| {
+                // TODO: don't fail code validation on dependency, compare hash after
+                // the dependency has finished execution.
+                match versioned_cache.fetch_code(k, idx_to_validate) {
+                    Ok(MVCodeOutput::Executable((_, desc))) => *r == desc,
+                    Ok(MVCodeOutput::Module(_))
+                    | Err(MVCodeError::NotFound)
+                    | Err(MVCodeError::Dependency(_)) => false,
+                }
+            });
 
         let aborted = !valid && scheduler.try_abort(idx_to_validate, incarnation);
 
@@ -213,7 +228,7 @@ where
     fn commit_hook(
         &self,
         txn_idx: TxnIndex,
-        versioned_cache: &MVHashMap<T::Key, T::Value, ExecutableTestType>,
+        versioned_cache: &MVHashMap<T::Key, T::Value, X>,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
         base_view: &S,
     ) {
@@ -258,7 +273,7 @@ where
         executor_arguments: &E::Argument,
         block: &[T],
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Value, ExecutableTestType>,
+        versioned_cache: &MVHashMap<T::Key, T::Value, X>,
         scheduler: &Scheduler,
         base_view: &S,
         role: CommitRole,
@@ -348,6 +363,7 @@ where
         executor_initial_arguments: E::Argument,
         signature_verified_block: &Vec<T>,
         base_view: &S,
+        executable_cache: Arc<ExecutableStore<T::Key, X>>,
     ) -> Result<Vec<E::Output>, E::Error> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         // Using parallel execution with 1 thread currently will not work as it
@@ -356,7 +372,7 @@ where
         // w. concurrency_level = 1 for some reason.
         assert!(self.concurrency_level > 1, "Must use sequential execution");
 
-        let versioned_cache = MVHashMap::new(None);
+        let versioned_cache = MVHashMap::new(executable_cache);
 
         if signature_verified_block.is_empty() {
             return Ok(vec![]);
@@ -424,18 +440,21 @@ where
             ret
         };
 
+        let (mv_data_cache, mv_code_cache) = RAYON_EXEC_POOL.install(|| versioned_cache.take());
+
         RAYON_EXEC_POOL.spawn(move || {
             // Explicit async drops.
             drop(last_input_output);
             drop(scheduler);
-            // TODO: re-use the code cache.
-            drop(versioned_cache);
+            drop(mv_data_cache);
+            drop(mv_code_cache);
         });
 
         match maybe_err {
             Some(err) => Err(err),
             None => {
                 final_results.resize_with(num_txns, E::Output::skip_output);
+
                 Ok(final_results)
             },
         }
@@ -449,12 +468,12 @@ where
     ) -> Result<Vec<E::Output>, E::Error> {
         let num_txns = signature_verified_block.len();
         let executor = E::init(executor_arguments);
-        let mut data_map = BTreeMap::new();
+        let data_map = UnsyncMap::default();
 
         let mut ret = Vec::with_capacity(num_txns);
         for (idx, txn) in signature_verified_block.iter().enumerate() {
             let res = executor.execute_transaction(
-                &LatestView::<T, S>::new_btree_view(base_view, &data_map, idx as TxnIndex),
+                &LatestView::<T, S, X>::new_unsync_view(base_view, &data_map, idx as TxnIndex),
                 txn,
                 idx as TxnIndex,
                 true,
@@ -486,6 +505,11 @@ where
             }
         }
 
+        info!(
+            "Sequential execution used executable cache of size = {} bytes",
+            data_map.executable_size(),
+        );
+
         ret.resize_with(num_txns, E::Output::skip_output);
         Ok(ret)
     }
@@ -495,12 +519,14 @@ where
         executor_arguments: E::Argument,
         signature_verified_block: Vec<T>,
         base_view: &S,
+        executable_cache: Arc<ExecutableStore<T::Key, X>>,
     ) -> Result<Vec<E::Output>, E::Error> {
         let mut ret = if self.concurrency_level > 1 {
             self.execute_transactions_parallel(
                 executor_arguments,
                 &signature_verified_block,
                 base_view,
+                executable_cache,
             )
         } else {
             self.execute_transactions_sequential(

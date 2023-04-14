@@ -5,8 +5,12 @@ use crate::{
     errors::Error,
     task::{ExecutionStatus, Transaction, TransactionOutput},
 };
-use aptos_mvhashmap::types::{Incarnation, TxnIndex, Version};
-use aptos_types::{access_path::AccessPath, executable::ModulePath, write_set::WriteOp};
+use aptos_mvhashmap::types::{Incarnation, TxnIndex};
+use aptos_types::{
+    access_path::AccessPath,
+    executable::{ExecutableDescriptor, ModulePath},
+    write_set::WriteOp,
+};
 use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
 use dashmap::DashSet;
@@ -20,7 +24,30 @@ use std::{
     },
 };
 
-type TxnInput<K> = Vec<ReadDescriptor<K>>;
+// Input is specified by intercepted (and captured) descriptors for data read and code
+// executed, which fully determines the expected transaction behavior (and outputs).
+pub(crate) struct TxnInput<K: ModulePath> {
+    captured_reads: Vec<(K, ReadDescriptor)>,
+    captured_executables: Vec<(K, ExecutableDescriptor)>,
+}
+
+impl<K: ModulePath> TxnInput<K> {
+    fn new(reads: Vec<(K, ReadDescriptor)>, executables: Vec<(K, ExecutableDescriptor)>) -> Self {
+        Self {
+            captured_reads: reads,
+            captured_executables: executables,
+        }
+    }
+
+    pub(crate) fn reads(&self) -> &Vec<(K, ReadDescriptor)> {
+        &self.captured_reads
+    }
+
+    pub(crate) fn executables(&self) -> &Vec<(K, ExecutableDescriptor)> {
+        &self.captured_executables
+    }
+}
+
 // When a transaction is committed, the output delta writes must be populated by
 // the WriteOps corresponding to the deltas in the corresponding outputs.
 #[derive(Debug)]
@@ -37,7 +64,7 @@ impl<T: TransactionOutput, E: Debug> TxnOutput<T, E> {
 
 /// Information about the read which is used by validation.
 #[derive(Clone, PartialEq)]
-enum ReadKind {
+pub(crate) enum ReadDescriptor {
     /// Read returned a value from the multi-version data-structure, with index
     /// and incarnation number of the execution associated with the write of
     /// that entry.
@@ -50,73 +77,7 @@ enum ReadKind {
     DeltaApplicationFailure,
 }
 
-#[derive(Clone)]
-pub struct ReadDescriptor<K> {
-    access_path: K,
-
-    kind: ReadKind,
-}
-
-impl<K: ModulePath> ReadDescriptor<K> {
-    pub fn from_version(access_path: K, txn_idx: TxnIndex, incarnation: Incarnation) -> Self {
-        Self {
-            access_path,
-            kind: ReadKind::Version(txn_idx, incarnation),
-        }
-    }
-
-    pub fn from_resolved(access_path: K, value: u128) -> Self {
-        Self {
-            access_path,
-            kind: ReadKind::Resolved(value),
-        }
-    }
-
-    pub fn from_storage(access_path: K) -> Self {
-        Self {
-            access_path,
-            kind: ReadKind::Storage,
-        }
-    }
-
-    pub fn from_delta_application_failure(access_path: K) -> Self {
-        Self {
-            access_path,
-            kind: ReadKind::DeltaApplicationFailure,
-        }
-    }
-
-    fn module_path(&self) -> Option<AccessPath> {
-        self.access_path.module_path()
-    }
-
-    pub fn path(&self) -> &K {
-        &self.access_path
-    }
-
-    // Does the read descriptor describe a read from MVHashMap w. a specified version.
-    pub fn validate_version(&self, version: Version) -> bool {
-        let (txn_idx, incarnation) = version;
-        self.kind == ReadKind::Version(txn_idx, incarnation)
-    }
-
-    // Does the read descriptor describe a read from MVHashMap w. a resolved delta.
-    pub fn validate_resolved(&self, value: u128) -> bool {
-        self.kind == ReadKind::Resolved(value)
-    }
-
-    // Does the read descriptor describe a read from storage.
-    pub fn validate_storage(&self) -> bool {
-        self.kind == ReadKind::Storage
-    }
-
-    // Does the read descriptor describe to a read with a delta application failure.
-    pub fn validate_delta_application_failure(&self) -> bool {
-        self.kind == ReadKind::DeltaApplicationFailure
-    }
-}
-
-pub struct TxnLastInputOutput<K, T: TransactionOutput, E: Debug> {
+pub struct TxnLastInputOutput<K: ModulePath, T: TransactionOutput, E: Debug> {
     inputs: Vec<CachePadded<ArcSwapOption<TxnInput<K>>>>, // txn_idx -> input.
 
     outputs: Vec<CachePadded<ArcSwapOption<TxnOutput<T, E>>>>, // txn_idx -> output.
@@ -176,11 +137,13 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
     pub(crate) fn record(
         &self,
         txn_idx: TxnIndex,
-        input: Vec<ReadDescriptor<K>>,
+        reads: Vec<(K, ReadDescriptor)>,
+        executables: Vec<(K, ExecutableDescriptor)>,
         output: ExecutionStatus<T, Error<E>>,
     ) {
+        // For now modules are still read as data. Once fixed, the fallback logic below can go.
         let read_modules: Vec<AccessPath> =
-            input.iter().filter_map(|desc| desc.module_path()).collect();
+            reads.iter().filter_map(|(k, _)| k.module_path()).collect();
         let written_modules: Vec<AccessPath> = match &output {
             ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => output
                 .get_writes()
@@ -200,7 +163,7 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
             }
         }
 
-        self.inputs[txn_idx as usize].store(Some(Arc::new(input)));
+        self.inputs[txn_idx as usize].store(Some(Arc::new(TxnInput::new(reads, executables))));
         self.outputs[txn_idx as usize].store(Some(Arc::new(TxnOutput::from_output_status(output))));
     }
 
@@ -208,8 +171,10 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
         self.module_read_write_intersection.load(Ordering::Acquire)
     }
 
-    pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<Vec<ReadDescriptor<K>>>> {
-        self.inputs[txn_idx as usize].load_full()
+    pub(crate) fn inputs(&self, txn_idx: TxnIndex) -> Arc<TxnInput<K>> {
+        self.inputs[txn_idx as usize]
+            .load_full()
+            .expect("Prior input descriptors must be recorded")
     }
 
     // Extracts a set of paths written or updated during execution from transaction

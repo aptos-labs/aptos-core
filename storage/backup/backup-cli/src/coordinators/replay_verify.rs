@@ -31,6 +31,7 @@ pub struct ReplayVerifyCoordinator {
     end_version: Version,
     validate_modules: bool,
     verify_execution_mode: VerifyExecutionMode,
+    replay_executable_cache_size: usize,
 }
 
 impl ReplayVerifyCoordinator {
@@ -45,6 +46,7 @@ impl ReplayVerifyCoordinator {
         end_version: Version,
         validate_modules: bool,
         verify_execution_mode: VerifyExecutionMode,
+        replay_executable_cache_size: usize,
     ) -> Result<Self> {
         Ok(Self {
             storage,
@@ -57,6 +59,7 @@ impl ReplayVerifyCoordinator {
             end_version,
             validate_modules,
             verify_execution_mode,
+            replay_executable_cache_size,
         })
     }
 
@@ -79,6 +82,7 @@ impl ReplayVerifyCoordinator {
 
     async fn run_impl(self) -> Result<()> {
         AptosVM::set_concurrency_level_once(self.replay_concurrency_level);
+        AptosVM::set_executable_cache_size_once(self.replay_executable_cache_size as u64);
         AptosVM::set_timed_feature_override(TimedFeatureOverride::Replay);
 
         let metadata_view = metadata::cache::sync_and_load(
@@ -134,6 +138,7 @@ impl ReplayVerifyCoordinator {
             run_mode,
             concurrent_downloads: self.concurrent_downloads,
             replay_concurrency_level: 0, // won't replay, doesn't matter
+            replay_executable_cache_size: 0, // won't replay, doesn't matter
         };
 
         if let Some(backup) = state_snapshot {

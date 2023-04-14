@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{format_err, Result};
+use aptos_executable_store::ExecutableStore;
 use aptos_gas::{
     AbstractValueSizeGasParameters, ChangeSetConfigs, NativeGasParameters, StandardGasMeter,
     LATEST_GAS_FEATURE_VERSION,
@@ -57,7 +58,7 @@ impl AptosDebugger {
         txns: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>> {
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        AptosVM::execute_block(txns, &state_view)
+        AptosVM::execute_block(txns, &state_view, Arc::new(ExecutableStore::default()))
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
     }
 

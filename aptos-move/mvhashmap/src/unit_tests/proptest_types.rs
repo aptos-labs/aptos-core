@@ -11,6 +11,7 @@ use aptos_aggregator::{
     delta_change_set::{delta_add, delta_sub, DeltaOp},
     transaction::AggregatorValue,
 };
+use aptos_executable_store::ExecutableStore;
 use aptos_types::{
     executable::ExecutableTestType, state_store::state_value::StateValue,
     write_set::TransactionWrite,
@@ -20,7 +21,10 @@ use std::{
     collections::{BTreeMap, HashMap},
     fmt::Debug,
     hash::Hash,
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
 };
 
 const DEFAULT_TIMEOUT: u64 = 30;
@@ -190,7 +194,11 @@ where
 
     let baseline = Baseline::new(transactions.as_slice());
     // Only testing data, provide executable type ().
-    let map = MVHashMap::<KeyType<K>, Value<V>, ExecutableTestType>::new(None);
+    let map =
+        MVHashMap::<KeyType<K>, Value<V>, ExecutableTestType>::new(Arc::new(ExecutableStore::<
+            KeyType<K>,
+            ExecutableTestType,
+        >::default()));
 
     // make ESTIMATE placeholders for all versions to be updated.
     // allows to test that correct values appear at the end of concurrent execution.

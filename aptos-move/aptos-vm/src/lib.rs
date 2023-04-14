@@ -123,12 +123,15 @@ pub mod transaction_metadata;
 mod verifier;
 
 pub use crate::aptos_vm::AptosVM;
+use aptos_executable_store::ExecutableStore;
 use aptos_state_view::StateView;
 use aptos_types::{
+    executable::ExecutableTestType,
+    state_store::state_key::StateKey,
     transaction::{SignedTransaction, Transaction, TransactionOutput, VMValidatorResult},
     vm_status::VMStatus,
 };
-use std::marker::Sync;
+use std::{marker::Sync, sync::Arc};
 pub use verifier::view_function::determine_is_view;
 
 /// This trait describes the VM's validation interfaces.
@@ -152,6 +155,7 @@ pub trait VMExecutor: Send + Sync {
     fn execute_block(
         transactions: Vec<Transaction>,
         state_view: &(impl StateView + Sync),
+        executable_cache: Arc<ExecutableStore<StateKey, ExecutableTestType>>,
     ) -> Result<Vec<TransactionOutput>, VMStatus>;
 }
 

@@ -15,6 +15,7 @@ use crate::{
 use anyhow::Result;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_db::AptosDB;
+use aptos_executable_store::ExecutableStore;
 use aptos_executor_types::{
     BlockExecutorTrait, ChunkExecutorTrait, TransactionReplayer, VerifyExecutionMode,
 };
@@ -27,6 +28,7 @@ use aptos_types::{
     aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     chain_id::ChainId,
+    executable::ExecutableTestType,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     proof::definition::LeafCount,
     state_store::{state_key::StateKey, state_value::StateValue},
@@ -566,6 +568,7 @@ fn run_transactions_naive(transactions: Vec<Transaction>) -> HashValue {
                     Arc::new(AsyncProofFetcher::new(db.reader.clone())),
                 )
                 .unwrap(),
+            Arc::new(ExecutableStore::<StateKey, ExecutableTestType>::default()),
         )
         .unwrap();
         let (executed, _, _) = out.apply_to_ledger(&ledger_view).unwrap();

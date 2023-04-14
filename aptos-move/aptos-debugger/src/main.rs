@@ -29,6 +29,10 @@ pub struct Argument {
 
     #[clap(long, default_value = "1")]
     concurrency_level: usize,
+
+    /// Default 0 disables executable caching across the blocks.
+    #[clap(long, default_value = "0")]
+    executable_cache_size: usize,
 }
 
 #[tokio::main]
@@ -36,6 +40,7 @@ async fn main() -> Result<()> {
     aptos_logger::Logger::new().init();
     let args = Argument::parse();
     AptosVM::set_concurrency_level_once(args.concurrency_level);
+    AptosVM::set_executable_cache_size_once(args.executable_cache_size as u64);
 
     let debugger = match args.target {
         Target::Rest { endpoint } => {

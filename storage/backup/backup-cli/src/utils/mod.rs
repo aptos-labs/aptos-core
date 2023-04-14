@@ -151,6 +151,9 @@ pub struct GlobalRestoreOpt {
 
     #[clap(flatten)]
     pub replay_concurrency_level: ReplayConcurrencyLevelOpt,
+
+    #[clap(flatten)]
+    pub replay_executable_cache_size: ReplayExecutableCacheSizeOpt,
 }
 
 pub enum RestoreRunMode {
@@ -259,6 +262,7 @@ pub struct GlobalRestoreOptions {
     pub run_mode: Arc<RestoreRunMode>,
     pub concurrent_downloads: usize,
     pub replay_concurrency_level: usize,
+    pub replay_executable_cache_size: usize,
 }
 
 impl TryFrom<GlobalRestoreOpt> for GlobalRestoreOptions {
@@ -268,6 +272,7 @@ impl TryFrom<GlobalRestoreOpt> for GlobalRestoreOptions {
         let target_version = opt.target_version.unwrap_or(Version::max_value());
         let concurrent_downloads = opt.concurrent_downloads.get();
         let replay_concurrency_level = opt.replay_concurrency_level.get();
+        let replay_executable_cache_size = opt.replay_executable_cache_size.get();
         let run_mode = if let Some(db_dir) = &opt.db_dir {
             let restore_handler = Arc::new(AptosDB::open(
                 db_dir,
@@ -289,6 +294,7 @@ impl TryFrom<GlobalRestoreOpt> for GlobalRestoreOptions {
             run_mode: Arc::new(run_mode),
             concurrent_downloads,
             replay_concurrency_level,
+            replay_executable_cache_size,
         })
     }
 }
@@ -362,6 +368,28 @@ impl ReplayConcurrencyLevelOpt {
         info!(
             concurrency = ret,
             "Determined concurrency level for transaction replaying."
+        );
+        ret
+    }
+}
+
+#[derive(Clone, Copy, Default, Parser)]
+pub struct ReplayExecutableCacheSizeOpt {
+    /// AptosVM::set_executable_cache_size_once() is called with this
+    #[clap(
+        long,
+        help = "concurrency_level used by the transaction executor, applicable when replaying transactions \
+        after a state snapshot. [Defaults to 0, executable cache flushed between blocks.]"
+    )]
+    replay_executable_cache_size: Option<usize>,
+}
+
+impl ReplayExecutableCacheSizeOpt {
+    pub fn get(&self) -> usize {
+        let ret = self.replay_executable_cache_size.unwrap_or_default();
+        info!(
+            executable_cache_size = ret,
+            "Determined executable cache size for transaction replaying."
         );
         ret
     }

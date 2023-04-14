@@ -10,6 +10,7 @@ use aptos_aggregator::{
     delta_change_set::{delta_add, delta_sub, DeltaOp, DeltaUpdate},
     transaction::AggregatorValue,
 };
+use aptos_executable_store::ExecutableStore;
 use aptos_types::{
     access_path::AccessPath,
     executable::{ExecutableTestType, ModulePath},
@@ -89,7 +90,11 @@ fn create_write_read_placeholder_struct() {
     let ap2 = KeyType(b"/foo/c".to_vec());
     let ap3 = KeyType(b"/foo/d".to_vec());
 
-    let mvtbl: MVHashMap<KeyType<Vec<u8>>, Value, ExecutableTestType> = MVHashMap::new(None);
+    let mvtbl: MVHashMap<KeyType<Vec<u8>>, Value, ExecutableTestType> =
+        MVHashMap::new(Arc::new(ExecutableStore::<
+            KeyType<Vec<u8>>,
+            ExecutableTestType,
+        >::default()));
 
     // Reads that should go the DB return Err(NotFound)
     let r_db = mvtbl.fetch_data(&ap1, 5);

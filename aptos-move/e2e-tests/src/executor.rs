@@ -15,6 +15,7 @@ use crate::{
 use anyhow::Error;
 use aptos_bitvec::BitVec;
 use aptos_crypto::HashValue;
+use aptos_executable_store::ExecutableStore;
 use aptos_framework::ReleaseBundle;
 use aptos_gas::{
     AbstractValueSizeGasParameters, ChangeSetConfigs, NativeGasParameters,
@@ -62,6 +63,7 @@ use std::{
     fs::{self, OpenOptions},
     io::Write,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 static RNG_SEED: [u8; 32] = [9u8; 32];
@@ -389,7 +391,12 @@ impl FakeExecutor {
         &self,
         txn_block: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        BlockAptosVM::execute_block(txn_block, &self.data_store, usize::min(4, num_cpus::get()))
+        BlockAptosVM::execute_block(
+            txn_block,
+            &self.data_store,
+            usize::min(4, num_cpus::get()),
+            Arc::new(ExecutableStore::default()),
+        )
     }
 
     pub fn execute_transaction_block(
@@ -409,7 +416,11 @@ impl FakeExecutor {
             }
         }
 
-        let output = AptosVM::execute_block(txn_block.clone(), &self.data_store);
+        let output = AptosVM::execute_block(
+            txn_block.clone(),
+            &self.data_store,
+            Arc::new(ExecutableStore::default()),
+        );
         if !self.no_parallel_exec {
             let parallel_output = self.execute_transaction_block_parallel(txn_block);
             assert_eq!(output, parallel_output);

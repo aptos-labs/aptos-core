@@ -7,6 +7,7 @@
 use crate::components::chunk_output::ChunkOutput;
 use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_crypto::HashValue;
+use aptos_executable_store::ExecutableStore;
 use aptos_executor_types::ExecutedChunk;
 use aptos_logger::prelude::*;
 use aptos_state_view::{StateViewId, TStateView};
@@ -19,6 +20,7 @@ use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     aggregate_signature::AggregateSignature,
     block_info::{BlockInfo, GENESIS_EPOCH, GENESIS_ROUND, GENESIS_TIMESTAMP_USECS},
+    executable::ExecutableTestType,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::ConfigurationResource,
     state_store::state_key::StateKey,
@@ -136,9 +138,12 @@ pub fn calculate_genesis<V: VMExecutor>(
         get_state_epoch(&base_state_view)?
     };
 
-    let (mut output, _, _) =
-        ChunkOutput::by_transaction_execution::<V>(vec![genesis_txn.clone()], base_state_view)?
-            .apply_to_ledger(&executed_trees)?;
+    let (mut output, _, _) = ChunkOutput::by_transaction_execution::<V>(
+        vec![genesis_txn.clone()],
+        base_state_view,
+        Arc::new(ExecutableStore::<StateKey, ExecutableTestType>::default()),
+    )?
+    .apply_to_ledger(&executed_trees)?;
     ensure!(
         !output.to_commit.is_empty(),
         "Genesis txn execution failed."

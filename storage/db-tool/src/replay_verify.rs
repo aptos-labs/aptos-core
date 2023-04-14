@@ -6,7 +6,10 @@ use aptos_backup_cli::{
     coordinators::replay_verify::ReplayVerifyCoordinator,
     metadata::cache::MetadataCacheOpt,
     storage::DBToolStorageOpt,
-    utils::{ConcurrentDownloadsOpt, ReplayConcurrencyLevelOpt, RocksdbOpt, TrustedWaypointOpt},
+    utils::{
+        ConcurrentDownloadsOpt, ReplayConcurrencyLevelOpt, ReplayExecutableCacheSizeOpt,
+        RocksdbOpt, TrustedWaypointOpt,
+    },
 };
 use aptos_config::config::{
     BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
@@ -56,6 +59,8 @@ pub struct Opt {
     txns_to_skip: Vec<Version>,
     #[clap(long, help = "Do not quit right away when a replay issue is detected.")]
     lazy_quit: bool,
+    #[clap(flatten)]
+    replay_executable_cache_size: ReplayExecutableCacheSizeOpt,
 }
 
 impl Opt {
@@ -81,6 +86,7 @@ impl Opt {
             self.end_version.unwrap_or(Version::MAX),
             self.validate_modules,
             VerifyExecutionMode::verify_except(self.txns_to_skip).set_lazy_quit(self.lazy_quit),
+            self.replay_executable_cache_size.get(),
         )?
         .run()
         .await

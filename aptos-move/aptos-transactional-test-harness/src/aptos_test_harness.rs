@@ -9,6 +9,7 @@ use aptos_crypto::{
     hash::HashValue,
     ValidCryptoMaterialStringExt,
 };
+use aptos_executable_store::ExecutableStore;
 use aptos_gas::{InitialGasSchedule, TransactionGasParameters};
 use aptos_language_e2e_tests::data_store::{FakeDataStore, GENESIS_CHANGE_SET_HEAD};
 use aptos_state_view::TStateView;
@@ -471,7 +472,11 @@ impl<'a> AptosTestAdapter<'a> {
     /// Should error if the transaction ends up being discarded, or having a status other than
     /// EXECUTED.
     fn run_transaction(&mut self, txn: Transaction) -> Result<TransactionOutput> {
-        let mut outputs = AptosVM::execute_block(vec![txn], &self.storage)?;
+        let mut outputs = AptosVM::execute_block(
+            vec![txn],
+            &self.storage,
+            Arc::new(ExecutableStore::default()),
+        )?;
 
         assert_eq!(outputs.len(), 1);
 

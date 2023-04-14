@@ -10,6 +10,8 @@ use crate::{
         TransactionGenParams, ValueType,
     },
 };
+use aptos_executable_store::ExecutableStore;
+use aptos_types::executable::ExecutableTestType;
 use claims::assert_ok;
 use num_cpus;
 use proptest::{
@@ -19,7 +21,7 @@ use proptest::{
     strategy::{Strategy, ValueTree},
     test_runner::TestRunner,
 };
-use std::{fmt::Debug, hash::Hash, marker::PhantomData};
+use std::{fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc};
 
 fn run_transactions<K, V>(
     key_universe: &[K],
@@ -55,8 +57,14 @@ fn run_transactions<K, V>(
             Transaction<KeyType<K>, ValueType<V>>,
             Task<KeyType<K>, ValueType<V>>,
             EmptyDataView<KeyType<K>, ValueType<V>>,
+            ExecutableTestType,
         >::new(num_cpus::get())
-        .execute_transactions_parallel((), &transactions, &data_view);
+        .execute_transactions_parallel(
+            (),
+            &transactions,
+            &data_view,
+            Arc::new(ExecutableStore::<KeyType<K>, ExecutableTestType>::default()),
+        );
 
         if module_access.0 && module_access.1 {
             assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);
@@ -179,8 +187,14 @@ fn deltas_writes_mixed() {
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
+            ExecutableTestType,
         >::new(num_cpus::get())
-        .execute_transactions_parallel((), &transactions, &data_view);
+        .execute_transactions_parallel(
+            (),
+            &transactions,
+            &data_view,
+            Arc::new(ExecutableStore::<KeyType<[u8; 32]>, ExecutableTestType>::default()),
+        );
 
         let baseline = ExpectedOutput::generate_baseline(&transactions, None);
         baseline.assert_output(&output);
@@ -219,8 +233,14 @@ fn deltas_resolver() {
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
+            ExecutableTestType,
         >::new(num_cpus::get())
-        .execute_transactions_parallel((), &transactions, &data_view);
+        .execute_transactions_parallel(
+            (),
+            &transactions,
+            &data_view,
+            Arc::new(ExecutableStore::<KeyType<[u8; 32]>, ExecutableTestType>::default()),
+        );
 
         let delta_writes = output
             .as_ref()
@@ -360,8 +380,14 @@ fn publishing_fixed_params() {
         Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
+        ExecutableTestType,
     >::new(num_cpus::get())
-    .execute_transactions_parallel((), &transactions, &data_view);
+    .execute_transactions_parallel(
+        (),
+        &transactions,
+        &data_view,
+        Arc::new(ExecutableStore::<KeyType<[u8; 32]>, ExecutableTestType>::default()),
+    );
     assert_ok!(output);
 
     // Adjust the reads of txn indices[2] to contain module read to key 42.
@@ -396,8 +422,14 @@ fn publishing_fixed_params() {
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
+            ExecutableTestType,
         >::new(num_cpus::get())
-        .execute_transactions_parallel((), &transactions, &data_view);
+        .execute_transactions_parallel(
+            (),
+            &transactions,
+            &data_view,
+            Arc::new(ExecutableStore::<KeyType<[u8; 32]>, ExecutableTestType>::default()),
+        );
 
         assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);
     }

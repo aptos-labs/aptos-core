@@ -17,6 +17,7 @@ anyhow = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-db = { workspace = true }
+aptos-executable-store = { workspace = true }
 aptos-executor = { workspace = true }
 aptos-executor-types = { workspace = true }
 aptos-genesis = { workspace = true, features = ["testing"] }

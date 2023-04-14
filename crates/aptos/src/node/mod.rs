@@ -23,7 +23,10 @@ use aptos_backup_cli::{
     coordinators::restore::{RestoreCoordinator, RestoreCoordinatorOpt},
     metadata::cache::MetadataCacheOpt,
     storage::command_adapter::{config::CommandAdapterConfig, CommandAdapter},
-    utils::{ConcurrentDownloadsOpt, GlobalRestoreOpt, ReplayConcurrencyLevelOpt, RocksdbOpt},
+    utils::{
+        ConcurrentDownloadsOpt, GlobalRestoreOpt, ReplayConcurrencyLevelOpt,
+        ReplayExecutableCacheSizeOpt, RocksdbOpt,
+    },
 };
 use aptos_cached_packages::aptos_stdlib;
 use aptos_config::config::NodeConfig;
@@ -1501,6 +1504,9 @@ pub struct BootstrapDbFromBackup {
 
     #[clap(flatten)]
     pub replay_concurrency_level: ReplayConcurrencyLevelOpt,
+
+    #[clap(flatten)]
+    pub replay_executable_cache_size: ReplayExecutableCacheSizeOpt,
 }
 
 #[async_trait]
@@ -1524,6 +1530,7 @@ impl CliCommand<()> for BootstrapDbFromBackup {
             rocksdb_opt: RocksdbOpt::default(),
             concurrent_downloads: self.concurrent_downloads,
             replay_concurrency_level: self.replay_concurrency_level,
+            replay_executable_cache_size: self.replay_executable_cache_size,
         }
         .try_into()?;
         let storage = Arc::new(CommandAdapter::new(

@@ -8,8 +8,12 @@ use crate::{
     scheduler::{Scheduler, SchedulerTask},
 };
 use aptos_aggregator::delta_change_set::{delta_add, delta_sub, DeltaOp, DeltaUpdate};
+use aptos_executable_store::ExecutableStore;
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_types::{executable::ModulePath, write_set::TransactionWrite};
+use aptos_types::{
+    executable::{ExecutableTestType, ModulePath},
+    write_set::TransactionWrite,
+};
 use claims::{assert_matches, assert_some_eq};
 use rand::{prelude::*, random};
 use std::{
@@ -30,9 +34,18 @@ where
         phantom: PhantomData,
     };
 
-    let output =
-        BlockExecutor::<Transaction<K, V>, Task<K, V>, DeltaDataView<K, V>>::new(num_cpus::get())
-            .execute_transactions_parallel((), &transactions, &data_view);
+    let output = BlockExecutor::<
+        Transaction<K, V>,
+        Task<K, V>,
+        DeltaDataView<K, V>,
+        ExecutableTestType,
+    >::new(num_cpus::get())
+    .execute_transactions_parallel(
+        (),
+        &transactions,
+        &data_view,
+        Arc::new(ExecutableStore::<K, ExecutableTestType>::default()),
+    );
 
     let baseline = ExpectedOutput::generate_baseline(&transactions, None);
     baseline.assert_output(&output);

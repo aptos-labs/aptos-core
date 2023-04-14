@@ -8,17 +8,21 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
+use aptos_executable_store::ExecutableStore;
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_state_view::StateView;
 use aptos_storage_interface::{
     cached_state_view::CachedStateView, state_delta::StateDelta, DbReader, DbReaderWriter, DbWriter,
 };
 use aptos_types::{
+    executable::ExecutableTestType,
     ledger_info::LedgerInfoWithSignatures,
+    state_store::state_key::StateKey,
     transaction::{Transaction, TransactionOutput, TransactionToCommit, Version},
     vm_status::VMStatus,
 };
 use aptos_vm::VMExecutor;
+use std::sync::Arc;
 
 fn create_test_executor() -> BlockExecutor<FakeVM, Transaction> {
     // setup fake db
@@ -51,8 +55,9 @@ impl TransactionBlockExecutor<Transaction> for FakeVM {
     fn execute_transaction_block(
         transactions: Vec<Transaction>,
         state_view: CachedStateView,
+        executable_cache: Arc<ExecutableStore<StateKey, ExecutableTestType>>,
     ) -> Result<ChunkOutput> {
-        ChunkOutput::by_transaction_execution::<FakeVM>(transactions, state_view)
+        ChunkOutput::by_transaction_execution::<FakeVM>(transactions, state_view, executable_cache)
     }
 }
 
@@ -60,6 +65,7 @@ impl VMExecutor for FakeVM {
     fn execute_block(
         _transactions: Vec<Transaction>,
         _state_view: &impl StateView,
+        _executable_cache: Arc<ExecutableStore<StateKey, ExecutableTestType>>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         Ok(Vec::new())
     }

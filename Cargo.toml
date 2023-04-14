@@ -127,6 +127,7 @@ members = [
     "storage/backup/backup-cli",
     "storage/backup/backup-service",
     "storage/db-tool",
+    "storage/executable-store",
     "storage/indexer",
     "storage/jellyfish-merkle",
     "storage/rocksdb-options",
@@ -270,6 +271,7 @@ aptos-event-notifications = { path = "state-sync/inter-component/event-notificat
 aptos-executor = { path = "execution/executor" }
 aptos-executor-test-helpers = { path = "execution/executor-test-helpers" }
 aptos-executor-types = { path = "execution/executor-types" }
+aptos-executable-store = { path = "storage/executable-store" }
 aptos-faucet-cli = { path = "crates/aptos-faucet/cli" }
 aptos-faucet-core = { path = "crates/aptos-faucet/core" }
 aptos-faucet-service = { path = "crates/aptos-faucet/service" }
@@ -412,7 +414,7 @@ crossbeam = "0.8.1"
 crossbeam-channel = "0.5.4"
 csv = "1.2.1"
 curve25519-dalek = "3"
-dashmap = "5.2.0"
+dashmap = { version = "5.4.0", features = ["rayon"] }
 datatest-stable = "0.1.1"
 debug-ignore = { version = "1.0.3", features = ["serde"] }
 derivative = "2.2.0"

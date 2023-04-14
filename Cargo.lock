@@ -450,6 +450,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-aggregator",
+ "aptos-executable-store",
  "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",
@@ -907,6 +908,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-crypto",
+ "aptos-executable-store",
  "aptos-gas",
  "aptos-gas-profiling",
  "aptos-logger",
@@ -957,6 +959,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-executable-store"
+version = "0.1.0"
+dependencies = [
+ "aptos-crypto",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-types",
+ "claims",
+ "dashmap",
+ "num-derive",
+ "num-traits 0.2.15",
+]
+
+[[package]]
 name = "aptos-executor"
 version = "0.1.0"
 dependencies = [
@@ -966,6 +982,7 @@ dependencies = [
  "aptos-consensus-types",
  "aptos-crypto",
  "aptos-db",
+ "aptos-executable-store",
  "aptos-executor-test-helpers",
  "aptos-executor-types",
  "aptos-gas",
@@ -1002,6 +1019,7 @@ dependencies = [
  "aptos-config",
  "aptos-crypto",
  "aptos-db",
+ "aptos-executable-store",
  "aptos-executor",
  "aptos-executor-types",
  "aptos-genesis",
@@ -1758,6 +1776,7 @@ dependencies = [
  "aptos-bitvec",
  "aptos-cached-packages",
  "aptos-crypto",
+ "aptos-executable-store",
  "aptos-framework",
  "aptos-gas",
  "aptos-keygen",
@@ -1952,6 +1971,7 @@ dependencies = [
  "anyhow",
  "aptos-aggregator",
  "aptos-crypto",
+ "aptos-executable-store",
  "aptos-infallible",
  "aptos-types",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
@@ -2983,6 +3003,7 @@ version = "0.1.0"
 dependencies = [
  "aptos-bitvec",
  "aptos-crypto",
+ "aptos-executable-store",
  "aptos-gas",
  "aptos-language-e2e-tests",
  "aptos-types",
@@ -3077,6 +3098,7 @@ dependencies = [
  "aptos-api-types",
  "aptos-cached-packages",
  "aptos-crypto",
+ "aptos-executable-store",
  "aptos-framework",
  "aptos-gas",
  "aptos-language-e2e-tests",
@@ -3183,6 +3205,7 @@ dependencies = [
  "aptos-block-executor",
  "aptos-crypto",
  "aptos-crypto-derive",
+ "aptos-executable-store",
  "aptos-framework",
  "aptos-gas",
  "aptos-infallible",
@@ -3261,6 +3284,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-cached-packages",
+ "aptos-executable-store",
  "aptos-language-e2e-tests",
  "aptos-move-stdlib",
  "aptos-types",
@@ -5073,13 +5097,16 @@ dependencies = [
 
 [[package]]
 name = "dashmap"
-version = "5.2.0"
+version = "5.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c8858831f7781322e539ea39e72449c46b059638250c14344fec8d0aa6e539c"
+checksum = "907076dfda823b0b36d2a1bb5f90c96660a5bbcd7729e10727f07858f22c4edc"
 dependencies = [
  "cfg-if",
- "num_cpus",
- "parking_lot 0.12.1",
+ "hashbrown 0.12.3",
+ "lock_api",
+ "once_cell",
+ "parking_lot_core 0.9.3",
+ "rayon",
 ]
 
 [[package]]
@@ -7373,10 +7400,11 @@ dependencies = [
 
 [[package]]
 name = "lock_api"
-version = "0.4.6"
+version = "0.4.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "88943dd7ef4a2e5a4bfa2753aaab3013e34ce2533d1996fb18ef591e315e2b3b"
+checksum = "435011366fe56583b16cf956f9df0095b405b82d76425bc8981c0e22e60ec4df"
 dependencies = [
+ "autocfg",
  "scopeguard",
 ]
 

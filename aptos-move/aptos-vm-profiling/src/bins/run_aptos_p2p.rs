@@ -2,12 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
+use aptos_executable_store::ExecutableStore;
 use aptos_language_e2e_tests::{account::AccountData, data_store::FakeDataStore};
-use aptos_types::{transaction::Transaction, write_set::WriteSet};
+use aptos_types::{
+    executable::ExecutableTestType, state_store::state_key::StateKey, transaction::Transaction,
+    write_set::WriteSet,
+};
 use aptos_vm::{AptosVM, VMExecutor};
 use std::{
     collections::HashMap,
     io::{self, Read},
+    sync::Arc,
 };
 
 fn main() -> Result<()> {
@@ -44,7 +49,11 @@ fn main() -> Result<()> {
         })
         .collect();
 
-    let res = AptosVM::execute_block(txns, &state_store)?;
+    let res = AptosVM::execute_block(
+        txns,
+        &state_store,
+        Arc::new(ExecutableStore::<StateKey, ExecutableTestType>::default()),
+    )?;
     for i in 0..NUM_TXNS {
         assert!(res[i as usize].status().status().unwrap().is_success());
     }

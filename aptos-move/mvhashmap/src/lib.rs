@@ -8,13 +8,16 @@ use crate::{
     versioned_data::VersionedData,
 };
 use aptos_aggregator::delta_change_set::DeltaOp;
+use aptos_executable_store::ExecutableStore;
 use aptos_types::{
     executable::{Executable, ExecutableDescriptor, ModulePath},
     write_set::TransactionWrite,
 };
-use std::{fmt::Debug, hash::Hash};
+use std::{fmt::Debug, hash::Hash, sync::Arc};
 
 pub mod types;
+pub mod unsync_map;
+mod utils;
 pub mod versioned_code;
 pub mod versioned_data;
 
@@ -31,26 +34,37 @@ mod unit_tests;
 /// TODO: separate V into different generic types for data and modules / code (currently
 /// both WriteOp for executor, and use extract_raw_bytes. data for aggregators, and
 /// code for computing the module hash.
-pub struct MVHashMap<K, V: TransactionWrite, X: Executable> {
+pub struct MVHashMap<
+    K: ModulePath + Send + Sync + Hash + Clone + Eq + Debug,
+    V: TransactionWrite + Send + Sync,
+    X: Executable,
+> {
     data: VersionedData<K, V>,
     code: VersionedCode<K, V, X>,
 }
 
-impl<K: ModulePath + Hash + Clone + Eq + Debug, V: TransactionWrite, X: Executable>
-    MVHashMap<K, V, X>
+impl<
+        K: ModulePath + Hash + Clone + Eq + Send + Sync + Debug,
+        V: TransactionWrite + Send + Sync,
+        X: Executable,
+    > MVHashMap<K, V, X>
 {
     // -----------------------------------
     // Functions shared for data and code.
 
-    // Option<VersionedCode> is passed to allow re-using code cache between blocks.
-    pub fn new(code_cache: Option<VersionedCode<K, V, X>>) -> MVHashMap<K, V, X> {
+    // Executable cache is passed as it's re-used across blocks.
+    pub fn new(executable_cache: Arc<ExecutableStore<K, X>>) -> MVHashMap<K, V, X> {
         MVHashMap {
             data: VersionedData::new(),
-            code: code_cache.unwrap_or_default(),
+            code: VersionedCode::new(executable_cache),
         }
     }
 
+    /// Should be called when block execution is complete. Updates base executables
+    /// for multi-versioned code using rayon, so recommended to be called with a proper
+    /// rayon threadpool installed.
     pub fn take(self) -> (VersionedData<K, V>, VersionedCode<K, V, X>) {
+        self.code.update_base_executables();
         (self.data, self.code)
     }
 
@@ -135,15 +149,18 @@ impl<K: ModulePath + Hash + Clone + Eq + Debug, V: TransactionWrite, X: Executab
         &self,
         key: &K,
         txn_idx: TxnIndex,
-    ) -> anyhow::Result<MVCodeOutput<V, X>, MVCodeError> {
+    ) -> anyhow::Result<MVCodeOutput<Arc<V>, X>, MVCodeError> {
         self.code.fetch_code(key, txn_idx)
     }
 }
 
-impl<K: ModulePath + Hash + Clone + Debug + Eq, V: TransactionWrite, X: Executable> Default
-    for MVHashMap<K, V, X>
+impl<
+        K: ModulePath + Hash + Clone + Eq + Send + Sync + Debug,
+        V: TransactionWrite + Send + Sync,
+        X: Executable,
+    > Default for MVHashMap<K, V, X>
 {
     fn default() -> Self {
-        Self::new(None)
+        Self::new(Arc::new(ExecutableStore::default()))
     }
 }

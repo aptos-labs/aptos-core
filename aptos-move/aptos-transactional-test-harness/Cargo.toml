@@ -17,6 +17,7 @@ anyhow = { workspace = true }
 aptos-api-types = { workspace = true }
 aptos-cached-packages = { workspace = true }
 aptos-crypto = { workspace = true }
+aptos-executable-store = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-gas = { workspace = true }
 aptos-language-e2e-tests = { workspace = true }

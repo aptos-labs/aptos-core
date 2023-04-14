@@ -3,7 +3,7 @@
 
 use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_crypto::hash::HashValue;
-use aptos_types::executable::ExecutableDescriptor;
+use aptos_types::executable::{Executable, ExecutableDescriptor};
 use std::sync::Arc;
 
 pub type TxnIndex = u32;
@@ -51,13 +51,14 @@ pub enum MVDataOutput<V> {
 
 /// Returned as Ok(..) when read successfully from the multi-version data-structure.
 #[derive(Debug, PartialEq, Eq)]
-pub enum MVCodeOutput<M, X> {
-    /// Arc to the executable corresponding to the latest module, and a descriptor
-    /// with either the module hash or indicator that the module is from storage.
-    Executable((Arc<X>, ExecutableDescriptor)),
-    /// Arc to the latest module, together with its (cryptographic) hash. Note that
+pub enum MVCodeOutput<M, X: Executable> {
+    /// Executable corresponding to the latest module, and a descriptor with either
+    /// the module hash or indicator that the module is from storage.
+    Executable((X, ExecutableDescriptor)),
+    /// The latest module, together with its (cryptographic) hash. Note that
     /// this can't be a storage-level module, as it's from multi-versioned code map.
-    /// The Option can be None if HashValue can't be computed, currently may happen
-    /// if the latest entry corresponded to the module deletion.
-    Module((Arc<M>, HashValue)),
+    // Note: currently used as Arc of type in multi-versioned, and directly in the
+    // simple (unsync) implementation. TODO: when the type is efficiently clonable
+    // and Arc wrapper will be deprecated anyway (both for modules and data).
+    Module((M, HashValue)),
 }
