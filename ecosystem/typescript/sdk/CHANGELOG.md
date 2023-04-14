@@ -6,7 +6,12 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
+## 1.8.5 (2023-04-14)
+
+- Hotfix since previous version `1.8.3` has some missing files
+
 ## 1.8.4 (2023-04-13)
+
 - Move `TypeTagParser` from `builder_utils.ts` to `type_tag.ts`
 - Update `StructTag.fromString()` to use and relies on TypeTagParser
 
