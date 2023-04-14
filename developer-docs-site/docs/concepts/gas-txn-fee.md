@@ -25,7 +25,7 @@ Transactions can range from simple and inexpensive to complicated based upon the
 See [How Base Gas Works](./base-gas.md) for a detailed description of gas fee types and available optimizations.
 
 :::tip Unit of gas
-👉 A **unit of gas** is a dimensionless number, expressed as an integer. The total gas units consumed by your transaction depends on the complexity of your transaction. The **gas price**, on the other hand, is expressed in terms of Aptos blockchain’s native coin (Octas). Also see [Transactions and States](txns-states.md) for how a transaction submitted to the Aptos blockchain looks like.
+👉 A **unit of gas** is a dimensionless number or a unit that is not associated with any one item such as a coin, expressed as an integer. The total gas units consumed by your transaction depend on the complexity of your transaction. The **gas price**, on the other hand, is expressed in terms of Aptos blockchain’s native coin (Octas). Also see [Transactions and States](txns-states.md) for how a transaction submitted to the Aptos blockchain looks like.
 :::
 
 ## Gas price and prioritizing transactions
@@ -35,7 +35,7 @@ In the Aptos network, the Aptos governance sets the absolute minimum gas unit pr
 By specifying a higher gas unit price than the current market price, you can **increase** the priority level for your transaction on the blockchain by paying a larger processing fee. As part of consensus, when the leader selects transactions from its mempool to propose as part of the next block, it will prioritize selecting transactions with a higher gas unit price. While in most cases this is unnecessary, if the network is under load this measure can ensure your transaction is processed more quickly. See the `gas_unit_price` entry under [Estimating the gas units via simulation](#estimating-the-gas-units-via-simulation) for details.
 
 :::caution Increasing gas unit price with in-flight transactions
-👉 If you are increasing gas unit price, but have in-flight (uncommitted) transactions for the same account, you should resubmit all of those transactions with the higher gas unit price. This is because transactions within the same account always have to respect sequence number, so effectively the higher gas unit price transaction will only increase priority after the in-flight transactions are included in a block.
+👉 If you are increasing gas unit price, but have in-flight (uncommitted) transactions for the same account, you should resubmit all of those transactions with the higher gas unit price. This is because transactions within the same account always have to respect sequence number, so effectively the higher gas unit price transaction will increase priority only after the in-flight transactions are included in a block.
 :::
 
 ## Specifying gas fees within a transaction
