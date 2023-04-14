@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    histogram_opts, register_histogram, register_int_counter, register_int_counter_vec,
+    exponential_buckets, histogram_opts, register_histogram, register_int_counter, register_int_counter_vec,
     register_int_gauge, Histogram, IntCounter, IntCounterVec, IntGauge,
 };
 use once_cell::sync::Lazy;
@@ -31,18 +31,13 @@ pub static BLOCK_EXECUTOR_CONCURRENCY: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
-const SIGNATURE_VERIFICATION_TIME_BUCKETS: [f64; 18] = [
-    0.0002, 0.0004, 0.0006, 0.0008, 0.001, 0.00125, 0.0015, 0.002, 0.0025, 0.003, 0.0035, 0.004,
-    0.005, 0.006, 0.008, 0.01, 0.015, 0.02,
-];
-
 pub static BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     let histogram_opts = histogram_opts!(
         // metric name
         "block_executor_signature_verification_seconds",
         // metric description
         "The time spent in seconds for signature verification of a block in executor",
-        SIGNATURE_VERIFICATION_TIME_BUCKETS.to_vec()
+        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
     );
     register_histogram!(histogram_opts).unwrap()
 });
@@ -87,9 +82,9 @@ pub static SYSTEM_TRANSACTIONS_EXECUTED: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
-const NUM_BLOCK_TRANSACTIONS_BUCKETS: [f64; 20] = [
-    5.0, 10.0, 20.0, 40.0, 75.0, 100.0, 125.0, 150.0, 175.0, 200.0, 250.0, 300.0, 350.0, 400.0,
-    450.0, 500.0, 750.0, 1000.0, 1500.0, 2000.0,
+const NUM_BLOCK_TRANSACTIONS_BUCKETS: [f64; 30] = [
+    5.0, 10.0, 20.0, 40.0, 75.0, 100.0, 200.0, 400.0, 800.0,
+    1200.0, 1800.0, 2500.0, 3300.0, 4000.0, 4700.0, 5500.0, 6500.0, 7500.0, 9000.0, 11500.0, 13000.0, 14500.0, 16500.0, 18500.0, 21000.0, 24000.0, 27000.0, 30000.0, 35000.0, 40000.0
 ];
 
 pub static BLOCK_TRANSACTION_COUNT: Lazy<Histogram> = Lazy::new(|| {
@@ -129,7 +124,9 @@ pub static TXN_VALIDATION_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(histogram_opts).unwrap()
 });
 
-const TXN_GAS_USAGE_BUCKETS: [f64; 10] = [2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0];
+const TXN_GAS_USAGE_BUCKETS: [f64; 14] = [
+    2.0, 4.0, 6.0, 8.0, 10.0, 12.5, 15.0, 20.0, 25.0, 35.0, 50.0, 70.0, 90.0, 120.0
+];
 
 pub static TXN_GAS_USAGE: Lazy<Histogram> = Lazy::new(|| {
     let histogram_opts = histogram_opts!(
