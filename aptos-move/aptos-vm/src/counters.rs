@@ -125,8 +125,9 @@ pub static TXN_VALIDATION_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(histogram_opts).unwrap()
 });
 
-const TXN_GAS_USAGE_BUCKETS: [f64; 14] = [
-    2.0, 4.0, 6.0, 8.0, 10.0, 12.5, 15.0, 20.0, 25.0, 35.0, 50.0, 70.0, 90.0, 120.0,
+const TXN_GAS_USAGE_BUCKETS: [f64; 22] = [
+    150.0, 300.0, 450.0, 600.0, 750.0, 900.0, 1050.0, 1200.0, 1350.0, 1600.0, 1900.0, 2200.0,
+    2800.0, 3600.0, 4600.0, 5800.0, 7100.0, 8800.0, 10700.0, 13000.0, 16500.0, 20000.0,
 ];
 
 pub static TXN_GAS_USAGE: Lazy<Histogram> = Lazy::new(|| {
