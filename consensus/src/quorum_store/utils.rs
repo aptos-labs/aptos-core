@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{monitor, quorum_store::counters};
-use aptos_consensus_types::{common::TransactionSummary, proof_of_store::ProofOfStore};
+use aptos_consensus_types::{common::TransactionInProgress, proof_of_store::ProofOfStore};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
@@ -103,14 +103,14 @@ impl MempoolProxy {
         &self,
         max_items: u64,
         max_bytes: u64,
-        return_non_full: bool,
-        exclude_txns: Vec<TransactionSummary>,
+        exclude_txns: Vec<TransactionInProgress>,
     ) -> Result<Vec<SignedTransaction>, anyhow::Error> {
         let (callback, callback_rcv) = oneshot::channel();
         let msg = QuorumStoreRequest::GetBatchRequest(
             max_items,
             max_bytes,
-            return_non_full,
+            true,
+            true,
             exclude_txns,
             callback,
         );

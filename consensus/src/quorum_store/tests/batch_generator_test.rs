@@ -11,7 +11,7 @@ use crate::quorum_store::{
     },
 };
 use aptos_config::config::QuorumStoreConfig;
-use aptos_consensus_types::{common::TransactionSummary, proof_of_store::BatchId};
+use aptos_consensus_types::{common::TransactionInProgress, proof_of_store::BatchId};
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use aptos_types::transaction::SignedTransaction;
 use futures::{
@@ -27,11 +27,12 @@ async fn queue_mempool_batch_response(
     txns: Vec<SignedTransaction>,
     max_size: usize,
     quorum_store_to_mempool_receiver: &mut Receiver<QuorumStoreRequest>,
-) -> Vec<TransactionSummary> {
+) -> Vec<TransactionInProgress> {
     if let QuorumStoreRequest::GetBatchRequest(
         _max_batch_size,
         _max_bytes,
         _return_non_full,
+        _include_gas_upgraded,
         exclude_txns,
         callback,
     ) = timeout(

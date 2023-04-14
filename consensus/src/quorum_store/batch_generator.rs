@@ -11,7 +11,10 @@ use crate::{
     },
 };
 use aptos_config::config::QuorumStoreConfig;
-use aptos_consensus_types::{common::TransactionSummary, proof_of_store::BatchId};
+use aptos_consensus_types::{
+    common::{TransactionInProgress, TransactionSummary},
+    proof_of_store::BatchId,
+};
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_types::{transaction::SignedTransaction, PeerId};
@@ -36,12 +39,6 @@ pub enum BatchGeneratorCommand {
 pub struct BackPressure {
     pub txn_count: bool,
     pub proof_count: bool,
-}
-
-#[derive(Clone)]
-struct TransactionInProgress {
-    pub summary: TransactionSummary,
-    pub gas_unit_price: u64,
 }
 
 pub struct BatchGenerator {
@@ -189,7 +186,7 @@ impl BatchGenerator {
             .batches_in_progress
             .values()
             .flatten()
-            .map(|txn| txn.summary.clone())
+            .cloned()
             .collect();
 
         trace!("QS: excluding txs len: {:?}", exclude_txns.len());
@@ -198,7 +195,6 @@ impl BatchGenerator {
             .pull_internal(
                 max_count,
                 self.config.mempool_txn_pull_max_bytes,
-                true,
                 exclude_txns,
             )
             .await
