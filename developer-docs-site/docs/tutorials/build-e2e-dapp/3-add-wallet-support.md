@@ -15,11 +15,11 @@ You can read about it more in the [Wallet Adapter Concept](../../concepts/wallet
 2. In the `client` folder, run:
 
 ```cmd
-npm i @aptos-labs/wallet-adapter-react@0.2.2
+npm i @aptos-labs/wallet-adapter-react@1.0.2
 ```
 
 ```cmd
-npm i @aptos-labs/wallet-adapter-ant-design@0.1.0
+npm i @aptos-labs/wallet-adapter-ant-design@1.0.0
 ```
 
 This installs two packages:
