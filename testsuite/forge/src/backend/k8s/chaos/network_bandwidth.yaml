@@ -2,23 +2,16 @@ kind: NetworkChaos
 apiVersion: chaos-mesh.org/v1alpha1
 metadata:
   namespace: {namespace}
-  name: {name} 
+  name: forge-namespace-{rate}mbps-bandwidth
 spec:
   action: bandwidth
   mode: all
   selector:
     namespaces:
       - {namespace}
-    expressionSelectors:
-      - {{ key: app.kubernetes.io/instance, operator: In, values: [{instance_labels}] }}
+    labelSelectors:
+      app.kubernetes.io/name: validator
   bandwidth:
     rate: "{rate}mbps"
     limit: {limit}
     buffer: {buffer}
-  target:
-    selector:
-      namespaces:
-        - {namespace}
-      expressionSelectors:
-        - {{ key: app.kubernetes.io/instance, operator: In, values: [{target_instance_labels}] }}
-    mode: all
