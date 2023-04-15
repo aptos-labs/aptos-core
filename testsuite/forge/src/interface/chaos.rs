@@ -11,6 +11,7 @@ pub enum SwarmChaos {
     Bandwidth(SwarmNetworkBandwidth),
     Loss(SwarmNetworkLoss),
     NetEm(SwarmNetEm),
+    CpuStress(SwarmCpuStress),
 }
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
@@ -97,8 +98,28 @@ pub struct GroupNetEm {
     pub name: String,
     pub source_nodes: Vec<PeerId>,
     pub target_nodes: Vec<PeerId>,
-    pub latency_ms: u64,
-    pub jitter_ms: u64,
-    pub correlation_percentage: u64,
+    pub delay_latency_ms: u64,
+    pub delay_jitter_ms: u64,
+    pub delay_correlation_percentage: u64,
     pub loss_percentage: u64,
+    pub loss_correlation_percentage: u64,
+}
+
+#[derive(Eq, Hash, PartialEq, Debug, Clone)]
+pub struct SwarmCpuStress {
+    pub group_cpu_stresses: Vec<GroupCpuStress>,
+}
+
+impl Display for SwarmCpuStress {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "CpuStress nodes {:?}", self.group_cpu_stresses)
+    }
+}
+
+#[derive(Eq, Hash, PartialEq, Debug, Clone)]
+pub struct GroupCpuStress {
+    pub name: String,
+    pub target_nodes: Vec<PeerId>,
+    pub num_workers: u64,
+    pub load_per_worker: u64,
 }

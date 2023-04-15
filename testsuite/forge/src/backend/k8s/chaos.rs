@@ -3,7 +3,7 @@
 
 use crate::{
     dump_string_to_file, K8sSwarm, Result, Swarm, SwarmChaos, SwarmNetworkBandwidth,
-    SwarmNetworkDelay, SwarmNetworkLoss, SwarmNetworkPartition, KUBECTL_BIN, SwarmNetEm,
+    SwarmNetworkDelay, SwarmNetworkLoss, SwarmNetworkPartition, KUBECTL_BIN, SwarmNetEm, SwarmCpuStress,
 };
 use anyhow::bail;
 use aptos_logger::info;
@@ -35,6 +35,12 @@ macro_rules! NETWORK_LOSS_CHAOS_TEMPLATE {
 macro_rules! NETEM_CHAOS_TEMPLATE {
     () => {
         "chaos/netem.yaml"
+    };
+}
+
+macro_rules! CPU_STRESS_CHAOS_TEMPLATE {
+    () => {
+        "chaos/cpu_stress.yaml"
     };
 }
 
@@ -206,16 +212,47 @@ impl K8sSwarm {
                 include_str!(NETEM_CHAOS_TEMPLATE!()),
                 name = &group_netem.name,
                 namespace = self.kube_namespace,
-                latency_ms = group_netem.latency_ms,
-                jitter_ms = group_netem.jitter_ms,
-                correlation_percentage = group_netem.correlation_percentage,
+                delay_latency_ms = group_netem.delay_latency_ms,
+                delay_jitter_ms = group_netem.delay_jitter_ms,
+                delay_correlation_percentage = group_netem.delay_correlation_percentage,
                 loss_percentage = group_netem.loss_percentage,
+                loss_correlation_percentage = group_netem.loss_correlation_percentage,
                 instance_labels = &source_instance_labels,
                 target_instance_labels = &target_instance_labels,
             ));
         }
 
         Ok(network_chaos_specs.join("\n---\n"))
+    }
+
+    fn create_cpu_stress_template(&self, swarm_cpu_stress: &SwarmCpuStress) -> Result<String> {
+        let mut cpu_stress_specs = vec![];
+
+        for group_cpu_stress in &swarm_cpu_stress.group_cpu_stresses {
+            let instance_labels = group_cpu_stress
+                .target_nodes
+                .iter()
+                .map(|node| {
+                    if let Some(v) = self.validator(*node) {
+                        v.name()
+                    } else {
+                        "invalid-node"
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(",");
+
+            cpu_stress_specs.push(format!(
+                include_str!(CPU_STRESS_CHAOS_TEMPLATE!()),
+                name = &group_cpu_stress.name,
+                namespace = self.kube_namespace,
+                num_workers = group_cpu_stress.num_workers,
+                load_per_worker = group_cpu_stress.load_per_worker,
+                instance_labels = &instance_labels,
+            ));
+        }
+
+        Ok(cpu_stress_specs.join("\n---\n"))
     }
 
     fn create_chaos_template(&self, chaos: &SwarmChaos) -> Result<String> {
@@ -225,6 +262,7 @@ impl K8sSwarm {
             SwarmChaos::Bandwidth(c) => self.create_network_bandwidth_template(c),
             SwarmChaos::Loss(c) => self.create_network_loss_template(c),
             SwarmChaos::NetEm(c) => self.create_netem_template(c),
+            SwarmChaos::CpuStress(c) => self.create_cpu_stress_template(c),
         }
     }
 
