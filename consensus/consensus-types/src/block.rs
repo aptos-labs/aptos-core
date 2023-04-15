@@ -10,7 +10,17 @@ use crate::{
 use anyhow::{bail, ensure, format_err};
 use aptos_crypto::{bls12381, hash::CryptoHash, HashValue};
 use aptos_infallible::duration_since_epoch;
-use aptos_types::{account_address::AccountAddress, block_info::BlockInfo, block_metadata::BlockMetadata, epoch_state::EpochState, ledger_info::LedgerInfo, PeerId, transaction::{SignedTransaction, Transaction, Version}, validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier};
+use aptos_types::{
+    account_address::AccountAddress,
+    block_info::BlockInfo,
+    block_metadata::BlockMetadata,
+    epoch_state::EpochState,
+    ledger_info::LedgerInfo,
+    transaction::{SignedTransaction, Transaction, Version},
+    validator_signer::ValidatorSigner,
+    validator_verifier::ValidatorVerifier,
+    PeerId,
+};
 use mirai_annotations::debug_checked_verify_eq;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::{
@@ -214,7 +224,6 @@ impl Block {
 
         Self::new_proposal_from_block_data(block_data, validator_signer)
     }
-
 
     pub fn new_proposal(
         payload: Payload,

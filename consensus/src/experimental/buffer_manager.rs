@@ -472,7 +472,7 @@ impl BufferManager {
                     };
                     self.buffer.set(&current_cursor, new_item);
                     if self.buffer.get(&current_cursor).is_aggregated() {
-                        info!{"dag: commit is aggregated"};
+                        info! {"dag: commit is aggregated"};
                         return Some(target_block_id);
                     }
                 }

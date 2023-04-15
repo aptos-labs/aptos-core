@@ -56,6 +56,7 @@ use aptos_consensus_types::{
     epoch_retrieval::EpochRetrievalRequest,
 };
 use aptos_event_notifications::ReconfigNotificationListener;
+use aptos_executor::components::block_tree::epoch_genesis_block_id;
 use aptos_global_constants::CONSENSUS_KEY;
 use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::prelude::*;
@@ -91,7 +92,6 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use aptos_executor::components::block_tree::epoch_genesis_block_id;
 
 /// Range of rounds (window) that we might be calling proposer election
 /// functions with at any given time, in addition to the proposer history length.
@@ -735,10 +735,11 @@ impl EpochManager {
         self.dag_driver_tx = Some(dag_driver_msg_tx);
         self.rb_tx = Some(rb_msg_tx);
 
-
-
-
-        let ledger_info_with_sigs = self.storage.aptos_db().get_latest_ledger_info().expect("could not latest ledger info");
+        let ledger_info_with_sigs = self
+            .storage
+            .aptos_db()
+            .get_latest_ledger_info()
+            .expect("could not latest ledger info");
         let ledger_info = ledger_info_with_sigs.ledger_info();
         let genesis_block_id = epoch_genesis_block_id(&ledger_info);
 
@@ -1075,7 +1076,11 @@ impl EpochManager {
                     return Ok(Some(event));
                 } else {
                     if let UnverifiedEvent::CommitVote(vote) = event.clone() {
-                        info!("dag: CommitVote epoch check failed. vote epoch {}, local epoch {}", vote.epoch() ,self.epoch());
+                        info!(
+                            "dag: CommitVote epoch check failed. vote epoch {}, local epoch {}",
+                            vote.epoch(),
+                            self.epoch()
+                        );
                     }
                     monitor!(
                         "process_different_epoch_consensus_msg",
@@ -1177,7 +1182,10 @@ impl EpochManager {
             buffer_manager_event @ (VerifiedEvent::CommitVote(_)
             | VerifiedEvent::CommitDecision(_)) => {
                 if let Some(sender) = &mut self.buffer_manager_msg_tx {
-                    info!("dag: received Commit Message (CommitVote/CommitDecision): {:?}", buffer_manager_event);
+                    info!(
+                        "dag: received Commit Message (CommitVote/CommitDecision): {:?}",
+                        buffer_manager_event
+                    );
                     sender.push(peer_id, buffer_manager_event)?;
                 } else {
                     bail!("Commit Phase not started but received Commit Message (CommitVote/CommitDecision)");

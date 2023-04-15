@@ -468,8 +468,11 @@ impl NetworkTask {
         network_service_events: NetworkServiceEvents<ConsensusMsg>,
         self_receiver: aptos_channels::Receiver<Event<ConsensusMsg>>,
     ) -> (NetworkTask, NetworkReceivers) {
-        let (consensus_messages_tx, consensus_messages) =
-            aptos_channel::new(QueueStyle::LIFO, 1000, Some(&counters::CONSENSUS_CHANNEL_MSGS));
+        let (consensus_messages_tx, consensus_messages) = aptos_channel::new(
+            QueueStyle::LIFO,
+            1000,
+            Some(&counters::CONSENSUS_CHANNEL_MSGS),
+        );
         let (quorum_store_messages_tx, quorum_store_messages) = aptos_channel::new(
             QueueStyle::FIFO,
             // TODO: tune this value based on quorum store messages with backpressure

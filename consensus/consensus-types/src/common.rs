@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::proof_of_store::ProofOfStore;
+use crate::{common::DataStatus::Cached, proof_of_store::ProofOfStore};
 use aptos_crypto::HashValue;
 use aptos_executor_types::Error;
 use aptos_infallible::Mutex;
@@ -14,7 +14,6 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, fmt, fmt::Write, sync::Arc};
 use tokio::sync::oneshot;
-use crate::common::DataStatus::Cached;
 
 /// The round of a block is a consensus-internal counter, which starts with 0 and increases
 /// monotonically. It is used for the protocol safety and liveness (please see the detailed
@@ -31,7 +30,7 @@ pub struct TransactionSummary {
 
 impl fmt::Display for TransactionSummary {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}", self.sender, self.sequence_number, )
+        write!(f, "{}:{}", self.sender, self.sequence_number,)
     }
 }
 
@@ -97,7 +96,11 @@ impl ProofWithData {
 
     pub fn extend(&mut self, other: ProofWithData) {
         self.proofs.extend(other.proofs);
-        self.status.lock().as_mut().unwrap().extend(other.status.lock().as_mut().unwrap().take());
+        self.status
+            .lock()
+            .as_mut()
+            .unwrap()
+            .extend(other.status.lock().as_mut().unwrap().take());
     }
 }
 
@@ -176,7 +179,7 @@ impl Payload {
                     proof.verify(validator)?;
                 }
                 Ok(())
-            }
+            },
             (_, _) => Err(anyhow::anyhow!(
                 "Wrong payload type. Expected Payload::InQuorumStore {} got {} ",
                 quorum_store_enabled,
@@ -191,10 +194,10 @@ impl fmt::Display for Payload {
         match self {
             Payload::DirectMempool(txns) => {
                 write!(f, "InMemory txns: {}", txns.len())
-            }
+            },
             Payload::InQuorumStore(proof_with_status) => {
                 write!(f, "InMemory proofs: {}", proof_with_status.proofs.len())
-            }
+            },
         }
     }
 }
@@ -250,17 +253,17 @@ impl fmt::Display for PayloadFilter {
                     write!(txns_str, "{} ", tx)?;
                 }
                 write!(f, "{}", txns_str)
-            }
+            },
             PayloadFilter::InQuorumStore(excluded_proofs) => {
                 let mut proofs_str = "".to_string();
                 for proof in excluded_proofs.iter() {
                     write!(proofs_str, "{} ", proof)?;
                 }
                 write!(f, "{}", proofs_str)
-            }
+            },
             PayloadFilter::Empty => {
                 write!(f, "Empty filter")
-            }
+            },
         }
     }
 }

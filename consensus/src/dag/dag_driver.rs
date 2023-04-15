@@ -12,6 +12,7 @@ use crate::{
     payload_manager::PayloadManager,
     round_manager::VerifiedEvent,
     state_replication::{PayloadClient, StateComputer},
+    util::time_service::TimeService,
 };
 use aptos_channels::aptos_channel;
 use aptos_config::config::DagConfig;
@@ -19,6 +20,7 @@ use aptos_consensus_types::{
     common::{Author, Round},
     node::{CertifiedNode, CertifiedNodeAck, CertifiedNodeRequest, Node, NodeMetaData},
 };
+use aptos_crypto::HashValue;
 use aptos_logger::spawn_named;
 use aptos_types::{
     validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier, PeerId,
@@ -29,8 +31,6 @@ use tokio::{
     sync::{mpsc::Sender, Mutex},
     time,
 };
-use aptos_crypto::HashValue;
-use crate::util::time_service::TimeService;
 
 pub struct DagDriver {
     epoch: u64,
@@ -146,7 +146,14 @@ impl DagDriver {
 
         let timestamp = self.time_service.get_current_timestamp().as_micros() as u64;
 
-        Node::new(self.epoch, self.round, self.author, payload, parents, timestamp)
+        Node::new(
+            self.epoch,
+            self.round,
+            self.author,
+            payload,
+            parents,
+            timestamp,
+        )
     }
 
     async fn try_advance_round(&mut self) -> Option<Node> {

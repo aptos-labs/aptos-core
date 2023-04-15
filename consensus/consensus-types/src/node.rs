@@ -19,7 +19,7 @@ pub enum SignedNodeDigestError {
 }
 
 #[derive(
-Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash, PartialEq, Eq, Hash,
+    Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash, PartialEq, Eq, Hash,
 )]
 pub struct SignedNodeDigestInfo {
     digest: HashValue,
@@ -153,7 +153,9 @@ impl NodeMetaData {
         self.digest
     }
 
-    pub fn timestamp(&self) -> u64 { self.timestamp }
+    pub fn timestamp(&self) -> u64 {
+        self.timestamp
+    }
 }
 
 fn compute_node_digest(
@@ -307,7 +309,9 @@ impl Node {
         self.consensus_payload
     }
 
-    pub fn timestamp(&self) -> u64 { self.metadata.timestamp }
+    pub fn timestamp(&self) -> u64 {
+        self.metadata.timestamp
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

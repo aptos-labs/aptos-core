@@ -13,7 +13,14 @@ use aptos_consensus_types::{
 use aptos_crypto::HashValue;
 use aptos_logger::Level;
 use aptos_types::{ledger_info::LedgerInfo, validator_signer::ValidatorSigner};
-use std::{future::Future, sync::{Arc, atomic::{AtomicU32, Ordering}}, time::Duration};
+use std::{
+    future::Future,
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 use tokio::{runtime, time::timeout};
 
 #[cfg(any(test, feature = "fuzzing"))]

@@ -16,6 +16,7 @@ use aptos_consensus_types::{
     vote_data::VoteData,
 };
 use aptos_crypto::HashValue;
+use aptos_executor::components::block_tree::epoch_genesis_block_id;
 use aptos_executor_types::StateComputeResult;
 use aptos_types::{
     aggregate_signature::AggregateSignature,
@@ -27,9 +28,12 @@ use aptos_types::{
 };
 use claims::assert_some;
 use itertools::Itertools;
-use std::{collections::HashMap, hash::Hash, iter::Extend, sync::Arc};
-use std::collections::BTreeMap;
-use aptos_executor::components::block_tree::epoch_genesis_block_id;
+use std::{
+    collections::{BTreeMap, HashMap},
+    hash::Hash,
+    iter::Extend,
+    sync::Arc,
+};
 
 pub struct Bullshark {
     epoch: u64,
@@ -52,7 +56,6 @@ impl Bullshark {
         verifier: ValidatorVerifier,
         prev_execution_block_id: HashValue,
     ) -> Self {
-
         Self {
             epoch,
             prev_execution_block_id,
@@ -153,7 +156,7 @@ impl Bullshark {
             reachable_nodes.into_iter().for_each(|(_, node)| {
                 node.parents().iter().for_each(|metadata| {
                     if let Some(parent) =
-                    self.dag[metadata.round() as usize].remove(&metadata.source())
+                        self.dag[metadata.round() as usize].remove(&metadata.source())
                     {
                         new_reachable_nodes.insert(parent.digest(), parent);
                     }
@@ -210,20 +213,15 @@ impl Bullshark {
     }
 
     async fn push_to_execution(&mut self, ordered_history: Vec<Node>) {
-
         let mut payload = Payload::empty(false);
         // let mut payload = ordered_history[0].maybe_payload().unwrap().clone();
         let round = ordered_history[0].round();
         let timestamp = ordered_history[0].timestamp();
         let author = ordered_history[0].source();
 
-            ordered_history
-                .into_iter()
-                .rev()
-                .for_each(|node| {
-                    payload.extend(node.take_payload());
-                });
-
+        ordered_history.into_iter().rev().for_each(|node| {
+            payload.extend(node.take_payload());
+        });
 
         let mut parent = BlockInfo::empty();
         parent.set_id(self.prev_execution_block_id);
@@ -244,7 +242,7 @@ impl Bullshark {
                 &ValidatorSigner::from_int(0),
                 Vec::new(),
             )
-                .unwrap(),
+            .unwrap(),
             StateComputeResult::new_dummy(),
         );
         let block_id = block.id();

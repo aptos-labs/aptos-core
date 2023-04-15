@@ -9,6 +9,7 @@ use crate::{
     test_utils::{
         consensus_runtime, timed_block_on, MockPayloadManager, MockStateComputer, MockStorage,
     },
+    util::time_service::ClockTimeService,
 };
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
@@ -19,6 +20,7 @@ use aptos_consensus_types::{
     common::Round, experimental::commit_decision::CommitDecision, proposal_msg::ProposalMsg,
     vote_msg::VoteMsg,
 };
+use aptos_crypto::HashValue;
 use aptos_logger::{prelude::info, spawn_named};
 use aptos_network::{
     application::interface::NetworkClient,
@@ -39,8 +41,6 @@ use futures::{channel::mpsc, stream::select, FutureExt, Stream, StreamExt};
 use maplit::hashmap;
 use std::{iter::FromIterator, sync::Arc};
 use tokio::runtime::Runtime;
-use aptos_crypto::HashValue;
-use crate::util::time_service::ClockTimeService;
 
 /// Auxiliary struct that is setting up node environment for the test.
 pub struct NodeSetup {
@@ -269,9 +269,10 @@ async fn basic_dag_driver_test() {
                 ref_block = Some(block);
             } else {
                 assert_eq!(
-                    ref_block.as_ref().unwrap().ordered_blocks[0].payload().unwrap(),
+                    ref_block.as_ref().unwrap().ordered_blocks[0]
+                        .payload()
+                        .unwrap(),
                     block.ordered_blocks[0].payload().unwrap()
-
                 );
             }
         }
