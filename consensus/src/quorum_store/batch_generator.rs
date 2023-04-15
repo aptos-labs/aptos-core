@@ -146,15 +146,19 @@ impl BatchGenerator {
         num_txns_in_bucket: usize,
         expiry_time: u64,
         bucket_start: u64,
-    ) {
+    ) -> bool {
         let mut remaining_txns = num_txns_in_bucket;
         while remaining_txns > 0 {
-            let num_batch_txns = std::cmp::min(self.config.max_batch_txns, remaining_txns);
+            if batches.len() == self.config.sender_max_num_batches {
+                return false;
+            }
+            let num_batch_txns = std::cmp::min(self.config.sender_max_batch_txns, remaining_txns);
             let batch_txns: Vec<_> = txns.drain(0..num_batch_txns).collect();
             let batch = self.create_new_batch(batch_txns, expiry_time, bucket_start);
             batches.push(batch);
             remaining_txns -= num_batch_txns;
         }
+        true
     }
 
     fn bucket_into_batches(
@@ -182,13 +186,16 @@ impl BatchGenerator {
                 continue;
             }
 
-            self.push_bucket_to_batches(
+            let batches_space_remaining = self.push_bucket_to_batches(
                 &mut batches,
                 pulled_txns,
                 num_txns_in_bucket,
                 expiry_time,
                 bucket_start,
             );
+            if !batches_space_remaining {
+                return batches;
+            }
         }
         if !pulled_txns.is_empty() {
             let bucket_start = *self.config.batch_buckets.last().unwrap();

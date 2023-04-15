@@ -72,7 +72,7 @@ async fn test_batch_creation() {
     let max_size = 9 * txn_size + 1;
 
     let config = QuorumStoreConfig {
-        max_batch_bytes: max_size,
+        sender_max_batch_bytes: max_size,
         ..Default::default()
     };
 
@@ -178,7 +178,7 @@ async fn test_bucketed_batch_creation() {
     let max_size = 9 * txn_size + 1;
 
     let config = QuorumStoreConfig {
-        max_batch_bytes: max_size,
+        sender_max_batch_bytes: max_size,
         ..Default::default()
     };
     let buckets = config.batch_buckets.clone();
@@ -307,10 +307,10 @@ async fn test_max_batch_txns() {
     let (batch_coordinator_cmd_tx, mut batch_coordinator_cmd_rx) = TokioChannel(100);
 
     let config = QuorumStoreConfig {
-        max_batch_txns: 10,
+        sender_max_batch_txns: 10,
         ..Default::default()
     };
-    let max_batch_bytes = config.max_batch_bytes;
+    let max_batch_bytes = config.sender_max_batch_bytes;
 
     let mut batch_generator = BatchGenerator::new(
         0,
@@ -363,10 +363,10 @@ async fn test_last_bucketed_batch() {
     let (batch_coordinator_cmd_tx, mut batch_coordinator_cmd_rx) = TokioChannel(100);
 
     let config = QuorumStoreConfig {
-        max_batch_txns: 10,
+        sender_max_batch_txns: 10,
         ..Default::default()
     };
-    let max_batch_bytes = config.max_batch_bytes;
+    let max_batch_bytes = config.sender_max_batch_bytes;
     let buckets = config.batch_buckets.clone();
 
     let mut batch_generator = BatchGenerator::new(
@@ -400,6 +400,129 @@ async fn test_last_bucketed_batch() {
 
             assert_eq!(&result[0].clone().into_transactions(), &signed_txns[0..1]);
             assert_eq!(&result[1].clone().into_transactions(), &signed_txns[1..]);
+        } else {
+            panic!("Unexpected variant")
+        }
+    });
+
+    let result = batch_generator.handle_scheduled_pull(300).await;
+    batch_coordinator_cmd_tx
+        .send(BatchCoordinatorCommand::NewBatches(result))
+        .await
+        .unwrap();
+
+    timeout(Duration::from_millis(10_000), join_handle)
+        .await
+        .unwrap()
+        .unwrap();
+}
+
+#[tokio::test]
+async fn test_sender_max_num_batches_single_bucket() {
+    let (quorum_store_to_mempool_tx, mut quorum_store_to_mempool_rx) = channel(1_024);
+    let (batch_coordinator_cmd_tx, mut batch_coordinator_cmd_rx) = TokioChannel(100);
+
+    let config = QuorumStoreConfig {
+        sender_max_batch_txns: 10,
+        sender_max_num_batches: 3,
+        ..Default::default()
+    };
+    let max_batch_txns = config.sender_max_batch_txns;
+    let max_batch_bytes = config.sender_max_batch_bytes;
+    let max_num_batches = config.sender_max_num_batches;
+
+    let mut batch_generator = BatchGenerator::new(
+        0,
+        AccountAddress::random(),
+        config,
+        Arc::new(MockQuorumStoreDB::new()),
+        quorum_store_to_mempool_tx,
+        1000,
+    );
+
+    let join_handle = tokio::spawn(async move {
+        let signed_txns =
+            create_vec_signed_transactions((max_batch_txns * max_num_batches + 1) as u64);
+        queue_mempool_batch_response(
+            signed_txns.clone(),
+            max_batch_bytes,
+            &mut quorum_store_to_mempool_rx,
+        )
+        .await;
+
+        let quorum_store_command = batch_coordinator_cmd_rx.recv().await.unwrap();
+        if let BatchCoordinatorCommand::NewBatches(result) = quorum_store_command {
+            assert_eq!(result.len(), max_num_batches);
+            for batch in &result {
+                assert_eq!(batch.num_txns(), max_batch_txns as u64);
+            }
+        } else {
+            panic!("Unexpected variant")
+        }
+    });
+
+    let result = batch_generator.handle_scheduled_pull(300).await;
+    batch_coordinator_cmd_tx
+        .send(BatchCoordinatorCommand::NewBatches(result))
+        .await
+        .unwrap();
+
+    timeout(Duration::from_millis(10_000), join_handle)
+        .await
+        .unwrap()
+        .unwrap();
+}
+
+#[tokio::test]
+async fn test_sender_max_num_batches_multi_buckets() {
+    let (quorum_store_to_mempool_tx, mut quorum_store_to_mempool_rx) = channel(1_024);
+    let (batch_coordinator_cmd_tx, mut batch_coordinator_cmd_rx) = TokioChannel(100);
+
+    let config = QuorumStoreConfig {
+        sender_max_batch_txns: 10,
+        sender_max_num_batches: 3,
+        ..Default::default()
+    };
+    let max_batch_txns = config.sender_max_batch_txns;
+    let max_batch_bytes = config.sender_max_batch_bytes;
+    let max_num_batches = config.sender_max_num_batches;
+    let buckets = config.batch_buckets.clone();
+
+    let mut batch_generator = BatchGenerator::new(
+        0,
+        AccountAddress::random(),
+        config,
+        Arc::new(MockQuorumStoreDB::new()),
+        quorum_store_to_mempool_tx,
+        1000,
+    );
+
+    let join_handle = tokio::spawn(async move {
+        let mut signed_txns = vec![];
+        for min_gas_price in buckets.iter().take(max_num_batches) {
+            let mut new_txns = create_vec_signed_transactions_with_gas(
+                max_batch_txns as u64 + 1,
+                *min_gas_price + 1,
+            );
+            signed_txns.append(&mut new_txns);
+        }
+        queue_mempool_batch_response(
+            signed_txns.clone(),
+            max_batch_bytes,
+            &mut quorum_store_to_mempool_rx,
+        )
+        .await;
+
+        let quorum_store_command = batch_coordinator_cmd_rx.recv().await.unwrap();
+        if let BatchCoordinatorCommand::NewBatches(result) = quorum_store_command {
+            assert_eq!(result.len(), max_num_batches);
+            for (i, batch) in result.iter().enumerate() {
+                if i % 2 == 0 {
+                    assert_eq!(batch.num_txns(), max_batch_txns as u64);
+                } else {
+                    assert_eq!(batch.num_txns(), 1);
+                }
+            }
         } else {
             panic!("Unexpected variant")
         }
