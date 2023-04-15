@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    create_emitter_and_request, three_region_simulation_test::ThreeRegionSameCloudSimulationTest,
-    traffic_emitter_runtime, LoadDestination, NetworkLoadTest,
+    create_emitter_and_request,
+    traffic_emitter_runtime, LoadDestination, NetworkLoadTest, three_region_simulation_test::ThreeRegionSimulationTest,
 };
 use anyhow::{bail, Ok};
 use aptos_forge::{
@@ -103,7 +103,7 @@ impl NetworkTest for TwoTrafficsTest {
 
 pub struct ThreeRegionSimulationTwoTrafficsTest {
     pub traffic_test: TwoTrafficsTest,
-    pub three_region_simulation_test: ThreeRegionSameCloudSimulationTest,
+    pub three_region_simulation_test: ThreeRegionSimulationTest,
 }
 
 impl Test for ThreeRegionSimulationTwoTrafficsTest {

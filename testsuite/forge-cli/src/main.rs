@@ -32,7 +32,7 @@ use aptos_testcases::{
         StateSyncFullnodeFastSyncPerformance, StateSyncFullnodePerformance,
         StateSyncValidatorPerformance,
     },
-    three_region_simulation_test::{ExecutionDelayConfig, ThreeRegionSameCloudSimulationTest},
+    three_region_simulation_test::{ExecutionDelayConfig, ThreeRegionSimulationTest},
     twin_validator_test::TwinValidatorTest,
     two_traffics_test::{ThreeRegionSimulationTwoTrafficsTest, TwoTrafficsTest},
     validator_join_leave_test::ValidatorJoinLeaveTest,
@@ -512,7 +512,7 @@ fn run_consensus_only_three_region_simulation(config: ForgeConfig) -> ForgeConfi
                 .mode(EmitJobMode::ConstTps { tps: 30000 })
                 .txn_expiration_time_secs(5 * 60),
         )
-        .with_network_tests(vec![&ThreeRegionSameCloudSimulationTest {
+        .with_network_tests(vec![&ThreeRegionSimulationTest {
             add_execution_delay: None,
         }])
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
@@ -861,7 +861,7 @@ fn three_region_sim_graceful_overload(config: ForgeConfig) -> ForgeConfig {
                 avg_tps: 3400,
                 latency_thresholds: &[],
             },
-            three_region_simulation_test: ThreeRegionSameCloudSimulationTest {
+            three_region_simulation_test: ThreeRegionSimulationTest {
                 add_execution_delay: None,
             },
         }])
@@ -1017,7 +1017,7 @@ fn three_region_simulation_with_different_node_speed(config: ForgeConfig) -> For
         .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
         .with_initial_fullnode_count(30)
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
-        .with_network_tests(vec![&ThreeRegionSameCloudSimulationTest {
+        .with_network_tests(vec![&ThreeRegionSimulationTest {
             add_execution_delay: Some(ExecutionDelayConfig {
                 inject_delay_node_fraction: 0.5,
                 inject_delay_max_transaction_percentage: 40,
@@ -1051,7 +1051,7 @@ fn three_region_simulation(config: ForgeConfig) -> ForgeConfig {
         .with_initial_validator_count(NonZeroUsize::new(12).unwrap())
         .with_initial_fullnode_count(12)
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
-        .with_network_tests(vec![&ThreeRegionSameCloudSimulationTest {
+        .with_network_tests(vec![&ThreeRegionSimulationTest {
             add_execution_delay: None,
         }])
         // TODO(rustielin): tune these success criteria after we have a better idea of the test behavior
@@ -1265,7 +1265,7 @@ fn chaos_test_suite(duration: Duration) -> ForgeConfig<'static> {
         .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
         .with_network_tests(vec![
             &NetworkBandwidthTest,
-            &ThreeRegionSameCloudSimulationTest {
+            &ThreeRegionSimulationTest {
                 add_execution_delay: None,
             },
             &NetworkLossTest,
