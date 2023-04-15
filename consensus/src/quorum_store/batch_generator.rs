@@ -157,30 +157,6 @@ impl BatchGenerator {
         }
     }
 
-    fn build_account_min_gas(
-        exclude_txns: &[TransactionInProgress],
-        pulled_txns: &[SignedTransaction],
-    ) -> HashMap<PeerId, u64> {
-        let mut account_min_gas = HashMap::new();
-        for txn in exclude_txns {
-            let current_min = account_min_gas
-                .entry(txn.summary.sender)
-                .or_insert(txn.gas_unit_price);
-            if txn.gas_unit_price < *current_min {
-                *current_min = txn.gas_unit_price
-            }
-        }
-        for txn in pulled_txns {
-            let current_min = account_min_gas
-                .entry(txn.sender())
-                .or_insert_with(|| txn.gas_unit_price());
-            if txn.gas_unit_price() < *current_min {
-                *current_min = txn.gas_unit_price()
-            }
-        }
-        account_min_gas
-    }
-
     pub(crate) async fn handle_scheduled_pull(&mut self, max_count: u64) -> Vec<Batch> {
         let exclude_txns: Vec<_> = self
             .batches_in_progress
@@ -220,21 +196,11 @@ impl BatchGenerator {
         // Compute bucketed batches
         let bucket_compute_start = Instant::now();
 
-        let exclude_txns_with_gas: Vec<_> = self
-            .batches_in_progress
-            .values()
-            .flatten()
-            .cloned()
-            .collect();
-        let account_min_gas = Self::build_account_min_gas(&exclude_txns_with_gas, &pulled_txns);
         let expiry_time = aptos_infallible::duration_since_epoch().as_micros() as u64
             + self.config.batch_expiry_gap_when_init_usecs;
 
-        pulled_txns.sort_by_cached_key(|txn| {
-            *account_min_gas
-                .get(&txn.sender())
-                .expect("Account min gas must exist")
-        });
+        pulled_txns.sort_by_key(|txn| txn.gas_unit_price());
+
         let mut batches = vec![];
         let buckets = self.config.batch_buckets.clone();
         for (&bucket_start, &bucket_end) in buckets.iter().tuple_windows() {
@@ -244,12 +210,7 @@ impl BatchGenerator {
 
             let split_index = pulled_txns
                 .iter()
-                .find_position(|txn| {
-                    *account_min_gas
-                        .get(&txn.sender())
-                        .expect("Account min gas must exist")
-                        >= bucket_end
-                })
+                .find_position(|txn| txn.gas_unit_price() >= bucket_end)
                 .map(|(index, _)| index)
                 .unwrap_or(pulled_txns.len());
             if split_index == 0 {

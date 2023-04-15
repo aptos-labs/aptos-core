@@ -6,8 +6,8 @@ use crate::quorum_store::{
     batch_generator::BatchGenerator,
     quorum_store_db::MockQuorumStoreDB,
     tests::utils::{
-        create_signed_transaction, create_signed_transaction_for_account, create_test_account,
-        create_vec_signed_transactions, create_vec_signed_transactions_with_gas,
+        create_signed_transaction, create_vec_signed_transactions,
+        create_vec_signed_transactions_with_gas,
     },
 };
 use aptos_config::config::QuorumStoreConfig;
@@ -340,69 +340,6 @@ async fn test_max_batch_txns() {
             assert_eq!(&result[0].clone().into_transactions(), &signed_txns[0..10]);
             assert_eq!(&result[1].clone().into_transactions(), &signed_txns[10..20]);
             assert_eq!(&result[2].clone().into_transactions(), &signed_txns[20..]);
-        } else {
-            panic!("Unexpected variant")
-        }
-    });
-
-    let result = batch_generator.handle_scheduled_pull(300).await;
-    batch_coordinator_cmd_tx
-        .send(BatchCoordinatorCommand::NewBatches(result))
-        .await
-        .unwrap();
-
-    timeout(Duration::from_millis(10_000), join_handle)
-        .await
-        .unwrap()
-        .unwrap();
-}
-
-#[tokio::test]
-async fn test_bucketed_batches_use_account_min_gas() {
-    let (quorum_store_to_mempool_tx, mut quorum_store_to_mempool_rx) = channel(1_024);
-    let (batch_coordinator_cmd_tx, mut batch_coordinator_cmd_rx) = TokioChannel(100);
-
-    let config = QuorumStoreConfig {
-        max_batch_txns: 10,
-        ..Default::default()
-    };
-    let max_batch_bytes = config.max_batch_bytes;
-
-    let mut batch_generator = BatchGenerator::new(
-        0,
-        AccountAddress::random(),
-        config,
-        Arc::new(MockQuorumStoreDB::new()),
-        quorum_store_to_mempool_tx,
-        1000,
-    );
-
-    let join_handle = tokio::spawn(async move {
-        // With the same account, the txns will be in the same (smaller) bucket
-        let (sender, private_key) = create_test_account();
-        let low_gas_txn = create_signed_transaction_for_account(&sender, &private_key, 0, 1);
-        let high_gas_txn = create_signed_transaction_for_account(&sender, &private_key, 0, 10_000);
-        // For a different account, the txn will be in the larger bucket
-        let high_gas_txn_other_account = create_signed_transaction(10_000);
-        let signed_txns = vec![low_gas_txn, high_gas_txn, high_gas_txn_other_account];
-
-        queue_mempool_batch_response(
-            signed_txns.clone(),
-            max_batch_bytes,
-            &mut quorum_store_to_mempool_rx,
-        )
-        .await;
-
-        let quorum_store_command = batch_coordinator_cmd_rx.recv().await.unwrap();
-        if let BatchCoordinatorCommand::NewBatches(result) = quorum_store_command {
-            assert_eq!(result.len(), 2);
-            assert_eq!(result[0].num_txns(), 2);
-            assert_eq!(result[1].num_txns(), 1);
-            assert_eq!(result[0].gas_bucket_start(), 0);
-            assert!(result[1].gas_bucket_start() > 0);
-
-            assert_eq!(&result[0].clone().into_transactions(), &signed_txns[0..2]);
-            assert_eq!(&result[1].clone().into_transactions(), &signed_txns[2..]);
         } else {
             panic!("Unexpected variant")
         }

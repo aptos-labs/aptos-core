@@ -882,9 +882,6 @@ fn test_include_gas_upgraded() {
         low_gas_txn.clone(),
     ]);
     assert_eq!(batch.len(), 0);
-    let batch = pool.get_batch(10, 10240, true, true, vec![
-        high_gas_txn.clone(),
-        low_gas_txn.clone(),
-    ]);
+    let batch = pool.get_batch(10, 10240, true, true, vec![high_gas_txn, low_gas_txn]);
     assert_eq!(batch.len(), 0);
 }
