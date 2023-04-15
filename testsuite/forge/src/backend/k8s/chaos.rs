@@ -142,32 +142,6 @@ impl K8sSwarm {
         let mut network_chaos_specs = vec![];
 
         for group_network_bandwidth in &swarm_network_bandwidth.group_network_bandwidths {
-            // let source_instance_labels = group_network_bandwidth
-            //     .source_nodes
-            //     .iter()
-            //     .map(|node| {
-            //         if let Some(v) = self.validator(*node) {
-            //             v.name()
-            //         } else {
-            //             "invalid-node"
-            //         }
-            //     })
-            //     .collect::<Vec<_>>()
-            //     .join(",");
-
-            // let target_instance_labels = group_network_bandwidth
-            //     .target_nodes
-            //     .iter()
-            //     .map(|node| {
-            //         if let Some(v) = self.validator(*node) {
-            //             v.name()
-            //         } else {
-            //             "invalid-node"
-            //         }
-            //     })
-            //     .collect::<Vec<_>>()
-            //     .join(",");
-
             network_chaos_specs.push(format!(
                 include_str!(BANDWIDTH_NETWORK_CHAOS_TEMPLATE!()),
                 namespace = self.kube_namespace,
