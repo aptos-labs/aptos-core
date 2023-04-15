@@ -19,6 +19,7 @@ describe("token objects", () => {
   beforeAll(async () => {
     // Fund Alice's Account
     await faucetClient.fundAccount(alice.address(), 100000000);
+    console.log(alice);
   }, longTestTimeout);
 
   test(
@@ -52,6 +53,7 @@ describe("token objects", () => {
         { checkSuccess: true },
       );
       tokenAddress = (txn as UserTransaction).events[0].data.token;
+      console.log(tokenAddress);
     },
     longTestTimeout,
   );
@@ -133,7 +135,35 @@ describe("token objects", () => {
     "add token property",
     async () => {
       await provider.waitForTransaction(
-        await aptosToken.addTokenProperty(alice, tokenAddress, "newKey", "bool", "true"),
+        await aptosToken.addTokenProperty(alice, tokenAddress, "newKey", "BOOLEAN", "true"),
+        { checkSuccess: true },
+      );
+    },
+    longTestTimeout,
+  );
+
+  test(
+    "add typed property",
+    async () => {
+      await provider.waitForTransaction(
+        await aptosToken.addTypedProperty(alice, tokenAddress, "newTypedKey", "U8", "5"),
+        { checkSuccess: true },
+      );
+    },
+    longTestTimeout,
+  );
+
+  test(
+    "update typed property",
+    async () => {
+      await provider.waitForTransaction(
+        await aptosToken.updateTypedProperty(
+          alice,
+          tokenAddress,
+          "newTypedKey",
+          "VECTORU8",
+          new TextEncoder().encode(["hello", "World"].join("")),
+        ),
         { checkSuccess: true },
       );
     },
@@ -144,7 +174,7 @@ describe("token objects", () => {
     "update token property",
     async () => {
       await provider.waitForTransaction(
-        await aptosToken.updateTokenProperty(alice, tokenAddress, "newKey", "u64", "0"),
+        await aptosToken.updateTokenProperty(alice, tokenAddress, "newKey", "U8", "5"),
         { checkSuccess: true },
       );
     },

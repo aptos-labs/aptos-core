@@ -236,6 +236,14 @@ function isValidAlphabetic(c: string): boolean {
   return false;
 }
 
+// Generic format is T<digits> - for example T1, T2, T10
+function isGeneric(c: string): boolean {
+  if (c.match(/T\d+/g)) {
+    return true;
+  }
+  return false;
+}
+
 type TokenType = string;
 type TokenValue = string;
 type Token = [TokenType, TokenValue];
@@ -275,6 +283,9 @@ function nextToken(tagStr: string, pos: number): [Token, number] {
         break;
       }
     }
+    if (isGeneric(res)) {
+      return [["GENERIC", res], res.length];
+    }
     return [["IDENT", res], res.length];
   }
   throw new Error("Unrecognized token.");
@@ -299,8 +310,11 @@ function tokenize(tagStr: string): Token[] {
 export class TypeTagParser {
   private readonly tokens: Token[];
 
-  constructor(tagStr: string) {
+  private readonly typeTags: string[] = [];
+
+  constructor(tagStr: string, typeTags?: string[]) {
     this.tokens = tokenize(tagStr);
+    this.typeTags = typeTags || [];
   }
 
   private consume(targetToken: string) {
@@ -410,6 +424,13 @@ export class TypeTagParser {
         tyTags,
       );
       return new TypeTagStruct(structTag);
+    }
+    if (tokenTy == "GENERIC") {
+      if (this.typeTags.length == 0) {
+        bail("Can't convert generic type to a tag type since typeTags array is empty.");
+      }
+      const idx = parseInt(tokenVal.substring(1));
+      return new TypeTagParser(this.typeTags[idx]).parseTypeTag();
     }
 
     throw new Error("Invalid type tag.");
