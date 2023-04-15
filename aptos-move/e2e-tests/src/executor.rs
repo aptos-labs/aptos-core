@@ -33,7 +33,7 @@ use aptos_types::{
     on_chain_config::{
         Features, OnChainConfig, TimedFeatureOverride, TimedFeatures, ValidatorSet, Version,
     },
-    state_store::state_key::StateKey,
+    state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
         ExecutionStatus, SignedTransaction, Transaction, TransactionOutput, TransactionStatus,
         VMValidatorResult,
@@ -476,7 +476,8 @@ impl FakeExecutor {
 
     /// Set the blob for the associated AccessPath
     pub fn write_state_value(&mut self, state_key: StateKey, data_blob: Vec<u8>) {
-        self.data_store.set(state_key, data_blob);
+        self.data_store
+            .set(state_key, StateValue::new_legacy(data_blob));
     }
 
     /// Verifies the given transaction by running it through the VM verifier.
