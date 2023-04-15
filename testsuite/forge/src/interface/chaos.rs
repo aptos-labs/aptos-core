@@ -46,24 +46,19 @@ impl Display for SwarmNetworkPartition {
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
 pub struct SwarmNetworkBandwidth {
-    pub group_network_bandwidths: Vec<GroupNetworkBandwidth>,
+    pub rate: u64,
+    pub limit: u64,
+    pub buffer: u64,
 }
 
 impl Display for SwarmNetworkBandwidth {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "Bandwidth nodes {:?}", self.group_network_bandwidths)
+        write!(
+            f,
+            "Limit bandwidth on all nodes: rate {}, limit {}, buffer {}",
+            self.rate, self.limit, self.buffer
+        )
     }
-}
-
-#[derive(Eq, Hash, PartialEq, Debug, Clone)]
-pub struct GroupNetworkBandwidth {
-    pub name: String,
-    pub source_nodes: Vec<PeerId>,
-    pub target_nodes: Vec<PeerId>,
-    /// Rate in megabytes per second
-    pub rate: u64,
-    pub limit: u64,
-    pub buffer: u64,
 }
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
