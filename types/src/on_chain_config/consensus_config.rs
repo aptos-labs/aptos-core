@@ -70,7 +70,7 @@ impl OnChainConsensusConfig {
 
     pub fn quorum_store_enabled(&self) -> bool {
         match &self {
-            OnChainConsensusConfig::V1(_config) => true,
+            OnChainConsensusConfig::V1(_config) => false,
             OnChainConsensusConfig::V2(_config) => true,
         }
     }
