@@ -10,7 +10,10 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 The Aptos Non-Fungible Token (NFT) Minting Tool allows NFT creators to upload assets, create NFT collections and run mint sites. This document explains how to launch an NFT project with the CLI and get the mint site up and running. The tool can be found in this [GitHub repo](https://github.com/aptos-labs/token).
 
-> This tool is tested on Mac, yet it should work on Linux and Windows Subsystem for Linux (WSL) too.
+You may also Mint NFT with the:
+
+* [Aptos CLI](../guides/move-guides/mint-nft-cli.md)
+* [Aptos SDKs](../../tutorials/your-first-nft.md)
 
 ## Setup
 

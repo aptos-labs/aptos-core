@@ -12,9 +12,10 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 This tutorial describes how to create and transfer NFTs on the Aptos blockchain. The Aptos implementation for core NFTs can be found in the [token.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move) Move module.
 
-For reference, also see:
-* [mint_nft](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/mint_nft) Move example on how to airdrop an NFT 
-* [mint_nft.rs](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/e2e-move-tests/src/tests/mint_nft.rs) Rust end-to-end test
+You may also Mint NFT with the:
+
+* [Aptos CLI](../guides/move-guides/mint-nft-cli.md)
+* [Aptos Minting Tool](../concepts/coin-and-token/nft-minting-tool.md)
 
 ## Step 1: Pick an SDK
 
@@ -22,7 +23,6 @@ Install your preferred SDK from the below list:
 
 * [TypeScript SDK](../sdks/ts-sdk/index.md)
 * [Python SDK](../sdks/python-sdk.md)
-* [Rust SDK](../sdks/rust-sdk.md)
 
 ---
 
@@ -70,10 +70,6 @@ git clone git@github.com:aptos-labs/aptos-core.git ~/aptos-core
   ```bash
   poetry run python -m examples.simple-nft
   ```
-  </TabItem>
-  <TabItem value="rust" label="Rust">
-
-Coming soon.
   </TabItem>
 </Tabs>
 
@@ -167,10 +163,6 @@ See [`simple_nft`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/
 See [`simple-nft`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/simple-nft.py) for the complete code as you follow the below steps.
 :::
   </TabItem>
-  <TabItem value="rust" label="Rust">
-
-Coming soon.
-  </TabItem>
 </Tabs>
 
 ---
@@ -211,23 +203,6 @@ Using the API client we can create a `TokenClient` that we use for common token 
 :!: static/sdks/python/examples/common.py section_1
 ```
   </TabItem>
-  <TabItem value="rust" label="Rust">
-
-
-```rust
-:!: static/sdks/rust/examples/transfer-coin.rs section_1a
-```
-
-Using the API client we can create a `CoinClient` that we use for common coin operations such as transferring coins and checking balances.
-```rust
-:!: static/sdks/rust/examples/transfer-coin.rs section_1b
-```
-
-In the example we initialize the URL values as such:
-```rust
-:!: static/sdks/rust/examples/transfer-coin.rs section_1c
-```
-  </TabItem>
 </Tabs>
 
 
@@ -257,13 +232,6 @@ The next step is to create two accounts locally. [Accounts](../concepts/accounts
 :!: static/sdks/python/examples/simple-nft.py section_2
 ```
   </TabItem>
-  <TabItem value="rust" label="Rust">
-
-
-```rust
-:!: static/sdks/rust/examples/transfer-coin.rs section_2
-```
-  </TabItem>
 </Tabs>
 
 ---
@@ -283,14 +251,6 @@ In Aptos, each account must have an on-chain representation in order to receive 
 
 ```python
 :!: static/sdks/python/examples/simple-nft.py section_3
-```
-  </TabItem>
-  <TabItem value="rust" label="Rust">
-  
-  Since the Rust example here uses the same `transfer-coin.rs` function as in the [Your First Transaction](first-transaction.md) tutorial, it creates but does not fund Bob's account.
-
-```rust
-:!: static/sdks/rust/examples/transfer-coin.rs section_3
 ```
   </TabItem>
 </Tabs>
@@ -326,10 +286,6 @@ The is the function signature of `create_collection`. It returns a transaction h
 :!: static/sdks/python/aptos_sdk/client.py create_collection
 ```
   </TabItem>
-  <TabItem value="rust" label="Rust">
-
-Coming soon.
-  </TabItem>
 </Tabs>
 
 ---
@@ -362,10 +318,6 @@ The is the function signature of `create_token`. It returns a transaction hash:
 ```python
 :!: static/sdks/python/aptos_sdk/client.py create_token
 ```
-  </TabItem>
-  <TabItem value="rust" label="Rust">
-
-Coming soon.
   </TabItem>
 </Tabs>
 
@@ -412,10 +364,6 @@ Here's how `get_token_data` queries the token metadata:
 ```
 
   </TabItem>
-  <TabItem value="rust" label="Rust">
-
-Coming soon.
-  </TabItem>
 </Tabs>
 
 ---
@@ -436,10 +384,6 @@ Each token within Aptos is a distinct asset. The assets owned by the user are st
 ```python
 :!: static/sdks/python/examples/simple-nft.py section_7
 ```
-  </TabItem>
-  <TabItem value="rust" label="Rust">
-
-Coming soon.
   </TabItem>
 </Tabs>
 
@@ -464,10 +408,6 @@ To offer a token:
 :!: static/sdks/python/examples/simple-nft.py section_9
 ```
   </TabItem>
-  <TabItem value="rust" label="Rust">
-
-Coming soon!
-  </TabItem>
 </Tabs>
 
 To claim a token:
@@ -484,10 +424,6 @@ To claim a token:
 ```python
 :!: static/sdks/python/examples/simple-nft.py section_10
 ```
-  </TabItem>
-  <TabItem value="rust" label="Rust">
-
-Coming soon.
   </TabItem>
 </Tabs>
 
@@ -510,10 +446,6 @@ To support safe unilateral transfers of a token, the sender may first ask the re
 :!: static/sdks/python/examples/simple-nft.py section_11
 ```
   </TabItem>
-  <TabItem value="rust" label="Rust">
-
-Coming soon.
-  </TabItem>
 </Tabs>
 
 ---
@@ -523,5 +455,4 @@ Coming soon.
 * [Account basics](../concepts/accounts.md)
 * [TypeScript SDK](../sdks/ts-sdk/index.md)
 * [Python SDK](../sdks/python-sdk.md)
-* [Rust SDK](../sdks/rust-sdk.md)
 * [REST API specification](https://aptos.dev/nodes/aptos-api-spec#/)
