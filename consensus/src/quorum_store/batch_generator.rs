@@ -139,15 +139,15 @@ impl BatchGenerator {
 
     /// Push num_txns from txns into batches. If num_txns is larger than max size, then multiple
     /// batches are pushed.
-    fn push_to_batches(
+    fn push_bucket_to_batches(
         &mut self,
         batches: &mut Vec<Batch>,
         txns: &mut Vec<SignedTransaction>,
-        num_txns: usize,
+        num_txns_in_bucket: usize,
         expiry_time: u64,
         bucket_start: u64,
     ) {
-        let mut remaining_txns = num_txns;
+        let mut remaining_txns = num_txns_in_bucket;
         while remaining_txns > 0 {
             let num_batch_txns = std::cmp::min(self.config.max_batch_txns, remaining_txns);
             let batch_txns: Vec<_> = txns.drain(0..num_batch_txns).collect();
@@ -155,6 +155,53 @@ impl BatchGenerator {
             batches.push(batch);
             remaining_txns -= num_batch_txns;
         }
+    }
+
+    fn bucket_into_batches(
+        &mut self,
+        pulled_txns: &mut Vec<SignedTransaction>,
+        expiry_time: u64,
+    ) -> Vec<Batch> {
+        pulled_txns.sort_by_key(|txn| txn.gas_unit_price());
+
+        let mut batches = vec![];
+        let buckets = self.config.batch_buckets.clone();
+        for (&bucket_start, &bucket_end) in buckets.iter().tuple_windows() {
+            if pulled_txns.is_empty() {
+                break;
+            }
+
+            let num_txns_in_bucket = match pulled_txns
+                .binary_search_by_key(&(bucket_end, PeerId::ZERO), |txn| {
+                    (txn.gas_unit_price(), txn.sender())
+                }) {
+                Ok(index) => index,
+                Err(index) => index,
+            };
+            if num_txns_in_bucket == 0 {
+                continue;
+            }
+
+            self.push_bucket_to_batches(
+                &mut batches,
+                pulled_txns,
+                num_txns_in_bucket,
+                expiry_time,
+                bucket_start,
+            );
+        }
+        if !pulled_txns.is_empty() {
+            let bucket_start = *self.config.batch_buckets.last().unwrap();
+
+            self.push_bucket_to_batches(
+                &mut batches,
+                pulled_txns,
+                pulled_txns.len(),
+                expiry_time,
+                bucket_start,
+            );
+        }
+        batches
     }
 
     pub(crate) async fn handle_scheduled_pull(&mut self, max_count: u64) -> Vec<Batch> {
@@ -193,52 +240,10 @@ impl BatchGenerator {
         }
         counters::BATCH_CREATION_DURATION.observe_duration(self.last_end_batch_time.elapsed());
 
-        // Compute bucketed batches
         let bucket_compute_start = Instant::now();
-
         let expiry_time = aptos_infallible::duration_since_epoch().as_micros() as u64
             + self.config.batch_expiry_gap_when_init_usecs;
-
-        pulled_txns.sort_by_key(|txn| txn.gas_unit_price());
-
-        let mut batches = vec![];
-        let buckets = self.config.batch_buckets.clone();
-        for (&bucket_start, &bucket_end) in buckets.iter().tuple_windows() {
-            if pulled_txns.is_empty() {
-                break;
-            }
-
-            let split_index = pulled_txns
-                .iter()
-                .find_position(|txn| txn.gas_unit_price() >= bucket_end)
-                .map(|(index, _)| index)
-                .unwrap_or(pulled_txns.len());
-            if split_index == 0 {
-                continue;
-            }
-
-            self.push_to_batches(
-                &mut batches,
-                &mut pulled_txns,
-                split_index,
-                expiry_time,
-                bucket_start,
-            );
-        }
-        if !pulled_txns.is_empty() {
-            let last_index = self.config.batch_buckets.len() - 1;
-            let bucket_start = self.config.batch_buckets[last_index];
-            let num_txns = pulled_txns.len();
-
-            self.push_to_batches(
-                &mut batches,
-                &mut pulled_txns,
-                num_txns,
-                expiry_time,
-                bucket_start,
-            );
-        }
-
+        let batches = self.bucket_into_batches(&mut pulled_txns, expiry_time);
         counters::BATCH_CREATION_COMPUTE_LATENCY.observe_duration(bucket_compute_start.elapsed());
         self.last_end_batch_time = Instant::now();
 
