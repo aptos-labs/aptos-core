@@ -115,12 +115,10 @@ fn create_bandwidth_limit(swarm: &dyn Swarm) -> SwarmNetworkBandwidth {
     let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
     SwarmNetworkBandwidth {
         group_network_bandwidths: vec![GroupNetworkBandwidth {
-            name: "forge-namespace-10000mbps-bandwidth".to_owned(),
-            rate: 10000 / 8, // 10 Gbps in megabytes per second
+            name: "forge-namespace-1000mbps-bandwidth".to_owned(),
+            rate: 1000, // 10 Gbps in megabytes per second
             limit: 20971520,
             buffer: 10000,
-            source_nodes: all_validators.clone(),
-            target_nodes: all_validators,
         }],
     }
 }

@@ -84,8 +84,8 @@ fn create_multi_region_swarm_network_chaos(
 
             let bandwidth = GroupNetworkBandwidth {
                 name: format!("{}-to-{}-bandwidth", from_region, to_region),
-                source_nodes: from_chunk.to_vec(),
-                target_nodes: to_chunk.to_vec(),
+                // source_nodes: from_chunk.to_vec(),
+                // target_nodes: to_chunk.to_vec(),
                 rate: bandwidth / 8,
                 limit: 20971520,
                 buffer: 10000,
@@ -108,9 +108,9 @@ fn create_multi_region_swarm_network_chaos(
         group_network_delays[0]
             .source_nodes
             .append(remaining_validators.to_vec().as_mut());
-        group_network_bandwidths[0]
-            .source_nodes
-            .append(remaining_validators.to_vec().as_mut());
+        // group_network_bandwidths[0]
+        //     .source_nodes
+        //     .append(remaining_validators.to_vec().as_mut());
     }
 
     (
@@ -185,13 +185,13 @@ mod tests {
                 rate: 5160960,
                 limit: 20971520,
                 buffer: 10000,
-                source_nodes: vec![
-                    all_validators[0],
-                    all_validators[1],
-                    all_validators[8],
-                    all_validators[9]
-                ],
-                target_nodes: vec![all_validators[2], all_validators[3]],
+                // source_nodes: vec![
+                //     all_validators[0],
+                //     all_validators[1],
+                //     all_validators[8],
+                //     all_validators[9]
+                // ],
+                // target_nodes: vec![all_validators[2], all_validators[3]],
             }
         )
     }

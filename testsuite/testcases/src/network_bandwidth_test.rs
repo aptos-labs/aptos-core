@@ -37,8 +37,8 @@ impl NetworkLoadTest for NetworkBandwidthTest {
                     rate: RATE_MBPS,
                     limit: LIMIT_BYTES,
                     buffer: BUFFER_BYTES,
-                    source_nodes: all_validators.clone(),
-                    target_nodes: all_validators,
+                    // source_nodes: all_validators.clone(),
+                    // target_nodes: all_validators,
                 }],
             }))?;
         let msg = format!(
@@ -58,8 +58,8 @@ impl NetworkLoadTest for NetworkBandwidthTest {
                 rate: RATE_MBPS,
                 limit: LIMIT_BYTES,
                 buffer: BUFFER_BYTES,
-                source_nodes: all_validators.clone(),
-                target_nodes: all_validators,
+                // source_nodes: all_validators.clone(),
+                // target_nodes: all_validators,
             }],
         }))
     }
