@@ -109,7 +109,7 @@ impl MoveTool {
             MoveTool::Coverage(tool) => tool.execute().await,
             MoveTool::CreateResourceAccountAndPublishPackage(tool) => {
                 tool.execute_serialized_success().await
-            },
+            }
             MoveTool::Document(tool) => tool.execute_serialized().await,
             MoveTool::Download(tool) => tool.execute_serialized().await,
             MoveTool::Init(tool) => tool.execute_serialized_success().await,
@@ -407,10 +407,10 @@ pub struct TestPackage {
     /// If set, the number of instructions executed by one test will be bounded
     // TODO: Remove short, it's against the style guidelines, and update the name here
     #[clap(
-        name = "instructions",
-        default_value = "100000",
-        short = 'i',
-        long = "instructions"
+    name = "instructions",
+    default_value = "100000",
+    short = 'i',
+    long = "instructions"
     )]
     pub instruction_execution_bound: u64,
 
@@ -474,7 +474,7 @@ impl CliCommand<&'static str> for TestPackage {
             self.compute_coverage,
             &mut std::io::stdout(),
         )
-        .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
+            .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
 
         // Print coverage summary if --coverage is set
         if self.compute_coverage {
@@ -549,8 +549,8 @@ impl CliCommand<&'static str> for ProvePackage {
                 move_options.bytecode_version,
             )
         })
-        .await
-        .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
+            .await
+            .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
         match result {
             Ok(_) => Ok("Success"),
             Err(e) => Err(CliError::MoveProverError(format!("{:#}", e))),
@@ -794,7 +794,7 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
             txn_options.profile_options.profile_name(),
             ConfigSearchMode::CurrentDirAndParents,
         )?
-        .map(|p| p.account)
+            .map(|p| p.account)
         {
             account
         } else {
@@ -1034,7 +1034,7 @@ impl CliCommand<&'static str> for ListPackage {
                     println!("  source_digest: {}", data.source_digest());
                     println!("  modules: {}", data.module_names().into_iter().join(", "));
                 }
-            },
+            }
         }
         Ok("list succeeded")
     }
@@ -1067,12 +1067,12 @@ impl CliCommand<&'static str> for CleanPackage {
         let move_dir = PathBuf::from(MOVE_HOME.as_str());
         if move_dir.exists()
             && prompt_yes_with_override(
-                &format!(
-                    "Do you also want to delete the local package download cache at `{}`?",
-                    move_dir.display()
-                ),
-                self.prompt_options,
-            )
+            &format!(
+                "Do you also want to delete the local package download cache at `{}`?",
+                move_dir.display()
+            ),
+            self.prompt_options,
+        )
             .is_ok()
         {
             std::fs::remove_dir_all(move_dir.as_path())
@@ -1259,6 +1259,7 @@ pub(crate) enum FunctionArgType {
     U128,
     U256,
     Raw,
+    Empty,
     Vector(Box<FunctionArgType>),
 }
 
@@ -1277,6 +1278,7 @@ impl Display for FunctionArgType {
             FunctionArgType::U128 => write!(f, "u128"),
             FunctionArgType::U256 => write!(f, "u256"),
             FunctionArgType::Raw => write!(f, "raw"),
+            FunctionArgType::Empty => write!(f, "empty"),
             FunctionArgType::Vector(inner) => write!(f, "vector<{}>", inner),
         }
     }
@@ -1307,7 +1309,7 @@ impl FunctionArgType {
                     })?);
                 }
                 bcs::to_bytes(&encoded)
-            },
+            }
             FunctionArgType::String => bcs::to_bytes(arg),
             FunctionArgType::U8 => bcs::to_bytes(
                 &u8::from_str(arg).map_err(|err| CliError::UnableToParse("u8", err.to_string()))?,
@@ -1336,7 +1338,10 @@ impl FunctionArgType {
                 let raw = hex::decode(arg)
                     .map_err(|err| CliError::UnableToParse("raw", err.to_string()))?;
                 Ok(raw)
-            },
+            }
+            FunctionArgType::Empty => {
+                Ok(Vec::new())
+            }
             FunctionArgType::Vector(inner) => {
                 let parsed = match inner.deref() {
                     FunctionArgType::Address => parse_vector_arg(arg, |arg| {
@@ -1383,14 +1388,16 @@ impl FunctionArgType {
                         U256::from_str(arg)
                             .map_err(|err| CliError::UnableToParse("vector<u256>", err.to_string()))
                     }),
+                    FunctionArgType::Empty =>
+                        bcs::to_bytes(&Vec::<u8>::new()).map_err(|err| CliError::BCS("empty", err)),
                     vector_type => {
                         panic!("Unsupported vector type vector<{}>", vector_type)
-                    },
+                    }
                 }?;
                 Ok(parsed)
-            },
+            }
         }
-        .map_err(|err| CliError::BCS("arg", err))
+            .map_err(|err| CliError::BCS("arg", err))
     }
 }
 
@@ -1447,7 +1454,7 @@ impl FromStr for FunctionArgType {
                 } else {
                     Err(CliError::CommandArgumentError(format!("Invalid arg type '{}'.  Must be one of: ['address','bool','hex','hex_array','string','u8','u16','u32','u64','u128','u256','raw', 'vector<inner_type>']", str)))
                 }
-            },
+            }
         }
     }
 }
@@ -1487,11 +1494,18 @@ impl ArgWithType {
         }
     }
 
+    pub fn empty(arg: Vec<u8>) -> Self {
+        ArgWithType {
+            _ty: FunctionArgType::Empty,
+            arg,
+        }
+    }
+
     pub fn to_json(&self) -> CliTypedResult<serde_json::Value> {
         match self._ty.clone() {
             FunctionArgType::Address => {
                 serde_json::to_value(bcs::from_bytes::<AccountAddress>(&self.arg)?)
-            },
+            }
             FunctionArgType::Bool => serde_json::to_value(bcs::from_bytes::<bool>(&self.arg)?),
             FunctionArgType::Hex => serde_json::to_value(bcs::from_bytes::<Vec<u8>>(&self.arg)?),
             FunctionArgType::String => serde_json::to_value(bcs::from_bytes::<String>(&self.arg)?),
@@ -1500,56 +1514,62 @@ impl ArgWithType {
             FunctionArgType::U32 => serde_json::to_value(bcs::from_bytes::<u32>(&self.arg)?),
             FunctionArgType::U64 => {
                 serde_json::to_value(bcs::from_bytes::<u64>(&self.arg)?.to_string())
-            },
+            }
             FunctionArgType::U128 => {
                 serde_json::to_value(bcs::from_bytes::<u128>(&self.arg)?.to_string())
-            },
+            }
             FunctionArgType::U256 => {
                 serde_json::to_value(bcs::from_bytes::<U256>(&self.arg)?.to_string())
-            },
+            }
             FunctionArgType::Raw => serde_json::to_value(&self.arg),
             FunctionArgType::HexArray => {
                 serde_json::to_value(bcs::from_bytes::<Vec<Vec<u8>>>(&self.arg)?)
-            },
+            }
+            FunctionArgType::Empty => {
+                serde_json::to_value(())
+            }
             FunctionArgType::Vector(inner) => match inner.deref() {
                 FunctionArgType::Address => {
                     serde_json::to_value(bcs::from_bytes::<Vec<AccountAddress>>(&self.arg)?)
-                },
+                }
                 FunctionArgType::Bool => {
                     serde_json::to_value(bcs::from_bytes::<Vec<bool>>(&self.arg)?)
-                },
+                }
                 FunctionArgType::Hex => {
                     serde_json::to_value(bcs::from_bytes::<Vec<Vec<u8>>>(&self.arg)?)
-                },
+                }
                 FunctionArgType::String => {
                     serde_json::to_value(bcs::from_bytes::<Vec<String>>(&self.arg)?)
-                },
+                }
                 FunctionArgType::U8 => serde_json::to_value(bcs::from_bytes::<Vec<u8>>(&self.arg)?),
                 FunctionArgType::U16 => {
                     serde_json::to_value(bcs::from_bytes::<Vec<u16>>(&self.arg)?)
-                },
+                }
                 FunctionArgType::U32 => {
                     serde_json::to_value(bcs::from_bytes::<Vec<u32>>(&self.arg)?)
-                },
+                }
                 FunctionArgType::U64 => {
                     serde_json::to_value(bcs::from_bytes::<Vec<u64>>(&self.arg)?)
-                },
+                }
                 FunctionArgType::U128 => {
                     serde_json::to_value(bcs::from_bytes::<Vec<u128>>(&self.arg)?)
-                },
+                }
                 FunctionArgType::U256 => {
                     serde_json::to_value(bcs::from_bytes::<Vec<U256>>(&self.arg)?)
-                },
+                }
+                FunctionArgType::Empty => {
+                    serde_json::to_value(Vec::<u8>::new())
+                }
                 FunctionArgType::Raw | FunctionArgType::HexArray | FunctionArgType::Vector(_) => {
                     return Err(CliError::UnexpectedError(
                         "Nested vectors not supported".to_string(),
                     ));
-                },
+                }
             },
         }
-        .map_err(|err| {
-            CliError::UnexpectedError(format!("Failed to parse argument to JSON {}", err))
-        })
+            .map_err(|err| {
+                CliError::UnexpectedError(format!("Failed to parse argument to JSON {}", err))
+            })
     }
 }
 
