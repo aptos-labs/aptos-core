@@ -5,19 +5,19 @@ metadata:
   name: {name} 
 spec:
   action: netem
-  mode: one
+  mode: all 
   selector:
     namespaces:
       - {namespace}
     expressionSelectors:
       - {{ key: app.kubernetes.io/instance, operator: In, values: [{instance_labels}] }}
   delay:
-    latency: "{latency_ms}ms"
-    correlation: "{correlation_percentage}"
-    jitter: "{jitter_ms}ms"
+    latency: "{delay_latency_ms}ms"
+    correlation: "{delay_correlation_percentage}"
+    jitter: "{delay_jitter_ms}ms"
   loss:
     loss: "{loss_percentage}"
-    correlation: "{correlation_percentage}"
+    correlation: "{loss_correlation_percentage}"
   target:
     selector:
       namespaces:
