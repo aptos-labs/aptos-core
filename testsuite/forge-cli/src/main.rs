@@ -848,7 +848,8 @@ fn three_region_sim_graceful_overload(config: ForgeConfig) -> ForgeConfig {
         .with_initial_fullnode_count(20)
         .with_network_tests(vec![&ThreeRegionSimulationTwoTrafficsTest {
             traffic_test: TwoTrafficsTest {
-                inner_tps: 15000,
+                // [TEST ONLY] make this test into a "low TPS" test
+                inner_tps: 20,
                 inner_gas_price: aptos_global_constants::GAS_UNIT_PRICE,
                 inner_init_gas_price_multiplier: 20,
                 // Additionally - we are not really gracefully handling overlaods,
