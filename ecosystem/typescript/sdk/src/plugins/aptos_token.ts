@@ -36,8 +36,8 @@ const PropertyTypeMap = {
   U128: "u128",
   U256: "u256",
   ADDRESS: "address",
-  VECTORU8: "vector<u8>",
-  STRING: "0x1::string::String",
+  U8VECTOR: "vector<u8>",
+  STRING: "string",
 };
 
 export type PropertyType = keyof typeof PropertyTypeMap;

@@ -218,6 +218,13 @@ export class StructTag {
   }
 }
 
+export const stringStructTag = new StructTag(
+  AccountAddress.fromHex("0x1"),
+  new Identifier("string"),
+  new Identifier("String"),
+  [],
+);
+
 function bail(message: string) {
   throw new TypeTagParserError(message);
 }
@@ -386,6 +393,9 @@ export class TypeTagParser {
       const res = this.parseTypeTag();
       this.consume(">");
       return new TypeTagVector(res);
+    }
+    if (tokenVal === "string") {
+      return new StructTag(AccountAddress.fromHex("0x1"), new Identifier("string"), new Identifier("String"), []);
     }
     if (tokenTy === "IDENT" && (tokenVal.startsWith("0x") || tokenVal.startsWith("0X"))) {
       const address = tokenVal;

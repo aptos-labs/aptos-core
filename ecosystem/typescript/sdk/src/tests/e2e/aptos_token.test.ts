@@ -2,9 +2,9 @@ import { AptosAccount } from "../../account";
 import { UserTransaction } from "../../generated";
 import { AptosToken } from "../../plugins";
 import { Provider } from "../../providers";
-import { NODE_URL, getFaucetClient, longTestTimeout } from "../unit/test_helper.test";
+import { PROVIDER_LOCAL_NETWORK_CONFIG, getFaucetClient, longTestTimeout } from "../unit/test_helper.test";
 
-const provider = new Provider({ fullnodeUrl: NODE_URL, indexerUrl: NODE_URL });
+const provider = new Provider(PROVIDER_LOCAL_NETWORK_CONFIG);
 const faucetClient = getFaucetClient();
 const aptosToken = new AptosToken(provider);
 
@@ -19,7 +19,6 @@ describe("token objects", () => {
   beforeAll(async () => {
     // Fund Alice's Account
     await faucetClient.fundAccount(alice.address(), 100000000);
-    console.log(alice);
   }, longTestTimeout);
 
   test(
@@ -53,7 +52,6 @@ describe("token objects", () => {
         { checkSuccess: true },
       );
       tokenAddress = (txn as UserTransaction).events[0].data.token;
-      console.log(tokenAddress);
     },
     longTestTimeout,
   );
@@ -157,13 +155,7 @@ describe("token objects", () => {
     "update typed property",
     async () => {
       await provider.waitForTransaction(
-        await aptosToken.updateTypedProperty(
-          alice,
-          tokenAddress,
-          "newTypedKey",
-          "VECTORU8",
-          new TextEncoder().encode(["hello", "World"].join("")),
-        ),
+        await aptosToken.updateTypedProperty(alice, tokenAddress, "newTypedKey", "U8", 2),
         { checkSuccess: true },
       );
     },

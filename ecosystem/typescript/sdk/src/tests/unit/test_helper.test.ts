@@ -1,10 +1,12 @@
 import { FaucetClient } from "../../plugins/faucet_client";
 import { OpenAPIConfig } from "../../generated";
+import { CustomEndpoints } from "../../utils/api-endpoints";
 
 export const NODE_URL = process.env.APTOS_NODE_URL!;
 export const FAUCET_URL = process.env.APTOS_FAUCET_URL!;
 export const API_TOKEN = process.env.API_TOKEN!;
 export const FAUCET_AUTH_TOKEN = process.env.FAUCET_AUTH_TOKEN!;
+export const PROVIDER_LOCAL_NETWORK_CONFIG: CustomEndpoints = { fullnodeUrl: NODE_URL, indexerUrl: NODE_URL };
 
 /**
  * Returns an instance of a FaucetClient with NODE_URL and FAUCET_URL from the
