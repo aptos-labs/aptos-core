@@ -86,8 +86,8 @@ fn create_multi_region_swarm_network_chaos(
 
             let bandwidth = GroupNetworkBandwidth {
                 name: format!("{}-to-{}-bandwidth", from_region, to_region),
-                // source_nodes: from_chunk.to_vec(),
-                // target_nodes: to_chunk.to_vec(),
+                source_nodes: from_chunk.to_vec(),
+                target_nodes: to_chunk.to_vec(),
                 rate: bandwidth / 8,
                 limit: 20971520,
                 buffer: 10000,
@@ -217,10 +217,17 @@ mod tests {
         assert_eq!(
             bandwidth.group_network_bandwidths[0],
             GroupNetworkBandwidth {
-                name: "aws--ap-northeast-1-to-aws--eu-west-1-bandwidth".to_owned(),
+                name: "aws--ap-northeast-1-to-aws--eu-west-1-bandwidth".to_owned(), 
                 rate: 5160960,
                 limit: 20971520,
                 buffer: 10000,
+                source_nodes: vec![
+                    all_validators[0],
+                    all_validators[1],
+                    all_validators[8],
+                    all_validators[9]
+                ],
+                target_nodes: vec![all_validators[2], all_validators[3]],
             }
         )
     }

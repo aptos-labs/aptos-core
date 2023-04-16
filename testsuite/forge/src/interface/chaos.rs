@@ -60,6 +60,8 @@ impl Display for SwarmNetworkBandwidth {
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
 pub struct GroupNetworkBandwidth {
     pub name: String,
+    pub source_nodes: Vec<PeerId>,
+    pub target_nodes: Vec<PeerId>,
     /// Rate in megabytes per second
     pub rate: u64,
     pub limit: u64,

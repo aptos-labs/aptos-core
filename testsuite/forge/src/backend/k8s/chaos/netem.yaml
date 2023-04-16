@@ -18,6 +18,7 @@ spec:
   loss:
     loss: "{loss_percentage}"
     correlation: "{loss_correlation_percentage}"
+  direction: both
   target:
     selector:
       namespaces:
