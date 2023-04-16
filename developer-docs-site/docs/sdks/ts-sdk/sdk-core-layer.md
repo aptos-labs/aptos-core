@@ -36,7 +36,7 @@ The Transaction Builder contains the TypeScript types for constructing the trans
 2. Script
 3. MultiSig Transaction
 
-#### Submit transaction to chain
+#### Generate transaction
 
 The TypeScript SDK provides 2 efficient ways to generate a raw transaction that can be signed and submitted to chain
 

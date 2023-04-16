@@ -23,8 +23,8 @@ See below a high-level architecture diagram of the Aptos TypeScript SDK.
 <ThemedImage
 alt="Signed Transaction Flow"
 sources={{
-    light: useBaseUrl('/img/docs/ts-sdk-light.svg'),
-    dark: useBaseUrl('/img/docs/ts-sdk-dark.svg'),
+    light: useBaseUrl('/img/docs/ts-sdk-architecture-light.png'),
+    dark: useBaseUrl('/img/docs/ts-sdk-architecture-dark.png'),
   }}
 />
 
