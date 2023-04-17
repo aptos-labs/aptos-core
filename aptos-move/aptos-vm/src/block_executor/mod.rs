@@ -232,7 +232,7 @@ impl BlockAptosVM {
             "Sequential execution finishes, TPS = {}",
             block_size * 1000 / seq_exec_t.as_millis() as usize
         );
-        
+
         // Sequential execution does not have deltas, assert and convert to the same type.
         let seq_ret: Result<Vec<TransactionOutput>, Error<VMStatus>> = seq_ret.map(|results| {
             results
