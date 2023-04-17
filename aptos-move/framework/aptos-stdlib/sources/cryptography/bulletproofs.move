@@ -108,17 +108,33 @@ module aptos_std::bulletproofs {
     }
 
     #[test_only]
-    /// Computes a range proof for the Pedersen commitment to 'val' with 'randomness', under the default Bulletproofs
+    /// Computes a range proof for the Pedersen commitment to 'val' with randomness 'r', under the default Bulletproofs
     /// commitment key; see `pedersen::new_commitment_for_bulletproof`. Returns the said commitment too.
     ///  Only works for `num_bits` \in {8, 16, 32, 64}.
     public fun prove_range_pedersen(val: &Scalar, r: &Scalar, num_bits: u64, dst: vector<u8>): (RangeProof, pedersen::Commitment) {
-        let (bytes, compressed_comm) = prove_range_internal(scalar_to_bytes(val), scalar_to_bytes(r), num_bits, dst);
+        let (bytes, compressed_comm) = prove_range_internal(scalar_to_bytes(val), scalar_to_bytes(r), num_bits, dst, &ristretto255::basepoint(), &ristretto255::hash_to_point_base());
         let point = ristretto255::new_compressed_point_from_bytes(compressed_comm);
         let point = &std::option::extract(&mut point);
 
         (
             RangeProof { bytes },
             pedersen::new_commitment_from_compressed(point)
+        )
+    }
+
+
+    #[test_only]
+    /// Computes a range proof for the ElGamal encryption of `val` with randomness `r`, under the default ristretto255  /// basepoint and provided ElGamal public key `pubkey`. Returnsboth the range proof and the encryption. 
+    /// ///  Only works for `num_bits` \in {8, 16, 32, 64}.
+    public fun prove_range_elgamal(val: &Scalar, r: &Scalar, pubkey: &elgamal::Pubkey, num_bits: u64, dst: vector<u8>): (RangeProof, elgamal::Ciphertext) {
+        let compressed_pubkey_point = elgamal::get_compressed_point_from_pubkey(pubkey);
+        let (bytes, compressed_comm) = prove_range_internal(scalar_to_bytes(val), scalar_to_bytes(r), num_bits, dst, &ristretto255::basepoint(), &ristretto255::point_decompress(&compressed_pubkey_point));
+        let left = ristretto255::new_point_from_bytes(compressed_comm);
+        let left = std::option::extract<RistrettoPoint>(&mut left);
+        let right = ristretto255::basepoint_mul(r);
+        (
+            RangeProof { bytes },
+            elgamal::new_ciphertext_from_points(left, right)
         )
     }
 
@@ -141,7 +157,9 @@ module aptos_std::bulletproofs {
         val: vector<u8>,
         r: vector<u8>,
         num_bits: u64,
-        dst: vector<u8>): (vector<u8>, vector<u8>);
+        dst: vector<u8>,
+        val_base: &RistrettoPoint,
+        rand_base: &RistrettoPoint): (vector<u8>, vector<u8>);
 
     //
     // Testing

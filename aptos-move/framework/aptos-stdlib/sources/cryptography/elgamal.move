@@ -28,9 +28,18 @@ module aptos_std::elgamal {
         point: CompressedRistretto,
     }
 
-    /// Given a public key, returns the underlying RistrettoPoint representing that key
+    /// Given a public key `pubkey`, returns the underlying RistrettoPoint representing that key
     public fun get_point_from_pubkey(pubkey: &Pubkey): RistrettoPoint {
 	ristretto255::point_decompress(&pubkey.point)
+    }
+
+    /// Given a ristretto255 `scalar`, returns as an ElGamal public key the ristretto255 basepoint multiplied
+    /// by `scalar`
+    public fun get_pubkey_from_scalar(scalar: &ristretto255::Scalar): Pubkey {
+        let point = ristretto255::basepoint_mul(scalar);
+        Pubkey {
+            point: point_compress(&point)
+        }
     }
 
     /// Given a public key, returns the underlying CompressedRistretto representing that key
@@ -52,6 +61,11 @@ module aptos_std::elgamal {
 	}
     }
 
+    /// Given an ElGamal public key `pubkey`, returns the byte representation of that public key
+    public fun pubkey_to_bytes(pubkey: &Pubkey): vector<u8> {
+        ristretto255::compressed_point_to_bytes(pubkey.point)
+    }
+
     /// Creates a new ciphertext from two serialized Ristretto points
     public fun new_ciphertext_from_bytes(bytes: vector<u8>): Option<Ciphertext> {
 	assert!(vector::length(&bytes) == 64, EWRONG_BYTE_LENGTH);
@@ -63,6 +77,16 @@ module aptos_std::elgamal {
 	} else {
 		std::option::none<Ciphertext>()
 	}
+    }
+
+    /// Given a ciphertext `ct`, returns that ciphertext in serialzied byte form
+    public fun ciphertext_to_bytes(ct: &Ciphertext): vector<u8> {
+        let bytes_left = ristretto255::point_to_bytes(&ristretto255::point_compress(&ct.left));
+        let bytes_right = ristretto255::point_to_bytes(&ristretto255::point_compress(&ct.right));
+        let bytes = vector::empty<u8>();
+        vector::append<u8>(&mut bytes, bytes_left);
+        vector::append<u8>(&mut bytes, bytes_right);
+        bytes
     }
 
     /// Moves a pair of Ristretto points into an ElGamal ciphertext.

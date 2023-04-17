@@ -175,6 +175,11 @@ module aptos_std::ristretto255 {
         }
     }
 
+    /// Given a compressed ristretto point `point`, returns the byte representation of that point
+    public fun compressed_point_to_bytes(point: CompressedRistretto): vector<u8> {
+        point.data
+    }
+
     /// DEPRECATED: Use the more clearly-named `new_point_from_sha2_512`
     ///
     /// Hashes the input to a uniformly-at-random RistrettoPoint via SHA512.

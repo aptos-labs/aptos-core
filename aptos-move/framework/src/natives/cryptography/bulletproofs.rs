@@ -50,9 +50,6 @@ fn is_supported_number_of_bits(num_bits: usize) -> bool {
     matches!(num_bits, 8 | 16 | 32 | 64)
 }
 
-/// Default Pedersen commitment key compatible with the default Bulletproof verification API.
-static PEDERSEN_GENERATORS: Lazy<PedersenGens> = Lazy::new(PedersenGens::default);
-
 /// Public parameters of the Bulletproof range proof system
 static BULLETPROOF_GENERATORS: Lazy<BulletproofGens> =
     Lazy::new(|| BulletproofGens::new(MAX_RANGE_BITS, 1));
@@ -101,13 +98,15 @@ fn native_verify_range_proof(
 #[cfg(feature = "testing")]
 /// This is a test-only native that charges zero gas. It is only exported in testing mode.
 fn native_test_only_prove_range(
-    _context: &mut SafeNativeContext,
+    context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(_ty_args.is_empty());
     debug_assert!(args.len() == 4);
 
+    let rand_base_handle = get_point_handle(&safely_pop_arg!(args, StructRef))?;
+    let val_base_handle = get_point_handle(&safely_pop_arg!(args, StructRef))?;
     let dst = safely_pop_arg!(args, Vec<u8>);
     let num_bits = safely_pop_arg!(args, u64) as usize;
     let v_blinding = pop_scalar_from_bytes(&mut args)?;
@@ -131,10 +130,24 @@ fn native_test_only_prove_range(
 
     let mut t = Transcript::new(dst.as_slice());
 
+    let pg = {
+        let point_context = context.extensions().get::<NativeRistrettoPointContext>();
+        let point_data = point_context.point_data.borrow_mut();
+
+        let rand_base = point_data.get_point(&rand_base_handle);
+        let val_base = point_data.get_point(&val_base_handle);
+
+        // TODO(Perf): Is there a way to avoid this unnecessary cloning here?
+        PedersenGens {
+            B: *val_base,
+            B_blinding: *rand_base,
+        }
+    };
+
     // Construct a range proof.
     let (proof, commitment) = bulletproofs::RangeProof::prove_single(
         &BULLETPROOF_GENERATORS,
-        &PEDERSEN_GENERATORS,
+        &pg,
         &mut t,
         v,
         &v_blinding,
