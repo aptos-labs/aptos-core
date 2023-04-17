@@ -147,12 +147,7 @@ impl BlockAptosVM {
         concurrency_level: usize,
     ) -> (
         usize,
-        Option<
-            Result<
-                Vec<(AptosTransactionOutput, Vec<(StateKey, WriteOp)>)>,
-                aptos_block_executor::errors::Error<VMStatus>,
-            >,
-        >,
+        Option<Result<Vec<TransactionOutput>, Error<VMStatus>>>,
     ) {
         // Verify the signatures of all the transactions in parallel.
         // This is time consuming so don't wait and do the checking
@@ -185,7 +180,20 @@ impl BlockAptosVM {
 
         flush_speculative_logs();
 
-        (block_size * 1000 / exec_t.as_millis() as usize, Some(ret))
+        // Merge the delta outputs for parallel execution in order to compare results.
+        // TODO: remove after this becomes part of the rolling commit_hook.
+        let par_ret = ret.map(|results| {
+            results
+                .into_iter()
+                .map(|(output, delta_writes)| {
+                    output // AptosTransactionOutput
+                    .into() // TransactionOutputExt
+                    .output_with_delta_writes(WriteSetMut::new(delta_writes))
+                })
+                .collect()
+        });
+
+        (block_size * 1000 / exec_t.as_millis() as usize, Some(par_ret))
     }
 
     fn execute_block_benchmark_sequential<S: StateView + Sync>(
@@ -193,12 +201,7 @@ impl BlockAptosVM {
         state_view: &S,
     ) -> (
         usize,
-        Option<
-            Result<
-                Vec<(AptosTransactionOutput, Vec<(StateKey, WriteOp)>)>,
-                aptos_block_executor::errors::Error<VMStatus>,
-            >,
-        >,
+        Option<Result<Vec<TransactionOutput>, Error<VMStatus>>>,
     ) {
         // Verify the signatures of all the transactions in parallel.
         // This is time consuming so don't wait and do the checking
@@ -225,6 +228,19 @@ impl BlockAptosVM {
             "Sequential execution finishes, TPS = {}",
             block_size * 1000 / seq_exec_t.as_millis() as usize
         );
+
+        // Sequential execution does not have deltas, assert and convert to the same type.
+        let seq_ret: Result<Vec<TransactionOutput>, Error<VMStatus>> = seq_ret.map(|results| {
+            results
+                .into_iter()
+                .map(|(output, deltas)| {
+                    assert_eq!(deltas.len(), 0);
+                    output
+                        .into()
+                        .output_with_delta_writes(WriteSetMut::new(vec![]))
+                })
+                .collect()
+        });
 
         (
             block_size * 1000 / seq_exec_t.as_millis() as usize,
