@@ -27,6 +27,18 @@ impl PeerMonitoringServiceResponse {
             Self::ServerProtocolVersion(_) => "server_protocol_version",
         }
     }
+
+    /// Returns the number of bytes in the serialized response
+    pub fn get_num_bytes(&self) -> Result<u64, UnexpectedResponseError> {
+        let serialized_bytes = bcs::to_bytes(&self).map_err(|error| {
+            UnexpectedResponseError(format!(
+                "Failed to serialize response: {}. Error: {:?}",
+                self.get_label(),
+                error
+            ))
+        })?;
+        Ok(serialized_bytes.len() as u64)
+    }
 }
 
 /// A response for the latency ping request

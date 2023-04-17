@@ -514,6 +514,7 @@ async fn test_network_info_request_failures() {
             false,
             true,
             false,
+            false,
         )
         .await;
 
@@ -542,6 +543,28 @@ async fn test_network_info_request_failures() {
             true,
             false,
             false,
+            false,
+        )
+        .await;
+
+        // Wait until the network info state is updated with the failure
+        wait_for_network_info_request_failure(&peer_monitor_state, &validator_peer, i + 1).await;
+    }
+
+    // Handle several network info requests with responses that are too large
+    for i in 10..15 {
+        // Elapse enough time for a network info update
+        elapse_network_info_update_interval(node_config.clone(), mock_time.clone()).await;
+
+        // Verify that a single network info request is received and send a response that is too large
+        verify_network_info_request_and_respond(
+            &network_id,
+            &mut mock_monitoring_server,
+            create_random_network_info_response(),
+            false,
+            false,
+            true,
+            false,
         )
         .await;
 
@@ -554,7 +577,7 @@ async fn test_network_info_request_failures() {
         &peer_monitor_state,
         &validator_peer,
         network_info_response.clone(),
-        10,
+        15,
     );
 
     // Elapse enough time for a network info request and perform a successful execution
@@ -584,7 +607,7 @@ async fn test_network_info_request_failures() {
     );
 
     // Handle several network info requests without responses
-    for i in 11..16 {
+    for i in 16..21 {
         // Elapse enough time for a network info update
         elapse_network_info_update_interval(node_config.clone(), mock_time.clone()).await;
 
@@ -595,12 +618,13 @@ async fn test_network_info_request_failures() {
             create_random_network_info_response(),
             false,
             false,
+            false,
             true,
         )
         .await;
 
         // Wait until the network info state is updated with the failure
-        wait_for_network_info_request_failure(&peer_monitor_state, &validator_peer, i - 10).await;
+        wait_for_network_info_request_failure(&peer_monitor_state, &validator_peer, i - 15).await;
     }
 
     // Verify the new network info state of the peer monitor
@@ -732,6 +756,27 @@ async fn test_node_info_request_failures() {
             create_random_node_info_response(),
             true,
             false,
+            false,
+        )
+        .await;
+
+        // Wait until the node info state is updated with the failure
+        wait_for_node_info_request_failure(&peer_monitor_state, &validator_peer, i + 1).await;
+    }
+
+    // Handle several node info requests with responses that are too large
+    for i in 5..10 {
+        // Elapse enough time for a node info update
+        elapse_node_info_update_interval(node_config.clone(), mock_time.clone()).await;
+
+        // Verify that a single node info request is received and send a response that is too large
+        verify_node_info_request_and_respond(
+            &network_id,
+            &mut mock_monitoring_server,
+            create_random_node_info_response(),
+            false,
+            true,
+            false,
         )
         .await;
 
@@ -740,7 +785,7 @@ async fn test_node_info_request_failures() {
     }
 
     // Handle several node info requests without responses
-    for i in 5..10 {
+    for i in 10..15 {
         // Elapse enough time for a node info update
         elapse_node_info_update_interval(node_config.clone(), mock_time.clone()).await;
 
@@ -749,6 +794,7 @@ async fn test_node_info_request_failures() {
             &network_id,
             &mut mock_monitoring_server,
             create_random_node_info_response(),
+            false,
             false,
             true,
         )
@@ -763,7 +809,7 @@ async fn test_node_info_request_failures() {
         &peer_monitor_state,
         &validator_peer,
         node_info_response.clone(),
-        10,
+        15,
     );
 
     // Elapse enough time for a node info request and perform a successful execution
