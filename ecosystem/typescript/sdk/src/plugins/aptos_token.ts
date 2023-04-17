@@ -406,8 +406,8 @@ export class AptosToken {
   }
 
   /**
-   * Transfer a token ownership
-   *
+   * Transfer a token ownership.
+   * We can transfer a token only when the token is not frozen (i.e. owner transfer is not disabled such as for soul bound tokens)
    * @param owner The account of the current token owner
    * @param token Token address
    * @param recipient Recipient address
