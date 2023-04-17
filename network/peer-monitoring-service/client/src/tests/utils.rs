@@ -96,6 +96,27 @@ pub fn create_connected_peers_map() -> BTreeMap<PeerNetworkId, ConnectionMetadat
     btreemap! { PeerNetworkId::random() => ConnectionMetadata::new(NetworkAddress::mock(), PeerId::random(), PeerRole::Unknown) }
 }
 
+/// Returns a build info map that is too large
+pub fn create_large_build_info_map() -> BTreeMap<String, String> {
+    let mut build_info = BTreeMap::new();
+    for i in 0..100_000 {
+        build_info.insert(i.to_string(), i.to_string());
+    }
+    build_info
+}
+
+/// Returns a connected peers map that is too large
+pub fn create_large_connected_peers_map() -> BTreeMap<PeerNetworkId, ConnectionMetadata> {
+    let mut peers = BTreeMap::new();
+    for _ in 0..100_000 {
+        peers.insert(
+            PeerNetworkId::random(),
+            ConnectionMetadata::new(NetworkAddress::mock(), PeerId::random(), PeerRole::Unknown),
+        );
+    }
+    peers
+}
+
 /// Creates a network info response with the given data
 pub fn create_network_info_response(
     connected_peers: &BTreeMap<PeerNetworkId, ConnectionMetadata>,
@@ -508,6 +529,7 @@ pub async fn verify_and_handle_network_info_request(
         false,
         false,
         false,
+        false,
     )
     .await;
 
@@ -548,6 +570,7 @@ pub async fn verify_and_handle_node_info_request(
         network_id,
         mock_monitoring_server,
         node_info_response.clone(),
+        false,
         false,
         false,
     )
@@ -702,6 +725,7 @@ pub async fn verify_network_info_request_and_respond(
     network_info_response: NetworkInformationResponse,
     respond_with_invalid_distance: bool,
     respond_with_invalid_message: bool,
+    respond_with_large_message: bool,
     skip_sending_a_response: bool,
 ) {
     // Create a task that waits for the request and sends a response
@@ -724,6 +748,12 @@ pub async fn verify_network_info_request_and_respond(
                     PeerMonitoringServiceResponse::LatencyPing(LatencyPingResponse {
                         ping_counter: 10,
                     })
+                } else if respond_with_large_message {
+                    // Respond with a large message
+                    PeerMonitoringServiceResponse::NetworkInformation(create_network_info_response(
+                        &create_large_connected_peers_map(),
+                        network_info_response.distance_from_validators,
+                    ))
                 } else {
                     // Send a valid response
                     PeerMonitoringServiceResponse::NetworkInformation(network_info_response)
@@ -751,8 +781,9 @@ pub async fn verify_network_info_request_and_respond(
 pub async fn verify_node_info_request_and_respond(
     network_id: &NetworkId,
     mock_monitoring_server: &mut MockMonitoringServer,
-    node_info_response: NodeInformationResponse,
+    mut node_info_response: NodeInformationResponse,
     respond_with_invalid_message: bool,
+    respond_with_large_message: bool,
     skip_sending_a_response: bool,
 ) {
     // Create a task that waits for the request and sends a response
@@ -769,6 +800,10 @@ pub async fn verify_node_info_request_and_respond(
                     PeerMonitoringServiceResponse::LatencyPing(LatencyPingResponse {
                         ping_counter: 10,
                     })
+                } else if respond_with_large_message {
+                    // Respond with a large message
+                    node_info_response.build_information = create_large_build_info_map();
+                    PeerMonitoringServiceResponse::NodeInformation(node_info_response)
                 } else {
                     // Send a valid response
                     PeerMonitoringServiceResponse::NodeInformation(node_info_response)
