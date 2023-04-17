@@ -35,11 +35,12 @@ pub fn aptos_natives(
     timed_features: TimedFeatures,
     features: Arc<Features>,
 ) -> NativeFunctionTable {
-    move_stdlib::natives::all_natives(CORE_CODE_ADDRESS, gas_params.move_stdlib)
+    aptos_move_stdlib::natives::all_natives(CORE_CODE_ADDRESS, gas_params.move_stdlib.clone())
         .into_iter()
         .filter(|(_, name, _, _)| name.as_str() != "vector")
         .chain(aptos_framework::natives::all_natives(
             CORE_CODE_ADDRESS,
+            gas_params.move_stdlib,
             gas_params.aptos_framework,
             timed_features,
             features,
@@ -49,17 +50,6 @@ pub fn aptos_natives(
             CORE_CODE_ADDRESS,
             gas_params.table,
         ))
-        // TODO(Gas): this isn't quite right yet...
-        .chain(
-            move_stdlib::natives::nursery_natives(
-                CORE_CODE_ADDRESS,
-                move_stdlib::natives::NurseryGasParameters::zeros(),
-            )
-            .into_iter()
-            .filter(|(addr, module_name, _, _)| {
-                !(*addr == CORE_CODE_ADDRESS && module_name.as_str() == "event")
-            }),
-        )
         .collect()
 }
 

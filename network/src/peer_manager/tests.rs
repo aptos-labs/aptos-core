@@ -31,7 +31,6 @@ use aptos_memsocket::MemorySocket;
 use aptos_netcore::transport::{
     boxed::BoxedTransport, memory::MemoryTransport, ConnectionOrigin, TransportExt,
 };
-use aptos_rate_limiter::rate_limit::TokenBucketRateLimiter;
 use aptos_time_service::TimeService;
 use aptos_types::{network_address::NetworkAddress, PeerId};
 use bytes::Bytes;
@@ -116,8 +115,6 @@ fn build_test_peer_manager(
         constants::MAX_FRAME_SIZE,
         constants::MAX_MESSAGE_SIZE,
         MAX_INBOUND_CONNECTIONS,
-        TokenBucketRateLimiter::open("inbound"),
-        TokenBucketRateLimiter::open("outbound"),
     );
 
     (
@@ -132,9 +129,8 @@ fn build_test_peer_manager(
 async fn ping_pong(connection: &mut MemorySocket) -> Result<(), PeerManagerError> {
     let (read_half, write_half) = tokio::io::split(connection.compat());
     let mut msg_tx =
-        MultiplexMessageSink::new(write_half.compat_write(), constants::MAX_FRAME_SIZE, None);
-    let mut msg_rx =
-        MultiplexMessageStream::new(read_half.compat(), constants::MAX_FRAME_SIZE, None);
+        MultiplexMessageSink::new(write_half.compat_write(), constants::MAX_FRAME_SIZE);
+    let mut msg_rx = MultiplexMessageStream::new(read_half.compat(), constants::MAX_FRAME_SIZE);
 
     // Send a garbage frame to trigger an expected Error response message
     msg_tx

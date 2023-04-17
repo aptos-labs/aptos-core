@@ -43,12 +43,19 @@ the return on investment didn't seem worth it for these simple functions.
     -  [Helper Functions](#@Helper_Functions_2)
     -  [Function `singleton`](#@Specification_1_singleton)
     -  [Function `reverse`](#@Specification_1_reverse)
+    -  [Function `reverse_slice`](#@Specification_1_reverse_slice)
     -  [Function `append`](#@Specification_1_append)
+    -  [Function `reverse_append`](#@Specification_1_reverse_append)
+    -  [Function `trim`](#@Specification_1_trim)
+    -  [Function `trim_reverse`](#@Specification_1_trim_reverse)
     -  [Function `is_empty`](#@Specification_1_is_empty)
     -  [Function `contains`](#@Specification_1_contains)
     -  [Function `index_of`](#@Specification_1_index_of)
+    -  [Function `insert`](#@Specification_1_insert)
     -  [Function `remove`](#@Specification_1_remove)
     -  [Function `swap_remove`](#@Specification_1_swap_remove)
+    -  [Function `rotate`](#@Specification_1_rotate)
+    -  [Function `rotate_slice`](#@Specification_1_rotate_slice)
 
 
 <pre><code></code></pre>
@@ -828,12 +835,76 @@ Check if <code>v</code> contains <code>e</code>.
 
 
 
+<a name="@Specification_1_reverse_slice"></a>
+
+### Function `reverse_slice`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_reverse_slice">reverse_slice</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, left: u64, right: u64)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic = <b>true</b>;
+</code></pre>
+
+
+
 <a name="@Specification_1_append"></a>
 
 ### Function `append`
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_append">append</a>&lt;Element&gt;(lhs: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, other: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic = <b>true</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_reverse_append"></a>
+
+### Function `reverse_append`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_reverse_append">reverse_append</a>&lt;Element&gt;(lhs: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, other: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic = <b>true</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_trim"></a>
+
+### Function `trim`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_trim">trim</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, new_len: u64): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic = <b>true</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_trim_reverse"></a>
+
+### Function `trim_reverse`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_trim_reverse">trim_reverse</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, new_len: u64): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;
 </code></pre>
 
 
@@ -892,6 +963,22 @@ Check if <code>v</code> contains <code>e</code>.
 
 
 
+<a name="@Specification_1_insert"></a>
+
+### Function `insert`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_insert">insert</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, i: u64, e: Element)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic = <b>true</b>;
+</code></pre>
+
+
+
 <a name="@Specification_1_remove"></a>
 
 ### Function `remove`
@@ -914,6 +1001,38 @@ Check if <code>v</code> contains <code>e</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_swap_remove">swap_remove</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, i: u64): Element
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic = <b>true</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_rotate"></a>
+
+### Function `rotate`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_rotate">rotate</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, rot: u64): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic = <b>true</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_rotate_slice"></a>
+
+### Function `rotate_slice`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_rotate_slice">rotate_slice</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, left: u64, rot: u64, right: u64): u64
 </code></pre>
 
 

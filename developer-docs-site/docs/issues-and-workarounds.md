@@ -11,6 +11,16 @@ This page provides workarounds and answers for issues and questions that frequen
 If you found an issue that is not on this page, submit a [GitHub Issue](https://github.com/aptos-labs/aptos-core/issues). Make sure to follow the issue format used in this document. 
 :::
 
+## Compiler
+
+#### Description
+
+Your Move code will fail compile-time checks for transaction arguments and produce an error if the code contains an entry function with a return value or passes a structure as a parameter.
+
+#### Workaround
+
+Follow semantic rules for [entry modifiers](../docs/guides/move-guides/book/functions.md#entry-modifier) and avoid using an entry function that returns a value or passes a structure as a parameter. If such entry functions are already in use and you cannot remove them due to [compatibility issues](../docs/guides/move-guides/book/package-upgrades.md#compatibility-rules), use the `#[legacy_entry_fun]` attribute to allow your code to compile. See [coin.move]((../../../../aptos-move/framework/aptos-framework/sources/coin.move#L362)) for usage examples.
+
 ## Nodes
 
 ### Logs slowing down system and hindering performance
@@ -235,6 +245,3 @@ full_node_networks:
 [devnet_waypoint]: https://devnet.aptoslabs.com/waypoint.txt
 [aptos-labs/aptos-core]: https://github.com/aptos-labs/aptos-core.git
 [status dashboard]: https://status.devnet.aptos.dev
-
-
-

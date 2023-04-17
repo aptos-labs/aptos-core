@@ -223,7 +223,7 @@ pub struct ChunkCommitNotification {
 /// Not every transaction in the payload succeeds: the returned vector keeps the boolean status
 /// of success / failure of the transactions.
 /// Note that the specific details of compute_status are opaque to StateMachineReplication,
-/// which is going to simply pass the results between StateComputer and TxnManager.
+/// which is going to simply pass the results between StateComputer and PayloadClient.
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct StateComputeResult {
     /// transaction accumulator root hash is identified as `state_id` in Consensus.
@@ -246,7 +246,7 @@ pub struct StateComputeResult {
     epoch_state: Option<EpochState>,
     /// The compute status (success/failure) of the given payload. The specific details are opaque
     /// for StateMachineReplication, which is merely passing it between StateComputer and
-    /// TxnManager.
+    /// PayloadClient.
     compute_status: Vec<TransactionStatus>,
 
     /// The transaction info hashes of all success txns.

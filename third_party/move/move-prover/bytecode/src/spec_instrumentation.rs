@@ -158,7 +158,7 @@ impl FunctionTargetProcessor for SpecInstrumentationProcessor {
             }
             for ref fun in module.get_functions() {
                 for (variant, target) in targets.get_targets(fun) {
-                    let spec = target.get_spec();
+                    let spec = &*target.get_spec();
                     if !spec.conditions.is_empty() {
                         writeln!(
                             f,
@@ -463,9 +463,10 @@ impl<'a> Instrumenter<'a> {
                         self.builder.emit(Prop(id, kind, prop));
                     },
                     Some((translated_spec, exp)) => {
-                        // Logic specifically for generating code of updating global spec variables in the function body
-                        if *exp == prop && !translated_spec.updates.is_empty() {
-                            self.emit_updates(translated_spec);
+                        let binding = self.builder.fun_env.get_spec();
+                        let cond_opt = binding.update_map.get(&prop.node_id());
+                        if cond_opt.is_some() {
+                            self.emit_updates(translated_spec, Some(prop));
                         } else {
                             self.emit_traces(translated_spec, exp);
                             self.builder.emit(Prop(id, kind, exp.clone()));
@@ -663,7 +664,7 @@ impl<'a> Instrumenter<'a> {
             self.emit_lets(&callee_spec, true);
 
             // Emit spec var updates.
-            self.emit_updates(&callee_spec);
+            self.emit_updates(&callee_spec, None);
 
             // Emit post conditions as assumptions.
             for (_, cond) in std::mem::take(&mut callee_spec.post) {
@@ -724,7 +725,7 @@ impl<'a> Instrumenter<'a> {
         }
     }
 
-    fn emit_updates(&mut self, spec: &TranslatedSpec) {
+    fn emit_updates(&mut self, spec: &TranslatedSpec, prop_rhs_opt: Option<Exp>) {
         for (loc, lhs, rhs) in &spec.updates {
             // Emit update of lhs, which is guaranteed to represent a ghost memory access.
             // We generate the actual byte code operations which would appear on a regular
@@ -732,7 +733,12 @@ impl<'a> Instrumenter<'a> {
             // interpret this like any other memory access.
             self.builder.set_loc(loc.clone());
             self.emit_traces(spec, lhs);
-            self.emit_traces(spec, rhs);
+            let new_rhs = if let Some(ref prop_rhs) = prop_rhs_opt {
+                prop_rhs
+            } else {
+                rhs
+            };
+            self.emit_traces(spec, new_rhs);
 
             // Extract the ghost mem from lhs
             let (ghost_mem, _field_id, addr) = lhs
@@ -748,7 +754,7 @@ impl<'a> Instrumenter<'a> {
                 &ghost_mem_ty,
                 ghost_mem.inst.clone(),
                 ast::Operation::Pack(ghost_mem.module_id, ghost_mem.id),
-                vec![rhs.clone()],
+                vec![new_rhs.clone()],
             ));
 
             // Update memory. We create a mut ref for the location then write the value back to it.
@@ -959,7 +965,7 @@ impl<'a> Instrumenter<'a> {
         // function variants, as the evolution of state updates is always the same.
         let lets_emitted = if !spec.updates.is_empty() {
             self.emit_lets(spec, true);
-            self.emit_updates(spec);
+            self.emit_updates(spec, None);
             true
         } else {
             false

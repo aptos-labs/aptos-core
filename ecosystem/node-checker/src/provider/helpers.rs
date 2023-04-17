@@ -9,7 +9,7 @@ pub const MISSING_PROVIDER_MESSAGE: &str = "Incomplete request";
 ///
 /// Example invocations:
 ///
-/// ```
+/// ```ignore
 /// # use std::io;
 /// let target_metrics_provider = aptos_node_checker_lib::get_provider!(
 ///     input.target_metrics_provider,

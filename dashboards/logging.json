@@ -861,7 +861,11 @@
       {
         "allFormat": "",
         "allValue": "",
-        "current": { "text": ["VictoriaMetrics Mainnet US"], "value": "VictoriaMetrics Mainnet US" },
+        "current": {
+          "selected": true,
+          "text": "VictoriaMetrics Global (Non-mainnet)",
+          "value": "VictoriaMetrics Global (Non-mainnet)"
+        },
         "hide": 0,
         "includeAll": false,
         "label": "",
@@ -870,8 +874,9 @@
         "name": "Datasource",
         "options": [],
         "query": "prometheus",
+        "queryValue": "",
         "refresh": 1,
-        "regex": "",
+        "regex": ".*Prometheus.*|.*Victoria.*|.*Telemetry.*",
         "skipUrlSync": false,
         "sort": 0,
         "type": "datasource"
@@ -1037,8 +1042,8 @@
   "time": { "from": "now-3h", "to": "now" },
   "timepicker": { "refresh_intervals": ["1m", "5m", "15m"] },
   "timezone": "",
-  "title": "Logging",
+  "title": "logging",
   "uid": "logging",
-  "version": 10,
+  "version": 2,
   "weekStart": ""
 }

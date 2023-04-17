@@ -23,6 +23,8 @@ use move_stackless_bytecode::{function_target::FunctionTarget, stackless_bytecod
 use num::BigUint;
 
 pub const MAX_MAKE_VEC_ARGS: usize = 4;
+pub const TABLE_NATIVE_SPEC_ERROR: &str =
+    "Native functions defined in Table cannot be used as specification functions";
 
 /// Return boogie name of given module.
 pub fn boogie_module_name(env: &ModuleEnv<'_>) -> String {
@@ -141,8 +143,13 @@ pub fn boogie_spec_fun_name(
     };
     let mut suffix = boogie_inst_suffix_bv(env.env, inst, &[bv_flag]);
     if env.is_table() {
-        assert_eq!(inst.len(), 2);
-        suffix = boogie_inst_suffix_bv_pair(env.env, inst, &[false, bv_flag]);
+        if inst.len() != 2 {
+            env.env.error(&decl.loc, TABLE_NATIVE_SPEC_ERROR);
+            return "".to_string();
+        }
+        let mut v = vec![false; inst.len()];
+        v[inst.len() - 1] = bv_flag;
+        suffix = boogie_inst_suffix_bv_pair(env.env, inst, &v);
     };
     format!(
         "${}_{}{}{}",

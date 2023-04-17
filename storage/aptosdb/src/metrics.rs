@@ -77,14 +77,14 @@ pub static PRUNER_WINDOW: Lazy<IntGaugeVec> = Lazy::new(|| {
 });
 
 /// DB pruner least readable versions
-pub static PRUNER_LEAST_READABLE_VERSION: Lazy<IntGaugeVec> = Lazy::new(|| {
+pub static PRUNER_VERSIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         // metric name
-        "aptos_pruner_min_readable_version",
+        "aptos_pruner_versions",
         // metric description
-        "Aptos pruner least readable state version",
+        "Aptos pruner versions",
         // metric labels (dimensions)
-        &["pruner_name",]
+        &["pruner_name", "tag"]
     )
     .unwrap()
 });

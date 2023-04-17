@@ -215,6 +215,10 @@ impl<'env> Evaluator<'env> {
             ExpData::Invalid(_) => unreachable!(),
             // should not appear in this context
             ExpData::Lambda(..) | ExpData::Block(..) => unreachable!(),
+            ExpData::Return(..)
+            | ExpData::Sequence(..)
+            | ExpData::Loop(..)
+            | ExpData::LoopCont(..) => panic!("imperative expressions not supported"),
         };
 
         if debug_expression {

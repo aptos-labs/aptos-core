@@ -67,6 +67,8 @@ pub struct RocksdbOpt {
     state_merkle_db_max_total_wal_size: u64,
     #[clap(long, hidden(true))]
     use_state_kv_db: bool,
+    #[clap(long, hidden(true))]
+    use_sharded_state_merkle_db: bool,
     #[clap(long, hidden(true), default_value = "5000")]
     state_kv_db_max_open_files: i32,
     #[clap(long, hidden(true), default_value = "1073741824")] // 1GB
@@ -95,6 +97,7 @@ impl From<RocksdbOpt> for RocksdbConfigs {
                 ..Default::default()
             },
             use_state_kv_db: opt.use_state_kv_db,
+            use_sharded_state_merkle_db: opt.use_sharded_state_merkle_db,
             state_kv_db_config: RocksdbConfig {
                 max_open_files: opt.state_kv_db_max_open_files,
                 max_total_wal_size: opt.state_kv_db_max_total_wal_size,

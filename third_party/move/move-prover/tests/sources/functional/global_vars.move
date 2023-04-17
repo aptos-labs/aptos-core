@@ -1,79 +1,123 @@
 // separate_baseline: simplify
 module 0x42::TestGlobalVars {
     use std::signer;
+    use extensions::table::{Self, Table};
 
     // ================================================================================
     // Counting
 
     spec module {
-        global sum_of_T: u64 = 0;
+        global sum_table: Table<address, u64>;
+        global sum_of_T2: u64 = 0;
+        invariant [suspendable] forall addr: address: table::spec_contains(sum_table, addr) ==>
+        (table::spec_get(sum_table, addr) == global<T>(addr).i);
     }
 
     struct T has key {
-      i: u64,
+        i: u64,
     }
 
-    fun add() acquires T {
-        borrow_global_mut<T>(@0).i = borrow_global_mut<T>(@0).i + 1;
+    public fun init(s: &signer) {
+        let t = T {
+            i:0
+        };
+        move_to<T>(s, t);
         spec {
-            update sum_of_T = sum_of_T + 1;
+            update sum_table = table::spec_new();
+            update sum_table = table::spec_set(sum_table, signer::address_of(s), 0);
         };
     }
 
-    fun sub() acquires T {
-        borrow_global_mut<T>(@0).i = borrow_global_mut<T>(@0).i - 1;
+    spec init {
+        pragma disable_invariants_in_body;
+    }
+
+    fun add(c: u64, s: &signer) acquires T {
+        let b = c + 2;
+        let bor = borrow_global_mut<T>(signer::address_of(s));
+        bor.i = bor.i + b;
         spec {
-            update sum_of_T = sum_of_T - 1;
+            update sum_table = table::spec_set(sum_table, signer::address_of(s), table::spec_get(sum_table, signer::address_of(s)) + b);
         };
     }
 
-    fun call_add_sub() acquires T {
-        add(); add(); sub();
+    spec add {
+        requires table::spec_contains(sum_table, signer::address_of(s));
+        pragma disable_invariants_in_body;
+    }
+
+    fun sub(s: &signer) acquires T {
+        let bor = borrow_global_mut<T>(signer::address_of(s));
+        bor.i = bor.i - 1;
+        spec {
+            update sum_table = table::spec_set(sum_table, signer::address_of(s), table::spec_get(sum_table, signer::address_of(s)) - 1);
+        };
+    }
+
+    spec sub {
+        requires table::spec_contains(sum_table, signer::address_of(s));
+        pragma disable_invariants_in_body;
+    }
+
+    fun call_add_sub(s: &signer) acquires T {
+        add(1, s); add(1, s); sub(s);
     }
     spec call_add_sub {
-        ensures sum_of_T == 1;
-    }
-
-    fun call_add_sub_invalid() acquires T {
-        add(); sub(); add();
-    }
-    spec call_add_sub_invalid {
-        ensures sum_of_T == 2;
+        requires table::spec_contains(sum_table, signer::address_of(s));
+        ensures table::spec_get(sum_table, signer::address_of(s)) == table::spec_get(old(sum_table), signer::address_of(s)) +  5;
     }
 
     // ================================================================================
     // Counting (opaque)
 
-    fun opaque_add() acquires T {
-        borrow_global_mut<T>(@0).i = borrow_global_mut<T>(@0).i + 1
+    struct T2 has key {
+        i: u64,
+    }
+
+    public fun initT2(s: &signer) {
+        let t = T2 {
+            i:0
+        };
+        move_to<T2>(s, t);
+    }
+
+    spec initT2 {
+        requires signer::address_of(s) == @0;
+        update sum_of_T2 = 0;
+    }
+
+    fun opaque_add() acquires T2 {
+        borrow_global_mut<T2>(@0).i = borrow_global_mut<T2>(@0).i + 1
     }
     spec opaque_add {
         pragma opaque;
-        modifies global<T>(@0);
-        update sum_of_T = sum_of_T + 1;
+        pragma disable_invariants_in_body;
+        modifies global<T2>(@0);
+        update sum_of_T2 = sum_of_T2 + 1;
     }
 
-    fun opaque_sub() acquires T {
-        borrow_global_mut<T>(@0).i = borrow_global_mut<T>(@0).i - 1
+    fun opaque_sub() acquires T2 {
+        borrow_global_mut<T2>(@0).i = borrow_global_mut<T2>(@0).i - 1
     }
     spec opaque_sub {
         pragma opaque;
-        modifies global<T>(@0);
-        update sum_of_T = sum_of_T - 1;
+        pragma disable_invariants_in_body;
+        modifies global<T2>(@0);
+        update sum_of_T2 = sum_of_T2 - 1;
     }
 
-    fun opaque_call_add_sub() acquires T {
+    fun opaque_call_add_sub() acquires T2 {
         opaque_add(); opaque_add(); opaque_sub();
     }
     spec opaque_call_add_sub {
-        ensures sum_of_T == 1;
+        ensures sum_of_T2 == 1;
     }
 
-    fun opaque_call_add_sub_invalid() acquires T {
+    fun opaque_call_add_sub_invalid() acquires T2 {
         opaque_add(); opaque_sub(); opaque_add();
     }
     spec opaque_call_add_sub_invalid {
-        ensures sum_of_T == 2;
+        ensures sum_of_T2 == 2;
     }
 
     // ================================================================================

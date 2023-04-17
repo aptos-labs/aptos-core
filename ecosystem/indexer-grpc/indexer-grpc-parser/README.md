@@ -33,6 +33,7 @@ Indexer GRPC parser is to indexer data processor that leverages the indexer grpc
 * Use the provided `Dockerfile` and `config.yaml`(update accordingly)
   * Build: `cd ecosystem/indexer-grpc/indexer-grpc-parser && docker build . -t indexer-processor`
   * Run: `docker run indexer-processor:latest`
+  
 
 ### Use source code for existing parsers
 * Use the provided `Dockerfile` and `config.yaml`(update accordingly)

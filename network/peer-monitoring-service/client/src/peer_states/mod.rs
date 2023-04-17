@@ -11,8 +11,9 @@ use std::collections::HashMap;
 use tokio::runtime::Handle;
 
 pub mod key_value;
-mod latency_info;
-mod network_info;
+pub mod latency_info;
+pub mod network_info;
+pub mod node_info;
 pub mod peer_state;
 mod request_tracker;
 

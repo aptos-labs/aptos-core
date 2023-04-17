@@ -188,6 +188,7 @@ impl RestoreCoordinator {
             None,
             epoch_history,
             VerifyExecutionMode::NoVerify,
+            None,
         )
         .run()
         .await?;

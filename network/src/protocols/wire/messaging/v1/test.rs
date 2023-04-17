@@ -97,7 +97,7 @@ fn aptosnet_wire_test_vectors() {
     // test reading and deserializing gives us the expected message
 
     let socket_rx = ReadOnlyTestSocket::new(&message_bytes);
-    let message_rx = MultiplexMessageStream::new(socket_rx, 128, None);
+    let message_rx = MultiplexMessageStream::new(socket_rx, 128);
 
     let recv_messages = block_on(message_rx.collect::<Vec<_>>());
     let recv_messages = recv_messages
@@ -112,7 +112,7 @@ fn aptosnet_wire_test_vectors() {
     let mut write_buf = Vec::new();
     socket_tx.save_writing(&mut write_buf);
 
-    let mut message_tx = MultiplexMessageSink::new(socket_tx, 128, None);
+    let mut message_tx = MultiplexMessageSink::new(socket_tx, 128);
     block_on(message_tx.send(&message)).unwrap();
 
     assert_eq!(&write_buf, &message_bytes);
@@ -121,7 +121,7 @@ fn aptosnet_wire_test_vectors() {
 #[test]
 fn send_fails_when_larger_than_frame_limit() {
     let (memsocket_tx, _memsocket_rx) = MemorySocket::new_pair();
-    let mut message_tx = MultiplexMessageSink::new(memsocket_tx, 64, None);
+    let mut message_tx = MultiplexMessageSink::new(memsocket_tx, 64);
 
     // attempting to send an outbound message larger than your frame size will
     // return an Err
@@ -137,9 +137,9 @@ fn send_fails_when_larger_than_frame_limit() {
 fn recv_fails_when_larger_than_frame_limit() {
     let (memsocket_tx, memsocket_rx) = MemorySocket::new_pair();
     // sender won't error b/c their max frame size is larger
-    let mut message_tx = MultiplexMessageSink::new(memsocket_tx, 128, None);
+    let mut message_tx = MultiplexMessageSink::new(memsocket_tx, 128);
     // receiver will reject the message b/c the frame size is > 64 bytes max
-    let mut message_rx = MultiplexMessageStream::new(memsocket_rx, 64, None);
+    let mut message_rx = MultiplexMessageStream::new(memsocket_rx, 64);
 
     let message = MultiplexMessage::Message(NetworkMessage::DirectSendMsg(DirectSendMsg {
         protocol_id: ProtocolId::ConsensusRpcBcs,
@@ -233,8 +233,8 @@ proptest! {
             socket_tx.set_fragmented_write();
         }
 
-        let mut message_tx = MultiplexMessageSink::new(socket_tx, 128, None);
-        let message_rx = MultiplexMessageStream::new(socket_rx, 128, None);
+        let mut message_tx = MultiplexMessageSink::new(socket_tx, 128);
+        let message_rx = MultiplexMessageStream::new(socket_rx, 128);
         let (stream_tx, stream_rx) = aptos_channels::new_test(1024);
         let (mut msg_tx, msg_rx) = aptos_channels::new_test(1024);
         let mut outbound_stream = OutboundStream::new(128, 64 * 255, stream_tx);

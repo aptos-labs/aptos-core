@@ -10,6 +10,7 @@ use crate::{
         state_store::{generics::StaleNodeIndexSchemaTrait, StateMerklePruner},
     },
     state_kv_db::StateKvDb,
+    state_merkle_db::StateMerkleDb,
     EventStore, TransactionStore,
 };
 use aptos_jellyfish_merkle::StaleNodeIndex;
@@ -18,7 +19,7 @@ use std::sync::Arc;
 
 /// A utility function to instantiate the state pruner
 pub fn create_state_merkle_pruner<S: StaleNodeIndexSchemaTrait>(
-    state_merkle_db: Arc<DB>,
+    state_merkle_db: Arc<StateMerkleDb>,
 ) -> Arc<StateMerklePruner<S>>
 where
     StaleNodeIndex: KeyCodec<S>,
