@@ -176,6 +176,7 @@ static NAMED_ADDRESSES: Lazy<BTreeMap<String, NumericalAddress>> = Lazy::new(|| 
     result.insert("aptos_token".to_owned(), two);
     result.insert("core_resources".to_owned(), resources);
     result.insert("vm_reserved".to_owned(), zero);
+    result.insert("ol_framework".to_owned(), two); /////// 0L /////////
     result
 });
 
