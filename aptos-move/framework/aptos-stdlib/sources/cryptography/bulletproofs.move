@@ -84,7 +84,7 @@ module aptos_std::bulletproofs {
 
         verify_range_proof_internal(
             ristretto255::point_to_bytes(&elgamal::get_value_component_compressed(ct)),
-	    &ristretto255::basepoint(), &elgamal::get_point_from_pubkey(pubkey),
+            &ristretto255::basepoint(), &elgamal::get_point_from_pubkey(pubkey),
             proof.bytes,
             num_bits,
             dst

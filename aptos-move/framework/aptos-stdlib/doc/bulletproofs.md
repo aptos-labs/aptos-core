@@ -249,7 +249,7 @@ for <code>num_bits</code> \in {8, 16, 32, 64}.
 
     <a href="bulletproofs.md#0x1_bulletproofs_verify_range_proof_internal">verify_range_proof_internal</a>(
         <a href="ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="elgamal.md#0x1_elgamal_get_value_component_compressed">elgamal::get_value_component_compressed</a>(ct)),
-	    &<a href="ristretto255.md#0x1_ristretto255_basepoint">ristretto255::basepoint</a>(), &<a href="elgamal.md#0x1_elgamal_get_point_from_pubkey">elgamal::get_point_from_pubkey</a>(pubkey),
+        &<a href="ristretto255.md#0x1_ristretto255_basepoint">ristretto255::basepoint</a>(), &<a href="elgamal.md#0x1_elgamal_get_point_from_pubkey">elgamal::get_point_from_pubkey</a>(pubkey),
         proof.bytes,
         num_bits,
         dst
