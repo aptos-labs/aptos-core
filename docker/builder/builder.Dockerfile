@@ -52,7 +52,7 @@ RUN --mount=type=secret,id=GIT_CREDENTIALS,target=/root/.git-credentials \
     --mount=type=cache,target=/usr/local/cargo/git,id=node-builder-cargo-git-cache \
     --mount=type=cache,target=/usr/local/cargo/registry,id=node-builder-cargo-registry-cache \
     --mount=type=cache,target=/aptos/target,id=node-builder-target-cache \
-        docker/experimental/build-node.sh
+        docker/builder/build-node.sh
 
 FROM builder-base as tools-builder
 
@@ -60,4 +60,4 @@ RUN --mount=type=secret,id=GIT_CREDENTIALS,target=/root/.git-credentials \
     --mount=type=cache,target=/usr/local/cargo/git,id=tools-builder-cargo-git-cache \
     --mount=type=cache,target=/usr/local/cargo/registry,id=tools-builder-cargo-registry-cache \
     --mount=type=cache,target=/aptos/target,id=tools-builder-target-cache \
-        docker/experimental/build-tools.sh
+        docker/builder/build-tools.sh
