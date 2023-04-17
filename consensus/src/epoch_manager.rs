@@ -20,7 +20,9 @@ use crate::{
             extract_epoch_to_proposers, AptosDBBackend, LeaderReputation,
             ProposerAndVoterHeuristic, ReputationHeuristic,
         },
-        proposal_generator::{ChainHealthBackoffConfig, ProposalGenerator},
+        proposal_generator::{
+            ChainHealthBackoffConfig, PipelineBackpressureConfig, ProposalGenerator,
+        },
         proposer_election::ProposerElection,
         rotating_proposer_election::{choose_leader, RotatingProposer},
         round_proposer_election::RoundProposer,
@@ -641,6 +643,9 @@ impl EpochManager {
         );
         let chain_health_backoff_config =
             ChainHealthBackoffConfig::new(self.config.chain_health_backoff.clone());
+        let pipeline_backpressure_config =
+            PipelineBackpressureConfig::new(self.config.pipeline_backpressure.clone());
+
         let safety_rules_container = Arc::new(Mutex::new(safety_rules));
 
         // Start QuorumStore
@@ -679,7 +684,6 @@ impl EpochManager {
 
         let payload_client = QuorumStoreClient::new(
             consensus_to_quorum_store_tx,
-            self.config.quorum_store_poll_count, // TODO: consider moving it to a quorum store config in later PRs.
             self.config.quorum_store_pull_timeout_ms,
             self.config.wait_for_full_blocks_above_recent_fill_threshold,
             self.config.wait_for_full_blocks_above_pending_blocks,
@@ -705,7 +709,7 @@ impl EpochManager {
             state_computer,
             self.config.max_pruned_blocks_in_mem,
             Arc::clone(&self.time_service),
-            onchain_consensus_config.back_pressure_limit(),
+            self.config.vote_back_pressure_limit,
             payload_manager.clone(),
         ));
 
@@ -724,11 +728,13 @@ impl EpochManager {
             block_store.clone(),
             Arc::new(payload_client),
             self.time_service.clone(),
+            Duration::from_millis(self.config.quorum_store_poll_time_ms),
             self.config
                 .max_sending_block_txns(self.quorum_store_enabled),
             self.config
                 .max_sending_block_bytes(self.quorum_store_enabled),
             onchain_consensus_config.max_failed_authors_to_store(),
+            pipeline_backpressure_config,
             chain_health_backoff_config,
             self.quorum_store_enabled,
         );

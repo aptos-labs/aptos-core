@@ -3,10 +3,10 @@
 
 use crate::common::{
     types::{
-        CliCommand, CliConfig, CliError, CliTypedResult, ConfigSearchMode, EncodingOptions,
-        EncodingType, ExtractPublicKey, ParsePrivateKey, ProfileConfig, ProfileOptions,
-        PublicKeyInputOptions, RestOptions, RotationProofChallenge, TransactionOptions,
-        TransactionSummary,
+        account_address_from_public_key, CliCommand, CliConfig, CliError, CliTypedResult,
+        ConfigSearchMode, EncodingOptions, EncodingType, ExtractPublicKey, ParsePrivateKey,
+        ProfileConfig, ProfileOptions, PublicKeyInputOptions, RestOptions, RotationProofChallenge,
+        TransactionOptions, TransactionSummary,
     },
     utils::{prompt_yes, prompt_yes_with_override, read_line},
 };
@@ -20,10 +20,7 @@ use aptos_rest_client::{
     error::{AptosErrorResponse, RestError},
     Client,
 };
-use aptos_types::{
-    account_address::AccountAddress, account_config::CORE_CODE_ADDRESS,
-    transaction::authenticator::AuthenticationKey,
-};
+use aptos_types::{account_address::AccountAddress, account_config::CORE_CODE_ADDRESS};
 use async_trait::async_trait;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
@@ -286,41 +283,54 @@ impl CliCommand<AccountAddress> for LookupAddress {
     async fn execute(self) -> CliTypedResult<AccountAddress> {
         let rest_client = self.rest_client()?;
 
-        let originating_resource: OriginatingResource = rest_client
-            .get_account_resource_bcs(CORE_CODE_ADDRESS, "0x1::account::OriginatingAddress")
-            .await?
-            .into_inner();
+        // TODO: Support arbitrary auth key to support other types like multie25519
+        let address = account_address_from_public_key(&self.public_key()?);
+        Ok(lookup_address(&rest_client, address, true).await?)
+    }
+}
 
-        let table_handle = originating_resource.address_map.handle;
+pub async fn lookup_address(
+    rest_client: &Client,
+    address_key: AccountAddress,
+    must_exist: bool,
+) -> Result<AccountAddress, RestError> {
+    let originating_resource: OriginatingResource = rest_client
+        .get_account_resource_bcs(CORE_CODE_ADDRESS, "0x1::account::OriginatingAddress")
+        .await?
+        .into_inner();
 
-        // The derived address that can be used to look up the original address
-        // TODO: This command needs to support multi-ed25519
-        let address_key = AuthenticationKey::ed25519(&self.public_key()?).derived_address();
-        match rest_client
-            .get_table_item_bcs(
-                table_handle,
-                "address",
-                "address",
-                address_key.to_hex_literal(),
-            )
-            .await
-        {
-            Ok(inner) => Ok(inner.into_inner()),
-            Err(RestError::Api(AptosErrorResponse {
-                error:
-                    AptosError {
-                        error_code: AptosErrorCode::TableItemNotFound,
-                        ..
-                    },
-                ..
-            })) => {
-                // If the table item wasn't found, let's at least check if the account exists
-                // It won't be in the table if it wasn't rotated, then return the derived account address
-                rest_client.get_account_bcs(address_key).await?;
+    let table_handle = originating_resource.address_map.handle;
+
+    // The derived address that can be used to look up the original address
+    match rest_client
+        .get_table_item_bcs(
+            table_handle,
+            "address",
+            "address",
+            address_key.to_hex_literal(),
+        )
+        .await
+    {
+        Ok(inner) => Ok(inner.into_inner()),
+        Err(RestError::Api(AptosErrorResponse {
+            error:
+                AptosError {
+                    error_code: AptosErrorCode::TableItemNotFound,
+                    ..
+                },
+            ..
+        })) => {
+            // If the table item wasn't found, we may check if the account exists
+            if !must_exist {
                 Ok(address_key)
-            },
-            Err(err) => Err(err)?,
-        }
+            } else {
+                rest_client
+                    .get_account_bcs(address_key)
+                    .await
+                    .map(|_| address_key)
+            }
+        },
+        Err(err) => Err(err),
     }
 }
 
