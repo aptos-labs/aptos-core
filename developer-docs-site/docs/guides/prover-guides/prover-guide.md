@@ -1,5 +1,5 @@
 ---
-title: "Use Move Prover"
+title: "Move Prover User Guide"
 slug: "prover-guide"
 ---
 
