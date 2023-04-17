@@ -9,6 +9,13 @@ pub mod aptos {
             // @@protoc_insertion_point(aptos.datastream.v1)
         }
     }
+    pub mod indexer_data {
+        // @@protoc_insertion_point(attribute:aptos.indexer_data.v1)
+        pub mod v1 {
+            include!("aptos.indexer_data.v1.rs");
+            // @@protoc_insertion_point(aptos.indexer_data.v1)
+        }
+    }
     pub mod transaction {
         pub mod testing1 {
             // @@protoc_insertion_point(attribute:aptos.transaction.testing1.v1)

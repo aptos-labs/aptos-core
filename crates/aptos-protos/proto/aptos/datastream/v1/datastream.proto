@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-
+// TODO: Move this file to internal.
 syntax = "proto3";
 
 package aptos.datastream.v1;

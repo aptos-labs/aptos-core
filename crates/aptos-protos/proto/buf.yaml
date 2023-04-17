@@ -9,10 +9,10 @@ breaking:
 lint:
   use:
     - DEFAULT
-  except:
-    # Avoid generated code with service like `FooServiceService`.
-    - SERVICE_SUFFIX
   ignore_only:
     PACKAGE_VERSION_SUFFIX:
       # Timestamp package is well-adpoted and we don't want to change it.
       - aptos/util/timestamp/timestamp.proto
+    SERVICE_SUFFIX:
+      # Datastream service is setup; we don't want to change it.
+      - aptos/datastream/v1/datastream.proto
