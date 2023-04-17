@@ -861,6 +861,7 @@ impl EpochManager {
             let buffer_manager_msg_tx = self.buffer_manager_msg_tx.clone();
             let round_manager_tx = self.round_manager_tx.clone();
             let my_peer_id = self.author;
+            let max_num_batches = self.config.quorum_store_configs.receiver_max_num_batches;
             self.bounded_executor
                 .spawn(async move {
                     match monitor!(
@@ -870,6 +871,7 @@ impl EpochManager {
                             &epoch_state.verifier,
                             quorum_store_enabled,
                             peer_id == my_peer_id,
+                            max_num_batches,
                         )
                     ) {
                         Ok(verified_event) => {

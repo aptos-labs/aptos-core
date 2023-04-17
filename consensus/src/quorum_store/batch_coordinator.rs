@@ -108,12 +108,6 @@ impl BatchCoordinator {
     }
 
     fn ensure_max_limits(&self, batches: &[Batch]) -> anyhow::Result<()> {
-        ensure!(
-            batches.len() <= self.max_num_batches,
-            "Exceeds num batches limit {} > {}",
-            batches.len(),
-            self.max_num_batches,
-        );
         let mut total_txns = 0;
         let mut total_bytes = 0;
         for batch in batches.iter() {

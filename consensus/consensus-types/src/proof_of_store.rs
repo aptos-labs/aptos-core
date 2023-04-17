@@ -144,8 +144,19 @@ impl SignedBatchInfoMsg {
         Self { signed_infos }
     }
 
-    pub fn verify(&self, sender: PeerId, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+    pub fn verify(
+        &self,
+        sender: PeerId,
+        max_num_batches: usize,
+        validator: &ValidatorVerifier,
+    ) -> anyhow::Result<()> {
         ensure!(!self.signed_infos.is_empty(), "Empty message");
+        ensure!(
+            self.signed_infos.len() <= max_num_batches,
+            "Too many batches: {} > {}",
+            self.signed_infos.len(),
+            max_num_batches
+        );
         for signed_info in &self.signed_infos {
             signed_info.verify(sender, validator)?
         }
@@ -239,8 +250,18 @@ impl ProofOfStoreMsg {
         Self { proofs }
     }
 
-    pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+    pub fn verify(
+        &self,
+        max_num_proofs: usize,
+        validator: &ValidatorVerifier,
+    ) -> anyhow::Result<()> {
         ensure!(!self.proofs.is_empty(), "Empty message");
+        ensure!(
+            self.proofs.len() <= max_num_proofs,
+            "Too many proofs: {} > {}",
+            self.proofs.len(),
+            max_num_proofs
+        );
         for proof in &self.proofs {
             proof.verify(validator)?
         }

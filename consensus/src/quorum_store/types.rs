@@ -244,8 +244,14 @@ impl BatchMsg {
         Self { batches }
     }
 
-    pub fn verify(&self, peer_id: PeerId) -> anyhow::Result<()> {
+    pub fn verify(&self, peer_id: PeerId, max_num_batches: usize) -> anyhow::Result<()> {
         ensure!(!self.batches.is_empty(), "Empty message");
+        ensure!(
+            self.batches.len() <= max_num_batches,
+            "Too many batches: {} > {}",
+            self.batches.len(),
+            max_num_batches
+        );
         for batch in self.batches.iter() {
             ensure!(
                 batch.author() == peer_id,
