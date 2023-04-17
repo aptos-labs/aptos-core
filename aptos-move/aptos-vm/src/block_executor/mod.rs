@@ -118,6 +118,7 @@ impl BlockAptosVM {
             .execute_block(state_view, signature_verified_block, state_view)
             .map(|results| {
                 // Process the outputs in parallel, combining delta writes with other writes.
+                // TODO: merge with rolling commit_hook (via trait) inside parallel executor.
                 RAYON_EXEC_POOL.install(|| {
                     results
                         .into_par_iter()
@@ -231,7 +232,7 @@ impl BlockAptosVM {
             "Sequential execution finishes, TPS = {}",
             block_size * 1000 / seq_exec_t.as_millis() as usize
         );
-
+        
         // Sequential execution does not have deltas, assert and convert to the same type.
         let seq_ret: Result<Vec<TransactionOutput>, Error<VMStatus>> = seq_ret.map(|results| {
             results

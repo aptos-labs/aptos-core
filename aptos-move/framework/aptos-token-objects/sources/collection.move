@@ -38,6 +38,8 @@ module aptos_token_objects::collection {
     const EURI_TOO_LONG: u64 = 4;
     /// The description is over the maximum length
     const EDESCRIPTION_TOO_LONG: u64 = 5;
+    /// The max supply must be positive
+    const EMAX_SUPPLY_CANNOT_BE_ZERO: u64 = 6;
 
     const MAX_COLLECTION_NAME_LENGTH: u64 = 128;
     const MAX_URI_LENGTH: u64 = 512;
@@ -118,6 +120,7 @@ module aptos_token_objects::collection {
         royalty: Option<Royalty>,
         uri: String,
     ): ConstructorRef {
+        assert!(max_supply != 0, error::invalid_argument(EMAX_SUPPLY_CANNOT_BE_ZERO));
         let collection_seed = create_collection_seed(&name);
         let constructor_ref = object::create_named_object(creator, collection_seed);
         let object_signer = object::generate_signer(&constructor_ref);

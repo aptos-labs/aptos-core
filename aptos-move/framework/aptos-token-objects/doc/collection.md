@@ -379,6 +379,16 @@ The description is over the maximum length
 
 
 
+<a name="0x4_collection_EMAX_SUPPLY_CANNOT_BE_ZERO"></a>
+
+The max supply must be positive
+
+
+<pre><code><b>const</b> <a href="collection.md#0x4_collection_EMAX_SUPPLY_CANNOT_BE_ZERO">EMAX_SUPPLY_CANNOT_BE_ZERO</a>: u64 = 6;
+</code></pre>
+
+
+
 <a name="0x4_collection_EURI_TOO_LONG"></a>
 
 The URI is over the maximum length
@@ -444,6 +454,7 @@ Beyond that, it adds supply tracking with events.
     <a href="royalty.md#0x4_royalty">royalty</a>: Option&lt;Royalty&gt;,
     uri: String,
 ): ConstructorRef {
+    <b>assert</b>!(max_supply != 0, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="collection.md#0x4_collection_EMAX_SUPPLY_CANNOT_BE_ZERO">EMAX_SUPPLY_CANNOT_BE_ZERO</a>));
     <b>let</b> collection_seed = <a href="collection.md#0x4_collection_create_collection_seed">create_collection_seed</a>(&name);
     <b>let</b> constructor_ref = <a href="../../aptos-framework/doc/object.md#0x1_object_create_named_object">object::create_named_object</a>(creator, collection_seed);
     <b>let</b> object_signer = <a href="../../aptos-framework/doc/object.md#0x1_object_generate_signer">object::generate_signer</a>(&constructor_ref);

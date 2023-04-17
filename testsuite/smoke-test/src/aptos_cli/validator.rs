@@ -179,7 +179,7 @@ async fn test_onchain_config_change() {
         .with_init_config(Arc::new(|_, conf, _| {
             // reduce timeout, as we will have dead node during rounds
             conf.consensus.round_initial_timeout_ms = 400;
-            conf.consensus.quorum_store_poll_count = 4;
+            conf.consensus.quorum_store_poll_time_ms = 100;
             conf.api.failpoints_enabled = true;
         }))
         .with_init_genesis_config(Arc::new(|genesis_config| {
@@ -432,7 +432,7 @@ async fn test_nodes_rewards() {
         .with_init_config(Arc::new(|i, conf, genesis_stake_amount| {
             // reduce timeout, as we will have dead node during rounds
             conf.consensus.round_initial_timeout_ms = 200;
-            conf.consensus.quorum_store_poll_count = 4;
+            conf.consensus.quorum_store_poll_time_ms = 100;
             conf.api.failpoints_enabled = true;
 
             // make sure we have quorum
@@ -861,7 +861,7 @@ async fn test_join_and_leave_validator() {
         .with_init_config(Arc::new(|_i, conf, genesis_stake_amount| {
             // reduce timeout, as we will have dead node during rounds
             conf.consensus.round_initial_timeout_ms = 200;
-            conf.consensus.quorum_store_poll_count = 4;
+            conf.consensus.quorum_store_poll_time_ms = 100;
             *genesis_stake_amount = 100000;
         }))
         .with_init_genesis_config(Arc::new(|genesis_config| {
@@ -1023,7 +1023,7 @@ async fn test_owner_create_and_delegate_flow() {
         .with_init_config(Arc::new(|_i, conf, genesis_stake_amount| {
             // reduce timeout, as we will have dead node during rounds
             conf.consensus.round_initial_timeout_ms = 200;
-            conf.consensus.quorum_store_poll_count = 4;
+            conf.consensus.quorum_store_poll_time_ms = 100;
             // enough for quorum
             *genesis_stake_amount = 5000000;
         }))

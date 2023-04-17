@@ -7,7 +7,11 @@ use aptos_types::{
     on_chain_config::FeatureFlag,
     transaction::{ExecutionStatus, TransactionStatus},
 };
-use move_core_types::{language_storage::TypeTag, parser::parse_struct_tag, vm_status::StatusCode};
+use move_core_types::{
+    language_storage::{StructTag, TypeTag},
+    parser::parse_struct_tag,
+    vm_status::StatusCode,
+};
 use serde::{Deserialize, Serialize};
 
 /// Mimics `0xcafe::test::ModuleData`
@@ -21,21 +25,26 @@ const OBJECT_ADDRESS: AccountAddress = AccountAddress::new([
     0x90, 0x71, 0xAA, 0x3F, 0xBD, 0x2A, 0xB9, 0x51, 0x37, 0xF7, 0xCB, 0xAD, 0x13, 0x6F, 0x09, 0x2B,
 ]);
 
-fn success(tests: Vec<(&str, Vec<Vec<u8>>, &str)>) {
-    success_generic(vec![], tests)
+fn module_data() -> StructTag {
+    parse_struct_tag("0xCAFE::test::ModuleData").unwrap()
 }
 
-fn success_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<Vec<u8>>, &str)>) {
-    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::STRUCT_CONSTRUCTORS], vec![]);
+fn success(h: &mut MoveHarness, tests: Vec<(&str, Vec<Vec<u8>>, &str)>) {
+    success_generic(h, vec![], tests)
+}
 
+fn success_generic(
+    h: &mut MoveHarness,
+    ty_args: Vec<TypeTag>,
+    tests: Vec<(&str, Vec<Vec<u8>>, &str)>,
+) {
     // Load the code
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+
     assert_success!(h.publish_package(&acc, &common::test_dir_path("constructor_args.data/pack")));
 
-    let module_data = parse_struct_tag("0xCAFE::test::ModuleData").unwrap();
-
     // Check in initial state, resource does not exist.
-    assert!(!h.exists_resource(acc.address(), module_data.clone()));
+    assert!(!h.exists_resource(acc.address(), module_data()));
 
     for (entry, args, expected_change) in tests {
         assert_success!(h.run_entry_function(
@@ -46,13 +55,34 @@ fn success_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<Vec<u8>>, &str)>
         ));
         assert_eq!(
             String::from_utf8(
-                h.read_resource::<ModuleData>(&OBJECT_ADDRESS, module_data.clone())
+                h.read_resource::<ModuleData>(&OBJECT_ADDRESS, module_data())
                     .unwrap()
                     .state
             )
             .unwrap(),
             expected_change,
         );
+    }
+}
+
+fn success_generic_view(
+    h: &mut MoveHarness,
+    ty_args: Vec<TypeTag>,
+    tests: Vec<(&str, Vec<Vec<u8>>, &str)>,
+) {
+    // Load the code
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    assert_success!(h.publish_package(&acc, &common::test_dir_path("constructor_args.data/pack")));
+
+    // Check in initial state, resource does not exist.
+    assert!(!h.exists_resource(acc.address(), module_data()));
+
+    for (entry, args, expected) in tests {
+        let res = h.execute_view_function(str::parse(entry).unwrap(), ty_args.clone(), args);
+        assert!(res.is_ok(), "{}", res.err().unwrap().to_string());
+        let bcs = res.unwrap().pop().unwrap();
+        let res = bcs::from_bytes::<String>(&bcs).unwrap();
+        assert_eq!(res, expected);
     }
 }
 
@@ -69,10 +99,8 @@ fn fail_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<Vec<u8>>, Closure)>
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
     assert_success!(h.publish_package(&acc, &common::test_dir_path("constructor_args.data/pack")));
 
-    let module_data = parse_struct_tag("0xCAFE::test::ModuleData").unwrap();
-
     // Check in initial state, resource does not exist.
-    assert!(!h.exists_resource(acc.address(), module_data));
+    assert!(!h.exists_resource(acc.address(), module_data()));
 
     for (entry, args, err) in tests {
         // Now send hi transaction, after that resource should exist and carry value
@@ -130,7 +158,38 @@ fn constructor_args_good() {
         ),
     ];
 
-    success(tests);
+    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::STRUCT_CONSTRUCTORS], vec![]);
+
+    success(&mut h, tests);
+}
+
+#[test]
+fn view_constructor_args() {
+    let tests = vec![
+        // ensure object exist
+        ("0xcafe::test::initialize", vec![], ""),
+        // make state equal hi
+        (
+            "0xcafe::test::object_arg",
+            vec![
+                bcs::to_bytes("hi").unwrap(),
+                bcs::to_bytes(&OBJECT_ADDRESS).unwrap(),
+            ],
+            "hi",
+        ),
+    ];
+
+    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::STRUCT_CONSTRUCTORS], vec![]);
+
+    success(&mut h, tests);
+
+    let view = vec![(
+        "0xcafe::test::get_state",
+        vec![bcs::to_bytes(&OBJECT_ADDRESS).unwrap()],
+        "hi",
+    )];
+    let module_data_type = TypeTag::Struct(Box::new(module_data()));
+    success_generic_view(&mut h, vec![module_data_type], view);
 }
 
 #[test]

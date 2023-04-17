@@ -19,7 +19,7 @@ pub fn test_config() -> (NodeConfig, Ed25519PrivateKey) {
     let (
         IdentityBlob {
             account_address,
-            account_private_key,
+            account_private_key: _,
             consensus_private_key,
             ..
         },
@@ -31,10 +31,6 @@ pub fn test_config() -> (NodeConfig, Ed25519PrivateKey) {
 
     let mut config = configs.swap_remove(0);
     config.set_data_dir(path.path().to_path_buf());
-    let mut test = aptos_config::config::TestConfig::new_with_temp_dir(Some(path));
-
-    test.owner_key(account_private_key.unwrap());
-    config.test = Some(test);
 
     let mut sr_test = aptos_config::config::SafetyRulesTestConfig::new(account_address.unwrap());
     sr_test.consensus_key(consensus_private_key.unwrap());

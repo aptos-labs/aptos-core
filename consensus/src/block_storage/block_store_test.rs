@@ -473,11 +473,12 @@ async fn test_need_sync_for_ledger_info() {
     assert!(block_store.need_sync_for_ledger_info(&ordered_too_far));
 
     let committed_round_too_far =
-        block_store.commit_root().round() + block_store.back_pressure_limit * 2 + 1;
+        block_store.commit_root().round() + block_store.vote_back_pressure_limit * 2 + 1;
     let committed_too_far = create_ledger_info(committed_round_too_far);
     assert!(block_store.need_sync_for_ledger_info(&committed_too_far));
 
-    let round_not_too_far = block_store.commit_root().round() + block_store.back_pressure_limit + 1;
+    let round_not_too_far =
+        block_store.commit_root().round() + block_store.vote_back_pressure_limit + 1;
     let not_too_far = create_ledger_info(round_not_too_far);
     assert!(!block_store.need_sync_for_ledger_info(&not_too_far));
 }
