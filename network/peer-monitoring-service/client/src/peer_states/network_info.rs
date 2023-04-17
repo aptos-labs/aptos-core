@@ -7,7 +7,7 @@ use crate::{
 };
 use aptos_config::{
     config::{BaseConfig, NetworkMonitoringConfig, NodeConfig, RoleType},
-    network_id::PeerNetworkId,
+    network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_infallible::RwLock;
 use aptos_logger::warn;
@@ -18,7 +18,11 @@ use aptos_peer_monitoring_service_types::{
     MAX_DISTANCE_FROM_VALIDATORS,
 };
 use aptos_time_service::TimeService;
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
+
+// The maximum number of entries and protocols in the connected peers map
+const MAX_CONNECTED_PEER_ENTRIES: usize = 500;
+const MAX_NETWORK_PROTOCOLS_PER_PEER: usize = 10;
 
 /// A simple container that holds a single peer's network info
 #[derive(Clone, Debug)]
@@ -67,50 +71,15 @@ impl NetworkInfoState {
     pub fn get_latest_network_info_response(&self) -> Option<NetworkInformationResponse> {
         self.recorded_network_info_response.clone()
     }
-}
 
-impl StateValueInterface for NetworkInfoState {
-    fn create_monitoring_service_request(&mut self) -> PeerMonitoringServiceRequest {
-        PeerMonitoringServiceRequest::GetNetworkInformation
-    }
-
-    fn get_request_timeout_ms(&self) -> u64 {
-        self.network_monitoring_config
-            .network_info_request_timeout_ms
-    }
-
-    fn get_request_tracker(&self) -> Arc<RwLock<RequestTracker>> {
-        self.request_tracker.clone()
-    }
-
-    fn handle_monitoring_service_response(
+    /// Returns true iff the distance from validators is valid
+    fn is_valid_distance_from_validators(
         &mut self,
-        peer_network_id: &PeerNetworkId,
         peer_metadata: PeerMetadata,
-        _monitoring_service_request: PeerMonitoringServiceRequest,
-        monitoring_service_response: PeerMonitoringServiceResponse,
-        _response_time_secs: f64,
-    ) {
-        // Verify the response type is valid
-        let network_info_response = match monitoring_service_response {
-            PeerMonitoringServiceResponse::NetworkInformation(network_information_response) => {
-                network_information_response
-            },
-            _ => {
-                warn!(LogSchema::new(LogEntry::NetworkInfoRequest)
-                    .event(LogEvent::ResponseError)
-                    .peer(peer_network_id)
-                    .message(
-                        "An unexpected response was received instead of a network info response!"
-                    ));
-                self.handle_request_failure();
-                return;
-            },
-        };
-
-        // Sanity check the response depth from the peer metadata
-        let network_id = peer_network_id.network_id();
-        let is_valid_depth = match network_info_response.distance_from_validators {
+        network_info_response: &mut NetworkInformationResponse,
+        network_id: NetworkId,
+    ) -> bool {
+        match network_info_response.distance_from_validators {
             0 => {
                 // Verify the peer is a validator and has the correct network id
                 let peer_is_validator = peer_metadata.get_connection_metadata().role.is_validator();
@@ -138,10 +107,59 @@ impl StateValueInterface for NetworkInfoState {
                     && !peer_is_vfn
                     && distance_from_validators <= MAX_DISTANCE_FROM_VALIDATORS
             },
+        }
+    }
+}
+
+impl StateValueInterface for NetworkInfoState {
+    fn create_monitoring_service_request(&mut self) -> PeerMonitoringServiceRequest {
+        PeerMonitoringServiceRequest::GetNetworkInformation
+    }
+
+    fn get_request_timeout_ms(&self) -> u64 {
+        self.network_monitoring_config
+            .network_info_request_timeout_ms
+    }
+
+    fn get_request_tracker(&self) -> Arc<RwLock<RequestTracker>> {
+        self.request_tracker.clone()
+    }
+
+    fn handle_monitoring_service_response(
+        &mut self,
+        peer_network_id: &PeerNetworkId,
+        peer_metadata: PeerMetadata,
+        _monitoring_service_request: PeerMonitoringServiceRequest,
+        monitoring_service_response: PeerMonitoringServiceResponse,
+        _response_time_secs: f64,
+    ) {
+        // Verify the response type is valid
+        let mut network_info_response = match monitoring_service_response {
+            PeerMonitoringServiceResponse::NetworkInformation(network_information_response) => {
+                network_information_response
+            },
+            _ => {
+                warn!(LogSchema::new(LogEntry::NetworkInfoRequest)
+                    .event(LogEvent::ResponseError)
+                    .peer(peer_network_id)
+                    .message(
+                        "An unexpected response was received instead of a network info response!"
+                    ));
+                self.handle_request_failure();
+                return;
+            },
         };
 
-        // If the depth did not pass our sanity checks, handle a failure
-        if !is_valid_depth {
+        // Sanity check the response depth from the peer metadata
+        let network_id = peer_network_id.network_id();
+        let is_valid_distance = self.is_valid_distance_from_validators(
+            peer_metadata,
+            &mut network_info_response,
+            network_id,
+        );
+
+        // If the distance did not pass our sanity checks, handle a failure
+        if !is_valid_distance {
             warn!(LogSchema::new(LogEntry::NetworkInfoRequest)
                 .event(LogEvent::InvalidResponse)
                 .peer(peer_network_id)
@@ -152,6 +170,33 @@ impl StateValueInterface for NetworkInfoState {
             self.handle_request_failure();
             return;
         }
+
+        // Verify the connected peers map does not have too many entries
+        let num_connected_peer_entries = network_info_response.connected_peers.len();
+        if num_connected_peer_entries > MAX_CONNECTED_PEER_ENTRIES {
+            warn!(LogSchema::new(LogEntry::NetworkInfoRequest)
+                .event(LogEvent::InvalidResponse)
+                .peer(peer_network_id)
+                .message(&format!(
+                    "The connected peers map is too large! Got length {:?} but the max is {:?}!",
+                    num_connected_peer_entries, MAX_CONNECTED_PEER_ENTRIES
+                )));
+            self.handle_request_failure();
+            return;
+        }
+
+        // Ignore entries that have too many network protocols
+        let connected_peers = network_info_response.connected_peers.iter().filter_map(
+            |(peer_network_id, connection_metadata)| {
+                let num_network_protocols = connection_metadata.network_address.as_slice().len();
+                if num_network_protocols > MAX_NETWORK_PROTOCOLS_PER_PEER {
+                    None
+                } else {
+                    Some((*peer_network_id, connection_metadata.clone()))
+                }
+            },
+        );
+        network_info_response.connected_peers = BTreeMap::from_iter(connected_peers);
 
         // Store the new latency ping result
         self.record_network_info_response(network_info_response);

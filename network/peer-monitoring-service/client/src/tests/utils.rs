@@ -25,10 +25,10 @@ use aptos_peer_monitoring_service_types::{
 };
 use aptos_time_service::{MockTimeService, TimeService, TimeServiceTrait};
 use aptos_types::{network_address::NetworkAddress, PeerId};
-use maplit::hashmap;
+use maplit::btreemap;
 use rand::{rngs::OsRng, Rng};
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, HashSet},
     future::Future,
     sync::Arc,
     time::{Duration, Instant},
@@ -92,13 +92,13 @@ pub fn config_without_node_info_requests() -> NodeConfig {
 }
 
 /// Returns a simple connected peers map for testing purposes
-pub fn create_connected_peers_map() -> HashMap<PeerNetworkId, ConnectionMetadata> {
-    hashmap! { PeerNetworkId::random() => ConnectionMetadata::new(NetworkAddress::mock(), PeerId::random(), PeerRole::Unknown) }
+pub fn create_connected_peers_map() -> BTreeMap<PeerNetworkId, ConnectionMetadata> {
+    btreemap! { PeerNetworkId::random() => ConnectionMetadata::new(NetworkAddress::mock(), PeerId::random(), PeerRole::Unknown) }
 }
 
 /// Creates a network info response with the given data
 pub fn create_network_info_response(
-    connected_peers: &HashMap<PeerNetworkId, ConnectionMetadata>,
+    connected_peers: &BTreeMap<PeerNetworkId, ConnectionMetadata>,
     distance_from_validators: u64,
 ) -> NetworkInformationResponse {
     NetworkInformationResponse {
@@ -410,7 +410,7 @@ pub fn update_network_info_for_peer(
     peers_and_metadata: Arc<PeersAndMetadata>,
     peer_network_id: &PeerNetworkId,
     peer_state: &mut PeerState,
-    connected_peers: HashMap<PeerNetworkId, ConnectionMetadata>,
+    connected_peers: BTreeMap<PeerNetworkId, ConnectionMetadata>,
     distance_from_validators: u64,
     response_time_secs: f64,
 ) {
