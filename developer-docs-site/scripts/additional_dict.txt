@@ -539,3 +539,12 @@ withdrawable
 xlarge
 yaml
 yamls
+mintAptosName
+getAddressByName
+getPrimaryNameByAddress
+acount
+fundAccount
+extensibility
+MultiSig
+IndexerClient
+Hasura
