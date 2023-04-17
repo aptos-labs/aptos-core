@@ -14,6 +14,7 @@ module aptos_framework::genesis {
     use aptos_framework::chain_status;
     use aptos_framework::coin;
     use aptos_framework::consensus_config;
+    use aptos_framework::execution_config;
     use aptos_framework::create_signer::create_signer;
     use aptos_framework::gas_schedule;
     use aptos_framework::reconfiguration;
@@ -67,6 +68,7 @@ module aptos_framework::genesis {
         chain_id: u8,
         initial_version: u64,
         consensus_config: vector<u8>,
+        execution_config: vector<u8>,
         epoch_interval_microsecs: u64,
         minimum_stake: u64,
         maximum_stake: u64,
@@ -103,6 +105,7 @@ module aptos_framework::genesis {
         };
 
         consensus_config::initialize(&aptos_framework_account, consensus_config);
+        execution_config::initialize(&aptos_framework_account, execution_config);
         version::initialize(&aptos_framework_account, initial_version);
         stake::initialize(&aptos_framework_account);
         staking_config::initialize(
@@ -400,6 +403,7 @@ module aptos_framework::genesis {
         chain_id: u8,
         initial_version: u64,
         consensus_config: vector<u8>,
+        execution_config: vector<u8>,
         epoch_interval_microsecs: u64,
         minimum_stake: u64,
         maximum_stake: u64,
@@ -423,6 +427,7 @@ module aptos_framework::genesis {
             chain_id,
             initial_version,
             consensus_config,
+            execution_config,
             epoch_interval_microsecs,
             minimum_stake,
             maximum_stake,
@@ -453,6 +458,7 @@ module aptos_framework::genesis {
             4u8, // TESTING chain ID
             0,
             x"12",
+            x"13",
             1,
             0,
             1,
