@@ -468,9 +468,10 @@ func DecodeEntryFunctionPayload(script aptostypes.TransactionPayload) (EntryFunc
         for (index, arg) in abi.args().iter().enumerate() {
             let decoding = match Self::bcs_primitive_type_name(arg.type_tag()) {
                 None => {
-                    let type_tag_str = format!("{}",(arg.type_tag()));
+                    let type_tag_str = format!("{}", (arg.type_tag()));
                     if "vector<0x1::string::String>".eq(&type_tag_str) {
-                        format!("bcs.NewDeserializer(script.Value.Args[{}]).DeserializeVecBytes()",
+                        format!(
+                            "bcs.NewDeserializer(script.Value.Args[{}]).DeserializeVecBytes()",
                             index,
                         )
                     } else {
@@ -485,10 +486,11 @@ func DecodeEntryFunctionPayload(script aptostypes.TransactionPayload) (EntryFunc
                             "{}.BcsDeserialize{}(script.Value.Args[{}])",
                             left, right, index,
                         )
-                }
-            },
+                    }
+                },
                 Some(type_name) => match type_name {
-                    "VecAddress" => format!(r#"
+                    "VecAddress" => format!(
+                        r#"
 var val {0}
 if err := deserializer.IncreaseContainerDepth(); err != nil {{
     return ({0})(val), err
@@ -509,27 +511,30 @@ for i := 0; i < int(length); i++ {{
 
 deserializer.DecreaseContainerDepth()
 call.{1} = val
-"#, Self::quote_type(arg.type_tag()), arg.name().to_camel_case()),
+"#,
+                        Self::quote_type(arg.type_tag()),
+                        arg.name().to_camel_case()
+                    ),
                     _ => format!(
-                    "bcs.NewDeserializer(script.Value.Args[{}]).Deserialize{}()",
-                    index, type_name
-                ),
-            }
+                        "bcs.NewDeserializer(script.Value.Args[{}]).Deserialize{}()",
+                        index, type_name
+                    ),
+                },
             };
             if Self::bcs_primitive_type_name(arg.type_tag()) != Some("VecAddress") {
-            writeln!(
-                self.out,
-                r#"
+                writeln!(
+                    self.out,
+                    r#"
 if val, err := {}; err == nil {{
 	call.{} = val
 }} else {{
 	return nil, err
 }}
 "#,
-                decoding,
-                arg.name().to_camel_case(),
-            )?;
-        }
+                    decoding,
+                    arg.name().to_camel_case(),
+                )?;
+            }
         }
         writeln!(self.out, "return &call, nil")?;
         self.out.unindent();
@@ -596,25 +601,28 @@ var entry_function_decoder_map = map[string]func(aptostypes.TransactionPayload) 
                 if "vecstring".eq(&common::mangle_type(type_tag)) {
                     "return encode_vecbytes_argument(arg)".to_string()
                 } else {
-                format!(r#"
+                    format!(
+                        r#"
     if val, err := arg.BcsSerialize(); err == nil {{
         return val;
     }}
     panic("Unable to serialize argument of type {}");
-    "#, common::mangle_type(type_tag))
-}
-            }
+    "#,
+                        common::mangle_type(type_tag)
+                    )
+                }
+            },
             Some(type_name) => match type_name {
-            "VecAddress" => r#"
+                "VecAddress" => r#"
     obj := []byte{ }
 	obj = append(obj, byte(len(arg)))
 	for _, val := range arg {{
 		valBytes := encode_address_argument(val)
 		obj = append(obj, valBytes...)
 	}}
-	return obj"#.into(),
-            _ =>
-                format!(
+	return obj"#
+                    .into(),
+                _ => format!(
                     r#"
     s := bcs.NewSerializer();
     if err := s.Serialize{}(arg); err == nil {{
@@ -624,9 +632,9 @@ var entry_function_decoder_map = map[string]func(aptostypes.TransactionPayload) 
     "#,
                     type_name,
                     common::mangle_type(type_tag)
-                )
-        },
-    };
+                ),
+            },
+        };
         writeln!(
             self.out,
             r#"
