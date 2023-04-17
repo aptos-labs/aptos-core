@@ -239,10 +239,10 @@ async fn test_bucketed_batch_creation() {
 
             let data = batches[0].clone();
             assert_eq!(data.batch_id(), BatchId::new_for_test(2));
-            assert_eq!(data.batch_info().gas_bucket_start(), buckets[0]);
+            assert_eq!(data.batch_info().gas_bucket_start(), buckets[4]);
             let txns = data.into_transactions();
-            // As only 9 items fit, the least gas bucket has less items.
-            assert_eq!(txns.len(), bucket_0.len() - 1);
+            // This gas bucket should have all elements
+            assert_eq!(txns.len(), bucket_4.len());
 
             let data = batches[1].clone();
             assert_eq!(data.batch_id(), BatchId::new_for_test(3));
@@ -253,10 +253,10 @@ async fn test_bucketed_batch_creation() {
 
             let data = batches[2].clone();
             assert_eq!(data.batch_id(), BatchId::new_for_test(4));
-            assert_eq!(data.batch_info().gas_bucket_start(), buckets[4]);
+            assert_eq!(data.batch_info().gas_bucket_start(), buckets[0]);
             let txns = data.into_transactions();
-            // This gas bucket should have all elements
-            assert_eq!(txns.len(), bucket_4.len());
+            // As only 9 items fit, the least gas bucket has less items.
+            assert_eq!(txns.len(), bucket_0.len() - 1);
         } else {
             panic!("Unexpected variant")
         }
@@ -395,11 +395,11 @@ async fn test_last_bucketed_batch() {
             assert_eq!(result.len(), 2);
             assert_eq!(result[0].num_txns(), 1);
             assert_eq!(result[1].num_txns(), 1);
-            assert_eq!(result[0].gas_bucket_start(), 0);
-            assert_eq!(result[1].gas_bucket_start(), buckets[buckets.len() - 1]);
+            assert_eq!(result[0].gas_bucket_start(), buckets[buckets.len() - 1]);
+            assert_eq!(result[1].gas_bucket_start(), 0);
 
-            assert_eq!(&result[0].clone().into_transactions(), &signed_txns[0..1]);
-            assert_eq!(&result[1].clone().into_transactions(), &signed_txns[1..]);
+            assert_eq!(&result[0].clone().into_transactions(), &signed_txns[1..]);
+            assert_eq!(&result[1].clone().into_transactions(), &signed_txns[0..1]);
         } else {
             panic!("Unexpected variant")
         }

@@ -19,7 +19,6 @@ use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use futures_channel::mpsc::Sender;
-use itertools::Itertools;
 use rand::{thread_rng, RngCore};
 use std::{
     collections::HashMap,
@@ -47,6 +46,7 @@ pub struct BatchGenerator {
     batch_id: BatchId,
     db: Arc<dyn QuorumStoreStorage>,
     config: QuorumStoreConfig,
+    buckets: Vec<u64>,
     mempool_proxy: MempoolProxy,
     batches_in_progress: HashMap<BatchId, Vec<TransactionInProgress>>,
     batch_expirations: TimeExpirations<BatchId>,
@@ -81,12 +81,14 @@ impl BatchGenerator {
         db.save_batch_id(epoch, incremented_batch_id)
             .expect("Could not save to db");
 
+        let buckets = config.batch_buckets.clone();
         Self {
             epoch,
             my_peer_id,
             batch_id,
             db,
             config,
+            buckets,
             mempool_proxy: MempoolProxy::new(mempool_tx, mempool_txn_pull_timeout_ms),
             batches_in_progress: HashMap::new(),
             batch_expirations: TimeExpirations::new(),
@@ -161,23 +163,35 @@ impl BatchGenerator {
         true
     }
 
+    fn get_descending_bucket_key(&self, txn: &SignedTransaction) -> u64 {
+        let bucket_index = match self.buckets.binary_search(&txn.gas_unit_price()) {
+            Ok(bucket_start) => bucket_start as u64,
+            Err(bucket_start) => bucket_start as u64,
+        };
+        u64::MAX - bucket_index
+    }
+
     fn bucket_into_batches(
         &mut self,
         pulled_txns: &mut Vec<SignedTransaction>,
         expiry_time: u64,
     ) -> Vec<Batch> {
-        pulled_txns.sort_by_key(|txn| txn.gas_unit_price());
+        // Sort by gas bucket, in descending order. Due to stable sort on existing mempool account
+        // ordering, this will result in (descending(gas), account) order.
+        pulled_txns.sort_by_cached_key(|txn| self.get_descending_bucket_key(txn));
 
+        let reverse_buckets_excluding_zero: Vec<_> =
+            self.buckets.iter().skip(1).rev().cloned().collect();
         let mut batches = vec![];
-        let buckets = self.config.batch_buckets.clone();
-        for (&bucket_start, &bucket_end) in buckets.iter().tuple_windows() {
+        for bucket_start in &reverse_buckets_excluding_zero {
             if pulled_txns.is_empty() {
                 break;
             }
 
+            // Search for key in descending gas order
             let num_txns_in_bucket = match pulled_txns
-                .binary_search_by_key(&(bucket_end, PeerId::ZERO), |txn| {
-                    (txn.gas_unit_price(), txn.sender())
+                .binary_search_by_key(&(u64::MAX - (*bucket_start - 1), PeerId::ZERO), |txn| {
+                    (u64::MAX - txn.gas_unit_price(), txn.sender())
                 }) {
                 Ok(index) => index,
                 Err(index) => index,
@@ -191,21 +205,19 @@ impl BatchGenerator {
                 pulled_txns,
                 num_txns_in_bucket,
                 expiry_time,
-                bucket_start,
+                *bucket_start,
             );
             if !batches_space_remaining {
                 return batches;
             }
         }
         if !pulled_txns.is_empty() {
-            let bucket_start = *self.config.batch_buckets.last().unwrap();
-
             self.push_bucket_to_batches(
                 &mut batches,
                 pulled_txns,
                 pulled_txns.len(),
                 expiry_time,
-                bucket_start,
+                0,
             );
         }
         batches

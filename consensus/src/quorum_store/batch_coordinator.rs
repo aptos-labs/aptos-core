@@ -27,7 +27,6 @@ pub struct BatchCoordinator {
     batch_store: Arc<BatchStore<NetworkSender>>,
     max_batch_txns: u64,
     max_batch_bytes: u64,
-    max_num_batches: usize,
     max_total_txns: u64,
     max_total_bytes: u64,
 }
@@ -39,7 +38,6 @@ impl BatchCoordinator {
         batch_store: Arc<BatchStore<NetworkSender>>,
         max_batch_txns: u64,
         max_batch_bytes: u64,
-        max_num_batches: usize,
         max_total_txns: u64,
         max_total_bytes: u64,
     ) -> Self {
@@ -49,7 +47,6 @@ impl BatchCoordinator {
             batch_store,
             max_batch_txns,
             max_batch_bytes,
-            max_num_batches,
             max_total_txns,
             max_total_bytes,
         }
