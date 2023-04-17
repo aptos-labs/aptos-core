@@ -23,7 +23,7 @@ use tonic::{transport::Server, Request, Response, Status};
 
 // Default Values
 pub const DEFAULT_NUM_RETRIES: usize = 3;
-pub const RETRY_TIME_MILLIS: u64 = 300;
+pub const RETRY_TIME_MILLIS: u64 = 100;
 const TRANSACTION_CHANNEL_SIZE: usize = 35;
 const DEFAULT_EMIT_SIZE: usize = 1000;
 
