@@ -4,11 +4,37 @@
 use crate::{
     assert_abort, assert_success, get_stake_pool, get_validator_config, get_validator_set,
     initialize_staking, join_validator_set, leave_validator_set, rotate_consensus_key,
-    setup_staking, unlock_stake, withdraw_stake, MoveHarness,
+    setup_staking, tests::common, unlock_stake, withdraw_stake, MoveHarness,
 };
 use aptos_cached_packages::aptos_stdlib;
 use aptos_types::account_address::{default_stake_pool_address, AccountAddress};
 use move_core_types::language_storage::CORE_CODE_ADDRESS;
+use once_cell::sync::Lazy;
+use std::collections::BTreeMap;
+
+pub static PROPOSAL_SCRIPTS: Lazy<BTreeMap<String, Vec<u8>>> = Lazy::new(build_scripts);
+
+fn build_scripts() -> BTreeMap<String, Vec<u8>> {
+    let package_folder = "stake.data";
+    let package_names = vec!["enable_rewards_rate_decrease"];
+    common::build_scripts(package_folder, package_names)
+}
+
+fn update_stake_amount_and_assert_with_errors(
+    harness: &mut MoveHarness,
+    stake_amount: &mut u64,
+    validator_address: AccountAddress,
+    rewards_rate: u64,
+    rewards_rate_denominator: u64,
+) {
+    *stake_amount += *stake_amount * rewards_rate / rewards_rate_denominator;
+    // The calculation uses fixed_point64 so we allow errors up to 1.
+    assert!(
+        *stake_amount - 1 <= get_stake_pool(harness, &validator_address).active
+            && get_stake_pool(harness, &validator_address).active <= *stake_amount + 1
+    );
+    *stake_amount = get_stake_pool(harness, &validator_address).active;
+}
 
 #[test]
 fn test_staking_end_to_end() {
@@ -187,6 +213,105 @@ fn test_staking_rewards() {
     assert_eq!(
         get_stake_pool(&harness, &validator_1_address).active,
         stake_amount_1
+    );
+
+    harness.new_block_with_metadata(validator_1_address, vec![]);
+    harness.new_block_with_metadata(validator_2_address, vec![]);
+    // Enable rewards rate decrease and change rewards config. In production it requires governance.
+    let core_resources =
+        harness.new_account_at(AccountAddress::from_hex_literal("0xA550C18").unwrap());
+    let script_code = PROPOSAL_SCRIPTS
+        .get("enable_rewards_rate_decrease")
+        .expect("proposal script should be built");
+    let txn = harness.create_script(&core_resources, script_code.clone(), vec![], vec![]);
+    assert_success!(harness.run(txn));
+
+    // Parameters from the proposal.
+    let one_year_in_secs: u64 = 365 * 24 * 60 * 60;
+    let mut rewards_rate: u64 = 100;
+    let min_rewards_rate: u64 = 30;
+    let rewards_rate_denominator: u64 = 10000;
+    let rewards_rate_decrease_rate_bps: u64 = 5000;
+    let bps_denominator: u64 = 10000;
+
+    // The initialize script calls reconfigure(). This epoch ends immediately.
+    // Both validators propose a block in the current epoch. Both should receive rewards at the
+    // new rewards rate, 1% every epoch.
+    update_stake_amount_and_assert_with_errors(
+        &mut harness,
+        &mut stake_amount_1,
+        validator_1_address,
+        rewards_rate,
+        rewards_rate_denominator,
+    );
+    update_stake_amount_and_assert_with_errors(
+        &mut harness,
+        &mut stake_amount_2,
+        validator_2_address,
+        rewards_rate,
+        rewards_rate_denominator,
+    );
+
+    // 0.5 year passed. Rewards rate halves. Rewards rate doesn't change.
+    // Both validators propose a block in the current epoch. Both should receive rewards.
+    harness.new_block_with_metadata(validator_1_address, vec![]);
+    harness.new_block_with_metadata(validator_2_address, vec![]);
+    harness.fast_forward(one_year_in_secs / 2);
+    harness.new_epoch();
+    update_stake_amount_and_assert_with_errors(
+        &mut harness,
+        &mut stake_amount_1,
+        validator_1_address,
+        rewards_rate,
+        rewards_rate_denominator,
+    );
+    update_stake_amount_and_assert_with_errors(
+        &mut harness,
+        &mut stake_amount_2,
+        validator_2_address,
+        rewards_rate,
+        rewards_rate_denominator,
+    );
+
+    // Another 0.5 year passed. Rewards rate halves. New rewards rate is 0.5% every epoch.
+    // Both validators propose a block in the current epoch. Both should receive rewards.
+    harness.new_block_with_metadata(validator_1_address, vec![]);
+    harness.new_block_with_metadata(validator_2_address, vec![]);
+    harness.fast_forward(one_year_in_secs / 2);
+    harness.new_epoch();
+    rewards_rate = rewards_rate * rewards_rate_decrease_rate_bps / bps_denominator;
+    update_stake_amount_and_assert_with_errors(
+        &mut harness,
+        &mut stake_amount_1,
+        validator_1_address,
+        rewards_rate,
+        rewards_rate_denominator,
+    );
+    update_stake_amount_and_assert_with_errors(
+        &mut harness,
+        &mut stake_amount_2,
+        validator_2_address,
+        rewards_rate,
+        rewards_rate_denominator,
+    );
+
+    // Another year passed. Rewards rate halves but it cannot be lower than 0.3%.
+    // New rewards rate is 0.3% every epoch.
+    // Validator 1 misses one proposal but has one successful so they receive half of the rewards.
+    harness.new_block_with_metadata(validator_1_address, vec![index_1]);
+    harness.fast_forward(one_year_in_secs);
+    harness.new_epoch();
+    rewards_rate = min_rewards_rate / 2;
+    update_stake_amount_and_assert_with_errors(
+        &mut harness,
+        &mut stake_amount_1,
+        validator_1_address,
+        rewards_rate,
+        rewards_rate_denominator,
+    );
+    assert_eq!(
+        get_stake_pool(&harness, &validator_2_address).active,
+        stake_amount_2
     );
 }
 

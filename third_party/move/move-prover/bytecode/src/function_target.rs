@@ -21,7 +21,7 @@ use move_model::{
     ty::{Type, TypeDisplayContext},
 };
 use std::{
-    cell::RefCell,
+    cell::{Ref, RefCell},
     collections::{BTreeMap, BTreeSet},
     fmt,
     ops::Range,
@@ -253,7 +253,7 @@ impl<'env> FunctionTarget<'env> {
     }
 
     /// Returns specification associated with this function.
-    pub fn get_spec(&'env self) -> &'env Spec {
+    pub fn get_spec(&'env self) -> Ref<Spec> {
         self.func_env.get_spec()
     }
 

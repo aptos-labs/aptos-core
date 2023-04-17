@@ -9,23 +9,18 @@
 /// * Addressed by a global identifier of creator's address and collection name, thus collections
 ///   cannot be deleted as a restriction of the object model.
 /// * Optional support for collection-wide royalties
-/// * Optional support for tracking of supply
-///
-/// This collection does not directly support:
-/// * Events on mint or burn -- that's left to the collection creator.
+/// * Optional support for tracking of supply with events on mint or burn
 ///
 /// TODO:
 /// * Consider supporting changing the name of the collection with the MutatorRef. This would
 ///   require adding the field original_name.
 /// * Consider supporting changing the aspects of supply with the MutatorRef.
 /// * Add aggregator support when added to framework
-/// * Update Object<T> to be viable input as a transaction arg and then update all readers as view.
 module aptos_token_objects::collection {
     use std::error;
     use std::option::{Self, Option};
     use std::signer;
     use std::string::{Self, String};
-
     use aptos_framework::event;
     use aptos_framework::object::{Self, ConstructorRef, Object};
 
@@ -33,10 +28,22 @@ module aptos_token_objects::collection {
 
     friend aptos_token_objects::token;
 
-    /// The collections supply is at its maximum amount
-    const EEXCEEDS_MAX_SUPPLY: u64 = 1;
     /// The collection does not exist
-    const ECOLLECTION_DOES_NOT_EXIST: u64 = 2;
+    const ECOLLECTION_DOES_NOT_EXIST: u64 = 1;
+    /// The collection has reached its supply and no more tokens can be minted, unless some are burned
+    const ECOLLECTION_SUPPLY_EXCEEDED: u64 = 2;
+    /// The collection name is over the maximum length
+    const ECOLLECTION_NAME_TOO_LONG: u64 = 3;
+    /// The URI is over the maximum length
+    const EURI_TOO_LONG: u64 = 4;
+    /// The description is over the maximum length
+    const EDESCRIPTION_TOO_LONG: u64 = 5;
+    /// The max supply must be positive
+    const EMAX_SUPPLY_CANNOT_BE_ZERO: u64 = 6;
+
+    const MAX_COLLECTION_NAME_LENGTH: u64 = 128;
+    const MAX_URI_LENGTH: u64 = 512;
+    const MAX_DESCRIPTION_LENGTH: u64 = 2048;
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Represents the common fields for a collection.
@@ -67,16 +74,44 @@ module aptos_token_objects::collection {
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Fixed supply tracker, this is useful for ensuring that a limited number of tokens are minted.
+    /// and adding events and supply tracking to a collection.
     struct FixedSupply has key {
+        /// Total minted - total burned
         current_supply: u64,
         max_supply: u64,
         total_minted: u64,
+        /// Emitted upon burning a Token.
+        burn_events: event::EventHandle<BurnEvent>,
+        /// Emitted upon minting an Token.
+        mint_events: event::EventHandle<MintEvent>,
+    }
+
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    /// Unlimited supply tracker, this is useful for adding events and supply tracking to a collection.
+    struct UnlimitedSupply has key {
+        current_supply: u64,
+        total_minted: u64,
+        /// Emitted upon burning a Token.
+        burn_events: event::EventHandle<BurnEvent>,
+        /// Emitted upon minting an Token.
+        mint_events: event::EventHandle<MintEvent>,
+    }
+
+    struct BurnEvent has drop, store {
+        collection_id: u64,
+        token: address,
+    }
+
+    struct MintEvent has drop, store {
+        collection_id: u64,
+        token: address,
     }
 
     /// Creates a fixed-sized collection, or a collection that supports a fixed amount of tokens.
     /// This is useful to create a guaranteed, limited supply on-chain digital asset. For example,
     /// a collection 1111 vicious vipers. Note, creating restrictions such as upward limits results
     /// in data structures that prevent Aptos from parallelizing mints of this collection type.
+    /// Beyond that, it adds supply tracking with events.
     public fun create_fixed_collection(
         creator: &signer,
         description: String,
@@ -85,14 +120,53 @@ module aptos_token_objects::collection {
         royalty: Option<Royalty>,
         uri: String,
     ): ConstructorRef {
+        assert!(max_supply != 0, error::invalid_argument(EMAX_SUPPLY_CANNOT_BE_ZERO));
+        let collection_seed = create_collection_seed(&name);
+        let constructor_ref = object::create_named_object(creator, collection_seed);
+        let object_signer = object::generate_signer(&constructor_ref);
+
         let supply = FixedSupply {
             current_supply: 0,
             max_supply,
             total_minted: 0,
+            burn_events: object::new_event_handle(&object_signer),
+            mint_events: object::new_event_handle(&object_signer),
         };
 
         create_collection_internal(
             creator,
+            constructor_ref,
+            description,
+            name,
+            royalty,
+            uri,
+            option::some(supply),
+        )
+    }
+
+    /// Creates an unlimited collection. This has support for supply tracking but does not limit
+    /// the supply of tokens.
+    public fun create_unlimited_collection(
+        creator: &signer,
+        description: String,
+        name: String,
+        royalty: Option<Royalty>,
+        uri: String,
+    ): ConstructorRef {
+        let collection_seed = create_collection_seed(&name);
+        let constructor_ref = object::create_named_object(creator, collection_seed);
+        let object_signer = object::generate_signer(&constructor_ref);
+
+        let supply = UnlimitedSupply {
+            current_supply: 0,
+            total_minted: 0,
+            burn_events: object::new_event_handle(&object_signer),
+            mint_events: object::new_event_handle(&object_signer),
+        };
+
+        create_collection_internal(
+            creator,
+            constructor_ref,
             description,
             name,
             royalty,
@@ -103,15 +177,20 @@ module aptos_token_objects::collection {
 
     /// Creates an untracked collection, or a collection that supports an arbitrary amount of
     /// tokens. This is useful for mass airdrops that fully leverage Aptos parallelization.
-    public fun create_untracked_collection(
+    /// TODO: Hide this until we bring back meaningful way to enforce burns
+    fun create_untracked_collection(
         creator: &signer,
         description: String,
         name: String,
         royalty: Option<Royalty>,
         uri: String,
     ): ConstructorRef {
+        let collection_seed = create_collection_seed(&name);
+        let constructor_ref = object::create_named_object(creator, collection_seed);
+
         create_collection_internal<FixedSupply>(
             creator,
+            constructor_ref,
             description,
             name,
             royalty,
@@ -122,14 +201,17 @@ module aptos_token_objects::collection {
 
     inline fun create_collection_internal<Supply: key>(
         creator: &signer,
+        constructor_ref: ConstructorRef,
         description: String,
         name: String,
         royalty: Option<Royalty>,
         uri: String,
         supply: Option<Supply>,
     ): ConstructorRef {
-        let collection_seed = create_collection_seed(&name);
-        let constructor_ref = object::create_named_object(creator, collection_seed);
+        assert!(string::length(&name) <= MAX_COLLECTION_NAME_LENGTH, error::out_of_range(ECOLLECTION_NAME_TOO_LONG));
+        assert!(string::length(&uri) <= MAX_URI_LENGTH, error::out_of_range(EURI_TOO_LONG));
+        assert!(string::length(&description) <= MAX_DESCRIPTION_LENGTH, error::out_of_range(EDESCRIPTION_TOO_LONG));
+
         let object_signer = object::generate_signer(&constructor_ref);
 
         let collection = Collection {
@@ -164,13 +246,15 @@ module aptos_token_objects::collection {
 
     /// Named objects are derived from a seed, the collection's seed is its name.
     public fun create_collection_seed(name: &String): vector<u8> {
+        assert!(string::length(name) <= MAX_COLLECTION_NAME_LENGTH, error::out_of_range(ECOLLECTION_NAME_TOO_LONG));
         *string::bytes(name)
     }
 
     /// Called by token on mint to increment supply if there's an appropriate Supply struct.
     public(friend) fun increment_supply(
         collection: &Object<Collection>,
-    ): Option<u64> acquires FixedSupply {
+        token: address,
+    ): Option<u64> acquires FixedSupply, UnlimitedSupply {
         let collection_addr = object::object_address(collection);
         if (exists<FixedSupply>(collection_addr)) {
             let supply = borrow_global_mut<FixedSupply>(collection_addr);
@@ -178,7 +262,25 @@ module aptos_token_objects::collection {
             supply.total_minted = supply.total_minted + 1;
             assert!(
                 supply.current_supply <= supply.max_supply,
-                error::out_of_range(EEXCEEDS_MAX_SUPPLY),
+                error::out_of_range(ECOLLECTION_SUPPLY_EXCEEDED),
+            );
+            event::emit_event(&mut supply.mint_events,
+                MintEvent {
+                    collection_id: supply.total_minted,
+                    token,
+                },
+            );
+            option::some(supply.total_minted)
+        } else if (exists<UnlimitedSupply>(collection_addr)) {
+            let supply = borrow_global_mut<UnlimitedSupply>(collection_addr);
+            supply.current_supply = supply.current_supply + 1;
+            supply.total_minted = supply.total_minted + 1;
+            event::emit_event(
+                &mut supply.mint_events,
+                MintEvent {
+                    collection_id: supply.total_minted,
+                    token,
+                },
             );
             option::some(supply.total_minted)
         } else {
@@ -187,11 +289,32 @@ module aptos_token_objects::collection {
     }
 
     /// Called by token on burn to decrement supply if there's an appropriate Supply struct.
-    public(friend) fun decrement_supply(collection: &Object<Collection>) acquires FixedSupply {
+    public(friend) fun decrement_supply(
+        collection: &Object<Collection>,
+        token: address,
+        collection_id: Option<u64>,
+    ) acquires FixedSupply, UnlimitedSupply {
         let collection_addr = object::object_address(collection);
         if (exists<FixedSupply>(collection_addr)) {
             let supply = borrow_global_mut<FixedSupply>(collection_addr);
             supply.current_supply = supply.current_supply - 1;
+            event::emit_event(
+                &mut supply.mint_events,
+                MintEvent {
+                    collection_id: *option::borrow(&collection_id),
+                    token,
+                },
+            );
+        } else if (exists<UnlimitedSupply>(collection_addr)) {
+            let supply = borrow_global_mut<UnlimitedSupply>(collection_addr);
+            supply.current_supply = supply.current_supply - 1;
+            event::emit_event(
+                &mut supply.mint_events,
+                MintEvent {
+                    collection_id: *option::borrow(&collection_id),
+                    token,
+                },
+            );
         }
     }
 
@@ -203,42 +326,52 @@ module aptos_token_objects::collection {
 
     // Accessors
 
-    inline fun borrow<T: key>(collection: &Object<T>): &Collection {
-        let collection_address = object::object_address(collection);
+    inline fun check_collection_exists(addr: address) {
         assert!(
-            exists<Collection>(collection_address),
+            exists<Collection>(addr),
             error::not_found(ECOLLECTION_DOES_NOT_EXIST),
         );
+    }
+
+    inline fun borrow<T: key>(collection: &Object<T>): &Collection {
+        let collection_address = object::object_address(collection);
+        check_collection_exists(collection_address);
         borrow_global<Collection>(collection_address)
     }
 
-    public fun count<T: key>(collection: Object<T>): Option<u64> acquires FixedSupply {
+    #[view]
+    /// Provides the count of the current selection if supply tracking is used
+    public fun count<T: key>(collection: Object<T>): Option<u64> acquires FixedSupply, UnlimitedSupply {
         let collection_address = object::object_address(&collection);
-        assert!(
-            exists<Collection>(collection_address),
-            error::not_found(ECOLLECTION_DOES_NOT_EXIST),
-        );
+        check_collection_exists(collection_address);
 
         if (exists<FixedSupply>(collection_address)) {
             let supply = borrow_global_mut<FixedSupply>(collection_address);
+            option::some(supply.current_supply)
+        } else if (exists<UnlimitedSupply>(collection_address)) {
+            let supply = borrow_global_mut<UnlimitedSupply>(collection_address);
             option::some(supply.current_supply)
         } else {
             option::none()
         }
     }
 
+    #[view]
     public fun creator<T: key>(collection: Object<T>): address acquires Collection {
         borrow(&collection).creator
     }
 
+    #[view]
     public fun description<T: key>(collection: Object<T>): String acquires Collection {
         borrow(&collection).description
     }
 
+    #[view]
     public fun name<T: key>(collection: Object<T>): String acquires Collection {
         borrow(&collection).name
     }
 
+    #[view]
     public fun uri<T: key>(collection: Object<T>): String acquires Collection {
         borrow(&collection).uri
     }
@@ -246,14 +379,12 @@ module aptos_token_objects::collection {
     // Mutators
 
     inline fun borrow_mut(mutator_ref: &MutatorRef): &mut Collection {
-        assert!(
-            exists<Collection>(mutator_ref.self),
-            error::not_found(ECOLLECTION_DOES_NOT_EXIST),
-        );
+        check_collection_exists(mutator_ref.self);
         borrow_global_mut<Collection>(mutator_ref.self)
     }
 
     public fun set_description(mutator_ref: &MutatorRef, description: String) acquires Collection {
+        assert!(string::length(&description) <= MAX_DESCRIPTION_LENGTH, error::out_of_range(EDESCRIPTION_TOO_LONG));
         let collection = borrow_mut(mutator_ref);
         collection.description = description;
         event::emit_event(
@@ -263,6 +394,7 @@ module aptos_token_objects::collection {
     }
 
     public fun set_uri(mutator_ref: &MutatorRef, uri: String) acquires Collection {
+        assert!(string::length(&uri) <= MAX_URI_LENGTH, error::out_of_range(EURI_TOO_LONG));
         let collection = borrow_mut(mutator_ref);
         collection.uri = uri;
         event::emit_event(
@@ -272,6 +404,36 @@ module aptos_token_objects::collection {
     }
 
     // Tests
+
+    #[test(creator = @0x123)]
+    fun test_create_mint_burn_for_unlimited(creator: &signer) acquires FixedSupply, UnlimitedSupply {
+        let creator_address = signer::address_of(creator);
+        let name = string::utf8(b"collection name");
+        create_unlimited_collection(creator, string::utf8(b""), name, option::none(), string::utf8(b""));
+        let collection = object::address_to_object<Collection>(
+            create_collection_address(&creator_address, &name),
+        );
+        assert!(count(collection) == option::some(0), 0);
+        let cid = increment_supply(&collection, creator_address);
+        assert!(count(collection) == option::some(1), 0);
+        decrement_supply(&collection, creator_address, cid);
+        assert!(count(collection) == option::some(0), 0);
+    }
+
+    #[test(creator = @0x123)]
+    fun test_create_mint_burn_for_fixed(creator: &signer) acquires FixedSupply, UnlimitedSupply {
+        let creator_address = signer::address_of(creator);
+        let name = string::utf8(b"collection name");
+        create_fixed_collection(creator, string::utf8(b""), 1, name, option::none(), string::utf8(b""));
+        let collection = object::address_to_object<Collection>(
+            create_collection_address(&creator_address, &name),
+        );
+        assert!(count(collection) == option::some(0), 0);
+        let cid = increment_supply(&collection, creator_address);
+        assert!(count(collection) == option::some(1), 0);
+        decrement_supply(&collection, creator_address, cid);
+        assert!(count(collection) == option::some(0), 0);
+    }
 
     #[test(creator = @0x123, trader = @0x456)]
     #[expected_failure(abort_code = 0x50003, location = aptos_framework::object)]

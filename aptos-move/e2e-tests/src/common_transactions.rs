@@ -54,13 +54,16 @@ pub fn create_account_txn(
         .sign()
 }
 
-/// Returns a transaction to transfer coin from one account to another (possibly new) one, with the
-/// given arguments.
+/// Returns a transaction to transfer coin from one account to another (possibly new) one,
+/// with the given arguments. Providing 0 as gas_unit_price generates transactions that
+/// don't use an aggregator for total supply tracking (due to logic in coin.move that
+/// doesn't generate a delta for total supply when gas is 0).
 pub fn peer_to_peer_txn(
     sender: &Account,
     receiver: &Account,
     seq_num: u64,
     transfer_amount: u64,
+    gas_unit_price: u64,
 ) -> SignedTransaction {
     // get a SignedTransaction
     sender
@@ -70,5 +73,6 @@ pub fn peer_to_peer_txn(
             transfer_amount,
         ))
         .sequence_number(seq_num)
+        .gas_unit_price(gas_unit_price)
         .sign()
 }

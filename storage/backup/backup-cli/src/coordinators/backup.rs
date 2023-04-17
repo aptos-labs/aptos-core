@@ -244,7 +244,7 @@ impl BackupCoordinator {
             self.state_snapshot_interval_epochs,
         );
 
-        // <= becuse db_state.epoch is still open
+        // <= because db_state.epoch is still open
         if db_state.epoch <= epoch {
             // wait for the next db_state update
             return Ok(last_snapshot_epoch_in_backup);

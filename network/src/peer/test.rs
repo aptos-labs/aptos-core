@@ -90,8 +90,6 @@ fn build_test_peer(
         MAX_CONCURRENT_OUTBOUND_RPCS,
         MAX_FRAME_SIZE,
         MAX_MESSAGE_SIZE,
-        None,
-        None,
     );
     let peer_handle = PeerHandle(peer_reqs_tx);
 
@@ -149,8 +147,8 @@ fn build_network_sink_stream(
     MultiplexMessageStream<impl AsyncRead + '_>,
 ) {
     let (read_half, write_half) = tokio::io::split(connection.compat());
-    let sink = MultiplexMessageSink::new(write_half.compat_write(), MAX_FRAME_SIZE, None);
-    let stream = MultiplexMessageStream::new(read_half.compat(), MAX_FRAME_SIZE, None);
+    let sink = MultiplexMessageSink::new(write_half.compat_write(), MAX_FRAME_SIZE);
+    let stream = MultiplexMessageStream::new(read_half.compat(), MAX_FRAME_SIZE);
     (sink, stream)
 }
 
@@ -263,7 +261,7 @@ fn peer_recv_message() {
     });
 
     let client = async move {
-        let mut connection = MultiplexMessageSink::new(connection, MAX_FRAME_SIZE, None);
+        let mut connection = MultiplexMessageSink::new(connection, MAX_FRAME_SIZE);
         for _ in 0..30 {
             // The client should then send the network message.
             connection.send(&send_msg).await.unwrap();

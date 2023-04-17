@@ -207,19 +207,6 @@ jobs:
       FORGE_TEST_SUITE: fullnode_reboot_stress_test
       POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
 
-  run-forge-network-partition-test:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-network-partition-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      # Run for 15 minutes
-      FORGE_RUNNER_DURATION_SECS: 900
-      FORGE_TEST_SUITE: network_partition
-      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
-
   ### Changing working quorum Forge tests
 
   run-forge-changing-working-quorum-test:

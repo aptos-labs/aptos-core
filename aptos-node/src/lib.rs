@@ -359,7 +359,7 @@ fn create_single_node_test_config(
 
     // Set the correct poll count for mempool
     if enable_lazy_mode {
-        node_config.consensus.quorum_store_poll_count = u64::MAX;
+        node_config.consensus.quorum_store_poll_time_ms = 3_600_000;
     }
 
     node_config
@@ -422,6 +422,7 @@ pub fn setup_environment_and_start_node(
     let peer_monitoring_service_runtime = services::start_peer_monitoring_service(
         &node_config,
         peer_monitoring_service_network_interfaces,
+        db_rw.reader.clone(),
     );
 
     // Start state sync and get the notification endpoints for mempool and consensus

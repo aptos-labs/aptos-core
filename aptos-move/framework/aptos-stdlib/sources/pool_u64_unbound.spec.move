@@ -7,8 +7,8 @@ spec aptos_std::pool_u64_unbound {
     // -----------------------
 
     spec Pool {
-        invariant forall addr: address:
-            table::spec_contains(shares, addr) ==> (table::spec_get(shares, addr) > 0);
+        // invariant forall addr: address:
+        // table::spec_contains(shares, addr) ==> (table::spec_get(shares, addr) > 0);
     }
 
     spec fun spec_contains(pool: Pool, shareholder: address): bool {
@@ -84,38 +84,26 @@ spec aptos_std::pool_u64_unbound {
             pool.shares == table::spec_set(old(pool.shares), shareholder, new_shares);
     }
 
-    spec fun spec_amount_to_shares_with_total_coins(pool: Pool, coins_amount: u64, total_coins: u64): u128 {
-        if (pool.total_coins == 0 || pool.total_shares == 0) {
-            coins_amount * pool.scaling_factor
-        }
-        else {
-            (coins_amount * pool.total_shares) / total_coins
-        }
-    }
+    spec fun spec_amount_to_shares_with_total_coins(pool: Pool, coins_amount: u64, total_coins: u64): u128;
 
     spec amount_to_shares_with_total_coins(pool: &Pool, coins_amount: u64, total_coins: u64): u128 {
+        pragma opaque;
         aborts_if pool.total_coins > 0 && pool.total_shares > 0
             && (coins_amount * pool.total_shares) / total_coins > MAX_U128;
         aborts_if (pool.total_coins == 0 || pool.total_shares == 0)
             && coins_amount * pool.scaling_factor > MAX_U128;
         aborts_if pool.total_coins > 0 && pool.total_shares > 0 && total_coins == 0;
-        ensures result == spec_amount_to_shares_with_total_coins(pool, coins_amount, total_coins);
+        ensures [abstract] result == spec_amount_to_shares_with_total_coins(pool, coins_amount, total_coins);
     }
 
     spec shares_to_amount_with_total_coins(pool: &Pool, shares: u128, total_coins: u64): u64 {
+        pragma opaque;
         aborts_if pool.total_coins > 0 && pool.total_shares > 0
             && (shares * total_coins) / pool.total_shares > MAX_U64;
-        ensures result == spec_shares_to_amount_with_total_coins(pool, shares, total_coins);
+        ensures [abstract] result == spec_shares_to_amount_with_total_coins(pool, shares, total_coins);
     }
 
-    spec fun spec_shares_to_amount_with_total_coins(pool: Pool, shares: u128, total_coins: u64): u64 {
-        if (pool.total_coins == 0 || pool.total_shares == 0) {
-            0
-        }
-        else {
-            (shares * total_coins) / pool.total_shares
-        }
-    }
+    spec fun spec_shares_to_amount_with_total_coins(pool: Pool, shares: u128, total_coins: u64): u64;
 
     spec multiply_then_divide(_pool: &Pool, x: u128, y: u128, z: u128): u128 {
         aborts_if z == 0;

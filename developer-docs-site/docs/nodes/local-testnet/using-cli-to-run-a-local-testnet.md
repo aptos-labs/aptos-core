@@ -38,7 +38,7 @@ Completed generating configuration:
 
 Aptos is running, press ctrl-c to exit
 
-Faucet is running.  Faucet endpoint: 0.0.0.0:8081
+Faucet is running.  Faucet endpoint: http://0.0.0.0:8081
 ```
 
 The above command will use the default configuration for the validator node.

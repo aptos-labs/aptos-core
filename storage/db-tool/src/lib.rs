@@ -10,6 +10,7 @@ mod replay_verify;
 mod restore;
 #[cfg(test)]
 mod tests;
+mod utils;
 
 use anyhow::Result;
 use clap::Parser;

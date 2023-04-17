@@ -20,7 +20,9 @@ use crate::{
             extract_epoch_to_proposers, AptosDBBackend, LeaderReputation,
             ProposerAndVoterHeuristic, ReputationHeuristic,
         },
-        proposal_generator::{ChainHealthBackoffConfig, ProposalGenerator},
+        proposal_generator::{
+            ChainHealthBackoffConfig, PipelineBackpressureConfig, ProposalGenerator,
+        },
         proposer_election::ProposerElection,
         rotating_proposer_election::{choose_leader, RotatingProposer},
         round_proposer_election::RoundProposer,
@@ -135,6 +137,8 @@ pub struct EpochManager {
     batch_retrieval_tx:
         Option<aptos_channel::Sender<AccountAddress, IncomingBatchRetrievalRequest>>,
     bounded_executor: BoundedExecutor,
+    // recovery_mode is set to true when the recovery manager is spawned
+    recovery_mode: bool,
 }
 
 impl EpochManager {
@@ -180,6 +184,7 @@ impl EpochManager {
             quorum_store_storage,
             batch_retrieval_tx: None,
             bounded_executor,
+            recovery_mode: false,
         }
     }
 
@@ -638,6 +643,9 @@ impl EpochManager {
         );
         let chain_health_backoff_config =
             ChainHealthBackoffConfig::new(self.config.chain_health_backoff.clone());
+        let pipeline_backpressure_config =
+            PipelineBackpressureConfig::new(self.config.pipeline_backpressure.clone());
+
         let safety_rules_container = Arc::new(Mutex::new(safety_rules));
 
         // Start QuorumStore
@@ -650,7 +658,7 @@ impl EpochManager {
                 self.epoch(),
                 self.author,
                 epoch_state.verifier.len() as u64,
-                self.config.quorum_store_configs.clone(),
+                self.config.quorum_store_configs,
                 consensus_to_quorum_store_rx,
                 self.quorum_store_to_mempool_sender.clone(),
                 self.config.mempool_txn_pull_timeout_ms,
@@ -676,7 +684,6 @@ impl EpochManager {
 
         let payload_client = QuorumStoreClient::new(
             consensus_to_quorum_store_tx,
-            self.config.quorum_store_poll_count, // TODO: consider moving it to a quorum store config in later PRs.
             self.config.quorum_store_pull_timeout_ms,
             self.config.wait_for_full_blocks_above_recent_fill_threshold,
             self.config.wait_for_full_blocks_above_pending_blocks,
@@ -702,7 +709,7 @@ impl EpochManager {
             state_computer,
             self.config.max_pruned_blocks_in_mem,
             Arc::clone(&self.time_service),
-            onchain_consensus_config.back_pressure_limit(),
+            self.config.vote_back_pressure_limit,
             payload_manager.clone(),
         ));
 
@@ -721,11 +728,13 @@ impl EpochManager {
             block_store.clone(),
             Arc::new(payload_client),
             self.time_service.clone(),
+            Duration::from_millis(self.config.quorum_store_poll_time_ms),
             self.config
                 .max_sending_block_txns(self.quorum_store_enabled),
             self.config
                 .max_sending_block_bytes(self.quorum_store_enabled),
             onchain_consensus_config.max_failed_authors_to_store(),
+            pipeline_backpressure_config,
             chain_health_backoff_config,
             self.quorum_store_enabled,
         );
@@ -799,6 +808,7 @@ impl EpochManager {
                 let consensus_config = onchain_consensus_config.unwrap_or_default();
                 let execution_config = onchain_execution_config.unwrap_or_default();
                 self.quorum_store_enabled = self.enable_quorum_store(&consensus_config);
+                self.recovery_mode = false;
                 self.start_round_manager(
                     initial_data,
                     epoch_state,
@@ -808,6 +818,7 @@ impl EpochManager {
                 .await
             },
             LivenessStorageData::PartialRecoveryData(ledger_data) => {
+                self.recovery_mode = true;
                 self.start_recovery_manager(ledger_data, epoch_state).await
             },
         }
@@ -838,8 +849,11 @@ impl EpochManager {
 
         if let Some(unverified_event) = maybe_unverified_event {
             // filter out quorum store messages if quorum store has not been enabled
-            self.filter_quorum_store_events(peer_id, &unverified_event)?;
-
+            match self.filter_quorum_store_events(peer_id, &unverified_event) {
+                Ok(true) => {},
+                Ok(false) => return Ok(()), // This occurs when the quorum store is not enabled, but the recovery mode is enabled. We filter out the messages, but don't raise any error.
+                Err(err) => return Err(err),
+            }
             // same epoch -> run well-formedness + signature check
             let epoch_state = self.epoch_state.clone().unwrap();
             let quorum_store_enabled = self.quorum_store_enabled;
@@ -946,13 +960,15 @@ impl EpochManager {
         &mut self,
         peer_id: AccountAddress,
         event: &UnverifiedEvent,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<bool> {
         match event {
             UnverifiedEvent::BatchMsg(_)
             | UnverifiedEvent::SignedBatchInfo(_)
             | UnverifiedEvent::ProofOfStoreMsg(_) => {
                 if self.quorum_store_enabled {
-                    Ok(())
+                    Ok(true) // This states that we shouldn't filter out the event
+                } else if self.recovery_mode {
+                    Ok(false) // This states that we should filter out the event, but without an error
                 } else {
                     Err(anyhow::anyhow!(
                         "Quorum store is not enabled locally, but received msg from sender: {}",
@@ -960,7 +976,7 @@ impl EpochManager {
                     ))
                 }
             },
-            _ => Ok(()),
+            _ => Ok(true), // This states that we shouldn't filter out the event
         }
     }
 

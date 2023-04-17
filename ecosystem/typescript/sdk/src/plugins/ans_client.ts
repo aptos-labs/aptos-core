@@ -1,5 +1,7 @@
-import { Provider } from "../providers";
+import { AptosClient, ApiError, Provider } from "../providers";
 import * as Gen from "../generated/index";
+import { AptosAccount } from "../account";
+import { TransactionBuilderRemoteABI } from "../transaction_builder";
 
 const ansContractsMap: Record<string, string> = {
   testnet: "0x5f8fd2347449685cf41d4db97926ec3a096eaf381332be4f1318ad4d16a8497c",
@@ -92,6 +94,33 @@ export class AnsClient {
     if (!domain) return null;
     if (subdomain) return this.getAddressBySubdomainName(domain, subdomain);
     return this.getAddressByDomainName(domain);
+  }
+
+  /**
+   * Mint a new Aptos name
+   *
+   * @param account AptosAccount where collection will be created
+   * @param domainName Aptos domain name to mint
+   * @param years year duration of the domain name
+   * @returns The hash of the pending transaction submitted to the API
+   */
+  async mintAptosName(account: AptosAccount, domainName: string, years: number = 1): Promise<Gen.HashValue> {
+    // check if the name is valid
+    if (domainName.match(nameComponentPattern) === null) {
+      throw new ApiError(400, `Name ${domainName} is not valid`);
+    }
+    // check if the name is available
+    const address = await this.getAddressByName(domainName);
+    if (address !== null) {
+      throw new ApiError(400, `Name ${domainName} is not available`);
+    }
+
+    const builder = new TransactionBuilderRemoteABI(this.provider.aptosClient, { sender: account.address() });
+    const rawTxn = await builder.build(`${this.contractAddress}::domains::register_domain`, [], [domainName, years]);
+
+    const bcsTxn = AptosClient.generateBCSTransaction(account, rawTxn);
+    const pendingTransaction = await this.provider.aptosClient.submitSignedBCSTransaction(bcsTxn);
+    return pendingTransaction.hash;
   }
 
   /**

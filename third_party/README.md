@@ -27,35 +27,48 @@ It is recommended to take a look at the [copybara tutorial](https://blog.kubesim
 - The tool furthermore knows a commit hash M from B which is the parent for the change in B. This is provided with the flag `--change-request-parent=M`.
 - The tool then computes all the commits needed to bring B from the last state H to the newest state
 
-TODO: flash out this description as we improve understanding
-
-### Source of Truth: Aptos Core
-
-Copybara can be used bidirectional using push and pull workflows as described below. However, those workflows will by default override changes made since the destinations has evolved independently. If there is no clear source of truth, the PRs created by the workflows below *must be rebased on the destination*, resolving potential merge conflicts manually.
-
-This problem does not arise if a unique source-of-truth is maintained, i.e. PRs are submitted to only one repo. This is `aptos-core`. However, occasionally we need to import back from `move` into `aptos-core`, in which case the PRs need to be manually rebased.
-
 ### Pushing
 
-In order to push to the Move repo, use:
+Pushing to [the `aptos-main` branch in the Move repo](https://github.com/move-language/move/tree/aptos-main) should be only be performed if this branch is not ahead of `third_party/move`, that are no outstanding changes which have not been pulled into aptos-core. This generally simplifies pushing, and will eventually allow us to fully automate it via a nightly job. 
+
+Currently, pushing has to be done manually. Below, substitute `/Users/wrwg/move` by your path to a local git repo of the Move language:
 
 ```shell
-copybara copy.bar.sky push_move --output-root=/tmp
+copybara copy.bara.sky pull_move --output-root=/tmp --git-destination-url=file:///Users/wrwg/move
 ```
 
-This will create a draft PR in move (in the fixed branch `from_aptos`) with the needed changes. The PR should be massaged and send out for regular review.
-
+This will create a branch `to_move` which can then be submitted to the upstream Move.
 
 ### Pulling
 
-Assuming `copybara` is available from the command line, to pull from the Move repo (for example), use:
+Code which is pulled from the Move repo might be derived from an older version than the current `main` of aptos-core.
 
-
-```shell
-copybara copy.bar.sky pull_move --output-root=/tmp 
+```
+        aptos-main
+       /          \
+      / pull       \
+      |             \ external contribution
+      | PRs in
+      | third_party
 ```
 
-This will create a draft PR in aptos_core (in the fixed branch `from_move`) with the needed changes. The PR should be massaged and send out for regular review.
+For this reason, pulling is a bit more complex right now and requires some extra work. 
+
+1. Checkout aptos-core to the commit of the last pull from the Move repo, into a branch `from_move` 
+   ```shell
+   git checkout <hash>
+   git switch -c from_move
+   ```
+2. Run the following command, where `/Users/wrwg/aptos-core` is replaced by our path to the aptos-core repo:
+   ```shell
+   copybara copy.bara.sky push_move --output-root=/tmp --git-destination-url=file:///Users/wrwg/aptos-core
+   ```
+   This will add a series of commits to the branch `from_move`
+3. Rebase `from_move` onto the current `main branch`
+   ```shell
+   git rebase main
+   ```
+   Any conflicts are now those of the external contributions relative to the progress in `third_party` and for you to resolve. After that, submit as a PR.
 
 
 ### Installing Copybara

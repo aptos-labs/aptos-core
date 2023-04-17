@@ -20,10 +20,12 @@ spec aptos_framework::gas_schedule {
         use aptos_framework::coin::CoinInfo;
         use aptos_framework::aptos_coin::AptosCoin;
         use aptos_framework::transaction_fee;
+        use aptos_framework::staking_config;
 
         requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
+        include staking_config::StakingRewardsConfigRequirement;
 
         include system_addresses::AbortsIfNotAptosFramework{ account: aptos_framework };
         aborts_if len(gas_schedule_blob) == 0;
@@ -38,6 +40,7 @@ spec aptos_framework::gas_schedule {
         use aptos_framework::coin::CoinInfo;
         use aptos_framework::aptos_coin::AptosCoin;
         use aptos_framework::transaction_fee;
+        use aptos_framework::staking_config;
 
         pragma timeout = 60;
 
@@ -45,6 +48,7 @@ spec aptos_framework::gas_schedule {
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
         include system_addresses::AbortsIfNotAptosFramework{ account: aptos_framework };
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
+        include staking_config::StakingRewardsConfigRequirement;
         aborts_if !exists<StorageGasConfig>(@aptos_framework);
     }
 }

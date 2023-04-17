@@ -15,6 +15,7 @@ use crate::{
         write_set::WriteSetSchema,
     },
     state_kv_db::StateKvDb,
+    state_merkle_db::StateMerkleDb,
     EventStore, TransactionStore, NUM_STATE_SHARDS,
 };
 use anyhow::Result;
@@ -46,6 +47,15 @@ pub(crate) fn get_state_kv_commit_progress(state_kv_db: &StateKvDb) -> Result<Op
     get_commit_progress(
         state_kv_db.metadata_db(),
         &DbMetadataKey::StateKvCommitProgress,
+    )
+}
+
+pub(crate) fn get_state_merkle_commit_progress(
+    state_merkle_db: &StateMerkleDb,
+) -> Result<Option<Version>> {
+    get_commit_progress(
+        state_merkle_db.metadata_db(),
+        &DbMetadataKey::StateMerkleCommitProgress,
     )
 }
 
@@ -150,12 +160,11 @@ pub(crate) fn truncate_state_kv_db_single_shard(
 }
 
 pub(crate) fn truncate_state_merkle_db(
-    state_merkle_db: &DB,
+    state_merkle_db: &StateMerkleDb,
     target_version: Version,
 ) -> Result<()> {
     let status = StatusLine::new(Progress::new(target_version));
     loop {
-        let batch = SchemaBatch::new();
         let current_version = get_current_version_in_state_merkle_db(state_merkle_db)?
             .expect("Current version of state merkle db must exist.");
         status.set_current_version(current_version);
@@ -164,41 +173,65 @@ pub(crate) fn truncate_state_merkle_db(
             break;
         }
 
-        let mut iter = state_merkle_db.iter::<JellyfishMerkleNodeSchema>(ReadOptions::default())?;
-        iter.seek(&NodeKey::new_empty_path(current_version))?;
-        for item in iter {
-            let (key, _) = item?;
-            batch.delete::<JellyfishMerkleNodeSchema>(&key)?;
-        }
+        let version_before =
+            find_closest_node_version_at_or_before(state_merkle_db, current_version - 1)?
+                .expect("Must exist.");
 
-        delete_stale_node_index_at_version::<StaleNodeIndexSchema>(
-            state_merkle_db,
+        let top_levels_batch = SchemaBatch::new();
+
+        delete_nodes_and_stale_indices_at_or_after_version(
+            state_merkle_db.metadata_db(),
             current_version,
-            &batch,
-        )?;
-        delete_stale_node_index_at_version::<StaleNodeIndexCrossEpochSchema>(
-            state_merkle_db,
-            current_version,
-            &batch,
+            &top_levels_batch,
         )?;
 
-        state_merkle_db.write_schemas(batch)?;
+        state_merkle_db.commit_top_levels(version_before, top_levels_batch)?;
+
+        truncate_state_merkle_db_shards(state_merkle_db, version_before)?;
     }
 
     Ok(())
 }
 
+pub(crate) fn truncate_state_merkle_db_shards(
+    state_merkle_db: &StateMerkleDb,
+    target_version: Version,
+) -> Result<()> {
+    // TODO(grao): Consider do it in parallel.
+    for shard_id in 0..NUM_STATE_SHARDS {
+        truncate_state_merkle_db_single_shard(state_merkle_db, shard_id as u8, target_version)?;
+    }
+
+    Ok(())
+}
+
+pub(crate) fn truncate_state_merkle_db_single_shard(
+    state_merkle_db: &StateMerkleDb,
+    shard_id: u8,
+    target_version: Version,
+) -> Result<()> {
+    let batch = SchemaBatch::new();
+    delete_nodes_and_stale_indices_at_or_after_version(
+        state_merkle_db.db_shard(shard_id),
+        target_version + 1,
+        &batch,
+    )?;
+    state_merkle_db.commit_single_shard(target_version, shard_id, batch)
+}
+
 pub(crate) fn get_current_version_in_state_merkle_db(
-    state_merkle_db: &DB,
+    state_merkle_db: &StateMerkleDb,
 ) -> Result<Option<Version>> {
     find_closest_node_version_at_or_before(state_merkle_db, u64::max_value())
 }
 
 pub(crate) fn find_closest_node_version_at_or_before(
-    state_merkle_db: &DB,
+    state_merkle_db: &StateMerkleDb,
     version: Version,
 ) -> Result<Option<Version>> {
-    let mut iter = state_merkle_db.rev_iter::<JellyfishMerkleNodeSchema>(Default::default())?;
+    let mut iter = state_merkle_db
+        .metadata_db()
+        .rev_iter::<JellyfishMerkleNodeSchema>(Default::default())?;
     iter.seek_for_prev(&NodeKey::new_empty_path(version))?;
     Ok(iter.next().transpose()?.map(|item| item.0.version()))
 }
@@ -341,8 +374,8 @@ fn delete_state_value_and_index(
     Ok(())
 }
 
-fn delete_stale_node_index_at_version<S>(
-    state_merkle_db: &DB,
+fn delete_stale_node_index_at_or_after_version<S>(
+    db: &DB,
     version: Version,
     batch: &SchemaBatch,
 ) -> Result<()>
@@ -350,12 +383,32 @@ where
     S: Schema<Key = StaleNodeIndex>,
     Version: SeekKeyCodec<S>,
 {
-    let mut iter = state_merkle_db.iter::<S>(ReadOptions::default())?;
+    let mut iter = db.iter::<S>(ReadOptions::default())?;
     iter.seek(&version)?;
     for item in iter {
         let (index, _) = item?;
-        assert_eq!(index.stale_since_version, version);
+        assert_ge!(index.stale_since_version, version);
         batch.delete::<S>(&index)?;
+    }
+
+    Ok(())
+}
+
+fn delete_nodes_and_stale_indices_at_or_after_version(
+    db: &DB,
+    version: Version,
+    batch: &SchemaBatch,
+) -> Result<()> {
+    delete_stale_node_index_at_or_after_version::<StaleNodeIndexSchema>(db, version, batch)?;
+    delete_stale_node_index_at_or_after_version::<StaleNodeIndexCrossEpochSchema>(
+        db, version, batch,
+    )?;
+
+    let mut iter = db.iter::<JellyfishMerkleNodeSchema>(ReadOptions::default())?;
+    iter.seek(&NodeKey::new_empty_path(version))?;
+    for item in iter {
+        let (key, _) = item?;
+        batch.delete::<JellyfishMerkleNodeSchema>(&key)?;
     }
 
     Ok(())

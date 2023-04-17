@@ -661,7 +661,6 @@ module aptos_framework::delegation_pool {
         spec{
         assume ghost_p_active == ghost_p_active_;
         assume ghost_p_pending_inactive == ghost_p_pending_inactive_;
-        //assume ghost_source_pool == table::borrow(pool.inactive_shares, pool.observed_lockup_cycle);
         assume ghost_coin_1 == gc1;
         assume ghost_coin_2 == gc2;
         };
@@ -673,9 +672,22 @@ module aptos_framework::delegation_pool {
             delegator_address,
             amount,
         );
+
+        //----------------------for spec only---------------------------
+        spec{
+        assume ghost_source_pool == pool.active_shares;
+        };
+        //----------------------for spec only---------------------------
+
         amount = redeem_active_shares(pool, delegator_address, amount);
 
         stake::unlock(&retrieve_stake_pool_owner(pool), amount);
+
+        //----------------------for spec only---------------------------
+        spec{
+        assume ghost_dest_pool == table::spec_get(pool.inactive_shares,pool.observed_lockup_cycle);
+        };
+        //----------------------for spec only---------------------------
 
         buy_in_pending_inactive_shares(pool, delegator_address, amount);
         assert_min_pending_inactive_balance(pool, delegator_address);
@@ -696,6 +708,7 @@ module aptos_framework::delegation_pool {
         let gc3 = pool_u64::balance(&pool.active_shares,delegator_address);
         let (ghost_active_p_, _, _ ,ghost_pending_inactive_p_) = stake::get_stake(pool_address); 
         spec{
+        assume ghost_amount == amount;
         assume ghost_active_p == ghost_active_p_;
         assume ghost_pending_inactive_p == ghost_pending_inactive_p_;
         assume ghost_share_source_p == ghost_share_source_p_;
@@ -773,6 +786,7 @@ module aptos_framework::delegation_pool {
         let gc4 = pool_u64::balance(&pool.active_shares,delegator_address);
         let (ghost_active_p_, _ , _,ghost_pending_inactive_p_) = stake::get_stake(pool_address); 
         spec{
+        assume ghost_amount == amount;
         assume ghost_active_p == ghost_active_p_;
         assume ghost_pending_inactive_p == ghost_pending_inactive_p_;
         assume ghost_share_source_p == ghost_share_source_p_;
@@ -798,10 +812,6 @@ module aptos_framework::delegation_pool {
         let pool_address = get_pool_address(pool);
         let (withdrawal_exists, withdrawal_olc) = pending_withdrawal_exists(pool, delegator_address);
         // exit if no withdrawal or (it is pending and cannot withdraw pending_inactive stake from stake pool)\
-
-        assert!(get_pool_address(pool) != pool_address, error::invalid_argument(ENOT_ENOUGH_ACTIVE_STAKE_TO_UNLOCK) );
-        assert!(delegator_address != pool_address, error::invalid_argument(ENOT_ENOUGH_ACTIVE_STAKE_TO_UNLOCK) );
-        assert!(get_pool_address(pool) != delegator_address, error::invalid_argument(ENOT_ENOUGH_ACTIVE_STAKE_TO_UNLOCK));
 
         // ----------------- spec only -------------------------
         let ghost_bool_ = !(
@@ -833,9 +843,19 @@ module aptos_framework::delegation_pool {
         amount = redeem_inactive_shares(pool, delegator_address, amount, withdrawal_olc);
 
         let stake_pool_owner = &retrieve_stake_pool_owner(pool);
+
         // stake pool will inactivate entire pending_inactive stake at `stake::withdraw` to make it withdrawable
         // however, bypassing the inactivation of excess stake (inactivated but not withdrawn) ensures
         // the OLC is not advanced indefinitely on `unlock`-`withdraw` paired calls
+
+        // ----------------- spec only -------------------------
+        let ghost_bool_1_ = can_withdraw_pending_inactive(pool_address);
+        spec{
+            assume ghost_amount == amount;
+            assume ghost_bool_1 == ghost_bool_1_;
+        };
+        // ----------------- spec only -------------------------
+
         if (can_withdraw_pending_inactive(pool_address)) {
             // get excess stake before being entirely inactivated
             let (_, _, _, pending_inactive) = stake::get_stake(pool_address);
@@ -852,6 +872,7 @@ module aptos_framework::delegation_pool {
             // no excess stake if `stake::withdraw` does not inactivate at all
             stake::withdraw(stake_pool_owner, amount);
         };
+
         coin::transfer<AptosCoin>(stake_pool_owner, delegator_address, amount);
 
         // commit withdrawal of possibly inactive stake to the `total_coins_inactive`
@@ -872,6 +893,7 @@ module aptos_framework::delegation_pool {
         let ghost_coin_3_ = coin::balance<AptosCoin>(delegator_address);
         let ghost_coin_4_ = coin::balance<AptosCoin>(get_pool_address(pool));
         spec{
+            
             assume ghost_olc == withdrawal_olc;
             assume ghost_coin_3 == ghost_coin_3_;
             assume ghost_coin_4 == ghost_coin_4_;

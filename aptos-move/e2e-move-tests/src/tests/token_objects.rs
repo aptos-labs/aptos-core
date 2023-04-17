@@ -15,7 +15,6 @@ struct Token {
     collection_id: u64,
     description: String,
     name: String,
-    creation_name: Option<String>,
     uri: String,
     mutation_events: EventHandle,
 }

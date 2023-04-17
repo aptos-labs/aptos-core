@@ -27,6 +27,7 @@ pub fn run<V>(
     storage_pruner_config: PrunerConfig,
     verify_sequence_numbers: bool,
     use_state_kv_db: bool,
+    use_sharded_state_merkle_db: bool,
 ) where
     V: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
 {
@@ -54,6 +55,7 @@ pub fn run<V>(
         storage_pruner_config,
         verify_sequence_numbers,
         use_state_kv_db,
+        use_sharded_state_merkle_db,
     );
 }
 
