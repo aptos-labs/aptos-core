@@ -135,6 +135,27 @@ export class AnsClient {
   }
 
   /**
+   * Mint a new Aptos name
+   *
+   * @param account AptosAccount where collection will be created
+   * @param domainName Aptos domain name to mint
+   * @param years year duration of the domain name
+   * @returns The hash of the pending transaction submitted to the API
+   */
+  async initReverseLookupRegistry(account: AptosAccount, extraArgs?: OptionalTransactionArgs): Promise<Gen.HashValue> {
+    const builder = new TransactionBuilderRemoteABI(this.provider.aptosClient, {
+      sender: account.address(),
+      ...extraArgs,
+    });
+    const rawTxn = await builder.build(`${this.contractAddress}::domains::init_reverse_lookup_registry_v1`, [], []);
+
+    const bcsTxn = AptosClient.generateBCSTransaction(account, rawTxn);
+    const pendingTransaction = await this.provider.submitSignedBCSTransaction(bcsTxn);
+
+    return pendingTransaction.hash;
+  }
+
+  /**
    * Returns the account address for the given domain name
    * @param domain domain name
    * @example
