@@ -433,4 +433,34 @@ export class AptosToken {
     const pendingTransaction = await this.provider.aptosClient.submitSignedBCSTransaction(bcsTxn);
     return pendingTransaction.hash;
   }
+
+  /**
+   * Transfer a token amount from the sender primary_store to the recipient primary_store
+   *
+   * @param sender The sender account
+   * @param token The token address - For example if you’re transferring USDT, this would be the USDT address
+   * @param recipient Recipient primary wallet address
+   * @returns The hash of the transaction submitted to the API
+   */
+  async transferTokenAmount(
+    sender: AptosAccount,
+    token: MaybeHexString,
+    recipient: MaybeHexString,
+    amount: number = 0,
+    tokenType?: string,
+    extraArgs?: OptionalTransactionArgs,
+  ) {
+    const builder = new TransactionBuilderRemoteABI(this.provider.aptosClient, {
+      sender: sender.address(),
+      ...extraArgs,
+    });
+    const rawTxn = await builder.build(
+      "0x1::primary_store::transfer",
+      [tokenType || this.tokenType],
+      [HexString.ensure(token).hex(), HexString.ensure(recipient).hex(), amount],
+    );
+    const bcsTxn = AptosClient.generateBCSTransaction(sender, rawTxn);
+    const pendingTransaction = await this.provider.aptosClient.submitSignedBCSTransaction(bcsTxn);
+    return pendingTransaction.hash;
+  }
 }
