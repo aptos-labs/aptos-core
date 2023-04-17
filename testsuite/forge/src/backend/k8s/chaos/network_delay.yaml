@@ -15,12 +15,12 @@ spec:
     latency: "{latency_ms}ms"
     correlation: "{correlation_percentage}"
     jitter: "{jitter_ms}ms"
-  # Indicates the direction of target packets. Available vaules include:
+  # Indicates the direction of target packets. Available values include:
   # from (the packets from target)
   # to (the packets to target)
   # both ( the packets from or to target)
   # This parameter makes Chaos only take effect for a specific direction of packets.
-  direction: from
+  direction: both
   target:
     # For delay NetworkChaos, always use "from" direction and always target an entire namespace
     # This is because Forge submits API requests to k8s Services, whereas Chaos Mesh applies the chaos

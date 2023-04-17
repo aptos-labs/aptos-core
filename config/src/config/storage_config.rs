@@ -17,7 +17,7 @@ pub const BUFFERED_STATE_TARGET_ITEMS: usize = 100_000;
 /// Port selected RocksDB options for tuning underlying rocksdb instance of AptosDB.
 /// see <https://github.com/facebook/rocksdb/blob/master/include/rocksdb/options.h>
 /// for detailed explanations.
-#[derive(Copy, Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct RocksdbConfig {
     pub max_open_files: i32,
@@ -49,13 +49,15 @@ impl Default for RocksdbConfig {
     }
 }
 
-#[derive(Copy, Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct RocksdbConfigs {
     pub ledger_db_config: RocksdbConfig,
     pub state_merkle_db_config: RocksdbConfig,
     // Note: Not ready for production use yet.
     pub use_state_kv_db: bool,
+    // Note: Not ready for production use yet.
+    pub use_sharded_state_merkle_db: bool,
     pub state_kv_db_config: RocksdbConfig,
     pub index_db_config: RocksdbConfig,
 }
@@ -66,6 +68,7 @@ impl Default for RocksdbConfigs {
             ledger_db_config: RocksdbConfig::default(),
             state_merkle_db_config: RocksdbConfig::default(),
             use_state_kv_db: false,
+            use_sharded_state_merkle_db: false,
             state_kv_db_config: RocksdbConfig::default(),
             index_db_config: RocksdbConfig {
                 max_open_files: 1000,
@@ -117,11 +120,6 @@ pub const NO_OP_STORAGE_PRUNER_CONFIG: PrunerConfig = PrunerConfig {
         prune_window: 0,
         batch_size: 0,
     },
-    state_kv_pruner_config: StateKvPrunerConfig {
-        enable: false,
-        prune_window: 0,
-        batch_size: 0,
-    },
 };
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -165,19 +163,6 @@ pub struct EpochSnapshotPrunerConfig {
     pub batch_size: usize,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct StateKvPrunerConfig {
-    /// Boolean to enable/disable the state kv pruner. The state pruner is responsible for
-    /// pruning state tree nodes.
-    pub enable: bool,
-    /// Window size in versions.
-    pub prune_window: u64,
-    /// Similar to the variable above but for state kv pruner. It means the number of versions to
-    /// prune a time.
-    pub batch_size: usize,
-}
-
 // Config for the epoch ending state pruner is actually in the same format as the state merkle
 // pruner, but it has it's own type hence separate default values. This converts it to the same
 // type, to use the same pruner implementation (but parameterized on the stale node index DB schema).
@@ -197,7 +182,6 @@ pub struct PrunerConfig {
     pub ledger_pruner_config: LedgerPrunerConfig,
     pub state_merkle_pruner_config: StateMerklePrunerConfig,
     pub epoch_snapshot_pruner_config: EpochSnapshotPrunerConfig,
-    pub state_kv_pruner_config: StateKvPrunerConfig,
 }
 
 impl Default for LedgerPrunerConfig {
@@ -244,17 +228,6 @@ impl Default for EpochSnapshotPrunerConfig {
             // A 10k transaction block (touching 60k state values, in the case of the account
             // creation benchmark) on a 4B items DB (or 1.33B accounts) yields 300k JMT nodes
             batch_size: 1_000,
-        }
-    }
-}
-
-impl Default for StateKvPrunerConfig {
-    fn default() -> Self {
-        Self {
-            // TODO(grao): Keep it the same as ledger pruner config for now, will revisit later.
-            enable: true,
-            prune_window: 150_000_000,
-            batch_size: 500,
         }
     }
 }

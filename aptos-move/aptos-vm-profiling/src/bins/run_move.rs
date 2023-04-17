@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, Result};
+use aptos_move_stdlib::natives::{all_natives, GasParameters};
 use move_binary_format::CompiledModule;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
 };
 use move_ir_compiler::Compiler;
-use move_stdlib::natives::{all_natives, GasParameters};
 use move_table_extension::{self, NativeTableContext};
 use move_vm_runtime::{
     move_vm::MoveVM, native_extensions::NativeContextExtensions, native_functions::NativeFunction,

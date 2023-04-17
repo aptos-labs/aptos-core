@@ -2,8 +2,12 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metadata::{
-    EpochEndingBackupMeta, IdentityMeta, Metadata, StateSnapshotBackupMeta, TransactionBackupMeta,
+use crate::{
+    metadata::{
+        EpochEndingBackupMeta, IdentityMeta, Metadata, StateSnapshotBackupMeta,
+        TransactionBackupMeta,
+    },
+    storage::FileHandle,
 };
 use anyhow::{anyhow, ensure, Result};
 use aptos_types::transaction::Version;
@@ -16,9 +20,40 @@ pub struct MetadataView {
     state_snapshot_backups: Vec<StateSnapshotBackupMeta>,
     transaction_backups: Vec<TransactionBackupMeta>,
     _identity: Option<IdentityMeta>,
+    file_handles: Option<Vec<FileHandle>>,
 }
 
 impl MetadataView {
+    pub(crate) fn new(metadata_vec: Vec<Metadata>, file_handles: Vec<FileHandle>) -> Self {
+        let mut epoch_ending_backups = Vec::new();
+        let mut state_snapshot_backups = Vec::new();
+        let mut transaction_backups = Vec::new();
+        let mut identity = None;
+
+        for meta in metadata_vec {
+            match meta {
+                Metadata::EpochEndingBackup(e) => epoch_ending_backups.push(e),
+                Metadata::StateSnapshotBackup(s) => state_snapshot_backups.push(s),
+                Metadata::TransactionBackup(t) => transaction_backups.push(t),
+                Metadata::Identity(i) => identity = Some(i),
+            }
+        }
+        epoch_ending_backups.sort_unstable();
+        epoch_ending_backups.dedup();
+        state_snapshot_backups.sort_unstable();
+        state_snapshot_backups.dedup();
+        transaction_backups.sort_unstable();
+        transaction_backups.dedup();
+
+        Self {
+            epoch_ending_backups,
+            state_snapshot_backups,
+            transaction_backups,
+            _identity: identity,
+            file_handles: Some(file_handles),
+        }
+    }
+
     pub fn get_storage_state(&self) -> Result<BackupStorageState> {
         let latest_epoch_ending_epoch =
             self.epoch_ending_backups.iter().map(|e| e.last_epoch).max();
@@ -166,36 +201,9 @@ impl MetadataView {
     ) -> Result<Vec<&[StateSnapshotBackupMeta]>> {
         Self::compact_backups(&self.state_snapshot_backups, compaction_cnt)
     }
-}
 
-impl From<Vec<Metadata>> for MetadataView {
-    fn from(metadata_vec: Vec<Metadata>) -> Self {
-        let mut epoch_ending_backups = Vec::new();
-        let mut state_snapshot_backups = Vec::new();
-        let mut transaction_backups = Vec::new();
-        let mut identity = None;
-
-        for meta in metadata_vec {
-            match meta {
-                Metadata::EpochEndingBackup(e) => epoch_ending_backups.push(e),
-                Metadata::StateSnapshotBackup(s) => state_snapshot_backups.push(s),
-                Metadata::TransactionBackup(t) => transaction_backups.push(t),
-                Metadata::Identity(i) => identity = Some(i),
-            }
-        }
-        epoch_ending_backups.sort_unstable();
-        epoch_ending_backups.dedup();
-        state_snapshot_backups.sort_unstable();
-        state_snapshot_backups.dedup();
-        transaction_backups.sort_unstable();
-        transaction_backups.dedup();
-
-        Self {
-            epoch_ending_backups,
-            state_snapshot_backups,
-            transaction_backups,
-            _identity: identity,
-        }
+    pub fn get_file_handles(&self) -> Vec<FileHandle> {
+        self.file_handles.clone().unwrap_or_default()
     }
 }
 

@@ -13,9 +13,8 @@ fn main() {
     let txns = [1000, 10000];
     let num_warmups = 2;
     let num_runs = 10;
-    let check_correctness = false;
 
-    let mut measurements = Vec::new();
+    let mut measurements: Vec<Vec<(usize, usize)>> = Vec::new();
     let concurrency_level = num_cpus::get();
 
     for block_size in txns {
@@ -26,16 +25,13 @@ fn main() {
                 num_warmups,
                 num_runs,
                 concurrency_level,
-                check_correctness,
             );
             times.sort();
             measurements.push(times);
         }
     }
-    if check_correctness {
-        println!("\nParallel execution output same as sequential!\n");
-    }
-    println!("concurrency_level = {}", concurrency_level);
+
+    println!("\nconcurrency_level = {}\n", concurrency_level);
 
     let mut i = 0;
     for block_size in txns {
@@ -44,12 +40,22 @@ fn main() {
                 "PARAMS: num_account = {}, block_size = {}",
                 num_accounts, block_size
             );
-            println!("TPS: {:?}", measurements[i]);
-            let mut sum = 0;
+            println!("Parallel/Sequential TPS: {:?}", measurements[i]);
+
+            let mut par_sum = 0;
             for m in &measurements[i] {
-                sum += m;
+                par_sum += m.0;
             }
-            println!("AVG TPS = {:?}", sum / measurements[i].len());
+            let mut seq_sum = 0;
+            for m in &measurements[i] {
+                seq_sum += m.1;
+            }
+            println!(
+                "Avg Parallel TPS = {:?}, Avg Sequential TPS = {:?}, speed up {}x",
+                par_sum / measurements[i].len(),
+                seq_sum / measurements[i].len(),
+                par_sum / seq_sum
+            );
             i += 1;
         }
         println!();

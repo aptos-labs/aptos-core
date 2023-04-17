@@ -142,10 +142,11 @@ impl Worker {
             starting_version,
             self.config.indexer_grpc_auth_token.clone(),
         );
+
         let mut resp_stream = rpc_client
             .raw_datastream(request)
             .await
-            .unwrap()
+            .expect("Failed to get grpc response. Is the server running?")
             .into_inner();
 
         let concurrent_tasks = self.config.number_concurrent_processing_tasks;
@@ -213,7 +214,7 @@ impl Worker {
                         resp_stream = rpc_client
                             .raw_datastream(request)
                             .await
-                            .unwrap()
+                            .expect("Failed to get grpc response. Is the server running?")
                             .into_inner();
                         transactions_batches.clear();
                         continue;
@@ -239,12 +240,6 @@ impl Worker {
                     );
                     panic!();
                 }
-
-                info!(
-                    processor_name = processor_name,
-                    batch_size = current_batch_size,
-                    "[Parser] Received batch from GRPC stream"
-                );
                 transactions_batches.push(transactions);
                 // If it is a partial batch, then skip polling and head to process it first.
                 if current_batch_size < BLOB_STORAGE_SIZE {
@@ -424,7 +419,7 @@ pub fn grpc_request_builder(
     grpc_auth_token: String,
 ) -> tonic::Request<RawDatastreamRequest> {
     let mut request = tonic::Request::new(RawDatastreamRequest {
-        starting_version,
+        starting_version: Some(starting_version),
         transactions_count: None,
     });
     request.metadata_mut().insert(

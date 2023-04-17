@@ -6,8 +6,8 @@ module token_objects::hero {
 
     use aptos_framework::object::{Self, ConstructorRef, Object};
 
-    use token_objects::collection;
-    use token_objects::token;
+    use aptos_token_objects::collection;
+    use aptos_token_objects::token;
 
     const ENOT_A_HERO: u64 = 1;
     const ENOT_A_WEAPON: u64 = 2;
@@ -61,7 +61,7 @@ module token_objects::hero {
 
     fun init_module(account: &signer) {
         let collection = string::utf8(b"Hero Quest!");
-        collection::create_untracked_collection(
+        collection::create_unlimited_collection(
             account,
             string::utf8(b"collection description"),
             *&collection,
@@ -82,7 +82,7 @@ module token_objects::hero {
         uri: String,
     ): ConstructorRef acquires OnChainConfig {
         let on_chain_config = borrow_global<OnChainConfig>(signer::address_of(creator));
-        token::create(
+        token::create_named_token(
             creator,
             *&on_chain_config.collection,
             description,

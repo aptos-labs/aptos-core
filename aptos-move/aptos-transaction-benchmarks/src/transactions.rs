@@ -5,7 +5,7 @@
 use aptos_bitvec::BitVec;
 use aptos_crypto::HashValue;
 use aptos_language_e2e_tests::{
-    account_universe::{log_balance_strategy, AUTransactionGen, AccountUniverseGen},
+    account_universe::{AUTransactionGen, AccountUniverseGen},
     executor::FakeExecutor,
     gas_costs::TXN_RESERVED,
 };
@@ -101,8 +101,7 @@ where
         num_warmups: usize,
         num_runs: usize,
         concurrency_level: usize,
-        check_correctness: bool,
-    ) -> Vec<usize> {
+    ) -> Vec<(usize, usize)> {
         let mut ret = Vec::new();
 
         let total_runs = num_warmups + num_runs;
@@ -111,7 +110,7 @@ where
 
             if i < num_warmups {
                 println!("WARMUP - ignore results");
-                state.execute_blockstm_benchmark(concurrency_level, check_correctness);
+                state.execute_blockstm_benchmark(concurrency_level);
             } else {
                 println!(
                     "RUN BlockSTM-only benchmark for: num_threads = {}, \
@@ -121,7 +120,7 @@ where
                     num_accounts,
                     num_txn,
                 );
-                ret.push(state.execute_blockstm_benchmark(concurrency_level, check_correctness));
+                ret.push(state.execute_blockstm_benchmark(concurrency_level));
             }
         }
 
@@ -237,27 +236,21 @@ impl TransactionBenchState {
         .expect("VM should not fail to start");
     }
 
-    fn execute_blockstm_benchmark(
-        self,
-        concurrency_level: usize,
-        check_correctness: bool,
-    ) -> usize {
+    fn execute_blockstm_benchmark(self, concurrency_level: usize) -> (usize, usize) {
         BlockAptosVM::execute_block_benchmark(
             self.transactions,
             self.executor.get_state_view(),
             concurrency_level,
-            check_correctness,
         )
     }
 }
 
-/// Returns a strategy for the account universe customized for benchmarks.
+/// Returns a strategy for the account universe customized for benchmarks, i.e. having
+/// sufficiently large balance for gas.
 fn universe_strategy(
     num_accounts: usize,
     num_transactions: usize,
 ) -> impl Strategy<Value = AccountUniverseGen> {
-    // Multiply by 5 past the number of  to provide
-    let max_balance = TXN_RESERVED * num_transactions as u64 * 5;
-    let balance_strategy = log_balance_strategy(max_balance);
-    AccountUniverseGen::strategy(num_accounts, balance_strategy)
+    let balance = TXN_RESERVED * num_transactions as u64 * 5;
+    AccountUniverseGen::strategy(num_accounts, balance..(balance + 1))
 }

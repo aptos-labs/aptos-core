@@ -17,6 +17,11 @@ export const $MoveFunction = {
             description: `Whether the function can be called as an entry function directly in a transaction`,
             isRequired: true,
         },
+        is_view: {
+            type: 'boolean',
+            description: `Whether the function is a view function or not`,
+            isRequired: true,
+        },
         generic_type_params: {
             type: 'array',
             contains: {

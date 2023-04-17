@@ -7,7 +7,7 @@
 //! This crate provides [`AptosDB`] which represents physical storage of the core Aptos data
 //! structures.
 //!
-//! It relays read/write operations on the physical storage via [`schemadb`] to the underlying
+//! It relays read/write operations on the physical storage via `schemadb` to the underlying
 //! Key-Value storage system, and implements aptos data structures on top of it.
 
 #[cfg(feature = "consensus-only-perf-test")]
@@ -46,10 +46,7 @@ pub mod db_debugger;
 use crate::{
     backup::{backup_handler::BackupHandler, restore_handler::RestoreHandler, restore_utils},
     db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
-    db_options::{
-        gen_ledger_cfds, gen_state_merkle_cfds, ledger_db_column_families,
-        state_kv_db_column_families, state_merkle_db_column_families,
-    },
+    db_options::{gen_ledger_cfds, ledger_db_column_families, state_merkle_db_column_families},
     errors::AptosDbError,
     event_store::EventStore,
     ledger_store::LedgerStore,
@@ -68,6 +65,7 @@ use crate::{
     stale_node_index::StaleNodeIndexSchema,
     stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
     state_kv_db::StateKvDb,
+    state_merkle_db::StateMerkleDb,
     state_store::StateStore,
     transaction_store::TransactionStore,
 };
@@ -137,7 +135,7 @@ pub const LEDGER_DB_NAME: &str = "ledger_db";
 pub const STATE_MERKLE_DB_NAME: &str = "state_merkle_db";
 pub const STATE_KV_DB_NAME: &str = "state_kv_db";
 
-pub(crate) const NUM_STATE_SHARDS: usize = 256;
+pub(crate) const NUM_STATE_SHARDS: usize = 16;
 
 static COMMIT_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
@@ -190,6 +188,17 @@ static ROCKSDB_PROPERTY_MAP: Lazy<HashMap<&str, String>> = Lazy::new(|| {
     .collect()
 });
 
+type ShardedStateKvSchemaBatch = [SchemaBatch; NUM_STATE_SHARDS];
+type ShardedStateMerkleSchemaBatch = [SchemaBatch; NUM_STATE_SHARDS];
+
+pub(crate) fn new_sharded_kv_schema_batch() -> ShardedStateKvSchemaBatch {
+    arr![SchemaBatch::new(); 16]
+}
+
+pub(crate) fn new_sharded_merkle_schema_batch() -> ShardedStateMerkleSchemaBatch {
+    arr![SchemaBatch::new(); 16]
+}
+
 fn error_if_too_many_requested(num_requested: u64, max_allowed: u64) -> Result<()> {
     if num_requested > max_allowed {
         Err(AptosDbError::TooManyRequested(num_requested, max_allowed).into())
@@ -198,7 +207,7 @@ fn error_if_too_many_requested(num_requested: u64, max_allowed: u64) -> Result<(
     }
 }
 
-fn update_rocksdb_properties(ledger_rocksdb: &DB, state_merkle_rocksdb: &DB) -> Result<()> {
+fn update_rocksdb_properties(ledger_rocksdb: &DB, state_merkle_db: &StateMerkleDb) -> Result<()> {
     let _timer = OTHER_TIMERS_SECONDS
         .with_label_values(&["update_rocksdb_properties"])
         .start_timer();
@@ -211,9 +220,14 @@ fn update_rocksdb_properties(ledger_rocksdb: &DB, state_merkle_rocksdb: &DB) -> 
     }
     for cf_name in state_merkle_db_column_families() {
         for (rockdb_property_name, aptos_rocksdb_property_name) in &*ROCKSDB_PROPERTY_MAP {
+            // TODO(grao): Support sharding here.
             ROCKSDB_PROPERTIES
                 .with_label_values(&[cf_name, aptos_rocksdb_property_name])
-                .set(state_merkle_rocksdb.get_property(cf_name, rockdb_property_name)? as i64);
+                .set(
+                    state_merkle_db
+                        .metadata_db()
+                        .get_property(cf_name, rockdb_property_name)? as i64,
+                );
         }
     }
     Ok(())
@@ -226,7 +240,7 @@ struct RocksdbPropertyReporter {
 }
 
 impl RocksdbPropertyReporter {
-    fn new(ledger_rocksdb: Arc<DB>, state_merkle_rocksdb: Arc<DB>) -> Self {
+    fn new(ledger_rocksdb: Arc<DB>, state_merkle_rocksdb: Arc<StateMerkleDb>) -> Self {
         let (send, recv) = mpsc::channel();
         let join_handle = Some(thread::spawn(move || loop {
             if let Err(e) = update_rocksdb_properties(&ledger_rocksdb, &state_merkle_rocksdb) {
@@ -267,7 +281,7 @@ impl Drop for RocksdbPropertyReporter {
 /// access to the core Aptos data structures.
 pub struct AptosDB {
     ledger_db: Arc<DB>,
-    state_merkle_db: Arc<DB>,
+    state_merkle_db: Arc<StateMerkleDb>,
     state_kv_db: Arc<StateKvDb>,
     event_store: Arc<EventStore>,
     ledger_store: Arc<LedgerStore>,
@@ -282,36 +296,32 @@ pub struct AptosDB {
 impl AptosDB {
     fn new_with_dbs(
         ledger_rocksdb: Arc<DB>,
-        state_merkle_rocksdb: DB,
+        state_merkle_db: StateMerkleDb,
         state_kv_db: StateKvDb,
         pruner_config: PrunerConfig,
         buffered_state_target_items: usize,
-        max_nodes_per_lru_cache_shard: usize,
         hack_for_tests: bool,
     ) -> Self {
-        let arc_state_merkle_rocksdb = Arc::new(state_merkle_rocksdb);
+        let state_merkle_db = Arc::new(state_merkle_db);
         let state_kv_db = Arc::new(state_kv_db);
         let state_merkle_pruner = StateMerklePrunerManager::new(
-            Arc::clone(&arc_state_merkle_rocksdb),
+            Arc::clone(&state_merkle_db),
             pruner_config.state_merkle_pruner_config,
         );
         let epoch_snapshot_pruner = StateMerklePrunerManager::new(
-            Arc::clone(&arc_state_merkle_rocksdb),
+            Arc::clone(&state_merkle_db),
             pruner_config.epoch_snapshot_pruner_config.into(),
         );
-        let state_kv_pruner = StateKvPrunerManager::new(
-            Arc::clone(&state_kv_db),
-            pruner_config.state_kv_pruner_config,
-        );
+        let state_kv_pruner =
+            StateKvPrunerManager::new(Arc::clone(&state_kv_db), pruner_config.ledger_pruner_config);
         let state_store = Arc::new(StateStore::new(
             Arc::clone(&ledger_rocksdb),
-            Arc::clone(&arc_state_merkle_rocksdb),
+            Arc::clone(&state_merkle_db),
             Arc::clone(&state_kv_db),
             state_merkle_pruner,
             epoch_snapshot_pruner,
             state_kv_pruner,
             buffered_state_target_items,
-            max_nodes_per_lru_cache_shard,
             hack_for_tests,
         ));
 
@@ -322,16 +332,17 @@ impl AptosDB {
 
         AptosDB {
             ledger_db: Arc::clone(&ledger_rocksdb),
-            state_merkle_db: Arc::clone(&arc_state_merkle_rocksdb),
+            state_merkle_db: Arc::clone(&state_merkle_db),
             state_kv_db: Arc::clone(&state_kv_db),
             event_store: Arc::new(EventStore::new(Arc::clone(&ledger_rocksdb))),
             ledger_store: Arc::new(LedgerStore::new(Arc::clone(&ledger_rocksdb))),
             state_store,
             transaction_store: Arc::new(TransactionStore::new(Arc::clone(&ledger_rocksdb))),
             ledger_pruner,
+            // TODO(grao): Include other DBs.
             _rocksdb_property_reporter: RocksdbPropertyReporter::new(
                 Arc::clone(&ledger_rocksdb),
-                Arc::clone(&arc_state_merkle_rocksdb),
+                Arc::clone(&state_merkle_db),
             ),
             ledger_commit_lock: std::sync::Mutex::new(()),
             indexer: None,
@@ -352,8 +363,12 @@ impl AptosDB {
             "Do not set prune_window when opening readonly.",
         );
 
-        let (ledger_db, state_merkle_db, state_kv_db) =
-            Self::open_dbs(db_root_path.as_ref(), rocksdb_configs, readonly)?;
+        let (ledger_db, state_merkle_db, state_kv_db) = Self::open_dbs(
+            db_root_path.as_ref(),
+            rocksdb_configs,
+            readonly,
+            max_num_nodes_per_lru_cache_shard,
+        )?;
 
         let mut myself = Self::new_with_dbs(
             ledger_db,
@@ -361,7 +376,6 @@ impl AptosDB {
             state_kv_db,
             pruner_config,
             buffered_state_target_items,
-            max_num_nodes_per_lru_cache_shard,
             readonly,
         );
 
@@ -376,57 +390,46 @@ impl AptosDB {
         db_root_path: P,
         rocksdb_configs: RocksdbConfigs,
         readonly: bool,
-    ) -> Result<(Arc<DB>, DB, StateKvDb)> {
+        max_num_nodes_per_lru_cache_shard: usize,
+    ) -> Result<(Arc<DB>, StateMerkleDb, StateKvDb)> {
         let instant = Instant::now();
 
         let ledger_db_path = db_root_path.as_ref().join(LEDGER_DB_NAME);
-        let state_merkle_db_path = db_root_path.as_ref().join(STATE_MERKLE_DB_NAME);
 
-        let (ledger_db, state_merkle_db) = if readonly {
-            (
-                DB::open_cf_readonly(
-                    &gen_rocksdb_options(&rocksdb_configs.ledger_db_config, true),
-                    ledger_db_path.clone(),
-                    LEDGER_DB_NAME,
-                    ledger_db_column_families(),
-                )?,
-                DB::open_cf_readonly(
-                    &gen_rocksdb_options(&rocksdb_configs.state_merkle_db_config, true),
-                    state_merkle_db_path.clone(),
-                    STATE_MERKLE_DB_NAME,
-                    state_merkle_db_column_families(),
-                )?,
-            )
+        let ledger_db = if readonly {
+            DB::open_cf_readonly(
+                &gen_rocksdb_options(&rocksdb_configs.ledger_db_config, true),
+                ledger_db_path.clone(),
+                LEDGER_DB_NAME,
+                ledger_db_column_families(),
+            )?
         } else {
-            (
-                DB::open_cf(
-                    &gen_rocksdb_options(&rocksdb_configs.ledger_db_config, false),
-                    ledger_db_path.clone(),
-                    LEDGER_DB_NAME,
-                    gen_ledger_cfds(&rocksdb_configs.ledger_db_config),
-                )?,
-                DB::open_cf(
-                    &gen_rocksdb_options(&rocksdb_configs.state_merkle_db_config, false),
-                    state_merkle_db_path.clone(),
-                    STATE_MERKLE_DB_NAME,
-                    gen_state_merkle_cfds(&rocksdb_configs.state_merkle_db_config),
-                )?,
-            )
+            DB::open_cf(
+                &gen_rocksdb_options(&rocksdb_configs.ledger_db_config, false),
+                ledger_db_path.clone(),
+                LEDGER_DB_NAME,
+                gen_ledger_cfds(&rocksdb_configs.ledger_db_config),
+            )?
         };
 
         let ledger_db = Arc::new(ledger_db);
         let state_kv_db = StateKvDb::new(
-            db_root_path,
+            db_root_path.as_ref(),
             rocksdb_configs,
             readonly,
             Arc::clone(&ledger_db),
         )?;
+        let state_merkle_db = StateMerkleDb::new(
+            db_root_path,
+            rocksdb_configs,
+            readonly,
+            max_num_nodes_per_lru_cache_shard,
+        )?;
 
         info!(
             ledger_db_path = ledger_db_path,
-            state_merkle_db_path = state_merkle_db_path,
             time_ms = %instant.elapsed().as_millis(),
-            "Opened AptosDB (LedgerDB + StateMerkleDB).",
+            "Opened AptosDB.",
         );
 
         Ok((ledger_db, state_merkle_db, state_kv_db))
@@ -668,49 +671,35 @@ impl AptosDB {
     }
 
     /// Creates new physical DB checkpoint in directory specified by `path`.
-    pub fn create_checkpoint(db_path: impl AsRef<Path>, cp_path: impl AsRef<Path>) -> Result<()> {
+    pub fn create_checkpoint(
+        db_path: impl AsRef<Path>,
+        cp_path: impl AsRef<Path>,
+        use_sharded_state_merkle_db: bool,
+    ) -> Result<()> {
         let start = Instant::now();
         let ledger_db_path = db_path.as_ref().join(LEDGER_DB_NAME);
         let ledger_cp_path = cp_path.as_ref().join(LEDGER_DB_NAME);
-        let state_merkle_db_path = db_path.as_ref().join(STATE_MERKLE_DB_NAME);
-        let state_merkle_cp_path = cp_path.as_ref().join(STATE_MERKLE_DB_NAME);
-        let state_kv_db_path = db_path.as_ref().join(STATE_KV_DB_NAME);
-        let state_kv_cp_path = cp_path.as_ref().join(STATE_KV_DB_NAME);
+
+        info!("Creating ledger_db checkpoint at: {ledger_cp_path:?}");
 
         std::fs::remove_dir_all(&ledger_cp_path).unwrap_or(());
-        std::fs::remove_dir_all(&state_merkle_cp_path).unwrap_or(());
-        std::fs::remove_dir_all(&state_kv_cp_path).unwrap_or(());
 
         // Weird enough, checkpoint doesn't work with readonly or secondary mode (gets stuck).
         // https://github.com/facebook/rocksdb/issues/11167
-        {
-            let ledger_db = aptos_schemadb::DB::open(
-                ledger_db_path,
-                LEDGER_DB_NAME,
-                ledger_db_column_families(),
-                &aptos_schemadb::Options::default(),
-            )?;
-            ledger_db.create_checkpoint(ledger_cp_path)?;
-        }
-        {
-            let state_merkle_db = aptos_schemadb::DB::open(
-                state_merkle_db_path,
-                STATE_MERKLE_DB_NAME,
-                state_merkle_db_column_families(),
-                &aptos_schemadb::Options::default(),
-            )?;
-            state_merkle_db.create_checkpoint(state_merkle_cp_path)?;
-        }
-        {
-            if let Ok(state_kv_db) = aptos_schemadb::DB::open(
-                state_kv_db_path,
-                STATE_KV_DB_NAME,
-                state_kv_db_column_families(),
-                &aptos_schemadb::Options::default(),
-            ) {
-                state_kv_db.create_checkpoint(state_kv_cp_path)?;
-            }
-        }
+        let ledger_db = aptos_schemadb::DB::open(
+            ledger_db_path,
+            LEDGER_DB_NAME,
+            ledger_db_column_families(),
+            &aptos_schemadb::Options::default(),
+        )?;
+        ledger_db.create_checkpoint(ledger_cp_path)?;
+
+        StateKvDb::create_checkpoint(db_path.as_ref(), cp_path.as_ref())?;
+        StateMerkleDb::create_checkpoint(
+            db_path.as_ref(),
+            cp_path.as_ref(),
+            use_sharded_state_merkle_db,
+        )?;
 
         info!(
             db_path = db_path.as_ref(),
@@ -1150,11 +1139,10 @@ impl DbReader for AptosDB {
                 .get_transaction_iter(start_version, limit as usize)?;
             let gas_prices: Vec<_> = txns
                 .filter_map(|txn| {
-                    if let Ok(Transaction::UserTransaction(txn)) = txn {
-                        Some(txn.gas_unit_price())
-                    } else {
-                        None
-                    }
+                    txn.as_ref()
+                        .ok()
+                        .and_then(|t| t.try_as_signed_user_txn())
+                        .map(|t| t.gas_unit_price())
                 })
                 .collect();
 
@@ -1714,7 +1702,7 @@ impl DbWriter for AptosDB {
 
             // Gather db mutations to `batch`.
             let ledger_batch = SchemaBatch::new();
-            let sharded_state_kv_batches = arr![SchemaBatch::new(); 256];
+            let sharded_state_kv_batches = new_sharded_kv_schema_batch();
 
             let new_root_hash = self.save_transactions_impl(
                 txns_to_commit,
@@ -1800,38 +1788,44 @@ impl DbWriter for AptosDB {
                 }
 
                 let mut end_with_reconfig = false;
-                let updates_until_latest_checkpoint_since_current = if let Some(
-                    latest_checkpoint_version,
-                ) =
-                    latest_in_memory_state.base_version
-                {
-                    if latest_checkpoint_version >= first_version {
-                        let idx = (latest_checkpoint_version - first_version) as usize;
-                        ensure!(
+                let updates_until_latest_checkpoint_since_current = {
+                    let _timer = OTHER_TIMERS_SECONDS
+                        .with_label_values(&["updates_until_next_checkpoint_since_current"])
+                        .start_timer();
+                    if let Some(latest_checkpoint_version) = latest_in_memory_state.base_version {
+                        if latest_checkpoint_version >= first_version {
+                            let idx = (latest_checkpoint_version - first_version) as usize;
+                            ensure!(
                             txns_to_commit[idx].is_state_checkpoint(),
                             "The new latest snapshot version passed in {:?} does not match with the last checkpoint version in txns_to_commit {:?}",
                             latest_checkpoint_version,
                             first_version + idx as u64
                         );
-                        end_with_reconfig = txns_to_commit[idx].is_reconfig();
-                        Some(
-                            txns_to_commit[..=idx]
-                                .iter()
-                                .flat_map(|txn_to_commit| txn_to_commit.state_updates().clone())
-                                .collect(),
-                        )
+                            end_with_reconfig = txns_to_commit[idx].is_reconfig();
+                            Some(
+                                txns_to_commit[..=idx]
+                                    .iter()
+                                    .flat_map(|txn_to_commit| txn_to_commit.state_updates().clone())
+                                    .collect(),
+                            )
+                        } else {
+                            None
+                        }
                     } else {
                         None
                     }
-                } else {
-                    None
                 };
 
-                buffered_state.update(
-                    updates_until_latest_checkpoint_since_current,
-                    latest_in_memory_state,
-                    end_with_reconfig || sync_commit,
-                )?;
+                {
+                    let _timer = OTHER_TIMERS_SECONDS
+                        .with_label_values(&["buffered_state___update"])
+                        .start_timer();
+                    buffered_state.update(
+                        updates_until_latest_checkpoint_since_current,
+                        latest_in_memory_state,
+                        end_with_reconfig || sync_commit,
+                    )?;
+                }
             }
 
             // If commit succeeds and there are at least one transaction written to the storage, we
@@ -2001,8 +1995,10 @@ impl DbWriter for AptosDB {
                 .save_min_readable_version(version, &state_kv_batch)?;
 
             // Apply the change set writes to the database (atomically) and update in-memory state
+            //
+            // TODO(grao): Support sharding here.
             self.state_merkle_db
-                .clone()
+                .metadata_db()
                 .write_schemas(state_merkle_batch)?;
             self.state_kv_db
                 .clone()

@@ -141,7 +141,7 @@ impl ::core::clone::Clone for TestDiemCryptoHasher {
         match *self {
             TestDiemCryptoHasher(ref __self_0_0) => {
                 TestDiemCryptoHasher(::core::clone::Clone::clone(__self_0_0))
-            }
+            },
         }
     }
 }
@@ -175,9 +175,11 @@ impl crate::hash::CryptoHasher for TestDiemCryptoHasher {
             crate::hash::DefaultHasher::prefixed_hash(name)
         })
     }
+
     fn update(&mut self, bytes: &[u8]) {
         self.0.update(bytes);
     }
+
     fn finish(self) -> crate::hash::HashValue {
         self.0.finish()
     }
@@ -188,6 +190,7 @@ impl std::io::Write for TestDiemCryptoHasher {
         self.0.update(bytes);
         Ok(bytes.len())
     }
+
     fn flush(&mut self) -> std::io::Result<()> {
         Ok(())
     }
@@ -195,6 +198,7 @@ impl std::io::Write for TestDiemCryptoHasher {
 #[cfg(any(test, feature = "fuzzing"))]
 impl crate::hash::CryptoHash for TestDiemCrypto {
     type Hasher = TestDiemCryptoHasher;
+
     fn hash(&self) -> crate::hash::HashValue {
         use crate::hash::CryptoHasher;
         let mut state = Self::Hasher::default();

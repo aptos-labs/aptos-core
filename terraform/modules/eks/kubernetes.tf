@@ -72,6 +72,7 @@ resource "kubernetes_storage_class" "gp2" {
   depends_on = [null_resource.delete-gp2]
 }
 
+# FIXME: Remove when migrating to K8s 1.25
 resource "kubernetes_role_binding" "psp-kube-system" {
   metadata {
     name      = "eks:podsecuritypolicy:privileged"
@@ -95,6 +96,7 @@ locals {
   kubeconfig = "/tmp/kube.config.${md5(timestamp())}"
 }
 
+# FIXME: Remove when migrating to K8s 1.25
 resource "null_resource" "delete-psp-authenticated" {
   provisioner "local-exec" {
     command = <<-EOT

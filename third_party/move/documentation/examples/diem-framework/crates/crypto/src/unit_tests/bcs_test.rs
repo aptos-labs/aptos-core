@@ -2,9 +2,6 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use rand::{rngs::StdRng, SeedableRng};
-use std::convert::TryFrom;
-
 use crate::{
     ed25519::{
         Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature, ED25519_PRIVATE_KEY_LENGTH,
@@ -14,6 +11,8 @@ use crate::{
     test_utils::{TestDiemCrypto, TEST_SEED},
     Signature, SigningKey, Uniform,
 };
+use rand::{rngs::StdRng, SeedableRng};
+use std::convert::TryFrom;
 
 #[test]
 fn ed25519_bcs_material() {
@@ -99,10 +98,12 @@ fn multi_ed25519_bcs_material() {
     );
 
     // Verify bitmap
-    assert_eq!(
-        multi_signature_7of10.bitmap(),
-        &[0b1111_1110, 0u8, 0u8, 0u8]
-    );
+    assert_eq!(multi_signature_7of10.bitmap(), &[
+        0b1111_1110,
+        0u8,
+        0u8,
+        0u8
+    ]);
 
     // Verify signature
     assert!(multi_signature_7of10

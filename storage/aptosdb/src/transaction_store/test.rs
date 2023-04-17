@@ -42,7 +42,7 @@ proptest! {
         for (ver, (txn, write_set)) in itertools::zip_eq(txns.iter(), write_sets.iter()).enumerate() {
             prop_assert_eq!(store.get_transaction(ver as Version).unwrap(), txn.clone());
             let user_txn = txn
-                .as_signed_user_txn()
+                .try_as_signed_user_txn()
                 .expect("All should be user transactions here.");
             prop_assert_eq!(
                 store
@@ -134,7 +134,7 @@ proptest! {
         let txns = txns
             .iter()
             .enumerate()
-            .map(|(version, txn)| (version as u64, txn.as_signed_user_txn().unwrap()))
+            .map(|(version, txn)| (version as u64, txn.try_as_signed_user_txn().unwrap()))
             .collect::<Vec<_>>();
 
         // can we just get all the account transaction versions individually

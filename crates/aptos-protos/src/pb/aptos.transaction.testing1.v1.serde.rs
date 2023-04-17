@@ -43,7 +43,6 @@ impl<'de> serde::Deserialize<'de> for AccountSignature {
         const FIELDS: &[&str] = &[
             "type",
             "ed25519",
-            "multi_ed25519",
             "multiEd25519",
         ];
 
@@ -75,7 +74,7 @@ impl<'de> serde::Deserialize<'de> for AccountSignature {
                         match value {
                             "type" => Ok(GeneratedField::Type),
                             "ed25519" => Ok(GeneratedField::Ed25519),
-                            "multiEd25519" | "multi_ed25519" => Ok(GeneratedField::MultiEd25519),
+                            "multiEd25519" => Ok(GeneratedField::MultiEd25519),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -109,15 +108,13 @@ impl<'de> serde::Deserialize<'de> for AccountSignature {
                             if signature__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("ed25519"));
                             }
-                            signature__ = map.next_value::<::std::option::Option<_>>()?.map(account_signature::Signature::Ed25519)
-;
+                            signature__ = Some(account_signature::Signature::Ed25519(map.next_value()?));
                         }
                         GeneratedField::MultiEd25519 => {
                             if signature__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("multiEd25519"));
                             }
-                            signature__ = map.next_value::<::std::option::Option<_>>()?.map(account_signature::Signature::MultiEd25519)
-;
+                            signature__ = Some(account_signature::Signature::MultiEd25519(map.next_value()?));
                         }
                     }
                 }
@@ -252,7 +249,6 @@ impl<'de> serde::Deserialize<'de> for Block {
             "timestamp",
             "height",
             "transactions",
-            "chain_id",
             "chainId",
         ];
 
@@ -286,7 +282,7 @@ impl<'de> serde::Deserialize<'de> for Block {
                             "timestamp" => Ok(GeneratedField::Timestamp),
                             "height" => Ok(GeneratedField::Height),
                             "transactions" => Ok(GeneratedField::Transactions),
-                            "chainId" | "chain_id" => Ok(GeneratedField::ChainId),
+                            "chainId" => Ok(GeneratedField::ChainId),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -316,15 +312,15 @@ impl<'de> serde::Deserialize<'de> for Block {
                             if timestamp__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("timestamp"));
                             }
-                            timestamp__ = map.next_value()?;
+                            timestamp__ = Some(map.next_value()?);
                         }
                         GeneratedField::Height => {
                             if height__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("height"));
                             }
-                            height__ =
-                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
-                            ;
+                            height__ = Some(
+                                map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0
+                            );
                         }
                         GeneratedField::Transactions => {
                             if transactions__.is_some() {
@@ -336,9 +332,9 @@ impl<'de> serde::Deserialize<'de> for Block {
                             if chain_id__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("chainId"));
                             }
-                            chain_id__ =
-                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
-                            ;
+                            chain_id__ = Some(
+                                map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0
+                            );
                         }
                     }
                 }
@@ -411,10 +407,8 @@ impl<'de> serde::Deserialize<'de> for BlockMetadataTransaction {
             "id",
             "round",
             "events",
-            "previous_block_votes_bitvec",
             "previousBlockVotesBitvec",
             "proposer",
-            "failed_proposer_indices",
             "failedProposerIndices",
         ];
 
@@ -450,9 +444,9 @@ impl<'de> serde::Deserialize<'de> for BlockMetadataTransaction {
                             "id" => Ok(GeneratedField::Id),
                             "round" => Ok(GeneratedField::Round),
                             "events" => Ok(GeneratedField::Events),
-                            "previousBlockVotesBitvec" | "previous_block_votes_bitvec" => Ok(GeneratedField::PreviousBlockVotesBitvec),
+                            "previousBlockVotesBitvec" => Ok(GeneratedField::PreviousBlockVotesBitvec),
                             "proposer" => Ok(GeneratedField::Proposer),
-                            "failedProposerIndices" | "failed_proposer_indices" => Ok(GeneratedField::FailedProposerIndices),
+                            "failedProposerIndices" => Ok(GeneratedField::FailedProposerIndices),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -490,9 +484,9 @@ impl<'de> serde::Deserialize<'de> for BlockMetadataTransaction {
                             if round__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("round"));
                             }
-                            round__ =
-                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
-                            ;
+                            round__ = Some(
+                                map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0
+                            );
                         }
                         GeneratedField::Events => {
                             if events__.is_some() {
@@ -504,9 +498,9 @@ impl<'de> serde::Deserialize<'de> for BlockMetadataTransaction {
                             if previous_block_votes_bitvec__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("previousBlockVotesBitvec"));
                             }
-                            previous_block_votes_bitvec__ =
-                                Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
-                            ;
+                            previous_block_votes_bitvec__ = Some(
+                                map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0
+                            );
                         }
                         GeneratedField::Proposer => {
                             if proposer__.is_some() {
@@ -518,10 +512,10 @@ impl<'de> serde::Deserialize<'de> for BlockMetadataTransaction {
                             if failed_proposer_indices__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("failedProposerIndices"));
                             }
-                            failed_proposer_indices__ =
-                                Some(map.next_value::<Vec<::pbjson::private::NumberDeserialize<_>>>()?
-                                    .into_iter().map(|x| x.0).collect())
-                            ;
+                            failed_proposer_indices__ = Some(
+                                map.next_value::<Vec<::pbjson::private::NumberDeserialize<_>>>()?
+                                    .into_iter().map(|x| x.0).collect()
+                            );
                         }
                     }
                 }
@@ -576,7 +570,6 @@ impl<'de> serde::Deserialize<'de> for DeleteModule {
     {
         const FIELDS: &[&str] = &[
             "address",
-            "state_key_hash",
             "stateKeyHash",
             "module",
         ];
@@ -608,7 +601,7 @@ impl<'de> serde::Deserialize<'de> for DeleteModule {
                     {
                         match value {
                             "address" => Ok(GeneratedField::Address),
-                            "stateKeyHash" | "state_key_hash" => Ok(GeneratedField::StateKeyHash),
+                            "stateKeyHash" => Ok(GeneratedField::StateKeyHash),
                             "module" => Ok(GeneratedField::Module),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
@@ -644,15 +637,15 @@ impl<'de> serde::Deserialize<'de> for DeleteModule {
                             if state_key_hash__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("stateKeyHash"));
                             }
-                            state_key_hash__ =
-                                Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
-                            ;
+                            state_key_hash__ = Some(
+                                map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0
+                            );
                         }
                         GeneratedField::Module => {
                             if module__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("module"));
                             }
-                            module__ = map.next_value()?;
+                            module__ = Some(map.next_value()?);
                         }
                     }
                 }
@@ -710,10 +703,8 @@ impl<'de> serde::Deserialize<'de> for DeleteResource {
     {
         const FIELDS: &[&str] = &[
             "address",
-            "state_key_hash",
             "stateKeyHash",
             "type",
-            "type_str",
             "typeStr",
         ];
 
@@ -745,9 +736,9 @@ impl<'de> serde::Deserialize<'de> for DeleteResource {
                     {
                         match value {
                             "address" => Ok(GeneratedField::Address),
-                            "stateKeyHash" | "state_key_hash" => Ok(GeneratedField::StateKeyHash),
+                            "stateKeyHash" => Ok(GeneratedField::StateKeyHash),
                             "type" => Ok(GeneratedField::Type),
-                            "typeStr" | "type_str" => Ok(GeneratedField::TypeStr),
+                            "typeStr" => Ok(GeneratedField::TypeStr),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -783,15 +774,15 @@ impl<'de> serde::Deserialize<'de> for DeleteResource {
                             if state_key_hash__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("stateKeyHash"));
                             }
-                            state_key_hash__ =
-                                Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
-                            ;
+                            state_key_hash__ = Some(
+                                map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0
+                            );
                         }
                         GeneratedField::Type => {
                             if r#type__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("type"));
                             }
-                            r#type__ = map.next_value()?;
+                            r#type__ = Some(map.next_value()?);
                         }
                         GeneratedField::TypeStr => {
                             if type_str__.is_some() {
@@ -844,7 +835,6 @@ impl<'de> serde::Deserialize<'de> for DeleteTableData {
     {
         const FIELDS: &[&str] = &[
             "key",
-            "key_type",
             "keyType",
         ];
 
@@ -874,7 +864,7 @@ impl<'de> serde::Deserialize<'de> for DeleteTableData {
                     {
                         match value {
                             "key" => Ok(GeneratedField::Key),
-                            "keyType" | "key_type" => Ok(GeneratedField::KeyType),
+                            "keyType" => Ok(GeneratedField::KeyType),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -964,7 +954,6 @@ impl<'de> serde::Deserialize<'de> for DeleteTableItem {
         D: serde::Deserializer<'de>,
     {
         const FIELDS: &[&str] = &[
-            "state_key_hash",
             "stateKeyHash",
             "handle",
             "key",
@@ -998,7 +987,7 @@ impl<'de> serde::Deserialize<'de> for DeleteTableItem {
                         E: serde::de::Error,
                     {
                         match value {
-                            "stateKeyHash" | "state_key_hash" => Ok(GeneratedField::StateKeyHash),
+                            "stateKeyHash" => Ok(GeneratedField::StateKeyHash),
                             "handle" => Ok(GeneratedField::Handle),
                             "key" => Ok(GeneratedField::Key),
                             "data" => Ok(GeneratedField::Data),
@@ -1031,9 +1020,9 @@ impl<'de> serde::Deserialize<'de> for DeleteTableItem {
                             if state_key_hash__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("stateKeyHash"));
                             }
-                            state_key_hash__ =
-                                Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
-                            ;
+                            state_key_hash__ = Some(
+                                map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0
+                            );
                         }
                         GeneratedField::Handle => {
                             if handle__.is_some() {
@@ -1051,7 +1040,7 @@ impl<'de> serde::Deserialize<'de> for DeleteTableItem {
                             if data__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("data"));
                             }
-                            data__ = map.next_value()?;
+                            data__ = Some(map.next_value()?);
                         }
                     }
                 }
@@ -1097,7 +1086,6 @@ impl<'de> serde::Deserialize<'de> for DirectWriteSet {
         D: serde::Deserializer<'de>,
     {
         const FIELDS: &[&str] = &[
-            "write_set_change",
             "writeSetChange",
             "events",
         ];
@@ -1127,7 +1115,7 @@ impl<'de> serde::Deserialize<'de> for DirectWriteSet {
                         E: serde::de::Error,
                     {
                         match value {
-                            "writeSetChange" | "write_set_change" => Ok(GeneratedField::WriteSetChange),
+                            "writeSetChange" => Ok(GeneratedField::WriteSetChange),
                             "events" => Ok(GeneratedField::Events),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
@@ -1206,7 +1194,6 @@ impl<'de> serde::Deserialize<'de> for Ed25519Signature {
         D: serde::Deserializer<'de>,
     {
         const FIELDS: &[&str] = &[
-            "public_key",
             "publicKey",
             "signature",
         ];
@@ -1236,7 +1223,7 @@ impl<'de> serde::Deserialize<'de> for Ed25519Signature {
                         E: serde::de::Error,
                     {
                         match value {
-                            "publicKey" | "public_key" => Ok(GeneratedField::PublicKey),
+                            "publicKey" => Ok(GeneratedField::PublicKey),
                             "signature" => Ok(GeneratedField::Signature),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
@@ -1265,17 +1252,17 @@ impl<'de> serde::Deserialize<'de> for Ed25519Signature {
                             if public_key__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("publicKey"));
                             }
-                            public_key__ =
-                                Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
-                            ;
+                            public_key__ = Some(
+                                map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0
+                            );
                         }
                         GeneratedField::Signature => {
                             if signature__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("signature"));
                             }
-                            signature__ =
-                                Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
-                            ;
+                            signature__ = Some(
+                                map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0
+                            );
                         }
                     }
                 }
@@ -1377,7 +1364,7 @@ impl<'de> serde::Deserialize<'de> for EntryFunctionId {
                             if module__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("module"));
                             }
-                            module__ = map.next_value()?;
+                            module__ = Some(map.next_value()?);
                         }
                         GeneratedField::Name => {
                             if name__.is_some() {
@@ -1440,10 +1427,8 @@ impl<'de> serde::Deserialize<'de> for EntryFunctionPayload {
     {
         const FIELDS: &[&str] = &[
             "function",
-            "type_arguments",
             "typeArguments",
             "arguments",
-            "entry_function_id_str",
             "entryFunctionIdStr",
         ];
 
@@ -1475,9 +1460,9 @@ impl<'de> serde::Deserialize<'de> for EntryFunctionPayload {
                     {
                         match value {
                             "function" => Ok(GeneratedField::Function),
-                            "typeArguments" | "type_arguments" => Ok(GeneratedField::TypeArguments),
+                            "typeArguments" => Ok(GeneratedField::TypeArguments),
                             "arguments" => Ok(GeneratedField::Arguments),
-                            "entryFunctionIdStr" | "entry_function_id_str" => Ok(GeneratedField::EntryFunctionIdStr),
+                            "entryFunctionIdStr" => Ok(GeneratedField::EntryFunctionIdStr),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -1507,7 +1492,7 @@ impl<'de> serde::Deserialize<'de> for EntryFunctionPayload {
                             if function__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("function"));
                             }
-                            function__ = map.next_value()?;
+                            function__ = Some(map.next_value()?);
                         }
                         GeneratedField::TypeArguments => {
                             if type_arguments__.is_some() {
@@ -1590,10 +1575,8 @@ impl<'de> serde::Deserialize<'de> for Event {
     {
         const FIELDS: &[&str] = &[
             "key",
-            "sequence_number",
             "sequenceNumber",
             "type",
-            "type_str",
             "typeStr",
             "data",
         ];
@@ -1627,9 +1610,9 @@ impl<'de> serde::Deserialize<'de> for Event {
                     {
                         match value {
                             "key" => Ok(GeneratedField::Key),
-                            "sequenceNumber" | "sequence_number" => Ok(GeneratedField::SequenceNumber),
+                            "sequenceNumber" => Ok(GeneratedField::SequenceNumber),
                             "type" => Ok(GeneratedField::Type),
-                            "typeStr" | "type_str" => Ok(GeneratedField::TypeStr),
+                            "typeStr" => Ok(GeneratedField::TypeStr),
                             "data" => Ok(GeneratedField::Data),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
@@ -1661,21 +1644,21 @@ impl<'de> serde::Deserialize<'de> for Event {
                             if key__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("key"));
                             }
-                            key__ = map.next_value()?;
+                            key__ = Some(map.next_value()?);
                         }
                         GeneratedField::SequenceNumber => {
                             if sequence_number__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("sequenceNumber"));
                             }
-                            sequence_number__ =
-                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
-                            ;
+                            sequence_number__ = Some(
+                                map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0
+                            );
                         }
                         GeneratedField::Type => {
                             if r#type__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("type"));
                             }
-                            r#type__ = map.next_value()?;
+                            r#type__ = Some(map.next_value()?);
                         }
                         GeneratedField::TypeStr => {
                             if type_str__.is_some() {
@@ -1734,9 +1717,7 @@ impl<'de> serde::Deserialize<'de> for EventKey {
         D: serde::Deserializer<'de>,
     {
         const FIELDS: &[&str] = &[
-            "creation_number",
             "creationNumber",
-            "account_address",
             "accountAddress",
         ];
 
@@ -1765,8 +1746,8 @@ impl<'de> serde::Deserialize<'de> for EventKey {
                         E: serde::de::Error,
                     {
                         match value {
-                            "creationNumber" | "creation_number" => Ok(GeneratedField::CreationNumber),
-                            "accountAddress" | "account_address" => Ok(GeneratedField::AccountAddress),
+                            "creationNumber" => Ok(GeneratedField::CreationNumber),
+                            "accountAddress" => Ok(GeneratedField::AccountAddress),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -1794,9 +1775,9 @@ impl<'de> serde::Deserialize<'de> for EventKey {
                             if creation_number__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("creationNumber"));
                             }
-                            creation_number__ =
-                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
-                            ;
+                            creation_number__ = Some(
+                                map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0
+                            );
                         }
                         GeneratedField::AccountAddress => {
                             if account_address__.is_some() {
@@ -1904,7 +1885,7 @@ impl<'de> serde::Deserialize<'de> for GenesisTransaction {
                             if payload__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("payload"));
                             }
-                            payload__ = map.next_value()?;
+                            payload__ = Some(map.next_value()?);
                         }
                         GeneratedField::Events => {
                             if events__.is_some() {
@@ -2155,9 +2136,7 @@ impl<'de> serde::Deserialize<'de> for MoveFunction {
         const FIELDS: &[&str] = &[
             "name",
             "visibility",
-            "is_entry",
             "isEntry",
-            "generic_type_params",
             "genericTypeParams",
             "params",
             "return",
@@ -2194,8 +2173,8 @@ impl<'de> serde::Deserialize<'de> for MoveFunction {
                         match value {
                             "name" => Ok(GeneratedField::Name),
                             "visibility" => Ok(GeneratedField::Visibility),
-                            "isEntry" | "is_entry" => Ok(GeneratedField::IsEntry),
-                            "genericTypeParams" | "generic_type_params" => Ok(GeneratedField::GenericTypeParams),
+                            "isEntry" => Ok(GeneratedField::IsEntry),
+                            "genericTypeParams" => Ok(GeneratedField::GenericTypeParams),
                             "params" => Ok(GeneratedField::Params),
                             "return" => Ok(GeneratedField::Return),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
@@ -2502,7 +2481,6 @@ impl<'de> serde::Deserialize<'de> for MoveModule {
             "address",
             "name",
             "friends",
-            "exposed_functions",
             "exposedFunctions",
             "structs",
         ];
@@ -2538,7 +2516,7 @@ impl<'de> serde::Deserialize<'de> for MoveModule {
                             "address" => Ok(GeneratedField::Address),
                             "name" => Ok(GeneratedField::Name),
                             "friends" => Ok(GeneratedField::Friends),
-                            "exposedFunctions" | "exposed_functions" => Ok(GeneratedField::ExposedFunctions),
+                            "exposedFunctions" => Ok(GeneratedField::ExposedFunctions),
                             "structs" => Ok(GeneratedField::Structs),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
@@ -2699,15 +2677,15 @@ impl<'de> serde::Deserialize<'de> for MoveModuleBytecode {
                             if bytecode__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("bytecode"));
                             }
-                            bytecode__ =
-                                Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
-                            ;
+                            bytecode__ = Some(
+                                map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0
+                            );
                         }
                         GeneratedField::Abi => {
                             if abi__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("abi"));
                             }
-                            abi__ = map.next_value()?;
+                            abi__ = Some(map.next_value()?);
                         }
                     }
                 }
@@ -2917,15 +2895,15 @@ impl<'de> serde::Deserialize<'de> for MoveScriptBytecode {
                             if bytecode__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("bytecode"));
                             }
-                            bytecode__ =
-                                Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
-                            ;
+                            bytecode__ = Some(
+                                map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0
+                            );
                         }
                         GeneratedField::Abi => {
                             if abi__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("abi"));
                             }
-                            abi__ = map.next_value()?;
+                            abi__ = Some(map.next_value()?);
                         }
                     }
                 }
@@ -2992,10 +2970,8 @@ impl<'de> serde::Deserialize<'de> for MoveStruct {
     {
         const FIELDS: &[&str] = &[
             "name",
-            "is_native",
             "isNative",
             "abilities",
-            "generic_type_params",
             "genericTypeParams",
             "fields",
         ];
@@ -3029,9 +3005,9 @@ impl<'de> serde::Deserialize<'de> for MoveStruct {
                     {
                         match value {
                             "name" => Ok(GeneratedField::Name),
-                            "isNative" | "is_native" => Ok(GeneratedField::IsNative),
+                            "isNative" => Ok(GeneratedField::IsNative),
                             "abilities" => Ok(GeneratedField::Abilities),
-                            "genericTypeParams" | "generic_type_params" => Ok(GeneratedField::GenericTypeParams),
+                            "genericTypeParams" => Ok(GeneratedField::GenericTypeParams),
                             "fields" => Ok(GeneratedField::Fields),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
@@ -3198,7 +3174,7 @@ impl<'de> serde::Deserialize<'de> for MoveStructField {
                             if r#type__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("type"));
                             }
-                            r#type__ = map.next_value()?;
+                            r#type__ = Some(map.next_value()?);
                         }
                     }
                 }
@@ -3247,7 +3223,6 @@ impl<'de> serde::Deserialize<'de> for MoveStructGenericTypeParam {
     {
         const FIELDS: &[&str] = &[
             "constraints",
-            "is_phantom",
             "isPhantom",
         ];
 
@@ -3277,7 +3252,7 @@ impl<'de> serde::Deserialize<'de> for MoveStructGenericTypeParam {
                     {
                         match value {
                             "constraints" => Ok(GeneratedField::Constraints),
-                            "isPhantom" | "is_phantom" => Ok(GeneratedField::IsPhantom),
+                            "isPhantom" => Ok(GeneratedField::IsPhantom),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -3370,7 +3345,6 @@ impl<'de> serde::Deserialize<'de> for MoveStructTag {
             "address",
             "module",
             "name",
-            "generic_type_params",
             "genericTypeParams",
         ];
 
@@ -3404,7 +3378,7 @@ impl<'de> serde::Deserialize<'de> for MoveStructTag {
                             "address" => Ok(GeneratedField::Address),
                             "module" => Ok(GeneratedField::Module),
                             "name" => Ok(GeneratedField::Name),
-                            "genericTypeParams" | "generic_type_params" => Ok(GeneratedField::GenericTypeParams),
+                            "genericTypeParams" => Ok(GeneratedField::GenericTypeParams),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -3519,7 +3493,6 @@ impl<'de> serde::Deserialize<'de> for MoveType {
             "type",
             "vector",
             "struct",
-            "generic_type_param_index",
             "genericTypeParamIndex",
             "reference",
             "unparsable",
@@ -3557,7 +3530,7 @@ impl<'de> serde::Deserialize<'de> for MoveType {
                             "type" => Ok(GeneratedField::Type),
                             "vector" => Ok(GeneratedField::Vector),
                             "struct" => Ok(GeneratedField::Struct),
-                            "genericTypeParamIndex" | "generic_type_param_index" => Ok(GeneratedField::GenericTypeParamIndex),
+                            "genericTypeParamIndex" => Ok(GeneratedField::GenericTypeParamIndex),
                             "reference" => Ok(GeneratedField::Reference),
                             "unparsable" => Ok(GeneratedField::Unparsable),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
@@ -3593,34 +3566,33 @@ impl<'de> serde::Deserialize<'de> for MoveType {
                             if content__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("vector"));
                             }
-                            content__ = map.next_value::<::std::option::Option<_>>()?.map(move_type::Content::Vector)
-;
+                            content__ = Some(move_type::Content::Vector(map.next_value()?));
                         }
                         GeneratedField::Struct => {
                             if content__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("struct"));
                             }
-                            content__ = map.next_value::<::std::option::Option<_>>()?.map(move_type::Content::Struct)
-;
+                            content__ = Some(move_type::Content::Struct(map.next_value()?));
                         }
                         GeneratedField::GenericTypeParamIndex => {
                             if content__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("genericTypeParamIndex"));
                             }
-                            content__ = map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| move_type::Content::GenericTypeParamIndex(x.0));
+                            content__ = Some(move_type::Content::GenericTypeParamIndex(
+                                map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0
+                            ));
                         }
                         GeneratedField::Reference => {
                             if content__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("reference"));
                             }
-                            content__ = map.next_value::<::std::option::Option<_>>()?.map(move_type::Content::Reference)
-;
+                            content__ = Some(move_type::Content::Reference(map.next_value()?));
                         }
                         GeneratedField::Unparsable => {
                             if content__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("unparsable"));
                             }
-                            content__ = map.next_value::<::std::option::Option<_>>()?.map(move_type::Content::Unparsable);
+                            content__ = Some(move_type::Content::Unparsable(map.next_value()?));
                         }
                     }
                 }
@@ -3728,7 +3700,7 @@ impl<'de> serde::Deserialize<'de> for move_type::ReferenceType {
                             if to__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("to"));
                             }
-                            to__ = map.next_value()?;
+                            to__ = Some(map.next_value()?);
                         }
                     }
                 }
@@ -3891,9 +3863,7 @@ impl<'de> serde::Deserialize<'de> for MultiAgentSignature {
     {
         const FIELDS: &[&str] = &[
             "sender",
-            "secondary_signer_addresses",
             "secondarySignerAddresses",
-            "secondary_signers",
             "secondarySigners",
         ];
 
@@ -3924,8 +3894,8 @@ impl<'de> serde::Deserialize<'de> for MultiAgentSignature {
                     {
                         match value {
                             "sender" => Ok(GeneratedField::Sender),
-                            "secondarySignerAddresses" | "secondary_signer_addresses" => Ok(GeneratedField::SecondarySignerAddresses),
-                            "secondarySigners" | "secondary_signers" => Ok(GeneratedField::SecondarySigners),
+                            "secondarySignerAddresses" => Ok(GeneratedField::SecondarySignerAddresses),
+                            "secondarySigners" => Ok(GeneratedField::SecondarySigners),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -3954,7 +3924,7 @@ impl<'de> serde::Deserialize<'de> for MultiAgentSignature {
                             if sender__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("sender"));
                             }
-                            sender__ = map.next_value()?;
+                            sender__ = Some(map.next_value()?);
                         }
                         GeneratedField::SecondarySignerAddresses => {
                             if secondary_signer_addresses__.is_some() {
@@ -4023,11 +3993,9 @@ impl<'de> serde::Deserialize<'de> for MultiEd25519Signature {
         D: serde::Deserializer<'de>,
     {
         const FIELDS: &[&str] = &[
-            "public_keys",
             "publicKeys",
             "signatures",
             "threshold",
-            "public_key_indices",
             "publicKeyIndices",
         ];
 
@@ -4058,10 +4026,10 @@ impl<'de> serde::Deserialize<'de> for MultiEd25519Signature {
                         E: serde::de::Error,
                     {
                         match value {
-                            "publicKeys" | "public_keys" => Ok(GeneratedField::PublicKeys),
+                            "publicKeys" => Ok(GeneratedField::PublicKeys),
                             "signatures" => Ok(GeneratedField::Signatures),
                             "threshold" => Ok(GeneratedField::Threshold),
-                            "publicKeyIndices" | "public_key_indices" => Ok(GeneratedField::PublicKeyIndices),
+                            "publicKeyIndices" => Ok(GeneratedField::PublicKeyIndices),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -4091,36 +4059,36 @@ impl<'de> serde::Deserialize<'de> for MultiEd25519Signature {
                             if public_keys__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("publicKeys"));
                             }
-                            public_keys__ =
-                                Some(map.next_value::<Vec<::pbjson::private::BytesDeserialize<_>>>()?
-                                    .into_iter().map(|x| x.0).collect())
-                            ;
+                            public_keys__ = Some(
+                                map.next_value::<Vec<::pbjson::private::BytesDeserialize<_>>>()?
+                                    .into_iter().map(|x| x.0).collect()
+                            );
                         }
                         GeneratedField::Signatures => {
                             if signatures__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("signatures"));
                             }
-                            signatures__ =
-                                Some(map.next_value::<Vec<::pbjson::private::BytesDeserialize<_>>>()?
-                                    .into_iter().map(|x| x.0).collect())
-                            ;
+                            signatures__ = Some(
+                                map.next_value::<Vec<::pbjson::private::BytesDeserialize<_>>>()?
+                                    .into_iter().map(|x| x.0).collect()
+                            );
                         }
                         GeneratedField::Threshold => {
                             if threshold__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("threshold"));
                             }
-                            threshold__ =
-                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
-                            ;
+                            threshold__ = Some(
+                                map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0
+                            );
                         }
                         GeneratedField::PublicKeyIndices => {
                             if public_key_indices__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("publicKeyIndices"));
                             }
-                            public_key_indices__ =
-                                Some(map.next_value::<Vec<::pbjson::private::NumberDeserialize<_>>>()?
-                                    .into_iter().map(|x| x.0).collect())
-                            ;
+                            public_key_indices__ = Some(
+                                map.next_value::<Vec<::pbjson::private::NumberDeserialize<_>>>()?
+                                    .into_iter().map(|x| x.0).collect()
+                            );
                         }
                     }
                 }
@@ -4166,9 +4134,7 @@ impl<'de> serde::Deserialize<'de> for MultisigPayload {
         D: serde::Deserializer<'de>,
     {
         const FIELDS: &[&str] = &[
-            "multisig_address",
             "multisigAddress",
-            "transaction_payload",
             "transactionPayload",
         ];
 
@@ -4197,8 +4163,8 @@ impl<'de> serde::Deserialize<'de> for MultisigPayload {
                         E: serde::de::Error,
                     {
                         match value {
-                            "multisigAddress" | "multisig_address" => Ok(GeneratedField::MultisigAddress),
-                            "transactionPayload" | "transaction_payload" => Ok(GeneratedField::TransactionPayload),
+                            "multisigAddress" => Ok(GeneratedField::MultisigAddress),
+                            "transactionPayload" => Ok(GeneratedField::TransactionPayload),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -4232,7 +4198,7 @@ impl<'de> serde::Deserialize<'de> for MultisigPayload {
                             if transaction_payload__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("transactionPayload"));
                             }
-                            transaction_payload__ = map.next_value()?;
+                            transaction_payload__ = Some(map.next_value()?);
                         }
                     }
                 }
@@ -4283,7 +4249,6 @@ impl<'de> serde::Deserialize<'de> for MultisigTransactionPayload {
     {
         const FIELDS: &[&str] = &[
             "type",
-            "entry_function_payload",
             "entryFunctionPayload",
         ];
 
@@ -4313,7 +4278,7 @@ impl<'de> serde::Deserialize<'de> for MultisigTransactionPayload {
                     {
                         match value {
                             "type" => Ok(GeneratedField::Type),
-                            "entryFunctionPayload" | "entry_function_payload" => Ok(GeneratedField::EntryFunctionPayload),
+                            "entryFunctionPayload" => Ok(GeneratedField::EntryFunctionPayload),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -4347,8 +4312,7 @@ impl<'de> serde::Deserialize<'de> for MultisigTransactionPayload {
                             if payload__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("entryFunctionPayload"));
                             }
-                            payload__ = map.next_value::<::std::option::Option<_>>()?.map(multisig_transaction_payload::Payload::EntryFunctionPayload)
-;
+                            payload__ = Some(multisig_transaction_payload::Payload::EntryFunctionPayload(map.next_value()?));
                         }
                     }
                 }
@@ -4472,7 +4436,6 @@ impl<'de> serde::Deserialize<'de> for ScriptPayload {
     {
         const FIELDS: &[&str] = &[
             "code",
-            "type_arguments",
             "typeArguments",
             "arguments",
         ];
@@ -4504,7 +4467,7 @@ impl<'de> serde::Deserialize<'de> for ScriptPayload {
                     {
                         match value {
                             "code" => Ok(GeneratedField::Code),
-                            "typeArguments" | "type_arguments" => Ok(GeneratedField::TypeArguments),
+                            "typeArguments" => Ok(GeneratedField::TypeArguments),
                             "arguments" => Ok(GeneratedField::Arguments),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
@@ -4534,7 +4497,7 @@ impl<'de> serde::Deserialize<'de> for ScriptPayload {
                             if code__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("code"));
                             }
-                            code__ = map.next_value()?;
+                            code__ = Some(map.next_value()?);
                         }
                         GeneratedField::TypeArguments => {
                             if type_arguments__.is_some() {
@@ -4591,7 +4554,6 @@ impl<'de> serde::Deserialize<'de> for ScriptWriteSet {
         D: serde::Deserializer<'de>,
     {
         const FIELDS: &[&str] = &[
-            "execute_as",
             "executeAs",
             "script",
         ];
@@ -4621,7 +4583,7 @@ impl<'de> serde::Deserialize<'de> for ScriptWriteSet {
                         E: serde::de::Error,
                     {
                         match value {
-                            "executeAs" | "execute_as" => Ok(GeneratedField::ExecuteAs),
+                            "executeAs" => Ok(GeneratedField::ExecuteAs),
                             "script" => Ok(GeneratedField::Script),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
@@ -4656,7 +4618,7 @@ impl<'de> serde::Deserialize<'de> for ScriptWriteSet {
                             if script__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("script"));
                             }
-                            script__ = map.next_value()?;
+                            script__ = Some(map.next_value()?);
                         }
                     }
                 }
@@ -4714,9 +4676,7 @@ impl<'de> serde::Deserialize<'de> for Signature {
         const FIELDS: &[&str] = &[
             "type",
             "ed25519",
-            "multi_ed25519",
             "multiEd25519",
-            "multi_agent",
             "multiAgent",
         ];
 
@@ -4749,8 +4709,8 @@ impl<'de> serde::Deserialize<'de> for Signature {
                         match value {
                             "type" => Ok(GeneratedField::Type),
                             "ed25519" => Ok(GeneratedField::Ed25519),
-                            "multiEd25519" | "multi_ed25519" => Ok(GeneratedField::MultiEd25519),
-                            "multiAgent" | "multi_agent" => Ok(GeneratedField::MultiAgent),
+                            "multiEd25519" => Ok(GeneratedField::MultiEd25519),
+                            "multiAgent" => Ok(GeneratedField::MultiAgent),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -4784,22 +4744,19 @@ impl<'de> serde::Deserialize<'de> for Signature {
                             if signature__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("ed25519"));
                             }
-                            signature__ = map.next_value::<::std::option::Option<_>>()?.map(signature::Signature::Ed25519)
-;
+                            signature__ = Some(signature::Signature::Ed25519(map.next_value()?));
                         }
                         GeneratedField::MultiEd25519 => {
                             if signature__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("multiEd25519"));
                             }
-                            signature__ = map.next_value::<::std::option::Option<_>>()?.map(signature::Signature::MultiEd25519)
-;
+                            signature__ = Some(signature::Signature::MultiEd25519(map.next_value()?));
                         }
                         GeneratedField::MultiAgent => {
                             if signature__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("multiAgent"));
                             }
-                            signature__ = map.next_value::<::std::option::Option<_>>()?.map(signature::Signature::MultiAgent)
-;
+                            signature__ = Some(signature::Signature::MultiAgent(map.next_value()?));
                         }
                     }
                 }
@@ -5042,13 +4999,10 @@ impl<'de> serde::Deserialize<'de> for Transaction {
             "version",
             "info",
             "epoch",
-            "block_height",
             "blockHeight",
             "type",
-            "block_metadata",
             "blockMetadata",
             "genesis",
-            "state_checkpoint",
             "stateCheckpoint",
             "user",
         ];
@@ -5090,11 +5044,11 @@ impl<'de> serde::Deserialize<'de> for Transaction {
                             "version" => Ok(GeneratedField::Version),
                             "info" => Ok(GeneratedField::Info),
                             "epoch" => Ok(GeneratedField::Epoch),
-                            "blockHeight" | "block_height" => Ok(GeneratedField::BlockHeight),
+                            "blockHeight" => Ok(GeneratedField::BlockHeight),
                             "type" => Ok(GeneratedField::Type),
-                            "blockMetadata" | "block_metadata" => Ok(GeneratedField::BlockMetadata),
+                            "blockMetadata" => Ok(GeneratedField::BlockMetadata),
                             "genesis" => Ok(GeneratedField::Genesis),
-                            "stateCheckpoint" | "state_checkpoint" => Ok(GeneratedField::StateCheckpoint),
+                            "stateCheckpoint" => Ok(GeneratedField::StateCheckpoint),
                             "user" => Ok(GeneratedField::User),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
@@ -5128,37 +5082,37 @@ impl<'de> serde::Deserialize<'de> for Transaction {
                             if timestamp__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("timestamp"));
                             }
-                            timestamp__ = map.next_value()?;
+                            timestamp__ = Some(map.next_value()?);
                         }
                         GeneratedField::Version => {
                             if version__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("version"));
                             }
-                            version__ =
-                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
-                            ;
+                            version__ = Some(
+                                map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0
+                            );
                         }
                         GeneratedField::Info => {
                             if info__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("info"));
                             }
-                            info__ = map.next_value()?;
+                            info__ = Some(map.next_value()?);
                         }
                         GeneratedField::Epoch => {
                             if epoch__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("epoch"));
                             }
-                            epoch__ =
-                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
-                            ;
+                            epoch__ = Some(
+                                map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0
+                            );
                         }
                         GeneratedField::BlockHeight => {
                             if block_height__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("blockHeight"));
                             }
-                            block_height__ =
-                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
-                            ;
+                            block_height__ = Some(
+                                map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0
+                            );
                         }
                         GeneratedField::Type => {
                             if r#type__.is_some() {
@@ -5170,29 +5124,25 @@ impl<'de> serde::Deserialize<'de> for Transaction {
                             if txn_data__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("blockMetadata"));
                             }
-                            txn_data__ = map.next_value::<::std::option::Option<_>>()?.map(transaction::TxnData::BlockMetadata)
-;
+                            txn_data__ = Some(transaction::TxnData::BlockMetadata(map.next_value()?));
                         }
                         GeneratedField::Genesis => {
                             if txn_data__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("genesis"));
                             }
-                            txn_data__ = map.next_value::<::std::option::Option<_>>()?.map(transaction::TxnData::Genesis)
-;
+                            txn_data__ = Some(transaction::TxnData::Genesis(map.next_value()?));
                         }
                         GeneratedField::StateCheckpoint => {
                             if txn_data__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("stateCheckpoint"));
                             }
-                            txn_data__ = map.next_value::<::std::option::Option<_>>()?.map(transaction::TxnData::StateCheckpoint)
-;
+                            txn_data__ = Some(transaction::TxnData::StateCheckpoint(map.next_value()?));
                         }
                         GeneratedField::User => {
                             if txn_data__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("user"));
                             }
-                            txn_data__ = map.next_value::<::std::option::Option<_>>()?.map(transaction::TxnData::User)
-;
+                            txn_data__ = Some(transaction::TxnData::User(map.next_value()?));
                         }
                     }
                 }
@@ -5366,18 +5316,12 @@ impl<'de> serde::Deserialize<'de> for TransactionInfo {
     {
         const FIELDS: &[&str] = &[
             "hash",
-            "state_change_hash",
             "stateChangeHash",
-            "event_root_hash",
             "eventRootHash",
-            "state_checkpoint_hash",
             "stateCheckpointHash",
-            "gas_used",
             "gasUsed",
             "success",
-            "vm_status",
             "vmStatus",
-            "accumulator_root_hash",
             "accumulatorRootHash",
             "changes",
         ];
@@ -5415,13 +5359,13 @@ impl<'de> serde::Deserialize<'de> for TransactionInfo {
                     {
                         match value {
                             "hash" => Ok(GeneratedField::Hash),
-                            "stateChangeHash" | "state_change_hash" => Ok(GeneratedField::StateChangeHash),
-                            "eventRootHash" | "event_root_hash" => Ok(GeneratedField::EventRootHash),
-                            "stateCheckpointHash" | "state_checkpoint_hash" => Ok(GeneratedField::StateCheckpointHash),
-                            "gasUsed" | "gas_used" => Ok(GeneratedField::GasUsed),
+                            "stateChangeHash" => Ok(GeneratedField::StateChangeHash),
+                            "eventRootHash" => Ok(GeneratedField::EventRootHash),
+                            "stateCheckpointHash" => Ok(GeneratedField::StateCheckpointHash),
+                            "gasUsed" => Ok(GeneratedField::GasUsed),
                             "success" => Ok(GeneratedField::Success),
-                            "vmStatus" | "vm_status" => Ok(GeneratedField::VmStatus),
-                            "accumulatorRootHash" | "accumulator_root_hash" => Ok(GeneratedField::AccumulatorRootHash),
+                            "vmStatus" => Ok(GeneratedField::VmStatus),
+                            "accumulatorRootHash" => Ok(GeneratedField::AccumulatorRootHash),
                             "changes" => Ok(GeneratedField::Changes),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
@@ -5457,41 +5401,41 @@ impl<'de> serde::Deserialize<'de> for TransactionInfo {
                             if hash__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("hash"));
                             }
-                            hash__ =
-                                Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
-                            ;
+                            hash__ = Some(
+                                map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0
+                            );
                         }
                         GeneratedField::StateChangeHash => {
                             if state_change_hash__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("stateChangeHash"));
                             }
-                            state_change_hash__ =
-                                Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
-                            ;
+                            state_change_hash__ = Some(
+                                map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0
+                            );
                         }
                         GeneratedField::EventRootHash => {
                             if event_root_hash__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("eventRootHash"));
                             }
-                            event_root_hash__ =
-                                Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
-                            ;
+                            event_root_hash__ = Some(
+                                map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0
+                            );
                         }
                         GeneratedField::StateCheckpointHash => {
                             if state_checkpoint_hash__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("stateCheckpointHash"));
                             }
-                            state_checkpoint_hash__ =
-                                map.next_value::<::std::option::Option<::pbjson::private::BytesDeserialize<_>>>()?.map(|x| x.0)
-                            ;
+                            state_checkpoint_hash__ = Some(
+                                map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0
+                            );
                         }
                         GeneratedField::GasUsed => {
                             if gas_used__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("gasUsed"));
                             }
-                            gas_used__ =
-                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
-                            ;
+                            gas_used__ = Some(
+                                map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0
+                            );
                         }
                         GeneratedField::Success => {
                             if success__.is_some() {
@@ -5509,9 +5453,9 @@ impl<'de> serde::Deserialize<'de> for TransactionInfo {
                             if accumulator_root_hash__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("accumulatorRootHash"));
                             }
-                            accumulator_root_hash__ =
-                                Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
-                            ;
+                            accumulator_root_hash__ = Some(
+                                map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0
+                            );
                         }
                         GeneratedField::Changes => {
                             if changes__.is_some() {
@@ -5587,15 +5531,10 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
     {
         const FIELDS: &[&str] = &[
             "type",
-            "entry_function_payload",
             "entryFunctionPayload",
-            "script_payload",
             "scriptPayload",
-            "module_bundle_payload",
             "moduleBundlePayload",
-            "write_set_payload",
             "writeSetPayload",
-            "multisig_payload",
             "multisigPayload",
         ];
 
@@ -5629,11 +5568,11 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
                     {
                         match value {
                             "type" => Ok(GeneratedField::Type),
-                            "entryFunctionPayload" | "entry_function_payload" => Ok(GeneratedField::EntryFunctionPayload),
-                            "scriptPayload" | "script_payload" => Ok(GeneratedField::ScriptPayload),
-                            "moduleBundlePayload" | "module_bundle_payload" => Ok(GeneratedField::ModuleBundlePayload),
-                            "writeSetPayload" | "write_set_payload" => Ok(GeneratedField::WriteSetPayload),
-                            "multisigPayload" | "multisig_payload" => Ok(GeneratedField::MultisigPayload),
+                            "entryFunctionPayload" => Ok(GeneratedField::EntryFunctionPayload),
+                            "scriptPayload" => Ok(GeneratedField::ScriptPayload),
+                            "moduleBundlePayload" => Ok(GeneratedField::ModuleBundlePayload),
+                            "writeSetPayload" => Ok(GeneratedField::WriteSetPayload),
+                            "multisigPayload" => Ok(GeneratedField::MultisigPayload),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -5667,36 +5606,31 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
                             if payload__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("entryFunctionPayload"));
                             }
-                            payload__ = map.next_value::<::std::option::Option<_>>()?.map(transaction_payload::Payload::EntryFunctionPayload)
-;
+                            payload__ = Some(transaction_payload::Payload::EntryFunctionPayload(map.next_value()?));
                         }
                         GeneratedField::ScriptPayload => {
                             if payload__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("scriptPayload"));
                             }
-                            payload__ = map.next_value::<::std::option::Option<_>>()?.map(transaction_payload::Payload::ScriptPayload)
-;
+                            payload__ = Some(transaction_payload::Payload::ScriptPayload(map.next_value()?));
                         }
                         GeneratedField::ModuleBundlePayload => {
                             if payload__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("moduleBundlePayload"));
                             }
-                            payload__ = map.next_value::<::std::option::Option<_>>()?.map(transaction_payload::Payload::ModuleBundlePayload)
-;
+                            payload__ = Some(transaction_payload::Payload::ModuleBundlePayload(map.next_value()?));
                         }
                         GeneratedField::WriteSetPayload => {
                             if payload__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("writeSetPayload"));
                             }
-                            payload__ = map.next_value::<::std::option::Option<_>>()?.map(transaction_payload::Payload::WriteSetPayload)
-;
+                            payload__ = Some(transaction_payload::Payload::WriteSetPayload(map.next_value()?));
                         }
                         GeneratedField::MultisigPayload => {
                             if payload__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("multisigPayload"));
                             }
-                            payload__ = map.next_value::<::std::option::Option<_>>()?.map(transaction_payload::Payload::MultisigPayload)
-;
+                            payload__ = Some(transaction_payload::Payload::MultisigPayload(map.next_value()?));
                         }
                     }
                 }
@@ -5883,7 +5817,7 @@ impl<'de> serde::Deserialize<'de> for UserTransaction {
                             if request__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("request"));
                             }
-                            request__ = map.next_value()?;
+                            request__ = Some(map.next_value()?);
                         }
                         GeneratedField::Events => {
                             if events__.is_some() {
@@ -5964,13 +5898,9 @@ impl<'de> serde::Deserialize<'de> for UserTransactionRequest {
     {
         const FIELDS: &[&str] = &[
             "sender",
-            "sequence_number",
             "sequenceNumber",
-            "max_gas_amount",
             "maxGasAmount",
-            "gas_unit_price",
             "gasUnitPrice",
-            "expiration_timestamp_secs",
             "expirationTimestampSecs",
             "payload",
             "signature",
@@ -6007,10 +5937,10 @@ impl<'de> serde::Deserialize<'de> for UserTransactionRequest {
                     {
                         match value {
                             "sender" => Ok(GeneratedField::Sender),
-                            "sequenceNumber" | "sequence_number" => Ok(GeneratedField::SequenceNumber),
-                            "maxGasAmount" | "max_gas_amount" => Ok(GeneratedField::MaxGasAmount),
-                            "gasUnitPrice" | "gas_unit_price" => Ok(GeneratedField::GasUnitPrice),
-                            "expirationTimestampSecs" | "expiration_timestamp_secs" => Ok(GeneratedField::ExpirationTimestampSecs),
+                            "sequenceNumber" => Ok(GeneratedField::SequenceNumber),
+                            "maxGasAmount" => Ok(GeneratedField::MaxGasAmount),
+                            "gasUnitPrice" => Ok(GeneratedField::GasUnitPrice),
+                            "expirationTimestampSecs" => Ok(GeneratedField::ExpirationTimestampSecs),
                             "payload" => Ok(GeneratedField::Payload),
                             "signature" => Ok(GeneratedField::Signature),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
@@ -6051,43 +5981,43 @@ impl<'de> serde::Deserialize<'de> for UserTransactionRequest {
                             if sequence_number__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("sequenceNumber"));
                             }
-                            sequence_number__ =
-                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
-                            ;
+                            sequence_number__ = Some(
+                                map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0
+                            );
                         }
                         GeneratedField::MaxGasAmount => {
                             if max_gas_amount__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("maxGasAmount"));
                             }
-                            max_gas_amount__ =
-                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
-                            ;
+                            max_gas_amount__ = Some(
+                                map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0
+                            );
                         }
                         GeneratedField::GasUnitPrice => {
                             if gas_unit_price__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("gasUnitPrice"));
                             }
-                            gas_unit_price__ =
-                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
-                            ;
+                            gas_unit_price__ = Some(
+                                map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0
+                            );
                         }
                         GeneratedField::ExpirationTimestampSecs => {
                             if expiration_timestamp_secs__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("expirationTimestampSecs"));
                             }
-                            expiration_timestamp_secs__ = map.next_value()?;
+                            expiration_timestamp_secs__ = Some(map.next_value()?);
                         }
                         GeneratedField::Payload => {
                             if payload__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("payload"));
                             }
-                            payload__ = map.next_value()?;
+                            payload__ = Some(map.next_value()?);
                         }
                         GeneratedField::Signature => {
                             if signature__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("signature"));
                             }
-                            signature__ = map.next_value()?;
+                            signature__ = Some(map.next_value()?);
                         }
                     }
                 }
@@ -6143,7 +6073,6 @@ impl<'de> serde::Deserialize<'de> for WriteModule {
     {
         const FIELDS: &[&str] = &[
             "address",
-            "state_key_hash",
             "stateKeyHash",
             "data",
         ];
@@ -6175,7 +6104,7 @@ impl<'de> serde::Deserialize<'de> for WriteModule {
                     {
                         match value {
                             "address" => Ok(GeneratedField::Address),
-                            "stateKeyHash" | "state_key_hash" => Ok(GeneratedField::StateKeyHash),
+                            "stateKeyHash" => Ok(GeneratedField::StateKeyHash),
                             "data" => Ok(GeneratedField::Data),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
@@ -6211,15 +6140,15 @@ impl<'de> serde::Deserialize<'de> for WriteModule {
                             if state_key_hash__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("stateKeyHash"));
                             }
-                            state_key_hash__ =
-                                Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
-                            ;
+                            state_key_hash__ = Some(
+                                map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0
+                            );
                         }
                         GeneratedField::Data => {
                             if data__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("data"));
                             }
-                            data__ = map.next_value()?;
+                            data__ = Some(map.next_value()?);
                         }
                     }
                 }
@@ -6283,10 +6212,8 @@ impl<'de> serde::Deserialize<'de> for WriteResource {
     {
         const FIELDS: &[&str] = &[
             "address",
-            "state_key_hash",
             "stateKeyHash",
             "type",
-            "type_str",
             "typeStr",
             "data",
         ];
@@ -6320,9 +6247,9 @@ impl<'de> serde::Deserialize<'de> for WriteResource {
                     {
                         match value {
                             "address" => Ok(GeneratedField::Address),
-                            "stateKeyHash" | "state_key_hash" => Ok(GeneratedField::StateKeyHash),
+                            "stateKeyHash" => Ok(GeneratedField::StateKeyHash),
                             "type" => Ok(GeneratedField::Type),
-                            "typeStr" | "type_str" => Ok(GeneratedField::TypeStr),
+                            "typeStr" => Ok(GeneratedField::TypeStr),
                             "data" => Ok(GeneratedField::Data),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
@@ -6360,15 +6287,15 @@ impl<'de> serde::Deserialize<'de> for WriteResource {
                             if state_key_hash__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("stateKeyHash"));
                             }
-                            state_key_hash__ =
-                                Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
-                            ;
+                            state_key_hash__ = Some(
+                                map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0
+                            );
                         }
                         GeneratedField::Type => {
                             if r#type__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("type"));
                             }
-                            r#type__ = map.next_value()?;
+                            r#type__ = Some(map.next_value()?);
                         }
                         GeneratedField::TypeStr => {
                             if type_str__.is_some() {
@@ -6436,11 +6363,8 @@ impl<'de> serde::Deserialize<'de> for WriteSet {
         D: serde::Deserializer<'de>,
     {
         const FIELDS: &[&str] = &[
-            "write_set_type",
             "writeSetType",
-            "script_write_set",
             "scriptWriteSet",
-            "direct_write_set",
             "directWriteSet",
         ];
 
@@ -6470,9 +6394,9 @@ impl<'de> serde::Deserialize<'de> for WriteSet {
                         E: serde::de::Error,
                     {
                         match value {
-                            "writeSetType" | "write_set_type" => Ok(GeneratedField::WriteSetType),
-                            "scriptWriteSet" | "script_write_set" => Ok(GeneratedField::ScriptWriteSet),
-                            "directWriteSet" | "direct_write_set" => Ok(GeneratedField::DirectWriteSet),
+                            "writeSetType" => Ok(GeneratedField::WriteSetType),
+                            "scriptWriteSet" => Ok(GeneratedField::ScriptWriteSet),
+                            "directWriteSet" => Ok(GeneratedField::DirectWriteSet),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -6506,15 +6430,13 @@ impl<'de> serde::Deserialize<'de> for WriteSet {
                             if write_set__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("scriptWriteSet"));
                             }
-                            write_set__ = map.next_value::<::std::option::Option<_>>()?.map(write_set::WriteSet::ScriptWriteSet)
-;
+                            write_set__ = Some(write_set::WriteSet::ScriptWriteSet(map.next_value()?));
                         }
                         GeneratedField::DirectWriteSet => {
                             if write_set__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("directWriteSet"));
                             }
-                            write_set__ = map.next_value::<::std::option::Option<_>>()?.map(write_set::WriteSet::DirectWriteSet)
-;
+                            write_set__ = Some(write_set::WriteSet::DirectWriteSet(map.next_value()?));
                         }
                     }
                 }
@@ -6656,17 +6578,11 @@ impl<'de> serde::Deserialize<'de> for WriteSetChange {
     {
         const FIELDS: &[&str] = &[
             "type",
-            "delete_module",
             "deleteModule",
-            "delete_resource",
             "deleteResource",
-            "delete_table_item",
             "deleteTableItem",
-            "write_module",
             "writeModule",
-            "write_resource",
             "writeResource",
-            "write_table_item",
             "writeTableItem",
         ];
 
@@ -6701,12 +6617,12 @@ impl<'de> serde::Deserialize<'de> for WriteSetChange {
                     {
                         match value {
                             "type" => Ok(GeneratedField::Type),
-                            "deleteModule" | "delete_module" => Ok(GeneratedField::DeleteModule),
-                            "deleteResource" | "delete_resource" => Ok(GeneratedField::DeleteResource),
-                            "deleteTableItem" | "delete_table_item" => Ok(GeneratedField::DeleteTableItem),
-                            "writeModule" | "write_module" => Ok(GeneratedField::WriteModule),
-                            "writeResource" | "write_resource" => Ok(GeneratedField::WriteResource),
-                            "writeTableItem" | "write_table_item" => Ok(GeneratedField::WriteTableItem),
+                            "deleteModule" => Ok(GeneratedField::DeleteModule),
+                            "deleteResource" => Ok(GeneratedField::DeleteResource),
+                            "deleteTableItem" => Ok(GeneratedField::DeleteTableItem),
+                            "writeModule" => Ok(GeneratedField::WriteModule),
+                            "writeResource" => Ok(GeneratedField::WriteResource),
+                            "writeTableItem" => Ok(GeneratedField::WriteTableItem),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -6740,43 +6656,37 @@ impl<'de> serde::Deserialize<'de> for WriteSetChange {
                             if change__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("deleteModule"));
                             }
-                            change__ = map.next_value::<::std::option::Option<_>>()?.map(write_set_change::Change::DeleteModule)
-;
+                            change__ = Some(write_set_change::Change::DeleteModule(map.next_value()?));
                         }
                         GeneratedField::DeleteResource => {
                             if change__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("deleteResource"));
                             }
-                            change__ = map.next_value::<::std::option::Option<_>>()?.map(write_set_change::Change::DeleteResource)
-;
+                            change__ = Some(write_set_change::Change::DeleteResource(map.next_value()?));
                         }
                         GeneratedField::DeleteTableItem => {
                             if change__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("deleteTableItem"));
                             }
-                            change__ = map.next_value::<::std::option::Option<_>>()?.map(write_set_change::Change::DeleteTableItem)
-;
+                            change__ = Some(write_set_change::Change::DeleteTableItem(map.next_value()?));
                         }
                         GeneratedField::WriteModule => {
                             if change__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("writeModule"));
                             }
-                            change__ = map.next_value::<::std::option::Option<_>>()?.map(write_set_change::Change::WriteModule)
-;
+                            change__ = Some(write_set_change::Change::WriteModule(map.next_value()?));
                         }
                         GeneratedField::WriteResource => {
                             if change__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("writeResource"));
                             }
-                            change__ = map.next_value::<::std::option::Option<_>>()?.map(write_set_change::Change::WriteResource)
-;
+                            change__ = Some(write_set_change::Change::WriteResource(map.next_value()?));
                         }
                         GeneratedField::WriteTableItem => {
                             if change__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("writeTableItem"));
                             }
-                            change__ = map.next_value::<::std::option::Option<_>>()?.map(write_set_change::Change::WriteTableItem)
-;
+                            change__ = Some(write_set_change::Change::WriteTableItem(map.next_value()?));
                         }
                     }
                 }
@@ -6902,7 +6812,6 @@ impl<'de> serde::Deserialize<'de> for WriteSetPayload {
         D: serde::Deserializer<'de>,
     {
         const FIELDS: &[&str] = &[
-            "write_set",
             "writeSet",
         ];
 
@@ -6930,7 +6839,7 @@ impl<'de> serde::Deserialize<'de> for WriteSetPayload {
                         E: serde::de::Error,
                     {
                         match value {
-                            "writeSet" | "write_set" => Ok(GeneratedField::WriteSet),
+                            "writeSet" => Ok(GeneratedField::WriteSet),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -6957,7 +6866,7 @@ impl<'de> serde::Deserialize<'de> for WriteSetPayload {
                             if write_set__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("writeSet"));
                             }
-                            write_set__ = map.next_value()?;
+                            write_set__ = Some(map.next_value()?);
                         }
                     }
                 }
@@ -7013,10 +6922,8 @@ impl<'de> serde::Deserialize<'de> for WriteTableData {
     {
         const FIELDS: &[&str] = &[
             "key",
-            "key_type",
             "keyType",
             "value",
-            "value_type",
             "valueType",
         ];
 
@@ -7048,9 +6955,9 @@ impl<'de> serde::Deserialize<'de> for WriteTableData {
                     {
                         match value {
                             "key" => Ok(GeneratedField::Key),
-                            "keyType" | "key_type" => Ok(GeneratedField::KeyType),
+                            "keyType" => Ok(GeneratedField::KeyType),
                             "value" => Ok(GeneratedField::Value),
-                            "valueType" | "value_type" => Ok(GeneratedField::ValueType),
+                            "valueType" => Ok(GeneratedField::ValueType),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -7156,7 +7063,6 @@ impl<'de> serde::Deserialize<'de> for WriteTableItem {
         D: serde::Deserializer<'de>,
     {
         const FIELDS: &[&str] = &[
-            "state_key_hash",
             "stateKeyHash",
             "handle",
             "key",
@@ -7190,7 +7096,7 @@ impl<'de> serde::Deserialize<'de> for WriteTableItem {
                         E: serde::de::Error,
                     {
                         match value {
-                            "stateKeyHash" | "state_key_hash" => Ok(GeneratedField::StateKeyHash),
+                            "stateKeyHash" => Ok(GeneratedField::StateKeyHash),
                             "handle" => Ok(GeneratedField::Handle),
                             "key" => Ok(GeneratedField::Key),
                             "data" => Ok(GeneratedField::Data),
@@ -7223,9 +7129,9 @@ impl<'de> serde::Deserialize<'de> for WriteTableItem {
                             if state_key_hash__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("stateKeyHash"));
                             }
-                            state_key_hash__ =
-                                Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
-                            ;
+                            state_key_hash__ = Some(
+                                map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0
+                            );
                         }
                         GeneratedField::Handle => {
                             if handle__.is_some() {
@@ -7243,7 +7149,7 @@ impl<'de> serde::Deserialize<'de> for WriteTableItem {
                             if data__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("data"));
                             }
-                            data__ = map.next_value()?;
+                            data__ = Some(map.next_value()?);
                         }
                     }
                 }

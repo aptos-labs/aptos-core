@@ -8,6 +8,11 @@ A Move source file (or **compilation unit**) may contain multiple modules and sc
 
 ### Scripts
 
+:::tip Tutorial
+To learn how to publish and execute a Move script, follow the [Move Scripts](../move-scripts.md) example.
+:::
+
+
 A script has the following structure:
 
 ```text

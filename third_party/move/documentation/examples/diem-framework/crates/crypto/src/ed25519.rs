@@ -39,11 +39,10 @@ use crate::{
 use anyhow::{anyhow, Result};
 use core::convert::TryFrom;
 use diem_crypto_derive::{DeserializeKey, SerializeKey, SilentDebug, SilentDisplay};
+pub use ed25519_dalek;
 use mirai_annotations::*;
 use serde::Serialize;
 use std::{cmp::Ordering, fmt};
-
-pub use ed25519_dalek;
 
 /// The length of the Ed25519PrivateKey
 pub const ED25519_PRIVATE_KEY_LENGTH: usize = ed25519_dalek::SECRET_KEY_LENGTH;
@@ -54,7 +53,7 @@ pub const ED25519_SIGNATURE_LENGTH: usize = ed25519_dalek::SIGNATURE_LENGTH;
 
 /// The order of ed25519 as defined in [RFC8032](https://tools.ietf.org/html/rfc8032).
 const L: [u8; 32] = [
-    0xed, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58, 0xd6, 0x9c, 0xf7, 0xa2, 0xde, 0xf9, 0xde, 0x14,
+    0xED, 0xD3, 0xF5, 0x5C, 0x1A, 0x63, 0x12, 0x58, 0xD6, 0x9C, 0xF7, 0xA2, 0xDE, 0xF9, 0xDE, 0x14,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10,
 ];
 
@@ -232,8 +231,8 @@ impl PrivateKey for Ed25519PrivateKey {
 }
 
 impl SigningKey for Ed25519PrivateKey {
-    type VerifyingKeyMaterial = Ed25519PublicKey;
     type SignatureMaterial = Ed25519Signature;
+    type VerifyingKeyMaterial = Ed25519PublicKey;
 
     fn sign<T: CryptoHash + Serialize>(&self, message: &T) -> Ed25519Signature {
         Ed25519PrivateKey::sign_arbitrary_message(self, signing_message(message).as_ref())
@@ -335,8 +334,8 @@ impl Eq for Ed25519PublicKey {}
 // We deduce VerifyingKey from pointing to the signature material
 // we get the ability to do `pubkey.validate(msg, signature)`
 impl VerifyingKey for Ed25519PublicKey {
-    type SigningKeyMaterial = Ed25519PrivateKey;
     type SignatureMaterial = Ed25519Signature;
+    type SigningKeyMaterial = Ed25519PrivateKey;
 }
 
 impl fmt::Display for Ed25519PublicKey {
@@ -403,8 +402,8 @@ impl ValidCryptoMaterial for Ed25519PublicKey {
 //////////////////////
 
 impl Signature for Ed25519Signature {
-    type VerifyingKeyMaterial = Ed25519PublicKey;
     type SigningKeyMaterial = Ed25519PrivateKey;
+    type VerifyingKeyMaterial = Ed25519PublicKey;
 
     /// Verifies that the provided signature is valid for the provided
     /// message, according to the RFC8032 algorithm. This strict verification performs the
@@ -526,7 +525,7 @@ fn check_s_lt_l(s: &[u8]) -> bool {
         match s[i].cmp(&L[i]) {
             Ordering::Less => return true,
             Ordering::Greater => return false,
-            _ => {}
+            _ => {},
         }
     }
     // As this stage S == L which implies a non canonical S.

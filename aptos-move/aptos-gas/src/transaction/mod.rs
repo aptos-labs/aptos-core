@@ -186,60 +186,41 @@ impl TransactionGasParameters {
         }
     }
 
-    /// New formula to charge storage fee for write set items based on fixed APT costs.
-    pub fn calculate_write_set_storage_fee<'a>(
-        &self,
-        ops: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
-    ) -> Fee {
+    /// New formula to charge storage fee for a write, measured in APT.
+    pub fn storage_fee_per_write(&self, key: &StateKey, op: &WriteOp) -> Fee {
         use WriteOp::*;
 
-        let excess_fee = |size: NumBytes| -> Fee {
+        let excess_fee = |key: &StateKey, data: &[u8]| -> Fee {
+            let size = NumBytes::new(key.size() as u64) + NumBytes::new(data.len() as u64);
             match size.checked_sub(self.free_write_bytes_quota) {
                 Some(excess) => excess * self.storage_fee_per_excess_state_byte,
                 None => 0.into(),
             }
         };
 
-        let mut fee = Fee::zero();
-        let mut new_slots = NumSlots::zero();
-
-        for (key, op) in ops {
-            let key_size = NumBytes::new(key.size() as u64);
-            match op {
-                Creation(data) | CreationWithMetadata { data, .. } => {
-                    new_slots += 1.into();
-                    let val_size = NumBytes::new(data.len() as u64);
-                    fee += excess_fee(key_size + val_size);
-                },
-                Modification(data) | ModificationWithMetadata { data, .. } => {
-                    let val_size = NumBytes::new(data.len() as u64);
-                    fee += excess_fee(key_size + val_size);
-                },
-                Deletion | DeletionWithMetadata { .. } => (),
-            }
+        match op {
+            Creation(data) | CreationWithMetadata { data, .. } => {
+                self.storage_fee_per_state_slot_create * NumSlots::new(1) + excess_fee(key, data)
+            },
+            Modification(data) | ModificationWithMetadata { data, .. } => excess_fee(key, data),
+            Deletion | DeletionWithMetadata { .. } => 0.into(),
         }
-
-        fee += new_slots * self.storage_fee_per_state_slot_create;
-
-        fee
     }
 
-    /// New formula to charge storage fee for events based on fixed APT costs.
-    pub fn calculate_event_storage_fee<'a>(
-        &self,
-        events: impl IntoIterator<Item = &'a ContractEvent>,
-    ) -> Fee {
-        let total_bytes = events.into_iter().fold(NumBytes::zero(), |total, event| {
-            total + NumBytes::new(event.size() as u64)
-        });
-        total_bytes
-            .checked_sub(self.free_event_bytes_quota)
-            .unwrap_or(NumBytes::zero())
-            * self.storage_fee_per_event_byte
+    /// New formula to charge storage fee for an event, measured in APT.
+    pub fn storage_fee_per_event(&self, event: &ContractEvent) -> Fee {
+        NumBytes::new(event.size() as u64) * self.storage_fee_per_event_byte
     }
 
-    /// New formula to charge storage fee for transaction based on fixed APT costs.
-    pub fn calculate_transaction_storage_fee(&self, txn_size: NumBytes) -> Fee {
+    pub fn storage_discount_for_events(&self, total_cost: Fee) -> Fee {
+        std::cmp::min(
+            total_cost,
+            self.free_event_bytes_quota * self.storage_fee_per_event_byte,
+        )
+    }
+
+    /// New formula to charge storage fee for transaction, measured in APT.
+    pub fn storage_fee_for_transaction_storage(&self, txn_size: NumBytes) -> Fee {
         txn_size
             .checked_sub(self.large_transaction_cutoff)
             .unwrap_or(NumBytes::zero())

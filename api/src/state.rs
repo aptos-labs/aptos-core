@@ -5,7 +5,7 @@ use crate::{
     accept_type::AcceptType,
     failpoint::fail_point_poem,
     response::{
-        api_disabled, build_not_found, module_not_found, resource_not_found, table_item_not_found,
+        api_forbidden, build_not_found, module_not_found, resource_not_found, table_item_not_found,
         BadRequestError, BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404,
         InternalError,
     },
@@ -197,8 +197,16 @@ impl StateApi {
         ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<MoveValue> {
         fail_point_poem("endpoint_get_table_item")?;
+
+        if AcceptType::Json == accept_type {
+            return Err(api_forbidden(
+                "Get raw table item",
+                "Only BCS is supported as an AcceptType.",
+            ));
+        }
         self.context
             .check_api_output_enabled("Get raw table item", &accept_type)?;
+
         self.raw_table_item(
             &accept_type,
             table_handle.0,
@@ -455,7 +463,10 @@ impl StateApi {
             })?;
 
         match accept_type {
-            AcceptType::Json => Err(api_disabled("Get raw table item by json")),
+            AcceptType::Json => Err(api_forbidden(
+                "Get raw table item",
+                "Please use get table item instead.",
+            )),
             AcceptType::Bcs => {
                 BasicResponse::try_from_encoded((bytes, &ledger_info, BasicResponseStatus::Ok))
             },

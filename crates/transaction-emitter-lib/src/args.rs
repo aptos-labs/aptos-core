@@ -62,7 +62,7 @@ impl CoinSourceArgs {
 
 #[derive(Clone, Debug, Default, Deserialize, Parser, Serialize)]
 pub struct ClusterArgs {
-    /// Nodes the cluster should connect to, e.g. http://node.mysite.com:8080
+    /// Nodes the cluster should connect to, e.g. `http://node.mysite.com:8080`
     /// If the port is not provided, it is assumed to be 8080.
     #[clap(short, long, required = true, min_values = 1, parse(try_from_str = parse_target))]
     pub targets: Option<Vec<Url>>,

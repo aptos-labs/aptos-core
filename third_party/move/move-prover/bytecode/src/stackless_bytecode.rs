@@ -393,6 +393,25 @@ impl Bytecode {
         }
     }
 
+    pub fn set_attr_id(&mut self, new_id: AttrId) {
+        use Bytecode::*;
+        let id = match self {
+            Assign(id, ..)
+            | Call(id, ..)
+            | Ret(id, ..)
+            | Load(id, ..)
+            | Branch(id, ..)
+            | Jump(id, ..)
+            | Label(id, ..)
+            | Abort(id, ..)
+            | Nop(id)
+            | SaveMem(id, ..)
+            | SaveSpecVar(id, ..)
+            | Prop(id, ..) => id,
+        };
+        *id = new_id;
+    }
+
     pub fn is_exit(&self) -> bool {
         matches!(
             self,

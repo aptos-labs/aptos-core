@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import unittest
 from typing import List, Tuple
 
@@ -94,7 +93,7 @@ class PublicKey:
         serializer.to_bytes(self.key.encode())
 
 
-class MultiEd25519PublicKey:
+class MultiPublicKey:
     keys: List[PublicKey]
     threshold: int
 
@@ -116,11 +115,6 @@ class MultiEd25519PublicKey:
     def __str__(self) -> str:
         return f"{self.threshold}-of-{len(self.keys)} Multi-Ed25519 public key"
 
-    def auth_key(self) -> bytes:
-        hasher = hashlib.sha3_256()
-        hasher.update(self.to_bytes() + b"\x01")
-        return hasher.digest()
-
     def to_bytes(self) -> bytes:
         concatenated_keys = bytes()
         for key in self.keys:
@@ -128,11 +122,11 @@ class MultiEd25519PublicKey:
         return concatenated_keys + bytes([self.threshold])
 
     @staticmethod
-    def from_bytes(key: bytes) -> MultiEd25519PublicKey:
+    def from_bytes(key: bytes) -> MultiPublicKey:
         # Get key count and threshold limits.
-        min_keys = MultiEd25519PublicKey.MIN_KEYS
-        max_keys = MultiEd25519PublicKey.MAX_KEYS
-        min_threshold = MultiEd25519PublicKey.MIN_THRESHOLD
+        min_keys = MultiPublicKey.MIN_KEYS
+        max_keys = MultiPublicKey.MAX_KEYS
+        min_threshold = MultiPublicKey.MIN_THRESHOLD
         # Get number of signers.
         n_signers = int(len(key) / PublicKey.LENGTH)
         assert (
@@ -149,7 +143,7 @@ class MultiEd25519PublicKey:
             start_byte = i * PublicKey.LENGTH
             end_byte = (i + 1) * PublicKey.LENGTH
             keys.append(PublicKey(VerifyKey(key[start_byte:end_byte])))
-        return MultiEd25519PublicKey(keys, threshold)
+        return MultiPublicKey(keys, threshold)
 
     def serialize(self, serializer: Serializer):
         serializer.to_bytes(self.to_bytes())
@@ -186,13 +180,13 @@ class Signature:
         serializer.to_bytes(self.signature)
 
 
-class MultiEd25519Signature:
+class MultiSignature:
     signatures: List[Signature]
     bitmap: bytes
 
     def __init__(
         self,
-        public_key: MultiEd25519PublicKey,
+        public_key: MultiPublicKey,
         signatures_map: List[Tuple[PublicKey, Signature]],
     ):
         self.signatures = list()
@@ -261,15 +255,8 @@ class Test(unittest.TestCase):
             "1e70e49b78f976644e2c51754a2f049d3ff041869c669523ba95b172c7329901"
         )
         # Generate multisig public key with threshold of 1.
-        multisig_public_key = MultiEd25519PublicKey(
+        multisig_public_key = MultiPublicKey(
             [private_key_1.public_key(), private_key_2.public_key()], 1
-        )
-        # Check expected authentication key.
-        expected_authentication_key = (
-            "835bb8c5ee481062946b18bbb3b42a40b998d6bf5316ca63834c959dc739acf0"
-        )
-        self.assertEqual(
-            multisig_public_key.auth_key().hex(), expected_authentication_key
         )
         # Get public key BCS representation.
         serializer = Serializer()
@@ -284,7 +271,7 @@ class Test(unittest.TestCase):
         # Get public key bytes representation.
         public_key_bytes = multisig_public_key.to_bytes()
         # Convert back to multisig class instance from bytes.
-        multisig_public_key = MultiEd25519PublicKey.from_bytes(public_key_bytes)
+        multisig_public_key = MultiPublicKey.from_bytes(public_key_bytes)
         # Get public key BCS representation.
         serializer = Serializer()
         multisig_public_key.serialize(serializer)
@@ -294,7 +281,7 @@ class Test(unittest.TestCase):
         # Have one signer sign arbitrary message.
         signature = private_key_2.sign(b"multisig")
         # Compose multisig signature.
-        multisig_signature = MultiEd25519Signature(
+        multisig_signature = MultiSignature(
             multisig_public_key, [(private_key_2.public_key(), signature)]
         )
         # Get signature BCS representation.
@@ -312,46 +299,43 @@ class Test(unittest.TestCase):
     def test_multisig_range_checks(self):
         # Generate public keys.
         keys = [
-            PrivateKey.random().public_key()
-            for x in range(MultiEd25519PublicKey.MAX_KEYS + 1)
+            PrivateKey.random().public_key() for x in range(MultiPublicKey.MAX_KEYS + 1)
         ]
         # Verify failure for initializing multisig instance with too few keys.
         with self.assertRaisesRegex(AssertionError, "Must have between 2 and 32 keys."):
-            MultiEd25519PublicKey([keys[0]], 1)
+            MultiPublicKey([keys[0]], 1)
         # Verify failure for initializing multisig instance with too many keys.
         with self.assertRaisesRegex(AssertionError, "Must have between 2 and 32 keys."):
-            MultiEd25519PublicKey(keys, 1)
+            MultiPublicKey(keys, 1)
         # Verify failure for initializing multisig instance with small threshold.
         with self.assertRaisesRegex(
             AssertionError, "Threshold must be between 1 and 4."
         ):
-            MultiEd25519PublicKey(keys[0:4], 0)
+            MultiPublicKey(keys[0:4], 0)
         # Verify failure for initializing multisig instance with large threshold.
         with self.assertRaisesRegex(
             AssertionError, "Threshold must be between 1 and 4."
         ):
-            MultiEd25519PublicKey(keys[0:4], 5)
+            MultiPublicKey(keys[0:4], 5)
         # Verify failure for initializing from bytes with too few keys.
         with self.assertRaisesRegex(AssertionError, "Must have between 2 and 32 keys."):
-            MultiEd25519PublicKey.from_bytes(
-                MultiEd25519PublicKey([keys[0]], 1, checked=False).to_bytes()
+            MultiPublicKey.from_bytes(
+                MultiPublicKey([keys[0]], 1, checked=False).to_bytes()
             )
         # Verify failure for initializing from bytes with too many keys.
         with self.assertRaisesRegex(AssertionError, "Must have between 2 and 32 keys."):
-            MultiEd25519PublicKey.from_bytes(
-                MultiEd25519PublicKey(keys, 1, checked=False).to_bytes()
-            )
+            MultiPublicKey.from_bytes(MultiPublicKey(keys, 1, checked=False).to_bytes())
         # Verify failure for initializing from bytes with small threshold.
         with self.assertRaisesRegex(
             AssertionError, "Threshold must be between 1 and 4."
         ):
-            MultiEd25519PublicKey.from_bytes(
-                MultiEd25519PublicKey(keys[0:4], 0, checked=False).to_bytes()
+            MultiPublicKey.from_bytes(
+                MultiPublicKey(keys[0:4], 0, checked=False).to_bytes()
             )
         # Verify failure for initializing from bytes with large threshold.
         with self.assertRaisesRegex(
             AssertionError, "Threshold must be between 1 and 4."
         ):
-            MultiEd25519PublicKey.from_bytes(
-                MultiEd25519PublicKey(keys[0:4], 5, checked=False).to_bytes()
+            MultiPublicKey.from_bytes(
+                MultiPublicKey(keys[0:4], 5, checked=False).to_bytes()
             )

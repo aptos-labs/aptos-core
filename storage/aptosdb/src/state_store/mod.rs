@@ -19,8 +19,9 @@ use crate::{
         truncation_helper::{truncate_ledger_db, truncate_state_kv_db},
     },
     version_data::VersionDataSchema,
-    AptosDbError, LedgerStore, StaleNodeIndexCrossEpochSchema, StaleNodeIndexSchema,
-    StateKvPrunerManager, StateMerklePrunerManager, TransactionStore, OTHER_TIMERS_SECONDS,
+    AptosDbError, LedgerStore, ShardedStateKvSchemaBatch, StaleNodeIndexCrossEpochSchema,
+    StaleNodeIndexSchema, StateKvPrunerManager, StateMerklePrunerManager, TransactionStore,
+    OTHER_TIMERS_SECONDS,
 };
 use anyhow::{ensure, format_err, Result};
 use aptos_crypto::{
@@ -279,13 +280,12 @@ impl StateDb {
 impl StateStore {
     pub fn new(
         ledger_db: Arc<DB>,
-        state_merkle_db: Arc<DB>,
+        state_merkle_db: Arc<StateMerkleDb>,
         state_kv_db: Arc<StateKvDb>,
         state_merkle_pruner: StateMerklePrunerManager<StaleNodeIndexSchema>,
         epoch_snapshot_pruner: StateMerklePrunerManager<StaleNodeIndexCrossEpochSchema>,
         state_kv_pruner: StateKvPrunerManager,
         buffered_state_target_items: usize,
-        max_nodes_per_lru_cache_shard: usize,
         hack_for_tests: bool,
     ) -> Self {
         Self::sync_commit_progress(
@@ -293,10 +293,6 @@ impl StateStore {
             Arc::clone(&state_kv_db),
             /*crash_if_difference_is_too_large=*/ true,
         );
-        let state_merkle_db = Arc::new(StateMerkleDb::new(
-            state_merkle_db,
-            max_nodes_per_lru_cache_shard,
-        ));
         let state_db = Arc::new(StateDb {
             ledger_db,
             state_merkle_db,
@@ -345,7 +341,7 @@ impl StateStore {
 
             let state_kv_commit_progress = state_kv_db
                 .metadata_db()
-                .get::<DbMetadataSchema>(&DbMetadataKey::StateKVCommitProgress)
+                .get::<DbMetadataSchema>(&DbMetadataKey::StateKvCommitProgress)
                 .expect("Failed to read state K/V commit progress.")
                 .expect("State K/V commit progress cannot be None.")
                 .expect_version();
@@ -394,24 +390,22 @@ impl StateStore {
     #[cfg(feature = "db-debugger")]
     pub fn catch_up_state_merkle_db(
         ledger_db: Arc<DB>,
-        state_merkle_db: DB,
+        state_merkle_db: Arc<StateMerkleDb>,
         state_kv_db: Arc<StateKvDb>,
     ) -> Result<Option<Version>> {
         use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
 
-        let arc_state_merkle_rocksdb = Arc::new(state_merkle_db);
         let state_merkle_pruner = StateMerklePrunerManager::new(
-            Arc::clone(&arc_state_merkle_rocksdb),
+            Arc::clone(&state_merkle_db),
             NO_OP_STORAGE_PRUNER_CONFIG.state_merkle_pruner_config,
         );
         let epoch_snapshot_pruner = StateMerklePrunerManager::new(
-            Arc::clone(&arc_state_merkle_rocksdb),
+            Arc::clone(&state_merkle_db),
             NO_OP_STORAGE_PRUNER_CONFIG.state_merkle_pruner_config,
         );
-        let state_merkle_db = Arc::new(StateMerkleDb::new(arc_state_merkle_rocksdb, 0));
         let state_kv_pruner = StateKvPrunerManager::new(
             Arc::clone(&state_kv_db),
-            NO_OP_STORAGE_PRUNER_CONFIG.state_kv_pruner_config,
+            NO_OP_STORAGE_PRUNER_CONFIG.ledger_pruner_config,
         );
         let state_db = Arc::new(StateDb {
             ledger_db,
@@ -583,7 +577,7 @@ impl StateStore {
         first_version: Version,
         expected_usage: StateStorageUsage,
         ledger_batch: &SchemaBatch,
-        sharded_state_kv_batches: &[SchemaBatch; 256],
+        sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["put_value_sets"])
@@ -636,7 +630,7 @@ impl StateStore {
         first_version: Version,
         expected_usage: StateStorageUsage,
         batch: &SchemaBatch,
-        sharded_state_kv_batches: &[SchemaBatch; 256],
+        sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["put_stats_and_indices"])
@@ -753,14 +747,15 @@ impl StateStore {
         version: Version,
         base_version: Option<Version>,
     ) -> Result<HashValue> {
-        let (batch, hash) = self.state_merkle_db.merklize_value_set(
+        let (top_levels_batch, sharded_batch, hash) = self.state_merkle_db.merklize_value_set(
             value_set,
             node_hashes,
             version,
             base_version,
             None, // previous epoch ending version
         )?;
-        self.state_merkle_db.write_schemas(batch)?;
+        self.state_merkle_db
+            .commit(version, top_levels_batch, sharded_batch)?;
         Ok(hash)
     }
 
@@ -859,10 +854,11 @@ impl StateStore {
 
     #[cfg(test)]
     pub fn get_all_jmt_nodes(&self) -> Result<Vec<aptos_jellyfish_merkle::node_type::NodeKey>> {
+        // TODO(grao): Support sharding here.
         let mut iter = self
             .state_db
             .state_merkle_db
-            .db
+            .metadata_db()
             .iter::<crate::jellyfish_merkle_node::JellyfishMerkleNodeSchema>(
             Default::default(),
         )?;

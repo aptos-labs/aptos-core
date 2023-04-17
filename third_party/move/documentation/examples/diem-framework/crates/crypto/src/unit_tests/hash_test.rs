@@ -30,17 +30,17 @@ fn test_default_hasher() {
 
 #[test]
 fn test_primitive_type() {
-    let x = 0xf312_u16;
+    let x = 0xF312_u16;
     let mut wtr: Vec<u8> = vec![];
     wtr.extend_from_slice(&x.to_le_bytes());
     assert_eq!(x.test_only_hash(), HashValue::sha3_256_of(&wtr[..]));
 
-    let x = 0xff00_1234_u32;
+    let x = 0xFF00_1234_u32;
     let mut wtr: Vec<u8> = vec![];
     wtr.extend_from_slice(&x.to_le_bytes());
     assert_eq!(x.test_only_hash(), HashValue::sha3_256_of(&wtr[..]));
 
-    let x = 0x89ab_cdef_0123_4567_u64;
+    let x = 0x89AB_CDEF_0123_4567_u64;
     let mut wtr: Vec<u8> = vec![];
     wtr.extend_from_slice(&x.to_le_bytes());
     assert_eq!(x.test_only_hash(), HashValue::sha3_256_of(&wtr[..]));
@@ -84,6 +84,7 @@ fn test_random_with_rng() {
 }
 
 #[test]
+#[allow(clippy::bool_assert_comparison)]
 fn test_hash_value_iter_bits() {
     let hash = b"hello".test_only_hash();
     let bits = hash.iter_bits().collect::<Vec<_>>();
@@ -146,7 +147,7 @@ fn test_get_nibble() {
     for byte in bytes.iter_mut().take(HashValue::LENGTH) {
         *byte = rand::thread_rng().gen();
         nibbles.push(*byte >> 4);
-        nibbles.push(*byte & 0x0f);
+        nibbles.push(*byte & 0x0F);
     }
     let hash = HashValue::new(bytes);
     for (i, nibble) in nibbles.iter().enumerate().take(HashValue::LENGTH * 2) {

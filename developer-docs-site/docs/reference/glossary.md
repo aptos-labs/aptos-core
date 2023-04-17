@@ -14,33 +14,65 @@ slug: "glossary"
 ### Account
 
 - An **account** in the Aptos blockchain is a container for an arbitrary number of [Move modules](#move-module) and [Move resources](#move-resources). This essentially means that the state of each [account](../concepts/accounts.md) is comprised of both code and data.
-- The account is identified by an [account address](#account-address).
+- The account is identified by [account address](#account-address).
+
+See [Accounts](../concepts/accounts.md) for more information.
 
 ### Account Address
 
-- The address of a Aptos account, see [basics on accounts](../concepts/accounts.md#initial-account-setup).
+- An **account address** is the address of an Aptos account.
+- Account address refers to a specific destination on the Aptos network. The address dictates the destination and source of a specific amount of assets exchanged by two parties on the blockchain. 
+- An Aptos address is a 64-character hex string, and sometimes it can be shortened by stripping leading 0s and prefixing `0x`. This makes a hex-encoded 32 byte Aptos account address.
+
+See [Accounts](../concepts/accounts.md) for more information.
+
+### API
+
+- An **Application Programming Interface (API)(** is a set of protocols and tools that allow users to interact with Aptos blockchain nodes and client networks via external applications. Aptos offers a REST API for this purpose. See the [Aptos API reference](https://aptos.dev/nodes/aptos-api-spec#/) documentation and [Use the Aptos API](../guides/aptos-apis.md) for more details.
+
+### APT
+
+**Aptos token (APT)** is the Aptos blockchain native token used for paying network and transaction fees.
+
+### Aptos
+
+**Aptos** is a Layer 1 blockchain for everyone. It uses the Move programming language and launched its mainnet on 2022-10-17 to redefine the web3 user experience. The Aptos blockchain is dedicated to creating better user experiences through increased speed, security, scalability, reliability and usability with low transaction costs.  The word “Aptos" means "The People" in the Ohlone language. See the [Aptos White Paper](../aptos-white-paper/index.md) for more details.
 
 ### AptosBFT
 
-- AptosBFT is the Aptos protocol's BFT consensus algorithm.
+- **AptosBFT** is the Aptos protocol's BFT consensus algorithm.
 - AptosBFT is based on HotStuff.
 
-### Aptos blockchain
+### Aptos Blockchain
 
 - The **Aptos blockchain** is a ledger of immutable transactions agreed upon by the validators on the Aptos network (the network of validators).
 
+### Aptos Name Service (ANS)
+
+- The **Aptos Name Service (ANS)** is a decentralized naming address service for the Aptos blockchain. An Aptos name is a human-readable *.apt* domain name that is used in place of a public key, for example *love.apt*. 
+- This service also allows users to register subdomain names in addition to the registered domain. Find out more at: [Aptosnames.com](https://www.aptosnames.com/)
+
 ### Aptos-core
 
-Aptos-core is the open source technology on which the Aptos Payment Network runs. Aptos-core contains software for
+**Aptos-core** is the open source technology on which the Aptos Payment Network runs. Aptos-core contains software for
 
 * the Aptos blockchain itself, which generates and stores the immutable ledger of confirmed transactions and
 * the validation process, which implements the consensus algorithm to validate transactions and add them to the Aptos blockchain immutable ledger.
 
-### Aptos Framework
-The Aptos Framework defines the public API for blockchain updates and the structure of on-chain data. It defines the business logic and access control for the three key pillars of Aptos functionality: payments, treasury, and on-chain governance. It is implemented as a set of modules written in the Move programming language and stored on-chain as Move bytecode.
+### Aptos Ecosystem
 
-### Aptos node
-An Aptos node is a peer entity of the Aptos network that tracks the state of the Aptos blockchain. There are two types of Aptos nodes, [validators](#validator) and [fullnodes](#fullnode)).
+- **Aptos ecosystem** refers to various components of the Aptos blockchain network and their interactions.  The Aptos ecosystem includes the community, community-driven projects, and events. See [Contribute to the Aptos Ecosystem](../community/index.md) for all possible ways to join Aptos.
+
+### Aptos Explorer
+
+- The **[Aptos Explorer](https://explorer.aptoslabs.com/)** is an interface that helps users examine details of the Aptos blockchain, including account information, validators, and transactions.
+- The Aptos Explorer help users validate their work in Aptos wallets and other tools in the blockchain. Find more details at [Use the Aptos Explorer](../guides/use-aptos-explorer.md).
+
+### Aptos Framework
+The **Aptos Framework** defines the public API for blockchain updates and the structure of on-chain data. It defines the business logic and access control for the three key pillars of Aptos functionality: payments, treasury, and on-chain governance. It is implemented as a set of modules written in the Move programming language and stored on-chain as Move bytecode.
+
+### Aptos Node
+An **Aptos node** is a peer entity of the Aptos network that tracks the state of the Aptos blockchain. There are two types of Aptos nodes, [validators](#validator) and [fullnodes](#fullnode)).
 
 ### Aptos Protocol
 
@@ -78,24 +110,42 @@ An Aptos node is a peer entity of the Aptos network that tracks the state of the
 
 ## C
 
+### CLI
+
+- **Command line interface** refers to the Aptos CLI used for developing on the Aptos blockchain, operating nodes, and debugging issues. Find out more at [Use the Aptos CLI](../cli-tools/aptos-cli-tool/use-aptos-cli.md). 
+
+### Client
+
+- **Client** is software that receives information from the blockchain and manages transactions. Clients interact with the blockchain through the Aptos nodes.
+
+### Code labs
+
+- **Code labs and tutorials** depict various workflows - such as the use of the Aptos CLI in minting non-fungible tokens (NFTs) - in order for users to understand how the process works and employ related functions in their code. If users have the necessary funds in their accounts, they can follow the same code lab and tutorial steps used in devnet, testnet and mainnet networks.
+
 ### Consensus
 
 - **Consensus** is a component of a validator.
 - The consensus component is responsible for coordination and agreement amongst all validators on the block of transactions to be executed, their order, and the execution results.
 - The Aptos blockchain is formed with these agreed-upon transactions and their corresponding execution results.
+- The consensus component is accountable for achieving security, trust, and agreement among all validators on the Aptos blockchain.
 
 ### Consensus Protocol
 
 - A **consensus protocol** is collectively executed by n validators to accept or reject a transaction and to agree on the ordering of transactions and [execution results](#execution-result).
-- See [BFT](#byzantine-fault-tolerance-bft)
+- See [BFT](#byzantine-fault-tolerance-bft).
 
 ## D
 
+### dApps
+
+- **Decentralized applications (dApps)** are programs or digital applications that run on the Aptos blockchain autonomously. Smart contracts are commonly used to achieve this function.
+
 ### devnet
 
-- The **devnet** is a publicly deployed instance of the Aptos network that runs using a set of validator test nodes.
+- The **Aptos devnet** is a publicly deployed instance of the Aptos network that runs using a set of validator test nodes.
 - The devnet is a demonstration of the Aptos network that is built for experimenting with new ideas
 - The devnet simulates a digital payment system and the coins on the devnet have _no real world value_.
+- The devnet is the network by which developers are given the opportunity to test given protocols. It is similar to testnet as it operates independently of the mainnet yet is reset weekly.
 
 ## E
 
@@ -110,6 +160,10 @@ An Aptos node is a peer entity of the Aptos network that tracks the state of the
 - A transaction may be designed to emit any number of events as a list. For example, a `Coin<AptosCoin>` transfer emits a `WithdrawEvent` for the sender account and a `DepositEvent` for the recipient account.
 - In the Aptos protocol, events provide evidence that the successful execution of a transaction resulted in a specific effect. The `DepositEvent` (in the above example) allows the recipient to confirm that a payment was received into their account.
 - Events are persisted on the blockchain and are used to answer queries by [clients](#client).
+
+### Execution
+
+- **Execution** in the Aptos blockchain is an Aptos node component that manages the block of transactions. The execution component stores successful transactions.
 
 ### Expiration Time
 
@@ -129,6 +183,10 @@ then there is a guarantee that T_N will never be included in the blockchain.
 - The Faucet is a service running along with the devnet. This service only exists to facilitate minting coins for the devnet.
 - You can use the Faucet by sending a request to create coins and transfer them into a given account on your behalf.
 
+### Fullnodes
+
+- **Fullnodes** are clients that ensure data are stored up-to-date on the network. They replicate blockchain state and transactions from other fullnodes and validator nodes.
+
 ## G
 
 ### Gas
@@ -139,7 +197,7 @@ then there is a guarantee that T_N will never be included in the blockchain.
 
 ### Gas Price
 
-- Each transaction specifies the gas price the sender is willing to pay. Gas price is specified in currency/gas units.
+- Each transaction specifies the **gas price** the sender is willing to pay. Gas price is specified in currency/gas units.
 - The price of gas required for a transaction depends on the current demand for usage of the network.
 - The gas cost is fixed at a point in time. Gas costs are denominated in gas units.
 
@@ -147,13 +205,19 @@ then there is a guarantee that T_N will never be included in the blockchain.
 
 ### Honest (Validator)
 
-- A validator that faithfully executes the consensus protocol and is not Byzantine.
+- **Honesty** means a validator that faithfully executes the consensus protocol and is not Byzantine.
 
 ### HotStuff
 
 - **HotStuff** is a recent proposal for a [BFT](#byzantine-fault-tolerance-bft) consensus protocol.
 - AptosBFT, the Aptos network's consensus algorithm, is based on HotStuff.
 - It simplifies the reasoning about safety, and it addresses some performance limitations of previous consensus protocols.
+
+## I
+
+### Indexer
+
+- **[Indexer](../guides/indexing.md)** is the component of Aptos that retrieves, processes, and efficiently stores raw data in the database to provide speedy access to the Aptos blockchain state.
 
 ## L
 
@@ -164,6 +228,10 @@ then there is a guarantee that T_N will never be included in the blockchain.
 - Leaders are selected by a function that takes the current [round number](https://fb.quip.com/LkbMAEBIVNbh#ffYACAO6CzD) as input.
 
 ## M
+
+### Mainnet
+
+- **Mainnet** refers to a working, fully-operational blockchain. A mainnet network has been fully deployed and performs the functionality of transferring digital currency from a sender to a recipient.
 
 ### Maximum Gas Amount
 
@@ -187,18 +255,23 @@ then there is a guarantee that T_N will never be included in the blockchain.
 
 ### Merkle Accumulator
 
-- The [Merkle Accumulator](https://www.usenix.org/legacy/event/sec09/tech/full_papers/crosby.pdf) is an _append-only_ Merkle tree that the Aptos blockchain uses to store the ledger.
+- The **[Merkle Accumulator](https://www.usenix.org/legacy/event/sec09/tech/full_papers/crosby.pdf)** is an _append-only_ Merkle tree that the Aptos blockchain uses to store the ledger.
 - Merkle accumulators can provide proofs that a transaction was included in the chain (“proof of inclusion”).
 - They are also called "history trees" in literature.
+
+### Module
+
+- A **module** in the Move programming language may either be a program or library that can create, transfer, or store assets.
 
 ### Move
 
 - **Move** is a new programming language that implements all the transactions on the Aptos blockchain.
 - It has two different kinds of code &mdash; [transaction scripts](#transaction-script) and [Move modules](#move-module).
+- Move is a safe and secure programming language for web3 that emphasizes access control and scarcity. It is the programming language used to build the Aptos blockchain. You can read more about it in [Move on Aptos](../guides/move-guides/move-on-aptos.md).
 
 ### Move Bytecode
 
-- Move programs are compiled into Move bytecode.
+- Move programs are compiled into **Move bytecode**.
 - Move bytecode is used to express transaction scripts and Move modules.
 
 ### Move Module
@@ -216,6 +289,7 @@ then there is a guarantee that T_N will never be included in the blockchain.
 
 - The **Move virtual machine** executes transaction scripts written in [Move bytecode](#move-bytecode) to produce an [execution result](#execution-result). This result is used to update the blockchain **state**.
 - The virtual machine is part of a [validator](#validator).
+- The Move virtual machine (MoveVM) processes each validator node that translates transactions along with the current blockchain ledger state to produce a changeset as input or storage delta as output.
 
 ## N
 
@@ -223,6 +297,10 @@ then there is a guarantee that T_N will never be included in the blockchain.
 
 - A **node** is a peer entity of the Aptos network that tracks the state of the Aptos blockchain.
 - An Aptos node consists of logical components. [Mempool](#mempool), [consensus](#consensus), and the [virtual machine](#virtual-machine) are examples of node components.
+
+### Nonce
+
+- **Nonce** is a number only used once, a random or semi-random number that is generated for a specific use for authentication protocols and cryptographic hash functions.
 
 ## O
 
@@ -238,19 +316,23 @@ then there is a guarantee that T_N will never be included in the blockchain.
 - Every operation in the Aptos blockchain can be verified cryptographically that it is indeed correct and that data has not been omitted.
 - For example, if a user queries the information within a particular executed transaction, they will be provided with a cryptographic proof that the data returned to them is correct.
 
+### PoS
+
+**Proof-of-Stake (PoS)** is a security mechanism that serves in confirming the uniqueness and legitimacy of blockchain transactions. The PoS consensus mechanism is leveraged by the Aptos blockchain powered by a network of validators, which in turn update the system and process transactions.
+
 ## R
 
 ### Resource Account
 
-- A resource account is used to manage resources independent of an account managed by a user. For example, a developer may use a resource account to manage an account for module publishing, say managing a contract.
+- A **resource account** is used to manage resources independent of an account managed by a user. For example, a developer may use a resource account to manage an account for module publishing, say managing a contract.
 
 - The contract itself does not require a signer post initialization. A resource account gives you the means for the module to provide a signer to other modules and sign transactions on behalf of the module.
 
-See [Resource accounts](../guides/resource-accounts.md).
+See [Resource accounts](../guides/resource-accounts.md) for instructions on use.
 
 ### REST Service
 
-- The REST Service component is the external interface of a Aptos node. Any incoming client request, such as submitted transactions or queries, must first go through the REST Service. A client needs to go through the REST Service component to access storage or any other component in the system. This filters requests and protects the system.
+- The **REST Service** component is the external interface of a Aptos node. Any incoming client request, such as submitted transactions or queries, must first go through the REST Service. A client needs to go through the REST Service component to access storage or any other component in the system. This filters requests and protects the system.
 - Whenever a client submits a new transaction, the REST Service passes it to [mempool](#mempool).
 
 ### Round
@@ -262,6 +344,10 @@ See [Resource accounts](../guides/resource-accounts.md).
 - A **round number** is a shared counter used to select leaders during an [epoch](#epoch) of the consensus protocol.
 
 ## S
+
+### SDKs
+
+- Aptos **software development kits (SDKs)** are sets of tools that enable a developer to quickly create a custom app on the Aptos platform. Find out more at [Use the Aptos SDKs](../sdks/index.md).
 
 ### Sequence Number
 
@@ -278,7 +364,8 @@ See [Resource accounts](../guides/resource-accounts.md).
 
 ### Smart Contract
 
-- See [Move Module](#move-module).
+- **Smart contract** refers to a computer program that automatically and directly carries out the contract's terms.
+- See [Move Module](#move-module) for related details.
 
 ### State
 
@@ -297,6 +384,14 @@ See [Resource accounts](../guides/resource-accounts.md).
 
 See [`table.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/table.move) for the associated Aptos source file.
 
+### Testnet
+
+- **Testnet** describes the Aptos network that is not fully functional yet more stable than devnet; it is an alternative network to mainnet to be used for testing.
+
+### Tokens
+
+- **Tokens** are digital units of value issued on a blockchain. They can be redeemed for assets or value held. Tokens can be of the types: Fungible Token (FT), Non-Fungible Token (NFT), and Semi-Fungible Token (SFT).
+
 ### Transaction
 
 - A raw **transaction** contains the following fields:
@@ -309,14 +404,16 @@ See [`table.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move
 - A signed transaction is a raw transaction with the digital signature.
 - An executed transaction changes the state of the Aptos blockchain.
 
-### Transaction Script
+### Transaction (or Move) Script
 
 - Each transaction submitted by a user includes a **transaction script**.
-- It represents the operation a client submits to a validator.
-- The operation could be a request to move coins from user A to user B, or it could involve interactions with published [Move modules](#move-modules)/smart contracts.
+- These transactions, also know as Move scripts, represent the operations a client submits to a validator.
+- The operation could be a request to move coins from user A to user B, or it could involve interactions with published [Move modules](#move-module) (smart contracts).
 - The transaction script is an arbitrary program that interacts with resources published in the global storage of the Aptos blockchain by calling the procedures of a module. It encodes the logic for a transaction.
 - A single transaction script can send funds to multiple recipients and invoke procedures from several different modules.
 - A transaction script **is not** stored in the global state and cannot be invoked by other transaction scripts. It is a single-use program.
+
+To see example uses of transaction scripts, follow [Move scripts](../guides/move-guides/move-scripts.md) and the [Your First Multisig](../tutorials/first-multisig.md) tutorial.
 
 ## V
 
@@ -326,6 +423,11 @@ See [`table.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move
 - A **validator** is an entity of the Aptos ecosystem that validates on the Aptos blockchain. It receives requests from clients and runs consensus, execution, and storage.
 - A validator maintains the history of all the transactions on the blockchain.
 - Internally, a validator needs to keep the current state, to execute transactions, and to calculate the next state.
+- Aptos validators are in charge of verifying transactions.
+
+### Validator Nodes
+
+- **Validator nodes** are a unique class of fullnodes that take part in consensus, specifically a Byzantine Fault Tolerance (BFT) consensus protocol in Aptos. Validators agree upon transactions to be added to the Aptos blockchain as well as the order in which they are added. 
 
 ### Version
 

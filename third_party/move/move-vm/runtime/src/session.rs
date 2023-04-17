@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    data_cache::TransactionDataCache, native_extensions::NativeContextExtensions,
-    runtime::VMRuntime,
+    data_cache::TransactionDataCache, loader::LoadedFunction,
+    native_extensions::NativeContextExtensions, runtime::VMRuntime,
 };
 use move_binary_format::{
     compatibility::Compatibility,
@@ -109,6 +109,24 @@ impl<'r, 'l, S: MoveResolver> Session<'r, 'l, S> {
             gas_meter,
             &mut self.native_extensions,
             bypass_declared_entry_check,
+        )
+    }
+
+    pub fn execute_instantiated_function(
+        &mut self,
+        func: LoadedFunction,
+        instantiation: LoadedFunctionInstantiation,
+        args: Vec<impl Borrow<[u8]>>,
+        gas_meter: &mut impl GasMeter,
+    ) -> VMResult<SerializedReturnValues> {
+        self.runtime.execute_function_instantiation(
+            func,
+            instantiation,
+            args,
+            &mut self.data_cache,
+            gas_meter,
+            &mut self.native_extensions,
+            true,
         )
     }
 
@@ -270,6 +288,25 @@ impl<'r, 'l, S: MoveResolver> Session<'r, 'l, S> {
                 .loader()
                 .load_script(script.borrow(), &ty_args, &self.data_cache)?;
         Ok(instantiation)
+    }
+
+    /// Load a module, a function, and all of its types into cache
+    pub fn load_function_with_type_arg_inference(
+        &self,
+        module_id: &ModuleId,
+        function_name: &IdentStr,
+        expected_return_type: &Type,
+    ) -> VMResult<(LoadedFunction, LoadedFunctionInstantiation)> {
+        let (func, instantiation) = self
+            .runtime
+            .loader()
+            .load_function_with_type_arg_inference(
+                module_id,
+                function_name,
+                expected_return_type,
+                &self.data_cache,
+            )?;
+        Ok((func, instantiation))
     }
 
     /// Load a module, a function, and all of its types into cache

@@ -14,6 +14,8 @@ pub enum TimedFeatureFlag {
     VerifierMetering,
     MultiEd25519NativePublicKeyValidateGasFix,
     Ristretto255NativeFloatingPointFix,
+    DisableInvariantViolationCheckInSwapLoc,
+    EntryTypeSizeLimit,
 }
 
 /// Representation of features that are gated by the block timestamps.
@@ -83,6 +85,12 @@ impl TimedFeatureFlag {
 
             (Ristretto255NativeFloatingPointFix, TESTNET) => NOT_YET_SPECIFIED,
             (Ristretto255NativeFloatingPointFix, MAINNET) => NOT_YET_SPECIFIED,
+
+            (DisableInvariantViolationCheckInSwapLoc, TESTNET) => NOT_YET_SPECIFIED,
+            (DisableInvariantViolationCheckInSwapLoc, MAINNET) => NOT_YET_SPECIFIED,
+
+            (EntryTypeSizeLimit, TESTNET) => NOT_YET_SPECIFIED,
+            (EntryTypeSizeLimit, MAINNET) => NOT_YET_SPECIFIED,
 
             // If unspecified, a timed feature is considered enabled from the very beginning of time.
             _ => 0,

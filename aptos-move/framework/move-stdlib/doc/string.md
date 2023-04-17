@@ -326,7 +326,7 @@ guaranteeing that the result is valid utf8.
         j &lt;= l && i &lt;= j && <a href="string.md#0x1_string_internal_is_char_boundary">internal_is_char_boundary</a>(bytes, i) && <a href="string.md#0x1_string_internal_is_char_boundary">internal_is_char_boundary</a>(bytes, j),
         <a href="string.md#0x1_string_EINVALID_INDEX">EINVALID_INDEX</a>
     );
-    <a href="string.md#0x1_string_String">String</a>{bytes: <a href="string.md#0x1_string_internal_sub_string">internal_sub_string</a>(bytes, i, j)}
+    <a href="string.md#0x1_string_String">String</a> { bytes: <a href="string.md#0x1_string_internal_sub_string">internal_sub_string</a>(bytes, i, j) }
 }
 </code></pre>
 
@@ -549,4 +549,4 @@ Computes the index of the first occurrence of a string. Returns <code><a href="s
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

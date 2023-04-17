@@ -27,9 +27,11 @@ The following guides provide step-by-step instructions for running public fullno
 
 After deploying your nodes, [connect to the Aptos Network](../connect-to-aptos-network.md).
 
-### Set up staking pool operations
+## Set up staking and delegation pool operations
 
-After connecting your nodes to the Aptos network, [establish staking pool operations](../staking-pool-operations.md).
+After connecting your nodes to the Aptos network, establish [staking pool operations](../staking-pool-operations.md) to add your node to the validator set. 
+
+Similarly, conduct [delegation pool operations](../delegation-pool-operations.md) for APT delegated to your validator. Your node will start syncing and participating in consensus.
 
 ## Test Validator node
 

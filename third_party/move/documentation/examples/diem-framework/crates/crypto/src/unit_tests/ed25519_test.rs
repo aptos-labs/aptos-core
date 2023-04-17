@@ -12,15 +12,13 @@ use crate::{
     traits::*,
     x25519,
 };
-
 use core::{
     convert::TryFrom,
     ops::{Add, Index, IndexMut, Mul, Neg},
 };
-use ed25519_dalek::ed25519::signature::{Signature as _, Verifier as _};
-
 use diem_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use digest::Digest;
+use ed25519_dalek::ed25519::signature::{Signature as _, Verifier as _};
 use proptest::{collection::vec, prelude::*};
 use serde::{Deserialize, Serialize};
 use sha2::Sha512;
@@ -506,9 +504,9 @@ struct Scalar52(pub [u64; 5]);
 
 /// `L` is the order of base point, i.e. 2^252 + 27742317777372353535851937790883648493
 const L: Scalar52 = Scalar52([
-    0x0002_631a_5cf5_d3ed,
-    0x000d_ea2f_79cd_6581,
-    0x0000_0000_0014_def9,
+    0x0002_631A_5CF5_D3ED,
+    0x000D_EA2F_79CD_6581,
+    0x0000_0000_0014_DEF9,
     0x0000_0000_0000_0000,
     0x0000_1000_0000_0000,
 ]);
@@ -599,6 +597,7 @@ impl Scalar52 {
 
 impl Index<usize> for Scalar52 {
     type Output = u64;
+
     fn index(&self, _index: usize) -> &u64 {
         &(self.0[_index])
     }

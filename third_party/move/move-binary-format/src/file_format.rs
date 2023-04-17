@@ -1286,8 +1286,8 @@ pub enum Bytecode {
     /// The values of the fields of the instance appear on the stack in the order defined
     /// in the struct definition.
     ///
-    /// This order makes Unpack<T> the inverse of Pack<T>. So `Unpack<T>; Pack<T>` is the identity
-    /// for struct T.
+    /// This order makes `Unpack<T>` the inverse of `Pack<T>`. So `Unpack<T>; Pack<T>` is the identity
+    /// for struct `T`.
     ///
     /// Stack transition:
     ///
@@ -1757,11 +1757,6 @@ impl Bytecode {
             "Program counter out of bounds"
         );
 
-        // Return early to prevent overflow if pc is hiting the end of max number of instructions allowed (u16::MAX).
-        if pc > u16::max_value() - 2 {
-            return vec![];
-        }
-
         let bytecode = &code[pc as usize];
         let mut v = vec![];
 
@@ -2069,12 +2064,14 @@ pub fn empty_module() -> CompiledModule {
 }
 
 /// Create the following module which is convenient in tests:
-/// // module <SELF> {
-/// //     struct Bar { x: u64 }
-/// //
-/// //     foo() {
-/// //     }
-/// // }
+/// ```text
+/// module <SELF> {
+///     struct Bar { x: u64 }
+///
+///     fun foo() {
+///     }
+/// }
+/// ```
 pub fn basic_test_module() -> CompiledModule {
     let mut m = empty_module();
 

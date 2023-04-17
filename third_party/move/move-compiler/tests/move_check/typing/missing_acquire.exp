@@ -2,5 +2,5 @@ error[E04020]: missing acquires annotation
    ┌─ tests/move_check/typing/missing_acquire.move:11:16
    │
 11 │         R1{} = move_from<R1>(a);
-   │                ^^^^^^^^^^^^^^^^ The call acquires '0x8675309::M::R1', but the 'acquires' list for the current function does not contain this type. It must be present in the calling context's acquires list
+   │                ^^^^^^^^^^^^^^^^ The call acquires '0x8675309::M::R1', but the 'acquires' list for the current function 't1` does not contain this type. It must be present in the calling context's acquires list
 

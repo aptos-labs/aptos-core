@@ -29,11 +29,11 @@ use std::{
 
 type Event = (Vec<u8>, u64, TypeTag, Vec<u8>);
 
-/// subdirectory of `DEFAULT_STORAGE_DIR`/<addr> where resources are stored
+/// subdirectory of `DEFAULT_STORAGE_DIR/<addr>` where resources are stored
 pub const RESOURCES_DIR: &str = "resources";
-/// subdirectory of `DEFAULT_STORAGE_DIR`/<addr> where modules are stored
+/// subdirectory of `DEFAULT_STORAGE_DIR/<addr>` where modules are stored
 pub const MODULES_DIR: &str = "modules";
-/// subdirectory of `DEFAULT_STORAGE_DIR`/<addr> where events are stored
+/// subdirectory of `DEFAULT_STORAGE_DIR/<addr>` where events are stored
 pub const EVENTS_DIR: &str = "events";
 
 /// file under `DEFAULT_BUILD_DIR` where a registry of generated struct layouts are stored

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{metrics, Error, PeerMonitorState, PeerMonitoringServiceClient, PeerState};
-use aptos_config::network_id::PeerNetworkId;
+use aptos_config::{config::PeerMonitoringServiceConfig, network_id::PeerNetworkId};
 use aptos_network::application::{interface::NetworkClient, metadata::PeerMetadata};
 use aptos_peer_monitoring_service_types::PeerMonitoringServiceMessage;
 use aptos_time_service::TimeService;
@@ -11,13 +11,15 @@ use std::collections::HashMap;
 use tokio::runtime::Handle;
 
 pub mod key_value;
-mod latency_info;
-mod network_info;
+pub mod latency_info;
+pub mod network_info;
+pub mod node_info;
 pub mod peer_state;
 mod request_tracker;
 
 /// Refreshes the states of the connected peers
 pub fn refresh_peer_states(
+    monitoring_service_config: &PeerMonitoringServiceConfig,
     peer_monitor_state: PeerMonitorState,
     peer_monitoring_client: PeerMonitoringServiceClient<
         NetworkClient<PeerMonitoringServiceMessage>,
@@ -46,6 +48,7 @@ pub fn refresh_peer_states(
             let should_refresh_peer_state_key = request_tracker.read().new_request_required();
             if should_refresh_peer_state_key {
                 peer_state.refresh_peer_state_key(
+                    monitoring_service_config,
                     &peer_state_key,
                     peer_monitoring_client.clone(),
                     *peer_network_id,

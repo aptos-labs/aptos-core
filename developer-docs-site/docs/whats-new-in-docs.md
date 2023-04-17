@@ -7,6 +7,43 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site. Note, this site is built from the `main` upstream branch of GitHub and so therefore reflects the latest changes to Aptos. If you have checked out [another branch](https://github.com/aptos-labs/aptos-core/branches) to use a [specific network](guides/system-integrators-guide.md#choose-a-network), the code may not yet have all of the features described here.
 
+## 30 March 2023
+
+- Depicted how to employ [Move scripts](./guides/move-guides/move-scripts.md) to execute a series of commands across published Move module interfaces.
+
+## 28 March 2023
+
+- Offered an experimental feature to [profile gas usage locally](./cli-tools/aptos-cli-tool/use-aptos-cli.md#profiling-gas-usage) via the Aptos CLI that not only simulates use but also generates flame graphs for visualizing gas usage.
+
+
+## 27 March 2023
+
+- Described how to [Use the Remix IDE Plugin](./community/contributions/remix-ide-plugin.md) to deploy and run Move modules on the Remix IDE, a graphical interface for developing Move modules written by [0xhsy](https://github.com/0xhsy) of [WELLDONE Studio](https://docs.welldonestudio.io/).
+
+## 24 March 2023
+
+- Added instructions to [Integrate with Aptos Names Service](./guides/aptos-name-service-connector.md) that offers developers a customizable button and modal to enable users to search for and mint Aptos names directly from their website.
+
+## 23 March 2023
+
+- Included an [Aptos Faucet integration](./guides/system-integrators-guide.md#integrating-with-the-faucet) section for SDK and wallet developers in the **Integrate with the Aptos Blockchain** system integrators guide.
+
+- Migrated the [Aptos Move package upgrade](./guides/move-guides/book/package-upgrades.md) documentation to a page in the Aptos Move Book.
+
+## 21 March 2023
+
+- Published beta [Delegation Pool Operations](./nodes/validator-node/operator/delegation-pool-operations.md) instructions for validator operators, written by [Raluca Popescu (dorinbwr](https://github.com/dorinbwr) ) of [Bware Labs](https://bwarelabs.com/).
+
+## 20 March 2023
+
+- Ported the original Move Tutorial to Aptos tooling as the [Move Primitives Tutorial](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/move-tutorial).
+
+## 19 March 2023
+
+- Published a tutorial on using the Aptos [multi-signature (multisig)](./tutorials/first-multisig.md) feature that introduces assorted [K-of-N multi-signer authentication](./concepts/accounts.md#multi-signer-authentication) operations and employs scripts for the first time in Aptos documentation.
+
+  Find this tutorial - provided by [alnoki](https://github.com/alnoki) - on the [Community Highlights](./community/contributions/index.md) page.
+
 ## 16 March 2023
 
 - Added the ability to use [Bytecode for Dependencies](./guides/move-guides/bytecode-dependencies.md) when compiling Move modules in cases where the Move source code for those dependencies are not available locally.
@@ -16,6 +53,17 @@ This page shows the key updates to the developer documentation on this site. Not
 ## 15 March 2023
 
 - Published a [PowerShell script](../../scripts/windows_dev_setup.ps1) to streamline the Aptos [development environment setup](../docs/guides/getting-started.md#set-up-build-dependencies) process on Windows. The script uses WinGet (Microsoft’s official package manager, included in Windows 10 and 11 by default) to install the necessary dependencies and keep them up-to-date.
+
+## 14 March 2023
+
+- Linked to **six** new [External Resources](./community/external-resources.md) for node operators:
+
+  - [Ansible playbook for Node Management (Bare Metal)](https://github.com/RhinoStake/ansible-aptos) - This Ansible Playbook is for the initialization, configuration, planned and hotfix upgrades of Aptos Validators, VFNs and PFNs on bare metal servers, by [RHINO](https://rhinostake.com).
+  - [Ansible playbook for Node Management (Docker)](https://github.com/LavenderFive/aptos-ansible) - This Ansible Playbook is intended for node management, including initial launch and handling upgrades of nodes, by [Lavender.Five Nodes].
+  - [Aptos Staking Dashboard](https://dashboard.stakeaptos.com) · [Repo](https://github.com/pakaplace/swtb-frontend/) - A dashboard to monitor your Aptos validator performance, view network stats, or request delegation commissions, by [Paymagic Labs](https://paymagic.xyz/).
+  - [Aptos Validator/Staking Postman Collection](https://github.com/pakaplace/aptos-validator-staking-postman) - A Postman collection for querying staking pool, staking contract, and account resources/events, by [pakaplace](https://github.com/pakaplace/).
+  - [One-stop solution for Aptos node monitoring](https://github.com/LavenderFive/aptos-monitoring) | A monitoring solution for Aptos nodes utilizing Docker containers with Prometheus, Grafana, cAdvisor, NodeExporter, and alerting with AlertManager. by [Lavender.Five Nodes](https://github.com/LavenderFive).
+  - [Monitor Your Aptos validator and validator fullnodes with Prometheus and Grafana](https://github.com/RhinoStake/aptos_monitoring) - A full-featured Grafana/Prometheus dashboard to monitor key infrastructure, node, and chain-related metrics and data relationships, by [RHINO](https://rhinostake.com).
 
 ## 08 March 2023
 
@@ -58,7 +106,7 @@ This page shows the key updates to the developer documentation on this site. Not
 
 - Added instructions for [working with `PropertyMap` off-chain](concepts/coin-and-token/propertymap-offchain.md) via the Aptos TypeScript SDK, enabling reading and writing of Binary Canonical Serialization (BCS) data in your app.
 
-- Provided an [example of a token airdrop](concepts/coin-and-token/token-airdrop-example.md) using the two-step transfer process.
+- Provided an [example of an NFT airdrop](concepts/coin-and-token/nft-airdrop-example.md) using the two-step transfer process.
 
 ## 31 January 2023
 
@@ -144,7 +192,7 @@ This page shows the key updates to the developer documentation on this site. Not
 
 - Added [Node Inspection Service](nodes/measure/node-inspection-service.md) document that explains how to access node metrics for validators and fullnodes and highlights key metrics for monitoring.
 
-- Added instructions for [running archival nodes](guides/state-sync.md#running-archival-nodes), specifically avoiding fast syncing and ledger pruning. 
+- Added instructions for [running archival nodes](guides/state-sync.md#running-archival-nodes), specifically avoiding fast syncing and ledger pruning.
 
 ## 29 December 2022
 
@@ -348,7 +396,7 @@ The [hardware requirements](nodes/validator-node/operator/node-requirements.md#h
 
 ## 12 September 2022
 
-- A new set of documents on Aptos [Coin and Token](concepts/coin-and-token/index.md) are posted. 
+- A new set of documents on Aptos [Coin and Token](concepts/coin-and-token/index.md) are posted.
 - A new document describing how to [bootstrap a new fullnode using data restore](nodes/full-node/bootstrap-fullnode.md) is posted.
 
 ## 06 September 2022
@@ -363,7 +411,7 @@ The [hardware requirements](nodes/validator-node/operator/node-requirements.md#h
 
 ## 25 August 2022
 
-- A new guide describing [Upgrading the Move Code](/guides/move-guides/upgrading-move-code.md) is posted.
+- A new guide describing [Move Package Upgrades](/guides/move-guides/book/package-upgrades.md) is posted.
 
 
 ## 24 August 2022

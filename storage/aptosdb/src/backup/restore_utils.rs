@@ -196,8 +196,8 @@ pub fn save_transactions_impl(
     ledger_store.put_transaction_infos(first_version, txn_infos, batch)?;
     event_store.put_events_multiple_versions(first_version, events, batch)?;
     // insert changes in write set schema batch
-    for ws in write_sets {
-        transaction_store.put_write_set(first_version, ws, batch)?;
+    for (idx, ws) in write_sets.iter().enumerate() {
+        transaction_store.put_write_set(first_version + idx as Version, ws, batch)?;
     }
 
     Ok(())

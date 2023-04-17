@@ -11,12 +11,10 @@ use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Eq, PartialEq)]
 struct Token {
-    collection: String,
+    collection: AccountAddress,
     collection_id: u64,
-    creator: AccountAddress,
     description: String,
     name: String,
-    creation_name: Option<String>,
     uri: String,
     mutation_events: EventHandle,
 }
@@ -70,7 +68,7 @@ fn test_basic_token() {
         type_params: vec![],
     };
     let token_obj_tag = StructTag {
-        address: addr,
+        address: AccountAddress::from_hex_literal("0x4").unwrap(),
         module: Identifier::new("token").unwrap(),
         name: Identifier::new("Token").unwrap(),
         type_params: vec![],

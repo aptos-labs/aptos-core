@@ -9,5 +9,5 @@ license = "Apache-2.0"
 [dependencies]
 anyhow = "1.0.52"
 move-command-line-common = { path = "../../move-command-line-common" }
-prettydiff = "0.4.0"
+prettydiff = { version = "0.6.2", default-features = false }
 regex = "1.5.5"

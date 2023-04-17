@@ -249,7 +249,7 @@ impl<K: Ord + Clone, V: AbstractDomain + Clone> MapDomain<K, V> {
         (ordmap! {k => v}).into()
     }
 
-    /// Join `v` with self[k] if `k` is bound, insert `v` otherwise
+    /// Join `v` with `self[k]` if `k` is bound, insert `v` otherwise
     pub fn insert_join(&mut self, k: K, v: V) -> JoinResult {
         let mut change = JoinResult::Unchanged;
         self.0

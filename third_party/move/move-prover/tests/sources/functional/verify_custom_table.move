@@ -14,6 +14,7 @@ module 0x42::table {
         map_del_return_key = remove_return_key,
         map_borrow = borrow,
         map_borrow_mut = borrow_mut,
+        map_borrow_mut_with_default = borrow_mut_with_default,
         map_spec_new = spec_new,
         map_spec_get = spec_get,
         map_spec_set = spec_set,
@@ -28,6 +29,7 @@ module 0x42::table {
     public native fun upsert<K: copy + drop, V>(table: &mut Table<K, V>, key: K, val: V);
     public native fun borrow<K: copy + drop, V>(table: &Table<K, V>, key: K): &V;
     public native fun borrow_mut<K: copy + drop, V>(table: &mut Table<K, V>, key: K): &mut V;
+    public native fun borrow_mut_with_default<K: copy + drop, V>(table: &mut Table<K, V>, key: K, default: V): &mut V;
     public native fun length<K: copy + drop, V>(table: &Table<K, V>): u64;
     public native fun empty<K: copy + drop, V>(table: &Table<K, V>): bool;
     public native fun remove<K: copy + drop, V>(table: &mut Table<K, V>, key: K): V;
@@ -160,6 +162,24 @@ module 0x42::VerifyTable {
         ensures spec_len(result) == 2;
         ensures spec_get(result, 1) == 4;
         ensures spec_get(result, 2) == 3;
+    }
+
+    fun borrow_mut_with_default(): Table<u8, u64> {
+        let t = table::new<u8, u64>();
+        table::add(&mut t, 1, 2);
+        table::add(&mut t, 2, 3);
+        let r = table::borrow_mut_with_default(&mut t, 1, 2);
+        *r = 4;
+        table::borrow_mut_with_default(&mut t, 3, 5);
+        t
+    }
+    spec borrow_mut_with_default {
+        ensures spec_contains(result, 1) && spec_contains(result, 2);
+        ensures spec_contains(result, 3);
+        ensures spec_len(result) == 3;
+        ensures spec_get(result, 1) == 4;
+        ensures spec_get(result, 2) == 3;
+        ensures spec_get(result, 3) == 5;
     }
 
     fun create_empty(): Table<u8, u64> {

@@ -12632,6 +12632,7 @@
           "name",
           "visibility",
           "is_entry",
+          "is_view",
           "generic_type_params",
           "params",
           "return"
@@ -12646,6 +12647,10 @@
           "is_entry": {
             "type": "boolean",
             "description": "Whether the function can be called as an entry function directly in a transaction"
+          },
+          "is_view": {
+            "type": "boolean",
+            "description": "Whether the function is a view function or not"
           },
           "generic_type_params": {
             "type": "array",

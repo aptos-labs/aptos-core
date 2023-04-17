@@ -103,7 +103,7 @@ impl Worker {
 
             // 2. Start streaming RPC.
             let request = tonic::Request::new(RawDatastreamRequest {
-                starting_version,
+                starting_version: Some(starting_version),
                 ..Default::default()
             });
 

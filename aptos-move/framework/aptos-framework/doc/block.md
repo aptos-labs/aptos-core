@@ -108,7 +108,7 @@ Should be in-sync with NewBlockEvent rust struct in new_block.rs
 
 <dl>
 <dt>
-<code><a href="../../aptos-stdlib/doc/hash.md#0x1_hash">hash</a>: <b>address</b></code>
+<code><a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>: <b>address</b></code>
 </dt>
 <dd>
 
@@ -346,7 +346,7 @@ Set the metadata for the current block.
 The runtime always runs this before executing the transactions in a block.
 
 
-<pre><code><b>fun</b> <a href="block.md#0x1_block_block_prologue">block_prologue</a>(vm: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="../../aptos-stdlib/doc/hash.md#0x1_hash">hash</a>: <b>address</b>, epoch: u64, round: u64, proposer: <b>address</b>, failed_proposer_indices: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, previous_block_votes_bitvec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="timestamp.md#0x1_timestamp">timestamp</a>: u64)
+<pre><code><b>fun</b> <a href="block.md#0x1_block_block_prologue">block_prologue</a>(vm: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>: <b>address</b>, epoch: u64, round: u64, proposer: <b>address</b>, failed_proposer_indices: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, previous_block_votes_bitvec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="timestamp.md#0x1_timestamp">timestamp</a>: u64)
 </code></pre>
 
 
@@ -357,7 +357,7 @@ The runtime always runs this before executing the transactions in a block.
 
 <pre><code><b>fun</b> <a href="block.md#0x1_block_block_prologue">block_prologue</a>(
     vm: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    <a href="../../aptos-stdlib/doc/hash.md#0x1_hash">hash</a>: <b>address</b>,
+    <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>: <b>address</b>,
     epoch: u64,
     round: u64,
     proposer: <b>address</b>,
@@ -383,7 +383,7 @@ The runtime always runs this before executing the transactions in a block.
     block_metadata_ref.height = <a href="event.md#0x1_event_counter">event::counter</a>(&block_metadata_ref.new_block_events);
 
     <b>let</b> new_block_event = <a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a> {
-        <a href="../../aptos-stdlib/doc/hash.md#0x1_hash">hash</a>,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>,
         epoch,
         round,
         height: block_metadata_ref.height,
@@ -497,7 +497,7 @@ reconfiguration event.
         &vm,
         &<b>mut</b> block_metadata_ref.new_block_events,
         <a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a> {
-            <a href="../../aptos-stdlib/doc/hash.md#0x1_hash">hash</a>: genesis_id,
+            <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>: genesis_id,
             epoch: 0,
             round: 0,
             height: 0,
@@ -539,7 +539,7 @@ new block event for WriteSetPayload.
     <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a>&gt;(
         &<b>mut</b> block_metadata_ref.new_block_events,
         <a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a> {
-            <a href="../../aptos-stdlib/doc/hash.md#0x1_hash">hash</a>: fake_block_hash,
+            <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>: fake_block_hash,
             epoch: <a href="reconfiguration.md#0x1_reconfiguration_current_epoch">reconfiguration::current_epoch</a>(),
             round: <a href="block.md#0x1_block_MAX_U64">MAX_U64</a>,
             height: block_metadata_ref.height,
@@ -683,13 +683,14 @@ The BlockResource existed under the @aptos_framework.
 ### Function `block_prologue`
 
 
-<pre><code><b>fun</b> <a href="block.md#0x1_block_block_prologue">block_prologue</a>(vm: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="../../aptos-stdlib/doc/hash.md#0x1_hash">hash</a>: <b>address</b>, epoch: u64, round: u64, proposer: <b>address</b>, failed_proposer_indices: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, previous_block_votes_bitvec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="timestamp.md#0x1_timestamp">timestamp</a>: u64)
+<pre><code><b>fun</b> <a href="block.md#0x1_block_block_prologue">block_prologue</a>(vm: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>: <b>address</b>, epoch: u64, round: u64, proposer: <b>address</b>, failed_proposer_indices: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, previous_block_votes_bitvec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="timestamp.md#0x1_timestamp">timestamp</a>: u64)
 </code></pre>
 
 
 
 
-<pre><code><b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
 <b>requires</b> <a href="system_addresses.md#0x1_system_addresses_is_vm">system_addresses::is_vm</a>(vm);
 <b>requires</b> proposer == @vm_reserved || <a href="stake.md#0x1_stake_spec_is_current_epoch_validator">stake::spec_is_current_epoch_validator</a>(proposer);
 <b>requires</b> <a href="timestamp.md#0x1_timestamp">timestamp</a> &gt;= <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">reconfiguration::last_reconfiguration_time</a>();
@@ -698,6 +699,7 @@ The BlockResource existed under the @aptos_framework.
 <b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorFees">stake::ValidatorFees</a>&gt;(@aptos_framework);
 <b>requires</b> <b>exists</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(@aptos_framework);
 <b>include</b> <a href="transaction_fee.md#0x1_transaction_fee_RequiresCollectedFeesPerValueLeqBlockAptosSupply">transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply</a>;
+<b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">staking_config::StakingRewardsConfigRequirement</a>;
 <b>aborts_if</b> <b>false</b>;
 </code></pre>
 
@@ -797,4 +799,4 @@ The CurrentTimeMicroseconds existed under the @aptos_framework.
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

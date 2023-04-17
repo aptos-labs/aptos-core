@@ -12,9 +12,9 @@ use aptos_id_generator::U64IdGenerator;
 use aptos_infallible::RwLock;
 use aptos_logger::{info, warn};
 use aptos_network::application::{
-    interface::NetworkClient, metadata::PeerMonitoringMetadata, storage::PeersAndMetadata,
+    interface::NetworkClient, metadata::PeerMetadata, storage::PeersAndMetadata,
 };
-use aptos_peer_monitoring_service_types::PeerMonitoringServiceMessage;
+use aptos_peer_monitoring_service_types::{PeerMonitoringMetadata, PeerMonitoringServiceMessage};
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use error::Error;
 use futures::StreamExt;
@@ -46,6 +46,12 @@ impl PeerMonitorState {
             request_id_generator: Arc::new(U64IdGenerator::new()),
         }
     }
+
+    /// Returns the peer state for the given peer (only used for testing)
+    #[cfg(test)]
+    pub fn get_peer_state(&self, peer_network_id: &PeerNetworkId) -> Option<PeerState> {
+        self.peer_states.read().get(peer_network_id).cloned()
+    }
 }
 
 /// Runs the peer monitor that continuously monitors
@@ -62,7 +68,7 @@ pub async fn start_peer_monitor(
     // Spawn the peer metadata updater
     let time_service = TimeService::real();
     spawn_peer_metadata_updater(
-        node_config.peer_monitoring_service.clone(),
+        node_config.peer_monitoring_service,
         peer_monitor_state.clone(),
         peer_monitoring_client.get_peers_and_metadata(),
         time_service.clone(),
@@ -95,8 +101,9 @@ async fn start_peer_monitor_with_state(
     let peers_and_metadata = peer_monitoring_client.get_peers_and_metadata();
 
     // Create an interval ticker for the monitor loop
+    let monitoring_service_config = node_config.peer_monitoring_service;
     let peer_monitor_duration =
-        Duration::from_millis(node_config.peer_monitoring_service.peer_monitor_interval_ms);
+        Duration::from_millis(monitoring_service_config.peer_monitor_interval_ms);
     let peer_monitor_ticker = time_service.interval(peer_monitor_duration);
     futures::pin_mut!(peer_monitor_ticker);
 
@@ -121,22 +128,20 @@ async fn start_peer_monitor_with_state(
                 },
             };
 
+        // Garbage collect the peer states (to remove disconnected peers)
+        garbage_collect_peer_states(&peer_monitor_state, &connected_peers_and_metadata);
+
         // Ensure all peers have a state (and create one for newly connected peers)
-        for peer_network_id in connected_peers_and_metadata.keys() {
-            let state_exists = peer_monitor_state
-                .peer_states
-                .read()
-                .contains_key(peer_network_id);
-            if !state_exists {
-                peer_monitor_state.peer_states.write().insert(
-                    *peer_network_id,
-                    PeerState::new(node_config.clone(), time_service.clone()),
-                );
-            }
-        }
+        create_states_for_new_peers(
+            &node_config,
+            &peer_monitor_state,
+            &time_service,
+            &connected_peers_and_metadata,
+        );
 
         // Refresh the peer states
         if let Err(error) = peer_states::refresh_peer_states(
+            &monitoring_service_config,
             peer_monitor_state.clone(),
             peer_monitoring_client.clone(),
             connected_peers_and_metadata,
@@ -147,6 +152,51 @@ async fn start_peer_monitor_with_state(
                 .event(LogEvent::UnexpectedErrorEncountered)
                 .error(&error)
                 .message("Failed to refresh peer states!"));
+        }
+    }
+}
+
+/// Creates a new peer state for peers that don't yet have one
+fn create_states_for_new_peers(
+    node_config: &NodeConfig,
+    peer_monitor_state: &PeerMonitorState,
+    time_service: &TimeService,
+    connected_peers_and_metadata: &HashMap<PeerNetworkId, PeerMetadata>,
+) {
+    for peer_network_id in connected_peers_and_metadata.keys() {
+        let state_exists = peer_monitor_state
+            .peer_states
+            .read()
+            .contains_key(peer_network_id);
+        if !state_exists {
+            peer_monitor_state.peer_states.write().insert(
+                *peer_network_id,
+                PeerState::new(node_config.clone(), time_service.clone()),
+            );
+        }
+    }
+}
+
+/// Garbage collects peer states for peers that are no longer connected
+fn garbage_collect_peer_states(
+    peer_monitor_state: &PeerMonitorState,
+    connected_peers_and_metadata: &HashMap<PeerNetworkId, PeerMetadata>,
+) {
+    // Get the set of peers with existing states
+    let peers_with_existing_states: Vec<PeerNetworkId> = peer_monitor_state
+        .peer_states
+        .read()
+        .keys()
+        .cloned()
+        .collect();
+
+    // Remove the states for disconnected peers
+    for peer_network_id in peers_with_existing_states {
+        if !connected_peers_and_metadata.contains_key(&peer_network_id) {
+            peer_monitor_state
+                .peer_states
+                .write()
+                .remove(&peer_network_id);
         }
     }
 }

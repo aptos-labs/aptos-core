@@ -10,7 +10,7 @@ variable "num_azs" {
 
 variable "kubernetes_version" {
   description = "Version of Kubernetes to use for EKS cluster"
-  default     = "1.22"
+  default     = "1.24"
 }
 
 variable "k8s_api_sources" {

@@ -46,18 +46,17 @@ pub fn native_ed25519_signature_verification(
         Ok(sig) => sig,
         Err(_) => {
             return Ok(NativeResult::ok(cost.into(), smallvec![Value::bool(false)]));
-        }
+        },
     };
     let pk = match ed25519::Ed25519PublicKey::try_from(pubkey.as_slice()) {
         Ok(pk) => pk,
         Err(_) => {
             return Ok(NativeResult::ok(cost.into(), smallvec![Value::bool(false)]));
-        }
+        },
     };
 
     let verify_result = sig.verify_arbitrary_msg(msg.as_slice(), &pk).is_ok();
-    Ok(NativeResult::ok(
-        cost.into(),
-        smallvec![Value::bool(verify_result)],
-    ))
+    Ok(NativeResult::ok(cost.into(), smallvec![Value::bool(
+        verify_result
+    )]))
 }

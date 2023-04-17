@@ -99,12 +99,15 @@ Fix formatting issues by running:
 pnpm fmt
 ```
 
-## Re-generate contributors
+## Regenerating contributors
+The src/contributors.json file (which powers the list of Authors at the bottom of doc pages) needs to be manually generated.
 
-The src/contributors.json file (which powers the list of Authors at the bottom of doc pages) needs to be manually generated. Run the following command:
+In order to generate the contributor map you must authenticate with GitHub. The best way to do that is using GitHub CLI ([installation guide(https://github.com/cli/cli#installation)]). Once you have the GitHub CLI installed, you can run the following command to authenticate:
+```
+gh auth login --scopes read:user,user:email
+```
 
+Once that is done, you can generate the map with this command:
 ```
 pnpm contributors
 ```
-
-And then create a PR with the updated src/contributors.json.

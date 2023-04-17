@@ -226,4 +226,4 @@ Provides a framework for comparing two elements
 </details>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

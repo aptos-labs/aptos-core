@@ -1,13 +1,16 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::{
-    types::{
-        account_address_from_public_key, CliCommand, CliConfig, CliError, CliTypedResult,
-        ConfigSearchMode, EncodingOptions, PrivateKeyInputOptions, ProfileConfig, ProfileOptions,
-        PromptOptions, RngArgs, DEFAULT_PROFILE,
+use crate::{
+    account::key_rotation::lookup_address,
+    common::{
+        types::{
+            account_address_from_public_key, CliCommand, CliConfig, CliError, CliTypedResult,
+            ConfigSearchMode, EncodingOptions, PrivateKeyInputOptions, ProfileConfig,
+            ProfileOptions, PromptOptions, RngArgs, DEFAULT_PROFILE,
+        },
+        utils::{fund_account, prompt_yes_with_override, read_line, wait_for_transactions},
     },
-    utils::{fund_account, prompt_yes_with_override, read_line},
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, ValidCryptoMaterialStringExt};
 use aptos_rest_client::{
@@ -104,6 +107,7 @@ impl CliCommand<()> for InitTool {
             }
         };
 
+        // Ensure that there is at least a REST URL set for the network
         match network {
             Network::Mainnet => {
                 profile_config.rest_url =
@@ -154,17 +158,27 @@ impl CliCommand<()> for InitTool {
             }
         };
         let public_key = private_key.public_key();
-        let address = account_address_from_public_key(&public_key);
+
+        let client = aptos_rest_client::Client::new(
+            Url::parse(
+                profile_config
+                    .rest_url
+                    .as_ref()
+                    .expect("Must have rest client as created above"),
+            )
+            .map_err(|err| CliError::UnableToParse("rest_url", err.to_string()))?,
+        );
+
+        // lookup the address from onchain instead of deriving it
+        // if this is the rotated key, deriving it will outputs an incorrect address
+        let derived_address = account_address_from_public_key(&public_key);
+        let address = lookup_address(&client, derived_address, false).await?;
+
         profile_config.private_key = Some(private_key);
         profile_config.public_key = Some(public_key);
         profile_config.account = Some(address);
 
         // Create account if it doesn't exist (and there's a faucet)
-        let client = aptos_rest_client::Client::new(
-            Url::parse(profile_config.rest_url.as_ref().unwrap())
-                .map_err(|err| CliError::UnableToParse("rest_url", err.to_string()))?,
-        );
-
         // Check if account exists
         let account_exists = match client.get_account(address).await {
             Ok(_) => true,
@@ -195,7 +209,15 @@ impl CliCommand<()> for InitTool {
                 }
             },
         };
-        if let Some(ref faucet_url) = profile_config.faucet_url {
+
+        // If you want to create a private key, but not fund the account, skipping the faucet is still possible
+        let maybe_faucet_url = if self.skip_faucet {
+            None
+        } else {
+            profile_config.faucet_url.as_ref()
+        };
+
+        if let Some(faucet_url) = maybe_faucet_url {
             if account_exists {
                 eprintln!("Account {} has been already found onchain", address);
             } else {
@@ -203,24 +225,22 @@ impl CliCommand<()> for InitTool {
                     "Account {} doesn't exist, creating it and funding it with {} Octas",
                     address, NUM_DEFAULT_OCTAS
                 );
-                match fund_account(
+                let hashes = fund_account(
                     Url::parse(faucet_url)
                         .map_err(|err| CliError::UnableToParse("rest_url", err.to_string()))?,
                     NUM_DEFAULT_OCTAS,
                     address,
                 )
-                .await
-                {
-                    Ok(_) => eprintln!("Account {} funded successfully", address),
-                    Err(err) => eprintln!("Account {} failed to be funded: {:?}", address, err),
-                };
+                .await?;
+                wait_for_transactions(&client, hashes).await?;
+                eprintln!("Account {} funded successfully", address);
             }
         } else if account_exists {
             eprintln!("Account {} has been already found onchain", address);
         } else if network == Network::Mainnet {
-            eprintln!("Account {} does not exist, you will need to create and fund the account through a faucet or by transferring funds from another account", address);
+            eprintln!("Account {} does not exist, you will need to create and fund the account by transferring funds from another account", address);
         } else {
-            eprintln!("Account {} has been initialized locally, but you must have coins transferred to it to create the account onchain", address);
+            eprintln!("Account {} has been initialized locally, but you must transfer coins to it to create the account onchain", address);
         }
 
         // Ensure the loaded config has profiles setup for a possible empty file
@@ -230,7 +250,7 @@ impl CliCommand<()> for InitTool {
         config
             .profiles
             .as_mut()
-            .unwrap()
+            .expect("Must have profiles, as created above")
             .insert(profile_name.to_string(), profile_config);
         config.save()?;
         eprintln!("\n---\nAptos CLI is now set up for account {} as profile {}!  Run `aptos --help` for more information about commands", address, self.profile_options.profile_name().unwrap_or(DEFAULT_PROFILE));
@@ -239,6 +259,7 @@ impl CliCommand<()> for InitTool {
 }
 
 impl InitTool {
+    /// Custom network created, which requires a REST URL
     fn custom_network(&self, profile_config: &mut ProfileConfig) -> CliTypedResult<()> {
         // Rest Endpoint
         let rest_url = if let Some(ref rest_url) = self.rest_url {
@@ -247,9 +268,9 @@ impl InitTool {
         } else {
             let current = profile_config.rest_url.as_deref();
             eprintln!(
-                "Enter your rest endpoint [Current: {} | No input: Exit (or keep the existing if present)]",
-                current.unwrap_or("None"),
-            );
+                    "Enter your rest endpoint [Current: {} | No input: Exit (or keep the existing if present)]",
+                    current.unwrap_or("None"),
+                );
             let input = read_line("Rest endpoint")?;
             let input = input.trim();
             if input.is_empty() {
@@ -280,10 +301,10 @@ impl InitTool {
         } else {
             let current = profile_config.faucet_url.as_deref();
             eprintln!(
-                "Enter your faucet endpoint [Current: {} | No input: Skip (or keep the existing one if present) | 'skip' to not use a faucet]",
-               current
-                    .unwrap_or("None"),
-            );
+                    "Enter your faucet endpoint [Current: {} | No input: Skip (or keep the existing one if present) | 'skip' to not use a faucet]",
+                    current
+                        .unwrap_or("None"),
+                );
             let input = read_line("Faucet endpoint")?;
             let input = input.trim();
             if input.is_empty() {
@@ -336,7 +357,7 @@ impl FromStr for Network {
                 return Err(CliError::CommandArgumentError(format!(
                     "Invalid network {}.  Must be one of [devnet, testnet, mainnet, local, custom]",
                     str
-                )))
+                )));
             },
         })
     }

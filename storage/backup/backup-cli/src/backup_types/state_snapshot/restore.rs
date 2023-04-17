@@ -192,14 +192,18 @@ impl StateSnapshotRestoreController {
         let con = self.concurrent_downloads;
         let mut futs_stream = stream::iter(futs_iter).buffered_x(con * 2, con);
         let mut start = None;
-        while let Some((chunk_idx, chunk, blobs, proof)) = futs_stream.try_next().await? {
+        while let Some((chunk_idx, chunk, mut blobs, proof)) = futs_stream.try_next().await? {
             start = start.or_else(|| Some(Instant::now()));
             let _timer = OTHER_TIMERS_SECONDS
                 .with_label_values(&["add_state_chunk"])
                 .start_timer();
             let receiver = receiver.clone();
             if self.validate_modules {
-                Self::validate_modules(&blobs);
+                blobs = tokio::task::spawn_blocking(move || {
+                    Self::validate_modules(&blobs);
+                    blobs
+                })
+                .await?;
             }
             tokio::task::spawn_blocking(move || {
                 receiver.lock().as_mut().unwrap().add_chunk(blobs, proof)

@@ -578,4 +578,4 @@ Helper specification function to obtain the delegates of a capability.
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

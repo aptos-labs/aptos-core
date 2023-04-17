@@ -42,7 +42,8 @@ message StreamStatus {
 
 message RawDatastreamRequest {
   // Required; start version of current stream.
-  uint64 starting_version = 1;
+  // If not set will panic somewhere
+  optional uint64 starting_version = 1;
 
   // Optional; number of transactions to return in current stream.
   // If not set, response streams infinitely.

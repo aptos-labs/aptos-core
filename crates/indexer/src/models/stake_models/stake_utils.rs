@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct StakePoolResource {
     pub delegated_voter: String,
+    pub operator_address: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -87,9 +88,7 @@ impl StakeResource {
     fn is_resource_supported(data_type: &str) -> bool {
         matches!(
             data_type,
-            "0x1::stake::StakePool"
-                | "0x1310dc820487f24755e6e06747f6582118597a48868e2a98260fa8c3ee945cbd\
-        ::delegation_pool::DelegationPool"
+            "0x1::stake::StakePool" | "0x1::delegation_pool::DelegationPool"
         )
     }
 
@@ -97,8 +96,7 @@ impl StakeResource {
         match data_type {
             "0x1::stake::StakePool" => serde_json::from_value(data.clone())
                 .map(|inner| Some(StakeResource::StakePool(inner))),
-            "0x1310dc820487f24755e6e06747f6582118597a48868e2a98260fa8c3ee945cbd\
-            ::delegation_pool::DelegationPool" => serde_json::from_value(data.clone())
+            "0x1::delegation_pool::DelegationPool" => serde_json::from_value(data.clone())
                 .map(|inner| Some(StakeResource::DelegationPool(inner))),
             _ => Ok(None),
         }
@@ -160,17 +158,13 @@ impl StakeEvent {
                 .map(|inner| Some(StakeEvent::GovernanceVoteEvent(inner))),
             "0x1::stake::DistributeRewardsEvent" => serde_json::from_value(data.clone())
                 .map(|inner| Some(StakeEvent::DistributeRewardsEvent(inner))),
-            "0x1310dc820487f24755e6e06747f6582118597a48868e2a98260fa8c3ee945cbd\
-            ::delegation_pool::AddStakeEvent" => serde_json::from_value(data.clone())
+            "0x1::delegation_pool::AddStakeEvent" => serde_json::from_value(data.clone())
                 .map(|inner| Some(StakeEvent::AddStakeEvent(inner))),
-            "0x1310dc820487f24755e6e06747f6582118597a48868e2a98260fa8c3ee945cbd\
-            ::delegation_pool::UnlockStakeEvent" => serde_json::from_value(data.clone())
+            "0x1::delegation_pool::UnlockStakeEvent" => serde_json::from_value(data.clone())
                 .map(|inner| Some(StakeEvent::UnlockStakeEvent(inner))),
-            "0x1310dc820487f24755e6e06747f6582118597a48868e2a98260fa8c3ee945cbd\
-            ::delegation_pool::WithdrawStakeEvent" => serde_json::from_value(data.clone())
+            "0x1::delegation_pool::WithdrawStakeEvent" => serde_json::from_value(data.clone())
                 .map(|inner| Some(StakeEvent::WithdrawStakeEvent(inner))),
-            "0x1310dc820487f24755e6e06747f6582118597a48868e2a98260fa8c3ee945cbd\
-            ::delegation_pool::ReactivateStakeEvent" => serde_json::from_value(data.clone())
+            "0x1::delegation_pool::ReactivateStakeEvent" => serde_json::from_value(data.clone())
                 .map(|inner| Some(StakeEvent::ReactivateStakeEvent(inner))),
             _ => Ok(None),
         }

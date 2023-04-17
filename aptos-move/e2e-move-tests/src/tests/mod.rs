@@ -7,6 +7,7 @@ mod attributes;
 mod chain_id;
 mod code_publishing;
 mod common;
+mod constructor_args;
 mod error_map;
 mod framework_compatibility;
 mod gas;

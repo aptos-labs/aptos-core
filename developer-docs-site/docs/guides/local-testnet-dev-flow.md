@@ -18,7 +18,7 @@ Pull and go into `aptos-core`:
 git clone git@github.com:aptos-labs/aptos-core.git ~/aptos-core && cd ~/aptos-core
 ```
 
-Run a local testnet:
+Run a local testnet with a faucet:
 ```
 cargo run -p aptos -- node run-local-testnet --with-faucet --faucet-port 8081 --force-restart --assume-yes
 ```

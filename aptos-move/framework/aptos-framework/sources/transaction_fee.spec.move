@@ -71,7 +71,7 @@ spec aptos_framework::transaction_fee {
 
     /// `AptosCoinCapabilities` should be exists.
     spec burn_fee(account: address, fee: u64) {
-        // TODO: call burn_from, complex aborts conditions.
+        // TODO: complex aborts conditions in `burn_from`
         pragma aborts_if_is_partial;
         aborts_if !exists<AptosCoinCapabilities>(@aptos_framework);
     }

@@ -784,10 +784,10 @@ impl Default for Substitution {
 /// and then performs unification of the terms. The resulting substitution
 /// is converted back to parameter instantiations.
 ///
-/// Example: consider a function f<X> which uses memory M<X, u64>, and invariant
-/// invariant<X> which uses memory M<bool, X>. Using this helper to unify both
-/// memories will result in instantiations which when applied create f<bool>
-/// and invariant<u64> respectively.
+/// Example: consider a function `f<X>` which uses memory `M<X, u64>`, and invariant
+/// `invariant<X>` which uses memory `M<bool, X>`. Using this helper to unify both
+/// memories will result in instantiations which when applied create `f<bool>`
+/// and `invariant<u64>` respectively.
 pub struct TypeUnificationAdapter {
     type_vars_map: BTreeMap<u16, (bool, TypeParameterIndex)>,
     types_adapted_lhs: Vec<Type>,

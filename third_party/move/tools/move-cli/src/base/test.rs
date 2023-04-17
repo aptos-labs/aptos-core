@@ -41,7 +41,7 @@ pub struct Test {
     #[clap(name = "gas_limit", short = 'i', long = "gas_limit")]
     pub gas_limit: Option<u64>,
     /// An optional filter string to determine which unit tests to run. A unit test will be run only if it
-    /// contains this string in its fully qualified (<addr>::<module_name>::<fn_name>) name.
+    /// contains this string in its fully qualified (`<addr>::<module_name>::<fn_name>`) name.
     #[clap(name = "filter")]
     pub filter: Option<String>,
     /// List all tests

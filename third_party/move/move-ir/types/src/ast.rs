@@ -227,10 +227,10 @@ pub type Field = Spanned<Field_>;
 
 /// A fully-qualified field identifier.
 ///
-/// Rather than simply referring to a field 'f' with a single identifier and
+/// Rather than simply referring to a field `f` with a single identifier and
 /// relying on type inference to determine the type of the struct being
-/// accessed, this type refers to the field 'f' on the explicit struct type
-/// 'S<T>' -- that is, 'S<T>::f'.
+/// accessed, this type refers to the field `f` on the explicit struct type
+/// `S<T>` -- that is, `S<T>::f`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct FieldIdent_ {
     /// The name of the struct type on which the field is declared.

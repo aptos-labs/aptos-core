@@ -137,6 +137,7 @@ spec aptos_framework::stake {
         // The following resource requirement cannot be discharged by the global
         // invariants because this function is called during genesis.
         include ResourceRequirement;
+        include staking_config::StakingRewardsConfigRequirement;
         // This function should never abort.
         aborts_if false;
     }
@@ -150,6 +151,7 @@ spec aptos_framework::stake {
 
     spec update_stake_pool {
         include ResourceRequirement;
+        include staking_config::StakingRewardsConfigRequirement;
         aborts_if !exists<StakePool>(pool_address);
         aborts_if !exists<ValidatorConfig>(pool_address);
         aborts_if global<ValidatorConfig>(pool_address).validator_index >= len(validator_perf.validators);
@@ -346,6 +348,7 @@ spec aptos_framework::stake {
         requires exists<ValidatorPerformance>(@aptos_framework);
         requires exists<ValidatorSet>(@aptos_framework);
         requires exists<StakingConfig>(@aptos_framework);
+        requires exists<StakingRewardsConfig>(@aptos_framework) || !features::spec_reward_rate_decrease_enabled();
         requires exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
         requires exists<ValidatorFees>(@aptos_framework);
     }

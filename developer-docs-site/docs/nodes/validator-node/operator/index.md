@@ -30,11 +30,11 @@ Note that your nodes will not be running correctly (not syncing, not participati
 
 After deploying your nodes, [connect to the Aptos Network](./connect-to-aptos-network.md).
 
-## Set up staking pool operations
+## Set up staking and delegation pool operations
 
-After connecting your nodes to the Aptos network, [establish staking pool operations](./staking-pool-operations.md) and add your node to the validator set.
+After connecting your nodes to the Aptos network, establish [staking pool operations](./staking-pool-operations.md) to add your node to the validator set. 
 
-Your node will start syncing and participating on consensus.
+Similarly, conduct [delegation pool operations](./delegation-pool-operations.md) for APT delegated to your validator. Your node will start syncing and participating in consensus.
 
 ## Ensure your nodes are live
 

@@ -7,7 +7,7 @@
 //! This module implements [`JellyfishMerkleTree`] backed by storage module. The tree itself doesn't
 //! persist anything, but realizes the logic of R/W only. The write path will produce all the
 //! intermediate results in a batch for storage layer to commit and the read path will return
-//! results directly. The public APIs are only [`new`], [`batch_put_value_set`], and
+//! results directly. The public APIs are only [`new`], [`JellyfishMerkleTree::batch_put_value_set`], and
 //! [`get_with_proof`]. After each put with a `value_set` based on a known version, the tree will
 //! return a new root hash with a [`TreeUpdateBatch`] containing all the new nodes and indices of
 //! stale nodes.
@@ -130,12 +130,17 @@ pub struct MissingRootError {
 pub trait TreeReader<K> {
     /// Gets node given a node key. Returns error if the node does not exist.
     fn get_node(&self, node_key: &NodeKey) -> Result<Node<K>> {
-        self.get_node_option(node_key)?
+        self.get_node_with_tag(node_key, "unknown")
+    }
+
+    /// Gets node given a node key. Returns error if the node does not exist.
+    fn get_node_with_tag(&self, node_key: &NodeKey, tag: &str) -> Result<Node<K>> {
+        self.get_node_option(node_key, tag)?
             .ok_or_else(|| format_err!("Missing node at {:?}.", node_key))
     }
 
     /// Gets node given a node key. Returns `None` if the node does not exist.
-    fn get_node_option(&self, node_key: &NodeKey) -> Result<Option<Node<K>>>;
+    fn get_node_option(&self, node_key: &NodeKey, tag: &str) -> Result<Option<Node<K>>>;
 
     /// Gets the rightmost leaf at a version. Note that this assumes we are in the process of
     /// restoring the tree and all nodes are at the same version.
@@ -447,7 +452,7 @@ where
         hash_cache: &Option<&HashMap<NibblePath, HashValue>>,
         batch: &mut TreeUpdateBatch<K>,
     ) -> Result<Option<Node<K>>> {
-        let node = self.reader.get_node(node_key)?;
+        let node = self.reader.get_node_with_tag(node_key, "commit")?;
         batch.put_stale_node(node_key.clone(), version, &node);
 
         match node {
@@ -529,7 +534,9 @@ where
                         if old_child.is_leaf() {
                             let old_child_node_key =
                                 node_key.gen_child_node_key(old_child.version, *old_child_nibble);
-                            let old_child_node = self.reader.get_node(&old_child_node_key)?;
+                            let old_child_node = self
+                                .reader
+                                .get_node_with_tag(&old_child_node_key, "commit")?;
                             batch.put_stale_node(old_child_node_key, version, &old_child_node);
                             return Ok(Some(old_child_node));
                         }
@@ -641,13 +648,16 @@ where
         // We limit the number of loops here deliberately to avoid potential cyclic graph bugs
         // in the tree structure.
         for nibble_depth in 0..=ROOT_NIBBLE_HEIGHT {
-            let next_node = self.reader.get_node(&next_node_key).map_err(|err| {
-                if nibble_depth == 0 {
-                    MissingRootError { version }.into()
-                } else {
-                    err
-                }
-            })?;
+            let next_node = self
+                .reader
+                .get_node_with_tag(&next_node_key, "get_proof")
+                .map_err(|err| {
+                    if nibble_depth == 0 {
+                        MissingRootError { version }.into()
+                    } else {
+                        err
+                    }
+                })?;
             match next_node {
                 Node::Internal(internal_node) => {
                     let queried_child_index = nibble_iter
@@ -733,7 +743,7 @@ where
 
     fn get_root_node_option(&self, version: Version) -> Result<Option<Node<K>>> {
         let root_node_key = NodeKey::new_empty_path(version);
-        self.reader.get_node_option(&root_node_key)
+        self.reader.get_node_option(&root_node_key, "get_root")
     }
 
     pub fn get_root_hash(&self, version: Version) -> Result<HashValue> {

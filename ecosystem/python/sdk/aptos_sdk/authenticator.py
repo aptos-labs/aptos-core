@@ -146,8 +146,8 @@ class MultiAgentAuthenticator:
 
 
 class MultiEd25519Authenticator:
-    public_key: ed25519.MultiEd25519PublicKey
-    signature: ed25519.MultiEd25519Signature
+    public_key: ed25519.MultiPublicKey
+    signature: ed25519.MultiSignature
 
     def __init__(self, public_key, signature):
         self.public_key = public_key

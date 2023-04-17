@@ -995,16 +995,20 @@ impl Locals {
         }
     }
 
-    fn swap_loc(&mut self, idx: usize, x: Value) -> PartialVMResult<Value> {
+    fn swap_loc(&mut self, idx: usize, x: Value, violation_check: bool) -> PartialVMResult<Value> {
         let mut v = self.0.borrow_mut();
         match v.get_mut(idx) {
             Some(v) => {
-                if let ValueImpl::Container(c) = v {
-                    if c.rc_count() > 1 {
-                        return Err(PartialVMError::new(
-                            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                        )
-                        .with_message("moving container with dangling references".to_string()));
+                if violation_check {
+                    if let ValueImpl::Container(c) = v {
+                        if c.rc_count() > 1 {
+                            return Err(PartialVMError::new(
+                                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                            )
+                            .with_message(
+                                "moving container with dangling references".to_string(),
+                            ));
+                        }
                     }
                 }
                 Ok(Value(std::mem::replace(v, x.0)))
@@ -1017,8 +1021,8 @@ impl Locals {
         }
     }
 
-    pub fn move_loc(&mut self, idx: usize) -> PartialVMResult<Value> {
-        match self.swap_loc(idx, Value(ValueImpl::Invalid))? {
+    pub fn move_loc(&mut self, idx: usize, violation_check: bool) -> PartialVMResult<Value> {
+        match self.swap_loc(idx, Value(ValueImpl::Invalid), violation_check)? {
             Value(ValueImpl::Invalid) => Err(PartialVMError::new(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
             )
@@ -1027,8 +1031,13 @@ impl Locals {
         }
     }
 
-    pub fn store_loc(&mut self, idx: usize, x: Value) -> PartialVMResult<()> {
-        self.swap_loc(idx, x)?;
+    pub fn store_loc(
+        &mut self,
+        idx: usize,
+        x: Value,
+        violation_check: bool,
+    ) -> PartialVMResult<()> {
+        self.swap_loc(idx, x, violation_check)?;
         Ok(())
     }
 
@@ -2207,8 +2216,7 @@ impl Vector {
         Self::pack(type_param, vec![])
     }
 
-    pub fn unpack(self, type_param: &Type, expected_num: u64) -> PartialVMResult<Vec<Value>> {
-        check_elem_layout(type_param, &self.0)?;
+    pub fn unpack_unchecked(self) -> PartialVMResult<Vec<Value>> {
         let elements: Vec<_> = match self.0 {
             Container::VecU8(r) => take_unique_ownership(r)?
                 .into_iter()
@@ -2245,6 +2253,12 @@ impl Vector {
             Container::Vec(r) => take_unique_ownership(r)?.into_iter().map(Value).collect(),
             Container::Locals(_) | Container::Struct(_) => unreachable!(),
         };
+        Ok(elements)
+    }
+
+    pub fn unpack(self, type_param: &Type, expected_num: u64) -> PartialVMResult<Vec<Value>> {
+        check_elem_layout(type_param, &self.0)?;
+        let elements = self.unpack_unchecked()?;
         if expected_num as usize == elements.len() {
             Ok(elements)
         } else {

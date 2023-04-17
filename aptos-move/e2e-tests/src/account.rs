@@ -89,8 +89,8 @@ impl Account {
 
     /// Creates a new account in memory representing an account created in the genesis transaction.
     ///
-    /// The address will be [`address`], which should be an address for a genesis account and
-    /// the account will use [`GENESIS_KEYPAIR`][struct@GENESIS_KEYPAIR] as its keypair.
+    /// The address will be `address`, which should be an address for a genesis account and
+    /// the account will use [`GENESIS_KEYPAIR`][static@@GENESIS_KEYPAIR] as its keypair.
     pub fn new_genesis_account(address: AccountAddress) -> Self {
         Account {
             addr: address,
@@ -102,7 +102,7 @@ impl Account {
     /// Creates a new account representing the aptos root account in memory.
     ///
     /// The address will be [`aptos_test_root_address`][account_config::aptos_test_root_address], and
-    /// the account will use [`GENESIS_KEYPAIR`][struct@GENESIS_KEYPAIR] as its keypair.
+    /// the account will use [`GENESIS_KEYPAIR`][static@GENESIS_KEYPAIR] as its keypair.
     pub fn new_aptos_root() -> Self {
         Self::new_genesis_account(account_config::aptos_test_root_address())
     }

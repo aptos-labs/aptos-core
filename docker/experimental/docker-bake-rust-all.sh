@@ -23,6 +23,7 @@ export PROFILE=${PROFILE:-release}
 export FEATURES=${FEATURES:-""}
 export NORMALIZED_FEATURES_LIST=$(printf "$FEATURES" | sed -e 's/[^a-zA-Z0-9]/_/g')
 export CUSTOM_IMAGE_TAG_PREFIX=${CUSTOM_IMAGE_TAG_PREFIX:-""}
+export CARGO_TARGET_DIR="target/${FEATURES:-"default"}"
 
 if [ "$PROFILE" = "release" ]; then
   # Do not prefix image tags if we're building the default profile "release"
@@ -44,9 +45,16 @@ else
   export IMAGE_TAG_PREFIX="${IMAGE_TAG_PREFIX}${profile_prefix}"
 fi
 
-BUILD_TARGET="${1:-forge-images}"
+BUILD_TARGET="${1:-all}"
+echo "Building target: ${BUILD_TARGET}"
+echo "To build only a specific target, run: docker/experimental/docker-bake-rust-all.sh <target>"
+echo "E.g. docker/experimental/docker-bake-rust-all.sh forge-images"
+
 if [ "$CI" == "true" ]; then
   TARGET_REGISTRY=remote docker buildx bake --progress=plain --file docker/experimental/docker-bake-rust-all.hcl --push $BUILD_TARGET
 else
-  TARGET_REGISTRY=local docker buildx bake --file docker/experimental/docker-bake-rust-all.hcl $BUILD_TARGET --load
+  TARGET_REGISTRY=local docker buildx bake --file docker/experimental/docker-bake-rust-all.hcl $BUILD_TARGET
 fi
+
+echo "Build complete. Docker buildx cache usage:"
+docker buildx du --verbose --filter type=exec.cachemount

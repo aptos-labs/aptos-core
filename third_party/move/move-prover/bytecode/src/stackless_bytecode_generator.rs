@@ -23,12 +23,14 @@ use move_core_types::{
     value::MoveValue,
 };
 use move_model::{
-    ast::{ConditionKind, TempIndex},
+    ast::{ConditionKind, ExpData, PropertyValue, TempIndex, Value},
     model::{FunId, FunctionEnv, Loc, ModuleId, StructId},
+    pragmas::CONDITION_UNROLL_PROP,
     ty::{PrimitiveType, Type},
 };
-use num::BigUint;
+use num::{BigUint, ToPrimitive};
 use std::{
+    borrow::BorrowMut,
     collections::{BTreeMap, BTreeSet},
     convert::TryInto,
     matches,
@@ -42,6 +44,7 @@ pub struct StacklessBytecodeGenerator<'a> {
     local_types: Vec<Type>,
     code: Vec<Bytecode>,
     location_table: BTreeMap<AttrId, Loc>,
+    loop_unrolling: BTreeMap<AttrId, usize>,
     loop_invariants: BTreeSet<AttrId>,
     fallthrough_labels: BTreeSet<Label>,
 }
@@ -59,6 +62,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
             local_types,
             code: vec![],
             location_table: BTreeMap::new(),
+            loop_unrolling: BTreeMap::new(),
             loop_invariants: BTreeSet::new(),
             fallthrough_labels: BTreeSet::new(),
         }
@@ -114,8 +118,9 @@ impl<'a> StacklessBytecodeGenerator<'a> {
             local_types,
             code,
             location_table,
+            loop_unrolling,
             loop_invariants,
-            ..
+            fallthrough_labels: _,
         } = self;
 
         FunctionData::new(
@@ -125,6 +130,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
             func_env.get_return_types(),
             location_table,
             func_env.get_acquires_global_resources(),
+            loop_unrolling,
             loop_invariants,
         )
     }
@@ -172,18 +178,52 @@ impl<'a> StacklessBytecodeGenerator<'a> {
         }
 
         // Handle spec block if defined at this code offset.
-        if let Some(spec) = self.func_env.get_spec().on_impl.get(&code_offset) {
+        let mut binding = self.func_env.get_mut_spec();
+        let fun_spec = binding.borrow_mut();
+        if let Some(spec) = fun_spec.on_impl.get_mut(&code_offset) {
+            let mut temp_update_map = BTreeMap::new();
             for cond in &spec.conditions {
                 let attr_id = self.new_loc_attr_from_loc(cond.loc.clone());
                 let kind = match cond.kind {
                     ConditionKind::Assert => PropKind::Assert,
                     ConditionKind::Assume => PropKind::Assume,
                     ConditionKind::LoopInvariant => {
-                        self.loop_invariants.insert(attr_id);
-                        PropKind::Assert
+                        let global_env = self.func_env.module_env.env;
+                        let sym = global_env.symbol_pool().make(CONDITION_UNROLL_PROP);
+                        match cond.properties.get(&sym) {
+                            None => {
+                                self.loop_invariants.insert(attr_id);
+                                PropKind::Assert
+                            },
+                            Some(PropertyValue::Value(Value::Number(count))) => {
+                                // the only allowed loop invariant condition is `True`
+                                match cond.exp.as_ref() {
+                                    ExpData::Value(_, Value::Bool(true)) => (),
+                                    _ => {
+                                        global_env.error(
+                                            &cond.loc,
+                                            "invalid loop unrolling specification",
+                                        );
+                                        continue;
+                                    },
+                                }
+                                self.loop_unrolling.insert(
+                                    attr_id,
+                                    count.to_usize().expect("invalid loop unrolling count"),
+                                );
+                                PropKind::Assume
+                            },
+                            Some(_) => {
+                                global_env.error(&cond.loc, "invalid loop unrolling property");
+                                continue;
+                            },
+                        }
                     },
                     // Updating global spec variables are translated to Assume, which will be replaced when instrumenting the spec
-                    ConditionKind::Update => PropKind::Assume,
+                    ConditionKind::Update => {
+                        temp_update_map.insert(cond.exp.node_id(), cond.clone());
+                        PropKind::Assume
+                    },
                     _ => {
                         panic!("unsupported spec condition in code")
                     },
@@ -191,6 +231,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                 self.code
                     .push(Bytecode::Prop(attr_id, kind, cond.exp.clone()));
             }
+            fun_spec.update_map.append(&mut temp_update_map);
 
             // If the current instruction is just a Nop, skip it. It has been generated to support
             // spec blocks.

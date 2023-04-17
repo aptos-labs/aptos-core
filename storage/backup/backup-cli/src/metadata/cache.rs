@@ -70,7 +70,8 @@ pub async fn initialize_identity(storage: &Arc<dyn BackupStorage>) -> Result<()>
     let metadata = Metadata::new_random_identity();
     storage
         .save_metadata_line(&metadata.name(), &metadata.to_text_line()?)
-        .await
+        .await?;
+    Ok(())
 }
 
 /// Sync local cache folder with remote storage, and load all metadata entries from the cache.
@@ -115,7 +116,7 @@ pub async fn sync_and_load(
         remote_file_handles = storage.list_metadata_files().await?;
     }
     let remote_file_handle_by_hash: HashMap<_, _> = remote_file_handles
-        .into_iter()
+        .iter()
         .map(|file_handle| (file_handle.file_handle_hash(), file_handle))
         .collect();
     let remote_hashes: HashSet<_> = remote_file_handle_by_hash.keys().cloned().collect();
@@ -201,7 +202,8 @@ pub async fn sync_and_load(
         total_time = timer.elapsed().as_secs(),
         "Metadata cache loaded.",
     );
-    Ok(metadata_vec.into())
+
+    Ok(MetadataView::new(metadata_vec, remote_file_handles))
 }
 
 trait FileHandleHash {

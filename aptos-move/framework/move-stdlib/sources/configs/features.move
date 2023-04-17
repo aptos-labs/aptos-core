@@ -140,7 +140,7 @@ module std::features {
         is_enabled(DELEGATION_POOLS)
     }
 
-    /// Whether generic algebra basic operation support in `algebra.move` are enabled.
+    /// Whether generic algebra basic operation support in `crypto_algebra.move` are enabled.
     ///
     /// Lifetime: transient
     const CRYPTOGRAPHY_ALGEBRA_NATIVES: u64 = 12;
@@ -161,6 +161,27 @@ module std::features {
     /// Whether native_public_key_validate aborts when a public key of the wrong length is given
     /// Lifetime: ephemeral
     const ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH: u64 = 14;
+
+    /// Whether struct constructors are enabled
+    ///
+    /// Lifetime: transient
+    const STRUCT_CONSTRUCTORS: u64 = 15;
+
+    /// Whether reward rate decreases periodically.
+    /// Lifetime: transient
+    const PERIODICAL_REWARD_RATE_DECREASE: u64 = 16;
+    public fun get_periodical_reward_rate_decrease_feature(): u64 { PERIODICAL_REWARD_RATE_DECREASE }
+    public fun periodical_reward_rate_decrease_enabled(): bool acquires Features {
+        is_enabled(PERIODICAL_REWARD_RATE_DECREASE)
+    }
+
+    /// Whether enable paritial governance voting.
+    /// Lifetime: transient
+    const PARTIAL_GOVERNANCE_VOTING: u64 = 17;
+    public fun get_partial_governance_voting(): u64 { PARTIAL_GOVERNANCE_VOTING }
+    public fun partial_governance_voting_enabled(): bool acquires Features {
+        is_enabled(PARTIAL_GOVERNANCE_VOTING)
+    }
 
     // ============================================================================================
     // Feature Flag Implementation

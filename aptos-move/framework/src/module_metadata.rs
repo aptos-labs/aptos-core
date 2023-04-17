@@ -4,7 +4,7 @@
 use crate::extended_checks::ResourceGroupScope;
 use aptos_types::{on_chain_config::Features, transaction::AbortInfo};
 use move_binary_format::{
-    file_format::{Ability, AbilitySet},
+    file_format::{Ability, AbilitySet, CompiledScript},
     normalized::{Function, Struct},
     CompiledModule,
 };
@@ -195,6 +195,39 @@ pub fn get_metadata_from_compiled_module(
     }
 }
 
+// This is mostly a copy paste of the existing function
+// get_metadata_from_compiled_module. In the API types there is a unifying trait for
+// modules and scripts called Bytecode that could help eliminate this duplication,
+// since all we need is a common way to access the metadata, but we'd have to move
+// that trait outside of the API types and into somewhere more reasonable for the
+// framework to access. There is currently no other trait that both CompiledModule
+// and CompiledScript implement. This stands as a future improvement, if we end
+// up needing more functions that work similarly for both of these types..
+//
+/// Extract metadata from a compiled module, upgrading V0 to V1 representation as needed.
+pub fn get_metadata_from_compiled_script(
+    script: &CompiledScript,
+) -> Option<RuntimeModuleMetadataV1> {
+    if let Some(data) = find_metadata_in_script(script, &APTOS_METADATA_KEY_V1) {
+        let mut metadata = bcs::from_bytes::<RuntimeModuleMetadataV1>(&data.value).ok();
+        // Clear out metadata for v5, since it shouldn't have existed in the first place and isn't
+        // being used. Note, this should have been gated in the verify module metadata.
+        if script.version == 5 {
+            if let Some(metadata) = metadata.as_mut() {
+                metadata.struct_attributes.clear();
+                metadata.fun_attributes.clear();
+            }
+        }
+        metadata
+    } else if let Some(data) = find_metadata_in_script(script, &APTOS_METADATA_KEY) {
+        // Old format available, upgrade to new one on the fly
+        let data_v0 = bcs::from_bytes::<RuntimeModuleMetadata>(&data.value).ok()?;
+        Some(data_v0.upgrade())
+    } else {
+        None
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
 pub enum MetaDataValidationError {
     #[error(transparent)]
@@ -353,6 +386,10 @@ pub fn verify_module_metadata(
 
 fn find_metadata<'a>(module: &'a CompiledModule, key: &[u8]) -> Option<&'a Metadata> {
     module.metadata.iter().find(|md| md.key == key)
+}
+
+fn find_metadata_in_script<'a>(script: &'a CompiledScript, key: &[u8]) -> Option<&'a Metadata> {
+    script.metadata.iter().find(|md| md.key == key)
 }
 
 impl RuntimeModuleMetadata {

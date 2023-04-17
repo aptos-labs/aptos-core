@@ -6,11 +6,12 @@ use crate::{
     cluster::Cluster,
     emitter::{stats::TxnStats, EmitJobMode, EmitJobRequest, TxnEmitter},
     instance::Instance,
-    EntryPoints, TransactionType, TransactionTypeArg,
+    TransactionTypeArg,
 };
 use anyhow::{bail, Context, Result};
 use aptos_logger::{error, info};
 use aptos_sdk::transaction_builder::TransactionFactory;
+use aptos_transaction_generator_lib::{EntryPoints, TransactionType};
 use rand::{rngs::StdRng, SeedableRng};
 use std::time::{Duration, Instant};
 

@@ -1,8 +1,8 @@
 # Address
 
-`address` is a built-in type in Move that is used to represent locations (sometimes called accounts) in global storage. An `address` value is a 128-bit (16 byte) identifier. At a given address, two things can be stored: [Modules](./modules-and-scripts.md) and [Resources](./structs-and-resources.md).
+`address` is a built-in type in Move that is used to represent locations (sometimes called accounts) in global storage. An `address` value is a 256-bit (32-byte) identifier. At a given address, two things can be stored: [Modules](./modules-and-scripts.md) and [Resources](./structs-and-resources.md).
 
-Although an `address` is a 128 bit integer under the hood, Move addresses are intentionally opaque---they cannot be created from integers, they do not support arithmetic operations, and they cannot be modified. Even though there might be interesting programs that would use such a feature (e.g., pointer arithmetic in C fills a similar niche), Move does not allow this dynamic behavior because it has been designed from the ground up to support static verification.
+Although an `address` is a 256-bit integer under the hood, Move addresses are intentionally opaque---they cannot be created from integers, they do not support arithmetic operations, and they cannot be modified. Even though there might be interesting programs that would use such a feature (e.g., pointer arithmetic in C fills a similar niche), Move does not allow this dynamic behavior because it has been designed from the ground up to support static verification.
 
 You can use runtime address values (values of type `address`) to access resources at that address. You *cannot* access modules at runtime via address values.
 
@@ -10,7 +10,7 @@ You can use runtime address values (values of type `address`) to access resource
 
 Addresses come in two flavors, named or numerical. The syntax for a named address follows the
 same rules for any named identifier in Move. The syntax of a numerical address is not restricted
-to hex-encoded values, and any valid [`u128` numerical value](./integers.md) can be used as an
+to hex-encoded values, and any valid [`u256` numerical value](./integers.md) can be used as an
 address value, e.g., `42`, `0xCAFE`, and `2021` are all valid numerical address
 literals.
 
@@ -41,10 +41,10 @@ Scripts](./modules-and-scripts.md).
 ### Examples
 
 ```move
-let a1: address = @0x1; // shorthand for 0x00000000000000000000000000000001
-let a2: address = @0x42; // shorthand for 0x00000000000000000000000000000042
-let a3: address = @0xDEADBEEF; // shorthand for 0x000000000000000000000000DEADBEEF
-let a4: address = @0x0000000000000000000000000000000A;
+let a1: address = @0x1; // shorthand for 0x0000000000000000000000000000000000000000000000000000000000000001
+let a2: address = @0x42; // shorthand for 0x0000000000000000000000000000000000000000000000000000000000000042
+let a3: address = @0xDEADBEEF; // shorthand for 0x00000000000000000000000000000000000000000000000000000000DEADBEEF
+let a4: address = @0x000000000000000000000000000000000000000000000000000000000000000A;
 let a5: address = @std; // Assigns `a5` the value of the named address `std`
 let a6: address = @66;
 let a7: address = @0x42;

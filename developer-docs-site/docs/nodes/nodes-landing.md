@@ -6,7 +6,9 @@ hide_table_of_contents: true
 
 # Learn about Nodes
 
-The Aptos network is comprised of nodes of three types: validator node, validator fullnode and public fullnode. To participate in consensus, you are required to run both a validator node and a validator fullnode, and stake. This section describes everything you need to stake and participate in consensus and governance. Also learn how to run a public fullnode on a local network and connect to either a testnet or a devnet. 
+The Aptos network is comprised of nodes of three types: validator node, validator fullnode and public fullnode. To participate in consensus, you are required to run both a validator node and a validator fullnode, and stake.
+
+Also learn how to run a public fullnode on a local network and connect to either a testnet or a devnet. This section describes everything you need to stake and participate in consensus and governance. See also the [external resources](../community/external-resources.md) offered by your fellow node operators.
 
 
 

@@ -686,4 +686,4 @@ Return <code><b>true</b></code> if the vector <code>v</code> has no elements and
 </details>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

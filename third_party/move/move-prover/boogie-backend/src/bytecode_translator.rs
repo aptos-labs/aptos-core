@@ -29,7 +29,10 @@ use move_model::{
     code_writer::CodeWriter,
     emit, emitln,
     model::{FieldId, GlobalEnv, Loc, NodeId, QualifiedInstId, StructEnv, StructId},
-    pragmas::{ADDITION_OVERFLOW_UNCHECKED_PRAGMA, SEED_PRAGMA, TIMEOUT_PRAGMA},
+    pragmas::{
+        ADDITION_OVERFLOW_UNCHECKED_PRAGMA, SEED_PRAGMA, TIMEOUT_PRAGMA,
+        VERIFY_DURATION_ESTIMATE_PRAGMA,
+    },
     ty::{PrimitiveType, Type, TypeDisplayContext, BOOL_TYPE},
     well_known::{TYPE_INFO_MOVE, TYPE_NAME_GET_MOVE, TYPE_NAME_MOVE},
 };
@@ -82,6 +85,34 @@ impl<'env> BoogieTranslator<'env> {
             targets,
             writer,
             spec_translator: SpecTranslator::new(writer, env, options),
+        }
+    }
+
+    fn get_timeout(&self, fun_target: &FunctionTarget) -> usize {
+        let options = self.options;
+        let estimate_timeout_opt = fun_target
+            .func_env
+            .get_num_pragma(VERIFY_DURATION_ESTIMATE_PRAGMA);
+        let default_timeout = estimate_timeout_opt.unwrap_or(options.vc_timeout);
+        fun_target
+            .func_env
+            .get_num_pragma(TIMEOUT_PRAGMA)
+            .unwrap_or(default_timeout)
+    }
+
+    pub fn is_not_verified_timeout(&self, fun_target: &FunctionTarget) -> bool {
+        let options = self.options;
+        let estimate_timeout_opt = fun_target
+            .func_env
+            .get_num_pragma(VERIFY_DURATION_ESTIMATE_PRAGMA);
+        if let Some(estimate_timeout) = estimate_timeout_opt {
+            let timeout = fun_target
+                .func_env
+                .get_num_pragma(TIMEOUT_PRAGMA)
+                .unwrap_or(options.vc_timeout);
+            estimate_timeout > timeout
+        } else {
+            false
         }
     }
 
@@ -242,7 +273,7 @@ impl<'env> BoogieTranslator<'env> {
                     continue;
                 }
                 for (variant, ref fun_target) in self.targets.get_targets(fun_env) {
-                    if variant.is_verified() {
+                    if variant.is_verified() && !self.is_not_verified_timeout(fun_target) {
                         verified_functions_count += 1;
                         // Always produce a verified functions with an empty instantiation such that
                         // there is at least one top-level entry points for a VC.
@@ -601,18 +632,16 @@ impl<'env> FunctionTranslator<'env> {
         let (suffix, attribs) = match &fun_target.data.variant {
             FunctionVariant::Baseline => ("".to_string(), "{:inline 1} ".to_string()),
             FunctionVariant::Verification(flavor) => {
-                let timeout = fun_target
-                    .func_env
-                    .get_num_pragma(TIMEOUT_PRAGMA, || options.vc_timeout);
+                let mut attribs = vec![format!(
+                    "{{:timeLimit {}}} ",
+                    self.parent.get_timeout(fun_target)
+                )];
 
-                let mut attribs = vec![format!("{{:timeLimit {}}} ", timeout)];
-
-                if fun_target.func_env.is_num_pragma_set(SEED_PRAGMA) {
-                    let seed = fun_target
-                        .func_env
-                        .get_num_pragma(SEED_PRAGMA, || options.random_seed);
+                if let Some(seed) = fun_target.func_env.get_num_pragma(SEED_PRAGMA) {
                     attribs.push(format!("{{:random_seed {}}} ", seed));
-                };
+                } else if fun_target.func_env.is_pragma_true(SEED_PRAGMA, || false) {
+                    attribs.push(format!("{{:random_seed {}}} ", options.random_seed));
+                }
 
                 let suffix = match flavor {
                     VerificationFlavor::Regular => "$verify".to_string(),
@@ -839,7 +868,7 @@ impl<'env> FunctionTranslator<'env> {
         }
 
         // Initial assumptions
-        if variant.is_verified() {
+        if variant.is_verified() && !self.parent.is_not_verified_timeout(fun_target) {
             self.translate_verify_entry_assumptions(fun_target);
         }
 
@@ -1948,7 +1977,7 @@ impl<'env> FunctionTranslator<'env> {
                             let src_type = boogie_num_type_base(&self.get_local_type(op2));
                             emitln!(
                                 writer,
-                                "call {} := ${}Bv{}From{}({}, {});",
+                                "call {} := ${}{}From{}({}, {});",
                                 str_local(dest),
                                 sh_oper_str,
                                 target_type,

@@ -47,7 +47,7 @@ pub struct ProverOptions {
     pub stable_test_output: bool,
     /// Scope of what functions to verify.
     pub verify_scope: VerificationScope,
-    /// [deprecated] Whether to emit global axiom that resources are well-formed.
+    /// *deprecated* Whether to emit global axiom that resources are well-formed.
     pub resource_wellformed_axiom: bool,
     /// Whether to assume wellformedness when elements are read from memory, instead of on
     /// function entry.

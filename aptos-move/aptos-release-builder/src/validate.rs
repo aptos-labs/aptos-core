@@ -52,6 +52,13 @@ script {
 }
 ";
 
+fn aptos_framework_path() -> PathBuf {
+    let mut path = Path::new(env!("CARGO_MANIFEST_DIR")).to_path_buf();
+    path.pop();
+    path.push("framework/aptos-framework");
+    path
+}
+
 impl NetworkConfig {
     pub fn new_from_dir(endpoint: Url, test_dir: &Path) -> Result<Self> {
         let root_key_path = test_dir.join("mint.key");
@@ -147,9 +154,13 @@ impl NetworkConfig {
             self.endpoint.as_str(),
         ];
         let rev = self.framework_git_rev.clone();
+        let framework_path = aptos_framework_path();
         if let Some(rev) = &rev {
             args.push("--framework-git-rev");
             args.push(rev.as_str());
+        } else {
+            args.push("--framework-local-dir");
+            args.push(framework_path.as_os_str().to_str().unwrap());
         };
 
         RunScript::parse_from(args).execute().await?;
@@ -188,11 +199,14 @@ impl NetworkConfig {
         }
 
         let rev_string = self.framework_git_rev.clone();
+        let framework_path = aptos_framework_path();
         if let Some(rev) = &rev_string {
             args.push("--framework-git-rev");
             args.push(rev.as_str());
             SubmitProposal::parse_from(args).execute().await?;
         } else {
+            args.push("--framework-local-dir");
+            args.push(framework_path.as_os_str().to_str().unwrap());
             SubmitProposal::parse_from(args).execute().await?;
         };
 
@@ -320,9 +334,13 @@ impl NetworkConfig {
         ];
 
         let rev = self.framework_git_rev.clone();
+        let framework_path = aptos_framework_path();
         if let Some(rev) = &rev {
             args.push("--framework-git-rev");
             args.push(rev.as_str());
+        } else {
+            args.push("--framework-local-dir");
+            args.push(framework_path.as_os_str().to_str().unwrap());
         };
 
         ExecuteProposal::parse_from(args).execute().await?;
@@ -377,9 +395,13 @@ async fn execute_release(
             ];
 
             let rev = network_config.framework_git_rev.clone();
+            let framework_path = aptos_framework_path();
             if let Some(rev) = &rev {
                 args.push("--framework-git-rev");
                 args.push(rev.as_str());
+            } else {
+                args.push("--framework-local-dir");
+                args.push(framework_path.as_os_str().to_str().unwrap());
             };
 
             RunScript::parse_from(args).execute().await?;

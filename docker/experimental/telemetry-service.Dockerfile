@@ -12,7 +12,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         libpq-dev \
         curl
 
-COPY --link --from=builder /aptos/dist/aptos-telemetry-service /usr/local/bin/aptos-telemetry-service
+COPY --link --from=tools-builder /aptos/dist/aptos-telemetry-service /usr/local/bin/aptos-telemetry-service
 
 EXPOSE 8000
 ENV RUST_LOG_FORMAT=json

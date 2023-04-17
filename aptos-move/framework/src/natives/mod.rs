@@ -8,11 +8,13 @@ pub mod any;
 pub mod code;
 pub mod create_signer;
 pub mod cryptography;
+pub mod debug;
 pub mod event;
 pub mod hash;
 mod helpers;
 pub mod object;
 pub mod state_storage;
+pub mod string_utils;
 pub mod transaction_context;
 pub mod type_info;
 pub mod util;
@@ -53,6 +55,7 @@ pub struct GasParameters {
     pub aggregator: aggregator::GasParameters,
     pub aggregator_factory: aggregator_factory::GasParameters,
     pub object: object::GasParameters,
+    pub string_utils: string_utils::GasParameters,
 }
 
 impl GasParameters {
@@ -77,7 +80,67 @@ impl GasParameters {
                 per_byte_hashing: 0.into(),
             },
             algebra: cryptography::algebra::gas::GasParameters {
-                placeholder: 0.into(),
+                ark_bls12_381_fr_serialize: 0.into(),
+                ark_bls12_381_fr_deser: 0.into(),
+                ark_bls12_381_fr_from_u64: 0.into(),
+                ark_bls12_381_fr_neg: 0.into(),
+                ark_bls12_381_fr_add: 0.into(),
+                ark_bls12_381_fr_sub: 0.into(),
+                ark_bls12_381_fr_mul: 0.into(),
+                ark_bls12_381_fr_inv: 0.into(),
+                ark_bls12_381_fr_div: 0.into(),
+                ark_bls12_381_fr_eq: 0.into(),
+                ark_bls12_381_g1_proj_infinity: 0.into(),
+                ark_bls12_381_g1_proj_generator: 0.into(),
+                ark_bls12_381_g1_affine_serialize_uncomp: 0.into(),
+                ark_bls12_381_g1_affine_deser_uncomp: 0.into(),
+                ark_bls12_381_g1_affine_serialize_comp: 0.into(),
+                ark_bls12_381_g1_affine_deser_comp: 0.into(),
+                ark_bls12_381_g1_proj_to_affine: 0.into(),
+                ark_bls12_381_g1_proj_neg: 0.into(),
+                ark_bls12_381_g1_proj_add: 0.into(),
+                ark_bls12_381_g1_proj_sub: 0.into(),
+                ark_bls12_381_g1_proj_scalar_mul: 0.into(),
+                ark_bls12_381_g1_proj_eq: 0.into(),
+                ark_bls12_381_g2_proj_infinity: 0.into(),
+                ark_bls12_381_g2_proj_generator: 0.into(),
+                ark_bls12_381_g2_affine_serialize_uncomp: 0.into(),
+                ark_bls12_381_g2_affine_deser_uncomp: 0.into(),
+                ark_bls12_381_g2_affine_serialize_comp: 0.into(),
+                ark_bls12_381_g2_affine_deser_comp: 0.into(),
+                ark_bls12_381_g2_proj_to_affine: 0.into(),
+                ark_bls12_381_g2_proj_neg: 0.into(),
+                ark_bls12_381_g2_proj_add: 0.into(),
+                ark_bls12_381_g2_proj_sub: 0.into(),
+                ark_bls12_381_g2_proj_scalar_mul: 0.into(),
+                ark_bls12_381_g2_proj_eq: 0.into(),
+                ark_bls12_381_fq12_serialize: 0.into(),
+                ark_bls12_381_fq12_eq: 0.into(),
+                ark_bls12_381_fq12_one: 0.into(),
+                ark_bls12_381_fq12_pow_u256: 0.into(),
+                ark_bls12_381_fq12_clone: 0.into(),
+                ark_bls12_381_fq12_deser: 0.into(),
+                ark_bls12_381_fq12_mul: 0.into(),
+                ark_bls12_381_fq12_sub: 0.into(),
+                ark_bls12_381_fq12_inv: 0.into(),
+                ark_bls12_381_fq12_square: 0.into(),
+                ark_bls12_381_g1_proj_double: 0.into(),
+                ark_bls12_381_g2_proj_double: 0.into(),
+                ark_bls12_381_fq12_div: 0.into(),
+                ark_bls12_381_fq12_add: 0.into(),
+                ark_bls12_381_fq12_from_u64: 0.into(),
+                ark_bls12_381_fq12_neg: 0.into(),
+                ark_bls12_381_fr_square: 0.into(),
+                ark_bls12_381_fr_one: 0.into(),
+                ark_bls12_381_fr_zero: 0.into(),
+                ark_bls12_381_fq12_zero: 0.into(),
+                ark_bls12_381_pairing: 0.into(),
+                ark_bls12_381_multi_pairing_base: 0.into(),
+                ark_bls12_381_multi_pairing_per_pair: 0.into(),
+                ark_h2c_bls12381g1_xmd_sha256_sswu_base: 0.into(),
+                ark_h2c_bls12381g1_xmd_sha256_sswu_per_msg_byte: 0.into(),
+                ark_h2c_bls12381g2_xmd_sha256_sswu_base: 0.into(),
+                ark_h2c_bls12381g2_xmd_sha256_sswu_per_msg_byte: 0.into(),
             },
             ed25519: ed25519::GasParameters {
                 base: 0.into(),
@@ -198,12 +261,17 @@ impl GasParameters {
                     per_item_loaded: 0.into(),
                 },
             },
+            string_utils: string_utils::GasParameters {
+                base: 0.into(),
+                per_byte: 0.into(),
+            },
         }
     }
 }
 
 pub fn all_natives(
     framework_addr: AccountAddress,
+    move_gas_params: aptos_move_stdlib::natives::GasParameters,
     gas_params: GasParameters,
     timed_features: TimedFeatures,
     features: Arc<Features>,
@@ -244,9 +312,10 @@ pub fn all_natives(
         )
     );
     add_natives_from_module!(
-        "algebra",
+        "crypto_algebra",
         cryptography::algebra::make_all(
-            gas_params.algebra.clone(),
+            move_gas_params,
+            gas_params.algebra,
             timed_features.clone(),
             features.clone()
         )
@@ -358,7 +427,12 @@ pub fn all_natives(
     );
     add_natives_from_module!(
         "object",
-        object::make_all(gas_params.object, timed_features, features)
+        object::make_all(gas_params.object, timed_features.clone(), features.clone())
+    );
+    add_natives_from_module!("debug", debug::make_all());
+    add_natives_from_module!(
+        "string_utils",
+        string_utils::make_all(gas_params.string_utils, timed_features, features)
     );
 
     make_table_from_iter(framework_addr, natives)

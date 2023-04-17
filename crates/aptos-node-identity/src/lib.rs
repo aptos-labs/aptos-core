@@ -43,21 +43,21 @@ pub fn set_chain_id(chain_id: ChainId) -> Result<()> {
     }
 }
 
-/// Returns the [PeerId] from the global [APTOS_NODE_IDENTITY]
+/// Returns the [PeerId] from the global `APTOS_NODE_IDENTITY`
 pub fn peer_id() -> Option<PeerId> {
     APTOS_NODE_IDENTITY
         .get()
         .and_then(|identity| identity.peer_id)
 }
 
-/// Returns the [PeerId] as [str] from the global [APTOS_NODE_IDENTITY]
+/// Returns the [PeerId] as [str] from the global `APTOS_NODE_IDENTITY`
 pub fn peer_id_as_str() -> Option<&'static str> {
     APTOS_NODE_IDENTITY
         .get()
         .and_then(|identity| identity.peer_id_str.as_deref())
 }
 
-/// Returns the [ChainId] from the global [APTOS_NODE_IDENTITY]
+/// Returns the [ChainId] from the global `APTOS_NODE_IDENTITY`
 pub fn chain_id() -> Option<ChainId> {
     APTOS_NODE_IDENTITY
         .get()

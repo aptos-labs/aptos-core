@@ -68,7 +68,7 @@ pub trait SpecRewriter {
         for menv in env.get_modules() {
             for fenv in menv.get_functions() {
                 let fid = fenv.get_qualified_id();
-                if let Some(new_spec) = self.rewrite_function_spec(env, fid, fenv.get_spec())? {
+                if let Some(new_spec) = self.rewrite_function_spec(env, fid, &fenv.get_spec())? {
                     new_specs.insert(fid, new_spec);
                 }
             }

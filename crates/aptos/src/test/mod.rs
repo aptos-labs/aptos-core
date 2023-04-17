@@ -16,7 +16,7 @@ use crate::{
             EncodingOptions, FaucetOptions, GasOptions, KeyType, MoveManifestAccountWrapper,
             MovePackageDir, OptionalPoolAddressArgs, PoolAddressArgs, PrivateKeyInputOptions,
             PromptOptions, PublicKeyInputOptions, RestOptions, RngArgs, SaveFile,
-            TransactionOptions, TransactionSummary,
+            TransactionOptions, TransactionSummary, VanityPrefix,
         },
         utils::write_to_file,
     },
@@ -719,6 +719,9 @@ impl CliTestFramework {
                     prompt_options: PromptOptions::yes(),
                 },
                 encoding_options: Default::default(),
+            },
+            vanity_prefix: VanityPrefix {
+                vanity_prefix: None,
             },
         }
         .execute()

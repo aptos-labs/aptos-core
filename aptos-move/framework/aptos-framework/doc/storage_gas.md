@@ -1442,6 +1442,7 @@ A non decreasing curve must ensure that next is greater than cur.
 
 
 <pre><code><b>pragma</b> aborts_if_is_strict = <b>false</b>;
+<b>pragma</b> verify = <b>false</b>;
 <b>pragma</b> opaque;
 <b>include</b> <a href="storage_gas.md#0x1_storage_gas_ValidatePointsAbortsIf">ValidatePointsAbortsIf</a>;
 </code></pre>
@@ -1460,6 +1461,7 @@ A non decreasing curve must ensure that next is greater than cur.
 
 
 <pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify_duration_estimate = 120;
 <b>requires</b> max_usage &gt; 0;
 <b>requires</b> max_usage &lt;= <a href="storage_gas.md#0x1_storage_gas_MAX_U64">MAX_U64</a> / <a href="storage_gas.md#0x1_storage_gas_BASIS_POINT_DENOMINATION">BASIS_POINT_DENOMINATION</a>;
 <b>aborts_if</b> <b>false</b>;
@@ -1545,4 +1547,4 @@ A non decreasing curve must ensure that next is greater than cur.
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

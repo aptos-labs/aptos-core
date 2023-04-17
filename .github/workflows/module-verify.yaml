@@ -30,7 +30,7 @@ concurrency:
 
 jobs:
   verify-modules-testnet:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.CHAIN_NAME == 'testnet' || inputs.CHAIN_NAME == 'all' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && (inputs.CHAIN_NAME == 'testnet' || inputs.CHAIN_NAME == 'all') }}
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-module-verify.yaml@main
     secrets: inherit
     with:
@@ -40,10 +40,10 @@ jobs:
       BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/s3-public.yaml
       # workflow config
       RUNS_ON: high-perf-docker-with-local-ssd
-      TIMEOUT_MINUTES: 10
+      TIMEOUT_MINUTES: 20
 
   verify-modules-mainnet:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.CHAIN_NAME == 'mainnet' || inputs.CHAIN_NAME == 'all' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && (inputs.CHAIN_NAME == 'mainnet' || inputs.CHAIN_NAME == 'all') }}
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-module-verify.yaml@main
     secrets: inherit
     with:
@@ -53,7 +53,7 @@ jobs:
       BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/s3-public.yaml
       # workflow config
       RUNS_ON: high-perf-docker-with-local-ssd
-      TIMEOUT_MINUTES: 720
+      TIMEOUT_MINUTES: 20
 
   test-verify-modules:
     if: ${{ github.event_name == 'pull_request' }}

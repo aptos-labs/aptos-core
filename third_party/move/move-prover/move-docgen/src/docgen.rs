@@ -54,7 +54,7 @@ pub struct DocgenOptions {
     pub include_impl: bool,
     /// Max depth to which sections are displayed in table-of-contents.
     pub toc_depth: usize,
-    /// Whether to use collapsed sections (<details>) for impl and specs
+    /// Whether to use collapsed sections (`<details>`) for implementation and specs
     pub collapsed_sections: bool,
     /// In which directory to store output.
     pub output_directory: String,

@@ -28,7 +28,6 @@ mod tags;
 
 pub use self::traits::*;
 pub use hash::HashValue;
-
 // Reexport once_cell and serde_name for use in CryptoHasher Derive implementation.
 #[doc(hidden)]
 pub use once_cell as _once_cell;

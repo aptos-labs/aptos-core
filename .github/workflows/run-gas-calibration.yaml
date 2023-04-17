@@ -29,6 +29,8 @@ jobs:
         with:
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - name: install Valgrind
         shell: bash
         run: sudo apt-get -y install valgrind

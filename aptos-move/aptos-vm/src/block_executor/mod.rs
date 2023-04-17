@@ -118,6 +118,7 @@ impl BlockAptosVM {
             .execute_block(state_view, signature_verified_block, state_view)
             .map(|results| {
                 // Process the outputs in parallel, combining delta writes with other writes.
+                // TODO: merge with rolling commit_hook (via trait) inside parallel executor.
                 RAYON_EXEC_POOL.install(|| {
                     results
                         .into_par_iter()
@@ -145,8 +146,7 @@ impl BlockAptosVM {
         transactions: Vec<Transaction>,
         state_view: &S,
         concurrency_level: usize,
-        check_correctness: bool,
-    ) -> usize {
+    ) -> (usize, usize) {
         // Verify the signatures of all the transactions in parallel.
         // This is time consuming so don't wait and do the checking
         // sequentially while executing the transactions.
@@ -175,27 +175,60 @@ impl BlockAptosVM {
         let executor = BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>, S>::new(
             concurrency_level,
         );
-
+        println!("Parallel execution starts...");
         let timer = Instant::now();
         let ret = executor.execute_block(state_view, signature_verified_block, state_view);
         let exec_t = timer.elapsed();
+        println!(
+            "Parallel execution finishes, TPS = {}",
+            block_size * 1000 / exec_t.as_millis() as usize
+        );
 
         flush_speculative_logs();
 
-        if check_correctness {
-            // sequentially execute the block and check if the results match
-            let seq_executor =
-                BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>, S>::new(1);
-            let seq_ret = seq_executor.execute_block(
-                state_view,
-                signature_verified_block_for_seq,
-                state_view,
-            );
-            assert_eq!(ret, seq_ret);
-            drop(seq_ret);
-        }
-        drop(ret);
+        // sequentially execute the block and check if the results match
+        let seq_executor =
+            BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>, S>::new(1);
+        println!("Sequential execution starts...");
+        let seq_timer = Instant::now();
+        let seq_ret =
+            seq_executor.execute_block(state_view, signature_verified_block_for_seq, state_view);
+        let seq_exec_t = seq_timer.elapsed();
+        println!(
+            "Sequential execution finishes, TPS = {}",
+            block_size * 1000 / seq_exec_t.as_millis() as usize
+        );
 
-        block_size * 1000 / exec_t.as_millis() as usize
+        // Merge the delta outputs for parallel execution in order to compare results.
+        // TODO: remove after this becomes part of the rolling commit_hook.
+        let par_ret = ret.map(|results| {
+            results
+                .into_iter()
+                .map(|(output, delta_writes)| {
+                    output // AptosTransactionOutput
+                    .into() // TransactionOutputExt
+                    .output_with_delta_writes(WriteSetMut::new(delta_writes))
+                })
+                .collect()
+        });
+        // Sequential execution does not have deltas, assert and convert to the same type.
+        let seq_ret: Result<Vec<TransactionOutput>, Error<VMStatus>> = seq_ret.map(|results| {
+            results
+                .into_iter()
+                .map(|(output, deltas)| {
+                    assert_eq!(deltas.len(), 0);
+                    output
+                        .into()
+                        .output_with_delta_writes(WriteSetMut::new(vec![]))
+                })
+                .collect()
+        });
+
+        assert_eq!(par_ret, seq_ret);
+
+        (
+            block_size * 1000 / exec_t.as_millis() as usize,
+            block_size * 1000 / seq_exec_t.as_millis() as usize,
+        )
     }
 }

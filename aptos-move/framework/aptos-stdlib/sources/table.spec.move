@@ -13,6 +13,7 @@ spec aptos_std::table {
             map_del_must_exist = remove,
             map_borrow = borrow,
             map_borrow_mut = borrow_mut,
+            map_borrow_mut_with_default = borrow_mut_with_default,
             map_spec_get = spec_get,
             map_spec_set = spec_set,
             map_spec_del = spec_remove,
@@ -36,6 +37,10 @@ spec aptos_std::table {
     }
 
     spec borrow_mut {
+        pragma intrinsic;
+    }
+
+    spec borrow_mut_with_default {
         pragma intrinsic;
     }
 
