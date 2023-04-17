@@ -1,0 +1,37 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+package aptos.datastream.v1;
+
+import "aptos/transaction/testing1/v1/transaction.proto";
+import "aptos/util/timestamp/timestamp.proto";
+
+message TransactionsData {
+  repeated aptos.transaction.testing1.v1.Transaction transactions  = 1;
+}
+
+message GetTransactionsRequest {
+  // Required; start version of current stream.
+  optional uint64 starting_version = 1;
+
+  // Optional; number of transactions to return in current stream.
+  optional uint64 transactions_count = 2;
+}
+
+message GetTransactionsResponse {
+  // Required; start version of current stream.
+  optional uint64 version = 1;
+
+  // Optional; number of transactions to return in current stream.
+  aptos.util.timestamp.Timestamp timestamp = 2;
+
+  // Required; transactions data.
+  TransactionsData transactions = 3;
+}
+
+service IndexerDataService {
+    // Get transactions without any filtering from starting version and end if transaction count is present.
+    rpc GetTransactions(GetTransactionsRequest) returns (GetTransactionsResponse);
+}
