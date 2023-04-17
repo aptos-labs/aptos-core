@@ -96,6 +96,7 @@ fn non_existent_sender() {
         receiver.account(),
         sequence_number,
         transfer_amount,
+        0,
     );
 
     let output = &executor.execute_transaction(txn);

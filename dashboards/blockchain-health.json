@@ -186,6 +186,15 @@
           "legendFormat": "alive without failed proposals",
           "range": true,
           "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "100 * sum(aptos_consensus_committed_failed_rounds_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}) / (sum(aptos_consensus_committed_failed_rounds_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}) + sum(aptos_consensus_committed_blocks_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}))",
+          "hide": false,
+          "legendFormat": "failed round %",
+          "range": true,
+          "refId": "C"
         }
       ],
       "title": "#nodes proposing perfectly within reputation window",
@@ -981,9 +990,18 @@
           "editorMode": "code",
           "expr": "avg(rate(aptos_consensus_backpressure_on_proposal_triggered_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval]) / rate(aptos_consensus_backpressure_on_proposal_triggered_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval]))",
           "hide": false,
-          "legendFormat": "aptos_consensus_backpressure_on_proposal_triggered",
+          "legendFormat": "consensus_backpressure_on_proposal_triggered",
           "range": true,
           "refId": "E"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "avg(rate(aptos_pipeline_backpressure_on_proposal_triggered_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval]) / rate(aptos_pipeline_backpressure_on_proposal_triggered_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval]))",
+          "hide": false,
+          "legendFormat": "pipeline_backpressure_on_proposal_triggered",
+          "range": true,
+          "refId": "F"
         }
       ],
       "title": "Backpressures triggered",
@@ -1200,13 +1218,7 @@
           },
           "mappings": [],
           "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
           "unit": "short"
         },
         "overrides": []
@@ -1259,13 +1271,7 @@
           },
           "mappings": [],
           "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
           "unit": "short"
         },
         "overrides": []
@@ -1318,13 +1324,7 @@
           },
           "mappings": [],
           "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
           "unit": "short"
         },
         "overrides": []
@@ -1384,13 +1384,7 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          }
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
         },
         "overrides": []
       },
@@ -1892,7 +1886,7 @@
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },
-          "custom": { "align": "auto", "displayMode": "auto", "filterable": false, "inspect": false },
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "filterable": false, "inspect": false },
           "mappings": [],
           "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
         },
@@ -1901,12 +1895,12 @@
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 85 },
       "id": 171,
       "options": {
-        "footer": { "enablePagination": false, "fields": "", "reducer": ["sum"], "show": false },
+        "footer": { "countRows": false, "enablePagination": false, "fields": "", "reducer": ["sum"], "show": false },
         "frameIndex": 29,
         "showHeader": true,
         "sortBy": [{ "desc": true, "displayName": "validator" }]
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.4.7",
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -1943,7 +1937,7 @@
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },
-          "custom": { "align": "auto", "displayMode": "auto", "inspect": false },
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false },
           "mappings": [],
           "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] }
         },
@@ -1952,8 +1946,11 @@
       "gridPos": { "h": 7, "w": 8, "x": 0, "y": 93 },
       "id": 189,
       "isNew": false,
-      "options": { "footer": { "fields": "", "reducer": ["sum"], "show": false }, "showHeader": true },
-      "pluginVersion": "9.1.1",
+      "options": {
+        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+        "showHeader": true
+      },
+      "pluginVersion": "9.4.7",
       "scroll": false,
       "span": 0,
       "targets": [
@@ -2944,7 +2941,8 @@
     }
   ],
   "refresh": false,
-  "schemaVersion": 37,
+  "revision": 1,
+  "schemaVersion": 38,
   "style": "dark",
   "tags": ["aptos-core"],
   "templating": {
@@ -3160,6 +3158,6 @@
   "timezone": "browser",
   "title": "blockchain-health",
   "uid": "JnOvNs4Vk",
-  "version": 4,
+  "version": 7,
   "weekStart": ""
 }

@@ -113,11 +113,6 @@ impl BackupStorage for LocalFs {
         Ok(Box::new(file))
     }
 
-    async fn save_metadata_line(&self, name: &ShellSafeName, content: &TextLine) -> Result<()> {
-        let txt = TextLine::new(content.as_ref().trim_end_matches('\n'))?;
-        self.save_metadata_lines(name, vec![txt].as_slice()).await
-    }
-
     async fn list_metadata_files(&self) -> Result<Vec<FileHandle>> {
         let dir = self.metadata_dir();
         let rel_path = Path::new(Self::METADATA_DIR);
@@ -156,7 +151,11 @@ impl BackupStorage for LocalFs {
         Ok(())
     }
 
-    async fn save_metadata_lines(&self, name: &ShellSafeName, lines: &[TextLine]) -> Result<()> {
+    async fn save_metadata_lines(
+        &self,
+        name: &ShellSafeName,
+        lines: &[TextLine],
+    ) -> Result<FileHandle> {
         let dir = self.metadata_dir();
         create_dir_all(&dir).await.err_notes(name)?; // in case not yet created
         let content = lines
@@ -181,6 +180,6 @@ impl BackupStorage for LocalFs {
             _ => bail!("Unexpected Error in saving metadata file {}", name.as_ref()),
         }
 
-        Ok(())
+        Ok(path.to_string_lossy().into_owned())
     }
 }

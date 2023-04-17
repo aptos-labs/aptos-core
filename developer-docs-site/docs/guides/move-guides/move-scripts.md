@@ -5,7 +5,7 @@ slug: "move-scripts"
 
 # Move Scripts
 
-This tutorial explains how to write and execute a Move script. You can use Move scripts to execute a series of commands across published Move module interfaces.
+This tutorial explains how to write and execute a [Move script](./book/modules-and-scripts.md). You can use Move scripts to execute a series of commands across published Move module interfaces.
 
 ## Example use case
 

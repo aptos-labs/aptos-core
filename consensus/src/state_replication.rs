@@ -17,7 +17,7 @@ use aptos_crypto::HashValue;
 use aptos_executor_types::{Error as ExecutionError, StateComputeResult};
 use aptos_types::{epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures};
 use futures::future::BoxFuture;
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 pub type StateComputerCommitCallBackType =
     Box<dyn FnOnce(&[Arc<ExecutedBlock>], LedgerInfoWithSignatures) + Send + Sync>;
@@ -28,6 +28,7 @@ pub type StateComputerCommitCallBackType =
 pub trait PayloadClient: Send + Sync {
     async fn pull_payload(
         &self,
+        max_poll_time: Duration,
         max_items: u64,
         max_bytes: u64,
         exclude: PayloadFilter,

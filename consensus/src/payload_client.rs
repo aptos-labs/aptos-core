@@ -25,7 +25,6 @@ const NO_TXN_DELAY: u64 = 30; // TODO: consider moving to a config
 #[derive(Clone)]
 pub struct QuorumStoreClient {
     consensus_to_quorum_store_sender: mpsc::Sender<GetPayloadCommand>,
-    poll_count: u64,
     /// Timeout for consensus to pull transactions from quorum store and get a response (in milliseconds)
     pull_timeout_ms: u64,
     wait_for_full_blocks_above_recent_fill_threshold: f32,
@@ -35,18 +34,12 @@ pub struct QuorumStoreClient {
 impl QuorumStoreClient {
     pub fn new(
         consensus_to_quorum_store_sender: mpsc::Sender<GetPayloadCommand>,
-        poll_count: u64,
         pull_timeout_ms: u64,
         wait_for_full_blocks_above_recent_fill_threshold: f32,
         wait_for_full_blocks_above_pending_blocks: usize,
     ) -> Self {
-        assert!(
-            poll_count > 0,
-            "poll_count = 0 won't pull any txns from quorum store"
-        );
         Self {
             consensus_to_quorum_store_sender,
-            poll_count,
             pull_timeout_ms,
             wait_for_full_blocks_above_recent_fill_threshold,
             wait_for_full_blocks_above_pending_blocks,
@@ -92,6 +85,7 @@ impl QuorumStoreClient {
 impl PayloadClient for QuorumStoreClient {
     async fn pull_payload(
         &self,
+        max_poll_time: Duration,
         max_items: u64,
         max_bytes: u64,
         exclude_payloads: PayloadFilter,
@@ -112,18 +106,16 @@ impl PayloadClient for QuorumStoreClient {
         });
         let mut callback_wrapper = Some(wait_callback);
         // keep polling QuorumStore until there's payloads available or there's still pending payloads
-        let mut count = self.poll_count;
         let start_time = Instant::now();
-        let max_duration = (self.poll_count.saturating_sub(1) * NO_TXN_DELAY) as u128;
+
         let payload = loop {
-            count -= 1;
             // Make sure we don't wait more than expected, due to thread scheduling delays/processing time consumed
-            let done = count == 0 || start_time.elapsed().as_millis() >= max_duration;
+            let done = start_time.elapsed() >= max_poll_time;
             let payload = self
                 .pull_internal(
                     max_items,
                     max_bytes,
-                    return_non_full || return_empty || done || self.poll_count == u64::MAX,
+                    return_non_full || return_empty || done,
                     exclude_payloads.clone(),
                 )
                 .await?;
@@ -137,8 +129,8 @@ impl PayloadClient for QuorumStoreClient {
             break payload;
         };
         info!(
-            poll_count = self.poll_count - count,
-            max_poll_count = self.poll_count,
+            elapsed_time = start_time.elapsed(),
+            max_poll_time = max_poll_time,
             payload_len = payload.len(),
             max_items = max_items,
             max_bytes = max_bytes,

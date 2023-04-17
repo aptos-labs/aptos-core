@@ -34,7 +34,10 @@ royalty.
 
 ## Resource `Royalty`
 
-The royalty of a token within this collection -- this optional
+The royalty of a token within this collection
+
+Royalties are optional for a collection.  Royalty percentage is calculated
+by (numerator / denominator) * 100%
 
 
 <pre><code><b>struct</b> <a href="royalty.md#0x4_royalty_Royalty">Royalty</a> <b>has</b> <b>copy</b>, drop, key
@@ -75,7 +78,7 @@ The royalty of a token within this collection -- this optional
 
 ## Struct `MutatorRef`
 
-This enables creating or overwriting a MutatorRef.
+This enables creating or overwriting a <code><a href="royalty.md#0x4_royalty_MutatorRef">MutatorRef</a></code>.
 
 
 <pre><code><b>struct</b> <a href="royalty.md#0x4_royalty_MutatorRef">MutatorRef</a> <b>has</b> drop, store
@@ -106,27 +109,30 @@ This enables creating or overwriting a MutatorRef.
 
 <a name="0x4_royalty_EROYALTY_DENOMINATOR_IS_ZERO"></a>
 
+The royalty denominator cannot be 0
 
 
-<pre><code><b>const</b> <a href="royalty.md#0x4_royalty_EROYALTY_DENOMINATOR_IS_ZERO">EROYALTY_DENOMINATOR_IS_ZERO</a>: u64 = 2;
+<pre><code><b>const</b> <a href="royalty.md#0x4_royalty_EROYALTY_DENOMINATOR_IS_ZERO">EROYALTY_DENOMINATOR_IS_ZERO</a>: u64 = 3;
 </code></pre>
 
 
 
 <a name="0x4_royalty_EROYALTY_DOES_NOT_EXIST"></a>
 
+Royalty does not exist
 
 
-<pre><code><b>const</b> <a href="royalty.md#0x4_royalty_EROYALTY_DOES_NOT_EXIST">EROYALTY_DOES_NOT_EXIST</a>: u64 = 3;
+<pre><code><b>const</b> <a href="royalty.md#0x4_royalty_EROYALTY_DOES_NOT_EXIST">EROYALTY_DOES_NOT_EXIST</a>: u64 = 1;
 </code></pre>
 
 
 
 <a name="0x4_royalty_EROYALTY_EXCEEDS_MAXIMUM"></a>
 
+The royalty cannot be greater than 100%
 
 
-<pre><code><b>const</b> <a href="royalty.md#0x4_royalty_EROYALTY_EXCEEDS_MAXIMUM">EROYALTY_EXCEEDS_MAXIMUM</a>: u64 = 1;
+<pre><code><b>const</b> <a href="royalty.md#0x4_royalty_EROYALTY_EXCEEDS_MAXIMUM">EROYALTY_EXCEEDS_MAXIMUM</a>: u64 = 2;
 </code></pre>
 
 
@@ -192,6 +198,7 @@ Set the royalty if it does not exist, replace it otherwise.
 
 ## Function `create`
 
+Creates a new royalty, verifying that it is a valid percentage
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="royalty.md#0x4_royalty_create">create</a>(numerator: u64, denominator: u64, payee_address: <b>address</b>): <a href="royalty.md#0x4_royalty_Royalty">royalty::Royalty</a>

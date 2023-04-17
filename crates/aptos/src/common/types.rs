@@ -1001,6 +1001,11 @@ pub fn load_account_arg(str: &str) -> Result<AccountAddress, CliError> {
         })
     } else if let Ok(account_address) = AccountAddress::from_str(str) {
         Ok(account_address)
+    } else if let Some(Some(account_address)) =
+        CliConfig::load_profile(Some(str), ConfigSearchMode::CurrentDirAndParents)?
+            .map(|p| p.account)
+    {
+        Ok(account_address)
     } else if let Some(Some(private_key)) =
         CliConfig::load_profile(Some(str), ConfigSearchMode::CurrentDirAndParents)?
             .map(|p| p.private_key)

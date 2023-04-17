@@ -5,7 +5,7 @@
 use aptos_bitvec::BitVec;
 use aptos_crypto::HashValue;
 use aptos_language_e2e_tests::{
-    account_universe::{log_balance_strategy, AUTransactionGen, AccountUniverseGen},
+    account_universe::{AUTransactionGen, AccountUniverseGen},
     executor::FakeExecutor,
     gas_costs::TXN_RESERVED,
 };
@@ -245,13 +245,12 @@ impl TransactionBenchState {
     }
 }
 
-/// Returns a strategy for the account universe customized for benchmarks.
+/// Returns a strategy for the account universe customized for benchmarks, i.e. having
+/// sufficiently large balance for gas.
 fn universe_strategy(
     num_accounts: usize,
     num_transactions: usize,
 ) -> impl Strategy<Value = AccountUniverseGen> {
-    // Multiply by 5 past the number of  to provide
-    let max_balance = TXN_RESERVED * num_transactions as u64 * 5;
-    let balance_strategy = log_balance_strategy(max_balance);
-    AccountUniverseGen::strategy(num_accounts, balance_strategy)
+    let balance = TXN_RESERVED * num_transactions as u64 * 5;
+    AccountUniverseGen::strategy(num_accounts, balance..(balance + 1))
 }

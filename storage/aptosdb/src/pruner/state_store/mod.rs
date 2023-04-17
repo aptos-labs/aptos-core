@@ -4,7 +4,7 @@
 use crate::{
     db_metadata::DbMetadataSchema,
     jellyfish_merkle_node::JellyfishMerkleNodeSchema,
-    metrics::PRUNER_LEAST_READABLE_VERSION,
+    metrics::PRUNER_VERSIONS,
     pruner::{db_pruner::DBPruner, state_store::generics::StaleNodeIndexSchemaTrait},
     pruner_utils,
     schema::db_metadata::DbMetadataValue,
@@ -91,6 +91,9 @@ where
 
     fn set_target_version(&self, target_version: Version) {
         self.target_version.store(target_version, Ordering::Relaxed);
+        PRUNER_VERSIONS
+            .with_label_values(&[S::name(), "target"])
+            .set(target_version as i64);
     }
 
     fn target_version(&self) -> Version {
@@ -183,8 +186,8 @@ where
 
     fn record_progress_impl(&self, min_readable_version: Version, is_fully_pruned: bool) {
         *self.progress.lock() = (min_readable_version, is_fully_pruned);
-        PRUNER_LEAST_READABLE_VERSION
-            .with_label_values(&[S::name()])
+        PRUNER_VERSIONS
+            .with_label_values(&[S::name(), "min_readable"])
             .set(min_readable_version as i64);
     }
 

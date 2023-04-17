@@ -23,7 +23,7 @@ for more details.
 
 ## How it works
 
-Move code upgrades on the Aptos blockchain happen at the [Move package](https://move-language.github.io/move/packages.html)
+Move code upgrades on the Aptos blockchain happen at the [Move package](./packages.md)
 granularity. A package specifies an upgrade policy in the `Move.toml` manifest:
 
 ```toml
@@ -34,7 +34,7 @@ upgrade_policy = "compatible"
 ...
 ```
 :::tip Compatibility check
-Aptos checks compatibility at the time a [Move package](https://move-language.github.io/move/packages.html) is published via an Aptos transaction. This transaction will abort if deemed incompatible.
+Aptos checks compatibility at the time a Move package is published via an Aptos transaction. This transaction will abort if deemed incompatible.
 :::
 
 ## How to upgrade
