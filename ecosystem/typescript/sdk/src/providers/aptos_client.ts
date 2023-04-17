@@ -35,6 +35,7 @@ import {
   AnyNumber,
 } from "../bcs";
 import { Ed25519PublicKey, MultiEd25519PublicKey } from "../aptos_types";
+import { VERSION } from "../version";
 
 export interface OptionalTransactionArgs {
   maxGasAmount?: Uint64;
@@ -85,6 +86,7 @@ export class AptosClient {
     } else {
       conf.WITH_CREDENTIALS = true;
     }
+    conf.HEADERS = { ...conf.HEADERS, "X-Aptos-Client": `aptos-ts-sdk/${VERSION}` };
     this.client = new Gen.AptosGeneratedClient(conf);
   }
 
