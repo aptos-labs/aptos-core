@@ -1,10 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-
+import * as Gen from "../generated/index";
 import { AptosAccount, getAddressFromAccountOrAddress } from "../account/aptos_account";
 import { AptosClient, OptionalTransactionArgs } from "../providers/aptos_client";
 import { MaybeHexString, APTOS_COIN } from "../utils";
 import { TransactionBuilderRemoteABI } from "../transaction_builder";
+import { FungibleAsset } from "./fungible_asset_client";
+import { Provider } from "../providers";
 
 /**
  * Class for working with the coin module, such as transferring coins and
@@ -54,8 +56,25 @@ export class CoinClient {
       // If this is the first time an account has received the specified coinType,
       // and this is set to false, the transaction would fail.
       createReceiverIfMissing?: boolean;
+      assetAddress?: MaybeHexString;
     },
   ): Promise<string> {
+    console.warn(
+      "CoinClient.transfer() will soon be deprecated, to send coins (i.e fungible assets) please use `FungibleAsset()` class",
+    );
+    if (extraArgs?.assetAddress) {
+      // asking for a fungible asset object
+      if (!extraArgs.coinType) {
+        throw Error("Need to provide an asset type");
+      }
+      const provider = new Provider({ fullnodeUrl: this.aptosClient.nodeUrl, indexerUrl: this.aptosClient.nodeUrl });
+      const fungibleAsset = new FungibleAsset(provider);
+      if (to instanceof AptosAccount) {
+        to = to.address();
+      }
+      return await fungibleAsset.transferAmount(from, extraArgs.assetAddress, to, amount, extraArgs.coinType);
+    }
+
     // If none is explicitly given, use 0x1::aptos_coin::AptosCoin as the coin type.
     const coinTypeToTransfer = extraArgs?.coinType ?? APTOS_COIN;
 
@@ -88,8 +107,25 @@ export class CoinClient {
     extraArgs?: {
       // The coin type to use, defaults to 0x1::aptos_coin::AptosCoin
       coinType?: string;
+      assetAddress?: MaybeHexString;
     },
-  ): Promise<bigint> {
+  ): Promise<bigint | Gen.MoveValue[]> {
+    console.warn(
+      "CoinClient.checkBalance() will soon be deprecated, to check account's coin balance (i.e fungible assets) please use `FungibleAsset()` class",
+    );
+    if (extraArgs?.assetAddress) {
+      // asking for a fungible asset object
+      if (!extraArgs.coinType) {
+        throw Error("Need to provide an asset type");
+      }
+      const provider = new Provider({ fullnodeUrl: this.aptosClient.nodeUrl, indexerUrl: this.aptosClient.nodeUrl });
+      const fungibleAsset = new FungibleAsset(provider);
+      if (account instanceof AptosAccount) {
+        account = account.address();
+      }
+      return await fungibleAsset.balance(account, extraArgs.assetAddress, extraArgs.coinType);
+    }
+
     const coinType = extraArgs?.coinType ?? APTOS_COIN;
     const typeTag = `0x1::coin::CoinStore<${coinType}>`;
     const address = getAddressFromAccountOrAddress(account);
