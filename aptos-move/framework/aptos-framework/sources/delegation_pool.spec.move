@@ -79,6 +79,7 @@ spec aptos_framework::delegation_pool {
 
         // Property 9 [TIMEOUT]:
         // TODO: TIMEOUT in init_dele_pool
+
         // invariant forall delegator: address where exists<DelegationPool>(delegator): table::spec_get(global<DelegationPool>(delegator).pending_withdrawals,delegator).index <= global<DelegationPool>(delegator).observed_lockup_cycle.index;
 
         // Property 11 [TIMEOUT]:
@@ -88,38 +89,38 @@ spec aptos_framework::delegation_pool {
     }
 
     spec owner_cap_exists(addr: address): bool {
-        pragma verify = false;
+        pragma verify = true;
         aborts_if false;
     }
 
     spec get_owned_pool_address(owner: address): address {
-        pragma verify = false;
+        pragma verify = true;
         aborts_if !exists<DelegationPoolOwnership>(owner);
     }
 
     /// Return whether a delegation pool exists at supplied address `addr`.
     spec delegation_pool_exists(addr: address): bool {
-        pragma verify = false;
+        pragma verify = true;
         aborts_if false;
     }
 
     spec observed_lockup_cycle(pool_address: address): u64 {
-        pragma verify = false;
+        pragma verify = true;
         aborts_if !exists<DelegationPool>(pool_address);
     }
 
     spec operator_commission_percentage(pool_address: address): u64 {
-        pragma verify = false;
+        pragma verify = true;
         aborts_if !exists<DelegationPool>(pool_address);
     }
 
     spec shareholders_count_active_pool(pool_address: address): u64 {
-        pragma verify = false;
+        pragma verify = true;
         aborts_if !exists<DelegationPool>(pool_address);
     }
 
     spec get_delegation_pool_stake(pool_address: address): (u64, u64, u64, u64) {
-        pragma verify = false;
+        pragma verify = true;
         aborts_if !exists<DelegationPool>(pool_address);
         aborts_if !stake::stake_pool_exists(pool_address);
     }
@@ -128,25 +129,26 @@ spec aptos_framework::delegation_pool {
         pool_address: address,
         delegator_address: address
     ): (bool, u64) {
-        pragma verify = false;
+        pragma verify = true;
         aborts_if !delegation_pool_exists(pool_address);
         // aborts_if !exists<DelegationPool>(pool_address);
         // aborts_if !stake::stake_pool_exists(pool_address);
     }
 
     spec get_stake(pool_address: address, delegator_address: address): (u64, u64, u64) {
-        pragma verify = false;
+        pragma verify = true;
     }
 
     spec fun spec_get_add_stake_fee(pool_address: address, amount: u64): u64;
 
     spec get_add_stake_fee(pool_address: address, amount: u64): u64 {
-        ensures result == spec_get_add_stake_fee(pool_address, amount);
+        pragma opaque;
+        ensures [abstract] result == spec_get_add_stake_fee(pool_address, amount);
     }
 
     spec can_withdraw_pending_inactive(pool_address: address): bool {
-        pragma verify = false;
-        // aborts_if !exists<stake::ValidatorSet>(@aptos_framework);
+        pragma verify = true;
+        aborts_if !exists<stake::ValidatorSet>(@aptos_framework);
     }
 
     //Complete
@@ -196,17 +198,17 @@ spec aptos_framework::delegation_pool {
     }
 
     spec assert_owner_cap_exists(owner: address) {
-        pragma verify = false;
+        pragma verify = true;
         aborts_if !owner_cap_exists(owner);
     }
 
     spec assert_delegation_pool_exists(pool_address: address) {
-        pragma verify = false;
+        pragma verify = true;
         aborts_if !delegation_pool_exists(pool_address);
     }
 
     spec assert_min_active_balance(pool: &DelegationPool, delegator_address: address) {
-        pragma verify = false;
+        pragma verify = true;
         let pool_u64 = pool.active_shares;
         include AssertMinActiveBalanceAbortsIf;
     }
@@ -221,7 +223,7 @@ spec aptos_framework::delegation_pool {
     }
 
     spec assert_min_pending_inactive_balance(pool: &DelegationPool, delegator_address: address) {
-        pragma verify = false;
+        pragma verify = true;
         let observed_lockup_cycle = pool.observed_lockup_cycle;
         aborts_if !table::spec_contains(pool.inactive_shares, observed_lockup_cycle);
         let pool_u64 = table::spec_get(pool.inactive_shares, observed_lockup_cycle);
@@ -233,7 +235,7 @@ spec aptos_framework::delegation_pool {
         shareholder: address,
         amount: u64,
     ): u64 {
-        pragma verify = false;
+        pragma verify = true;
         include AmountToSharesToRedeemAbortsIf {
             shares_pool: src_shares_pool,
         };
@@ -245,7 +247,7 @@ spec aptos_framework::delegation_pool {
         shareholder: address,
         amount: u64,
     ): u64 {
-        pragma verify = false;
+        pragma verify = true;
         include AmountToSharesToRedeemAbortsIf {
             shares_pool: src_shares_pool,
         };
@@ -259,17 +261,17 @@ spec aptos_framework::delegation_pool {
     }
 
     spec retrieve_stake_pool_owner(pool: &DelegationPool): signer {
-        pragma verify = false;
+        pragma verify = true;
         aborts_if false;
     }
 
     spec get_pool_address(pool: &DelegationPool): address {
-        pragma verify = false;
+        pragma verify = true;
         aborts_if false;
     }
 
     spec olc_with_index(index: u64): ObservedLockupCycle {
-        pragma verify = false;
+        pragma verify = true;
         aborts_if false;
     }
 
@@ -277,14 +279,14 @@ spec aptos_framework::delegation_pool {
         owner: &signer,
         new_operator: address
     ) {
-        pragma verify = false;
+        pragma verify = true;
     }
 
     spec set_delegated_voter(
         owner: &signer,
         new_voter: address
     ) {
-        pragma verify = false;
+        pragma verify = true;
     }
     
 
@@ -451,7 +453,7 @@ spec aptos_framework::delegation_pool {
     }
 
     spec withdraw(delegator: &signer, pool_address: address, amount: u64) {
-        pragma verify = false;
+        pragma verify = true;
         pragma aborts_if_is_partial;
         // Property 1 [OK]: aborts_if amount == 0;
         aborts_if amount == 0;
@@ -561,21 +563,21 @@ spec aptos_framework::delegation_pool {
     }
 
     spec pending_withdrawal_exists(pool: &DelegationPool, delegator_address: address): (bool, ObservedLockupCycle) {
-        pragma verify = false;
+        pragma verify = true;
     }
 
     spec pending_inactive_shares_pool_mut(pool: &mut DelegationPool): &mut pool_u64::Pool {
-        pragma verify = false;
+        pragma verify = true;
         let observed_lockup_cycle = pool.observed_lockup_cycle;
         aborts_if !table::spec_contains(pool.inactive_shares, observed_lockup_cycle);
     }
 
     spec pending_inactive_shares_pool(pool: &DelegationPool): &pool_u64::Pool {
-        pragma verify = false;
+        pragma verify = true;
     }
 
     spec execute_pending_withdrawal(pool: &mut DelegationPool, delegator_address: address) {
-        pragma verify = false;
+        pragma verify = true;
     }
 
     spec buy_in_pending_inactive_shares(
@@ -583,7 +585,7 @@ spec aptos_framework::delegation_pool {
         shareholder: address,
         coins_amount: u64,
     ): u128 {
-        pragma verify = false;
+        pragma verify = true;
         let observed_lockup_cycle = pool.observed_lockup_cycle;
         aborts_if !table::spec_contains(pool.inactive_shares, observed_lockup_cycle);
     }
@@ -593,7 +595,7 @@ spec aptos_framework::delegation_pool {
         shareholder: address,
         coins_amount: u64,
     ): u128 {
-        pragma verify = false;
+        pragma verify = true;
         include AmountToSharesToRedeemAbortsIf;
         ensures result == spec_amount_to_shares_to_redeem(shares_pool, shareholder, coins_amount);
     }
@@ -625,7 +627,7 @@ spec aptos_framework::delegation_pool {
         shareholder: address,
         coins_amount: u64,
     ): u64 {
-        pragma verify = false;
+        pragma verify = true;
         pragma aborts_if_is_partial;
         let shares_pool = pool.active_shares;
 
@@ -668,11 +670,10 @@ spec aptos_framework::delegation_pool {
     }
 
     spec calculate_stake_pool_drift(pool: &DelegationPool): (bool, u64, u64, u64, u64) {
-        pragma verify = false;
+        pragma verify = true;
     }
 
     spec fun spec_get_pending_inactive(pool: DelegationPool):u64 {
-        
         let pool_address = pool.stake_pool_signer_cap.account;
         let stake_pool = global<stake::StakePool>(pool_address);
         let inactive = stake_pool.inactive.value;
@@ -712,7 +713,7 @@ spec aptos_framework::delegation_pool {
             ensures pool.total_coins_inactive == stake_pool.inactive.value;
 
             // Property 4 [ERROR]: inactive > old(total_coins_inactive) IFF pool.OLC == old(pool).OLC + 1:
-            ensures pre_pool.observed_lockup_cycle.index != pool.observed_lockup_cycle.index && inactive > pre_pool.total_coins_inactive;
+            ensures old(global<DelegationPool>(pool_address)).observed_lockup_cycle.index != pool.observed_lockup_cycle.index && inactive > old(global<DelegationPool>(pool_address)).total_coins_inactive;
              
             // Property 5.1 [TIMOUT]: pool.OLC == old(pool).OLC + 1 => table::contains(pool.inactive_shares, pool.OLC)
 
