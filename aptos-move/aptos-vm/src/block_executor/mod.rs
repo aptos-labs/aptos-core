@@ -193,7 +193,10 @@ impl BlockAptosVM {
                 .collect()
         });
 
-        (block_size * 1000 / exec_t.as_millis() as usize, Some(par_ret))
+        (
+            block_size * 1000 / exec_t.as_millis() as usize,
+            Some(par_ret),
+        )
     }
 
     fn execute_block_benchmark_sequential<S: StateView + Sync>(
