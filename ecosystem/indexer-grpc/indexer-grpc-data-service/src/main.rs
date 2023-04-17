@@ -2,7 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_indexer_grpc_data_service::service::DatastreamServer;
-use aptos_protos::datastream::v1::indexer_stream_server::IndexerStreamServer;
+use aptos_protos::{
+    datastream::v1::{
+        indexer_stream_server::IndexerStreamServer,
+        FILE_DESCRIPTOR_SET as DATASTREAM_V1_FILE_DESCRIPTOR_SET,
+    },
+    transaction::testing1::v1::FILE_DESCRIPTOR_SET as TRANSACTION_V1_TESTING_FILE_DESCRIPTOR_SET,
+    util::timestamp::FILE_DESCRIPTOR_SET as UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET,
+};
 use clap::Parser;
 use std::{
     collections::HashSet,
@@ -58,11 +65,25 @@ fn main() {
         }
     };
     let runtime = aptos_runtimes::spawn_named_runtime("indexerdata".to_string(), None);
+
+    let reflection_service = tonic_reflection::server::Builder::configure()
+        // Note: It is critical that the file descriptor set is registered for every
+        // file that the top level API proto depends on recursively. If you don't,
+        // compilation will still succeed but reflection will fail at runtime.
+        //
+        // TODO: Add a test for this / something in build.rs, this is a big footgun.
+        .register_encoded_file_descriptor_set(DATASTREAM_V1_FILE_DESCRIPTOR_SET)
+        .register_encoded_file_descriptor_set(TRANSACTION_V1_TESTING_FILE_DESCRIPTOR_SET)
+        .register_encoded_file_descriptor_set(UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET)
+        .build()
+        .expect("Failed to build reflection service");
+
     // Add authentication interceptor.
     runtime.spawn(async move {
         let server = DatastreamServer::new(config);
         let svc = IndexerStreamServer::with_interceptor(server, authentication_inceptor);
         Server::builder()
+            .add_service(reflection_service)
             .add_service(svc)
             .serve(grpc_address.to_socket_addrs().unwrap().next().unwrap())
             .await

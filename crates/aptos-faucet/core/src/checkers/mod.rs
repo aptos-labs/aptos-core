@@ -7,6 +7,7 @@ mod ip_blocklist;
 mod magic_header;
 mod memory_ratelimit;
 mod redis_ratelimit;
+mod referer_blocklist;
 mod tap_captcha;
 
 pub use self::tap_captcha::CaptchaManager;
@@ -17,10 +18,11 @@ use self::{
     magic_header::{MagicHeaderChecker, MagicHeaderCheckerConfig},
     memory_ratelimit::{MemoryRatelimitChecker, MemoryRatelimitCheckerConfig},
     redis_ratelimit::{RedisRatelimitChecker, RedisRatelimitCheckerConfig},
+    referer_blocklist::RefererBlocklistChecker,
     tap_captcha::{TapCaptchaChecker, TapCaptchaCheckerConfig},
 };
 use crate::{
-    common::{AuthTokenManagerConfig, IpRangeManagerConfig},
+    common::{IpRangeManagerConfig, ListManagerConfig},
     endpoints::{AptosTapError, RejectionReason},
 };
 use anyhow::Result;
@@ -80,7 +82,7 @@ pub trait CheckerTrait: Sync + Send + 'static {
 #[serde(tag = "type")]
 pub enum CheckerConfig {
     /// Requires that an auth token is included in the Authorization header.
-    AuthToken(AuthTokenManagerConfig),
+    AuthToken(ListManagerConfig),
 
     /// Requires a legitimate Google ReCaptcha token.
     GoogleCaptcha(GoogleCaptchaCheckerConfig),
@@ -96,6 +98,9 @@ pub enum CheckerConfig {
 
     /// Ratelimiter that uses Redis.
     RedisRatelimit(RedisRatelimitCheckerConfig),
+
+    /// Rejects requests if their Referer is blocklisted.
+    RefererBlocklist(ListManagerConfig),
 
     /// In-house captcha solution.
     TapCaptcha(TapCaptchaCheckerConfig),
@@ -116,6 +121,9 @@ impl CheckerConfig {
             CheckerConfig::RedisRatelimit(config) => {
                 Checker::from(RedisRatelimitChecker::new(config).await?)
             },
+            CheckerConfig::RefererBlocklist(config) => {
+                Checker::from(RefererBlocklistChecker::new(config)?)
+            },
             CheckerConfig::TapCaptcha(config) => {
                 Checker::from(TapCaptchaChecker::new(config, captcha_manager)?)
             },
@@ -132,6 +140,7 @@ pub enum Checker {
     MagicHeaderChecker,
     MemoryRatelimitChecker,
     RedisRatelimitChecker,
+    RefererBlocklistChecker,
     TapCaptchaChecker,
 }
 

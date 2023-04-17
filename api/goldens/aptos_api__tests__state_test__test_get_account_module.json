@@ -12,6 +12,7 @@
         "name": "create",
         "visibility": "friend",
         "is_entry": false,
+        "is_view": false,
         "generic_type_params": [],
         "params": [
           "address",
@@ -25,6 +26,7 @@
         "name": "create_id",
         "visibility": "public",
         "is_entry": false,
+        "is_view": false,
         "generic_type_params": [],
         "params": [
           "address",
@@ -38,6 +40,7 @@
         "name": "creation_num",
         "visibility": "public",
         "is_entry": false,
+        "is_view": false,
         "generic_type_params": [],
         "params": [
           "&0x1::guid::GUID"
@@ -50,6 +53,7 @@
         "name": "creator_address",
         "visibility": "public",
         "is_entry": false,
+        "is_view": false,
         "generic_type_params": [],
         "params": [
           "&0x1::guid::GUID"
@@ -62,6 +66,7 @@
         "name": "eq_id",
         "visibility": "public",
         "is_entry": false,
+        "is_view": false,
         "generic_type_params": [],
         "params": [
           "&0x1::guid::GUID",
@@ -75,6 +80,7 @@
         "name": "id",
         "visibility": "public",
         "is_entry": false,
+        "is_view": false,
         "generic_type_params": [],
         "params": [
           "&0x1::guid::GUID"
@@ -87,6 +93,7 @@
         "name": "id_creation_num",
         "visibility": "public",
         "is_entry": false,
+        "is_view": false,
         "generic_type_params": [],
         "params": [
           "&0x1::guid::ID"
@@ -99,6 +106,7 @@
         "name": "id_creator_address",
         "visibility": "public",
         "is_entry": false,
+        "is_view": false,
         "generic_type_params": [],
         "params": [
           "&0x1::guid::ID"

@@ -667,7 +667,11 @@
       {
         "allFormat": "",
         "allValue": "",
-        "current": { "text": ["VictoriaMetrics Mainnet US"], "value": "VictoriaMetrics Mainnet US" },
+        "current": {
+          "selected": true,
+          "text": "VictoriaMetrics Global (Non-mainnet)",
+          "value": "VictoriaMetrics Global (Non-mainnet)"
+        },
         "hide": 0,
         "includeAll": false,
         "label": "",
@@ -676,8 +680,9 @@
         "name": "Datasource",
         "options": [],
         "query": "prometheus",
+        "queryValue": "",
         "refresh": 1,
-        "regex": "",
+        "regex": ".*Prometheus.*|.*Victoria.*|.*Telemetry.*",
         "skipUrlSync": false,
         "sort": 0,
         "type": "datasource"
@@ -826,8 +831,8 @@
   "time": { "from": "now-3h", "to": "now" },
   "timepicker": {},
   "timezone": "",
-  "title": "Safety Rules",
+  "title": "safety-rules",
   "uid": "safety-rules",
-  "version": 6,
+  "version": 3,
   "weekStart": ""
 }

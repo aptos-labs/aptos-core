@@ -37,6 +37,8 @@ use std::collections::BTreeMap;
 //  - [what else]?
 //
 // Change log:
+// - V8
+//   - Added BLS12-381 operations.
 // - V7
 //   - Native support for exists<T>
 //   - New formulae for storage fees based on fixed APT costs
@@ -61,7 +63,7 @@ use std::collections::BTreeMap;
 //       global operations.
 // - V1
 //   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = 7;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = 8;
 
 pub(crate) const EXECUTION_GAS_MULTIPLIER: u64 = 20;
 
@@ -93,7 +95,7 @@ pub trait InitialGasSchedule: Sized {
 /// Gas parameters for all native functions.
 #[derive(Debug, Clone)]
 pub struct NativeGasParameters {
-    pub move_stdlib: move_stdlib::natives::GasParameters,
+    pub move_stdlib: aptos_move_stdlib::natives::GasParameters,
     pub aptos_framework: aptos_framework::natives::GasParameters,
     pub table: move_table_extension::GasParameters,
 }
@@ -135,7 +137,7 @@ impl ToOnChainGasSchedule for NativeGasParameters {
 impl NativeGasParameters {
     pub fn zeros() -> Self {
         Self {
-            move_stdlib: move_stdlib::natives::GasParameters::zeros(),
+            move_stdlib: aptos_move_stdlib::natives::GasParameters::zeros(),
             aptos_framework: aptos_framework::natives::GasParameters::zeros(),
             table: move_table_extension::GasParameters::zeros(),
         }

@@ -7,8 +7,7 @@
 
 use crate::{
     config::{
-        DiscoveryMethod, NetworkConfig, NodeConfig, Peer, PeerRole, PeerSet, TestConfig,
-        HANDSHAKE_VERSION,
+        DiscoveryMethod, NetworkConfig, NodeConfig, Peer, PeerRole, PeerSet, HANDSHAKE_VERSION,
     },
     network_id::NetworkId,
 };
@@ -61,10 +60,7 @@ pub fn validator_swarm(
 }
 
 pub fn validator_swarm_for_testing(nodes: usize) -> ValidatorSwarm {
-    let config = NodeConfig {
-        test: Some(TestConfig::open_module()),
-        ..Default::default()
-    };
+    let config = NodeConfig::default();
     validator_swarm(&config, nodes, [1u8; 32], true)
 }
 

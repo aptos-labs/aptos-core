@@ -9,10 +9,6 @@ The table below contains latest release information for each Aptos component in 
 
 See the [Latest Aptos Releases](./index.md) index for how to subscribe to GitHub notifications and more release-related information.
 
-## Aptos Framework
-
-Aptos Framework Release commit hash - `1d0dc2c75da1e397effc8bcfa14114652462654d`
-
 ## Aptos SDK
 
 Aptos SDK Release v1.7.2
@@ -21,10 +17,10 @@ Aptos SDK Release v1.7.2
 
 |Release | Git Tag | Commit Hash|
 |---|---|---|
-|[Aptos CLI Release v1.0.8](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-cli-v1.0.8)| `aptos-cli-v1.0.8` | `8fc6515e8014b0890f62621ed85de932a03a00b6` |
+|[Aptos CLI Release v1.0.9](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-cli-v1.0.9)| `aptos-cli-v1.0.9` | `f7eae8b477e6fa9cf7dc036739755c3d82138136` |
 
 ## Aptos Node
 
 |Devnet Branch Commit | Docker Image Tag | Docker Image Digest | genesis.blob SHA-256 | Waypoint | Chain ID|
 |---|---|---|---|---|---|
-|`03fe083436c42a54f146852564b3cdf4568cdb52`| `devnet_03fe083436c42a54f146852564b3cdf4568cdb52` | `sha256:4ca5a5fb54d37b411898e9adf932e4ef60d52ad70318f156c2b5cd8fb3f2735c` | `sha256: f4959d166d72c65cadb1b411aac4c6217ca626331707f3d14659767d16a5e7f1`| `0:80fa4c5bd8898c93d13a90b8c9cf654518c76c156cce5d9e0a282b573019b7c3` | 47 |
+|`34a8450d17f4e6f7f0d61889edec7623e9a361ac`| `devnet_34a8450d17f4e6f7f0d61889edec7623e9a361ac` | `sha256:34221f1411bccc0a55eeaec1ac2098c9e1f402e0071705aeb0565a3b4e2ed2a7` | `sha256: 449f73bc2c6d6e581f97c1debc67883b1aacb022a2e3fede5af3a459c6a356c4`| `0:2f485c632e01f81a4ea23e5ed963335527c0d14e727e48ba188169df56987872` | 54 |

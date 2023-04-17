@@ -41,6 +41,7 @@ sources={{
 
 - To vote, you must stake, though you are not required to run a validator node. Your voting power is derived from the backing stake pool. 
 - Voting power is calculated based on the current epoch's active stake of the proposer or voter's backing stake pool. In addition, the stake pool's lockup must be at least as long as the proposal's duration.
+- Verify proposals before voting. Ensure each proposal is linked to its source code, and if there is a corresponding AIP, the AIP is in the title and description.
 
 :::tip
 Each stake pool can be used to vote on each proposal exactly only one time.

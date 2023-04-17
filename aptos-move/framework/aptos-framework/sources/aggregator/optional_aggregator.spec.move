@@ -84,9 +84,6 @@ spec aptos_framework::optional_aggregator {
         ensures is_parallelizable(old(optional_aggregator)) ==> !is_parallelizable(optional_aggregator);
         ensures !is_parallelizable(old(optional_aggregator)) ==> is_parallelizable(optional_aggregator);
         ensures optional_aggregator_value(optional_aggregator) == 0;
-        // ensures !is_parallelizable(optional_aggregator) ==> option::borrow(optional_aggregator.integer).value == 0;
-        // ensures is_parallelizable(optional_aggregator) ==> aggregator::spec_aggregator_get_val
-        //     (option::borrow(optional_aggregator.aggregator)) == 0;
     }
 
     /// The aggregator exists and the integer dosex not exist when Switches from parallelizable to non-parallelizable implementation.

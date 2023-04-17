@@ -17,10 +17,8 @@ Pedersen commitment <code>com</code> satisfies $v \in [0, 2^{num_bits})$. Curren
 -  [Function `verify_range_proof_elgamal`](#0x1_bulletproofs_verify_range_proof_elgamal)
 -  [Function `verify_range_proof`](#0x1_bulletproofs_verify_range_proof)
 -  [Function `verify_range_proof_internal`](#0x1_bulletproofs_verify_range_proof_internal)
--  [Function `verify_range_proof_custom_ck_internal`](#0x1_bulletproofs_verify_range_proof_custom_ck_internal)
 -  [Specification](#@Specification_1)
     -  [Function `verify_range_proof_internal`](#@Specification_1_verify_range_proof_internal)
-    -  [Function `verify_range_proof_custom_ck_internal`](#@Specification_1_verify_range_proof_custom_ck_internal)
 
 
 <pre><code><b>use</b> <a href="elgamal.md#0x1_elgamal">0x1::elgamal</a>;
@@ -217,6 +215,7 @@ for <code>num_bits</code> \in {8, 16, 32, 64}.
 
     <a href="bulletproofs.md#0x1_bulletproofs_verify_range_proof_internal">verify_range_proof_internal</a>(
         <a href="ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="pedersen.md#0x1_pedersen_commitment_as_compressed_point">pedersen::commitment_as_compressed_point</a>(com)),
+        &<a href="ristretto255.md#0x1_ristretto255_basepoint">ristretto255::basepoint</a>(), &<a href="ristretto255.md#0x1_ristretto255_hash_to_point_base">ristretto255::hash_to_point_base</a>(),
         proof.bytes,
         num_bits,
         dst
@@ -248,7 +247,7 @@ for <code>num_bits</code> \in {8, 16, 32, 64}.
 <pre><code><b>public</b> <b>fun</b> <a href="bulletproofs.md#0x1_bulletproofs_verify_range_proof_elgamal">verify_range_proof_elgamal</a>(ct: &<a href="elgamal.md#0x1_elgamal_Ciphertext">elgamal::Ciphertext</a>, proof: &<a href="bulletproofs.md#0x1_bulletproofs_RangeProof">RangeProof</a>, pubkey: &<a href="elgamal.md#0x1_elgamal_Pubkey">elgamal::Pubkey</a>, num_bits: u64, dst: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool {
     <b>assert</b>!(<a href="../../move-stdlib/doc/features.md#0x1_features_bulletproofs_enabled">features::bulletproofs_enabled</a>(), <a href="bulletproofs.md#0x1_bulletproofs_E_NATIVE_FUN_NOT_AVAILABLE">E_NATIVE_FUN_NOT_AVAILABLE</a>);
 
-    <a href="bulletproofs.md#0x1_bulletproofs_verify_range_proof_custom_ck_internal">verify_range_proof_custom_ck_internal</a>(
+    <a href="bulletproofs.md#0x1_bulletproofs_verify_range_proof_internal">verify_range_proof_internal</a>(
         <a href="ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="elgamal.md#0x1_elgamal_get_value_component_compressed">elgamal::get_value_component_compressed</a>(ct)),
 	    &<a href="ristretto255.md#0x1_ristretto255_basepoint">ristretto255::basepoint</a>(), &<a href="elgamal.md#0x1_elgamal_get_point_from_pubkey">elgamal::get_point_from_pubkey</a>(pubkey),
         proof.bytes,
@@ -270,7 +269,7 @@ Verifies a zero-knowledge range proof that the value <code>v</code> committed in
 for some randomness <code>r</code>) satisfies $v \in [0, 2^{num_bits})$. Only works for <code>num_bits</code> \in {8, 16, 32, 64}.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bulletproofs.md#0x1_bulletproofs_verify_range_proof">verify_range_proof</a>(com: &<a href="pedersen.md#0x1_pedersen_Commitment">pedersen::Commitment</a>, val_base: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, rand_base: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, proof: &<a href="bulletproofs.md#0x1_bulletproofs_RangeProof">bulletproofs::RangeProof</a>, num_bits: u64, dst: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool
+<pre><code><b>public</b> <b>fun</b> <a href="bulletproofs.md#0x1_bulletproofs_verify_range_proof">verify_range_proof</a>(com: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, val_base: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, rand_base: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, proof: &<a href="bulletproofs.md#0x1_bulletproofs_RangeProof">bulletproofs::RangeProof</a>, num_bits: u64, dst: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool
 </code></pre>
 
 
@@ -280,14 +279,14 @@ for some randomness <code>r</code>) satisfies $v \in [0, 2^{num_bits})$. Only wo
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="bulletproofs.md#0x1_bulletproofs_verify_range_proof">verify_range_proof</a>(
-    com: &<a href="pedersen.md#0x1_pedersen_Commitment">pedersen::Commitment</a>,
+    com: &RistrettoPoint,
     val_base: &RistrettoPoint, rand_base: &RistrettoPoint,
     proof: &<a href="bulletproofs.md#0x1_bulletproofs_RangeProof">RangeProof</a>, num_bits: u64, dst: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool
 {
     <b>assert</b>!(<a href="../../move-stdlib/doc/features.md#0x1_features_bulletproofs_enabled">features::bulletproofs_enabled</a>(), <a href="bulletproofs.md#0x1_bulletproofs_E_NATIVE_FUN_NOT_AVAILABLE">E_NATIVE_FUN_NOT_AVAILABLE</a>);
 
-    <a href="bulletproofs.md#0x1_bulletproofs_verify_range_proof_custom_ck_internal">verify_range_proof_custom_ck_internal</a>(
-        <a href="ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="pedersen.md#0x1_pedersen_commitment_as_compressed_point">pedersen::commitment_as_compressed_point</a>(com)),
+    <a href="bulletproofs.md#0x1_bulletproofs_verify_range_proof_internal">verify_range_proof_internal</a>(
+        <a href="ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(com)),
         val_base, rand_base,
         proof.bytes, num_bits, dst
     )
@@ -304,7 +303,7 @@ for some randomness <code>r</code>) satisfies $v \in [0, 2^{num_bits})$. Only wo
 
 
 
-<pre><code><b>fun</b> <a href="bulletproofs.md#0x1_bulletproofs_verify_range_proof_internal">verify_range_proof_internal</a>(com: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, proof: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, num_bits: u64, dst: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool
+<pre><code><b>fun</b> <a href="bulletproofs.md#0x1_bulletproofs_verify_range_proof_internal">verify_range_proof_internal</a>(com: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, val_base: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, rand_base: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, proof: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, num_bits: u64, dst: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool
 </code></pre>
 
 
@@ -314,32 +313,6 @@ for some randomness <code>r</code>) satisfies $v \in [0, 2^{num_bits})$. Only wo
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="bulletproofs.md#0x1_bulletproofs_verify_range_proof_internal">verify_range_proof_internal</a>(
-    com: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
-    proof: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
-    num_bits: u64,
-    dst: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool;
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_bulletproofs_verify_range_proof_custom_ck_internal"></a>
-
-## Function `verify_range_proof_custom_ck_internal`
-
-
-
-<pre><code><b>fun</b> <a href="bulletproofs.md#0x1_bulletproofs_verify_range_proof_custom_ck_internal">verify_range_proof_custom_ck_internal</a>(com: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, val_base: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, rand_base: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, proof: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, num_bits: u64, dst: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="bulletproofs.md#0x1_bulletproofs_verify_range_proof_custom_ck_internal">verify_range_proof_custom_ck_internal</a>(
     com: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     val_base: &RistrettoPoint,
     rand_base: &RistrettoPoint,
@@ -362,23 +335,7 @@ for some randomness <code>r</code>) satisfies $v \in [0, 2^{num_bits})$. Only wo
 ### Function `verify_range_proof_internal`
 
 
-<pre><code><b>fun</b> <a href="bulletproofs.md#0x1_bulletproofs_verify_range_proof_internal">verify_range_proof_internal</a>(com: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, proof: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, num_bits: u64, dst: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool
-</code></pre>
-
-
-
-
-<pre><code><b>pragma</b> opaque;
-</code></pre>
-
-
-
-<a name="@Specification_1_verify_range_proof_custom_ck_internal"></a>
-
-### Function `verify_range_proof_custom_ck_internal`
-
-
-<pre><code><b>fun</b> <a href="bulletproofs.md#0x1_bulletproofs_verify_range_proof_custom_ck_internal">verify_range_proof_custom_ck_internal</a>(com: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, val_base: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, rand_base: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, proof: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, num_bits: u64, dst: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool
+<pre><code><b>fun</b> <a href="bulletproofs.md#0x1_bulletproofs_verify_range_proof_internal">verify_range_proof_internal</a>(com: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, val_base: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, rand_base: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, proof: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, num_bits: u64, dst: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool
 </code></pre>
 
 

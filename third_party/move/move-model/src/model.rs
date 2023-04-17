@@ -65,7 +65,7 @@ use num::{BigUint, One, ToPrimitive};
 use serde::{Deserialize, Serialize};
 use std::{
     any::{Any, TypeId},
-    cell::RefCell,
+    cell::{Ref, RefCell, RefMut},
     collections::{BTreeMap, BTreeSet, VecDeque},
     ffi::OsStr,
     fmt::{self, Formatter},
@@ -1184,6 +1184,7 @@ impl GlobalEnv {
         arg_names: Vec<Symbol>,
         type_arg_names: Vec<Symbol>,
         spec: Spec,
+        def: Option<Exp>,
     ) -> FunctionData {
         let handle_idx = module.function_def_at(def_idx).function;
         FunctionData {
@@ -1194,7 +1195,8 @@ impl GlobalEnv {
             handle_idx,
             arg_names,
             type_arg_names,
-            spec,
+            spec: spec.into(),
+            def,
             called_funs: Default::default(),
             calling_funs: Default::default(),
             transitive_closure_of_called_funs: Default::default(),
@@ -1668,7 +1670,7 @@ impl GlobalEnv {
             .unwrap_or_else(|_| {
                 panic!("Expect one and only one function for {:?}", fid);
             });
-        func_data.spec = spec;
+        func_data.spec = spec.into();
     }
 
     /// Override the specification for a given code location
@@ -1692,7 +1694,11 @@ impl GlobalEnv {
             .unwrap_or_else(|_| {
                 panic!("Expect one and only one function for {:?}", fid);
             });
-        func_data.spec.on_impl.insert(code_offset, spec);
+        func_data
+            .spec
+            .borrow_mut()
+            .on_impl
+            .insert(code_offset, spec);
     }
 
     /// Produce a TypeDisplayContext to print types within the scope of this env
@@ -1934,7 +1940,7 @@ impl<'env> ModuleEnv<'env> {
                 add_usage_of_spec(&mut usage, struct_env.get_spec())
             }
             for func_env in self.get_functions() {
-                add_usage_of_spec(&mut usage, func_env.get_spec())
+                add_usage_of_spec(&mut usage, &func_env.get_spec())
             }
             for (_, decl) in self.get_spec_funs() {
                 if let Some(def) = &decl.body {
@@ -2981,7 +2987,11 @@ pub struct FunctionData {
     type_arg_names: Vec<Symbol>,
 
     /// Specification associated with this function.
-    spec: Spec,
+    spec: RefCell<Spec>,
+
+    /// Optional definition associated with this function. The definition is available if
+    /// the model is build with option `ModelBuilderOptions::compile_via_model`.
+    def: Option<Exp>,
 
     /// A cache for the called functions.
     called_funs: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
@@ -3007,7 +3017,8 @@ impl FunctionData {
             handle_idx,
             arg_names: vec![],
             type_arg_names: vec![],
-            spec: Spec::default(),
+            spec: Spec::default().into(),
+            def: None,
             called_funs: Default::default(),
             calling_funs: Default::default(),
             transitive_closure_of_called_funs: Default::default(),
@@ -3088,7 +3099,7 @@ impl<'env> FunctionEnv<'env> {
     /// Returns the location of the specification block of this function. If the function has
     /// none, returns that of the function itself.
     pub fn get_spec_loc(&self) -> Loc {
-        if let Some(loc) = &self.data.spec.loc {
+        if let Some(loc) = &self.data.spec.borrow().loc {
             loc.clone()
         } else {
             self.get_loc()
@@ -3515,8 +3526,19 @@ impl<'env> FunctionEnv<'env> {
     }
 
     /// Returns associated specification.
-    pub fn get_spec(&'env self) -> &'env Spec {
-        &self.data.spec
+    pub fn get_spec(&'env self) -> Ref<Spec> {
+        self.data.spec.borrow()
+    }
+
+    /// Returns associated mutable reference to specification.
+    pub fn get_mut_spec(&'env self) -> RefMut<Spec> {
+        self.data.spec.borrow_mut()
+    }
+
+    /// Returns associated definition. The definition of the function, in Exp form, is available
+    /// if the model is build with `ModelBuilderOptions::compile_via_model`
+    pub fn get_def(&self) -> &Option<Exp> {
+        &self.data.def
     }
 
     /// Returns the acquired global resource types.
@@ -3537,7 +3559,8 @@ impl<'env> FunctionEnv<'env> {
     /// resource indices (list of types and address).
     pub fn get_modify_targets(&self) -> BTreeMap<QualifiedId<StructId>, Vec<Exp>> {
         // Compute the modify targets from `modifies` conditions.
-        let modify_conditions = self.get_spec().filter_kind(ConditionKind::Modifies);
+        let spec = &self.get_spec();
+        let modify_conditions = spec.filter_kind(ConditionKind::Modifies);
         let mut modify_targets: BTreeMap<QualifiedId<StructId>, Vec<Exp>> = BTreeMap::new();
         for cond in modify_conditions {
             cond.all_exps().for_each(|target| {

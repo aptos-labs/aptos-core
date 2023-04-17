@@ -50,10 +50,12 @@ In the future, we might support additional features:
 -  [Function `point_identity_compressed`](#0x1_ristretto255_point_identity_compressed)
 -  [Function `point_identity`](#0x1_ristretto255_point_identity)
 -  [Function `basepoint_compressed`](#0x1_ristretto255_basepoint_compressed)
+-  [Function `hash_to_point_base`](#0x1_ristretto255_hash_to_point_base)
 -  [Function `basepoint`](#0x1_ristretto255_basepoint)
 -  [Function `basepoint_mul`](#0x1_ristretto255_basepoint_mul)
 -  [Function `new_compressed_point_from_bytes`](#0x1_ristretto255_new_compressed_point_from_bytes)
 -  [Function `new_point_from_bytes`](#0x1_ristretto255_new_point_from_bytes)
+-  [Function `compressed_point_to_bytes`](#0x1_ristretto255_compressed_point_to_bytes)
 -  [Function `new_point_from_sha512`](#0x1_ristretto255_new_point_from_sha512)
 -  [Function `new_point_from_sha2_512`](#0x1_ristretto255_new_point_from_sha2_512)
 -  [Function `new_point_from_64_uniform_bytes`](#0x1_ristretto255_new_point_from_64_uniform_bytes)
@@ -603,6 +605,32 @@ Returns the basepoint (generator) of the Ristretto255 group as a compressed poin
 
 </details>
 
+<a name="0x1_ristretto255_hash_to_point_base"></a>
+
+## Function `hash_to_point_base`
+
+Returns the hash-to-point result of serializing the basepoint of the Ristretto255 group.
+For use as the random value basepoint in Pedersen commitments
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_hash_to_point_base">hash_to_point_base</a>(): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_hash_to_point_base">hash_to_point_base</a>(): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
+    <a href="ristretto255.md#0x1_ristretto255_new_point_from_sha2_512">new_point_from_sha2_512</a>(<a href="ristretto255.md#0x1_ristretto255_basepoint_compressed">basepoint_compressed</a>().data)
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_ristretto255_basepoint"></a>
 
 ## Function `basepoint`
@@ -716,6 +744,31 @@ returns None.
     } <b>else</b> {
         std::option::none&lt;<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>&gt;()
     }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_ristretto255_compressed_point_to_bytes"></a>
+
+## Function `compressed_point_to_bytes`
+
+Given a compressed ristretto point <code>point</code>, returns the byte representation of that point
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_compressed_point_to_bytes">compressed_point_to_bytes</a>(point: <a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_compressed_point_to_bytes">compressed_point_to_bytes</a>(point: <a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">CompressedRistretto</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    point.data
 }
 </code></pre>
 

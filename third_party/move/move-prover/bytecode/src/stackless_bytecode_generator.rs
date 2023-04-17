@@ -30,6 +30,7 @@ use move_model::{
 };
 use num::{BigUint, ToPrimitive};
 use std::{
+    borrow::BorrowMut,
     collections::{BTreeMap, BTreeSet},
     convert::TryInto,
     matches,
@@ -177,7 +178,10 @@ impl<'a> StacklessBytecodeGenerator<'a> {
         }
 
         // Handle spec block if defined at this code offset.
-        if let Some(spec) = self.func_env.get_spec().on_impl.get(&code_offset) {
+        let mut binding = self.func_env.get_mut_spec();
+        let fun_spec = binding.borrow_mut();
+        if let Some(spec) = fun_spec.on_impl.get_mut(&code_offset) {
+            let mut temp_update_map = BTreeMap::new();
             for cond in &spec.conditions {
                 let attr_id = self.new_loc_attr_from_loc(cond.loc.clone());
                 let kind = match cond.kind {
@@ -216,7 +220,10 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                         }
                     },
                     // Updating global spec variables are translated to Assume, which will be replaced when instrumenting the spec
-                    ConditionKind::Update => PropKind::Assume,
+                    ConditionKind::Update => {
+                        temp_update_map.insert(cond.exp.node_id(), cond.clone());
+                        PropKind::Assume
+                    },
                     _ => {
                         panic!("unsupported spec condition in code")
                     },
@@ -224,6 +231,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                 self.code
                     .push(Bytecode::Prop(attr_id, kind, cond.exp.clone()));
             }
+            fun_spec.update_map.append(&mut temp_update_map);
 
             // If the current instruction is just a Nop, skip it. It has been generated to support
             // spec blocks.

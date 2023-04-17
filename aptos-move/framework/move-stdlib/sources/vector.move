@@ -84,6 +84,9 @@ module std::vector {
             right = right - 1;
         }
     }
+    spec reverse_slice {
+        pragma intrinsic = true;
+    }
 
     /// Pushes all of the elements of the `other` vector into the `lhs` vector.
     public fun append<Element>(lhs: &mut vector<Element>, other: vector<Element>) {
@@ -106,12 +109,18 @@ module std::vector {
         };
         destroy_empty(other);
     }
+    spec reverse_append {
+        pragma intrinsic = true;
+    }
 
     /// Trim a vector to a smaller size, returning the evicted elements in order
     public fun trim<Element>(v: &mut vector<Element>, new_len: u64): vector<Element> {
         let res = trim_reverse(v, new_len);
         reverse(&mut res);
         res
+    }
+    spec trim {
+        pragma intrinsic = true;
     }
 
     /// Trim a vector to a smaller size, returning the evicted elements in reverse order
@@ -124,6 +133,9 @@ module std::vector {
             len = len - 1;
         };
         result
+    }
+    spec trim_reverse {
+        pragma intrinsic = true;
     }
 
 
@@ -171,6 +183,9 @@ module std::vector {
             swap(v, i, len);
             i = i + 1;
         };
+    }
+    spec insert {
+        pragma intrinsic = true;
     }
 
     /// Remove the `i`th element of the vector `v`, shifting all subsequent elements.
@@ -329,6 +344,9 @@ module std::vector {
         let len = length(v);
         rotate_slice(v, 0, rot, len)
     }
+    spec rotate {
+        pragma intrinsic = true;
+    }
 
     /// Same as above but on a sub-slice of an array [left, right) with left <= rot <= right
     /// returns the
@@ -342,6 +360,9 @@ module std::vector {
         reverse_slice(v, rot, right);
         reverse_slice(v, left, right);
         left + (right - rot)
+    }
+    spec rotate_slice {
+        pragma intrinsic = true;
     }
 
     /// Partition the array based on a predicate p, this routine is stable and thus

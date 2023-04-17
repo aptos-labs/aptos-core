@@ -26,6 +26,9 @@ class AccountInfo:
     account_address: str
 
 
+# This is an account that use for testing, for example to create it with the init
+# account, send funds to it, etc. This is not the account created by the `aptos init`
+# test. To get details about that account use get_account_info on the RunHelper.
 OTHER_ACCOUNT_ONE = AccountInfo(
     private_key="0x37368b46ce665362562c6d1d4ec01a08c8644c488690df5a17e13ba163e20221",
     public_key="0x25caf00522e4d4664ec0a27166a69e8a32b5078959d0fc398da70d40d2893e8f",
@@ -35,13 +38,6 @@ OTHER_ACCOUNT_ONE = AccountInfo(
 
 def build_image_name(image_repo_with_project: str, tag: str):
     return f"{image_repo_with_project}/tools:{tag}"
-
-
-def recursive_chmod(path, perms):
-    for dirpath, _, filenames in os.walk(path):
-        os.chmod(dirpath, perms)
-        for filename in filenames:
-            os.chmod(os.path.join(dirpath, filename), perms)
 
 
 # Exception to use when a test fails, for the CLI did something unexpected, an

@@ -57,7 +57,7 @@ env:
 
 jobs:
   rust-all:
-    runs-on: high-perf-docker
+    runs-on: experimental-docker 
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
         with:
@@ -74,7 +74,7 @@ jobs:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
       - name: Build and Push Rust images
-        run: docker/docker-bake-rust-all.sh
+        run: docker/experimental/docker-bake-rust-all.sh
         env:
           PROFILE: ${{ env.PROFILE }}
           FEATURES: ${{ env.FEATURES }}

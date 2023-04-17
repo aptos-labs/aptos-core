@@ -14,9 +14,12 @@ Note we place the value v in the exponent of g so that ciphertexts are additivel
 -  [Struct `Pubkey`](#0x1_elgamal_Pubkey)
 -  [Constants](#@Constants_0)
 -  [Function `get_point_from_pubkey`](#0x1_elgamal_get_point_from_pubkey)
+-  [Function `get_pubkey_from_scalar`](#0x1_elgamal_get_pubkey_from_scalar)
 -  [Function `get_compressed_point_from_pubkey`](#0x1_elgamal_get_compressed_point_from_pubkey)
 -  [Function `new_pubkey_from_bytes`](#0x1_elgamal_new_pubkey_from_bytes)
+-  [Function `pubkey_to_bytes`](#0x1_elgamal_pubkey_to_bytes)
 -  [Function `new_ciphertext_from_bytes`](#0x1_elgamal_new_ciphertext_from_bytes)
+-  [Function `ciphertext_to_bytes`](#0x1_elgamal_ciphertext_to_bytes)
 -  [Function `new_ciphertext_from_points`](#0x1_elgamal_new_ciphertext_from_points)
 -  [Function `new_ciphertext_from_compressed`](#0x1_elgamal_new_ciphertext_from_compressed)
 -  [Function `new_ciphertext_no_randomness`](#0x1_elgamal_new_ciphertext_no_randomness)
@@ -160,7 +163,7 @@ The wrong number of bytes was passed in for deserialization
 
 ## Function `get_point_from_pubkey`
 
-Given a public key, returns the underlying RistrettoPoint representing that key
+Given a public key <code>pubkey</code>, returns the underlying RistrettoPoint representing that key
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="elgamal.md#0x1_elgamal_get_point_from_pubkey">get_point_from_pubkey</a>(pubkey: &<a href="elgamal.md#0x1_elgamal_Pubkey">elgamal::Pubkey</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
@@ -174,6 +177,35 @@ Given a public key, returns the underlying RistrettoPoint representing that key
 
 <pre><code><b>public</b> <b>fun</b> <a href="elgamal.md#0x1_elgamal_get_point_from_pubkey">get_point_from_pubkey</a>(pubkey: &<a href="elgamal.md#0x1_elgamal_Pubkey">Pubkey</a>): RistrettoPoint {
 	<a href="ristretto255.md#0x1_ristretto255_point_decompress">ristretto255::point_decompress</a>(&pubkey.point)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_elgamal_get_pubkey_from_scalar"></a>
+
+## Function `get_pubkey_from_scalar`
+
+Given a ristretto255 <code>scalar</code>, returns as an ElGamal public key the ristretto255 basepoint multiplied
+by <code>scalar</code>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="elgamal.md#0x1_elgamal_get_pubkey_from_scalar">get_pubkey_from_scalar</a>(scalar: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="elgamal.md#0x1_elgamal_Pubkey">elgamal::Pubkey</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="elgamal.md#0x1_elgamal_get_pubkey_from_scalar">get_pubkey_from_scalar</a>(scalar: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="elgamal.md#0x1_elgamal_Pubkey">Pubkey</a> {
+    <b>let</b> point = <a href="ristretto255.md#0x1_ristretto255_basepoint_mul">ristretto255::basepoint_mul</a>(scalar);
+    <a href="elgamal.md#0x1_elgamal_Pubkey">Pubkey</a> {
+        point: point_compress(&point)
+    }
 }
 </code></pre>
 
@@ -240,6 +272,31 @@ Creates a new public key from a serialized RistrettoPoint
 
 </details>
 
+<a name="0x1_elgamal_pubkey_to_bytes"></a>
+
+## Function `pubkey_to_bytes`
+
+Given an ElGamal public key <code>pubkey</code>, returns the byte representation of that public key
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="elgamal.md#0x1_elgamal_pubkey_to_bytes">pubkey_to_bytes</a>(pubkey: &<a href="elgamal.md#0x1_elgamal_Pubkey">elgamal::Pubkey</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="elgamal.md#0x1_elgamal_pubkey_to_bytes">pubkey_to_bytes</a>(pubkey: &<a href="elgamal.md#0x1_elgamal_Pubkey">Pubkey</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    <a href="ristretto255.md#0x1_ristretto255_compressed_point_to_bytes">ristretto255::compressed_point_to_bytes</a>(pubkey.point)
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_elgamal_new_ciphertext_from_bytes"></a>
 
 ## Function `new_ciphertext_from_bytes`
@@ -266,6 +323,36 @@ Creates a new ciphertext from two serialized Ristretto points
 	} <b>else</b> {
 		std::option::none&lt;<a href="elgamal.md#0x1_elgamal_Ciphertext">Ciphertext</a>&gt;()
 	}
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_elgamal_ciphertext_to_bytes"></a>
+
+## Function `ciphertext_to_bytes`
+
+Given a ciphertext <code>ct</code>, returns that ciphertext in serialzied byte form
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="elgamal.md#0x1_elgamal_ciphertext_to_bytes">ciphertext_to_bytes</a>(ct: &<a href="elgamal.md#0x1_elgamal_Ciphertext">elgamal::Ciphertext</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="elgamal.md#0x1_elgamal_ciphertext_to_bytes">ciphertext_to_bytes</a>(ct: &<a href="elgamal.md#0x1_elgamal_Ciphertext">Ciphertext</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    <b>let</b> bytes_left = <a href="ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(&ct.left));
+    <b>let</b> bytes_right = <a href="ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(&ct.right));
+    <b>let</b> bytes = <a href="../../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u8&gt;();
+    <a href="../../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>&lt;u8&gt;(&<b>mut</b> bytes, bytes_left);
+    <a href="../../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>&lt;u8&gt;(&<b>mut</b> bytes, bytes_right);
+    bytes
 }
 </code></pre>
 

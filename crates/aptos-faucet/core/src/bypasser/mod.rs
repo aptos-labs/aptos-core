@@ -7,7 +7,7 @@ mod ip_allowlist;
 use self::{auth_token::AuthTokenBypasser, ip_allowlist::IpAllowlistBypasser};
 use crate::{
     checkers::CheckerData,
-    common::{AuthTokenManagerConfig, IpRangeManagerConfig},
+    common::{IpRangeManagerConfig, ListManagerConfig},
 };
 use anyhow::Result;
 use async_trait::async_trait;
@@ -29,7 +29,7 @@ pub trait BypasserTrait: Sync + Send + 'static {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(tag = "type")]
 pub enum BypasserConfig {
-    AuthToken(AuthTokenManagerConfig),
+    AuthToken(ListManagerConfig),
     IpAllowlist(IpRangeManagerConfig),
 }
 

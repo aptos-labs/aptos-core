@@ -9,6 +9,8 @@ a 64-bit fractional part.
 
 -  [Struct `FixedPoint64`](#0x1_fixed_point64_FixedPoint64)
 -  [Constants](#@Constants_0)
+-  [Function `sub`](#0x1_fixed_point64_sub)
+-  [Function `add`](#0x1_fixed_point64_add)
 -  [Function `multiply_u128`](#0x1_fixed_point64_multiply_u128)
 -  [Function `divide_u128`](#0x1_fixed_point64_divide_u128)
 -  [Function `create_from_rational`](#0x1_fixed_point64_create_from_rational)
@@ -17,17 +19,31 @@ a 64-bit fractional part.
 -  [Function `is_zero`](#0x1_fixed_point64_is_zero)
 -  [Function `min`](#0x1_fixed_point64_min)
 -  [Function `max`](#0x1_fixed_point64_max)
+-  [Function `less_or_equal`](#0x1_fixed_point64_less_or_equal)
+-  [Function `less`](#0x1_fixed_point64_less)
+-  [Function `greater_or_equal`](#0x1_fixed_point64_greater_or_equal)
+-  [Function `greater`](#0x1_fixed_point64_greater)
+-  [Function `equal`](#0x1_fixed_point64_equal)
+-  [Function `almost_equal`](#0x1_fixed_point64_almost_equal)
 -  [Function `create_from_u128`](#0x1_fixed_point64_create_from_u128)
 -  [Function `floor`](#0x1_fixed_point64_floor)
 -  [Function `ceil`](#0x1_fixed_point64_ceil)
 -  [Function `round`](#0x1_fixed_point64_round)
 -  [Specification](#@Specification_1)
+    -  [Function `sub`](#@Specification_1_sub)
+    -  [Function `add`](#@Specification_1_add)
     -  [Function `multiply_u128`](#@Specification_1_multiply_u128)
     -  [Function `divide_u128`](#@Specification_1_divide_u128)
     -  [Function `create_from_rational`](#@Specification_1_create_from_rational)
     -  [Function `create_from_raw_value`](#@Specification_1_create_from_raw_value)
     -  [Function `min`](#@Specification_1_min)
     -  [Function `max`](#@Specification_1_max)
+    -  [Function `less_or_equal`](#@Specification_1_less_or_equal)
+    -  [Function `less`](#@Specification_1_less)
+    -  [Function `greater_or_equal`](#@Specification_1_greater_or_equal)
+    -  [Function `greater`](#@Specification_1_greater)
+    -  [Function `equal`](#@Specification_1_equal)
+    -  [Function `almost_equal`](#@Specification_1_almost_equal)
     -  [Function `create_from_u128`](#@Specification_1_create_from_u128)
     -  [Function `floor`](#@Specification_1_floor)
     -  [Function `ceil`](#@Specification_1_ceil)
@@ -128,6 +144,16 @@ The multiplied value would be too large to be held in a <code>u128</code>
 
 
 
+<a name="0x1_fixed_point64_ENEGATIVE_RESULT"></a>
+
+Abort code on calculation result is negative.
+
+
+<pre><code><b>const</b> <a href="fixed_point64.md#0x1_fixed_point64_ENEGATIVE_RESULT">ENEGATIVE_RESULT</a>: u64 = 65542;
+</code></pre>
+
+
+
 <a name="0x1_fixed_point64_ERATIO_OUT_OF_RANGE"></a>
 
 The computed ratio when converting to a <code><a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a></code> would be unrepresentable
@@ -137,6 +163,63 @@ The computed ratio when converting to a <code><a href="fixed_point64.md#0x1_fixe
 </code></pre>
 
 
+
+<a name="0x1_fixed_point64_sub"></a>
+
+## Function `sub`
+
+Returns x - y. x must be not less than y.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_sub">sub</a>(x: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, y: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>): <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_sub">sub</a>(x: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>, y: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>): <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a> {
+    <b>let</b> x_raw = <a href="fixed_point64.md#0x1_fixed_point64_get_raw_value">get_raw_value</a>(x);
+    <b>let</b> y_raw = <a href="fixed_point64.md#0x1_fixed_point64_get_raw_value">get_raw_value</a>(y);
+    <b>assert</b>!(x_raw &gt;= y_raw, <a href="fixed_point64.md#0x1_fixed_point64_ENEGATIVE_RESULT">ENEGATIVE_RESULT</a>);
+    <a href="fixed_point64.md#0x1_fixed_point64_create_from_raw_value">create_from_raw_value</a>(x_raw - y_raw)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_fixed_point64_add"></a>
+
+## Function `add`
+
+Returns x + y. The result cannot be greater than MAX_U128.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_add">add</a>(x: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, y: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>): <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_add">add</a>(x: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>, y: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>): <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a> {
+    <b>let</b> x_raw = <a href="fixed_point64.md#0x1_fixed_point64_get_raw_value">get_raw_value</a>(x);
+    <b>let</b> y_raw = <a href="fixed_point64.md#0x1_fixed_point64_get_raw_value">get_raw_value</a>(y);
+    <b>let</b> result = (x_raw <b>as</b> u256) + (y_raw <b>as</b> u256);
+    <b>assert</b>!(result &lt;= <a href="fixed_point64.md#0x1_fixed_point64_MAX_U128">MAX_U128</a>, <a href="fixed_point64.md#0x1_fixed_point64_ERATIO_OUT_OF_RANGE">ERATIO_OUT_OF_RANGE</a>);
+    <a href="fixed_point64.md#0x1_fixed_point64_create_from_raw_value">create_from_raw_value</a>((result <b>as</b> u128))
+}
+</code></pre>
+
+
+
+</details>
 
 <a name="0x1_fixed_point64_multiply_u128"></a>
 
@@ -390,6 +473,160 @@ Returns the larger of the two FixedPoint64 numbers.
 
 </details>
 
+<a name="0x1_fixed_point64_less_or_equal"></a>
+
+## Function `less_or_equal`
+
+Returns true if num1 <= num2
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_less_or_equal">less_or_equal</a>(num1: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, num2: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_less_or_equal">less_or_equal</a>(num1: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>, num2: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>): bool {
+    num1.value &lt;= num2.value
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_fixed_point64_less"></a>
+
+## Function `less`
+
+Returns true if num1 < num2
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_less">less</a>(num1: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, num2: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_less">less</a>(num1: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>, num2: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>): bool {
+    num1.value &lt; num2.value
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_fixed_point64_greater_or_equal"></a>
+
+## Function `greater_or_equal`
+
+Returns true if num1 >= num2
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_greater_or_equal">greater_or_equal</a>(num1: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, num2: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_greater_or_equal">greater_or_equal</a>(num1: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>, num2: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>): bool {
+    num1.value &gt;= num2.value
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_fixed_point64_greater"></a>
+
+## Function `greater`
+
+Returns true if num1 > num2
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_greater">greater</a>(num1: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, num2: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_greater">greater</a>(num1: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>, num2: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>): bool {
+    num1.value &gt; num2.value
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_fixed_point64_equal"></a>
+
+## Function `equal`
+
+Returns true if num1 = num2
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_equal">equal</a>(num1: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, num2: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_equal">equal</a>(num1: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>, num2: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>): bool {
+    num1.value == num2.value
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_fixed_point64_almost_equal"></a>
+
+## Function `almost_equal`
+
+Returns true if num1 almost equals to num2, which means abs(num1-num2) <= precision
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_almost_equal">almost_equal</a>(num1: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, num2: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, precision: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_almost_equal">almost_equal</a>(num1: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>, num2: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>, precision: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>): bool {
+    <b>if</b> (num1.value &gt; num2.value) {
+        (num1.value - num2.value &lt;= precision.value)
+    } <b>else</b> {
+        (num2.value - num1.value &lt;= precision.value)
+    }
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_fixed_point64_create_from_u128"></a>
 
 ## Function `create_from_u128`
@@ -511,6 +748,42 @@ Returns the value of a FixedPoint64 to the nearest integer.
 
 
 <pre><code><b>pragma</b> aborts_if_is_strict;
+</code></pre>
+
+
+
+<a name="@Specification_1_sub"></a>
+
+### Function `sub`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_sub">sub</a>(x: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, y: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>): <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> x.value &lt; y.value <b>with</b> <a href="fixed_point64.md#0x1_fixed_point64_ENEGATIVE_RESULT">ENEGATIVE_RESULT</a>;
+<b>ensures</b> result.value == x.value - y.value;
+</code></pre>
+
+
+
+<a name="@Specification_1_add"></a>
+
+### Function `add`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_add">add</a>(x: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, y: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>): <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> (x.value <b>as</b> u256) + (y.value <b>as</b> u256) &gt; <a href="fixed_point64.md#0x1_fixed_point64_MAX_U128">MAX_U128</a> <b>with</b> <a href="fixed_point64.md#0x1_fixed_point64_ERATIO_OUT_OF_RANGE">ERATIO_OUT_OF_RANGE</a>;
+<b>ensures</b> result.value == x.value + y.value;
 </code></pre>
 
 
@@ -726,6 +999,184 @@ Returns the value of a FixedPoint64 to the nearest integer.
        num1
    } <b>else</b> {
        num2
+   }
+}
+</code></pre>
+
+
+
+<a name="@Specification_1_less_or_equal"></a>
+
+### Function `less_or_equal`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_less_or_equal">less_or_equal</a>(num1: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, num2: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == <a href="fixed_point64.md#0x1_fixed_point64_spec_less_or_equal">spec_less_or_equal</a>(num1, num2);
+</code></pre>
+
+
+
+
+<a name="0x1_fixed_point64_spec_less_or_equal"></a>
+
+
+<pre><code><b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_spec_less_or_equal">spec_less_or_equal</a>(num1: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>, num2: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>): bool {
+   num1.value &lt;= num2.value
+}
+</code></pre>
+
+
+
+<a name="@Specification_1_less"></a>
+
+### Function `less`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_less">less</a>(num1: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, num2: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == <a href="fixed_point64.md#0x1_fixed_point64_spec_less">spec_less</a>(num1, num2);
+</code></pre>
+
+
+
+
+<a name="0x1_fixed_point64_spec_less"></a>
+
+
+<pre><code><b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_spec_less">spec_less</a>(num1: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>, num2: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>): bool {
+   num1.value &lt; num2.value
+}
+</code></pre>
+
+
+
+<a name="@Specification_1_greater_or_equal"></a>
+
+### Function `greater_or_equal`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_greater_or_equal">greater_or_equal</a>(num1: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, num2: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == <a href="fixed_point64.md#0x1_fixed_point64_spec_greater_or_equal">spec_greater_or_equal</a>(num1, num2);
+</code></pre>
+
+
+
+
+<a name="0x1_fixed_point64_spec_greater_or_equal"></a>
+
+
+<pre><code><b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_spec_greater_or_equal">spec_greater_or_equal</a>(num1: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>, num2: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>): bool {
+   num1.value &gt;= num2.value
+}
+</code></pre>
+
+
+
+<a name="@Specification_1_greater"></a>
+
+### Function `greater`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_greater">greater</a>(num1: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, num2: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == <a href="fixed_point64.md#0x1_fixed_point64_spec_greater">spec_greater</a>(num1, num2);
+</code></pre>
+
+
+
+
+<a name="0x1_fixed_point64_spec_greater"></a>
+
+
+<pre><code><b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_spec_greater">spec_greater</a>(num1: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>, num2: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>): bool {
+   num1.value &gt; num2.value
+}
+</code></pre>
+
+
+
+<a name="@Specification_1_equal"></a>
+
+### Function `equal`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_equal">equal</a>(num1: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, num2: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == <a href="fixed_point64.md#0x1_fixed_point64_spec_equal">spec_equal</a>(num1, num2);
+</code></pre>
+
+
+
+
+<a name="0x1_fixed_point64_spec_equal"></a>
+
+
+<pre><code><b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_spec_equal">spec_equal</a>(num1: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>, num2: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>): bool {
+   num1.value == num2.value
+}
+</code></pre>
+
+
+
+<a name="@Specification_1_almost_equal"></a>
+
+### Function `almost_equal`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_almost_equal">almost_equal</a>(num1: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, num2: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, precision: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == <a href="fixed_point64.md#0x1_fixed_point64_spec_almost_equal">spec_almost_equal</a>(num1, num2, precision);
+</code></pre>
+
+
+
+
+<a name="0x1_fixed_point64_spec_almost_equal"></a>
+
+
+<pre><code><b>fun</b> <a href="fixed_point64.md#0x1_fixed_point64_spec_almost_equal">spec_almost_equal</a>(num1: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>, num2: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>, precision: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a>): bool {
+   <b>if</b> (num1.value &gt; num2.value) {
+       (num1.value - num2.value &lt;= precision.value)
+   } <b>else</b> {
+       (num2.value - num1.value &lt;= precision.value)
    }
 }
 </code></pre>
