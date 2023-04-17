@@ -81,9 +81,9 @@ def install_dependency(dependency: str) -> None:
     answer = os.getenv("FORGE_INSTALL_DEPENDENCIES") or os.getenv("CI")
     if get_prompt_answer("Would you like to install it now?", answer):
         shell = LocalShell()
-        shell.run(["pip3", "install", dependency], stream_output=True).unwrap()
+        shell.run(["poetry", "install", dependency], stream_output=True).unwrap()
     else:
-        log.fatal(f"Please install click (pip install {dependency}) and try again")
+        log.fatal(f"Please install click (poetry install {dependency}) and try again")
 
 
 try:
