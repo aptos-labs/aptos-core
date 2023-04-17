@@ -28,7 +28,7 @@ use aptos_types::{network_address::NetworkAddress, PeerId};
 use maplit::hashmap;
 use rand::{rngs::OsRng, Rng};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     future::Future,
     sync::Arc,
     time::{Duration, Instant},
@@ -109,7 +109,7 @@ pub fn create_network_info_response(
 
 /// Creates a node info response with the given data
 pub fn create_node_info_response(
-    git_hash: String,
+    build_information: BTreeMap<String, String>,
     highest_synced_epoch: u64,
     highest_synced_version: u64,
     ledger_timestamp_usecs: u64,
@@ -117,7 +117,7 @@ pub fn create_node_info_response(
     uptime: Duration,
 ) -> NodeInformationResponse {
     NodeInformationResponse {
-        git_hash,
+        build_information,
         highest_synced_epoch,
         highest_synced_version,
         ledger_timestamp_usecs,
@@ -298,7 +298,7 @@ pub fn create_random_network_info_response() -> NetworkInformationResponse {
 /// Creates a new network info response with random values
 pub fn create_random_node_info_response() -> NodeInformationResponse {
     // Create the random values
-    let git_hash = aptos_build_info::get_git_hash();
+    let build_information = aptos_build_info::get_build_information();
     let highest_synced_epoch = get_random_u64();
     let highest_synced_version = get_random_u64();
     let ledger_timestamp_usecs = get_random_u64();
@@ -307,7 +307,7 @@ pub fn create_random_node_info_response() -> NodeInformationResponse {
 
     // Create and return the node info response
     create_node_info_response(
-        git_hash,
+        build_information,
         highest_synced_epoch,
         highest_synced_version,
         ledger_timestamp_usecs,

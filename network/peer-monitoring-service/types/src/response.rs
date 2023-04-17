@@ -4,7 +4,10 @@
 use aptos_config::{config::PeerRole, network_id::PeerNetworkId};
 use aptos_types::{network_address::NetworkAddress, PeerId};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, time::Duration};
+use std::{
+    collections::{BTreeMap, HashMap},
+    time::Duration,
+};
 use thiserror::Error;
 
 /// A peer monitoring service response
@@ -69,12 +72,12 @@ pub struct ServerProtocolVersionResponse {
 /// A response for the node information request
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct NodeInformationResponse {
-    pub git_hash: String, // The git hash of the build the peer is running on
-    pub highest_synced_epoch: u64, // The highest synced epoch of the node
-    pub highest_synced_version: u64, // The highest synced version of the node
+    pub build_information: BTreeMap<String, String>, // The build information of the node
+    pub highest_synced_epoch: u64,                   // The highest synced epoch of the node
+    pub highest_synced_version: u64,                 // The highest synced version of the node
     pub ledger_timestamp_usecs: u64, // The latest timestamp of the blockchain (in microseconds)
     pub lowest_available_version: u64, // The lowest stored version of the node (in storage)
-    pub uptime: Duration, // The amount of time the peer has been running
+    pub uptime: Duration,            // The amount of time the peer has been running
 }
 
 #[derive(Clone, Debug, Error)]
