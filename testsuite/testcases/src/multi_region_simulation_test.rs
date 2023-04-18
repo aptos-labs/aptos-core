@@ -60,7 +60,7 @@ fn create_multi_region_swarm_network_chaos(
 
     let validator_chunks = all_validators.chunks_exact(approx_validators_per_region);
 
-    let (mut group_network_delays, mut group_network_bandwidths): (
+    let (mut group_network_delays, group_network_bandwidths): (
         Vec<GroupNetworkDelay>,
         Vec<GroupNetworkBandwidth>,
     ) = validator_chunks
@@ -84,8 +84,8 @@ fn create_multi_region_swarm_network_chaos(
 
             let bandwidth = GroupNetworkBandwidth {
                 name: format!("{}-to-{}-bandwidth", from_region, to_region),
-                source_nodes: from_chunk.to_vec(),
-                target_nodes: to_chunk.to_vec(),
+                // source_nodes: from_chunk.to_vec(),
+                // target_nodes: to_chunk.to_vec(),
                 rate: bandwidth / 8,
                 limit: 20971520,
                 buffer: 10000,
@@ -106,9 +106,6 @@ fn create_multi_region_swarm_network_chaos(
     info!("remaining: {:?}", remaining_validators);
     if !remaining_validators.is_empty() {
         group_network_delays[0]
-            .source_nodes
-            .append(remaining_validators.to_vec().as_mut());
-        group_network_bandwidths[0]
             .source_nodes
             .append(remaining_validators.to_vec().as_mut());
     }
@@ -170,14 +167,12 @@ mod tests {
         assert_eq!(bandwidth.group_network_bandwidths.len(), 6);
 
         let all_validators: Vec<PeerId> = (0..10).map(|_| PeerId::random()).collect();
-        let (delay, bandwidth) = create_multi_region_swarm_network_chaos(all_validators.clone());
+        let (delay, bandwidth) = create_multi_region_swarm_network_chaos(all_validators);
 
         assert_eq!(delay.group_network_delays.len(), 6);
         assert_eq!(bandwidth.group_network_bandwidths.len(), 6);
         assert_eq!(delay.group_network_delays[0].source_nodes.len(), 4);
         assert_eq!(delay.group_network_delays[0].target_nodes.len(), 2);
-        assert_eq!(bandwidth.group_network_bandwidths[0].source_nodes.len(), 4);
-        assert_eq!(bandwidth.group_network_bandwidths[0].target_nodes.len(), 2);
         assert_eq!(
             bandwidth.group_network_bandwidths[0],
             GroupNetworkBandwidth {
@@ -185,13 +180,6 @@ mod tests {
                 rate: 5160960,
                 limit: 20971520,
                 buffer: 10000,
-                source_nodes: vec![
-                    all_validators[0],
-                    all_validators[1],
-                    all_validators[8],
-                    all_validators[9]
-                ],
-                target_nodes: vec![all_validators[2], all_validators[3]],
             }
         )
     }

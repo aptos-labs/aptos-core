@@ -41,7 +41,7 @@ use tokio::{runtime::Handle, task::JoinHandle, time};
 // Max is 100k TPS for 3 hours
 const MAX_TXNS: u64 = 1_000_000_000;
 
-const MAX_RETRIES: usize = 8;
+const MAX_RETRIES: usize = 12;
 
 // This retry policy is used for important client calls necessary for setting
 // up the test (e.g. account creation) and collecting its results (e.g. checking
@@ -119,15 +119,20 @@ pub struct EmitJobRequest {
     rest_clients: Vec<RestClient>,
     mode: EmitJobMode,
 
-    gas_price: u64,
-    max_gas_per_txn: u64,
-    reuse_accounts: bool,
-    mint_to_root: bool,
-    init_gas_price_multiplier: u64,
-
     transaction_mix_per_phase: Vec<Vec<(TransactionType, usize)>>,
 
+    max_gas_per_txn: u64,
+    gas_price: u64,
+    init_gas_price_multiplier: u64,
+
+    reuse_accounts: bool,
+    mint_to_root: bool,
+
     txn_expiration_time_secs: u64,
+    init_expiration_multiplier: f64,
+
+    init_retry_interval: Duration,
+
     max_transactions_per_account: usize,
 
     expected_max_txns: u64,
@@ -135,9 +140,6 @@ pub struct EmitJobRequest {
     prompt_before_spending: bool,
 
     coordination_delay_between_instances: Duration,
-
-    init_retry_count: usize,
-    init_retry_interval: Duration,
 }
 
 impl Default for EmitJobRequest {
@@ -147,20 +149,20 @@ impl Default for EmitJobRequest {
             mode: EmitJobMode::MaxLoad {
                 mempool_backlog: 3000,
             },
-            gas_price: aptos_global_constants::GAS_UNIT_PRICE,
+            transaction_mix_per_phase: vec![vec![(TransactionType::default(), 1)]],
             max_gas_per_txn: aptos_global_constants::MAX_GAS_AMOUNT,
+            gas_price: aptos_global_constants::GAS_UNIT_PRICE,
+            init_gas_price_multiplier: 10,
             reuse_accounts: false,
             mint_to_root: false,
-            init_gas_price_multiplier: 10,
-            transaction_mix_per_phase: vec![vec![(TransactionType::default(), 1)]],
             txn_expiration_time_secs: 60,
+            init_expiration_multiplier: 3.0,
+            init_retry_interval: Duration::from_secs(10),
             max_transactions_per_account: 20,
             expected_max_txns: MAX_TXNS,
             expected_gas_per_txn: aptos_global_constants::MAX_GAS_AMOUNT,
             prompt_before_spending: false,
             coordination_delay_between_instances: Duration::from_secs(0),
-            init_retry_count: MAX_RETRIES,
-            init_retry_interval: Duration::from_secs(5),
         }
     }
 }
@@ -533,9 +535,12 @@ impl TxnEmitter {
             .with_transaction_expiration_time(mode_params.txn_expiration_time_secs)
             .with_gas_unit_price(req.gas_price)
             .with_max_gas_amount(req.max_gas_per_txn);
+        let init_expiration_time =
+            (mode_params.txn_expiration_time_secs as f64 * req.init_expiration_multiplier) as u64;
         let init_txn_factory = txn_factory
             .clone()
-            .with_gas_unit_price(req.gas_price * req.init_gas_price_multiplier);
+            .with_gas_unit_price(req.gas_price * req.init_gas_price_multiplier)
+            .with_transaction_expiration_time(init_expiration_time);
         let seed = self.rng.gen();
         info!(
             "AccountMinter Seed (can be passed in to reuse accounts): {:?}",
@@ -546,9 +551,16 @@ impl TxnEmitter {
             init_txn_factory.clone(),
             StdRng::from_seed(seed),
         );
+        let init_retries: usize =
+            usize::try_from(init_expiration_time / req.init_retry_interval.as_secs()).unwrap();
+        info!(
+            "Using reliable/retriable init transaction executor with {} retries, every {}s",
+            init_retries,
+            req.init_retry_interval.as_secs_f32()
+        );
         let txn_executor = RestApiTransactionExecutor {
             rest_clients: req.rest_clients.clone(),
-            max_retries: req.init_retry_count,
+            max_retries: init_retries,
             retry_after: req.init_retry_interval,
         };
         let mut all_accounts = account_minter

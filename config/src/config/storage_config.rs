@@ -17,7 +17,7 @@ pub const BUFFERED_STATE_TARGET_ITEMS: usize = 100_000;
 /// Port selected RocksDB options for tuning underlying rocksdb instance of AptosDB.
 /// see <https://github.com/facebook/rocksdb/blob/master/include/rocksdb/options.h>
 /// for detailed explanations.
-#[derive(Copy, Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct RocksdbConfig {
     pub max_open_files: i32,
@@ -49,7 +49,7 @@ impl Default for RocksdbConfig {
     }
 }
 
-#[derive(Copy, Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct RocksdbConfigs {
     pub ledger_db_config: RocksdbConfig,

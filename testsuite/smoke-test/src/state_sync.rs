@@ -25,7 +25,7 @@ async fn test_full_node_bootstrap_state_snapshot() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
 
     // Create a fullnode config that uses snapshot syncing
-    let mut vfn_config = NodeConfig::default_for_validator_full_node();
+    let mut vfn_config = NodeConfig::get_default_vfn_config();
     vfn_config.state_sync.state_sync_driver.bootstrapping_mode =
         BootstrappingMode::DownloadLatestStates;
 
@@ -54,17 +54,21 @@ async fn test_full_node_bootstrap_state_snapshot() {
 
     let inspection_client = swarm.fullnode(vfn_peer_id).unwrap().inspection_client();
     let state_merkle_pruner_version = inspection_client
-        .get_node_metric_i64("aptos_pruner_min_readable_version{pruner_name=state_merkle_pruner}")
+        .get_node_metric_i64(
+            "aptos_pruner_versions{pruner_name=state_merkle_pruner,tag=min_readable}",
+        )
         .await
         .unwrap()
         .unwrap();
     let epoch_snapshot_pruner_version = inspection_client
-        .get_node_metric_i64("aptos_pruner_min_readable_version{pruner_name=epoch_snapshot_pruner}")
+        .get_node_metric_i64(
+            "aptos_pruner_versions{pruner_name=epoch_snapshot_pruner,tag=min_readable}",
+        )
         .await
         .unwrap()
         .unwrap();
     let ledger_pruner_version = inspection_client
-        .get_node_metric_i64("aptos_pruner_min_readable_version{pruner_name=ledger_pruner}")
+        .get_node_metric_i64("aptos_pruner_versions{pruner_name=ledger_pruner,tag=min_readable}")
         .await
         .unwrap()
         .unwrap();
@@ -80,7 +84,7 @@ async fn test_full_node_bootstrap_outputs() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
 
     // Create a fullnode config that uses transaction outputs to sync
-    let mut vfn_config = NodeConfig::default_for_validator_full_node();
+    let mut vfn_config = NodeConfig::get_default_vfn_config();
     vfn_config.state_sync.state_sync_driver.bootstrapping_mode =
         BootstrappingMode::ApplyTransactionOutputsFromGenesis;
     vfn_config
@@ -102,7 +106,7 @@ async fn test_full_node_bootstrap_outputs_no_compression() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
 
     // Create a fullnode config that uses transaction outputs to sync (without compression)
-    let mut vfn_config = NodeConfig::default_for_validator_full_node();
+    let mut vfn_config = NodeConfig::get_default_vfn_config();
     vfn_config.state_sync.state_sync_driver.bootstrapping_mode =
         BootstrappingMode::ApplyTransactionOutputsFromGenesis;
     vfn_config
@@ -124,7 +128,7 @@ async fn test_full_node_bootstrap_outputs_exponential_backoff() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
 
     // Create a fullnode config that uses transaction outputs to sync with a small timeout
-    let mut vfn_config = NodeConfig::default_for_validator_full_node();
+    let mut vfn_config = NodeConfig::get_default_vfn_config();
     vfn_config.state_sync.state_sync_driver.bootstrapping_mode =
         BootstrappingMode::ApplyTransactionOutputsFromGenesis;
     vfn_config
@@ -152,7 +156,7 @@ async fn test_full_node_bootstrap_transactions_or_outputs() {
         .await;
 
     // Create a fullnode config that uses transactions or outputs to sync
-    let mut vfn_config = NodeConfig::default_for_validator_full_node();
+    let mut vfn_config = NodeConfig::get_default_vfn_config();
     vfn_config.state_sync.state_sync_driver.bootstrapping_mode =
         BootstrappingMode::ExecuteOrApplyFromGenesis;
     vfn_config
@@ -184,7 +188,7 @@ async fn test_full_node_bootstrap_snapshot_transactions_or_outputs() {
         .await;
 
     // Create a fullnode config that uses snapshot syncing and transactions or outputs
-    let mut vfn_config = NodeConfig::default_for_validator_full_node();
+    let mut vfn_config = NodeConfig::get_default_vfn_config();
     vfn_config.state_sync.state_sync_driver.bootstrapping_mode =
         BootstrappingMode::DownloadLatestStates;
     vfn_config
@@ -210,7 +214,7 @@ async fn test_full_node_bootstrap_transactions() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
 
     // Create a fullnode config that uses transactions to sync
-    let mut vfn_config = NodeConfig::default_for_validator_full_node();
+    let mut vfn_config = NodeConfig::get_default_vfn_config();
     vfn_config.state_sync.state_sync_driver.bootstrapping_mode =
         BootstrappingMode::ExecuteTransactionsFromGenesis;
     vfn_config
@@ -232,7 +236,7 @@ async fn test_full_node_continuous_sync_outputs() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
 
     // Create a fullnode config that uses transaction outputs to sync
-    let mut vfn_config = NodeConfig::default_for_validator_full_node();
+    let mut vfn_config = NodeConfig::get_default_vfn_config();
     vfn_config
         .state_sync
         .state_sync_driver
@@ -251,7 +255,7 @@ async fn test_full_node_continuous_sync_transactions() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
 
     // Create a fullnode config that uses transactions to sync
-    let mut vfn_config = NodeConfig::default_for_validator_full_node();
+    let mut vfn_config = NodeConfig::get_default_vfn_config();
     vfn_config
         .state_sync
         .state_sync_driver

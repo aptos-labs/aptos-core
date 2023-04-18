@@ -17,6 +17,8 @@ pub struct MempoolConfig {
     // number of failovers to broadcast to when the primary network is alive
     pub default_failovers: usize,
     pub max_broadcasts_per_peer: usize,
+    // length of inbound queue of messages
+    pub max_network_channel_size: usize,
     pub mempool_snapshot_interval_secs: u64,
     pub shared_mempool_ack_timeout_ms: u64,
     pub shared_mempool_backoff_interval_ms: u64,
@@ -41,6 +43,7 @@ impl Default for MempoolConfig {
             shared_mempool_ack_timeout_ms: 2_000,
             shared_mempool_max_concurrent_inbound_syncs: 4,
             max_broadcasts_per_peer: 1,
+            max_network_channel_size: 1024,
             mempool_snapshot_interval_secs: 180,
             capacity: 2_000_000,
             capacity_bytes: 2 * 1024 * 1024 * 1024,

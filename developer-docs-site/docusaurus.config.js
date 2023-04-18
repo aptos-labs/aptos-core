@@ -263,7 +263,7 @@ const config = {
               {
                 type: "doc",
                 label: "Airdrop Aptos Tokens",
-                docId: "concepts/coin-and-token/airdrop-aptos-tokens",
+                docId: "concepts/coin-and-token/nft-airdrop-example",
               },
             ],
           },

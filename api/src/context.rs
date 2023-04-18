@@ -798,13 +798,30 @@ impl Context {
 
     pub fn estimate_gas_price<E: InternalError>(
         &self,
-        _ledger_info: &LedgerInfo,
+        ledger_info: &LedgerInfo,
     ) -> Result<GasEstimation, E> {
+        let min_gas_unit_price = self.min_gas_unit_price(ledger_info)?;
+        let second_bucket = match self
+            .node_config
+            .mempool
+            .broadcast_buckets
+            .iter()
+            .enumerate()
+            .nth(1)
+        {
+            Some(bucket) => *bucket.1,
+            None => min_gas_unit_price,
+        };
         Ok(GasEstimation {
-            deprioritized_gas_estimate: Some(100),
-            gas_estimate: 100,
-            prioritized_gas_estimate: Some(150),
+            deprioritized_gas_estimate: Some(min_gas_unit_price),
+            gas_estimate: min_gas_unit_price,
+            prioritized_gas_estimate: Some(second_bucket),
         })
+    }
+
+    fn min_gas_unit_price<E: InternalError>(&self, ledger_info: &LedgerInfo) -> Result<u64, E> {
+        let (_, gas_schedule) = self.get_gas_schedule(ledger_info)?;
+        Ok(gas_schedule.txn.min_price_per_gas_unit.into())
     }
 
     pub fn get_gas_schedule<E: InternalError>(

@@ -3,7 +3,7 @@
 
 use crate::{
     db_metadata::DbMetadataSchema,
-    metrics::PRUNER_LEAST_READABLE_VERSION,
+    metrics::PRUNER_VERSIONS,
     pruner::{
         db_pruner::DBPruner,
         db_sub_pruner::DBSubPruner,
@@ -111,7 +111,10 @@ impl DBPruner for LedgerPruner {
     }
 
     fn set_target_version(&self, target_version: Version) {
-        self.target_version.store(target_version, Ordering::Relaxed)
+        self.target_version.store(target_version, Ordering::Relaxed);
+        PRUNER_VERSIONS
+            .with_label_values(&["ledger_pruner", "target"])
+            .set(target_version as i64);
     }
 
     fn target_version(&self) -> Version {
@@ -121,8 +124,8 @@ impl DBPruner for LedgerPruner {
     fn record_progress(&self, min_readable_version: Version) {
         self.min_readable_version
             .store(min_readable_version, Ordering::Relaxed);
-        PRUNER_LEAST_READABLE_VERSION
-            .with_label_values(&["ledger_pruner"])
+        PRUNER_VERSIONS
+            .with_label_values(&["ledger_pruner", "min_readable"])
             .set(min_readable_version as i64);
     }
 

@@ -33,6 +33,7 @@ pub enum FeatureFlag {
     Ed25519PubkeyValidateReturnFalseWrongLength,
     StructConstructors,
     PeriodicalRewardRateReduction,
+    PartialGovernanceVoting,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -144,6 +145,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::PeriodicalRewardRateReduction => {
                 AptosFeatureFlag::PERIODICAL_REWARD_RATE_DECREASE
             },
+            FeatureFlag::PartialGovernanceVoting => AptosFeatureFlag::PARTIAL_GOVERNANCE_VOTING,
         }
     }
 }
@@ -180,6 +182,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::PERIODICAL_REWARD_RATE_DECREASE => {
                 FeatureFlag::PeriodicalRewardRateReduction
             },
+            AptosFeatureFlag::PARTIAL_GOVERNANCE_VOTING => FeatureFlag::PartialGovernanceVoting,
         }
     }
 }

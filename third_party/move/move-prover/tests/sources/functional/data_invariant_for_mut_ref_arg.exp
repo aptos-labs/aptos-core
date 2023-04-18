@@ -10,7 +10,6 @@ error: data invariant does not hold
   =     at tests/sources/functional/data_invariant_for_mut_ref_arg.move:17: push_1
   =     at tests/sources/functional/data_invariant_for_mut_ref_arg.move:19: push_1
   =         s = <redacted>
-  =         s = <redacted>
   =     at tests/sources/functional/data_invariant_for_mut_ref_arg.move:8
 
 error: data invariant does not hold

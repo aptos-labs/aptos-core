@@ -542,7 +542,7 @@ impl RoundManager {
 
     fn sync_only(&self) -> bool {
         if self.decoupled_execution() {
-            let sync_or_not = self.local_config.sync_only || self.block_store.back_pressure();
+            let sync_or_not = self.local_config.sync_only || self.block_store.vote_back_pressure();
             counters::OP_COUNTERS
                 .gauge("sync_only")
                 .set(sync_or_not as i64);
@@ -695,7 +695,7 @@ impl RoundManager {
         );
 
         observe_block(proposal.timestamp_usecs(), BlockStage::SYNCED);
-        if self.decoupled_execution() && self.block_store.back_pressure() {
+        if self.decoupled_execution() && self.block_store.vote_back_pressure() {
             // In case of back pressure, we delay processing proposal. This is done by resending the
             // same proposal to self after some time. Even if processing proposal is delayed, we add
             // the block to the block store so that we don't need to fetch it from remote once we
@@ -734,7 +734,7 @@ impl RoundManager {
         let event = VerifiedEvent::VerifiedProposalMsg(Box::new(proposal));
         tokio::spawn(async move {
             while start.elapsed() < Duration::from_millis(timeout_ms) {
-                if !block_store.back_pressure() {
+                if !block_store.vote_back_pressure() {
                     if let Err(e) =
                         self_sender.push((author, discriminant(&event)), (author, event))
                     {

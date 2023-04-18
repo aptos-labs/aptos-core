@@ -27,6 +27,7 @@ aptos-memsocket = { workspace = true, optional = true }
 aptos-metrics-core = { workspace = true }
 aptos-netcore = { workspace = true }
 aptos-num-variants = { workspace = true }
+aptos-peer-monitoring-service-types = { workspace = true }
 aptos-proptest-helpers = { workspace = true, optional = true }
 aptos-rate-limiter = { workspace = true }
 aptos-short-hex-str = { workspace = true }
