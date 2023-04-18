@@ -27,7 +27,7 @@ const coinTransferFunction = "0x1::coin::transfer";
 test.only("call should include X-Aptos-Client header", async () => {
   const client = new AptosClient(NODE_URL, { HEADERS: { my: "header" } });
   const heders = client.client.request.config.HEADERS;
-  expect(heders).toHaveProperty("X-Aptos-Client", `aptos-ts-sdk/${VERSION}`);
+  expect(heders).toHaveProperty("x-aptos-client", `aptos-ts-sdk/${VERSION}`);
   expect(heders).toHaveProperty("my", "header");
 });
 
