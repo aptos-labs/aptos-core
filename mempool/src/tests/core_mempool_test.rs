@@ -811,7 +811,7 @@ fn test_not_return_non_full() {
 
 #[test]
 fn test_include_gas_upgraded() {
-    let mut config = NodeConfig::random();
+    let mut config = NodeConfig::generate_random_config();
     config.mempool.capacity = 100;
     let mut pool = CoreMempool::new(&config);
 
