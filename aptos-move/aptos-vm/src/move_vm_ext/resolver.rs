@@ -3,14 +3,14 @@
 
 use aptos_framework::{natives::state_storage::StateStorageUsageResolver, RuntimeModuleMetadataV1};
 use aptos_types::on_chain_config::ConfigStorage;
-use aptos_vm_types::{remote_cache::StateViewWithRemoteCache, write::AptosResourceRef};
+use aptos_vm_types::remote_cache::StateViewWithRemoteCache;
 use move_binary_format::errors::VMError;
 use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, StructTag},
 };
 use move_table_extension::TableResolver;
-use move_vm_types::resolver::MoveRefResolver;
+use move_vm_types::resolver::{MoveRefResolver, ResourceRef};
 
 pub trait MoveResolverExt:
     MoveRefResolver<Err = VMError>
@@ -25,26 +25,20 @@ pub trait MoveResolverExt:
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-    ) -> Result<Option<AptosResourceRef>, VMError>;
+    ) -> Result<Option<ResourceRef>, VMError>;
 
     fn get_standard_resource(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-    ) -> Result<Option<AptosResourceRef>, VMError>;
+    ) -> Result<Option<ResourceRef>, VMError>;
 
     fn get_any_resource(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-    ) -> Result<Option<AptosResourceRef>, VMError> {
-        let metadata = self.get_module_metadata(struct_tag.module_id());
-        let resource_group = Self::get_resource_group_from_metadata(struct_tag, metadata);
-        if let Some(resource_group) = resource_group {
-            self.get_resource_from_group(address, struct_tag, &resource_group)
-        } else {
-            self.get_standard_resource(address, struct_tag)
-        }
+    ) -> Result<Option<ResourceRef>, VMError> {
+        panic!("Cannot call 'get_any_resource' -- no support for resource groups")
     }
 
     fn get_resource_from_group(
@@ -52,17 +46,8 @@ pub trait MoveResolverExt:
         address: &AccountAddress,
         struct_tag: &StructTag,
         resource_group: &StructTag,
-    ) -> Result<Option<AptosResourceRef>, VMError> {
-        Ok(None)
-        // let group_data = self.get_resource_group_data(address, resource_group)?;
-        // if let Some(AptosWrite::Group(group_data)) = group_data {
-        //     Ok(group_data
-        //         .get(struct_tag)
-        //         .cloned()
-        //         .map(AptosWrite::Standard))
-        // } else {
-        //     Ok(None)
-        // }
+    ) -> Result<Option<ResourceRef>, VMError> {
+        panic!("Cannot call 'get_resource_from_group', - resource groups are not supported yet!")
     }
 
     fn get_resource_group(&self, struct_tag: &StructTag) -> Result<Option<StructTag>, VMError> {

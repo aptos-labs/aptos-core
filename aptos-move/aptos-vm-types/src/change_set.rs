@@ -5,7 +5,7 @@ use crate::{
     delta::DeltaOp,
     effects::Op,
     remote_cache::StateViewWithRemoteCache,
-    write::{squash_writes, AptosResource, WriteOp},
+    write::{squash_writes, WriteOp},
 };
 use anyhow::bail;
 use aptos_types::{
@@ -15,15 +15,13 @@ use aptos_types::{
 };
 use move_binary_format::errors::Location;
 use move_core_types::vm_status::VMStatus;
-use std::{
-    collections::{
-        btree_map::{
-            Entry,
-            Entry::{Occupied, Vacant},
-            IntoIter, Iter,
-        },
-        BTreeMap,
+use std::collections::{
+    btree_map::{
+        Entry,
+        Entry::{Occupied, Vacant},
+        IntoIter, Iter,
     },
+    BTreeMap,
 };
 
 /// Container to hold arbitrary changes to the global state.
@@ -181,7 +179,7 @@ impl DeltaChangeSet {
         let mut materialized_set = WriteChangeSet::empty();
         for (state_key, delta) in self {
             let write = delta.try_materialize(state_view, &state_key)?;
-            materialized_set.insert((state_key, WriteOp::ResourceWrite(write)));
+            materialized_set.insert((state_key, write));
         }
 
         // All deltas are applied successfully.
@@ -237,14 +235,13 @@ fn extend_with_deltas(
 ) -> anyhow::Result<()> {
     for (key, mut delta) in other_deltas.into_iter() {
         if let Some(write) = writes.get_mut(&key) {
-            // Delta can only be applied to resources.
-            if let WriteOp::ResourceWrite(op) = write {
+            // Delta can only be applied to aggregators!
+            if let WriteOp::AggregatorWrite(op) = write {
                 match op {
-                    Op::Creation(r) | Op::Modification(r) => {
-                        let value: u128 = r.as_aggregator_value()?;
-                        *r = AptosResource::AggregatorValue(value);
+                    Some(v) => {
+                        *v = delta.apply_to(*v)?;
                     },
-                    Op::Deletion => {
+                    None => {
                         bail!(format!("Failed to apply aggregator delta {:?} because the value is already deleted", delta));
                     },
                 }

@@ -258,22 +258,24 @@ impl BlockAptosVM {
         );
 
         // Sequential execution does not have deltas, assert and convert to the same type.
-        let seq_ret: Result<Vec<FinalTransactionOutput>, Error<VMStatus>> = seq_ret.map(|results| {
-            results
-                .into_iter()
-                .map(|(output, deltas)| {
-                    assert_eq!(deltas.len(), 0);
+        let seq_ret: Result<Vec<FinalTransactionOutput>, Error<VMStatus>> =
+            seq_ret.map(|results| {
+                results
+                    .into_iter()
+                    .map(|(output, deltas)| {
+                        assert_eq!(deltas.len(), 0);
 
-                    let (writes, output_deltas, events, gas_used, status) = output.into().unpack();
-                    assert_eq!(output_deltas.len(), 0);
+                        let (writes, output_deltas, events, gas_used, status) =
+                            output.into().unpack();
+                        assert_eq!(output_deltas.len(), 0);
 
-                    // TODO: If conversion to WriteSet fails, it means deserialization failure. Is it ok
-                    // to assume it never happens?
-                    let write_set = writes.into_write_set().unwrap();
-                    FinalTransactionOutput::new(write_set, events, gas_used, status)
-                })
-                .collect()
-        });
+                        // TODO: If conversion to WriteSet fails, it means deserialization failure. Is it ok
+                        // to assume it never happens?
+                        let write_set = writes.into_write_set().unwrap();
+                        FinalTransactionOutput::new(write_set, events, gas_used, status)
+                    })
+                    .collect()
+            });
 
         (
             block_size * 1000 / seq_exec_t.as_millis() as usize,

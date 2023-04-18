@@ -9,6 +9,7 @@ pub use crate::{rest_interface::RestDebuggerInterface, storage_interface::DBDebu
 use anyhow::{anyhow, Result};
 use aptos_state_view::TStateView;
 use aptos_types::{
+    access_path::PathType::Resource,
     account_address::AccountAddress,
     account_config::CORE_CODE_ADDRESS,
     account_state::AccountState,
@@ -19,12 +20,10 @@ use aptos_types::{
     },
     transaction::{Transaction, TransactionInfo, Version},
 };
-use aptos_vm_types::{
-    remote_cache::{TRemoteCache, TStateViewWithRemoteCache},
-    write::{AptosModuleRef, AptosResourceRef, AptosWrite},
-};
+use aptos_vm_types::remote_cache::{TRemoteCache, TStateViewWithRemoteCache};
 use lru::LruCache;
 use move_binary_format::file_format::CompiledModule;
+use move_vm_types::resolver::{Module, ModuleRef, ResourceRef};
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
@@ -208,15 +207,25 @@ impl TStateView for DebuggerStateView {
 impl TRemoteCache for DebuggerStateView {
     type Key = StateKey;
 
-    fn get_cached_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<AptosModuleRef>> {
-        todo!()
+    fn get_move_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<ModuleRef>> {
+        // TODO: Should we deserialize on the call-site or here?
+        Ok(self
+            .get_state_value_bytes(state_key)?
+            .map(|blob| ModuleRef::new(Module::Serialized(blob))))
     }
 
-    fn get_cached_resource(
-        &self,
-        state_key: &Self::Key,
-    ) -> anyhow::Result<Option<AptosResourceRef>> {
-        todo!()
+    fn get_move_resource(&self, state_key: &Self::Key) -> anyhow::Result<Option<ResourceRef>> {
+        // TODO: Should we deserialize on the call-site or here?
+        Ok(self
+            .get_state_value_bytes(state_key)?
+            .map(|blob| ResourceRef::new(Resource::Serialized(blob))))
+    }
+
+    fn get_aggregator_value(&self, state_key: &Self::Key) -> Result<Option<u128>> {
+        Ok(match self.get_state_value_bytes(state_key)? {
+            Some(blob) => Some(bcs::from_bytes(&blob)?),
+            None => None,
+        })
     }
 }
 

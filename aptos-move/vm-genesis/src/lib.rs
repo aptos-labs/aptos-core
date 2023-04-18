@@ -31,7 +31,6 @@ use aptos_vm::{
     data_cache::AsMoveResolver,
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
 };
-use aptos_vm_types::change_set::AptosChangeSet;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
@@ -159,7 +158,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
             &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
         )
         .unwrap();
-    let change_set = cs1; //.squash(cs2).unwrap();
+    let change_set = cs1.squash(cs2).unwrap();
 
     let (writes, deltas, events) = change_set.into_inner();
 
@@ -277,7 +276,7 @@ pub fn encode_genesis_change_set(
         )
         .unwrap();
 
-    let change_set = cs1; //.squash(cs2).unwrap();
+    let change_set = cs1.squash(cs2).unwrap();
     let (writes, deltas, events) = change_set.into_inner();
 
     // Publishing stdlib should not produce any deltas around aggregators and map to write ops and

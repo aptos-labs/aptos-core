@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
     state_store::{
@@ -13,8 +13,9 @@ use aptos_vm_types::{
     change_set::WriteChangeSet,
     effects::Op,
     remote_cache::{TRemoteCache, TStateViewWithRemoteCache},
-    write::{AptosModuleRef, AptosResourceRef},
+    write::WriteOp,
 };
+use move_vm_types::resolver::{ModuleRef, ResourceRef};
 
 pub struct DeltaStateView<'a, 'b, S> {
     base: &'a S,
@@ -68,28 +69,35 @@ where
 {
     type Key = StateKey;
 
-    fn get_cached_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<AptosModuleRef>> {
-        match self.writes.get(state_key) {
-            Some(_) => Ok(None),
-            // Some(write_op) => Ok(match write_op {
-            //     Op::Creation(write) | Op::Modification(write) => None,
-            //     Op::Deletion => None,
-            // }),
-            None => self.base.get_cached_module(state_key),
-        }
+    fn get_move_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<ModuleRef>> {
+        Ok(match self.writes.get(state_key) {
+            Some(WriteOp::ModuleWrite(op)) => match op {
+                // TODO: avoid clone by storing the ref in the transaction output directly.
+                Op::Creation(m) | Op::Modification(m) => Some(ModuleRef::new(m.clone())),
+                Op::Deletion => None,
+            },
+            Some(_) => bail!("encountered non-module when reading a module"),
+            None => self.base.get_move_module(state_key)?,
+        })
     }
 
-    fn get_cached_resource(
-        &self,
-        state_key: &Self::Key,
-    ) -> anyhow::Result<Option<AptosResourceRef>> {
-        match self.writes.get(state_key) {
-            Some(_) => Ok(None),
-            // Some(write_op) => Ok(match write_op {
-            //     Op::Creation(write) | Op::Modification(write) => None,
-            //     Op::Deletion => None,
-            // }),
-            None => self.base.get_cached_resource(state_key),
-        }
+    fn get_move_resource(&self, state_key: &Self::Key) -> anyhow::Result<Option<ResourceRef>> {
+        Ok(match self.writes.get(state_key) {
+            Some(WriteOp::ResourceWrite(op)) => match op {
+                // TODO: avoid clone by storing the ref in the transaction output directly.
+                Op::Creation(r) | Op::Modification(r) => Some(ResourceRef::new(r.clone())),
+                Op::Deletion => None,
+            },
+            Some(_) => bail!("encountered non-resource when reading a resource"),
+            None => self.base.get_move_resource(state_key)?,
+        })
+    }
+
+    fn get_aggregator_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<u128>> {
+        Ok(match self.writes.get(state_key) {
+            Some(WriteOp::AggregatorWrite(value)) => value.clone(),
+            Some(_) => bail!("encountered non-aggregator value when reading an aggregator"),
+            None => self.base.get_aggregator_value(state_key)?,
+        })
     }
 }

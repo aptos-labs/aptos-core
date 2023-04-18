@@ -41,7 +41,7 @@ use aptos_types::{
 };
 use aptos_vm_logging::{init_speculative_logs, log_schema::AdapterLogSchema};
 use aptos_vm_types::{
-    change_set::{AptosChangeSet, ChangeSet},
+    change_set::{AptosChangeSet, DeltaChangeSet, WriteChangeSet},
     remote_cache::StateViewWithRemoteCache,
     transaction_output::TransactionOutput,
 };
@@ -74,8 +74,6 @@ use std::{
         Arc,
     },
 };
-use aptos_vm_types::change_set::{DeltaChangeSet, WriteChangeSet};
-use aptos_vm_types::write::WriteOp;
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
@@ -1193,11 +1191,7 @@ impl AptosVM {
         Ok(match writeset_payload {
             WriteSetPayload::Direct(legacy_change_set) => {
                 // TODO: Fix this by converting WriteSet as into WriteChangeSet.
-                AptosChangeSet::new(
-                    WriteChangeSet::empty(),
-                    DeltaChangeSet::empty(),
-                    vec![],
-                )
+                AptosChangeSet::new(WriteChangeSet::empty(), DeltaChangeSet::empty(), vec![])
             },
             WriteSetPayload::Script { script, execute_as } => {
                 let resolver = self.0.new_move_resolver(storage);
@@ -1661,7 +1655,9 @@ impl VMAdapter for AptosVM {
                 (vm_status, output, None)
             },
             PreprocessedTransaction::StateCheckpoint => {
-                let output = TransactionOutput::empty_with_status(TransactionStatus::Keep(ExecutionStatus::Success));
+                let output = TransactionOutput::empty_with_status(TransactionStatus::Keep(
+                    ExecutionStatus::Success,
+                ));
                 (VMStatus::Executed, output, Some("state_checkpoint".into()))
             },
         })

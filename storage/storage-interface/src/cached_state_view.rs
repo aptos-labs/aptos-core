@@ -14,11 +14,9 @@ use aptos_types::{
     transaction::Version,
     write_set::WriteSet,
 };
-use aptos_vm_types::{
-    remote_cache::{TRemoteCache, TStateViewWithRemoteCache},
-    write::{AptosModuleRef, AptosResourceRef},
-};
+use aptos_vm_types::remote_cache::{TRemoteCache, TStateViewWithRemoteCache};
 use dashmap::DashMap;
+use move_vm_types::resolver::{Module, ModuleRef, Resource, ResourceRef};
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use std::{
@@ -226,15 +224,25 @@ impl TStateView for CachedStateView {
 impl TRemoteCache for CachedStateView {
     type Key = StateKey;
 
-    fn get_cached_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<AptosModuleRef>> {
-        todo!()
+    fn get_move_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<ModuleRef>> {
+        // TODO: Should we deserialize on the call-site or here?
+        Ok(self
+            .get_state_value_bytes(state_key)?
+            .map(|blob| ModuleRef::new(Module::Serialized(blob))))
     }
 
-    fn get_cached_resource(
-        &self,
-        state_key: &Self::Key,
-    ) -> anyhow::Result<Option<AptosResourceRef>> {
-        todo!()
+    fn get_move_resource(&self, state_key: &Self::Key) -> anyhow::Result<Option<ResourceRef>> {
+        // TODO: Should we deserialize on the call-site or here?
+        Ok(self
+            .get_state_value_bytes(state_key)?
+            .map(|blob| ResourceRef::new(Resource::Serialized(blob))))
+    }
+
+    fn get_aggregator_value(&self, state_key: &Self::Key) -> Result<Option<u128>> {
+        Ok(match self.get_state_value_bytes(state_key)? {
+            Some(blob) => Some(bcs::from_bytes(&blob)?),
+            None => None,
+        })
     }
 }
 
@@ -290,15 +298,25 @@ impl TStateView for CachedDbStateView {
 impl TRemoteCache for CachedDbStateView {
     type Key = StateKey;
 
-    fn get_cached_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<AptosModuleRef>> {
-        todo!()
+    fn get_move_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<ModuleRef>> {
+        // TODO: Should we deserialize on the call-site or here?
+        Ok(self
+            .get_state_value_bytes(state_key)?
+            .map(|blob| ModuleRef::new(Module::Serialized(blob))))
     }
 
-    fn get_cached_resource(
-        &self,
-        state_key: &Self::Key,
-    ) -> anyhow::Result<Option<AptosResourceRef>> {
-        todo!()
+    fn get_move_resource(&self, state_key: &Self::Key) -> anyhow::Result<Option<ResourceRef>> {
+        // TODO: Should we deserialize on the call-site or here?
+        Ok(self
+            .get_state_value_bytes(state_key)?
+            .map(|blob| ResourceRef::new(Resource::Serialized(blob))))
+    }
+
+    fn get_aggregator_value(&self, state_key: &Self::Key) -> Result<Option<u128>> {
+        Ok(match self.get_state_value_bytes(state_key)? {
+            Some(blob) => Some(bcs::from_bytes(&blob)?),
+            None => None,
+        })
     }
 }
 

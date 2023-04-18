@@ -20,10 +20,10 @@ use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::{
     delta::DeltaOp,
     remote_cache::{TRemoteCache, TStateViewWithRemoteCache},
-    write::{AptosModuleRef, AptosResourceRef},
 };
 use claims::assert_none;
 use move_binary_format::errors::Location;
+use move_vm_types::resolver::{Module, ModuleRef, Resource, ResourceRef};
 use std::{cell::RefCell, collections::BTreeMap, hash::Hash, sync::Arc};
 
 /// A struct that is always used by a single thread performing an execution task. The struct is
@@ -230,7 +230,9 @@ impl<'a, T: Transaction, S: TStateViewWithRemoteCache<CommonKey = T::Key>> TStat
     }
 
     fn get_state_value(&self, state_key: &T::Key) -> anyhow::Result<Option<StateValue>> {
-        Ok(None)
+        // Only called if `RemoteCache` fails to locate the data.
+        println!("calling 'get_state_value'...");
+        self.base_view.get_state_value(state_key)
     }
 
     fn is_genesis(&self) -> bool {
@@ -247,14 +249,15 @@ impl<'a, T: Transaction, S: TStateViewWithRemoteCache<CommonKey = T::Key>> TRemo
 {
     type Key = T::Key;
 
-    fn get_cached_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<AptosModuleRef>> {
-        Ok(None)
+    fn get_move_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<ModuleRef>> {
+        panic!("Panic at 'get_move_module' at {:?}", state_key)
     }
 
-    fn get_cached_resource(
-        &self,
-        state_key: &Self::Key,
-    ) -> anyhow::Result<Option<AptosResourceRef>> {
-        Ok(None)
+    fn get_move_resource(&self, state_key: &Self::Key) -> anyhow::Result<Option<ResourceRef>> {
+        panic!("Panic at 'get_move_resource' at {:?}", state_key)
+    }
+
+    fn get_aggregator_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<u128>> {
+        panic!("Panic at 'get_aggregator_value' at {:?}", state_key)
     }
 }

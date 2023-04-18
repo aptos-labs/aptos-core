@@ -31,6 +31,7 @@ crossbeam = { workspace = true }
 crossbeam-queue = { workspace = true }
 dashmap = { workspace = true }
 move-binary-format = { workspace = true }
+move-vm-types = { workspace = true }
 num_cpus = { workspace = true }
 once_cell = { workspace = true }
 parking_lot = { workspace = true }

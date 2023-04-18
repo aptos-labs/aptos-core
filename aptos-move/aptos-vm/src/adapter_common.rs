@@ -13,10 +13,7 @@ use aptos_types::{
     vm_status::{StatusCode, VMStatus},
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
-use aptos_vm_types::{
-    change_set::{DeltaChangeSet, WriteChangeSet},
-    transaction_output::TransactionOutput,
-};
+use aptos_vm_types::transaction_output::TransactionOutput;
 
 /// This trait describes the VM adapter's interface.
 /// TODO: bring more of the execution logic in aptos_vm into this file.

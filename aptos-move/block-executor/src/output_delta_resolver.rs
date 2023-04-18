@@ -4,9 +4,7 @@
 use crate::{executor::RAYON_EXEC_POOL, task::Transaction};
 use aptos_aggregator::delta_change_set::deserialize;
 use aptos_mvhashmap::versioned_data::VersionedData;
-use aptos_vm_types::{remote_cache::TStateViewWithRemoteCache, write::WriteOp};
-use aptos_vm_types::effects::Op;
-use aptos_vm_types::write::AptosResource;
+use aptos_vm_types::{effects::Op, remote_cache::TStateViewWithRemoteCache, write::WriteOp};
 
 pub(crate) struct OutputDeltaResolver<T: Transaction> {
     versioned_outputs: VersionedData<T::Key, T::Value>,
@@ -34,9 +32,14 @@ impl<T: Transaction> OutputDeltaResolver<T> {
                 base_view
                     .get_state_value_bytes(&key)
                     .ok() // Was anything found in storage
-                    .and_then(|value| value.map(|bytes| bcs::from_bytes(&bytes).expect("unexpected deserialization error in aggregator"))),
+                    .and_then(|value| {
+                        value.map(|bytes| {
+                            bcs::from_bytes(&bytes)
+                                .expect("unexpected deserialization error in aggregator")
+                        })
+                    }),
             ) {
-                ret[idx as usize].push((key.clone(), WriteOp::ResourceWrite(Op::Modification(AptosResource::AggregatorValue(value)))));
+                ret[idx as usize].push((key.clone(), WriteOp::AggregatorWrite(Some(value))));
             }
         }
 

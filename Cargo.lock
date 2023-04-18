@@ -467,6 +467,7 @@ dependencies = [
  "crossbeam-queue",
  "dashmap",
  "move-binary-format",
+ "move-vm-types",
  "num_cpus",
  "once_cell",
  "parking_lot 0.12.1",
@@ -2772,6 +2773,7 @@ dependencies = [
  "crossbeam-channel",
  "dashmap",
  "move-core-types",
+ "move-vm-types",
  "once_cell",
  "parking_lot 0.12.1",
  "rayon",
@@ -3143,9 +3145,11 @@ dependencies = [
  "aptos-types",
  "aptos-vm-types",
  "async-trait",
+ "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "itertools",
  "lru 0.7.8",
  "move-binary-format",
+ "move-vm-types",
  "tokio",
 ]
 

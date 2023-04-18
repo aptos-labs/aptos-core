@@ -48,7 +48,6 @@ use aptos_vm::{
     AptosVM, VMExecutor, VMValidator,
 };
 use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
-use aptos_vm_types::change_set::AptosChangeSet;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,

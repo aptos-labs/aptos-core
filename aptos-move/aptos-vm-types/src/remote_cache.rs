@@ -1,20 +1,19 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::write::{AptosModuleRef, AptosResourceRef};
 use aptos_state_view::TStateView;
 use aptos_types::state_store::state_key::StateKey;
+use move_vm_types::resolver::{ModuleRef, ResourceRef};
 use std::ops::Deref;
 
 pub trait TRemoteCache {
     type Key;
 
-    fn get_cached_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<AptosModuleRef>>;
+    fn get_move_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<ModuleRef>>;
 
-    fn get_cached_resource(
-        &self,
-        state_key: &Self::Key,
-    ) -> anyhow::Result<Option<AptosResourceRef>>;
+    fn get_move_resource(&self, state_key: &Self::Key) -> anyhow::Result<Option<ResourceRef>>;
+
+    fn get_aggregator_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<u128>>;
 }
 
 pub trait RemoteCache: TRemoteCache<Key = StateKey> {}
@@ -28,15 +27,16 @@ where
 {
     type Key = K;
 
-    fn get_cached_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<AptosModuleRef>> {
-        self.deref().get_cached_module(state_key)
+    fn get_move_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<ModuleRef>> {
+        self.deref().get_move_module(state_key)
     }
 
-    fn get_cached_resource(
-        &self,
-        state_key: &Self::Key,
-    ) -> anyhow::Result<Option<AptosResourceRef>> {
-        self.deref().get_cached_resource(state_key)
+    fn get_move_resource(&self, state_key: &Self::Key) -> anyhow::Result<Option<ResourceRef>> {
+        self.deref().get_move_resource(state_key)
+    }
+
+    fn get_aggregator_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<u128>> {
+        self.deref().get_aggregator_value(state_key)
     }
 }
 

@@ -21,12 +21,10 @@ use aptos_vm_genesis::{
     generate_genesis_change_set_for_mainnet, generate_genesis_change_set_for_testing,
     GenesisOptions,
 };
-use aptos_vm_types::{
-    remote_cache::{TRemoteCache, TStateViewWithRemoteCache},
-    write::{AptosModuleRef, AptosResourceRef},
-};
+use aptos_vm_types::remote_cache::{TRemoteCache, TStateViewWithRemoteCache};
 use move_core_types::language_storage::ModuleId;
 use move_table_extension::{TableHandle, TableResolver};
+use move_vm_types::resolver::{Module, ModuleRef, Resource, ResourceRef};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -142,24 +140,23 @@ impl TStateView for FakeDataStore {
 impl TRemoteCache for FakeDataStore {
     type Key = StateKey;
 
-    fn get_cached_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<AptosModuleRef>> {
-        Ok(None)
-        // let data = self.get_state_value_bytes(state_key);
-        // data.map(|maybe_bytes| maybe_bytes.map(|bytes| AptosWrite::Module(bytes)))
+    fn get_move_module(&self, state_key: &Self::Key) -> anyhow::Result<Option<ModuleRef>> {
+        Ok(self
+            .get_state_value_bytes(state_key)?
+            .map(|blob| ModuleRef::new(Module::Serialized(blob))))
     }
 
-    fn get_cached_resource(
-        &self,
-        state_key: &Self::Key,
-    ) -> anyhow::Result<Option<AptosResourceRef>> {
-        Ok(None)
-        // let data = self.get_state_value_bytes(state_key);
-        // TODO: How does it work with groups?
-        // data.map(|maybe_bytes| {
-        //     maybe_bytes.map(|bytes| {
-        //         AptosWrite::Standard(move_vm_types::resolver::Resource::from_blob(bytes))
-        //     })
-        // })
+    fn get_move_resource(&self, state_key: &Self::Key) -> anyhow::Result<Option<ResourceRef>> {
+        Ok(self
+            .get_state_value_bytes(state_key)?
+            .map(|blob| ResourceRef::new(Resource::Serialized(blob))))
+    }
+
+    fn get_aggregator_value(&self, state_key: &Self::Key) -> Result<Option<u128>> {
+        Ok(match self.get_state_value_bytes(state_key)? {
+            Some(blob) => Some(bcs::from_bytes(&blob)?),
+            None => None,
+        })
     }
 }
 

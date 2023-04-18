@@ -21,6 +21,7 @@ use aptos_types::{
 };
 use aptos_vm_types::{
     change_set::{AptosChangeSet, DeltaChangeSet, WriteChangeSet},
+    effects::Op,
     write::WriteOp,
 };
 use move_binary_format::errors::{Location, PartialVMError, VMResult};
@@ -41,8 +42,6 @@ use std::{
     collections::BTreeMap,
     ops::{Deref, DerefMut},
 };
-use aptos_vm_types::effects::Op;
-use aptos_vm_types::write::{AptosModule, AptosResource};
 
 #[derive(BCSCryptoHash, CryptoHasher, Deserialize, Serialize)]
 pub enum SessionId {
@@ -313,11 +312,13 @@ where
 
             match change {
                 AggregatorChange::Write(value) => {
-                    let op = WriteOp::ResourceWrite(Op::Modification(AptosResource::AggregatorValue(value)));
+                    let op = WriteOp::AggregatorWrite(Some(value));
                     writes.insert((state_key, op));
                 },
                 AggregatorChange::Merge(delta_op) => deltas.insert((state_key, delta_op)),
-                AggregatorChange::Delete => writes.insert((state_key, WriteOp::ResourceWrite(Op::Deletion))),
+                AggregatorChange::Delete => {
+                    writes.insert((state_key, WriteOp::AggregatorWrite(None)))
+                },
             }
         }
 
@@ -341,17 +342,17 @@ where
     ) -> WriteOp {
         use MoveStorageOp::*;
         use Op::*;
-        WriteOp::ResourceWrite(match move_storage_op {
-            Delete => Deletion,
+        match move_storage_op {
+            Delete => WriteOp::ResourceWrite(Deletion),
             New(resource) => {
                 if creation_as_modification {
-                    Modification(AptosResource::Standard(resource))
+                    WriteOp::ResourceWrite(Modification(resource))
                 } else {
-                    Creation(AptosResource::Standard(resource))
+                    WriteOp::ResourceWrite(Creation(resource))
                 }
             },
-            Modify(resource) => Modification(AptosResource::Standard(resource)),
-        })
+            Modify(resource) => WriteOp::ResourceWrite(Modification(resource)),
+        }
     }
 
     fn convert_module_op(
@@ -360,17 +361,17 @@ where
     ) -> WriteOp {
         use MoveStorageOp::*;
         use Op::*;
-        WriteOp::ModuleWrite(match move_storage_op {
-            Delete => Deletion,
+        match move_storage_op {
+            Delete => WriteOp::ModuleWrite(Deletion),
             New(m) => {
                 if creation_as_modification {
-                    Modification(AptosModule::new(m))
+                    WriteOp::ModuleWrite(Modification(m))
                 } else {
-                    Creation(AptosModule::new(m))
+                    WriteOp::ModuleWrite(Creation(m))
                 }
             },
-            Modify(m) => Modification(AptosModule::new(m)),
-        })
+            Modify(m) => WriteOp::ModuleWrite(Modification(m)),
+        }
     }
 }
 
