@@ -3,7 +3,8 @@
 
 use crate::common::{
     types::{
-        account_address_from_public_key, CliCommand, CliConfig, CliError, CliTypedResult,
+        account_address_from_auth_key, account_address_from_public_key,
+        AuthenticationKeyInputOptions, CliCommand, CliConfig, CliError, CliTypedResult,
         ConfigSearchMode, EncodingOptions, EncodingType, ExtractPublicKey, ParsePrivateKey,
         ProfileConfig, ProfileOptions, PublicKeyInputOptions, RestOptions, RotationProofChallenge,
         TransactionOptions, TransactionSummary,
@@ -20,13 +21,14 @@ use aptos_rest_client::{
     error::{AptosErrorResponse, RestError},
     Client,
 };
-use aptos_types::{account_address::AccountAddress, account_config::CORE_CODE_ADDRESS};
+use aptos_types::{
+    account_address::AccountAddress, account_config::CORE_CODE_ADDRESS,
+    transaction::authenticator::AuthenticationKey,
+};
 use async_trait::async_trait;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, path::PathBuf};
-use aptos_types::transaction::authenticator::AuthenticationKey;
-use crate::common::types::{account_address_from_auth_key, AuthenticationKeyInputOptions};
 
 /// Rotate an account's authentication key
 ///
@@ -274,7 +276,8 @@ impl LookupAddress {
     }
 
     pub(crate) fn auth_key(&self) -> CliTypedResult<Option<AuthenticationKey>> {
-        self.authentication_key_options.extract_auth_key(self.encoding_options.encoding, )
+        self.authentication_key_options
+            .extract_auth_key(self.encoding_options.encoding)
     }
 
     /// Builds a rest client
@@ -295,9 +298,9 @@ impl CliCommand<AccountAddress> for LookupAddress {
         // TODO: Support arbitrary auth key to support other types like multie25519
         let mut address = account_address_from_public_key(&self.public_key()?);
         let authentication_key = self.auth_key()?;
-        if authentication_key.is_some() {
+        if let Some(key) = authentication_key {
             // override the address using auth_key provided
-            address = account_address_from_auth_key(&authentication_key.unwrap())
+            address = account_address_from_auth_key(&key)
         }
         Ok(lookup_address(&rest_client, address, true).await?)
     }

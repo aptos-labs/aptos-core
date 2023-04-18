@@ -632,14 +632,20 @@ impl AuthenticationKeyInputOptions {
         encoding: EncodingType,
     ) -> CliTypedResult<Option<AuthenticationKey>> {
         if let Some(ref file) = self.auth_key_file {
-            Ok(Some(
-                encoding.load_key("--auth-key-file", file.as_path())?,
-            ))
+            Ok(Some(encoding.load_key("--auth-key-file", file.as_path())?))
         } else if let Some(ref key) = self.auth_key {
             let key = key.as_bytes().to_vec();
             Ok(Some(encoding.decode_key("--auth-key", key)?))
         } else {
             Ok(None)
+        }
+    }
+
+    pub fn from_public_key(key: &Ed25519PublicKey) -> AuthenticationKeyInputOptions {
+        let auth_key = AuthenticationKey::ed25519(key);
+        AuthenticationKeyInputOptions {
+            auth_key: Some(auth_key.to_encoded_string().unwrap()),
+            auth_key_file: None,
         }
     }
 }

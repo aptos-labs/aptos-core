@@ -75,6 +75,7 @@ use thiserror::__private::PathAsDisplay;
 #[cfg(feature = "cli-framework-test-move")]
 use thiserror::__private::PathAsDisplay;
 use tokio::time::{sleep, Instant};
+use crate::common::types::AuthenticationKeyInputOptions;
 
 #[cfg(test)]
 mod tests;
@@ -241,7 +242,7 @@ impl CliTestFramework {
             rest_options: self.rest_options(),
             encoding_options: Default::default(),
             profile_options: Default::default(),
-            authentication_key_options: Default::default(),
+            authentication_key_options: AuthenticationKeyInputOptions::from_public_key(public_key),
         }
         .execute()
         .await
