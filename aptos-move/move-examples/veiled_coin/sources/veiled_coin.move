@@ -93,7 +93,6 @@ module veiled_coin::veiled_coin {
         let x1_bytes = vector::trim<u8>(&mut proof_bytes, 32);
         let x1 = ristretto255::new_point_from_bytes(x1_bytes);
         if (!std::option::is_some<RistrettoPoint>(&x1)) {
-            print(&3);
             return std::option::none<SigmaProof<CoinType>>()
         };
         let x1 = std::option::extract<RistrettoPoint>(&mut x1);
