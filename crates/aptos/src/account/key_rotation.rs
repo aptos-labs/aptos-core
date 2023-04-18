@@ -25,6 +25,8 @@ use async_trait::async_trait;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, path::PathBuf};
+use aptos_types::transaction::authenticator::AuthenticationKey;
+use crate::common::types::{account_address_from_auth_key, AuthenticationKeyInputOptions};
 
 /// Rotate an account's authentication key
 ///
@@ -260,12 +262,19 @@ pub struct LookupAddress {
 
     #[clap(flatten)]
     pub(crate) rest_options: RestOptions,
+
+    #[clap(flatten)]
+    pub(crate) authentication_key_options: AuthenticationKeyInputOptions,
 }
 
 impl LookupAddress {
     pub(crate) fn public_key(&self) -> CliTypedResult<Ed25519PublicKey> {
         self.public_key_options
             .extract_public_key(self.encoding_options.encoding, &self.profile_options)
+    }
+
+    pub(crate) fn auth_key(&self) -> CliTypedResult<Option<AuthenticationKey>> {
+        self.authentication_key_options.extract_auth_key(self.encoding_options.encoding, )
     }
 
     /// Builds a rest client
@@ -284,7 +293,12 @@ impl CliCommand<AccountAddress> for LookupAddress {
         let rest_client = self.rest_client()?;
 
         // TODO: Support arbitrary auth key to support other types like multie25519
-        let address = account_address_from_public_key(&self.public_key()?);
+        let mut address = account_address_from_public_key(&self.public_key()?);
+        let authentication_key = self.auth_key()?;
+        if authentication_key.is_some() {
+            // override the address using auth_key provided
+            address = account_address_from_auth_key(&authentication_key.unwrap())
+        }
         Ok(lookup_address(&rest_client, address, true).await?)
     }
 }

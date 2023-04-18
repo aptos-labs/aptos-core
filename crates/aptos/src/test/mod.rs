@@ -241,6 +241,7 @@ impl CliTestFramework {
             rest_options: self.rest_options(),
             encoding_options: Default::default(),
             profile_options: Default::default(),
+            authentication_key_options: Default::default(),
         }
         .execute()
         .await
