@@ -250,11 +250,21 @@ pub static CORE_MEMPOOL_GC_EAGER_EXPIRE_EVENT_COUNT: Lazy<IntCounter> = Lazy::ne
         .unwrap()
 });
 
-pub static CORE_MEMPOOL_GC_EAGER_EXPIRE_NON_PARKED: Lazy<Histogram> =
-    Lazy::new(|| register_avg_counter("aptos_core_mempool_gc_eager_expire_non_parked", ""));
+/// Number of non-parked entries were checked for eager expiration
+pub static CORE_MEMPOOL_GC_EAGER_EXPIRE_NON_PARKED: Lazy<Histogram> = Lazy::new(|| {
+    register_avg_counter(
+        "aptos_core_mempool_gc_eager_expire_non_parked",
+        "Number of non-parked entries were checked for eager expiration",
+    )
+});
 
-pub static CORE_MEMPOOL_GC_EAGER_EXPIRE_OLDEST_AGE: Lazy<Histogram> =
-    Lazy::new(|| register_avg_counter("aptos_core_mempool_gc_eager_expire_oldest_age", ""));
+/// Oldest age found during eager expiration-based GC
+pub static CORE_MEMPOOL_GC_EAGER_EXPIRE_OLDEST_AGE: Lazy<Histogram> = Lazy::new(|| {
+    register_avg_counter(
+        "aptos_core_mempool_gc_eager_expire_oldest_age",
+        "Oldest age found during eager expiration-based GC",
+    )
+});
 
 /// Counter tracking time for how long a transaction stayed in core-mempool before being garbage-collected
 pub static CORE_MEMPOOL_GC_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {

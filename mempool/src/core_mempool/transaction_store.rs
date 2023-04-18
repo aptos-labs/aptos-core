@@ -657,9 +657,9 @@ impl TransactionStore {
                 }
             }
         }
+        counters::CORE_MEMPOOL_GC_EAGER_EXPIRE_NON_PARKED.observe(non_parked as f64);
         if let Some(insertion_time) = oldest_insertion_time {
             if let Ok(age) = SystemTime::now().duration_since(insertion_time) {
-                counters::CORE_MEMPOOL_GC_EAGER_EXPIRE_NON_PARKED.observe(non_parked as f64);
                 counters::CORE_MEMPOOL_GC_EAGER_EXPIRE_OLDEST_AGE.observe(age.as_secs_f64());
                 if age > eager_expire_threshold {
                     counters::CORE_MEMPOOL_GC_EAGER_EXPIRE_EVENT_COUNT.inc();
