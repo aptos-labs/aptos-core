@@ -2,7 +2,7 @@
 /// metadata object can be any object that equipped with `Metadata` resource.
 module aptos_framework::fungible_asset {
     use aptos_framework::event;
-    use aptos_framework::object::{Self, Object, ConstructorRef, DeleteRef};
+    use aptos_framework::object::{Self, Object, ConstructorRef, DeleteRef, can_generate_delete_ref};
     use aptos_framework::optional_aggregator::{Self, OptionalAggregator};
     use std::string;
 
@@ -21,8 +21,8 @@ module aptos_framework::fungible_asset {
     const EINSUFFICIENT_BALANCE: u64 = 4;
     /// The fungible asset's supply has exceeded maximum.
     const EMAX_SUPPLY_EXCEEDED: u64 = 5;
-    /// Cannot burn more tokens than the remaining supply.
-    const ESUPPLY_UNDERFLOW: u64 = 6;
+    /// Fungible asset do not match when merging.
+    const EFUNGIBLE_ASSET_MISMATCH: u64 = 6;
     /// The mint ref and the the store do not match.
     const EMINT_REF_AND_STORE_MISMATCH: u64 = 7;
     /// Account is not the store's owner.
@@ -45,6 +45,8 @@ module aptos_framework::fungible_asset {
     const ESYMBOL_TOO_LONG: u64 = 16;
     /// Decimals is over the maximum of 32
     const EDECIMALS_TOO_LARGE: u64 = 17;
+    /// Fungibility is only available for non-deletable objects.
+    const EOBJECT_IS_DELETABLE: u64 = 18;
 
     //
     // Constants
@@ -143,6 +145,7 @@ module aptos_framework::fungible_asset {
         symbol: String,
         decimals: u8,
     ): Object<Metadata> {
+        assert!(!can_generate_delete_ref(constructor_ref), error::invalid_argument(EOBJECT_IS_DELETABLE));
         let metadata_object_signer = &object::generate_signer(constructor_ref);
         let supply = option::map(monitoring_supply_with_maximum, |maximum| {
             Supply {
@@ -473,7 +476,8 @@ module aptos_framework::fungible_asset {
     /// "Merges" the two given fungible assets. The fungible asset passed in as `dst_fungible_asset` will have a value
     /// equal to the sum of the two (`dst_fungible_asset` and `src_fungible_asset`).
     public fun merge(dst_fungible_asset: &mut FungibleAsset, src_fungible_asset: FungibleAsset) {
-        let FungibleAsset { metadata: _, amount } = src_fungible_asset;
+        let FungibleAsset { metadata, amount } = src_fungible_asset;
+        assert!(metadata == dst_fungible_asset.metadata, error::invalid_argument(EFUNGIBLE_ASSET_MISMATCH));
         dst_fungible_asset.amount = dst_fungible_asset.amount + amount;
     }
 
@@ -522,7 +526,7 @@ module aptos_framework::fungible_asset {
                 let max = *option::borrow_mut(&mut supply.maximum);
                 assert!(
                     max - optional_aggregator::read(&supply.current) >= (amount as u128),
-                    error::invalid_argument(EMAX_SUPPLY_EXCEEDED)
+                    error::out_of_range(EMAX_SUPPLY_EXCEEDED)
                 )
             };
             optional_aggregator::add(&mut supply.current, (amount as u128))
@@ -535,12 +539,6 @@ module aptos_framework::fungible_asset {
         let fungible_metadata = borrow_fungible_metadata_mut(metadata);
         if (option::is_some(&fungible_metadata.supply)) {
             let supply = option::borrow_mut(&mut fungible_metadata.supply);
-            if (option::is_some(&supply.maximum)) {
-                assert!(
-                    optional_aggregator::read(&supply.current) >= (amount as u128),
-                    error::invalid_argument(ESUPPLY_UNDERFLOW)
-                )
-            };
             optional_aggregator::sub(&mut supply.current, (amount as u128))
         };
     }
@@ -568,12 +566,13 @@ module aptos_framework::fungible_asset {
 
     #[test_only]
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+
     struct TestToken has key {}
 
     #[test_only]
     public fun create_test_token(creator: &signer): (ConstructorRef, Object<TestToken>) {
         account::create_account_for_test(signer::address_of(creator));
-        let creator_ref = object::create_object_from_account(creator);
+        let creator_ref = object::create_named_object(creator, b"TEST");
         let object_signer = object::generate_signer(&creator_ref);
         move_to(&object_signer, TestToken {});
 
@@ -585,9 +584,9 @@ module aptos_framework::fungible_asset {
     public fun init_test_metadata(constructor_ref: &ConstructorRef): (MintRef, TransferRef, BurnRef) {
         add_fungibility(
             constructor_ref,
-            option::some(option::some(100)), // max supply
-            string::utf8(b"USDA"),
-            string::utf8(b"$$$"),
+            option::some(option::some(100)) /* max supply */,
+            string::utf8(b"TEST"),
+            string::utf8(b"@@"),
             0
         );
         let mint_ref = generate_mint_ref(constructor_ref);
@@ -599,10 +598,10 @@ module aptos_framework::fungible_asset {
     #[test_only]
     public fun create_fungible_asset(
         creator: &signer
-    ): (MintRef, TransferRef, BurnRef, Object<TestToken>) {
-        let (creator_ref, metadata) = create_test_token(creator);
+    ): (MintRef, TransferRef, BurnRef, Object<Metadata>) {
+        let (creator_ref, token_object) = create_test_token(creator);
         let (mint, transfer, burn) = init_test_metadata(&creator_ref);
-        (mint, transfer, burn, metadata)
+        (mint, transfer, burn, object::convert<TestToken, Metadata>(token_object))
     }
 
     #[test_only]
@@ -620,8 +619,8 @@ module aptos_framework::fungible_asset {
         init_test_metadata(&creator_ref);
         assert!(supply(asset) == option::some(0), 1);
         assert!(maximum(asset) == option::some(100), 2);
-        assert!(name(asset) == string::utf8(b"USDA"), 3);
-        assert!(symbol(asset) == string::utf8(b"$$$"), 4);
+        assert!(name(asset) == string::utf8(b"TEST"), 3);
+        assert!(symbol(asset) == string::utf8(b"@@"), 4);
         assert!(decimals(asset) == 0, 5);
 
         increase_supply(&asset, 50);
@@ -631,7 +630,7 @@ module aptos_framework::fungible_asset {
     }
 
     #[test(creator = @0xcafe)]
-    #[expected_failure(abort_code = 0x10005, location = Self)]
+    #[expected_failure(abort_code = 0x20005, location = Self)]
     fun test_supply_overflow(creator: &signer) acquires Metadata {
         let (creator_ref, asset) = create_test_token(creator);
         init_test_metadata(&creator_ref);
@@ -639,7 +638,7 @@ module aptos_framework::fungible_asset {
     }
 
     #[test(creator = @0xcafe)]
-    #[expected_failure(abort_code = 0x10006, location = Self)]
+    #[expected_failure(abort_code = 0x20002, location = aptos_framework::optional_aggregator)]
     fun test_supply_underflow(creator: &signer) acquires Metadata {
         let (creator_ref, asset) = create_test_token(creator);
         init_test_metadata(&creator_ref);
@@ -733,5 +732,33 @@ module aptos_framework::fungible_asset {
         merge(&mut cash, more_cash);
         assert!(cash.amount == 100, 3);
         burn(&burn_ref, cash);
+    }
+
+    #[test(creator = @0xcafe)]
+    #[expected_failure(abort_code = 0x10012, location = Self)]
+    fun test_add_fungibility_to_deletable_object(creator: &signer) {
+        account::create_account_for_test(signer::address_of(creator));
+        let creator_ref = &object::create_object_from_account(creator);
+        init_test_metadata(creator_ref);
+    }
+
+    #[test(creator = @0xcafe, aaron = @0xface)]
+    #[expected_failure(abort_code = 0x10006, location = Self)]
+    fun test_fungible_asset_mismatch_when_merge(creator: &signer, aaron: &signer) {
+        let (_, _, _, metadata1) = create_fungible_asset(creator);
+        let (_, _, _, metadata2) = create_fungible_asset(aaron);
+        let base = FungibleAsset {
+            metadata: metadata1,
+            amount: 1,
+        };
+        let addon = FungibleAsset {
+            metadata: metadata2,
+            amount: 1
+        };
+        merge(&mut base, addon);
+        let FungibleAsset {
+            metadata: _,
+            amount: _
+        } = base;
     }
 }
