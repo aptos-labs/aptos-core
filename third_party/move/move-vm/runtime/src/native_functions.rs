@@ -153,10 +153,6 @@ impl<'a, 'b> NativeContext<'a, 'b> {
         }
     }
 
-    pub fn events(&self) -> &Vec<(Vec<u8>, u64, Type, MoveTypeLayout, Value)> {
-        self.data_store.events()
-    }
-
     pub fn type_to_type_tag(&self, ty: &Type) -> PartialVMResult<TypeTag> {
         self.resolver.loader().type_to_type_tag(ty)
     }

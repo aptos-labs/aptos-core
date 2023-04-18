@@ -89,7 +89,7 @@ impl Interpreter {
         function: Arc<Function>,
         ty_args: Vec<Type>,
         args: Vec<Value>,
-        data_store: &mut impl DataStore,
+        data_store: &mut dyn DataStore,
         gas_meter: &mut impl GasMeter,
         extensions: &mut NativeContextExtensions,
         loader: &Loader,
@@ -113,7 +113,7 @@ impl Interpreter {
     fn execute_main(
         mut self,
         loader: &Loader,
-        data_store: &mut impl DataStore,
+        data_store: &mut dyn DataStore,
         gas_meter: &mut impl GasMeter,
         extensions: &mut NativeContextExtensions,
         function: Arc<Function>,
@@ -539,7 +539,7 @@ impl Interpreter {
     fn load_resource<'b>(
         loader: &Loader,
         gas_meter: &mut impl GasMeter,
-        data_store: &'b mut impl DataStore,
+        data_store: &'b mut dyn DataStore,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<&'b mut GlobalValue> {
@@ -580,7 +580,7 @@ impl Interpreter {
         is_generic: bool,
         loader: &Loader,
         gas_meter: &mut impl GasMeter,
-        data_store: &mut impl DataStore,
+        data_store: &mut dyn DataStore,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<()> {
@@ -601,7 +601,7 @@ impl Interpreter {
         is_generic: bool,
         loader: &Loader,
         gas_meter: &mut impl GasMeter,
-        data_store: &mut impl DataStore,
+        data_store: &mut dyn DataStore,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<()> {
@@ -618,7 +618,7 @@ impl Interpreter {
         is_generic: bool,
         loader: &Loader,
         gas_meter: &mut impl GasMeter,
-        data_store: &mut impl DataStore,
+        data_store: &mut dyn DataStore,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<()> {
@@ -648,7 +648,7 @@ impl Interpreter {
         is_generic: bool,
         loader: &Loader,
         gas_meter: &mut impl GasMeter,
-        data_store: &mut impl DataStore,
+        data_store: &mut dyn DataStore,
         addr: AccountAddress,
         ty: &Type,
         resource: Value,
@@ -1047,7 +1047,7 @@ impl Frame {
         &mut self,
         resolver: &Resolver,
         interpreter: &mut Interpreter,
-        data_store: &mut impl DataStore,
+        data_store: &mut dyn DataStore,
         gas_meter: &mut impl GasMeter,
     ) -> VMResult<ExitCode> {
         self.execute_code_impl(resolver, interpreter, data_store, gas_meter)
@@ -1666,7 +1666,7 @@ impl Frame {
         &mut self,
         resolver: &Resolver,
         interpreter: &mut Interpreter,
-        data_store: &mut impl DataStore,
+        data_store: &mut dyn DataStore,
         gas_meter: &mut impl GasMeter,
     ) -> PartialVMResult<ExitCode> {
         use SimpleInstruction as S;

@@ -57,6 +57,4 @@ pub trait DataStore {
         ty: Type,
         val: Value,
     ) -> PartialVMResult<()>;
-
-    fn events(&self) -> &Vec<(Vec<u8>, u64, Type, MoveTypeLayout, Value)>;
 }
