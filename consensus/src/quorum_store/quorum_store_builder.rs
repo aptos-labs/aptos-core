@@ -282,7 +282,7 @@ impl InnerBuilder {
         let batch_generator = BatchGenerator::new(
             self.epoch,
             self.author,
-            self.config.clone(),
+            self.config,
             self.quorum_store_storage.clone(),
             self.quorum_store_to_mempool_sender,
             self.mempool_txn_pull_timeout_ms,
@@ -307,9 +307,9 @@ impl InnerBuilder {
                 self.config.max_batch_bytes as u64,
             );
             #[allow(unused_variables)]
-            let name = format!("batch_coordinator-{}", i).as_str();
+            let name = format!("batch_coordinator-{}", i);
             spawn_named!(
-                name,
+                name.as_str(),
                 batch_coordinator.start(remote_batch_coordinator_cmd_rx)
             );
         }

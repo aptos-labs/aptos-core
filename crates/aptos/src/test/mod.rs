@@ -720,6 +720,8 @@ impl CliTestFramework {
                 },
                 encoding_options: Default::default(),
             },
+            vanity_prefix: None,
+            vanity_multisig: false,
         }
         .execute()
         .await

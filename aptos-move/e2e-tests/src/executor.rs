@@ -12,6 +12,7 @@ use crate::{
     },
     golden_outputs::GoldenOutputs,
 };
+use anyhow::Error;
 use aptos_bitvec::BitVec;
 use aptos_crypto::HashValue;
 use aptos_framework::ReleaseBundle;
@@ -664,5 +665,23 @@ impl FakeExecutor {
         let (writes, _deltas, _events) = change_set.into_inner();
         let write_set = writes.into_write_set().expect("should not fail");
         Ok(write_set)
+    }
+
+    pub fn execute_view_function(
+        &mut self,
+        module_id: ModuleId,
+        func_name: Identifier,
+        type_args: Vec<TypeTag>,
+        arguments: Vec<Vec<u8>>,
+    ) -> Result<Vec<Vec<u8>>, Error> {
+        // No gas limit
+        AptosVM::execute_view_function(
+            self.get_state_view(),
+            module_id,
+            func_name,
+            type_args,
+            arguments,
+            u64::MAX,
+        )
     }
 }

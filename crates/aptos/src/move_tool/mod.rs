@@ -19,7 +19,7 @@ use crate::{
         },
         utils::{
             check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
-            prompt_yes_with_override, write_to_file,
+            profile_or_submit, prompt_yes_with_override, write_to_file,
         },
     },
     governance::CompileScriptFunction,
@@ -744,14 +744,7 @@ impl CliCommand<TransactionSummary> for PublishPackage {
                 MAX_PUBLISH_PACKAGE_SIZE, size
             )));
         }
-        if txn_options.profile_gas {
-            txn_options.profile_gas(payload).await
-        } else {
-            txn_options
-                .submit_transaction(payload)
-                .await
-                .map(TransactionSummary::from)
-        }
+        profile_or_submit(payload, &txn_options).await
     }
 }
 
@@ -1144,14 +1137,7 @@ impl CliCommand<TransactionSummary> for RunFunction {
             args,
         ));
 
-        if self.txn_options.profile_gas {
-            self.txn_options.profile_gas(payload).await
-        } else {
-            self.txn_options
-                .submit_transaction(payload)
-                .await
-                .map(TransactionSummary::from)
-        }
+        profile_or_submit(payload, &self.txn_options).await
     }
 }
 
@@ -1255,14 +1241,7 @@ impl CliCommand<TransactionSummary> for RunScript {
 
         let payload = TransactionPayload::Script(Script::new(bytecode, type_args, args));
 
-        if self.txn_options.profile_gas {
-            self.txn_options.profile_gas(payload).await
-        } else {
-            self.txn_options
-                .submit_transaction(payload)
-                .await
-                .map(TransactionSummary::from)
-        }
+        profile_or_submit(payload, &self.txn_options).await
     }
 }
 
@@ -1375,11 +1354,7 @@ impl FunctionArgType {
                     }),
                     // Note commas cannot be put into the strings.  But, this should be a less likely case,
                     // and the utility from having this available should be worth it.
-                    FunctionArgType::String => parse_vector_arg(arg, |arg| {
-                        bcs::to_bytes(arg).map_err(|err| {
-                            CliError::UnableToParse("vector<string>", err.to_string())
-                        })
-                    }),
+                    FunctionArgType::String => parse_vector_arg(arg, |arg| Ok(String::from(arg))),
                     FunctionArgType::U8 => parse_vector_arg(arg, |arg| {
                         u8::from_str(arg)
                             .map_err(|err| CliError::UnableToParse("vector<u8>", err.to_string()))
@@ -1516,8 +1491,8 @@ impl ArgWithType {
             FunctionArgType::Bool => serde_json::to_value(bcs::from_bytes::<bool>(&self.arg)?),
             FunctionArgType::Hex => serde_json::to_value(bcs::from_bytes::<Vec<u8>>(&self.arg)?),
             FunctionArgType::String => serde_json::to_value(bcs::from_bytes::<String>(&self.arg)?),
-            FunctionArgType::U8 => serde_json::to_value(bcs::from_bytes::<u32>(&self.arg)?),
-            FunctionArgType::U16 => serde_json::to_value(bcs::from_bytes::<u32>(&self.arg)?),
+            FunctionArgType::U8 => serde_json::to_value(bcs::from_bytes::<u8>(&self.arg)?),
+            FunctionArgType::U16 => serde_json::to_value(bcs::from_bytes::<u16>(&self.arg)?),
             FunctionArgType::U32 => serde_json::to_value(bcs::from_bytes::<u32>(&self.arg)?),
             FunctionArgType::U64 => {
                 serde_json::to_value(bcs::from_bytes::<u64>(&self.arg)?.to_string())
@@ -1586,7 +1561,6 @@ impl FromStr for ArgWithType {
                 "Arguments must be pairs of <type>:<arg> e.g. bool:true".to_string(),
             ));
         }
-
         let ty = FunctionArgType::from_str(parts.first().unwrap())?;
         let arg = parts.last().unwrap();
         let arg = ty.parse_arg(arg)?;

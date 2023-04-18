@@ -74,8 +74,8 @@ The raw transaction includes the following fields:
 
 | Description                                                  | Aptos Node Component Interactions                           |
 | ------------------------------------------------------------ | ---------------------------------------------------------- |
-| 1. **Client → REST service**: The client submits transaction T<sub>5</sub> to the REST service of an Aptos fullnode. The fullnode uses the REST service to forward the transaction to its own mempool, which then forwards the transaction to mempools running on other nodes in the network. The transaction will eventually be forwarded to a mempool running on a validator Fullnode, which will send it to a validator node (V<sub>1</sub> in this case). | [1. REST Service](#1-client--rest-service)                  |
-| 2. **REST service → Mempool**: The fullnode's REST service transmits transaction T<sub>5</sub> to validator V<sub>1</sub>'s mempool. | [2. REST Service](#2-rest-service--mempool), [1. Mempool](#1-rest-service--mempool) |
+| 1. **Client → REST service**: The client submits transaction T<sub>5</sub> to the REST service of an Aptos fullnode. The fullnode uses the REST service to forward the transaction to its own mempool, which then forwards the transaction to mempools running on other nodes in the network. The transaction will eventually be forwarded to a mempool running on a validator fullnode, which will send it to a validator node (V<sub>1</sub> in this case). | [1. REST Service](#1-client--rest-service)                  |
+| 2. **REST service → Mempool**: The fullnode's mempool transmits transaction T<sub>5</sub> to validator V<sub>1</sub>'s mempool. | [2. REST Service](#2-rest-service--mempool), [1. Mempool](#1-rest-service--mempool) |
 | 3. **Mempool → Virtual Machine (VM)**: Mempool will use the virtual machine (VM) component to perform transaction validation, such as signature verification, account balance verification and replay resistance using the sequence number. | [4. Mempool](#4-mempool--vm), [3. Virtual Machine](#3-mempool--virtual-machine) |
 
 
@@ -157,12 +157,15 @@ A client submits a transaction to the REST service of an Aptos fullnode.
 
 ### 2. REST Service → Mempool
 
-The REST service forwards the transaction to a validator fullnode, which then sends it to validator node V<sub>X</sub>'s mempool. The mempool will accept the transaction T<sub>N</sub> only if the sequence number of T<sub>N</sub> is greater than or equal to the current sequence number of the sender's account (note that the transaction will not be passed to consensus until the sequence number matches the sequence number of the sender’s account).
+The REST service of the fullnode puts the transaction in its mempool. After mempool does some initial checks, REST Service will return a status to the client indicating whether the transaction was accepted or rejected. For example, out-of-date transactions will be rejected: mempool will accept the transaction T<sub>N</sub> only if the sequence number of T<sub>N</sub> is greater than or equal to the current sequence number of the sender's account.
 
-### 3. REST Service → Storage
+### 3. Mempool -> Mempool
+
+The mempool on the fullnode sends the transaction to the mempool of a validator fullnode, which then sends the transaction to validator node V<sub>X</sub>'s mempool.  Note that the transaction will not be sent to the next mempool (or passed to consensus) until the sequence number matches the sequence number of the sender’s account.
+
+### 4. REST Service → Storage
 
 When a client performs a read query on the Aptos blockchain (for example, to get the balance of Alice's account), the REST service interacts with the storage component directly to obtain the requested information.
-
 
 ## Virtual Machine (VM)
 
@@ -216,7 +219,7 @@ Mempool is a shared buffer that holds the transactions that are “waiting” to
 
 ### 1. REST Service → Mempool
 
-* After receiving a transaction from the client, the REST service proxies the transaction to a validator fullnode. The transaction is then sent to the validator node’s mempool.
+* After receiving a transaction from the client, the REST service sends the transaction to its own mempool, which then shares the transaction with the mempool of a validator fullnode. The mempool on the validator fullnode then shares the transaction with the mempool of a validator.
 * The mempool for validator node V<sub>X</sub> accepts transaction T<sub>N</sub> for the sender's account only if the sequence number of T<sub>N</sub> is greater than or equal to the current sequence number of the sender's account.
 
 ### 2. Mempool → Other validator nodes

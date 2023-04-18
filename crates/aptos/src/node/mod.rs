@@ -1148,7 +1148,7 @@ impl CliCommand<()> for RunLocalTestnet {
             let mut config = None;
             let start = Instant::now();
             while start.elapsed() < max_wait {
-                if let Ok(loaded_config) = NodeConfig::load(&config_path) {
+                if let Ok(loaded_config) = NodeConfig::load_from_path(&config_path) {
                     config = Some(loaded_config);
                     break;
                 }

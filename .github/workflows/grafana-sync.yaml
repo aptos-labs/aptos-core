@@ -11,7 +11,7 @@ on:
     - cron: "0 */3 * * *"
 
 env:
-  GRAFANA_API_KEY: ${{ secrets.GRAFANA_API_KEY }}
+  GRAFANA_API_KEY: ${{ secrets.GRAFANA_CLOUD_API_KEY }}
 
 jobs:
   grafana-sync:

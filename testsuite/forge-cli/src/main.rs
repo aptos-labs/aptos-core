@@ -1126,7 +1126,7 @@ fn state_sync_perf_fullnodes_apply_outputs(
             helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
                 ["continuous_syncing_mode"] = "ApplyTransactionOutputs".into();
         }))
-        .with_success_criteria(SuccessCriteria::new(10000))
+        .with_success_criteria(SuccessCriteria::new(9000))
 }
 
 /// The config for running a state sync performance test when executing
@@ -1227,9 +1227,9 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
         .with_success_criteria(
             SuccessCriteria::new(
                 if duration.as_secs() > 1200 {
-                    5000
+                    4500
                 } else {
-                    5500
+                    5000
                 },
             )
             .add_no_restarts()

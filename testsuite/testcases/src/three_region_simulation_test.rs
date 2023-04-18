@@ -86,18 +86,15 @@ fn create_three_region_swarm_network_delay(swarm: &dyn Swarm) -> SwarmNetworkDel
     }
 }
 
-/// 10 Gbps network bandwidth simulation between all regions within
+/// 1000 mbps network bandwidth simulation between all regions within
 /// the same cloud with dedicated backbone like GCP
-fn create_bandwidth_limit(swarm: &dyn Swarm) -> SwarmNetworkBandwidth {
-    let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
+fn create_bandwidth_limit() -> SwarmNetworkBandwidth {
     SwarmNetworkBandwidth {
         group_network_bandwidths: vec![GroupNetworkBandwidth {
-            name: "forge-namespace-10000mbps-bandwidth".to_owned(),
-            rate: 10000 / 8, // 10 Gbps in megabytes per second
+            name: "forge-namespace-1000mbps-bandwidth".to_owned(),
+            rate: 1000, // 1000 megabytes per second
             limit: 20971520,
             buffer: 10000,
-            source_nodes: all_validators.clone(),
-            target_nodes: all_validators,
         }],
     }
 }
@@ -174,7 +171,7 @@ impl NetworkLoadTest for ThreeRegionSameCloudSimulationTest {
         ctx.swarm().inject_chaos(chaos)?;
 
         // inject bandwidth limit
-        let bandwidth = create_bandwidth_limit(ctx.swarm());
+        let bandwidth = create_bandwidth_limit();
         let chaos = SwarmChaos::Bandwidth(bandwidth);
         ctx.swarm().inject_chaos(chaos)?;
 

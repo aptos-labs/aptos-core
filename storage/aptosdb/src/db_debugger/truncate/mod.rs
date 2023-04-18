@@ -60,7 +60,8 @@ impl Cmd {
             );
             println!("Creating backup at: {:?}", &backup_checkpoint_dir);
             fs::create_dir_all(&backup_checkpoint_dir)?;
-            AptosDB::create_checkpoint(&self.db_dir, backup_checkpoint_dir)?;
+            // TODO(grao): Support sharded state merkle db here.
+            AptosDB::create_checkpoint(&self.db_dir, backup_checkpoint_dir, false)?;
             println!("Done!");
         } else {
             println!("Opted out backup creation!.");

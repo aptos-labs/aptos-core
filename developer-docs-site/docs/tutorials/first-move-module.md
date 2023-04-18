@@ -32,10 +32,10 @@ Start a new terminal and run the following command to initialize a new local acc
 aptos init
 ```
 
-You will see output asking for an endpoint:
+You will see output asking to choose a network:
 
 ```text
-Enter your rest endpoint [Current: None | No input: https://fullnode.devnet.aptoslabs.com/v1]
+Choose network from [devnet, testnet, mainnet, local, custom | defaults to devnet]
 ```
 
 Press **return** to accept the default devnet network or specify the network of your choosing:
@@ -50,12 +50,15 @@ See and respond to the prompt for your private key by accepting the default to c
 Enter your private key as a hex literal (0x...) [Current: None | No input: Generate new key (or keep one if present)]
 ```
 
-Assuming you elected to create anew, you will see:
+Assuming you elected to create a new, you will see:
 
 ```text
 No key given, generating key...
-Account a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a doesn't exist, creating it and funding it with 10000 Octas
-Aptos is now set up for account a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a!  Run `aptos help` for more information about commands
+Account a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a doesn't exist, creating it and funding it with 100000000 Octas
+Account a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a funded successfully
+
+---
+Aptos CLI is now set up for account a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a as profile default!  Run `aptos --help` for more information about commands
 {
   "Result": "Success"
 }
@@ -72,7 +75,7 @@ You will see output resembling:
 
 ```text
 {
-  "Result": "Added 500000 Octas to account a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a"
+  "Result": "Added 100000000 Octas to account a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a"
 }
 ```
 
@@ -196,7 +199,7 @@ Upon success, the CLI will print out the following:
 }
 ```
 
-The `set_message` function modifies the `hello_blockchain` `MessageHolder` resource. A resource is a data structure that is stored in [global storage](https://move-language.github.io/move/structs-and-resources.html#storing-resources-in-global-storage). The resource can be read by querying the following REST API:
+The `set_message` function modifies the `hello_blockchain` `MessageHolder` resource. A resource is a data structure that is stored in [global storage](../guides/move-guides/book/structs-and-resources.md#storing-resources-in-global-storage). The resource can be read by querying the following REST API:
 
 ```bash
 

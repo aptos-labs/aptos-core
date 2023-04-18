@@ -10,9 +10,13 @@ from aptos_sdk.account_address import AccountAddress
 from aptos_sdk.async_client import ClientConfig, FaucetClient, RestClient
 from aptos_sdk.authenticator import Authenticator, Ed25519Authenticator
 from aptos_sdk.bcs import Serializer
-from aptos_sdk.transactions import (EntryFunction, RawTransaction,
-                                    SignedTransaction, TransactionArgument,
-                                    TransactionPayload)
+from aptos_sdk.transactions import (
+    EntryFunction,
+    RawTransaction,
+    SignedTransaction,
+    TransactionArgument,
+    TransactionPayload,
+)
 from aptos_sdk.type_tag import StructTag, TypeTag
 
 from .common import FAUCET_URL, NODE_URL

@@ -747,15 +747,15 @@ impl StateStore {
         version: Version,
         base_version: Option<Version>,
     ) -> Result<HashValue> {
-        let (batch, hash) = self.state_merkle_db.merklize_value_set(
+        let (top_levels_batch, sharded_batch, hash) = self.state_merkle_db.merklize_value_set(
             value_set,
             node_hashes,
             version,
             base_version,
             None, // previous epoch ending version
         )?;
-        // TODO(grao): Support sharding here.
-        self.state_merkle_db.metadata_db().write_schemas(batch)?;
+        self.state_merkle_db
+            .commit(version, top_levels_batch, sharded_batch)?;
         Ok(hash)
     }
 
