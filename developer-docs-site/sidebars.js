@@ -217,6 +217,14 @@ const sidebars = {
         "guides/move-guides/book/coding-conventions",
       ],
     },
+    {
+      type: "category",
+      label: "Move Prover Book",
+      link: { type: "doc", id: "guides/prover-guides/index" },
+      collapsible: true,
+      collapsed: true,
+      items: ["guides/prover-guides/prover-guide", "guides/prover-guides/spec-lang"],
+    },
   ],
   nftSidebar: [
     {
