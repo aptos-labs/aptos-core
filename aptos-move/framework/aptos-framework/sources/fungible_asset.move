@@ -4,12 +4,12 @@ module aptos_framework::fungible_asset {
     use aptos_framework::event;
     use aptos_framework::object::{Self, Object, ConstructorRef, DeleteRef};
     use aptos_framework::optional_aggregator::{Self, OptionalAggregator};
-    use std::string;
 
     use std::error;
+    use std::features;
     use std::option::{Self, Option};
     use std::signer;
-    use std::string::String;
+    use std::string::{Self, String};
 
     /// Amount cannot be zero.
     const EAMOUNT_CANNOT_BE_ZERO: u64 = 1;
@@ -45,6 +45,10 @@ module aptos_framework::fungible_asset {
     const ESYMBOL_TOO_LONG: u64 = 16;
     /// Decimals is over the maximum of 32
     const EDECIMALS_TOO_LARGE: u64 = 17;
+    /// Fungible assets are currently not enabled.
+    const EFUNGIBLE_ASSETS_DISABLED: u64 = 18;
+    /// Metadata of the input fungible assets do not match.
+    const EFUNGIBLE_ASSET_METADATA_MISMATCH: u64 = 19;
 
     //
     // Constants
@@ -143,6 +147,8 @@ module aptos_framework::fungible_asset {
         symbol: String,
         decimals: u8,
     ): Object<Metadata> {
+        assert!(features::fungible_assets_enabled(), error::unavailable(EFUNGIBLE_ASSETS_DISABLED));
+
         let metadata_object_signer = &object::generate_signer(constructor_ref);
         let supply = option::map(monitoring_supply_with_maximum, |maximum| {
             Supply {
@@ -474,6 +480,10 @@ module aptos_framework::fungible_asset {
     /// "Merges" the two given fungible assets. The fungible asset passed in as `dst_fungible_asset` will have a value
     /// equal to the sum of the two (`dst_fungible_asset` and `src_fungible_asset`).
     public fun merge(dst_fungible_asset: &mut FungibleAsset, src_fungible_asset: FungibleAsset) {
+        assert!(
+            src_fungible_asset.metadata == dst_fungible_asset.metadata,
+            error::invalid_argument(EFUNGIBLE_ASSET_METADATA_MISMATCH),
+        );
         let FungibleAsset { metadata: _, amount } = src_fungible_asset;
         dst_fungible_asset.amount = dst_fungible_asset.amount + amount;
     }
@@ -583,7 +593,11 @@ module aptos_framework::fungible_asset {
     }
 
     #[test_only]
-    public fun init_test_metadata(constructor_ref: &ConstructorRef): (MintRef, TransferRef, BurnRef) {
+    public fun init_test_metadata(
+        aptos_framework: &signer,
+        constructor_ref: &ConstructorRef,
+    ): (MintRef, TransferRef, BurnRef) {
+        features::change_feature_flags(aptos_framework, vector[features::get_fungible_assets()], vector[]);
         add_fungibility(
             constructor_ref,
             option::some(option::some(100)) /* max supply */,
@@ -599,10 +613,11 @@ module aptos_framework::fungible_asset {
 
     #[test_only]
     public fun create_fungible_asset(
+        aptos_framework: &signer,
         creator: &signer
     ): (MintRef, TransferRef, BurnRef, Object<TestToken>) {
         let (creator_ref, metadata) = create_test_token(creator);
-        let (mint, transfer, burn) = init_test_metadata(&creator_ref);
+        let (mint, transfer, burn) = init_test_metadata(aptos_framework, &creator_ref);
         (mint, transfer, burn, metadata)
     }
 
@@ -615,10 +630,10 @@ module aptos_framework::fungible_asset {
         create_store(&object::create_object_from_account(owner), metadata)
     }
 
-    #[test(creator = @0xcafe)]
-    fun test_metadata_basic_flow(creator: &signer) acquires Metadata {
+    #[test(aptos_framework = @0x1, creator = @0xcafe)]
+    fun test_metadata_basic_flow(aptos_framework: &signer, creator: &signer) acquires Metadata {
         let (creator_ref, asset) = create_test_token(creator);
-        init_test_metadata(&creator_ref);
+        init_test_metadata(aptos_framework, &creator_ref);
         assert!(supply(asset) == option::some(0), 1);
         assert!(maximum(asset) == option::some(100), 2);
         assert!(name(asset) == string::utf8(b"USDA"), 3);
@@ -631,37 +646,38 @@ module aptos_framework::fungible_asset {
         assert!(supply(asset) == option::some(20), 7);
     }
 
-    #[test(creator = @0xcafe)]
+    #[test(aptos_framework = @0x1, creator = @0xcafe)]
     #[expected_failure(abort_code = 0x10005, location = Self)]
-    fun test_supply_overflow(creator: &signer) acquires Metadata {
+    fun test_supply_overflow(aptos_framework: &signer, creator: &signer) acquires Metadata {
         let (creator_ref, asset) = create_test_token(creator);
-        init_test_metadata(&creator_ref);
+        init_test_metadata(aptos_framework, &creator_ref);
         increase_supply(&asset, 101);
     }
 
-    #[test(creator = @0xcafe)]
+    #[test(aptos_framework = @0x1, creator = @0xcafe)]
     #[expected_failure(abort_code = 0x10006, location = Self)]
-    fun test_supply_underflow(creator: &signer) acquires Metadata {
+    fun test_supply_underflow(aptos_framework: &signer, creator: &signer) acquires Metadata {
         let (creator_ref, asset) = create_test_token(creator);
-        init_test_metadata(&creator_ref);
+        init_test_metadata(aptos_framework, &creator_ref);
         decrease_supply(&asset, 1);
     }
 
-    #[test(creator = @0xcafe)]
-    fun test_create_and_remove_store(creator: &signer) acquires FungibleStore, FungibleAssetEvents {
-        let (_, _, _, asset) = create_fungible_asset(creator);
+    #[test(aptos_framework = @0x1, creator = @0xcafe)]
+    fun test_create_and_remove_store(aptos_framework: &signer, creator: &signer) acquires FungibleStore, FungibleAssetEvents {
+        let (_, _, _, asset) = create_fungible_asset(aptos_framework, creator);
         let creator_ref = object::create_object_from_account(creator);
         create_store(&creator_ref, asset);
         let delete_ref = object::generate_delete_ref(&creator_ref);
         remove_store(&delete_ref);
     }
 
-    #[test(creator = @0xcafe, aaron = @0xface)]
+    #[test(aptos_framework = @0x1, creator = @0xcafe, aaron = @0xface)]
     fun test_e2e_basic_flow(
+        aptos_framework: &signer,
         creator: &signer,
         aaron: &signer,
     ) acquires Metadata, FungibleStore, FungibleAssetEvents {
-        let (mint_ref, transfer_ref, burn_ref, test_token) = create_fungible_asset(creator);
+        let (mint_ref, transfer_ref, burn_ref, test_token) = create_fungible_asset(aptos_framework, creator);
         let metadata = mint_ref.metadata;
         let creator_store = create_test_store(creator, metadata);
         let aaron_store = create_test_store(aaron, metadata);
@@ -688,12 +704,13 @@ module aptos_framework::fungible_asset {
         assert!(!ungated_balance_transfer_allowed(aaron_store), 7);
     }
 
-    #[test(creator = @0xcafe)]
+    #[test(aptos_framework = @0x1, creator = @0xcafe)]
     #[expected_failure(abort_code = 0x10003, location = Self)]
     fun test_ungated_transfer(
+        aptos_framework: &signer,
         creator: &signer
     ) acquires Metadata, FungibleStore, FungibleAssetEvents {
-        let (mint_ref, transfer_ref, _burn_ref, _) = create_fungible_asset(creator);
+        let (mint_ref, transfer_ref, _burn_ref, _) = create_fungible_asset(aptos_framework, creator);
 
         let creator_store = create_test_store(creator, mint_ref.metadata);
         let fa = mint(&mint_ref, 100);
@@ -701,12 +718,13 @@ module aptos_framework::fungible_asset {
         deposit(creator_store, fa);
     }
 
-    #[test(creator = @0xcafe, aaron = @0xface)]
+    #[test(aptos_framework = @0x1, creator = @0xcafe, aaron = @0xface)]
     fun test_transfer_with_ref(
+        aptos_framework: &signer,
         creator: &signer,
         aaron: &signer,
     ) acquires Metadata, FungibleStore, FungibleAssetEvents {
-        let (mint_ref, transfer_ref, _burn_ref, _) = create_fungible_asset(creator);
+        let (mint_ref, transfer_ref, _burn_ref, _) = create_fungible_asset(aptos_framework, creator);
         let metadata = mint_ref.metadata;
         let creator_store = create_test_store(creator, metadata);
         let aaron_store = create_test_store(aaron, metadata);
@@ -722,9 +740,9 @@ module aptos_framework::fungible_asset {
         assert!(!ungated_balance_transfer_allowed(aaron_store), 4);
     }
 
-    #[test(creator = @0xcafe)]
-    fun test_merge_and_exact(creator: &signer) acquires Metadata {
-        let (mint_ref, _transfer_ref, burn_ref, _) = create_fungible_asset(creator);
+    #[test(aptos_framework = @0x1, creator = @0xcafe)]
+    fun test_merge_and_exact(aptos_framework: &signer, creator: &signer) acquires Metadata {
+        let (mint_ref, _transfer_ref, burn_ref, _) = create_fungible_asset(aptos_framework, creator);
         let fa = mint(&mint_ref, 100);
         let cash = extract(&mut fa, 80);
         assert!(fa.amount == 20, 1);

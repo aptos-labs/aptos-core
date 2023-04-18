@@ -183,6 +183,14 @@ module std::features {
         is_enabled(PARTIAL_GOVERNANCE_VOTING)
     }
 
+    /// Whether fungible assets (new standard) are enabled.
+    /// Lifetime: transient
+    const FUNGIBLE_ASSETS: u64 = 18;
+    public fun get_fungible_assets(): u64 { FUNGIBLE_ASSETS }
+    public fun fungible_assets_enabled(): bool acquires Features {
+        is_enabled(FUNGIBLE_ASSETS)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

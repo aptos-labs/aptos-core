@@ -121,14 +121,18 @@ module aptos_framework::primary_fungible_store {
     #[test_only]
     use aptos_framework::fungible_asset::{create_test_token, mint, generate_mint_ref, generate_burn_ref, MintRef, TransferRef, BurnRef, generate_transfer_ref};
     #[test_only]
-    use std::string;
+    use std::features;
     #[test_only]
     use std::option;
+    #[test_only]
+    use std::string;
 
     #[test_only]
     public fun init_test_metadata_with_primary_store_enabled(
+        aptos_framework: &signer,
         constructor_ref: &ConstructorRef
     ): (MintRef, TransferRef, BurnRef) {
+        features::change_feature_flags(aptos_framework, vector[features::get_fungible_assets()], vector[]);
         create_primary_store_enabled_fungible_asset(
             constructor_ref,
             option::some(option::some(100)) /* max supply */,
@@ -142,10 +146,10 @@ module aptos_framework::primary_fungible_store {
         (mint_ref, transfer_ref, burn_ref)
     }
 
-    #[test(creator = @0xcafe, aaron = @0xface)]
-    fun test_default_behavior(creator: &signer, aaron: &signer) acquires DeriveRefPod {
+    #[test(aptos_framework = @0x1, creator = @0xcafe, aaron = @0xface)]
+    fun test_default_behavior(aptos_framework: &signer, creator: &signer, aaron: &signer) acquires DeriveRefPod {
         let (creator_ref, metadata) = create_test_token(creator);
-        init_test_metadata_with_primary_store_enabled(&creator_ref);
+        init_test_metadata_with_primary_store_enabled(aptos_framework, &creator_ref);
         let creator_address = signer::address_of(creator);
         let aaron_address = signer::address_of(aaron);
         assert!(!primary_store_exists(creator_address, metadata), 1);
@@ -160,13 +164,14 @@ module aptos_framework::primary_fungible_store {
         assert!(primary_store_exists(aaron_address, metadata), 8);
     }
 
-    #[test(creator = @0xcafe, aaron = @0xface)]
+    #[test(aptos_framework = @0x1, creator = @0xcafe, aaron = @0xface)]
     fun test_basic_flow(
+        aptos_framework: &signer,
         creator: &signer,
         aaron: &signer,
     ) acquires DeriveRefPod {
         let (creator_ref, metadata) = create_test_token(creator);
-        let (mint_ref, _transfer_ref, _burn_ref) = init_test_metadata_with_primary_store_enabled(&creator_ref);
+        let (mint_ref, _transfer_ref, _burn_ref) = init_test_metadata_with_primary_store_enabled(aptos_framework, &creator_ref);
         let creator_address = signer::address_of(creator);
         let aaron_address = signer::address_of(aaron);
         assert!(balance(creator_address, metadata) == 0, 1);
