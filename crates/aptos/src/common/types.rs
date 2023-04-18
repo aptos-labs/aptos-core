@@ -13,6 +13,7 @@ use crate::{
     },
     config::GlobalConfig,
     genesis::git::from_yaml,
+    move_tool::{ArgWithType, MemberId},
 };
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
@@ -23,7 +24,7 @@ use aptos_gas_profiling::FrameName;
 use aptos_global_constants::adjust_gas_headroom;
 use aptos_keygen::KeyGen;
 use aptos_rest_client::{
-    aptos_api_types::{HashValue, ViewRequest},
+    aptos_api_types::{HashValue, MoveType, ViewRequest},
     error::RestError,
     Client, Transaction,
 };
@@ -31,13 +32,14 @@ use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_types::{
     chain_id::ChainId,
     transaction::{
-        authenticator::AuthenticationKey, SignedTransaction, TransactionPayload, TransactionStatus,
+        authenticator::AuthenticationKey, EntryFunction, SignedTransaction, TransactionPayload,
+        TransactionStatus,
     },
 };
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser};
 use hex::FromHexError;
-use move_core_types::account_address::AccountAddress;
+use move_core_types::{account_address::AccountAddress, language_storage::TypeTag};
 use serde::{Deserialize, Serialize};
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
@@ -1668,4 +1670,62 @@ pub struct RotationProofChallenge {
     pub originator: AccountAddress,
     pub current_auth_key: AccountAddress,
     pub new_public_key: Vec<u8>,
+}
+
+/// Common options for constructing an entry function transaction payload.
+#[derive(Debug, Parser)]
+pub struct EntryFunctionArguments {
+    /// Function name as `<ADDRESS>::<MODULE_ID>::<FUNCTION_NAME>`
+    ///
+    /// Example: `0x842ed41fad9640a2ad08fdd7d3e4f7f505319aac7d67e1c0dd6a7cce8732c7e3::message::set_message`
+    #[clap(long)]
+    pub function_id: MemberId,
+
+    /// Arguments combined with their type separated by spaces.
+    ///
+    /// Supported types [u8, u16, u32, u64, u128, u256, bool, hex, string, address, raw, vector<inner_type>]
+    ///
+    /// Example: `address:0x1 bool:true u8:0 u256:1234 'vector<u32>:a,b,c,d'`
+    #[clap(long, multiple_values = true)]
+    pub args: Vec<ArgWithType>,
+
+    /// TypeTag arguments separated by spaces.
+    ///
+    /// Example: `u8 u16 u32 u64 u128 u256 bool address vector signer`
+    #[clap(long, multiple_values = true)]
+    pub type_args: Vec<MoveType>,
+}
+
+impl EntryFunctionArguments {
+    /// Construct and return an entry function payload from function_id, args, and type_args.
+    pub fn create_entry_function_payload(self) -> CliTypedResult<EntryFunction> {
+        let args: Vec<Vec<u8>> = self
+            .args
+            .into_iter()
+            .map(|arg_with_type| arg_with_type.arg)
+            .collect();
+
+        let mut parsed_type_args: Vec<TypeTag> = Vec::new();
+        // These TypeArgs are used for generics
+        for type_arg in self.type_args.into_iter() {
+            let type_tag = TypeTag::try_from(type_arg.clone())
+                .map_err(|err| CliError::UnableToParse("--type-args", err.to_string()))?;
+            parsed_type_args.push(type_tag)
+        }
+
+        Ok(EntryFunction::new(
+            self.function_id.module_id,
+            self.function_id.member_id,
+            parsed_type_args,
+            args,
+        ))
+    }
+}
+
+/// Common options for interactions with a multisig account.
+#[derive(Clone, Debug, Parser, Serialize)]
+pub struct MultisigAccount {
+    /// The address of the multisig account to interact with.
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    pub(crate) multisig_address: AccountAddress,
 }
