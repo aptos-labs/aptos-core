@@ -8,6 +8,7 @@
 // A helper file is provided to manipulate that file to generate
 // multiple, publishable module.
 module 0xABCD::Simple {
+    use std::error;
     use std::signer;
     use std::string::{Self, String, utf8};
     use std::vector;
@@ -17,6 +18,9 @@ module 0xABCD::Simple {
     // That would affect the size of the module being published
     // and the cost of loading a constant.
     const RANDOM: vector<u64> = vector<u64>[0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+
+    // Resource being modified doesn't exist
+    const ECOUNTER_RESOURCE_NOT_PRESENT: u64 = 1;
 
     // Load and return a value from the constant `RANDOM`.
     // No data read or write.
@@ -80,7 +84,7 @@ module 0xABCD::Simple {
     // classic langages) by `COUNTER_STEP`.
     // The idea is that `COUNTER_STEP` is one of the few values (if not the only
     // one) that changes across versions.
-    public entry fun step(s: &signer) acquires Counter {
+    public entry fun step_signer(s: &signer) acquires Counter {
         let counter = borrow_global_mut<Counter>(signer::address_of(s));
         *(&mut counter.count) = counter.count + COUNTER_STEP;
     }
@@ -89,6 +93,22 @@ module 0xABCD::Simple {
     public entry fun get_counter(s: &signer) acquires Counter {
         let counter = borrow_global<Counter>(signer::address_of(s));
         counter.count;
+    }
+
+    public entry fun step_destination(owner: &signer, destination: address) acquires Counter {
+        let value = {
+            assert!(exists<Counter>(destination), error::invalid_argument(ECOUNTER_RESOURCE_NOT_PRESENT));
+
+            let counter = borrow_global_mut<Counter>(destination);
+            *(&mut counter.count) = counter.count + COUNTER_STEP;
+            counter.count
+        };
+        if (exists<Counter>(signer::address_of(owner))) {
+            let counter_owner = borrow_global_mut<Counter>(signer::address_of(owner));
+            *(&mut counter_owner.count) = value;
+        } else {
+            move_to<Counter>(owner, Counter { count: value });
+        }
     }
 
     //
