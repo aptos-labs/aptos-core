@@ -33,7 +33,7 @@ pub struct MVHashMap<K, V, X: Executable> {
     code: VersionedCode<K, V, X>,
 }
 
-impl<K: ModulePath + Hash + Clone + Eq, V, X: Executable> MVHashMap<K, V, X> {
+impl<K: ModulePath + Hash + Clone + Eq, V: Clone, X: Executable> MVHashMap<K, V, X> {
     // -----------------------------------
     // Functions shared for data and code.
 
@@ -117,7 +117,7 @@ impl<K: ModulePath + Hash + Clone + Eq, V, X: Executable> MVHashMap<K, V, X> {
     }
 }
 
-impl<K: ModulePath + Hash + Clone + Eq, V, X: Executable> Default for MVHashMap<K, V, X> {
+impl<K: ModulePath + Hash + Clone + Eq, V: Clone, X: Executable> Default for MVHashMap<K, V, X> {
     fn default() -> Self {
         Self::new(None)
     }

@@ -4,7 +4,7 @@
 use crate::{
     effects::Op,
     remote_cache::StateViewWithRemoteCache,
-    write::{AptosResource, WriteOp},
+    write::AptosResource,
 };
 use aptos_types::state_store::state_key::StateKey;
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult};

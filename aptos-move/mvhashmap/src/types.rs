@@ -38,9 +38,8 @@ pub enum MVDataOutput<V> {
     /// actual data because u128 is cheap to copy and validation can be done correctly
     /// on values as well (ABA is not a problem).
     Resolved(u128),
-    /// Information from the last versioned-write. Note that the version is returned
-    /// and not the data to avoid copying big values around.
-    Versioned(Version, Arc<V>),
+    /// Information from the last versioned-write.
+    Versioned(Version, V),
 }
 
 /// Returned as Ok(..) when read successfully from the multi-version data-structure.

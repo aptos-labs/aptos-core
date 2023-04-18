@@ -34,7 +34,7 @@ impl<T: Transaction> OutputDeltaResolver<T> {
                 base_view
                     .get_state_value_bytes(&key)
                     .ok() // Was anything found in storage
-                    .and_then(|value| value.map(|bytes| deserialize(&bytes))),
+                    .and_then(|value| value.map(|bytes| bcs::from_bytes(&bytes).expect("unexpected deserialization error in aggregator"))),
             ) {
                 ret[idx as usize].push((key.clone(), WriteOp::ResourceWrite(Op::Modification(AptosResource::AggregatorValue(value)))));
             }

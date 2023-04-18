@@ -3,7 +3,6 @@
 
 use crate::types::{Incarnation, MVDataError, MVDataOutput, TxnIndex, Version};
 use aptos_infallible::Mutex;
-use aptos_types::write_set::TransactionWrite;
 use aptos_vm_types::delta::DeltaOp;
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
@@ -37,7 +36,7 @@ enum EntryCell<V> {
     /// has: 1) Incarnation number of the transaction that wrote the entry (note
     /// that TxnIndex is part of the key and not recorded here), 2) actual data
     /// stored in a shared pointer (to ensure ownership and avoid clones).
-    Write(Incarnation, Arc<V>),
+    Write(Incarnation, V),
 
     /// Recorded in the shared multi-version data-structure for each delta.
     Delta(DeltaOp),
@@ -63,7 +62,7 @@ impl<V> Entry<V> {
     pub fn new_write_from(flag: usize, incarnation: Incarnation, data: V) -> Entry<V> {
         Entry {
             flag: AtomicUsize::new(flag),
-            cell: EntryCell::Write(incarnation, Arc::new(data)),
+            cell: EntryCell::Write(incarnation, data),
         }
     }
 
@@ -98,7 +97,7 @@ impl<V> Default for VersionedValue<V> {
     }
 }
 
-impl<K: Hash + Clone + Eq, V> VersionedData<K, V> {
+impl<K: Hash + Clone + Eq, V: Clone> VersionedData<K, V> {
     pub(crate) fn new() -> Self {
         Self {
             values: DashMap::new(),

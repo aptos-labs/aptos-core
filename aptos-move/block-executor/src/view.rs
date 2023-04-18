@@ -4,7 +4,6 @@
 use crate::{
     counters, scheduler::Scheduler, task::Transaction, txn_last_input_output::ReadDescriptor,
 };
-use aptos_aggregator::delta_change_set::{deserialize, serialize};
 use aptos_logger::error;
 use aptos_mvhashmap::{
     types::{MVCodeError, MVCodeOutput, MVDataError, MVDataOutput, TxnIndex},
@@ -45,7 +44,7 @@ pub(crate) struct MVHashMapView<'a, K, V> {
 #[derive(Debug)]
 pub(crate) enum ReadResult<V> {
     // Successful read of a value.
-    Value(Arc<V>),
+    Value(V),
     // Similar to above, but the value was aggregated and is an integer.
     U128(u128),
     // Read failed while resolving a delta.
@@ -54,7 +53,7 @@ pub(crate) enum ReadResult<V> {
     None,
 }
 
-impl<'a, K: ModulePath + PartialOrd + Ord + Send + Clone + Hash + Eq, V: Send + Sync>
+impl<'a, K: ModulePath + PartialOrd + Ord + Send + Clone + Hash + Eq, V: Send + Sync + Clone>
     MVHashMapView<'a, K, V>
 {
     pub(crate) fn new(

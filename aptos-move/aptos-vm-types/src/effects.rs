@@ -4,7 +4,6 @@
 // use std::fmt::{Debug, Formatter, Result};
 
 use anyhow::bail;
-use move_binary_format::errors::PartialVMResult;
 
 /// Represents a write op at the VM level.
 #[derive(Clone, Debug, PartialEq, Eq)]

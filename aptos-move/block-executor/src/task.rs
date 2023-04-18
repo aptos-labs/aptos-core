@@ -24,7 +24,7 @@ pub enum ExecutionStatus<T, E> {
 /// transaction will write to a key value storage as their side effect.
 pub trait Transaction: Sync + Send + 'static {
     type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug;
-    type Value: Send + Sync;
+    type Value: Send + Sync + Clone;
 }
 
 /// Inference result of a transaction.

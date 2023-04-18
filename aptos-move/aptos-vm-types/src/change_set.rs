@@ -13,7 +13,7 @@ use aptos_types::{
     state_store::state_key::StateKey,
     write_set::{WriteSet, WriteSetMut},
 };
-use move_binary_format::errors::{Location, PartialVMResult};
+use move_binary_format::errors::Location;
 use move_core_types::vm_status::VMStatus;
 use std::{
     collections::{

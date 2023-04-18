@@ -78,7 +78,7 @@ impl<V> Entry<V> {
     }
 }
 
-impl<V, X: Executable> VersionedValue<V, X> {
+impl<V: Clone, X: Executable> VersionedValue<V, X> {
     pub fn new() -> Self {
         Self {
             versioned_map: BTreeMap::new(),
@@ -106,13 +106,13 @@ impl<V, X: Executable> VersionedValue<V, X> {
     }
 }
 
-impl<V, X: Executable> Default for VersionedValue<V, X> {
+impl<V: Clone, X: Executable> Default for VersionedValue<V, X> {
     fn default() -> Self {
         VersionedValue::new()
     }
 }
 
-impl<K: Hash + Clone + Eq, V, X: Executable> VersionedCode<K, V, X> {
+impl<K: Hash + Clone + Eq, V: Clone, X: Executable> VersionedCode<K, V, X> {
     pub(crate) fn new() -> Self {
         Self {
             values: DashMap::new(),
@@ -189,7 +189,7 @@ impl<K: Hash + Clone + Eq, V, X: Executable> VersionedCode<K, V, X> {
     }
 }
 
-impl<K: Hash + Clone + Eq, V, X: Executable> Default for VersionedCode<K, V, X> {
+impl<K: Hash + Clone + Eq, V: Clone, X: Executable> Default for VersionedCode<K, V, X> {
     fn default() -> Self {
         VersionedCode::new()
     }

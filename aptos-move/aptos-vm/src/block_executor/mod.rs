@@ -154,13 +154,13 @@ impl BlockAptosVM {
         }
     }
 
-    pub fn execute_block_benchmark<S: StateViewWithRemoteCache + Sync>(
+    pub fn execute_block_benchmark_parallel<S: StateViewWithRemoteCache + Sync>(
         transactions: Vec<Transaction>,
         state_view: &S,
         concurrency_level: usize,
     ) -> (
         usize,
-        Option<Result<Vec<TransactionOutput>, Error<VMStatus>>>,
+        Option<Result<Vec<FinalTransactionOutput>, Error<VMStatus>>>,
     ) {
         // Verify the signatures of all the transactions in parallel.
         // This is time consuming so don't wait and do the checking
@@ -199,9 +199,21 @@ impl BlockAptosVM {
             results
                 .into_iter()
                 .map(|(output, delta_writes)| {
-                    output // AptosTransactionOutput
-                    .into() // TransactionOutputExt
-                    .output_with_delta_writes(WriteSetMut::new(delta_writes))
+                    let (mut writes, deltas, events, gas_used, status) = output.into().unpack();
+
+                    // We should have a delta write for every delta in the output.
+                    assert_eq!(deltas.len(), delta_writes.len());
+
+                    // Recall that deltas and writes must have different state keys, and thus
+                    // the merge must succeed.
+                    writes
+                        .merge_writes(delta_writes)
+                        .expect("merging materialized aggregator deltas should not fail");
+
+                    // TODO: If conversion to WriteSet fails, it means deserialization failure. Is it ok
+                    // to assume it never happens?
+                    let write_set = writes.into_write_set().unwrap();
+                    FinalTransactionOutput::new(write_set, events, gas_used, status)
                 })
                 .collect()
         });
@@ -212,12 +224,12 @@ impl BlockAptosVM {
         )
     }
 
-    fn execute_block_benchmark_sequential<S: StateView + Sync>(
+    fn execute_block_benchmark_sequential<S: StateViewWithRemoteCache + Sync>(
         transactions: Vec<Transaction>,
         state_view: &S,
     ) -> (
         usize,
-        Option<Result<Vec<TransactionOutput>, Error<VMStatus>>>,
+        Option<Result<Vec<FinalTransactionOutput>, Error<VMStatus>>>,
     ) {
         // Verify the signatures of all the transactions in parallel.
         // This is time consuming so don't wait and do the checking
@@ -246,14 +258,19 @@ impl BlockAptosVM {
         );
 
         // Sequential execution does not have deltas, assert and convert to the same type.
-        let seq_ret: Result<Vec<TransactionOutput>, Error<VMStatus>> = seq_ret.map(|results| {
+        let seq_ret: Result<Vec<FinalTransactionOutput>, Error<VMStatus>> = seq_ret.map(|results| {
             results
                 .into_iter()
                 .map(|(output, deltas)| {
                     assert_eq!(deltas.len(), 0);
-                    output
-                        .into()
-                        .output_with_delta_writes(WriteSetMut::new(vec![]))
+
+                    let (writes, output_deltas, events, gas_used, status) = output.into().unpack();
+                    assert_eq!(output_deltas.len(), 0);
+
+                    // TODO: If conversion to WriteSet fails, it means deserialization failure. Is it ok
+                    // to assume it never happens?
+                    let write_set = writes.into_write_set().unwrap();
+                    FinalTransactionOutput::new(write_set, events, gas_used, status)
                 })
                 .collect()
         });
@@ -264,7 +281,7 @@ impl BlockAptosVM {
         )
     }
 
-    pub fn execute_block_benchmark<S: StateView + Sync>(
+    pub fn execute_block_benchmark<S: StateViewWithRemoteCache + Sync>(
         transactions: Vec<Transaction>,
         state_view: &S,
         concurrency_level: usize,
