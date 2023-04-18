@@ -39,7 +39,7 @@ async fn test_connection_limiting() {
     let (private_key, peer_set) =
         generate_private_key_and_peer(&cli, host.clone(), [1u8; 32]).await;
     let discovery_file = create_discovery_file(peer_set.clone());
-    let mut full_node_config = NodeConfig::default_for_validator_full_node();
+    let mut full_node_config = NodeConfig::get_default_vfn_config();
     modify_network_config(&mut full_node_config, &NetworkId::Public, |network| {
         network.discovery_method = DiscoveryMethod::None;
         network.discovery_methods = vec![
@@ -69,7 +69,7 @@ async fn test_connection_limiting() {
         .add_full_node(
             &version,
             add_identity_to_config(
-                NodeConfig::default_for_public_full_node(),
+                NodeConfig::get_default_pfn_config(),
                 &NetworkId::Public,
                 private_key,
                 peer_set,
@@ -109,7 +109,7 @@ async fn test_connection_limiting() {
         .add_full_node(
             &version,
             add_identity_to_config(
-                NodeConfig::default_for_public_full_node(),
+                NodeConfig::get_default_pfn_config(),
                 &NetworkId::Public,
                 private_key,
                 peer_set,
@@ -146,7 +146,7 @@ async fn test_rest_discovery() {
         let validator = swarm.validators().next().unwrap();
         (validator.version(), validator.rest_api_endpoint())
     };
-    let mut full_node_config = NodeConfig::default_for_public_full_node();
+    let mut full_node_config = NodeConfig::get_default_pfn_config();
     let network_config = full_node_config.full_node_networks.first_mut().unwrap();
     network_config.discovery_method = DiscoveryMethod::Rest(RestDiscovery {
         url: rest_endpoint,
@@ -212,7 +212,7 @@ async fn test_peer_monitoring_service_enabled() {
         .await;
 
     // Create a fullnode config that with peer monitoring enabled
-    let mut vfn_config = NodeConfig::default_for_validator_full_node();
+    let mut vfn_config = NodeConfig::get_default_vfn_config();
     vfn_config
         .peer_monitoring_service
         .enable_peer_monitoring_client = true;

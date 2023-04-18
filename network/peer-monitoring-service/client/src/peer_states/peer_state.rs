@@ -19,7 +19,9 @@ use aptos_config::{
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_infallible::RwLock;
 use aptos_network::application::{interface::NetworkClient, metadata::PeerMetadata};
-use aptos_peer_monitoring_service_types::{PeerMonitoringMetadata, PeerMonitoringServiceMessage};
+use aptos_peer_monitoring_service_types::{
+    response::PeerMonitoringServiceResponse, PeerMonitoringMetadata, PeerMonitoringServiceMessage,
+};
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use rand::{rngs::OsRng, Rng};
 use std::{collections::HashMap, sync::Arc, time::Duration};
@@ -82,6 +84,9 @@ impl PeerState {
         let request_jitter_ms = OsRng.gen_range(0, monitoring_service_config.max_request_jitter_ms);
         let request_timeout_ms = peer_state_value.read().get_request_timeout_ms();
 
+        // Get the max message size for the response
+        let max_num_response_bytes = monitoring_service_config.max_num_response_bytes;
+
         // Create the request task
         let request_task = async move {
             // Add some amount of jitter before sending the request.
@@ -118,6 +123,16 @@ impl PeerState {
                     return;
                 },
             };
+
+            // Verify the response respects the message size limits
+            if let Err(error) =
+                sanity_check_response_size(max_num_response_bytes, &monitoring_service_response)
+            {
+                peer_state_value
+                    .write()
+                    .handle_monitoring_service_response_error(&peer_network_id, error);
+                return;
+            }
 
             // Handle the monitoring service response
             peer_state_value.write().handle_monitoring_service_response(
@@ -228,4 +243,26 @@ impl PeerState {
             ))),
         }
     }
+}
+
+/// Sanity checks that the monitoring service response size
+/// is valid (i.e., it respects the max message size).
+fn sanity_check_response_size(
+    max_num_response_bytes: u64,
+    monitoring_service_response: &PeerMonitoringServiceResponse,
+) -> Result<(), Error> {
+    // Calculate the number of bytes in the response
+    let num_response_bytes = monitoring_service_response.get_num_bytes()?;
+
+    // Verify the response respects the max message sizes
+    if num_response_bytes > max_num_response_bytes {
+        return Err(Error::UnexpectedError(format!(
+            "The monitoring service response ({:?}) is too large: {:?}. Maximum allowed: {:?}",
+            monitoring_service_response.get_label(),
+            num_response_bytes,
+            max_num_response_bytes
+        )));
+    }
+
+    Ok(())
 }

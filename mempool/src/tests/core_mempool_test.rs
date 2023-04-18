@@ -11,7 +11,9 @@ use crate::{
 };
 use aptos_config::config::NodeConfig;
 use aptos_crypto::HashValue;
-use aptos_types::{mempool_status::MempoolStatusCode, transaction::SignedTransaction};
+use aptos_types::{
+    mempool_status::MempoolStatusCode, transaction::SignedTransaction, vm_status::DiscardedVMStatus,
+};
 use itertools::Itertools;
 use std::{
     collections::HashSet,
@@ -197,6 +199,7 @@ fn test_reject_transaction() {
         &TestTransaction::get_address(0),
         0,
         &txns[1].clone().committed_hash(), // hash of other txn
+        &DiscardedVMStatus::MALFORMED,
     );
     assert!(pool
         .get_transaction_store()
@@ -206,6 +209,30 @@ fn test_reject_transaction() {
         &TestTransaction::get_address(0),
         1,
         &txns[0].clone().committed_hash(), // hash of other txn
+        &DiscardedVMStatus::MALFORMED,
+    );
+    assert!(pool
+        .get_transaction_store()
+        .get(&TestTransaction::get_address(0), 1)
+        .is_some());
+
+    // reject with sequence number too new should have no effect
+    // reject with wrong hash should have no effect
+    pool.reject_transaction(
+        &TestTransaction::get_address(0),
+        0,
+        &txns[0].clone().committed_hash(),
+        &DiscardedVMStatus::SEQUENCE_NUMBER_TOO_NEW,
+    );
+    assert!(pool
+        .get_transaction_store()
+        .get(&TestTransaction::get_address(0), 0)
+        .is_some());
+    pool.reject_transaction(
+        &TestTransaction::get_address(0),
+        1,
+        &txns[1].clone().committed_hash(),
+        &DiscardedVMStatus::SEQUENCE_NUMBER_TOO_NEW,
     );
     assert!(pool
         .get_transaction_store()
@@ -217,6 +244,7 @@ fn test_reject_transaction() {
         &TestTransaction::get_address(0),
         0,
         &txns[0].clone().committed_hash(),
+        &DiscardedVMStatus::MALFORMED,
     );
     assert!(pool
         .get_transaction_store()
@@ -226,6 +254,7 @@ fn test_reject_transaction() {
         &TestTransaction::get_address(0),
         1,
         &txns[1].clone().committed_hash(),
+        &DiscardedVMStatus::MALFORMED,
     );
     assert!(pool
         .get_transaction_store()
@@ -237,7 +266,7 @@ fn test_reject_transaction() {
 fn test_system_ttl() {
     // Created mempool with system_transaction_timeout = 0.
     // All transactions are supposed to be evicted on next gc run.
-    let mut config = NodeConfig::random();
+    let mut config = NodeConfig::generate_random_config();
     config.mempool.system_transaction_timeout_secs = 0;
     let mut mempool = CoreMempool::new(&config);
 
@@ -286,8 +315,18 @@ fn test_reset_sequence_number_on_failure() {
     ]);
 
     // Notify mempool about failure in arbitrary order
-    pool.reject_transaction(&TestTransaction::get_address(1), 0, &hashes[0]);
-    pool.reject_transaction(&TestTransaction::get_address(1), 1, &hashes[1]);
+    pool.reject_transaction(
+        &TestTransaction::get_address(1),
+        0,
+        &hashes[0],
+        &DiscardedVMStatus::MALFORMED,
+    );
+    pool.reject_transaction(
+        &TestTransaction::get_address(1),
+        1,
+        &hashes[1],
+        &DiscardedVMStatus::MALFORMED,
+    );
 
     // Verify that new transaction for this account can be added.
     assert!(add_txn(&mut pool, TestTransaction::new(1, 0, 1)).is_ok());
@@ -450,7 +489,7 @@ fn test_multi_bucket_removal() {
 
 #[test]
 fn test_capacity() {
-    let mut config = NodeConfig::random();
+    let mut config = NodeConfig::generate_random_config();
     config.mempool.capacity = 1;
     config.mempool.system_transaction_timeout_secs = 0;
     let mut pool = CoreMempool::new(&config);
@@ -498,7 +537,7 @@ fn test_capacity_bytes() {
     // Set exact limit
     let capacity_bytes = size_bytes;
 
-    let mut config = NodeConfig::random();
+    let mut config = NodeConfig::generate_random_config();
     config.mempool.capacity = 1_000; // Won't hit this limit.
     config.mempool.capacity_bytes = capacity_bytes;
     config.mempool.system_transaction_timeout_secs = 0;
@@ -543,7 +582,7 @@ fn new_test_mempool_transaction(address: usize, sequence_number: u64) -> Mempool
 
 #[test]
 fn test_parking_lot_eviction() {
-    let mut config = NodeConfig::random();
+    let mut config = NodeConfig::generate_random_config();
     config.mempool.capacity = 5;
     let mut pool = CoreMempool::new(&config);
     // Add transactions with the following sequence numbers to Mempool.
@@ -569,7 +608,7 @@ fn test_parking_lot_eviction() {
 
 #[test]
 fn test_parking_lot_evict_only_for_ready_txn_insertion() {
-    let mut config = NodeConfig::random();
+    let mut config = NodeConfig::generate_random_config();
     config.mempool.capacity = 6;
     let mut pool = CoreMempool::new(&config);
     // Add transactions with the following sequence numbers to Mempool.
@@ -692,7 +731,7 @@ fn test_get_transaction_by_hash_after_the_txn_is_updated() {
 
 #[test]
 fn test_bytes_limit() {
-    let mut config = NodeConfig::random();
+    let mut config = NodeConfig::generate_random_config();
     config.mempool.capacity = 100;
     let mut pool = CoreMempool::new(&config);
     // add 100 transacionts
@@ -709,7 +748,7 @@ fn test_bytes_limit() {
 
 #[test]
 fn test_transaction_store_remove_account_if_empty() {
-    let mut config = NodeConfig::random();
+    let mut config = NodeConfig::generate_random_config();
     config.mempool.capacity = 100;
     let mut pool = CoreMempool::new(&config);
 
@@ -730,13 +769,18 @@ fn test_transaction_store_remove_account_if_empty() {
     add_signed_txn(&mut pool, txn).unwrap();
     assert_eq!(pool.get_transaction_store().get_transactions().len(), 1);
 
-    pool.reject_transaction(&TestTransaction::get_address(2), 2, &hash);
+    pool.reject_transaction(
+        &TestTransaction::get_address(2),
+        2,
+        &hash,
+        &DiscardedVMStatus::MALFORMED,
+    );
     assert_eq!(pool.get_transaction_store().get_transactions().len(), 0);
 }
 
 #[test]
 fn test_sequence_number_behavior_at_capacity() {
-    let mut config = NodeConfig::random();
+    let mut config = NodeConfig::generate_random_config();
     config.mempool.capacity = 2;
     let mut pool = CoreMempool::new(&config);
 
@@ -752,7 +796,7 @@ fn test_sequence_number_behavior_at_capacity() {
 
 #[test]
 fn test_not_return_non_full() {
-    let mut config = NodeConfig::random();
+    let mut config = NodeConfig::generate_random_config();
     config.mempool.capacity = 2;
     let mut pool = CoreMempool::new(&config);
     add_txn(&mut pool, TestTransaction::new(0, 0, 1)).unwrap();

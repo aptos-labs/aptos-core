@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Macros for sending logs at predetermined log `Level`s
-#[cfg(not(feature = "aptos-console"))]
+#[cfg(not(feature = "tokio-console"))]
 #[macro_export]
 macro_rules! spawn_named {
       ($name:expr, $func:expr) => { tokio::spawn($func); };
@@ -14,7 +14,7 @@ macro_rules! spawn_named {
       ($name:expr, $handler:expr, $async:ident = async ; $move:ident = move; $clojure:block) => { $handler.spawn( async move $clojure); };
   }
 
-#[cfg(feature = "aptos-console")]
+#[cfg(feature = "tokio-console")]
 #[macro_export]
 macro_rules! spawn_named {
       ($name:expr, $func:expr) => { tokio::task::Builder::new()

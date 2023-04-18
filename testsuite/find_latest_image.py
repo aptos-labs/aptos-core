@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 
+import argparse
+import os
+import sys
+
 # This script is used to find the latest built image tag. It has two modes where it can be used:
 # 1. If the IMAGE_TAG environment variable is set, it will simply check that the image exists.
 # 2. If the IMAGE_TAG environment variable is not set, it will find the latest image tag from git history,
 #    assuming images are tagged with the git commit hash.
 
+from applogging import logger, init_logging
 from forge import find_recent_images, image_exists
 from forge_wrapper_core.shell import LocalShell
 from forge_wrapper_core.git import Git
@@ -12,17 +17,16 @@ from forge_wrapper_core.git import Git
 # gh output logic from determinator
 from determinator import GithubOutput, write_github_output
 
-import argparse
-import os
-import sys
-
 # the environment variable containing the image tag to check for existence
 IMAGE_TAG_ENV = "IMAGE_TAG"
 # if running in github actions, this is the output key that will contain the latest image tag
 GH_OUTPUT_KEY = "IMAGE_TAG"
 
 
-def main():
+@logger
+def main() -> None:
+    init_logging(logger=log)
+
     shell = LocalShell()
     git = Git(shell)
 
@@ -51,31 +55,30 @@ def main():
             sys.exit(1)
 
     variants = args.variants
-    print(f"Finding latest {image_name} image with build variants: {variants}")
+    log.info(f"Finding latest {image_name} image with build variants: {variants}")
     variant_prefixes = [f"{v}_" if v != "" else "" for v in variants]
     if "" not in variant_prefixes:
         variant_prefixes.append("")  # search for the default release build as well
-    print(f"With prefixes: {variant_prefixes}")
+    log.info(f"With prefixes: {variant_prefixes}")
 
     # Find the latest image from git history
     num_images_to_find = 1  # for the purposes of this script, this is always 1
     images = list(
         find_recent_images(shell, git, num_images_to_find, image_name, variant_prefixes)
     )
-    print(f"Found latest images: {images}")
+    log.info(f"Found latest images: {images}")
 
     # write the output to Github outputs (via stdout)
     git_sha_set = set([x.split("_")[-1] for x in images])  # trim to get the base sha
     assert len(git_sha_set) == num_images_to_find
     git_sha = git_sha_set.pop()
-    print(f"Exporting latest image as base GIT_SHA: {git_sha}")
+    log.info(f"Exporting latest image as base GIT_SHA: {git_sha}")
     latest_image_gh_output = GithubOutput(GH_OUTPUT_KEY, git_sha)
     try:
         write_github_output(latest_image_gh_output)
     except Exception as e:
-        print(e)
-        print(
-            "This may be an indication that you're running locally or the environment is not configured correctly"
+        log.error(
+            f"{e}\nThis may be an indication that you're running locally or the environment is not configured correctly"
         )
 
 

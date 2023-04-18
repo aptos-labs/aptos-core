@@ -28,7 +28,7 @@ async fn test_full_node_basic_flow() {
     let vfn_peer_id = swarm.full_nodes().next().unwrap().peer_id();
     let version = swarm.versions().max().unwrap();
     let pfn_peer_id = swarm
-        .add_full_node(&version, NodeConfig::default_for_public_full_node())
+        .add_full_node(&version, NodeConfig::get_default_pfn_config())
         .unwrap();
     for fullnode in swarm.full_nodes_mut() {
         fullnode
@@ -112,7 +112,7 @@ async fn test_full_node_basic_flow() {
 #[tokio::test]
 async fn test_vfn_failover() {
     // VFN failover happens when validator is down even for default_failovers = 0
-    let mut vfn_config = NodeConfig::default_for_validator_full_node();
+    let mut vfn_config = NodeConfig::get_default_vfn_config();
     vfn_config.mempool.default_failovers = 0;
     let mut swarm = SwarmBuilder::new_local(4)
         .with_num_fullnodes(4)
@@ -184,14 +184,14 @@ async fn test_private_full_node() {
     let transaction_factory = swarm.chain_info().transaction_factory();
 
     // Here we want to add two swarms, a private full node, followed by a user full node connected to it
-    let mut private_config = NodeConfig::default_for_public_full_node();
+    let mut private_config = NodeConfig::get_default_pfn_config();
     let private_network = private_config.full_node_networks.first_mut().unwrap();
     // Disallow public connections
     private_network.max_inbound_connections = 0;
     // Also, we only want it to purposely connect to 1 VFN
     private_network.max_outbound_connections = 1;
 
-    let mut user_config = NodeConfig::default_for_public_full_node();
+    let mut user_config = NodeConfig::get_default_pfn_config();
     let user_network = user_config.full_node_networks.first_mut().unwrap();
     // Disallow fallbacks to VFNs
     user_network.max_outbound_connections = 1;

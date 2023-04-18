@@ -3,14 +3,13 @@
 
 from __future__ import annotations
 
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Tuple
 
 from .account import Account
 from .account_address import AccountAddress
 from .async_client import RestClient
 from .bcs import Deserializer, Serializer
-from .transactions import (EntryFunction, TransactionArgument,
-                           TransactionPayload)
+from .transactions import EntryFunction, TransactionArgument, TransactionPayload
 from .type_tag import StructTag, TypeTag
 
 
@@ -93,7 +92,6 @@ class Token:
 
     collection: AccountAddress
     collection_id: int
-    creation_name: Optional[str]
     description: str
     name: str
     uri: str
@@ -104,29 +102,24 @@ class Token:
         self,
         collection: AccountAddress,
         collection_id: int,
-        creation_name: Optional[str],
         description: str,
         name: str,
         uri: str,
     ):
         self.collection = collection
         self.collection_id = collection_id
-        self.creation_name = creation_name
         self.description = description
         self.name = name
         self.uri = uri
 
     def __str__(self) -> str:
-        return f"Token[collection: {self.collection}, collection_id: {self.collection_id}, creation_name: {self.creation_name}, description: {self.description}, name: {self.name}, uri: {self.uri}]"
+        return f"Token[collection: {self.collection}, collection_id: {self.collection_id}, description: {self.description}, name: {self.name}, uri: {self.uri}]"
 
     @staticmethod
     def parse(resource: dict[str, Any]):
         return Token(
             AccountAddress.from_hex(resource["collection"]["inner"]),
             int(resource["collection_id"]),
-            resource["creation_name"]["vec"][0]
-            if len(resource["creation_name"]["vec"]) == 1
-            else None,
             resource["description"],
             resource["name"],
             resource["uri"],

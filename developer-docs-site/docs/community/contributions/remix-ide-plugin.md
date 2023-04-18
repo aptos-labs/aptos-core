@@ -55,13 +55,14 @@ width="50%"
 
 ## Step 3: Install a wallet
 
-This steps assumes you are using the [WELLDONE Wallet](https://docs.welldonestudio.io/wallet/manual/). following that manual to install and create a wallet and then create an account for the selected chain.
+WELLDONE Wallet can be used with the Remix IDE plugin now, with support for [Petra wallet](https://petra.app/) coming soon. See the list of [Aptos wallets](https://github.com/aptos-foundation/ecosystem-projects#wallets) available in the ecosystem.
 
-[Petra wallet](https://petra.app/) will be supported soon, and WELLDONE Wallet can be used with the Remix IDE plugin now. See the list of [Aptos wallets](https://github.com/aptos-foundation/ecosystem-projects#wallets) available in the ecosystem.
+This steps assumes you are using the WELLDONE Wallet. Follow [the manual](https://docs.welldonestudio.io/wallet/manual/) to install the wallet and create an account for the Aptos blockchain. Once that is done, follow these steps:
 
-After choosing a chain, click the `Connect to WELLDONE` button to connect to the **WELLDONE Wallet.** 
+1. Choose a network (e.g. devnet) in the dropdown menu at the top of the main tab.
+1. Go into the **Settings** tab of your wallet and activate **Developer Mode**.
 
-Now go into the *Settings* tab of your wallet and activate **Developer Mode**.
+Now in the Remix UI click the **Connect to WELLDONE** button to connect to the **WELLDONE Wallet**. 
 
 Click the **Refresh** button in the upper right corner of the plug-in to apply changes to your wallet.
 
@@ -121,11 +122,10 @@ AptosFramework = { git = "https://github.com/aptos-labs/aptos-core.git", subdir 
 4. When the compilation is complete, a compiled binary file is returned in the `aptos/<YOUR_PROJECT_NAME>/out` directory.
 
 If you need to revise the contract and compile again, delete the `out` directory and click **Compile** once more.
-:::
 
 5. Once you have compiled contract code, the `Deploy` button will be activated.
 
-## Step 6: Interact with a Move module.
+## Step 6: Interact with a Move module
 
 :::info
 There are two ways to import contracts.
