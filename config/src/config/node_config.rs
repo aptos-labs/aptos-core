@@ -7,8 +7,8 @@ use crate::{
         persistable_config::PersistableConfig, utils::RootPath, ApiConfig, BaseConfig,
         ConsensusConfig, Error, ExecutionConfig, IndexerConfig, IndexerGrpcConfig,
         InspectionServiceConfig, LoggerConfig, MempoolConfig, NetworkConfig,
-        PeerMonitoringServiceConfig, RoleType, SafetyRulesTestConfig, StateSyncConfig,
-        StorageConfig, DEFAULT_BATCH_SIZE, DEFAULT_FETCH_TASKS, DEFAULT_PROCESSOR_TASKS,
+        PeerMonitoringServiceConfig, SafetyRulesTestConfig, StateSyncConfig, StorageConfig,
+        DEFAULT_BATCH_SIZE, DEFAULT_FETCH_TASKS, DEFAULT_PROCESSOR_TASKS,
     },
     network_id::NetworkId,
 };
@@ -62,75 +62,91 @@ pub struct NodeConfig {
 }
 
 impl NodeConfig {
-    pub fn data_dir(&self) -> &Path {
+    /// Returns the data directory for this config
+    pub fn get_data_dir(&self) -> &Path {
         &self.base.data_dir
     }
 
-    pub fn working_dir(&self) -> &Path {
+    /// Returns the working directory for this config (if set),
+    /// otherwise, returns the data directory.
+    pub fn get_working_dir(&self) -> &Path {
         match &self.base.working_dir {
             Some(working_dir) => working_dir,
             None => &self.base.data_dir,
         }
     }
 
+    /// Sets the data directory for this config
     pub fn set_data_dir(&mut self, data_dir: PathBuf) {
+        // Set the base directory
         self.base.data_dir = data_dir.clone();
+
+        // Set the data directory for each sub-module
         self.consensus.set_data_dir(data_dir.clone());
         self.storage.set_data_dir(data_dir);
     }
 
-    /// Reads the config file and returns the configuration object in addition to doing some
-    /// post-processing of the config.
-    /// Paths used in the config are either absolute or relative to the config location.
-    pub fn load<P: AsRef<Path>>(input_path: P) -> Result<Self, Error> {
-        let mut config = Self::load_config(&input_path)?;
+    /// Load the node config from the given path and perform several processing
+    /// steps. Note: paths used in the node config are either absolute or
+    /// relative to the config location.
+    pub fn load_from_path<P: AsRef<Path>>(input_path: P) -> Result<Self, Error> {
+        // Load the node config from disk
+        let mut node_config = Self::load_config(&input_path)?;
 
+        // Load the execution config
         let input_dir = RootPath::new(input_path);
-        config.execution.load(&input_dir)?;
+        node_config.execution.load(&input_dir)?;
 
-        let mut config = config
-            .validate_indexer_configs()?
-            .validate_indexer_grpc_configs()?
-            .validate_network_configs()?;
-        config.set_data_dir(config.data_dir().to_path_buf());
-        Ok(config)
+        // Validate the node config
+        node_config.validate_config()?;
+
+        // Update the data directory
+        node_config.set_data_dir(node_config.get_data_dir().to_path_buf());
+        Ok(node_config)
     }
 
-    pub fn peer_id(&self) -> Option<PeerId> {
-        match self.base.role {
-            RoleType::Validator => self.validator_network.as_ref().map(NetworkConfig::peer_id),
-            RoleType::FullNode => self
-                .full_node_networks
-                .iter()
-                .find(|config| config.network_id == NetworkId::Public)
-                .map(NetworkConfig::peer_id),
-        }
+    /// Validate the node config for consistency and correctness
+    pub fn validate_config(&mut self) -> Result<(), Error> {
+        self.validate_indexer_configs()?;
+        self.validate_indexer_grpc_configs()?;
+        self.validate_network_configs()
     }
 
-    pub fn identity_key(&self) -> Option<x25519::PrivateKey> {
-        match self.base.role {
-            RoleType::Validator => self
-                .validator_network
-                .as_ref()
-                .map(NetworkConfig::identity_key),
-            RoleType::FullNode => self
-                .full_node_networks
+    /// Returns the peer ID of the node based on the role
+    pub fn get_peer_id(&self) -> Option<PeerId> {
+        self.get_primary_network_config()
+            .map(NetworkConfig::peer_id)
+    }
+
+    /// Returns the identity key of the node based on the role
+    pub fn get_identity_key(&self) -> Option<x25519::PrivateKey> {
+        self.get_primary_network_config()
+            .map(NetworkConfig::identity_key)
+    }
+
+    /// Returns the primary network config of the node. If the node
+    /// is a validator, the validator network config is returned.
+    /// Otherwise, the public fullnode network config is returned.
+    fn get_primary_network_config(&self) -> Option<&NetworkConfig> {
+        if self.base.role.is_validator() {
+            self.validator_network.as_ref()
+        } else {
+            self.full_node_networks
                 .iter()
                 .find(|config| config.network_id == NetworkId::Public)
-                .map(NetworkConfig::identity_key),
         }
     }
 
     /// Validate `IndexerConfig`, ensuring that it's set up correctly
     /// Additionally, handles any strange missing default cases
-    fn validate_indexer_configs(mut self) -> Result<NodeConfig, Error> {
+    fn validate_indexer_configs(&mut self) -> Result<(), Error> {
         if !self.indexer.enabled {
-            return Ok(self);
+            return Ok(());
         }
 
         self.indexer.postgres_uri = env_or_default(
             "INDEXER_DATABASE_URL",
-            self.indexer.postgres_uri,
+            self.indexer.postgres_uri.clone(),
             must_be_set("postgres_uri", "INDEXER_DATABASE_URL"),
         );
 
@@ -138,6 +154,7 @@ impl NodeConfig {
             "PROCESSOR_NAME",
             self.indexer
                 .processor
+                .clone()
                 .or_else(|| Some("default_processor".to_string())),
             None,
         );
@@ -179,19 +196,20 @@ impl NodeConfig {
             None,
         );
 
-        Ok(self)
+        Ok(())
     }
 
     /// Validate `IndexerGrpcConfig`, ensuring that it's set up correctly
     /// Additionally, handles any strange missing default cases
-    fn validate_indexer_grpc_configs(mut self) -> Result<NodeConfig, Error> {
+    fn validate_indexer_grpc_configs(&mut self) -> Result<(), Error> {
         if !self.indexer_grpc.enabled {
-            return Ok(self);
+            return Ok(());
         }
 
         self.indexer_grpc.address = self
             .indexer_grpc
             .address
+            .clone()
             .or_else(|| Some("0.0.0.0:50051".to_string()));
 
         self.indexer_grpc.processor_task_count =
@@ -202,12 +220,12 @@ impl NodeConfig {
 
         self.indexer_grpc.output_batch_size = self.indexer_grpc.output_batch_size.or(Some(100));
 
-        Ok(self)
+        Ok(())
     }
 
     /// Checks `NetworkConfig` setups so that they exist on proper networks
     /// Additionally, handles any strange missing default cases
-    fn validate_network_configs(mut self) -> Result<NodeConfig, Error> {
+    fn validate_network_configs(&mut self) -> Result<(), Error> {
         if self.base.role.is_validator() {
             invariant(
                 self.validator_network.is_some(),
@@ -227,7 +245,8 @@ impl NodeConfig {
         for network in &mut self.full_node_networks {
             network.load_fullnode_network()?;
         }
-        Ok(self)
+
+        Ok(())
     }
 
     pub fn save<P: AsRef<Path>>(&mut self, output_path: P) -> Result<(), Error> {
@@ -238,54 +257,56 @@ impl NodeConfig {
         Ok(())
     }
 
+    /// Randomizes the various ports of the node config
     pub fn randomize_ports(&mut self) {
+        // Randomize the ports for the services
         self.api.randomize_ports();
         self.inspection_service.randomize_ports();
         self.storage.randomize_ports();
         self.logger.disable_console();
 
+        // Randomize the ports for the networks
         if let Some(network) = self.validator_network.as_mut() {
             network.listen_address = crate::utils::get_available_port_in_multiaddr(true);
         }
-
         for network in self.full_node_networks.iter_mut() {
             network.listen_address = crate::utils::get_available_port_in_multiaddr(true);
         }
     }
 
-    pub fn random() -> Self {
+    /// Generates a random config for testing purposes
+    pub fn generate_random_config() -> Self {
         let mut rng = StdRng::from_seed([0u8; 32]);
-        Self::random_with_template(0, &NodeConfig::default(), &mut rng)
+        Self::generate_random_config_with_template(&NodeConfig::default(), &mut rng)
     }
 
-    pub fn random_with_template(_idx: u32, template: &Self, rng: &mut StdRng) -> Self {
-        let mut config = template.clone();
-        config.random_internal(rng);
-        config
-    }
+    /// Generates a random config using the given template and rng
+    pub fn generate_random_config_with_template(template: &Self, rng: &mut StdRng) -> Self {
+        // Create the node and test configs
+        let mut node_config = template.clone();
 
-    fn random_internal(&mut self, rng: &mut StdRng) {
-        // Randomize the internal values
-        if self.base.role == RoleType::Validator {
+        // Modify the configs based on the role type
+        if node_config.base.role.is_validator() {
             let peer_id = PeerId::random();
-            if self.validator_network.is_none() {
+
+            if node_config.validator_network.is_none() {
                 let network_config = NetworkConfig::network_with_id(NetworkId::Validator);
-                self.validator_network = Some(network_config);
+                node_config.validator_network = Some(network_config);
             }
 
-            let validator_network = self.validator_network.as_mut().unwrap();
+            let validator_network = node_config.validator_network.as_mut().unwrap();
             validator_network.random_with_peer_id(rng, Some(peer_id));
 
             let mut safety_rules_test_config = SafetyRulesTestConfig::new(peer_id);
             safety_rules_test_config.random_consensus_key(rng);
-            self.consensus.safety_rules.test = Some(safety_rules_test_config);
+            node_config.consensus.safety_rules.test = Some(safety_rules_test_config);
         } else {
-            self.validator_network = None;
-            if self.full_node_networks.is_empty() {
+            node_config.validator_network = None;
+            if node_config.full_node_networks.is_empty() {
                 let network_config = NetworkConfig::network_with_id(NetworkId::Public);
-                self.full_node_networks.push(network_config);
+                node_config.full_node_networks.push(network_config);
             }
-            for network in &mut self.full_node_networks {
+            for network in &mut node_config.full_node_networks {
                 network.random(rng);
             }
         }
@@ -299,32 +320,50 @@ impl NodeConfig {
                 error
             )
         });
-        self.set_data_dir(temp_dir.path().to_path_buf());
+        node_config.set_data_dir(temp_dir.path().to_path_buf());
+
+        node_config
     }
 
-    fn default_config(serialized: &str, path: &'static str) -> Self {
-        let config = Self::parse(serialized).unwrap_or_else(|e| panic!("Error in {}: {}", path, e));
-        config
-            .validate_indexer_configs()
-            .unwrap_or_else(|e| panic!("Error in {}: {}", path, e))
-            .validate_network_configs()
-            .unwrap_or_else(|e| panic!("Error in {}: {}", path, e))
+    /// Returns the default config for a public full node
+    pub fn get_default_pfn_config() -> Self {
+        let contents = include_str!("test_data/public_full_node.yaml");
+        parse_serialized_node_config(contents, "default_for_public_full_node")
     }
 
-    pub fn default_for_public_full_node() -> Self {
-        let contents = std::include_str!("test_data/public_full_node.yaml");
-        Self::default_config(contents, "default_for_public_full_node")
+    /// Returns the default config for a validator
+    pub fn get_default_validator_config() -> Self {
+        let contents = include_str!("test_data/validator.yaml");
+        parse_serialized_node_config(contents, "default_for_validator")
     }
 
-    pub fn default_for_validator() -> Self {
-        let contents = std::include_str!("test_data/validator.yaml");
-        Self::default_config(contents, "default_for_validator")
+    /// Returns the default config for a validator full node
+    pub fn get_default_vfn_config() -> Self {
+        let contents = include_str!("test_data/validator_full_node.yaml");
+        parse_serialized_node_config(contents, "default_for_validator_full_node")
     }
+}
 
-    pub fn default_for_validator_full_node() -> Self {
-        let contents = std::include_str!("test_data/validator_full_node.yaml");
-        Self::default_config(contents, "default_for_validator_full_node")
-    }
+/// Parses the given serialized config into a node config
+fn parse_serialized_node_config(serialized_config: &str, caller: &'static str) -> NodeConfig {
+    // Parse the node config
+    let mut node_config =
+        NodeConfig::parse_serialized_config(serialized_config).unwrap_or_else(|error| {
+            panic!(
+                "Failed to parse node config! Caller: {}, Error: {}",
+                caller, error
+            )
+        });
+
+    // Validate the config
+    node_config.validate_config().unwrap_or_else(|error| {
+        panic!(
+            "Config validation failed! Caller: {}, Error: {}",
+            caller, error
+        )
+    });
+
+    node_config
 }
 
 #[cfg(test)]
@@ -336,19 +375,19 @@ mod test {
     };
 
     #[test]
-    fn verify_configs() {
-        NodeConfig::default_for_public_full_node();
-        NodeConfig::default_for_validator();
-        NodeConfig::default_for_validator_full_node();
+    fn verify_config_defaults() {
+        // Verify the node config defaults
+        NodeConfig::get_default_pfn_config();
+        NodeConfig::get_default_validator_config();
+        NodeConfig::get_default_vfn_config();
 
-        let contents = std::include_str!("test_data/safety_rules.yaml");
-        SafetyRulesConfig::parse(contents)
-            .unwrap_or_else(|e| panic!("Error in safety_rules.yaml: {}", e));
+        // Verify the safety rules config default
+        SafetyRulesConfig::get_default_config();
     }
 
     #[test]
     fn validate_invalid_network_id() {
-        let mut config = NodeConfig::default_for_public_full_node();
+        let mut config = NodeConfig::get_default_pfn_config();
         let network = config.full_node_networks.iter_mut().next().unwrap();
         network.network_id = NetworkId::Validator;
         assert!(matches!(
