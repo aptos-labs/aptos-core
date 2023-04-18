@@ -9,6 +9,7 @@ on:
       - mainnet
       - aptos-node-v*
       - aptos-release-v*
+  workflow_dispatch:
 
 env:
   HAS_BUILDPULSE_SECRETS: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID != '' && secrets.BUILDPULSE_SECRET_ACCESS_KEY != '' }}
@@ -62,7 +63,8 @@ jobs:
       - uses: snok/install-poetry@v1
         with:
           version: 1.2.2
-      - run: cd ./ecosystem/python/sdk && poetry install && make fmt && [[ -z $(git status --porcelain --untracked-files=no) ]]
+      - run: cd ecosystem/python/sdk && poetry install
+      - run: make -C ecosystem/python/sdk fmt && ./scripts/fail_if_modified_files.sh
 
   docs-lint:
     runs-on: ubuntu-latest

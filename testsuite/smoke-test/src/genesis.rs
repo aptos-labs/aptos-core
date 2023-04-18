@@ -117,7 +117,13 @@ async fn test_genesis_transaction_flow() {
         node.stop();
     }
 
-    let first_validator_address = env.validators().nth(4).unwrap().config().peer_id().unwrap();
+    let first_validator_address = env
+        .validators()
+        .nth(4)
+        .unwrap()
+        .config()
+        .get_peer_id()
+        .unwrap();
 
     let script = format!(
         r#"

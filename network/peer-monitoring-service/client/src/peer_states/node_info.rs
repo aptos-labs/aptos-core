@@ -154,7 +154,7 @@ mod test {
         // Handle several valid node info responses and verify the state
         for i in 0..10 {
             // Generate the test data
-            let git_hash = i.to_string();
+            let build_information = aptos_build_info::get_build_information();
             let highest_synced_epoch = i;
             let highest_synced_version = (i + 1) * 100;
             let ledger_timestamp_usecs = (i + 1) * 200;
@@ -163,7 +163,7 @@ mod test {
 
             // Create the service response
             let node_information_response = NodeInformationResponse {
-                git_hash,
+                build_information,
                 highest_synced_epoch,
                 highest_synced_version,
                 ledger_timestamp_usecs,

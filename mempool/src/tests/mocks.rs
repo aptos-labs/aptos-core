@@ -103,7 +103,7 @@ impl MockSharedMempool {
         mpsc::Sender<QuorumStoreRequest>,
         MempoolNotifier,
     ) {
-        let mut config = NodeConfig::random();
+        let mut config = NodeConfig::generate_random_config();
         config.validator_network = Some(NetworkConfig::network_with_id(NetworkId::Validator));
 
         let mempool = Arc::new(Mutex::new(CoreMempool::new(&config)));
