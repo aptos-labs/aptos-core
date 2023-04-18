@@ -82,7 +82,7 @@ fn test_speculative_logging() {
     )); // Expected
 
     assert_err!(receiver.try_recv());
-    speculative_logs.flush();
+    speculative_logs.flush(2);
 
     // We expect 3 messages.
     let expected = vec![

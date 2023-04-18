@@ -113,7 +113,8 @@ impl BlockAptosVM {
             });
         drop(signature_verification_timer);
 
-        init_speculative_logs(signature_verified_block.len());
+        let num_txns = signature_verified_block.len();
+        init_speculative_logs(num_txns);
 
         BLOCK_EXECUTOR_CONCURRENCY.set(concurrency_level as i64);
         let executor = BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>, S>::new(
@@ -138,7 +139,15 @@ impl BlockAptosVM {
                 })
             });
 
-        flush_speculative_logs();
+        // Flush the speculative logs of the committed transactions.
+        let pos = ret
+            .as_ref()
+            .ok()
+            .and_then(|outputs: &Vec<TransactionOutput>| {
+                outputs.iter().position(|o| o.status().is_retry())
+            });
+
+        flush_speculative_logs(pos.unwrap_or(num_txns));
 
         match ret {
             Ok(outputs) => Ok(outputs),
@@ -188,7 +197,7 @@ impl BlockAptosVM {
             block_size * 1000 / exec_t.as_millis() as usize
         );
 
-        flush_speculative_logs();
+        flush_speculative_logs(block_size);
 
         // Merge the delta outputs for parallel execution in order to compare results.
         // TODO: remove after this becomes part of the rolling commit_hook.

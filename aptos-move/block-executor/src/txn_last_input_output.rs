@@ -229,9 +229,7 @@ impl<K: ModulePath, T: TransactionOutput, E: Send + Clone> TxnLastInputOutput<K,
     pub fn success_gas(&self, txn_idx: TxnIndex) -> anyhow::Result<u64> {
         match self.write_set(txn_idx).as_ref() {
             ExecutionStatus::Success(output) => Ok(output.gas_used()),
-            _ => Err(anyhow!(
-                "[BlockSTM] Committing transaction with status SkipRest or Abort, early halt BlockSTM."
-            )),
+            _ => anyhow::bail!("[BlockSTM] Committing transaction with status SkipRest or Abort, early halt BlockSTM.")
         }
     }
 
