@@ -30,7 +30,7 @@ fn main() {
     let mut seq_measurements: Vec<Vec<usize>> = Vec::new();
 
     let concurrency_level = num_cpus::get();
-    let maybe_gas_limit = Some(1000);
+    let maybe_gas_limit = None;
 
     for block_size in txns {
         for num_accounts in acts {
