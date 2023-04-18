@@ -13,7 +13,6 @@ use async_trait::async_trait;
 use futures::future::join_all;
 use rand::{rngs::StdRng, seq::SliceRandom, thread_rng, Rng, SeedableRng};
 use std::{
-    collections::HashMap,
     sync::atomic::AtomicUsize,
     time::{Duration, Instant},
 };
@@ -190,16 +189,6 @@ impl TransactionExecutor for RestApiTransactionExecutor {
             .await?
             .into_inner()
             .sequence_number())
-    }
-
-    async fn execute_transactions(&self, txns: &[SignedTransaction]) -> Result<()> {
-        self.execute_transactions_with_counter(txns, &CounterState {
-            submit_failures: vec![AtomicUsize::new(0)],
-            wait_failures: vec![AtomicUsize::new(0)],
-            successes: AtomicUsize::new(0),
-            by_client: HashMap::new(),
-        })
-        .await
     }
 
     async fn execute_transactions_with_counter(

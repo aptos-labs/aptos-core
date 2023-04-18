@@ -129,7 +129,15 @@ pub trait TransactionExecutor: Sync + Send {
 
     async fn query_sequence_number(&self, account_address: AccountAddress) -> Result<u64>;
 
-    async fn execute_transactions(&self, txns: &[SignedTransaction]) -> Result<()>;
+    async fn execute_transactions(&self, txns: &[SignedTransaction]) -> Result<()> {
+        self.execute_transactions_with_counter(txns, &CounterState {
+            submit_failures: vec![AtomicUsize::new(0)],
+            wait_failures: vec![AtomicUsize::new(0)],
+            successes: AtomicUsize::new(0),
+            by_client: HashMap::new(),
+        })
+        .await
+    }
 
     async fn execute_transactions_with_counter(
         &self,
@@ -186,14 +194,21 @@ impl CounterState {
 pub async fn create_txn_generator_creator(
     transaction_mix_per_phase: &[Vec<(TransactionType, usize)>],
     num_workers: usize,
-    all_accounts: &mut [LocalAccount],
+    source_accounts: &mut [LocalAccount],
     txn_executor: &dyn TransactionExecutor,
     txn_factory: &TransactionFactory,
     init_txn_factory: &TransactionFactory,
     cur_phase: Arc<AtomicUsize>,
-) -> Box<dyn TransactionGeneratorCreator> {
-    let all_addresses = Arc::new(RwLock::new(
-        all_accounts.iter().map(|d| d.address()).collect::<Vec<_>>(),
+) -> (
+    Box<dyn TransactionGeneratorCreator>,
+    Arc<RwLock<Vec<AccountAddress>>>,
+    Arc<RwLock<Vec<LocalAccount>>>,
+) {
+    let addresses_pool = Arc::new(RwLock::new(
+        source_accounts
+            .iter()
+            .map(|d| d.address())
+            .collect::<Vec<_>>(),
     ));
     let accounts_pool = Arc::new(RwLock::new(Vec::new()));
 
@@ -226,7 +241,7 @@ pub async fn create_txn_generator_creator(
                     Box::new(P2PTransactionGeneratorCreator::new(
                         txn_factory.clone(),
                         SEND_AMOUNT,
-                        all_addresses.clone(),
+                        addresses_pool.clone(),
                         *invalid_transaction_ratio,
                     )),
                     *sender_use_account_pool,
@@ -238,7 +253,7 @@ pub async fn create_txn_generator_creator(
                     creation_balance,
                 } => Box::new(AccountGeneratorCreator::new(
                     txn_factory.clone(),
-                    all_addresses.clone(),
+                    addresses_pool.clone(),
                     accounts_pool.clone(),
                     *add_created_accounts_to_pool,
                     *max_account_working_set,
@@ -248,7 +263,7 @@ pub async fn create_txn_generator_creator(
                     NFTMintAndTransferGeneratorCreator::new(
                         txn_factory.clone(),
                         init_txn_factory.clone(),
-                        all_accounts.get_mut(0).unwrap(),
+                        source_accounts.get_mut(0).unwrap(),
                         txn_executor,
                         num_workers,
                     )
@@ -268,7 +283,7 @@ pub async fn create_txn_generator_creator(
                         CallCustomModulesCreator::new(
                             txn_factory.clone(),
                             init_txn_factory.clone(),
-                            all_accounts,
+                            source_accounts,
                             txn_executor,
                             *entry_point,
                             *num_modules,
@@ -284,10 +299,14 @@ pub async fn create_txn_generator_creator(
         txn_generator_creator_mix_per_phase.push(txn_generator_creator_mix)
     }
 
-    Box::new(PhasedTxnMixGeneratorCreator::new(
-        txn_generator_creator_mix_per_phase,
-        cur_phase,
-    ))
+    (
+        Box::new(PhasedTxnMixGeneratorCreator::new(
+            txn_generator_creator_mix_per_phase,
+            cur_phase,
+        )),
+        addresses_pool,
+        accounts_pool,
+    )
 }
 
 fn get_account_to_burn_from_pool(
