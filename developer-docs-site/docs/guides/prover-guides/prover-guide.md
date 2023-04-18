@@ -19,7 +19,7 @@ Once the package exists, call the Move Prover from the directory to be tested or
   aptos move prove
   ```
 
-  * Prove the sources of the package at <path>:
+  * Prove the sources of the package at &lt;path&gt;:
   ```shell
   aptos move prove --package-dir <path>
   ```
