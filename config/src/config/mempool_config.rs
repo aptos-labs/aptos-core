@@ -2,7 +2,10 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::config::MAX_APPLICATION_MESSAGE_SIZE;
+use crate::config::{
+    config_sanitizer::ConfigSanitizer, Error, NodeConfig, RoleType, MAX_APPLICATION_MESSAGE_SIZE,
+};
+use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
 
 pub const DEFAULT_BROADCAST_BUCKETS: &[u64] =
@@ -55,5 +58,16 @@ impl Default for MempoolConfig {
             eager_expire_threshold_ms: Some(10_000),
             eager_expire_time_ms: 3_000,
         }
+    }
+}
+
+impl ConfigSanitizer for MempoolConfig {
+    /// Validate and process the mempool config according to the given node role and chain ID
+    fn sanitize(
+        _node_config: &mut NodeConfig,
+        _node_role: RoleType,
+        _chain_id: ChainId,
+    ) -> Result<(), Error> {
+        Ok(()) // TODO: add reasonable verifications
     }
 }

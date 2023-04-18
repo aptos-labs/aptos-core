@@ -4,10 +4,11 @@
 
 //! This module defines the control-flow graph uses for bytecode verification.
 use crate::file_format::{Bytecode, CodeOffset};
-use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
+use indexmap::{map::Entry, IndexMap};
+use std::collections::BTreeSet;
 
 // BTree/Hash agnostic type wrappers
-type Map<K, V> = BTreeMap<K, V>;
+type Map<K, V> = IndexMap<K, V>;
 type Set<V> = BTreeSet<V>;
 
 pub type BlockId = CodeOffset;
@@ -275,6 +276,15 @@ impl VMControlFlowGraph {
 
     pub fn reachable_from(&self, block_id: BlockId) -> Vec<BlockId> {
         self.traverse_by(block_id)
+    }
+
+    pub fn traversal_index(&self, block_id: u16) -> usize {
+        let index = self
+            .traversal_successors
+            .get_index_of(&block_id)
+            .unwrap_or_else(|| self.traversal_successors.len());
+        debug_assert!(index <= self.traversal_successors.len());
+        index
     }
 }
 

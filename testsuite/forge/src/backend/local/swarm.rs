@@ -207,7 +207,7 @@ impl LocalSwarm {
                 };
 
                 // Since the validator's config has changed we need to save it
-                validator_config.save(validator.config_path())?;
+                validator_config.save_to_path(validator.config_path())?;
                 *validator.config_mut() = validator_config;
 
                 Ok((validator.peer_id(), public_network))
