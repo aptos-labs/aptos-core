@@ -5,8 +5,7 @@ import asyncio
 
 from aptos_sdk.account import Account
 from aptos_sdk.account_address import AccountAddress
-from aptos_sdk.aptos_token_client import (AptosTokenClient, Property,
-                                          PropertyMap)
+from aptos_sdk.aptos_token_client import AptosTokenClient, Property, PropertyMap
 from aptos_sdk.async_client import FaucetClient, RestClient
 
 from .common import FAUCET_URL, NODE_URL

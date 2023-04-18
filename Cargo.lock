@@ -2323,6 +2323,7 @@ version = "0.1.0"
 dependencies = [
  "aptos-config",
  "aptos-types",
+ "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "serde 1.0.149",
  "thiserror",
 ]
