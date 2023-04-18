@@ -114,6 +114,7 @@ impl<'a, T: MoveResolver + ?Sized> MoveValueAnnotator<'a, T> {
         &self,
         module: &ModuleId,
         function: &IdentStr,
+        ty_args: &[TypeTag],
         args: &[Vec<u8>],
     ) -> Result<Vec<AnnotatedMoveValue>> {
         let types: Vec<FatType> = self
@@ -143,11 +144,19 @@ impl<'a, T: MoveResolver + ?Sized> MoveValueAnnotator<'a, T> {
             types.len(),
             args.len(),
         );
+
+        // Make an approximation at the fat types for the type arguments
+        let ty_args: Vec<FatType> = ty_args.iter().map(|inner| inner.into()).collect();
+
         types
             .iter()
             .enumerate()
-            .map(|(i, ty)| self.view_value_by_fat_type(ty, &args[i]))
-            .collect::<Result<_>>()
+            .map(|(i, ty)| {
+                ty.subst(&ty_args)
+                    .map_err(anyhow::Error::from)
+                    .and_then(|fat_type| self.view_value_by_fat_type(&fat_type, &args[i]))
+            })
+            .collect::<Result<Vec<AnnotatedMoveValue>>>()
     }
 
     pub fn view_resource(&self, tag: &StructTag, blob: &[u8]) -> Result<AnnotatedMoveStruct> {
@@ -253,7 +262,7 @@ impl<'a, T: MoveResolver + ?Sized> MoveValueAnnotator<'a, T> {
                     "Cannot annotate value {:?} with type {:?}",
                     value,
                     ty
-                ))
+                ));
             },
         })
     }
