@@ -102,7 +102,7 @@ fn test_hello_blockchain() {
 
 #[test]
 fn test_drand_lottery() {
-    test_common("drand_lottery");
+    test_common("drand");
 }
 
 #[test]

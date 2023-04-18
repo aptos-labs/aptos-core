@@ -1,4 +1,3 @@
-#[test_only]
 module drand::lottery_test {
     use drand::lottery;
     use aptos_framework::timestamp;
@@ -11,6 +10,8 @@ module drand::lottery_test {
     use std::string;
     use aptos_framework::coin::MintCapability;
     use std::vector;
+    #[test_only]
+    use aptos_std::crypto_algebra::enable_cryptography_algebra_natives;
 
     fun give_coins(mint_cap: &MintCapability<AptosCoin>, to: &signer) {
         let to_addr = signer::address_of(to);
@@ -28,6 +29,7 @@ module drand::lottery_test {
         myself: signer, fx: signer,
         u1: signer, u2: signer, u3: signer, u4: signer,
     ) {
+        enable_cryptography_algebra_natives(&fx);
         timestamp::set_time_has_started_for_testing(&fx);
 
         // Deploy the lottery smart contract
@@ -38,14 +40,14 @@ module drand::lottery_test {
 
         // We simulate different runs of the lottery to demonstrate the uniformity of the outcomes
         let vec_signed_bytes = vector::empty<vector<u8>>();
-        vector::push_back(&mut vec_signed_bytes, x"c0ffeedeadbeef1337acbd123456789000"); // u1 wins
-        vector::push_back(&mut vec_signed_bytes, x"c0ffeedeadbeef1337acbd123456789001"); // u2 wins
-        vector::push_back(&mut vec_signed_bytes, x"c0ffeedeadbeef1337acbd123456789002"); // u3 wins
-        vector::push_back(&mut vec_signed_bytes, x"c0ffeedeadbeef1337acbd123456789003"); // u3 wins
-        vector::push_back(&mut vec_signed_bytes, x"c0ffeedeadbeef1337acbd123456789004"); // u4 wins
-        vector::push_back(&mut vec_signed_bytes, x"c0ffeedeadbeef1337acbd123456789005"); // u3 wins
-        vector::push_back(&mut vec_signed_bytes, x"c0ffeedeadbeef1337acbd123456789006"); // u3 wins
-        vector::push_back(&mut vec_signed_bytes, x"c0ffeedeadbeef1337acbd123456789007"); // u1 wins
+        // curl https://api3.drand.sh/dbd506d6ef76e5f386f41c651dcb808c5bcbd75471cc4eafa3f4df7ad4e4c493/public/202
+        vector::push_back(&mut vec_signed_bytes, x"a438d55a0a3aeff6c6b78ad40c2dfb55dae5154d86eeb8163138f2bf96294f90841e75ad952bf8101630da7bb527da21"); // u2 wins.
+        // curl https://api3.drand.sh/dbd506d6ef76e5f386f41c651dcb808c5bcbd75471cc4eafa3f4df7ad4e4c493/public/602
+        vector::push_back(&mut vec_signed_bytes, x"b0e64fd43f49f3cf20135e7133112c0ae461e6a7b2961ef474f716648a9ab5b67f606af2980944344de131ab970ccb5d"); // u1 wins.
+        // curl https://api3.drand.sh/dbd506d6ef76e5f386f41c651dcb808c5bcbd75471cc4eafa3f4df7ad4e4c493/public/1002
+        vector::push_back(&mut vec_signed_bytes, x"8a9b54d4790bcc1e0b8b3e452102bfc091d23ede4b488cb81580f37a52762a283ed8c8dd844f0a112fda3d768ec3f9a2"); // u3 wins.
+        // curl https://api3.drand.sh/dbd506d6ef76e5f386f41c651dcb808c5bcbd75471cc4eafa3f4df7ad4e4c493/public/1402
+        vector::push_back(&mut vec_signed_bytes, x"8eaca04732b0de0c2a385f0ccaab9504592fcae7ca621bef58302d4ef0bd2ce3dd9c90153688dedd47efdbeb4d9ecde5"); // u1 wins.
 
         let lottery_start_time_secs = 1677685200; // the time that the 1st drand epoch started
         let lottery_duration = lottery::get_minimum_lottery_duration_in_secs();

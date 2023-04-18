@@ -1,3 +1,17 @@
+/// An example of a decentralized lottery that picks its winner based on randomness generated in the future
+/// by the drand randomnes beacon.
+///
+/// WARNING #1: This example has not been audited and should thus NOT be relied upon as an authoritative guide on
+/// using `drand` randomness safely in Move.
+///
+/// WARNING #2: This code makes a STRONG assumption that the Aptos clock and the drand clock are synchronized.
+/// In practice, the Aptos clock could be lagging behind. As an example, even though the current time is Friday, July
+/// 14th, 2023, 7:34PM, from the perspective of the blockchain validators, the time could be Thursday, July 13th, 2023.
+/// (Exaggerating the difference, to make the point clearer.) Therefore, a drand round for noon at Friday would be
+/// incorrectly treated as a valid future drand round, even though that round has passed. It is therefore important that
+/// contracts account for any drift between the Aptos clock and the drand clock. In this example, this can be done by
+/// increasing the MINIMUM_LOTTERY_DURATION_SECS to account for this drift.
+
 module drand::lottery {
     use std::signer;
     use aptos_framework::account;
@@ -8,17 +22,19 @@ module drand::lottery {
     use aptos_framework::timestamp;
     use aptos_framework::aptos_coin::AptosCoin;
     use drand::drand;
-    use aptos_std::type_info;
-    use std::string::{Self};
     //use aptos_std::debug;
 
-    /// Error code code when someone tries to start a very "short" lottery where users might not have enough time to buy tickets.
+    /// Error code code when someone tries to start a very "short" lottery where users might not have enough time
+    /// to buy tickets.
     const E_LOTTERY_IS_NOT_LONG_ENOUGH: u64 = 0;
-    /// Error code for when someone tries to modify the time when the lottery is drawn. Once set, this time cannot be modified (for simplicity).
+    /// Error code for when someone tries to modify the time when the lottery is drawn.
+    /// Once set, this time cannot be modified (for simplicity).
     const E_LOTTERY_ALREADY_STARTED: u64 = 1;
-    /// Error code for when a user tries to purchase a ticket after the lottery has closed. This would not be secure since such users might know the public randomness, which is revealed soon after the lottery has closed.
+    /// Error code for when a user tries to purchase a ticket after the lottery has closed. This would not be secure
+    /// since such users might know the public randomness, which is revealed soon after the lottery has closed.
     const E_LOTTERY_HAS_CLOSED: u64 = 2;
-    /// Error code for when a user tries to initiating the drawing too early (enough time must've elapsed since the lottery started for users to have time to register).
+    /// Error code for when a user tries to initiating the drawing too early (enough time must've elapsed since the
+    /// lottery started for users to have time to register).
     const E_LOTTERY_DRAW_IS_TOO_EARLY: u64 = 3;
     /// Error code for when anyone submits an incorrect randomness for the randomized draw phase of the lottery.
     const E_INCORRECT_RANDOMNESS: u64 = 4;
@@ -38,9 +54,9 @@ module drand::lottery {
         tickets: vector<address>,
 
         // The time when the lottery ends (and thus when the drawing happens).
-        // Specifically, the drawing will happen during the next drand round after time `end_time`.
+        // Specifically, the drawing will happen during the drand round at time `draw_at`.
         // `None` if the lottery is in the 'not started' state.
-        end_time: Option<u64>,
+        draw_at: Option<u64>,
 
         // Signer for the resource accounts storing the coins that can be won
         signer_cap: account::SignerCapability,
@@ -65,7 +81,7 @@ module drand::lottery {
         move_to(deployer,
             Lottery {
                 tickets: vector::empty<address>(),
-                end_time: option::none(),
+                draw_at: option::none(),
                 signer_cap,
             }
         )
@@ -74,8 +90,8 @@ module drand::lottery {
     public fun get_ticket_price(): u64 { TICKET_PRICE }
     public fun get_minimum_lottery_duration_in_secs(): u64 { MINIMUM_LOTTERY_DURATION_SECS }
 
-    /// Allows anyone to start & configure the lottery so that drawing happens at time `end_time_secs` (and thus users
-    /// have plenty of time to buy tickets), where `end_time_secs` is a UNIX timestamp in seconds.
+    /// Allows anyone to start & configure the lottery so that drawing happens at time `draw_at` (and thus users
+    /// have plenty of time to buy tickets), where `draw_at` is a UNIX timestamp in seconds.
     ///
     /// NOTE: A real application can access control this.
     public entry fun start_lottery(end_time_secs: u64) acquires Lottery {
@@ -84,11 +100,11 @@ module drand::lottery {
 
         // Update the Lottery resource with the (future) lottery drawing time, effectively 'starting' the lottery.
         let lottery = borrow_global_mut<Lottery>(@drand);
-        assert!(option::is_none(&lottery.end_time), error::permission_denied(E_LOTTERY_ALREADY_STARTED));
-        lottery.end_time = option::some(end_time_secs);
+        assert!(option::is_none(&lottery.draw_at), error::permission_denied(E_LOTTERY_ALREADY_STARTED));
+        lottery.draw_at = option::some(end_time_secs);
 
         //debug::print(&string::utf8(b"Started a lottery that will draw at time: "));
-        //debug::print(&end_time_secs);
+        //debug::print(&draw_at_in_secs);
     }
 
     /// Called by any user to purchase a ticket in the lottery.
@@ -97,8 +113,8 @@ module drand::lottery {
         let lottery = borrow_global_mut<Lottery>(@drand);
 
         // Make sure the lottery has been 'started' but has NOT been 'drawn' yet
-        let end_time = *option::borrow(&lottery.end_time);
-        assert!(timestamp::now_seconds() < end_time, error::out_of_range(E_LOTTERY_HAS_CLOSED));
+        let draw_at = *option::borrow(&lottery.draw_at);
+        assert!(timestamp::now_seconds() < draw_at, error::out_of_range(E_LOTTERY_HAS_CLOSED));
 
         // Get the address of the resource account that stores the coin bounty
         let (_, rsrc_acc_addr) = get_rsrc_acc(lottery);
@@ -111,34 +127,39 @@ module drand::lottery {
     }
 
     /// Allows anyone to close the lottery (if enough time has elapsed) and to decide the winner, by uploading
-    /// the correct _drand-signed bytes_ associated with the committed draw time in `Lottery::draw_post`.
+    /// the correct _drand-signed bytes_ associated with the committed draw time in `Lottery::draw_at`.
     /// These bytes will then be verified and used to extract randomness.
     public entry fun close_lottery(drand_signed_bytes: vector<u8>): Option<address> acquires Lottery {
         // Get the Lottery resource
         let lottery = borrow_global_mut<Lottery>(@drand);
 
         // Make sure the lottery has been 'started' and enough time has elapsed before the drawing can start
-        let end_time = *option::borrow(&lottery.end_time);
-        assert!(timestamp::now_seconds() >= end_time, error::out_of_range(E_LOTTERY_DRAW_IS_TOO_EARLY));
+        let draw_at = *option::borrow(&lottery.draw_at);
+        assert!(timestamp::now_seconds() >= draw_at, error::out_of_range(E_LOTTERY_DRAW_IS_TOO_EARLY));
 
         // It could be that no one signed up...
         if(vector::is_empty(&lottery.tickets)) {
             // It's time to draw, but nobody signed up => nobody won.
             // Close the lottery (even if the randomness might be incorrect).
-            option::extract(&mut lottery.end_time);
+            option::extract(&mut lottery.draw_at);
             return option::none<address>()
         };
 
-        // Verify the randomness for the next drand round after `end_time` and pick a winner
-        let randomness = drand::verify_and_extract_next_randomness(drand_signed_bytes, end_time);
+        // Determine the next drand round after `draw_at`
+        let drand_round = drand::next_round_after(draw_at);
+
+        // Verify the randomness for this round and pick a winner
+        let randomness = drand::verify_and_extract_randomness(
+            drand_signed_bytes,
+            drand_round
+        );
         assert!(option::is_some(&randomness), error::permission_denied(E_INCORRECT_RANDOMNESS));
 
         // Use the bytes to pick a number at random from 0 to `|lottery.tickets| - 1` and select the winner
-        let randomness = option::extract(&mut randomness);
-
-        let dst = type_info::type_name<Lottery>();
-        let dst = string::bytes(&dst);
-        let winner_idx = drand::uniform_random_less_than_n(*dst, randomness, vector::length(&lottery.tickets));
+        let winner_idx = drand::random_number(
+            option::extract(&mut randomness),
+            vector::length(&lottery.tickets)
+        );
 
         // Pay the winner
         let (rsrc_acc_signer, rsrc_acc_addr) = get_rsrc_acc(lottery);
@@ -151,7 +172,7 @@ module drand::lottery {
             balance);
 
         // Close the lottery
-        option::extract(&mut lottery.end_time);
+        option::extract(&mut lottery.draw_at);
         lottery.tickets = vector::empty<address>();
         option::some(winner_addr)
     }
