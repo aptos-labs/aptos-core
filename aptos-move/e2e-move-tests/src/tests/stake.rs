@@ -2,13 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    assert_abort, assert_success, get_stake_pool, get_validator_config, get_validator_set,
-    initialize_staking, join_validator_set, leave_validator_set, rotate_consensus_key,
-    setup_staking, tests::common, unlock_stake, withdraw_stake, MoveHarness,
+    assert_success, get_stake_pool, get_validator_config, get_validator_set, initialize_staking,
+    join_validator_set, leave_validator_set, rotate_consensus_key, setup_staking, tests::common,
+    unlock_stake, withdraw_stake, MoveHarness,
 };
 use aptos_cached_packages::aptos_stdlib;
 use aptos_types::account_address::{default_stake_pool_address, AccountAddress};
-use move_core_types::language_storage::CORE_CODE_ADDRESS;
 use once_cell::sync::Lazy;
 use std::collections::BTreeMap;
 
