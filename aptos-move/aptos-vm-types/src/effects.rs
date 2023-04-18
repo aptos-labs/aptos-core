@@ -1,8 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-// use std::fmt::{Debug, Formatter, Result};
-
 use anyhow::bail;
 
 /// Represents a write op at the VM level.
@@ -15,6 +13,15 @@ pub enum Op<T> {
 }
 
 impl<T> Op<T> {
+    pub fn map<F: FnOnce(T) -> U, U>(self, f: F) -> Op<U> {
+        use Op::*;
+        match self {
+            Creation(data) => Creation(f(data)),
+            Modification(data) => Modification(f(data)),
+            Deletion => Deletion,
+        }
+    }
+
     pub fn squash(&mut self, op: Self) -> anyhow::Result<bool> {
         match (&self, op) {
             (Self::Deletion, Self::Creation(data)) => {

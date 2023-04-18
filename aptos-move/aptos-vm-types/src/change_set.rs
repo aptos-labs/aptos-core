@@ -3,7 +3,6 @@
 
 use crate::{
     delta::DeltaOp,
-    effects::Op,
     remote_cache::StateViewWithRemoteCache,
     write::{squash_writes, WriteOp},
 };

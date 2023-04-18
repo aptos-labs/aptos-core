@@ -8,7 +8,7 @@ use crate::{
     versioned_data::VersionedData,
 };
 use aptos_types::executable::{Executable, ExecutableDescriptor, ModulePath};
-use aptos_vm_types::delta::DeltaOp;
+use aptos_vm_types::{delta::DeltaOp, write::TransactionWriteRef};
 use std::hash::Hash;
 
 pub mod types;
@@ -28,12 +28,14 @@ mod unit_tests;
 /// TODO: separate V into different generic types for data and modules / code (currently
 /// both WriteOp for executor, and use extract_raw_bytes. data for aggregators, and
 /// code for computing the module hash.
-pub struct MVHashMap<K, V, X: Executable> {
+pub struct MVHashMap<K, V: TransactionWriteRef + Clone, X: Executable> {
     data: VersionedData<K, V>,
     code: VersionedCode<K, V, X>,
 }
 
-impl<K: ModulePath + Hash + Clone + Eq, V: Clone, X: Executable> MVHashMap<K, V, X> {
+impl<K: ModulePath + Hash + Clone + Eq, V: TransactionWriteRef + Clone, X: Executable>
+    MVHashMap<K, V, X>
+{
     // -----------------------------------
     // Functions shared for data and code.
 
@@ -117,7 +119,9 @@ impl<K: ModulePath + Hash + Clone + Eq, V: Clone, X: Executable> MVHashMap<K, V,
     }
 }
 
-impl<K: ModulePath + Hash + Clone + Eq, V: Clone, X: Executable> Default for MVHashMap<K, V, X> {
+impl<K: ModulePath + Hash + Clone + Eq, V: TransactionWriteRef + Clone, X: Executable> Default
+    for MVHashMap<K, V, X>
+{
     fn default() -> Self {
         Self::new(None)
     }

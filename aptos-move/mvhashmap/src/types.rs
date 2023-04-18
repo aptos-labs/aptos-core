@@ -52,5 +52,5 @@ pub enum MVCodeOutput<M, X> {
     /// this can't be a storage-level module, as it's from multi-versioned code map.
     /// The Option can be None if HashValue can't be computed, currently may happen
     /// if the latest entry corresponded to the module deletion.
-    Module((Arc<M>, HashValue)),
+    Module((M, HashValue)),
 }

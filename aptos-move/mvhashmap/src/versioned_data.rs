@@ -3,16 +3,13 @@
 
 use crate::types::{Incarnation, MVDataError, MVDataOutput, TxnIndex, Version};
 use aptos_infallible::Mutex;
-use aptos_vm_types::delta::DeltaOp;
+use aptos_vm_types::{delta::DeltaOp, write::TransactionWriteRef};
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
 use std::{
     collections::btree_map::BTreeMap,
     hash::Hash,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
+    sync::atomic::{AtomicUsize, Ordering},
 };
 
 const FLAG_DONE: usize = 0;
@@ -82,7 +79,7 @@ impl<V> Entry<V> {
     }
 }
 
-impl<V> VersionedValue<V> {
+impl<V: TransactionWriteRef> VersionedValue<V> {
     pub fn new() -> Self {
         Self {
             versioned_map: BTreeMap::new(),
@@ -91,13 +88,13 @@ impl<V> VersionedValue<V> {
     }
 }
 
-impl<V> Default for VersionedValue<V> {
+impl<V: TransactionWriteRef> Default for VersionedValue<V> {
     fn default() -> Self {
         VersionedValue::new()
     }
 }
 
-impl<K: Hash + Clone + Eq, V: Clone> VersionedData<K, V> {
+impl<K: Hash + Clone + Eq, V: TransactionWriteRef + Clone> VersionedData<K, V> {
     pub(crate) fn new() -> Self {
         Self {
             values: DashMap::new(),
@@ -131,9 +128,7 @@ impl<K: Hash + Clone + Eq, V: Clone> VersionedData<K, V> {
             .filter_map(|(idx, entry)| {
                 match &entry.cell {
                     EntryCell::Write(_, data) => {
-                        latest_value = Some(vec![])//data
-                            //.extract_raw_bytes()
-                            .map(|bytes| bcs::from_bytes(&bytes).expect("should not fail"));
+                        latest_value = data.as_aggregator_value();
                         None
                     },
                     EntryCell::Delta(delta) => {
@@ -222,7 +217,7 @@ impl<K: Hash + Clone + Eq, V: Clone> VersionedData<K, V> {
 
                             // None if data represents deletion. Otherwise, panics if the
                             // data can't be resolved to an aggregator value.
-                            let maybe_value: Option<u128> = None;
+                            let maybe_value = data.as_aggregator_value();
 
                             if maybe_value.is_none() {
                                 // Resolve to the write if the WriteOp was deletion
@@ -234,7 +229,7 @@ impl<K: Hash + Clone + Eq, V: Clone> VersionedData<K, V> {
                             return accumulator.map_err(|_| DeltaApplicationFailure).and_then(
                                 |a| {
                                     // Apply accumulated delta to resolve the aggregator value.
-                                    a.apply_to(maybe_value.unwrap().into())
+                                    a.apply_to(maybe_value.unwrap())
                                         .map(|result| Resolved(result))
                                         .map_err(|_| DeltaApplicationFailure)
                                 },

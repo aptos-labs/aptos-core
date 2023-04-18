@@ -4,7 +4,9 @@
 
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::executable::ModulePath;
-use aptos_vm_types::{delta::DeltaOp, remote_cache::TStateViewWithRemoteCache};
+use aptos_vm_types::{
+    delta::DeltaOp, remote_cache::TStateViewWithRemoteCache, write::TransactionWriteRef,
+};
 use std::{fmt::Debug, hash::Hash};
 
 /// The execution result of a transaction
@@ -25,6 +27,7 @@ pub enum ExecutionStatus<T, E> {
 pub trait Transaction: Sync + Send + 'static {
     type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug;
     type Value: Send + Sync + Clone;
+    type ValueRef: TransactionWriteRef + Send + Sync + Clone + From<Self::Value> + Debug;
 }
 
 /// Inference result of a transaction.

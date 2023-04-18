@@ -20,6 +20,7 @@ use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::{
     delta::DeltaOp,
     remote_cache::{TRemoteCache, TStateViewWithRemoteCache},
+    write::TransactionWriteRef,
 };
 use claims::assert_none;
 use move_binary_format::errors::Location;
@@ -33,7 +34,7 @@ use std::{cell::RefCell, collections::BTreeMap, hash::Hash, sync::Arc};
 /// TODO(issue 10177): MvHashMapView currently needs to be sync due to trait bounds, but should
 /// not be. In this case, the read_dependency member can have a RefCell<bool> type and the
 /// captured_reads member can have RefCell<Vec<ReadDescriptor<K>>> type.
-pub(crate) struct MVHashMapView<'a, K, V> {
+pub(crate) struct MVHashMapView<'a, K, V: TransactionWriteRef + Clone> {
     versioned_map: &'a MVHashMap<K, V, ExecutableTestType>, // TODO: proper generic type
     scheduler: &'a Scheduler,
     captured_reads: RefCell<Vec<ReadDescriptor<K>>>,
@@ -53,8 +54,11 @@ pub(crate) enum ReadResult<V> {
     None,
 }
 
-impl<'a, K: ModulePath + PartialOrd + Ord + Send + Clone + Hash + Eq, V: Send + Sync + Clone>
-    MVHashMapView<'a, K, V>
+impl<
+        'a,
+        K: ModulePath + PartialOrd + Ord + Send + Clone + Hash + Eq,
+        V: TransactionWriteRef + Send + Sync + Clone,
+    > MVHashMapView<'a, K, V>
 {
     pub(crate) fn new(
         versioned_map: &'a MVHashMap<K, V, ExecutableTestType>,
@@ -162,8 +166,8 @@ impl<'a, K: ModulePath + PartialOrd + Ord + Send + Clone + Hash + Eq, V: Send + 
 }
 
 enum ViewMapKind<'a, T: Transaction> {
-    MultiVersion(&'a MVHashMapView<'a, T::Key, T::Value>),
-    BTree(&'a BTreeMap<T::Key, T::Value>),
+    MultiVersion(&'a MVHashMapView<'a, T::Key, T::ValueRef>),
+    BTree(&'a BTreeMap<T::Key, T::ValueRef>),
 }
 
 pub(crate) struct LatestView<'a, T: Transaction, S: TStateViewWithRemoteCache<CommonKey = T::Key>> {
@@ -181,7 +185,7 @@ impl<'a, T: Transaction, S: TStateViewWithRemoteCache<CommonKey = T::Key>> TStat
 impl<'a, T: Transaction, S: TStateViewWithRemoteCache<CommonKey = T::Key>> LatestView<'a, T, S> {
     pub(crate) fn new_mv_view(
         base_view: &'a S,
-        map: &'a MVHashMapView<'a, T::Key, T::Value>,
+        map: &'a MVHashMapView<'a, T::Key, T::ValueRef>,
         txn_idx: TxnIndex,
     ) -> LatestView<'a, T, S> {
         LatestView {
@@ -193,7 +197,7 @@ impl<'a, T: Transaction, S: TStateViewWithRemoteCache<CommonKey = T::Key>> Lates
 
     pub(crate) fn new_btree_view(
         base_view: &'a S,
-        map: &'a BTreeMap<T::Key, T::Value>,
+        map: &'a BTreeMap<T::Key, T::ValueRef>,
         txn_idx: TxnIndex,
     ) -> LatestView<'a, T, S> {
         LatestView {
@@ -254,10 +258,47 @@ impl<'a, T: Transaction, S: TStateViewWithRemoteCache<CommonKey = T::Key>> TRemo
     }
 
     fn get_move_resource(&self, state_key: &Self::Key) -> anyhow::Result<Option<ResourceRef>> {
-        panic!("Panic at 'get_move_resource' at {:?}", state_key)
+        match self.latest_view {
+            ViewMapKind::MultiVersion(map) => {
+                let data = map.fetch_data(state_key, self.txn_idx);
+                if let ReadResult::Value(v) = data {
+                    Ok(v.into_resource_ref())
+                } else {
+                    claims::assert_matches!(data, ReadResult::None);
+                    self.base_view.get_move_resource(state_key)
+                }
+            },
+            ViewMapKind::BTree(map) => map.get(state_key).map_or_else(
+                || self.base_view.get_move_resource(state_key),
+                |v| Ok(v.clone().into_resource_ref()),
+            ),
+        }
     }
 
     fn get_aggregator_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<u128>> {
-        panic!("Panic at 'get_aggregator_value' at {:?}", state_key)
+        match self.latest_view {
+            ViewMapKind::MultiVersion(map) => {
+                let data = map.fetch_data(state_key, self.txn_idx);
+                if let ReadResult::U128(v) = data {
+                    Ok(Some(v))
+                } else if let ReadResult::Unresolved(delta) = data {
+                    let from_storage = self
+                        .base_view
+                        .get_aggregator_value(state_key)?
+                        .expect("aggregator value ust exist");
+                    let result = delta
+                        .apply_to(from_storage)
+                        .map_err(|pe| pe.finish(Location::Undefined).into_vm_status())?;
+                    Ok(Some(result))
+                } else {
+                    claims::assert_matches!(data, ReadResult::None);
+                    self.base_view.get_aggregator_value(state_key)
+                }
+            },
+            ViewMapKind::BTree(map) => map.get(state_key).map_or_else(
+                || self.base_view.get_aggregator_value(state_key),
+                |v| Ok(v.as_aggregator_value()),
+            ),
+        }
     }
 }

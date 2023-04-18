@@ -71,7 +71,7 @@ where
         version: Version,
         signature_verified_block: &[T],
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Value, ExecutableTestType>,
+        versioned_cache: &MVHashMap<T::Key, T::ValueRef, ExecutableTestType>,
         scheduler: &Scheduler,
         executor: &E,
         base_view: &S,
@@ -100,7 +100,7 @@ where
                 if !prev_modified_keys.remove(&k) {
                     updates_outside = true;
                 }
-                versioned_cache.write(&k, write_version, v);
+                versioned_cache.write(&k, write_version, v.into());
             }
 
             // Then, apply deltas.
@@ -147,7 +147,7 @@ where
         version_to_validate: Version,
         validation_wave: Wave,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Value, ExecutableTestType>,
+        versioned_cache: &MVHashMap<T::Key, T::ValueRef, ExecutableTestType>,
         scheduler: &Scheduler,
     ) -> SchedulerTask {
         use MVDataError::*;
@@ -201,7 +201,7 @@ where
         executor_arguments: &E::Argument,
         block: &[T],
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Value, ExecutableTestType>,
+        versioned_cache: &MVHashMap<T::Key, T::ValueRef, ExecutableTestType>,
         scheduler: &Scheduler,
         base_view: &S,
         committing: bool,
@@ -373,8 +373,8 @@ where
                         "Sequential execution must materialize deltas"
                     );
                     // Apply the writes.
-                    for (ap, write_op) in output.get_writes().into_iter() {
-                        data_map.insert(ap, write_op);
+                    for (ap, write) in output.get_writes().into_iter() {
+                        data_map.insert(ap, write.into());
                     }
                     ret.push(output);
                 },

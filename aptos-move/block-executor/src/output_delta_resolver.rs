@@ -7,11 +7,11 @@ use aptos_mvhashmap::versioned_data::VersionedData;
 use aptos_vm_types::{effects::Op, remote_cache::TStateViewWithRemoteCache, write::WriteOp};
 
 pub(crate) struct OutputDeltaResolver<T: Transaction> {
-    versioned_outputs: VersionedData<T::Key, T::Value>,
+    versioned_outputs: VersionedData<T::Key, T::ValueRef>,
 }
 
 impl<T: Transaction> OutputDeltaResolver<T> {
-    pub fn new(versioned_outputs: VersionedData<T::Key, T::Value>) -> Self {
+    pub fn new(versioned_outputs: VersionedData<T::Key, T::ValueRef>) -> Self {
         Self { versioned_outputs }
     }
 

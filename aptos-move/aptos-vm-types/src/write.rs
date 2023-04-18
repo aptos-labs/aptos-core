@@ -15,6 +15,59 @@ pub enum WriteOp {
     ModuleWrite(Op<Module>),
 }
 
+/// Represents any write operation reference produced by the VM.
+#[derive(Clone, Debug)]
+pub enum WriteOpRef {
+    AggregatorWrite(Option<u128>),
+    ResourceWrite(Op<ResourceRef>),
+    ModuleWrite(Op<ModuleRef>),
+}
+
+impl From<WriteOp> for WriteOpRef {
+    fn from(value: WriteOp) -> Self {
+        match value {
+            WriteOp::AggregatorWrite(w) => WriteOpRef::AggregatorWrite(w),
+            WriteOp::ResourceWrite(w) => WriteOpRef::ResourceWrite(w.map(ResourceRef::new)),
+            WriteOp::ModuleWrite(w) => WriteOpRef::ModuleWrite(w.map(ModuleRef::new)),
+        }
+    }
+}
+
+pub trait TransactionWriteRef {
+    fn as_aggregator_value(&self) -> Option<u128>;
+    fn into_module_ref(self) -> Option<ModuleRef>;
+    fn into_resource_ref(self) -> Option<ResourceRef>;
+}
+
+impl TransactionWriteRef for WriteOpRef {
+    fn as_aggregator_value(&self) -> Option<u128> {
+        match self {
+            Self::AggregatorWrite(w) => w.clone(),
+            _ => unreachable!(),
+        }
+    }
+
+    fn into_module_ref(self) -> Option<ModuleRef> {
+        match self {
+            Self::ModuleWrite(op) => match op {
+                Op::Creation(m) | Op::Modification(m) => Some(m),
+                Op::Deletion => None,
+            },
+            _ => unreachable!(),
+        }
+    }
+
+    fn into_resource_ref(self) -> Option<ResourceRef> {
+        match self {
+            Self::ResourceWrite(op) => match op {
+                Op::Creation(m) | Op::Modification(m) => Some(m),
+                Op::Deletion => None,
+            },
+            _ => unreachable!(),
+        }
+    }
+}
+
 impl WriteOp {
     pub fn is_deletion(&self) -> bool {
         match self {

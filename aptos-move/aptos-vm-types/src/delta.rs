@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{effects::Op, remote_cache::StateViewWithRemoteCache, write::WriteOp};
+use crate::{remote_cache::StateViewWithRemoteCache, write::WriteOp};
 use aptos_types::state_store::state_key::StateKey;
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult};
 use move_core_types::{
@@ -10,7 +10,6 @@ use move_core_types::{
     language_storage::{ModuleId, CORE_CODE_ADDRESS},
     vm_status::{StatusCode, VMStatus},
 };
-use move_vm_types::resolver::Resource;
 use once_cell::sync::Lazy;
 use std::fmt::{Debug, Formatter, Result};
 

@@ -27,8 +27,10 @@ use aptos_types::{
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
 use aptos_vm_types::{
-    delta::DeltaOp, remote_cache::StateViewWithRemoteCache,
-    transaction_output::TransactionOutput as IntermediateOutput, write::WriteOp,
+    delta::DeltaOp,
+    remote_cache::StateViewWithRemoteCache,
+    transaction_output::TransactionOutput as IntermediateOutput,
+    write::{WriteOp, WriteOpRef},
 };
 use move_core_types::vm_status::VMStatus;
 use rayon::prelude::*;
@@ -37,6 +39,7 @@ use std::time::Instant;
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Key = StateKey;
     type Value = WriteOp;
+    type ValueRef = WriteOpRef;
 }
 
 // Wrapper to avoid orphan rule

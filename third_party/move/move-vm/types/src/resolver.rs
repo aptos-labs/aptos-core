@@ -30,6 +30,18 @@ impl<T> AsRef<T> for MoveRef<T> {
 pub type ModuleRef = MoveRef<Module>;
 pub type ResourceRef = MoveRef<Resource>;
 
+impl ModuleRef {
+    pub fn into_bytes(self) -> Option<Vec<u8>> {
+        self.0.as_ref().as_bytes()
+    }
+}
+
+impl ResourceRef {
+    pub fn into_bytes(self) -> Option<Vec<u8>> {
+        self.0.as_ref().as_bytes()
+    }
+}
+
 /// Wrapper around any Move resource.
 #[derive(Clone, Debug)]
 pub enum Resource {
