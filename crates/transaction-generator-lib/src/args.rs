@@ -9,12 +9,15 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Copy, Clone, ArgEnum, Deserialize, Parser, Serialize)]
 pub enum TransactionTypeArg {
     CoinTransfer,
+    CoinTransferWithInvalid,
     AccountGeneration,
     AccountGenerationLargePool,
     NftMintAndTransfer,
     PublishPackage,
     CustomFunctionLargeModuleWorkingSet,
     CreateNewResource,
+    ModifyGlobalResource,
+    ModifyTenGlobalResources,
     NoOp,
 }
 
@@ -29,6 +32,10 @@ impl TransactionTypeArg {
         match self {
             TransactionTypeArg::CoinTransfer => TransactionType::CoinTransfer {
                 invalid_transaction_ratio: 0,
+                sender_use_account_pool: false,
+            },
+            TransactionTypeArg::CoinTransferWithInvalid => TransactionType::CoinTransfer {
+                invalid_transaction_ratio: 10,
                 sender_use_account_pool: false,
             },
             TransactionTypeArg::AccountGeneration => TransactionType::default_account_generation(),
@@ -54,6 +61,16 @@ impl TransactionTypeArg {
                 },
                 num_modules: 1,
                 use_account_pool: true,
+            },
+            TransactionTypeArg::ModifyGlobalResource => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::StepDst,
+                num_modules: 1,
+                use_account_pool: false,
+            },
+            TransactionTypeArg::ModifyTenGlobalResources => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::StepDst,
+                num_modules: 10,
+                use_account_pool: false,
             },
             TransactionTypeArg::NoOp => TransactionType::CallCustomModules {
                 entry_point: EntryPoints::Nop,

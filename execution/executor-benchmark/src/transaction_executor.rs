@@ -20,6 +20,8 @@ pub struct TransactionExecutor<V> {
     // If commit_sender is `None`, we will commit all the execution result immediately in this struct.
     commit_sender:
         Option<mpsc::SyncSender<(HashValue, HashValue, Instant, Instant, Duration, usize)>>,
+    allow_discards: bool,
+    allow_aborts: bool,
 }
 
 impl<V> TransactionExecutor<V>
@@ -33,6 +35,8 @@ where
         commit_sender: Option<
             mpsc::SyncSender<(HashValue, HashValue, Instant, Instant, Duration, usize)>,
         >,
+        allow_discards: bool,
+        allow_aborts: bool,
     ) -> Self {
         Self {
             executor,
@@ -40,6 +44,8 @@ where
             version,
             start_time: None,
             commit_sender,
+            allow_discards,
+            allow_aborts,
         }
     }
 
@@ -59,6 +65,54 @@ where
             .execute_block((block_id, transactions), self.parent_block_id)
             .unwrap();
 
+        assert_eq!(output.compute_status().len(), num_txns);
+        let discards = output
+            .compute_status()
+            .iter()
+            .flat_map(|status| match status.status() {
+                Ok(_) => None,
+                Err(error_code) => Some(format!("{:?}", error_code)),
+            })
+            .collect::<Vec<_>>();
+
+        let aborts = output
+            .compute_status()
+            .iter()
+            .flat_map(|status| match status.status() {
+                Ok(execution_status) => {
+                    if execution_status.is_success() {
+                        None
+                    } else {
+                        Some(format!("{:?}", execution_status))
+                    }
+                },
+                Err(_) => None,
+            })
+            .collect::<Vec<_>>();
+        if !discards.is_empty() || !aborts.is_empty() {
+            println!(
+                "Some transactions were not successful: {} discards and {} aborts out of {}, examples: discards: {:?}, aborts: {:?}",
+                discards.len(),
+                aborts.len(),
+                output.compute_status().len(),
+                &discards[..(discards.len().min(3))],
+                &aborts[..(aborts.len().min(3))]
+            )
+        }
+
+        assert!(
+            self.allow_discards || discards.is_empty(),
+            "No discards allowed, {}, examples: {:?}",
+            discards.len(),
+            &discards[..(discards.len().min(3))]
+        );
+        assert!(
+            self.allow_aborts || aborts.is_empty(),
+            "No aborts allowed, {}, examples: {:?}",
+            aborts.len(),
+            &aborts[..(aborts.len().min(3))]
+        );
+
         self.parent_block_id = block_id;
 
         if let Some(ref commit_sender) = self.commit_sender {
@@ -69,7 +123,7 @@ where
                     self.start_time.unwrap(),
                     execution_start,
                     Instant::now().duration_since(execution_start),
-                    num_txns,
+                    num_txns - discards.len(),
                 ))
                 .unwrap();
         } else {

@@ -1021,6 +1021,7 @@ dependencies = [
  "async-trait",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "chrono",
+ "clap 3.2.23",
  "criterion",
  "indicatif 0.15.0",
  "itertools",
@@ -1031,7 +1032,6 @@ dependencies = [
  "rand 0.7.3",
  "rayon",
  "serde 1.0.149",
- "structopt",
  "tokio",
  "toml",
 ]
