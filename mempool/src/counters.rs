@@ -4,9 +4,10 @@
 
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_metrics_core::{
-    exponential_buckets, histogram_opts, op_counters::DurationHistogram, register_histogram,
-    register_histogram_vec, register_int_counter, register_int_counter_vec, register_int_gauge_vec,
-    Histogram, HistogramTimer, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
+    exponential_buckets, histogram_opts, op_counters::DurationHistogram, register_avg_counter,
+    register_histogram, register_histogram_vec, register_int_counter, register_int_counter_vec,
+    register_int_gauge_vec, Histogram, HistogramTimer, HistogramVec, IntCounter, IntCounterVec,
+    IntGauge, IntGaugeVec,
 };
 use aptos_short_hex_str::AsShortHexStr;
 use once_cell::sync::Lazy;
@@ -248,6 +249,12 @@ pub static CORE_MEMPOOL_GC_EAGER_EXPIRE_EVENT_COUNT: Lazy<IntCounter> = Lazy::ne
         "Number of times the periodic garbage-collection event triggers eager expiration, regardless of how many txns were actually removed")
         .unwrap()
 });
+
+pub static CORE_MEMPOOL_GC_EAGER_EXPIRE_NON_PARKED: Lazy<Histogram> =
+    Lazy::new(|| register_avg_counter("aptos_core_mempool_gc_eager_expire_non_parked", ""));
+
+pub static CORE_MEMPOOL_GC_EAGER_EXPIRE_OLDEST_AGE: Lazy<Histogram> =
+    Lazy::new(|| register_avg_counter("aptos_core_mempool_gc_eager_expire_oldest_age", ""));
 
 /// Counter tracking time for how long a transaction stayed in core-mempool before being garbage-collected
 pub static CORE_MEMPOOL_GC_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
