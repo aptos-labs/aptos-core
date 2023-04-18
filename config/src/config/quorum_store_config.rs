@@ -1,8 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::config::MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE;
+use crate::config::{
+    config_sanitizer::ConfigSanitizer, Error, NodeConfig, RoleType,
+    MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE,
+};
 use aptos_global_constants::DEFAULT_BUCKETS;
+use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
@@ -99,5 +103,102 @@ impl Default for QuorumStoreConfig {
             num_workers_for_remote_batches: 10,
             batch_buckets: DEFAULT_BUCKETS.to_vec(),
         }
+    }
+}
+
+impl QuorumStoreConfig {
+    fn sanitize_send_recv_batch_limits(
+        sanitizer_name: &String,
+        config: &QuorumStoreConfig,
+    ) -> Result<(), Error> {
+        let send_recv_pairs = [
+            (
+                config.sender_max_batch_txns,
+                config.receiver_max_batch_txns,
+                "txns",
+            ),
+            (
+                config.sender_max_batch_bytes,
+                config.receiver_max_batch_bytes,
+                "bytes",
+            ),
+            (
+                config.sender_max_total_txns,
+                config.receiver_max_total_txns,
+                "total_txns",
+            ),
+            (
+                config.sender_max_total_bytes,
+                config.receiver_max_total_bytes,
+                "total_bytes",
+            ),
+        ];
+        for (send, recv, label) in &send_recv_pairs {
+            if *send > *recv {
+                return Err(Error::ConfigSanitizerFailed(
+                    sanitizer_name.clone(),
+                    format!("Failed {}: {} > {}", label, *send, *recv),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn sanitize_batch_total_limits(
+        sanitizer_name: &String,
+        config: &QuorumStoreConfig,
+    ) -> Result<(), Error> {
+        let batch_total_pairs = [
+            (
+                config.sender_max_batch_txns,
+                config.sender_max_total_txns,
+                "send_txns",
+            ),
+            (
+                config.sender_max_batch_bytes,
+                config.sender_max_total_bytes,
+                "send_bytes",
+            ),
+            (
+                config.receiver_max_batch_txns,
+                config.receiver_max_total_txns,
+                "recv_txns",
+            ),
+            (
+                config.receiver_max_batch_bytes,
+                config.receiver_max_total_bytes,
+                "recv_bytes",
+            ),
+        ];
+        for (batch, total, label) in &batch_total_pairs {
+            if *batch > *total {
+                return Err(Error::ConfigSanitizerFailed(
+                    sanitizer_name.clone(),
+                    format!("Failed {}: {} > {}", label, *batch, *total),
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl ConfigSanitizer for QuorumStoreConfig {
+    /// Validate and process the quorum store config according to the given node role and chain ID
+    fn sanitize(
+        node_config: &mut NodeConfig,
+        _node_role: RoleType,
+        _chain_id: ChainId,
+    ) -> Result<(), Error> {
+        let sanitizer_name = Self::get_sanitizer_name();
+
+        Self::sanitize_send_recv_batch_limits(
+            &sanitizer_name,
+            &node_config.consensus.quorum_store_configs,
+        )?;
+        Self::sanitize_batch_total_limits(
+            &sanitizer_name,
+            &node_config.consensus.quorum_store_configs,
+        )?;
+        Ok(())
     }
 }

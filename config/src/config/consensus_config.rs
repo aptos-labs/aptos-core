@@ -246,11 +246,11 @@ impl ConsensusConfig {
         }
     }
 
-    fn sanitize_block_limits(
-        sanitizer_name: String,
+    fn sanitize_send_recv_block_limits(
+        sanitizer_name: &String,
         config: &ConsensusConfig,
     ) -> Result<(), Error> {
-        let sending_receiving_pairs = [
+        let send_recv_pairs = [
             (
                 config.max_sending_block_txns,
                 config.max_receiving_block_txns,
@@ -272,11 +272,11 @@ impl ConsensusConfig {
                 "bytes_quorum_store_override",
             ),
         ];
-        for (sending, receiving, label) in &sending_receiving_pairs {
-            if *sending > *receiving {
+        for (send, recv, label) in &send_recv_pairs {
+            if *send > *recv {
                 return Err(Error::ConfigSanitizerFailed(
-                    sanitizer_name,
-                    format!("Failed {}: {} > {}", label, *sending, *receiving),
+                    sanitizer_name.clone(),
+                    format!("Failed {}: {} > {}", label, *send, *recv),
                 ));
             }
         }
@@ -284,7 +284,7 @@ impl ConsensusConfig {
     }
 
     fn sanitize_batch_block_limits(
-        sanitizer_name: String,
+        sanitizer_name: &String,
         config: &ConsensusConfig,
     ) -> Result<(), Error> {
         // Note, we are strict here: receiver batch limits <= sender block limits
@@ -340,7 +340,7 @@ impl ConsensusConfig {
         for (batch, block, label) in &recv_batch_send_block_pairs {
             if *batch > *block {
                 return Err(Error::ConfigSanitizerFailed(
-                    sanitizer_name,
+                    sanitizer_name.clone(),
                     format!("Failed {}: {} > {}", label, *batch, *block),
                 ));
             }
@@ -356,9 +356,11 @@ impl ConfigSanitizer for ConsensusConfig {
         node_role: RoleType,
         chain_id: ChainId,
     ) -> Result<(), Error> {
-        // Verify that the safety rules config is valid
         let sanitizer_name = Self::get_sanitizer_name();
+
+        // Verify that the safety rules config is valid
         SafetyRulesConfig::sanitize(node_config, node_role, chain_id)?;
+        QuorumStoreConfig::sanitize(node_config, node_role, chain_id)?;
 
         // Verify that the consensus-only feature is not enabled in mainnet
         if chain_id.is_mainnet() && is_consensus_only_perf_test_enabled() {
@@ -369,17 +371,9 @@ impl ConfigSanitizer for ConsensusConfig {
         }
 
         // Sender block limits must be <= receiver block limits
-        if let Err(e) = Self::sanitize_block_limits(sanitizer_name.clone(), &node_config.consensus)
-        {
-            return Err(e);
-        }
-
+        Self::sanitize_send_recv_block_limits(&sanitizer_name, &node_config.consensus)?;
         // Quorum store batches must be <= consensus blocks
-        if let Err(e) =
-            Self::sanitize_batch_block_limits(sanitizer_name.clone(), &node_config.consensus)
-        {
-            return Err(e);
-        }
+        Self::sanitize_batch_block_limits(&sanitizer_name, &node_config.consensus)?;
 
         Ok(())
     }
