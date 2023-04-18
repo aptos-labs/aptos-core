@@ -17,3 +17,5 @@ pub const X_APTOS_OLDEST_BLOCK_HEIGHT: &str = "X-Aptos-Oldest-Block-Height";
 pub const X_APTOS_LEDGER_TIMESTAMP: &str = "X-Aptos-Ledger-TimestampUsec";
 /// Cursor used for pagination.
 pub const X_APTOS_CURSOR: &str = "X-Aptos-Cursor";
+/// Provided by the client to identify what client it is.
+pub const X_APTOS_CLIENT: &str = "x-aptos-client";
