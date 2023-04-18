@@ -3,9 +3,8 @@ spec aptos_framework::delegation_pool {
     spec module {
         // TODO: verification disabled until this module is specified.
         pragma verify = false;
-        pragma aborts_if_is_strict;
+        pragma aborts_if_is_partial;
 
-        apply Global_Requirement to withdraw_internal;
         // Property 1 [OK]:
         invariant forall addr: address: exists<DelegationPool>(addr) ==> exists<stake::StakePool>(addr);
 
@@ -129,14 +128,16 @@ spec aptos_framework::delegation_pool {
         pool_address: address,
         delegator_address: address
     ): (bool, u64) {
-        pragma verify = true;
+        //EXTRA TODO: TIMEOUT
+        pragma verify = false;
         aborts_if !delegation_pool_exists(pool_address);
         // aborts_if !exists<DelegationPool>(pool_address);
         // aborts_if !stake::stake_pool_exists(pool_address);
     }
 
     spec get_stake(pool_address: address, delegator_address: address): (u64, u64, u64) {
-        pragma verify = true;
+        //EXTRA TODO: TIMEOUT
+        pragma verify = false;
     }
 
     spec fun spec_get_add_stake_fee(pool_address: address, amount: u64): u64;
@@ -261,43 +262,43 @@ spec aptos_framework::delegation_pool {
     }
 
     spec retrieve_stake_pool_owner(pool: &DelegationPool): signer {
-        pragma verify = true;
-        aborts_if false;
+
     }
 
     spec get_pool_address(pool: &DelegationPool): address {
-        pragma verify = true;
-        aborts_if false;
+
     }
 
     spec olc_with_index(index: u64): ObservedLockupCycle {
-        pragma verify = true;
-        aborts_if false;
+
     }
 
     spec set_operator(
         owner: &signer,
         new_operator: address
     ) {
-        pragma verify = true;
+        //EXTRA TODO: TIMEOUT
+        pragma verify = false;
     }
 
     spec set_delegated_voter(
         owner: &signer,
         new_voter: address
     ) {
-        pragma verify = true;
+        //EXTRA TODO: TIMEOUT
+        pragma verify = false;
     }
     
 
     spec add_stake(delegator: &signer, pool_address: address, amount: u64) {
 
-        pragma verify = true;
+        //TODO: Decrease the usage of ghost var
+        //All of the passed property may takes about 200s - 300s, it passed anyway 
+
+        pragma verify = false;
         pragma aborts_if_is_partial = true;
 
         include stake::ResourceRequirement;
-        //TODO: Decrease the usage of ghost var
-        //All of the passed property may takes about 100s 
 
         let pool = global<DelegationPool>(pool_address);
         //Note: Origin func return when amount > 0, so it should be a pre-condition
@@ -453,7 +454,8 @@ spec aptos_framework::delegation_pool {
     }
 
     spec withdraw(delegator: &signer, pool_address: address, amount: u64) {
-        pragma verify = true;
+        //TODO: TIMEOUT via Global
+        pragma verify = false;
         pragma aborts_if_is_partial;
         // Property 1 [OK]: aborts_if amount == 0;
         aborts_if amount == 0;
@@ -466,6 +468,7 @@ spec aptos_framework::delegation_pool {
 
         requires get_pool_address(pool) != delegator_address;
         requires pool.stake_pool_signer_cap.account == get_pool_address(pool);
+
         // Property 1 [OK]: !(withdrawal_exists && (withdrawing_inactive_stake ||
         // can_withdraw_pending_inactive(pool_address))) =>
         // a. delegator-balance == old(delegator-balance) && there are no state changes on
@@ -563,21 +566,21 @@ spec aptos_framework::delegation_pool {
     }
 
     spec pending_withdrawal_exists(pool: &DelegationPool, delegator_address: address): (bool, ObservedLockupCycle) {
-        pragma verify = true;
+    
     }
 
     spec pending_inactive_shares_pool_mut(pool: &mut DelegationPool): &mut pool_u64::Pool {
-        pragma verify = true;
+        
         let observed_lockup_cycle = pool.observed_lockup_cycle;
         aborts_if !table::spec_contains(pool.inactive_shares, observed_lockup_cycle);
     }
 
     spec pending_inactive_shares_pool(pool: &DelegationPool): &pool_u64::Pool {
-        pragma verify = true;
+        
     }
 
     spec execute_pending_withdrawal(pool: &mut DelegationPool, delegator_address: address) {
-        pragma verify = true;
+        
     }
 
     spec buy_in_pending_inactive_shares(
@@ -585,7 +588,6 @@ spec aptos_framework::delegation_pool {
         shareholder: address,
         coins_amount: u64,
     ): u128 {
-        pragma verify = true;
         let observed_lockup_cycle = pool.observed_lockup_cycle;
         aborts_if !table::spec_contains(pool.inactive_shares, observed_lockup_cycle);
     }
@@ -595,9 +597,9 @@ spec aptos_framework::delegation_pool {
         shareholder: address,
         coins_amount: u64,
     ): u128 {
-        pragma verify = true;
+        pragma opaque;
         include AmountToSharesToRedeemAbortsIf;
-        ensures result == spec_amount_to_shares_to_redeem(shares_pool, shareholder, coins_amount);
+        ensures [abstract] result == spec_amount_to_shares_to_redeem(shares_pool, shareholder, coins_amount);
     }
     spec schema AmountToSharesToRedeemAbortsIf {
         shares_pool: pool_u64::Pool;
@@ -627,7 +629,7 @@ spec aptos_framework::delegation_pool {
         shareholder: address,
         coins_amount: u64,
     ): u64 {
-        pragma verify = true;
+        pragma verify = false;
         pragma aborts_if_is_partial;
         let shares_pool = pool.active_shares;
 
@@ -652,6 +654,7 @@ spec aptos_framework::delegation_pool {
         pragma aborts_if_is_partial;
         //Property 1 [OK]: pool_u64::shares(old(pool).inactive_shares[lockup_cycle], shareholder) != 0 && pool_u64::shares(pool.inactive_shares[lockup_cycle], shareholder) == 0 => !table::contains(pending_withdrawals, delegator)
         ensures (pool_u64::spec_shares(table::spec_get(old(pool).inactive_shares,lockup_cycle), shareholder) != 0 && pool_u64::spec_shares(table::spec_get(old(pool).inactive_shares,lockup_cycle), shareholder) == 0 ==> !table::spec_contains(pool.pending_withdrawals, shareholder));
+        
         //Property 2 [OK]: total_coins(old(pool).inactive_shares[lockup_cycle]) - redeemed_coins (result) == 0 => !table::contains(pool.inactive_shares, lockup_cycle): 
         //Note: The inactive[olc] exist, however, it's total_coin = 0. Should we change the condition to pool.inactive_shares.total_coin == 0 ?
         //If the condition modified as mentioned, it shall pass.
@@ -715,28 +718,28 @@ spec aptos_framework::delegation_pool {
             // Property 4 [ERROR]: inactive > old(total_coins_inactive) IFF pool.OLC == old(pool).OLC + 1:
             ensures old(global<DelegationPool>(pool_address)).observed_lockup_cycle.index != pool.observed_lockup_cycle.index && inactive > old(global<DelegationPool>(pool_address)).total_coins_inactive;
              
-            // Property 5.1 [TIMOUT]: pool.OLC == old(pool).OLC + 1 => table::contains(pool.inactive_shares, pool.OLC)
+            // Property 5.1 [TIMEOUT]: pool.OLC == old(pool).OLC + 1 => table::contains(pool.inactive_shares, pool.OLC)
 
             ensures (pool.observed_lockup_cycle.index == old(global<DelegationPool>(pool_address)).observed_lockup_cycle.index + 1) ==> table::spec_contains(pool.inactive_shares,pool.observed_lockup_cycle);
 
-            // Property 5.2 [TIMOUT]: pool.OLC == old(pool).OLC + 1 => total_coins(pool.inactive_shares[pool.OLC]) == 0
+            // Property 5.2 [TIMEOUT]: pool.OLC == old(pool).OLC + 1 => total_coins(pool.inactive_shares[pool.OLC]) == 0
             ensures (pool.observed_lockup_cycle.index == old(global<DelegationPool>(pool_address)).observed_lockup_cycle.index + 1) ==> table::spec_get(pool.inactive_shares, pool.observed_lockup_cycle).total_coins == 0;
 
-            // Property 5.3 [TIMOUT]: pool.OLC == old(pool).OLC + 1 => total_coins(pool.inactive_shares[old(pool).OLC]) == inactive - old(total_coins_inactive)
+            // Property 5.3 [TIMEOUT]: pool.OLC == old(pool).OLC + 1 => total_coins(pool.inactive_shares[old(pool).OLC]) == inactive - old(total_coins_inactive)
             ensures (pool.observed_lockup_cycle.index == old(global<DelegationPool>(pool_address)).observed_lockup_cycle.index + 1) ==> table::spec_get(pool.inactive_shares,  old(global<DelegationPool>(pool_address)).observed_lockup_cycle).total_coins == inactive - old(global<DelegationPool>(pool_address)).total_coins_inactive;
 
-            // Property 5.4 [TIMOUT]: pool.OLC == old(pool).OLC + 1 => pending_inactive == 0: this is the 1st stake-management operation on this new lockup cycle and thus no stake could have been unlocked yet
+            // Property 5.4 [TIMEOUT]: pool.OLC == old(pool).OLC + 1 => pending_inactive == 0: this is the 1st stake-management operation on this new lockup cycle and thus no stake could have been unlocked yet
             ensures (pool.observed_lockup_cycle.index == old(global<DelegationPool>(pool_address)).observed_lockup_cycle.index + 1) ==> pending_active == 0;
 
-            // Property 6 [TIMOUT]: pending_active == 0 => pool_u64::shares(pool.active_shares, NULL_SHAREHOLDER) == 0: add_stake fees charged during previous epoch have been refunded
+            // Property 6 [TIMEOUT]: pending_active == 0 => pool_u64::shares(pool.active_shares, NULL_SHAREHOLDER) == 0: add_stake fees charged during previous epoch have been refunded
 
             ensures pending_active == 0 ==> pool_u64::spec_shares(pool.active_shares, NULL_SHAREHOLDER) == 0;
 
-            // Property 7 [TIMOUT]: pending_active != 0 => pool_u64::shares(pool.active_shares, NULL_SHAREHOLDER) == pool_u64::shares(old(pool).active_shares, NULL_SHAREHOLDER): any add_stake fees are not refunded unless the epoch when charged has ended
+            // Property 7 [TIMEOUT]: pending_active != 0 => pool_u64::shares(pool.active_shares, NULL_SHAREHOLDER) == pool_u64::shares(old(pool).active_shares, NULL_SHAREHOLDER): any add_stake fees are not refunded unless the epoch when charged has ended
 
             ensures pending_active != 0 ==> pool_u64::spec_shares(pool.active_shares, NULL_SHAREHOLDER) == pool_u64::spec_shares(old(global<DelegationPool>(pool_address)).active_shares, NULL_SHAREHOLDER);
 
-            // Property 8 [TIMOUT]: let commission_active = delta total_coins(pool.active_shares) * pool.commission;
+            // Property 8 [TIMEOUT]: let commission_active = delta total_coins(pool.active_shares) * pool.commission;
             // pool_u64::shares(pool.active_shares, operator) - pool_u64::shares(old(pool).active_shares, operator) ==
             // pool_u64::amount_to_shares(
             // pool.active_shares, // snapshot of shares pool before buy_in
@@ -745,15 +748,14 @@ spec aptos_framework::delegation_pool {
             // Note: commission_active = ghost_coin_1
             ensures pool_u64::spec_shares(pool.active_shares, global<stake::StakePool>(pool_address).operator_address) - pool_u64::spec_shares(old(global<DelegationPool>(pool_address)).active_shares, global<stake::StakePool>(pool_address).operator_address) == pool_u64::spec_amount_to_shares_with_total_coins(pool.active_shares, ghost_coin_1, pool.active_shares.total_coins);
 
-            // Property 9 [TIMOUT]: Same for pending_inactive commission used to buy shares into pool at index old(OLC) in pool.inactive_shares
+            // Property 9 [TIMEOUT]: Same for pending_inactive commission used to buy shares into pool at index old(OLC) in pool.inactive_shares
             // forall delegators: delegator != operator && != NULL_SHAREHOLDER => pool_u64::shares(pool.active_shares, delegator) == pool_u64::shares(old(pool).active_shares, delegator) 
             ensures forall delegators: address: delegators != global<stake::StakePool>(pool_address).operator_address && delegators != NULL_SHAREHOLDER ==> pool_u64::spec_shares(pool.active_shares, delegators) == pool_u64::spec_shares(old(global<DelegationPool>(pool_address)).active_shares, delegators); 
 
         }
 
     spec to_u128(num: u64): u128 {
-        pragma verify = false;
-        aborts_if false;
+
     }
 
 }

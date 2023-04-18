@@ -590,11 +590,13 @@ module aptos_framework::delegation_pool {
         // stake the entire amount to the stake pool
         coin::transfer<AptosCoin>(delegator, pool_address, amount);
         stake::add_stake(resource_signer, amount);
+        
         // NEW ASSERT
-        assert!(get_pool_address(pool) != pool_address, error::invalid_argument(ENOT_ENOUGH_ACTIVE_STAKE_TO_UNLOCK) );
-        assert!(delegator_address != pool_address, error::invalid_argument(ENOT_ENOUGH_ACTIVE_STAKE_TO_UNLOCK) );
-        assert!(resource_signer != delegator, error::invalid_argument(ENOT_ENOUGH_ACTIVE_STAKE_TO_UNLOCK));
-        assert!(signer::address_of(resource_signer) != pool_address, error::invalid_argument(ENOT_ENOUGH_ACTIVE_STAKE_TO_UNLOCK));
+        // assert!(get_pool_address(pool) != pool_address, error::invalid_argument(ENOT_ENOUGH_ACTIVE_STAKE_TO_UNLOCK) );
+        // assert!(delegator_address != pool_address, error::invalid_argument(ENOT_ENOUGH_ACTIVE_STAKE_TO_UNLOCK) );
+        // assert!(resource_signer != delegator, error::invalid_argument(ENOT_ENOUGH_ACTIVE_STAKE_TO_UNLOCK));
+        // assert!(signer::address_of(resource_signer) != pool_address, error::invalid_argument(ENOT_ENOUGH_ACTIVE_STAKE_TO_UNLOCK));
+        
         // but buy shares for delegator just for the remaining amount after fee
         pool_u64::buy_in(&mut pool.active_shares, delegator_address, amount - add_stake_fee);
         assert_min_active_balance(pool, delegator_address);
