@@ -429,7 +429,7 @@ export class AptosToken {
     token: MaybeHexString,
     propertyKey: string,
     propertyType: PropertyType,
-    propertyValue: Generic,
+    propertyValue: string,
     tokenType?: string,
     extraArgs?: OptionalTransactionArgs,
   ) {
@@ -447,7 +447,7 @@ export class AptosToken {
     token: MaybeHexString,
     propertyKey: string,
     propertyType: PropertyType,
-    propertyValue: Generic,
+    propertyValue: string,
     tokenType?: string,
     extraArgs?: OptionalTransactionArgs,
   ) {

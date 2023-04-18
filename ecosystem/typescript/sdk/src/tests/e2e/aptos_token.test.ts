@@ -144,7 +144,7 @@ describe("token objects", () => {
     "add typed property",
     async () => {
       await provider.waitForTransaction(
-        await aptosToken.addTypedProperty(alice, tokenAddress, "newTypedKey", "U8", "5"),
+        await aptosToken.addTypedProperty(alice, tokenAddress, "newTypedKey", "U8VECTOR", "[hello,world]"),
         { checkSuccess: true },
       );
     },
@@ -155,7 +155,7 @@ describe("token objects", () => {
     "update typed property",
     async () => {
       await provider.waitForTransaction(
-        await aptosToken.updateTypedProperty(alice, tokenAddress, "newTypedKey", "U8", 2),
+        await aptosToken.updateTypedProperty(alice, tokenAddress, "newTypedKey", "U8", "2"),
         { checkSuccess: true },
       );
     },
