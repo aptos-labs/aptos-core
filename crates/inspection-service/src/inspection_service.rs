@@ -274,7 +274,7 @@ mod test {
 
     #[test]
     fn test_inspect_configuration() {
-        let mut config = NodeConfig::default_for_validator();
+        let mut config = NodeConfig::get_default_validator_config();
 
         config.inspection_service.expose_configuration = false;
         let mut r1 = do_test_get(&config, CONFIGURATION_PATH);
@@ -294,7 +294,7 @@ mod test {
 
     #[test]
     fn test_inspect_system() {
-        let mut config = NodeConfig::default_for_validator();
+        let mut config = NodeConfig::get_default_validator_config();
 
         config.inspection_service.expose_system_information = false;
         let mut r1 = do_test_get(&config, SYSTEM_INFORMATION_PATH);
@@ -317,7 +317,7 @@ mod test {
     fn test_inspect_metrics() {
         INT_COUNTER.inc(); // make sure we have a count to show
 
-        let config = NodeConfig::default_for_validator();
+        let config = NodeConfig::get_default_validator_config();
         let mut r1 = do_test_get(&config, METRICS_PATH);
         assert_eq!(r1.status(), StatusCode::OK);
         let r1body = block_on(body::to_bytes(r1.body_mut())).unwrap();
@@ -330,7 +330,7 @@ mod test {
     fn test_inspect_json_metrics() {
         INT_COUNTER.inc(); // make sure we have a count to show
 
-        let config = NodeConfig::default_for_validator();
+        let config = NodeConfig::get_default_validator_config();
         let mut r1 = do_test_get(&config, JSON_METRICS_PATH);
         assert_eq!(r1.status(), StatusCode::OK);
         let r1body = block_on(body::to_bytes(r1.body_mut())).unwrap();
@@ -343,7 +343,7 @@ mod test {
     fn test_inspect_forge_metrics() {
         INT_COUNTER.inc(); // make sure we have a count to show
 
-        let config = NodeConfig::default_for_validator();
+        let config = NodeConfig::get_default_validator_config();
         let mut r1 = do_test_get(&config, FORGE_METRICS_PATH);
         assert_eq!(r1.status(), StatusCode::OK);
         let r1body = block_on(body::to_bytes(r1.body_mut())).unwrap();
