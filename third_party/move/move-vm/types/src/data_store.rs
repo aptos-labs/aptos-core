@@ -9,7 +9,6 @@ use crate::{
 use move_binary_format::errors::{PartialVMResult, VMResult};
 use move_core_types::{
     account_address::AccountAddress, gas_algebra::NumBytes, language_storage::ModuleId,
-    value::MoveTypeLayout,
 };
 
 /// Provide an implementation for bytecodes related to data with a given data store.
