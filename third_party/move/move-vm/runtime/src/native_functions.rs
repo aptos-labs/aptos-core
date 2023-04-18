@@ -93,8 +93,7 @@ impl NativeFunctions {
 }
 
 pub struct NativeContext<'a, 'b> {
-    interpreter: &'a mut Interpreter,
-    data_store: &'a mut dyn DataStore,
+    interpreter: &'a mut Interpreter<'a>,
     resolver: &'a Resolver<'a>,
     extensions: &'a mut NativeContextExtensions<'b>,
     gas_balance: InternalGas,
@@ -102,15 +101,13 @@ pub struct NativeContext<'a, 'b> {
 
 impl<'a, 'b> NativeContext<'a, 'b> {
     pub(crate) fn new(
-        interpreter: &'a mut Interpreter,
-        data_store: &'a mut dyn DataStore,
+        interpreter: &'a mut Interpreter<'a>,
         resolver: &'a Resolver<'a>,
         extensions: &'a mut NativeContextExtensions<'b>,
         gas_balance: InternalGas,
     ) -> Self {
         Self {
             interpreter,
-            data_store,
             resolver,
             extensions,
             gas_balance,
@@ -130,7 +127,7 @@ impl<'a, 'b> NativeContext<'a, 'b> {
         type_: &Type,
     ) -> VMResult<(bool, Option<Option<NumBytes>>)> {
         let (value, num_bytes) = self
-            .data_store
+            .interpreter.data_store
             .load_resource(address, type_)
             .map_err(|err| err.finish(Location::Undefined))?;
         let exists = value
@@ -146,7 +143,7 @@ impl<'a, 'b> NativeContext<'a, 'b> {
         ty: Type,
         val: Value,
     ) -> PartialVMResult<bool> {
-        match self.data_store.emit_event(guid, seq_num, ty, val) {
+        match self.interpreter.data_store.emit_event(guid, seq_num, ty, val) {
             Ok(()) => Ok(true),
             Err(e) if e.major_status().status_type() == StatusType::InvariantViolation => Err(e),
             Err(_) => Ok(false),
