@@ -206,6 +206,8 @@ fn main() -> Result<()> {
 
     let args = Args::from_args();
     let duration = Duration::from_secs(args.duration_secs as u64);
+    // Override:
+    let duration = Duration::from_secs(60 * 30);
     let suite_name: &str = args.suite.as_ref();
 
     let runtime = Runtime::new()?;
@@ -875,7 +877,8 @@ fn three_region_sim_graceful_overload(config: ForgeConfig) -> ForgeConfig {
                 .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE),
         )
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
-            helm_values["chain"]["epoch_duration_secs"] = 300.into();
+            // Ten minutes
+            helm_values["chain"]["epoch_duration_secs"] = 600.into();
         }))
         .with_success_criteria(
             SuccessCriteria::new(900)
