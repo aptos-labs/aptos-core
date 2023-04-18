@@ -14,6 +14,7 @@ module veiled_coin::veiled_coin {
     use std::option::Option;
     use aptos_std::elgamal::{Self, Ciphertext, CompressedCiphertext, Pubkey};
     use aptos_std::ristretto255::{RistrettoPoint, Self, Scalar, new_scalar_from_u64};
+    use aptos_std::debug::print;
 
     use aptos_framework::account;
     use aptos_framework::coin::{Self, Coin};
@@ -92,6 +93,7 @@ module veiled_coin::veiled_coin {
         let x1_bytes = vector::trim<u8>(&mut proof_bytes, 32);
         let x1 = ristretto255::new_point_from_bytes(x1_bytes);
         if (!std::option::is_some<RistrettoPoint>(&x1)) {
+            print(&3);
             return std::option::none<SigmaProof<CoinType>>()
         };
         let x1 = std::option::extract<RistrettoPoint>(&mut x1);
@@ -710,6 +712,7 @@ module veiled_coin::veiled_coin {
         let alpha3_bytes = ristretto255::scalar_to_bytes(&proof.alpha3);
         let alpha4_bytes = ristretto255::scalar_to_bytes(&proof.alpha4); 
 
+        // TODO: Remove this
         let bytes = vector::empty<u8>();
         vector::append<u8>(&mut bytes, x1_bytes);
         vector::append<u8>(&mut bytes, x2_bytes);
@@ -720,6 +723,17 @@ module veiled_coin::veiled_coin {
         vector::append<u8>(&mut bytes, alpha2_bytes);
         vector::append<u8>(&mut bytes, alpha3_bytes);
         vector::append<u8>(&mut bytes, alpha4_bytes);
+
+        /*let bytes = vector::empty<u8>();
+        vector::append<u8>(&mut bytes, alpha4_bytes);
+        vector::append<u8>(&mut bytes, alpha3_bytes);
+        vector::append<u8>(&mut bytes, alpha2_bytes);
+        vector::append<u8>(&mut bytes, alpha1_bytes);
+        vector::append<u8>(&mut bytes, x5_bytes);
+        vector::append<u8>(&mut bytes, x4_bytes);
+        vector::append<u8>(&mut bytes, x3_bytes);
+        vector::append<u8>(&mut bytes, x2_bytes);
+        vector::append<u8>(&mut bytes, x1_bytes);*/
         bytes
     }
 

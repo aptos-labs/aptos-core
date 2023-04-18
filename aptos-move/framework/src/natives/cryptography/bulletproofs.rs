@@ -103,7 +103,7 @@ fn native_test_only_prove_range(
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(_ty_args.is_empty());
-    debug_assert!(args.len() == 4);
+    debug_assert!(args.len() == 6);
 
     let rand_base_handle = get_point_handle(&safely_pop_arg!(args, StructRef))?;
     let val_base_handle = get_point_handle(&safely_pop_arg!(args, StructRef))?;
