@@ -10,6 +10,7 @@ pub struct PeerMonitoringServiceConfig {
     pub latency_monitoring: LatencyMonitoringConfig,
     pub max_concurrent_requests: u64, // Max num of concurrent server tasks
     pub max_network_channel_size: u64, // Max num of pending network messages
+    pub max_num_response_bytes: u64,  // Max num of bytes in a (serialized) response
     pub max_request_jitter_ms: u64, // Max amount of jitter (ms) that a request will be delayed for
     pub metadata_update_interval_ms: u64, // The interval (ms) between metadata updates
     pub network_monitoring: NetworkMonitoringConfig,
@@ -24,7 +25,8 @@ impl Default for PeerMonitoringServiceConfig {
             latency_monitoring: LatencyMonitoringConfig::default(),
             max_concurrent_requests: 1000,
             max_network_channel_size: 1000,
-            max_request_jitter_ms: 1000, // Monitoring requests are very infrequent
+            max_num_response_bytes: 100 * 1024, // 100 KB
+            max_request_jitter_ms: 1000,        // Monitoring requests are very infrequent
             metadata_update_interval_ms: 5000,
             network_monitoring: NetworkMonitoringConfig::default(),
             node_monitoring: NodeMonitoringConfig::default(),

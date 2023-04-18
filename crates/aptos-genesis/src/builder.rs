@@ -488,7 +488,7 @@ impl Builder {
         let root_key = keygen.generate_ed25519_private_key();
 
         // Generate validator configs
-        let template = NodeConfig::default_for_validator();
+        let template = NodeConfig::get_default_validator_config();
         let mut validators: Vec<ValidatorNodeConfig> = (0..self.num_validators.get())
             .map(|i| self.generate_validator_config(i, &mut rng, &template))
             .collect::<anyhow::Result<Vec<ValidatorNodeConfig>>>()?;

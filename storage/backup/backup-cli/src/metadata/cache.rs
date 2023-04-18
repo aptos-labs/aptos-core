@@ -70,7 +70,8 @@ pub async fn initialize_identity(storage: &Arc<dyn BackupStorage>) -> Result<()>
     let metadata = Metadata::new_random_identity();
     storage
         .save_metadata_line(&metadata.name(), &metadata.to_text_line()?)
-        .await
+        .await?;
+    Ok(())
 }
 
 /// Sync local cache folder with remote storage, and load all metadata entries from the cache.

@@ -8,14 +8,14 @@ use super::{
 use crate::{
     block_storage::BlockReader,
     counters::{
-        CHAIN_HEALTH_BACKOFF_TRIGGERED, PROPOSER_PENDING_BLOCKS_COUNT,
-        PROPOSER_PENDING_BLOCKS_FILL_FRACTION,
+        CHAIN_HEALTH_BACKOFF_TRIGGERED, PIPELINE_BACKPRESSURE_ON_PROPOSAL_TRIGGERED,
+        PROPOSER_PENDING_BLOCKS_COUNT, PROPOSER_PENDING_BLOCKS_FILL_FRACTION,
     },
     state_replication::PayloadClient,
     util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, format_err, Context};
-use aptos_config::config::ChainHealthBackoffValues;
+use aptos_config::config::{ChainHealthBackoffValues, PipelineBackpressureValues};
 use aptos_consensus_types::{
     block::Block,
     block_data::BlockData,
@@ -53,16 +53,11 @@ impl ChainHealthBackoffConfig {
         }
     }
 
-    pub fn get_backoff(
-        &self,
-        round: Round,
-        proposer_election: &dyn ProposerElection,
-    ) -> Option<&ChainHealthBackoffValues> {
+    pub fn get_backoff(&self, voting_power_ratio: f64) -> Option<&ChainHealthBackoffValues> {
         if self.backoffs.is_empty() {
             return None;
         }
 
-        let voting_power_ratio = proposer_election.get_voting_power_participation_ratio(round);
         if voting_power_ratio < 2.0 / 3.0 {
             error!("Voting power ratio {} is below 2f + 1", voting_power_ratio);
         }
@@ -80,8 +75,56 @@ impl ChainHealthBackoffConfig {
                 sample!(
                     SampleRate::Duration(Duration::from_secs(10)),
                     warn!(
-                        "Using chain health backoff config for {} voting power ratio: {:?}",
+                        "Using chain health backoff config for {} voting power percentage: {:?}",
                         voting_power_percentage, v
+                    )
+                );
+                v
+            })
+    }
+}
+
+#[derive(Clone)]
+pub struct PipelineBackpressureConfig {
+    backoffs: BTreeMap<Round, PipelineBackpressureValues>,
+}
+
+impl PipelineBackpressureConfig {
+    pub fn new(backoffs: Vec<PipelineBackpressureValues>) -> Self {
+        let original_len = backoffs.len();
+        let backoffs = backoffs
+            .into_iter()
+            .map(|v| (v.back_pressure_pipeline_latency_limit_ms, v))
+            .collect::<BTreeMap<_, _>>();
+        assert_eq!(original_len, backoffs.len());
+        Self { backoffs }
+    }
+
+    #[allow(dead_code)]
+    pub fn new_no_backoff() -> Self {
+        Self {
+            backoffs: BTreeMap::new(),
+        }
+    }
+
+    pub fn get_backoff(
+        &self,
+        pipeline_pending_latency: Duration,
+    ) -> Option<&PipelineBackpressureValues> {
+        if self.backoffs.is_empty() {
+            return None;
+        }
+
+        self.backoffs
+            .range(..(pipeline_pending_latency.as_millis() as u64))
+            .last()
+            .map(|(_, v)| {
+                sample!(
+                    SampleRate::Duration(Duration::from_secs(10)),
+                    warn!(
+                        "Using consensus backpressure config for {}ms pending duration: {:?}",
+                        pipeline_pending_latency.as_millis(),
+                        v
                     )
                 );
                 v
@@ -109,6 +152,8 @@ pub struct ProposalGenerator {
     // Transaction manager is delivering the transactions.
     // Time service to generate block timestamps
     time_service: Arc<dyn TimeService>,
+    // Max time for preparation of the proposal
+    quorum_store_poll_time: Duration,
     // Max number of transactions to be added to a proposed block.
     max_block_txns: u64,
     // Max number of bytes to be added to a proposed block.
@@ -116,6 +161,7 @@ pub struct ProposalGenerator {
     // Max number of failed authors to be added to a proposed block.
     max_failed_authors_to_store: usize,
 
+    pipeline_backpressure_config: PipelineBackpressureConfig,
     chain_health_backoff_config: ChainHealthBackoffConfig,
 
     // Last round that a proposal was generated
@@ -129,9 +175,11 @@ impl ProposalGenerator {
         block_store: Arc<dyn BlockReader + Send + Sync>,
         payload_client: Arc<dyn PayloadClient>,
         time_service: Arc<dyn TimeService>,
+        quorum_store_poll_time: Duration,
         max_block_txns: u64,
         max_block_bytes: u64,
         max_failed_authors_to_store: usize,
+        pipeline_backpressure_config: PipelineBackpressureConfig,
         chain_health_backoff_config: ChainHealthBackoffConfig,
         quorum_store_enabled: bool,
     ) -> Self {
@@ -140,9 +188,11 @@ impl ProposalGenerator {
             block_store,
             payload_client,
             time_service,
+            quorum_store_poll_time,
             max_block_txns,
             max_block_bytes,
             max_failed_authors_to_store,
+            pipeline_backpressure_config,
             chain_health_backoff_config,
             last_round_generated: 0,
             quorum_store_enabled,
@@ -192,10 +242,6 @@ impl ProposalGenerator {
             bail!("Already proposed in the round {}", round);
         }
 
-        let chain_health_backoff = self
-            .chain_health_backoff_config
-            .get_backoff(round, proposer_election);
-
         let hqc = self.ensure_highest_quorum_cert(round)?;
 
         let (payload, timestamp) = if hqc.certified_block().has_reconfiguration() {
@@ -236,25 +282,15 @@ impl ProposalGenerator {
             // the local time exceeds it.
             let timestamp = self.time_service.get_current_timestamp();
 
-            let (max_block_txns, max_block_bytes) = if let Some(value) = chain_health_backoff {
-                let max_block_txns = self
-                    .max_block_txns
-                    .min(value.max_sending_block_txns_override);
-                let max_block_bytes = self
-                    .max_block_bytes
-                    .min(value.max_sending_block_bytes_override);
+            let voting_power_ratio = proposer_election.get_voting_power_participation_ratio(round);
 
-                CHAIN_HEALTH_BACKOFF_TRIGGERED.observe(1.0);
-                warn!(
-                    "Generating proposal reducing limits to {} txns and {} bytes, due to chain health backoff",
-                    max_block_txns,
-                    max_block_bytes,
-                );
-                (max_block_txns, max_block_bytes)
-            } else {
-                CHAIN_HEALTH_BACKOFF_TRIGGERED.observe(0.0);
-                (self.max_block_txns, self.max_block_bytes)
-            };
+            let (max_block_txns, max_block_bytes, backpressure_proposal_delay) = self
+                .calculate_max_block_sizes(voting_power_ratio, timestamp)
+                .await;
+
+            if !backpressure_proposal_delay.is_zero() {
+                tokio::time::sleep(backpressure_proposal_delay).await;
+            }
 
             let max_pending_block_len = pending_blocks
                 .iter()
@@ -266,6 +302,7 @@ impl ProposalGenerator {
                 .map(|block| block.payload().map_or(0, |p| p.size()))
                 .max()
                 .unwrap_or(0);
+            // Use non-backpressure reduced values for computing fill_fraction
             let max_fill_fraction = (max_pending_block_len as f32 / self.max_block_txns as f32)
                 .max(max_pending_block_bytes as f32 / self.max_block_bytes as f32);
             PROPOSER_PENDING_BLOCKS_COUNT.set(pending_blocks.len() as i64);
@@ -273,6 +310,8 @@ impl ProposalGenerator {
             let payload = self
                 .payload_client
                 .pull_payload(
+                    self.quorum_store_poll_time
+                        .saturating_sub(backpressure_proposal_delay),
                     max_block_txns,
                     max_block_bytes,
                     payload_filter,
@@ -303,6 +342,59 @@ impl ProposalGenerator {
             timestamp,
             quorum_cert,
         ))
+    }
+
+    async fn calculate_max_block_sizes(
+        &mut self,
+        voting_power_ratio: f64,
+        timestamp: Duration,
+    ) -> (u64, u64, Duration) {
+        let mut values_max_block_txns = vec![self.max_block_txns];
+        let mut values_max_block_bytes = vec![self.max_block_bytes];
+        let mut values_backpressure_proposal_delay = vec![Duration::ZERO];
+
+        let chain_health_backoff = self
+            .chain_health_backoff_config
+            .get_backoff(voting_power_ratio);
+        if let Some(value) = chain_health_backoff {
+            values_max_block_txns.push(value.max_sending_block_txns_override);
+            values_max_block_bytes.push(value.max_sending_block_bytes_override);
+            CHAIN_HEALTH_BACKOFF_TRIGGERED.observe(1.0);
+        } else {
+            CHAIN_HEALTH_BACKOFF_TRIGGERED.observe(0.0);
+        }
+
+        let pipeline_backpressure = self
+            .pipeline_backpressure_config
+            .get_backoff(self.block_store.pipeline_pending_latency(timestamp));
+        if let Some(value) = pipeline_backpressure {
+            values_max_block_txns.push(value.max_sending_block_txns_override);
+            values_max_block_bytes.push(value.max_sending_block_bytes_override);
+            values_backpressure_proposal_delay
+                .push(Duration::from_millis(value.backpressure_proposal_delay_ms));
+            PIPELINE_BACKPRESSURE_ON_PROPOSAL_TRIGGERED.observe(1.0);
+        } else {
+            PIPELINE_BACKPRESSURE_ON_PROPOSAL_TRIGGERED.observe(0.0);
+        };
+
+        let max_block_txns = values_max_block_txns.into_iter().min().unwrap();
+        let max_block_bytes = values_max_block_bytes.into_iter().min().unwrap();
+        let backpressure_proposal_delay = values_backpressure_proposal_delay
+            .into_iter()
+            .max()
+            .unwrap();
+
+        if pipeline_backpressure.is_some() || chain_health_backoff.is_some() {
+            warn!(
+                "Generating proposal: reducing limits to {} txns and {} bytes, due to pipeline_backpressure: {}, chain health backoff: {}. Delaying sending proposal by {}ms",
+                max_block_txns,
+                max_block_bytes,
+                pipeline_backpressure.is_some(),
+                chain_health_backoff.is_some(),
+                backpressure_proposal_delay.as_millis(),
+            );
+        }
+        (max_block_txns, max_block_bytes, backpressure_proposal_delay)
     }
 
     fn ensure_highest_quorum_cert(&self, round: Round) -> anyhow::Result<Arc<QuorumCert>> {

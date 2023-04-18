@@ -253,7 +253,7 @@ impl<T: StorageReaderInterface> Handler<T> {
 
     fn get_node_information(&self) -> Result<PeerMonitoringServiceResponse, Error> {
         // Get the node information
-        let git_hash = aptos_build_info::get_git_hash();
+        let build_information = aptos_build_info::get_build_information();
         let current_time: Instant = self.time_service.now();
         let uptime = current_time.duration_since(self.start_time);
         let (highest_synced_epoch, highest_synced_version) =
@@ -263,7 +263,7 @@ impl<T: StorageReaderInterface> Handler<T> {
 
         // Create and return the response
         let node_information_response = NodeInformationResponse {
-            git_hash,
+            build_information,
             highest_synced_epoch,
             highest_synced_version,
             ledger_timestamp_usecs,

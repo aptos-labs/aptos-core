@@ -266,7 +266,7 @@ fn test_reject_transaction() {
 fn test_system_ttl() {
     // Created mempool with system_transaction_timeout = 0.
     // All transactions are supposed to be evicted on next gc run.
-    let mut config = NodeConfig::random();
+    let mut config = NodeConfig::generate_random_config();
     config.mempool.system_transaction_timeout_secs = 0;
     let mut mempool = CoreMempool::new(&config);
 
@@ -489,7 +489,7 @@ fn test_multi_bucket_removal() {
 
 #[test]
 fn test_capacity() {
-    let mut config = NodeConfig::random();
+    let mut config = NodeConfig::generate_random_config();
     config.mempool.capacity = 1;
     config.mempool.system_transaction_timeout_secs = 0;
     let mut pool = CoreMempool::new(&config);
@@ -537,7 +537,7 @@ fn test_capacity_bytes() {
     // Set exact limit
     let capacity_bytes = size_bytes;
 
-    let mut config = NodeConfig::random();
+    let mut config = NodeConfig::generate_random_config();
     config.mempool.capacity = 1_000; // Won't hit this limit.
     config.mempool.capacity_bytes = capacity_bytes;
     config.mempool.system_transaction_timeout_secs = 0;
@@ -582,7 +582,7 @@ fn new_test_mempool_transaction(address: usize, sequence_number: u64) -> Mempool
 
 #[test]
 fn test_parking_lot_eviction() {
-    let mut config = NodeConfig::random();
+    let mut config = NodeConfig::generate_random_config();
     config.mempool.capacity = 5;
     let mut pool = CoreMempool::new(&config);
     // Add transactions with the following sequence numbers to Mempool.
@@ -608,7 +608,7 @@ fn test_parking_lot_eviction() {
 
 #[test]
 fn test_parking_lot_evict_only_for_ready_txn_insertion() {
-    let mut config = NodeConfig::random();
+    let mut config = NodeConfig::generate_random_config();
     config.mempool.capacity = 6;
     let mut pool = CoreMempool::new(&config);
     // Add transactions with the following sequence numbers to Mempool.
@@ -731,7 +731,7 @@ fn test_get_transaction_by_hash_after_the_txn_is_updated() {
 
 #[test]
 fn test_bytes_limit() {
-    let mut config = NodeConfig::random();
+    let mut config = NodeConfig::generate_random_config();
     config.mempool.capacity = 100;
     let mut pool = CoreMempool::new(&config);
     // add 100 transacionts
@@ -748,7 +748,7 @@ fn test_bytes_limit() {
 
 #[test]
 fn test_transaction_store_remove_account_if_empty() {
-    let mut config = NodeConfig::random();
+    let mut config = NodeConfig::generate_random_config();
     config.mempool.capacity = 100;
     let mut pool = CoreMempool::new(&config);
 
@@ -780,7 +780,7 @@ fn test_transaction_store_remove_account_if_empty() {
 
 #[test]
 fn test_sequence_number_behavior_at_capacity() {
-    let mut config = NodeConfig::random();
+    let mut config = NodeConfig::generate_random_config();
     config.mempool.capacity = 2;
     let mut pool = CoreMempool::new(&config);
 
@@ -796,7 +796,7 @@ fn test_sequence_number_behavior_at_capacity() {
 
 #[test]
 fn test_not_return_non_full() {
-    let mut config = NodeConfig::random();
+    let mut config = NodeConfig::generate_random_config();
     config.mempool.capacity = 2;
     let mut pool = CoreMempool::new(&config);
     add_txn(&mut pool, TestTransaction::new(0, 0, 1)).unwrap();
