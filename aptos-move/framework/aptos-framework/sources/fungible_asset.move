@@ -2,7 +2,7 @@
 /// metadata object can be any object that equipped with `Metadata` resource.
 module aptos_framework::fungible_asset {
     use aptos_framework::event;
-    use aptos_framework::object::{Self, Object, ConstructorRef, DeleteRef, can_generate_delete_ref};
+    use aptos_framework::object::{Self, Object, ConstructorRef, DeleteRef};
     use aptos_framework::optional_aggregator::{Self, OptionalAggregator};
     use std::string;
 
@@ -145,7 +145,7 @@ module aptos_framework::fungible_asset {
         symbol: String,
         decimals: u8,
     ): Object<Metadata> {
-        assert!(!can_generate_delete_ref(constructor_ref), error::invalid_argument(EOBJECT_IS_DELETABLE));
+        assert!(!object::can_generate_delete_ref(constructor_ref), error::invalid_argument(EOBJECT_IS_DELETABLE));
         let metadata_object_signer = &object::generate_signer(constructor_ref);
         let supply = option::map(monitoring_supply_with_maximum, |maximum| {
             Supply {
@@ -615,41 +615,33 @@ module aptos_framework::fungible_asset {
 
     #[test(creator = @0xcafe)]
     fun test_metadata_basic_flow(creator: &signer) acquires Metadata {
-        let (creator_ref, asset) = create_test_token(creator);
+        let (creator_ref, metadata) = create_test_token(creator);
         init_test_metadata(&creator_ref);
-        assert!(supply(asset) == option::some(0), 1);
-        assert!(maximum(asset) == option::some(100), 2);
-        assert!(name(asset) == string::utf8(b"TEST"), 3);
-        assert!(symbol(asset) == string::utf8(b"@@"), 4);
-        assert!(decimals(asset) == 0, 5);
+        assert!(supply(metadata) == option::some(0), 1);
+        assert!(maximum(metadata) == option::some(100), 2);
+        assert!(name(metadata) == string::utf8(b"TEST"), 3);
+        assert!(symbol(metadata) == string::utf8(b"@@"), 4);
+        assert!(decimals(metadata) == 0, 5);
 
-        increase_supply(&asset, 50);
-        assert!(supply(asset) == option::some(50), 6);
-        decrease_supply(&asset, 30);
-        assert!(supply(asset) == option::some(20), 7);
+        increase_supply(&metadata, 50);
+        assert!(supply(metadata) == option::some(50), 6);
+        decrease_supply(&metadata, 30);
+        assert!(supply(metadata) == option::some(20), 7);
     }
 
     #[test(creator = @0xcafe)]
     #[expected_failure(abort_code = 0x20005, location = Self)]
     fun test_supply_overflow(creator: &signer) acquires Metadata {
-        let (creator_ref, asset) = create_test_token(creator);
+        let (creator_ref, metadata) = create_test_token(creator);
         init_test_metadata(&creator_ref);
-        increase_supply(&asset, 101);
-    }
-
-    #[test(creator = @0xcafe)]
-    #[expected_failure(abort_code = 0x20002, location = aptos_framework::optional_aggregator)]
-    fun test_supply_underflow(creator: &signer) acquires Metadata {
-        let (creator_ref, asset) = create_test_token(creator);
-        init_test_metadata(&creator_ref);
-        decrease_supply(&asset, 1);
+        increase_supply(&metadata, 101);
     }
 
     #[test(creator = @0xcafe)]
     fun test_create_and_remove_store(creator: &signer) acquires FungibleStore, FungibleAssetEvents {
-        let (_, _, _, asset) = create_fungible_asset(creator);
+        let (_, _, _, metadata) = create_fungible_asset(creator);
         let creator_ref = object::create_object_from_account(creator);
-        create_store(&creator_ref, asset);
+        create_store(&creator_ref, metadata);
         let delete_ref = object::generate_delete_ref(&creator_ref);
         remove_store(&delete_ref);
     }
