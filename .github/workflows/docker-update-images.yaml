@@ -23,4 +23,4 @@ jobs:
           body: "Update Docker images"
           branch: "docker-update-images"
           delete-branch: true
-          assignee: @aptos-labs/prod-eng
+          team-reviewers: @aptos-labs/prod-eng
