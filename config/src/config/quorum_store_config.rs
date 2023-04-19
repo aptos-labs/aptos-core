@@ -193,12 +193,9 @@ impl ConfigSanitizer for QuorumStoreConfig {
 
         Self::sanitize_send_recv_batch_limits(
             &sanitizer_name,
-            &node_config.consensus.quorum_store_configs,
+            &node_config.consensus.quorum_store,
         )?;
-        Self::sanitize_batch_total_limits(
-            &sanitizer_name,
-            &node_config.consensus.quorum_store_configs,
-        )?;
+        Self::sanitize_batch_total_limits(&sanitizer_name, &node_config.consensus.quorum_store)?;
         Ok(())
     }
 }
