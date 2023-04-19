@@ -32,7 +32,7 @@ aptos node get-stake-pool \
    - See [Node Files](../../node-files-all-networks/node-files.md) for your network (mainnet, testnet, or devnet) for the locations and commands to download these files.
 3. Update your `account_address` in the `validator-identity.yaml` and `validator-fullnode-identity.yaml` files to your **pool address**. Do not change anything else. Keep the keys as they are. 
 4. Pull the latest changes from the associated (ex. `mainnet`) branch. 
-5. [Optional] You can use [fast sync](../../../guides/state-sync.md#fast-syncing) to bootstrap your node if the network has been running for a long time (e.g. testnet). Add the below configuration to your `validator.yaml` and `fullnode.yaml` files:
+5. [Optional] You can use [fast sync](../../../guides/state-sync.md#fast-syncing) to bootstrap your node if the network has been running for a long time (e.g. testnet, mainnet). Add the below configuration to your `validator.yaml` and `fullnode.yaml` files:
     ```yaml
     state_sync:
      state_sync_driver:
