@@ -11,9 +11,9 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
 
 task 1 'publish'. lines 12-21:
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000042::N'. Got VMError: {
-    major_status: NEGATIVE_STACK_SIZE_WITHIN_BLOCK,
+    major_status: CONSTRAINT_NOT_SATISFIED,
     sub_status: None,
     location: 0x42::N,
-    indices: [(FunctionDefinition, 0)],
-    offsets: [(FunctionDefinitionIndex(0), 0)],
+    indices: [(StructDefInstantiation, 0), (FunctionDefinition, 0)],
+    offsets: [],
 }

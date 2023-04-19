@@ -46,10 +46,11 @@ impl MoveVmExt {
                 5
             };
 
-        let treat_friend_as_private = features.is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE);
         let enable_invariant_violation_check_in_swap_loc =
             !timed_features.is_enabled(TimedFeatureFlag::DisableInvariantViolationCheckInSwapLoc);
         let type_size_limit = timed_features.is_enabled(TimedFeatureFlag::EntryTypeSizeLimit);
+
+        let verifier_config = verifier_config(&features, &timed_features);
 
         Ok(Self {
             inner: MoveVM::new_with_config(
@@ -57,11 +58,11 @@ impl MoveVmExt {
                     native_gas_params,
                     abs_val_size_gas_params,
                     gas_feature_version,
-                    timed_features.clone(),
+                    timed_features,
                     Arc::new(features),
                 ),
                 VMConfig {
-                    verifier: verifier_config(treat_friend_as_private, &timed_features),
+                    verifier: verifier_config,
                     max_binary_format_version,
                     paranoid_type_checks: crate::AptosVM::get_paranoid_checks(),
                     enable_invariant_violation_check_in_swap_loc,
@@ -122,10 +123,7 @@ impl Deref for MoveVmExt {
     }
 }
 
-pub fn verifier_config(
-    _treat_friend_as_private: bool,
-    timed_features: &TimedFeatures,
-) -> VerifierConfig {
+pub fn verifier_config(features: &Features, timed_features: &TimedFeatures) -> VerifierConfig {
     let mut max_back_edges_per_function = None;
     let mut max_back_edges_per_module = None;
     let mut max_basic_blocks_in_script = None;
@@ -166,5 +164,6 @@ pub fn verifier_config(
         max_basic_blocks_in_script,
         max_per_fun_meter_units,
         max_per_mod_meter_units,
+        use_signature_checker_v2: features.is_enabled(FeatureFlag::SIGNATURE_CHECKER_V2),
     }
 }
