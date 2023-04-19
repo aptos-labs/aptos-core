@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_indexer_grpc_data_service::service::DatastreamServer;
+use aptos_indexer_grpc_utils::register_probes_and_metrics_handler;
 use aptos_protos::{
     datastream::v1::{
         indexer_stream_server::IndexerStreamServer,
@@ -24,7 +25,6 @@ use tonic::{
     transport::Server,
     Request, Status,
 };
-use warp::Filter;
 
 #[derive(Parser)]
 pub struct Args {
@@ -92,11 +92,7 @@ fn main() {
 
     // Start liveness and readiness probes.
     runtime.spawn(async move {
-        let readiness = warp::path("readiness")
-            .map(move || warp::reply::with_status("ready", warp::http::StatusCode::OK));
-        warp::serve(readiness)
-            .run(([0, 0, 0, 0], health_port))
-            .await;
+        register_probes_and_metrics_handler(health_port).await;
     });
 
     let term = Arc::new(AtomicBool::new(false));

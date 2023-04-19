@@ -25,7 +25,7 @@ use aptos_network::{
 };
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use rand::{rngs::StdRng, SeedableRng};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 /// A struct holding a list of overriding configurations for mempool
 #[derive(Clone, Copy)]
@@ -368,7 +368,8 @@ impl TestHarness {
                                 100,
                                 102400,
                                 true,
-                                HashSet::new(),
+                                false,
+                                vec![],
                             );
                             for txn in transactions.iter() {
                                 assert!(block.contains(txn));

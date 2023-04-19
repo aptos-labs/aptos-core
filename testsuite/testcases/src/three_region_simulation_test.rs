@@ -4,31 +4,12 @@
 use crate::{LoadDestination, NetworkLoadTest};
 use aptos_forge::{
     GroupNetworkBandwidth, GroupNetworkDelay, NetworkContext, NetworkTest, Swarm, SwarmChaos,
-    SwarmExt, SwarmNetworkBandwidth, SwarmNetworkDelay, Test,
+    SwarmNetworkBandwidth, SwarmNetworkDelay, Test,
 };
 use aptos_logger::info;
-use rand::Rng;
-use tokio::runtime::Runtime;
-
-/// Config for additing variable processing overhead/delay into
-/// execution, to make different nodes have different processing speed.
-pub struct ExecutionDelayConfig {
-    /// Fraction (0.0 - 1.0) of nodes on which any delay will be introduced
-    pub inject_delay_node_fraction: f64,
-    /// For nodes with delay, what percentage (0-100) of transaction will be delayed.
-    /// (this is needed because delay that can be introduced is integer number of ms)
-    /// Different node speed come from this setting, each node is selected a number
-    /// between 1 and given max.
-    pub inject_delay_max_transaction_percentage: u32,
-    /// Fixed busy-loop delay applied to each transaction that is delayed,
-    /// before it is executed.
-    pub inject_delay_per_transaction_ms: u32,
-}
 
 /// Represents a test that simulates a network with 3 regions, all in the same cloud.
-pub struct ThreeRegionSameCloudSimulationTest {
-    pub add_execution_delay: Option<ExecutionDelayConfig>,
-}
+pub struct ThreeRegionSameCloudSimulationTest;
 
 impl Test for ThreeRegionSameCloudSimulationTest {
     fn name(&self) -> &'static str {
@@ -99,70 +80,6 @@ fn create_bandwidth_limit() -> SwarmNetworkBandwidth {
     }
 }
 
-fn add_execution_delay(swarm: &mut dyn Swarm, config: &ExecutionDelayConfig) -> anyhow::Result<()> {
-    let runtime = Runtime::new().unwrap();
-    let validators = swarm.get_validator_clients_with_names();
-
-    runtime.block_on(async {
-        let mut rng = rand::thread_rng();
-        for (name, validator) in validators {
-            let sleep_fraction = if rng.gen_bool(config.inject_delay_node_fraction) {
-                rng.gen_range(1_u32, config.inject_delay_max_transaction_percentage)
-            } else {
-                0
-            };
-            let name = name.clone();
-            info!(
-                "Validator {} adding {}% of transactions with 1ms execution delay",
-                name, sleep_fraction
-            );
-            validator
-                .set_failpoint(
-                    "aptos_vm::execution::user_transaction".to_string(),
-                    format!(
-                        "{}%delay({})",
-                        sleep_fraction, config.inject_delay_per_transaction_ms
-                    ),
-                )
-                .await
-                .map_err(|e| {
-                    anyhow::anyhow!(
-                        "set_failpoint to add execution delay on {} failed, {:?}",
-                        name,
-                        e
-                    )
-                })?;
-        }
-        Ok::<(), anyhow::Error>(())
-    })
-}
-
-fn remove_execution_delay(swarm: &mut dyn Swarm) -> anyhow::Result<()> {
-    let runtime = Runtime::new().unwrap();
-    let validators = swarm.get_validator_clients_with_names();
-
-    runtime.block_on(async {
-        for (name, validator) in validators {
-            let name = name.clone();
-
-            validator
-                .set_failpoint(
-                    "aptos_vm::execution::block_metadata".to_string(),
-                    "off".to_string(),
-                )
-                .await
-                .map_err(|e| {
-                    anyhow::anyhow!(
-                        "set_failpoint to remove execution delay on {} failed, {:?}",
-                        name,
-                        e
-                    )
-                })?;
-        }
-        Ok::<(), anyhow::Error>(())
-    })
-}
-
 impl NetworkLoadTest for ThreeRegionSameCloudSimulationTest {
     fn setup(&self, ctx: &mut NetworkContext) -> anyhow::Result<LoadDestination> {
         // inject network delay
@@ -175,18 +92,10 @@ impl NetworkLoadTest for ThreeRegionSameCloudSimulationTest {
         let chaos = SwarmChaos::Bandwidth(bandwidth);
         ctx.swarm().inject_chaos(chaos)?;
 
-        if let Some(config) = &self.add_execution_delay {
-            add_execution_delay(ctx.swarm(), config)?;
-        }
-
         Ok(LoadDestination::FullnodesOtherwiseValidators)
     }
 
     fn finish(&self, swarm: &mut dyn Swarm) -> anyhow::Result<()> {
-        if self.add_execution_delay.is_some() {
-            remove_execution_delay(swarm)?;
-        }
-
         swarm.remove_all_chaos()
     }
 }

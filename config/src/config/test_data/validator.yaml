@@ -50,6 +50,7 @@ validator_network:
             ca_certificate: "/full/path/to/certificate"
             token:
                 from_disk: "/full/path/to/token"
+    network_id: "validator"
     ### Load keys from file
     # identity:
     #     type: "from_file"

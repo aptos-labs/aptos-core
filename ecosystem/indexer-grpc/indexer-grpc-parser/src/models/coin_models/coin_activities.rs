@@ -19,7 +19,6 @@ use aptos_protos::transaction::testing1::v1::{
     transaction::TxnData, write_set_change::Change as WriteSetChangeEnum, Event as EventPB,
     Transaction as TransactionPB, TransactionInfo, UserTransactionRequest,
 };
-use aptos_types::APTOS_COIN_TYPE;
 use bigdecimal::BigDecimal;
 use chrono::NaiveDateTime;
 use field_count::FieldCount;
@@ -27,6 +26,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 const GAS_FEE_EVENT: &str = "0x1::aptos_coin::GasFeeEvent";
+const APTOS_COIN_TYPE_STR: &str = "0x1::aptos_coin::AptosCoin";
 // We will never have a negative number on chain so this will avoid collision in postgres
 const BURN_GAS_EVENT_CREATION_NUM: i64 = -1;
 const BURN_GAS_EVENT_INDEX: i64 = -1;
@@ -279,7 +279,7 @@ impl CoinActivity {
             event_creation_number: BURN_GAS_EVENT_CREATION_NUM,
             event_sequence_number: user_transaction_request.sequence_number as i64,
             owner_address: standardize_address(&user_transaction_request.sender.to_string()),
-            coin_type: APTOS_COIN_TYPE.to_string(),
+            coin_type: APTOS_COIN_TYPE_STR.to_string(),
             amount: aptos_coin_burned,
             activity_type: GAS_FEE_EVENT.to_string(),
             is_gas_fee: true,

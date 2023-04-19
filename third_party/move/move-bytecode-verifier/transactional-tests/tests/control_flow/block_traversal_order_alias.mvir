@@ -1,0 +1,51 @@
+//# publish
+
+module 0x1.Test {
+	struct K has drop { x: u64 }
+
+	public no_alias(a: &mut Self.K, b: &mut Self.K) {
+		label start:
+		assert(!(*&copy(a).K::x == 100 && *&copy(b).K::x == 100), 123);
+		return;
+	}
+
+	public t() {
+		let x1: Self.K;
+		let x2: Self.K;
+		let ref: &mut Self.K;
+		let z: u64;
+		let p: u64;
+
+		// block start -> {loop_head}
+		label start:
+		x1 = K { x: 100 };
+		x2 = K { x: 200 };
+		ref = &mut x2;
+		z = 0;
+
+		// block loop_head -> {noalias_call, done}
+		label loop_head:
+		jump_if (copy(z) == 2) done;
+
+		// block noalias_call:
+		// NOTE: the verifier should realize that this block can be reached with ref set to &mut x1
+		//       and reject the module
+		Self.no_alias(&mut x1, copy(ref));
+		jump loop_back;
+
+		// block two_back_edges -> loop_back, loop_head
+		label two_back_edges:
+		p=1; // intentionally cause a change in state
+		ref = &mut x1;
+		jump_if (true) loop_head;
+
+		// block loop_back -> two_back_edges
+		label loop_back:
+		z = copy(z) + 1;
+		jump two_back_edges;
+
+		label done:
+		return;
+
+	}
+}

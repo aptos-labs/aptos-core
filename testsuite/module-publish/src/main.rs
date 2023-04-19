@@ -45,8 +45,7 @@ fn main() -> Result<()> {
     // If directory structure changes this breaks.
     // However it is a test that is ignored and runs only with the intent of creating files
     // for the modules compiled, so people can change it as they wish and need to.
-    let base_path =
-        base_dir.join("../../crates/transaction-emitter-lib/src/transaction_generator/publishing/");
+    let base_path = base_dir.join("../../crates/transaction-generator-lib/src/publishing/");
     let mut generic_mod = std::fs::File::create(base_path.join("raw_module_data.rs")).unwrap();
 
     //

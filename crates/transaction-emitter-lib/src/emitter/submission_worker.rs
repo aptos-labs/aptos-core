@@ -318,16 +318,16 @@ pub async fn submit_transactions(
                 .failed_submission
                 .fetch_add(failures.len() as u64, Ordering::Relaxed);
 
-            sample!(SampleRate::Duration(Duration::from_secs(60)), {
-                let by_error = failures
-                    .iter()
-                    .map(|f| {
-                        f.error
-                            .vm_error_code
-                            .and_then(|c| StatusCode::try_from(c).ok())
-                    })
-                    .counts();
-                if let Some(failure) = failures.first() {
+            let by_error = failures
+                .iter()
+                .map(|f| {
+                    f.error
+                        .vm_error_code
+                        .and_then(|c| StatusCode::try_from(c).ok())
+                })
+                .counts();
+            if let Some(failure) = failures.first() {
+                sample!(SampleRate::Duration(Duration::from_secs(60)), {
                     let sender = txns[failure.transaction_index].sender();
 
                     let last_transactions =
@@ -361,8 +361,8 @@ pub async fn submit_transactions(
                         balance,
                         last_transactions,
                     );
-                }
-            });
+                });
+            }
         },
     };
 }
