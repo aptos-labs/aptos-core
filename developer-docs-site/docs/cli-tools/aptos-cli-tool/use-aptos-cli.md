@@ -1148,6 +1148,10 @@ $ aptos move run --function-id default::message::set_message --args string:hello
 
 ## Node command examples
 
+This section summarizes how to run a local testnet with Aptos CLI. See [Run a Local Testnet with Aptos CLI](../../nodes/local-testnet/using-cli-to-run-a-local-testnet.md) for more details.
+
+For Aptos CLI commands applicable to validator nodes, see the [Owner](../../nodes/validator-node/owner/index.md) and [Voter](../../nodes/validator-node/voter/index.md#steps-using-aptos-cli) instructions.
+
 ### Running a local testnet
 
 You can run a local testnet from the aptos CLI, that will match the version it was built with.  Additionally, it can
