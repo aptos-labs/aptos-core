@@ -990,6 +990,10 @@ module aptos_framework::delegation_pool {
 
     #[test_only]
     use aptos_framework::reconfiguration;
+    #[test_only]
+    use aptos_std::fixed_point64;
+    #[test_only]
+    use aptos_framework::timestamp::fast_forward_seconds;
 
     #[test_only]
     const CONSENSUS_KEY_1: vector<u8> = x"8a54b92288d4ba5073d3a52e80cc00ae9fbbc1cc5b433b46089b7804c38a76f00fc64746c7685ee628fc2d0b929c2294";
@@ -1317,6 +1321,40 @@ module aptos_framework::delegation_pool {
         // stakes should remain the same - `Self::get_stake` correctly calculates them
         synchronize_delegation_pool(pool_address);
         assert_delegation(delegator1_address, pool_address, 11201699216002, 0, 2000000000000);
+
+        let reward_period_start_time_in_sec = timestamp::now_seconds();
+        // Enable rewards rate decrease. Initially rewards rate is still 1% every epoch. Rewards rate halves every year.
+        let one_year_in_secs: u64 = 31536000;
+        staking_config::initialize_rewards(
+            aptos_framework,
+            fixed_point64::create_from_rational(2, 100),
+            fixed_point64::create_from_rational(6, 1000),
+            one_year_in_secs,
+            reward_period_start_time_in_sec,
+            fixed_point64::create_from_rational(50, 100),
+        );
+        features::change_feature_flags(aptos_framework, vector[features::get_periodical_reward_rate_decrease_feature()], vector[]);
+
+        // add more stake from delegator 1
+        stake::mint(delegator1, 20000 * ONE_APT);
+        let delegator1_pending_inactive: u64;
+        (delegator1_active, _, delegator1_pending_inactive) = get_stake(pool_address, delegator1_address);
+        fee = get_add_stake_fee(pool_address, 20000 * ONE_APT);
+        add_stake(delegator1, pool_address, 20000 * ONE_APT);
+
+        assert_delegation(delegator1_address, pool_address, delegator1_active + 20000 * ONE_APT - fee, 0, delegator1_pending_inactive);
+
+        // delegator 1 unlocks his entire newly added stake
+        unlock(delegator1, pool_address, 20000 * ONE_APT - fee);
+        end_aptos_epoch();
+        // delegator 1 should own previous 11201699216002 active * ~1.01253 and 20000 * ~1.01253 + 20000 coins pending_inactive
+        assert_delegation(delegator1_address, pool_address, 11342056366822, 0, 4025059974939);
+
+        // stakes should remain the same - `Self::get_stake` correctly calculates them
+        synchronize_delegation_pool(pool_address);
+        assert_delegation(delegator1_address, pool_address, 11342056366822, 0, 4025059974939);
+
+        fast_forward_seconds(one_year_in_secs);
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123, delegator = @0x010)]
