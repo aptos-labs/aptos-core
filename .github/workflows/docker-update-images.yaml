@@ -28,6 +28,7 @@ jobs:
           commit-message: "Update Docker images"
           title: "Update Docker images"
           body: "Update Docker images"
+          base: main
           branch: "docker-update-images"
           delete-branch: true
           team-reviewers: |
