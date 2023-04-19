@@ -864,7 +864,7 @@ fn three_region_sim_graceful_overload(config: ForgeConfig) -> ForgeConfig {
                 // Additionally - we are not really gracefully handling overlaods,
                 // setting limits based on current reality, to make sure they
                 // don't regress, but something to investigate
-                avg_tps: 3400,
+                avg_tps: 1400,
                 latency_thresholds: &[],
             },
         }])

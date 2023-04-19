@@ -7,10 +7,9 @@ use crate::{
 };
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter, ProofWithData},
-    proof_of_store::{ProofOfStore, ProofOfStoreMsg},
+    proof_of_store::{BatchInfo, ProofOfStore, ProofOfStoreMsg},
     request_response::{GetPayloadCommand, GetPayloadResponse},
 };
-use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_types::PeerId;
 use futures::StreamExt;
@@ -20,14 +19,12 @@ use std::collections::HashSet;
 #[derive(Debug)]
 pub enum ProofManagerCommand {
     ReceiveProofs(ProofOfStoreMsg),
-    CommitNotification(u64, Vec<HashValue>),
+    CommitNotification(u64, Vec<BatchInfo>),
     Shutdown(tokio::sync::oneshot::Sender<()>),
 }
 
 pub struct ProofManager {
-    my_peer_id: PeerId,
     proofs_for_consensus: ProofQueue,
-    latest_block_timestamp: u64,
     back_pressure_total_txn_limit: u64,
     remaining_total_txn_num: u64,
     back_pressure_total_proof_limit: u64,
@@ -41,9 +38,7 @@ impl ProofManager {
         back_pressure_total_proof_limit: u64,
     ) -> Self {
         Self {
-            my_peer_id,
-            proofs_for_consensus: ProofQueue::new(),
-            latest_block_timestamp: 0,
+            proofs_for_consensus: ProofQueue::new(my_peer_id),
             back_pressure_total_txn_limit,
             remaining_total_txn_num: 0,
             back_pressure_total_proof_limit,
@@ -51,41 +46,33 @@ impl ProofManager {
         }
     }
 
-    #[inline]
-    fn increment_remaining_txns(&mut self, num_txns: u64) {
-        self.remaining_total_txn_num += num_txns;
-        self.remaining_total_proof_num += 1;
-    }
-
     pub(crate) fn receive_proofs(&mut self, proofs: Vec<ProofOfStore>) {
         for proof in proofs.into_iter() {
-            let is_local = proof.author() == self.my_peer_id;
-            let num_txns = proof.num_txns();
-            self.increment_remaining_txns(num_txns);
-            self.proofs_for_consensus.push(proof, is_local);
+            self.proofs_for_consensus.push(proof);
         }
+        (self.remaining_total_txn_num, self.remaining_total_proof_num) =
+            self.proofs_for_consensus.remaining_txns_and_proofs();
     }
 
     pub(crate) fn handle_commit_notification(
         &mut self,
         block_timestamp: u64,
-        digests: Vec<HashValue>,
+        batches: Vec<BatchInfo>,
     ) {
         trace!(
             "QS: got clean request from execution at block timestamp {}",
             block_timestamp
         );
-        assert!(
-            self.latest_block_timestamp <= block_timestamp,
-            "Decreasing block timestamp"
-        );
-        self.latest_block_timestamp = block_timestamp;
-        self.proofs_for_consensus.mark_committed(digests);
+
+        self.proofs_for_consensus.mark_committed(batches);
+        self.proofs_for_consensus
+            .handle_updated_block_timestamp(block_timestamp);
+        (self.remaining_total_txn_num, self.remaining_total_proof_num) =
+            self.proofs_for_consensus.remaining_txns_and_proofs();
     }
 
     pub(crate) fn handle_proposal_request(&mut self, msg: GetPayloadCommand) {
         match msg {
-            // TODO: check what max_txns consensus is using
             GetPayloadCommand::GetPayloadRequest(
                 max_txns,
                 max_bytes,
@@ -93,8 +80,7 @@ impl ProofManager {
                 filter,
                 callback,
             ) => {
-                // TODO: Pass along to batch_store
-                let excluded_proofs: HashSet<HashValue> = match filter {
+                let excluded_batches: HashSet<_> = match filter {
                     PayloadFilter::Empty => HashSet::new(),
                     PayloadFilter::DirectMempool(_) => {
                         unreachable!()
@@ -103,15 +89,11 @@ impl ProofManager {
                 };
 
                 let proof_block = self.proofs_for_consensus.pull_proofs(
-                    &excluded_proofs,
-                    self.latest_block_timestamp,
+                    &excluded_batches,
                     max_txns,
                     max_bytes,
                     return_non_full,
                 );
-                (self.remaining_total_txn_num, self.remaining_total_proof_num) = self
-                    .proofs_for_consensus
-                    .num_total_txns_and_proofs(self.latest_block_timestamp);
 
                 let res = GetPayloadResponse::GetPayloadResponse(
                     if proof_block.is_empty() {
@@ -119,7 +101,7 @@ impl ProofManager {
                     } else {
                         trace!(
                             "QS: GetBlockRequest excluded len {}, block len {}",
-                            excluded_proofs.len(),
+                            excluded_batches.len(),
                             proof_block.len()
                         );
                         Payload::InQuorumStore(ProofWithData::new(proof_block))
@@ -153,8 +135,7 @@ impl ProofManager {
         };
 
         loop {
-            // TODO: additional main loop counter
-            let _timer = counters::WRAPPER_MAIN_LOOP.start_timer();
+            let _timer = counters::PROOF_MANAGER_MAIN_LOOP.start_timer();
 
             tokio::select! {
                     Some(msg) = proposal_rx.next() => monitor!("proof_manager_handle_proposal", {
@@ -180,14 +161,11 @@ impl ProofManager {
                             ProofManagerCommand::ReceiveProofs(proofs) => {
                                 self.receive_proofs(proofs.take());
                             },
-                            ProofManagerCommand::CommitNotification(block_timestamp, digests) => {
-                                self.handle_commit_notification(block_timestamp, digests);
-
-                                // update the backpressure upon new commit round
-                                (self.remaining_total_txn_num, self.remaining_total_proof_num) =
-                                    self.proofs_for_consensus.num_total_txns_and_proofs(block_timestamp);
-                                // TODO: keeping here for metrics, might be part of the backpressure in the future?
-                                self.proofs_for_consensus.clean_local_proofs(block_timestamp);
+                            ProofManagerCommand::CommitNotification(block_timestamp, batches) => {
+                                self.handle_commit_notification(
+                                    block_timestamp,
+                                    batches,
+                                );
                             },
                         }
                         let updated_back_pressure = self.qs_back_pressure();
