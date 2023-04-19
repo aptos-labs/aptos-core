@@ -247,7 +247,7 @@ impl ConsensusConfig {
     }
 
     fn sanitize_send_recv_block_limits(
-        sanitizer_name: &String,
+        sanitizer_name: &str,
         config: &ConsensusConfig,
     ) -> Result<(), Error> {
         let send_recv_pairs = [
@@ -275,7 +275,7 @@ impl ConsensusConfig {
         for (send, recv, label) in &send_recv_pairs {
             if *send > *recv {
                 return Err(Error::ConfigSanitizerFailed(
-                    sanitizer_name.clone(),
+                    sanitizer_name.to_owned(),
                     format!("Failed {}: {} > {}", label, *send, *recv),
                 ));
             }
@@ -284,7 +284,7 @@ impl ConsensusConfig {
     }
 
     fn sanitize_batch_block_limits(
-        sanitizer_name: &String,
+        sanitizer_name: &str,
         config: &ConsensusConfig,
     ) -> Result<(), Error> {
         // Note, we are strict here: receiver batch limits <= sender block limits
@@ -340,7 +340,7 @@ impl ConsensusConfig {
         for (batch, block, label) in &recv_batch_send_block_pairs {
             if *batch > *block {
                 return Err(Error::ConfigSanitizerFailed(
-                    sanitizer_name.clone(),
+                    sanitizer_name.to_owned(),
                     format!("Failed {}: {} > {}", label, *batch, *block),
                 ));
             }

@@ -108,7 +108,7 @@ impl Default for QuorumStoreConfig {
 
 impl QuorumStoreConfig {
     fn sanitize_send_recv_batch_limits(
-        sanitizer_name: &String,
+        sanitizer_name: &str,
         config: &QuorumStoreConfig,
     ) -> Result<(), Error> {
         let send_recv_pairs = [
@@ -136,7 +136,7 @@ impl QuorumStoreConfig {
         for (send, recv, label) in &send_recv_pairs {
             if *send > *recv {
                 return Err(Error::ConfigSanitizerFailed(
-                    sanitizer_name.clone(),
+                    sanitizer_name.to_owned(),
                     format!("Failed {}: {} > {}", label, *send, *recv),
                 ));
             }
@@ -145,7 +145,7 @@ impl QuorumStoreConfig {
     }
 
     fn sanitize_batch_total_limits(
-        sanitizer_name: &String,
+        sanitizer_name: &str,
         config: &QuorumStoreConfig,
     ) -> Result<(), Error> {
         let batch_total_pairs = [
@@ -173,7 +173,7 @@ impl QuorumStoreConfig {
         for (batch, total, label) in &batch_total_pairs {
             if *batch > *total {
                 return Err(Error::ConfigSanitizerFailed(
-                    sanitizer_name.clone(),
+                    sanitizer_name.to_owned(),
                     format!("Failed {}: {} > {}", label, *batch, *total),
                 ));
             }
