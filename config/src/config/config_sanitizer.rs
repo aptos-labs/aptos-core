@@ -94,7 +94,7 @@ fn sanitize_failpoints_config(
 
     // Verify that failpoints are not enabled in mainnet
     let failpoints_enabled = are_failpoints_enabled();
-    if chain_id.is_mainnet()? && failpoints_enabled {
+    if chain_id.is_mainnet() && failpoints_enabled {
         return Err(Error::ConfigSanitizerFailed(
             sanitizer_name,
             "Failpoints are not supported on mainnet nodes!".into(),
