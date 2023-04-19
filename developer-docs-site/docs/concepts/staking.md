@@ -181,7 +181,6 @@ For step-by-step instructions on how to join the validator set, see: [Joining Va
 
 You must stake the required minimum amount to join the validator set. Moreover, you can only stake up to the maximum stake amount. The current required minimum for staking is 1M APT tokens.
 
-
 If at any time after joining the validator set, your current staked amount exceeds the maximum allowed stake (for example as the rewards are added to your staked amount), then your voting power and the rewards will be calculated only using the maximum allowed stake amount, and not your current staked amount. 
 
 The owner can withdraw part of the stake and leave their balance below the required minimum. In such case, their stake pool will be removed from the validator set when the next epoch starts.
