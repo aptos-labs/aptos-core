@@ -38,6 +38,8 @@ module aptos_token_objects::collection {
     const EURI_TOO_LONG: u64 = 4;
     /// The description is over the maximum length
     const EDESCRIPTION_TOO_LONG: u64 = 5;
+    /// The max supply must be positive
+    const EMAX_SUPPLY_CANNOT_BE_ZERO: u64 = 6;
 
     const MAX_COLLECTION_NAME_LENGTH: u64 = 128;
     const MAX_URI_LENGTH: u64 = 512;
@@ -118,6 +120,7 @@ module aptos_token_objects::collection {
         royalty: Option<Royalty>,
         uri: String,
     ): ConstructorRef {
+        assert!(max_supply != 0, error::invalid_argument(EMAX_SUPPLY_CANNOT_BE_ZERO));
         let collection_seed = create_collection_seed(&name);
         let constructor_ref = object::create_named_object(creator, collection_seed);
         let object_signer = object::generate_signer(&constructor_ref);
@@ -437,7 +440,7 @@ module aptos_token_objects::collection {
     entry fun test_create_and_transfer(creator: &signer, trader: &signer) {
         let creator_address = signer::address_of(creator);
         let collection_name = string::utf8(b"collection name");
-        create_collection_helper(creator, *&collection_name);
+        create_collection_helper(creator, collection_name);
 
         let collection = object::address_to_object<Collection>(
             create_collection_address(&creator_address, &collection_name),
@@ -450,35 +453,35 @@ module aptos_token_objects::collection {
     #[expected_failure(abort_code = 0x80001, location = aptos_framework::object)]
     entry fun test_duplicate_collection(creator: &signer) {
         let collection_name = string::utf8(b"collection name");
-        create_collection_helper(creator, *&collection_name);
+        create_collection_helper(creator, collection_name);
         create_collection_helper(creator, collection_name);
     }
 
     #[test(creator = @0x123)]
     entry fun test_set_description(creator: &signer) acquires Collection {
         let collection_name = string::utf8(b"collection name");
-        let constructor_ref = create_collection_helper(creator, *&collection_name);
+        let constructor_ref = create_collection_helper(creator, collection_name);
         let collection = object::address_to_object<Collection>(
             create_collection_address(&signer::address_of(creator), &collection_name),
         );
         let mutator_ref = generate_mutator_ref(&constructor_ref);
         let description = string::utf8(b"no fail");
         assert!(description != description(collection), 0);
-        set_description(&mutator_ref, *&description);
+        set_description(&mutator_ref, description);
         assert!(description == description(collection), 1);
     }
 
     #[test(creator = @0x123)]
     entry fun test_set_uri(creator: &signer) acquires Collection {
         let collection_name = string::utf8(b"collection name");
-        let constructor_ref = create_collection_helper(creator, *&collection_name);
+        let constructor_ref = create_collection_helper(creator, collection_name);
         let mutator_ref = generate_mutator_ref(&constructor_ref);
         let collection = object::address_to_object<Collection>(
             create_collection_address(&signer::address_of(creator), &collection_name),
         );
         let uri = string::utf8(b"no fail");
         assert!(uri != uri(collection), 0);
-        set_uri(&mutator_ref, *&uri);
+        set_uri(&mutator_ref, uri);
         assert!(uri == uri(collection), 1);
     }
 

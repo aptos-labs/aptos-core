@@ -5,6 +5,8 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 **Note:** The Aptos TS SDK does not follow semantic version while we are in active development. Instead, breaking changes will be announced with each devnet cut. Once we launch our mainnet, the SDK will follow semantic versioning closely.
 
 ## Unreleased
+
+## 1.8.4 (2023-04-13)
 - Move `TypeTagParser` from `builder_utils.ts` to `type_tag.ts`
 - Update `StructTag.fromString()` to use and relies on TypeTagParser
 

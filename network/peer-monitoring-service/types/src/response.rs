@@ -4,7 +4,7 @@
 use aptos_config::{config::PeerRole, network_id::PeerNetworkId};
 use aptos_types::{network_address::NetworkAddress, PeerId};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, time::Duration};
+use std::{collections::BTreeMap, time::Duration};
 use thiserror::Error;
 
 /// A peer monitoring service response
@@ -27,6 +27,18 @@ impl PeerMonitoringServiceResponse {
             Self::ServerProtocolVersion(_) => "server_protocol_version",
         }
     }
+
+    /// Returns the number of bytes in the serialized response
+    pub fn get_num_bytes(&self) -> Result<u64, UnexpectedResponseError> {
+        let serialized_bytes = bcs::to_bytes(&self).map_err(|error| {
+            UnexpectedResponseError(format!(
+                "Failed to serialize response: {}. Error: {:?}",
+                self.get_label(),
+                error
+            ))
+        })?;
+        Ok(serialized_bytes.len() as u64)
+    }
 }
 
 /// A response for the latency ping request
@@ -38,7 +50,7 @@ pub struct LatencyPingResponse {
 /// A response for the network information request
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct NetworkInformationResponse {
-    pub connected_peers: HashMap<PeerNetworkId, ConnectionMetadata>, // Connected peers
+    pub connected_peers: BTreeMap<PeerNetworkId, ConnectionMetadata>, // Connected peers
     pub distance_from_validators: u64, // The distance of the peer from the validator set
 }
 
@@ -69,12 +81,12 @@ pub struct ServerProtocolVersionResponse {
 /// A response for the node information request
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct NodeInformationResponse {
-    pub git_hash: String, // The git hash of the build the peer is running on
-    pub highest_synced_epoch: u64, // The highest synced epoch of the node
-    pub highest_synced_version: u64, // The highest synced version of the node
+    pub build_information: BTreeMap<String, String>, // The build information of the node
+    pub highest_synced_epoch: u64,                   // The highest synced epoch of the node
+    pub highest_synced_version: u64,                 // The highest synced version of the node
     pub ledger_timestamp_usecs: u64, // The latest timestamp of the blockchain (in microseconds)
     pub lowest_available_version: u64, // The lowest stored version of the node (in storage)
-    pub uptime: Duration, // The amount of time the peer has been running
+    pub uptime: Duration,            // The amount of time the peer has been running
 }
 
 #[derive(Clone, Debug, Error)]

@@ -168,11 +168,11 @@ module aptos_token::property_map {
     }
 
     public fun borrow_value(property: &PropertyValue): vector<u8> {
-        *&property.value
+        property.value
     }
 
     public fun borrow_type(property: &PropertyValue): String {
-        *&property.type
+        property.type
     }
 
     public fun remove(

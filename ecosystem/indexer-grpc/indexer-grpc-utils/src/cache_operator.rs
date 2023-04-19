@@ -187,26 +187,6 @@ impl<T: redis::aio::ConnectionLike + Send> CacheOperator<T> {
         }
     }
 
-    pub async fn update_cache_transaction(
-        &mut self,
-        version: u64,
-        encoded_proto_data: String,
-        timestamp_in_seconds: u64,
-    ) -> anyhow::Result<()> {
-        match self
-            .conn
-            .set_ex::<String, String, String>(
-                version.to_string(),
-                encoded_proto_data,
-                get_ttl_in_seconds(timestamp_in_seconds) as usize,
-            )
-            .await
-        {
-            Ok(_) => Ok(()),
-            Err(err) => Err(err.into()),
-        }
-    }
-
     pub async fn update_cache_transactions(
         &mut self,
         transactions: Vec<(u64, String, u64)>,

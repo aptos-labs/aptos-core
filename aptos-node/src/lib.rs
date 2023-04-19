@@ -137,9 +137,9 @@ impl AptosNodeArgs {
             }
 
             // A config file exists, attempt to parse the config
-            let config = NodeConfig::load(config_path.clone()).unwrap_or_else(|error| {
+            let config = NodeConfig::load_from_path(config_path.clone()).unwrap_or_else(|error| {
                 panic!(
-                    "Failed to parse node config file! Given file path: {:?}. Error: {:?}",
+                    "Failed to load the node config file! Given file path: {:?}. Error: {:?}",
                     config_path.display(),
                     error
                 )
@@ -178,7 +178,7 @@ pub fn start(
     utils::create_global_rayon_pool(create_global_rayon_pool);
 
     // Initialize the global aptos-node-identity
-    aptos_node_identity::init(config.peer_id())?;
+    aptos_node_identity::init(config.get_peer_id())?;
 
     // Instantiate the global logger
     let (remote_log_receiver, logger_filter_update) = logger::create_logger(&config, log_file);
@@ -239,7 +239,7 @@ where
 
     // If there's already a config, use it. Otherwise create a test one.
     let config = if validator_config_path.exists() {
-        NodeConfig::load(&validator_config_path)
+        NodeConfig::load_from_path(&validator_config_path)
             .map_err(|error| anyhow!("Unable to load config: {:?}", error))?
     } else {
         // Create a test only config for a single validator node
@@ -308,7 +308,7 @@ fn create_single_node_test_config(
     enable_lazy_mode: bool,
 ) -> NodeConfig {
     // Build a single validator network with a generated config
-    let mut node_config = NodeConfig::default_for_validator();
+    let mut node_config = NodeConfig::get_default_validator_config();
 
     // Adjust some fields in the default template to lower the overhead of
     // running on a local machine.
@@ -343,7 +343,7 @@ fn create_single_node_test_config(
     if let Some(config_path) = config_path {
         node_config = NodeConfig::load_config(&config_path).unwrap_or_else(|error| {
             panic!(
-                "Failed to load config at path: {:?}. Error: {:?}",
+                "Failed to load persisted config at path: {:?}. Error: {:?}",
                 config_path, error
             )
         });
@@ -359,7 +359,7 @@ fn create_single_node_test_config(
 
     // Set the correct poll count for mempool
     if enable_lazy_mode {
-        node_config.consensus.quorum_store_poll_count = u64::MAX;
+        node_config.consensus.quorum_store_poll_time_ms = 3_600_000;
     }
 
     node_config

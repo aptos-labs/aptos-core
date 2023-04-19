@@ -142,7 +142,7 @@ impl LocalSwarm {
                     // which cause flakiness in tests.
                     if number_of_validators.get() == 1 {
                         // this delays empty block by (30-1) * 30ms
-                        config.consensus.quorum_store_poll_count = 30;
+                        config.consensus.quorum_store_poll_time_ms = 900;
                         config
                             .state_sync
                             .state_sync_driver
@@ -207,7 +207,7 @@ impl LocalSwarm {
                 };
 
                 // Since the validator's config has changed we need to save it
-                validator_config.save(validator.config_path())?;
+                validator_config.save_to_path(validator.config_path())?;
                 *validator.config_mut() = validator_config;
 
                 Ok((validator.peer_id(), public_network))

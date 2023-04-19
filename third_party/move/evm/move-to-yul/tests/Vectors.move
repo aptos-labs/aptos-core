@@ -46,9 +46,9 @@ module 0x2::Vectors {
     fun test_one_elem_struct() {
         let v = one_elem_struct();
         assert!(vector::length(&v) == 1, 101);
-        assert!(*&vector::borrow(&v, 0).x == 42, 102);
-        assert!(*&vector::borrow(&v, 0).y == true, 103);
-        assert!(*&vector::borrow(&v, 0).z == 789, 104);
+        assert!(vector::borrow(&v, 0).x == 42, 102);
+        assert!(vector::borrow(&v, 0).y == true, 103);
+        assert!(vector::borrow(&v, 0).z == 789, 104);
     }
 
     #[evm_test]
@@ -140,25 +140,25 @@ module 0x2::Vectors {
         let v = one_elem_struct();
         vector::push_back(&mut v, S { x: 45, y: false, z: 123 });
         let s1_ref = vector::borrow_mut(&mut v, 0);
-        *&mut s1_ref.x = 90;
-        *&mut s1_ref.y = false;
-        *&mut s1_ref.z = 1028;
+        s1_ref.x = 90;
+        s1_ref.y = false;
+        s1_ref.z = 1028;
         // the first element is properly changed
-        assert!(*&vector::borrow(&v, 0).x == 90, 101);
-        assert!(*&vector::borrow(&v, 0).y == false, 102);
-        assert!(*&vector::borrow(&v, 0).z == 1028, 103);
+        assert!(vector::borrow(&v, 0).x == 90, 101);
+        assert!(vector::borrow(&v, 0).y == false, 102);
+        assert!(vector::borrow(&v, 0).z == 1028, 103);
         // the second element is not changed
-        assert!(*&vector::borrow(&v, 1).x == 45, 104);
-        assert!(*&vector::borrow(&v, 1).y == false, 105);
-        assert!(*&vector::borrow(&v, 1).z == 123, 106);
+        assert!(vector::borrow(&v, 1).x == 45, 104);
+        assert!(vector::borrow(&v, 1).y == false, 105);
+        assert!(vector::borrow(&v, 1).z == 123, 106);
         // TODO: uncomment this after we've implemented equality for struct
         // assert!(*vector::borrow(&v, 0) == S { x: 90, y: false, z: 1028 }, 104);
 
         let s2_ref = vector::borrow_mut(&mut v, 1);
-        *&mut s2_ref.x = 10;
-        *&mut s2_ref.y = true;
-        *&mut s2_ref.z = 456;
-        assert!(*&vector::borrow(&v, 1).x == 10, 107);
+        s2_ref.x = 10;
+        s2_ref.y = true;
+        s2_ref.z = 456;
+        assert!(vector::borrow(&v, 1).x == 10, 107);
         assert!(*&vector::borrow(&v, 1).y == true, 108);
         assert!(*&vector::borrow(&v, 1).z == 456, 109);
     }

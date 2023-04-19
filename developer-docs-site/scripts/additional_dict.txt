@@ -139,6 +139,7 @@ Labs's
 Leaderboard
 Liveness
 MOV
+MSL
 MSVC
 MVM
 Mainnet
@@ -177,6 +178,7 @@ Paymagic
 Petra
 PoS
 Pontem
+Postcondition
 Postgres
 PowerShell
 PropertyMap
@@ -291,6 +293,7 @@ boolean
 broadcasted
 bytecode
 cAdvisor
+callee
 cancelled
 cfg
 changeset
@@ -370,15 +373,18 @@ jsx
 kickstart
 korean
 kubernetes
+lang
 leaderboard
 lexically
 libclang
 libpq
 libssl
 lifecycle
+linter
 liveness
 localhost
 loopwise
+lt
 macOS
 mainnet
 md
@@ -421,6 +427,7 @@ pipelined
 png
 polymorphism
 powershell
+pragmas
 pre
 prebuilt
 precompiled
@@ -442,6 +449,7 @@ rpc
 ruleset
 runtime
 sandboxed
+satisfiable
 scalability
 scalable
 schema

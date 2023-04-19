@@ -10,6 +10,7 @@ use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue};
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter};
+use aptos_transaction_generator_lib::TransactionGeneratorCreator;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::aptos_test_root_address,
@@ -31,7 +32,7 @@ use std::{
 };
 
 const META_FILENAME: &str = "metadata.toml";
-const MAX_ACCOUNTS_INVOLVED_IN_P2P: usize = 1_000_000;
+pub const MAX_ACCOUNTS_INVOLVED_IN_P2P: usize = 1_000_000;
 
 fn get_progress_bar(num_accounts: usize) -> ProgressBar {
     let bar = ProgressBar::new(num_accounts as u64);
@@ -119,7 +120,7 @@ impl TransactionGenerator {
         accounts
     }
 
-    fn gen_user_account_cache(num_accounts: usize) -> AccountCache {
+    pub fn gen_user_account_cache(num_accounts: usize) -> AccountCache {
         Self::gen_account_cache(
             AccountGenerator::new_for_user_accounts(0),
             num_accounts,
@@ -145,16 +146,7 @@ impl TransactionGenerator {
         db_dir: P,
         version: Version,
     ) -> Self {
-        let path = db_dir.as_ref().join(META_FILENAME);
-
-        let num_existing_accounts = File::open(path).map_or(0, |mut file| {
-            let mut contents = vec![];
-            file.read_to_end(&mut contents).unwrap();
-            let test_case: TestCase = toml::from_slice(&contents).expect("Must exist.");
-            let TestCase::P2p(P2pTestCase { num_accounts }) = test_case;
-            num_accounts
-        });
-
+        let num_existing_accounts = TransactionGenerator::read_meta(&db_dir);
         let num_cached_accounts =
             std::cmp::min(num_existing_accounts, MAX_ACCOUNTS_INVOLVED_IN_P2P);
         let accounts_cache = Some(Self::gen_user_account_cache(num_cached_accounts));
@@ -174,7 +166,7 @@ impl TransactionGenerator {
         }
     }
 
-    fn create_transaction_factory() -> TransactionFactory {
+    pub fn create_transaction_factory() -> TransactionFactory {
         TransactionFactory::new(ChainId::test())
             .with_transaction_expiration_time(300)
             .with_gas_unit_price(100)
@@ -191,6 +183,17 @@ impl TransactionGenerator {
         let meta_file = path.as_ref().join(META_FILENAME);
         let mut file = File::create(meta_file).unwrap();
         file.write_all(&serialized).unwrap();
+    }
+
+    pub fn read_meta<P: AsRef<Path>>(path: &P) -> usize {
+        let filename = path.as_ref().join(META_FILENAME);
+        File::open(filename).map_or(0, |mut file| {
+            let mut contents = vec![];
+            file.read_to_end(&mut contents).unwrap();
+            let test_case: TestCase = toml::from_slice(&contents).expect("Must exist.");
+            let TestCase::P2p(P2pTestCase { num_accounts }) = test_case;
+            num_accounts
+        })
     }
 
     pub fn num_existing_accounts(&self) -> usize {
@@ -234,6 +237,44 @@ impl TransactionGenerator {
     ) {
         assert!(self.block_sender.is_some());
         self.gen_transfer_transactions(block_size, num_transfer_blocks, transactions_per_sender);
+    }
+
+    pub fn run_workload(
+        &mut self,
+        block_size: usize,
+        num_blocks: usize,
+        mut transaction_generator_creator: Box<dyn TransactionGeneratorCreator>,
+        transactions_per_sender: usize,
+    ) {
+        assert!(self.block_sender.is_some());
+        let mut transaction_generator =
+            transaction_generator_creator.create_transaction_generator();
+
+        for _ in 0..num_blocks {
+            // TODO: handle when block_size isn't divisible by transactions_per_sender
+            let transactions: Vec<_> = (0..(block_size / transactions_per_sender))
+                .into_iter()
+                .flat_map(|_| {
+                    let sender = self.accounts_cache.as_mut().unwrap().get_random();
+                    transaction_generator
+                        .generate_transactions(vec![sender], transactions_per_sender)
+                        .into_iter()
+                        .map(|t| BenchmarkTransaction {
+                            transaction: Transaction::UserTransaction(t),
+                            extra_info: None,
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .chain(once(
+                    Transaction::StateCheckpoint(HashValue::random()).into(),
+                ))
+                .collect();
+            self.version += transactions.len() as Version;
+
+            if let Some(sender) = &self.block_sender {
+                sender.send(transactions).unwrap();
+            }
+        }
     }
 
     pub fn create_seed_accounts(

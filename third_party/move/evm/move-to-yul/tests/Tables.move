@@ -96,20 +96,20 @@ module 0x2::Tables {
 
         Table::insert(&mut t, &@0xAB, Balance{ value: val_1 });
         assert!(Table::contains(&t, &@0xAB), 101);
-        assert!(*&Table::borrow(&t, &@0xAB).value == val_1, 102);
+        assert!(Table::borrow(&t, &@0xAB).value == val_1, 102);
 
         move_to(&sign(@0x42), S { t });
 
         let global_t = &mut borrow_global_mut<S<address, Balance>>(@0x42).t;
 
         Table::insert(global_t, &@0xCD, Balance{ value: val_2 });
-        assert!(*&Table::borrow(global_t, &@0xAB).value == val_1, 103);
-        assert!(*&Table::borrow(global_t, &@0xCD).value == val_2, 104);
+        assert!(Table::borrow(global_t, &@0xAB).value == val_1, 103);
+        assert!(Table::borrow(global_t, &@0xCD).value == val_2, 104);
 
 
         let entry_mut_ref = Table::borrow_mut(global_t , &@0xCD);
-        *&mut entry_mut_ref.value = sub(entry_mut_ref.value, one());
-        assert!(*&Table::borrow(global_t, &@0xCD).value == u256_from_words(45, 45), 105);
+        entry_mut_ref.value = sub(entry_mut_ref.value, one());
+        assert!(Table::borrow(global_t, &@0xCD).value == u256_from_words(45, 45), 105);
 
         let Balance { value } = Table::remove(global_t, &@0xAB);
         assert!(value == val_1, 106);
