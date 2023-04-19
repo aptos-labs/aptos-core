@@ -263,12 +263,12 @@ impl ConsensusConfig {
             ),
             (
                 config.max_sending_block_txns_quorum_store_override,
-                config.max_sending_block_txns_quorum_store_override,
+                config.max_receiving_block_txns_quorum_store_override,
                 "txns_quorum_store_override",
             ),
             (
                 config.max_sending_block_bytes_quorum_store_override,
-                config.max_sending_block_bytes_quorum_store_override,
+                config.max_receiving_block_bytes_quorum_store_override,
                 "bytes_quorum_store_override",
             ),
         ];
