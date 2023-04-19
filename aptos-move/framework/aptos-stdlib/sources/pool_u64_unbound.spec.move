@@ -7,8 +7,8 @@ spec aptos_std::pool_u64_unbound {
     // -----------------------
 
     spec Pool {
-        // invariant forall addr: address:
-        // table::spec_contains(shares, addr) ==> (table::spec_get(shares, addr) > 0);
+        invariant forall addr: address:
+        table::spec_contains(shares, addr) ==> (table::spec_get(shares, addr) > 0);
     }
 
     spec fun spec_contains(pool: Pool, shareholder: address): bool {

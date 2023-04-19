@@ -1,5 +1,4 @@
 spec aptos_framework::delegation_pool {
-    use aptos_std::table_with_length;
     spec module {
         // TODO: verification disabled until this module is specified.
         pragma verify = false;
@@ -715,8 +714,8 @@ spec aptos_framework::delegation_pool {
             // inactive > pre_pool.total_coins_inactive &&
             ensures pool.total_coins_inactive == stake_pool.inactive.value;
 
-            // Property 4 [ERROR]: inactive > old(total_coins_inactive) IFF pool.OLC == old(pool).OLC + 1:
-            ensures old(global<DelegationPool>(pool_address)).observed_lockup_cycle.index != pool.observed_lockup_cycle.index && inactive > old(global<DelegationPool>(pool_address)).total_coins_inactive;
+            // Property 4 [ERROR]: inactive > old(total_coins_inactive) IF pool.OLC == old(pool).OLC + 1:
+            ensures old(global<DelegationPool>(pool_address)).observed_lockup_cycle.index != pool.observed_lockup_cycle.index ==> inactive > old(global<DelegationPool>(pool_address)).total_coins_inactive;
              
             // Property 5.1 [TIMEOUT]: pool.OLC == old(pool).OLC + 1 => table::contains(pool.inactive_shares, pool.OLC)
 
