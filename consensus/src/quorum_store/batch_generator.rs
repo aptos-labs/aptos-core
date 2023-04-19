@@ -46,7 +46,6 @@ pub struct BatchGenerator {
     batch_id: BatchId,
     db: Arc<dyn QuorumStoreStorage>,
     config: QuorumStoreConfig,
-    buckets: Vec<u64>,
     mempool_proxy: MempoolProxy,
     batches_in_progress: HashMap<BatchId, Vec<TransactionInProgress>>,
     batch_expirations: TimeExpirations<BatchId>,
@@ -81,14 +80,12 @@ impl BatchGenerator {
         db.save_batch_id(epoch, incremented_batch_id)
             .expect("Could not save to db");
 
-        let buckets = config.batch_buckets.clone();
         Self {
             epoch,
             my_peer_id,
             batch_id,
             db,
             config,
-            buckets,
             mempool_proxy: MempoolProxy::new(mempool_tx, mempool_txn_pull_timeout_ms),
             batches_in_progress: HashMap::new(),
             batch_expirations: TimeExpirations::new(),
@@ -163,25 +160,23 @@ impl BatchGenerator {
         true
     }
 
-    fn get_descending_bucket_key(&self, txn: &SignedTransaction) -> u64 {
-        let bucket_index = match self.buckets.binary_search(&txn.gas_unit_price()) {
-            Ok(bucket_start) => bucket_start as u64,
-            Err(bucket_start) => bucket_start as u64,
-        };
-        u64::MAX - bucket_index
-    }
-
     fn bucket_into_batches(
         &mut self,
         pulled_txns: &mut Vec<SignedTransaction>,
         expiry_time: u64,
     ) -> Vec<Batch> {
-        // Sort by gas bucket, in descending order. Due to stable sort on existing mempool account
-        // ordering, this will result in (descending(gas), account) order.
-        pulled_txns.sort_by_cached_key(|txn| self.get_descending_bucket_key(txn));
+        // Sort by gas, in descending order. This is a stable sort on existing mempool ordering,
+        // so will not reorder accounts or their sequence numbers as long as they have the same gas.
+        pulled_txns.sort_by_key(|txn| u64::MAX - txn.gas_unit_price());
 
-        let reverse_buckets_excluding_zero: Vec<_> =
-            self.buckets.iter().skip(1).rev().cloned().collect();
+        let reverse_buckets_excluding_zero: Vec<_> = self
+            .config
+            .batch_buckets
+            .iter()
+            .skip(1)
+            .rev()
+            .cloned()
+            .collect();
         let mut batches = vec![];
         for bucket_start in &reverse_buckets_excluding_zero {
             if pulled_txns.is_empty() {
