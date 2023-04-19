@@ -2,8 +2,6 @@ import { AptosClient, ApiError, Provider, OptionalTransactionArgs } from "../pro
 import * as Gen from "../generated/index";
 import { AptosAccount } from "../account";
 import { TransactionBuilderRemoteABI } from "../transaction_builder";
-import { EntryFunction, TransactionPayloadEntryFunction } from "../aptos_types/transaction";
-import { bcsSerializeStr, bcsSerializeU8, bcsSerializeUint64, bcsToBytes } from "../bcs";
 
 const ansContractsMap: Record<string, string> = {
   testnet: "0x5f8fd2347449685cf41d4db97926ec3a096eaf381332be4f1318ad4d16a8497c",
