@@ -752,9 +752,4 @@ spec aptos_framework::delegation_pool {
             ensures forall delegators: address: delegators != global<stake::StakePool>(pool_address).operator_address && delegators != NULL_SHAREHOLDER ==> pool_u64::spec_shares(pool.active_shares, delegators) == pool_u64::spec_shares(old(global<DelegationPool>(pool_address)).active_shares, delegators); 
 
         }
-
-    spec to_u128(num: u64): u128 {
-
-    }
-
 }

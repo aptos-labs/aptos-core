@@ -280,7 +280,7 @@ pub enum EntryFunctionCall {
         pool_address: AccountAddress,
     },
 
-    /// Unlock `amount` from the active + pending_active stake of `delegator` or
+    /// Unlock `amount` from the active + pending_active stake of `de legator` or
     /// at most how much active stake there is on the stake pool.
     DelegationPoolUnlock {
         pool_address: AccountAddress,
@@ -1892,7 +1892,7 @@ pub fn delegation_pool_synchronize_delegation_pool(
     ))
 }
 
-/// Unlock `amount` from the active + pending_active stake of `delegator` or
+/// Unlock `amount` from the active + pending_active stake of `de legator` or
 /// at most how much active stake there is on the stake pool.
 pub fn delegation_pool_unlock(pool_address: AccountAddress, amount: u64) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(

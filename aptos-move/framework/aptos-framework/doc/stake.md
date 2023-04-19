@@ -68,6 +68,7 @@
 -  [Function `initialize_validator`](#0x1_stake_initialize_validator)
 -  [Function `initialize_owner`](#0x1_stake_initialize_owner)
 -  [Function `extract_owner_cap`](#0x1_stake_extract_owner_cap)
+-  [Function `get_owner_cap_address`](#0x1_stake_get_owner_cap_address)
 -  [Function `deposit_owner_cap`](#0x1_stake_deposit_owner_cap)
 -  [Function `destroy_owner_cap`](#0x1_stake_destroy_owner_cap)
 -  [Function `set_operator`](#0x1_stake_set_operator)
@@ -1989,6 +1990,33 @@ Extract and return owner capability from the signing account.
     <b>let</b> owner_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
     <a href="stake.md#0x1_stake_assert_owner_cap_exists">assert_owner_cap_exists</a>(owner_address);
     <b>move_from</b>&lt;<a href="stake.md#0x1_stake_OwnerCapability">OwnerCapability</a>&gt;(owner_address)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_stake_get_owner_cap_address"></a>
+
+## Function `get_owner_cap_address`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_get_owner_cap_address">get_owner_cap_address</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_get_owner_cap_address">get_owner_cap_address</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): <b>address</b> <b>acquires</b> <a href="stake.md#0x1_stake_OwnerCapability">OwnerCapability</a> {
+    <b>let</b> owner_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
+    <a href="stake.md#0x1_stake_assert_owner_cap_exists">assert_owner_cap_exists</a>(owner_address);
+    <b>let</b> ownership_cap = <b>borrow_global</b>&lt;<a href="stake.md#0x1_stake_OwnerCapability">OwnerCapability</a>&gt;(owner_address);
+    ownership_cap.pool_address
 }
 </code></pre>
 
