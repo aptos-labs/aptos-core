@@ -1,6 +1,7 @@
 import {
   StructTag,
   TypeTagAddress,
+  TypeTagBool,
   TypeTagParser,
   TypeTagParserError,
   TypeTagStruct,
@@ -116,6 +117,23 @@ describe("TypeTagParser", () => {
       expect(result.value.type_args.length).toEqual(2);
       expect(result.value.type_args[0] instanceof TypeTagAddress).toBeTruthy();
       expect(result.value.type_args[1] instanceof TypeTagStruct).toBeTruthy();
+    });
+  });
+
+  describe.only("supports generic types", () => {
+    test("throws an error when the type to use is not provided", () => {
+      const typeTag = "T0";
+      const parser = new TypeTagParser(typeTag);
+      expect(() => {
+        parser.parseTypeTag();
+      }).toThrow("Can't convert generic type to a tag type since typeTags array is empty.");
+    });
+
+    test("successfully parses a generic type tag to the provided type", () => {
+      const typeTag = "T0";
+      const parser = new TypeTagParser(typeTag, ["bool"]);
+      const result = parser.parseTypeTag();
+      expect(result instanceof TypeTagBool).toBeTruthy();
     });
   });
 });
