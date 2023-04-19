@@ -9,10 +9,8 @@ Reconfiguration, and may be updated by root.
 
 -  [Resource `ExecutionConfig`](#0x1_execution_config_ExecutionConfig)
 -  [Constants](#@Constants_0)
--  [Function `initialize`](#0x1_execution_config_initialize)
 -  [Function `set`](#0x1_execution_config_set)
 -  [Specification](#@Specification_1)
-    -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `set`](#@Specification_1_set)
 
 
@@ -65,33 +63,6 @@ The provided on chain config bytes are empty or invalid
 
 
 
-<a name="0x1_execution_config_initialize"></a>
-
-## Function `initialize`
-
-Publishes the ExecutionConfig config.
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="execution_config.md#0x1_execution_config_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="execution_config.md#0x1_execution_config_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&config) &gt; 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="execution_config.md#0x1_execution_config_EINVALID_CONFIG">EINVALID_CONFIG</a>));
-    <b>move_to</b>(aptos_framework, <a href="execution_config.md#0x1_execution_config_ExecutionConfig">ExecutionConfig</a> { config });
-}
-</code></pre>
-
-
-
-</details>
-
 <a name="0x1_execution_config_set"></a>
 
 ## Function `set`
@@ -112,9 +83,12 @@ This can be called by on-chain governance to update on-chain execution configs.
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(<a href="account.md#0x1_account">account</a>);
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&config) &gt; 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="execution_config.md#0x1_execution_config_EINVALID_CONFIG">EINVALID_CONFIG</a>));
 
-    <b>let</b> config_ref = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="execution_config.md#0x1_execution_config_ExecutionConfig">ExecutionConfig</a>&gt;(@aptos_framework).config;
-    *config_ref = config;
-
+    <b>if</b> (<b>exists</b>&lt;<a href="execution_config.md#0x1_execution_config_ExecutionConfig">ExecutionConfig</a>&gt;(@aptos_framework)) {
+        <b>let</b> config_ref = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="execution_config.md#0x1_execution_config_ExecutionConfig">ExecutionConfig</a>&gt;(@aptos_framework).config;
+        *config_ref = config;
+    } <b>else</b> {
+        <b>move_to</b>(<a href="account.md#0x1_account">account</a>, <a href="execution_config.md#0x1_execution_config_ExecutionConfig">ExecutionConfig</a> { config });
+    };
     // Need <b>to</b> trigger <a href="reconfiguration.md#0x1_reconfiguration">reconfiguration</a> so validator nodes can sync on the updated configs.
     <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>();
 }
@@ -136,26 +110,6 @@ This can be called by on-chain governance to update on-chain execution configs.
 
 
 
-<a name="@Specification_1_initialize"></a>
-
-### Function `initialize`
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="execution_config.md#0x1_execution_config_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
-</code></pre>
-
-
-Ensure caller is admin.
-
-
-<pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
-<b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(addr);
-<b>aborts_if</b> <b>exists</b>&lt;<a href="execution_config.md#0x1_execution_config_ExecutionConfig">ExecutionConfig</a>&gt;(@aptos_framework);
-<b>aborts_if</b> !(len(config) &gt; 0);
-</code></pre>
-
-
-
 <a name="@Specification_1_set"></a>
 
 ### Function `set`
@@ -165,14 +119,13 @@ Ensure caller is admin.
 </code></pre>
 
 
-Ensure the caller is admin and <code><a href="execution_config.md#0x1_execution_config_ExecutionConfig">ExecutionConfig</a></code> should be existed.
+Ensure the caller is admin
 When setting now time must be later than last_reconfiguration_time.
 
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
 <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
 <b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(addr);
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="execution_config.md#0x1_execution_config_ExecutionConfig">ExecutionConfig</a>&gt;(@aptos_framework);
 <b>aborts_if</b> !(len(config) &gt; 0);
 <b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
 <b>requires</b> <a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>() &gt;= <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">reconfiguration::last_reconfiguration_time</a>();
