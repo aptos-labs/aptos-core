@@ -15,7 +15,6 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{
-    data_store::DataStore,
     loaded_data::runtime_types::Type,
     values::{GlobalValue, Value},
 };
@@ -48,17 +47,17 @@ impl AccountDataCache {
 /// The Move VM takes a `DataStore` in input and this is the default and correct implementation
 /// for a data store related to a transaction. Clients should create an instance of this type
 /// and pass it to the Move VM.
-pub(crate) struct TransactionDataCache<'r, 'l, S> {
-    remote: &'r S,
-    loader: &'l Loader,
+pub(crate) struct TransactionDataCache<'r, 'l> {
+    remote: &'r dyn MoveResolver,
+    pub(crate) loader: &'l Loader,
     account_map: BTreeMap<AccountAddress, AccountDataCache>,
     event_data: Vec<(Vec<u8>, u64, Type, MoveTypeLayout, Value)>,
 }
 
-impl<'r, 'l, S: MoveResolver> TransactionDataCache<'r, 'l, S> {
+impl<'r, 'l> TransactionDataCache<'r, 'l> {
     /// Create a `TransactionDataCache` with a `RemoteCache` that provides access to data
     /// not updated in the transaction.
-    pub(crate) fn new(remote: &'r S, loader: &'l Loader) -> Self {
+    pub(crate) fn new(remote: &'r dyn MoveResolver, loader: &'l Loader) -> Self {
         TransactionDataCache {
             remote,
             loader,
@@ -158,14 +157,11 @@ impl<'r, 'l, S: MoveResolver> TransactionDataCache<'r, 'l, S> {
         }
         map.get_mut(k).unwrap()
     }
-}
 
-// `DataStore` implementation for the `TransactionDataCache`
-impl<'r, 'l, S: MoveResolver> DataStore for TransactionDataCache<'r, 'l, S> {
     // Retrieve data from the local cache or loads it from the remote cache into the local cache.
     // All operations on the global data are based on this API and they all load the data
     // into the cache.
-    fn load_resource(
+    pub(crate) fn load_resource(
         &mut self,
         addr: AccountAddress,
         ty: &Type,
@@ -230,7 +226,7 @@ impl<'r, 'l, S: MoveResolver> DataStore for TransactionDataCache<'r, 'l, S> {
         ))
     }
 
-    fn load_module(&self, module_id: &ModuleId) -> VMResult<Vec<u8>> {
+    pub(crate) fn load_module(&self, module_id: &ModuleId) -> VMResult<Vec<u8>> {
         if let Some(account_cache) = self.account_map.get(module_id.address()) {
             if let Some((blob, _is_republishing)) = account_cache.module_map.get(module_id.name()) {
                 return Ok(blob.clone());
@@ -252,7 +248,7 @@ impl<'r, 'l, S: MoveResolver> DataStore for TransactionDataCache<'r, 'l, S> {
         }
     }
 
-    fn publish_module(
+    pub(crate) fn publish_module(
         &mut self,
         module_id: &ModuleId,
         blob: Vec<u8>,
@@ -270,7 +266,7 @@ impl<'r, 'l, S: MoveResolver> DataStore for TransactionDataCache<'r, 'l, S> {
         Ok(())
     }
 
-    fn exists_module(&self, module_id: &ModuleId) -> VMResult<bool> {
+    pub(crate) fn exists_module(&self, module_id: &ModuleId) -> VMResult<bool> {
         if let Some(account_cache) = self.account_map.get(module_id.address()) {
             if account_cache.module_map.contains_key(module_id.name()) {
                 return Ok(true);
@@ -286,7 +282,7 @@ impl<'r, 'l, S: MoveResolver> DataStore for TransactionDataCache<'r, 'l, S> {
     }
 
     #[allow(clippy::unit_arg)]
-    fn emit_event(
+    pub(crate) fn emit_event(
         &mut self,
         guid: Vec<u8>,
         seq_num: u64,

@@ -20,9 +20,7 @@ use std::fmt::Debug;
 ///                       are always structurally valid)
 ///                    - storage encounters internal error
 pub trait ModuleResolver {
-    type Error: Debug;
-
-    fn get_module(&self, id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error>;
+    fn get_module(&self, id: &ModuleId) -> Result<Option<Vec<u8>>, Box<dyn Debug>>;
 }
 
 /// A persistent storage backend that can resolve resources by address + type
@@ -35,44 +33,36 @@ pub trait ModuleResolver {
 ///                       are always structurally valid)
 ///                    - storage encounters internal error
 pub trait ResourceResolver {
-    type Error: Debug;
-
     fn get_resource(
         &self,
         address: &AccountAddress,
         typ: &StructTag,
-    ) -> Result<Option<Vec<u8>>, Self::Error>;
+    ) -> Result<Option<Vec<u8>>, Box<dyn Debug>>;
 }
 
 /// A persistent storage implementation that can resolve both resources and modules
 pub trait MoveResolver:
-    ModuleResolver<Error = Self::Err> + ResourceResolver<Error = Self::Err>
+    ModuleResolver + ResourceResolver
 {
-    type Err: Debug;
 }
 
-impl<E: Debug, T: ModuleResolver<Error = E> + ResourceResolver<Error = E> + ?Sized> MoveResolver
+impl<T: ModuleResolver + ResourceResolver + ?Sized> MoveResolver
     for T
 {
-    type Err = E;
 }
 
 impl<T: ResourceResolver + ?Sized> ResourceResolver for &T {
-    type Error = T::Error;
-
     fn get_resource(
         &self,
         address: &AccountAddress,
         tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, Self::Error> {
+    ) -> Result<Option<Vec<u8>>, Box<dyn Debug>> {
         (**self).get_resource(address, tag)
     }
 }
 
 impl<T: ModuleResolver + ?Sized> ModuleResolver for &T {
-    type Error = T::Error;
-
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
+    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Box<dyn Debug>> {
         (**self).get_module(module_id)
     }
 }

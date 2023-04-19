@@ -20,7 +20,6 @@ use move_core_types::{
     vm_status::{StatusCode, StatusType},
 };
 use move_vm_types::{
-    data_store::DataStore,
     gas::{GasMeter, SimpleInstruction},
     loaded_data::runtime_types::Type,
     natives::function::NativeResult,
@@ -32,6 +31,7 @@ use move_vm_types::{
 };
 use std::{cmp::min, collections::VecDeque, fmt::Write, sync::Arc};
 use tracing::error;
+use crate::data_cache::TransactionDataCache;
 
 macro_rules! debug_write {
     ($($toks: tt)*) => {
@@ -62,14 +62,14 @@ macro_rules! set_err_info {
 ///
 /// An `Interpreter` instance is a stand alone execution context for a function.
 /// It mimics execution on a single thread, with an call stack and an operand stack.
-pub(crate) struct Interpreter<'a> {
+pub(crate) struct Interpreter<'a, 'r, 'l> {
     /// Operand stack, where Move `Value`s are stored for stack operations.
     operand_stack: Stack,
     /// The stack of active functions.
     call_stack: CallStack,
     /// Whether to perform a paranoid type safety checks at runtime.
     paranoid_type_checks: bool,
-    pub(crate) data_store: &'a mut dyn DataStore,
+    pub(crate) data_store: &'a mut TransactionDataCache<'r, 'l>,
 }
 
 struct TypeWithLoader<'a, 'b> {
@@ -83,14 +83,14 @@ impl<'a, 'b> TypeView for TypeWithLoader<'a, 'b> {
     }
 }
 
-impl<'a> Interpreter<'a> {
+impl<'a, 'r, 'l> Interpreter<'a, 'r, 'l> {
     /// Entrypoint into the interpreter. All external calls need to be routed through this
     /// function.
     pub(crate) fn entrypoint(
         function: Arc<Function>,
         ty_args: Vec<Type>,
         args: Vec<Value>,
-        data_store: &mut dyn DataStore,
+        data_store: &mut TransactionDataCache<'r, 'l>,
         gas_meter: &mut impl GasMeter,
         extensions: &mut NativeContextExtensions,
         loader: &Loader,
@@ -113,7 +113,7 @@ impl<'a> Interpreter<'a> {
     /// on call. When that happens the frame is changes to a new one (call) or to the one
     /// at the top of the stack (return). If the call stack is empty execution is completed.
     fn execute_main(
-        &'a mut self,
+        mut self,
         loader: &Loader,
         gas_meter: &mut impl GasMeter,
         extensions: &mut NativeContextExtensions,
@@ -141,7 +141,7 @@ impl<'a> Interpreter<'a> {
             let resolver = current_frame.resolver(loader);
             let exit_code =
                 current_frame //self
-                    .execute_code(&resolver, self, gas_meter)
+                    .execute_code(&resolver, &mut self, gas_meter)
                     .map_err(|err| self.maybe_core_dump(err, &current_frame))?;
             match exit_code {
                 ExitCode::Return => {
@@ -532,13 +532,13 @@ impl<'a> Interpreter<'a> {
     }
 
     /// Loads a resource from the data store and return the number of bytes read from the storage.
-    fn load_resource<'b>(
-        loader: &Loader,
+    fn load_resource<'c>(
+        data_store: &'c mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
-        data_store: &'b mut dyn DataStore,
         addr: AccountAddress,
         ty: &Type,
-    ) -> PartialVMResult<&'b mut GlobalValue> {
+    ) -> PartialVMResult<&'c mut GlobalValue> {
+        let loader = data_store.loader;
         match data_store.load_resource(addr, ty) {
             Ok((gv, load_res)) => {
                 if let Some(loaded) = load_res {
@@ -570,8 +570,8 @@ impl<'a> Interpreter<'a> {
     }
 
     /// BorrowGlobal (mutable and not) opcode.
-    fn borrow_global(
-        &mut self,
+    fn borrow_global<'c: 'a>(
+        &'c mut self,
         is_mut: bool,
         is_generic: bool,
         loader: &Loader,
@@ -579,7 +579,7 @@ impl<'a> Interpreter<'a> {
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<()> {
-        let res = Self::load_resource(loader, gas_meter, self.data_store, addr, ty)?.borrow_global();
+        let res = Self::load_resource(self.data_store, gas_meter, addr, ty)?.borrow_global();
         gas_meter.charge_borrow_global(
             is_mut,
             is_generic,
@@ -599,7 +599,7 @@ impl<'a> Interpreter<'a> {
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<()> {
-        let gv = Self::load_resource(loader, gas_meter, self.data_store, addr, ty)?;
+        let gv = Self::load_resource(self.data_store, gas_meter, addr, ty)?;
         let exists = gv.exists()?;
         gas_meter.charge_exists(is_generic, TypeWithLoader { ty, loader }, exists)?;
         self.operand_stack.push(Value::bool(exists))?;
@@ -616,7 +616,7 @@ impl<'a> Interpreter<'a> {
         ty: &Type,
     ) -> PartialVMResult<()> {
         let resource =
-            match Self::load_resource(loader, gas_meter, self.data_store, addr, ty)?.move_from() {
+            match Self::load_resource(self.data_store, gas_meter, addr, ty)?.move_from() {
                 Ok(resource) => {
                     gas_meter.charge_move_from(
                         is_generic,
@@ -645,7 +645,7 @@ impl<'a> Interpreter<'a> {
         ty: &Type,
         resource: Value,
     ) -> PartialVMResult<()> {
-        let gv = Self::load_resource(loader, gas_meter, self.data_store, addr, ty)?;
+        let gv = Self::load_resource(self.data_store, gas_meter, addr, ty)?;
         // NOTE(Gas): To maintain backward compatibility, we need to charge gas after attempting
         //            the move_to operation.
         match gv.move_to(resource) {
@@ -1035,10 +1035,10 @@ fn check_ability(has_ability: bool) -> PartialVMResult<()> {
 
 impl Frame {
     /// Execute a Move function until a return or a call opcode is found.
-    fn execute_code<'a>(
+    fn execute_code<'a, 'r, 'l>(
         &mut self,
         resolver: &Resolver,
-        interpreter: &mut Interpreter<'a>,
+        interpreter: &mut Interpreter<'a, 'r, 'l>,
         gas_meter: &mut impl GasMeter,
     ) -> VMResult<ExitCode> {
         self.execute_code_impl(resolver, interpreter, gas_meter)
@@ -1168,11 +1168,11 @@ impl Frame {
     /// Paranoid type checks to perform after instruction execution.
     ///
     /// This function and `pre_execution_type_stack_transition` should constitute the full type stack transition for the paranoid mode.
-    fn post_execution_type_stack_transition(
+    fn post_execution_type_stack_transition<'a, 'r, 'l>(
         local_tys: &[Type],
         ty_args: &[Type],
         resolver: &Resolver,
-        interpreter: &mut Interpreter,
+        interpreter: &mut Interpreter<'a, 'r, 'l>,
         instruction: &Bytecode,
     ) -> PartialVMResult<()> {
         match instruction {
@@ -1653,10 +1653,10 @@ impl Frame {
         Ok(())
     }
 
-    fn execute_code_impl(
+    fn execute_code_impl<'a, 'r, 'l>(
         &mut self,
         resolver: &Resolver,
-        interpreter: &mut Interpreter,
+        interpreter: &mut Interpreter<'a, 'r, 'l>,
         gas_meter: &mut impl GasMeter,
     ) -> PartialVMResult<ExitCode> {
         use SimpleInstruction as S;
@@ -1673,14 +1673,14 @@ impl Frame {
         let code = self.function.code();
         loop {
             for instruction in &code[self.pc as usize..] {
-                trace!(
+                /*trace!(
                     &self.function,
                     &self.locals,
                     self.pc,
                     instruction,
                     resolver,
                     interpreter
-                );
+                );*/
 
                 fail_point!("move_vm::interpreter_loop", |_| {
                     Err(

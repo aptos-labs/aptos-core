@@ -17,7 +17,7 @@ use move_core_types::{
     vm_status::{StatusCode, StatusType},
 };
 use move_vm_types::{
-    data_store::DataStore, loaded_data::runtime_types::Type, natives::function::NativeResult,
+    loaded_data::runtime_types::Type, natives::function::NativeResult,
     values::Value,
 };
 use std::{
@@ -92,16 +92,16 @@ impl NativeFunctions {
     }
 }
 
-pub struct NativeContext<'a, 'b> {
-    interpreter: &'a mut Interpreter<'a>,
+pub struct NativeContext<'a, 'b, 'c, 'r, 'l> {
+    interpreter: &'a mut Interpreter<'c, 'r, 'l>,
     resolver: &'a Resolver<'a>,
     extensions: &'a mut NativeContextExtensions<'b>,
     gas_balance: InternalGas,
 }
 
-impl<'a, 'b> NativeContext<'a, 'b> {
+impl<'a, 'b, 'c, 'r, 'l> NativeContext<'a, 'b, 'c, 'r, 'l> {
     pub(crate) fn new(
-        interpreter: &'a mut Interpreter<'a>,
+        interpreter: &'a mut Interpreter<'c, 'r, 'l>,
         resolver: &'a Resolver<'a>,
         extensions: &'a mut NativeContextExtensions<'b>,
         gas_balance: InternalGas,
@@ -115,7 +115,7 @@ impl<'a, 'b> NativeContext<'a, 'b> {
     }
 }
 
-impl<'a, 'b> NativeContext<'a, 'b> {
+impl<'a, 'b, 'c, 'r, 'l> NativeContext<'a, 'b, 'c, 'r, 'l> {
     pub fn print_stack_trace<B: Write>(&self, buf: &mut B) -> PartialVMResult<()> {
         self.interpreter
             .debug_print_stack_trace(buf, self.resolver.loader())

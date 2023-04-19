@@ -16,19 +16,17 @@ use move_core_types::{
     effects::{ChangeSet, Event},
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
-    resolver::MoveResolver,
     value::MoveTypeLayout,
 };
 use move_vm_types::{
-    data_store::DataStore,
     gas::GasMeter,
     loaded_data::runtime_types::{CachedStructIndex, StructType, Type},
 };
 use std::{borrow::Borrow, sync::Arc};
 
-pub struct Session<'r, 'l, S> {
+pub struct Session<'r, 'l> {
     pub(crate) runtime: &'l VMRuntime,
-    pub(crate) data_cache: TransactionDataCache<'r, 'l, S>,
+    pub(crate) data_cache: TransactionDataCache<'r, 'l>,
     pub(crate) native_extensions: NativeContextExtensions<'r>,
 }
 
@@ -43,7 +41,7 @@ pub struct SerializedReturnValues {
     pub return_values: Vec<(Vec<u8>, MoveTypeLayout)>,
 }
 
-impl<'r, 'l, S: MoveResolver> Session<'r, 'l, S> {
+impl<'r, 'l> Session<'r, 'l> {
     /// Execute a Move function with the given arguments. This is mainly designed for an external
     /// environment to invoke system logic written in Move.
     ///
@@ -363,7 +361,7 @@ impl<'r, 'l, S: MoveResolver> Session<'r, 'l, S> {
     }
 
     /// Gets the underlying data store
-    pub fn get_data_store(&mut self) -> &mut dyn DataStore {
+    pub fn get_data_store<'a>(&mut self) -> &mut TransactionDataCache<'r, 'l> {
         &mut self.data_cache
     }
 
