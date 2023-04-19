@@ -1207,15 +1207,7 @@ The `aptos` tool supports bootstrapping new blockchains through what is known as
 
 ### Prepare aptos-core
 
-The following guide assumes that you have access to the Aptos-core repository or the associated tools. You can download and prepare Aptos-core from [GitHub](https://github.com/aptos-labs/aptos-core):
-
-```
-git clone https://github.com/aptos-labs/aptos-core.git
-cd aptos-core
-git checkout --track origin/testnet
-./scripts/dev_setup.sh
-source ~/.cargo/env
-```
+The following sections rely on tools from the Aptos source. See [Building Aptos From Source](../../guides/building-from-source.md) for setup.
 
 ### The `layout` file
 
