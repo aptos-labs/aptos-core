@@ -4,9 +4,9 @@ proposals:
   - name: step_1
     metadata:
       title: "Enable Struct Constructor Feature"
-      description: "TBD"
+      description: "AIP-25: Enable some select set of structs as valid parameters to entry and view functions."
       source_code_url: "TBD"
-      discussion_url: "TBD"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/104"
     execution_mode: MultiStep
     update_sequence:
     - FeatureFlag:
@@ -15,8 +15,8 @@ proposals:
         disabled: []
   - name: step_2
     metadata:
-      title: "Update to latest framework"
-      description: "TBD"
+      title: "Multi-step proposal to upgrade mainnet framework to v1.4.0"
+      description: "This includes changes outlined in https://github.com/aptos-labs/aptos-core/releases/aptos-node-v1.4.0. Struct constructor, generic cryptography algebra, ed25519 returns false if wrong length, quorum store, and transaction shuffling will be enabled in separate proposals."
       source_code_url: "TBD"
       discussion_url: "TBD"
     execution_mode: MultiStep
@@ -28,9 +28,9 @@ proposals:
   - name: step_3
     metadata:
       title: "Enable bls12381"
-      description: "TBD"
+      description: "AIP-20: Support of generic cryptography algebra operations in Aptos standard library."
       source_code_url: "TBD"
-      discussion_url: "TBD"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/94"
     execution_mode: MultiStep
     update_sequence:
     - FeatureFlag:
@@ -41,9 +41,9 @@ proposals:
   - name: step_4
     metadata:
       title: "Enable ed25519_pubkey_validate_return_false_wrong_length"
-      description: "TBD"
+      description: "AIP-23: Make ed25519 public key validation return none if key has the wrong length."
       source_code_url: "TBD"
-      discussion_url: "TBD"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/102"
     execution_mode: MultiStep
     update_sequence:
     - FeatureFlag:
@@ -53,7 +53,7 @@ proposals:
   - name: step_5
     metadata:
       title: "Enable Quorum Store"
-      description: "TBD"
+      description: "AIP-X: Quorum Store is a production-optimized implementation of Narwhal [1], that improves consensus throughput."
       source_code_url: "TBD"
       discussion_url: "TBD"
     execution_mode: MultiStep
