@@ -121,7 +121,7 @@ sources={{
 />
 
 There are two edge cases to call out:
-1. If a validator's stake drops below the required [minimum](#minimum-and-maximum-stake), that validator can be moved from active state directly to the inactive state during an epoch change. This happens only during an epoch change.
+1. If a validator's stake drops below the required [minimum](#minimum-and-maximum-stake), that validator will be moved from active state directly to the inactive state during an epoch change. This happens only during an epoch change.
 2. Aptos governance can also directly remove validators from the active set. **Note that governance proposals will always trigger an epoch change.**
 
 ### Stake state
