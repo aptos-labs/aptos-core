@@ -256,7 +256,7 @@ impl ConfigSanitizer for ConsensusConfig {
         SafetyRulesConfig::sanitize(node_config, node_role, chain_id)?;
 
         // Verify that the consensus-only feature is not enabled in mainnet
-        if chain_id.is_mainnet()? && is_consensus_only_perf_test_enabled() {
+        if chain_id.is_mainnet() && is_consensus_only_perf_test_enabled() {
             return Err(Error::ConfigSanitizerFailed(
                 sanitizer_name,
                 "consensus-only-perf-test should not be enabled in mainnet!".to_string(),
