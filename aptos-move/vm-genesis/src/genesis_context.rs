@@ -16,18 +16,18 @@ use move_core_types::language_storage::ModuleId;
 use std::collections::HashMap;
 
 // `StateView` has no data given we are creating the genesis
-pub(crate) struct GenesisStateView {
+pub struct GenesisStateView { //////// 0L ////////
     state_data: HashMap<StateKey, Vec<u8>>,
 }
 
 impl GenesisStateView {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self { //////// 0L ////////
         Self {
             state_data: HashMap::new(),
         }
     }
 
-    pub(crate) fn add_module(&mut self, module_id: &ModuleId, blob: &[u8]) {
+    pub fn add_module(&mut self, module_id: &ModuleId, blob: &[u8]) { //////// 0L ////////
         self.state_data.insert(
             StateKey::access_path(AccessPath::from(module_id)),
             blob.to_vec(),
