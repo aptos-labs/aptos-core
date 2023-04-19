@@ -14,7 +14,7 @@ evolving objectives.
 
 This document describes the language only; see [Use the Move Prover](./prover-guide.md) for instructions. The reader is expected to have basic knowledge of the Move language, as well as basic
 principles of pre- and post-condition specifications. (See for example the [Design by contract](https://en.wikipedia.org/wiki/Design_by_contract)). For examples of specifications, we refer to
-the [Aptos framework][https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/overview.md] documentation, which has specifications embedded.
+the [Aptos framework](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/overview.md) documentation, which has specifications embedded.
 
 # Expressions
 
