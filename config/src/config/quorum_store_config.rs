@@ -65,7 +65,7 @@ impl Default for QuorumStoreConfig {
             batch_generation_min_non_empty_interval_ms: 200,
             batch_generation_max_interval_ms: 250,
             max_batch_bytes: 4 * 1024 * 1024,
-            batch_request_num_peers: 3,
+            batch_request_num_peers: 5,
             batch_request_retry_limit: 10,
             batch_request_retry_interval_ms: 1000,
             batch_request_rpc_timeout_ms: 5000,
