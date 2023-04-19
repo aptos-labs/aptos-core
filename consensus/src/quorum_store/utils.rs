@@ -290,26 +290,18 @@ impl ProofQueue {
         let mut excluded_txns = 0;
         let mut full = false;
 
-        let mut author_to_num_remaining = HashMap::new();
-        for (author, batches) in self.author_to_batches.iter() {
-            author_to_num_remaining.insert(*author, batches.len());
+        let mut iters = vec![];
+        for (_, batches) in self.author_to_batches.iter() {
+            iters.push(batches.iter().rev());
         }
 
-        'outer: while !author_to_num_remaining.is_empty() {
-            let shuffled_peers: Vec<_> = {
-                let mut peers: Vec<_> = author_to_num_remaining.keys().cloned().collect();
-                peers.shuffle(&mut thread_rng());
-                peers
-            };
-
-            for peer in shuffled_peers {
-                let queue = self.author_to_batches.get(&peer).unwrap();
-                let num_remaining = author_to_num_remaining.remove(&peer).unwrap();
-                let to_skip = queue.len() - num_remaining;
-
-                let mut num_read = 0;
-                for (sort_key, batch) in queue.iter().rev().skip(to_skip) {
-                    num_read += 1;
+        while !iters.is_empty() {
+            iters.shuffle(&mut thread_rng());
+            iters.retain_mut(|iter| {
+                if full {
+                    return false;
+                }
+                if let Some((sort_key, batch)) = iter.next() {
                     if excluded_batches.contains(batch) {
                         excluded_txns += batch.num_txns();
                     } else if let Some(Some((proof, insertion_time))) =
@@ -320,18 +312,17 @@ impl ProofQueue {
                         if cur_bytes > max_bytes || cur_txns > max_txns {
                             // Exceeded the limit for requested bytes or number of transactions.
                             full = true;
-                            break 'outer;
+                            return false;
                         }
                         let bucket = proof.gas_bucket_start();
                         ret.push(proof.clone());
                         counters::pos_to_pull(bucket, insertion_time.elapsed().as_secs_f64());
-                        break;
                     }
+                    true
+                } else {
+                    false
                 }
-                if num_remaining != num_read {
-                    author_to_num_remaining.insert(peer, num_remaining - num_read);
-                }
-            }
+            })
         }
         info!(
             // before non full check
