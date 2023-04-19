@@ -4,16 +4,7 @@ spec aptos_framework::execution_config {
         pragma aborts_if_is_strict;
     }
 
-    /// Ensure caller is admin.
-    spec initialize(aptos_framework: &signer, config: vector<u8>) {
-        use std::signer;
-        let addr = signer::address_of(aptos_framework);
-        aborts_if !system_addresses::is_aptos_framework_address(addr);
-        aborts_if exists<ExecutionConfig>(@aptos_framework);
-        aborts_if !(len(config) > 0);
-    }
-
-    /// Ensure the caller is admin and `ExecutionConfig` should be existed.
+    /// Ensure the caller is admin
     /// When setting now time must be later than last_reconfiguration_time.
     spec set(account: &signer, config: vector<u8>) {
         use aptos_framework::chain_status;
@@ -24,7 +15,6 @@ spec aptos_framework::execution_config {
 
         let addr = signer::address_of(account);
         aborts_if !system_addresses::is_aptos_framework_address(addr);
-        aborts_if !exists<ExecutionConfig>(@aptos_framework);
         aborts_if !(len(config) > 0);
 
         requires chain_status::is_operating();
