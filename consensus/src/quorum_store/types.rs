@@ -156,6 +156,10 @@ impl Batch {
 
     pub fn verify(&self) -> anyhow::Result<()> {
         ensure!(
+            self.payload.author == self.author(),
+            "Payload author doesn't match the info"
+        );
+        ensure!(
             self.payload.hash() == *self.digest(),
             "Payload hash doesn't match the digest"
         );
