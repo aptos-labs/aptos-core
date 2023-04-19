@@ -14,7 +14,6 @@ use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{transaction::SignedTransaction, LocalAccount},
 };
-use async_trait::async_trait;
 use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
 use std::sync::Arc;
 
@@ -41,7 +40,6 @@ impl CallCustomModulesGenerator {
     }
 }
 
-#[async_trait]
 impl TransactionGenerator for CallCustomModulesGenerator {
     fn generate_transactions(
         &mut self,
@@ -106,9 +104,8 @@ impl CallCustomModulesCreator {
     }
 }
 
-#[async_trait]
 impl TransactionGeneratorCreator for CallCustomModulesCreator {
-    async fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator> {
+    fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator> {
         Box::new(CallCustomModulesGenerator::new(
             StdRng::from_entropy(),
             self.txn_factory.clone(),

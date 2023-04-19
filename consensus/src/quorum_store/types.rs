@@ -131,6 +131,7 @@ impl Batch {
         epoch: u64,
         expiration: u64,
         batch_author: PeerId,
+        gas_bucket_start: u64,
     ) -> Self {
         let payload = BatchPayload::new(payload);
         let batch_info = BatchInfo::new(
@@ -141,6 +142,7 @@ impl Batch {
             payload.hash(),
             payload.num_txns() as u64,
             payload.num_bytes() as u64,
+            gas_bucket_start,
         );
         Self {
             batch_info,
@@ -161,6 +163,12 @@ impl Batch {
             self.payload.num_bytes() as u64 == self.num_bytes(),
             "Payload num bytes doesn't match batch info"
         );
+        for txn in &self.payload.txns {
+            ensure!(
+                txn.gas_unit_price() >= self.gas_bucket_start(),
+                "Payload gas unit price doesn't match batch info"
+            )
+        }
         Ok(())
     }
 
@@ -234,27 +242,51 @@ impl From<Batch> for PersistedValue {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct BatchMsg {
-    batch: Batch,
+    batches: Vec<Batch>,
 }
 
 impl BatchMsg {
-    pub fn new(batch: Batch) -> Self {
-        Self { batch }
+    pub fn new(batches: Vec<Batch>) -> Self {
+        Self { batches }
     }
 
-    pub fn verify(&self, peer_id: PeerId) -> anyhow::Result<()> {
+    pub fn verify(&self, peer_id: PeerId, max_num_batches: usize) -> anyhow::Result<()> {
+        ensure!(!self.batches.is_empty(), "Empty message");
         ensure!(
-            self.batch.author() == peer_id,
-            "Batch author doesn't match sender"
+            self.batches.len() <= max_num_batches,
+            "Too many batches: {} > {}",
+            self.batches.len(),
+            max_num_batches
         );
-        self.batch.verify()
+        for batch in self.batches.iter() {
+            ensure!(
+                batch.author() == peer_id,
+                "Batch author doesn't match sender"
+            );
+            batch.verify()?
+        }
+        Ok(())
     }
 
-    pub fn epoch(&self) -> u64 {
-        self.batch.epoch()
+    pub fn epoch(&self) -> anyhow::Result<u64> {
+        ensure!(!self.batches.is_empty(), "Empty message");
+        let epoch = self.batches[0].epoch();
+        for batch in self.batches.iter() {
+            ensure!(
+                batch.epoch() == epoch,
+                "Epoch mismatch: {} != {}",
+                batch.epoch(),
+                epoch
+            );
+        }
+        Ok(epoch)
     }
 
-    pub fn unpack(self) -> Batch {
-        self.batch
+    pub fn author(&self) -> PeerId {
+        self.batches[0].author()
+    }
+
+    pub fn take(self) -> Vec<Batch> {
+        self.batches
     }
 }

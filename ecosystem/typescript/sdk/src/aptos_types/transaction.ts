@@ -225,6 +225,9 @@ export class MultiSigTransactionPayload {
   }
 
   static deserialize(deserializer: Deserializer): MultiSigTransactionPayload {
+    // TODO: Support other types of payload beside EntryFunction.
+    // This is the enum value indicating which type of payload the multisig tx contains.
+    deserializer.deserializeUleb128AsU32();
     return new MultiSigTransactionPayload(EntryFunction.deserialize(deserializer));
   }
 }

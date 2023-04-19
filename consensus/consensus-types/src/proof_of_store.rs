@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{bail, Context};
+use anyhow::{bail, ensure, Context};
 use aptos_crypto::{bls12381, CryptoMaterialError, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
@@ -75,6 +75,7 @@ pub struct BatchInfo {
     digest: HashValue,
     num_txns: u64,
     num_bytes: u64,
+    gas_bucket_start: u64,
 }
 
 impl BatchInfo {
@@ -86,6 +87,7 @@ impl BatchInfo {
         digest: HashValue,
         num_txns: u64,
         num_bytes: u64,
+        gas_bucket_start: u64,
     ) -> Self {
         Self {
             author,
@@ -95,6 +97,7 @@ impl BatchInfo {
             digest,
             num_txns,
             num_bytes,
+            gas_bucket_start,
         }
     }
 
@@ -124,6 +127,58 @@ impl BatchInfo {
 
     pub fn num_bytes(&self) -> u64 {
         self.num_bytes
+    }
+
+    pub fn gas_bucket_start(&self) -> u64 {
+        self.gas_bucket_start
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct SignedBatchInfoMsg {
+    signed_infos: Vec<SignedBatchInfo>,
+}
+
+impl SignedBatchInfoMsg {
+    pub fn new(signed_infos: Vec<SignedBatchInfo>) -> Self {
+        Self { signed_infos }
+    }
+
+    pub fn verify(
+        &self,
+        sender: PeerId,
+        max_num_batches: usize,
+        validator: &ValidatorVerifier,
+    ) -> anyhow::Result<()> {
+        ensure!(!self.signed_infos.is_empty(), "Empty message");
+        ensure!(
+            self.signed_infos.len() <= max_num_batches,
+            "Too many batches: {} > {}",
+            self.signed_infos.len(),
+            max_num_batches
+        );
+        for signed_info in &self.signed_infos {
+            signed_info.verify(sender, validator)?
+        }
+        Ok(())
+    }
+
+    pub fn epoch(&self) -> anyhow::Result<u64> {
+        ensure!(!self.signed_infos.is_empty(), "Empty message");
+        let epoch = self.signed_infos[0].epoch();
+        for info in self.signed_infos.iter() {
+            ensure!(
+                info.epoch() == epoch,
+                "Epoch mismatch: {} != {}",
+                info.epoch(),
+                epoch
+            );
+        }
+        Ok(epoch)
+    }
+
+    pub fn take(self) -> Vec<SignedBatchInfo> {
+        self.signed_infos
     }
 }
 
@@ -183,6 +238,53 @@ pub enum SignedBatchInfoError {
     WrongInfo,
     DuplicatedSignature,
     InvalidAuthor,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+pub struct ProofOfStoreMsg {
+    proofs: Vec<ProofOfStore>,
+}
+
+impl ProofOfStoreMsg {
+    pub fn new(proofs: Vec<ProofOfStore>) -> Self {
+        Self { proofs }
+    }
+
+    pub fn verify(
+        &self,
+        max_num_proofs: usize,
+        validator: &ValidatorVerifier,
+    ) -> anyhow::Result<()> {
+        ensure!(!self.proofs.is_empty(), "Empty message");
+        ensure!(
+            self.proofs.len() <= max_num_proofs,
+            "Too many proofs: {} > {}",
+            self.proofs.len(),
+            max_num_proofs
+        );
+        for proof in &self.proofs {
+            proof.verify(validator)?
+        }
+        Ok(())
+    }
+
+    pub fn epoch(&self) -> anyhow::Result<u64> {
+        ensure!(!self.proofs.is_empty(), "Empty message");
+        let epoch = self.proofs[0].epoch();
+        for proof in self.proofs.iter() {
+            ensure!(
+                proof.epoch() == epoch,
+                "Epoch mismatch: {} != {}",
+                proof.epoch(),
+                epoch
+            );
+        }
+        Ok(epoch)
+    }
+
+    pub fn take(self) -> Vec<ProofOfStore> {
+        self.proofs
+    }
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]

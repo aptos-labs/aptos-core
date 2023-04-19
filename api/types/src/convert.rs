@@ -188,7 +188,8 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                 let (module, function, ty_args, args) = fun.into_inner();
                 let func_args = self
                     .inner
-                    .view_function_arguments(&module, &function, &args);
+                    .view_function_arguments(&module, &function, &ty_args, &args);
+
                 let json_args = match func_args {
                     Ok(values) => values
                         .into_iter()
@@ -218,7 +219,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                             let (module, function, ty_args, args) = entry_function.into_inner();
                             let func_args = self
                                 .inner
-                                .view_function_arguments(&module, &function, &args);
+                                .view_function_arguments(&module, &function, &ty_args, &args);
                             let json_args = match func_args {
                                 Ok(values) => values
                                     .into_iter()
