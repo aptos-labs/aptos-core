@@ -2,12 +2,12 @@
 name: Docker Update Images
 
 on:
-  workflow-dispatch:
+  workflow_dispatch:
 
   schedule:
     - cron: "0 9 * * 1" # once a week
 
-  pull-request:
+  pull_request:
     paths:
       - scripts/docker-update-images.py
       - workflows/docker-update-images.yaml
