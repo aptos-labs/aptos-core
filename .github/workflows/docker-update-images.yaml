@@ -1,0 +1,26 @@
+# Continuously build Rosetta
+name: Docker Update Images
+
+on:
+  schedule:
+    - cron: "0 9 * * 1" # once a week
+
+jobs:
+  update:
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Check and pin updates (if any)
+        run: scripts/docker-update-images.py
+
+      - name: Create Pull Request
+        if: #{{ success() }}
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "Update Docker images"
+          title: "Update Docker images"
+          body: "Update Docker images"
+          branch: "docker-update-images"
+          delete-branch: true
+          assignee: @aptos-labs/prod-eng
