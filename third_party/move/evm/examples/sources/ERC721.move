@@ -74,14 +74,14 @@ module Evm::ERC721 {
     /// Get the name.
     public fun name(): String acquires State {
         let s = borrow_global<State>(self());
-        *&s.name
+        s.name
     }
 
     #[callable]
     /// Get the symbol.
     public fun symbol(): String acquires State {
         let s = borrow_global<State>(self());
-        *&s.symbol
+        s.symbol
     }
 
     #[callable]
