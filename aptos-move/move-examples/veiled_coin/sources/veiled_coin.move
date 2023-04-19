@@ -87,6 +87,7 @@ module veiled_coin::veiled_coin {
         alpha4: Scalar,
     }
 
+    // TODO: Replace trim with more gas efficient function
     /// Deserializes and returns a VeiledWithdrawalProof given its byte representation
     fun deserialize_sigma_proof<CoinType>(proof_bytes: vector<u8>): Option<SigmaProof<CoinType>> {
         assert!(vector::length<u8>(&proof_bytes) == 288, EBYTES_WRONG_LENGTH);
@@ -738,8 +739,24 @@ module veiled_coin::veiled_coin {
         elgamal::ciphertext_equals(&actual_ct, &expected_ct)
     }
 
-//    #[test(myself = 
-//    fun 
+    #[test(source_fx = @aptos_framework)]
+    fun sigma_proof_verify_test() 
+    {
+       let (source_priv_key, source_pubkey) = generate_elgamal_keypair(SOME_RANDOMNESS_1); 
+       let rand = ristretto255::new_scalar_from_sha2_512(SOME_RANDOMNESS_2);
+       let val = new_scalar_from_u64(50);
+       let (_, dest_pubkey) = generate_elgamal_keypair(SOME_RANDOMNESS_3);
+       let balance_ct = elgamal::new_ciphertext_with_basepoint(&val, &rand, &source_pubkey);
+       let source_randomness = ristretto255::scalar_neg(&rand);
+       let (_, withdraw_ct) = bulletproofs::prove_range_elgamal(&val, &source_randomness, &source_pubkey, MAX_BITS_IN_VALUE, VEILED_COIN_DST);
+       let source_new_val = new_scalar_from_u64(100);
+
+       let sigma_proof = generate_sigma_proof<coin::FakeMoney>(&source_pubkey, &dest_pubkey, &balance_ct, &withdraw_ct, &source_randomness, &source_priv_key, &val, &source_new_val);
+
+       let (_, deposit_ct) = bulletproofs::prove_range_elgamal(&source_new_val, &source_randomness, &dest_pubkey, MAX_BITS_IN_VALUE, VEILED_COIN_DST);
+
+       verify_withdrawal_sigma_protocol(&source_pubkey, &dest_pubkey, &balance_ct, &withdraw_ct, &deposit_ct, &sigma_proof);
+    }
 
     #[test(myself = @veiled_coin, source_fx = @aptos_framework, destination = @0x1337)]
     fun basic_viability_test(
