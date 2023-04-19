@@ -62,6 +62,7 @@ module veiled_coin::veiled_coin {
 
     /// The domain separation tag (DST) used for the Bulletproofs prover.
     const VEILED_COIN_DST : vector<u8> = b"AptosVeiledCoinExample";
+    const FIAT_SHAMIR_SIGMA_DST : vector<u8> = b"SigmaFiatShamir";
 
     //
     // Core data structures.
@@ -304,15 +305,6 @@ module veiled_coin::veiled_coin {
         )
     }
 
-    /// Returns the ciphertext of the balance of `owner` for the provided `CoinType`.
-    public fun private_balance<CoinType>(owner: address): CompressedCiphertext acquires VeiledCoinStore {
-        assert!(
-            has_veiled_coin_store<CoinType>(owner),
-            error::not_found(EVEILED_COIN_STORE_NOT_PUBLISHED),
-        );
-
-        borrow_global<VeiledCoinStore<CoinType>>(owner).private_balance
-    }
 
     //
     // Private functions.
@@ -335,9 +327,9 @@ module veiled_coin::veiled_coin {
         coin_store.pubkey
     }
 
-    /// Verifies a sigma proof needed to perform a private withdrawal. The relation is descirbed on
+    /// Verifies a sigma proof needed to perform a private withdrawal. The relation is described on
     /// page 14 of the Zether paper: https://crypto.stanford.edu/~buenz/papers/zether.pdf
-    /// TODO: Finish description
+    // TODO: Finish description
     fun verify_withdrawal_sigma_protocol<CoinType>(sender_pubkey: &elgamal::Pubkey, recipient_pubkey: &Pubkey, balance: &Ciphertext, withdrawal_ct: &Ciphertext, deposit_ct: &Ciphertext, proof: &SigmaProof<CoinType>) {
         let sender_pubkey_point = elgamal::get_point_from_pubkey(sender_pubkey);
         let recipient_pubkey_point = elgamal::get_point_from_pubkey(recipient_pubkey);
@@ -345,6 +337,7 @@ module veiled_coin::veiled_coin {
         let (bar_c, _) = elgamal::ciphertext_as_points(deposit_ct);
         let (c_L, c_R) = elgamal::ciphertext_as_points(balance);
 
+        // TODO: Can this be optimized so we don't re-serialize the proof for fiat-shamir?
         // c <- H(g,y,\bar{y},C_L,C_R,C,D,\bar{C},X_1,X_2,X_3,X_4,X_5)
         let hash_input = vector::empty<u8>();
 
@@ -388,6 +381,8 @@ module veiled_coin::veiled_coin {
 
         let x_5_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x5));
         vector::append<u8>(&mut hash_input, x_5_bytes);
+
+        vector::append<u8>(&mut hash_input, FIAT_SHAMIR_SIGMA_DST);
 
         let c = ristretto255::new_scalar_from_sha2_512(hash_input);
 
@@ -483,6 +478,16 @@ module veiled_coin::veiled_coin {
         VeiledCoin<CoinType> {
             private_value: elgamal::new_ciphertext_no_randomness(&value)
         }
+    }
+
+    /// Returns the ciphertext of the balance of `owner` for the provided `CoinType`.
+    public fun private_balance<CoinType>(owner: address): CompressedCiphertext acquires VeiledCoinStore {
+        assert!(
+            has_veiled_coin_store<CoinType>(owner),
+            error::not_found(EVEILED_COIN_STORE_NOT_PUBLISHED),
+        );
+
+        borrow_global<VeiledCoinStore<CoinType>>(owner).private_balance
     }
 
     /// Removes `amount` coins from the VeiledCoinStore balance of `sender`, by subtracting `amount_ct` from

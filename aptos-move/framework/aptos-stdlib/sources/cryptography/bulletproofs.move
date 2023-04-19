@@ -77,7 +77,9 @@ module aptos_std::bulletproofs {
         )
     }
 
-    /// Verifies a zero-knowledge range proof that the value `v` encrypted by `ct` with ElGamal public key `pubkey` satisfies $v \in [0, 2^{num_bits})$. Only works
+    /// Verifies a zero-knowledge range proof that the value `v` encrypted by `ct` = (r * G, v * G + r * pubkey) 
+    /// with ElGamal public key `pubkey` = sk * G where G is the ristretto255 basepoint obtained by 
+    /// ristretto255::basepoint() satisfies $v \in [0, 2^{num_bits})$. Only works
     /// for `num_bits` \in {8, 16, 32, 64}.
     public fun verify_range_proof_elgamal(ct: &elgamal::Ciphertext, proof: &RangeProof, pubkey: &elgamal::Pubkey, num_bits: u64, dst: vector<u8>): bool {
         assert!(features::bulletproofs_enabled(), E_NATIVE_FUN_NOT_AVAILABLE);

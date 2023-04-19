@@ -225,10 +225,6 @@ pub fn make_all(gas_params: GasParameters, timed_features: TimedFeatures, featur
 
     natives.append(&mut vec![
         (
-            "verify_range_proof_custom_ck_internal",
-            make_safe_native(gas_params.clone(), timed_features.clone(), features.clone(), native_verify_range_proof),
-        ),
-        (
             "verify_range_proof_internal",
             make_safe_native(gas_params, timed_features, features, native_verify_range_proof),
         ),

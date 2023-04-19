@@ -231,7 +231,9 @@ for <code>num_bits</code> \in {8, 16, 32, 64}.
 
 ## Function `verify_range_proof_elgamal`
 
-Verifies a zero-knowledge range proof that the value <code>v</code> encrypted by <code>ct</code> with ElGamal public key <code>pubkey</code> satisfies $v \in [0, 2^{num_bits})$. Only works
+Verifies a zero-knowledge range proof that the value <code>v</code> encrypted by <code>ct</code> = (r * G, v * G + r * pubkey)
+with ElGamal public key <code>pubkey</code> = sk * G where G is the ristretto255 basepoint obtained by
+ristretto255::basepoint() satisfies $v \in [0, 2^{num_bits})$. Only works
 for <code>num_bits</code> \in {8, 16, 32, 64}.
 
 

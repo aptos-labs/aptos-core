@@ -5,7 +5,7 @@
 
 This module implements an ElGamal encryption API that can be used with the Bulletproofs module.
 
-An ElGamal encryption of a value v under a generator g and public key y is (v * g + r * y, r * g), for a random scalar r.
+An ElGamal encryption of a value v under a generator g and public key y = sk * g where sk is the corresponding secret key is (v * g + r * y, r * g), for a random scalar r.
 Note we place the value v in the exponent of g so that ciphertexts are additively homomorphic, so that Enc(v,y) + Enc(v',y) = Enc(v+v', y) where v,v' are encrypted messages, y is a public key, and the same randomness is used across both encryptions.
 
 
