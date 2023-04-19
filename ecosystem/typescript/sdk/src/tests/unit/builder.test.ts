@@ -12,7 +12,7 @@ import {
 } from "../../aptos_types";
 import { HexString } from "../../utils";
 
-describe.only("builder", () => {
+describe.only("TransactionBuilderRemoteABI", () => {
   test(
     "generates raw txn from an entry function",
     async () => {
