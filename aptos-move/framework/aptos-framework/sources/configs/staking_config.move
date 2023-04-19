@@ -10,6 +10,7 @@ module aptos_framework::staking_config {
     use aptos_std::math_fixed64;
 
     friend aptos_framework::genesis;
+    friend aptos_framework::stake;
 
     /// Stake lockup duration cannot be zero.
     const EZERO_LOCKUP_DURATION: u64 = 1;
@@ -195,8 +196,8 @@ module aptos_framework::staking_config {
         config.voting_power_increase_limit
     }
 
-    /// Return the rewards rate of a epoch in the format of (nominator, denominator).
-    public fun calculate_and_save_latest_epoch_rewards_rate(): FixedPoint64 acquires StakingRewardsConfig {
+    /// Calculate and save the latest rewards rate.
+    public(friend) fun calculate_and_save_latest_epoch_rewards_rate(): FixedPoint64 acquires StakingRewardsConfig {
         assert!(features::periodical_reward_rate_decrease_enabled(), error::invalid_state(EDISABLED_FUNCTION));
         let staking_rewards_config = calculate_and_save_latest_rewards_config();
         staking_rewards_config.rewards_rate
