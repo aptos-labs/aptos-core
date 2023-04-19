@@ -175,7 +175,7 @@ impl Package {
         account: &mut LocalAccount,
         txn_factory: &TransactionFactory,
         rng: Option<&mut StdRng>,
-        other: Option<AccountAddress>,
+        other: Option<&AccountAddress>,
     ) -> SignedTransaction {
         match self {
             Self::Simple(modules, _) => {

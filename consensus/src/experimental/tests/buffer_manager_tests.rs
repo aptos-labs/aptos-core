@@ -226,7 +226,7 @@ async fn loopback_commit_vote(
                 msg_tx
                     .push(
                         author,
-                        event.verify(author, verifier, false, false).unwrap(),
+                        event.verify(author, verifier, false, false, 100).unwrap(),
                     )
                     .ok();
             }

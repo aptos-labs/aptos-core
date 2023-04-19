@@ -8,13 +8,13 @@ pub mod forge_setup_test;
 pub mod framework_upgrade;
 pub mod fullnode_reboot_stress_test;
 pub mod load_vs_perf_benchmark;
+pub mod modifiers;
 pub mod multi_region_simulation_test;
 pub mod network_bandwidth_test;
 pub mod network_loss_test;
 pub mod network_partition_test;
 pub mod partial_nodes_down_test;
 pub mod performance_test;
-pub mod performance_with_fullnode_test;
 pub mod quorum_store_onchain_enable_test;
 pub mod reconfiguration_test;
 pub mod state_sync_performance;
@@ -340,5 +340,29 @@ impl dyn NetworkLoadTest {
             ledger_transactions,
             stats_and_duration_by_phase_filtered,
         ))
+    }
+}
+
+pub struct CompositeNetworkTest {
+    // Wrapper tests - their setup and finish methods are called, before the test ones.
+    // TODO don't know how to make this array, and have forge/main.rs work
+    pub wrapper: &'static dyn NetworkLoadTest,
+    // This is the main test, return values from this test are used in setup, and
+    // only it's test function is called.
+    pub test: &'static dyn NetworkTest,
+}
+
+impl NetworkTest for CompositeNetworkTest {
+    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> anyhow::Result<()> {
+        self.wrapper.setup(ctx)?;
+        self.test.run(ctx)?;
+        self.wrapper.finish(ctx.swarm())?;
+        Ok(())
+    }
+}
+
+impl Test for CompositeNetworkTest {
+    fn name(&self) -> &'static str {
+        "CompositeNetworkTest"
     }
 }

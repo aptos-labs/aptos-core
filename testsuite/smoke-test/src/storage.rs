@@ -122,7 +122,7 @@ async fn test_db_restore() {
     let mut node0_config = swarm.validator(node_to_restart).unwrap().config().clone();
     let genesis_waypoint = node0_config.base.waypoint.genesis_waypoint();
     insert_waypoint(&mut node0_config, genesis_waypoint);
-    node0_config.save(node0_config_path).unwrap();
+    node0_config.save_to_path(node0_config_path).unwrap();
     let db_dir = node0_config.storage.dir();
     fs::remove_dir_all(db_dir.clone()).unwrap();
 

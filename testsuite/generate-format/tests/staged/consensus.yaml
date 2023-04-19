@@ -60,10 +60,12 @@ BatchInfo:
         TYPENAME: HashValue
     - num_txns: U64
     - num_bytes: U64
+    - gas_bucket_start: U64
 BatchMsg:
   STRUCT:
-    - batch:
-        TYPENAME: Batch
+    - batches:
+        SEQ:
+          TYPENAME: Batch
 BatchPayload:
   STRUCT:
     - txns:
@@ -243,11 +245,11 @@ ConsensusMsg:
     12:
       SignedBatchInfo:
         NEWTYPE:
-          TYPENAME: SignedBatchInfo
+          TYPENAME: SignedBatchInfoMsg
     13:
       ProofOfStoreMsg:
         NEWTYPE:
-          TYPENAME: ProofOfStore
+          TYPENAME: ProofOfStoreMsg
 ContractEvent:
   ENUM:
     0:
@@ -371,6 +373,11 @@ ProofOfStore:
         TYPENAME: BatchInfo
     - multi_signature:
         TYPENAME: AggregateSignature
+ProofOfStoreMsg:
+  STRUCT:
+    - proofs:
+        SEQ:
+          TYPENAME: ProofOfStore
 ProofWithData:
   STRUCT:
     - proofs:
@@ -421,6 +428,11 @@ SignedBatchInfo:
         TYPENAME: AccountAddress
     - signature:
         TYPENAME: Signature
+SignedBatchInfoMsg:
+  STRUCT:
+    - signed_infos:
+        SEQ:
+          TYPENAME: SignedBatchInfo
 SignedTransaction:
   STRUCT:
     - raw_txn:

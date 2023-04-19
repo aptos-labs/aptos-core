@@ -2,7 +2,12 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::config::{QuorumStoreConfig, SafetyRulesConfig};
+use crate::config::{
+    config_sanitizer::ConfigSanitizer, Error, NodeConfig, QuorumStoreConfig, RoleType,
+    SafetyRulesConfig,
+};
+use aptos_types::chain_id::ChainId;
+use cfg_if::cfg_if;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -235,6 +240,40 @@ impl ConsensusConfig {
             self.max_receiving_block_bytes_quorum_store_override
         } else {
             self.max_receiving_block_bytes
+        }
+    }
+}
+
+impl ConfigSanitizer for ConsensusConfig {
+    /// Validate and process the consensus config according to the given node role and chain ID
+    fn sanitize(
+        node_config: &mut NodeConfig,
+        node_role: RoleType,
+        chain_id: ChainId,
+    ) -> Result<(), Error> {
+        // Verify that the safety rules config is valid
+        let sanitizer_name = Self::get_sanitizer_name();
+        SafetyRulesConfig::sanitize(node_config, node_role, chain_id)?;
+
+        // Verify that the consensus-only feature is not enabled in mainnet
+        if chain_id.is_mainnet()? && is_consensus_only_perf_test_enabled() {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "consensus-only-perf-test should not be enabled in mainnet!".to_string(),
+            ));
+        }
+
+        Ok(())
+    }
+}
+
+/// Returns true iff consensus-only-perf-test is enabled
+fn is_consensus_only_perf_test_enabled() -> bool {
+    cfg_if! {
+        if #[cfg(feature = "consensus-only-perf-test")] {
+            true
+        } else {
+            false
         }
     }
 }

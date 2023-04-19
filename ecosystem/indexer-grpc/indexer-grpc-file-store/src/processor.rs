@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::metrics::{LATEST_PROCESSED_VERSION, PROCESSED_VERSIONS_COUNT};
 use aptos_indexer_grpc_utils::{
     build_protobuf_encoded_transaction_wrappers,
     cache_operator::{CacheBatchGetStatus, CacheOperator},
@@ -13,7 +14,7 @@ use aptos_moving_average::MovingAverage;
 use std::time::Duration;
 
 // If the version is ahead of the cache head, retry after a short sleep.
-const AHEAD_OF_CACHE_SLEEP_DURATION_IN_MILLIS: u64 = 1000;
+const AHEAD_OF_CACHE_SLEEP_DURATION_IN_MILLIS: u64 = 100;
 
 /// Processor tails the data in cache and stores the data in file store.
 pub struct Processor {
@@ -135,6 +136,7 @@ impl Processor {
                 .upload_transactions(cache_chain_id, current_batch)
                 .await
                 .unwrap();
+            PROCESSED_VERSIONS_COUNT.inc_by(process_size as u64);
             tps_calculator.tick_now(process_size as u64);
             aptos_logger::info!(
                 tps = (tps_calculator.avg() * 1000.0) as u64,
@@ -142,6 +144,7 @@ impl Processor {
                 "Upload transactions to file store."
             );
             current_file_store_version += process_size as u64;
+            LATEST_PROCESSED_VERSION.set(current_file_store_version as i64);
         }
     }
 }

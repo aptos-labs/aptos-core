@@ -14,8 +14,8 @@ use crate::{
     common::{
         types::{
             load_account_arg, CliConfig, CliError, CliTypedResult, ConfigSearchMode,
-            MoveManifestAccountWrapper, MovePackageDir, ProfileOptions, PromptOptions, RestOptions,
-            TransactionOptions, TransactionSummary,
+            EntryFunctionArguments, MoveManifestAccountWrapper, MovePackageDir, ProfileOptions,
+            PromptOptions, RestOptions, TransactionOptions, TransactionSummary,
         },
         utils::{
             check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
@@ -39,7 +39,7 @@ use aptos_rest_client::aptos_api_types::{EntryFunctionId, MoveType, ViewRequest}
 use aptos_transactional_test_harness::run_aptos_test;
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
-    transaction::{EntryFunction, Script, TransactionArgument, TransactionPayload},
+    transaction::{Script, TransactionArgument, TransactionPayload},
 };
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser, Subcommand};
@@ -1085,26 +1085,8 @@ impl CliCommand<&'static str> for CleanPackage {
 /// Run a Move function
 #[derive(Parser)]
 pub struct RunFunction {
-    /// Function name as `<ADDRESS>::<MODULE_ID>::<FUNCTION_NAME>`
-    ///
-    /// Example: `0x842ed41fad9640a2ad08fdd7d3e4f7f505319aac7d67e1c0dd6a7cce8732c7e3::message::set_message`
-    #[clap(long)]
-    pub(crate) function_id: MemberId,
-
-    /// Arguments combined with their type separated by spaces.
-    ///
-    /// Supported types [u8, u16, u32, u64, u128, u256, bool, hex, string, address, raw, vector<inner_type>]
-    ///
-    /// Example: `address:0x1 bool:true u8:0 u256:1234 'vector<u32>:a,b,c,d'`
-    #[clap(long, multiple_values = true)]
-    pub(crate) args: Vec<ArgWithType>,
-
-    /// TypeTag arguments separated by spaces.
-    ///
-    /// Example: `u8 u16 u32 u64 u128 u256 bool address vector signer`
-    #[clap(long, multiple_values = true)]
-    pub(crate) type_args: Vec<MoveType>,
-
+    #[clap(flatten)]
+    pub(crate) entry_function_args: EntryFunctionArguments,
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
 }
@@ -1116,27 +1098,9 @@ impl CliCommand<TransactionSummary> for RunFunction {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
-        let args: Vec<Vec<u8>> = self
-            .args
-            .into_iter()
-            .map(|arg_with_type| arg_with_type.arg)
-            .collect();
-        let mut type_args: Vec<TypeTag> = Vec::new();
-
-        // These TypeArgs are used for generics
-        for type_arg in self.type_args.into_iter() {
-            let type_tag = TypeTag::try_from(type_arg)
-                .map_err(|err| CliError::UnableToParse("--type-args", err.to_string()))?;
-            type_args.push(type_tag)
-        }
-
-        let payload = TransactionPayload::EntryFunction(EntryFunction::new(
-            self.function_id.module_id,
-            self.function_id.member_id,
-            type_args,
-            args,
-        ));
-
+        let payload = TransactionPayload::EntryFunction(
+            self.entry_function_args.create_entry_function_payload()?,
+        );
         profile_or_submit(payload, &self.txn_options).await
     }
 }
@@ -1144,26 +1108,8 @@ impl CliCommand<TransactionSummary> for RunFunction {
 /// Run a view function
 #[derive(Parser)]
 pub struct ViewFunction {
-    /// Function name as `<ADDRESS>::<MODULE_ID>::<FUNCTION_NAME>`
-    ///
-    /// Example: `0x842ed41fad9640a2ad08fdd7d3e4f7f505319aac7d67e1c0dd6a7cce8732c7e3::message::set_message`
-    #[clap(long)]
-    pub(crate) function_id: MemberId,
-
-    /// Arguments combined with their type separated by spaces.
-    ///
-    /// Supported types [u8, u16, u32, u64, u128, u256, bool, hex, string, address, raw, vector<inner_type>]
-    ///
-    /// Example: `address:0x1 bool:true u8:0 u256:1234 'vector<u32>:a,b,c,d'`
-    #[clap(long, multiple_values = true)]
-    pub(crate) args: Vec<ArgWithType>,
-
-    /// TypeTag arguments separated by spaces.
-    ///
-    /// Example: `u8 u16 u32 u64 u128 u256 bool address vector signer`
-    #[clap(long, multiple_values = true)]
-    pub(crate) type_args: Vec<MoveType>,
-
+    #[clap(flatten)]
+    pub(crate) entry_function_args: EntryFunctionArguments,
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
 }
@@ -1176,16 +1122,16 @@ impl CliCommand<Vec<serde_json::Value>> for ViewFunction {
 
     async fn execute(self) -> CliTypedResult<Vec<serde_json::Value>> {
         let mut args: Vec<serde_json::Value> = vec![];
-        for arg in self.args {
+        for arg in self.entry_function_args.args {
             args.push(arg.to_json()?);
         }
 
         let view_request = ViewRequest {
             function: EntryFunctionId {
-                module: self.function_id.module_id.into(),
-                name: self.function_id.member_id.into(),
+                module: self.entry_function_args.function_id.module_id.into(),
+                name: self.entry_function_args.function_id.member_id.into(),
             },
-            type_arguments: self.type_args,
+            type_arguments: self.entry_function_args.type_args,
             arguments: args,
         };
 
@@ -1449,6 +1395,7 @@ impl FromStr for FunctionArgType {
 }
 
 /// A parseable arg with a type separated by a colon
+#[derive(Debug)]
 pub struct ArgWithType {
     pub(crate) _ty: FunctionArgType,
     pub(crate) arg: Vec<u8>,
