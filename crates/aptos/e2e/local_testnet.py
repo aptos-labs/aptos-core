@@ -19,6 +19,18 @@ def run_node(network: Network, image_repo_with_project: str):
     container_name = f"aptos-tools-{network}"
     LOG.info(f"Trying to run aptos CLI local testnet from image: {image_name}")
 
+    # Confirm that the Docker daemon is running.
+    try:
+        subprocess.run(
+            ["docker", "container", "ls"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=True,
+        )
+    except:
+        LOG.error("Failed to connect to Docker. Is it installed and running?")
+        raise
+
     # First delete the existing container if there is one with the same name.
     subprocess.run(
         ["docker", "rm", "-f", container_name],
