@@ -25,7 +25,6 @@ export interface CreateCollectionOptions {
   tokensBurnableByCreator?: boolean;
   tokensFreezableByCreator?: boolean;
 }
-type Generic = string | number | boolean | Uint8Array | Array<Generic>;
 
 const PropertyTypeMap = {
   BOOLEAN: "bool",
@@ -36,7 +35,7 @@ const PropertyTypeMap = {
   U128: "u128",
   U256: "u256",
   ADDRESS: "address",
-  U8VECTOR: "vector<u8>",
+  VECTOR: "vector<u8>",
   STRING: "string",
 };
 
