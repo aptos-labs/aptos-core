@@ -30,4 +30,6 @@ jobs:
           body: "Update Docker images"
           branch: "docker-update-images"
           delete-branch: true
-          team-reviewers: @aptos-labs/prod-eng, @aptos-labs/security
+          team-reviewers: |
+            aptos-labs/prod-eng
+            aptos-labs/security
