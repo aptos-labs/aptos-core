@@ -317,6 +317,11 @@ impl ProofQueue {
                         let bucket = proof.gas_bucket_start();
                         ret.push(proof.clone());
                         counters::pos_to_pull(bucket, insertion_time.elapsed().as_secs_f64());
+                        if cur_bytes == max_bytes || cur_txns == max_txns {
+                            // Exactly the limit for requested bytes or number of transactions.
+                            full = true;
+                            return false;
+                        }
                     }
                     true
                 } else {
