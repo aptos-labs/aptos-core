@@ -66,6 +66,9 @@ module aptos_std::ristretto255 {
     /// The basepoint (generator) of the Ristretto255 group
     const BASE_POINT: vector<u8> = x"e2f2ae0a6abc4e71a884a961c500515f58e30b6aa582dd8db6a65945e08d2d76";
 
+    /// The hash of the basepoint of the Ristretto255 group using new_point_from_sha2_512(basepoint_compressed().data) 
+    const HASH_BASE_POINT: vector<u8> = x"90ca11cd6c6227cb0abc39e2710c444ae6617ea81898e716353f3410d9656605";
+
     //
     // Reasons for error codes
     //
@@ -132,7 +135,8 @@ module aptos_std::ristretto255 {
     /// Returns the hash-to-point result of serializing the basepoint of the Ristretto255 group.
     /// For use as the random value basepoint in Pedersen commitments
     public fun hash_to_point_base(): RistrettoPoint {
-        new_point_from_sha2_512(basepoint_compressed().data)
+        let comp_res = CompressedRistretto { data: HASH_BASE_POINT };
+        point_decompress(&comp_res)
     }
 
     /// Returns the basepoint (generator) of the Ristretto255 group
