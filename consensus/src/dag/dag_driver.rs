@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
@@ -25,8 +27,9 @@ use aptos_logger::spawn_named;
 use aptos_types::{
     validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier, PeerId,
 };
-use futures::StreamExt;
+use futures::{FutureExt, StreamExt};
 use std::{collections::HashSet, sync::Arc, time::Duration};
+use futures_channel::oneshot;
 use tokio::{
     sync::{mpsc::Sender, Mutex},
     time,
@@ -178,7 +181,7 @@ impl DagDriver {
         }
     }
 
-    pub(crate) async fn start(mut self) {
+    pub(crate) async fn start(mut self, close_rx: oneshot::Receiver<oneshot::Sender<()>>) {
         let node = self.create_node(HashSet::new()).await;
         self.rb_tx
             .send(ReliableBroadcastCommand::BroadcastRequest(node))
@@ -187,14 +190,14 @@ impl DagDriver {
 
         let mut interval_missing_nodes = time::interval(Duration::from_millis(500)); // time out should be slightly more than one network round trip.
         let mut interval_timeout = time::interval(Duration::from_millis(1000)); // similar to leader timeout in our consensus
+        let mut close_rx = close_rx.into_stream();
         loop {
-            // TODO: shutdown
             tokio::select! {
                 biased;
 
                 _ = interval_missing_nodes.tick() => {
-                self.remote_fetch_missing_nodes().await
-            },
+                    self.remote_fetch_missing_nodes().await
+                },
 
                 _ = interval_timeout.tick() => {
                     if self.timeout == false {
@@ -208,7 +211,7 @@ impl DagDriver {
                     }
                 }
 
-            Some(msg) = self.network_msg_rx.next() => {
+                Some(msg) = self.network_msg_rx.next() => {
                     match msg {
 
                         VerifiedEvent::CertifiedNodeMsg(certified_node, ack_required) => {
@@ -224,10 +227,17 @@ impl DagDriver {
 
                         VerifiedEvent::CertifiedNodeRequestMsg(node_request) => {
                             self.handle_node_request(*node_request).await;
-                    }
-                    _ => unreachable!("reliable broadcast got wrong messsgae"),
+                        },
+                        _ => unreachable!("reliable broadcast got wrong messsgae"),
                     }
                 },
+
+                close_req = close_rx.select_next_some() => {
+                    if let Ok(ack_sender) = close_req {
+                        ack_sender.send(()).expect("[DagDriver] Fail to ack shutdown");
+                    }
+                    break;
+                }
             }
         }
     }

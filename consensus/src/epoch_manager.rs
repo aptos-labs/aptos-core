@@ -131,6 +131,7 @@ pub struct EpochManager {
     >,
     rb_tx: Option<aptos_channel::Sender<Author, VerifiedEvent>>,
     dag_driver_tx: Option<aptos_channel::Sender<Author, VerifiedEvent>>,
+    dag_driver_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
     round_manager_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
     epoch_state: Option<EpochState>,
     block_retrieval_tx:
@@ -179,6 +180,7 @@ impl EpochManager {
             round_manager_tx: None,
             rb_tx: None,
             dag_driver_tx: None,
+            dag_driver_close_tx: None,
             round_manager_close_tx: None,
             epoch_state: None,
             block_retrieval_tx: None,
@@ -759,8 +761,9 @@ impl EpochManager {
             self.time_service.clone(),
             genesis_block_id,
         );
-
-        tokio::spawn(dag_driver.start());
+        let (close_tx, close_rx) = oneshot::channel();
+        self.dag_driver_close_tx = Some(close_tx);
+        tokio::spawn(dag_driver.start(close_rx));
     }
 
     async fn start_round_manager(
@@ -940,7 +943,8 @@ impl EpochManager {
 
         let (close_tx, close_rx) = oneshot::channel();
         self.round_manager_close_tx = Some(close_tx);
-        tokio::spawn(round_manager.start(round_manager_rx, close_rx));
+        tokio::spawn(round_manager.
+            start(round_manager_rx, close_rx));
 
         self.spawn_block_retrieval_task(epoch, block_store);
     }

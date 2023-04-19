@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use super::dag_driver::DagDriver;
 use crate::{
     experimental::buffer_manager::OrderedBlocks,
@@ -40,6 +42,7 @@ use aptos_types::{
 use futures::{channel::mpsc, stream::select, FutureExt, Stream, StreamExt};
 use maplit::hashmap;
 use std::{iter::FromIterator, sync::Arc};
+use futures_channel::oneshot;
 use tokio::runtime::Runtime;
 
 /// Auxiliary struct that is setting up node environment for the test.
@@ -186,7 +189,8 @@ impl NodeSetup {
     }
 
     async fn start(&mut self) {
-        spawn_named!("dag-driver", self.dag_driver.take().unwrap().start());
+        let (_close_tx, close_rx) = oneshot::channel();
+        spawn_named!("dag-driver", self.dag_driver.take().unwrap().start(close_rx));
         loop {
             match self.next_network_message().await {
                 ConsensusMsg::NodeMsg(msg) => self
