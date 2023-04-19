@@ -63,7 +63,7 @@ jobs:
         with:
           ref: ${{ env.GIT_SHA }}
 
-      - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
+      - uses: ./.github/actions/docker-setup
         with:
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
