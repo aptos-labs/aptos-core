@@ -29,7 +29,7 @@ haproxy:
     # -- Image repo to use for HAProxy images
     repo: haproxy
     # -- Image tag to use for HAProxy images
-    tag: 2.2.14@sha256:36aa98fff27dcb2d12c93e68515a6686378c783ea9b1ab1d01ce993a5cbc73e1
+    tag: 2.2.29@sha256:8019a233a37045a27970dbc990e9ea485799200c40f658e4620b7fdf55641a3c
     # -- Image pull policy to use for HAProxy images
     pullPolicy: IfNotPresent
   resources:
