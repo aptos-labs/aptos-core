@@ -229,16 +229,16 @@ impl Aggregator {
         // extension.
         let key_bytes = id.key.0.to_vec();
         resolver
-            .resolve_table_entry(&id.handle, &key_bytes)
+            .resolve_aggregator_entry(&id.handle, &key_bytes)
             .map_err(|_| extension_error("could not find the value of the aggregator"))?
             .map_or(
                 Err(extension_error(
                     "could not find the value of the aggregator",
                 )),
-                |bytes| {
+                |value_from_storage| {
                     // Get the value from the storage to which we want to apply
                     // the delta.
-                    let value_from_storage = deserialize(&bytes);
+                    // let value_from_storage = deserialize(&bytes);
 
                     // Sanity checks.
                     debug_assert!(

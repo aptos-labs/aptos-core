@@ -94,6 +94,14 @@ impl<'a, 'm, S: MoveResolverExt> TableResolver for MoveResolverWithVMMetadata<'a
     ) -> Result<Option<Vec<u8>>, Error> {
         self.move_resolver.resolve_table_entry(handle, key)
     }
+
+    fn resolve_aggregator_entry(
+        &self,
+        handle: &TableHandle,
+        key: &[u8],
+    ) -> Result<Option<u128>, anyhow::Error> {
+        self.move_resolver.resolve_aggregator_entry(handle, key)
+    }
 }
 
 impl<'a, 'm, S: MoveResolverExt> ConfigStorage for MoveResolverWithVMMetadata<'a, 'm, S> {
@@ -203,6 +211,14 @@ impl<'a, S: StateViewWithRemoteCache> TableResolver for StorageAdapter<'a, S> {
     ) -> Result<Option<Vec<u8>>, Error> {
         self.get_state_value_bytes(&StateKey::table_item((*handle).into(), key.to_vec()))
     }
+
+    fn resolve_aggregator_entry(
+        &self,
+        handle: &TableHandle,
+        key: &[u8],
+    ) -> Result<Option<u128>, Error> {
+        self.get_aggregator_value(&StateKey::table_item((*handle).into(), key.to_vec()))
+    }
 }
 
 impl<'a, S: StateViewWithRemoteCache> ConfigStorage for StorageAdapter<'a, S> {
@@ -311,6 +327,15 @@ impl<S: StateViewWithRemoteCache> TableResolver for StorageAdapterOwned<S> {
         key: &[u8],
     ) -> Result<Option<Vec<u8>>, Error> {
         self.as_move_resolver().resolve_table_entry(handle, key)
+    }
+
+    fn resolve_aggregator_entry(
+        &self,
+        handle: &TableHandle,
+        key: &[u8],
+    ) -> Result<Option<u128>, Error> {
+        self.as_move_resolver()
+            .resolve_aggregator_entry(handle, key)
     }
 }
 

@@ -101,10 +101,12 @@ impl<'r, 'l, S: MoveRefResolver> TransactionDataCache<'r, 'l, S> {
                 match op {
                     Op::New(val) => {
                         let resource = Resource::from_value_layout(val.freeze()?, layout);
+                        // let resource = Resource::from_blob(val.simple_serialize(&layout).expect("success"));
                         resources.insert(struct_tag, Op::New(resource));
                     },
                     Op::Modify(val) => {
                         let resource = Resource::from_value_layout(val.freeze()?, layout);
+                        // let resource = Resource::from_blob(val.simple_serialize(&layout).expect("success"));
                         resources.insert(struct_tag, Op::Modify(resource));
                     },
                     Op::Delete => {
@@ -182,15 +184,17 @@ impl<'r, 'l, S: MoveRefResolver> DataStore for TransactionDataCache<'r, 'l, S> {
                     return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR))
                 },
             };
-            // TODO(Gas): Shall we charge for this?
-            let ty_layout = self.loader.type_to_type_layout(ty)?;
+
+            let mut ty_layout: Option<MoveTypeLayout> = None;
 
             let gv = match self.remote.get_resource_ref(&addr, &ty_tag) {
                 Ok(Some(resource)) => {
                     match resource.as_ref() {
                         Resource::Serialized(blob) => {
                             load_res = Some(Some(NumBytes::new(blob.len() as u64)));
-                            let val = match Value::simple_deserialize(blob, &ty_layout) {
+                            // TODO(Gas): Shall we charge for this?
+                            let layout = self.loader.type_to_type_layout(ty)?;
+                            let val = match Value::simple_deserialize(blob, &layout) {
                                 Some(val) => val,
                                 None => {
                                     let msg = format!(
@@ -203,13 +207,13 @@ impl<'r, 'l, S: MoveRefResolver> DataStore for TransactionDataCache<'r, 'l, S> {
                                     .with_message(msg));
                                 },
                             };
-
+                            ty_layout = Some(layout);
                             GlobalValue::cached(val)?
                         },
-                        Resource::Cached(frozen_val, _layout, _num_bytes) => {
+                        Resource::Cached(frozen_val, layout, _num_bytes) => {
                             // Data was not serialized and should not be charged for loading.
                             load_res = Some(None);
-
+                            ty_layout = Some(layout.clone());
                             // TODO: instead of unfreezing the value here (i.e. making a copy), we
                             // can store its frozen version and only unfreeze on modification,
                             // basically doing copy/clone-on-write.
@@ -219,6 +223,7 @@ impl<'r, 'l, S: MoveRefResolver> DataStore for TransactionDataCache<'r, 'l, S> {
                 },
                 Ok(None) => {
                     load_res = Some(None);
+                    ty_layout = Some(self.loader.type_to_type_layout(ty)?);
                     GlobalValue::none()
                 },
                 Err(err) => {
@@ -230,7 +235,9 @@ impl<'r, 'l, S: MoveRefResolver> DataStore for TransactionDataCache<'r, 'l, S> {
                 },
             };
 
-            account_cache.data_map.insert(ty.clone(), (ty_layout, gv));
+            account_cache
+                .data_map
+                .insert(ty.clone(), (ty_layout.unwrap(), gv));
         }
 
         Ok((

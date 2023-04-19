@@ -93,6 +93,12 @@ pub trait TableResolver {
         handle: &TableHandle,
         key: &[u8],
     ) -> Result<Option<Vec<u8>>, anyhow::Error>;
+
+    fn resolve_aggregator_entry(
+        &self,
+        handle: &TableHandle,
+        key: &[u8],
+    ) -> Result<Option<u128>, anyhow::Error>;
 }
 
 /// The native table context extension. This needs to be attached to the NativeContextExtensions

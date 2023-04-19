@@ -66,6 +66,14 @@ impl TableResolver for BlankStorage {
     ) -> Result<Option<Vec<u8>>, Error> {
         Ok(None)
     }
+
+    fn resolve_aggregator_entry(
+        &self,
+        handle: &TableHandle,
+        key: &[u8],
+    ) -> Result<Option<u128>, anyhow::Error> {
+        Ok(None)
+    }
 }
 
 /// A storage adapter created by stacking a change set on top of an existing storage backend.
@@ -119,6 +127,14 @@ impl<'a, 'b, S: TableResolver> TableResolver for DeltaStorage<'a, 'b, S> {
     ) -> std::result::Result<Option<Vec<u8>>, Error> {
         // TODO: No support for table deltas
         self.base.resolve_table_entry(handle, key)
+    }
+
+    fn resolve_aggregator_entry(
+        &self,
+        handle: &TableHandle,
+        key: &[u8],
+    ) -> Result<Option<u128>, anyhow::Error> {
+        Ok(None)
     }
 }
 
@@ -375,5 +391,13 @@ impl TableResolver for InMemoryStorage {
         key: &[u8],
     ) -> std::result::Result<Option<Vec<u8>>, Error> {
         Ok(self.tables.get(handle).and_then(|t| t.get(key).cloned()))
+    }
+
+    fn resolve_aggregator_entry(
+        &self,
+        handle: &TableHandle,
+        key: &[u8],
+    ) -> Result<Option<u128>, anyhow::Error> {
+        Ok(None)
     }
 }

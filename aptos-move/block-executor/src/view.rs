@@ -279,6 +279,7 @@ impl<'a, T: Transaction, S: TStateViewWithRemoteCache<CommonKey = T::Key>> TRemo
         match self.latest_view {
             ViewMapKind::MultiVersion(map) => {
                 let data = map.fetch_data(state_key, self.txn_idx);
+                // TODO: We do not need u128 anymore?
                 if let ReadResult::U128(v) = data {
                     Ok(Some(v))
                 } else if let ReadResult::Unresolved(delta) = data {
@@ -290,6 +291,8 @@ impl<'a, T: Transaction, S: TStateViewWithRemoteCache<CommonKey = T::Key>> TRemo
                         .apply_to(from_storage)
                         .map_err(|pe| pe.finish(Location::Undefined).into_vm_status())?;
                     Ok(Some(result))
+                } else if let ReadResult::Value(aw) = data {
+                    Ok(aw.as_aggregator_value())
                 } else {
                     claims::assert_matches!(data, ReadResult::None);
                     self.base_view.get_aggregator_value(state_key)

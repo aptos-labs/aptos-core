@@ -174,4 +174,13 @@ impl TableResolver for FakeDataStore {
         let state_key = StateKey::table_item(AptosTableHandle::from(*handle), key.to_vec());
         self.get_state_value_bytes(&state_key)
     }
+
+    fn resolve_aggregator_entry(
+        &self,
+        handle: &TableHandle,
+        key: &[u8],
+    ) -> Result<Option<u128>, anyhow::Error> {
+        let state_key = StateKey::table_item(AptosTableHandle::from(*handle), key.to_vec());
+        self.get_aggregator_value(&state_key)
+    }
 }
