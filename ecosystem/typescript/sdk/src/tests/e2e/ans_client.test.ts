@@ -2,19 +2,18 @@ import { AptosAccount } from "../../account";
 import { AnsClient } from "../../plugins/ans_client";
 import { Provider } from "../../providers";
 import { HexString, Network } from "../../utils";
-import { getFaucetClient, longTestTimeout, NODE_URL } from "../unit/test_helper.test";
+import { ANS_OWNER_ADDRESS, ANS_OWNER_PK, getFaucetClient, longTestTimeout, NODE_URL } from "../unit/test_helper.test";
 
-const ANS_OWNER_ADDRESS = "0x585fc9f0f0c54183b039ffc770ca282ebd87307916c215a3e692f2f8e4305e82";
-const ANS_OWNER_PK = "0x37368b46ce665362562c6d1d4ec01a08c8644c488690df5a17e13ba163e20221";
 const alice = new AptosAccount();
 const ACCOUNT_ADDRESS = alice.address().hex();
-const DOMAIN_NAME = `alice${Math.floor(Math.random() * 100 + 1)}`;
+// generate random name so we can run the test against local tesnet without the need to re-run it each time.
+// This will produce a string anywhere between zero and 12 characters long, usually 11 characters, only lower-case and numbers
+const DOMAIN_NAME = Math.random().toString(36).slice(2);
 
 describe("ANS", () => {
   beforeAll(async () => {
     const faucetClient = getFaucetClient();
     await faucetClient.fundAccount(alice.address(), 100_000_000_000);
-    console.log(alice);
   }, longTestTimeout);
 
   test("fails to create a new ANS class instance", () => {
@@ -34,7 +33,7 @@ describe("ANS", () => {
     expect(ans_client.contractAddress).toEqual(ANS_OWNER_ADDRESS);
   });
 
-  test("sets the contract address to be the matching node url", () => {
+  test("sets the contract address to be the one that matches the provided node url", () => {
     const provider = new Provider(Network.TESTNET);
     const ans_client = new AnsClient(provider, ANS_OWNER_ADDRESS);
     expect(ans_client.contractAddress).toEqual("0x5f8fd2347449685cf41d4db97926ec3a096eaf381332be4f1318ad4d16a8497c");
