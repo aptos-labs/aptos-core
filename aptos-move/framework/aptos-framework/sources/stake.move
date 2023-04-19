@@ -1141,6 +1141,11 @@ module aptos_framework::stake {
 
             validator_index = validator_index + 1;
         };
+
+        if (features::periodical_reward_rate_decrease_enabled()) {
+            // Update rewards rate after reward distribution.
+            staking_config::calculate_and_save_latest_epoch_rewards_rate();
+        };
     }
 
     /// Update individual validator's stake pool
@@ -1163,23 +1168,7 @@ module aptos_framework::stake {
             assume cur_validator_perf.successful_proposals + cur_validator_perf.failed_proposals <= MAX_U64;
         };
         let num_total_proposals = cur_validator_perf.successful_proposals + cur_validator_perf.failed_proposals;
-        let (rewards_rate, rewards_rate_denominator) = if (features::periodical_reward_rate_decrease_enabled()) {
-            let epoch_rewards_rate = staking_config::calculate_and_save_latest_epoch_rewards_rate();
-            if (fixed_point64::is_zero(epoch_rewards_rate)) {
-                (0u64, 1u64)
-            } else {
-                // Maximize denominator for higher precision.
-                // Restriction: nominator <= MAX_REWARDS_RATE && denominator <= MAX_U64
-                let denominator = fixed_point64::divide_u128((MAX_REWARDS_RATE as u128), epoch_rewards_rate);
-                if (denominator > MAX_U64) {
-                    denominator = MAX_U64
-                };
-                let nominator = (fixed_point64::multiply_u128(denominator, epoch_rewards_rate) as u64);
-                (nominator, (denominator as u64))
-            }
-        } else {
-            staking_config::get_reward_rate(staking_config)
-        };
+        let (rewards_rate, rewards_rate_denominator) = staking_config::get_reward_rate(staking_config);
         let rewards_active = distribute_rewards(
             &mut stake_pool.active,
             num_successful_proposals,
@@ -1372,6 +1361,7 @@ module aptos_framework::stake {
     #[test_only]
     use aptos_framework::aptos_coin;
     use aptos_std::bls12381::proof_of_possession_from_bytes;
+    #[test_only]
     use aptos_std::fixed_point64;
 
     #[test_only]
@@ -2465,17 +2455,22 @@ module aptos_framework::stake {
         // For some reason, this epoch is very long. It has been 1 year since genesis when the epoch ends.
         timestamp::fast_forward_seconds(one_year_in_secs - EPOCH_DURATION * 3);
         end_epoch();
-        // Rewards rate has halved. Validator 1 and validator 2 should receive rewards at rewards rate = 0.5% every epoch.
-        assert_validator_state(validator_1_address, 1015, 0, 0, 0, 1);
-        assert_validator_state(validator_2_address, 10150, 0, 0, 0, 0);
+        // Validator 1 and validator 2 should still receive rewards at rewards rate = 1% every epoch. Rewards rate has halved after this epoch.
+        assert_validator_state(validator_1_address, 1020, 0, 0, 0, 1);
+        assert_validator_state(validator_2_address, 10200, 0, 0, 0, 0);
 
         // For some reason, this epoch is also very long. One year passed.
         timestamp::fast_forward_seconds(one_year_in_secs - EPOCH_DURATION);
         end_epoch();
+        // Validator 1 and validator 2 should still receive rewards at rewards rate = 0.5% every epoch. Rewards rate has halved after this epoch.
+        assert_validator_state(validator_1_address, 1025, 0, 0, 0, 1);
+        assert_validator_state(validator_2_address, 10250, 0, 0, 0, 0);
+
+        end_epoch();
         // Rewards rate has halved but cannot become lower than min_rewards_rate.
         // Validator 1 and validator 2 should receive rewards at rewards rate = 0.3% every epoch.
-        assert_validator_state(validator_1_address, 1018, 0, 0, 0, 1);
-        assert_validator_state(validator_2_address, 10180, 0, 0, 0, 0);
+        assert_validator_state(validator_1_address, 1028, 0, 0, 0, 1);
+        assert_validator_state(validator_2_address, 10280, 0, 0, 0, 0);
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
