@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::sender_aware_shuffler::SenderAwareShuffler;
+use aptos_logger::info;
 use aptos_types::{
     on_chain_config::{
         TransactionShufflerType,
@@ -31,6 +32,10 @@ pub fn create_transaction_shuffler(
     match shuffler_type {
         NoShuffling => Arc::new(NoOpShuffler {}),
         SenderAwareV1(confict_window_size) => {
+            info!(
+                "Using sender aware transaction shuffling with conflict window size {}",
+                confict_window_size
+            );
             Arc::new(SenderAwareShuffler::new(confict_window_size as usize))
         },
     }
