@@ -42,6 +42,7 @@ async fn test_block_request_no_txns() {
         _max_batch_size,
         _max_bytes,
         _return_non_full,
+        _include_gas_upgraded,
         _exclude_txns,
         callback,
     ) = timeout(

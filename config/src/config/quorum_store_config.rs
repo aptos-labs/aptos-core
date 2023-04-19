@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::config::MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE;
+use aptos_global_constants::DEFAULT_BUCKETS;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
@@ -33,7 +34,7 @@ impl Default for QuorumStoreBackPressureConfig {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct QuorumStoreConfig {
     pub channel_size: usize,
@@ -41,7 +42,16 @@ pub struct QuorumStoreConfig {
     pub batch_generation_poll_interval_ms: usize,
     pub batch_generation_min_non_empty_interval_ms: usize,
     pub batch_generation_max_interval_ms: usize,
-    pub max_batch_bytes: usize,
+    pub sender_max_batch_txns: usize,
+    pub sender_max_batch_bytes: usize,
+    pub sender_max_num_batches: usize,
+    pub sender_max_total_txns: usize,
+    pub sender_max_total_bytes: usize,
+    pub receiver_max_batch_txns: usize,
+    pub receiver_max_batch_bytes: usize,
+    pub receiver_max_num_batches: usize,
+    pub receiver_max_total_txns: usize,
+    pub receiver_max_total_bytes: usize,
     pub batch_request_num_peers: usize,
     pub batch_request_retry_limit: usize,
     pub batch_request_retry_interval_ms: usize,
@@ -54,6 +64,7 @@ pub struct QuorumStoreConfig {
     pub mempool_txn_pull_max_bytes: u64,
     pub back_pressure: QuorumStoreBackPressureConfig,
     pub num_workers_for_remote_batches: usize,
+    pub batch_buckets: Vec<u64>,
 }
 
 impl Default for QuorumStoreConfig {
@@ -64,7 +75,16 @@ impl Default for QuorumStoreConfig {
             batch_generation_poll_interval_ms: 25,
             batch_generation_min_non_empty_interval_ms: 200,
             batch_generation_max_interval_ms: 250,
-            max_batch_bytes: 4 * 1024 * 1024,
+            sender_max_batch_txns: 250,
+            sender_max_batch_bytes: 4 * 1024 * 1024,
+            sender_max_num_batches: 20,
+            sender_max_total_txns: 2000,
+            sender_max_total_bytes: 4 * 1024 * 1024,
+            receiver_max_batch_txns: 250,
+            receiver_max_batch_bytes: 4 * 1024 * 1024,
+            receiver_max_num_batches: 20,
+            receiver_max_total_txns: 2000,
+            receiver_max_total_bytes: 4 * 1024 * 1024,
             batch_request_num_peers: 5,
             batch_request_retry_limit: 10,
             batch_request_retry_interval_ms: 1000,
@@ -77,6 +97,7 @@ impl Default for QuorumStoreConfig {
             back_pressure: QuorumStoreBackPressureConfig::default(),
             // number of batch coordinators to handle QS batch messages, should be >= 1
             num_workers_for_remote_batches: 10,
+            batch_buckets: DEFAULT_BUCKETS.to_vec(),
         }
     }
 }

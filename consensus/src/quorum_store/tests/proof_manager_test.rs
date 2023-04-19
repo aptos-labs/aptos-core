@@ -20,10 +20,10 @@ async fn test_block_request() {
     let digest = HashValue::random();
     let batch_id = BatchId::new_for_test(1);
     let proof = ProofOfStore::new(
-        BatchInfo::new(PeerId::random(), batch_id, 0, 10, digest, 1, 1),
+        BatchInfo::new(PeerId::random(), batch_id, 0, 10, digest, 1, 1, 0),
         AggregateSignature::empty(),
     );
-    proof_manager.receive_proof(proof.clone());
+    proof_manager.receive_proofs(vec![proof.clone()]);
 
     let (callback_tx, callback_rx) = oneshot::channel();
     let req = GetPayloadCommand::GetPayloadRequest(

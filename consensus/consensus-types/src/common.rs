@@ -22,16 +22,31 @@ pub type Round = u64;
 /// Author refers to the author's account address
 pub type Author = AccountAddress;
 
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize, Hash, Ord, PartialOrd)]
 pub struct TransactionSummary {
     pub sender: AccountAddress,
     pub sequence_number: u64,
+}
+
+impl TransactionSummary {
+    pub fn new(sender: AccountAddress, sequence_number: u64) -> Self {
+        Self {
+            sender,
+            sequence_number,
+        }
+    }
 }
 
 impl fmt::Display for TransactionSummary {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}:{}", self.sender, self.sequence_number,)
     }
+}
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub struct TransactionInProgress {
+    pub summary: TransactionSummary,
+    pub gas_unit_price: u64,
 }
 
 #[derive(Clone)]

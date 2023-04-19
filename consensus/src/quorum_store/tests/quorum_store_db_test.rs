@@ -19,7 +19,7 @@ fn test_db_for_data() {
     let source = AccountAddress::random();
     let signed_txns = create_vec_signed_transactions(100);
     let persist_request_1: PersistedValue =
-        Batch::new(BatchId::new_for_test(1), signed_txns, 1, 20, source).into();
+        Batch::new(BatchId::new_for_test(1), signed_txns, 1, 20, source, 0).into();
     let clone_1 = persist_request_1.clone();
     assert!(db.save_batch(clone_1).is_ok());
 
@@ -32,13 +32,13 @@ fn test_db_for_data() {
 
     let signed_txns = create_vec_signed_transactions(200);
     let persist_request_2: PersistedValue =
-        Batch::new(BatchId::new_for_test(1), signed_txns, 1, 20, source).into();
+        Batch::new(BatchId::new_for_test(1), signed_txns, 1, 20, source, 0).into();
     let clone_2 = persist_request_2.clone();
     assert_ok!(db.save_batch(clone_2));
 
     let signed_txns = create_vec_signed_transactions(300);
     let persist_request_3: PersistedValue =
-        Batch::new(BatchId::new_for_test(1), signed_txns, 1, 20, source).into();
+        Batch::new(BatchId::new_for_test(1), signed_txns, 1, 20, source, 0).into();
     let clone_3 = persist_request_3.clone();
     assert_ok!(db.save_batch(clone_3));
 
