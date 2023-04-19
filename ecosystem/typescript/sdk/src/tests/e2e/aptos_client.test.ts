@@ -135,15 +135,10 @@ test(
     let tokenAddress = "";
 
     await provider.waitForTransaction(
-      await aptosToken.createCollection(
-        account1,
-        "Collection description",
-        "Collection Name",
-        "https://aptos.dev",
-        5,
-        10,
-        10,
-      ),
+      await aptosToken.createCollection(account1, "Collection description", "Collection Name", "https://aptos.dev", 5, {
+        royaltyNumerator: 10,
+        royaltyDenominator: 10,
+      }),
     );
     const txn = await provider.waitForTransactionWithResult(
       await aptosToken.mint(
