@@ -29,6 +29,7 @@ fn test_batch() {
         epoch,
         1,
         source,
+        0,
     );
 
     assert!(batch.verify().is_ok());

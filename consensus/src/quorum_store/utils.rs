@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{monitor, quorum_store::counters};
-use aptos_consensus_types::{common::TransactionSummary, proof_of_store::ProofOfStore};
+use aptos_consensus_types::{common::TransactionInProgress, proof_of_store::ProofOfStore};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
@@ -103,14 +103,14 @@ impl MempoolProxy {
         &self,
         max_items: u64,
         max_bytes: u64,
-        return_non_full: bool,
-        exclude_txns: Vec<TransactionSummary>,
+        exclude_txns: Vec<TransactionInProgress>,
     ) -> Result<Vec<SignedTransaction>, anyhow::Error> {
         let (callback, callback_rcv) = oneshot::channel();
         let msg = QuorumStoreRequest::GetBatchRequest(
             max_items,
             max_bytes,
-            return_non_full,
+            true,
+            true,
             exclude_txns,
             callback,
         );
@@ -176,11 +176,11 @@ impl ProofQueue {
             },
         }
         if local {
-            counters::LOCAL_POS_COUNT.inc();
+            counters::inc_local_pos_count(proof.gas_bucket_start().to_string().as_str());
             self.local_digest_queue
                 .push_back((*proof.digest(), proof.expiration()));
         } else {
-            counters::REMOTE_POS_COUNT.inc();
+            counters::inc_remote_pos_count(proof.gas_bucket_start().to_string().as_str());
         }
     }
 
@@ -246,7 +246,10 @@ impl ProofQueue {
                     }
                     ret.push(proof.clone());
                     if let Some(insertion_time) = self.digest_insertion_time.get(digest) {
-                        counters::POS_TO_PULL.observe(insertion_time.elapsed().as_secs_f64());
+                        counters::pos_to_pull(
+                            proof.gas_bucket_start(),
+                            insertion_time.elapsed().as_secs_f64(),
+                        );
                     }
                 } else {
                     // non-committed proof that is expired
@@ -337,9 +340,14 @@ impl ProofQueue {
     //mark in the hashmap committed PoS, but keep them until they expire
     pub(crate) fn mark_committed(&mut self, digests: Vec<HashValue>) {
         for digest in digests {
+            let bucket = if let Some(Some(proof)) = self.digest_proof.get(&digest) {
+                Some(proof.gas_bucket_start())
+            } else {
+                None
+            };
             self.digest_proof.insert(digest, None);
             if let Some(insertion_time) = self.digest_insertion_time.get(&digest) {
-                counters::POS_TO_COMMIT.observe(insertion_time.elapsed().as_secs_f64());
+                counters::pos_to_commit(bucket, insertion_time.elapsed().as_secs_f64());
             }
         }
     }

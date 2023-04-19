@@ -1,11 +1,16 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::metrics::{
+    ERROR_COUNT, LATEST_PROCESSED_VERSION, PROCESSED_BATCH_SIZE, PROCESSED_LATENCY_IN_SECS,
+    PROCESSED_VERSIONS_COUNT,
+};
 use aptos_indexer_grpc_utils::{
     cache_operator::CacheOperator,
     config::IndexerGrpcConfig,
     create_grpc_client,
     file_store_operator::{FileStoreMetadata, FileStoreOperator},
+    time_diff_since_pb_timestamp_in_secs,
 };
 use aptos_logger::{error, info};
 use aptos_moving_average::MovingAverage;
@@ -142,6 +147,8 @@ async fn process_raw_datastream_response(
         datastream::raw_datastream_response::Response::Data(data) => {
             let transaction_len = data.transactions.len();
             let start_version = data.transactions.first().unwrap().version;
+            let first_transaction_pb_timestamp =
+                data.transactions.first().unwrap().timestamp.clone();
             let transactions = data
                 .transactions
                 .into_iter()
@@ -158,8 +165,14 @@ async fn process_raw_datastream_response(
             match cache_operator.update_cache_transactions(transactions).await {
                 Ok(_) => {},
                 Err(e) => {
+                    ERROR_COUNT
+                        .with_label_values(&["failed_to_update_cache_version"])
+                        .inc();
                     anyhow::bail!("Update cache with version failed: {}", e);
                 },
+            }
+            if let Some(ref txn_time) = first_transaction_pb_timestamp {
+                PROCESSED_LATENCY_IN_SECS.set(time_diff_since_pb_timestamp_in_secs(txn_time));
             }
             Ok(GrpcDataStatus::ChunkDataOk {
                 start_version,
@@ -238,6 +251,7 @@ async fn process_streaming_response(
             Ok(r) => r,
             Err(err) => {
                 error!("[Indexer Cache] Streaming error: {}", err);
+                ERROR_COUNT.with_label_values(&["streaming_error"]).inc();
                 break;
             },
         };
@@ -255,6 +269,10 @@ async fn process_streaming_response(
                     current_version += num_of_transactions;
                     transaction_count += num_of_transactions;
                     tps_calculator.tick_now(num_of_transactions);
+
+                    PROCESSED_VERSIONS_COUNT.inc_by(num_of_transactions);
+                    LATEST_PROCESSED_VERSION.set(current_version as i64);
+                    PROCESSED_BATCH_SIZE.set(num_of_transactions as i64);
                     aptos_logger::info!(
                         start_version = start_version,
                         num_of_transactions = num_of_transactions,
@@ -266,6 +284,7 @@ async fn process_streaming_response(
                         current_version = new_version,
                         "[Indexer Cache] Init signal received twice."
                     );
+                    ERROR_COUNT.with_label_values(&["data_init_twice"]).inc();
                     break;
                 },
                 GrpcDataStatus::BatchEnd {
@@ -283,6 +302,9 @@ async fn process_streaming_response(
                             actual_current_version = start_version + num_of_transactions,
                             "[Indexer Cache] End signal received with wrong version."
                         );
+                        ERROR_COUNT
+                            .with_label_values(&["data_end_wrong_version"])
+                            .inc();
                         break;
                     }
                     cache_operator
@@ -303,6 +325,7 @@ async fn process_streaming_response(
                     "[Indexer Cache] Process raw datastream response failed: {}",
                     e
                 );
+                ERROR_COUNT.with_label_values(&["response_error"]).inc();
                 break;
             },
         }

@@ -658,7 +658,7 @@ impl EpochManager {
                 self.epoch(),
                 self.author,
                 epoch_state.verifier.len() as u64,
-                self.config.quorum_store_configs,
+                self.config.quorum_store_configs.clone(),
                 consensus_to_quorum_store_rx,
                 self.quorum_store_to_mempool_sender.clone(),
                 self.config.mempool_txn_pull_timeout_ms,
@@ -861,6 +861,7 @@ impl EpochManager {
             let buffer_manager_msg_tx = self.buffer_manager_msg_tx.clone();
             let round_manager_tx = self.round_manager_tx.clone();
             let my_peer_id = self.author;
+            let max_num_batches = self.config.quorum_store_configs.receiver_max_num_batches;
             self.bounded_executor
                 .spawn(async move {
                     match monitor!(
@@ -870,6 +871,7 @@ impl EpochManager {
                             &epoch_state.verifier,
                             quorum_store_enabled,
                             peer_id == my_peer_id,
+                            max_num_batches,
                         )
                     ) {
                         Ok(verified_event) => {
@@ -912,12 +914,12 @@ impl EpochManager {
             | ConsensusMsg::SignedBatchInfo(_)
             | ConsensusMsg::ProofOfStoreMsg(_) => {
                 let event: UnverifiedEvent = msg.into();
-                if event.epoch() == self.epoch() {
+                if event.epoch()? == self.epoch() {
                     return Ok(Some(event));
                 } else {
                     monitor!(
                         "process_different_epoch_consensus_msg",
-                        self.process_different_epoch(event.epoch(), peer_id)
+                        self.process_different_epoch(event.epoch()?, peer_id)
                     )?;
                 }
             },

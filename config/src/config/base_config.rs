@@ -1,9 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::config::SecureBackend;
+use crate::config::{config_sanitizer::ConfigSanitizer, Error, NodeConfig, SecureBackend};
 use aptos_secure_storage::{KVStorage, Storage};
-use aptos_types::waypoint::Waypoint;
+use aptos_types::{chain_id::ChainId, waypoint::Waypoint};
 use poem_openapi::Enum as PoemEnum;
 use serde::{Deserialize, Serialize};
 use std::{fmt, fs, path::PathBuf, str::FromStr};
@@ -26,6 +26,27 @@ impl Default for BaseConfig {
             role: RoleType::Validator,
             waypoint: WaypointConfig::None,
         }
+    }
+}
+
+impl ConfigSanitizer for BaseConfig {
+    fn sanitize(
+        node_config: &mut NodeConfig,
+        _node_role: RoleType,
+        _chain_id: ChainId,
+    ) -> Result<(), Error> {
+        let sanitizer_name = Self::get_sanitizer_name();
+        let base_config = &node_config.base;
+
+        // Verify the waypoint is not None
+        if let WaypointConfig::None = base_config.waypoint {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "The waypoint config must be set in the base config!".into(),
+            ));
+        }
+
+        Ok(())
     }
 }
 
@@ -151,6 +172,38 @@ pub struct ParseRoleError(String);
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn test_sanitize_valid_base_config() {
+        // Create a node config with a waypoint
+        let mut node_config = NodeConfig {
+            base: BaseConfig {
+                waypoint: WaypointConfig::FromConfig(Waypoint::default()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it passes
+        BaseConfig::sanitize(&mut node_config, RoleType::Validator, ChainId::mainnet()).unwrap();
+    }
+
+    #[test]
+    fn test_sanitize_missing_waypoint() {
+        // Create a node config with a missing waypoint
+        let mut node_config = NodeConfig {
+            base: BaseConfig {
+                waypoint: WaypointConfig::None,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails because of the missing waypoint
+        let error = BaseConfig::sanitize(&mut node_config, RoleType::Validator, ChainId::mainnet())
+            .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
 
     #[test]
     fn verify_role_type_conversion() {

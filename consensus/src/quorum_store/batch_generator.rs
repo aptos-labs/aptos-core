@@ -11,10 +11,13 @@ use crate::{
     },
 };
 use aptos_config::config::QuorumStoreConfig;
-use aptos_consensus_types::{common::TransactionSummary, proof_of_store::BatchId};
+use aptos_consensus_types::{
+    common::{TransactionInProgress, TransactionSummary},
+    proof_of_store::BatchId,
+};
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
-use aptos_types::PeerId;
+use aptos_types::{transaction::SignedTransaction, PeerId};
 use futures_channel::mpsc::Sender;
 use rand::{thread_rng, RngCore};
 use std::{
@@ -44,7 +47,7 @@ pub struct BatchGenerator {
     db: Arc<dyn QuorumStoreStorage>,
     config: QuorumStoreConfig,
     mempool_proxy: MempoolProxy,
-    batches_in_progress: HashMap<BatchId, Vec<TransactionSummary>>,
+    batches_in_progress: HashMap<BatchId, Vec<TransactionInProgress>>,
     batch_expirations: TimeExpirations<BatchId>,
     latest_block_timestamp: u64,
     last_end_batch_time: Instant,
@@ -95,9 +98,127 @@ impl BatchGenerator {
         }
     }
 
-    pub(crate) async fn handle_scheduled_pull(&mut self, max_count: u64) -> Option<Batch> {
-        // TODO: as an optimization, we could filter out the txns that have expired
+    fn create_new_batch(
+        &mut self,
+        txns: Vec<SignedTransaction>,
+        expiry_time: u64,
+        bucket_start: u64,
+    ) -> Batch {
+        let batch_id = self.batch_id;
+        self.batch_id.increment();
+        self.db
+            .save_batch_id(self.epoch, self.batch_id)
+            .expect("Could not save to db");
 
+        let txns_in_progress: Vec<_> = txns
+            .iter()
+            .map(|txn| TransactionInProgress {
+                summary: TransactionSummary {
+                    sender: txn.sender(),
+                    sequence_number: txn.sequence_number(),
+                },
+                gas_unit_price: txn.gas_unit_price(),
+            })
+            .collect();
+        self.batches_in_progress.insert(batch_id, txns_in_progress);
+        self.batch_expirations.add_item(batch_id, expiry_time);
+
+        counters::CREATED_BATCHES_COUNT.inc();
+        counters::num_txn_per_batch(bucket_start.to_string().as_str(), txns.len());
+
+        Batch::new(
+            batch_id,
+            txns,
+            self.epoch,
+            expiry_time,
+            self.my_peer_id,
+            bucket_start,
+        )
+    }
+
+    /// Push num_txns from txns into batches. If num_txns is larger than max size, then multiple
+    /// batches are pushed.
+    fn push_bucket_to_batches(
+        &mut self,
+        batches: &mut Vec<Batch>,
+        txns: &mut Vec<SignedTransaction>,
+        num_txns_in_bucket: usize,
+        expiry_time: u64,
+        bucket_start: u64,
+    ) -> bool {
+        let mut remaining_txns = num_txns_in_bucket;
+        while remaining_txns > 0 {
+            if batches.len() == self.config.sender_max_num_batches {
+                return false;
+            }
+            let num_batch_txns = std::cmp::min(self.config.sender_max_batch_txns, remaining_txns);
+            let batch_txns: Vec<_> = txns.drain(0..num_batch_txns).collect();
+            let batch = self.create_new_batch(batch_txns, expiry_time, bucket_start);
+            batches.push(batch);
+            remaining_txns -= num_batch_txns;
+        }
+        true
+    }
+
+    fn bucket_into_batches(
+        &mut self,
+        pulled_txns: &mut Vec<SignedTransaction>,
+        expiry_time: u64,
+    ) -> Vec<Batch> {
+        // Sort by gas, in descending order. This is a stable sort on existing mempool ordering,
+        // so will not reorder accounts or their sequence numbers as long as they have the same gas.
+        pulled_txns.sort_by_key(|txn| u64::MAX - txn.gas_unit_price());
+
+        let reverse_buckets_excluding_zero: Vec<_> = self
+            .config
+            .batch_buckets
+            .iter()
+            .skip(1)
+            .rev()
+            .cloned()
+            .collect();
+        let mut batches = vec![];
+        for bucket_start in &reverse_buckets_excluding_zero {
+            if pulled_txns.is_empty() {
+                break;
+            }
+
+            // Search for key in descending gas order
+            let num_txns_in_bucket = match pulled_txns
+                .binary_search_by_key(&(u64::MAX - (*bucket_start - 1), PeerId::ZERO), |txn| {
+                    (u64::MAX - txn.gas_unit_price(), txn.sender())
+                }) {
+                Ok(index) => index,
+                Err(index) => index,
+            };
+            if num_txns_in_bucket == 0 {
+                continue;
+            }
+
+            let batches_space_remaining = self.push_bucket_to_batches(
+                &mut batches,
+                pulled_txns,
+                num_txns_in_bucket,
+                expiry_time,
+                *bucket_start,
+            );
+            if !batches_space_remaining {
+                return batches;
+            }
+        }
+        if !pulled_txns.is_empty() {
+            self.push_bucket_to_batches(
+                &mut batches,
+                pulled_txns,
+                pulled_txns.len(),
+                expiry_time,
+                0,
+            );
+        }
+        batches
+    }
+
+    pub(crate) async fn handle_scheduled_pull(&mut self, max_count: u64) -> Vec<Batch> {
         let exclude_txns: Vec<_> = self
             .batches_in_progress
             .values()
@@ -106,12 +227,11 @@ impl BatchGenerator {
             .collect();
 
         trace!("QS: excluding txs len: {:?}", exclude_txns.len());
-        let pulled_txns = self
+        let mut pulled_txns = self
             .mempool_proxy
             .pull_internal(
                 max_count,
                 self.config.mempool_txn_pull_max_bytes,
-                true,
                 exclude_txns,
             )
             .await
@@ -124,54 +244,24 @@ impl BatchGenerator {
             // Quorum store metrics
             counters::CREATED_EMPTY_BATCHES_COUNT.inc();
 
-            let duration = self.last_end_batch_time.elapsed().as_secs_f64();
             counters::EMPTY_BATCH_CREATION_DURATION
-                .observe_duration(Duration::from_secs_f64(duration));
-
+                .observe_duration(self.last_end_batch_time.elapsed());
             self.last_end_batch_time = Instant::now();
-            return None;
+            return vec![];
         } else {
             counters::PULLED_TXNS_COUNT.inc();
             counters::PULLED_TXNS_NUM.observe(pulled_txns.len() as f64);
         }
+        counters::BATCH_CREATION_DURATION.observe_duration(self.last_end_batch_time.elapsed());
 
-        // Quorum store metrics
-        counters::CREATED_BATCHES_COUNT.inc();
-
-        let duration = self.last_end_batch_time.elapsed().as_secs_f64();
-        counters::BATCH_CREATION_DURATION.observe_duration(Duration::from_secs_f64(duration));
-
-        counters::NUM_TXN_PER_BATCH.observe(pulled_txns.len() as f64);
-
-        let batch_id = self.batch_id;
-        self.batch_id.increment();
-        self.db
-            .save_batch_id(self.epoch, self.batch_id)
-            .expect("Could not save to db");
-
+        let bucket_compute_start = Instant::now();
         let expiry_time = aptos_infallible::duration_since_epoch().as_micros() as u64
             + self.config.batch_expiry_gap_when_init_usecs;
-        let txn_summaries: Vec<_> = pulled_txns
-            .iter()
-            .map(|txn| TransactionSummary {
-                sender: txn.sender(),
-                sequence_number: txn.sequence_number(),
-            })
-            .collect();
-
-        let batch = Batch::new(
-            batch_id,
-            pulled_txns,
-            self.epoch,
-            expiry_time,
-            self.my_peer_id,
-        );
-
-        self.batches_in_progress.insert(batch_id, txn_summaries);
-        self.batch_expirations.add_item(batch_id, expiry_time);
-
+        let batches = self.bucket_into_batches(&mut pulled_txns, expiry_time);
+        counters::BATCH_CREATION_COMPUTE_LATENCY.observe_duration(bucket_compute_start.elapsed());
         self.last_end_batch_time = Instant::now();
-        Some(batch)
+
+        batches
     }
 
     pub async fn start(
@@ -246,9 +336,10 @@ impl BatchGenerator {
 
                         let dynamic_pull_max_txn = std::cmp::max(
                             (since_last_non_empty_pull_ms as f64 / 1000.0 * dynamic_pull_txn_per_s as f64) as u64, 1);
-                        if let Some(batch) = self.handle_scheduled_pull(dynamic_pull_max_txn).await {
+                        let batches = self.handle_scheduled_pull(dynamic_pull_max_txn).await;
+                        if !batches.is_empty() {
                             last_non_empty_pull = now;
-                            network_sender.broadcast_batch_msg(batch).await;
+                            network_sender.broadcast_batch_msg(batches).await;
                         }
                     }
                 }),

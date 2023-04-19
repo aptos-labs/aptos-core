@@ -570,7 +570,7 @@ impl TxnEmitter {
         let stats = Arc::new(DynamicStatsTracking::new(stats_tracking_phases));
         let tokio_handle = Handle::current();
 
-        let mut txn_generator_creator = create_txn_generator_creator(
+        let (mut txn_generator_creator, _, _) = create_txn_generator_creator(
             &req.transaction_mix_per_phase,
             num_workers,
             &mut all_accounts,
@@ -616,7 +616,7 @@ impl TxnEmitter {
                     .collect::<Vec<_>>();
                 let stop = stop.clone();
                 let stats = Arc::clone(&stats);
-                let txn_generator = txn_generator_creator.create_transaction_generator().await;
+                let txn_generator = txn_generator_creator.create_transaction_generator();
                 let worker_index = workers.len();
 
                 let worker = SubmissionWorker::new(

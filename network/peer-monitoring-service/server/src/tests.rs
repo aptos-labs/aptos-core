@@ -59,10 +59,15 @@ use aptos_types::{
     PeerId,
 };
 use futures::channel::oneshot;
-use maplit::hashmap;
+use maplit::btreemap;
 use mockall::mock;
 use rand::{rngs::OsRng, Rng};
-use std::{collections::HashMap, str::FromStr, sync::Arc, time::Duration};
+use std::{
+    collections::{BTreeMap, HashMap},
+    str::FromStr,
+    sync::Arc,
+    time::Duration,
+};
 
 // Useful test constants
 const LOCAL_HOST_NET_ADDR: &str = "/ip4/127.0.0.1/tcp/8081";
@@ -99,7 +104,7 @@ async fn test_get_network_information_fullnode() {
     // Process a client request to fetch the network information and verify an empty response
     verify_network_information(
         &mut mock_client,
-        HashMap::new(),
+        BTreeMap::new(),
         MAX_DISTANCE_FROM_VALIDATORS,
     )
     .await;
@@ -113,7 +118,7 @@ async fn test_get_network_information_fullnode() {
         .unwrap();
 
     // Process a client request to fetch the network information and verify the response
-    let expected_peers = hashmap! {peer_network_id_1 => connection_metadata_1.clone()};
+    let expected_peers = btreemap! {peer_network_id_1 => connection_metadata_1.clone()};
     verify_network_information(
         &mut mock_client,
         expected_peers.clone(),
@@ -160,7 +165,7 @@ async fn test_get_network_information_fullnode() {
     // Process a client request to fetch the network information and verify the response
     verify_network_information(
         &mut mock_client,
-        hashmap! {peer_network_id_1 => connection_metadata_1.clone()},
+        btreemap! {peer_network_id_1 => connection_metadata_1.clone()},
         peer_distance_1 + 1,
     )
     .await;
@@ -170,7 +175,7 @@ async fn test_get_network_information_fullnode() {
     let peer_network_id_2 = PeerNetworkId::new(NetworkId::Validator, peer_id_2);
     let peer_distance_2 = 0; // The peer is a validator
     let connection_metadata_2 = create_connection_metadata(peer_id_2);
-    let expected_peers = hashmap! {peer_network_id_1 => connection_metadata_1.clone(), peer_network_id_2 => connection_metadata_2.clone()};
+    let expected_peers = btreemap! {peer_network_id_1 => connection_metadata_1.clone(), peer_network_id_2 => connection_metadata_2.clone()};
     let latest_network_info_response = NetworkInformationResponse {
         connected_peers: transform_connection_metadata(expected_peers),
         distance_from_validators: peer_distance_2,
@@ -187,7 +192,7 @@ async fn test_get_network_information_fullnode() {
     // Process a client request to fetch the network information and verify the response
     verify_network_information(
         &mut mock_client,
-        hashmap! {peer_network_id_1 => connection_metadata_1.clone(), peer_network_id_2 => connection_metadata_2},
+        btreemap! {peer_network_id_1 => connection_metadata_1.clone(), peer_network_id_2 => connection_metadata_2},
         peer_distance_2 + 1,
     )
     .await;
@@ -200,7 +205,7 @@ async fn test_get_network_information_fullnode() {
     // Process a request to fetch the network information and verify the response
     verify_network_information(
         &mut mock_client,
-        hashmap! {peer_network_id_1 => connection_metadata_1},
+        btreemap! {peer_network_id_1 => connection_metadata_1},
         peer_distance_1 + 1,
     )
     .await;
@@ -218,7 +223,7 @@ async fn test_get_network_information_validator() {
     tokio::spawn(service.start());
 
     // Process a client request to fetch the network information and verify distance is 0
-    verify_network_information(&mut mock_client, HashMap::new(), 0).await;
+    verify_network_information(&mut mock_client, BTreeMap::new(), 0).await;
 
     // Connect a new peer to the validator (another validator)
     let peer_id_1 = PeerId::random();
@@ -229,7 +234,7 @@ async fn test_get_network_information_validator() {
         .unwrap();
 
     // Process a client request to fetch the network information and verify the response
-    let expected_peers = hashmap! {peer_network_id_1 => connection_metadata_1.clone()};
+    let expected_peers = btreemap! {peer_network_id_1 => connection_metadata_1.clone()};
     verify_network_information(&mut mock_client, expected_peers.clone(), 0).await;
 
     // Update the peer monitoring metadata for peer 1
@@ -252,7 +257,7 @@ async fn test_get_network_information_validator() {
     let peer_network_id_2 = PeerNetworkId::new(NetworkId::Vfn, peer_id_2);
     let peer_distance_2 = 1; // The peer is a VFN
     let connection_metadata_2 = create_connection_metadata(peer_id_2);
-    let expected_peers = hashmap! {peer_network_id_1 => connection_metadata_1.clone(), peer_network_id_2 => connection_metadata_2.clone()};
+    let expected_peers = btreemap! {peer_network_id_1 => connection_metadata_1.clone(), peer_network_id_2 => connection_metadata_2.clone()};
     let latest_network_info_response = NetworkInformationResponse {
         connected_peers: transform_connection_metadata(expected_peers.clone()),
         distance_from_validators: peer_distance_2,
@@ -277,7 +282,7 @@ async fn test_get_network_information_validator() {
     // Process a request to fetch the network information and verify the response
     verify_network_information(
         &mut mock_client,
-        hashmap! {peer_network_id_1 => connection_metadata_1},
+        btreemap! {peer_network_id_1 => connection_metadata_1},
         0,
     )
     .await;
@@ -390,7 +395,7 @@ fn create_connection_metadata(peer_id: AccountAddress) -> ConnectionMetadata {
 /// client, and verifies the response is correct.
 async fn verify_network_information(
     client: &mut MockClient,
-    expected_peers: HashMap<PeerNetworkId, ConnectionMetadata>,
+    expected_peers: BTreeMap<PeerNetworkId, ConnectionMetadata>,
     expected_distance_from_validators: u64,
 ) {
     // Send a request to fetch the network information
@@ -409,8 +414,8 @@ async fn verify_network_information(
 /// Transforms the connection metadata for the given peers into
 /// metadata expected by the peer monitoring service.
 fn transform_connection_metadata(
-    expected_peers: HashMap<PeerNetworkId, ConnectionMetadata>,
-) -> HashMap<PeerNetworkId, aptos_peer_monitoring_service_types::response::ConnectionMetadata> {
+    expected_peers: BTreeMap<PeerNetworkId, ConnectionMetadata>,
+) -> BTreeMap<PeerNetworkId, aptos_peer_monitoring_service_types::response::ConnectionMetadata> {
     expected_peers
         .into_iter()
         .map(|(peer_id, metadata)| {
@@ -442,7 +447,7 @@ async fn verify_node_information(
     // Verify the response is correct
     let expected_response =
         PeerMonitoringServiceResponse::NodeInformation(NodeInformationResponse {
-            git_hash: aptos_build_info::get_git_hash(),
+            build_information: aptos_build_info::get_build_information(),
             highest_synced_epoch,
             highest_synced_version,
             ledger_timestamp_usecs,
