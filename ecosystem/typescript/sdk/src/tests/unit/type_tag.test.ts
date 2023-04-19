@@ -1,10 +1,16 @@
-import { StructTag, TypeTagParser, TypeTagParserError, TypeTagStruct } from "../../aptos_types/type_tag";
+import {
+  StructTag,
+  TypeTagAddress,
+  TypeTagParser,
+  TypeTagParserError,
+  TypeTagStruct,
+} from "../../aptos_types/type_tag";
 
 const expectedTypeTag = {
-  string: "0x0000000000000000000000000000000000000000000000000000000000000001::aptos_coin::AptosCoin",
+  string: "0x0000000000000000000000000000000000000000000000000000000000000001::some_module::SomeResource",
   address: "0x0000000000000000000000000000000000000000000000000000000000000001",
-  module_name: "aptos_coin",
-  name: "AptosCoin",
+  module_name: "some_module",
+  name: "SomeResource",
 };
 
 describe("StructTag", () => {
@@ -49,7 +55,7 @@ describe("TypeTagParser", () => {
       expect(typeTagError.message).toEqual("Invalid type tag.");
     }
 
-    typeTag = "0x1::aptos_coin::AptosCoin<0x1>";
+    typeTag = "0x1::some_module::SomeResource<0x1>";
     parser = new TypeTagParser(typeTag);
     expect(() => parser.parseTypeTag()).toThrowError("Invalid type tag.");
   });
@@ -64,7 +70,7 @@ describe("TypeTagParser", () => {
   });
 
   test("make sure parseTypeTag works with nested type tag", () => {
-    const typeTag = "0x1::aptos_coin::AptosCoin<0x1::aptos_coin::AptosCoin, 0x1::aptos_coin::AptosCoin>";
+    const typeTag = "0x1::some_module::SomeResource<0x1::some_module::SomeResource, 0x1::some_module::SomeResource>";
     const parser = new TypeTagParser(typeTag);
     const result = parser.parseTypeTag() as TypeTagStruct;
     expect(result.value.address.toHexString()).toEqual(expectedTypeTag.address);
@@ -80,5 +86,36 @@ describe("TypeTagParser", () => {
       expect(nestedTypeTag.value.name.value).toEqual(expectedTypeTag.name);
       expect(nestedTypeTag.value.type_args.length).toEqual(0);
     }
+  });
+
+  describe("parse Object type", () => {
+    test("TypeTagParser successfully parses an Object type", () => {
+      const typeTag = "0x1::object::Object<T>";
+      const parser = new TypeTagParser(typeTag);
+      const result = parser.parseTypeTag();
+      expect(result instanceof TypeTagAddress).toBeTruthy();
+    });
+
+    test("TypeTagParser successfully parses a strcut with a nested Object type", () => {
+      const typeTag = "0x1::some_module::SomeResource<0x1::object::Object<T>>";
+      const parser = new TypeTagParser(typeTag);
+      const result = parser.parseTypeTag() as TypeTagStruct;
+      expect(result.value.address.toHexString()).toEqual(expectedTypeTag.address);
+      expect(result.value.module_name.value).toEqual("some_module");
+      expect(result.value.name.value).toEqual("SomeResource");
+      expect(result.value.type_args[0] instanceof TypeTagAddress).toBeTruthy();
+    });
+
+    test("TypeTagParser successfully parses a strcut with a nested Object and Struct types", () => {
+      const typeTag = "0x1::some_module::SomeResource<0x4::object::Object<T>, 0x1::some_module::SomeResource>";
+      const parser = new TypeTagParser(typeTag);
+      const result = parser.parseTypeTag() as TypeTagStruct;
+      expect(result.value.address.toHexString()).toEqual(expectedTypeTag.address);
+      expect(result.value.module_name.value).toEqual("some_module");
+      expect(result.value.name.value).toEqual("SomeResource");
+      expect(result.value.type_args.length).toEqual(2);
+      expect(result.value.type_args[0] instanceof TypeTagAddress).toBeTruthy();
+      expect(result.value.type_args[1] instanceof TypeTagStruct).toBeTruthy();
+    });
   });
 });

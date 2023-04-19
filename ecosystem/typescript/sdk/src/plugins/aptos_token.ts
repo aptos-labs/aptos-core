@@ -12,6 +12,20 @@ import { TransactionBuilderRemoteABI } from "../transaction_builder";
 import { HexString, MaybeHexString } from "../utils";
 import { getPropertyValueRaw, getSinglePropertyValueRaw } from "../utils/property_map_serde";
 
+export interface CreateCollectionOptions {
+  royaltyNumerator?: number;
+  royaltyDenominator?: number;
+  mutableDescription?: boolean;
+  mutableRoyalty?: boolean;
+  mutableURI?: boolean;
+  mutableTokenDescription?: boolean;
+  mutableTokenName?: boolean;
+  mutableTokenProperties?: boolean;
+  mutableTokenURI?: boolean;
+  tokensBurnableByCreator?: boolean;
+  tokensFreezableByCreator?: boolean;
+}
+
 /**
  * Class for managing aptos_token
  */
@@ -53,18 +67,7 @@ export class AptosToken {
    * @param description Collection description
    * @param name Collection name
    * @param uri URL to additional info about collection
-   * @param maxSupply Maximum number of `token_data` allowed within this collection
-   * @param royaltyNumerator The numerator for calculating royalty
-   * @param royaltyDenominator The denominator for calculating royalty
-   * @param mutableDescription Whether the description in mutable
-   * @param mutableRoyalty Whether the royalt in mutable
-   * @param mutableURI Whether the URI in mutable
-   * @param mutableTokenDescription Whether the token description in mutable
-   * @param mutableTokenName Whether the token name in mutable
-   * @param mutableTokenProperties Whether the token properties are mutable
-   * @param mutableTokenURI Whether the token URI in mutable
-   * @param tokensBurnableByCreator Whether token burnable by creator
-   * @param tokensFreezableByCreator Whether token freezable by creator
+   * @param options CreateCollectionOptions type. By default all values set to `true` or `0`
    * @returns The hash of the transaction submitted to the API
    */
   async createCollection(
@@ -73,17 +76,7 @@ export class AptosToken {
     name: string,
     uri: string,
     maxSupply: AnyNumber = MAX_U64_BIG_INT,
-    royaltyNumerator: number = 0,
-    royaltyDenominator: number = 0,
-    mutableDescription: boolean = true,
-    mutableRoyalty: boolean = true,
-    mutableURI: boolean = true,
-    mutableTokenDescription: boolean = true,
-    mutableTokenName: boolean = true,
-    mutableTokenProperties: boolean = true,
-    mutableTokenURI: boolean = true,
-    tokensBurnableByCreator: boolean = true,
-    tokensFreezableByCreator: boolean = true,
+    options?: CreateCollectionOptions,
     extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
     return this.submitTransaction(
@@ -95,17 +88,17 @@ export class AptosToken {
         maxSupply,
         name,
         uri,
-        mutableDescription,
-        mutableRoyalty,
-        mutableURI,
-        mutableTokenDescription,
-        mutableTokenName,
-        mutableTokenProperties,
-        mutableTokenURI,
-        tokensBurnableByCreator,
-        tokensFreezableByCreator,
-        royaltyNumerator,
-        royaltyDenominator,
+        options?.mutableDescription || true,
+        options?.mutableRoyalty || true,
+        options?.mutableURI || true,
+        options?.mutableTokenDescription || true,
+        options?.mutableTokenName || true,
+        options?.mutableTokenProperties || true,
+        options?.mutableTokenURI || true,
+        options?.tokensBurnableByCreator || true,
+        options?.tokensFreezableByCreator || true,
+        options?.royaltyNumerator || 0,
+        options?.royaltyDenominator || 0,
       ],
       extraArgs,
     );

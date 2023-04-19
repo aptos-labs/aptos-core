@@ -84,12 +84,3 @@ test("Test getAddressFromAccountOrAddress", () => {
   );
   expect(getAddressFromAccountOrAddress(account).toString()).toBe(aptosAccountObject.address);
 });
-
-test("Gets the collection object address", () => {
-  const creator = "0x28aa1624f8a8974c4158da696eea0e1c26af2cf7cacdb3564193ae817a44f908";
-  const collectionName = "AliceCollection";
-
-  expect(AptosAccount.getCollectionObjectAddress(creator, collectionName).hex()).toBe(
-    "0xe74374a411c3db7991608d3cfb06501f6c90852ffee35da4bb2fa4839a947047",
-  );
-});

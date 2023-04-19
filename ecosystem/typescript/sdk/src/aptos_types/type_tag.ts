@@ -389,6 +389,9 @@ export class TypeTagParser {
       // an Object `0x1::object::Object<T>` doesn't hold a real type, it points to an address
       // therefore, we parse it as an address and dont need to care/parse the `T` type
       if (module === "object" && name === "Object") {
+        // to support a nested type tag, i.e 0x1::some_module::SomeResource<0x1::object::Object<T>>, we want
+        // to remove the `<T>` part from the tokens list so we dont parse it and can keep parse the type tag.
+        this.tokens.splice(0, 3);
         return new TypeTagAddress();
       }
 
