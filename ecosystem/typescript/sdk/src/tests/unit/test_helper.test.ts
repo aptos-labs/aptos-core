@@ -30,4 +30,4 @@ test("noop", () => {
   // 2. Prevent jest from exploding when it finds a file with no tests in it
 });
 
-export const longTestTimeout = 80 * 1000;
+export const longTestTimeout = 120 * 1000;

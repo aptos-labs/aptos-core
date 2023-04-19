@@ -127,26 +127,6 @@ export class AptosAccount {
   }
 
   /**
-   * Takes creator address and collection name and returns the collection object address.
-   * Collection object addresses are generated as sha256 hash of (creator address + collection_name)
-   *
-   * @param creator Creator address
-   * @param collectionName The collection name
-   * @returns The collection object address
-   */
-  static getCollectionObjectAddress(creator: MaybeHexString, collectionName: string): HexString {
-    const source = bcsToBytes(AccountAddress.fromHex(creator));
-    const seed = new TextEncoder().encode(collectionName);
-
-    const bytes = new Uint8Array([...source, ...seed, AuthenticationKey.DERIVE_OBJECT_FROM_SEED_SCHEME]);
-
-    const hash = sha3Hash.create();
-    hash.update(bytes);
-
-    return HexString.fromUint8Array(hash.digest());
-  }
-
-  /**
    * This key is generated with Ed25519 scheme.
    * Public key is used to check a signature of transaction, signed by given account
    * @returns The public key for the associated account
