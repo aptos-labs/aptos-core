@@ -29,6 +29,11 @@ pub async fn create_swarm(num_nodes: usize, max_block_txns: u64) -> LocalSwarm {
             config
                 .consensus
                 .max_sending_block_txns_quorum_store_override = max_block_txns;
+            config.consensus.quorum_store_configs.sender_max_batch_txns = max_block_txns as usize;
+            config
+                .consensus
+                .quorum_store_configs
+                .receiver_max_batch_txns = max_block_txns as usize;
             config.consensus.round_initial_timeout_ms = 1000;
             // no increase in timeout, to have stable round/second rate.
             config.consensus.round_timeout_backoff_exponent_base = 1.0;
