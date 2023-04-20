@@ -26,13 +26,28 @@ export interface CreateCollectionOptions {
   tokensFreezableByCreator?: boolean;
 }
 
+const PropertyTypeMap = {
+  BOOLEAN: "bool",
+  U8: "u8",
+  U16: "u16",
+  U32: "u32",
+  U64: "u64",
+  U128: "u128",
+  U256: "u256",
+  ADDRESS: "address",
+  VECTOR: "vector<u8>",
+  STRING: "string",
+};
+
+export type PropertyType = keyof typeof PropertyTypeMap;
+
 /**
  * Class for managing aptos_token
  */
 export class AptosToken {
-  provider: Provider;
+  readonly provider: Provider;
 
-  tokenType: string = "0x4::token::Token";
+  private readonly tokenType: string = "0x4::token::Token";
 
   /**
    * Creates new AptosToken instance
@@ -50,13 +65,13 @@ export class AptosToken {
     args: any[],
     extraArgs?: OptionalTransactionArgs,
   ) {
-    const builder = new TransactionBuilderRemoteABI(this.provider.aptosClient, {
+    const builder = new TransactionBuilderRemoteABI(this.provider, {
       sender: account.address(),
       ...extraArgs,
     });
     const rawTxn = await builder.build(`0x4::aptos_token::${funcName}`, typeArgs, args);
     const bcsTxn = AptosClient.generateBCSTransaction(account, rawTxn);
-    const pendingTransaction = await this.provider.aptosClient.submitSignedBCSTransaction(bcsTxn);
+    const pendingTransaction = await this.provider.submitSignedBCSTransaction(bcsTxn);
     return pendingTransaction.hash;
   }
 
@@ -333,9 +348,9 @@ export class AptosToken {
   async addTokenProperty(
     creator: AptosAccount,
     token: MaybeHexString,
-    key: string,
-    type: string,
-    value: string,
+    propertyKey: string,
+    propertyType: PropertyType,
+    propertyValue: string,
     tokenType?: string,
     extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
@@ -343,7 +358,12 @@ export class AptosToken {
       creator,
       "add_property",
       [tokenType || this.tokenType],
-      [HexString.ensure(token).hex(), key, type, getSinglePropertyValueRaw(value, type)],
+      [
+        HexString.ensure(token).hex(),
+        propertyKey,
+        PropertyTypeMap[propertyType],
+        getSinglePropertyValueRaw(propertyValue, PropertyTypeMap[propertyType]),
+      ],
       extraArgs,
     );
   }
@@ -358,7 +378,7 @@ export class AptosToken {
   async removeTokenProperty(
     creator: AptosAccount,
     token: MaybeHexString,
-    key: string,
+    propertyKey: string,
     tokenType?: string,
     extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
@@ -366,7 +386,7 @@ export class AptosToken {
       creator,
       "remove_property",
       [tokenType || this.tokenType],
-      [HexString.ensure(token).hex(), key],
+      [HexString.ensure(token).hex(), propertyKey],
       extraArgs,
     );
   }
@@ -383,9 +403,9 @@ export class AptosToken {
   async updateTokenProperty(
     creator: AptosAccount,
     token: MaybeHexString,
-    key: string,
-    type: string,
-    value: string,
+    propertyKey: string,
+    propertyType: PropertyType,
+    propertyValue: string,
     tokenType?: string,
     extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
@@ -393,7 +413,48 @@ export class AptosToken {
       creator,
       "update_property",
       [tokenType || this.tokenType],
-      [HexString.ensure(token).hex(), key, type, getSinglePropertyValueRaw(value, type)],
+      [
+        HexString.ensure(token).hex(),
+        propertyKey,
+        PropertyTypeMap[propertyType],
+        getSinglePropertyValueRaw(propertyValue, PropertyTypeMap[propertyType]),
+      ],
+      extraArgs,
+    );
+  }
+
+  async addTypedProperty(
+    creator: AptosAccount,
+    token: MaybeHexString,
+    propertyKey: string,
+    propertyType: PropertyType,
+    propertyValue: string,
+    tokenType?: string,
+    extraArgs?: OptionalTransactionArgs,
+  ) {
+    return this.submitTransaction(
+      creator,
+      "add_typed_property",
+      [tokenType || this.tokenType, PropertyTypeMap[propertyType]],
+      [HexString.ensure(token).hex(), propertyKey, propertyValue],
+      extraArgs,
+    );
+  }
+
+  async updateTypedProperty(
+    creator: AptosAccount,
+    token: MaybeHexString,
+    propertyKey: string,
+    propertyType: PropertyType,
+    propertyValue: string,
+    tokenType?: string,
+    extraArgs?: OptionalTransactionArgs,
+  ) {
+    return this.submitTransaction(
+      creator,
+      "update_typed_property",
+      [tokenType || this.tokenType, PropertyTypeMap[propertyType]],
+      [HexString.ensure(token).hex(), propertyKey, propertyValue],
       extraArgs,
     );
   }

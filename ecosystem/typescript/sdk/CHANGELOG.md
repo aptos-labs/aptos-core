@@ -6,11 +6,7 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
-<<<<<<< HEAD
 - Add local tests for `AnsClient`
-=======
-- Add `AptosToken` plugin to support tokenv2
->>>>>>> bb6a557801 (update changelog)
 
 ## 1.8.4 (2023-04-13)
 

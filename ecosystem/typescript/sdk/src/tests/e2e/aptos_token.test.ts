@@ -2,9 +2,9 @@ import { AptosAccount } from "../../account";
 import { UserTransaction } from "../../generated";
 import { AptosToken } from "../../plugins";
 import { Provider } from "../../providers";
-import { NODE_URL, getFaucetClient, longTestTimeout } from "../unit/test_helper.test";
+import { PROVIDER_LOCAL_NETWORK_CONFIG, getFaucetClient, longTestTimeout } from "../unit/test_helper.test";
 
-const provider = new Provider({ fullnodeUrl: NODE_URL, indexerUrl: NODE_URL });
+const provider = new Provider(PROVIDER_LOCAL_NETWORK_CONFIG);
 const faucetClient = getFaucetClient();
 const aptosToken = new AptosToken(provider);
 
@@ -133,7 +133,29 @@ describe("token objects", () => {
     "add token property",
     async () => {
       await provider.waitForTransaction(
-        await aptosToken.addTokenProperty(alice, tokenAddress, "newKey", "bool", "true"),
+        await aptosToken.addTokenProperty(alice, tokenAddress, "newKey", "BOOLEAN", "true"),
+        { checkSuccess: true },
+      );
+    },
+    longTestTimeout,
+  );
+
+  test(
+    "add typed property",
+    async () => {
+      await provider.waitForTransaction(
+        await aptosToken.addTypedProperty(alice, tokenAddress, "newTypedKey", "VECTOR", "[hello,world]"),
+        { checkSuccess: true },
+      );
+    },
+    longTestTimeout,
+  );
+
+  test(
+    "update typed property",
+    async () => {
+      await provider.waitForTransaction(
+        await aptosToken.updateTypedProperty(alice, tokenAddress, "newTypedKey", "U8", "2"),
         { checkSuccess: true },
       );
     },
@@ -144,7 +166,7 @@ describe("token objects", () => {
     "update token property",
     async () => {
       await provider.waitForTransaction(
-        await aptosToken.updateTokenProperty(alice, tokenAddress, "newKey", "u64", "0"),
+        await aptosToken.updateTokenProperty(alice, tokenAddress, "newKey", "U8", "5"),
         { checkSuccess: true },
       );
     },
