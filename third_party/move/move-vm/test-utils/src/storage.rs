@@ -2,7 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{bail, Result, Error};
+use anyhow::{bail, Error, Result};
 use move_core_types::{
     account_address::AccountAddress,
     effects::{AccountChangeSet, ChangeSet, Op},
@@ -10,13 +10,11 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag},
     resolver::{ModuleResolver, MoveResolver, ResourceResolver},
 };
+#[cfg(feature = "table-extension")]
+use move_table_extension::{TableChangeSet, TableHandle, TableResolver};
 use std::{
     collections::{btree_map, BTreeMap},
     fmt::Debug,
-};
-#[cfg(feature = "table-extension")]
-use {
-    move_table_extension::{TableChangeSet, TableHandle, TableResolver},
 };
 
 /// A dummy storage containing no modules or resources.
@@ -36,11 +34,7 @@ impl ModuleResolver for BlankStorage {
 }
 
 impl ResourceResolver for BlankStorage {
-    fn get_resource(
-        &self,
-        _address: &AccountAddress,
-        _tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>> {
+    fn get_resource(&self, _address: &AccountAddress, _tag: &StructTag) -> Result<Option<Vec<u8>>> {
         Ok(None)
     }
 }
