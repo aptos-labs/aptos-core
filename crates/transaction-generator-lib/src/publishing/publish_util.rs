@@ -16,7 +16,7 @@ use rand::{rngs::StdRng, Rng};
 // Information used to track a publisher and what allows to identify and
 // version the package published.
 #[derive(Clone, Debug)]
-struct PackageInfo {
+struct PublisherInfo {
     publisher: AccountAddress,
     suffix: u64,
     fn_count: usize,
@@ -27,7 +27,7 @@ struct PackageInfo {
 // Given a Package, track all publishers.
 #[derive(Clone, Debug)]
 struct PackageTracker {
-    publishers: Vec<PackageInfo>,
+    publishers: Vec<PublisherInfo>,
     suffix: u64,
     package: Package,
 }
@@ -76,7 +76,7 @@ impl PackageHandler {
             Some(idx) => (idx, true),
             None => {
                 let fn_count = rng.gen_range(0usize, 30usize);
-                tracker.publishers.push(PackageInfo {
+                tracker.publishers.push(PublisherInfo {
                     publisher: publisher_address,
                     suffix: tracker.suffix,
                     fn_count,

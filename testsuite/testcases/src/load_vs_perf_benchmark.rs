@@ -60,6 +60,7 @@ pub enum TransactinWorkload {
     CoinTransfer,
     CoinTransferUnique,
     NftMint,
+    TokenV1,
 }
 
 impl TransactinWorkload {
@@ -72,12 +73,14 @@ impl TransactinWorkload {
 
         match self {
             Self::NoOp => request.transaction_type(TransactionType::CallCustomModules {
+                initial_entry_point: None,
                 entry_point: EntryPoints::Nop,
                 num_modules: 1,
                 use_account_pool: false,
             }),
             Self::LargeModuleWorkingSet => {
                 request.transaction_type(TransactionType::CallCustomModules {
+                    initial_entry_point: None,
                     entry_point: EntryPoints::Nop,
                     num_modules: 1000,
                     use_account_pool: false,
@@ -85,6 +88,7 @@ impl TransactinWorkload {
             },
             Self::WriteResourceSmall | Self::WriteResourceBig => {
                 let write_type = TransactionType::CallCustomModules {
+                    initial_entry_point: None,
                     entry_point: EntryPoints::BytesMakeOrChange {
                         data_length: Some(
                             if let Self::WriteResourceBig = self {
@@ -130,6 +134,7 @@ impl TransactinWorkload {
                     }
                 } else {
                     TransactionType::CallCustomModules {
+                        initial_entry_point: None,
                         entry_point: EntryPoints::Nop,
                         num_modules: 1,
                         use_account_pool: true,
@@ -145,6 +150,12 @@ impl TransactinWorkload {
                 ])
             },
             Self::NftMint => request.transaction_type(TransactionType::NftMintAndTransfer),
+            Self::TokenV1 => request.transaction_type(TransactionType::CallCustomModules {
+                initial_entry_point: Some(EntryPoints::InitializeCollection),
+                entry_point: EntryPoints::TokenV1MintAndTransferNFTParallel,
+                num_modules: 1,
+                use_account_pool: false,
+            }),
         }
     }
 }

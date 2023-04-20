@@ -3,7 +3,7 @@
 #![allow(unused)]
 
 use crate::publishing::raw_module_data;
-use aptos_framework::natives::code::PackageMetadata;
+use aptos_framework::natives::code::{MoveOption, PackageMetadata};
 use aptos_sdk::{
     bcs,
     move_types::{
@@ -146,6 +146,15 @@ pub enum EntryPoints {
     },
     /// Increment destination resource - COUNTER_STEP
     StepDst,
+    /// Initialize Token V1 NFT collection
+    InitializeCollection,
+    /// Mint an NFT token. Should be called only after InitializeCollection is called
+    TokenV1MintAndStoreNFTParallel,
+    TokenV1MintAndStoreNFTSequential,
+    TokenV1MintAndTransferNFTParallel,
+    TokenV1MintAndTransferNFTSequential,
+    TokenV1MintAndStoreFT,
+    TokenV1MintAndTransferFT,
 }
 
 impl EntryPoints {
@@ -201,6 +210,40 @@ impl EntryPoints {
                 bytes_make_or_change(rng, module_id, data_len)
             },
             EntryPoints::StepDst => step_dst(module_id, other.expect("Must provide other")),
+            EntryPoints::InitializeCollection => {
+                get_payload_void(module_id, ident_str!("initialize_collection").to_owned())
+            },
+            EntryPoints::TokenV1MintAndStoreNFTParallel => get_payload(
+                module_id,
+                ident_str!("token_v1_mint_and_store_nft_parallel").to_owned(),
+                vec![bcs::to_bytes(other.expect("Must provide other")).unwrap()],
+            ),
+            EntryPoints::TokenV1MintAndStoreNFTSequential => get_payload(
+                module_id,
+                ident_str!("token_v1_mint_and_store_nft_sequential").to_owned(),
+                vec![bcs::to_bytes(other.expect("Must provide other")).unwrap()],
+            ),
+
+            EntryPoints::TokenV1MintAndTransferNFTParallel => get_payload(
+                module_id,
+                ident_str!("token_v1_mint_and_transfer_nft_parallel").to_owned(),
+                vec![bcs::to_bytes(other.expect("Must provide other")).unwrap()],
+            ),
+            EntryPoints::TokenV1MintAndTransferNFTSequential => get_payload(
+                module_id,
+                ident_str!("token_v1_mint_and_transfer_nft_sequential").to_owned(),
+                vec![bcs::to_bytes(other.expect("Must provide other")).unwrap()],
+            ),
+            EntryPoints::TokenV1MintAndStoreFT => get_payload(
+                module_id,
+                ident_str!("token_v1_mint_and_store_ft").to_owned(),
+                vec![bcs::to_bytes(other.expect("Must provide other")).unwrap()],
+            ),
+            EntryPoints::TokenV1MintAndTransferFT => get_payload(
+                module_id,
+                ident_str!("token_v1_mint_and_transfer_ft").to_owned(),
+                vec![bcs::to_bytes(other.expect("Must provide other")).unwrap()],
+            ),
         }
     }
 }
@@ -321,6 +364,12 @@ fn minimize(module_id: ModuleId, other: &AccountAddress) -> TransactionPayload {
 fn step_dst(module_id: ModuleId, dst: &AccountAddress) -> TransactionPayload {
     get_payload(module_id, ident_str!("step_destination").to_owned(), vec![
         bcs::to_bytes(dst).unwrap(),
+    ])
+}
+
+fn mint_new_token(module_id: ModuleId, other: AccountAddress) -> TransactionPayload {
+    get_payload(module_id, ident_str!("mint_new_token").to_owned(), vec![
+        bcs::to_bytes(&other).unwrap(),
     ])
 }
 

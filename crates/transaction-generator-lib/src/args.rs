@@ -15,6 +15,7 @@ pub enum TransactionTypeArg {
     PublishPackage,
     CustomFunctionLargeModuleWorkingSet,
     CreateNewResource,
+    TokenV1NFTMint,
     NoOp,
 }
 
@@ -43,12 +44,14 @@ impl TransactionTypeArg {
             },
             TransactionTypeArg::CustomFunctionLargeModuleWorkingSet => {
                 TransactionType::CallCustomModules {
+                    initial_entry_point: None,
                     entry_point: EntryPoints::Nop,
                     num_modules: 1000,
                     use_account_pool: false,
                 }
             },
             TransactionTypeArg::CreateNewResource => TransactionType::CallCustomModules {
+                initial_entry_point: None,
                 entry_point: EntryPoints::BytesMakeOrChange {
                     data_length: Some(32),
                 },
@@ -56,7 +59,14 @@ impl TransactionTypeArg {
                 use_account_pool: true,
             },
             TransactionTypeArg::NoOp => TransactionType::CallCustomModules {
+                initial_entry_point: None,
                 entry_point: EntryPoints::Nop,
+                num_modules: 1,
+                use_account_pool: false,
+            },
+            TransactionTypeArg::TokenV1NFTMint => TransactionType::CallCustomModules {
+                initial_entry_point: Some(EntryPoints::InitializeCollection),
+                entry_point: EntryPoints::TokenV1MintAndStoreNFTParallel,
                 num_modules: 1,
                 use_account_pool: false,
             },

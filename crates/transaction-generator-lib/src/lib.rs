@@ -58,6 +58,7 @@ pub enum TransactionType {
         use_account_pool: bool,
     },
     CallCustomModules {
+        initial_entry_point: Option<EntryPoints>,
         entry_point: EntryPoints,
         num_modules: usize,
         use_account_pool: bool,
@@ -82,6 +83,7 @@ impl TransactionType {
 
     pub fn default_call_custom_module() -> Self {
         Self::CallCustomModules {
+            initial_entry_point: None,
             entry_point: EntryPoints::Nop,
             num_modules: 1,
             use_account_pool: false,
@@ -90,6 +92,7 @@ impl TransactionType {
 
     pub fn default_call_different_modules() -> Self {
         Self::CallCustomModules {
+            initial_entry_point: None,
             entry_point: EntryPoints::Nop,
             num_modules: 100,
             use_account_pool: false,
@@ -270,12 +273,23 @@ pub async fn create_txn_generator_creator(
                     )
                     .await,
                 ),
+                // TransactionType::NftMint => Box::new(
+                //     NFTMintGeneratorCreator::new(
+                //         txn_factory.clone(),
+                //         init_txn_factory.clone(),
+                //         all_accounts.get_mut(0).unwrap(),
+                //         txn_executor,
+                //         num_workers,
+                //     )
+                //     .await,
+                // ),
                 TransactionType::PublishPackage { use_account_pool } => wrap_accounts_pool(
                     Box::new(PublishPackageCreator::new(txn_factory.clone())),
                     *use_account_pool,
                     accounts_pool.clone(),
                 ),
                 TransactionType::CallCustomModules {
+                    initial_entry_point,
                     entry_point,
                     num_modules,
                     use_account_pool,
@@ -287,6 +301,7 @@ pub async fn create_txn_generator_creator(
                             source_accounts,
                             txn_executor,
                             *entry_point,
+                            *initial_entry_point,
                             *num_modules,
                         )
                         .await,
