@@ -79,7 +79,6 @@ impl CallCustomModulesCreator {
         accounts: &mut [LocalAccount],
         txn_executor: &dyn TransactionExecutor,
         entry_point: EntryPoints,
-        initial_entry_point: Option<EntryPoints>,
         num_modules: usize,
     ) -> Self {
         let mut rng = StdRng::from_entropy();
@@ -103,7 +102,7 @@ impl CallCustomModulesCreator {
         // For Token V1/V2 transactions, we first need to initialize collections before generating mint/transfer transactions.
         // The initial_entry_point is the initialize_collection method for the Token transactions.
         let mut initial_requests = Vec::with_capacity(accounts.len());
-        if let Some(initial_entry_point) = initial_entry_point {
+        if let Some(initial_entry_point) = entry_point.initialize_entry_point() {
             info!("Initializing {} collections", initial_requests.len());
             for account in accounts.iter_mut().take(num_modules) {
                 let package = package_handler.pick_package(&mut rng, account);

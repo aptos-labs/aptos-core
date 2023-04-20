@@ -924,7 +924,6 @@ fn individual_workload_tests(test_name: String, config: ForgeConfig) -> ForgeCon
                     creation_balance: 200_000_000,
                 };
                 let write_type = TransactionType::CallCustomModules {
-                    initial_entry_point: None,
                     entry_point: EntryPoints::BytesMakeOrChange {
                         data_length: Some(32),
                     },
@@ -950,13 +949,11 @@ fn individual_workload_tests(test_name: String, config: ForgeConfig) -> ForgeCon
                         use_account_pool: false,
                     },
                     "module_loading" => TransactionType::CallCustomModules {
-                        initial_entry_point: None,
                         entry_point: EntryPoints::Nop,
                         num_modules: 1000,
                         use_account_pool: false,
                     },
                     "token_v1" => TransactionType::CallCustomModules {
-                        initial_entry_point: Some(EntryPoints::InitializeCollection),
                         entry_point: EntryPoints::TokenV1MintAndStoreNFTParallel,
                         num_modules: 1,
                         use_account_pool: false,

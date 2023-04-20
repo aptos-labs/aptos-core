@@ -246,6 +246,20 @@ impl EntryPoints {
             ),
         }
     }
+
+    pub fn initialize_entry_point(&self) -> Option<EntryPoints> {
+        match self {
+            EntryPoints::TokenV1MintAndStoreFT
+            | EntryPoints::TokenV1MintAndTransferFT
+            | EntryPoints::TokenV1MintAndStoreNFTParallel
+            | EntryPoints::TokenV1MintAndStoreNFTSequential
+            | EntryPoints::TokenV1MintAndTransferNFTParallel
+            | EntryPoints::TokenV1MintAndTransferNFTSequential => {
+                Some(EntryPoints::InitializeCollection)
+            },
+            _ => None,
+        }
+    }
 }
 
 const ZERO_ARG_ENTRY_POINTS: &[EntryPoints; 6] = &[

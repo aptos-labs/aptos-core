@@ -81,7 +81,6 @@ async fn test_txn_emmitter() {
                 // (TransactionType::default_call_different_modules(), 20),
                 (
                     TransactionType::CallCustomModules {
-                        initial_entry_point: None,
                         entry_point: EntryPoints::TokenV1MintAndStoreNFTParallel,
                         num_modules: 1,
                         use_account_pool: false,
@@ -91,7 +90,6 @@ async fn test_txn_emmitter() {
             ],
             vec![(
                 TransactionType::CallCustomModules {
-                    initial_entry_point: None,
                     entry_point: EntryPoints::TokenV1MintAndStoreNFTSequential,
                     num_modules: 1,
                     use_account_pool: false,
@@ -100,7 +98,6 @@ async fn test_txn_emmitter() {
             )],
             vec![(
                 TransactionType::CallCustomModules {
-                    initial_entry_point: None,
                     entry_point: EntryPoints::TokenV1MintAndTransferNFTParallel,
                     num_modules: 1,
                     use_account_pool: false,
@@ -109,7 +106,6 @@ async fn test_txn_emmitter() {
             )],
             vec![(
                 TransactionType::CallCustomModules {
-                    initial_entry_point: None,
                     entry_point: EntryPoints::TokenV1MintAndTransferNFTSequential,
                     num_modules: 1,
                     use_account_pool: false,
