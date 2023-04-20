@@ -1114,7 +1114,7 @@ Helper to check whether a feature flag is enabled.
 
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> [abstract] <b>false</b>;
-<b>ensures</b> [abstract] result == <a href="features.md#0x1_features_spec_reward_rate_decrease_enabled">spec_reward_rate_decrease_enabled</a>();
+<b>ensures</b> [abstract] result == <a href="features.md#0x1_features_spec_periodical_reward_rate_decrease_enabled">spec_periodical_reward_rate_decrease_enabled</a>();
 </code></pre>
 
 
@@ -1194,10 +1194,10 @@ Helper to check whether a feature flag is enabled.
 
 
 
-<a name="0x1_features_spec_reward_rate_decrease_enabled"></a>
+<a name="0x1_features_spec_periodical_reward_rate_decrease_enabled"></a>
 
 
-<pre><code><b>fun</b> <a href="features.md#0x1_features_spec_reward_rate_decrease_enabled">spec_reward_rate_decrease_enabled</a>(): bool {
+<pre><code><b>fun</b> <a href="features.md#0x1_features_spec_periodical_reward_rate_decrease_enabled">spec_periodical_reward_rate_decrease_enabled</a>(): bool {
    <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(<a href="features.md#0x1_features_PERIODICAL_REWARD_RATE_DECREASE">PERIODICAL_REWARD_RATE_DECREASE</a>)
 }
 </code></pre>

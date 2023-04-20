@@ -102,8 +102,14 @@ impl PrimitiveType {
 }
 
 impl Type {
+    /// Create a new primitive type
     pub fn new_prim(p: PrimitiveType) -> Type {
         Type::Primitive(p)
+    }
+
+    /// Creates a unit type
+    pub fn unit() -> Type {
+        Type::Tuple(vec![])
     }
 
     /// Determines whether this is a type parameter.

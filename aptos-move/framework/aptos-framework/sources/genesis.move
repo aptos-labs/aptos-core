@@ -105,7 +105,7 @@ module aptos_framework::genesis {
         };
 
         consensus_config::initialize(&aptos_framework_account, consensus_config);
-        execution_config::initialize(&aptos_framework_account, execution_config);
+        execution_config::set(&aptos_framework_account, execution_config);
         version::initialize(&aptos_framework_account, initial_version);
         stake::initialize(&aptos_framework_account);
         staking_config::initialize(

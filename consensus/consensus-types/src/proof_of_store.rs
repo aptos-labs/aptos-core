@@ -22,9 +22,9 @@ use std::{
 )]
 pub struct BatchId {
     pub id: u64,
-    /// A random number that is stored in the DB and updated only if the value does not exist in
+    /// A number that is stored in the DB and updated only if the value does not exist in
     /// the DB: (a) at the start of an epoch, or (b) the DB was wiped. When the nonce is updated,
-    /// id starts again at 0.
+    /// id starts again at 0. Using the current system time allows the nonce to be ordering.
     pub nonce: u64,
 }
 
@@ -50,11 +50,11 @@ impl PartialOrd<Self> for BatchId {
 
 impl Ord for BatchId {
     fn cmp(&self, other: &Self) -> Ordering {
-        match self.id.cmp(&other.id) {
+        match self.nonce.cmp(&other.nonce) {
             Ordering::Equal => {},
             ordering => return ordering,
         }
-        self.nonce.cmp(&other.nonce)
+        self.id.cmp(&other.id)
     }
 }
 
@@ -313,6 +313,10 @@ impl ProofOfStore {
             .get_voter_addresses(&validator.get_ordered_account_addresses());
         ret.shuffle(&mut thread_rng());
         ret
+    }
+
+    pub fn info(&self) -> &BatchInfo {
+        &self.info
     }
 }
 

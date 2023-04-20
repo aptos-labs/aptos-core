@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::proof_of_store::ProofOfStore;
+use crate::proof_of_store::{BatchInfo, ProofOfStore};
 use aptos_crypto::HashValue;
 use aptos_executor_types::Error;
 use aptos_infallible::Mutex;
@@ -185,7 +185,7 @@ impl fmt::Display for Payload {
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum PayloadFilter {
     DirectMempool(Vec<TransactionSummary>),
-    InQuorumStore(HashSet<HashValue>),
+    InQuorumStore(HashSet<BatchInfo>),
     Empty,
 }
 
@@ -214,7 +214,7 @@ impl From<&Vec<&Payload>> for PayloadFilter {
             for payload in exclude_payloads {
                 if let Payload::InQuorumStore(proof_with_status) = payload {
                     for proof in &proof_with_status.proofs {
-                        exclude_proofs.insert(*proof.digest());
+                        exclude_proofs.insert(proof.info().clone());
                     }
                 }
             }
@@ -236,7 +236,7 @@ impl fmt::Display for PayloadFilter {
             PayloadFilter::InQuorumStore(excluded_proofs) => {
                 let mut proofs_str = "".to_string();
                 for proof in excluded_proofs.iter() {
-                    write!(proofs_str, "{} ", proof)?;
+                    write!(proofs_str, "{} ", proof.digest())?;
                 }
                 write!(f, "{}", proofs_str)
             },

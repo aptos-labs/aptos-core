@@ -68,6 +68,8 @@ BatchMsg:
           TYPENAME: Batch
 BatchPayload:
   STRUCT:
+    - author:
+        TYPENAME: AccountAddress
     - txns:
         SEQ:
           TYPENAME: SignedTransaction

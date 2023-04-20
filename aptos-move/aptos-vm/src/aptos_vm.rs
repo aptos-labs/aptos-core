@@ -28,7 +28,7 @@ use aptos_gas::{
     AptosGasMeter, AptosGasParameters, ChangeSetConfigs, Gas, StandardGasMeter,
     StorageGasParameters,
 };
-use aptos_logger::prelude::*;
+use aptos_logger::{enabled, prelude::*, Level};
 use aptos_state_view::StateView;
 use aptos_types::{
     account_config,
@@ -44,7 +44,9 @@ use aptos_types::{
     vm_status::{AbortLocation, DiscardedVMStatus, StatusCode, VMStatus},
     write_set::WriteSet,
 };
-use aptos_vm_logging::{init_speculative_logs, log_schema::AdapterLogSchema};
+use aptos_vm_logging::{
+    init_speculative_logs, log_schema::AdapterLogSchema, speculative_error, speculative_log,
+};
 use fail::fail_point;
 use move_binary_format::{
     access::ModuleAccess,
@@ -59,6 +61,7 @@ use move_core_types::{
     language_storage::{ModuleId, TypeTag},
     transaction_argument::convert_txn_args,
     value::{serialize_values, MoveValue},
+    vm_status::StatusType,
 };
 use move_vm_runtime::session::SerializedReturnValues;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -1113,6 +1116,13 @@ impl AptosVM {
                 if new_published_modules_loaded {
                     self.0.mark_loader_cache_as_invalid();
                 };
+
+                if err.status_type() == StatusType::InvariantViolation {
+                    speculative_error!(
+                        log_context,
+                        format!("[VM] discarded txn with error {:?}", err)
+                    );
+                }
 
                 let txn_status = TransactionStatus::from(err.clone());
                 if txn_status.is_discarded() {

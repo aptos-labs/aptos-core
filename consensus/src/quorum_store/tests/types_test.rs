@@ -15,7 +15,7 @@ fn test_batch() {
     let source = AccountAddress::random();
     let signed_txns = create_vec_signed_transactions(500);
 
-    let payload = BatchPayload::new(signed_txns.clone());
+    let payload = BatchPayload::new(source, signed_txns.clone());
     let digest = payload.hash();
 
     let batch_request = BatchRequest::new(source, epoch, digest);

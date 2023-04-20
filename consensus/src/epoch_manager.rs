@@ -658,7 +658,7 @@ impl EpochManager {
                 self.epoch(),
                 self.author,
                 epoch_state.verifier.len() as u64,
-                self.config.quorum_store_configs.clone(),
+                self.config.quorum_store.clone(),
                 consensus_to_quorum_store_rx,
                 self.quorum_store_to_mempool_sender.clone(),
                 self.config.mempool_txn_pull_timeout_ms,
@@ -861,7 +861,7 @@ impl EpochManager {
             let buffer_manager_msg_tx = self.buffer_manager_msg_tx.clone();
             let round_manager_tx = self.round_manager_tx.clone();
             let my_peer_id = self.author;
-            let max_num_batches = self.config.quorum_store_configs.receiver_max_num_batches;
+            let max_num_batches = self.config.quorum_store.receiver_max_num_batches;
             self.bounded_executor
                 .spawn(async move {
                     match monitor!(
