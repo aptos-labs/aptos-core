@@ -389,41 +389,6 @@ impl<'r, 'l> Session<'r, 'l> {
     }
 }
 
-/*impl<'r, 'l> DataStore for Session<'r, 'l> {
-    /// Publish a module.
-    fn publish_module(
-        &mut self,
-        module_id: &ModuleId,
-        blob: Vec<u8>,
-        is_republishing: bool,
-    ) -> VMResult<()> {
-        self.data_cache
-            .publish_module(module_id, blob, is_republishing)
-    }
-
-    /// Check if this module exists.
-    fn exists_module(&self, module_id: &ModuleId) -> VMResult<bool> {
-        self.data_cache.exists_module(module_id)
-    }
-
-    // ---
-    // EventStore operations
-    // ---
-
-    /// Emit an event to the EventStore
-    fn emit_event(
-        &mut self,
-        guid: Vec<u8>,
-        seq_num: u64,
-        ty: Type,
-        val: Value,
-    ) -> PartialVMResult<()> {
-        self.data_cache
-            .emit_event(self.runtime.loader(), guid, seq_num, ty, val)
-    }
-}
-*/
-
 pub struct LoadedFunctionInstantiation {
     pub type_arguments: Vec<Type>,
     pub parameters: Vec<Type>,
