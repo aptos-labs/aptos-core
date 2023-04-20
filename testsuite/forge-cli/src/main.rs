@@ -11,11 +11,7 @@ use aptos_forge::{
 };
 use aptos_logger::Level;
 use aptos_rest_client::Client as RestClient;
-use aptos_sdk::{
-    move_types::account_address::AccountAddress,
-    transaction_builder::aptos_stdlib,
-    types::on_chain_config::{ConsensusConfigV1, OnChainConsensusConfig},
-};
+use aptos_sdk::{move_types::account_address::AccountAddress, transaction_builder::aptos_stdlib};
 use aptos_testcases::{
     compatibility_test::SimpleValidatorUpgrade,
     consensus_reliability_tests::ChangingWorkingQuorumTest,
@@ -1074,45 +1070,6 @@ fn three_region_simulation(config: ForgeConfig) -> ForgeConfig {
         )
 }
 
-fn land_blocking_three_region_test_suite(duration: Duration) -> ForgeConfig<'static> {
-    ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
-        .with_initial_fullnode_count(10)
-        .with_network_tests(vec![&ThreeRegionSameCloudSimulationTest])
-        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
-            // Using V2 turns quorum store on by default
-            let consensus_config = OnChainConsensusConfig::V2(ConsensusConfigV1::default());
-            helm_values["chain"]["consensus_config"] =
-                serde_yaml::to_value(consensus_config).unwrap();
-            // Have single epoch change in land blocking
-            helm_values["chain"]["epoch_duration_secs"] = 300.into();
-        }))
-        .with_success_criteria(
-            SuccessCriteria::new(
-                if duration.as_secs() > 1200 {
-                    4500
-                } else {
-                    5000
-                },
-            )
-            .add_no_restarts()
-            .add_wait_for_catchup_s(
-                // Give at least 60s for catchup, give 10% of the run for longer durations.
-                (duration.as_secs() / 10).max(60),
-            )
-            .add_system_metrics_threshold(SystemMetricsThreshold::new(
-                // Check that we don't use more than 12 CPU cores for 30% of the time.
-                MetricsThreshold::new(12, 30),
-                // Check that we don't use more than 10 GB of memory for 30% of the time.
-                MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
-            ))
-            .add_chain_progress(StateProgressThreshold {
-                max_no_progress_secs: 10.0,
-                max_round_gap: 4,
-            }),
-        )
-}
-
 fn network_partition(config: ForgeConfig) -> ForgeConfig {
     config
         .with_initial_validator_count(NonZeroUsize::new(10).unwrap())
@@ -1266,11 +1223,47 @@ fn validators_join_and_leave(forge_config: ForgeConfig<'static>) -> ForgeConfig<
         )
 }
 
+#[allow(dead_code)]
 fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
         .with_initial_fullnode_count(10)
         .with_network_tests(vec![&PerformanceBenchmark])
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+            // Have single epoch change in land blocking
+            helm_values["chain"]["epoch_duration_secs"] = 300.into();
+        }))
+        .with_success_criteria(
+            SuccessCriteria::new(
+                if duration.as_secs() > 1200 {
+                    4500
+                } else {
+                    5000
+                },
+            )
+            .add_no_restarts()
+            .add_wait_for_catchup_s(
+                // Give at least 60s for catchup, give 10% of the run for longer durations.
+                (duration.as_secs() / 10).max(60),
+            )
+            .add_system_metrics_threshold(SystemMetricsThreshold::new(
+                // Check that we don't use more than 12 CPU cores for 30% of the time.
+                MetricsThreshold::new(12, 30),
+                // Check that we don't use more than 10 GB of memory for 30% of the time.
+                MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
+            ))
+            .add_chain_progress(StateProgressThreshold {
+                max_no_progress_secs: 10.0,
+                max_round_gap: 4,
+            }),
+        )
+}
+
+fn land_blocking_three_region_test_suite(duration: Duration) -> ForgeConfig<'static> {
+    ForgeConfig::default()
+        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_fullnode_count(10)
+        .with_network_tests(vec![&ThreeRegionSameCloudSimulationTest])
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // Have single epoch change in land blocking
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
