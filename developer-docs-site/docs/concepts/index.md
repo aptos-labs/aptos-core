@@ -1,6 +1,6 @@
 ---
 title: "Learn Aptos Concepts"
-slug: "aptos-concepts"
+slug: /concepts
 hidden: false
 ---
 
