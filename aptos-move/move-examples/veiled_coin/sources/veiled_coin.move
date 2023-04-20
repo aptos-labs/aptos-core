@@ -400,11 +400,11 @@ module veiled_coin::veiled_coin {
 
         let g_alpha3 = ristretto255::basepoint_mul(&proof.alpha3); 
         // c * C + X3 =? \alpha_3 * g + \alpha_1 * y
-        let big_c = ristretto255::point_mul(big_c, &c);
-        ristretto255::point_add_assign(&mut big_c, &proof.x3);
+        let big_c_acc = ristretto255::point_mul(big_c, &c);
+        ristretto255::point_add_assign(&mut big_c_acc, &proof.x3);
         let y_alpha1 = ristretto255::point_mul(&sender_pubkey_point, &proof.alpha1);
         ristretto255::point_add_assign(&mut y_alpha1, &g_alpha3);
-        assert!(ristretto255::point_equals(&big_c, &y_alpha1), ESIGMA_PROTOCOL_VERIFY_FAILED);
+        assert!(ristretto255::point_equals(&big_c_acc, &y_alpha1), ESIGMA_PROTOCOL_VERIFY_FAILED);
 
         // c * \bar{C} + X4 =? \alpha_3 * g + \alpha_1 * \bar{y}
         let bar_c = ristretto255::point_mul(bar_c, &c);
@@ -414,7 +414,7 @@ module veiled_coin::veiled_coin {
         assert!(ristretto255::point_equals(&bar_c, &bar_y_alpha1), ESIGMA_PROTOCOL_VERIFY_FAILED);
 
         // c * (C_L + -C) + X5 =? \alpha_4 * g + \alpha_2 * (C_R + -D)
-        let neg_C = ristretto255::point_neg(&big_c);
+        let neg_C = ristretto255::point_neg(big_c);
         ristretto255::point_add_assign(&mut neg_C, c_L);
         ristretto255::point_mul_assign(&mut neg_C, &c);
         ristretto255::point_add_assign(&mut neg_C, &proof.x5);
@@ -668,12 +668,12 @@ module veiled_coin::veiled_coin {
         let big_x5 = ristretto255::basepoint_mul(&x4);
         let (c_L, c_R) = elgamal::ciphertext_as_points(source_balance_ct);
         let (big_c, big_d) = elgamal::ciphertext_as_points(withdraw_ct);
-        let (bar_c, _) = elgamal::ciphertext_as_points(deposit_ct);
         let neg_d = ristretto255::point_neg(big_d);
         let c_R_acc = ristretto255::point_add(c_R, &neg_d);
         ristretto255::point_mul_assign(&mut c_R_acc, &x2);
         ristretto255::point_add_assign(&mut big_x5, &c_R_acc);
 
+        let (bar_c, _) = elgamal::ciphertext_as_points(deposit_ct);
         // c <- H(g,y,\bar{y},C_L,C_R,C,D,\bar{C},X_1,X_2,X_3,X_4,X_5)
         let hash_input = vector::empty<u8>();
 
@@ -807,7 +807,6 @@ module veiled_coin::veiled_coin {
        let (_, deposit_ct) = bulletproofs::prove_range_elgamal(&transfer_val, &transfer_rand, &dest_pubkey, MAX_BITS_IN_VALUE, VEILED_COIN_DST);
 
        let sigma_proof = generate_sigma_proof<coin::FakeMoney>(&source_pubkey, &dest_pubkey, &balance_ct, &withdraw_ct, &deposit_ct, &transfer_rand, &source_priv_key, &transfer_val, &new_balance_val);
-
 
        verify_withdrawal_sigma_protocol(&source_pubkey, &dest_pubkey, &balance_ct, &withdraw_ct, &deposit_ct, &sigma_proof);
     }
