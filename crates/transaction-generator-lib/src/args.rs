@@ -19,6 +19,7 @@ pub enum TransactionTypeArg {
     ModifyGlobalResource,
     ModifyTenGlobalResources,
     NoOp,
+    TokenV1NFTMint,
 }
 
 impl Default for TransactionTypeArg {
