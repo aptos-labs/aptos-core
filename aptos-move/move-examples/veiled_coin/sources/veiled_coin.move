@@ -864,50 +864,38 @@ module veiled_coin::veiled_coin {
         // Split 500 and 500 between source and destination
         coin::transfer<coin::FakeMoney>(&source_fx, destination_addr, 500);
 
-        // Mint 100 veiled coins at source (requires registering a veiled coin store at 'source')
+        // Mint 150 veiled coins at source (requires registering a veiled coin store at 'source')
         let (source_priv_key, source_pubkey) = generate_elgamal_keypair(SOME_RANDOMNESS_1);
         let source_pubkey_bytes = elgamal::pubkey_to_bytes(&source_pubkey);
         register<coin::FakeMoney>(&source_fx, source_pubkey_bytes);
         wrap<coin::FakeMoney>(&source_fx, 150);
 
+        let source_original_balance = private_balance<coin::FakeMoney>(source_addr);
+        let source_original_balance = elgamal::decompress_ciphertext(&source_original_balance);
         // Transfer 50 of these veiled coins to destination
-        let val = new_scalar_from_u64(50);
-        let rand = ristretto255::new_scalar_from_sha2_512(SOME_RANDOMNESS_2);
-
-        //let ct = elgamal::new_ciphertext_with_basepoint(&val, &rand, &source_pubkey);
+        let transfer_val = new_scalar_from_u64(50);
+        let transfer_rand = ristretto255::new_scalar_from_sha2_512(SOME_RANDOMNESS_2);
 
         // This will be the balance left at the source, that we need to do a range proof for
-        let source_randomness = ristretto255::scalar_neg(&rand);
-        let source_new_val = new_scalar_from_u64(100);
-        let (new_balance_range_proof, _) = bulletproofs::prove_range_elgamal(&source_new_val, &source_randomness, &source_pubkey, MAX_BITS_IN_VALUE, VEILED_COIN_DST);
+        let new_balance_rand_source = ristretto255::scalar_neg(&transfer_rand);
+        let source_new_balance = new_scalar_from_u64(100);
+        let (new_balance_range_proof, _) = bulletproofs::prove_range_elgamal(&source_new_balance, &new_balance_rand_source, &source_pubkey, MAX_BITS_IN_VALUE, VEILED_COIN_DST);
 
-        let (transferred_amount_range_proof, withdraw_ct) = bulletproofs::prove_range_elgamal(&val, &source_randomness, &source_pubkey, MAX_BITS_IN_VALUE, VEILED_COIN_DST);
+        let (transferred_amount_range_proof, withdraw_ct) = bulletproofs::prove_range_elgamal(&transfer_val, &transfer_rand, &source_pubkey, MAX_BITS_IN_VALUE, VEILED_COIN_DST);
 
         // Execute the veiled transaction: no one will be able to tell 50 coins are being transferred.
         let (_, dest_pubkey) = generate_elgamal_keypair(SOME_RANDOMNESS_3);
         let dest_pubkey_bytes = elgamal::pubkey_to_bytes(&dest_pubkey);
         register<coin::FakeMoney>(&destination, dest_pubkey_bytes);
 
-        let (_, deposit_ct) = bulletproofs::prove_range_elgamal(&source_new_val, &source_randomness, &dest_pubkey, MAX_BITS_IN_VALUE, VEILED_COIN_DST);
+        let (_, deposit_ct) = bulletproofs::prove_range_elgamal(&transfer_val, &transfer_rand, &dest_pubkey, MAX_BITS_IN_VALUE, VEILED_COIN_DST);
 
-        let source_original_balance =  borrow_global<VeiledCoinStore<coin::FakeMoney>>(source_addr).private_balance;
-        let sigma_proof = generate_sigma_proof<coin::FakeMoney>(&source_pubkey, &dest_pubkey, &elgamal::decompress_ciphertext(&source_original_balance), &withdraw_ct, &deposit_ct, &source_randomness, &source_priv_key, &val, &source_new_val);
+        let sigma_proof = generate_sigma_proof<coin::FakeMoney>(&source_pubkey, &dest_pubkey, &source_original_balance, &withdraw_ct, &deposit_ct, &transfer_rand, &source_priv_key, &transfer_val, &source_new_balance);
         let sigma_proof_bytes = serialize_sigma_proof<coin::FakeMoney>(&sigma_proof);
         private_transfer_to_entry<coin::FakeMoney>(&source_fx, destination_addr, elgamal::ciphertext_to_bytes(&withdraw_ct), elgamal::ciphertext_to_bytes(&deposit_ct), bulletproofs::range_proof_to_bytes(&new_balance_range_proof), bulletproofs::range_proof_to_bytes(&transferred_amount_range_proof), sigma_proof_bytes);
 
         // Sanity check veiled balances
-        assert!(verify_opened_balance<coin::FakeMoney>(source_addr, 50, &source_randomness, &source_pubkey), 1);
-        assert!(verify_opened_balance<coin::FakeMoney>(destination_addr, 50, &rand, &dest_pubkey), 1);
-
-        // TODO: Fix this
-        /*assert!(point_equals(
-            pedersen::commitment_as_point(&comm),
-            &point_decompress(&private_balance<coin::FakeMoney>(destination_addr))
-        ), 1);
-
-        assert!(point_equals(
-            pedersen::commitment_as_point(&source_new_comm),
-            &point_decompress(&private_balance<coin::FakeMoney>(source_addr))
-        ), 1);*/
+        assert!(verify_opened_balance<coin::FakeMoney>(source_addr, 100, &new_balance_rand_source, &source_pubkey), 1);
+        assert!(verify_opened_balance<coin::FakeMoney>(destination_addr, 50, &transfer_rand, &dest_pubkey), 1);
     }
 }
