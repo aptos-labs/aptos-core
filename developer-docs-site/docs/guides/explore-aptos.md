@@ -1,6 +1,6 @@
 ---
-title: "Use the Aptos Explorer"
-slug: "use-aptos-explorer"
+title: "Explore Aptos"
+slug: "explore-aptos"
 ---
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';

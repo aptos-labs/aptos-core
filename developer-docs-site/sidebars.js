@@ -56,6 +56,15 @@ const sidebars = {
       link: { type: "doc", id: "releases/index" },
       items: ["releases/mainnet-release", "releases/testnet-release", "releases/devnet-release"],
     },
+    "guides/explore-aptos",
+    "guides/system-integrators-guide",
+  ],
+  appSidebar: [
+    {
+      type: "html",
+      value: "Build",
+      className: "sidebar-title",
+    },
     {
       type: "category",
       label: "Prepare Your Environment",
@@ -63,7 +72,6 @@ const sidebars = {
       collapsible: true,
       collapsed: true,
       items: [
-        "guides/use-aptos-explorer",
         {
           type: "category",
           label: "Install the Aptos CLI",
@@ -81,14 +89,6 @@ const sidebars = {
         "cli-tools/aptos-cli-tool/use-aptos-cli",
         "guides/get-test-funds",
       ],
-    },
-    "guides/system-integrators-guide",
-  ],
-  appSidebar: [
-    {
-      type: "html",
-      value: "Build Apps",
-      className: "sidebar-title",
     },
     {
       type: "category",
