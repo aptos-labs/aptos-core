@@ -98,18 +98,13 @@ const config = {
           {
             type: "dropdown",
             label: "Start",
-            to: "whats-new-in-docs",
+            to: "concepts",
             position: "left",
             items: [
               {
-                label: "See What's New",
+                label: "Learn Aptos Concepts",
                 type: "doc",
-                docId: "whats-new-in-docs",
-              },
-              {
-                label: "Latest Releases",
-                type: "doc",
-                docId: "releases/index",
+                docId: "concepts/index",
               },
               {
                 label: "Read the Aptos White Paper",
@@ -117,9 +112,9 @@ const config = {
                 docId: "aptos-white-paper/index",
               },
               {
-                label: "Learn Aptos Concepts",
+                label: "Latest Releases",
                 type: "doc",
-                docId: "concepts/index",
+                docId: "releases/index",
               },
               {
                 label: "Prepare Your Environment",
@@ -488,7 +483,7 @@ const config = {
             ],
           },
           {
-            to: "/concepts/aptos-concepts",
+            to: "/concepts",
             from: [
               "/basics/basics-txns-states",
               "/basics/basics-accounts",
@@ -497,6 +492,8 @@ const config = {
               "/basics/basics-fullnodes",
               "/basics/basics-validator-nodes",
               "/basics/basics-node-networks-sync",
+              "/concepts/aptos-concepts",
+              "/whats-new-in-docs",
             ],
           },
           {
