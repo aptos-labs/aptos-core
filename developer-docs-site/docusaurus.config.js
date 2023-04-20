@@ -492,6 +492,10 @@ const config = {
             ],
           },
           {
+            to: "/concepts/blockchain",
+            from: ["/guides/basics-life-of-txn"],
+          },
+          {
             to: "/concepts/txns-states",
             from: ["/concepts/basics-txns-states"],
           },

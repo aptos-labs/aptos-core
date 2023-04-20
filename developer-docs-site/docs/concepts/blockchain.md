@@ -1,6 +1,6 @@
 ---
 title: "Aptos Blockchain Deep Dive"
-slug: "basics-life-of-txn"
+slug: "blockchain"
 ---
 
 import ThemedImage from '@theme/ThemedImage';
