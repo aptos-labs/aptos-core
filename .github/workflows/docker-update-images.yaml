@@ -24,7 +24,7 @@ jobs:
         if: ${{ success() }}
         uses: peter-evans/create-pull-request@v5
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.REPO_TOKEN }}
           commit-message: "Update Docker images"
           title: "Update Docker images"
           body: "Update Docker images"
