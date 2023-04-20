@@ -441,19 +441,6 @@ module 0xABCD::Simple {
         let maximum_supply = 1000000;
         let mutate_setting = vector<bool>[ false, false, false ];
 
-        // Create token data for fungible token
-        let tokendata_id = create_token_data(creator, string::utf8(TOKEN_URI), string::utf8(TOKEN_NAME), 5000000);
-
-
-        // Create the Minter resource and publish it under the creator's address
-        move_to(creator, MinterConfig {
-            signer_cap,
-            minting_enabled: true,
-            minted_tokens: table::new(),
-            tokendata_id
-        });
-
-
         token::create_collection(
             &resource_signer,
             collection_name,
@@ -462,6 +449,17 @@ module 0xABCD::Simple {
             maximum_supply,
             mutate_setting
         );
+
+        // Create token data for fungible token
+        let tokendata_id = create_token_data(&resource_signer, string::utf8(TOKEN_URI), string::utf8(TOKEN_NAME), 5000000);
+
+        // Create the Minter resource and publish it under the creator's address
+        move_to(creator, MinterConfig {
+            signer_cap,
+            minting_enabled: true,
+            minted_tokens: table::new(),
+            tokendata_id
+        });
     }
 
     fun get_signer(account_address: address): signer acquires MinterConfig {

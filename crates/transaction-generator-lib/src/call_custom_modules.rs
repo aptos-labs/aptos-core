@@ -103,7 +103,6 @@ impl CallCustomModulesCreator {
         // The initial_entry_point is the initialize_collection method for the Token transactions.
         let mut initial_requests = Vec::with_capacity(accounts.len());
         if let Some(initial_entry_point) = entry_point.initialize_entry_point() {
-            info!("Initializing {} collections", initial_requests.len());
             for account in accounts.iter_mut().take(num_modules) {
                 let package = package_handler.pick_package(&mut rng, account);
                 let request = package.use_specific_transaction(
@@ -115,6 +114,7 @@ impl CallCustomModulesCreator {
                 );
                 initial_requests.push(request);
             }
+            info!("Initializing {} collections", initial_requests.len());
             txn_executor
                 .execute_transactions(&initial_requests)
                 .await
