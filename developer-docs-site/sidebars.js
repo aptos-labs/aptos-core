@@ -92,6 +92,21 @@ const sidebars = {
     },
     {
       type: "category",
+      label: "Learn from Onboarding Tutorials",
+      link: { type: "doc", id: "tutorials/index" },
+      collapsible: true,
+      collapsed: true,
+      items: [
+        "tutorials/first-transaction",
+        "tutorials/your-first-nft",
+        "tutorials/first-coin",
+        "tutorials/first-move-module",
+        "tutorials/first-dapp",
+        "tutorials/first-multisig",
+      ],
+    },
+    {
+      type: "category",
       label: "Follow the Aptos Standards",
       link: { type: "doc", id: "concepts/coin-and-token/index" },
       collapsible: true,
@@ -123,20 +138,6 @@ const sidebars = {
         "guides/resource-accounts",
         "guides/aptos-names-service-package",
         "guides/handle-aptos-errors",
-      ],
-    },
-    {
-      type: "category",
-      label: "Develop with the SDKs",
-      link: { type: "doc", id: "tutorials/index" },
-      collapsible: true,
-      collapsed: true,
-      items: [
-        "tutorials/first-transaction",
-        "tutorials/first-dapp",
-        "tutorials/first-coin",
-        "tutorials/first-multisig",
-        "concepts/coin-and-token/propertymap-offchain",
       ],
     },
     {
@@ -176,7 +177,6 @@ const sidebars = {
     "guides/move-guides/bytecode-dependencies",
     "concepts/base-gas",
     "guides/interacting-with-the-blockchain",
-    "tutorials/first-move-module",
     {
       type: "category",
       label: "Aptos Move Book",
@@ -248,7 +248,6 @@ const sidebars = {
       },
       items: [
         "concepts/coin-and-token/aptos-token-comparison",
-        "tutorials/your-first-nft",
         "guides/move-guides/mint-nft-cli",
         "concepts/coin-and-token/onchain-data",
         "concepts/coin-and-token/nft-minting-tool",

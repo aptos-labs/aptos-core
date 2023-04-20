@@ -141,6 +141,11 @@ const config = {
               },
               {
                 type: "doc",
+                label: "Learn from Onboarding Tutorials",
+                docId: "tutorials/index",
+              },
+              {
+                type: "doc",
                 label: "Follow the Aptos Standards",
                 docId: "concepts/coin-and-token/index",
               },
@@ -153,11 +158,6 @@ const config = {
                 type: "doc",
                 label: "Interact with the Blockchain",
                 docId: "guides/index",
-              },
-              {
-                type: "doc",
-                label: "Develop with the SDKs",
-                docId: "tutorials/index",
               },
               {
                 type: "doc",
@@ -213,11 +213,6 @@ const config = {
                 docId: "guides/interacting-with-the-blockchain",
               },
               {
-                label: "Your First Move Module",
-                type: "doc",
-                docId: "tutorials/first-move-module",
-              },
-              {
                 label: "Aptos Move Book",
                 type: "doc",
                 docId: "guides/move-guides/book/SUMMARY",
@@ -244,11 +239,6 @@ const config = {
                 type: "doc",
                 label: "Compare Token Standards",
                 docId: "concepts/coin-and-token/aptos-token-comparison",
-              },
-              {
-                type: "doc",
-                label: "Mint NFTs with the SDKs",
-                docId: "tutorials/your-first-nft",
               },
               {
                 type: "doc",
