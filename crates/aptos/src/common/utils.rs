@@ -10,11 +10,16 @@ use crate::{
     CliResult,
 };
 use aptos_build_info::build_information;
-use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
+use aptos_crypto::{
+    _once_cell::sync::Lazy,
+    ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
+};
 use aptos_keygen::KeyGen;
 use aptos_logger::{debug, Level};
 use aptos_rest_client::{aptos_api_types::HashValue, Account, Client, State};
-use aptos_telemetry::service::telemetry_is_disabled;
+use aptos_telemetry::{
+    service::telemetry_is_disabled, system_information::collect_limited_system_information,
+};
 use aptos_types::{
     account_address::create_multisig_account_address,
     chain_id::ChainId,
@@ -33,6 +38,7 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
     str::FromStr,
+    sync::{Arc, Mutex},
     time::{Duration, Instant, SystemTime},
 };
 
@@ -97,6 +103,9 @@ pub fn cli_build_information() -> BTreeMap<String, String> {
     build_information!()
 }
 
+pub static CLI_TELEMETRY: Lazy<Arc<Mutex<BTreeMap<String, String>>>> =
+    Lazy::new(|| Arc::new(Mutex::new(build_information!())));
+
 /// Sends a telemetry event about the CLI build, command and result
 async fn send_telemetry_event(
     command: &str,
@@ -104,12 +113,12 @@ async fn send_telemetry_event(
     success: bool,
     error: Option<&str>,
 ) {
-    // Collect the build information
-    let build_information = cli_build_information();
+    let mut telemetry = CLI_TELEMETRY.lock().unwrap().clone();
+    collect_limited_system_information(&mut telemetry);
 
     // Send the event
     aptos_telemetry::cli_metrics::send_cli_telemetry_event(
-        build_information,
+        telemetry,
         command.into(),
         latency,
         success,

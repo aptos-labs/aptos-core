@@ -20,6 +20,7 @@ use crate::common::{
     types::{CliCommand, CliResult, CliTypedResult},
     utils::cli_build_information,
 };
+use aptos_telemetry::system_information::collect_limited_system_information;
 use async_trait::async_trait;
 use clap::Parser;
 use std::collections::BTreeMap;
@@ -85,6 +86,8 @@ impl CliCommand<BTreeMap<String, String>> for InfoTool {
     }
 
     async fn execute(self) -> CliTypedResult<BTreeMap<String, String>> {
-        Ok(cli_build_information())
+        let mut info = cli_build_information();
+        collect_limited_system_information(&mut info);
+        Ok(info)
     }
 }

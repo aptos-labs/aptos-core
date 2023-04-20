@@ -54,6 +54,45 @@ pub fn get_system_information() -> BTreeMap<String, String> {
     system_information
 }
 
+/// This collects limited information used for something like the CLI rather than
+/// collecting everything about the system
+pub fn collect_limited_system_information(system_information: &mut BTreeMap<String, String>) {
+    // Note: this might be expensive, so it shouldn't be done often
+    let mut system_lock = GLOBAL_SYSTEM.lock();
+    system_lock.refresh_system();
+
+    let cpus = system_lock.cpus();
+    system_information.insert(CPU_COUNT.into(), cpus.len().to_string());
+    utils::insert_optional_value(
+        system_information,
+        CPU_CORE_COUNT,
+        system_lock
+            .physical_core_count()
+            .map(|count| count.to_string()),
+    );
+
+    // Collect the overall CPU info
+    let global_cpu = system_lock.global_cpu_info();
+    system_information.insert(CPU_BRAND.into(), global_cpu.brand().into());
+    system_information.insert(CPU_VENDOR_ID.into(), global_cpu.vendor_id().into());
+
+    // Collect memory total
+    system_information.insert(MEMORY_TOTAL.into(), system_lock.total_memory().to_string());
+
+    // Collect system info
+    utils::insert_optional_value(
+        system_information,
+        SYSTEM_KERNEL_VERSION,
+        system_lock.kernel_version(),
+    );
+    utils::insert_optional_value(system_information, SYSTEM_NAME, system_lock.name());
+    utils::insert_optional_value(
+        system_information,
+        SYSTEM_OS_VERSION,
+        system_lock.long_os_version(),
+    );
+}
+
 /// Collects the system info and appends it to the given map
 pub(crate) fn collect_system_info(system_information: &mut BTreeMap<String, String>) {
     // Note: this might be expensive, so it shouldn't be done often
