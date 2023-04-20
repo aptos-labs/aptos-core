@@ -36,7 +36,7 @@ Aptos blockchain node deployment
 | haproxy.enabled | bool | `true` | Enable HAProxy deployment in front of validator and fullnodes |
 | haproxy.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy to use for HAProxy images |
 | haproxy.image.repo | string | `"haproxy"` | Image repo to use for HAProxy images |
-| haproxy.image.tag | string | `"2.2.14@sha256:36aa98fff27dcb2d12c93e68515a6686378c783ea9b1ab1d01ce993a5cbc73e1"` | Image tag to use for HAProxy images |
+| haproxy.image.tag | string | `"2.2.29@sha256:8019a233a37045a27970dbc990e9ea485799200c40f658e4620b7fdf55641a3c"` | Image tag to use for HAProxy images |
 | haproxy.limits.validator.connectionsPerIPPerMin | int | `12` | Limit the number of connections per IP address per min |
 | haproxy.limits.validator.maxBytesOutRate10sec | int | `134217728` |  |
 | haproxy.limits.validator.rateLimitSession | int | `256` |  |

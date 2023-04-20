@@ -2,8 +2,13 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::utils;
+use crate::{
+    config::{config_sanitizer::ConfigSanitizer, Error, NodeConfig, RoleType},
+    utils,
+};
 use aptos_logger::{Level, CHANNEL_SIZE};
+use aptos_types::chain_id::ChainId;
+use cfg_if::cfg_if;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -49,5 +54,68 @@ impl LoggerConfig {
 
     pub fn randomize_ports(&mut self) {
         self.tokio_console_port = Some(utils::get_available_port());
+    }
+}
+
+impl ConfigSanitizer for LoggerConfig {
+    /// Validate and process the logger config according to the given node role and chain ID
+    fn sanitize(
+        node_config: &mut NodeConfig,
+        _node_role: RoleType,
+        _chain_id: ChainId,
+    ) -> Result<(), Error> {
+        let sanitizer_name = Self::get_sanitizer_name();
+        let logger_config = &node_config.logger;
+
+        // Verify that tokio console tracing is correctly configured
+        if is_tokio_console_enabled() && logger_config.tokio_console_port.is_none() {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "The tokio-console feature is enabled but the tokio console port is not set!"
+                    .into(),
+            ));
+        } else if !is_tokio_console_enabled() && logger_config.tokio_console_port.is_some() {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "The tokio-console feature is not enabled but the tokio console port is set!"
+                    .into(),
+            ));
+        }
+
+        Ok(())
+    }
+}
+
+/// Returns true iff the tokio-console feature is enabled
+fn is_tokio_console_enabled() -> bool {
+    cfg_if! {
+        if #[cfg(feature = "tokio-console")] {
+            true
+        } else {
+            false
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sanitize_missing_feature() {
+        // Create a logger config with the tokio console port set
+        let mut node_config = NodeConfig {
+            logger: LoggerConfig {
+                tokio_console_port: Some(100),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Verify that the config fails sanitization (the tokio-console feature is missing!)
+        let error =
+            LoggerConfig::sanitize(&mut node_config, RoleType::Validator, ChainId::testnet())
+                .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
     }
 }

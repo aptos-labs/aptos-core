@@ -1,11 +1,11 @@
 ---
-title: "Connecting to Aptos Network"
+title: "Connect to Aptos Network"
 slug: "connect-to-aptos-network"
 ---
 
-# Connecting to Aptos Network
+# Connect to Aptos Network
 
-This document describes how to connect your running validator node and validator fullnode to an Aptos network. Follow these instructions only if your validator has met the minimal staking requirement. 
+This document describes how to connect your running validator node and validator fullnode to an Aptos network. Follow these instructions only if your validator has met the minimal [staking](../../../concepts/staking.md) requirement. 
 
 :::tip Minimum staking requirement
 The current required minimum for staking is 1M APT tokens.
@@ -13,7 +13,7 @@ The current required minimum for staking is 1M APT tokens.
 
 ## Bootstrapping validator node
 
-Before joining the network, make sure the validator node is bootstrapped with the correct genesis blob and waypoint for corresponding network. To bootstrap your node, first you need to know the pool address to use:
+Before joining the network, make sure the validator node is bootstrapped with the correct [genesis blob and waypoint](../../node-files-all-networks/node-files.md) for the corresponding network. To bootstrap your node, first you need to know the pool address to use:
 
 :::tip 
 The command below uses the network you set for the account when [initializing the CLI](../../../nodes/validator-node/owner/index.md#initialize-cli).
@@ -28,11 +28,11 @@ aptos node get-stake-pool \
 
 1. Stop your node and remove the data directory. 
    - **Make sure you remove the `secure-data.json` file also**. View [validator.yaml](https://github.com/aptos-labs/aptos-core/blob/e358a61018bb056812b5c3dbd197b0311a071baf/docker/compose/aptos-node/validator.yaml#L13) to see the location of the `secure-data.json` file. 
-2. Download the `genesis.blob` and `waypoint.txt` files published by Aptos Labs team. 
-   - See [Node Files](../../node-files-all-networks/node-files.md) for locations and commands to download these files.
+2. Download the `genesis.blob` and `waypoint.txt` files published by Aptos. 
+   - See [Node Files](../../node-files-all-networks/node-files.md) for your network (mainnet, testnet, or devnet) for the locations and commands to download these files.
 3. Update your `account_address` in the `validator-identity.yaml` and `validator-fullnode-identity.yaml` files to your **pool address**. Do not change anything else. Keep the keys as they are. 
-4. Pull the latest changes from the `mainnet` branch. 
-5. [Optional] You can use fast sync to bootstrap your node if the network has been running for a long time (e.g. testnet). Add the below configuration to your `validator.yaml` and `fullnode.yaml` files. Also see [Fast syncing](../../../guides/state-sync.md#fast-syncing).
+4. Pull the latest changes from the associated (ex. `mainnet`) branch. 
+5. [Optional] You can use [fast sync](../../../guides/state-sync.md#fast-syncing) to bootstrap your node if the network has been running for a long time (e.g. testnet, mainnet). Add the below configuration to your `validator.yaml` and `fullnode.yaml` files:
     ```yaml
     state_sync:
      state_sync_driver:
@@ -45,12 +45,12 @@ aptos node get-stake-pool \
 ### Using Docker
 
 1. Stop your node and remove the data volumes: `docker compose down --volumes`. 
-   - **Make sure you remove the `secure-data.json` file too.** [Click here to see the location of the `secure-data.json` file](https://github.com/aptos-labs/aptos-core/blob/e358a61018bb056812b5c3dbd197b0311a071baf/docker/compose/aptos-node/validator.yaml#L13). 
-2. Download the `genesis.blob` and `waypoint.txt` files published by Aptos Labs team. 
+   - **Make sure you remove the `secure-data.json` file too.** See this [validator.yaml](https://github.com/aptos-labs/aptos-core/blob/e358a61018bb056812b5c3dbd197b0311a071baf/docker/compose/aptos-node/validator.yaml#L13) line for the location of the `secure-data.json` file. 
+2. Download the `genesis.blob` and `waypoint.txt` files published by Aptos. 
    - See [Node Files](../../node-files-all-networks/node-files.md) for locations and commands to download these files.
 3. Update your `account_address` in the `validator-identity.yaml` and `validator-fullnode-identity.yaml` files to your **pool address**.
-4. Update your Docker image to the latest of the network branch (e.g. mainnet, testnet).
-5. [Optional] You can use fast sync to bootstrap your node if the network has been running for a long time (e.g. testnet). Add this configuration to your `validator.yaml` and `fullnode.yaml` files. Also see [Fast syncing](../../../guides/state-sync.md#fast-syncing).
+4. Update your Docker image to the [latest release](../../../releases/index.md) of the network branch (e.g. mainnet, testnet).
+5. [Optional] You can use [fast sync](../../../guides/state-sync.md#fast-syncing) to bootstrap your node if the network has been running for a long time (e.g. testnet). Add this configuration to your `validator.yaml` and `fullnode.yaml` files:
     ```yaml
     state_sync:
      state_sync_driver:
@@ -58,13 +58,13 @@ aptos node get-stake-pool \
          continuous_syncing_mode: ApplyTransactionOutputs
     ```
 6. Close the metrics port `9101` and the REST API port `80` on your validator (remove it from the Docker compose file). You can leave it open for the public fullnode.
-7. Restart the node: `docker compose up`.
+7. Restart the node with: `docker compose up`
 
 ### Using Terraform
 
-1. Increase `era` number in your Terraform configuration. When this configuration is applied, it will wipe the data.
+1. Increase the `era` number in your Terraform configuration. When this configuration is applied, it will wipe the data.
 2. Update `chain_id` to 1 (for mainnet). The chain IDs for other Aptos networks are in [Aptos Blockchain Deployments](../../aptos-deployments.md).
-3. Update your Docker image to the latest of the network branch (e.g. mainnet, testnet).
+3. Update your Docker image to the [latest release](../../../releases/index.md) of the network branch (e.g. mainnet, testnet).
 4. Close the metrics port and the REST API port for validator. 
 5. [Optional] You can use fast sync to bootstrap your node if the network has been running for a long time (e.g. testnet). by adding the following Helm values in your `main.tf ` file:
 
@@ -110,7 +110,7 @@ aptos node get-stake-pool \
          }
          ```
 
-     2. Apply the changes: `terraform apply`.
+     2. Apply the changes with: `terraform apply`
 
      3. You will see a new pod getting created. Run `kubectl get pods` to check.
 
@@ -126,7 +126,7 @@ aptos node get-stake-pool \
 
 
 7. Pull latest of the terraform module `terraform get -update`, and then apply Terraform: `terraform apply`.
-8. Download the `genesis.blob` and `waypoint.txt` files published by Aptos Labs team. 
+8. Download the `genesis.blob` and `waypoint.txt` files published by Aptos. 
    - See [Node Files](../../node-files-all-networks/node-files.md) for locations and commands to download these files.
 9. Update your `account_address` in the `validator-identity.yaml` and `validator-fullnode-identity.yaml` files to your  **pool address**. Do not change anything else. Keep the keys as they are.
 10. Recreate the secrets. Make sure the secret name matches your `era` number, e.g. if you have `era = 3`, then you should replace the secret name to be:
@@ -144,14 +144,15 @@ aptos node get-stake-pool \
       --from-file=validator-full-node-identity.yaml=keys/validator-full-node-identity.yaml
   ```
 
+## Verify Node Connections
 
-## Verify node connections
+Now that you have [connected to the Aptos network](./connect-to-aptos-network.md), you should verify your node connections.
 
 :::tip Node Liveness Definition
 See [node liveness criteria](../operator/node-liveness-criteria.md) for details. 
 :::
 
-After your validator node joined the validator set, you can verify the correctness following those steps:
+After your validator node has joined the validator set, you can validate its correctness by following these steps:
 
 1. Verify that your node is connecting to other peers on the network. **Replace `127.0.0.1` with your validator IP/DNS if deployed on the cloud**.
 
@@ -168,7 +169,7 @@ After your validator node joined the validator set, you can verify the correctne
 
     As long as one of the metrics is greater than zero, your node is connected to at least one of the peers on the testnet.
 
-2. You can also check if your node is connected to Aptos Labs's node: replace `<Aptos Peer ID>` with the peer ID shared by Aptos team.
+2. You can also check if your node is connected to an Aptos node: replace `<Aptos Peer ID>` with the peer ID shared by Aptos team.
 
     ```bash
     curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_network_peer_connected{.*remote_peer_id=\"<Aptos Peer ID>\".*}"

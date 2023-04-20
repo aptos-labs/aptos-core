@@ -10,25 +10,8 @@ Our goal is to make contributing to Aptos Core easy and transparent. See [Aptos 
 ## Aptos Core
 
 To contribute to the Aptos Core implementation, first start with the proper development copy.
-
-To get the development installation with all the necessary dependencies for linting, testing, and building the documentation, run the following:
-```bash
-# fork https://github.com/aptos-labs/aptos-core.git via the github UI
-# repace <your-github> below to clone your (origin) remote fork
-git clone https://github.com/<your-github>/aptos-core.git
-cd aptos-core
-git remote add upstream https://github.com/aptos-labs/aptos-core.git
-./scripts/dev_setup.sh
-cargo build
-cargo test -- --skip prover
-```
-
-Bonus round, install prover tools and don't skip the prover tests:
-
-```bash
-./scripts/dev_setup.sh -y -p
-cargo test
-```
+You may want to use the GitHub interface to fork [aptos-core](https://github.com/aptos-labs/aptos-core) and check out your fork.
+For development environment setup and first build, see [Building Aptos From Source](https://aptos.dev/guides/building-from-source)
 
 ## Our Development Process
 

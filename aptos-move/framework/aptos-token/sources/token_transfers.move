@@ -238,7 +238,7 @@ module aptos_token::token_transfers {
 
         token::create_collection(
             creator,
-            *&collection_name,
+            collection_name,
             string::utf8(b"Collection: Hello, World"),
             string::utf8(b"https://aptos.dev"),
             1,
@@ -251,7 +251,7 @@ module aptos_token::token_transfers {
         let default_types = vector<String>[string::utf8(b"integer"), string::utf8(b"integer")];
         token::create_token_script(
             creator,
-            *&collection_name,
+            collection_name,
             string::utf8(b"Token: Hello, Token"),
             string::utf8(b"Hello, Token"),
             amount,
@@ -267,7 +267,7 @@ module aptos_token::token_transfers {
         );
         token::create_token_id_raw(
             signer::address_of(creator),
-            *&collection_name,
+            collection_name,
             string::utf8(b"Token: Hello, Token"),
             0
         )

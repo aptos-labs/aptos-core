@@ -10,7 +10,7 @@ use std::{convert::TryFrom, fmt, str::FromStr};
 /// When signing transactions for such chains, the numerical chain ID should still be used
 /// (e.g. MAINNET has numeric chain ID 1, TESTNET has chain ID 2, etc)
 #[repr(u8)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum NamedChain {
     /// Users might accidentally initialize the ChainId field to 0, hence reserving ChainId 0 for accidental
     /// initialization.
@@ -75,6 +75,32 @@ impl FromStr for NamedChain {
 /// that this field maybe updated to be uleb64 in the future
 #[derive(Clone, Copy, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct ChainId(u8);
+
+impl ChainId {
+    /// Returns true iff the chain ID matches devnet
+    pub fn is_devnet(&self) -> bool {
+        self.matches_named_chain(NamedChain::DEVNET)
+    }
+
+    /// Returns true iff the chain ID matches testnet
+    pub fn is_testnet(&self) -> bool {
+        self.matches_named_chain(NamedChain::TESTNET)
+    }
+
+    /// Returns true iff the chain ID matches mainnet
+    pub fn is_mainnet(&self) -> bool {
+        self.matches_named_chain(NamedChain::MAINNET)
+    }
+
+    /// Returns true iff the chain ID matches the given named chain
+    fn matches_named_chain(&self, expected_chain: NamedChain) -> bool {
+        if let Ok(named_chain) = NamedChain::from_chain_id(self) {
+            named_chain == expected_chain
+        } else {
+            false
+        }
+    }
+}
 
 pub fn deserialize_config_chain_id<'de, D>(
     deserializer: D,

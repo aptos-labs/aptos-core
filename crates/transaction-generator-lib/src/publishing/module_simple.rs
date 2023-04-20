@@ -106,9 +106,9 @@ pub enum EntryPoints {
     // 0 args
     /// Empty (NoOp) function
     Nop,
-    /// Increment global resource - COUNTER_STEP
+    /// Increment signer resource - COUNTER_STEP
     Step,
-    /// Fetch global resource - COUNTER_STEP
+    /// Fetch signer resource - COUNTER_STEP
     GetCounter,
     /// Reset resource `Resource`
     ResetData,
@@ -144,6 +144,8 @@ pub enum EntryPoints {
     BytesMakeOrChange {
         data_length: Option<usize>,
     },
+    /// Increment destination resource - COUNTER_STEP
+    StepDst,
 }
 
 impl EntryPoints {
@@ -151,7 +153,7 @@ impl EntryPoints {
         &self,
         module_id: ModuleId,
         rng: Option<&mut StdRng>,
-        other: Option<AccountAddress>,
+        other: Option<&AccountAddress>,
     ) -> TransactionPayload {
         match self {
             // 0 args
@@ -198,6 +200,7 @@ impl EntryPoints {
                 let data_len = data_length.unwrap_or_else(|| rng.gen_range(0usize, 1000usize));
                 bytes_make_or_change(rng, module_id, data_len)
             },
+            EntryPoints::StepDst => step_dst(module_id, other.expect("Must provide other")),
         }
     }
 }
@@ -303,15 +306,21 @@ fn set_name(rng: &mut StdRng, module_id: ModuleId) -> TransactionPayload {
     ])
 }
 
-fn maximize(module_id: ModuleId, other: AccountAddress) -> TransactionPayload {
+fn maximize(module_id: ModuleId, other: &AccountAddress) -> TransactionPayload {
     get_payload(module_id, ident_str!("maximize").to_owned(), vec![
-        bcs::to_bytes(&other).unwrap(),
+        bcs::to_bytes(other).unwrap(),
     ])
 }
 
-fn minimize(module_id: ModuleId, other: AccountAddress) -> TransactionPayload {
+fn minimize(module_id: ModuleId, other: &AccountAddress) -> TransactionPayload {
     get_payload(module_id, ident_str!("minimize").to_owned(), vec![
-        bcs::to_bytes(&other).unwrap(),
+        bcs::to_bytes(other).unwrap(),
+    ])
+}
+
+fn step_dst(module_id: ModuleId, dst: &AccountAddress) -> TransactionPayload {
+    get_payload(module_id, ident_str!("step_destination").to_owned(), vec![
+        bcs::to_bytes(dst).unwrap(),
     ])
 }
 

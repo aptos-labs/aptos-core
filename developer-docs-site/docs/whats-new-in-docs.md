@@ -7,6 +7,10 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site. Note, this site is built from the `main` upstream branch of GitHub and so therefore reflects the latest changes to Aptos. If you have checked out [another branch](https://github.com/aptos-labs/aptos-core/branches) to use a [specific network](guides/system-integrators-guide.md#choose-a-network), the code may not yet have all of the features described here.
 
+## 14 April 2023
+
+- Migrated the [Move Prover](./guides/prover-guides/index.md) [User Guide](./guides/prover-guides/prover-guide.md) and [Move Specification Language](./guides/prover-guides/spec-lang.md) to Aptos.dev for greater visibility and ease of use.
+
 ## 30 March 2023
 
 - Depicted how to employ [Move scripts](./guides/move-guides/move-scripts.md) to execute a series of commands across published Move module interfaces.
