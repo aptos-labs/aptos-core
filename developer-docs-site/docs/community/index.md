@@ -45,8 +45,6 @@ We at Aptos love direct contributions in the form of [pull requests](https://git
 * [Move](../guides/move-guides/book/coding-conventions.md)
 * [Rust](./rust-coding-guidelines.md)
 
-For larger changes, [report the issue](#report-issues-request-enhancements) for discussion with the Aptos team before beginning your coding work. And when done, add your enhancement to the [Community Highlights](./contributions/index.md) list.
-
 ## Update the documentation
 
 You may report problems and supply other input in the [#docs-feedback](https://discord.com/channels/945856774056083548/1034215378299133974) channel of [Aptos Discord](https://discord.gg/aptoslabs). To help with our contents, follow [Update Aptos.dev](./site-updates.md).

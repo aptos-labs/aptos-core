@@ -360,11 +360,6 @@ const config = {
                 docId: "community/index",
               },
               {
-                label: "Community Highlights",
-                type: "doc",
-                docId: "community/contributions/index",
-              },
-              {
                 label: "External Resources",
                 type: "doc",
                 docId: "community/external-resources",
