@@ -203,7 +203,8 @@ impl<'r> TransactionDataCache<'r> {
                     load_res = Some(None);
                     GlobalValue::none()
                 },
-                Err(msg) => {
+                Err(err) => {
+                    let msg = format!("Unexpected storage error: {:?}", err);
                     return Err(
                         PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                             .with_message(msg),
@@ -235,7 +236,8 @@ impl<'r> TransactionDataCache<'r> {
             Ok(None) => Err(PartialVMError::new(StatusCode::LINKER_ERROR)
                 .with_message(format!("Cannot find {:?} in data cache", module_id))
                 .finish(Location::Undefined)),
-            Err(msg) => {
+            Err(err) => {
+                let msg = format!("Unexpected storage error: {:?}", err);
                 Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                         .with_message(msg)

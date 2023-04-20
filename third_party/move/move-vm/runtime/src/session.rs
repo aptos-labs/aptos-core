@@ -14,19 +14,18 @@ use move_binary_format::{
 use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet, Event},
+    gas_algebra::NumBytes,
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
     value::MoveTypeLayout,
 };
 use move_vm_types::{
+    data_store::DataStore,
     gas::GasMeter,
     loaded_data::runtime_types::{CachedStructIndex, StructType, Type},
+    values::{GlobalValue, Value},
 };
 use std::{borrow::Borrow, sync::Arc};
-use move_core_types::gas_algebra::NumBytes;
-use move_vm_types::data_store::DataStore;
-use move_vm_types::values::{Value, GlobalValue};
-use crate::loader::Loader;
 
 pub struct Session<'r, 'l> {
     pub(crate) runtime: &'l VMRuntime,
@@ -358,7 +357,7 @@ impl<'r, 'l> Session<'r, 'l> {
 
     /// Gets the abilities for this type, at it's particular instantiation
     pub fn get_type_abilities(&self, ty: &Type) -> VMResult<AbilitySet> {
-        self.runtime/**/
+        self.runtime /**/
             .loader()
             .abilities(ty)
             .map_err(|e| e.finish(Location::Undefined))
@@ -387,8 +386,7 @@ impl<'r, 'l> DataStore for Session<'r, 'l> {
 
     /// Get the serialized format of a `CompiledModule` given a `ModuleId`.
     fn load_module(&self, module_id: &ModuleId) -> VMResult<Vec<u8>> {
-        self.data_cache
-            .load_module(module_id)
+        self.data_cache.load_module(module_id)
     }
 
     /// Publish a module.
@@ -398,7 +396,8 @@ impl<'r, 'l> DataStore for Session<'r, 'l> {
         blob: Vec<u8>,
         is_republishing: bool,
     ) -> VMResult<()> {
-        self.data_cache.publish_module(module_id, blob, is_republishing)
+        self.data_cache
+            .publish_module(module_id, blob, is_republishing)
     }
 
     /// Check if this module exists.
@@ -418,7 +417,8 @@ impl<'r, 'l> DataStore for Session<'r, 'l> {
         ty: Type,
         val: Value,
     ) -> PartialVMResult<()> {
-        self.data_cache.emit_event(self.runtime.loader(), guid, seq_num, ty, val)
+        self.data_cache
+            .emit_event(self.runtime.loader(), guid, seq_num, ty, val)
     }
 }
 

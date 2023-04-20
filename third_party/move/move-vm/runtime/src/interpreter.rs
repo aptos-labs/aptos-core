@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    data_cache::TransactionDataCache,
     loader::{Function, Loader, Resolver},
     native_extensions::NativeContextExtensions,
     native_functions::NativeContext,
@@ -31,7 +32,6 @@ use move_vm_types::{
 };
 use std::{cmp::min, collections::VecDeque, fmt::Write, sync::Arc};
 use tracing::error;
-use crate::data_cache::TransactionDataCache;
 
 macro_rules! debug_write {
     ($($toks: tt)*) => {

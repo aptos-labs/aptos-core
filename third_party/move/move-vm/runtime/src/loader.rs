@@ -4,6 +4,7 @@
 
 use crate::{
     config::VMConfig,
+    data_cache::TransactionDataCache,
     logging::expect_no_verification_errors,
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
     session::LoadedFunctionInstantiation,
@@ -29,9 +30,7 @@ use move_core_types::{
     value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
 };
-use move_vm_types::{
-    loaded_data::runtime_types::{CachedStructIndex, StructType, Type},
-};
+use move_vm_types::loaded_data::runtime_types::{CachedStructIndex, StructType, Type};
 use parking_lot::RwLock;
 use sha3::{Digest, Sha3_256};
 use std::{
@@ -41,7 +40,6 @@ use std::{
     sync::Arc,
 };
 use tracing::error;
-use crate::data_cache::TransactionDataCache;
 
 type ScriptHash = [u8; 32];
 

@@ -3,7 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    interpreter::Interpreter, loader::Resolver, native_extensions::NativeContextExtensions,
+    data_cache::TransactionDataCache, interpreter::Interpreter, loader::Resolver,
+    native_extensions::NativeContextExtensions,
 };
 use move_binary_format::errors::{
     ExecutionState, Location, PartialVMError, PartialVMResult, VMResult,
@@ -17,15 +18,13 @@ use move_core_types::{
     vm_status::{StatusCode, StatusType},
 };
 use move_vm_types::{
-    loaded_data::runtime_types::Type, natives::function::NativeResult,
-    values::Value,
+    loaded_data::runtime_types::Type, natives::function::NativeResult, values::Value,
 };
 use std::{
     collections::{HashMap, VecDeque},
     fmt::Write,
     sync::Arc,
 };
-use crate::data_cache::TransactionDataCache;
 
 pub type UnboxedNativeFunction = dyn Fn(&mut NativeContext, Vec<Type>, VecDeque<Value>) -> PartialVMResult<NativeResult>
     + Send
@@ -147,7 +146,10 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
         ty: Type,
         val: Value,
     ) -> PartialVMResult<bool> {
-        match self.data_store.emit_event(self.resolver.loader(), guid, seq_num, ty, val) {
+        match self
+            .data_store
+            .emit_event(self.resolver.loader(), guid, seq_num, ty, val)
+        {
             Ok(()) => Ok(true),
             Err(e) if e.major_status().status_type() == StatusType::InvariantViolation => Err(e),
             Err(_) => Ok(false),

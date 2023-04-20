@@ -6,14 +6,7 @@ use crate::{
     account_address::AccountAddress,
     language_storage::{ModuleId, StructTag},
 };
-use std::fmt::Debug;
-
-pub fn convert_error<R, E: Debug>(res: Result<R, E>) -> Result<R, String> {
-    match res {
-        Ok(o) => Ok(o),
-        Err(e) => Err(format!("Unexpected storage error: {:?}", e)),
-    }
-}
+use anyhow::Error;
 
 /// Traits for resolving Move modules and resources from persistent storage
 
@@ -27,7 +20,7 @@ pub fn convert_error<R, E: Debug>(res: Result<R, E>) -> Result<R, String> {
 ///                       are always structurally valid)
 ///                    - storage encounters internal error
 pub trait ModuleResolver {
-    fn get_module(&self, id: &ModuleId) -> Result<Option<Vec<u8>>, String>;
+    fn get_module(&self, id: &ModuleId) -> Result<Option<Vec<u8>>, Error>;
 }
 
 /// A persistent storage backend that can resolve resources by address + type
@@ -44,32 +37,26 @@ pub trait ResourceResolver {
         &self,
         address: &AccountAddress,
         typ: &StructTag,
-    ) -> Result<Option<Vec<u8>>, String>;
+    ) -> Result<Option<Vec<u8>>, Error>;
 }
 
 /// A persistent storage implementation that can resolve both resources and modules
-pub trait MoveResolver:
-    ModuleResolver + ResourceResolver
-{
-}
+pub trait MoveResolver: ModuleResolver + ResourceResolver {}
 
-impl<T: ModuleResolver + ResourceResolver + ?Sized> MoveResolver
-    for T
-{
-}
+impl<T: ModuleResolver + ResourceResolver + ?Sized> MoveResolver for T {}
 
 impl<T: ResourceResolver + ?Sized> ResourceResolver for &T {
     fn get_resource(
         &self,
         address: &AccountAddress,
         tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, String> {
+    ) -> Result<Option<Vec<u8>>, Error> {
         (**self).get_resource(address, tag)
     }
 }
 
 impl<T: ModuleResolver + ?Sized> ModuleResolver for &T {
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, String> {
+    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Error> {
         (**self).get_module(module_id)
     }
 }

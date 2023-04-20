@@ -31,7 +31,7 @@ impl BlankStorage {
 }
 
 impl ModuleResolver for BlankStorage {
-    fn get_module(&self, _module_id: &ModuleId) -> Result<Option<Vec<u8>>, String> {
+    fn get_module(&self, _module_id: &ModuleId) -> Result<Option<Vec<u8>>, Error> {
         Ok(None)
     }
 }
@@ -41,7 +41,7 @@ impl ResourceResolver for BlankStorage {
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, String> {
+    ) -> Result<Option<Vec<u8>>, Error> {
         Ok(None)
     }
 }
@@ -66,7 +66,7 @@ pub struct DeltaStorage<'a, 'b, S> {
 }
 
 impl<'a, 'b, S: ModuleResolver> ModuleResolver for DeltaStorage<'a, 'b, S> {
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, String> {
+    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Error> {
         if let Some(account_storage) = self.delta.accounts().get(module_id.address()) {
             if let Some(blob_opt) = account_storage.modules().get(module_id.name()) {
                 return Ok(blob_opt.clone().ok());
@@ -82,7 +82,7 @@ impl<'a, 'b, S: ResourceResolver> ResourceResolver for DeltaStorage<'a, 'b, S> {
         &self,
         address: &AccountAddress,
         tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, String> {
+    ) -> Result<Option<Vec<u8>>, Error> {
         if let Some(account_storage) = self.delta.accounts().get(address) {
             if let Some(blob_opt) = account_storage.resources().get(tag) {
                 return Ok(blob_opt.clone().ok());
@@ -276,7 +276,7 @@ impl InMemoryStorage {
 }
 
 impl ModuleResolver for InMemoryStorage {
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, String> {
+    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Error> {
         if let Some(account_storage) = self.accounts.get(module_id.address()) {
             return Ok(account_storage.modules.get(module_id.name()).cloned());
         }
@@ -289,7 +289,7 @@ impl ResourceResolver for InMemoryStorage {
         &self,
         address: &AccountAddress,
         tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, String> {
+    ) -> Result<Option<Vec<u8>>, Error> {
         if let Some(account_storage) = self.accounts.get(address) {
             return Ok(account_storage.resources.get(tag).cloned());
         }

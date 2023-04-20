@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //! Scratchpad for on chain values during the execution.
 
-use std::fmt::Debug;
 use crate::move_vm_ext::MoveResolverExt;
 #[allow(unused_imports)]
 use anyhow::Error;
@@ -24,7 +23,6 @@ use move_core_types::{
 use move_table_extension::{TableHandle, TableResolver};
 use move_vm_runtime::move_vm::MoveVM;
 use std::ops::{Deref, DerefMut};
-use move_core_types::resolver::convert_error;
 
 pub struct MoveResolverWithVMMetadata<'a, 'm, S> {
     move_resolver: &'a S,
@@ -65,7 +63,7 @@ impl<'a, 'm, S: MoveResolverExt> MoveResolverExt for MoveResolverWithVMMetadata<
 }
 
 impl<'a, 'm, S: MoveResolverExt> ModuleResolver for MoveResolverWithVMMetadata<'a, 'm, S> {
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, String> {
+    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Error> {
         self.move_resolver.get_module(module_id)
     }
 }
@@ -75,8 +73,8 @@ impl<'a, 'm, S: MoveResolverExt> ResourceResolver for MoveResolverWithVMMetadata
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, String> {
-        convert_error(self.get_any_resource(address, struct_tag))
+    ) -> Result<Option<Vec<u8>>, Error> {
+        Ok(self.get_any_resource(address, struct_tag)?)
     }
 }
 
@@ -156,10 +154,10 @@ impl<'a, S: StateView> MoveResolverExt for StorageAdapter<'a, S> {
 }
 
 impl<'a, S: StateView> ModuleResolver for StorageAdapter<'a, S> {
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, String> {
+    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Error> {
         // REVIEW: cache this?
         let ap = AccessPath::from(module_id);
-        convert_error(self.get(ap).map_err(|e| e.finish(Location::Undefined)))
+        Ok(self.get(ap).map_err(|e| e.finish(Location::Undefined))?)
     }
 }
 
@@ -168,8 +166,8 @@ impl<'a, S: StateView> ResourceResolver for StorageAdapter<'a, S> {
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, String> {
-        convert_error(self.get_any_resource(address, struct_tag))
+    ) -> Result<Option<Vec<u8>>, Error> {
+        Ok(self.get_any_resource(address, struct_tag)?)
     }
 }
 
@@ -233,7 +231,7 @@ impl<S> DerefMut for StorageAdapterOwned<S> {
 }
 
 impl<S: StateView> ModuleResolver for StorageAdapterOwned<S> {
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, String> {
+    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Error> {
         self.as_move_resolver().get_module(module_id)
     }
 }
@@ -267,7 +265,7 @@ impl<S: StateView> ResourceResolver for StorageAdapterOwned<S> {
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, String> {
+    ) -> Result<Option<Vec<u8>>, Error> {
         self.as_move_resolver().get_resource(address, struct_tag)
     }
 }
