@@ -75,3 +75,15 @@ proposals:
                 weight_by_voting_power: true
                 use_history_from_previous_epoch_max_count: 5
           max_failed_authors_to_store: 10
+  - name: step_6
+    metadata:
+      title: "Enable Transaction Shuffling"
+      description: "TBD"
+      source_code_url: "TBD"
+      discussion_url: "TBD"
+    execution_mode: MultiStep
+    update_sequence:
+    - Execution:
+        V1:
+          transaction_shuffler_type:
+            sender_aware_v1: 32
