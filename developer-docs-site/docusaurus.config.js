@@ -313,7 +313,7 @@ const config = {
           {
             type: "dropdown",
             label: "Community",
-            to: "community/help-index",
+            to: "community",
             position: "left",
             items: [
               {

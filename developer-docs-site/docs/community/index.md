@@ -1,6 +1,6 @@
 ---
 title: "Contribute to the Aptos Ecosystem"
-slug: "help-index"
+slug: ./
 ---
 
 # Contribute to the Aptos Ecosystem

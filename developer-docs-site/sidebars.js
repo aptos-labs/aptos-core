@@ -435,6 +435,7 @@ const sidebars = {
       value: "Aptos Community",
       className: "sidebar-title",
     },
+    "community/index",
     "community/external-resources",
     "community/rust-coding-guidelines",
     "community/site-updates",
