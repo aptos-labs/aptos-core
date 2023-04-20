@@ -87,7 +87,6 @@ const sidebars = {
           ],
         },
         "cli-tools/aptos-cli-tool/use-aptos-cli",
-        "guides/get-test-funds",
       ],
     },
     {

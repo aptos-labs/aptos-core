@@ -98,7 +98,7 @@ At creation, an [Aptos account](https://github.com/aptos-labs/aptos-core/blob/88
 * An [event handle](../concepts/events.md) for all new types of coins added to the account.
 * An event handle for all key rotations for the account.
 
-Read more about [Accounts](../concepts/accounts.md) and [set one up with test funds](./get-test-funds.md).
+Read more about [Accounts](../concepts/accounts.md) and [set one up](../cli-tools/aptos-cli-tool/use-aptos-cli#initialize-local-configuration-and-create-an-account).
 
 ## Transactions
 
@@ -502,7 +502,7 @@ To learn more about coin creation, make ["Your First Coin"](../tutorials/first-c
 
 ## Integrating with the faucet
 
-This tutorial is for SDK and wallet developers who want to integrate with the [Aptos Faucet](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos-faucet). If you are a dapp developer, you should access the faucet through an existing [SDK](../tutorials/first-transaction.md) or [wallet](https://aptos.dev/guides/get-test-funds/) instead.
+This tutorial is for SDK and wallet developers who want to integrate with the [Aptos Faucet](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos-faucet). If you are a dapp developer, you should access the faucet through an existing [SDK](../tutorials/first-transaction.md) or [CLI](../cli-tools/aptos-cli-tool/use-aptos-cli#initialize-local-configuration-and-create-an-account) instead.
 
 ### Differences between devnet and testnet
 What are the differences between devnet and testnet? Effectively none. In the past, the testnet faucet had a Captcha in front of it, making it unqueryable by normal means. This is no longer true.
@@ -527,7 +527,7 @@ async function callFaucet(amount: number, address: string): Promise<string[]> {
     amount,
     address,
   };
-  const response = await faucetClient.fund.fund({ requestBody: request });
+  const response = await faucetClient.fund({ requestBody: request });
   return response.txn_hashes;
 }
 ```
