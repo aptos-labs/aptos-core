@@ -44,7 +44,7 @@ The Aptos token standard supports [mutation of a fungible token to an NFT](#evol
 
 ### Storing customized token properties on-chain
 
-The Aptos token standard provides an easy way to store properties on-chain and be used by [Aptos Names](https://www.aptosnames.com/) and other services. You can define your own properties based on your application. Each token can also have its own property values. These properties can be directly read and written by smart contracts.
+The Aptos token standard uses the [`PropertyMap`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/property_map.move) module to store on-chain properties of tokens. `PropertyMap` maps a string key to a property value on-chain, which stores the value in Binary Canonical Serialization (BCS) format and its type. Currently, only primitive types (bool, u8, u64, u128, address and String) are supported in `PropertyMap`. Applications, such as [Aptos Names](https://www.aptosnames.com/), define application specific properties that are read and written by the applications smart contract.
 
 #### Default properties
 

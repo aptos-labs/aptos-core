@@ -538,6 +538,10 @@ const config = {
             from: "/nodes/full-node/troubleshooting-fullnode-setup",
           },
           {
+            to: "/guides/move-guides/mint-nft-cli",
+            from: "/concepts/coin-and-token/nft-airdrop-example",
+          },
+          {
             to: "/guides/state-sync",
             from: "/concepts/state-sync",
           },

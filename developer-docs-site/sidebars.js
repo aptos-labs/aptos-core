@@ -164,7 +164,6 @@ const sidebars = {
         "guides/move-guides/mint-nft-cli",
         "concepts/coin-and-token/onchain-data",
         "concepts/coin-and-token/nft-minting-tool",
-        "concepts/coin-and-token/nft-airdrop-example",
       ],
     },
     {

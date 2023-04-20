@@ -563,3 +563,30 @@ aptos move run --function-id <resource-account-address>::minting::set_minting_en
 Now you can include your own artwork once you are ready to customize your NFTs by replacing our defaults in `minting.move`:
 * https://slwdaeeko5tz5hx46c6zwqhmh3c6je4sbdbjsdjzbntme5dxarxa.arweave.net/kuwwEIp3Z56e_PC9m0DsPsXkk5IIwpkNOQtmwnR3BG4
 * https://lty5vdw4cl6yczbpz2rnm2732rbtnk3jeiutyqd644wojmkyt2hq.arweave.net/XPHajtwS_YFkL86i1mv71EM2q2kiKTxAfucs5LFYno8
+
+### NFT Airdrops
+
+The earlier examples demonstrate how users directly mint NFTs. Aptos also supports airdropping via a two step process:
+1. The creator mints the token into their `TokenStore`
+2. The creator then offers the token to a receiving account.
+3. The receiver claims the token.
+
+Using the [NFT mint example](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/move-examples/mint_nft/2-Using-Resource-Account/sources/create_nft_with_resource_account.move) replace the `mint` function with an `airdrop` function as below.
+
+```rust
+public entry fun airdrop(whitelist: vector<address>) acquires ModuleData {
+    let module_data = borrow_global_mut<ModuleData>(@mint_nft);
+    let count = vector::length(&whitelists);
+    let resource_signer = account::create_signer_with_capability(&module_data.signer_cap);
+    let token_id = token::mint_token(&resource_signer, module_data.token_data_id, count);
+    let i: u64 = 0;
+    while(i < count) {
+        let receiver = vector::pop_back(&mut whitelist);
+        token_transfers::offer(&resource_signer, receiver, token_id, 1);
+        i = i + 1;
+    };
+}
+```
+
+After offering the token, the wallet receiver (eg: [Petra](https://petra.app/)) would see the offer as shown below:
+![petra_screenshot.png](../../../static/img/token-airdrop.png)
