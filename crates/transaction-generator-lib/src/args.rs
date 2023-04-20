@@ -77,6 +77,11 @@ impl TransactionTypeArg {
                 num_modules: 1,
                 use_account_pool: false,
             },
+            TransactionTypeArg::TokenV1NFTMint => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::TokenV1MintAndTransferNFTSequential,
+                num_modules: 1,
+                use_account_pool: false,
+            },
         }
     }
 }
