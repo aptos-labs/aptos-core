@@ -46,7 +46,7 @@ mkdir testing
 cd testing
 ```
 
-2. Set up the Aptos CLI and [create an account](../get-test-funds.md#create-an-aptos-account):
+2. Set up the Aptos CLI and [create an account](../../cli-tools/aptos-cli-tool/use-aptos-cli#initialize-local-configuration-and-create-an-account):
 ```sh
 aptos init
 ```

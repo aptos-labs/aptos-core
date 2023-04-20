@@ -64,10 +64,6 @@ This tool will help you compile, test, and publish contracts as well as run cont
 
 See [Building Aptos From Source](building-from-source.md)
 
-## Create and fund test accounts
-
-Use the Aptos CLI and wallet of your choice to create and fund an Aptos account in `testnet` (or `devnet`). For more options and details, see [Create and Fund Aptos Accounts](./get-test-funds.md).
-
 ## Understand the Aptos Token Standard
 
 The [Aptos Token Standard](../concepts/coin-and-token/index.md) lays out the rules for creating and distributing digital assets on the Aptos blockchain.
