@@ -3,7 +3,8 @@
 
 use anyhow::Result;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, ValidCryptoMaterialStringExt};
-use aptos_types::account_address::AccountAddress;
+use aptos_release_builder::validate::{DEFAULT_RESOLUTION_TIME, FAST_RESOLUTION_TIME};
+use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
@@ -26,6 +27,7 @@ pub enum Commands {
         output_path: PathBuf,
     },
     ValidateProposals {
+        /// Path to the config to be released.
         #[clap(short, long)]
         release_config: PathBuf,
         #[clap(short, long)]
@@ -34,6 +36,7 @@ pub enum Commands {
         framework_git_rev: Option<String>,
         #[clap(subcommand)]
         input_option: InputOptions,
+        /// Mint to validator such that it has enough stake to allow fast voting resolution.
         #[clap(long)]
         mint_to_validator: bool,
     },
@@ -42,14 +45,18 @@ pub enum Commands {
 #[derive(Subcommand, Debug)]
 pub enum InputOptions {
     FromDirectory {
+        /// Path to the local testnet folder. If you are running local testnet via cli, it should be `.aptos/testnet`.
         #[clap(short, long)]
         test_dir: PathBuf,
     },
     FromArgs {
+        /// Hex encoded string for the root key of the network.
         #[clap(long)]
         root_key: String,
+        /// Hex encoded string for the address of a validator node.
         #[clap(long)]
         validator_address: String,
+        /// Hex encoded string for the private key of a validator node.
         #[clap(long)]
         validator_key: String,
     },
@@ -85,7 +92,7 @@ async fn main() -> Result<()> {
             let mut network_config = match input_option {
                 InputOptions::FromDirectory { test_dir } => {
                     aptos_release_builder::validate::NetworkConfig::new_from_dir(
-                        endpoint,
+                        endpoint.clone(),
                         test_dir.as_path(),
                     )?
                 },
@@ -108,7 +115,7 @@ async fn main() -> Result<()> {
                         validator_account,
                         validator_key,
                         framework_git_rev: None,
-                        endpoint,
+                        endpoint: endpoint.clone(),
                     }
                 },
             };
@@ -116,14 +123,28 @@ async fn main() -> Result<()> {
             network_config.framework_git_rev = framework_git_rev;
 
             if mint_to_validator {
+                let chain_id = aptos_rest_client::Client::new(endpoint)
+                    .get_ledger_information()
+                    .await?
+                    .inner()
+                    .chain_id;
+
+                if chain_id == ChainId::mainnet().id() || chain_id == ChainId::testnet().id() {
+                    anyhow::bail!("Mint to mainnet/testnet is not allowed");
+                }
+
                 network_config.mint_to_validator().await?;
             }
 
-            network_config.set_fast_resolve(30).await?;
+            network_config
+                .set_fast_resolve(FAST_RESOLUTION_TIME)
+                .await?;
             aptos_release_builder::validate::validate_config(config, network_config.clone())
                 .await?;
             // Reset resolution time back to normal after resolution
-            network_config.set_fast_resolve(43200).await
+            network_config
+                .set_fast_resolve(DEFAULT_RESOLUTION_TIME)
+                .await
         },
     }
 }
