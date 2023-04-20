@@ -131,7 +131,7 @@ const config = {
           {
             type: "dropdown",
             label: "Build",
-            to: "concepts/coin-and-token/index",
+            to: "guides/getting-started",
             position: "left",
             items: [
               {
@@ -163,6 +163,11 @@ const config = {
                 type: "doc",
                 label: "Integrate with Wallets",
                 docId: "concepts/wallet-adapter-concept",
+              },
+              {
+                type: "doc",
+                label: "Create NFTs on Aptos",
+                docId: "/category/nft",
               },
               {
                 type: "doc",
@@ -221,44 +226,6 @@ const config = {
                 label: "Move Prover Book",
                 type: "doc",
                 docId: "guides/prover-guides/index",
-              },
-            ],
-          },
-          {
-            type: "dropdown",
-            label: "Tokens",
-            to: "/category/nft",
-            position: "left",
-            items: [
-              {
-                type: "doc",
-                label: "Create Tokens on Aptos",
-                docId: "/category/nft",
-              },
-              {
-                type: "doc",
-                label: "Compare Token Standards",
-                docId: "concepts/coin-and-token/aptos-token-comparison",
-              },
-              {
-                type: "doc",
-                label: "Mint NFTs with the Aptos CLI",
-                docId: "guides/move-guides/mint-nft-cli",
-              },
-              {
-                type: "doc",
-                label: "Mint FTs with On-Chain Data",
-                docId: "concepts/coin-and-token/onchain-data",
-              },
-              {
-                type: "doc",
-                label: "Mint NFTs with the Mint Tool",
-                docId: "concepts/coin-and-token/nft-minting-tool",
-              },
-              {
-                type: "doc",
-                label: "Airdrop Aptos Tokens",
-                docId: "concepts/coin-and-token/nft-airdrop-example",
               },
             ],
           },
