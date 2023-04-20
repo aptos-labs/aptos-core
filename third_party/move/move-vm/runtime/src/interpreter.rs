@@ -686,7 +686,9 @@ impl Interpreter {
             };
             err = new_err.finish(err.location().clone())
         }
-        if err.status_type() == StatusType::InvariantViolation {
+        if err.status_type() == StatusType::InvariantViolation
+            && err.major_status() != StatusCode::STORAGE_ERROR
+        {
             let location = err.location().clone();
             let state = self.internal_state_str(current_frame);
             err = err

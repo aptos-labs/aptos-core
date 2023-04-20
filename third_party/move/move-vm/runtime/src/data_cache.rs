@@ -215,10 +215,7 @@ impl<'r> TransactionDataCache<'r> {
                 },
                 Err(err) => {
                     let msg = format!("Unexpected storage error: {:?}", err);
-                    return Err(
-                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                            .with_message(msg),
-                    );
+                    return Err(PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(msg));
                 },
             };
 
@@ -248,11 +245,9 @@ impl<'r> TransactionDataCache<'r> {
                 .finish(Location::Undefined)),
             Err(err) => {
                 let msg = format!("Unexpected storage error: {:?}", err);
-                Err(
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message(msg)
-                        .finish(Location::Undefined),
-                )
+                Err(PartialVMError::new(StatusCode::STORAGE_ERROR)
+                    .with_message(msg)
+                    .finish(Location::Undefined))
             },
         }
     }
