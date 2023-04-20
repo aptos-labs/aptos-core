@@ -20,10 +20,9 @@ use move_core_types::{
     value::MoveTypeLayout,
 };
 use move_vm_types::{
-    data_store::DataStore,
     gas::GasMeter,
     loaded_data::runtime_types::{CachedStructIndex, StructType, Type},
-    values::{GlobalValue, Value},
+    values::GlobalValue,
 };
 use std::{borrow::Borrow, sync::Arc};
 
@@ -278,6 +277,27 @@ impl<'r, 'l> Session<'r, 'l> {
         Ok((change_set, events, native_extensions))
     }
 
+    /// Try to load a resource from remote storage and create a corresponding GlobalValue
+    /// that is owned by the data store.
+    pub fn load_resource(
+        &mut self,
+        addr: AccountAddress,
+        ty: &Type,
+    ) -> PartialVMResult<(&mut GlobalValue, Option<Option<NumBytes>>)> {
+        self.data_cache
+            .load_resource(self.runtime.loader(), addr, ty)
+    }
+
+    /// Get the serialized format of a `CompiledModule` given a `ModuleId`.
+    pub fn load_module(&self, module_id: &ModuleId) -> VMResult<Vec<u8>> {
+        self.data_cache.load_module(module_id)
+    }
+
+    /// Check if this module exists.
+    pub fn exists_module(&self, module_id: &ModuleId) -> VMResult<bool> {
+        self.data_cache.exists_module(module_id)
+    }
+
     /// Load a script and all of its types into cache
     pub fn load_script(
         &self,
@@ -363,32 +383,13 @@ impl<'r, 'l> Session<'r, 'l> {
             .map_err(|e| e.finish(Location::Undefined))
     }
 
-    /// Gets the underlying data store
-    pub fn get_data_store(&mut self) -> &mut dyn DataStore {
-        self
-    }
-
     /// Gets the underlying native extensions.
     pub fn get_native_extensions(&mut self) -> &mut NativeContextExtensions<'r> {
         &mut self.native_extensions
     }
 }
 
-impl<'r, 'l> DataStore for Session<'r, 'l> {
-    fn load_resource(
-        &mut self,
-        addr: AccountAddress,
-        ty: &Type,
-    ) -> PartialVMResult<(&mut GlobalValue, Option<Option<NumBytes>>)> {
-        self.data_cache
-            .load_resource(self.runtime.loader(), addr, ty)
-    }
-
-    /// Get the serialized format of a `CompiledModule` given a `ModuleId`.
-    fn load_module(&self, module_id: &ModuleId) -> VMResult<Vec<u8>> {
-        self.data_cache.load_module(module_id)
-    }
-
+/*impl<'r, 'l> DataStore for Session<'r, 'l> {
     /// Publish a module.
     fn publish_module(
         &mut self,
@@ -421,6 +422,7 @@ impl<'r, 'l> DataStore for Session<'r, 'l> {
             .emit_event(self.runtime.loader(), guid, seq_num, ty, val)
     }
 }
+*/
 
 pub struct LoadedFunctionInstantiation {
     pub type_arguments: Vec<Type>,
