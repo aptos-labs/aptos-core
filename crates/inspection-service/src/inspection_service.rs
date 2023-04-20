@@ -24,9 +24,9 @@ use std::{
 const CONTENT_TYPE_JSON: &str = "application/json";
 const CONTENT_TYPE_TEXT: &str = "text/plain";
 const CONFIGURATION_DISABLED_MESSAGE: &str =
-    "This endpoint is disabled! Enable it in node config at inspection_service.expose_configuration: true";
+    "This endpoint is disabled! Enable it in the node config at inspection_service.expose_configuration: true";
 const SYSINFO_DISABLED_MESSAGE: &str =
-    "This endpoint is disabled! Enable it in node config at inspection_service.expose_system_information: true";
+    "This endpoint is disabled! Enable it in the node config at inspection_service.expose_system_information: true";
 const HEADER_CONTENT_TYPE: &str = "Content-Type";
 const INVALID_ENDPOINT_MESSAGE: &str = "The requested endpoint is invalid!";
 const UNEXPECTED_ERROR_MESSAGE: &str = "An unexpected error was encountered!";
@@ -90,10 +90,10 @@ pub fn get_all_metrics() -> HashMap<String, String> {
 }
 
 const CONFIGURATION_PATH: &str = "/configuration";
+const FORGE_METRICS_PATH: &str = "/forge_metrics";
+const JSON_METRICS_PATH: &str = "/json_metrics";
 const METRICS_PATH: &str = "/metrics";
 const SYSTEM_INFORMATION_PATH: &str = "/system_information";
-const JSON_METRICS_PATH: &str = "/json_metrics";
-const FORGE_METRICS_PATH: &str = "/forge_metrics";
 
 async fn serve_requests(
     req: Request<Body>,
@@ -122,6 +122,17 @@ async fn serve_requests(
                 )
             }
         },
+        FORGE_METRICS_PATH => {
+            // /forge_metrics
+            // Exposes forge encoded metrics
+            let metrics = get_all_metrics();
+            let encoded_metrics = serde_json::to_string(&metrics).unwrap();
+            (
+                StatusCode::OK,
+                Body::from(encoded_metrics),
+                CONTENT_TYPE_JSON,
+            )
+        },
         JSON_METRICS_PATH => {
             // /json_metrics
             // Exposes JSON encoded metrics
@@ -135,17 +146,6 @@ async fn serve_requests(
             let encoder = TextEncoder::new();
             let buffer = encode_metrics(encoder);
             (StatusCode::OK, Body::from(buffer), CONTENT_TYPE_TEXT)
-        },
-        FORGE_METRICS_PATH => {
-            // /forge_metrics
-            // Exposes forge encoded metrics
-            let metrics = get_all_metrics();
-            let encoded_metrics = serde_json::to_string(&metrics).unwrap();
-            (
-                StatusCode::OK,
-                Body::from(encoded_metrics),
-                CONTENT_TYPE_JSON,
-            )
         },
         SYSTEM_INFORMATION_PATH => {
             // /system_information
@@ -277,19 +277,19 @@ mod test {
         let mut config = NodeConfig::get_default_validator_config();
 
         config.inspection_service.expose_configuration = false;
-        let mut r1 = do_test_get(&config, CONFIGURATION_PATH);
-        assert_eq!(r1.status(), StatusCode::FORBIDDEN);
-        let r1body = block_on(body::to_bytes(r1.body_mut())).unwrap();
-        assert_eq!(r1body, CONFIGURATION_DISABLED_MESSAGE);
+        let mut response_1 = do_test_get(&config, CONFIGURATION_PATH);
+        assert_eq!(response_1.status(), StatusCode::FORBIDDEN);
+        let response_1_body = block_on(body::to_bytes(response_1.body_mut())).unwrap();
+        assert_eq!(response_1_body, CONFIGURATION_DISABLED_MESSAGE);
 
         config.inspection_service.expose_configuration = true;
-        let mut r2 = do_test_get(&config, CONFIGURATION_PATH);
-        assert_eq!(r2.status(), StatusCode::OK);
-        let r2body = block_on(body::to_bytes(r2.body_mut())).unwrap();
-        let r2bs = read_to_string(r2body.as_ref()).unwrap();
-        assert!(r2bs.contains("NodeConfig")); // debug format prints a field type name
-        assert!(r2bs.contains("InspectionServiceConfig")); // debug format prints a field type name
-        assert!(r2bs.contains("expose_configuration: true")); // configuration is on as set above
+        let mut response_2 = do_test_get(&config, CONFIGURATION_PATH);
+        assert_eq!(response_2.status(), StatusCode::OK);
+        let response_2_body = block_on(body::to_bytes(response_2.body_mut())).unwrap();
+        let response_2_body_string = read_to_string(response_2_body.as_ref()).unwrap();
+        assert!(response_2_body_string.contains("NodeConfig")); // debug format prints a field type name
+        assert!(response_2_body_string.contains("InspectionServiceConfig")); // debug format prints a field type name
+        assert!(response_2_body_string.contains("expose_configuration: true")); // configuration is on as set above
     }
 
     #[test]
@@ -297,20 +297,20 @@ mod test {
         let mut config = NodeConfig::get_default_validator_config();
 
         config.inspection_service.expose_system_information = false;
-        let mut r1 = do_test_get(&config, SYSTEM_INFORMATION_PATH);
-        assert_eq!(r1.status(), StatusCode::FORBIDDEN);
-        let r1body = block_on(body::to_bytes(r1.body_mut())).unwrap();
-        assert_eq!(r1body, SYSINFO_DISABLED_MESSAGE);
+        let mut response_1 = do_test_get(&config, SYSTEM_INFORMATION_PATH);
+        assert_eq!(response_1.status(), StatusCode::FORBIDDEN);
+        let response_1_body = block_on(body::to_bytes(response_1.body_mut())).unwrap();
+        assert_eq!(response_1_body, SYSINFO_DISABLED_MESSAGE);
 
         config.inspection_service.expose_system_information = true;
-        let mut r2 = do_test_get(&config, SYSTEM_INFORMATION_PATH);
-        assert_eq!(r2.status(), StatusCode::OK);
-        let r2body = block_on(body::to_bytes(r2.body_mut())).unwrap();
-        let r2bs = read_to_string(r2body.as_ref()).unwrap();
+        let mut response_2 = do_test_get(&config, SYSTEM_INFORMATION_PATH);
+        assert_eq!(response_2.status(), StatusCode::OK);
+        let response_2_body = block_on(body::to_bytes(response_2.body_mut())).unwrap();
+        let response_2_body_string = read_to_string(response_2_body.as_ref()).unwrap();
         // Assert some field names we expect to see in the system information:
-        assert!(r2bs.contains("build_commit_hash"));
-        assert!(r2bs.contains("cpu_count"));
-        assert!(r2bs.contains("memory_available"));
+        assert!(response_2_body_string.contains("build_commit_hash"));
+        assert!(response_2_body_string.contains("cpu_count"));
+        assert!(response_2_body_string.contains("memory_available"));
     }
 
     #[test]
@@ -318,12 +318,12 @@ mod test {
         INT_COUNTER.inc(); // make sure we have a count to show
 
         let config = NodeConfig::get_default_validator_config();
-        let mut r1 = do_test_get(&config, METRICS_PATH);
-        assert_eq!(r1.status(), StatusCode::OK);
-        let r1body = block_on(body::to_bytes(r1.body_mut())).unwrap();
-        let r1bs = read_to_string(r1body.as_ref()).unwrap();
+        let mut response_1 = do_test_get(&config, METRICS_PATH);
+        assert_eq!(response_1.status(), StatusCode::OK);
+        let response_1_body = block_on(body::to_bytes(response_1.body_mut())).unwrap();
+        let response_1_body_string = read_to_string(response_1_body.as_ref()).unwrap();
         // Ensure that the text has at least the one counter we set.
-        assert!(r1bs.contains(INT_COUNTER_NAME));
+        assert!(response_1_body_string.contains(INT_COUNTER_NAME));
     }
 
     #[test]
@@ -331,12 +331,12 @@ mod test {
         INT_COUNTER.inc(); // make sure we have a count to show
 
         let config = NodeConfig::get_default_validator_config();
-        let mut r1 = do_test_get(&config, JSON_METRICS_PATH);
-        assert_eq!(r1.status(), StatusCode::OK);
-        let r1body = block_on(body::to_bytes(r1.body_mut())).unwrap();
-        let r1bs = read_to_string(r1body.as_ref()).unwrap();
+        let mut response_1 = do_test_get(&config, JSON_METRICS_PATH);
+        assert_eq!(response_1.status(), StatusCode::OK);
+        let response_1_body = block_on(body::to_bytes(response_1.body_mut())).unwrap();
+        let response_1_body_string = read_to_string(response_1_body.as_ref()).unwrap();
         // Ensure that the text has at least the one counter we set.
-        assert!(r1bs.contains(INT_COUNTER_NAME));
+        assert!(response_1_body_string.contains(INT_COUNTER_NAME));
     }
 
     #[test]
@@ -344,11 +344,11 @@ mod test {
         INT_COUNTER.inc(); // make sure we have a count to show
 
         let config = NodeConfig::get_default_validator_config();
-        let mut r1 = do_test_get(&config, FORGE_METRICS_PATH);
-        assert_eq!(r1.status(), StatusCode::OK);
-        let r1body = block_on(body::to_bytes(r1.body_mut())).unwrap();
-        let r1bs = read_to_string(r1body.as_ref()).unwrap();
+        let mut response_1 = do_test_get(&config, FORGE_METRICS_PATH);
+        assert_eq!(response_1.status(), StatusCode::OK);
+        let response_1_body = block_on(body::to_bytes(response_1.body_mut())).unwrap();
+        let response_1_body_string = read_to_string(response_1_body.as_ref()).unwrap();
         // Ensure that the text has at least the one counter we set.
-        assert!(r1bs.contains(INT_COUNTER_NAME));
+        assert!(response_1_body_string.contains(INT_COUNTER_NAME));
     }
 }
