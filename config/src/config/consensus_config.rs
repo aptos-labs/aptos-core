@@ -86,6 +86,8 @@ pub struct ChainHealthBackoffValues {
 
     pub max_sending_block_txns_override: u64,
     pub max_sending_block_bytes_override: u64,
+
+    pub backoff_proposal_delay_ms: u64,
 }
 
 impl Default for ConsensusConfig {
@@ -132,74 +134,75 @@ impl Default for ConsensusConfig {
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 1000,
                     max_sending_block_txns_override: 10000,
-                    max_sending_block_bytes_override: 5000 * 1024,
+                    max_sending_block_bytes_override: 5 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 100,
                 },
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 1500,
                     max_sending_block_txns_override: 10000,
-                    max_sending_block_bytes_override: 5000 * 1024,
+                    max_sending_block_bytes_override: 5 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 200,
                 },
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 2000,
                     max_sending_block_txns_override: 10000,
-                    max_sending_block_bytes_override: 5000 * 1024,
+                    max_sending_block_bytes_override: 5 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 300,
                 },
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 2500,
                     max_sending_block_txns_override: 2000,
-                    max_sending_block_bytes_override: 500 * 1024,
+                    max_sending_block_bytes_override: 1024 * 1024,
                     backpressure_proposal_delay_ms: 300,
                 },
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 4000,
+                    // in practice, latencies and delay make it such that ~2 blocks/s is max,
+                    // meaning that most aggressively we limit to ~1000 TPS
+                    // For transactions that are more expensive than that, we should
+                    // instead rely on max gas per block to limit latency
                     max_sending_block_txns_override: 500,
-                    max_sending_block_bytes_override: 100 * 1024,
+                    // stop reducing size, so 1MB transactions can still go through
+                    max_sending_block_bytes_override: 1024 * 1024,
                     backpressure_proposal_delay_ms: 300,
                 },
-                // PipelineBackpressureValues {
-                //     back_pressure_pipeline_latency_limit_ms: 3500,
-                //     // in practice, latencies make it such that 2-4 blocks/s is max,
-                //     // meaning that most aggressively we limit to ~600-1200 TPS
-                //     // For transactions that are more expensive than that, we should
-                //     // instead rely on max gas per block to limit latency
-                //     max_sending_block_txns_override: 300,
-                //     // stop reducing size, so 100k transactions can still go through
-                //     max_sending_block_bytes_override: 100 * 1024,
-                //     backpressure_proposal_delay_ms: 300,
-                // },
             ],
             window_for_chain_health: 100,
             chain_health_backoff: vec![
                 ChainHealthBackoffValues {
                     backoff_if_below_participating_voting_power_percentage: 80,
-                    max_sending_block_txns_override: 2000,
-                    max_sending_block_bytes_override: 500 * 1024,
+                    max_sending_block_txns_override: 10000,
+                    max_sending_block_bytes_override: 5 * 1024 * 1024,
+                    backoff_proposal_delay_ms: 150,
                 },
                 ChainHealthBackoffValues {
                     backoff_if_below_participating_voting_power_percentage: 77,
-                    max_sending_block_txns_override: 1000,
-                    max_sending_block_bytes_override: 250 * 1024,
+                    max_sending_block_txns_override: 2000,
+                    max_sending_block_bytes_override: 1024 * 1024,
+                    backoff_proposal_delay_ms: 300,
                 },
                 ChainHealthBackoffValues {
                     backoff_if_below_participating_voting_power_percentage: 75,
-                    max_sending_block_txns_override: 400,
-                    max_sending_block_bytes_override: 100 * 1024,
+                    max_sending_block_txns_override: 1000,
+                    // stop reducing size, so 1MB transactions can still go through
+                    max_sending_block_bytes_override: 1024 * 1024,
+                    backoff_proposal_delay_ms: 300,
                 },
                 ChainHealthBackoffValues {
                     backoff_if_below_participating_voting_power_percentage: 72,
-                    max_sending_block_txns_override: 200,
-                    // stop reducing size, so 100k transactions can still go through
-                    max_sending_block_bytes_override: 100 * 1024,
+                    max_sending_block_txns_override: 500,
+                    max_sending_block_bytes_override: 1024 * 1024,
+                    backoff_proposal_delay_ms: 300,
                 },
                 ChainHealthBackoffValues {
                     backoff_if_below_participating_voting_power_percentage: 69,
-                    // in practice, latencies make it such that 2-4 blocks/s is max,
-                    // meaning that most aggressively we limit to ~200-400 TPS
-                    max_sending_block_txns_override: 100,
-                    max_sending_block_bytes_override: 100 * 1024,
+                    // in practice, latencies and delay make it such that ~2 blocks/s is max,
+                    // meaning that most aggressively we limit to ~500 TPS
+                    // For transactions that are more expensive than that, we should
+                    // instead rely on max gas per block to limit latency
+                    max_sending_block_txns_override: 250,
+                    max_sending_block_bytes_override: 1024 * 1024,
+                    backoff_proposal_delay_ms: 300,
                 },
             ],
         }
