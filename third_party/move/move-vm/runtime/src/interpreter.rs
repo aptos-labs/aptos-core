@@ -62,14 +62,13 @@ macro_rules! set_err_info {
 ///
 /// An `Interpreter` instance is a stand alone execution context for a function.
 /// It mimics execution on a single thread, with an call stack and an operand stack.
-pub(crate) struct Interpreter<'a, 'r, 'l> {
+pub(crate) struct Interpreter {
     /// Operand stack, where Move `Value`s are stored for stack operations.
     operand_stack: Stack,
     /// The stack of active functions.
     call_stack: CallStack,
     /// Whether to perform a paranoid type safety checks at runtime.
     paranoid_type_checks: bool,
-    pub(crate) data_store: &'a mut TransactionDataCache<'r, 'l>,
 }
 
 struct TypeWithLoader<'a, 'b> {
@@ -83,14 +82,14 @@ impl<'a, 'b> TypeView for TypeWithLoader<'a, 'b> {
     }
 }
 
-impl<'a, 'r, 'l> Interpreter<'a, 'r, 'l> {
+impl Interpreter {
     /// Entrypoint into the interpreter. All external calls need to be routed through this
     /// function.
     pub(crate) fn entrypoint(
         function: Arc<Function>,
         ty_args: Vec<Type>,
         args: Vec<Value>,
-        data_store: &mut TransactionDataCache<'r, 'l>,
+        data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
         extensions: &mut NativeContextExtensions,
         loader: &Loader,
@@ -99,10 +98,9 @@ impl<'a, 'r, 'l> Interpreter<'a, 'r, 'l> {
             operand_stack: Stack::new(),
             call_stack: CallStack::new(),
             paranoid_type_checks: loader.vm_config().paranoid_type_checks,
-            data_store,
         }
         .execute_main(
-            loader, gas_meter, extensions, function, ty_args, args,
+            loader, data_store, gas_meter, extensions, function, ty_args, args,
         )
     }
 
@@ -115,6 +113,7 @@ impl<'a, 'r, 'l> Interpreter<'a, 'r, 'l> {
     fn execute_main(
         mut self,
         loader: &Loader,
+        data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
         extensions: &mut NativeContextExtensions,
         function: Arc<Function>,
@@ -141,7 +140,7 @@ impl<'a, 'r, 'l> Interpreter<'a, 'r, 'l> {
             let resolver = current_frame.resolver(loader);
             let exit_code =
                 current_frame //self
-                    .execute_code(&resolver, &mut self, gas_meter)
+                    .execute_code(&resolver, &mut self, data_store, gas_meter)
                     .map_err(|err| self.maybe_core_dump(err, &current_frame))?;
             match exit_code {
                 ExitCode::Return => {
@@ -194,6 +193,7 @@ impl<'a, 'r, 'l> Interpreter<'a, 'r, 'l> {
                     if func.is_native() {
                         self.call_native(
                             &resolver,
+                            data_store,
                             gas_meter,
                             extensions,
                             func,
@@ -247,7 +247,7 @@ impl<'a, 'r, 'l> Interpreter<'a, 'r, 'l> {
 
                     if func.is_native() {
                         self.call_native(
-                            &resolver, gas_meter, extensions, func, ty_args,
+                            &resolver, data_store, gas_meter, extensions, func, ty_args,
                         )?;
                         current_frame.pc += 1; // advance past the Call instruction in the caller
                         continue;
@@ -343,6 +343,7 @@ impl<'a, 'r, 'l> Interpreter<'a, 'r, 'l> {
     fn call_native(
         &mut self,
         resolver: &Resolver,
+        data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
         extensions: &mut NativeContextExtensions,
         function: Arc<Function>,
@@ -351,6 +352,7 @@ impl<'a, 'r, 'l> Interpreter<'a, 'r, 'l> {
         // Note: refactor if native functions push a frame on the stack
         self.call_native_impl(
             resolver,
+            data_store,
             gas_meter,
             extensions,
             function.clone(),
@@ -371,6 +373,7 @@ impl<'a, 'r, 'l> Interpreter<'a, 'r, 'l> {
     fn call_native_impl(
         &mut self,
         resolver: &Resolver,
+        data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
         extensions: &mut NativeContextExtensions,
         function: Arc<Function>,
@@ -394,6 +397,7 @@ impl<'a, 'r, 'l> Interpreter<'a, 'r, 'l> {
 
         let mut native_context = NativeContext::new(
             self,
+            data_store,
             resolver,
             extensions,
             gas_meter.balance_internal(),
@@ -533,13 +537,13 @@ impl<'a, 'r, 'l> Interpreter<'a, 'r, 'l> {
 
     /// Loads a resource from the data store and return the number of bytes read from the storage.
     fn load_resource<'c>(
+        loader: &Loader,
         data_store: &'c mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<&'c mut GlobalValue> {
-        let loader = data_store.loader;
-        match data_store.load_resource(addr, ty) {
+        match data_store.load_resource(loader, addr, ty) {
             Ok((gv, load_res)) => {
                 if let Some(loaded) = load_res {
                     let opt = match loaded {
@@ -570,16 +574,17 @@ impl<'a, 'r, 'l> Interpreter<'a, 'r, 'l> {
     }
 
     /// BorrowGlobal (mutable and not) opcode.
-    fn borrow_global<'c: 'a>(
-        &'c mut self,
+    fn borrow_global(
+        &mut self,
         is_mut: bool,
         is_generic: bool,
         loader: &Loader,
+        data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<()> {
-        let res = Self::load_resource(self.data_store, gas_meter, addr, ty)?.borrow_global();
+        let res = Self::load_resource(loader, data_store, gas_meter, addr, ty)?.borrow_global();
         gas_meter.charge_borrow_global(
             is_mut,
             is_generic,
@@ -595,11 +600,12 @@ impl<'a, 'r, 'l> Interpreter<'a, 'r, 'l> {
         &mut self,
         is_generic: bool,
         loader: &Loader,
+        data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<()> {
-        let gv = Self::load_resource(self.data_store, gas_meter, addr, ty)?;
+        let gv = Self::load_resource(loader, data_store, gas_meter, addr, ty)?;
         let exists = gv.exists()?;
         gas_meter.charge_exists(is_generic, TypeWithLoader { ty, loader }, exists)?;
         self.operand_stack.push(Value::bool(exists))?;
@@ -611,12 +617,13 @@ impl<'a, 'r, 'l> Interpreter<'a, 'r, 'l> {
         &mut self,
         is_generic: bool,
         loader: &Loader,
+        data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<()> {
         let resource =
-            match Self::load_resource(self.data_store, gas_meter, addr, ty)?.move_from() {
+            match Self::load_resource(loader, data_store, gas_meter, addr, ty)?.move_from() {
                 Ok(resource) => {
                     gas_meter.charge_move_from(
                         is_generic,
@@ -640,12 +647,13 @@ impl<'a, 'r, 'l> Interpreter<'a, 'r, 'l> {
         &mut self,
         is_generic: bool,
         loader: &Loader,
+        data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
         addr: AccountAddress,
         ty: &Type,
         resource: Value,
     ) -> PartialVMResult<()> {
-        let gv = Self::load_resource(self.data_store, gas_meter, addr, ty)?;
+        let gv = Self::load_resource(loader, data_store, gas_meter, addr, ty)?;
         // NOTE(Gas): To maintain backward compatibility, we need to charge gas after attempting
         //            the move_to operation.
         match gv.move_to(resource) {
@@ -1035,13 +1043,14 @@ fn check_ability(has_ability: bool) -> PartialVMResult<()> {
 
 impl Frame {
     /// Execute a Move function until a return or a call opcode is found.
-    fn execute_code<'a, 'r, 'l>(
+    fn execute_code(
         &mut self,
         resolver: &Resolver,
-        interpreter: &mut Interpreter<'a, 'r, 'l>,
+        interpreter: &mut Interpreter,
+        data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
     ) -> VMResult<ExitCode> {
-        self.execute_code_impl(resolver, interpreter, gas_meter)
+        self.execute_code_impl(resolver, interpreter, data_store, gas_meter)
             .map_err(|e| {
                 let e = if cfg!(feature = "testing") || cfg!(feature = "stacktrace") {
                     e.with_exec_state(interpreter.get_internal_state())
@@ -1168,11 +1177,11 @@ impl Frame {
     /// Paranoid type checks to perform after instruction execution.
     ///
     /// This function and `pre_execution_type_stack_transition` should constitute the full type stack transition for the paranoid mode.
-    fn post_execution_type_stack_transition<'a, 'r, 'l>(
+    fn post_execution_type_stack_transition(
         local_tys: &[Type],
         ty_args: &[Type],
         resolver: &Resolver,
-        interpreter: &mut Interpreter<'a, 'r, 'l>,
+        interpreter: &mut Interpreter,
         instruction: &Bytecode,
     ) -> PartialVMResult<()> {
         match instruction {
@@ -1653,10 +1662,11 @@ impl Frame {
         Ok(())
     }
 
-    fn execute_code_impl<'a, 'r, 'l>(
+    fn execute_code_impl(
         &mut self,
         resolver: &Resolver,
-        interpreter: &mut Interpreter<'a, 'r, 'l>,
+        interpreter: &mut Interpreter,
+        data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
     ) -> PartialVMResult<ExitCode> {
         use SimpleInstruction as S;
@@ -1673,14 +1683,14 @@ impl Frame {
         let code = self.function.code();
         loop {
             for instruction in &code[self.pc as usize..] {
-                /*trace!(
+                trace!(
                     &self.function,
                     &self.locals,
                     self.pc,
                     instruction,
                     resolver,
                     interpreter
-                );*/
+                );
 
                 fail_point!("move_vm::interpreter_loop", |_| {
                     Err(
@@ -2069,6 +2079,7 @@ impl Frame {
                             is_mut,
                             false,
                             resolver.loader(),
+                            data_store,
                             gas_meter,
                             addr,
                             &ty,
@@ -2083,6 +2094,7 @@ impl Frame {
                             is_mut,
                             true,
                             resolver.loader(),
+                            data_store,
                             gas_meter,
                             addr,
                             &ty,
@@ -2094,6 +2106,7 @@ impl Frame {
                         interpreter.exists(
                             false,
                             resolver.loader(),
+                            data_store,
                             gas_meter,
                             addr,
                             &ty,
@@ -2105,6 +2118,7 @@ impl Frame {
                         interpreter.exists(
                             true,
                             resolver.loader(),
+                            data_store,
                             gas_meter,
                             addr,
                             &ty,
@@ -2116,6 +2130,7 @@ impl Frame {
                         interpreter.move_from(
                             false,
                             resolver.loader(),
+                            data_store,
                             gas_meter,
                             addr,
                             &ty,
@@ -2127,6 +2142,7 @@ impl Frame {
                         interpreter.move_from(
                             true,
                             resolver.loader(),
+                            data_store,
                             gas_meter,
                             addr,
                             &ty,
@@ -2145,6 +2161,7 @@ impl Frame {
                         interpreter.move_to(
                             false,
                             resolver.loader(),
+                            data_store,
                             gas_meter,
                             addr,
                             &ty,
@@ -2163,6 +2180,7 @@ impl Frame {
                         interpreter.move_to(
                             true,
                             resolver.loader(),
+                            data_store,
                             gas_meter,
                             addr,
                             &ty,

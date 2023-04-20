@@ -25,6 +25,7 @@ use std::{
     fmt::Write,
     sync::Arc,
 };
+use crate::data_cache::TransactionDataCache;
 
 pub type UnboxedNativeFunction = dyn Fn(&mut NativeContext, Vec<Type>, VecDeque<Value>) -> PartialVMResult<NativeResult>
     + Send
@@ -92,22 +93,25 @@ impl NativeFunctions {
     }
 }
 
-pub struct NativeContext<'a, 'b, 'c, 'r, 'l> {
-    interpreter: &'a mut Interpreter<'c, 'r, 'l>,
+pub struct NativeContext<'a, 'b, 'c> {
+    interpreter: &'a mut Interpreter,
+    data_store: &'a mut TransactionDataCache<'c>,
     resolver: &'a Resolver<'a>,
     extensions: &'a mut NativeContextExtensions<'b>,
     gas_balance: InternalGas,
 }
 
-impl<'a, 'b, 'c, 'r, 'l> NativeContext<'a, 'b, 'c, 'r, 'l> {
+impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
     pub(crate) fn new(
-        interpreter: &'a mut Interpreter<'c, 'r, 'l>,
+        interpreter: &'a mut Interpreter,
+        data_store: &'a mut TransactionDataCache<'c>,
         resolver: &'a Resolver<'a>,
         extensions: &'a mut NativeContextExtensions<'b>,
         gas_balance: InternalGas,
     ) -> Self {
         Self {
             interpreter,
+            data_store,
             resolver,
             extensions,
             gas_balance,
@@ -115,7 +119,7 @@ impl<'a, 'b, 'c, 'r, 'l> NativeContext<'a, 'b, 'c, 'r, 'l> {
     }
 }
 
-impl<'a, 'b, 'c, 'r, 'l> NativeContext<'a, 'b, 'c, 'r, 'l> {
+impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
     pub fn print_stack_trace<B: Write>(&self, buf: &mut B) -> PartialVMResult<()> {
         self.interpreter
             .debug_print_stack_trace(buf, self.resolver.loader())
@@ -127,8 +131,8 @@ impl<'a, 'b, 'c, 'r, 'l> NativeContext<'a, 'b, 'c, 'r, 'l> {
         type_: &Type,
     ) -> VMResult<(bool, Option<Option<NumBytes>>)> {
         let (value, num_bytes) = self
-            .interpreter.data_store
-            .load_resource(address, type_)
+            .data_store
+            .load_resource(self.resolver.loader(), address, type_)
             .map_err(|err| err.finish(Location::Undefined))?;
         let exists = value
             .exists()
@@ -143,7 +147,7 @@ impl<'a, 'b, 'c, 'r, 'l> NativeContext<'a, 'b, 'c, 'r, 'l> {
         ty: Type,
         val: Value,
     ) -> PartialVMResult<bool> {
-        match self.interpreter.data_store.emit_event(guid, seq_num, ty, val) {
+        match self.data_store.emit_event(self.resolver.loader(), guid, seq_num, ty, val) {
             Ok(()) => Ok(true),
             Err(e) if e.major_status().status_type() == StatusType::InvariantViolation => Err(e),
             Err(_) => Ok(false),

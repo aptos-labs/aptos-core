@@ -8,6 +8,13 @@ use crate::{
 };
 use std::fmt::Debug;
 
+pub fn convert_error<R, E: Debug>(res: Result<R, E>) -> Result<R, String> {
+    match res {
+        Ok(o) => Ok(o),
+        Err(e) => Err(format!("Unexpected storage error: {:?}", e)),
+    }
+}
+
 /// Traits for resolving Move modules and resources from persistent storage
 
 /// A persistent storage backend that can resolve modules by address + name.
@@ -20,7 +27,7 @@ use std::fmt::Debug;
 ///                       are always structurally valid)
 ///                    - storage encounters internal error
 pub trait ModuleResolver {
-    fn get_module(&self, id: &ModuleId) -> Result<Option<Vec<u8>>, Box<dyn Debug>>;
+    fn get_module(&self, id: &ModuleId) -> Result<Option<Vec<u8>>, String>;
 }
 
 /// A persistent storage backend that can resolve resources by address + type
@@ -37,7 +44,7 @@ pub trait ResourceResolver {
         &self,
         address: &AccountAddress,
         typ: &StructTag,
-    ) -> Result<Option<Vec<u8>>, Box<dyn Debug>>;
+    ) -> Result<Option<Vec<u8>>, String>;
 }
 
 /// A persistent storage implementation that can resolve both resources and modules
@@ -56,13 +63,13 @@ impl<T: ResourceResolver + ?Sized> ResourceResolver for &T {
         &self,
         address: &AccountAddress,
         tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, Box<dyn Debug>> {
+    ) -> Result<Option<Vec<u8>>, String> {
         (**self).get_resource(address, tag)
     }
 }
 
 impl<T: ModuleResolver + ?Sized> ModuleResolver for &T {
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Box<dyn Debug>> {
+    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, String> {
         (**self).get_module(module_id)
     }
 }

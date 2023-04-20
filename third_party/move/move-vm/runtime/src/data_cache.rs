@@ -47,20 +47,18 @@ impl AccountDataCache {
 /// The Move VM takes a `DataStore` in input and this is the default and correct implementation
 /// for a data store related to a transaction. Clients should create an instance of this type
 /// and pass it to the Move VM.
-pub(crate) struct TransactionDataCache<'r, 'l> {
+pub(crate) struct TransactionDataCache<'r> {
     remote: &'r dyn MoveResolver,
-    pub(crate) loader: &'l Loader,
     account_map: BTreeMap<AccountAddress, AccountDataCache>,
     event_data: Vec<(Vec<u8>, u64, Type, MoveTypeLayout, Value)>,
 }
 
-impl<'r, 'l> TransactionDataCache<'r, 'l> {
+impl<'r> TransactionDataCache<'r> {
     /// Create a `TransactionDataCache` with a `RemoteCache` that provides access to data
     /// not updated in the transaction.
-    pub(crate) fn new(remote: &'r dyn MoveResolver, loader: &'l Loader) -> Self {
+    pub(crate) fn new(remote: &'r dyn MoveResolver) -> Self {
         TransactionDataCache {
             remote,
-            loader,
             account_map: BTreeMap::new(),
             event_data: vec![],
         }
@@ -70,7 +68,7 @@ impl<'r, 'l> TransactionDataCache<'r, 'l> {
     /// published modules.
     ///
     /// Gives all proper guarantees on lifetime of global data as well.
-    pub(crate) fn into_effects(self) -> PartialVMResult<(ChangeSet, Vec<Event>)> {
+    pub(crate) fn into_effects(self, loader: &Loader) -> PartialVMResult<(ChangeSet, Vec<Event>)> {
         let mut change_set = ChangeSet::new();
         for (addr, account_data_cache) in self.account_map.into_iter() {
             let mut modules = BTreeMap::new();
@@ -90,7 +88,7 @@ impl<'r, 'l> TransactionDataCache<'r, 'l> {
                     None => continue,
                 };
 
-                let struct_tag = match self.loader.type_to_type_tag(&ty)? {
+                let struct_tag = match loader.type_to_type_tag(&ty)? {
                     TypeTag::Struct(struct_tag) => *struct_tag,
                     _ => return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)),
                 };
@@ -125,7 +123,7 @@ impl<'r, 'l> TransactionDataCache<'r, 'l> {
 
         let mut events = vec![];
         for (guid, seq_num, ty, ty_layout, val) in self.event_data {
-            let ty_tag = self.loader.type_to_type_tag(&ty)?;
+            let ty_tag = loader.type_to_type_tag(&ty)?;
             let blob = val
                 .simple_serialize(&ty_layout)
                 .ok_or_else(|| PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR))?;
@@ -163,6 +161,7 @@ impl<'r, 'l> TransactionDataCache<'r, 'l> {
     // into the cache.
     pub(crate) fn load_resource(
         &mut self,
+        loader: &Loader,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<(&mut GlobalValue, Option<Option<NumBytes>>)> {
@@ -172,7 +171,7 @@ impl<'r, 'l> TransactionDataCache<'r, 'l> {
 
         let mut load_res = None;
         if !account_cache.data_map.contains_key(ty) {
-            let ty_tag = match self.loader.type_to_type_tag(ty)? {
+            let ty_tag = match loader.type_to_type_tag(ty)? {
                 TypeTag::Struct(s_tag) => s_tag,
                 _ =>
                 // non-struct top-level value; can't happen
@@ -181,7 +180,7 @@ impl<'r, 'l> TransactionDataCache<'r, 'l> {
                 },
             };
             // TODO(Gas): Shall we charge for this?
-            let ty_layout = self.loader.type_to_type_layout(ty)?;
+            let ty_layout = loader.type_to_type_layout(ty)?;
 
             let gv = match self.remote.get_resource(&addr, &ty_tag) {
                 Ok(Some(blob)) => {
@@ -204,8 +203,7 @@ impl<'r, 'l> TransactionDataCache<'r, 'l> {
                     load_res = Some(None);
                     GlobalValue::none()
                 },
-                Err(err) => {
-                    let msg = format!("Unexpected storage error: {:?}", err);
+                Err(msg) => {
                     return Err(
                         PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                             .with_message(msg),
@@ -237,8 +235,7 @@ impl<'r, 'l> TransactionDataCache<'r, 'l> {
             Ok(None) => Err(PartialVMError::new(StatusCode::LINKER_ERROR)
                 .with_message(format!("Cannot find {:?} in data cache", module_id))
                 .finish(Location::Undefined)),
-            Err(err) => {
-                let msg = format!("Unexpected storage error: {:?}", err);
+            Err(msg) => {
                 Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                         .with_message(msg)
@@ -284,12 +281,13 @@ impl<'r, 'l> TransactionDataCache<'r, 'l> {
     #[allow(clippy::unit_arg)]
     pub(crate) fn emit_event(
         &mut self,
+        loader: &Loader,
         guid: Vec<u8>,
         seq_num: u64,
         ty: Type,
         val: Value,
     ) -> PartialVMResult<()> {
-        let ty_layout = self.loader.type_to_type_layout(&ty)?;
+        let ty_layout = loader.type_to_type_layout(&ty)?;
         Ok(self.event_data.push((guid, seq_num, ty, ty_layout, val)))
     }
 }
