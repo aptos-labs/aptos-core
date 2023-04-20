@@ -66,7 +66,7 @@ See [Accounts](../concepts/accounts.md) for more information.
 ### Aptos Explorer
 
 - The **[Aptos Explorer](https://explorer.aptoslabs.com/)** is an interface that helps users examine details of the Aptos blockchain, including account information, validators, and transactions.
-- The Aptos Explorer help users validate their work in Aptos wallets and other tools in the blockchain. Find more details at [Use the Aptos Explorer](../guides/use-aptos-explorer.md).
+- The Aptos Explorer help users validate their work in Aptos wallets and other tools in the blockchain. Find more details at [Use the Aptos Explorer](../guides/explore-aptos.md).
 
 ### Aptos Framework
 The **Aptos Framework** defines the public API for blockchain updates and the structure of on-chain data. It defines the business logic and access control for the three key pillars of Aptos functionality: payments, treasury, and on-chain governance. It is implemented as a set of modules written in the Move programming language and stored on-chain as Move bytecode.

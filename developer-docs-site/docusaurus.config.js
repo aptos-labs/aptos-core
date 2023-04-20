@@ -117,9 +117,9 @@ const config = {
                 docId: "releases/index",
               },
               {
-                label: "Prepare Your Environment",
+                label: "Explore Aptos",
                 type: "doc",
-                docId: "guides/getting-started",
+                docId: "guides/explore-aptos",
               },
               {
                 label: "Integrate with Aptos",
@@ -130,10 +130,15 @@ const config = {
           },
           {
             type: "dropdown",
-            label: "Apps",
+            label: "Build",
             to: "concepts/coin-and-token/index",
             position: "left",
             items: [
+              {
+                label: "Prepare Your Environment",
+                type: "doc",
+                docId: "guides/getting-started",
+              },
               {
                 type: "doc",
                 label: "Follow the Aptos Standards",
@@ -546,6 +551,10 @@ const config = {
           {
             to: "/sdks/ts-sdk/index",
             from: "/sdks/typescript-sdk",
+          },
+          {
+            to: "/guides/explore-aptos",
+            from: ["/guides/use-aptos-explorer"],
           },
           {
             to: "/guides/getting-started",
