@@ -18,7 +18,7 @@ In order to ensure interoperability across Aptos wallets, the following is requi
 ## Mnemonics phrases
 
 A mnemonic phrase is a multiple word phrase that can be used to generate account addresses.
-We recommend one mnemonic per account in order to handle key rotation better.  For example, [Petra wallet](../guides/install-petra-wallet.md) uses a one-to-one matching of mnemonic to account system.
+We recommend one mnemonic per account in order to handle key rotation better.
 However, some wallets may want to support one mnemonic to many accounts coming from other chains. To support both of these use cases, the Aptos wallet standard uses a [Bitcoin Improvement Proposal (BIP44)](https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki) to derive path for mnemonics to accounts.
 
 ### Creating an Aptos account

@@ -18,7 +18,7 @@ Other [Aptos networks](./system-integrators-guide.md#choose-a-network) and metho
 
 You will need these installed to proceed:
 
-* The wallet of your choice; we use the [Petra Wallet](./install-petra-wallet.md) Chrome extension.
+* The [wallet](https://github.com/aptos-foundation/ecosystem-projects#wallets) of your choice, for example, the [Petra Wallet](https://petra.app) Chrome extension.
 * [Aptos CLI](../cli-tools/aptos-cli-tool/index.md)
 
 ## Create an Aptos account
@@ -60,7 +60,7 @@ Note that you may create specific account types by passing the `--profile` argum
 
 ## Import the account into the CLI
 
-Here we will add the account to your [wallet](https://github.com/aptos-foundation/ecosystem-projects#wallets). We use the [Petra Wallet](./install-petra-wallet.md) Chrome extension here:
+Here we will add the account to your wallet:
 
 1. Read `.aptos/config.yaml` to see and copy the `default` private key.
 3. Open the wallet and select the [Testnet network](https://petra.app/docs/use) in the wallet via *Petra settings > Network > Testnet*.

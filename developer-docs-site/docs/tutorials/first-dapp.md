@@ -17,7 +17,7 @@ For a more comprehensive view of this process, see [Build an End-to-End Dapp on 
 We will use the:
 
 * [TypeScript SDK](../sdks/ts-sdk/index.md)
-* [Petra Wallet](../guides/install-petra-wallet.md)
+* [Petra Wallet](https://petra.app)
 * [Aptos CLI](../cli-tools/aptos-cli-tool/use-aptos-cli.md)
 
 :::tip Full source code
@@ -29,8 +29,7 @@ We recommend becoming familiar with the newer full source code documented in the
 
 ### Aptos Wallet
 
-Before starting this tutorial, you'll need a chrome extension wallet to interact with the dapp. You can first install
-the [Petra wallet extension](../guides/install-petra-wallet.md) for use in this tutorial.
+Before starting this tutorial, you'll need a chrome extension wallet to interact with the dapp, such as, the the [Petra wallet extension](https://petra.app).
 
 If you haven't installed the Petra wallet extension before:
 1. Open the Wallet and click **Create a new wallet**. Then click **Create account** to create an Aptos Account.

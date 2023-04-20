@@ -10,10 +10,6 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 This document describes how to [use the Aptos CLI](../../../cli-tools/aptos-cli-tool/use-aptos-cli.md) to perform owner operations during validation.
 
-:::tip Petra on Chrome browser only
-The [Petra wallet extension](../../../guides/install-petra-wallet.md) is supported only on the Chrome browser. However, the extensions for [Brave browser](https://brave.com/) and [Kiwi browser](https://kiwibrowser.com/) and [Microsoft Edge browser](https://www.microsoft.com/en-us/edge) will also work.
-:::
-
 ## Owner operations with CLI
 
 :::tip Testnet vs Mainnet
@@ -22,7 +18,7 @@ The below CLI command examples use mainnet. Change the `--network` value for tes
 
 ### Initialize CLI
 
-Initialize CLI with your Petra wallet private key or create new wallet. 
+Initialize CLI with a private key from an existing account, such as a wallet, or create a new account.
 
 ```bash
 aptos init --profile mainnet-owner \

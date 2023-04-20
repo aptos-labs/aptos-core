@@ -45,11 +45,6 @@ Use these tools to enhance your Move development experience.
 The [Aptos command line interface](../../cli-tools/aptos-cli-tool/index.md) (CLI) helps you test development, as many of the functions in our SDKs have corresponding commands.
 
 
-### Petra Wallet
-
-Although you may use any wallet developed for Aptos, the documents here reflect Petra Wallet. We recommend [installing](../../guides/install-petra-wallet.md) and [using](https://petra.app/docs/petra-intro) it.
-
-
 ### Aptos Simulation API
 
 Use the [Aptos Simulation API](../../concepts/gas-txn-fee.md#estimating-the-gas-units-via-simulation) to test your apps, understanding the blockchain is in an ever-changing state. For example, an auction where people are selling, bidding, and buying will return varying results second by second. Gambling apps may generate wildly different results in a short time. So depending upon your application, you should expect some randomness. So guard your users by keeping simulations realistic.

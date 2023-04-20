@@ -37,7 +37,7 @@ npm i petra-plugin-wallet-adapter
 :::tip
 If you haven't installed the Petra wallet extension yet:
 
-1. [Install Petra Wallet](../../guides/install-petra-wallet.md) and open the Chrome extension.
+1. [Install Petra Wallet](https://petra.app) and open the Chrome extension.
 2. Follow the [user instructions](https://petra.app/docs/use) on petra.app for help.
 3. Switch to the Devnet network by clicking **Settings** > **Network** and selecting **devnet**.
 4. Click the **Faucet** button to ensure you can receive test tokens.

@@ -64,7 +64,6 @@ const sidebars = {
       collapsed: true,
       items: [
         "guides/use-aptos-explorer",
-        "guides/install-petra-wallet",
         {
           type: "category",
           label: "Install the Aptos CLI",
