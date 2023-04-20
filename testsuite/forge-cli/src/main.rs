@@ -1329,6 +1329,7 @@ fn changing_working_quorum_test_helper(
                 ["round_timeout_backoff_exponent_base"] = 1.0.into();
             helm_values["validator"]["config"]["consensus"]["quorum_store_poll_count"] = 1.into();
 
+            let mut min_block_txns = block_size;
             let mut chain_health_backoff = ConsensusConfig::default().chain_health_backoff;
             if use_chain_backoff {
                 // Generally if we are stress testing the consensus, we don't want to slow it down.
@@ -1338,10 +1339,15 @@ fn changing_working_quorum_test_helper(
                     // as we have lower TPS, make limits smaller
                     item.max_sending_block_txns_override =
                         (block_size / 2_u64.pow(i as u32 + 1)).max(2);
+                    min_block_txns = min_block_txns.min(item.max_sending_block_txns_override);
                     // as we have fewer nodes, make backoff triggered earlier:
                     item.backoff_if_below_participating_voting_power_percentage = 90 - i * 5;
                 }
             }
+            helm_values["validator"]["config"]["consensus"]["quorum_store"]
+                ["sender_max_batch_txns"] = min_block_txns.into();
+            helm_values["validator"]["config"]["consensus"]["quorum_store"]
+                ["receiver_max_batch_txns"] = min_block_txns.into();
 
             helm_values["validator"]["config"]["consensus"]["chain_health_backoff"] =
                 serde_yaml::to_value(chain_health_backoff).unwrap();

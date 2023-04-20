@@ -58,7 +58,7 @@ pub struct ConsensusConfig {
     pub wait_for_full_blocks_above_pending_blocks: usize,
     pub wait_for_full_blocks_above_recent_fill_threshold: f32,
     pub intra_consensus_channel_buffer_size: usize,
-    pub quorum_store_configs: QuorumStoreConfig,
+    pub quorum_store: QuorumStoreConfig,
     pub vote_back_pressure_limit: u64,
     pub pipeline_backpressure: Vec<PipelineBackpressureValues>,
     // Used to decide if backoff is needed.
@@ -125,7 +125,7 @@ impl Default for ConsensusConfig {
             // Max is 1, so 1.1 disables it.
             wait_for_full_blocks_above_recent_fill_threshold: 1.1,
             intra_consensus_channel_buffer_size: 10,
-            quorum_store_configs: QuorumStoreConfig::default(),
+            quorum_store: QuorumStoreConfig::default(),
 
             // Voting backpressure is only used as a backup, to make sure pending rounds don't
             // increase uncontrollably, and we know when to go to state sync.
@@ -245,6 +245,108 @@ impl ConsensusConfig {
             self.max_receiving_block_bytes
         }
     }
+
+    fn sanitize_send_recv_block_limits(
+        sanitizer_name: &str,
+        config: &ConsensusConfig,
+    ) -> Result<(), Error> {
+        let send_recv_pairs = [
+            (
+                config.max_sending_block_txns,
+                config.max_receiving_block_txns,
+                "txns",
+            ),
+            (
+                config.max_sending_block_bytes,
+                config.max_receiving_block_bytes,
+                "bytes",
+            ),
+            (
+                config.max_sending_block_txns_quorum_store_override,
+                config.max_receiving_block_txns_quorum_store_override,
+                "txns_quorum_store_override",
+            ),
+            (
+                config.max_sending_block_bytes_quorum_store_override,
+                config.max_receiving_block_bytes_quorum_store_override,
+                "bytes_quorum_store_override",
+            ),
+        ];
+        for (send, recv, label) in &send_recv_pairs {
+            if *send > *recv {
+                return Err(Error::ConfigSanitizerFailed(
+                    sanitizer_name.to_owned(),
+                    format!("Failed {}: {} > {}", label, *send, *recv),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn sanitize_batch_block_limits(
+        sanitizer_name: &str,
+        config: &ConsensusConfig,
+    ) -> Result<(), Error> {
+        // Note, we are strict here: receiver batch limits <= sender block limits
+        let mut recv_batch_send_block_pairs = vec![
+            (
+                config.quorum_store.receiver_max_batch_txns as u64,
+                config.max_sending_block_txns_quorum_store_override,
+                "txns".to_string(),
+            ),
+            (
+                config.quorum_store.receiver_max_batch_bytes as u64,
+                config.max_sending_block_bytes_quorum_store_override,
+                "bytes".to_string(),
+            ),
+        ];
+        for backpressure_values in &config.pipeline_backpressure {
+            recv_batch_send_block_pairs.push((
+                config.quorum_store.receiver_max_batch_txns as u64,
+                backpressure_values.max_sending_block_txns_override,
+                format!(
+                    "backpressure {} ms: txns",
+                    backpressure_values.back_pressure_pipeline_latency_limit_ms,
+                ),
+            ));
+            recv_batch_send_block_pairs.push((
+                config.quorum_store.receiver_max_batch_bytes as u64,
+                backpressure_values.max_sending_block_bytes_override,
+                format!(
+                    "backpressure {} ms: bytes",
+                    backpressure_values.back_pressure_pipeline_latency_limit_ms,
+                ),
+            ));
+        }
+        for backoff_values in &config.chain_health_backoff {
+            recv_batch_send_block_pairs.push((
+                config.quorum_store.receiver_max_batch_txns as u64,
+                backoff_values.max_sending_block_txns_override,
+                format!(
+                    "backoff {} %: txns",
+                    backoff_values.backoff_if_below_participating_voting_power_percentage,
+                ),
+            ));
+            recv_batch_send_block_pairs.push((
+                config.quorum_store.receiver_max_batch_bytes as u64,
+                backoff_values.max_sending_block_bytes_override,
+                format!(
+                    "backoff {} %: bytes",
+                    backoff_values.backoff_if_below_participating_voting_power_percentage,
+                ),
+            ));
+        }
+
+        for (batch, block, label) in &recv_batch_send_block_pairs {
+            if *batch > *block {
+                return Err(Error::ConfigSanitizerFailed(
+                    sanitizer_name.to_owned(),
+                    format!("Failed {}: {} > {}", label, *batch, *block),
+                ));
+            }
+        }
+        Ok(())
+    }
 }
 
 impl ConfigSanitizer for ConsensusConfig {
@@ -254,9 +356,11 @@ impl ConfigSanitizer for ConsensusConfig {
         node_role: RoleType,
         chain_id: ChainId,
     ) -> Result<(), Error> {
-        // Verify that the safety rules config is valid
         let sanitizer_name = Self::get_sanitizer_name();
+
+        // Verify that the safety rules config is valid
         SafetyRulesConfig::sanitize(node_config, node_role, chain_id)?;
+        QuorumStoreConfig::sanitize(node_config, node_role, chain_id)?;
 
         // Verify that the consensus-only feature is not enabled in mainnet
         if chain_id.is_mainnet() && is_consensus_only_perf_test_enabled() {
@@ -265,6 +369,11 @@ impl ConfigSanitizer for ConsensusConfig {
                 "consensus-only-perf-test should not be enabled in mainnet!".to_string(),
             ));
         }
+
+        // Sender block limits must be <= receiver block limits
+        Self::sanitize_send_recv_block_limits(&sanitizer_name, &node_config.consensus)?;
+        // Quorum store batches must be <= consensus blocks
+        Self::sanitize_batch_block_limits(&sanitizer_name, &node_config.consensus)?;
 
         Ok(())
     }
