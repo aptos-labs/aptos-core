@@ -141,7 +141,7 @@ module aptos_std::fixed_point64 {
     }
     spec create_from_rational {
         pragma opaque;
-        pragma verify = false; // TODO: set to false because of timeout (property proved).
+        pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved).
         include CreateFromRationalAbortsIf;
         ensures result == spec_create_from_rational(numerator, denominator);
     }
@@ -383,7 +383,6 @@ module aptos_std::fixed_point64 {
         }
     }
     spec round {
-        pragma verify = false; // TODO: set to false because of timeout
         pragma opaque;
         aborts_if false;
         ensures result == spec_round(num);
