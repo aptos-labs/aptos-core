@@ -66,7 +66,7 @@ impl TransactionTypeArg {
             },
             TransactionTypeArg::TokenV1NFTMint => TransactionType::CallCustomModules {
                 initial_entry_point: Some(EntryPoints::InitializeCollection),
-                entry_point: EntryPoints::TokenV1MintAndStoreNFTParallel,
+                entry_point: EntryPoints::TokenV1MintAndTransferNFTParallel,
                 num_modules: 1,
                 use_account_pool: false,
             },

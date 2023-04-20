@@ -273,16 +273,6 @@ pub async fn create_txn_generator_creator(
                     )
                     .await,
                 ),
-                // TransactionType::NftMint => Box::new(
-                //     NFTMintGeneratorCreator::new(
-                //         txn_factory.clone(),
-                //         init_txn_factory.clone(),
-                //         all_accounts.get_mut(0).unwrap(),
-                //         txn_executor,
-                //         num_workers,
-                //     )
-                //     .await,
-                // ),
                 TransactionType::PublishPackage { use_account_pool } => wrap_accounts_pool(
                     Box::new(PublishPackageCreator::new(txn_factory.clone())),
                     *use_account_pool,
