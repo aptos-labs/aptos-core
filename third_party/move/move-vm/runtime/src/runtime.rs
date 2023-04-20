@@ -34,7 +34,6 @@ use move_vm_types::{
     values::{Locals, Reference, VMValueCast, Value},
 };
 use std::{borrow::Borrow, collections::BTreeSet, sync::Arc};
-use tracing::warn;
 
 /// An instantiation of the MoveVM.
 pub(crate) struct VMRuntime {
@@ -89,8 +88,12 @@ impl VMRuntime {
         {
             Ok(modules) => modules,
             Err(err) => {
-                warn!("[VM] module deserialization failed {:?}", err);
-                return Err(err.finish(Location::Undefined));
+                return Err(err
+                    .append_message_with_separator(
+                        '\n',
+                        "[VM] module deserialization failed".to_string(),
+                    )
+                    .finish(Location::Undefined));
             },
         };
 
@@ -208,21 +211,19 @@ impl VMRuntime {
         let layout = match self.loader.type_to_type_layout(ty) {
             Ok(layout) => layout,
             Err(_err) => {
-                warn!("[VM] failed to get layout from type");
                 return Err(PartialVMError::new(
                     StatusCode::INVALID_PARAM_TYPE_FOR_DESERIALIZATION,
-                ));
+                )
+                .with_message("[VM] failed to get layout from type".to_string()));
             },
         };
 
         match Value::simple_deserialize(arg.borrow(), &layout) {
             Some(val) => Ok(val),
-            None => {
-                warn!("[VM] failed to deserialize argument");
-                Err(PartialVMError::new(
-                    StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-                ))
-            },
+            None => Err(
+                PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT)
+                    .with_message("[VM] failed to deserialize argument".to_string()),
+            ),
         }
     }
 

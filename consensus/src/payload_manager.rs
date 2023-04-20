@@ -65,7 +65,7 @@ impl PayloadManager {
                     .update_certified_timestamp(block_timestamp)
                     .await;
 
-                let digests: Vec<HashValue> = payloads
+                let batches: Vec<_> = payloads
                     .into_iter()
                     .flat_map(|payload| match payload {
                         Payload::DirectMempool(_) => {
@@ -73,7 +73,7 @@ impl PayloadManager {
                         },
                         Payload::InQuorumStore(proof_with_status) => proof_with_status.proofs,
                     })
-                    .map(|proof| *proof.digest())
+                    .map(|proof| proof.info().clone())
                     .collect();
 
                 let mut tx = coordinator_tx.clone();
@@ -81,7 +81,7 @@ impl PayloadManager {
                 if let Err(e) = tx
                     .send(CoordinatorCommand::CommitNotification(
                         block_timestamp,
-                        digests,
+                        batches,
                     ))
                     .await
                 {

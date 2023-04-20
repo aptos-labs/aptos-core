@@ -223,7 +223,11 @@ const sidebars = {
       link: { type: "doc", id: "guides/prover-guides/index" },
       collapsible: true,
       collapsed: true,
-      items: ["guides/prover-guides/prover-guide", "guides/prover-guides/spec-lang"],
+      items: [
+        "guides/prover-guides/prover-guide",
+        "guides/prover-guides/spec-lang",
+        "guides/prover-guides/supporting-resources",
+      ],
     },
   ],
   nftSidebar: [

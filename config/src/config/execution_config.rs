@@ -128,7 +128,7 @@ impl ConfigSanitizer for ExecutionConfig {
         let execution_config = &node_config.execution;
 
         // If this is a mainnet node, ensure that additional verifiers are enabled
-        if chain_id.is_mainnet()? {
+        if chain_id.is_mainnet() {
             if !execution_config.paranoid_hot_potato_verification {
                 return Err(Error::ConfigSanitizerFailed(
                     sanitizer_name,

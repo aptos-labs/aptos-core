@@ -1148,6 +1148,10 @@ $ aptos move run --function-id default::message::set_message --args string:hello
 
 ## Node command examples
 
+This section summarizes how to run a local testnet with Aptos CLI. See [Run a Local Testnet with Aptos CLI](../../nodes/local-testnet/using-cli-to-run-a-local-testnet.md) for more details.
+
+For Aptos CLI commands applicable to validator nodes, see the [Owner](../../nodes/validator-node/owner/index.md) and [Voter](../../nodes/validator-node/voter/index.md#steps-using-aptos-cli) instructions.
+
 ### Running a local testnet
 
 You can run a local testnet from the aptos CLI, that will match the version it was built with.  Additionally, it can
@@ -1207,15 +1211,7 @@ The `aptos` tool supports bootstrapping new blockchains through what is known as
 
 ### Prepare aptos-core
 
-The following guide assumes that you have access to the Aptos-core repository or the associated tools. You can download and prepare Aptos-core from [GitHub](https://github.com/aptos-labs/aptos-core):
-
-```
-git clone https://github.com/aptos-labs/aptos-core.git
-cd aptos-core
-git checkout --track origin/testnet
-./scripts/dev_setup.sh
-source ~/.cargo/env
-```
+The following sections rely on tools from the Aptos source. See [Building Aptos From Source](../../guides/building-from-source.md) for setup.
 
 ### The `layout` file
 

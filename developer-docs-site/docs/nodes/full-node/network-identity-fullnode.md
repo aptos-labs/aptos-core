@@ -44,14 +44,7 @@ Follow the below detailed steps:
     
     **Using Aptos-core source code**
     
-    Clone the [aptos-labs/aptos-core](https://github.com/aptos-labs/aptos-core) repo. For example:
-
-    ```bash
-    git clone https://github.com/aptos-labs/aptos-core.git
-    cd aptos-core
-    ./scripts/dev_setup.sh
-    source ~/.cargo/env
-    ```
+    See [Building Aptos From Source](../../guides/building-from-source.md)
 
     **Using Docker**
 

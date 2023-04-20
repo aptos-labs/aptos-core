@@ -233,6 +233,15 @@ pub static CONSENSUS_PROPOSAL_PENDING_DURATION: Lazy<Histogram> = Lazy::new(|| {
     )
 });
 
+/// Amount of time (in seconds) proposal is delayed due to backpressure/backoff
+pub static PROPOSER_DELAY_PROPOSAL: Lazy<Gauge> = Lazy::new(|| {
+    register_gauge!(
+        "aptos_proposer_delay_proposal",
+        "Amount of time (in seconds) proposal is delayed due to backpressure/backoff",
+    )
+    .unwrap()
+});
+
 /// How many pending blocks are there, when we make a proposal
 pub static PROPOSER_PENDING_BLOCKS_COUNT: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(

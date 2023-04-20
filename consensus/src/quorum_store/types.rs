@@ -65,9 +65,11 @@ impl TryFrom<PersistedValue> for Batch {
     type Error = anyhow::Error;
 
     fn try_from(value: PersistedValue) -> Result<Self, Self::Error> {
+        let author = value.author();
         Ok(Batch {
             batch_info: value.info,
             payload: BatchPayload::new(
+                author,
                 value
                     .maybe_payload
                     .ok_or_else(|| anyhow::anyhow!("Payload not exist"))?,
@@ -78,6 +80,7 @@ impl TryFrom<PersistedValue> for Batch {
 
 #[derive(Clone, Debug, Deserialize, Serialize, CryptoHasher)]
 pub struct BatchPayload {
+    author: PeerId,
     txns: Vec<SignedTransaction>,
     #[serde(skip)]
     num_bytes: OnceCell<usize>,
@@ -96,8 +99,9 @@ impl CryptoHash for BatchPayload {
 }
 
 impl BatchPayload {
-    pub fn new(txns: Vec<SignedTransaction>) -> Self {
+    pub fn new(author: PeerId, txns: Vec<SignedTransaction>) -> Self {
         Self {
+            author,
             txns,
             num_bytes: OnceCell::new(),
         }
@@ -133,7 +137,7 @@ impl Batch {
         batch_author: PeerId,
         gas_bucket_start: u64,
     ) -> Self {
-        let payload = BatchPayload::new(payload);
+        let payload = BatchPayload::new(batch_author, payload);
         let batch_info = BatchInfo::new(
             batch_author,
             batch_id,
@@ -151,6 +155,10 @@ impl Batch {
     }
 
     pub fn verify(&self) -> anyhow::Result<()> {
+        ensure!(
+            self.payload.author == self.author(),
+            "Payload author doesn't match the info"
+        );
         ensure!(
             self.payload.hash() == *self.digest(),
             "Payload hash doesn't match the digest"

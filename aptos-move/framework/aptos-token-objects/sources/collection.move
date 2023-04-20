@@ -440,7 +440,7 @@ module aptos_token_objects::collection {
     entry fun test_create_and_transfer(creator: &signer, trader: &signer) {
         let creator_address = signer::address_of(creator);
         let collection_name = string::utf8(b"collection name");
-        create_collection_helper(creator, *&collection_name);
+        create_collection_helper(creator, collection_name);
 
         let collection = object::address_to_object<Collection>(
             create_collection_address(&creator_address, &collection_name),
@@ -453,35 +453,35 @@ module aptos_token_objects::collection {
     #[expected_failure(abort_code = 0x80001, location = aptos_framework::object)]
     entry fun test_duplicate_collection(creator: &signer) {
         let collection_name = string::utf8(b"collection name");
-        create_collection_helper(creator, *&collection_name);
+        create_collection_helper(creator, collection_name);
         create_collection_helper(creator, collection_name);
     }
 
     #[test(creator = @0x123)]
     entry fun test_set_description(creator: &signer) acquires Collection {
         let collection_name = string::utf8(b"collection name");
-        let constructor_ref = create_collection_helper(creator, *&collection_name);
+        let constructor_ref = create_collection_helper(creator, collection_name);
         let collection = object::address_to_object<Collection>(
             create_collection_address(&signer::address_of(creator), &collection_name),
         );
         let mutator_ref = generate_mutator_ref(&constructor_ref);
         let description = string::utf8(b"no fail");
         assert!(description != description(collection), 0);
-        set_description(&mutator_ref, *&description);
+        set_description(&mutator_ref, description);
         assert!(description == description(collection), 1);
     }
 
     #[test(creator = @0x123)]
     entry fun test_set_uri(creator: &signer) acquires Collection {
         let collection_name = string::utf8(b"collection name");
-        let constructor_ref = create_collection_helper(creator, *&collection_name);
+        let constructor_ref = create_collection_helper(creator, collection_name);
         let mutator_ref = generate_mutator_ref(&constructor_ref);
         let collection = object::address_to_object<Collection>(
             create_collection_address(&signer::address_of(creator), &collection_name),
         );
         let uri = string::utf8(b"no fail");
         assert!(uri != uri(collection), 0);
-        set_uri(&mutator_ref, *&uri);
+        set_uri(&mutator_ref, uri);
         assert!(uri == uri(collection), 1);
     }
 

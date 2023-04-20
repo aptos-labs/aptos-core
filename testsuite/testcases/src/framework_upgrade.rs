@@ -90,6 +90,8 @@ impl NetworkTest for FrameworkUpgrade {
             framework_git_rev: None,
         };
 
+        runtime.block_on(network_info.mint_to_validator())?;
+
         let release_config = aptos_release_builder::current_release_config();
 
         runtime.block_on(aptos_release_builder::validate::validate_config(
