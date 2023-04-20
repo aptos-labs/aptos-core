@@ -1,20 +1,12 @@
-import React from 'react';
-import PropTypes from 'prop-types'
+import React from "react";
+import PropTypes from "prop-types";
 
-import isInternalUrl from '@docusaurus/isInternalUrl';
-import Link from '@docusaurus/Link';
-import clsx from 'clsx';
-import styles from './styles.module.css';
+import isInternalUrl from "@docusaurus/isInternalUrl";
+import Link from "@docusaurus/Link";
+import clsx from "clsx";
+import styles from "./styles.module.css";
 
-const BaseContainer = ({
-                         children,
-                         className,
-                         hasShadow,
-                         hasRoundedCorners,
-                         overlay,
-                         to,
-                       }) => {
-
+const BaseContainer = ({ children, className, hasShadow, hasRoundedCorners, overlay, to }) => {
   return (
     <Link
       className={clsx(styles.root, {
@@ -23,14 +15,14 @@ const BaseContainer = ({
         [styles.hasRoundedCorners]: hasRoundedCorners,
       })}
       to={to}
-      target={isInternalUrl(to) ? '_self' : '_blank'}
+      target={isInternalUrl(to) ? "_self" : "_blank"}
     >
       <div className={clsx(styles.children, className)}>{children}</div>
-      {overlay &&
-      <div className={styles.overlay}>
-        <p>{overlay}</p>
-      </div>
-      }
+      {overlay && (
+        <div className={styles.overlay}>
+          <p>{overlay}</p>
+        </div>
+      )}
     </Link>
   );
 };

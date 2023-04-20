@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::Sleep;
@@ -15,7 +16,7 @@ use thiserror::Error;
 #[error("timeout elapsed")]
 pub struct Elapsed;
 
-/// Future returned by [`TimeService::timeout`](crate::TimeService::timeout).
+/// Future returned by [`TimeServiceTrait::timeout`](crate::TimeServiceTrait::timeout).
 ///
 /// Mostly taken from [`tokio::time::Timeout`] but uses our `Sleep` future.
 #[pin_project]

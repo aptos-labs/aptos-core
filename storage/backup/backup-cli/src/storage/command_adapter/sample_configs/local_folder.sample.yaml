@@ -6,5 +6,6 @@ commands:
   create_backup: 'cd "$FOLDER" && mkdir $BACKUP_NAME && echo $BACKUP_NAME'
   create_for_write: 'cd "$FOLDER" && cd "$BACKUP_HANDLE" && test ! -f $FILE_NAME && touch $FILE_NAME && echo $BACKUP_HANDLE/$FILE_NAME && exec >&- && gzip -c > $FILE_NAME'
   open_for_read: 'cat "$FOLDER/$FILE_HANDLE" | gzip -cd'
-  save_metadata_line: 'cd "$FOLDER" && mkdir -p metadata && cd metadata && gzip -c > $FILE_NAME'
+  save_metadata_line: 'cd "$FOLDER" && mkdir -p metadata && cd metadata && FILE_HANDLE="metadata/$FILE_NAME" && echo "$FILE_HANDLE"; exec 1>&- && gzip -c > $FILE_NAME'
   list_metadata_files: 'cd "$FOLDER" && (test -d metadata && cd metadata && ls -1 || exec) | while read f; do echo metadata/$f; done'
+  backup_metadata_file: 'cd "$FOLDER" && mkdir -p metadata_backup && mv metadata/$FILE_NAME metadata_backup/$FILE_NAME'

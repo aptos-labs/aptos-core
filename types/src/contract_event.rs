@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -9,7 +10,6 @@ use crate::{
 use anyhow::{Error, Result};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::{language_storage::TypeTag, move_resource::MoveStructType};
-
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
@@ -92,6 +92,10 @@ impl ContractEventV0 {
 
     pub fn type_tag(&self) -> &TypeTag {
         &self.type_tag
+    }
+
+    pub fn size(&self) -> usize {
+        self.key.size() + 8 /* u64 */ + bcs::to_bytes(&self.type_tag).unwrap().len() + self.event_data.len()
     }
 }
 

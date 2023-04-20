@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! This file contains logic for checking a node, common to both VFNs and PFNs.
@@ -6,19 +6,18 @@
 //! VFN information on chain or PFN information from a file, and has converted
 //! it into a common format that these functions can ingest.
 
-use aptos_node_checker_lib::EvaluationSummary;
+use aptos_logger::{debug, info};
+use aptos_node_checker_lib::CheckSummary;
 use aptos_sdk::{
     crypto::{x25519, ValidCryptoMaterialStringExt},
     types::account_address::AccountAddress,
 };
 use clap::Parser;
-use futures::stream::FuturesUnordered;
-use futures::StreamExt;
-use log::{debug, info};
+use futures::{stream::FuturesUnordered, StreamExt};
 use reqwest::{Client as ReqwestClient, Url};
 use serde::Serialize;
-use std::collections::HashMap;
 use std::{
+    collections::HashMap,
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -43,7 +42,7 @@ pub struct NodeHealthCheckerArgs {
     pub nhc_baseline_config_name: String,
 
     /// How long to wait when talking to NHC. The check should be quick unless
-    /// we're using the TPS evaluator.
+    /// we're using the TPS checker.
     #[clap(long, default_value_t = 60)]
     pub nhc_timeout_secs: u64,
 
@@ -92,16 +91,16 @@ impl NodeHealthCheckerArgs {
             match single_check_result {
                 SingleCheckResult::Success(_) => {
                     info!("NHC returned a 200 for {}", node_url);
-                }
+                },
                 SingleCheckResult::NodeCheckFailure(_) => {
                     info!("NHC did not return a 200 for {}", node_url);
-                }
+                },
                 wildcard => {
                     panic!(
                         "Shouldn't be possible for checK_single_fn_wrapper to return {:?}",
                         wildcard
                     )
-                }
+                },
             }
             nhc_responses
                 .entry(account_address)
@@ -150,7 +149,7 @@ impl NodeHealthCheckerArgs {
                     node_info.public_key,
                 )
                 .await
-            }
+            },
             None => {
                 let mut index = 0;
                 loop {
@@ -182,7 +181,7 @@ impl NodeHealthCheckerArgs {
                     }
                     index += 1;
                 }
-            }
+            },
         }
     }
 
@@ -230,7 +229,7 @@ impl NodeHealthCheckerArgs {
                     format!("Error with request flow to NHC: {:#}", e),
                     NodeCheckFailureCode::RequestResponseError,
                 ));
-            }
+            },
         };
 
         // Handle the case where NHC itself throws an error (as opposed to a success
@@ -243,35 +242,31 @@ impl NodeHealthCheckerArgs {
         };
 
         // Confirm the response is valid JSON.
-        let evaluation_summary = match response.json::<EvaluationSummary>().await {
-            Ok(evaluation_summary) => evaluation_summary,
+        let check_summary = match response.json::<CheckSummary>().await {
+            Ok(check_summary) => check_summary,
             Err(e) => {
                 return SingleCheckResult::NodeCheckFailure(NodeCheckFailure::new(
                     format!("{:#}", e),
                     NodeCheckFailureCode::CouldNotDeserializeResponse,
                 ))
-            }
+            },
         };
 
         // Check specifically if the API port is closed.
-        if evaluation_summary
-            .evaluation_results
-            .iter()
-            .any(|evaluation_result| {
-                evaluation_result.evaluator_name == "index_response" && evaluation_result.score == 0
-            })
-        {
+        if check_summary.check_results.iter().any(|check_result| {
+            check_result.checker_name == "NodeIdentityChecker" && check_result.score == 0
+        }) {
             return SingleCheckResult::NodeCheckFailure(NodeCheckFailure::new(
                 format!(
                     "Couldn't talk to API on any of the expected ports {:?}: {:?}",
-                    API_PORTS, evaluation_summary
+                    API_PORTS, check_summary
                 ),
                 NodeCheckFailureCode::ApiPortClosed,
             ));
         }
 
         SingleCheckResult::Success(SingleCheckSuccess::new(
-            evaluation_summary,
+            check_summary,
             address_single_string,
         ))
     }
@@ -341,7 +336,7 @@ pub struct SingleCheckSuccess {
     /// The evaluation summary returned by NHC. This doesn't necessarily imply
     /// that the node passed the evaluation, just that an evaluation was returned
     /// successfully and it passed the API available check.
-    pub evaluation_summary: EvaluationSummary,
+    pub check_summary: CheckSummary,
 
     /// This is the address that we used to get this successful evaluation.
     /// This is presented in a normal URL format, not the NetworkAddress
@@ -354,9 +349,9 @@ pub struct SingleCheckSuccess {
 }
 
 impl SingleCheckSuccess {
-    pub fn new(evaluation_summary: EvaluationSummary, fn_address_url: String) -> Self {
+    pub fn new(check_summary: CheckSummary, fn_address_url: String) -> Self {
         Self {
-            evaluation_summary,
+            check_summary,
             fn_address_url,
         }
     }

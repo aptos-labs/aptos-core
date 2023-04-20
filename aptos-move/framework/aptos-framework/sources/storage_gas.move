@@ -374,7 +374,7 @@ module aptos_framework::storage_gas {
     /// | Data style | Operation | Minimum gas | Maximum gas |
     /// |------------|-----------|-------------|-------------|
     /// | Per item   | Read      | 300K        | 300K * 100  |
-    /// | Per item   | Create    | 5M          | 5M * 100    |
+    /// | Per item   | Create    | 300k        | 300k * 100    |
     /// | Per item   | Write     | 300K        | 300K * 100  |
     /// | Per byte   | Read      | 300         | 300 * 100   |
     /// | Per byte   | Create    | 5K          | 5K * 100    |
@@ -399,7 +399,7 @@ module aptos_framework::storage_gas {
         let item_config = UsageGasConfig {
             target_usage: 2 * k * m, // 2 billion
             read_curve: base_8192_exponential_curve(300 * k, 300 * k * 100),
-            create_curve: base_8192_exponential_curve(5 * m, 5 * m * 100),
+            create_curve: base_8192_exponential_curve(300 * k, 300 * k * 100),
             write_curve: base_8192_exponential_curve(300 * k, 300 * k * 100),
         };
         let byte_config = UsageGasConfig {

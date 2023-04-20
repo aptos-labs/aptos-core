@@ -1,13 +1,20 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{bootstrap_genesis, gen_block_id, gen_ledger_info_with_sigs};
 use anyhow::{anyhow, ensure, Result};
+use aptos_cached_packages::aptos_stdlib;
+use aptos_consensus_types::block::Block;
+use aptos_db::AptosDB;
+use aptos_executor::block_executor::BlockExecutor;
+use aptos_executor_types::BlockExecutorTrait;
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{AccountKey, LocalAccount},
 };
 use aptos_state_view::account_with_state_view::{AccountWithStateView, AsAccountWithStateView};
+use aptos_storage_interface::{state_view::DbStateViewAtVersion, DbReaderWriter, Order};
 use aptos_types::{
     account_config::aptos_test_root_address,
     account_view::AccountView,
@@ -23,25 +30,18 @@ use aptos_types::{
     waypoint::Waypoint,
 };
 use aptos_vm::AptosVM;
-use aptosdb::AptosDB;
-use cached_packages::aptos_stdlib;
-use consensus_types::block::Block;
-use executor::block_executor::BlockExecutor;
-use executor_types::BlockExecutorTrait;
 use rand::SeedableRng;
 use std::sync::Arc;
-
-use storage_interface::{state_view::DbStateViewAtVersion, DbReaderWriter, Order};
 
 pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     const B: u64 = 1_000_000_000;
 
-    let (genesis, validators) = vm_genesis::test_genesis_change_set_and_validators(Some(1));
+    let (genesis, validators) = aptos_vm_genesis::test_genesis_change_set_and_validators(Some(1));
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
 
     let mut core_resources_account: LocalAccount = LocalAccount::new(
         aptos_test_root_address(),
-        AccountKey::from_private_key(vm_genesis::GENESIS_KEYPAIR.0.clone()),
+        AccountKey::from_private_key(aptos_vm_genesis::GENESIS_KEYPAIR.0.clone()),
         0,
     );
 
@@ -506,7 +506,7 @@ pub fn create_db_and_executor<P: AsRef<std::path::Path>>(
 ) -> (
     Arc<AptosDB>,
     DbReaderWriter,
-    BlockExecutor<AptosVM>,
+    BlockExecutor<AptosVM, Transaction>,
     Waypoint,
 ) {
     let (db, dbrw) = DbReaderWriter::wrap(AptosDB::new_for_test(&path));

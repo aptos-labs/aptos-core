@@ -1,7 +1,7 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::utils::ReplayConcurrencyLevelOpt;
 use crate::{
     backup_types::{
         state_snapshot::{
@@ -17,16 +17,17 @@ use crate::{
     utils::{
         backup_service_client::BackupServiceClient, test_utils::start_local_backup_service,
         ConcurrentDownloadsOpt, GlobalBackupOpt, GlobalRestoreOpt, GlobalRestoreOptions,
-        RocksdbOpt, TrustedWaypointOpt,
+        ReplayConcurrencyLevelOpt, RocksdbOpt, TrustedWaypointOpt,
     },
 };
+use aptos_db::AptosDB;
+use aptos_executor_test_helpers::integration_test_impl::test_execution_with_storage_impl;
+use aptos_executor_types::VerifyExecutionMode;
+use aptos_storage_interface::DbReader;
 use aptos_temppath::TempPath;
 use aptos_types::transaction::Version;
-use aptosdb::AptosDB;
-use executor_test_helpers::integration_test_impl::test_execution_with_storage_impl;
 use proptest::{prelude::*, sample::Index};
 use std::{convert::TryInto, sync::Arc};
-use storage_interface::DbReader;
 use tokio::time::Duration;
 
 #[derive(Debug)]
@@ -114,7 +115,6 @@ fn test_end_to_end_impl(d: TestData) {
             .run(),
         )
         .unwrap();
-
     // Restore
     let global_restore_opt: GlobalRestoreOptions = GlobalRestoreOpt {
         dry_run: false,
@@ -133,6 +133,7 @@ fn test_end_to_end_impl(d: TestData) {
                 StateSnapshotRestoreOpt {
                     manifest_handle: state_snapshot_manifest.unwrap(),
                     version,
+                    validate_modules: false,
                 },
                 global_restore_opt.clone(),
                 Arc::clone(&store),
@@ -153,6 +154,7 @@ fn test_end_to_end_impl(d: TestData) {
             global_restore_opt,
             store,
             None, /* epoch_history */
+            VerifyExecutionMode::verify_all(),
         )
         .run(),
     )
@@ -197,7 +199,8 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
 
     #[test]
-    fn test_end_to_end(d in test_data_strategy()) {
+    #[cfg_attr(feature = "consensus-only-perf-test", ignore)]
+    fn test_end_to_end(d in test_data_strategy().no_shrink()) {
         test_end_to_end_impl(d)
     }
 }

@@ -17,6 +17,9 @@ numFullnodeGroups: 1
 # -- Specify validator and fullnode NodeConfigs via named ConfigMaps, rather than the generated ones from this chart.
 overrideNodeConfig: false
 
+# -- If true, helm will always override the deployed image with what is configured in the helm values. If not, helm will take the latest image from the currently running workloads, which is useful if you have a separate procedure to update images (e.g. rollout)
+manageImages: true
+
 haproxy:
   # -- Enable HAProxy deployment in front of validator and fullnodes
   enabled: true
@@ -67,7 +70,7 @@ validator:
   resources:
     limits:
       cpu: 15.5
-      memory: 30Gi
+      memory: 26Gi
     requests:
       cpu: 15
       memory: 26Gi
@@ -78,8 +81,6 @@ validator:
     size: 2048Gi
   # -- Log level for the validator
   rust_log: info
-  # -- Remote log level for the validator
-  rust_log_remote: debug,hyper=off
   # -- Address for remote logging. See `logger` helm chart
   remoteLogAddress:
   # -- Flag to force enable telemetry service (useful for forge tests)
@@ -101,7 +102,7 @@ fullnode:
   resources:
     limits:
       cpu: 15.5
-      memory: 30Gi
+      memory: 26Gi
     requests:
       cpu: 15
       memory: 26Gi
@@ -112,8 +113,6 @@ fullnode:
     size: 2048Gi
   # -- Log level for the fullnode
   rust_log: info
-  # -- Remote log level for the fullnode
-  rust_log_remote: debug,hyper=off
   # -- Flag to force enable telemetry service (useful for forge tests)
   force_enable_telemetry: false
   nodeSelector: {}
@@ -176,11 +175,17 @@ serviceAccount:
   # -- The name of the service account to use. If not set and create is true, a name is generated using the fullname template
   name:
 
-# -- LEGACY: create PodSecurityPolicy, which exists at the cluster-level
-podSecurityPolicy: true
-
 # -- Load test-data for starting a test network
 loadTestGenesis: false
+
+# -- TEST ONLY: Enable running as root for profiling
+enablePrivilegedMode: false
+
+pyroscope:
+  # -- Enable Pyroscope profiling
+  enabled: false
+  # -- Secret which contains the Pyroscope API key and other configuration
+  secretName: pyroscope
 
 # Additional labels
 labels:

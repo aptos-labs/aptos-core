@@ -1,73 +1,72 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! Objects used by/related to shared mempool
 use crate::{
-    core_mempool::CoreMempool, network::MempoolNetworkInterface,
-    shared_mempool::network::MempoolNetworkSender,
+    core_mempool::CoreMempool,
+    network::{MempoolNetworkInterface, MempoolSyncMsg},
 };
 use anyhow::Result;
 use aptos_config::{
     config::{MempoolConfig, RoleType},
-    network_id::{NetworkId, PeerNetworkId},
+    network_id::PeerNetworkId,
 };
+use aptos_consensus_types::common::{RejectedTransactionSummary, TransactionInProgress};
 use aptos_crypto::HashValue;
 use aptos_infallible::{Mutex, RwLock};
+use aptos_network::{
+    application::interface::NetworkClientInterface, transport::ConnectionMetadata,
+};
+use aptos_storage_interface::DbReader;
 use aptos_types::{
     mempool_status::MempoolStatus, transaction::SignedTransaction, vm_status::DiscardedVMStatus,
 };
-use consensus_types::common::{RejectedTransactionSummary, TransactionSummary};
+use aptos_vm_validator::vm_validator::TransactionValidation;
 use futures::{
     channel::{mpsc, mpsc::UnboundedSender, oneshot},
     future::Future,
     task::{Context, Poll},
 };
-use network::{application::storage::PeerMetadataStorage, transport::ConnectionMetadata};
 use serde::{Deserialize, Serialize};
-use std::cmp::Ordering;
 use std::{
-    collections::{BTreeMap, BTreeSet, HashMap},
+    cmp::Ordering,
+    collections::{BTreeMap, BTreeSet},
     fmt,
     pin::Pin,
     sync::Arc,
     task::Waker,
     time::{Instant, SystemTime},
 };
-use storage_interface::DbReader;
 use tokio::runtime::Handle;
-use vm_validator::vm_validator::TransactionValidation;
 
 /// Struct that owns all dependencies required by shared mempool routines.
 #[derive(Clone)]
-pub(crate) struct SharedMempool<V>
-where
-    V: TransactionValidation + 'static,
-{
+pub(crate) struct SharedMempool<NetworkClient, TransactionValidator> {
     pub mempool: Arc<Mutex<CoreMempool>>,
     pub config: MempoolConfig,
-    pub(crate) network_interface: MempoolNetworkInterface,
+    pub network_interface: MempoolNetworkInterface<NetworkClient>,
     pub db: Arc<dyn DbReader>,
-    pub validator: Arc<RwLock<V>>,
+    pub validator: Arc<RwLock<TransactionValidator>>,
     pub subscribers: Vec<UnboundedSender<SharedMempoolNotification>>,
+    pub broadcast_within_validator_network: Arc<RwLock<bool>>,
 }
 
-impl<V: TransactionValidation + 'static> SharedMempool<V> {
+impl<
+        NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
+        TransactionValidator: TransactionValidation + 'static,
+    > SharedMempool<NetworkClient, TransactionValidator>
+{
     pub fn new(
         mempool: Arc<Mutex<CoreMempool>>,
         config: MempoolConfig,
-        network_senders: HashMap<NetworkId, MempoolNetworkSender>,
+        network_client: NetworkClient,
         db: Arc<dyn DbReader>,
-        validator: Arc<RwLock<V>>,
+        validator: Arc<RwLock<TransactionValidator>>,
         subscribers: Vec<UnboundedSender<SharedMempoolNotification>>,
         role: RoleType,
-        peer_metadata_storage: Arc<PeerMetadataStorage>,
     ) -> Self {
-        let network_interface = MempoolNetworkInterface::new(
-            peer_metadata_storage,
-            network_senders,
-            role,
-            config.clone(),
-        );
+        let network_interface = MempoolNetworkInterface::new(network_client, role, config.clone());
         SharedMempool {
             mempool,
             config,
@@ -75,11 +74,18 @@ impl<V: TransactionValidation + 'static> SharedMempool<V> {
             db,
             validator,
             subscribers,
+            broadcast_within_validator_network: Arc::new(RwLock::new(true)),
         }
     }
 
     pub fn broadcast_within_validator_network(&self) -> bool {
-        self.config.shared_mempool_validator_broadcast
+        // This value will be changed true -> false via onchain config when quorum store is enabled.
+        // On the transition from true -> false, all transactions in mempool will be eligible for
+        // at least one of mempool broadcast or quorum store batch.
+        // A transition from false -> true is unexpected -- it would only be triggered if quorum
+        // store needs an emergency rollback. In this case, some transactions may not be propagated,
+        // they will neither go through a mempool broadcast or quorum store batch.
+        *self.broadcast_within_validator_network.read()
     }
 }
 
@@ -135,7 +141,9 @@ impl ScheduledBroadcast {
 }
 
 impl Future for ScheduledBroadcast {
-    type Output = (PeerNetworkId, bool); // (peer, whether this broadcast was scheduled as a backoff broadcast)
+    type Output = (PeerNetworkId, bool);
+
+    // (peer, whether this broadcast was scheduled as a backoff broadcast)
 
     fn poll(self: Pin<&mut Self>, context: &mut Context) -> Poll<Self::Output> {
         if Instant::now() < self.deadline {
@@ -157,11 +165,16 @@ pub enum QuorumStoreRequest {
         u64,
         // max byte size
         u64,
+        // return non full
+        bool,
+        // include gas upgraded
+        bool,
         // transactions to exclude from the requested batch
-        Vec<TransactionSummary>,
+        Vec<TransactionInProgress>,
         // callback to respond to
         oneshot::Sender<Result<QuorumStoreResponse>>,
     ),
+    // TODO: Do we use it in the real QS as well?
     /// Notifications about *rejected* committed txns.
     RejectNotification(
         // rejected transactions from consensus
@@ -174,20 +187,29 @@ pub enum QuorumStoreRequest {
 impl fmt::Display for QuorumStoreRequest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let payload = match self {
-            QuorumStoreRequest::GetBatchRequest(max_txns, max_bytes, excluded_txns, _) => {
+            QuorumStoreRequest::GetBatchRequest(
+                max_txns,
+                max_bytes,
+                return_non_full,
+                include_gas_upgraded,
+                excluded_txns,
+                _,
+            ) => {
                 format!(
-                    "GetBatchRequest [max_txns: {}, max_bytes: {}, excluded_txns_length: {}]",
+                    "GetBatchRequest [max_txns: {}, max_bytes: {}, return_non_full: {}, include_gas_upgraded: {}, excluded_txns_length: {}]",
                     max_txns,
                     max_bytes,
+                    return_non_full,
+                    include_gas_upgraded,
                     excluded_txns.len()
                 )
-            }
+            },
             QuorumStoreRequest::RejectNotification(rejected_txns, _) => {
                 format!(
                     "RejectNotification [rejected_txns_length: {}]",
                     rejected_txns.len()
                 )
-            }
+            },
         };
         write!(f, "{}", payload)
     }

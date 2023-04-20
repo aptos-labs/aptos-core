@@ -1,119 +1,217 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{error::QuorumStoreError, monitor, state_replication::PayloadManager};
-use anyhow::Result;
+use crate::{
+    counters,
+    network::NetworkSender,
+    quorum_store::{
+        batch_store::{BatchReader, BatchStore},
+        quorum_store_coordinator::CoordinatorCommand,
+    },
+};
+use aptos_consensus_types::{
+    block::Block,
+    common::{DataStatus, Payload},
+    proof_of_store::ProofOfStore,
+};
+use aptos_crypto::HashValue;
+use aptos_executor_types::{Error::DataNotFound, *};
 use aptos_logger::prelude::*;
-use consensus_types::{
-    common::{Payload, PayloadFilter},
-    request_response::{ConsensusRequest, ConsensusResponse},
-};
-use fail::fail_point;
-use futures::{
-    channel::{mpsc, oneshot},
-    future::BoxFuture,
-};
-use std::time::Duration;
-use tokio::time::{sleep, timeout};
+use aptos_types::transaction::SignedTransaction;
+use futures::{channel::mpsc::Sender, SinkExt};
+use std::sync::Arc;
+use tokio::sync::oneshot;
 
-const NO_TXN_DELAY: u64 = 30;
-
-/// Client that pulls blocks from Quorum Store
-#[derive(Clone)]
-pub struct QuorumStoreClient {
-    consensus_to_quorum_store_sender: mpsc::Sender<ConsensusRequest>,
-    poll_count: u64,
-    /// Timeout for consensus to pull transactions from quorum store and get a response (in milliseconds)
-    pull_timeout_ms: u64,
+/// Responsible to extract the transactions out of the payload and notify QuorumStore about commits.
+/// If QuorumStore is enabled, has to ask BatchReader for the transaction behind the proofs of availability in the payload.
+pub enum PayloadManager {
+    DirectMempool,
+    InQuorumStore(Arc<BatchStore<NetworkSender>>, Sender<CoordinatorCommand>),
 }
 
-impl QuorumStoreClient {
-    pub fn new(
-        consensus_to_quorum_store_sender: mpsc::Sender<ConsensusRequest>,
-        poll_count: u64,
-        pull_timeout_ms: u64,
-    ) -> Self {
-        assert!(
-            poll_count > 0,
-            "poll_count = 0 won't pull any txns from quorum store"
-        );
-        Self {
-            consensus_to_quorum_store_sender,
-            poll_count,
-            pull_timeout_ms,
+impl PayloadManager {
+    async fn request_transactions(
+        proofs: Vec<ProofOfStore>,
+        block_timestamp: u64,
+        batch_store: &BatchStore<NetworkSender>,
+    ) -> Vec<(
+        HashValue,
+        oneshot::Receiver<Result<Vec<SignedTransaction>, aptos_executor_types::Error>>,
+    )> {
+        let mut receivers = Vec::new();
+        for pos in proofs {
+            trace!(
+                "QSE: requesting pos {:?}, digest {}, time = {}",
+                pos,
+                pos.digest(),
+                block_timestamp
+            );
+            if block_timestamp <= pos.expiration() {
+                receivers.push((*pos.digest(), batch_store.get_batch(pos)));
+            } else {
+                debug!("QSE: skipped expired pos {}", pos.digest());
+            }
         }
+        receivers
     }
 
-    async fn pull_internal(
-        &self,
-        max_items: u64,
-        max_bytes: u64,
-        exclude_payloads: PayloadFilter,
-    ) -> Result<Payload, QuorumStoreError> {
-        let (callback, callback_rcv) = oneshot::channel();
-        let req = ConsensusRequest::GetBlockRequest(
-            max_items,
-            max_bytes,
-            exclude_payloads.clone(),
-            callback,
-        );
-        // send to shared mempool
-        self.consensus_to_quorum_store_sender
-            .clone()
-            .try_send(req)
-            .map_err(anyhow::Error::from)?;
-        // wait for response
-        match monitor!(
-            "pull_payload",
-            timeout(Duration::from_millis(self.pull_timeout_ms), callback_rcv).await
-        ) {
-            Err(_) => {
-                Err(anyhow::anyhow!("[consensus] did not receive GetBlockResponse on time").into())
-            }
-            Ok(resp) => match resp.map_err(anyhow::Error::from)?? {
-                ConsensusResponse::GetBlockResponse(payload) => Ok(payload),
-                _ => Err(
-                    anyhow::anyhow!("[consensus] did not receive expected GetBlockResponse").into(),
-                ),
+    ///Pass commit information to BatchReader and QuorumStore wrapper for their internal cleanups.
+    pub async fn notify_commit(&self, block_timestamp: u64, payloads: Vec<Payload>) {
+        match self {
+            PayloadManager::DirectMempool => {},
+            PayloadManager::InQuorumStore(batch_store, coordinator_tx) => {
+                // TODO: move this to somewhere in quorum store, so this can be a batch reader
+                batch_store
+                    .update_certified_timestamp(block_timestamp)
+                    .await;
+
+                let batches: Vec<_> = payloads
+                    .into_iter()
+                    .flat_map(|payload| match payload {
+                        Payload::DirectMempool(_) => {
+                            unreachable!("InQuorumStore should be used");
+                        },
+                        Payload::InQuorumStore(proof_with_status) => proof_with_status.proofs,
+                    })
+                    .map(|proof| proof.info().clone())
+                    .collect();
+
+                let mut tx = coordinator_tx.clone();
+
+                if let Err(e) = tx
+                    .send(CoordinatorCommand::CommitNotification(
+                        block_timestamp,
+                        batches,
+                    ))
+                    .await
+                {
+                    warn!(
+                        "CommitNotification failed. Is the epoch shutting down? error: {}",
+                        e
+                    );
+                }
             },
         }
     }
-}
 
-#[async_trait::async_trait]
-impl PayloadManager for QuorumStoreClient {
-    async fn pull_payload(
-        &self,
-        max_items: u64,
-        max_bytes: u64,
-        exclude_payloads: PayloadFilter,
-        wait_callback: BoxFuture<'static, ()>,
-        pending_ordering: bool,
-    ) -> Result<Payload, QuorumStoreError> {
-        fail_point!("consensus::pull_payload", |_| {
-            Err(anyhow::anyhow!("Injected error in pull_payload").into())
-        });
-        let mut callback_wrapper = Some(wait_callback);
-        // keep polling QuorumStore until there's payloads available or there's still pending payloads
-        let mut count = self.poll_count;
-        let payload = loop {
-            count -= 1;
-            let payload = self
-                .pull_internal(max_items, max_bytes, exclude_payloads.clone())
-                .await?;
-            if payload.is_empty() && !pending_ordering && count > 0 {
-                if let Some(callback) = callback_wrapper.take() {
-                    callback.await;
-                }
-                sleep(Duration::from_millis(NO_TXN_DELAY)).await;
-                continue;
-            }
-            break payload;
+    /// Called from consensus to pre-fetch the transaction behind the batches in the block.
+    pub async fn prefetch_payload_data(&self, block: &Block) {
+        let payload = match block.payload() {
+            Some(p) => p,
+            None => return,
         };
-        debug!(
-            poll_count = self.poll_count - count,
-            "Pull payloads from QuorumStore"
-        );
-        Ok(payload)
+        match self {
+            PayloadManager::DirectMempool => {},
+            PayloadManager::InQuorumStore(batch_store, _) => match payload {
+                Payload::InQuorumStore(proof_with_status) => {
+                    if proof_with_status.status.lock().is_none() {
+                        let receivers = PayloadManager::request_transactions(
+                            proof_with_status.proofs.clone(),
+                            block.timestamp_usecs(),
+                            batch_store,
+                        )
+                        .await;
+                        proof_with_status
+                            .status
+                            .lock()
+                            .replace(DataStatus::Requested(receivers));
+                    }
+                },
+                Payload::DirectMempool(_) => {
+                    unreachable!()
+                },
+            },
+        }
+    }
+
+    /// Extract transaction from a given block
+    /// Assumes it is never called for the same block concurrently. Otherwise status can be None.
+    pub async fn get_transactions(&self, block: &Block) -> Result<Vec<SignedTransaction>, Error> {
+        let payload = match block.payload() {
+            Some(p) => p,
+            None => return Ok(Vec::new()),
+        };
+
+        match (self, payload) {
+            (PayloadManager::DirectMempool, Payload::DirectMempool(txns)) => Ok(txns.clone()),
+            (
+                PayloadManager::InQuorumStore(batch_store, _),
+                Payload::InQuorumStore(proof_with_data),
+            ) => {
+                let status = proof_with_data.status.lock().take();
+                match status.expect("Should have been updated before.") {
+                    DataStatus::Cached(data) => {
+                        counters::QUORUM_BATCH_READY_COUNT.inc();
+                        proof_with_data
+                            .status
+                            .lock()
+                            .replace(DataStatus::Cached(data.clone()));
+                        Ok(data)
+                    },
+                    DataStatus::Requested(receivers) => {
+                        let _timer = counters::BATCH_WAIT_DURATION.start_timer();
+                        let mut vec_ret = Vec::new();
+                        if !receivers.is_empty() {
+                            debug!(
+                                "QSE: waiting for data on {} receivers, block_round {}",
+                                receivers.len(),
+                                block.round()
+                            );
+                        }
+                        for (digest, rx) in receivers {
+                            match rx.await {
+                                Err(e) => {
+                                    // We probably advanced epoch already.
+                                    warn!("Oneshot channel to get a batch was dropped with error {:?}", e);
+                                    let new_receivers = PayloadManager::request_transactions(
+                                        proof_with_data.proofs.clone(),
+                                        block.timestamp_usecs(),
+                                        batch_store,
+                                    )
+                                    .await;
+                                    // Could not get all data so requested again
+                                    proof_with_data
+                                        .status
+                                        .lock()
+                                        .replace(DataStatus::Requested(new_receivers));
+                                    return Err(DataNotFound(digest));
+                                },
+                                Ok(Ok(data)) => {
+                                    vec_ret.push(data);
+                                },
+                                Ok(Err(e)) => {
+                                    let new_receivers = PayloadManager::request_transactions(
+                                        proof_with_data.proofs.clone(),
+                                        block.timestamp_usecs(),
+                                        batch_store,
+                                    )
+                                    .await;
+                                    // Could not get all data so requested again
+                                    proof_with_data
+                                        .status
+                                        .lock()
+                                        .replace(DataStatus::Requested(new_receivers));
+                                    return Err(e);
+                                },
+                            }
+                        }
+                        let ret: Vec<SignedTransaction> = vec_ret.into_iter().flatten().collect();
+                        // execution asks for the data twice, so data is cached here for the second time.
+                        proof_with_data
+                            .status
+                            .lock()
+                            .replace(DataStatus::Cached(ret.clone()));
+                        Ok(ret)
+                    },
+                }
+            },
+            (_, _) => unreachable!(
+                "Wrong payload {} epoch {}, round {}, id {}",
+                payload,
+                block.block_data().epoch(),
+                block.block_data().round(),
+                block.id()
+            ),
+        }
     }
 }

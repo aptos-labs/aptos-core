@@ -1,17 +1,20 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
-
-use serde::{Deserialize, Serialize};
-use thiserror::Error;
 
 use aptos_crypto::HashValue;
 use aptos_types::transaction::Version;
+use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 #[derive(Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
 /// Different reasons for proposal rejection
 pub enum Error {
     #[error("Cannot find speculation result for block id {0}")]
     BlockNotFound(HashValue),
+
+    #[error("Cannot get data for batch id {0}")]
+    DataNotFound(HashValue),
 
     #[error(
         "Bad num_txns_to_commit. first version {}, num to commit: {}, target version: {}",
@@ -33,6 +36,9 @@ pub enum Error {
 
     #[error("Received Empty Blocks")]
     EmptyBlocks,
+
+    #[error("request timeout")]
+    CouldNotGetData,
 }
 
 impl From<anyhow::Error> for Error {

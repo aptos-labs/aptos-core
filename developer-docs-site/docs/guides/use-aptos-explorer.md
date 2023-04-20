@@ -1,5 +1,5 @@
 ---
-title: "Using Aptos Explorer"
+title: "Use the Aptos Explorer"
 slug: "use-aptos-explorer"
 ---
 import Tabs from '@theme/Tabs';
@@ -8,9 +8,9 @@ import TabItem from '@theme/TabItem';
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Using Aptos Explorer
+# Use the Aptos Explorer
 
-The [Aptos Explorer](https://explorer.aptoslabs.com/) lets you delve into the activity on the Aptos blockchain in great detail, seeing transactions, validators, and account information. With the Aptos Explorer, you may ensure the work you do in the [Aptos Petra Wallet](install-petra-wallet.md) and elsewhere on the blockchain is accurately reflected in Aptos.
+The [Aptos Explorer](https://explorer.aptoslabs.com/) lets you delve into the activity on the Aptos blockchain in great detail, seeing transactions, validators, and account information. With the Aptos Explorer, you may ensure the work you do in the [Aptos Petra Wallet](install-petra-wallet.md) and elsewhere on the blockchain is accurately reflected in Aptos. Note, the Aptos ecosystem has [several other explorers](https://github.com/aptos-foundation/ecosystem-projects#explorers) to choose from.
 
 The Aptos Explorer provides a one-step search engine across the blockchain to discover details about wallets, transactions, network analytics, user accounts, smart contracts, and more. The Aptos Explorer also offers dedicated pages for key elements of the blockchain and acts as the source of truth for all things Aptos. See the [Aptos Glossary](../reference/glossary.md) for definitions of many of the terms found here.
 
@@ -27,7 +27,7 @@ The Aptos Explorer gives you a near real-time view into the status of the networ
 
 Follow the instructions here to conduct typical work in the Aptos Explorer.
 
-### Select network
+### Select a network
 
 The Aptos Explorer renders data from all Aptos networks: Mainnet, Testnet, Devnet, and your local host if configured. See [Aptos Blockchain Deployments](../nodes/aptos-deployments.md) for a detailed view of their purposes and differences.
 
@@ -65,11 +65,11 @@ sources={{
 
 The resulting [Transaction details](#transaction-details) page appears.
 
-### Find account address
+### Find an account address
 
-The simplest way to find your addess is to use the [Aptos Petra Wallet](https://petra.app/docs/use).
+The simplest way to find your address is to use the [Aptos Petra Wallet](https://petra.app/docs/use).
 
-Then simply append it to the following URL to load its details in th Aptos Explorer:
+Then simply append it to the following URL to load its details in the Aptos Explorer:
 https://explorer.aptoslabs.com/account/
 
 Like so:
@@ -79,7 +79,7 @@ See [Accounts](#accounts) for instructions on use.
 
 ## Explorer pages
 
-This secton walks you through the available screens in Aptos Explorer to help you find the information you need.
+This section walks you through the available screens in Aptos Explorer to help you find the information you need.
 
 ### Explorer home
 
@@ -161,7 +161,7 @@ sources={{
 />
 </center>
 
-You can load your acccount page by apending your account addresss to:
+You can load your account page by appending your account address to:
 https://explorer.aptoslabs.com/account/
 
 See [Find account address](#find-account-address) for more help.
@@ -181,7 +181,7 @@ The *Tokens* tab presents any assets owned by the account, as well as details ab
 The *Token details* page contains:
 
   * *Overview* tab including token name, owner, collection, creator, royalty, and more.
-  * *Actitivies* tab showing all transfer types, the addresses involved, property version, and amount.
+  * *Activities* tab showing all transfer types, the addresses involved, property version, and amount.
 
 <center>
 <ThemedImage
@@ -201,7 +201,17 @@ The *Resources* tab presents a view of all types used by the account. Use the *C
 
 #### Modules
 
-The *Modules* tab displays the bytecode and ABI used by the account. As with Payload, click the down arrow at the bottom of the ABI code block to expand it and see all contents.
+The *Modules* tab displays the source code and ABI used by the account. Select different modules on the left sidebar to view Move source code and ABI of a specific module. Use the expand button at the top right of the source code to expand the code for better readability.
+
+<center>
+<ThemedImage
+alt="Aptos Explorer Modules tab"
+sources={{
+    light: useBaseUrl('/img/docs/10-explorer-modules.png'),
+    dark: useBaseUrl('/img/docs/10-explorer-modules-dark.png'),
+  }}
+/>
+</center>
 
 #### Info
 

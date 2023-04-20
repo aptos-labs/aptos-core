@@ -45,8 +45,11 @@ Basic instruction gas parameters are defined at [`instr.rs`] and include the fol
 |---------------------|----------------------------------|
 | `pop`               | Pop from stack                   |
 | `ld_u8`             | Load a `u8`                      |
+| `ld_u16`            | Load a `u16`                     |
+| `ld_u32`            | Load a `u32`                     |
 | `ld_u64`            | Load a `u64`                     |
 | `ld_u128`           | Load a `u128`                    |
+| `ld_256`            | Load a `u256`                    |
 | `ld_true`           | Load a `true`                    |
 | `ld_false`          | Load a `false`                   |
 | `ld_const_base`     | Base cost to load a constant     |
@@ -69,13 +72,15 @@ Basic instruction gas parameters are defined at [`instr.rs`] and include the fol
 
 ### Calling
 
-| Parameter                 | Meaning                       |
-|---------------------------|-------------------------------|
-| `call_base`               | Base cost for a function call |
-| `call_per_arg`            | Cost per function argument    |
-| `call_generic_base`       |                               |
-| `call_generic_per_ty_arg` | Cost per type argument        |
-| `call_generic_per_arg`    |                               |
+| Parameter                 | Meaning                         |
+|---------------------------|---------------------------------|
+| `call_base`               | Base cost for a function call   |
+| `call_per_arg`            | Cost per function argument      |
+| `call_per_local`          | Cost per local argument         |
+| `call_generic_base`       |                                 |
+| `call_generic_per_ty_arg` | Cost per type argument          |
+| `call_generic_per_arg`    |                                 |
+| `call_generic_per_local`  | Cost generic per local argument |
 
 ### Structs
 
@@ -104,8 +109,11 @@ Basic instruction gas parameters are defined at [`instr.rs`] and include the fol
 | Parameter   | Meaning          |
 |-------------|------------------|
 | `cast_u8`   | Cast to a `u8`   |
+| `cast_u16`  | Cast to a `u16`  |
+| `cast_u32`  | Cast to a `u32`  |
 | `cast_u64`  | Cast to a `u64`  |
 | `cast_u128` | Cast to a `u128` |
+| `cast_u256` | Cast to a `u256` |
 
 ### Arithmetic
 
@@ -218,7 +226,7 @@ Hence per the item-wise read methodology described above, reading the last eleme
 
 ## Payload gas
 
-Payload gas is defined in [`transaction.rs`], which incorporates storage gas with several payload- and pricing-associated parameters:
+Payload gas is defined in [`transaction/mod.rs`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/transaction/mod.rs), which incorporates storage gas with several payload- and pricing-associated parameters:
 
 | Parameter                       | Meaning                                                                                |
 |---------------------------------|----------------------------------------------------------------------------------------|
@@ -239,7 +247,7 @@ Then, to convert from external gas units to octas, multiply by the "gas price", 
 
 ### Unit and pricing constants
 
-As of the time of this writing, `min_price_per_gas_unit` in [`transaction.rs`] is defined as [`aptos_global_constants`]`::GAS_UNIT_PRICE` (which is itself defined as 100), with other noteworthy [`transaction.rs`] constants as follows:
+As of the time of this writing, `min_price_per_gas_unit` in [`transaction/mod.rs`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/transaction/mod.rs) is defined as [`aptos_global_constants`]`::GAS_UNIT_PRICE` (which is itself defined as 100), with other noteworthy [`transaction/mod.rs`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/transaction/mod.rs) constants as follows:
 
 | Constant                  | Value  |
 |---------------------------|--------|
@@ -318,7 +326,7 @@ In extreme cases it is possible for instruction gas to far outweigh storage gas,
 
 ### Payload gas
 
-As of the time of this writing, [`transaction.rs`] defines the minimum amount of internal gas per transaction as 1,500,000 internal units (15,000 octas at minimum), an amount that increases by 2,000 internal gas units (20 octas minimum) per byte for payloads larger than 600 bytes, with the maximum number of bytes permitted in a transaction set at 65536.
+As of the time of this writing, [`transaction/mod.rs`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/transaction/mod.rs) defines the minimum amount of internal gas per transaction as 1,500,000 internal units (15,000 octas at minimum), an amount that increases by 2,000 internal gas units (20 octas minimum) per byte for payloads larger than 600 bytes, with the maximum number of bytes permitted in a transaction set at 65536.
 Hence in practice, payload gas is unlikely to be a concern.
 
 <!--- Alphabetized reference links -->
@@ -326,15 +334,15 @@ Hence in practice, payload gas is unlikely to be a concern.
 [#4540]:                           https://github.com/aptos-labs/aptos-core/pull/4540/files
 [`aptos-gas/src/`]:                https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/
 [`aptos_global_constants`]:        https://github.com/aptos-labs/aptos-core/blob/main/config/global-constants/src/lib.rs
-[`base_8192_exponential_curve()`]: https://github.com/aptos-labs/aptos-core/blob/framework-docs/AptosFramework/storage_gas.md#0x1_storage_gas_base_8192_exponential_curve
+[`base_8192_exponential_curve()`]: https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/storage_gas.md#0x1_storage_gas_base_8192_exponential_curve
 [BCS sequence specification]:      https://github.com/diem/bcs#fixed-and-variable-length-sequences
 [`gas_meter.rs`]:                  https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/gas_meter.rs
-[`initialize()`]:                  https://github.com/aptos-labs/aptos-core/blob/framework-docs/AptosFramework/storage_gas.md#0x1_storage_gas_initialize
+[`initialize()`]:                  https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/storage_gas.md#0x1_storage_gas_initialize
 [`instr.rs`]:                      https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/instr.rs
 [`move_stdlib.rs`]:                https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/move_stdlib.rs
-[`on_reconfig()`]:                 https://github.com/aptos-labs/aptos-core/blob/framework-docs/AptosFramework/storage_gas.md#0x1_storage_gas_on_reconfig
-[`storage_gas.md`]:                https://github.com/aptos-labs/aptos-core/blob/framework-docs/AptosFramework/storage_gas.md
+[`on_reconfig()`]:                 https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/storage_gas.md#@Specification_16_on_reconfig
+[`storage_gas.md`]:                https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/storage_gas.md
 [`storage_gas.move`]:              https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/storage_gas.move
-[`StorageGas`]:                    https://github.com/aptos-labs/aptos-core/blob/framework-docs/AptosFramework/storage_gas.md#0x1_storage_gas_StorageGas
+[`StorageGas`]:                    https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/storage_gas.md#resource-storagegas
 [`table.rs`]:                      https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/table.rs
 [`transaction.rs`]:                https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/transaction.rs

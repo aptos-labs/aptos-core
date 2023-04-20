@@ -1,31 +1,41 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::error::{QuorumStoreError, StateSyncError};
+use crate::{
+    error::{QuorumStoreError, StateSyncError},
+    payload_manager::PayloadManager,
+    transaction_shuffler::TransactionShuffler,
+};
 use anyhow::Result;
-use aptos_crypto::HashValue;
-use aptos_types::{epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures};
-use consensus_types::{
+use aptos_consensus_types::{
     block::Block,
     common::{Payload, PayloadFilter},
     executed_block::ExecutedBlock,
 };
-use executor_types::{Error as ExecutionError, StateComputeResult};
+use aptos_crypto::HashValue;
+use aptos_executor_types::{Error as ExecutionError, StateComputeResult};
+use aptos_types::{epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures};
 use futures::future::BoxFuture;
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 pub type StateComputerCommitCallBackType =
     Box<dyn FnOnce(&[Arc<ExecutedBlock>], LedgerInfoWithSignatures) + Send + Sync>;
 
+/// Clients can pull information about transactions from the mempool and return
+/// the retrieved information as a `Payload`.
 #[async_trait::async_trait]
-pub trait PayloadManager: Send + Sync {
+pub trait PayloadClient: Send + Sync {
     async fn pull_payload(
         &self,
+        max_poll_time: Duration,
         max_items: u64,
         max_bytes: u64,
         exclude: PayloadFilter,
         wait_callback: BoxFuture<'static, ()>,
         pending_ordering: bool,
+        pending_uncommitted_blocks: usize,
+        recent_max_fill_fraction: f32,
     ) -> Result<Payload, QuorumStoreError>;
 
     fn trace_payloads(&self) {}
@@ -62,5 +72,13 @@ pub trait StateComputer: Send + Sync {
     async fn sync_to(&self, target: LedgerInfoWithSignatures) -> Result<(), StateSyncError>;
 
     // Reconfigure to execute transactions for a new epoch.
-    fn new_epoch(&self, epoch_state: &EpochState);
+    fn new_epoch(
+        &self,
+        epoch_state: &EpochState,
+        payload_manager: Arc<PayloadManager>,
+        transaction_shuffler: Arc<dyn TransactionShuffler>,
+    );
+
+    // Reconfigure to clear epoch state at end of epoch.
+    fn end_epoch(&self);
 }

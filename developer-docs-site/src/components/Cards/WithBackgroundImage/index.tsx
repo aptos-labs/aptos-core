@@ -1,18 +1,17 @@
-import React, {useEffect, useState} from 'react';
-import PropTypes from 'prop-types';
+import React, { useEffect, useState } from "react";
+import PropTypes from "prop-types";
 
-import useBaseUrl from '@docusaurus/useBaseUrl';
-import {useColorMode} from '@docusaurus/theme-common';
+import useBaseUrl from "@docusaurus/useBaseUrl";
+import { useColorMode } from "@docusaurus/theme-common";
 
 let counter = 0;
 
-const getImage = (imageDark, imageDarkHover, imageLight, imageLightHover, isHovered,
-) => {
+const getImage = (imageDark, imageDarkHover, imageLight, imageLightHover, isHovered) => {
   if (!imageLight) {
-    return '';
+    return "";
   }
 
-  const {isDarkTheme} = useColorMode();
+  const { isDarkTheme } = useColorMode();
 
   const backgroundImage = isDarkTheme && imageDark ? imageDark : imageLight;
 
@@ -38,13 +37,11 @@ const WithBackgroundImage = ({
 
   const image = getImage(imageDark, imageDarkHover, imageLight, imageLightHover, isHovered);
 
-  const backgroundImageStyle = image
-    ? {'backgroundImage': `url('${image}')`}
-    : {};
-  const imagesToPreload = images.filter(url => url).map(url => useBaseUrl(url));
+  const backgroundImageStyle = image ? { backgroundImage: `url('${image}')` } : {};
+  const imagesToPreload = images.filter((url) => url).map((url) => useBaseUrl(url));
 
   useEffect(() => {
-    const preloadedImages = imagesToPreload.map(url => {
+    const preloadedImages = imagesToPreload.map((url) => {
       const image = new Image();
       image.src = url;
       return image;

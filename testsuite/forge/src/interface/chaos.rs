@@ -1,9 +1,8 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::fmt::{Display, Formatter};
-
 use aptos_sdk::types::PeerId;
+use std::fmt::{Display, Formatter};
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
 pub enum SwarmChaos {
@@ -47,19 +46,22 @@ impl Display for SwarmNetworkPartition {
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
 pub struct SwarmNetworkBandwidth {
-    pub rate: u64,
-    pub limit: u64,
-    pub buffer: u64,
+    pub group_network_bandwidths: Vec<GroupNetworkBandwidth>,
 }
 
 impl Display for SwarmNetworkBandwidth {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "Limit bandwidth on all nodes: rate {}, limit {}, buffer {}",
-            self.rate, self.limit, self.buffer
-        )
+        write!(f, "Bandwidth nodes {:?}", self.group_network_bandwidths)
     }
+}
+
+#[derive(Eq, Hash, PartialEq, Debug, Clone)]
+pub struct GroupNetworkBandwidth {
+    pub name: String,
+    /// Rate in megabytes per second
+    pub rate: u64,
+    pub limit: u64,
+    pub buffer: u64,
 }
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]

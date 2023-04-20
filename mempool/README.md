@@ -27,7 +27,7 @@ This allows transactions to be grouped into a single consensus block, and priori
 Mempool doesn't keep track of transactions sent to consensus. On each get_block request (to pull a block of transaction from mempool), consensus sends a set of transactions that were pulled from mempool, but not committed. This allows the mempool to stay agnostic about different consensus proposal branches.
 
 When a transaction is fully executed and written to storage, consensus notifies mempool of committed rejected transactions,
-and state sync notifies mempool of accepted transctions. Mempool then drops this transaction from its internal state.
+and state sync notifies mempool of accepted transactions. Mempool then drops this transaction from its internal state.
 
 ## Implementation Details
 

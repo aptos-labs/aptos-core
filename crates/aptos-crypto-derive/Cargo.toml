@@ -1,21 +1,24 @@
 [package]
 name = "aptos-crypto-derive"
-version = "0.0.3"
-authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Custom derives for `aptos-crypto`"
-repository = "https://github.com/aptos-labs/aptos-core"
-homepage = "https://aptoslabs.com"
-license = "Apache-2.0"
-publish = ["crates-io"]
-edition = "2021"
+version = "0.0.3"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
 
 [lib]
 proc-macro = true
 
 [dependencies]
-proc-macro2 = "1.0.38"
-quote = "1.0.18"
-syn = { version = "1.0.92", features = ["derive"] }
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true }
 
 [dev-dependencies]
-anyhow = "1.0.57"
+anyhow = { workspace = true }

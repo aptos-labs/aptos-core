@@ -1,20 +1,24 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{common::Author, quorum_cert::QuorumCert};
 use anyhow::ensure;
 use aptos_crypto::{bls12381, CryptoMaterialError};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use aptos_types::account_address::AccountAddress;
-use aptos_types::aggregate_signature::{AggregateSignature, PartialSignatures};
-use aptos_types::validator_verifier::VerifyError;
 use aptos_types::{
-    block_info::Round, validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier,
+    account_address::AccountAddress,
+    aggregate_signature::{AggregateSignature, PartialSignatures},
+    block_info::Round,
+    validator_signer::ValidatorSigner,
+    validator_verifier::{ValidatorVerifier, VerifyError},
 };
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap};
-use std::fmt::{Display, Formatter};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fmt::{Display, Formatter},
+};
 
 /// This structure contains all the information necessary to construct a signature
 /// on the equivalent of a AptosBFT v4 timeout message.
@@ -128,6 +132,7 @@ impl TwoChainTimeoutCertificate {
             signatures_with_rounds: AggregateSignatureWithRounds::empty(),
         }
     }
+
     /// Verifies the signatures for each validator, the signature is on the TimeoutSigningRepr where the
     /// hqc_round is in the signature map.
     /// We verify the following:
@@ -283,6 +288,7 @@ impl PartialSignaturesWithRound {
     pub fn new(signatures: BTreeMap<AccountAddress, (Round, bls12381::Signature)>) -> Self {
         Self { signatures }
     }
+
     pub fn empty() -> Self {
         Self::new(BTreeMap::new())
     }
@@ -387,8 +393,10 @@ impl AggregateSignatureWithRounds {
 
 #[cfg(test)]
 mod tests {
-    use crate::quorum_cert::QuorumCert;
-    use crate::timeout_2chain::{TwoChainTimeout, TwoChainTimeoutWithPartialSignatures};
+    use crate::{
+        quorum_cert::QuorumCert,
+        timeout_2chain::{TwoChainTimeout, TwoChainTimeoutWithPartialSignatures},
+    };
     use aptos_crypto::bls12381;
 
     #[test]

@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::delta_change_set::{addition, deserialize, subtraction};
@@ -25,7 +25,7 @@ pub struct AggregatorHandle(pub AccountAddress);
 /// Uniquely identifies each aggregator instance in storage.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AggregatorID {
-    // A handle that is shared accross all aggregator instances created by the
+    // A handle that is shared across all aggregator instances created by the
     // same `AggregatorFactory` and which is used for fine-grained storage
     // access.
     pub handle: TableHandle,
@@ -39,6 +39,16 @@ impl AggregatorID {
     pub fn new(handle: TableHandle, key: AggregatorHandle) -> Self {
         AggregatorID { handle, key }
     }
+}
+
+/// Generates a dummy id for aggregator based on the given key. Only used for testing.
+pub fn aggregator_id_for_test(key: u128) -> AggregatorID {
+    let bytes: Vec<u8> = [key.to_le_bytes(), key.to_le_bytes()]
+        .iter()
+        .flat_map(|b| b.to_vec())
+        .collect();
+    let key = AggregatorHandle(AccountAddress::from_bytes(bytes).unwrap());
+    AggregatorID::new(TableHandle(AccountAddress::ZERO), key)
 }
 
 /// Tracks values seen by aggregator. In particular, stores information about
@@ -119,7 +129,7 @@ impl Aggregator {
                 AggregatorState::NegativeDelta => history.record_negative(self.value),
                 AggregatorState::Data => {
                     unreachable!("history is not tracked when aggregator knows its value")
-                }
+                },
             }
         }
     }
@@ -131,11 +141,11 @@ impl Aggregator {
                 // If aggregator knows the value, add directly and keep the state.
                 self.value = addition(self.value, value, self.limit)?;
                 return Ok(());
-            }
+            },
             AggregatorState::PositiveDelta => {
                 // If positive delta, add directly but also record the state.
                 self.value = addition(self.value, value, self.limit)?;
-            }
+            },
             AggregatorState::NegativeDelta => {
                 // Negative delta is a special case, since the state might
                 // change depending on how big the `value` is. Suppose
@@ -149,7 +159,7 @@ impl Aggregator {
                 } else {
                     self.value = subtraction(self.value, value)?;
                 }
-            }
+            },
         }
 
         // Record side-effects of addition in history.
@@ -166,7 +176,7 @@ impl Aggregator {
                 // record the history.
                 self.value = subtraction(self.value, value)?;
                 return Ok(());
-            }
+            },
             AggregatorState::PositiveDelta => {
                 // Positive delta is a special case because the state can
                 // change depending on how big the `value` is. Suppose
@@ -185,14 +195,14 @@ impl Aggregator {
                     self.value = subtraction(value, self.value)?;
                     self.state = AggregatorState::NegativeDelta;
                 }
-            }
+            },
             AggregatorState::NegativeDelta => {
                 // Since we operate on unsigned integers, we have to add
                 // when subtracting from negative delta. Note that if limit
                 // is some X, then we cannot subtract more than X, and so
                 // we should return an error there.
                 self.value = addition(self.value, value, self.limit)?;
-            }
+            },
         }
 
         // Record side-effects of addition in history.
@@ -247,13 +257,13 @@ impl Aggregator {
                     match self.state {
                         AggregatorState::PositiveDelta => {
                             self.value = addition(value_from_storage, self.value, self.limit)?;
-                        }
+                        },
                         AggregatorState::NegativeDelta => {
                             self.value = subtraction(value_from_storage, self.value)?;
-                        }
+                        },
                         AggregatorState::Data => {
                             unreachable!("history is not tracked when aggregator knows its value")
-                        }
+                        },
                     }
 
                     // Change the state and return the new value. Also, make
@@ -363,91 +373,29 @@ pub fn extension_error(message: impl ToString) -> PartialVMError {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::delta_change_set::serialize;
-    use aptos_state_view::StateView;
-    use aptos_types::{
-        account_address::AccountAddress,
-        state_store::{
-            state_key::StateKey, state_storage_usage::StateStorageUsage,
-            table::TableHandle as AptosTableHandle,
-        },
-    };
+    use aptos_language_e2e_tests::data_store::FakeDataStore;
     use claims::{assert_err, assert_ok};
     use once_cell::sync::Lazy;
-    use std::collections::HashMap;
-
-    #[derive(Default)]
-    pub struct FakeTestStorage {
-        data: HashMap<StateKey, Vec<u8>>,
-    }
-
-    impl FakeTestStorage {
-        fn new() -> Self {
-            let mut data = HashMap::new();
-
-            // Initialize storage with some test data.
-            data.insert(id_to_state_key(test_id(600)), serialize(&300));
-            FakeTestStorage { data }
-        }
-    }
-
-    impl StateView for FakeTestStorage {
-        fn get_state_value(&self, state_key: &StateKey) -> anyhow::Result<Option<Vec<u8>>> {
-            Ok(self.data.get(state_key).cloned())
-        }
-
-        fn is_genesis(&self) -> bool {
-            self.data.is_empty()
-        }
-
-        fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
-            Ok(StateStorageUsage::new_untracked())
-        }
-    }
-
-    impl TableResolver for FakeTestStorage {
-        fn resolve_table_entry(
-            &self,
-            handle: &TableHandle,
-            key: &[u8],
-        ) -> Result<Option<Vec<u8>>, anyhow::Error> {
-            let state_key = StateKey::table_item(AptosTableHandle::from(*handle), key.to_vec());
-            self.get_state_value(&state_key)
-        }
-    }
-
-    fn test_id(key: u128) -> AggregatorID {
-        let bytes: Vec<u8> = [key.to_le_bytes(), key.to_le_bytes()]
-            .iter()
-            .flat_map(|b| b.to_vec())
-            .collect();
-        let key = AggregatorHandle(AccountAddress::from_bytes(&bytes).unwrap());
-        AggregatorID::new(TableHandle(AccountAddress::ZERO), key)
-    }
-
-    fn id_to_state_key(id: AggregatorID) -> StateKey {
-        StateKey::table_item(AptosTableHandle::from(id.handle), id.key.0.to_vec())
-    }
 
     #[allow(clippy::redundant_closure)]
-    static TEST_RESOLVER: Lazy<FakeTestStorage> = Lazy::new(|| FakeTestStorage::new());
+    static TEST_RESOLVER: Lazy<FakeDataStore> = Lazy::new(|| FakeDataStore::default());
 
     #[test]
     fn test_materialize_not_in_storage() {
         let mut aggregator_data = AggregatorData::default();
 
-        let aggregator = aggregator_data.get_aggregator(test_id(300), 700);
-        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &test_id(700)));
+        let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(300), 700);
+        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &aggregator_id_for_test(700)));
     }
 
     #[test]
     fn test_materialize_known() {
         let mut aggregator_data = AggregatorData::default();
-        aggregator_data.create_new_aggregator(test_id(200), 200);
+        aggregator_data.create_new_aggregator(aggregator_id_for_test(200), 200);
 
-        let aggregator = aggregator_data.get_aggregator(test_id(200), 200);
+        let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(200), 200);
         assert_ok!(aggregator.add(100));
-        assert_ok!(aggregator.read_and_materialize(&*TEST_RESOLVER, &test_id(200)));
+        assert_ok!(aggregator.read_and_materialize(&*TEST_RESOLVER, &aggregator_id_for_test(200)));
         assert_eq!(aggregator.value, 100);
     }
 
@@ -457,9 +405,9 @@ mod test {
 
         // +0 to +400 satisfies <= 600 and is ok, but materialization fails
         // with 300 + 400 > 600!
-        let aggregator = aggregator_data.get_aggregator(test_id(600), 600);
+        let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(600), 600);
         assert_ok!(aggregator.add(400));
-        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &test_id(600)));
+        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &aggregator_id_for_test(600)));
     }
 
     #[test]
@@ -467,9 +415,9 @@ mod test {
         let mut aggregator_data = AggregatorData::default();
 
         // +0 to -400 is ok, but materialization fails with 300 - 400 < 0!
-        let aggregator = aggregator_data.get_aggregator(test_id(600), 600);
+        let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(600), 600);
         assert_ok!(aggregator.add(400));
-        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &test_id(600)));
+        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &aggregator_id_for_test(600)));
     }
 
     #[test]
@@ -477,12 +425,12 @@ mod test {
         let mut aggregator_data = AggregatorData::default();
 
         // +0 to +400 to +0 is ok, but materialization fails since we had 300 + 400 > 600!
-        let aggregator = aggregator_data.get_aggregator(test_id(600), 600);
+        let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(600), 600);
         assert_ok!(aggregator.add(400));
         assert_ok!(aggregator.sub(300));
         assert_eq!(aggregator.value, 100);
         assert_eq!(aggregator.state, AggregatorState::PositiveDelta);
-        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &test_id(600)));
+        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &aggregator_id_for_test(600)));
     }
 
     #[test]
@@ -490,12 +438,12 @@ mod test {
         let mut aggregator_data = AggregatorData::default();
 
         // +0 to -301 to -300 is ok, but materialization fails since we had 300 - 301 < 0!
-        let aggregator = aggregator_data.get_aggregator(test_id(600), 600);
+        let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(600), 600);
         assert_ok!(aggregator.sub(301));
         assert_ok!(aggregator.add(1));
         assert_eq!(aggregator.value, 300);
         assert_eq!(aggregator.state, AggregatorState::NegativeDelta);
-        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &test_id(600)));
+        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &aggregator_id_for_test(600)));
     }
 
     #[test]
@@ -503,25 +451,25 @@ mod test {
         let mut aggregator_data = AggregatorData::default();
 
         // +0 to +800 > 600!
-        let aggregator = aggregator_data.get_aggregator(test_id(600), 600);
+        let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(600), 600);
         assert_err!(aggregator.add(800));
 
         // 0 + 300 > 200!
-        let aggregator = aggregator_data.get_aggregator(test_id(200), 200);
+        let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(200), 200);
         assert_err!(aggregator.add(300));
     }
 
     #[test]
     fn test_sub_underflow() {
         let mut aggregator_data = AggregatorData::default();
-        aggregator_data.create_new_aggregator(test_id(200), 200);
+        aggregator_data.create_new_aggregator(aggregator_id_for_test(200), 200);
 
         // +0 to -601 is impossible!
-        let aggregator = aggregator_data.get_aggregator(test_id(600), 600);
+        let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(600), 600);
         assert_err!(aggregator.sub(601));
 
         // Similarly, we cannot subtract anything from 0...
-        let aggregator = aggregator_data.get_aggregator(test_id(200), 200);
+        let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(200), 200);
         assert_err!(aggregator.sub(2));
     }
 
@@ -530,7 +478,7 @@ mod test {
         let mut aggregator_data = AggregatorData::default();
 
         // +200 -300 +50 +300 -25 +375 -600.
-        let aggregator = aggregator_data.get_aggregator(test_id(600), 600);
+        let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(600), 600);
         assert_ok!(aggregator.add(200));
         assert_ok!(aggregator.sub(300));
 

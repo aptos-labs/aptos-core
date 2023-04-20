@@ -1,8 +1,7 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::Arc;
-
+use crate::collectors::common::{MeasureLatency, NAMESPACE};
 use aptos_infallible::Mutex;
 use aptos_metrics_core::const_metric::ConstMetric;
 use prometheus::{
@@ -10,9 +9,8 @@ use prometheus::{
     proto::MetricFamily,
     Opts,
 };
+use std::sync::Arc;
 use sysinfo::{RefreshKind, System, SystemExt};
-
-use crate::collectors::common::{MeasureLatency, NAMESPACE};
 
 const MEM_METRICS_COUNT: usize = 6;
 

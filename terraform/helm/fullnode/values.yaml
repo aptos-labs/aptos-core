@@ -1,5 +1,8 @@
-# -- Default image tag to use for all validator and fullnode images
+# -- Default image tag to use for all fullnode images
 imageTag: devnet
+
+# -- If true, helm will always override the deployed image with what is configured in the helm values. If not, helm will take the latest image from the currently running workloads, which is useful if you have a separate procedure to update images (e.g. rollout)
+manageImages: true
 
 chain:
   # -- Bump this number to wipe the underlying storage
@@ -41,15 +44,15 @@ rust_log: info
 image:
   # -- Image repo to use for fullnode images. Fullnodes and validators use the same image
   repo: aptoslabs/validator
-  # -- Image tag to use for fullnode images
-  tag: devnet
+  # -- Image tag to use for fullnode images. If set, overrides `imageTag`
+  tag:
   # -- Image pull policy to use for fullnode images
   pullPolicy: IfNotPresent
 
 resources:
   limits:
     cpu: 14
-    memory: 30Gi
+    memory: 26Gi
   requests:
     cpu: 14
     memory: 26Gi
@@ -136,11 +139,11 @@ backup_verify:
   schedule: "@daily"
   resources:
     limits:
-      cpu: 0.5
-      memory: 512Mi
+      cpu: 4
+      memory: 8Gi
     requests:
-      cpu: 0.5
-      memory: 512Mi
+      cpu: 4
+      memory: 8Gi
   nodeSelector: {}
   tolerations: []
   affinity: {}

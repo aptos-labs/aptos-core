@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -14,9 +14,12 @@ pub mod op;
 pub mod stake;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod test;
+pub mod update;
 
-use crate::common::types::{CliCommand, CliResult, CliTypedResult};
-use crate::common::utils::cli_build_information;
+use crate::common::{
+    types::{CliCommand, CliResult, CliTypedResult},
+    utils::cli_build_information,
+};
 use async_trait::async_trait;
 use clap::Parser;
 use std::collections::BTreeMap;
@@ -40,9 +43,12 @@ pub enum Tool {
     #[clap(subcommand)]
     Move(move_tool::MoveTool),
     #[clap(subcommand)]
+    Multisig(account::MultisigAccountTool),
+    #[clap(subcommand)]
     Node(node::NodeTool),
     #[clap(subcommand)]
     Stake(stake::StakeTool),
+    Update(update::UpdateTool),
 }
 
 impl Tool {
@@ -58,8 +64,10 @@ impl Tool {
             Init(tool) => tool.execute_serialized_success().await,
             Key(tool) => tool.execute().await,
             Move(tool) => tool.execute().await,
+            Multisig(tool) => tool.execute().await,
             Node(tool) => tool.execute().await,
             Stake(tool) => tool.execute().await,
+            Update(tool) => tool.execute_serialized().await,
         }
     }
 }

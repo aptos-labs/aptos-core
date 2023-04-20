@@ -1,26 +1,27 @@
 [package]
-name = "accumulator"
-version = "0.1.0"
-authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+name = "aptos-accumulator"
 description = "Aptos merkle tree accumulator"
-repository = "https://github.com/aptos-labs/aptos-core"
-homepage = "https://aptoslabs.com"
-license = "Apache-2.0"
-publish = false
-edition = "2021"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
 
 [dependencies]
-anyhow = "1.0.57"
-proptest = { version = "1.0.0", optional = true }
-
-aptos-crypto = { path = "../../crates/aptos-crypto" }
-aptos-types = { path = "../../types" }
+anyhow = { workspace = true }
+aptos-crypto = { workspace = true }
+aptos-types = { workspace = true }
+proptest = { workspace = true, optional = true }
 
 [dev-dependencies]
-proptest = "1.0.0"
-rand = "0.7.3"
-
-aptos-crypto = { path = "../../crates/aptos-crypto", features = ["fuzzing"] }
+aptos-crypto = { workspace = true, features = ["fuzzing"] }
+proptest = { workspace = true }
+rand = { workspace = true }
 
 [features]
 default = []

@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
@@ -76,14 +77,14 @@ pub static PRUNER_WINDOW: Lazy<IntGaugeVec> = Lazy::new(|| {
 });
 
 /// DB pruner least readable versions
-pub static PRUNER_LEAST_READABLE_VERSION: Lazy<IntGaugeVec> = Lazy::new(|| {
+pub static PRUNER_VERSIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         // metric name
-        "aptos_pruner_min_readable_version",
+        "aptos_pruner_versions",
         // metric description
-        "Aptos pruner least readable state version",
+        "Aptos pruner versions",
         // metric labels (dimensions)
-        &["pruner_name",]
+        &["pruner_name", "tag"]
     )
     .unwrap()
 });
@@ -135,7 +136,7 @@ pub static NODE_CACHE_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
         // metric description
         "Latency of node cache.",
         // metric labels (dimensions)
-        &["name"],
+        &["tag", "name"],
         exponential_buckets(/*start=*/ 1e-9, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
     )
     .unwrap()

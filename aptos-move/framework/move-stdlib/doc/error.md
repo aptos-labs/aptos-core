@@ -490,11 +490,11 @@ Functions to construct a canonical error code of the given category.
 
 
 <pre><code><b>pragma</b> opaque = <b>true</b>;
-<b>let</b> shl_res = (category * 65536) % 18446744073709551616;
+<b>let</b> shl_res = category &lt;&lt; 16;
 <b>ensures</b> [concrete] result == shl_res + reason;
 <b>aborts_if</b> [abstract] <b>false</b>;
 <b>ensures</b> [abstract] result == category;
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

@@ -1,0 +1,45 @@
+[package]
+name = "aptos-vm-profiling"
+version = "0.1.0"
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+repository = "https://github.com/aptos-labs/aptos-core"
+homepage = "https://aptoslabs.com"
+license = "Apache-2.0"
+publish = false
+edition = "2021"
+default-run = "main"
+
+[dependencies]
+anyhow = { workspace = true }
+bcs = { workspace = true }
+clap = { workspace = true }
+glob = { workspace = true }
+once_cell = { workspace = true }
+smallvec = { workspace = true }
+
+aptos-cached-packages = { workspace = true }
+aptos-language-e2e-tests = { workspace = true }
+aptos-move-stdlib = { workspace = true }
+aptos-types = { workspace = true }
+aptos-vm = { workspace = true }
+aptos-vm-genesis = { workspace = true }
+
+move-binary-format = { workspace = true }
+move-core-types = { workspace = true }
+move-ir-compiler = { workspace = true }
+move-table-extension = { workspace = true }
+move-vm-runtime = { workspace = true }
+move-vm-test-utils = { workspace = true }
+move-vm-types = { workspace = true }
+
+[[bin]]
+name = "main"
+path  = "src/main.rs"
+
+[[bin]]
+name = "run-move"
+path = "src/bins/run_move.rs"
+
+[[bin]]
+name = "run-aptos-p2p"
+path = "src/bins/run_aptos_p2p.rs"

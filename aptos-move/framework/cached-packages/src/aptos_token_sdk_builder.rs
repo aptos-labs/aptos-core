@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 // This file was generated. Do not modify!
@@ -12,6 +12,7 @@
 
 #![allow(dead_code)]
 #![allow(unused_imports)]
+#![allow(clippy::too_many_arguments)]
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{EntryFunction, TransactionPayload},

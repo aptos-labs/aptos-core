@@ -1,29 +1,31 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     driver::DriverConfiguration,
     error::Error,
+    metrics,
+    metrics::ExecutingComponent,
     notification_handlers::ConsensusSyncRequest,
     storage_synchronizer::StorageSynchronizerInterface,
     utils,
-    utils::{SpeculativeStreamState, PENDING_DATA_LOG_FREQ_SECS},
+    utils::{OutputFallbackHandler, SpeculativeStreamState, PENDING_DATA_LOG_FREQ_SECS},
 };
 use aptos_config::config::ContinuousSyncingMode;
+use aptos_data_streaming_service::{
+    data_notification::{DataNotification, DataPayload, NotificationId},
+    data_stream::DataStreamListener,
+    streaming_client::{DataStreamingClient, Epoch, NotificationAndFeedback, NotificationFeedback},
+};
 use aptos_infallible::Mutex;
 use aptos_logger::{prelude::*, sample, sample::SampleRate};
+use aptos_storage_interface::DbReader;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
 };
-use data_streaming_service::streaming_client::NotificationAndFeedback;
-use data_streaming_service::{
-    data_notification::{DataNotification, DataPayload, NotificationId},
-    data_stream::DataStreamListener,
-    streaming_client::{DataStreamingClient, Epoch, NotificationFeedback},
-};
 use std::{sync::Arc, time::Duration};
-use storage_interface::DbReader;
 
 /// A simple component that manages the continuous syncing of the node
 pub struct ContinuousSyncer<StorageSyncer, StreamingClient> {
@@ -32,6 +34,9 @@ pub struct ContinuousSyncer<StorageSyncer, StreamingClient> {
 
     // The config of the state sync driver
     driver_configuration: DriverConfiguration,
+
+    // The handler for output fallback behaviour
+    output_fallback_handler: OutputFallbackHandler,
 
     // The speculative state tracking the active data stream
     speculative_stream_state: Option<SpeculativeStreamState>,
@@ -54,12 +59,14 @@ impl<
     pub fn new(
         driver_configuration: DriverConfiguration,
         streaming_client: StreamingClient,
+        output_fallback_handler: OutputFallbackHandler,
         storage: Arc<dyn DbReader>,
         storage_synchronizer: StorageSyncer,
     ) -> Self {
         Self {
             active_data_stream: None,
             driver_configuration,
+            output_fallback_handler,
             speculative_stream_state: None,
             streaming_client,
             storage,
@@ -112,7 +119,7 @@ impl<
             .map(|sync_request| sync_request.get_sync_target());
 
         // Initialize a new active data stream
-        let active_data_stream = match self.driver_configuration.config.continuous_syncing_mode {
+        let active_data_stream = match self.get_continuous_syncing_mode() {
             ContinuousSyncingMode::ApplyTransactionOutputs => {
                 self.streaming_client
                     .continuously_stream_transaction_outputs(
@@ -121,7 +128,7 @@ impl<
                         sync_request_target,
                     )
                     .await?
-            }
+            },
             ContinuousSyncingMode::ExecuteTransactions => {
                 self.streaming_client
                     .continuously_stream_transactions(
@@ -131,7 +138,37 @@ impl<
                         sync_request_target,
                     )
                     .await?
-            }
+            },
+            ContinuousSyncingMode::ExecuteTransactionsOrApplyOutputs => {
+                if self.output_fallback_handler.in_fallback_mode() {
+                    metrics::set_gauge(
+                        &metrics::DRIVER_FALLBACK_MODE,
+                        ExecutingComponent::ContinuousSyncer.get_label(),
+                        1,
+                    );
+                    self.streaming_client
+                        .continuously_stream_transaction_outputs(
+                            highest_synced_version,
+                            highest_synced_epoch,
+                            sync_request_target,
+                        )
+                        .await?
+                } else {
+                    metrics::set_gauge(
+                        &metrics::DRIVER_FALLBACK_MODE,
+                        ExecutingComponent::ContinuousSyncer.get_label(),
+                        0,
+                    );
+                    self.streaming_client
+                        .continuously_stream_transactions_or_outputs(
+                            highest_synced_version,
+                            highest_synced_epoch,
+                            false,
+                            sync_request_target,
+                        )
+                        .await?
+                }
+            },
         };
         self.speculative_stream_state = Some(SpeculativeStreamState::new(
             highest_epoch_state,
@@ -146,9 +183,13 @@ impl<
     /// Attempts to fetch a data notification from the active stream
     async fn fetch_next_data_notification(&mut self) -> Result<DataNotification, Error> {
         let max_stream_wait_time_ms = self.driver_configuration.config.max_stream_wait_time_ms;
-        let result =
-            utils::get_data_notification(max_stream_wait_time_ms, self.active_data_stream.as_mut())
-                .await;
+        let max_num_stream_timeouts = self.driver_configuration.config.max_num_stream_timeouts;
+        let result = utils::get_data_notification(
+            max_stream_wait_time_ms,
+            max_num_stream_timeouts,
+            self.active_data_stream.as_mut(),
+        )
+        .await;
         if matches!(result, Err(Error::CriticalDataStreamTimeout(_))) {
             // If the stream has timed out too many times, we need to reset it
             warn!("Resetting the currently active data stream due to too many timeouts!");
@@ -185,7 +226,7 @@ impl<
                         payload_start_version,
                     )
                     .await?;
-                }
+                },
                 DataPayload::ContinuousTransactionsWithProof(
                     ledger_info_with_sigs,
                     transactions_with_proof,
@@ -200,16 +241,21 @@ impl<
                         payload_start_version,
                     )
                     .await?;
-                }
+                },
                 _ => {
                     return self
                         .handle_end_of_stream_or_invalid_payload(data_notification)
                         .await;
-                }
+                },
             }
         }
 
         Ok(())
+    }
+
+    /// Returns the continuous syncing mode of the node
+    fn get_continuous_syncing_mode(&self) -> ContinuousSyncingMode {
+        self.driver_configuration.config.continuous_syncing_mode
     }
 
     /// Returns the highest synced version and epoch in storage
@@ -244,62 +290,86 @@ impl<
         .await?;
 
         // Execute/apply and commit the transactions/outputs
-        let num_transactions_or_outputs =
-            match self.driver_configuration.config.continuous_syncing_mode {
-                ContinuousSyncingMode::ApplyTransactionOutputs => {
-                    if let Some(transaction_outputs_with_proof) = transaction_outputs_with_proof {
-                        let num_transaction_outputs = transaction_outputs_with_proof
-                            .transactions_and_outputs
-                            .len();
-                        self.storage_synchronizer
-                            .apply_transaction_outputs(
-                                notification_id,
-                                transaction_outputs_with_proof,
-                                ledger_info_with_signatures.clone(),
-                                None,
-                            )
-                            .await?;
-                        num_transaction_outputs
-                    } else {
-                        self.reset_active_stream(Some(NotificationAndFeedback::new(
-                            notification_id,
-                            NotificationFeedback::PayloadTypeIsIncorrect,
-                        )))
-                        .await?;
-                        return Err(Error::InvalidPayload(
-                            "Did not receive transaction outputs with proof!".into(),
-                        ));
-                    }
+        let num_transactions_or_outputs = match self.get_continuous_syncing_mode() {
+            ContinuousSyncingMode::ApplyTransactionOutputs => {
+                if let Some(transaction_outputs_with_proof) = transaction_outputs_with_proof {
+                    utils::apply_transaction_outputs(
+                        self.storage_synchronizer.clone(),
+                        notification_id,
+                        ledger_info_with_signatures.clone(),
+                        None,
+                        transaction_outputs_with_proof,
+                    )
+                    .await?
+                } else {
+                    self.reset_active_stream(Some(NotificationAndFeedback::new(
+                        notification_id,
+                        NotificationFeedback::PayloadTypeIsIncorrect,
+                    )))
+                    .await?;
+                    return Err(Error::InvalidPayload(
+                        "Did not receive transaction outputs with proof!".into(),
+                    ));
                 }
-                ContinuousSyncingMode::ExecuteTransactions => {
-                    if let Some(transaction_list_with_proof) = transaction_list_with_proof {
-                        let num_transactions = transaction_list_with_proof.transactions.len();
-                        self.storage_synchronizer
-                            .execute_transactions(
-                                notification_id,
-                                transaction_list_with_proof,
-                                ledger_info_with_signatures.clone(),
-                                None,
-                            )
-                            .await?;
-                        num_transactions
-                    } else {
-                        self.reset_active_stream(Some(NotificationAndFeedback::new(
-                            notification_id,
-                            NotificationFeedback::PayloadTypeIsIncorrect,
-                        )))
-                        .await?;
-                        return Err(Error::InvalidPayload(
-                            "Did not receive transactions with proof!".into(),
-                        ));
-                    }
+            },
+            ContinuousSyncingMode::ExecuteTransactions => {
+                if let Some(transaction_list_with_proof) = transaction_list_with_proof {
+                    utils::execute_transactions(
+                        self.storage_synchronizer.clone(),
+                        notification_id,
+                        ledger_info_with_signatures.clone(),
+                        None,
+                        transaction_list_with_proof,
+                    )
+                    .await?
+                } else {
+                    self.reset_active_stream(Some(NotificationAndFeedback::new(
+                        notification_id,
+                        NotificationFeedback::PayloadTypeIsIncorrect,
+                    )))
+                    .await?;
+                    return Err(Error::InvalidPayload(
+                        "Did not receive transactions with proof!".into(),
+                    ));
                 }
-            };
+            },
+            ContinuousSyncingMode::ExecuteTransactionsOrApplyOutputs => {
+                if let Some(transaction_list_with_proof) = transaction_list_with_proof {
+                    utils::execute_transactions(
+                        self.storage_synchronizer.clone(),
+                        notification_id,
+                        ledger_info_with_signatures.clone(),
+                        None,
+                        transaction_list_with_proof,
+                    )
+                    .await?
+                } else if let Some(transaction_outputs_with_proof) = transaction_outputs_with_proof
+                {
+                    utils::apply_transaction_outputs(
+                        self.storage_synchronizer.clone(),
+                        notification_id,
+                        ledger_info_with_signatures.clone(),
+                        None,
+                        transaction_outputs_with_proof,
+                    )
+                    .await?
+                } else {
+                    self.reset_active_stream(Some(NotificationAndFeedback::new(
+                        notification_id,
+                        NotificationFeedback::PayloadTypeIsIncorrect,
+                    )))
+                    .await?;
+                    return Err(Error::InvalidPayload(
+                        "No transactions or output with proof was provided!".into(),
+                    ));
+                }
+            },
+        };
         let synced_version = payload_start_version
             .checked_add(num_transactions_or_outputs as u64)
             .and_then(|version| version.checked_sub(1)) // synced_version = start + num txns/outputs - 1
             .ok_or_else(|| Error::IntegerOverflow("The synced version has overflown!".into()))?;
-        let speculative_stream_state = self.get_speculative_stream_state();
+        let speculative_stream_state = self.get_speculative_stream_state()?;
         speculative_stream_state.update_synced_version(synced_version);
         speculative_stream_state.maybe_update_epoch_state(ledger_info_with_signatures);
 
@@ -314,7 +384,7 @@ impl<
     ) -> Result<Version, Error> {
         // Compare the payload start version with the expected version
         let expected_version = self
-            .get_speculative_stream_state()
+            .get_speculative_stream_state()?
             .expected_next_version()?;
         if let Some(payload_start_version) = payload_start_version {
             if payload_start_version != expected_version {
@@ -373,7 +443,7 @@ impl<
 
         // Verify the ledger info state and signatures
         if let Err(error) = self
-            .get_speculative_stream_state()
+            .get_speculative_stream_state()?
             .verify_ledger_info_with_signatures(ledger_info_with_signatures)
         {
             self.reset_active_stream(Some(NotificationAndFeedback::new(
@@ -412,11 +482,30 @@ impl<
         }
     }
 
-    /// Returns the speculative stream state. Assumes that the state exists.
-    fn get_speculative_stream_state(&mut self) -> &mut SpeculativeStreamState {
-        self.speculative_stream_state
-            .as_mut()
-            .expect("Speculative stream state does not exist!")
+    /// Returns the speculative stream state
+    fn get_speculative_stream_state(&mut self) -> Result<&mut SpeculativeStreamState, Error> {
+        self.speculative_stream_state.as_mut().ok_or_else(|| {
+            Error::UnexpectedError("Speculative stream state does not exist!".into())
+        })
+    }
+
+    /// Handles the storage synchronizer error sent by the driver
+    pub async fn handle_storage_synchronizer_error(
+        &mut self,
+        notification_and_feedback: NotificationAndFeedback,
+    ) -> Result<(), Error> {
+        // Reset the active stream
+        self.reset_active_stream(Some(notification_and_feedback))
+            .await?;
+
+        // Fallback to output syncing if we need to
+        if let ContinuousSyncingMode::ExecuteTransactionsOrApplyOutputs =
+            self.get_continuous_syncing_mode()
+        {
+            self.output_fallback_handler.fallback_to_outputs();
+        }
+
+        Ok(())
     }
 
     /// Resets the currently active data stream and speculative state

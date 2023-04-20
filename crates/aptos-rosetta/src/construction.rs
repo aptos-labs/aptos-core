@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! Construction APIs
@@ -24,11 +24,10 @@
 //! a connection to a full node.  The online ones need a connection to a full node.
 //!
 
-use crate::common::parse_currency;
 use crate::{
     common::{
         check_network, decode_bcs, decode_key, encode_bcs, get_account, handle_request,
-        native_coin, with_context,
+        native_coin, parse_currency, with_context,
     },
     error::{ApiError, ApiResult},
     types::{InternalOperation, *},
@@ -44,21 +43,23 @@ use aptos_sdk::{
     move_types::language_storage::{StructTag, TypeTag},
     transaction_builder::TransactionFactory,
 };
-use aptos_types::chain_id::ChainId;
 use aptos_types::{
     account_address::AccountAddress,
+    chain_id::ChainId,
     transaction::{
         authenticator::AuthenticationKey, RawTransaction, SignedTransaction, TransactionPayload,
     },
 };
 use serde::de::DeserializeOwned;
-use std::convert::TryFrom;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    convert::TryFrom,
+    time::{SystemTime, UNIX_EPOCH},
+};
 use warp::Filter;
 
 pub fn combine_route(
     server_context: RosettaContext,
-) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
     warp::path!("construction" / "combine")
         .and(warp::post())
         .and(warp::body::json())
@@ -68,7 +69,7 @@ pub fn combine_route(
 
 pub fn derive_route(
     server_context: RosettaContext,
-) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
     warp::path!("construction" / "derive")
         .and(warp::post())
         .and(warp::body::json())
@@ -78,7 +79,7 @@ pub fn derive_route(
 
 pub fn hash_route(
     server_context: RosettaContext,
-) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
     warp::path!("construction" / "hash")
         .and(warp::post())
         .and(warp::body::json())
@@ -88,7 +89,7 @@ pub fn hash_route(
 
 pub fn metadata_route(
     server_context: RosettaContext,
-) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
     warp::path!("construction" / "metadata")
         .and(warp::post())
         .and(warp::body::json())
@@ -98,7 +99,7 @@ pub fn metadata_route(
 
 pub fn parse_route(
     server_context: RosettaContext,
-) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
     warp::path!("construction" / "parse")
         .and(warp::post())
         .and(warp::body::json())
@@ -108,7 +109,7 @@ pub fn parse_route(
 
 pub fn payloads_route(
     server_context: RosettaContext,
-) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
     warp::path!("construction" / "payloads")
         .and(warp::post())
         .and(warp::body::json())
@@ -118,7 +119,7 @@ pub fn payloads_route(
 
 pub fn preprocess_route(
     server_context: RosettaContext,
-) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
     warp::path!("construction" / "preprocess")
         .and(warp::post())
         .and(warp::body::json())
@@ -128,7 +129,7 @@ pub fn preprocess_route(
 
 pub fn submit_route(
     server_context: RosettaContext,
-) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
     warp::path!("construction" / "submit")
         .and(warp::post())
         .and(warp::body::json())
@@ -234,28 +235,27 @@ async fn fill_in_operator(
                     .get_account_resource_bcs::<Store>(op.owner, "0x1::staking_contract::Store")
                     .await?
                     .into_inner();
-                if store.staking_contracts.len() != 1 {
-                    let operators: Vec<_> = store
-                        .staking_contracts
+                let staking_contracts = store.staking_contracts;
+                if staking_contracts.len() != 1 {
+                    let operators: Vec<_> = staking_contracts
                         .iter()
-                        .map(|(operator, _)| operator)
+                        .map(|(address, _)| *address)
                         .collect();
                     return Err(ApiError::InvalidInput(Some(format!(
                         "Account has more than one operator, operator must be specified from: {:?}",
                         operators
                     ))));
                 } else {
+                    // Take the only staking contract
                     op.old_operator = Some(
-                        *store
-                            .staking_contracts
-                            .iter()
-                            .next()
-                            .map(|inner| inner.0)
+                        staking_contracts
+                            .first()
+                            .map(|(address, _)| *address)
                             .unwrap(),
                     );
                 }
             }
-        }
+        },
         InternalOperation::SetVoter(op) => {
             // If there was no operator set, and there is only one, we should use that
             if op.operator.is_none() {
@@ -263,29 +263,28 @@ async fn fill_in_operator(
                     .get_account_resource_bcs::<Store>(op.owner, "0x1::staking_contract::Store")
                     .await?
                     .into_inner();
-                if store.staking_contracts.len() != 1 {
-                    let operators: Vec<_> = store
-                        .staking_contracts
+                let staking_contracts = store.staking_contracts;
+                if staking_contracts.len() != 1 {
+                    let operators: Vec<_> = staking_contracts
                         .iter()
-                        .map(|(operator, _)| operator)
+                        .map(|(address, _)| address)
                         .collect();
                     return Err(ApiError::InvalidInput(Some(format!(
                         "Account has more than one operator, operator must be specified from: {:?}",
                         operators
                     ))));
                 } else {
+                    // Take the only staking contract
                     op.operator = Some(
-                        *store
-                            .staking_contracts
-                            .iter()
-                            .next()
-                            .map(|inner| inner.0)
+                        staking_contracts
+                            .first()
+                            .map(|(address, _)| *address)
                             .unwrap(),
                     );
                 }
             }
-        }
-        _ => {}
+        },
+        _ => {},
     }
 
     Ok(internal_operation)
@@ -398,7 +397,7 @@ async fn simulate_transaction(
         ))));
     }
 
-    if let Ok(user_txn) = simulated_txn.transaction.as_signed_user_txn() {
+    if let Some(user_txn) = simulated_txn.transaction.try_as_signed_user_txn() {
         // This gas price came from the simulation (would be the one from the input if provided)
         let simulated_gas_unit_price = user_txn.gas_unit_price();
 
@@ -531,13 +530,13 @@ async fn construction_parse(
             ) {
                 (AccountAddress::ONE, COIN_MODULE, TRANSFER_FUNCTION) => {
                     parse_transfer_operation(sender, &type_args, &args)?
-                }
+                },
                 (AccountAddress::ONE, APTOS_ACCOUNT_MODULE, TRANSFER_FUNCTION) => {
                     parse_account_transfer_operation(sender, &type_args, &args)?
-                }
+                },
                 (AccountAddress::ONE, APTOS_ACCOUNT_MODULE, CREATE_ACCOUNT_FUNCTION) => {
                     parse_create_account_operation(sender, &type_args, &args)?
-                }
+                },
                 (
                     AccountAddress::ONE,
                     STAKING_CONTRACT_MODULE,
@@ -545,10 +544,23 @@ async fn construction_parse(
                 ) => parse_set_operator_operation(sender, &type_args, &args)?,
                 (AccountAddress::ONE, STAKING_CONTRACT_MODULE, UPDATE_VOTER_FUNCTION) => {
                     parse_set_voter_operation(sender, &type_args, &args)?
-                }
-                (AccountAddress::ONE, STAKING_CONTRACT_MODULE, CREATE_STAKING_CONTRACT) => {
-                    parse_create_stake_pool_operation(sender, &type_args, &args)?
-                }
+                },
+                (
+                    AccountAddress::ONE,
+                    STAKING_CONTRACT_MODULE,
+                    CREATE_STAKING_CONTRACT_FUNCTION,
+                ) => parse_create_stake_pool_operation(sender, &type_args, &args)?,
+                (AccountAddress::ONE, STAKING_CONTRACT_MODULE, RESET_LOCKUP_FUNCTION) => {
+                    parse_reset_lockup_operation(sender, &type_args, &args)?
+                },
+                (AccountAddress::ONE, STAKING_CONTRACT_MODULE, UNLOCK_STAKE_FUNCTION) => {
+                    parse_unlock_stake_operation(sender, &type_args, &args)?
+                },
+                (
+                    AccountAddress::ONE,
+                    STAKING_CONTRACT_MODULE,
+                    DISTRIBUTE_STAKING_REWARDS_FUNCTION,
+                ) => parse_distribute_staking_rewards_operation(sender, &type_args, &args)?,
                 _ => {
                     return Err(ApiError::TransactionParseError(Some(format!(
                         "Unsupported entry function type {:x}::{}::{}",
@@ -556,15 +568,15 @@ async fn construction_parse(
                         module.name(),
                         function_name
                     ))));
-                }
+                },
             }
-        }
+        },
         payload => {
             return Err(ApiError::TransactionParseError(Some(format!(
                 "Unsupported transaction payload type {:?}",
                 payload
             ))))
-        }
+        },
     };
 
     Ok(ConstructionParseResponse {
@@ -623,12 +635,12 @@ fn parse_transfer_operation(
             } = &**struct_tag;
 
             parse_currency(*address, module.as_str(), name.as_str())?
-        }
+        },
         _ => {
             return Err(ApiError::TransactionParseError(Some(
                 "No coin type in transfer".to_string(),
             )))
-        }
+        },
     };
 
     // Retrieve the args for the operations
@@ -792,6 +804,7 @@ pub fn parse_create_stake_pool_operation(
     let operator = parse_function_arg("create_stake_pool", args, 0)?;
     let voter = parse_function_arg("create_stake_pool", args, 1)?;
     let amount: u64 = parse_function_arg("create_stake_pool", args, 2)?;
+    let commission_percentage: u64 = parse_function_arg("create_stake_pool", args, 3)?;
     Ok(vec![Operation::create_stake_pool(
         0,
         None,
@@ -799,6 +812,76 @@ pub fn parse_create_stake_pool_operation(
         Some(operator),
         Some(voter),
         Some(amount),
+        Some(commission_percentage),
+    )])
+}
+
+pub fn parse_reset_lockup_operation(
+    sender: AccountAddress,
+    type_args: &[TypeTag],
+    args: &[Vec<u8>],
+) -> ApiResult<Vec<Operation>> {
+    if !type_args.is_empty() {
+        return Err(ApiError::TransactionParseError(Some(format!(
+            "Reset lockup should not have type arguments: {:?}",
+            type_args
+        ))));
+    }
+
+    let operator: AccountAddress = parse_function_arg("reset_lockup", args, 0)?;
+    Ok(vec![Operation::reset_lockup(
+        0,
+        None,
+        sender,
+        Some(AccountIdentifier::base_account(operator)),
+    )])
+}
+
+pub fn parse_unlock_stake_operation(
+    sender: AccountAddress,
+    type_args: &[TypeTag],
+    args: &[Vec<u8>],
+) -> ApiResult<Vec<Operation>> {
+    if !type_args.is_empty() {
+        return Err(ApiError::TransactionParseError(Some(format!(
+            "Unlock stake should not have type arguments: {:?}",
+            type_args
+        ))));
+    }
+
+    let operator: AccountAddress = parse_function_arg("unlock_stake", args, 0)?;
+    let amount: u64 = parse_function_arg("unlock_stake", args, 1)?;
+
+    Ok(vec![Operation::unlock_stake(
+        0,
+        None,
+        sender,
+        Some(AccountIdentifier::base_account(operator)),
+        Some(amount),
+    )])
+}
+
+pub fn parse_distribute_staking_rewards_operation(
+    sender: AccountAddress,
+    type_args: &[TypeTag],
+    args: &[Vec<u8>],
+) -> ApiResult<Vec<Operation>> {
+    if !type_args.is_empty() {
+        return Err(ApiError::TransactionParseError(Some(format!(
+            "Distribute should not have type arguments: {:?}",
+            type_args
+        ))));
+    }
+
+    let staker: AccountAddress = parse_function_arg("distribute_staking_rewards", args, 0)?;
+    let operator: AccountAddress = parse_function_arg("distribute_staking_rewards", args, 1)?;
+
+    Ok(vec![Operation::distribute_staking_rewards(
+        0,
+        None,
+        sender,
+        AccountIdentifier::base_account(operator),
+        AccountIdentifier::base_account(staker),
     )])
 }
 
@@ -831,7 +914,7 @@ async fn construction_payloads(
                     operation, metadata.internal_operation
                 ))));
             }
-        }
+        },
         InternalOperation::Transfer(_) => {
             if operation != metadata.internal_operation {
                 return Err(ApiError::InvalidInput(Some(format!(
@@ -839,7 +922,7 @@ async fn construction_payloads(
                     operation, metadata.internal_operation
                 ))));
             }
-        }
+        },
         InternalOperation::SetOperator(inner) => {
             if let InternalOperation::SetOperator(ref metadata_op) = metadata.internal_operation {
                 if inner.owner == metadata_op.owner
@@ -860,7 +943,7 @@ async fn construction_payloads(
                     inner, metadata.internal_operation
                 ))));
             }
-        }
+        },
         InternalOperation::SetVoter(inner) => {
             if let InternalOperation::SetVoter(ref metadata_op) = metadata.internal_operation {
                 if inner.owner == metadata_op.owner && inner.new_voter == metadata_op.new_voter {
@@ -879,7 +962,7 @@ async fn construction_payloads(
                     inner, metadata.internal_operation
                 ))));
             }
-        }
+        },
         InternalOperation::InitializeStakePool(_) => {
             if operation != metadata.internal_operation {
                 return Err(ApiError::InvalidInput(Some(format!(
@@ -887,7 +970,54 @@ async fn construction_payloads(
                     operation, metadata.internal_operation
                 ))));
             }
-        }
+        },
+        InternalOperation::ResetLockup(inner) => {
+            if let InternalOperation::ResetLockup(ref metadata_op) = metadata.internal_operation {
+                if inner.owner != metadata_op.owner || inner.operator != metadata_op.operator {
+                    return Err(ApiError::InvalidInput(Some(format!(
+                        "Reset lockup operation doesn't match metadata {:?} vs {:?}",
+                        inner, metadata.internal_operation
+                    ))));
+                }
+            } else {
+                return Err(ApiError::InvalidInput(Some(format!(
+                    "Reset lockup operation doesn't match metadata {:?} vs {:?}",
+                    inner, metadata.internal_operation
+                ))));
+            }
+        },
+        InternalOperation::UnlockStake(inner) => {
+            if let InternalOperation::UnlockStake(ref metadata_op) = metadata.internal_operation {
+                if inner.owner != metadata_op.owner || inner.operator != metadata_op.operator {
+                    return Err(ApiError::InvalidInput(Some(format!(
+                        "Unlock stake operation doesn't match metadata {:?} vs {:?}",
+                        inner, metadata.internal_operation
+                    ))));
+                }
+            } else {
+                return Err(ApiError::InvalidInput(Some(format!(
+                    "Unlock stake operation doesn't match metadata {:?} vs {:?}",
+                    inner, metadata.internal_operation
+                ))));
+            }
+        },
+        InternalOperation::DistributeStakingRewards(inner) => {
+            if let InternalOperation::DistributeStakingRewards(ref metadata_op) =
+                metadata.internal_operation
+            {
+                if inner.operator != metadata_op.operator || inner.staker != metadata_op.staker {
+                    return Err(ApiError::InvalidInput(Some(format!(
+                        "Distribute staking rewards operation doesn't match metadata {:?} vs {:?}",
+                        inner, metadata.internal_operation
+                    ))));
+                }
+            } else {
+                return Err(ApiError::InvalidInput(Some(format!(
+                    "Distribute staking rewards operation doesn't match metadata {:?} vs {:?}",
+                    inner, metadata.internal_operation
+                ))));
+            }
+        },
     }
 
     // Encode operation

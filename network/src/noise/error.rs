@@ -1,9 +1,11 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::application;
 use aptos_crypto::noise::NoiseError;
+use aptos_short_hex_str::ShortHexStr;
 use aptos_types::PeerId;
-use short_hex_str::ShortHexStr;
 use std::io;
 use thiserror::Error;
 
@@ -78,6 +80,9 @@ pub enum NoiseHandshakeError {
 
     #[error("noise server: client {0}: error sending server handshake response message: {1}")]
     ServerWriteFailed(ShortHexStr, io::Error),
+
+    #[error("unexpected error encountered: {0}")]
+    UnexpectedError(String),
 }
 
 impl NoiseHandshakeError {
@@ -86,5 +91,11 @@ impl NoiseHandshakeError {
     pub fn should_security_log(&self) -> bool {
         use NoiseHandshakeError::*;
         matches!(self, ServerReplayDetected(_, _))
+    }
+}
+
+impl From<application::error::Error> for NoiseHandshakeError {
+    fn from(error: application::error::Error) -> Self {
+        NoiseHandshakeError::UnexpectedError(error.to_string())
     }
 }

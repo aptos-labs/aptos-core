@@ -42,7 +42,7 @@ jobs:
           FAILED=$?
           set -e
 
-          echo "::set-output name=FAIL_MERGE_BASE::$FAILED"
+          echo "FAIL_MERGE_BASE=${FAILED}" >> $GITHUB_OUTPUT
           MERGE_BASE="$(git merge-base origin/main ${{ env.GIT_SHA }})"
 
           if [[ $FAILED == 1 ]]; then

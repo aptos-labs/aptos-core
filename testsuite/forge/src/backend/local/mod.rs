@@ -1,28 +1,29 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{Factory, GenesisConfig, GenesisConfigFn, NodeConfigFn, Result, Swarm, Version};
 use anyhow::{bail, Context};
 use aptos_config::config::NodeConfig;
+use aptos_framework::ReleaseBundle;
 use aptos_genesis::builder::{InitConfigFn, InitGenesisConfigFn};
 use aptos_infallible::Mutex;
-use framework::ReleaseBundle;
 use rand::rngs::StdRng;
-use std::time::Duration;
 use std::{
     collections::HashMap,
     num::NonZeroUsize,
     path::{Path, PathBuf},
     sync::Arc,
+    time::Duration,
 };
 
 mod cargo;
 mod node;
 mod swarm;
+pub use self::swarm::ActiveNodesGuard;
+pub use cargo::cargo_build_common_args;
 pub use node::LocalNode;
 pub use swarm::{LocalSwarm, SwarmDirectory};
-
-pub use self::swarm::ActiveNodesGuard;
 
 #[derive(Clone, Debug)]
 pub struct LocalVersion {
@@ -152,7 +153,7 @@ impl LocalFactory {
                     version,
                     vfn_config
                         .clone()
-                        .unwrap_or_else(NodeConfig::default_for_validator_full_node),
+                        .unwrap_or_else(NodeConfig::get_default_vfn_config),
                     *validator_peer_id,
                 )
                 .unwrap();
@@ -180,13 +181,14 @@ impl Factory for LocalFactory {
         _cleanup_duration: Duration,
         _genesis_config_fn: Option<GenesisConfigFn>,
         _node_config_fn: Option<NodeConfigFn>,
+        _existing_db_tag: Option<String>,
     ) -> Result<Box<dyn Swarm>> {
         let framework = match genesis_config {
             Some(config) => match config {
                 GenesisConfig::Bundle(bundle) => Some(bundle.clone()),
                 GenesisConfig::Path(_) => {
                     bail!("local forge backend does not support flattened dir for genesis")
-                }
+                },
             },
             None => None,
         };

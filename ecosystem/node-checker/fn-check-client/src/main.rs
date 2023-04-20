@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 mod big_query;
@@ -7,13 +7,12 @@ mod get_pfns;
 mod get_vfns;
 mod helpers;
 
+use crate::big_query::write_to_big_query;
 use anyhow::{Context, Result};
+use aptos_logger::info;
 use big_query::BigQueryArgs;
 use check::NodeHealthCheckerArgs;
 use clap::{Parser, Subcommand};
-use log::info;
-
-use crate::big_query::write_to_big_query;
 
 #[derive(Debug, Parser)]
 #[clap(author, version, about)]
@@ -49,10 +48,10 @@ impl Command {
         match self {
             Command::CheckValidatorFullNodes(vfn_args) => {
                 format!("the on-chain validator set at {}", vfn_args.node_address)
-            }
+            },
             Command::CheckPublicFullNodes(pfn_args) => {
                 format!("the data in {}", pfn_args.input_file.to_string_lossy())
-            }
+            },
         }
     }
 

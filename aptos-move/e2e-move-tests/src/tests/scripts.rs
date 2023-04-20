@@ -1,13 +1,13 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{assert_success, tests::common, MoveHarness};
+use aptos_language_e2e_tests::account::TransactionBuilder;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::CoinStoreResource,
     transaction::{Script, TransactionArgument},
 };
-use language_e2e_tests::account::TransactionBuilder;
 use move_core_types::move_resource::MoveStructType;
 
 #[test]
@@ -24,15 +24,15 @@ fn test_two_to_two_transfer() {
     let amount_carol = 50;
     let amount_david = amount_alice + amount_bob - amount_carol;
 
-    let build_options = framework::BuildOptions {
+    let build_options = aptos_framework::BuildOptions {
         with_srcs: false,
         with_abis: false,
         with_source_maps: false,
         with_error_map: false,
-        ..framework::BuildOptions::default()
+        ..aptos_framework::BuildOptions::default()
     };
 
-    let package = framework::BuiltPackage::build(
+    let package = aptos_framework::BuiltPackage::build(
         common::test_dir_path("../../../move-examples/scripts/two_by_two_transfer"),
         build_options,
     )
@@ -44,17 +44,13 @@ fn test_two_to_two_transfer() {
     let david_start = read_coin(&h, david.address());
 
     let code = package.extract_script_code()[0].clone();
-    let script = Script::new(
-        code,
-        vec![],
-        vec![
-            TransactionArgument::U64(amount_alice),
-            TransactionArgument::U64(amount_bob),
-            TransactionArgument::Address(*carol.address()),
-            TransactionArgument::Address(*david.address()),
-            TransactionArgument::U64(amount_carol),
-        ],
-    );
+    let script = Script::new(code, vec![], vec![
+        TransactionArgument::U64(amount_alice),
+        TransactionArgument::U64(amount_bob),
+        TransactionArgument::Address(*carol.address()),
+        TransactionArgument::Address(*david.address()),
+        TransactionArgument::U64(amount_carol),
+    ]);
 
     let transaction = TransactionBuilder::new(alice.clone())
         .secondary_signers(vec![bob.clone()])

@@ -1,9 +1,10 @@
-# Copyright (c) Aptos
+# Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
 from __future__ import annotations
 
 import typing
+from typing import List
 
 from . import ed25519
 from .account_address import AccountAddress
@@ -37,7 +38,9 @@ class Authenticator:
             raise Exception("Invalid type")
         self.authenticator = authenticator
 
-    def __eq__(self, other: Authenticator) -> bool:
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Authenticator):
+            return NotImplemented
         return (
             self.variant == other.variant and self.authenticator == other.authenticator
         )
@@ -48,17 +51,18 @@ class Authenticator:
     def verify(self, data: bytes) -> bool:
         return self.authenticator.verify(data)
 
+    @staticmethod
     def deserialize(deserializer: Deserializer) -> Authenticator:
         variant = deserializer.uleb128()
 
         if variant == Authenticator.ED25519:
-            authenticator = Ed25519Authenticator.deserialize(deserializer)
+            authenticator: typing.Any = Ed25519Authenticator.deserialize(deserializer)
         elif variant == Authenticator.MULTI_ED25519:
             authenticator = MultiEd25519Authenticator.deserialize(deserializer)
         elif variant == Authenticator.MULTI_AGENT:
             authenticator = MultiAgentAuthenticator.deserialize(deserializer)
         else:
-            raise Exception("Invalid type")
+            raise Exception(f"Invalid type: {variant}")
 
         return Authenticator(authenticator)
 
@@ -75,7 +79,10 @@ class Ed25519Authenticator:
         self.public_key = public_key
         self.signature = signature
 
-    def __eq__(self, other: Ed25519Authenticator) -> bool:
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Ed25519Authenticator):
+            return NotImplemented
+
         return self.public_key == other.public_key and self.signature == other.signature
 
     def __str__(self) -> str:
@@ -84,6 +91,7 @@ class Ed25519Authenticator:
     def verify(self, data: bytes) -> bool:
         return self.public_key.verify(data, self.signature)
 
+    @staticmethod
     def deserialize(deserializer: Deserializer) -> Ed25519Authenticator:
         key = deserializer.struct(ed25519.PublicKey)
         signature = deserializer.struct(ed25519.Signature)
@@ -96,17 +104,19 @@ class Ed25519Authenticator:
 
 class MultiAgentAuthenticator:
     sender: Authenticator
-    secondary_signers: List[(AccountAddress, Authenticator)]
+    secondary_signers: List[typing.Tuple[AccountAddress, Authenticator]]
 
     def __init__(
         self,
         sender: Authenticator,
-        secondary_signers: List[(AccountAddress, Authenticator)],
+        secondary_signers: List[typing.Tuple[AccountAddress, Authenticator]],
     ):
         self.sender = sender
         self.secondary_signers = secondary_signers
 
-    def __eq__(self, other: MultiAgentAuthenticator) -> bool:
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, MultiAgentAuthenticator):
+            return NotImplemented
         return (
             self.sender == other.sender
             and self.secondary_signers == other.secondary_signers
@@ -120,6 +130,7 @@ class MultiAgentAuthenticator:
             return False
         return all([x[1].verify(data) for x in self.secondary_signers])
 
+    @staticmethod
     def deserialize(deserializer: Deserializer) -> MultiAgentAuthenticator:
         sender = deserializer.struct(Authenticator)
         secondary_addresses = deserializer.sequence(AccountAddress.deserialize)
@@ -135,14 +146,20 @@ class MultiAgentAuthenticator:
 
 
 class MultiEd25519Authenticator:
-    def __init__(self):
-        raise NotImplementedError
+    public_key: ed25519.MultiPublicKey
+    signature: ed25519.MultiSignature
+
+    def __init__(self, public_key, signature):
+        self.public_key = public_key
+        self.signature = signature
 
     def verify(self, data: bytes) -> bool:
         raise NotImplementedError
 
+    @staticmethod
     def deserialize(deserializer: Deserializer) -> MultiEd25519Authenticator:
         raise NotImplementedError
 
     def serialize(self, serializer: Serializer):
-        raise NotImplementedError
+        serializer.struct(self.public_key)
+        serializer.struct(self.signature)

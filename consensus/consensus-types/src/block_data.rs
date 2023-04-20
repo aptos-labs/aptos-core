@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -8,8 +9,8 @@ use crate::{
 };
 use aptos_crypto::hash::HashValue;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::{
+    aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
 };
@@ -263,7 +264,7 @@ fn test_reconfiguration_suffix() {
         ),
     );
     let reconfig_suffix_block = BlockData::new_proposal(
-        Payload::empty(),
+        Payload::empty(false),
         AccountAddress::random(),
         Vec::new(),
         2,

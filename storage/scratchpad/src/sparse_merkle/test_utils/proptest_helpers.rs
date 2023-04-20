@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -7,8 +8,7 @@ use crate::{
     SparseMerkleTree,
 };
 use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
-use aptos_types::state_store::state_value::StateValue;
+use aptos_types::state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue};
 use proptest::{
     collection::{hash_set, vec},
     prelude::*,
@@ -87,18 +87,17 @@ pub fn test_smt_correctness_impl(input: Vec<Action>) {
                     naive_q.pop_front();
                     updater_q.pop_front();
                 }
-            }
+            },
             Action::Execute(block) => {
-                let updates = block
+                let updates_flat_batch = block
                     .iter()
-                    .map(|txn_updates| {
+                    .flat_map(|txn_updates| {
                         txn_updates
                             .iter()
                             .map(|(k, v)| (*k, v.as_ref()))
                             .collect::<Vec<_>>()
                     })
                     .collect::<Vec<_>>();
-                let updates_flat_batch = updates.into_iter().flatten().collect::<Vec<_>>();
 
                 let committed = naive_q.front_mut().unwrap();
                 let proofs = updates_flat_batch
@@ -120,7 +119,7 @@ pub fn test_smt_correctness_impl(input: Vec<Action>) {
 
                 naive_q.push_back(naive_smt);
                 updater_q.push_back(updater_smt);
-            }
+            },
         }
     }
 }

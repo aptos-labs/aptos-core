@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -14,7 +15,7 @@ use crate::{
     vm_status::{DiscardedVMStatus, KeptVMStatus, StatusCode, StatusType, VMStatus},
     write_set::WriteSet,
 };
-use anyhow::{ensure, format_err, Error, Result};
+use anyhow::{ensure, format_err, Context, Error, Result};
 use aptos_crypto::{
     ed25519::*,
     hash::{CryptoHash, EventAccumulatorHasher},
@@ -37,19 +38,22 @@ use std::{
 pub mod authenticator;
 mod change_set;
 mod module;
+mod multisig;
 mod script;
 mod transaction_argument;
 
-pub use change_set::ChangeSet;
+use crate::state_store::{state_key::StateKey, state_value::StateValue};
+#[cfg(any(test, feature = "fuzzing"))]
+pub use change_set::NoOpChangeSetChecker;
+pub use change_set::{ChangeSet, CheckChangeSet};
 pub use module::{Module, ModuleBundle};
+use move_core_types::vm_status::AbortLocation;
+pub use multisig::{ExecutionError, Multisig, MultisigTransactionPayload};
+use once_cell::sync::OnceCell;
 pub use script::{
     ArgumentABI, EntryABI, EntryFunction, EntryFunctionABI, Script, TransactionScriptABI,
     TypeArgumentABI,
 };
-
-use crate::state_store::{state_key::StateKey, state_value::StateValue};
-use move_core_types::vm_status::AbortLocation;
-use once_cell::sync::OnceCell;
 use std::{collections::BTreeSet, hash::Hash, ops::Deref, sync::atomic::AtomicU64};
 pub use transaction_argument::{parse_transaction_argument, TransactionArgument};
 
@@ -136,9 +140,7 @@ impl RawTransaction {
         }
     }
 
-    /// Create a new `RawTransaction` with a entry function.
-    ///
-    /// A script transaction contains only code to execute. No publishing is allowed in scripts.
+    /// Create a new `RawTransaction` with an entry function.
     pub fn new_entry_function(
         sender: AccountAddress,
         sequence_number: u64,
@@ -159,10 +161,28 @@ impl RawTransaction {
         }
     }
 
+    /// Create a new `RawTransaction` of multisig type.
+    pub fn new_multisig(
+        sender: AccountAddress,
+        sequence_number: u64,
+        multisig: Multisig,
+        max_gas_amount: u64,
+        gas_unit_price: u64,
+        expiration_timestamp_secs: u64,
+        chain_id: ChainId,
+    ) -> Self {
+        RawTransaction {
+            sender,
+            sequence_number,
+            payload: TransactionPayload::Multisig(multisig),
+            max_gas_amount,
+            gas_unit_price,
+            expiration_timestamp_secs,
+            chain_id,
+        }
+    }
+
     /// Create a new `RawTransaction` with a module to publish.
-    ///
-    /// A module transaction is the only way to publish code. Only one module per transaction
-    /// can be published.
     pub fn new_module(
         sender: AccountAddress,
         sequence_number: u64,
@@ -185,8 +205,7 @@ impl RawTransaction {
 
     /// Create a new `RawTransaction` with a list of modules to publish.
     ///
-    /// A module transaction is the only way to publish code. Multiple modules per transaction
-    /// can be published.
+    /// Multiple modules per transaction can be published.
     pub fn new_module_bundle(
         sender: AccountAddress,
         sequence_number: u64,
@@ -292,6 +311,13 @@ impl RawTransaction {
                 format!("{}::{}", script_fn.module(), script_fn.function()),
                 script_fn.args().to_vec(),
             ),
+            TransactionPayload::Multisig(multisig) => (
+                format!(
+                    "Executing next transaction for multisig account {}",
+                    multisig.multisig_address,
+                ),
+                vec![],
+            ),
             TransactionPayload::ModuleBundle(_) => ("module publishing".to_string(), vec![]),
         };
         let mut f_args: String = "".to_string();
@@ -322,6 +348,7 @@ impl RawTransaction {
             self.chain_id,
         )
     }
+
     /// Return the sender of this transaction.
     pub fn sender(&self) -> AccountAddress {
         self.sender
@@ -360,10 +387,13 @@ impl RawTransactionWithData {
 pub enum TransactionPayload {
     /// A transaction that executes code.
     Script(Script),
-    /// A transaction that publishes multiple modules at the same time.
+    /// Deprecated.
     ModuleBundle(ModuleBundle),
     /// A transaction that executes an existing entry function published on-chain.
     EntryFunction(EntryFunction),
+    /// A multisig transaction that allows an owner of a multisig account to execute a pre-approved
+    /// transaction as the multisig account.
+    Multisig(Multisig),
 }
 
 impl TransactionPayload {
@@ -633,6 +663,7 @@ impl TransactionWithProof {
             proof,
         }
     }
+
     /// Verifies the transaction with the proof, both carried by `self`.
     ///
     /// A few things are ensured if no error is raised:
@@ -649,7 +680,10 @@ impl TransactionWithProof {
         sender: AccountAddress,
         sequence_number: u64,
     ) -> Result<()> {
-        let signed_transaction = self.transaction.as_signed_user_txn()?;
+        let signed_transaction = self
+            .transaction
+            .try_as_signed_user_txn()
+            .context("not user transaction")?;
 
         ensure!(
             self.version == version,
@@ -800,7 +834,7 @@ impl From<VMStatus> for TransactionStatus {
             Ok(recorded) => match recorded {
                 KeptVMStatus::MiscellaneousError => {
                     TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(status_code)))
-                }
+                },
                 _ => TransactionStatus::Keep(recorded.into()),
             },
             Err(code) => TransactionStatus::Discard(code),
@@ -920,6 +954,67 @@ impl TransactionOutput {
             status,
         } = self;
         (write_set, events, gas_used, status)
+    }
+
+    pub fn ensure_match_transaction_info(
+        &self,
+        version: Version,
+        txn_info: &TransactionInfo,
+        expected_write_set: Option<&WriteSet>,
+        expected_events: Option<&[ContractEvent]>,
+    ) -> Result<()> {
+        const ERR_MSG: &str = "TransactionOutput does not match TransactionInfo";
+
+        let expected_txn_status: TransactionStatus = txn_info.status().clone().into();
+        ensure!(
+            self.status() == &expected_txn_status,
+            "{}: version:{}, status:{:?}, expected:{:?}",
+            ERR_MSG,
+            version,
+            self.status(),
+            expected_txn_status,
+        );
+
+        ensure!(
+            self.gas_used() == txn_info.gas_used(),
+            "{}: version:{}, gas_used:{:?}, expected:{:?}",
+            ERR_MSG,
+            version,
+            self.gas_used(),
+            txn_info.gas_used(),
+        );
+
+        let write_set_hash = CryptoHash::hash(self.write_set());
+        ensure!(
+            write_set_hash == txn_info.state_change_hash(),
+            "{}: version:{}, write_set_hash:{:?}, expected:{:?}, write_set: {:?}, expected(if known): {:?}",
+            ERR_MSG,
+            version,
+            write_set_hash,
+            txn_info.state_change_hash(),
+            self.write_set,
+            expected_write_set,
+        );
+
+        let event_hashes = self
+            .events()
+            .iter()
+            .map(CryptoHash::hash)
+            .collect::<Vec<_>>();
+        let event_root_hash =
+            InMemoryAccumulator::<EventAccumulatorHasher>::from_leaves(&event_hashes).root_hash;
+        ensure!(
+            event_root_hash == txn_info.event_root_hash(),
+            "{}: version:{}, event_root_hash:{:?}, expected:{:?}, events: {:?}, expected(if known): {:?}",
+            ERR_MSG,
+            version,
+            event_root_hash,
+            txn_info.event_root_hash(),
+            self.events(),
+            expected_events,
+        );
+
+        Ok(())
     }
 }
 
@@ -1474,7 +1569,7 @@ pub enum Transaction {
     ///       transaction types we had in our codebase.
     UserTransaction(SignedTransaction),
 
-    /// Transaction that applies a WriteSet to the current storage, it's applied manually via db-bootstrapper.
+    /// Transaction that applies a WriteSet to the current storage, it's applied manually via aptos-db-bootstrapper.
     GenesisTransaction(WriteSetPayload),
 
     /// Transaction to update the block metadata resource at the beginning of a block.
@@ -1487,10 +1582,17 @@ pub enum Transaction {
 }
 
 impl Transaction {
-    pub fn as_signed_user_txn(&self) -> Result<&SignedTransaction> {
+    pub fn try_as_signed_user_txn(&self) -> Option<&SignedTransaction> {
         match self {
-            Transaction::UserTransaction(txn) => Ok(txn),
-            _ => Err(format_err!("Not a user transaction.")),
+            Transaction::UserTransaction(txn) => Some(txn),
+            _ => None,
+        }
+    }
+
+    pub fn try_as_block_metadata(&self) -> Option<&BlockMetadata> {
+        match self {
+            Transaction::BlockMetadata(v1) => Some(v1),
+            _ => None,
         }
     }
 
@@ -1498,7 +1600,7 @@ impl Transaction {
         match self {
             Transaction::UserTransaction(user_txn) => {
                 user_txn.format_for_client(get_transaction_name)
-            }
+            },
             // TODO: display proper information for client
             Transaction::GenesisTransaction(_write_set) => String::from("genesis"),
             // TODO: display proper information for client

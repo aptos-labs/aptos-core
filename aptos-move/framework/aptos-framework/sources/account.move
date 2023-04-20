@@ -5,14 +5,16 @@ module aptos_framework::account {
     use std::option::{Self, Option};
     use std::signer;
     use std::vector;
-    use aptos_std::type_info::{Self, TypeInfo};
+    use aptos_framework::chain_id;
+    use aptos_framework::create_signer::create_signer;
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::guid;
     use aptos_framework::system_addresses;
-    use aptos_std::table::{Self, Table};
     use aptos_std::ed25519;
     use aptos_std::from_bcs;
     use aptos_std::multi_ed25519;
+    use aptos_std::table::{Self, Table};
+    use aptos_std::type_info::{Self, TypeInfo};
 
     friend aptos_framework::aptos_account;
     friend aptos_framework::coin;
@@ -46,6 +48,17 @@ module aptos_framework::account {
 
     struct SignerCapability has drop, store { account: address }
 
+    /// It is easy to fetch the authentication key of an address by simply reading it from the `Account` struct at that address.
+    /// The table in this struct makes it possible to do a reverse lookup: it maps an authentication key, to the address of the account which has that authentication key set.
+    ///
+    /// This mapping is needed when recovering wallets for accounts whose authentication key has been rotated.
+    ///
+    /// For example, imagine a freshly-created wallet with address `a` and thus also with authentication key `a`, derived from a PK `pk_a` with corresponding SK `sk_a`.
+    /// It is easy to recover such a wallet given just the secret key `sk_a`, since the PK can be derived from the SK, the authentication key can then be derived from the PK, and the address equals the authentication key (since there was no key rotation).
+    ///
+    /// However, if such a wallet rotates its authentication key to `b` derived from a different PK `pk_b` with SK `sk_b`, how would account recovery work?
+    /// The recovered address would no longer be 'a'; it would be `b`, which is incorrect.
+    /// This struct solves this problem by mapping the new authentication key `b` to the original address `a` and thus helping the wallet software during recovery find the correct address.
     struct OriginatingAddress has key {
         address_map: Table<address, address>,
     }
@@ -56,25 +69,35 @@ module aptos_framework::account {
     /// knowledge of this new public key's associated secret key. These two signatures cannot be replayed in another
     /// context because they include the TXN's unique sequence number.
     struct RotationProofChallenge has copy, drop {
-        sequence_number: u64,
-        originator: address,
-        // originating address
-        current_auth_key: address,
-        // current auth key
-        new_public_key: vector<u8>,
+        sequence_number: u64, // the sequence number of the account whose key is being rotated
+        originator: address, // the address of the account whose key is being rotated
+        current_auth_key: address, // the current authentication key of the account whose key is being rotated
+        new_public_key: vector<u8>, // the new public key that the account owner wants to rotate to
     }
 
+    /// Deprecated struct - newest version is `RotationCapabilityOfferProofChallengeV2`
     struct RotationCapabilityOfferProofChallenge has drop {
         sequence_number: u64,
         recipient_address: address,
     }
 
+    /// Deprecated struct - newest version is `SignerCapabilityOfferProofChallengeV2`
     struct SignerCapabilityOfferProofChallenge has drop {
         sequence_number: u64,
         recipient_address: address,
     }
 
-    struct SignerCapabilityOfferProofChallengeV2 has drop {
+    /// This struct stores the challenge message that should be signed by the source account, when the source account
+    /// is delegating its rotation capability to the `recipient_address`.
+    /// This V2 struct adds the `chain_id` and `source_address` to the challenge message, which prevents replaying the challenge message.
+    struct RotationCapabilityOfferProofChallengeV2 has drop {
+        chain_id: u8,
+        sequence_number: u64,
+        source_address: address,
+        recipient_address: address,
+    }
+
+    struct SignerCapabilityOfferProofChallengeV2 has copy, drop {
         sequence_number: u64,
         source_address: address,
         recipient_address: address,
@@ -120,14 +143,26 @@ module aptos_framework::account {
     const EINVALID_SCHEME: u64 = 12;
     /// Abort the transaction if the expected originating address is different from the originating addres on-chain
     const EINVALID_ORIGINATING_ADDRESS: u64 = 13;
-    /// The signer capability doesn't exist at the given address
+    /// The signer capability offer doesn't exist at the given address
     const ENO_SUCH_SIGNER_CAPABILITY: u64 = 14;
     /// An attempt to create a resource account on a claimed account
     const ERESOURCE_ACCCOUNT_EXISTS: u64 = 15;
     /// An attempt to create a resource account on an account that has a committed transaction
     const EACCOUNT_ALREADY_USED: u64 = 16;
+    /// Offerer address doesn't exist
+    const EOFFERER_ADDRESS_DOES_NOT_EXIST: u64 = 17;
+    /// The specified rotation capablity offer does not exist at the specified offerer address
+    const ENO_SUCH_ROTATION_CAPABILITY_OFFER: u64 = 18;
+    // The signer capability is not offered to any address
+    const ENO_SIGNER_CAPABILITY_OFFERED: u64 = 19;
+    // This account has exceeded the allocated GUIDs it can create. It should be impossible to reach this number for real applications.
+    const EEXCEEDED_MAX_GUID_CREATION_NUM: u64 = 20;
 
-    native fun create_signer(addr: address): signer;
+    /// Explicitly separate the GUID space between Object and Account to prevent accidental overlap.
+    const MAX_GUID_CREATION_NUM: u64 = 0x4000000000000;
+    #[test_only]
+    /// Create signer for testing, independently of an Aptos-style `Account`.
+    public fun create_signer_for_test(addr: address): signer { create_signer(addr) }
 
     /// Only called during genesis to initialize system resources for this module.
     public(friend) fun initialize(aptos_framework: &signer) {
@@ -150,11 +185,6 @@ module aptos_framework::account {
             error::invalid_argument(ECANNOT_RESERVED_ADDRESS)
         );
 
-        create_account_unchecked(new_address)
-    }
-
-    #[test_only]
-    public fun create_account_for_test(new_address: address): signer {
         create_account_unchecked(new_address)
     }
 
@@ -190,14 +220,17 @@ module aptos_framework::account {
         new_account
     }
 
+    #[view]
     public fun exists_at(addr: address): bool {
         exists<Account>(addr)
     }
 
+    #[view]
     public fun get_guid_next_creation_num(addr: address): u64 acquires Account {
         borrow_global<Account>(addr).guid_creation_num
     }
 
+    #[view]
     public fun get_sequence_number(addr: address): u64 acquires Account {
         borrow_global<Account>(addr).sequence_number
     }
@@ -213,10 +246,13 @@ module aptos_framework::account {
         *sequence_number = *sequence_number + 1;
     }
 
+    #[view]
     public fun get_authentication_key(addr: address): vector<u8> acquires Account {
-        *&borrow_global<Account>(addr).authentication_key
+        borrow_global<Account>(addr).authentication_key
     }
 
+    /// This function is used to rotate a resource account's authentication key to 0, so that no private key can control
+    /// the resource account.
     public(friend) fun rotate_authentication_key_internal(account: &signer, new_auth_key: vector<u8>) acquires Account {
         let addr = signer::address_of(account);
         assert!(exists_at(addr), error::not_found(EACCOUNT_DOES_NOT_EXIST));
@@ -228,33 +264,34 @@ module aptos_framework::account {
         account_resource.authentication_key = new_auth_key;
     }
 
-    fun assert_valid_signature_and_get_auth_key(scheme: u8, public_key_bytes: vector<u8>, signature: vector<u8>, challenge: &RotationProofChallenge): vector<u8> {
-        if (scheme == ED25519_SCHEME) {
-            let pk = ed25519::new_unvalidated_public_key_from_bytes(public_key_bytes);
-            let sig = ed25519::new_signature_from_bytes(signature);
-            assert!(ed25519::signature_verify_strict_t(&sig, &pk, *challenge), std::error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
-            ed25519::unvalidated_public_key_to_authentication_key(&pk)
-        } else if (scheme == MULTI_ED25519_SCHEME) {
-            let pk = multi_ed25519::new_unvalidated_public_key_from_bytes(public_key_bytes);
-            let sig = multi_ed25519::new_signature_from_bytes(signature);
-            assert!(multi_ed25519::signature_verify_strict_t(&sig, &pk, *challenge), std::error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
-            multi_ed25519::unvalidated_public_key_to_authentication_key(&pk)
-        } else {
-            abort error::invalid_argument(EINVALID_SCHEME)
-        }
-    }
-
     /// Generic authentication key rotation function that allows the user to rotate their authentication key from any scheme to any scheme.
     /// To authorize the rotation, we need two signatures:
     /// - the first signature `cap_rotate_key` refers to the signature by the account owner's current key on a valid `RotationProofChallenge`,
     /// demonstrating that the user intends to and has the capability to rotate the authentication key of this account;
     /// - the second signature `cap_update_table` refers to the signature by the new key (that the account owner wants to rotate to) on a
     /// valid `RotationProofChallenge`, demonstrating that the user owns the new private key, and has the authority to update the
-    /// `OriginatingAddress` map with the new address mapping <new_address, originating_address>.
-    /// To verify signatures, we need their corresponding public key and public key scheme: we use `from_scheme` and `from_public_key_bytes`
+    /// `OriginatingAddress` map with the new address mapping `<new_address, originating_address>`.
+    /// To verify these two signatures, we need their corresponding public key and public key scheme: we use `from_scheme` and `from_public_key_bytes`
     /// to verify `cap_rotate_key`, and `to_scheme` and `to_public_key_bytes` to verify `cap_update_table`.
     /// A scheme of 0 refers to an Ed25519 key and a scheme of 1 refers to Multi-Ed25519 keys.
     /// `originating address` refers to an account's original/first address.
+    ///
+    /// Here is an example attack if we don't ask for the second signature `cap_update_table`:
+    /// Alice has rotated her account `addr_a` to `new_addr_a`. As a result, the following entry is created, to help Alice when recovering her wallet:
+    /// `OriginatingAddress[new_addr_a]` -> `addr_a`
+    /// Alice has had bad day: her laptop blew up and she needs to reset her account on a new one.
+    /// (Fortunately, she still has her secret key `new_sk_a` associated with her new address `new_addr_a`, so she can do this.)
+    ///
+    /// But Bob likes to mess with Alice.
+    /// Bob creates an account `addr_b` and maliciously rotates it to Alice's new address `new_addr_a`. Since we are no longer checking a PoK,
+    /// Bob can easily do this.
+    ///
+    /// Now, the table will be updated to make Alice's new address point to Bob's address: `OriginatingAddress[new_addr_a]` -> `addr_b`.
+    /// When Alice recovers her account, her wallet will display the attacker's address (Bob's) `addr_b` as her address.
+    /// Now Alice will give `addr_b` to everyone to pay her, but the money will go to Bob.
+    ///
+    /// Because we ask for a valid `cap_update_table`, this kind of attack is not possible. Bob would not have the secret key of Alice's address
+    /// to rotate his address to Alice's address in the first place.
     public entry fun rotate_authentication_key(
         account: &signer,
         from_scheme: u8,
@@ -291,35 +328,115 @@ module aptos_framework::account {
         };
 
         // Assert the challenges signed by the current and new keys are valid
-        let curr_auth_key = assert_valid_signature_and_get_auth_key(from_scheme, from_public_key_bytes, cap_rotate_key, &challenge);
-        let new_auth_key = assert_valid_signature_and_get_auth_key(to_scheme, to_public_key_bytes, cap_update_table, &challenge);
+        assert_valid_rotation_proof_signature_and_get_auth_key(from_scheme, from_public_key_bytes, cap_rotate_key, &challenge);
+        let new_auth_key = assert_valid_rotation_proof_signature_and_get_auth_key(to_scheme, to_public_key_bytes, cap_update_table, &challenge);
 
-        // Update the `OriginatingAddress` table, so that we can find the originating address using the latest address
-        // in the event of key recovery
-        let address_map = &mut borrow_global_mut<OriginatingAddress>(@aptos_framework).address_map;
-        let new_auth_key_as_address = from_bcs::to_address(new_auth_key);
-        if (table::contains(address_map, curr_auth_key_as_address)) {
-            // Assert that we're calling from the account with the originating address.
-            // For example, if we have already rotated from keypair_a to keypair_b, and are trying to rotate from
-            // keypair_b to keypair_c, we could call `rotate_authentication_key` from address_a or address_b.
-            // Here, we wanted to enforce the standard that we expect the call to come from the signer with address a.
-            // If a signer with address b calls this function with two valid signatures, it will abort at this step,
-            // because address b is not the account's originating address.
-            // This means that after key rotation, the account's address should be the same, but their public key
-            // and private key should be updated to the new ones.
-            assert!(addr == table::remove(address_map, curr_auth_key_as_address), error::not_found(EINVALID_ORIGINATING_ADDRESS));
+        // Update the `OriginatingAddress` table.
+        update_auth_key_and_originating_address_table(addr, account_resource, new_auth_key);
+    }
+
+    public entry fun rotate_authentication_key_with_rotation_capability(
+        delegate_signer: &signer,
+        rotation_cap_offerer_address: address,
+        new_scheme: u8,
+        new_public_key_bytes: vector<u8>,
+        cap_update_table: vector<u8>
+    ) acquires Account, OriginatingAddress {
+        assert!(exists_at(rotation_cap_offerer_address), error::not_found(EOFFERER_ADDRESS_DOES_NOT_EXIST));
+
+        // Check that there exists a rotation capability offer at the offerer's account resource for the delegate.
+        let delegate_address = signer::address_of(delegate_signer);
+        let offerer_account_resource = borrow_global<Account>(rotation_cap_offerer_address);
+        assert!(option::contains(&offerer_account_resource.rotation_capability_offer.for, &delegate_address), error::not_found(ENO_SUCH_ROTATION_CAPABILITY_OFFER));
+
+        let curr_auth_key = from_bcs::to_address(offerer_account_resource.authentication_key);
+        let challenge = RotationProofChallenge {
+            sequence_number: get_sequence_number(delegate_address),
+            originator: rotation_cap_offerer_address,
+            current_auth_key: curr_auth_key,
+            new_public_key: new_public_key_bytes,
         };
-        table::add(address_map, new_auth_key_as_address, addr);
 
-        event::emit_event<KeyRotationEvent>(
-            &mut account_resource.key_rotation_events,
-            KeyRotationEvent {
-                old_authentication_key: curr_auth_key,
-                new_authentication_key: new_auth_key,
-            }
-        );
+        // Verifies that the `RotationProofChallenge` from above is signed under the new public key that we are rotating to.        l
+        let new_auth_key = assert_valid_rotation_proof_signature_and_get_auth_key(new_scheme, new_public_key_bytes, cap_update_table, &challenge);
 
-        account_resource.authentication_key = new_auth_key;
+        // Update the `OriginatingAddress` table, so we can find the originating address using the new address.
+        let offerer_account_resource = borrow_global_mut<Account>(rotation_cap_offerer_address);
+        update_auth_key_and_originating_address_table(rotation_cap_offerer_address, offerer_account_resource, new_auth_key);
+    }
+
+    /// Offers rotation capability on behalf of `account` to the account at address `recipient_address`.
+    /// An account can delegate its rotation capability to only one other address at one time. If the account
+    /// has an existing rotation capability offer, calling this function will update the rotation capability offer with
+    /// the new `recipient_address`.
+    /// Here, `rotation_capability_sig_bytes` signature indicates that this key rotation is authorized by the account owner,
+    /// and prevents the classic "time-of-check time-of-use" attack.
+    /// For example, users usually rely on what the wallet displays to them as the transaction's outcome. Consider a contract that with 50% probability
+    /// (based on the current timestamp in Move), rotates somebody's key. The wallet might be unlucky and get an outcome where nothing is rotated,
+    /// incorrectly telling the user nothing bad will happen. But when the transaction actually gets executed, the attacker gets lucky and
+    /// the execution path triggers the account key rotation.
+    /// We prevent such attacks by asking for this extra signature authorizing the key rotation.
+    ///
+    /// @param rotation_capability_sig_bytes is the signature by the account owner's key on `RotationCapabilityOfferProofChallengeV2`.
+    /// @param account_scheme is the scheme of the account (ed25519 or multi_ed25519).
+    /// @param account_public_key_bytes is the public key of the account owner.
+    /// @param recipient_address is the address of the recipient of the rotation capability - note that if there's an existing rotation capability
+    /// offer, calling this function will replace the previous `recipient_address` upon successful verification.
+    public entry fun offer_rotation_capability(
+        account: &signer,
+        rotation_capability_sig_bytes: vector<u8>,
+        account_scheme: u8,
+        account_public_key_bytes: vector<u8>,
+        recipient_address: address,
+    ) acquires Account {
+        let addr = signer::address_of(account);
+        assert!(exists_at(recipient_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
+
+        // proof that this account intends to delegate its rotation capability to another account
+        let account_resource = borrow_global_mut<Account>(addr);
+        let proof_challenge = RotationCapabilityOfferProofChallengeV2 {
+            chain_id: chain_id::get(),
+            sequence_number: account_resource.sequence_number,
+            source_address: addr,
+            recipient_address,
+        };
+
+        // verify the signature on `RotationCapabilityOfferProofChallengeV2` by the account owner
+        if (account_scheme == ED25519_SCHEME) {
+            let pubkey = ed25519::new_unvalidated_public_key_from_bytes(account_public_key_bytes);
+            let expected_auth_key = ed25519::unvalidated_public_key_to_authentication_key(&pubkey);
+            assert!(account_resource.authentication_key == expected_auth_key, error::invalid_argument(EWRONG_CURRENT_PUBLIC_KEY));
+
+            let rotation_capability_sig = ed25519::new_signature_from_bytes(rotation_capability_sig_bytes);
+            assert!(ed25519::signature_verify_strict_t(&rotation_capability_sig, &pubkey, proof_challenge), error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
+        } else if (account_scheme == MULTI_ED25519_SCHEME) {
+            let pubkey = multi_ed25519::new_unvalidated_public_key_from_bytes(account_public_key_bytes);
+            let expected_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&pubkey);
+            assert!(account_resource.authentication_key == expected_auth_key, error::invalid_argument(EWRONG_CURRENT_PUBLIC_KEY));
+
+            let rotation_capability_sig = multi_ed25519::new_signature_from_bytes(rotation_capability_sig_bytes);
+            assert!(multi_ed25519::signature_verify_strict_t(&rotation_capability_sig, &pubkey, proof_challenge), error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
+        } else {
+            abort error::invalid_argument(EINVALID_SCHEME)
+        };
+
+        // update the existing rotation capability offer or put in a new rotation capability offer for the current account
+        option::swap_or_fill(&mut account_resource.rotation_capability_offer.for, recipient_address);
+    }
+
+    /// Revoke the rotation capability offer given to `to_be_revoked_recipient_address` from `account`
+    public entry fun revoke_rotation_capability(account: &signer, to_be_revoked_address: address) acquires Account {
+        assert!(exists_at(to_be_revoked_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
+        let addr = signer::address_of(account);
+        let account_resource = borrow_global_mut<Account>(addr);
+        assert!(option::contains(&account_resource.rotation_capability_offer.for, &to_be_revoked_address), error::not_found(ENO_SUCH_ROTATION_CAPABILITY_OFFER));
+        revoke_any_rotation_capability(account);
+    }
+
+    /// Revoke any rotation capability offer in the specified account.
+    public entry fun revoke_any_rotation_capability(account: &signer) acquires Account {
+        let account_resource = borrow_global_mut<Account>(signer::address_of(account));
+        option::extract(&mut account_resource.rotation_capability_offer.for);
     }
 
     /// Offers signer capability on behalf of `account` to the account at address `recipient_address`.
@@ -341,36 +458,33 @@ module aptos_framework::account {
         let source_address = signer::address_of(account);
         assert!(exists_at(recipient_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
 
-        let account_resource = borrow_global_mut<Account>(source_address);
-
         // Proof that this account intends to delegate its signer capability to another account.
         let proof_challenge = SignerCapabilityOfferProofChallengeV2 {
-            sequence_number: account_resource.sequence_number,
+            sequence_number: get_sequence_number(source_address),
             source_address,
             recipient_address,
         };
-
-        // Verify that the `SignerCapabilityOfferProofChallengeV2` has the right information and is signed by the account owner's key
-        if (account_scheme == ED25519_SCHEME) {
-            let pubkey = ed25519::new_unvalidated_public_key_from_bytes(account_public_key_bytes);
-            let expected_auth_key = ed25519::unvalidated_public_key_to_authentication_key(&pubkey);
-            assert!(account_resource.authentication_key == expected_auth_key, error::invalid_argument(EWRONG_CURRENT_PUBLIC_KEY));
-
-            let signer_capability_sig = ed25519::new_signature_from_bytes(signer_capability_sig_bytes);
-            assert!(ed25519::signature_verify_strict_t(&signer_capability_sig, &pubkey, proof_challenge), error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
-        } else if (account_scheme == MULTI_ED25519_SCHEME) {
-            let pubkey = multi_ed25519::new_unvalidated_public_key_from_bytes(account_public_key_bytes);
-            let expected_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&pubkey);
-            assert!(account_resource.authentication_key == expected_auth_key, error::invalid_argument(EWRONG_CURRENT_PUBLIC_KEY));
-
-            let signer_capability_sig = multi_ed25519::new_signature_from_bytes(signer_capability_sig_bytes);
-            assert!(multi_ed25519::signature_verify_strict_t(&signer_capability_sig, &pubkey, proof_challenge), error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
-        } else {
-            abort error::invalid_argument(EINVALID_SCHEME)
-        };
+        verify_signed_message(
+            source_address, account_scheme, account_public_key_bytes, signer_capability_sig_bytes, proof_challenge);
 
         // Update the existing signer capability offer or put in a new signer capability offer for the recipient.
+        let account_resource = borrow_global_mut<Account>(source_address);
         option::swap_or_fill(&mut account_resource.signer_capability_offer.for, recipient_address);
+    }
+
+    #[view]
+    /// Returns true if the account at `account_addr` has a signer capability offer.
+    public fun is_signer_capability_offered(account_addr: address): bool acquires Account {
+        let account_resource = borrow_global<Account>(account_addr);
+        option::is_some(&account_resource.signer_capability_offer.for)
+    }
+
+    #[view]
+    /// Returns the address of the account that has a signer capability offer from the account at `account_addr`.
+    public fun get_signer_capability_offer_for(account_addr: address): address acquires Account {
+        let account_resource = borrow_global<Account>(account_addr);
+        assert!(option::is_some(&account_resource.signer_capability_offer.for), error::not_found(ENO_SIGNER_CAPABILITY_OFFERED));
+        *option::borrow(&account_resource.signer_capability_offer.for)
     }
 
     /// Revoke the account owner's signer capability offer for `to_be_revoked_address` (i.e., the address that
@@ -380,13 +494,19 @@ module aptos_framework::account {
         let addr = signer::address_of(account);
         let account_resource = borrow_global_mut<Account>(addr);
         assert!(option::contains(&account_resource.signer_capability_offer.for, &to_be_revoked_address), error::not_found(ENO_SUCH_SIGNER_CAPABILITY));
+        revoke_any_signer_capability(account);
+    }
+
+    /// Revoke any signer capability offer in the specified account.
+    public entry fun revoke_any_signer_capability(account: &signer) acquires Account {
+        let account_resource = borrow_global_mut<Account>(signer::address_of(account));
         option::extract(&mut account_resource.signer_capability_offer.for);
     }
 
     /// Return an authorized signer of the offerer, if there's an existing signer capability offer for `account`
     /// at the offerer's address.
     public fun create_authorized_signer(account: &signer, offerer_address: address): signer acquires Account {
-        assert!(exists_at(offerer_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
+        assert!(exists_at(offerer_address), error::not_found(EOFFERER_ADDRESS_DOES_NOT_EXIST));
 
         // Check if there's an existing signer capability offer from the offerer.
         let account_resource = borrow_global<Account>(offerer_address);
@@ -394,6 +514,67 @@ module aptos_framework::account {
         assert!(option::contains(&account_resource.signer_capability_offer.for, &addr), error::not_found(ENO_SUCH_SIGNER_CAPABILITY));
 
         create_signer(offerer_address)
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
+    /// Helper functions for authentication key rotation.
+    ///////////////////////////////////////////////////////////////////////////
+    fun assert_valid_rotation_proof_signature_and_get_auth_key(scheme: u8, public_key_bytes: vector<u8>, signature: vector<u8>, challenge: &RotationProofChallenge): vector<u8> {
+        if (scheme == ED25519_SCHEME) {
+            let pk = ed25519::new_unvalidated_public_key_from_bytes(public_key_bytes);
+            let sig = ed25519::new_signature_from_bytes(signature);
+            assert!(ed25519::signature_verify_strict_t(&sig, &pk, *challenge), std::error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
+            ed25519::unvalidated_public_key_to_authentication_key(&pk)
+        } else if (scheme == MULTI_ED25519_SCHEME) {
+            let pk = multi_ed25519::new_unvalidated_public_key_from_bytes(public_key_bytes);
+            let sig = multi_ed25519::new_signature_from_bytes(signature);
+            assert!(multi_ed25519::signature_verify_strict_t(&sig, &pk, *challenge), std::error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
+            multi_ed25519::unvalidated_public_key_to_authentication_key(&pk)
+        } else {
+            abort error::invalid_argument(EINVALID_SCHEME)
+        }
+    }
+
+    /// Update the `OriginatingAddress` table, so that we can find the originating address using the latest address
+    /// in the event of key recovery.
+    fun update_auth_key_and_originating_address_table(
+        originating_addr: address,
+        account_resource: &mut Account,
+        new_auth_key_vector: vector<u8>,
+    ) acquires OriginatingAddress {
+        let address_map = &mut borrow_global_mut<OriginatingAddress>(@aptos_framework).address_map;
+        let curr_auth_key = from_bcs::to_address(account_resource.authentication_key);
+
+        // Checks `OriginatingAddress[curr_auth_key]` is either unmapped, or mapped to `originating_address`.
+        // If it's mapped to the originating address, removes that mapping.
+        // Otherwise, abort if it's mapped to a different address.
+        if (table::contains(address_map, curr_auth_key)) {
+            // If account_a with address_a is rotating its keypair from keypair_a to keypair_b, we expect
+            // the address of the account to stay the same, while its keypair updates to keypair_b.
+            // Here, by asserting that we're calling from the account with the originating address, we enforce
+            // the standard of keeping the same address and updating the keypair at the contract level.
+            // Without this assertion, the dapps could also update the account's address to address_b (the address that
+            // is programmatically related to keypaier_b) and update the keypair to keypair_b. This causes problems
+            // for interoperability because different dapps can implement this in different ways.
+            // If the account with address b calls this function with two valid signatures, it will abort at this step,
+            // because address b is not the account's originating address.
+            assert!(originating_addr == table::remove(address_map, curr_auth_key), error::not_found(EINVALID_ORIGINATING_ADDRESS));
+        };
+
+        // Set `OriginatingAddress[new_auth_key] = originating_address`.
+        let new_auth_key = from_bcs::to_address(new_auth_key_vector);
+        table::add(address_map, new_auth_key, originating_addr);
+
+        event::emit_event<KeyRotationEvent>(
+            &mut account_resource.key_rotation_events,
+            KeyRotationEvent {
+                old_authentication_key: account_resource.authentication_key,
+                new_authentication_key: new_auth_key_vector,
+            }
+        );
+
+        // Update the account resource's authentication key.
+        account_resource.authentication_key = new_auth_key_vector;
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -412,10 +593,10 @@ module aptos_framework::account {
     /// A resource account is used to manage resources independent of an account managed by a user.
     /// In Aptos a resource account is created based upon the sha3 256 of the source's address and additional seed data.
     /// A resource account can only be created once, this is designated by setting the
-    /// `Account::signer_capbility_offer::for` to the address of the resource account. While an entity may call
+    /// `Account::signer_capability_offer::for` to the address of the resource account. While an entity may call
     /// `create_account` to attempt to claim an account ahead of the creation of a resource account, if found Aptos will
     /// transition ownership of the account over to the resource account. This is done by validating that the account has
-    /// yet to execute any transactions and that the `Account::signer_capbility_offer::for` is none. The probability of a
+    /// yet to execute any transactions and that the `Account::signer_capability_offer::for` is none. The probability of a
     /// collision where someone has legitimately produced a private key that maps to a resource account address is less
     /// than `(1/2)^(256)`.
     public fun create_resource_account(source: &signer, seed: vector<u8>): (signer, SignerCapability) acquires Account {
@@ -473,7 +654,12 @@ module aptos_framework::account {
     public fun create_guid(account_signer: &signer): guid::GUID acquires Account {
         let addr = signer::address_of(account_signer);
         let account = borrow_global_mut<Account>(addr);
-        guid::create(addr, &mut account.guid_creation_num)
+        let guid = guid::create(addr, &mut account.guid_creation_num);
+        assert!(
+            account.guid_creation_num < MAX_GUID_CREATION_NUM,
+            error::out_of_range(EEXCEEDED_MAX_GUID_CREATION_NUM),
+        );
+        guid
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -511,6 +697,58 @@ module aptos_framework::account {
         capability.account
     }
 
+    public fun verify_signed_message<T: drop>(
+        account: address,
+        account_scheme: u8,
+        account_public_key: vector<u8>,
+        signed_message_bytes: vector<u8>,
+        message: T,
+    ) acquires Account {
+        let account_resource = borrow_global_mut<Account>(account);
+        // Verify that the `SignerCapabilityOfferProofChallengeV2` has the right information and is signed by the account owner's key
+        if (account_scheme == ED25519_SCHEME) {
+            let pubkey = ed25519::new_unvalidated_public_key_from_bytes(account_public_key);
+            let expected_auth_key = ed25519::unvalidated_public_key_to_authentication_key(&pubkey);
+            assert!(
+                account_resource.authentication_key == expected_auth_key,
+                error::invalid_argument(EWRONG_CURRENT_PUBLIC_KEY),
+            );
+
+            let signer_capability_sig = ed25519::new_signature_from_bytes(signed_message_bytes);
+            assert!(
+                ed25519::signature_verify_strict_t(&signer_capability_sig, &pubkey, message),
+                error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE),
+            );
+        } else if (account_scheme == MULTI_ED25519_SCHEME) {
+            let pubkey = multi_ed25519::new_unvalidated_public_key_from_bytes(account_public_key);
+            let expected_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&pubkey);
+            assert!(
+                account_resource.authentication_key == expected_auth_key,
+                error::invalid_argument(EWRONG_CURRENT_PUBLIC_KEY),
+            );
+
+            let signer_capability_sig = multi_ed25519::new_signature_from_bytes(signed_message_bytes);
+            assert!(
+                multi_ed25519::signature_verify_strict_t(&signer_capability_sig, &pubkey, message),
+                error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE),
+            );
+        } else {
+            abort error::invalid_argument(EINVALID_SCHEME)
+        };
+    }
+
+    #[test_only]
+    public fun create_account_for_test(new_address: address): signer {
+        create_account_unchecked(new_address)
+    }
+
+    #[test]
+    /// Assert correct signer creation.
+    fun test_create_signer_for_test() {
+        assert!(signer::address_of(&create_signer_for_test(@aptos_framework)) == @0x1, 0);
+        assert!(signer::address_of(&create_signer_for_test(@0x123)) == @0x123, 0);
+    }
+
     #[test(user = @0x1)]
     public entry fun test_create_resource_account(user: signer) acquires Account {
         let (resource_account, resource_account_cap) = create_resource_account(&user, x"01");
@@ -520,28 +758,46 @@ module aptos_framework::account {
     }
 
     #[test]
-    #[expected_failure(abort_code = 0x10007)]
+    #[expected_failure(abort_code = 0x10007, location = Self)]
     public entry fun test_cannot_control_resource_account_via_auth_key() acquires Account {
         let alice_pk = x"4141414141414141414141414141414141414141414141414141414141414145";
         let alice = create_account_from_ed25519_public_key(alice_pk);
         let alice_auth = get_authentication_key(signer::address_of(&alice)); // must look like a valid public key
 
-        let eve_pk = x"d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a";
-        let eve = create_account_from_ed25519_public_key(eve_pk);
+        let (eve_sk, eve_pk) = ed25519::generate_keys();
+        let eve_pk_bytes = ed25519::validated_public_key_to_bytes(&eve_pk);
+        let eve = create_account_from_ed25519_public_key(eve_pk_bytes);
+        let recipient_address = signer::address_of(&eve);
 
-        let seed = *&eve_pk; // multisig public key
+        let seed = eve_pk_bytes; // multisig public key
         vector::push_back(&mut seed, 1); // multisig threshold
         vector::push_back(&mut seed, 1); // signature scheme id
         let (resource, _) = create_resource_account(&alice, seed);
 
-        let signer_capability_sig_bytes = x"587e200320086d8a8d674181f85a8f8b24ee4fd7269870554d18fe830129e7c71f2730a4988c8374c4de5845b52bea4d182640ab6c50c176a3ae90d18002e603";
-        vector::append(&mut signer_capability_sig_bytes, x"40000000");
-        let account_scheme = MULTI_ED25519_SCHEME;
+        let resource_addr = signer::address_of(&resource);
+        let proof_challenge = SignerCapabilityOfferProofChallengeV2 {
+            sequence_number: borrow_global_mut<Account>(resource_addr).sequence_number,
+            source_address: resource_addr,
+            recipient_address,
+        };
+
+        let eve_sig = ed25519::sign_struct(&eve_sk, copy proof_challenge);
+
+        // Construct a malicious 1-out-of-2 multisig PK over Alice's authentication key and Eve's Ed25519 PK.
         let account_public_key_bytes = alice_auth;
-        vector::append(&mut account_public_key_bytes, *&eve_pk);
-        vector::push_back(&mut account_public_key_bytes, 1);
-        let recipient_address = signer::address_of(&eve);
-        offer_signer_capability(&resource, signer_capability_sig_bytes, account_scheme, account_public_key_bytes, recipient_address);
+        vector::append(&mut account_public_key_bytes, eve_pk_bytes);
+        vector::push_back(&mut account_public_key_bytes, 1); // Multisig verification threshold.
+        let fake_pk = multi_ed25519::new_unvalidated_public_key_from_bytes(account_public_key_bytes);
+
+        // Construct a multisig for `proof_challenge` as if it is signed by the signers behind `fake_pk`,
+        // Eve being the only participant.
+        let signer_capability_sig_bytes = x"";
+        vector::append(&mut signer_capability_sig_bytes, ed25519::signature_to_bytes(&eve_sig));
+        vector::append(&mut signer_capability_sig_bytes, x"40000000"); // Signers bitmap.
+        let fake_sig = multi_ed25519::new_signature_from_bytes(signer_capability_sig_bytes);
+
+        assert!(multi_ed25519::signature_verify_strict_t(&fake_sig, &fake_pk, proof_challenge), error::invalid_state(EINVALID_PROOF_OF_KNOWLEDGE));
+        offer_signer_capability(&resource, signer_capability_sig_bytes, MULTI_ED25519_SCHEME, account_public_key_bytes, recipient_address);
     }
 
     #[test_only]
@@ -568,7 +824,7 @@ module aptos_framework::account {
     }
 
     #[test(user = @0x1)]
-    #[expected_failure(abort_code = 0x8000f)]
+    #[expected_failure(abort_code = 0x8000f, location = Self)]
     public entry fun test_duplice_create_resource_account(user: signer) acquires Account {
         create_resource_account(&user, x"01");
         create_resource_account(&user, x"01");
@@ -622,7 +878,7 @@ module aptos_framework::account {
     ///////////////////////////////////////////////////////////////////////////
 
     #[test(alice = @0xa11ce)]
-    #[expected_failure(abort_code = 65537)]
+    #[expected_failure(abort_code = 65537, location = aptos_framework::ed25519)]
     public entry fun test_empty_public_key(alice: signer) acquires Account, OriginatingAddress {
         create_account(signer::address_of(&alice));
         let pk = vector::empty<u8>();
@@ -631,7 +887,7 @@ module aptos_framework::account {
     }
 
     #[test(alice = @0xa11ce)]
-    #[expected_failure(abort_code = 262151)]
+    #[expected_failure(abort_code = 262151, location = Self)]
     public entry fun test_empty_signature(alice: signer) acquires Account, OriginatingAddress {
         create_account(signer::address_of(&alice));
         let test_signature = vector::empty<u8>();
@@ -648,156 +904,359 @@ module aptos_framework::account {
         alice
     }
 
-    /*
-    TODO bring back with generic rotation capability
-        #[test(bob = @0x345)]
-        #[expected_failure(abort_code = 65544)]
-        public entry fun test_invalid_offer_rotation_capability(bob: signer) acquires Account {
-            let pk = x"f66bf0ce5ceb582b93d6780820c2025b9967aedaa259bdbb9f3d0297eced0e18";
-            let alice = create_account_from_ed25519_public_key(pk);
-            create_account(signer::address_of(&bob));
-
-            let invalid_signature = x"78f7d09ef7a9d8d7450d600b10231e6512610f919a63bd71bea1c907f7e101ed333bff360eeda97a8637a53fd622d597c03a0d6fd1315c6fa23719983ff7de0c";
-            offer_rotation_capability_ed25519(&alice, invalid_signature, pk, signer::address_of(&bob));
-        }
-    */
-
     //
     // Tests for offering & revoking signer capabilities
     //
 
-    // NOTE: These test cases were generated using `cargo test -- offer_signer_capability_v2 --nocapture` in `aptos-move/e2e-move-tests/src/tests`
-    #[test_only]
-    const ALICE_PK: vector<u8> = x"550e7e166e01047c9134d7a1c540b865bd984a326e9304e7d4a04d89f0aee747";
-    #[test_only]
-    const ALICE_ADDRESS: vector<u8> = x"47e56cf3958e4c93c72fc0ceccef12c0e05f2fe2b91014eaaa798026b8df754f";
-    #[test_only]
-    const ALICE_SIGNER_CAPABILITY_OFFER_SIGNATURE: vector<u8> = x"6591c10ca8485e700d1288a16f8555fdbe0c7dd52c12542dbabb9bd3eb12a27ffe981f2b7516d02cc4a78eee7e9f44490f93aa08100c06c55fb7615bcc66c805";
-
     #[test(bob = @0x345)]
-    #[expected_failure(abort_code = 65544)]
+    #[expected_failure(abort_code = 65544, location = Self)]
     public entry fun test_invalid_offer_signer_capability(bob: signer) acquires Account {
-        let alice = create_account_from_ed25519_public_key(ALICE_PK);
-        create_account(signer::address_of(&bob));
+        let (_alice_sk, alice_pk) = ed25519::generate_keys();
+        let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
+        let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
+        let alice_addr = signer::address_of(&alice);
+
+        let bob_addr = signer::address_of(&bob);
+        create_account(bob_addr);
+
+        let challenge = SignerCapabilityOfferProofChallengeV2 {
+            sequence_number: borrow_global<Account>(alice_addr).sequence_number,
+            source_address: alice_addr,
+            recipient_address: bob_addr,
+        };
+
+        let sig = ed25519::sign_struct(&_alice_sk, challenge);
 
         // Maul the signature and make sure the call would fail
-        let invalid_signature = ALICE_SIGNER_CAPABILITY_OFFER_SIGNATURE;
-
+        let invalid_signature = ed25519::signature_to_bytes(&sig);
         let first_sig_byte = vector::borrow_mut(&mut invalid_signature, 0);
         *first_sig_byte = *first_sig_byte + 1;
 
-        offer_signer_capability(&alice, invalid_signature, 0, ALICE_PK, signer::address_of(&bob));
+        offer_signer_capability(&alice, invalid_signature, 0, alice_pk_bytes, bob_addr);
     }
 
     #[test(bob = @0x345)]
     public entry fun test_valid_check_signer_capability_and_create_authorized_signer(bob: signer) acquires Account {
-        let alice = create_account_from_ed25519_public_key(ALICE_PK);
-        assert!(signer::address_of(&alice) == from_bcs::to_address(ALICE_ADDRESS), 0);
+        let (alice_sk, alice_pk) = ed25519::generate_keys();
+        let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
+        let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
+        let alice_addr = signer::address_of(&alice);
 
-        create_account(signer::address_of(&bob));
+        let bob_addr = signer::address_of(&bob);
+        create_account(bob_addr);
 
-        offer_signer_capability(&alice, ALICE_SIGNER_CAPABILITY_OFFER_SIGNATURE, 0, ALICE_PK, signer::address_of(&bob));
+        let challenge = SignerCapabilityOfferProofChallengeV2 {
+            sequence_number: borrow_global<Account>(alice_addr).sequence_number,
+            source_address: alice_addr,
+            recipient_address: bob_addr,
+        };
 
-        let alice_account_resource = borrow_global_mut<Account>(signer::address_of(&alice));
-        assert!(option::contains(&alice_account_resource.signer_capability_offer.for, &signer::address_of(&bob)), 0);
+        let alice_signer_capability_offer_sig = ed25519::sign_struct(&alice_sk, challenge);
 
-        let signer = create_authorized_signer(&bob, signer::address_of(&alice));
+        offer_signer_capability(&alice, ed25519::signature_to_bytes(&alice_signer_capability_offer_sig), 0, alice_pk_bytes, bob_addr);
+
+        assert!(option::contains(&borrow_global<Account>(alice_addr).signer_capability_offer.for, &bob_addr), 0);
+
+        let signer = create_authorized_signer(&bob, alice_addr);
         assert!(signer::address_of(&signer) == signer::address_of(&alice), 0);
     }
 
+    #[test(bob = @0x345)]
+    public entry fun test_get_signer_cap_and_is_signer_cap(bob: signer) acquires Account {
+        let (alice_sk, alice_pk) = ed25519::generate_keys();
+        let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
+        let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
+        let alice_addr = signer::address_of(&alice);
+
+        let bob_addr = signer::address_of(&bob);
+        create_account(bob_addr);
+
+        let challenge = SignerCapabilityOfferProofChallengeV2 {
+            sequence_number: borrow_global<Account>(alice_addr).sequence_number,
+            source_address: alice_addr,
+            recipient_address: bob_addr,
+        };
+
+        let alice_signer_capability_offer_sig = ed25519::sign_struct(&alice_sk, challenge);
+
+        offer_signer_capability(&alice, ed25519::signature_to_bytes(&alice_signer_capability_offer_sig), 0, alice_pk_bytes, bob_addr);
+
+        assert!(is_signer_capability_offered(alice_addr), 0);
+        assert!(get_signer_capability_offer_for(alice_addr) == bob_addr, 0);
+    }
+
+
     #[test(bob = @0x345, charlie = @0x567)]
-    #[expected_failure(abort_code = 393230)]
+    #[expected_failure(abort_code = 393230, location = Self)]
     public entry fun test_invalid_check_signer_capability_and_create_authorized_signer(bob: signer, charlie: signer) acquires Account {
-        let alice = create_account_from_ed25519_public_key(ALICE_PK);
-        create_account(signer::address_of(&bob));
+        let (alice_sk, alice_pk) = ed25519::generate_keys();
+        let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
+        let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
+        let alice_addr = signer::address_of(&alice);
 
-        offer_signer_capability(&alice, ALICE_SIGNER_CAPABILITY_OFFER_SIGNATURE, 0, ALICE_PK, signer::address_of(&bob));
+        let bob_addr = signer::address_of(&bob);
+        create_account(bob_addr);
 
-        let alice_account_resource = borrow_global_mut<Account>(signer::address_of(&alice));
-        assert!(option::contains(&alice_account_resource.signer_capability_offer.for, &signer::address_of(&bob)), 0);
+        let challenge = SignerCapabilityOfferProofChallengeV2 {
+            sequence_number: borrow_global<Account>(alice_addr).sequence_number,
+            source_address: alice_addr,
+            recipient_address: bob_addr,
+        };
 
-        create_authorized_signer(&charlie, signer::address_of(&alice));
+        let alice_signer_capability_offer_sig = ed25519::sign_struct(&alice_sk, challenge);
+
+        offer_signer_capability(&alice, ed25519::signature_to_bytes(&alice_signer_capability_offer_sig), 0, alice_pk_bytes, bob_addr);
+
+        let alice_account_resource = borrow_global_mut<Account>(alice_addr);
+        assert!(option::contains(&alice_account_resource.signer_capability_offer.for, &bob_addr), 0);
+
+        create_authorized_signer(&charlie, alice_addr);
     }
 
     #[test(bob = @0x345)]
     public entry fun test_valid_revoke_signer_capability(bob: signer) acquires Account {
-        let alice = create_account_from_ed25519_public_key(ALICE_PK);
-        create_account(signer::address_of(&bob));
+        let (alice_sk, alice_pk) = ed25519::generate_keys();
+        let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
+        let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
+        let alice_addr = signer::address_of(&alice);
 
-        offer_signer_capability(&alice, ALICE_SIGNER_CAPABILITY_OFFER_SIGNATURE, 0, ALICE_PK, signer::address_of(&bob));
-        revoke_signer_capability(&alice, signer::address_of(&bob));
+        let bob_addr = signer::address_of(&bob);
+        create_account(bob_addr);
+
+        let challenge = SignerCapabilityOfferProofChallengeV2 {
+            sequence_number: borrow_global<Account>(alice_addr).sequence_number,
+            source_address: alice_addr,
+            recipient_address: bob_addr,
+        };
+
+        let alice_signer_capability_offer_sig = ed25519::sign_struct(&alice_sk, challenge);
+
+        offer_signer_capability(&alice, ed25519::signature_to_bytes(&alice_signer_capability_offer_sig), 0, alice_pk_bytes, bob_addr);
+        revoke_signer_capability(&alice, bob_addr);
     }
 
     #[test(bob = @0x345, charlie = @0x567)]
-    #[expected_failure(abort_code = 393230)]
+    #[expected_failure(abort_code = 393230, location = Self)]
     public entry fun test_invalid_revoke_signer_capability(bob: signer, charlie: signer) acquires Account {
-        let alice = create_account_from_ed25519_public_key(ALICE_PK);
-        create_account(signer::address_of(&bob));
+        let (alice_sk, alice_pk) = ed25519::generate_keys();
+        let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
+        let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
+        let alice_addr = signer::address_of(&alice);
+        let alice_account_resource = borrow_global<Account>(alice_addr);
+
+        let bob_addr = signer::address_of(&bob);
+        create_account(bob_addr);
+
+        let charlie_addr = signer::address_of(&charlie);
+        create_account(charlie_addr);
+
+        let challenge = SignerCapabilityOfferProofChallengeV2 {
+            sequence_number: alice_account_resource.sequence_number,
+            source_address: alice_addr,
+            recipient_address: bob_addr,
+        };
+        let alice_signer_capability_offer_sig = ed25519::sign_struct(&alice_sk, challenge);
+        offer_signer_capability(&alice, ed25519::signature_to_bytes(&alice_signer_capability_offer_sig), 0, alice_pk_bytes, bob_addr);
+        revoke_signer_capability(&alice, charlie_addr);
+    }
+
+    //
+    // Tests for offering rotation capabilities
+    //
+    #[test(bob = @0x345, framework = @aptos_framework)]
+    public entry fun test_valid_offer_rotation_capability(bob: signer, framework: signer) acquires Account {
+        chain_id::initialize_for_test(&framework, 4);
+        let (alice_sk, alice_pk) = ed25519::generate_keys();
+        let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
+        let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
+        let alice_addr = signer::address_of(&alice);
+
+        let bob_addr = signer::address_of(&bob);
+        create_account(bob_addr);
+
+        let challenge = RotationCapabilityOfferProofChallengeV2 {
+            chain_id: chain_id::get(),
+            sequence_number: get_sequence_number(alice_addr),
+            source_address: alice_addr,
+            recipient_address: bob_addr,
+        };
+
+        let alice_rotation_capability_offer_sig = ed25519::sign_struct(&alice_sk, challenge);
+
+        offer_rotation_capability(&alice,  ed25519::signature_to_bytes(&alice_rotation_capability_offer_sig),  0, alice_pk_bytes, bob_addr);
+
+        let alice_resource = borrow_global_mut<Account>(signer::address_of(&alice));
+        assert!(option::contains(&alice_resource.rotation_capability_offer.for, &bob_addr), 0);
+    }
+
+    #[test(bob = @0x345, framework = @aptos_framework)]
+    #[expected_failure(abort_code = 65544, location = Self)]
+    public entry fun test_invalid_offer_rotation_capability(bob: signer, framework: signer) acquires Account {
+        chain_id::initialize_for_test(&framework, 4);
+        let (alice_sk, alice_pk) = ed25519::generate_keys();
+        let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
+        let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
+        let alice_addr = signer::address_of(&alice);
+
+        let bob_addr = signer::address_of(&bob);
+        create_account(bob_addr);
+
+        let challenge = RotationCapabilityOfferProofChallengeV2 {
+            chain_id: chain_id::get(),
+            // Intentionally make the signature invalid.
+            sequence_number: 2,
+            source_address: alice_addr,
+            recipient_address: bob_addr,
+        };
+
+        let alice_rotation_capability_offer_sig = ed25519::sign_struct(&alice_sk, challenge);
+
+        offer_rotation_capability(&alice, ed25519::signature_to_bytes(&alice_rotation_capability_offer_sig), 0, alice_pk_bytes, signer::address_of(&bob));
+    }
+
+    #[test(bob = @0x345, framework = @aptos_framework)]
+    public entry fun test_valid_revoke_rotation_capability(bob: signer, framework: signer) acquires Account {
+        chain_id::initialize_for_test(&framework, 4);
+        let (alice_sk, alice_pk) = ed25519::generate_keys();
+        let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
+        let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
+        let alice_addr = signer::address_of(&alice);
+
+        let bob_addr = signer::address_of(&bob);
+        create_account(bob_addr);
+
+        let challenge = RotationCapabilityOfferProofChallengeV2 {
+            chain_id: chain_id::get(),
+            sequence_number: get_sequence_number(alice_addr),
+            source_address: alice_addr,
+            recipient_address: bob_addr,
+        };
+
+        let alice_rotation_capability_offer_sig = ed25519::sign_struct(&alice_sk, challenge);
+
+        offer_rotation_capability(&alice, ed25519::signature_to_bytes(&alice_rotation_capability_offer_sig), 0, alice_pk_bytes, signer::address_of(&bob));
+        revoke_rotation_capability(&alice, signer::address_of(&bob));
+    }
+
+    #[test(bob = @0x345, charlie = @0x567, framework = @aptos_framework)]
+    #[expected_failure(abort_code = 393234, location = Self)]
+    public entry fun test_invalid_revoke_rotation_capability(bob: signer, charlie: signer, framework: signer) acquires Account {
+        chain_id::initialize_for_test(&framework, 4);
+        let (alice_sk, alice_pk) = ed25519::generate_keys();
+        let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
+        let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
+        let alice_addr = signer::address_of(&alice);
+
+        let bob_addr = signer::address_of(&bob);
+        create_account(bob_addr);
         create_account(signer::address_of(&charlie));
 
-        offer_signer_capability(&alice, ALICE_SIGNER_CAPABILITY_OFFER_SIGNATURE, 0, ALICE_PK, signer::address_of(&bob));
-        revoke_signer_capability(&alice, signer::address_of(&charlie));
+        let challenge = RotationCapabilityOfferProofChallengeV2 {
+            chain_id: chain_id::get(),
+            sequence_number: get_sequence_number(alice_addr),
+            source_address: alice_addr,
+            recipient_address: bob_addr,
+        };
+
+        let alice_rotation_capability_offer_sig = ed25519::sign_struct(&alice_sk, challenge);
+
+        offer_rotation_capability(&alice, ed25519::signature_to_bytes(&alice_rotation_capability_offer_sig), 0, alice_pk_bytes, signer::address_of(&bob));
+        revoke_rotation_capability(&alice, signer::address_of(&charlie));
     }
 
     //
     // Tests for key rotation
     //
 
-    // TODO: Add command used to generate these test cases
-    #[test_only]
-    const MULTI_ED25519_SRC_PK_BYTES: vector<u8> = x"26885bfb2e41746ffce3ab6ee9b5c9d15f4fbcba241362e814650a961daabb3464a19c23cf3b21ddda4b1370d2cf38aebd33732628049c7a00b97d4baf5b221d5ac38ef40f3fc7e8cd5c72229c0427b5fe68f580dbb9e297b544613e6948539e0328f304d79e0796c50344562a4b017019423b3dd6784495bada7e096cb9302f653e9618cf7b063de024db9adfb9d0b77dbb0048d312f167146f2807d991499fe21702f0df26ea83d418ccf8fd5fb6611c0cfb87c01e680e527a0b3fd7c0ac9b6e742db658fda20f93b446ac4b011430f8d455d71e29df2dca88a772bd598d5953f9fab64b9c5f7e0f424cd8659fb033aee099abeab7ce21463a8d4f84b803cd970ad8812196438311a72fc30720f42f863234ad30ba335d91281bf5c2c09e74e4c37b2f8d18781735e1301c0bd24d8b8e564a1e380cd862e4d058b99645efc98f27e1857f38ede528deb50f9310b2ee68756bac74279990de5dfd3557dbb0e631dc83e71e51abfa928bffff19b5e8ec751073fb371e3444272899cef16789a8812c21d54a4ae7fedd80623e2ed80f7652aa6a6ed97813d69c7f636b4a832088ed2d981e809dddf25566b926cb1677ba80793b4aa70087ef27c8b54d4c28f15ad2fe702293e628888fc548851063b89bcd1b0d8547a2856dbd9814bbff331e2e5a6ea7bb9cd6881ea498f46b3552d4815fed985b8c94c7800355f334b0e81fa7e3eb8ed19d83ac19d14d1bf0c4e978f339818514e36e9253172d8cb8ae4b194c2b507cb498e2c15fa567d17ef0be9d8cfd9eb17d46e71c0741bc81def63b6ff5559e83cd0a8f616ffa0b7c0f5b4c874d95ec92e97e7711b85cb2fef5a6f4fd4902";
-    #[test_only]
-    const MULTI_ED25519_TO_PK_BYTES: vector<u8> =  x"a63203808ff99ba9ea9133d4e1dafc42109c36ce4de07920ee6cae6136f97719cffa6ecd1582144a41c4388fa20a955339f96834c3901d98e7263ffe455266d1e14e07851e068243e3953bcc3ded766056f7a9586a1bd17fbaefc60c39c8e966a931455983b2b2004101bd7dabab7f5df17fd9281bee392cc7d65bff7f2b7730899c517c0035a971527f9e23d349c5e002e6208465b84a93bbdfb33f670ba4d69ac72f7bae9e577db6480ffef0559839c0317a00cb9cc7577fd18268dbf3b67f68b4f8a1cacd3fbd226e61fa2e849da1ed1f1d131a6b598957a022bdb462254871bd7dc490ac7675b638c1e750b1c7f6f035681abcca48b6b4f96367e4c75c8cd4da5321ec31899cb036469d478e028b5173b78336fc390be06b6a811d8d1022182fb3e8a4a94fd62267be02734b685beb24cf59bd1081216b11404a185df033aa8f546fd2fefd182dc364d48223d462dd8e4e1fa29889b526f67984b4862744ef7282cd606ff2aee79b05c4d366c7280dc92ade0415a3711a09d2d760a00e9f4960dcb1eb71fee22489f54cba68838816e6a0b3e83e85433ee836da1e4738229ec1ca8ad64c675fffbf0bc26022a39ddedae215286427a5bb1b84ca280d83dbe6ecef2dadceef0cd12347393f787e1e5e1b26f7a4fcfbae768e0e4f538141109ca98def3c85a8f7e54fc96e4547626a7a46536710a0c341ca4196676797a8590f";
-    #[test_only]
-    const SIG_CAP_ROTATE_KEY_MULTI_TO_MULTI: vector<u8> = x"ddf094fd2039546fe229cc86b5c664aeaa7b40670aec18232e61eb591474ba33bccc63af9a5efe0563d03e11025b87bd820a5d8c72c0ac15ea1ff5632acb160808bb16b4088b9f985a3133c194bf67c2be4c34f788a857b26d5dd6c2ebb69bfcf959f44fbb2a96bd88da0091fe38eb029225ef3239e316372a35e08c5f10c70dc0000000";
-    #[test_only]
-    const SIG_CAP_UPDATE_TABLE_MULTI_TO_MULTI: vector<u8> = x"26dd17b80c92c5a1cbacf79edc1b46ff55dcba108559b14385dc3f91166d6194347ebcff7d1b1bf6864b342865c3a43e88b8203003b9a668b13921abbc6cad071479d0290c3639527d061b71596e0cbab07603f7cc69e6b1fd2ed7215d464c886e81e2bdf750a868180faea77b727b3f001b77b8cd8beb903a1b0a4228f01706870db6464656537e35a0a4584c9838cce37b14f97b81161239b48a1c596c2dc3e0177b3b9882b801a6cec5411346b4309f4ee6ab539ae0ffe0a40c678960f00c28c12fd8404e701115bcee7d07036cf8baae12869c4242a354836c82fa890c2bd396df231609e376d7faf0c31d5f6bb4d3b887a316f08a79b8e1054ed92a860b51c15b6bb53ffe515c22fff0638fc866320d0fce21a53776318b424a9dd2003efa3e8c3c142af50d556ae0c719cb0cca616128068b7b9671b53d7747ed4c870d76e00f8a32595fb04b31590271c34feac567596355ac13ce3bb784c34e81235fa021127e6395c35f3dd67134a1f78105982a923e259319114b04d060b2fdeb07d34bc50ec89f0ba7e749b164970449f95a5b865a3c6cd32e2bfc7f53ae02a3439f5f0259cdfa84eecba7f97302eca29ca33b89e4d8ba328017bbb6450ce1e70f426dcefec406ab7ad64f0ba6c0d8eeb273b1098ea2b2139b5828edfb847a68dadf43b956777c756152fca8d5c14cd66aa2a6e1c9d28d873a2bb118044e35c30cc9d21454821a516691cd301cedfc53a5ebb13310644dcd7ba1ac899cb8c895b8f9fdcd08b5b1096e338a5a92ff379a6395331a0629d97479231d186b418ed406e22974f3e0db1e4c8320427650f5048b7a2ffb6c9c168bf0e268e9915a42e15bb9c659f6fdf130fd2a5a8b841dde53920916b4c3fef07c692b583d41ea75a20cf7d77ab710816adf07a5773b3cd08ff6a95d5ef1ba036909e3c90801ec78b37bca8af036fd712684385a192e535aace4ea5871bfd32433184c48a51ea8491c05380ae41117d3a5b7e8480604087aa23c3f0fce2eda25da006c2ea181ff0efc0097d9bab5c95d6129c63fdb28faea20d76e7c52d74df81ac3009f1107d64dbc0406cc7d3fee03d9b77b06509d1be0a73cee18cbd0fbe9551de100e5eb8831c1e0b122f846de988076d9db22a600225454e877307692d0e8e9eea1341d48a5720163120187a2264d671299fd5a28f52a9bee534008fa4a0390238c9ae426507218f903acedd135708a33092c2e2bddb671237fd2b3cf434a1d08a8596ae215fe02b008fd2932940a2e925e923e04d20e8f8d9a6f40ce0eb550687885fcdecc98ddbd54d6b73217fc212a480841820e0d67894edb84538c2a0d4ae342868194d204fffe0000";
-    #[test_only]
-    const ED25519_TO_PK_BYTES : vector<u8> = x"20fdbac9b10b7587bba7b5bc163bce69e796d71e4ed44c10fcb4488689f7a144";
-    #[test_only]
-    const SIG_CAP_ROTATE_KEY_MULTI_TO_SINGLE: vector<u8> = x"0bc503a99ee09a2bfaeb0039a092abda54cf7493608c01a2e0ac4a0c49958fcbf7eb0521e388ec73b03b978dce79ffda20194aca52cdd13f35c4776de8d27808f0d8c0dbeb14700b46e3c927d848aeba74e0749cdc6429fa1aba1d3e7ef57948bef0810125ccaa2de25a167d13f5725bbc85fcac1b03dff944275d4b4cad3c0ac0000000";
-    #[test_only]
-    const SIG_CAP_UPDATE_TABLE_MULTI_TO_SINGLE: vector<u8> = x"dcb63645f22c9c3f9ff6b05293dc3c0e22e4bd6d6c4001d68869139e78a645d4c0745b61538916b0f6e42736f0dbba19dbd6d1eee5bdd5ef3e7c1d0617b72d01";
-
     #[test(account = @aptos_framework)]
     public entry fun test_valid_rotate_authentication_key_multi_ed25519_to_multi_ed25519(account: signer) acquires Account, OriginatingAddress {
         initialize(&account);
+        let (curr_sk, curr_pk) = multi_ed25519::generate_keys(2, 3);
+        let curr_pk_unvalidated = multi_ed25519::public_key_to_unvalidated(&curr_pk);
+        let curr_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&curr_pk_unvalidated);
+        let alice_addr = from_bcs::to_address(curr_auth_key);
+        let alice = create_account_unchecked(alice_addr);
 
-        let curr_pk = multi_ed25519::new_unvalidated_public_key_from_bytes(MULTI_ED25519_SRC_PK_BYTES);
-        let curr_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&curr_pk);
-        let alice_address = from_bcs::to_address(curr_auth_key);
-        let alice = create_account_unchecked(alice_address);
-
-        rotate_authentication_key(&alice, MULTI_ED25519_SCHEME, MULTI_ED25519_SRC_PK_BYTES, MULTI_ED25519_SCHEME, MULTI_ED25519_TO_PK_BYTES, SIG_CAP_ROTATE_KEY_MULTI_TO_MULTI, SIG_CAP_UPDATE_TABLE_MULTI_TO_MULTI);
-        let address_map = &mut borrow_global_mut<OriginatingAddress>(@aptos_framework).address_map;
-        let new_pk = multi_ed25519::new_unvalidated_public_key_from_bytes(MULTI_ED25519_TO_PK_BYTES);
-        let new_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&new_pk);
+        let (new_sk, new_pk) = multi_ed25519::generate_keys(4, 5);
+        let new_pk_unvalidated = multi_ed25519::public_key_to_unvalidated(&new_pk);
+        let new_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&new_pk_unvalidated);
         let new_address = from_bcs::to_address(new_auth_key);
-        let expected_originating_address = table::borrow(address_map, new_address);
-        assert!(*expected_originating_address == alice_address, 0);
 
-        let account_resource = borrow_global_mut<Account>(alice_address);
-        assert!(account_resource.authentication_key == new_auth_key, 0);
+        let challenge = RotationProofChallenge {
+            sequence_number: borrow_global<Account>(alice_addr).sequence_number,
+            originator: alice_addr,
+            current_auth_key: alice_addr,
+            new_public_key: multi_ed25519::unvalidated_public_key_to_bytes(&new_pk_unvalidated),
+        };
+
+        let from_sig = multi_ed25519::sign_struct(&curr_sk, challenge);
+        let to_sig = multi_ed25519::sign_struct(&new_sk, challenge);
+
+        rotate_authentication_key(
+            &alice,
+            MULTI_ED25519_SCHEME,
+            multi_ed25519::unvalidated_public_key_to_bytes(&curr_pk_unvalidated),
+            MULTI_ED25519_SCHEME,
+            multi_ed25519::unvalidated_public_key_to_bytes(&new_pk_unvalidated),
+            multi_ed25519::signature_to_bytes(&from_sig),
+            multi_ed25519::signature_to_bytes(&to_sig),
+        );
+        let address_map = &mut borrow_global_mut<OriginatingAddress>(@aptos_framework).address_map;
+        let expected_originating_address = table::borrow(address_map, new_address);
+        assert!(*expected_originating_address == alice_addr, 0);
+        assert!(borrow_global<Account>(alice_addr).authentication_key == new_auth_key, 0);
     }
 
     #[test(account = @aptos_framework)]
     public entry fun test_valid_rotate_authentication_key_multi_ed25519_to_ed25519(account: signer) acquires Account, OriginatingAddress {
         initialize(&account);
 
-        let curr_pk = multi_ed25519::new_unvalidated_public_key_from_bytes(MULTI_ED25519_SRC_PK_BYTES);
-        let curr_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&curr_pk);
-        let alice_address = from_bcs::to_address(curr_auth_key);
-        let alice = create_account_unchecked(alice_address);
+        let (curr_sk, curr_pk) = multi_ed25519::generate_keys(2, 3);
+        let curr_pk_unvalidated = multi_ed25519::public_key_to_unvalidated(&curr_pk);
+        let curr_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&curr_pk_unvalidated);
+        let alice_addr = from_bcs::to_address(curr_auth_key);
+        let alice = create_account_unchecked(alice_addr);
 
-        rotate_authentication_key(&alice, MULTI_ED25519_SCHEME, MULTI_ED25519_SRC_PK_BYTES, ED25519_SCHEME, ED25519_TO_PK_BYTES, SIG_CAP_ROTATE_KEY_MULTI_TO_SINGLE, SIG_CAP_UPDATE_TABLE_MULTI_TO_SINGLE);
+        let account_resource = borrow_global_mut<Account>(alice_addr);
+
+        let (new_sk, new_pk) = ed25519::generate_keys();
+        let new_pk_unvalidated = ed25519::public_key_to_unvalidated(&new_pk);
+        let new_auth_key = ed25519::unvalidated_public_key_to_authentication_key(&new_pk_unvalidated);
+        let new_addr = from_bcs::to_address(new_auth_key);
+
+        let challenge = RotationProofChallenge {
+            sequence_number: account_resource.sequence_number,
+            originator: alice_addr,
+            current_auth_key: alice_addr,
+            new_public_key: ed25519::unvalidated_public_key_to_bytes(&new_pk_unvalidated),
+        };
+
+        let from_sig = multi_ed25519::sign_struct(&curr_sk, challenge);
+        let to_sig = ed25519::sign_struct(&new_sk, challenge);
+
+        rotate_authentication_key(
+            &alice,
+            MULTI_ED25519_SCHEME,
+            multi_ed25519::unvalidated_public_key_to_bytes(&curr_pk_unvalidated),
+            ED25519_SCHEME,
+            ed25519::unvalidated_public_key_to_bytes(&new_pk_unvalidated),
+            multi_ed25519::signature_to_bytes(&from_sig),
+            ed25519::signature_to_bytes(&to_sig),
+        );
+
         let address_map = &mut borrow_global_mut<OriginatingAddress>(@aptos_framework).address_map;
-        let new_pk = ed25519::new_unvalidated_public_key_from_bytes(ED25519_TO_PK_BYTES);
-        let new_auth_key = ed25519::unvalidated_public_key_to_authentication_key(&new_pk);
-        let new_address = from_bcs::to_address(new_auth_key);
-        let expected_originating_address = table::borrow(address_map, new_address);
-        assert!(*expected_originating_address == alice_address, 0);
+        let expected_originating_address = table::borrow(address_map, new_addr);
+        assert!(*expected_originating_address == alice_addr, 0);
+        assert!(borrow_global<Account>(alice_addr).authentication_key == new_auth_key, 0);
+    }
 
-        let account_resource = borrow_global_mut<Account>(alice_address);
-        assert!(account_resource.authentication_key == new_auth_key, 0);
+    #[test(account = @aptos_framework)]
+    #[expected_failure(abort_code = 0x20014, location = Self)]
+    public entry fun test_max_guid(account: &signer) acquires Account {
+        let addr = signer::address_of(account);
+        create_account_unchecked(addr);
+        let account_state = borrow_global_mut<Account>(addr);
+        account_state.guid_creation_num = MAX_GUID_CREATION_NUM - 1;
+        create_guid(account);
     }
 }

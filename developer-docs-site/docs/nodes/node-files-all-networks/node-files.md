@@ -7,8 +7,8 @@ slug: "node-files"
 
 When you are deploying an Aptos node in the **mainnet**, you will need to download the files listed on this page. 
 
-- **Devnet:** If you are deploying in the devnet, download the files from the [Node Files For Devnet](node-files-devnet) page.
-- **Testnet:** If you are deploying in the testnet, download the files from the [Node Files For Testnet](node-files-testnet) page.
+- **Devnet:** If you are deploying in the devnet, download the files from the [Node Files For Devnet](./node-files-devnet.md) page.
+- **Testnet:** If you are deploying in the testnet, download the files from the [Node Files For Testnet](./node-files-testnet.md) page.
 
 ---
 
@@ -91,7 +91,7 @@ Fullnode means either a validator fullnode or a public fullnode.
 - **Git branch:** `mainnet` on https://github.com/aptos-labs/aptos-core
 - **Command to download:**
   ```bash
-  wget -O docker-compose.yaml https://raw.githubusercontent.com/aptos-labs/aptos-core/mainnet/docker/compose/aptos-node/docker-compose-fullnode.yaml
+  wget -O docker-compose-fullnode.yaml https://raw.githubusercontent.com/aptos-labs/aptos-core/mainnet/docker/compose/aptos-node/docker-compose-fullnode.yaml
   ```
 
 ## fullnode.yaml (fullnode only)

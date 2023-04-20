@@ -1,12 +1,13 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_cached_packages::aptos_stdlib;
+use aptos_language_e2e_tests::{common_transactions::peer_to_peer_txn, executor::FakeExecutor};
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS, on_chain_config::Version, transaction::TransactionStatus,
 };
 use aptos_vm::AptosVM;
-use cached_packages::aptos_stdlib;
-use language_e2e_tests::{common_transactions::peer_to_peer_txn, executor::FakeExecutor};
 
 #[test]
 fn initial_aptos_version() {
@@ -26,12 +27,9 @@ fn initial_aptos_version() {
     executor.execute_and_apply(txn);
 
     let new_vm = AptosVM::new(executor.get_state_view());
-    assert_eq!(
-        new_vm.internals().version().unwrap(),
-        Version {
-            major: version.major + 1
-        }
-    );
+    assert_eq!(new_vm.internals().version().unwrap(), Version {
+        major: version.major + 1
+    });
 }
 
 #[test]
@@ -52,7 +50,7 @@ fn drop_txn_after_reconfiguration() {
 
     let sender = executor.create_raw_account_data(1_000_000, 10);
     let receiver = executor.create_raw_account_data(100_000, 10);
-    let txn2 = peer_to_peer_txn(sender.account(), receiver.account(), 11, 1000);
+    let txn2 = peer_to_peer_txn(sender.account(), receiver.account(), 11, 1000, 0);
 
     let mut output = executor.execute_block(vec![txn, txn2]).unwrap();
     assert_eq!(output.pop().unwrap().status(), &TransactionStatus::Retry)

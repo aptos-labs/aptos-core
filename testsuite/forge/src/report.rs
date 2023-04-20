@@ -1,9 +1,10 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_transaction_emitter_lib::emitter::stats::TxnStats;
 use serde::Serialize;
 use std::{fmt, time::Duration};
-use transaction_emitter_lib::emitter::stats::TxnStats;
 
 #[derive(Default, Debug, Serialize)]
 pub struct TestReport {

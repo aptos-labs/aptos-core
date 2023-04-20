@@ -1,13 +1,14 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto::HashValue;
-pub use block_store::{sync_manager::BlockRetriever, BlockStore};
-use consensus_types::{
+use aptos_consensus_types::{
     executed_block::ExecutedBlock, quorum_cert::QuorumCert, sync_info::SyncInfo,
     timeout_2chain::TwoChainTimeoutCertificate,
 };
-use std::sync::Arc;
+use aptos_crypto::HashValue;
+pub use block_store::{sync_manager::BlockRetriever, BlockStore};
+use std::{sync::Arc, time::Duration};
 
 mod block_store;
 mod block_tree;
@@ -56,4 +57,10 @@ pub trait BlockReader: Send + Sync {
 
     /// Return the combination of highest quorum cert, timeout cert and commit cert.
     fn sync_info(&self) -> SyncInfo;
+
+    /// Return if the consensus is backpressured
+    fn vote_back_pressure(&self) -> bool;
+
+    // Return time difference between last committed block and new proposal
+    fn pipeline_pending_latency(&self, proposal_timestamp: Duration) -> Duration;
 }

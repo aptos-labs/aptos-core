@@ -1,17 +1,20 @@
 [package]
-name = "bounded-executor"
-version = "0.1.0"
-authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+name = "aptos-bounded-executor"
 description = "Executor bounded by number of concurrent tasks"
-repository = "https://github.com/aptos-labs/aptos-core"
-homepage = "https://aptoslabs.com"
-license = "Apache-2.0"
-publish = false
-edition = "2021"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
 
 [dependencies]
-futures = "0.3.21"
-tokio = { version = "1.21.0", features = ["sync", "rt"] }
+futures = { workspace = true }
+tokio = { workspace = true }
 
 [dev-dependencies]
-tokio = { version = "1.21.0", features = ["full"] }
+tokio = { workspace = true }

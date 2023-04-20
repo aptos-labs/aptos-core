@@ -1,10 +1,12 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::native_coin;
-use crate::error::ApiError;
-use crate::types::{AccountIdentifier, Amount};
-use crate::{AccountAddress, ApiResult};
+use crate::{
+    common::native_coin,
+    error::ApiError,
+    types::{AccountIdentifier, Amount},
+    AccountAddress, ApiResult,
+};
 use aptos_types::stake_pool::StakePool;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -78,6 +80,14 @@ pub struct Version {
     pub middleware_version: String,
 }
 
+/// Represents the result of the balance retrieval
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct BalanceResult {
+    pub balance: Option<Amount>,
+    /// Time at which the lockup expires and pending_inactive balance becomes inactive
+    pub lockup_expiration: u64,
+}
+
 /// An internal enum to support Operation typing
 #[derive(Clone, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 pub enum OperationType {
@@ -90,6 +100,9 @@ pub enum OperationType {
     SetOperator,
     SetVoter,
     InitializeStakePool,
+    ResetLockup,
+    UnlockStake,
+    DistributeStakingRewards,
     // Fee must always be last for ordering
     Fee,
 }
@@ -97,12 +110,15 @@ pub enum OperationType {
 impl OperationType {
     const CREATE_ACCOUNT: &'static str = "create_account";
     const DEPOSIT: &'static str = "deposit";
-    const WITHDRAW: &'static str = "withdraw";
+    const DISTRIBUTE_STAKING_REWARDS: &'static str = "distribute_staking_rewards";
     const FEE: &'static str = "fee";
-    const STAKING_REWARD: &'static str = "staking_reward";
+    const INITIALIZE_STAKE_POOL: &'static str = "initialize_stake_pool";
+    const RESET_LOCKUP: &'static str = "reset_lockup";
     const SET_OPERATOR: &'static str = "set_operator";
     const SET_VOTER: &'static str = "set_voter";
-    const INITIALIZE_STAKE_POOL: &'static str = "initialize_stake_pool";
+    const STAKING_REWARD: &'static str = "staking_reward";
+    const UNLOCK_STAKE: &'static str = "unlock_stake";
+    const WITHDRAW: &'static str = "withdraw";
 
     pub fn all() -> Vec<OperationType> {
         use OperationType::*;
@@ -115,6 +131,9 @@ impl OperationType {
             SetVoter,
             StakingReward,
             InitializeStakePool,
+            ResetLockup,
+            UnlockStake,
+            DistributeStakingRewards,
         ]
     }
 }
@@ -132,6 +151,9 @@ impl FromStr for OperationType {
             Self::SET_OPERATOR => Ok(OperationType::SetOperator),
             Self::SET_VOTER => Ok(OperationType::SetVoter),
             Self::INITIALIZE_STAKE_POOL => Ok(OperationType::InitializeStakePool),
+            Self::RESET_LOCKUP => Ok(OperationType::ResetLockup),
+            Self::UNLOCK_STAKE => Ok(OperationType::UnlockStake),
+            Self::DISTRIBUTE_STAKING_REWARDS => Ok(OperationType::DistributeStakingRewards),
             _ => Err(ApiError::DeserializationFailed(Some(format!(
                 "Invalid OperationType: {}",
                 s
@@ -151,6 +173,9 @@ impl Display for OperationType {
             SetOperator => Self::SET_OPERATOR,
             SetVoter => Self::SET_VOTER,
             InitializeStakePool => Self::INITIALIZE_STAKE_POOL,
+            ResetLockup => Self::RESET_LOCKUP,
+            UnlockStake => Self::UNLOCK_STAKE,
+            DistributeStakingRewards => Self::DISTRIBUTE_STAKING_REWARDS,
             Fee => Self::FEE,
         })
     }
@@ -166,8 +191,8 @@ pub enum OperationStatusType {
 }
 
 impl OperationStatusType {
-    const SUCCESS: &'static str = "success";
     const FAILURE: &'static str = "failure";
+    const SUCCESS: &'static str = "success";
 
     pub fn all() -> Vec<OperationStatusType> {
         vec![OperationStatusType::Success, OperationStatusType::Failure]
@@ -220,12 +245,12 @@ impl Display for OperationStatusType {
     }
 }
 
-pub async fn get_total_stake(
+pub async fn get_stake_balances(
     rest_client: &aptos_rest_client::Client,
     owner_account: &AccountIdentifier,
     pool_address: AccountAddress,
     version: u64,
-) -> ApiResult<Option<Amount>> {
+) -> ApiResult<Option<BalanceResult>> {
     const STAKE_POOL: &str = "0x1::stake::StakePool";
     if let Ok(response) = rest_client
         .get_account_resource_at_version_bcs::<StakePool>(pool_address, STAKE_POOL, version)
@@ -233,36 +258,50 @@ pub async fn get_total_stake(
     {
         let stake_pool = response.into_inner();
 
-        // Any stake pools that match, retrieve that.  Then update the total
-        let balance = get_stake_balance_from_stake_pool(&stake_pool, owner_account)?;
-        Ok(Some(balance))
+        // Stake isn't allowed for base accounts
+        if owner_account.is_base_account() {
+            return Err(ApiError::InvalidInput(Some(
+                "Stake pool not supported for base account".to_string(),
+            )));
+        }
+
+        // If the operator address is different, skip
+        if owner_account.is_operator_stake()
+            && owner_account.operator_address()? != stake_pool.operator_address
+        {
+            return Err(ApiError::InvalidInput(Some(
+                "Stake pool not for matching operator".to_string(),
+            )));
+        }
+
+        // Any stake pools that match, retrieve that.
+        let mut requested_balance: Option<String> = None;
+        let lockup_expiration = stake_pool.locked_until_secs;
+
+        if owner_account.is_active_stake() {
+            requested_balance = Some(stake_pool.active.to_string());
+        } else if owner_account.is_pending_active_stake() {
+            requested_balance = Some(stake_pool.pending_active.to_string());
+        } else if owner_account.is_inactive_stake() {
+            requested_balance = Some(stake_pool.inactive.to_string());
+        } else if owner_account.is_pending_inactive_stake() {
+            requested_balance = Some(stake_pool.pending_inactive.to_string());
+        } else if owner_account.is_total_stake() {
+            requested_balance = Some(stake_pool.get_total_staked_amount().to_string());
+        }
+
+        if let Some(balance) = requested_balance {
+            Ok(Some(BalanceResult {
+                balance: Some(Amount {
+                    value: balance,
+                    currency: native_coin(),
+                }),
+                lockup_expiration,
+            }))
+        } else {
+            Ok(None)
+        }
     } else {
         Ok(None)
     }
-}
-
-/// Retrieves total stake balances from an individual stake pool
-fn get_stake_balance_from_stake_pool(
-    stake_pool: &StakePool,
-    account: &AccountIdentifier,
-) -> ApiResult<Amount> {
-    // Stake isn't allowed for base accounts
-    if account.is_base_account() {
-        return Err(ApiError::InvalidInput(Some(
-            "Stake pool not supported for base account".to_string(),
-        )));
-    }
-
-    // If the operator address is different, skip
-    if account.is_operator_stake() && account.operator_address()? != stake_pool.operator_address {
-        return Err(ApiError::InvalidInput(Some(
-            "Stake pool not for matching operator".to_string(),
-        )));
-    }
-
-    // TODO: Represent inactive, and pending as separate?
-    Ok(Amount {
-        value: stake_pool.get_total_staked_amount().to_string(),
-        currency: native_coin(),
-    })
 }

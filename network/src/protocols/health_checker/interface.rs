@@ -1,28 +1,21 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    application::{
-        interface::NetworkInterface,
-        storage::{LockingHashMap, PeerMetadataStorage},
-        types::{PeerError, PeerState},
-    },
-    error::NetworkError,
+    application::{error::Error, interface::NetworkClientInterface, metadata::ConnectionState},
     protocols::{
-        health_checker::{
-            HealthCheckerMsg, HealthCheckerNetworkEvents, HealthCheckerNetworkSender,
-        },
+        health_checker::{HealthCheckerMsg, HealthCheckerNetworkEvents},
         network::Event,
     },
 };
 use aptos_config::network_id::PeerNetworkId;
+use aptos_infallible::RwLock;
 use aptos_types::PeerId;
-use async_trait::async_trait;
 use futures::{stream::FusedStream, Stream};
 use std::{
-    collections::hash_map::Entry,
+    collections::HashMap,
     pin::Pin,
-    sync::Arc,
     task::{Context, Poll},
 };
 
@@ -39,85 +32,115 @@ impl HealthCheckData {
 }
 
 /// HealthChecker's view into networking
-pub struct HealthCheckNetworkInterface {
-    peer_metadata_storage: Arc<PeerMetadataStorage>,
-    app_data: LockingHashMap<PeerId, HealthCheckData>,
-    sender: HealthCheckerNetworkSender,
+pub struct HealthCheckNetworkInterface<NetworkClient> {
+    health_check_data: RwLock<HashMap<PeerId, HealthCheckData>>,
+    network_client: NetworkClient,
     receiver: HealthCheckerNetworkEvents,
 }
 
-impl HealthCheckNetworkInterface {
-    pub fn new(
-        peer_metadata_storage: Arc<PeerMetadataStorage>,
-        sender: HealthCheckerNetworkSender,
-        receiver: HealthCheckerNetworkEvents,
-    ) -> Self {
+impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg>>
+    HealthCheckNetworkInterface<NetworkClient>
+{
+    pub fn new(network_client: NetworkClient, receiver: HealthCheckerNetworkEvents) -> Self {
         Self {
-            peer_metadata_storage,
-            app_data: LockingHashMap::new(),
-            sender,
+            health_check_data: RwLock::new(HashMap::new()),
+            network_client,
             receiver,
         }
     }
 
+    // TODO: migrate this over to the network client once we
+    // deduplicate the work.
+    /// Returns all connected peers
+    pub fn connected_peers(&self) -> Vec<PeerId> {
+        self.health_check_data.read().keys().cloned().collect()
+    }
+
     /// Disconnect a peer, and keep track of the associated state
     /// Note: This removes the peer outright for now until we add GCing, and historical state management
-    pub async fn disconnect_peer(
-        &mut self,
-        peer_network_id: PeerNetworkId,
-    ) -> Result<(), NetworkError> {
+    pub async fn disconnect_peer(&mut self, peer_network_id: PeerNetworkId) -> Result<(), Error> {
         // Possibly already disconnected, but try anyways
-        let _ = self.update_state(peer_network_id, PeerState::Disconnecting);
+        let _ = self.update_connection_state(peer_network_id, ConnectionState::Disconnecting);
+        let result = self
+            .network_client
+            .disconnect_from_peer(peer_network_id)
+            .await;
         let peer_id = peer_network_id.peer_id();
-        let result = self.sender.disconnect_peer(peer_id).await;
         if result.is_ok() {
-            self.app_data().remove(&peer_id);
+            self.health_check_data.write().remove(&peer_id);
         }
         result
     }
 
-    pub fn connected_peers(&self) -> Vec<PeerId> {
-        self.app_data.keys()
-    }
-
-    /// Update state of peer globally
-    fn update_state(
+    /// Update connection state of peer globally
+    fn update_connection_state(
         &self,
         peer_network_id: PeerNetworkId,
-        state: PeerState,
-    ) -> Result<(), PeerError> {
-        self.peer_metadata_storage()
-            .write(peer_network_id, |entry| match entry {
-                Entry::Vacant(..) => Err(PeerError::NotFound),
-                Entry::Occupied(inner) => {
-                    inner.get_mut().status = state;
-                    Ok(())
-                }
-            })
+        state: ConnectionState,
+    ) -> Result<(), Error> {
+        self.network_client
+            .get_peers_and_metadata()
+            .update_connection_state(peer_network_id, state)
+    }
+
+    /// Creates and saves new peer health data for the specified peer
+    pub fn create_peer_and_health_data(&mut self, peer_id: PeerId, round: u64) {
+        self.health_check_data
+            .write()
+            .entry(peer_id)
+            .and_modify(|health_check_data| health_check_data.round = round)
+            .or_insert_with(|| HealthCheckData::new(round));
+    }
+
+    /// Removes the peer and any associated health data
+    pub fn remove_peer_and_health_data(&mut self, peer_id: &PeerId) {
+        self.health_check_data.write().remove(peer_id);
+    }
+
+    /// Increments the number of failures for the specified round.
+    /// If the round is in the past, nothing is done.
+    pub fn increment_peer_round_failure(&mut self, peer_id: PeerId, round: u64) {
+        if let Some(health_check_data) = self.health_check_data.write().get_mut(&peer_id) {
+            if health_check_data.round <= round {
+                health_check_data.failures += 1;
+            }
+        }
+    }
+
+    /// Resets the number of peer failures for the given peer.
+    /// If the peer is not found, nothing is done.
+    pub fn reset_peer_failures(&mut self, peer_id: PeerId) {
+        if let Some(health_check_data) = self.health_check_data.write().get_mut(&peer_id) {
+            health_check_data.failures = 0;
+        }
+    }
+
+    /// Resets the state if the given round is newer than the
+    /// currently stored round. Otherwise, nothing is done.
+    pub fn reset_peer_round_state(&mut self, peer_id: PeerId, round: u64) {
+        if let Some(health_check_data) = self.health_check_data.write().get_mut(&peer_id) {
+            if round > health_check_data.round {
+                health_check_data.round = round;
+                health_check_data.failures = 0;
+            }
+        }
+    }
+
+    /// Returns the number of peer failures currently recorded
+    pub fn get_peer_failures(&self, peer_id: PeerId) -> Option<u64> {
+        self.health_check_data
+            .read()
+            .get(&peer_id)
+            .map(|health_check_data| health_check_data.failures)
+    }
+
+    // TODO: we shouldn't need to expose this
+    pub fn network_client(&self) -> NetworkClient {
+        self.network_client.clone()
     }
 }
 
-#[async_trait]
-impl NetworkInterface<HealthCheckerMsg, HealthCheckerNetworkSender>
-    for HealthCheckNetworkInterface
-{
-    type AppDataKey = PeerId;
-    type AppData = HealthCheckData;
-
-    fn peer_metadata_storage(&self) -> &PeerMetadataStorage {
-        &self.peer_metadata_storage
-    }
-
-    fn sender(&self) -> HealthCheckerNetworkSender {
-        self.sender.clone()
-    }
-
-    fn app_data(&self) -> &LockingHashMap<PeerId, HealthCheckData> {
-        &self.app_data
-    }
-}
-
-impl Stream for HealthCheckNetworkInterface {
+impl<NetworkClient: Unpin> Stream for HealthCheckNetworkInterface<NetworkClient> {
     type Item = Event<HealthCheckerMsg>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -125,7 +148,7 @@ impl Stream for HealthCheckNetworkInterface {
     }
 }
 
-impl FusedStream for HealthCheckNetworkInterface {
+impl<NetworkClient: Unpin> FusedStream for HealthCheckNetworkInterface<NetworkClient> {
     fn is_terminated(&self) -> bool {
         self.receiver.is_terminated()
     }

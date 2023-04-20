@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_infallible::RwLock;
@@ -41,7 +42,7 @@ fn verify_tracing_kvs() {
     let logs = writer.logs.clone();
     AptosData::builder()
         .is_async(false)
-        .console_port(None)
+        .tokio_console_port(None)
         .printer(Box::new(writer.write_to_stderr(false)))
         .build();
 

@@ -1,16 +1,19 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
-
-use std::collections::BTreeMap;
 
 use super::{balance_ap, encode_mint_transaction, encode_transfer_transaction, seqnum_ap, MockVM};
 use anyhow::Result;
-use aptos_state_view::StateView;
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
+use aptos_state_view::TStateView;
 use aptos_types::{
-    account_address::AccountAddress, state_store::state_key::StateKey, write_set::WriteOp,
+    account_address::AccountAddress,
+    state_store::{
+        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+    },
+    write_set::WriteOp,
 };
 use aptos_vm::VMExecutor;
+use std::collections::BTreeMap;
 
 fn gen_address(index: u8) -> AccountAddress {
     AccountAddress::new([index; AccountAddress::LENGTH])
@@ -18,8 +21,10 @@ fn gen_address(index: u8) -> AccountAddress {
 
 struct MockStateView;
 
-impl StateView for MockStateView {
-    fn get_state_value(&self, _state_key: &StateKey) -> Result<Option<Vec<u8>>> {
+impl TStateView for MockStateView {
+    type Key = StateKey;
+
+    fn get_state_value(&self, _state_key: &StateKey) -> Result<Option<StateValue>> {
         Ok(None)
     }
 
@@ -44,7 +49,7 @@ fn test_mock_vm_different_senders() {
         .expect("MockVM should not fail to start");
 
     for (output, txn) in itertools::zip_eq(outputs.iter(), txns.iter()) {
-        let sender = txn.as_signed_user_txn().unwrap().sender();
+        let sender = txn.try_as_signed_user_txn().unwrap().sender();
         assert_eq!(
             output
                 .write_set()
@@ -53,11 +58,11 @@ fn test_mock_vm_different_senders() {
                 .collect::<BTreeMap<_, _>>(),
             [
                 (
-                    StateKey::AccessPath(balance_ap(sender)),
+                    StateKey::access_path(balance_ap(sender)),
                     WriteOp::Modification(amount.to_le_bytes().to_vec())
                 ),
                 (
-                    StateKey::AccessPath(seqnum_ap(sender)),
+                    StateKey::access_path(seqnum_ap(sender)),
                     WriteOp::Modification(1u64.to_le_bytes().to_vec())
                 ),
             ]
@@ -88,11 +93,11 @@ fn test_mock_vm_same_sender() {
                 .collect::<BTreeMap<_, _>>(),
             [
                 (
-                    StateKey::AccessPath(balance_ap(sender)),
+                    StateKey::access_path(balance_ap(sender)),
                     WriteOp::Modification((amount * (i as u64 + 1)).to_le_bytes().to_vec())
                 ),
                 (
-                    StateKey::AccessPath(seqnum_ap(sender)),
+                    StateKey::access_path(seqnum_ap(sender)),
                     WriteOp::Modification((i as u64 + 1).to_le_bytes().to_vec())
                 ),
             ]
@@ -126,15 +131,15 @@ fn test_mock_vm_payment() {
             .collect::<BTreeMap<_, _>>(),
         [
             (
-                StateKey::AccessPath(balance_ap(gen_address(0))),
+                StateKey::access_path(balance_ap(gen_address(0))),
                 WriteOp::Modification(50u64.to_le_bytes().to_vec())
             ),
             (
-                StateKey::AccessPath(seqnum_ap(gen_address(0))),
+                StateKey::access_path(seqnum_ap(gen_address(0))),
                 WriteOp::Modification(2u64.to_le_bytes().to_vec())
             ),
             (
-                StateKey::AccessPath(balance_ap(gen_address(1))),
+                StateKey::access_path(balance_ap(gen_address(1))),
                 WriteOp::Modification(150u64.to_le_bytes().to_vec())
             ),
         ]

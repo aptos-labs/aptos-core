@@ -1,23 +1,26 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::utils::create_dir_if_not_exist;
 use crate::{
     common::{
         types::{CliError, CliTypedResult},
-        utils::write_to_file,
+        utils::{create_dir_if_not_exist, write_to_file},
     },
     CliCommand,
 };
 use aptos_config::config::Token;
+use aptos_framework::ReleaseBundle;
 use aptos_genesis::config::Layout;
 use aptos_github_client::Client as GithubClient;
 use async_trait::async_trait;
 use clap::Parser;
-use framework::ReleaseBundle;
 use serde::{de::DeserializeOwned, Serialize};
-use std::path::Path;
-use std::{fmt::Debug, io::Read, path::PathBuf, str::FromStr};
+use std::{
+    fmt::Debug,
+    io::Read,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 pub const LAYOUT_FILE: &str = "layout.yaml";
 pub const OPERATOR_FILE: &str = "operator.yaml";
@@ -173,10 +176,10 @@ impl Client {
                 file.read_to_string(&mut contents)
                     .map_err(|e| CliError::IO(path.display().to_string(), e))?;
                 from_yaml(&contents)
-            }
+            },
             Client::Github(client) => {
                 from_base64_encoded_yaml(&client.get_file(&path.display().to_string())?)
-            }
+            },
         }
     }
 
@@ -200,10 +203,10 @@ impl Client {
                     &path.display().to_string(),
                     to_yaml(input)?.as_bytes(),
                 )?;
-            }
+            },
             Client::Github(client) => {
                 client.put(&name.display().to_string(), &to_base64_encoded_yaml(input)?)?;
-            }
+            },
         }
 
         Ok(())
@@ -214,10 +217,10 @@ impl Client {
             Client::Local(local_repository_path) => {
                 let path = local_repository_path.join(dir);
                 create_dir_if_not_exist(path.as_path())?;
-            }
+            },
             Client::Github(_) => {
                 // There's no such thing as an empty directory in Git, so do nothing
-            }
+            },
         }
 
         Ok(())
@@ -235,11 +238,11 @@ impl Client {
                     ));
                 }
                 Ok(ReleaseBundle::read(path)?)
-            }
+            },
             Client::Github(client) => {
                 let bytes = base64::decode(client.get_file(FRAMEWORK_NAME)?)?;
                 Ok(bcs::from_bytes::<ReleaseBundle>(&bytes)?)
-            }
+            },
         }
     }
 }

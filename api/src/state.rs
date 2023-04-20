@@ -1,11 +1,11 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::response::{module_not_found, resource_not_found, table_item_not_found, StdApiError};
 use crate::{
     accept_type::AcceptType,
     failpoint::fail_point_poem,
     response::{
+        api_forbidden, build_not_found, module_not_found, resource_not_found, table_item_not_found,
         BadRequestError, BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404,
         InternalError,
     },
@@ -13,24 +13,26 @@ use crate::{
 };
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
-    verify_module_identifier, Address, AptosErrorCode, AsConverter, IdentifierWrapper, LedgerInfo,
-    MoveModuleBytecode, MoveResource, MoveStructTag, MoveValue, TableItemRequest, VerifyInput,
-    VerifyInputWithRecursion, U64,
+    verify_module_identifier, Address, AptosErrorCode, AsConverter, IdentifierWrapper,
+    MoveModuleBytecode, MoveResource, MoveStructTag, MoveValue, RawTableItemRequest,
+    TableItemRequest, VerifyInput, VerifyInputWithRecursion, U64,
 };
-use aptos_state_view::StateView;
+use aptos_state_view::TStateView;
 use aptos_types::{
     access_path::AccessPath,
     state_store::{state_key::StateKey, table::TableHandle},
 };
 use aptos_vm::data_cache::AsMoveResolver;
-use move_core_types::language_storage::{ModuleId, ResourceKey, StructTag};
+use move_core_types::{
+    language_storage::{ModuleId, StructTag},
+    resolver::ResourceResolver,
+};
 use poem_openapi::{
     param::{Path, Query},
     payload::Json,
     OpenApi,
 };
 use std::{convert::TryInto, sync::Arc};
-use storage_interface::state_view::DbStateView;
 
 /// API for retrieving individual state
 pub struct StateApi {
@@ -165,28 +167,56 @@ impl StateApi {
             ledger_version.0,
         )
     }
+
+    /// Get raw table item
+    ///
+    /// Get a table item at a specific ledger version from the table identified by {table_handle}
+    /// in the path and the "key" (RawTableItemRequest) provided in the request body.
+    ///
+    /// The `get_raw_table_item` requires only a serialized key comparing to the full move type information
+    /// comparing to the `get_table_item` api, and can only return the query in the bcs format.
+    ///
+    /// The Aptos nodes prune account state history, via a configurable time window.
+    /// If the requested ledger version has been pruned, the server responds with a 410.
+    #[oai(
+        path = "/tables/:table_handle/raw_item",
+        method = "post",
+        operation_id = "get_raw_table_item",
+        tag = "ApiTags::Tables"
+    )]
+    async fn get_raw_table_item(
+        &self,
+        accept_type: AcceptType,
+        /// Table handle hex encoded 32-byte string
+        table_handle: Path<Address>,
+        /// Table request detailing the key type, key, and value type
+        table_item_request: Json<RawTableItemRequest>,
+        /// Ledger version to get state of account
+        ///
+        /// If not provided, it will be the latest version
+        ledger_version: Query<Option<U64>>,
+    ) -> BasicResultWith404<MoveValue> {
+        fail_point_poem("endpoint_get_table_item")?;
+
+        if AcceptType::Json == accept_type {
+            return Err(api_forbidden(
+                "Get raw table item",
+                "Only BCS is supported as an AcceptType.",
+            ));
+        }
+        self.context
+            .check_api_output_enabled("Get raw table item", &accept_type)?;
+
+        self.raw_table_item(
+            &accept_type,
+            table_handle.0,
+            table_item_request.0,
+            ledger_version.0,
+        )
+    }
 }
 
 impl StateApi {
-    /// Retrieve state at the requested ledger version
-    fn preprocess_request<E: StdApiError>(
-        &self,
-        requested_ledger_version: Option<u64>,
-    ) -> Result<(LedgerInfo, u64, DbStateView), E> {
-        let (latest_ledger_info, requested_ledger_version) = self
-            .context
-            .get_latest_ledger_info_and_verify_lookup_version(requested_ledger_version)?;
-
-        let state_view = self
-            .context
-            .state_view_at_version(requested_ledger_version)
-            .map_err(|err| {
-                E::internal_with_code(err, AptosErrorCode::InternalError, &latest_ledger_info)
-            })?;
-
-        Ok((latest_ledger_info, requested_ledger_version, state_view))
-    }
-
     /// Read a resource at the ledger version
     ///
     /// JSON: Convert to MoveResource
@@ -204,13 +234,15 @@ impl StateApi {
             .map_err(|err| {
                 BasicErrorWith404::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
             })?;
-        let (ledger_info, ledger_version, state_view) = self.preprocess_request(ledger_version)?;
-        let resource_key = ResourceKey::new(address.into(), resource_type.clone());
-        let access_path = AccessPath::resource_access_path(resource_key);
-        let state_key = StateKey::AccessPath(access_path);
-        let bytes = state_view
-            .get_state_value(&state_key)
-            .context(format!("Failed to query DB to check for {:?}", state_key))
+
+        let (ledger_info, ledger_version, state_view) = self.context.state_view(ledger_version)?;
+        let resolver = state_view.as_move_resolver();
+        let bytes = resolver
+            .get_resource(&address.into(), &resource_type)
+            .context(format!(
+                "Failed to query DB to check for {} at {}",
+                resource_type, address
+            ))
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
                     err,
@@ -238,10 +270,10 @@ impl StateApi {
                     })?;
 
                 BasicResponse::try_from_json((resource, &ledger_info, BasicResponseStatus::Ok))
-            }
+            },
             AcceptType::Bcs => {
                 BasicResponse::try_from_encoded((bytes, &ledger_info, BasicResponseStatus::Ok))
-            }
+            },
         }
     }
 
@@ -258,11 +290,12 @@ impl StateApi {
     ) -> BasicResultWith404<MoveModuleBytecode> {
         let module_id = ModuleId::new(address.into(), name.into());
         let access_path = AccessPath::code_access_path(module_id.clone());
-        let state_key = StateKey::AccessPath(access_path);
-        let (ledger_info, ledger_version, state_view) =
-            self.preprocess_request(ledger_version.map(|inner| inner.0))?;
+        let state_key = StateKey::access_path(access_path);
+        let (ledger_info, ledger_version, state_view) = self
+            .context
+            .state_view(ledger_version.map(|inner| inner.0))?;
         let bytes = state_view
-            .get_state_value(&state_key)
+            .get_state_value_bytes(&state_key)
             .context(format!("Failed to query DB to check for {:?}", state_key))
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
@@ -289,10 +322,10 @@ impl StateApi {
                     })?;
 
                 BasicResponse::try_from_json((module, &ledger_info, BasicResponseStatus::Ok))
-            }
+            },
             AcceptType::Bcs => {
                 BasicResponse::try_from_encoded((bytes, &ledger_info, BasicResponseStatus::Ok))
-            }
+            },
         }
     }
 
@@ -322,8 +355,9 @@ impl StateApi {
             })?;
 
         // Retrieve local state
-        let (ledger_info, ledger_version, state_view) =
-            self.preprocess_request(ledger_version.map(|inner| inner.0))?;
+        let (ledger_info, ledger_version, state_view) = self
+            .context
+            .state_view(ledger_version.map(|inner| inner.0))?;
 
         let resolver = state_view.as_move_resolver();
         let converter = resolver.as_converter(self.context.db.clone());
@@ -349,7 +383,7 @@ impl StateApi {
         // Retrieve value from the state key
         let state_key = StateKey::table_item(TableHandle(table_handle.into()), raw_key);
         let bytes = state_view
-            .get_state_value(&state_key)
+            .get_state_value_bytes(&state_key)
             .context(format!(
                 "Failed when trying to retrieve table item from the DB with key: {}",
                 key
@@ -379,10 +413,63 @@ impl StateApi {
                     })?;
 
                 BasicResponse::try_from_json((move_value, &ledger_info, BasicResponseStatus::Ok))
-            }
+            },
             AcceptType::Bcs => {
                 BasicResponse::try_from_encoded((bytes, &ledger_info, BasicResponseStatus::Ok))
-            }
+            },
+        }
+    }
+
+    /// Retrieve table item for a specific ledger version
+    pub fn raw_table_item(
+        &self,
+        accept_type: &AcceptType,
+        table_handle: Address,
+        table_item_request: RawTableItemRequest,
+        ledger_version: Option<U64>,
+    ) -> BasicResultWith404<MoveValue> {
+        // Retrieve local state
+        let (ledger_info, ledger_version, state_view) = self
+            .context
+            .state_view(ledger_version.map(|inner| inner.0))?;
+
+        let state_key = StateKey::table_item(
+            TableHandle(table_handle.into()),
+            table_item_request.key.0.clone(),
+        );
+        let bytes = state_view
+            .get_state_value_bytes(&state_key)
+            .context(format!(
+                "Failed when trying to retrieve table item from the DB with key: {}",
+                table_item_request.key,
+            ))
+            .map_err(|err| {
+                BasicErrorWith404::internal_with_code(
+                    err,
+                    AptosErrorCode::InternalError,
+                    &ledger_info,
+                )
+            })?
+            .ok_or_else(|| {
+                build_not_found(
+                    "Table Item",
+                    format!(
+                        "Table handle({}), Table key({}) and Ledger version({})",
+                        table_handle, table_item_request.key, ledger_version
+                    ),
+                    AptosErrorCode::TableItemNotFound,
+                    &ledger_info,
+                )
+            })?;
+
+        match accept_type {
+            AcceptType::Json => Err(api_forbidden(
+                "Get raw table item",
+                "Please use get table item instead.",
+            )),
+            AcceptType::Bcs => {
+                BasicResponse::try_from_encoded((bytes, &ledger_info, BasicResponseStatus::Ok))
+            },
         }
     }
 }

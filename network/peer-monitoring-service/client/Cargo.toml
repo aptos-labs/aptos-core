@@ -1,21 +1,43 @@
 [package]
-name = "peer-monitoring-service-client"
-version = "0.1.0"
-authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+name = "aptos-peer-monitoring-service-client"
 description = "The Aptos peer monitoring service (client-side)"
-repository = "https://github.com/aptos-labs/aptos-core"
-homepage = "https://aptoslabs.com"
-license = "Apache-2.0"
-publish = false
-edition = "2021"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
 
 [dependencies]
-async-trait = "0.1.42"
-thiserror = "1.0.24"
+aptos-channels = { workspace = true }
+aptos-config = { workspace = true }
+aptos-id-generator = { workspace = true }
+aptos-infallible = { workspace = true }
+aptos-logger = { workspace = true }
+aptos-metrics-core = { workspace = true }
+aptos-network = { workspace = true }
+aptos-peer-monitoring-service-types = { workspace = true }
+aptos-time-service = { workspace = true }
+aptos-types = { workspace = true }
+async-trait = { workspace = true }
+enum_dispatch = { workspace = true }
+futures = { workspace = true }
+once_cell = { workspace = true }
+rand = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
 
-aptos-config = { path = "../../../config" }
-aptos-types = { path = "../../../types" }
-
-channel = { path = "../../../crates/channel" }
-network = { path = "../../../network" }
-peer-monitoring-service-types = { path = "../types" }
+[dev-dependencies]
+aptos-build-info = { workspace = true }
+aptos-config = { workspace = true }
+aptos-netcore = { workspace = true }
+aptos-network = { workspace = true, features = ["fuzzing"] }
+aptos-peer-monitoring-service-server = { workspace = true }
+bcs = { workspace = true }
+maplit = { workspace = true }
+tokio-stream = { workspace = true }

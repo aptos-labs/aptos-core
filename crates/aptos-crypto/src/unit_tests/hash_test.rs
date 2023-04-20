@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::hash::*;
@@ -29,17 +29,17 @@ fn test_default_hasher() {
 
 #[test]
 fn test_primitive_type() {
-    let x = 0xf312_u16;
+    let x = 0xF312_u16;
     let mut wtr: Vec<u8> = vec![];
     wtr.extend_from_slice(&x.to_le_bytes());
     assert_eq!(x.test_only_hash(), HashValue::sha3_256_of(&wtr[..]));
 
-    let x = 0xff00_1234_u32;
+    let x = 0xFF00_1234_u32;
     let mut wtr: Vec<u8> = vec![];
     wtr.extend_from_slice(&x.to_le_bytes());
     assert_eq!(x.test_only_hash(), HashValue::sha3_256_of(&wtr[..]));
 
-    let x = 0x89ab_cdef_0123_4567_u64;
+    let x = 0x89AB_CDEF_0123_4567_u64;
     let mut wtr: Vec<u8> = vec![];
     wtr.extend_from_slice(&x.to_le_bytes());
     assert_eq!(x.test_only_hash(), HashValue::sha3_256_of(&wtr[..]));
@@ -50,14 +50,14 @@ fn test_from_slice() {
     {
         let zero_byte_vec = vec![0; 32];
         assert_eq!(
-            HashValue::from_slice(&zero_byte_vec).unwrap(),
+            HashValue::from_slice(zero_byte_vec).unwrap(),
             HashValue::zero()
         );
     }
     {
         // The length is mismatched.
         let zero_byte_vec = vec![0; 31];
-        assert!(HashValue::from_slice(&zero_byte_vec).is_err());
+        assert!(HashValue::from_slice(zero_byte_vec).is_err());
     }
     {
         let bytes = vec![1; 123];
@@ -88,22 +88,22 @@ fn test_hash_value_iter_bits() {
     let bits = hash.iter_bits().collect::<Vec<_>>();
 
     assert_eq!(bits.len(), HashValue::LENGTH_IN_BITS);
-    assert_eq!(bits[0], false);
-    assert_eq!(bits[1], false);
-    assert_eq!(bits[2], true);
-    assert_eq!(bits[3], true);
-    assert_eq!(bits[4], false);
-    assert_eq!(bits[5], false);
-    assert_eq!(bits[6], true);
-    assert_eq!(bits[7], true);
-    assert_eq!(bits[248], true);
-    assert_eq!(bits[249], false);
-    assert_eq!(bits[250], false);
-    assert_eq!(bits[251], true);
-    assert_eq!(bits[252], false);
-    assert_eq!(bits[253], false);
-    assert_eq!(bits[254], true);
-    assert_eq!(bits[255], false);
+    assert!(!bits[0]);
+    assert!(!bits[1]);
+    assert!(bits[2]);
+    assert!(bits[3]);
+    assert!(!bits[4]);
+    assert!(!bits[5]);
+    assert!(bits[6]);
+    assert!(bits[7]);
+    assert!(bits[248]);
+    assert!(!bits[249]);
+    assert!(!bits[250]);
+    assert!(bits[251]);
+    assert!(!bits[252]);
+    assert!(!bits[253]);
+    assert!(bits[254]);
+    assert!(!bits[255]);
 
     let mut bits_rev = hash.iter_bits().rev().collect::<Vec<_>>();
     bits_rev.reverse();
@@ -145,7 +145,7 @@ fn test_get_nibble() {
     for byte in bytes.iter_mut().take(HashValue::LENGTH) {
         *byte = rand::thread_rng().gen();
         nibbles.push(*byte >> 4);
-        nibbles.push(*byte & 0x0f);
+        nibbles.push(*byte & 0x0F);
     }
     let hash = HashValue::new(bytes);
     for (i, nibble) in nibbles.iter().enumerate().take(HashValue::LENGTH * 2) {
@@ -193,7 +193,7 @@ proptest! {
     fn test_hashvalue_to_bits_roundtrip(hash in any::<HashValue>()) {
         let bitvec: BitVec<Msb0, u8>  = hash.iter_bits().collect();
         let bytes: Vec<u8> = bitvec.into();
-        let hash2 = HashValue::from_slice(&bytes).unwrap();
+        let hash2 = HashValue::from_slice(bytes).unwrap();
         prop_assert_eq!(hash, hash2);
     }
 
@@ -201,7 +201,7 @@ proptest! {
     fn test_hashvalue_to_bits_inverse_roundtrip(bits in vec(any::<bool>(), HashValue::LENGTH_IN_BITS)) {
         let bitvec: BitVec<Msb0, u8> = bits.iter().cloned().collect();
         let bytes: Vec<u8> = bitvec.into();
-        let hash = HashValue::from_slice(&bytes).unwrap();
+        let hash = HashValue::from_slice(bytes).unwrap();
         let bits2: Vec<bool> = hash.iter_bits().collect();
         prop_assert_eq!(bits, bits2);
     }
@@ -219,7 +219,7 @@ proptest! {
         let bitvec: BitVec<Lsb0, u8> = hash.iter_bits().rev().collect();
         let mut bytes: Vec<u8> = bitvec.into();
         bytes.reverse();
-        let hash2 = HashValue::from_slice(&bytes).unwrap();
+        let hash2 = HashValue::from_slice(bytes).unwrap();
         prop_assert_eq!(hash, hash2);
     }
 

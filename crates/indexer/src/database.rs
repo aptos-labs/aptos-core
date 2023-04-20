@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! Database-related functions
@@ -61,18 +61,13 @@ pub fn new_db_pool(database_url: &str) -> Result<PgDbPool, PoolError> {
     PgPool::builder().build(manager).map(Arc::new)
 }
 
-pub fn execute_with_better_error<
-    T: diesel::Table + diesel::QuerySource + diesel::query_builder::QueryId + 'static,
-    U: diesel::query_builder::QueryFragment<diesel::pg::Pg>
-        + diesel::query_builder::QueryId
-        + diesel::insertable::CanInsertInSingleQuery<diesel::pg::Pg>,
->(
+pub fn execute_with_better_error<U>(
     conn: &mut PgConnection,
-    query: diesel::query_builder::InsertStatement<T, U>,
+    query: U,
     mut additional_where_clause: Option<&'static str>,
-) -> diesel::QueryResult<usize>
+) -> QueryResult<usize>
 where
-    <T as diesel::QuerySource>::FromClause: diesel::query_builder::QueryFragment<diesel::pg::Pg>,
+    U: QueryFragment<Pg> + diesel::query_builder::QueryId,
 {
     let original_query = diesel::debug_query::<diesel::pg::Pg, _>(&query).to_string();
     // This is needed because if we don't insert any row, then diesel makes a call like this
@@ -122,17 +117,21 @@ mod test {
         assert_eq!(get_chunks(10, 5), vec![(0, 10)]);
         assert_eq!(get_chunks(65535, 1), vec![(0, 65535)]);
         // 200,000 total items will take 6 buckets. Each bucket can only be 3276 size.
-        assert_eq!(
-            get_chunks(10000, 20),
-            vec![(0, 3276), (3276, 6552), (6552, 9828), (9828, 10000)]
-        );
-        assert_eq!(
-            get_chunks(65535, 2),
-            vec![(0, 32767), (32767, 65534), (65534, 65535)]
-        );
-        assert_eq!(
-            get_chunks(65535, 3),
-            vec![(0, 21845), (21845, 43690), (43690, 65535)]
-        );
+        assert_eq!(get_chunks(10000, 20), vec![
+            (0, 3276),
+            (3276, 6552),
+            (6552, 9828),
+            (9828, 10000)
+        ]);
+        assert_eq!(get_chunks(65535, 2), vec![
+            (0, 32767),
+            (32767, 65534),
+            (65534, 65535)
+        ]);
+        assert_eq!(get_chunks(65535, 3), vec![
+            (0, 21845),
+            (21845, 43690),
+            (43690, 65535)
+        ]);
     }
 }

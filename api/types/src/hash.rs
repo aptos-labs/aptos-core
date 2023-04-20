@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
@@ -73,7 +74,6 @@ impl HashValue {
 #[cfg(test)]
 mod tests {
     use crate::hash::HashValue;
-
     use serde_json::{json, Value};
 
     #[test]

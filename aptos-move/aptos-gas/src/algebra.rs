@@ -1,11 +1,10 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use move_core_types::gas_algebra::{GasQuantity, InternalGasUnit, UnitDiv};
-
-pub use gas_algebra_ext::{
+pub use aptos_gas_algebra_ext::{
     AbstractValueSize, AbstractValueSizePerArg, AbstractValueUnit, InternalGasPerAbstractValueUnit,
 };
+use move_core_types::gas_algebra::{Byte, GasQuantity, InternalGasUnit, UnitDiv};
 
 /// Unit of (external) gas.
 pub enum GasUnit {}
@@ -20,3 +19,12 @@ pub type GasScalingFactor = GasQuantity<UnitDiv<InternalGasUnit, GasUnit>>;
 pub type Fee = GasQuantity<Octa>;
 
 pub type FeePerGasUnit = GasQuantity<UnitDiv<Octa, GasUnit>>;
+
+/// Unit of storage slot
+pub enum Slot {}
+
+pub type NumSlots = GasQuantity<Slot>;
+
+pub type FeePerSlot = GasQuantity<UnitDiv<Octa, Slot>>;
+
+pub type FeePerByte = GasQuantity<UnitDiv<Octa, Byte>>;

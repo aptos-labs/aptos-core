@@ -44,7 +44,6 @@ Aptos blockchain automated genesis ceremony for testnets
 | genesis.validator.larger_stake_amount | string | `"1000000000000000"` | Stake amount for each validator in this testnet. Defaults to 1M APTOS coins with 8 decimals |
 | imageTag | string | `"testnet"` | Default image tag to use for all tools images |
 | labels | string | `nil` |  |
-| podSecurityPolicy | bool | `true` | LEGACY: create PodSecurityPolicy, which exists at the cluster-level |
 | serviceAccount.create | bool | `true` | Specifies whether a service account should be created |
 | serviceAccount.name | string | `nil` | The name of the service account to use. If not set and create is true, a name is generated using the fullname template |
 

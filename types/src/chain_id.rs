@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 use anyhow::{ensure, format_err, Error, Result};
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize};
@@ -9,7 +10,7 @@ use std::{convert::TryFrom, fmt, str::FromStr};
 /// When signing transactions for such chains, the numerical chain ID should still be used
 /// (e.g. MAINNET has numeric chain ID 1, TESTNET has chain ID 2, etc)
 #[repr(u8)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum NamedChain {
     /// Users might accidentally initialize the ChainId field to 0, hence reserving ChainId 0 for accidental
     /// initialization.
@@ -30,19 +31,9 @@ const TESTING: &str = "testing";
 const PREMAINNET: &str = "premainnet";
 
 impl NamedChain {
-    fn str_to_chain_id(s: &str) -> Result<ChainId> {
-        // TODO implement custom macro that derives FromStr impl for enum (similar to aptos-core/common/num-variants)
-        let reserved_chain = match s.to_lowercase().as_str() {
-            MAINNET => NamedChain::MAINNET,
-            TESTNET => NamedChain::TESTNET,
-            DEVNET => NamedChain::DEVNET,
-            TESTING => NamedChain::TESTING,
-            PREMAINNET => NamedChain::PREMAINNET,
-            _ => {
-                return Err(format_err!("Not a reserved chain: {:?}", s));
-            }
-        };
-        Ok(ChainId::new(reserved_chain.id()))
+    fn str_to_chain_id(string: &str) -> Result<ChainId> {
+        let named_chain = NamedChain::from_str(string)?;
+        Ok(ChainId::new(named_chain.id()))
     }
 
     pub fn id(&self) -> u8 {
@@ -50,14 +41,33 @@ impl NamedChain {
     }
 
     pub fn from_chain_id(chain_id: &ChainId) -> Result<NamedChain, String> {
-        match chain_id.id() {
+        let chain_id = chain_id.id();
+        match chain_id {
             1 => Ok(NamedChain::MAINNET),
             2 => Ok(NamedChain::TESTNET),
             3 => Ok(NamedChain::DEVNET),
             4 => Ok(NamedChain::TESTING),
             5 => Ok(NamedChain::PREMAINNET),
-            _ => Err(String::from("Not a named chain")),
+            _ => Err(format!("Not a named chain. Given ID: {:?}", chain_id)),
         }
+    }
+}
+
+impl FromStr for NamedChain {
+    type Err = Error;
+
+    fn from_str(string: &str) -> Result<Self> {
+        let named_chain = match string.to_lowercase().as_str() {
+            MAINNET => NamedChain::MAINNET,
+            TESTNET => NamedChain::TESTNET,
+            DEVNET => NamedChain::DEVNET,
+            TESTING => NamedChain::TESTING,
+            PREMAINNET => NamedChain::PREMAINNET,
+            _ => {
+                return Err(format_err!("Not a reserved chain name: {:?}", string));
+            },
+        };
+        Ok(named_chain)
     }
 }
 
@@ -65,6 +75,32 @@ impl NamedChain {
 /// that this field maybe updated to be uleb64 in the future
 #[derive(Clone, Copy, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct ChainId(u8);
+
+impl ChainId {
+    /// Returns true iff the chain ID matches devnet
+    pub fn is_devnet(&self) -> bool {
+        self.matches_named_chain(NamedChain::DEVNET)
+    }
+
+    /// Returns true iff the chain ID matches testnet
+    pub fn is_testnet(&self) -> bool {
+        self.matches_named_chain(NamedChain::TESTNET)
+    }
+
+    /// Returns true iff the chain ID matches mainnet
+    pub fn is_mainnet(&self) -> bool {
+        self.matches_named_chain(NamedChain::MAINNET)
+    }
+
+    /// Returns true iff the chain ID matches the given named chain
+    fn matches_named_chain(&self, expected_chain: NamedChain) -> bool {
+        if let Ok(named_chain) = NamedChain::from_chain_id(self) {
+            named_chain == expected_chain
+        } else {
+            false
+        }
+    }
+}
 
 pub fn deserialize_config_chain_id<'de, D>(
     deserializer: D,
@@ -120,17 +156,13 @@ impl fmt::Display for ChainId {
 
 impl fmt::Display for NamedChain {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                NamedChain::DEVNET => DEVNET,
-                NamedChain::TESTNET => TESTNET,
-                NamedChain::MAINNET => MAINNET,
-                NamedChain::TESTING => TESTING,
-                NamedChain::PREMAINNET => PREMAINNET,
-            }
-        )
+        write!(f, "{}", match self {
+            NamedChain::DEVNET => DEVNET,
+            NamedChain::TESTNET => TESTNET,
+            NamedChain::MAINNET => MAINNET,
+            NamedChain::TESTING => TESTING,
+            NamedChain::PREMAINNET => PREMAINNET,
+        })
     }
 }
 
@@ -165,6 +197,10 @@ impl ChainId {
 
     pub fn test() -> Self {
         ChainId::new(NamedChain::TESTING.id())
+    }
+
+    pub fn testnet() -> Self {
+        ChainId::new(NamedChain::TESTNET.id())
     }
 
     pub fn mainnet() -> Self {

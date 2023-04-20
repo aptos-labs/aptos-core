@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{emitter::query_sequence_number, instance::Instance, ClusterArgs};
@@ -12,8 +12,9 @@ use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::{
     account_config::aptos_test_root_address, chain_id::ChainId, AccountKey, LocalAccount,
 };
+use futures::{stream::FuturesUnordered, StreamExt};
 use rand::seq::SliceRandom;
-use std::convert::TryFrom;
+use std::{convert::TryFrom, time::Instant};
 use url::Url;
 
 #[derive(Debug)]
@@ -42,6 +43,8 @@ impl Cluster {
 
         let mut instance_states = Vec::new();
         let mut errors = Vec::new();
+        let start = Instant::now();
+        let futures = FuturesUnordered::new();
         for url in &peers {
             let instance = Instance::new(
                 format!(
@@ -52,9 +55,24 @@ impl Cluster {
                 url.clone(),
                 None,
             );
-            match instance.rest_client().get_ledger_information().await {
+            futures.push(async move {
+                let result = instance.rest_client().get_ledger_information().await;
+                (instance, result)
+            });
+        }
+
+        let results: Vec<_> = futures.collect().await;
+        let fetch_time_s = start.elapsed().as_secs();
+        for (instance, result) in results {
+            match result {
                 Ok(v) => instance_states.push((instance, v.into_inner())),
-                Err(err) => errors.push(err),
+                Err(err) => {
+                    warn!(
+                        "Excluding client {} because failing to fetch the ledger information",
+                        instance.peer_name()
+                    );
+                    errors.push(err)
+                },
             }
         }
 
@@ -66,27 +84,33 @@ impl Cluster {
         }
 
         let mut instances = Vec::new();
-        let max_version = instance_states
+        let max_timestamp = instance_states
             .iter()
-            .map(|(_, s)| s.version)
+            .map(|(_, s)| s.timestamp_usecs / 1000000)
             .max()
             .unwrap();
 
         for (instance, state) in instance_states.into_iter() {
+            let state_timestamp = state.timestamp_usecs / 1000000;
             if state.chain_id != chain_id.id() {
                 warn!(
-                    "Client {} running wrong chain {}",
+                    "Excluding client {} running wrong chain {}",
                     instance.peer_name(),
                     state.chain_id
                 );
-            } else if state.version + 100000 < max_version {
+            } else if state_timestamp + 20 + fetch_time_s < max_timestamp {
                 warn!(
-                    "Client {} too stale, {}, while chain at {}",
+                    "Excluding Client {} too stale, {}, while chain at {} (delta of {}s)",
                     instance.peer_name(),
-                    state.version,
-                    max_version
+                    state_timestamp,
+                    max_timestamp,
+                    max_timestamp - state_timestamp,
                 );
             } else {
+                info!(
+                    "Client {} is healthy, adding to the list of end points for load testing",
+                    instance.peer_name()
+                );
                 instances.push(instance);
             }
         }
@@ -114,7 +138,7 @@ impl Cluster {
 
     pub async fn try_from_cluster_args(args: &ClusterArgs) -> Result<Self> {
         let mut urls = Vec::new();
-        for url in &args.targets {
+        for url in &args.get_targets()? {
             if !url.has_host() {
                 bail!("No host found in URL: {}", url);
             }

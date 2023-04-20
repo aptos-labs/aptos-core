@@ -1,7 +1,12 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::utils;
+use crate::{
+    config::{config_sanitizer::ConfigSanitizer, Error, NodeConfig, RoleType},
+    utils,
+};
+use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
@@ -16,7 +21,7 @@ pub const BUFFERED_STATE_TARGET_ITEMS: usize = 100_000;
 /// Port selected RocksDB options for tuning underlying rocksdb instance of AptosDB.
 /// see <https://github.com/facebook/rocksdb/blob/master/include/rocksdb/options.h>
 /// for detailed explanations.
-#[derive(Copy, Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct RocksdbConfig {
     pub max_open_files: i32,
@@ -48,11 +53,16 @@ impl Default for RocksdbConfig {
     }
 }
 
-#[derive(Copy, Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct RocksdbConfigs {
     pub ledger_db_config: RocksdbConfig,
     pub state_merkle_db_config: RocksdbConfig,
+    // Note: Not ready for production use yet.
+    pub use_state_kv_db: bool,
+    // Note: Not ready for production use yet.
+    pub use_sharded_state_merkle_db: bool,
+    pub state_kv_db_config: RocksdbConfig,
     pub index_db_config: RocksdbConfig,
 }
 
@@ -61,6 +71,9 @@ impl Default for RocksdbConfigs {
         Self {
             ledger_db_config: RocksdbConfig::default(),
             state_merkle_db_config: RocksdbConfig::default(),
+            use_state_kv_db: false,
+            use_sharded_state_merkle_db: false,
+            state_kv_db_config: RocksdbConfig::default(),
             index_db_config: RocksdbConfig {
                 max_open_files: 1000,
                 ..Default::default()
@@ -134,13 +147,12 @@ pub struct LedgerPrunerConfig {
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct StateMerklePrunerConfig {
-    /// Boolean to enable/disable the state store pruner. The state pruner is responsible for
-    /// pruning state tree nodes.
+    /// Boolean to enable/disable the state merkle pruner. The state merkle pruner is responsible
+    /// for pruning state tree nodes.
     pub enable: bool,
-    /// The size of the window should be calculated based on disk space availability and system TPS.
+    /// Window size in versions.
     pub prune_window: u64,
-    /// Similar to the variable above but for state store pruner. It means the number of stale
-    /// nodes to prune a time.
+    /// Number of stale nodes to prune a time.
     pub batch_size: usize,
 }
 
@@ -264,12 +276,23 @@ impl StorageConfig {
     }
 }
 
+impl ConfigSanitizer for StorageConfig {
+    /// Validate and process the storage config according to the given node role and chain ID
+    fn sanitize(
+        _node_config: &mut NodeConfig,
+        _node_role: RoleType,
+        _chain_id: ChainId,
+    ) -> Result<(), Error> {
+        Ok(()) // TODO: add validation of higher-level properties once we have variable configs
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::config::PrunerConfig;
 
     #[test]
-    pub fn tset_default_prune_window() {
+    pub fn test_default_prune_window() {
         // Not that these can't be changed, but think twice -- make them safe for mainnet
 
         let config = PrunerConfig::default();

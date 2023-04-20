@@ -1,14 +1,12 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::common::types::{CliError, CliTypedResult};
 /// Most of the code below comes from the crate `datatest-stable`. Because the limitation of `datatest-stable`,
 /// we are not able to run transactional tests as a subcommand of the Aptos CLI. Therefore, we need to duplicate code
 /// here and make minor modifications.
 ///
 use clap::Parser;
-
-use crate::common::types::{CliError, CliTypedResult};
-
 use std::{
     io::{self, Write},
     num::NonZeroUsize,
@@ -18,7 +16,6 @@ use std::{
     sync::mpsc::{channel, Sender},
     thread,
 };
-
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
@@ -209,18 +206,18 @@ impl TestSummary {
             TestResult::Ok => {
                 self.passed += 1;
                 self.write_ok()?;
-            }
+            },
             TestResult::Failed => {
                 self.failed.push(name);
                 self.write_failed()?;
-            }
+            },
             TestResult::FailedWithMsg(msg) => {
                 self.failed.push(name);
                 self.write_failed()?;
                 writeln!(self.stdout)?;
 
                 write!(self.stdout, "Error: {}", msg)?;
-            }
+            },
         }
         writeln!(self.stdout)?;
         Ok(())

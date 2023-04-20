@@ -11,9 +11,9 @@
  *
  * Move `bool` type value is serialized into `boolean`.
  *
- * Move `u8` type value is serialized into `integer`.
+ * Move `u8`, `u16` and `u32` type value is serialized into `integer`.
  *
- * Move `u64` and `u128` type value is serialized into `string`.
+ * Move `u64`, `u128` and `u256` type value is serialized into `string`.
  *
  * Move `address` type value (32 byte Aptos account address) is serialized into a HexEncodedBytes string.
  * For example:

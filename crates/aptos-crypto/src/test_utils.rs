@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! Internal module containing convenience utility functions mainly for testing
@@ -146,7 +147,7 @@ pub fn small_order_pk_with_adversarial_message(
                 let mut h: Sha512 = Sha512::new();
                 h.update(R.compress().as_bytes());
                 h.update(pk_bytes);
-                h.update(&msg_bytes);
+                h.update(msg_bytes);
 
                 let k = Scalar::from_hash(h);
 
@@ -238,7 +239,7 @@ impl ::core::clone::Clone for TestAptosCryptoHasher {
         match *self {
             TestAptosCryptoHasher(ref __self_0_0) => {
                 TestAptosCryptoHasher(::core::clone::Clone::clone(__self_0_0))
-            }
+            },
         }
     }
 }
@@ -272,9 +273,11 @@ impl crate::hash::CryptoHasher for TestAptosCryptoHasher {
             crate::hash::DefaultHasher::prefixed_hash(name)
         })
     }
+
     fn update(&mut self, bytes: &[u8]) {
         self.0.update(bytes);
     }
+
     fn finish(self) -> crate::hash::HashValue {
         self.0.finish()
     }
@@ -285,6 +288,7 @@ impl std::io::Write for TestAptosCryptoHasher {
         self.0.update(bytes);
         Ok(bytes.len())
     }
+
     fn flush(&mut self) -> std::io::Result<()> {
         Ok(())
     }
@@ -292,6 +296,7 @@ impl std::io::Write for TestAptosCryptoHasher {
 // #[cfg(any(test, feature = "fuzzing"))]
 impl crate::hash::CryptoHash for TestAptosCrypto {
     type Hasher = TestAptosCryptoHasher;
+
     fn hash(&self) -> crate::hash::HashValue {
         use crate::hash::CryptoHasher;
         let mut state = Self::Hasher::default();

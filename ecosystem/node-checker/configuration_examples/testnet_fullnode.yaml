@@ -1,0 +1,20 @@
+# Here we only use metrics checks that rely on the API port being open, since the
+# metrics port is closed and there are no meaningful noise based checks for fullnodes
+# at the moment. There are still metrics checks, but only those that rely on the
+# metrics port of the target node being open. Since this config is for the operator's
+# benefit, we don't mark any check as required, meaning if they only provide the
+# metrics port for example, we'll only run metrics checks.
+---
+node_address:
+  url: "https://fullnode.testnet.aptoslabs.com/"
+  api_port: 443
+configuration_id: testnet_fullnode
+configuration_name: "Testnet Fullnode"
+checkers:
+  - type: "BuildVersion"
+  - type: "Latency"
+    max_api_latency_ms: 750
+  - type: "MinimumPeers"
+  - type: "NodeIdentity"
+  - type: "StateSyncVersion"
+  - type: "TransactionCorrectness"

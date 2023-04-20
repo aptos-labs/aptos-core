@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module defines the AptosNet v1 message types, how they are
@@ -10,7 +11,6 @@
 //! over-the-wire.
 
 use crate::protocols::{stream::StreamMessage, wire::handshake::v1::ProtocolId};
-use aptos_rate_limiter::{async_lib::AsyncRateLimiter, rate_limit::SharedBucket};
 use bytes::Bytes;
 use futures::{
     io::{AsyncRead, AsyncWrite},
@@ -177,14 +177,13 @@ pub fn network_message_frame_codec(max_frame_size: usize) -> LengthDelimitedCode
 #[pin_project]
 pub struct MultiplexMessageStream<TReadSocket: AsyncRead + Unpin> {
     #[pin]
-    framed_read: FramedRead<Compat<AsyncRateLimiter<TReadSocket>>, LengthDelimitedCodec>,
+    framed_read: FramedRead<Compat<TReadSocket>, LengthDelimitedCodec>,
 }
 
 impl<TReadSocket: AsyncRead + Unpin> MultiplexMessageStream<TReadSocket> {
-    pub fn new(socket: TReadSocket, max_frame_size: usize, bucket: Option<SharedBucket>) -> Self {
+    pub fn new(socket: TReadSocket, max_frame_size: usize) -> Self {
         let frame_codec = network_message_frame_codec(max_frame_size);
-        let rate_limited_socket = AsyncRateLimiter::new(socket, bucket);
-        let compat_socket = rate_limited_socket.compat();
+        let compat_socket = socket.compat();
         let framed_read = FramedRead::new(compat_socket, frame_codec);
         Self { framed_read }
     }
@@ -208,9 +207,9 @@ impl<TReadSocket: AsyncRead + Unpin> Stream for MultiplexMessageStream<TReadSock
                         frame.truncate(8);
                         let err = ReadError::DeserializeError(err, frame_len, frame);
                         Poll::Ready(Some(Err(err)))
-                    }
+                    },
                 }
-            }
+            },
             Poll::Ready(Some(Err(err))) => Poll::Ready(Some(Err(ReadError::IoError(err)))),
             Poll::Ready(None) => Poll::Ready(None),
             Poll::Pending => Poll::Pending,
@@ -223,14 +222,13 @@ impl<TReadSocket: AsyncRead + Unpin> Stream for MultiplexMessageStream<TReadSock
 #[pin_project]
 pub struct MultiplexMessageSink<TWriteSocket: AsyncWrite> {
     #[pin]
-    framed_write: FramedWrite<Compat<AsyncRateLimiter<TWriteSocket>>, LengthDelimitedCodec>,
+    framed_write: FramedWrite<Compat<TWriteSocket>, LengthDelimitedCodec>,
 }
 
 impl<TWriteSocket: AsyncWrite> MultiplexMessageSink<TWriteSocket> {
-    pub fn new(socket: TWriteSocket, max_frame_size: usize, bucket: Option<SharedBucket>) -> Self {
+    pub fn new(socket: TWriteSocket, max_frame_size: usize) -> Self {
         let frame_codec = network_message_frame_codec(max_frame_size);
-        let rate_limited_socket = AsyncRateLimiter::new(socket, bucket);
-        let compat_socket = rate_limited_socket.compat_write();
+        let compat_socket = socket.compat_write();
         let framed_write = FramedWrite::new(compat_socket, frame_codec);
         Self { framed_write }
     }

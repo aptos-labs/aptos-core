@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod git;
@@ -7,39 +7,44 @@ pub mod keys;
 mod tests;
 pub mod tools;
 
-use crate::common::utils::dir_default_to_current;
-use crate::genesis::git::{OPERATOR_FILE, OWNER_FILE};
 use crate::{
     common::{
         types::{CliError, CliTypedResult, PromptOptions},
-        utils::{check_if_file_exists, write_to_file},
+        utils::{check_if_file_exists, dir_default_to_current, write_to_file},
     },
     genesis::git::{
         Client, GitOptions, BALANCES_FILE, EMPLOYEE_VESTING_ACCOUNTS_FILE, LAYOUT_FILE,
+        OPERATOR_FILE, OWNER_FILE,
     },
     CliCommand, CliResult,
 };
-use aptos_crypto::ed25519::ED25519_PUBLIC_KEY_LENGTH;
-use aptos_crypto::{bls12381, x25519, ValidCryptoMaterial, ValidCryptoMaterialStringExt};
-use aptos_genesis::builder::GenesisConfiguration;
-use aptos_genesis::config::{
-    AccountBalanceMap, EmployeePoolMap, HostAndPort, StringOperatorConfiguration,
-    StringOwnerConfiguration,
+use aptos_crypto::{
+    bls12381, ed25519::ED25519_PUBLIC_KEY_LENGTH, x25519, ValidCryptoMaterial,
+    ValidCryptoMaterialStringExt,
 };
 use aptos_genesis::{
-    config::{Layout, ValidatorConfiguration},
+    builder::GenesisConfiguration,
+    config::{
+        AccountBalanceMap, EmployeePoolMap, HostAndPort, Layout, StringOperatorConfiguration,
+        StringOwnerConfiguration, ValidatorConfiguration,
+    },
     mainnet::MainnetGenesisInfo,
     GenesisInfo,
 };
 use aptos_logger::info;
-use aptos_types::account_address::{AccountAddress, AccountAddressWithChecks};
+use aptos_types::{
+    account_address::{AccountAddress, AccountAddressWithChecks},
+    on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig},
+};
+use aptos_vm_genesis::{default_gas_schedule, AccountBalance, EmployeePool};
 use async_trait::async_trait;
 use clap::Parser;
-use std::cmp::Ordering;
-use std::collections::{BTreeMap, BTreeSet, HashSet};
-use std::path::Path;
-use std::{path::PathBuf, str::FromStr};
-use vm_genesis::{AccountBalance, EmployeePool};
+use std::{
+    cmp::Ordering,
+    collections::{BTreeMap, BTreeSet, HashSet},
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 const WAYPOINT_FILE: &str = "waypoint.txt";
 const GENESIS_FILE: &str = "genesis.blob";
@@ -50,25 +55,25 @@ const GENESIS_FILE: &str = "genesis.blob";
 /// accounts to build a genesis transaction for a new chain.
 #[derive(Parser)]
 pub enum GenesisTool {
+    GenerateAdminWriteSet(keys::GenerateAdminWriteSet),
     GenerateGenesis(GenerateGenesis),
+    GetPoolAddresses(tools::PoolAddresses),
     GenerateKeys(keys::GenerateKeys),
     GenerateLayoutTemplate(keys::GenerateLayoutTemplate),
-    GenerateAdminWriteSet(keys::GenerateAdminWriteSet),
     SetupGit(git::SetupGit),
     SetValidatorConfiguration(keys::SetValidatorConfiguration),
-    GetPoolAddresses(tools::PoolAddresses),
 }
 
 impl GenesisTool {
     pub async fn execute(self) -> CliResult {
         match self {
+            GenesisTool::GenerateAdminWriteSet(tool) => tool.execute_serialized_success().await,
             GenesisTool::GenerateGenesis(tool) => tool.execute_serialized().await,
+            GenesisTool::GetPoolAddresses(tool) => tool.execute_serialized().await,
             GenesisTool::GenerateKeys(tool) => tool.execute_serialized().await,
             GenesisTool::GenerateLayoutTemplate(tool) => tool.execute_serialized_success().await,
-            GenesisTool::GenerateAdminWriteSet(tool) => tool.execute_serialized_success().await,
             GenesisTool::SetupGit(tool) => tool.execute_serialized_success().await,
             GenesisTool::SetValidatorConfiguration(tool) => tool.execute_serialized_success().await,
-            GenesisTool::GetPoolAddresses(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -249,6 +254,9 @@ pub fn fetch_mainnet_genesis_info(git_options: GitOptions) -> CliTypedResult<Mai
             voting_power_increase_limit: layout.voting_power_increase_limit,
             employee_vesting_start: layout.employee_vesting_start,
             employee_vesting_period_duration: layout.employee_vesting_period_duration,
+            consensus_config: OnChainConsensusConfig::default(),
+            execution_config: OnChainExecutionConfig::default(),
+            gas_schedule: default_gas_schedule(),
         },
     )?)
 }
@@ -286,6 +294,9 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
             voting_power_increase_limit: layout.voting_power_increase_limit,
             employee_vesting_start: layout.employee_vesting_start,
             employee_vesting_period_duration: layout.employee_vesting_period_duration,
+            consensus_config: OnChainConsensusConfig::default(),
+            execution_config: OnChainExecutionConfig::default(),
+            gas_schedule: default_gas_schedule(),
         },
     )?)
 }
@@ -309,14 +320,14 @@ fn get_validator_configs(
         match get_config(client, user, is_mainnet) {
             Ok(validator) => {
                 validators.push(validator);
-            }
+            },
             Err(failure) => {
                 if let CliError::UnexpectedError(failure) = failure {
                     errors.push(format!("{}: {}", user, failure));
                 } else {
                     errors.push(format!("{}: {:?}", user, failure));
                 }
-            }
+            },
         }
     }
 
@@ -531,7 +542,7 @@ fn parse_key<T: ValidCryptoMaterial>(num_bytes: usize, str: &str) -> anyhow::Res
                 working.len(),
                 num_chars
             )
-        }
+        },
         Ordering::Greater => {
             anyhow::bail!(
                 "Key {} is too long {} must be {} hex characters with or without a 0x in front",
@@ -539,8 +550,8 @@ fn parse_key<T: ValidCryptoMaterial>(num_bytes: usize, str: &str) -> anyhow::Res
                 working.len(),
                 num_chars
             )
-        }
-        Ordering::Equal => {}
+        },
+        Ordering::Equal => {},
     }
 
     if !working.chars().all(|c| char::is_ascii_hexdigit(&c)) {
@@ -758,13 +769,13 @@ fn validate_validators(
             ) {
                 (None, None) => {
                     info!("Validator {} does not have a full node setup", name);
-                }
+                },
                 (Some(_), None) | (None, Some(_)) => {
                     errors.push(CliError::UnexpectedError(format!(
                         "Validator {} has a full node host or public key but not both",
                         name
                     )));
-                }
+                },
                 (Some(full_node_host), Some(full_node_network_public_key)) => {
                     // Ensure that the validator and the full node aren't the same
                     let validator_host = validator.validator_host.as_ref().unwrap();
@@ -800,7 +811,7 @@ fn validate_validators(
                             validator.full_node_network_public_key.unwrap()
                         )));
                     }
-                }
+                },
             }
         } else {
             if validator.validator_network_public_key.is_some() {

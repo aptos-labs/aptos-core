@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! Convenience structs and functions for generating a random set of nodes without the
@@ -6,8 +7,7 @@
 
 use crate::{
     config::{
-        DiscoveryMethod, NetworkConfig, NodeConfig, Peer, PeerRole, PeerSet, TestConfig,
-        HANDSHAKE_VERSION,
+        DiscoveryMethod, NetworkConfig, NodeConfig, Peer, PeerRole, PeerSet, HANDSHAKE_VERSION,
     },
     network_id::NetworkId,
 };
@@ -27,8 +27,8 @@ pub fn validator_swarm(
     let mut rng = StdRng::from_seed(seed);
     let mut nodes = Vec::new();
 
-    for index in 0..count {
-        let mut node = NodeConfig::random_with_template(index as u32, template, &mut rng);
+    for _ in 0..count {
+        let mut node = NodeConfig::generate_random_config_with_template(template, &mut rng);
         if randomize_ports {
             node.randomize_ports();
         }
@@ -60,10 +60,7 @@ pub fn validator_swarm(
 }
 
 pub fn validator_swarm_for_testing(nodes: usize) -> ValidatorSwarm {
-    let config = NodeConfig {
-        test: Some(TestConfig::open_module()),
-        ..Default::default()
-    };
+    let config = NodeConfig::default();
     validator_swarm(&config, nodes, [1u8; 32], true)
 }
 

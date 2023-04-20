@@ -1,19 +1,25 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     common::{
         types::{
-            CliError, CliTypedResult, EncodingOptions, EncodingType, KeyType, RngArgs, SaveFile,
+            account_address_from_public_key, CliError, CliTypedResult, EncodingOptions,
+            EncodingType, KeyType, RngArgs, SaveFile,
         },
-        utils::{append_file_extension, check_if_file_exists, write_to_file},
+        utils::{
+            append_file_extension, check_if_file_exists, generate_vanity_account_ed25519,
+            write_to_file,
+        },
     },
     CliCommand, CliResult,
 };
 use aptos_config::config::{Peer, PeerRole};
 use aptos_crypto::{bls12381, ed25519, x25519, PrivateKey, ValidCryptoMaterial};
 use aptos_genesis::config::HostAndPort;
-use aptos_types::account_address::{from_identity_public_key, AccountAddress};
+use aptos_types::account_address::{
+    create_multisig_account_address, from_identity_public_key, AccountAddress,
+};
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
 use std::{
@@ -166,7 +172,17 @@ pub struct GenerateKey {
     /// Key type to generate. Must be one of [x25519, ed25519, bls12381]
     #[clap(long, default_value_t = KeyType::Ed25519)]
     pub(crate) key_type: KeyType,
-
+    /// Vanity prefix that resultant account address should start with, e.g. 0xaceface or d00d. Each
+    /// additional character multiplies by a factor of 16 the computational difficulty associated
+    /// with generating an address, so try out shorter prefixes first and be prepared to wait for
+    /// longer ones
+    #[clap(long)]
+    pub vanity_prefix: Option<String>,
+    /// Use this flag when vanity prefix is for a multisig account. This mines a private key for
+    /// a single signer account that can, as its first transaction, create a multisig account with
+    /// the given vanity prefix
+    #[clap(long)]
+    pub vanity_multisig: bool,
     #[clap(flatten)]
     pub rng_args: RngArgs,
     #[clap(flatten)]
@@ -180,9 +196,19 @@ impl CliCommand<HashMap<&'static str, PathBuf>> for GenerateKey {
     }
 
     async fn execute(self) -> CliTypedResult<HashMap<&'static str, PathBuf>> {
+        if self.vanity_prefix.is_some() && !matches!(self.key_type, KeyType::Ed25519) {
+            return Err(CliError::CommandArgumentError(format!(
+                "Vanity prefixes are only accepted for {} keys",
+                KeyType::Ed25519
+            )));
+        }
+        if self.vanity_multisig && self.vanity_prefix.is_none() {
+            return Err(CliError::CommandArgumentError(
+                "No vanity prefix provided".to_string(),
+            ));
+        }
         self.save_params.check_key_file()?;
         let mut keygen = self.rng_args.key_generator()?;
-
         match self.key_type {
             KeyType::X25519 => {
                 let private_key = keygen.generate_x25519_private_key().map_err(|err| {
@@ -192,15 +218,44 @@ impl CliCommand<HashMap<&'static str, PathBuf>> for GenerateKey {
                     ))
                 })?;
                 self.save_params.save_key(&private_key, "x25519")
-            }
+            },
             KeyType::Ed25519 => {
-                let private_key = keygen.generate_ed25519_private_key();
-                self.save_params.save_key(&private_key, "ed25519")
-            }
+                // If no vanity prefix specified, generate a standard Ed25519 private key.
+                let private_key = if self.vanity_prefix.is_none() {
+                    keygen.generate_ed25519_private_key()
+                } else {
+                    // If a vanity prefix is specified, generate vanity Ed25519 account from it.
+                    generate_vanity_account_ed25519(
+                        self.vanity_prefix.clone().unwrap().as_str(),
+                        self.vanity_multisig,
+                    )?
+                };
+                // Store CLI result from key save operation, to append vanity address(es) if needed.
+                let mut result_map = self.save_params.save_key(&private_key, "ed25519").unwrap();
+                if self.vanity_prefix.is_some() {
+                    let account_address = account_address_from_public_key(
+                        &ed25519::Ed25519PublicKey::from(&private_key),
+                    );
+                    // Store account address in a PathBuf so it can be displayed in CLI result.
+                    result_map.insert(
+                        "Account Address:",
+                        PathBuf::from(account_address.to_hex_literal()),
+                    );
+                    if self.vanity_multisig {
+                        let multisig_account_address =
+                            create_multisig_account_address(account_address, 0);
+                        result_map.insert(
+                            "Multisig Account Address:",
+                            PathBuf::from(multisig_account_address.to_hex_literal()),
+                        );
+                    }
+                }
+                return Ok(result_map);
+            },
             KeyType::Bls12381 => {
                 let private_key = keygen.generate_bls12381_private_key();
                 self.save_params.save_bls_key(&private_key, "bls12381")
-            }
+            },
         }
     }
 }

@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
@@ -6,10 +7,10 @@ use crate::{
     protocols::stream::{InboundStreamBuffer, OutboundStream, StreamFragment, StreamHeader},
     testutils::fake_socket::{ReadOnlyTestSocket, ReadWriteTestSocket},
 };
+use aptos_memsocket::MemorySocket;
 use bcs::test_helpers::assert_canonical_encode_decode;
 use futures::{executor::block_on, future, sink::SinkExt, stream::StreamExt};
 use futures_util::stream::select;
-use memsocket::MemorySocket;
 use proptest::{collection::vec, prelude::*};
 
 // Ensure serialization of ProtocolId enum takes 1 byte.
@@ -62,19 +63,17 @@ fn stream_message() {
         num_fragments: 10,
         message,
     };
-    assert_eq!(
-        bcs::to_bytes(&stream_header).unwrap(),
-        vec![42, 0, 0, 0, 10, 3, 2, 0, 11, 104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100],
-    );
+    assert_eq!(bcs::to_bytes(&stream_header).unwrap(), vec![
+        42, 0, 0, 0, 10, 3, 2, 0, 11, 104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100
+    ],);
     let stream_fragment = StreamFragment {
         request_id: 42,
         fragment_id: 254,
         raw_data: vec![11, 22, 33],
     };
-    assert_eq!(
-        bcs::to_bytes(&stream_fragment).unwrap(),
-        vec![42, 0, 0, 0, 254, 3, 11, 22, 33],
-    );
+    assert_eq!(bcs::to_bytes(&stream_fragment).unwrap(), vec![
+        42, 0, 0, 0, 254, 3, 11, 22, 33
+    ],);
 }
 
 #[test]
@@ -98,7 +97,7 @@ fn aptosnet_wire_test_vectors() {
     // test reading and deserializing gives us the expected message
 
     let socket_rx = ReadOnlyTestSocket::new(&message_bytes);
-    let message_rx = MultiplexMessageStream::new(socket_rx, 128, None);
+    let message_rx = MultiplexMessageStream::new(socket_rx, 128);
 
     let recv_messages = block_on(message_rx.collect::<Vec<_>>());
     let recv_messages = recv_messages
@@ -113,7 +112,7 @@ fn aptosnet_wire_test_vectors() {
     let mut write_buf = Vec::new();
     socket_tx.save_writing(&mut write_buf);
 
-    let mut message_tx = MultiplexMessageSink::new(socket_tx, 128, None);
+    let mut message_tx = MultiplexMessageSink::new(socket_tx, 128);
     block_on(message_tx.send(&message)).unwrap();
 
     assert_eq!(&write_buf, &message_bytes);
@@ -122,7 +121,7 @@ fn aptosnet_wire_test_vectors() {
 #[test]
 fn send_fails_when_larger_than_frame_limit() {
     let (memsocket_tx, _memsocket_rx) = MemorySocket::new_pair();
-    let mut message_tx = MultiplexMessageSink::new(memsocket_tx, 64, None);
+    let mut message_tx = MultiplexMessageSink::new(memsocket_tx, 64);
 
     // attempting to send an outbound message larger than your frame size will
     // return an Err
@@ -138,9 +137,9 @@ fn send_fails_when_larger_than_frame_limit() {
 fn recv_fails_when_larger_than_frame_limit() {
     let (memsocket_tx, memsocket_rx) = MemorySocket::new_pair();
     // sender won't error b/c their max frame size is larger
-    let mut message_tx = MultiplexMessageSink::new(memsocket_tx, 128, None);
+    let mut message_tx = MultiplexMessageSink::new(memsocket_tx, 128);
     // receiver will reject the message b/c the frame size is > 64 bytes max
-    let mut message_rx = MultiplexMessageStream::new(memsocket_rx, 64, None);
+    let mut message_rx = MultiplexMessageStream::new(memsocket_rx, 64);
 
     let message = MultiplexMessage::Message(NetworkMessage::DirectSendMsg(DirectSendMsg {
         protocol_id: ProtocolId::ConsensusRpcBcs,
@@ -234,10 +233,10 @@ proptest! {
             socket_tx.set_fragmented_write();
         }
 
-        let mut message_tx = MultiplexMessageSink::new(socket_tx, 128, None);
-        let message_rx = MultiplexMessageStream::new(socket_rx, 128, None);
-        let (stream_tx, stream_rx) = channel::new_test(1024);
-        let (mut msg_tx, msg_rx) = channel::new_test(1024);
+        let mut message_tx = MultiplexMessageSink::new(socket_tx, 128);
+        let message_rx = MultiplexMessageStream::new(socket_rx, 128);
+        let (stream_tx, stream_rx) = aptos_channels::new_test(1024);
+        let (mut msg_tx, msg_rx) = aptos_channels::new_test(1024);
         let mut outbound_stream = OutboundStream::new(128, 64 * 255, stream_tx);
         let mut inbound_stream = InboundStreamBuffer::new(255);
 

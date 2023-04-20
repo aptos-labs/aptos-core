@@ -1,14 +1,18 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::{Error, IdentityBlob, SecureBackend},
-    keys::ConfigKey,
+    config::{
+        identity_config::{Identity, IdentityFromStorage},
+        Error, IdentityBlob,
+    },
     network_id::NetworkId,
     utils,
 };
 use aptos_crypto::{x25519, Uniform};
 use aptos_secure_storage::{CryptoStorage, KVStorage, Storage};
+use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::{
     account_address::from_identity_public_key, network_address::NetworkAddress,
     transaction::authenticator::AuthenticationKey, PeerId,
@@ -18,20 +22,18 @@ use rand::{
     Rng, SeedableRng,
 };
 use serde::{Deserialize, Serialize};
-use short_hex_str::AsShortHexStr;
 use std::{
     collections::{HashMap, HashSet},
     convert::TryFrom,
     fmt,
     path::PathBuf,
     string::ToString,
-    time::Duration,
 };
 
 // TODO: We could possibly move these constants somewhere else, but since they are defaults for the
 //   configurations of the system, we'll leave it here for now.
 /// Current supported protocol negotiation handshake version. See
-/// [`network::protocols::wire::v1`](../../network/protocols/wire/handshake/v1/index.html).
+/// [`aptos_network::protocols::wire::v1`](../../network/protocols/wire/handshake/v1/index.html).
 pub const HANDSHAKE_VERSION: u8 = 0;
 pub const NETWORK_CHANNEL_SIZE: usize = 1024;
 pub const PING_INTERVAL_MS: u64 = 10_000;
@@ -157,9 +159,7 @@ impl NetworkConfig {
         config.prepare_identity();
         config
     }
-}
 
-impl NetworkConfig {
     pub fn identity_key(&self) -> x25519::PrivateKey {
         let key = match &self.identity {
             Identity::FromConfig(config) => Some(config.key.private_key()),
@@ -171,11 +171,11 @@ impl NetworkConfig {
                 let key = x25519::PrivateKey::from_ed25519_private_bytes(&key.to_bytes())
                     .expect("Unable to convert key");
                 Some(key)
-            }
+            },
             Identity::FromFile(config) => {
                 let identity_blob: IdentityBlob = IdentityBlob::from_file(&config.path).unwrap();
                 Some(identity_blob.network_private_key)
-            }
+            },
             Identity::None => None,
         };
         key.expect("identity key should be present")
@@ -203,29 +203,17 @@ impl NetworkConfig {
         }
     }
 
-    /// Per convenience, so that NetworkId isn't needed to be specified for `validator_networks`
-    pub fn load_validator_network(&mut self) -> Result<(), Error> {
-        self.network_id = NetworkId::Validator;
-        self.load()
-    }
-
-    pub fn load_fullnode_network(&mut self) -> Result<(), Error> {
-        if self.network_id.is_validator_network() {
-            return Err(Error::InvariantViolation(format!(
-                "Set {} network for a non-validator network",
-                self.network_id
-            )));
-        }
-        self.load()
-    }
-
-    fn load(&mut self) -> Result<(), Error> {
+    pub fn set_listen_address_and_prepare_identity(&mut self) -> Result<(), Error> {
+        // Set the listen address to the local IP if it is not specified
         if self.listen_address.to_string().is_empty() {
-            self.listen_address = utils::get_local_ip()
-                .ok_or_else(|| Error::InvariantViolation("No local IP".to_string()))?;
+            self.listen_address = utils::get_local_ip().ok_or_else(|| {
+                Error::InvariantViolation("Failed to get the Local IP".to_string())
+            })?;
         }
 
+        // Prepare the identity
         self.prepare_identity();
+
         Ok(())
     }
 
@@ -239,7 +227,7 @@ impl NetworkConfig {
                     .expect("Unable to read peer id")
                     .value;
                 Some(peer_id)
-            }
+            },
             Identity::FromFile(config) => {
                 let identity_blob: IdentityBlob = IdentityBlob::from_file(&config.path).unwrap();
 
@@ -251,7 +239,7 @@ impl NetworkConfig {
                         identity_blob.network_private_key.public_key(),
                     ))
                 }
-            }
+            },
             Identity::None => None,
         }
         .expect("peer id should be present")
@@ -263,17 +251,14 @@ impl NetworkConfig {
             Identity::None => {
                 let mut rng = StdRng::from_seed(OsRng.gen());
                 let key = x25519::PrivateKey::generate(&mut rng);
-                let peer_id =
-                    aptos_types::account_address::from_identity_public_key(key.public_key());
+                let peer_id = from_identity_public_key(key.public_key());
                 self.identity = Identity::from_config(key, peer_id);
-            }
+            },
             Identity::FromConfig(config) => {
-                let peer_id =
-                    aptos_types::account_address::from_identity_public_key(config.key.public_key());
                 if config.peer_id == PeerId::ZERO {
-                    config.peer_id = peer_id;
+                    config.peer_id = from_identity_public_key(config.key.public_key());
                 }
-            }
+            },
             Identity::FromFile(_) => (),
         };
     }
@@ -295,14 +280,15 @@ impl NetworkConfig {
     }
 
     fn verify_address(peer_id: &PeerId, addr: &NetworkAddress) -> Result<(), Error> {
-        crate::config::invariant(
-            addr.is_aptosnet_addr(),
-            format!(
+        if !addr.is_aptosnet_addr() {
+            return Err(Error::InvariantViolation(format!(
                 "Unexpected seed peer address format: peer_id: {}, addr: '{}'",
                 peer_id.short_str(),
                 addr,
-            ),
-        )
+            )));
+        }
+
+        Ok(())
     }
 
     // Verifies both the `seed_addrs` and `seeds` before they're merged
@@ -319,28 +305,14 @@ impl NetworkConfig {
             }
 
             // Require there to be a pubkey somewhere, either in the address (assumed by `is_aptosnet_addr`)
-            crate::config::invariant(
-                !seed.keys.is_empty() || !seed.addresses.is_empty(),
-                format!("Seed peer {} has no pubkeys", peer_id.short_str()),
-            )?;
+            if seed.keys.is_empty() && seed.addresses.is_empty() {
+                return Err(Error::InvariantViolation(format!(
+                    "Seed peer {} has no pubkeys",
+                    peer_id.short_str(),
+                )));
+            }
         }
         Ok(())
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct PeerMonitoringServiceConfig {
-    pub max_concurrent_requests: u64, // Max num of concurrent server tasks
-    pub max_network_channel_size: u64, // Max num of pending network messages
-}
-
-impl Default for PeerMonitoringServiceConfig {
-    fn default() -> Self {
-        Self {
-            max_concurrent_requests: 1000,
-            max_network_channel_size: 1000,
-        }
     }
 }
 
@@ -348,63 +320,26 @@ impl Default for PeerMonitoringServiceConfig {
 #[serde(rename_all = "snake_case")]
 pub enum DiscoveryMethod {
     Onchain,
-    File(PathBuf, Duration),
+    File(FileDiscovery),
+    Rest(RestDiscovery),
     None,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case", tag = "type")]
-pub enum Identity {
-    FromConfig(IdentityFromConfig),
-    FromStorage(IdentityFromStorage),
-    FromFile(IdentityFromFile),
-    None,
-}
-
-impl Identity {
-    pub fn from_config(key: x25519::PrivateKey, peer_id: PeerId) -> Self {
-        let key = ConfigKey::new(key);
-        Identity::FromConfig(IdentityFromConfig { key, peer_id })
-    }
-
-    pub fn from_storage(key_name: String, peer_id_name: String, backend: SecureBackend) -> Self {
-        Identity::FromStorage(IdentityFromStorage {
-            backend,
-            key_name,
-            peer_id_name,
-        })
-    }
-
-    pub fn from_file(path: PathBuf) -> Self {
-        Identity::FromFile(IdentityFromFile { path })
-    }
-}
-
-/// The identity is stored within the config.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct IdentityFromConfig {
-    #[serde(flatten)]
-    pub key: ConfigKey<x25519::PrivateKey>,
-    pub peer_id: PeerId,
-}
-
-/// This represents an identity in a secure-storage as defined in NodeConfig::secure.
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct IdentityFromStorage {
-    pub backend: SecureBackend,
-    pub key_name: String,
-    pub peer_id_name: String,
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct IdentityFromFile {
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub struct FileDiscovery {
     pub path: PathBuf,
+    pub interval_secs: u64,
 }
 
-#[derive(Copy, Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub struct RestDiscovery {
+    pub url: url::Url,
+    pub interval_secs: u64,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct RateLimitConfig {
     /// Maximum number of bytes/s for an IP
@@ -455,6 +390,14 @@ pub enum PeerRole {
 }
 
 impl PeerRole {
+    pub fn is_validator(self) -> bool {
+        self == PeerRole::Validator
+    }
+
+    pub fn is_vfn(self) -> bool {
+        self == PeerRole::ValidatorFullNode
+    }
+
     pub fn as_str(self) -> &'static str {
         match self {
             PeerRole::Validator => "validator",
@@ -517,13 +460,12 @@ impl Peer {
     /// Combines two `Peer`.  Note: Does not merge duplicate addresses
     /// TODO: Instead of rejecting, maybe pick one of the roles?
     pub fn extend(&mut self, other: Peer) -> Result<(), Error> {
-        crate::config::invariant(
-            self.role != other.role,
-            format!(
+        if self.role == other.role {
+            return Err(Error::InvariantViolation(format!(
                 "Roles don't match self {:?} vs other {:?}",
                 self.role, other.role
-            ),
-        )?;
+            )));
+        }
         self.addresses.extend(other.addresses);
         self.keys.extend(other.keys);
         Ok(())

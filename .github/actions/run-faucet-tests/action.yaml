@@ -1,0 +1,53 @@
+name: "Faucet Integration Tests"
+description: |
+  Runs the tests for the Aptos faucet against a local testnet built from a particular release branch
+inputs:
+  NETWORK:
+    description: "The network branch for running the local testnet: devnet or testnet."
+    required: true
+  GCP_DOCKER_ARTIFACT_REPO:
+    description: "The GCP Docker artifact repository."
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # Create the bindmount directory.
+    - name: Create bindmount directory
+      run: mkdir -p ${{ runner.temp }}/testnet
+      shell: bash
+
+    # Run a Redis server.
+    - name: Run Redis server
+      uses: shogo82148/actions-setup-redis@v1
+      with:
+        redis-version: '6.x'
+
+    # Set up Rust for running the integration tests.
+    - name: Set up Rust
+      uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+
+    # Install Poetry.
+    - uses: snok/install-poetry@v1
+      with:
+        version: 1.2.2
+
+    # Install the script dependencies.
+    - name: Install script dependencies
+      working-directory: crates/aptos-faucet/integration-tests
+      shell: bash
+      run: poetry install
+
+    # Run the faucet integration tests. This script will handle starting the local
+    # testnet, moving the mint key where the tests expect it to be, and running the
+    # integration tests.
+    - name: Run integration tests
+      run: poetry run python main.py --base-network ${{ inputs.NETWORK }} --external-test-dir ${{ runner.temp }}/testnet --image-repo-with-project ${{ inputs.GCP_DOCKER_ARTIFACT_REPO }}
+      working-directory: crates/aptos-faucet/integration-tests
+      shell: bash
+
+    # Print the logs from the local testnet if the tests failed.
+    - name: Print local testnet logs if something failed
+      run: docker logs local-testnet-${{ inputs.NETWORK }}
+      shell: bash
+      if: ${{ failure() }}

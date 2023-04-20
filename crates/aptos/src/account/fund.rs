@@ -1,13 +1,11 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-
-use std::time::{Duration, SystemTime};
 
 use crate::{
     account::create::DEFAULT_FUNDED_COINS,
     common::{
-        types::{CliCommand, CliError, CliTypedResult, FaucetOptions, ProfileOptions, RestOptions},
-        utils::fund_account,
+        types::{CliCommand, CliTypedResult, FaucetOptions, ProfileOptions, RestOptions},
+        utils::{fund_account, wait_for_transactions},
     },
 };
 use aptos_types::account_address::AccountAddress;
@@ -54,22 +52,8 @@ impl CliCommand<String> for FundWithFaucet {
             self.account,
         )
         .await?;
-        let sys_time = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .map_err(|e| CliError::UnexpectedError(e.to_string()))?
-            .as_secs()
-            + 30;
         let client = self.rest_options.client(&self.profile_options)?;
-        for hash in hashes {
-            client
-                .wait_for_transaction_by_hash(
-                    hash.into(),
-                    sys_time,
-                    Some(Duration::from_secs(60)),
-                    None,
-                )
-                .await?;
-        }
+        wait_for_transactions(&client, hashes).await?;
         return Ok(format!(
             "Added {} Octas to account {}",
             self.amount, self.account

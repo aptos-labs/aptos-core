@@ -1,6 +1,6 @@
 /// Utility for converting a Move value to its binary representation in BCS (Binary Canonical
 /// Serialization). BCS is the binary encoding for Move resources and other non-module values
-/// published on-chain. See https://github.com/aptos/bcs#binary-canonical-serialization-bcs for more
+/// published on-chain. See https://github.com/aptos-labs/bcs#binary-canonical-serialization-bcs for more
 /// details on BCS.
 module std::bcs {
     /// Return the binary representation of `v` in BCS (Binary Canonical Serialization) format

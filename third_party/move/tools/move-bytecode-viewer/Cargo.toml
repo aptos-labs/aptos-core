@@ -1,0 +1,24 @@
+[package]
+name = "move-bytecode-viewer"
+version = "0.1.0"
+authors = ["Diem Association <opensource@diem.com>"]
+description = "Explore Move bytecode and how the source code compiles to it"
+license = "Apache-2.0"
+publish = false
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.52"
+clap = { version = "3.1.8", features = ["derive"] }
+crossterm = "0.21"
+move-binary-format = { path = "../../move-binary-format" }
+move-bytecode-source-map = { path = "../../move-ir-compiler/move-bytecode-source-map" }
+regex = "1.5.5"
+tui = "0.17.0"
+
+move-command-line-common = { path = "../../move-command-line-common" }
+move-disassembler = { path = "../move-disassembler" }
+move-ir-types = { path = "../../move-ir/types" }
+
+[features]
+default = []

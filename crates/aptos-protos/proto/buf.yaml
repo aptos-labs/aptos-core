@@ -1,0 +1,13 @@
+version: v1
+
+# lint contains the options for lint rules.
+lint:
+  use:
+    - DEFAULT
+  except:
+    # Avoid generated code with service like `FooServiceService`.
+    - SERVICE_SUFFIX
+  ignore_only:
+    PACKAGE_VERSION_SUFFIX:
+      # Timestamp package is well-adpoted and we don't want to change it.
+      - aptos/util/timestamp/timestamp.proto

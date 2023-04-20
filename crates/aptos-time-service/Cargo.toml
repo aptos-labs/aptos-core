@@ -1,28 +1,30 @@
 [package]
 name = "aptos-time-service"
-version = "0.1.0"
-authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Time Service for mocking time with tokio"
-repository = "https://github.com/aptos-labs/aptos-core"
-homepage = "https://aptoslabs.com"
-license = "Apache-2.0"
-publish = false
-edition = "2021"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
 
 [dependencies]
-enum_dispatch = "0.3.8"
-futures = { version = "0.3.12", optional = true }
-pin-project = { version = "1.0.10", optional = true }
-thiserror = "1.0.31"
-tokio = { version = "1.21.0", features = ["macros", "rt-multi-thread", "time"], optional = true }
-
-aptos-infallible = { path = "../../crates/aptos-infallible" }
+aptos-infallible = { workspace = true }
+enum_dispatch = { workspace = true }
+futures = { workspace = true, optional = true }
+pin-project = { workspace = true, optional = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, optional = true }
 
 [dev-dependencies]
-futures = "0.3.21"
-pin-project = "1.0.10"
-tokio = { version = "1.21.0", features = ["macros", "rt-multi-thread", "time"] }
-tokio-test = "0.4.1"
+futures = { workspace = true }
+pin-project = { workspace = true }
+tokio = { workspace = true }
+tokio-test = { workspace = true }
 
 [features]
 default = []

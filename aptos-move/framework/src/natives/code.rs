@@ -1,27 +1,38 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::natives::any::Any;
+use crate::{
+    natives::{
+        any::Any,
+        helpers::{make_safe_native, SafeNativeContext, SafeNativeError, SafeNativeResult},
+    },
+    safely_pop_arg,
+};
 use anyhow::bail;
-use aptos_types::transaction::ModuleBundle;
-use aptos_types::vm_status::StatusCode;
+use aptos_types::{
+    on_chain_config::{Features, TimedFeatures},
+    transaction::ModuleBundle,
+    vm_status::StatusCode,
+};
 use better_any::{Tid, TidAble};
-use move_binary_format::errors::PartialVMError;
-use move_binary_format::errors::PartialVMResult;
-use move_core_types::account_address::AccountAddress;
-use move_core_types::gas_algebra::{InternalGas, InternalGasPerByte, NumBytes};
-use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
-use move_vm_types::pop_arg;
-use move_vm_types::values::Struct;
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use move_core_types::{
+    account_address::AccountAddress,
+    gas_algebra::{InternalGas, InternalGasPerByte, NumBytes},
+};
+use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
-    loaded_data::runtime_types::Type, natives::function::NativeResult, values::Value,
+    loaded_data::runtime_types::Type,
+    values::{Struct, Value},
 };
 use serde::{Deserialize, Serialize};
-use smallvec::smallvec;
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
-use std::fmt;
-use std::str::FromStr;
-use std::sync::Arc;
+use smallvec::{smallvec, SmallVec};
+use std::{
+    collections::{btree_map::Entry, BTreeMap, BTreeSet, VecDeque},
+    fmt,
+    str::FromStr,
+    sync::Arc,
+};
 
 /// A wrapper around the representation of a Move Option, which is a vector with 0 or 1 element.
 /// TODO: move this elsewhere for reuse?
@@ -101,9 +112,11 @@ impl UpgradePolicy {
     pub fn arbitrary() -> Self {
         UpgradePolicy { policy: 0 }
     }
+
     pub fn compat() -> Self {
         UpgradePolicy { policy: 1 }
     }
+
     pub fn immutable() -> Self {
         UpgradePolicy { policy: 2 }
     }
@@ -111,6 +124,7 @@ impl UpgradePolicy {
 
 impl FromStr for UpgradePolicy {
     type Err = anyhow::Error;
+
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "arbitrary" => Ok(UpgradePolicy::arbitrary()),
@@ -209,57 +223,56 @@ pub struct RequestPublishGasParameters {
 
 fn native_request_publish(
     gas_params: &RequestPublishGasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(matches!(args.len(), 4 | 5));
     let with_allowed_deps = args.len() == 5;
 
-    let policy = pop_arg!(args, u8);
+    context.charge(gas_params.base)?;
+
+    let policy = safely_pop_arg!(args, u8);
     let mut code = vec![];
-    for module in pop_arg!(args, Vec<Value>) {
-        code.push(module.value_as::<Vec<u8>>()?);
+    for module in safely_pop_arg!(args, Vec<Value>) {
+        let module_code = module.value_as::<Vec<u8>>()?;
+
+        context.charge(gas_params.per_byte * NumBytes::new(module_code.len() as u64))?;
+        code.push(module_code);
     }
 
     let allowed_deps = if with_allowed_deps {
         let mut allowed_deps: BTreeMap<AccountAddress, BTreeSet<String>> = BTreeMap::new();
-        for dep in pop_arg!(args, Vec<Value>) {
+
+        for dep in safely_pop_arg!(args, Vec<Value>) {
             let (account, module_name) = unpack_allowed_dep(dep)?;
-            allowed_deps.entry(account).or_default().insert(module_name);
+
+            let entry = allowed_deps.entry(account);
+
+            if let Entry::Vacant(_) = &entry {
+                // TODO: Is the 32 here supposed to indicate the length of an account address in bytes?
+                context.charge(gas_params.per_byte * NumBytes::new(32))?;
+            }
+
+            context.charge(gas_params.per_byte * NumBytes::new(module_name.len() as u64))?;
+            entry.or_default().insert(module_name);
         }
+
         Some(allowed_deps)
     } else {
         None
     };
 
     let mut expected_modules = BTreeSet::new();
-    for name in pop_arg!(args, Vec<Value>) {
-        expected_modules.insert(get_move_string(name)?);
+    for name in safely_pop_arg!(args, Vec<Value>) {
+        let str = get_move_string(name)?;
+
+        // TODO(Gas): fine tune the gas formula
+        context.charge(gas_params.per_byte * NumBytes::new(str.len() as u64))?;
+        expected_modules.insert(str);
     }
 
-    // TODO(Gas): fine tune the gas formula
-    let cost = gas_params.base
-        + gas_params.per_byte
-            * code.iter().fold(NumBytes::new(0), |acc, module_code| {
-                acc + NumBytes::new(module_code.len() as u64)
-            })
-        + gas_params.per_byte
-            * expected_modules.iter().fold(NumBytes::new(0), |acc, name| {
-                acc + NumBytes::new(name.len() as u64)
-            })
-        + gas_params.per_byte
-            * allowed_deps.clone().unwrap_or_default().iter().fold(
-                NumBytes::new(0),
-                |acc, (_, deps)| {
-                    acc + NumBytes::new(32)
-                        + deps.iter().fold(NumBytes::zero(), |inner_acc, name| {
-                            inner_acc + NumBytes::new(name.len() as u64)
-                        })
-                },
-            );
-
-    let destination = pop_arg!(args, AccountAddress);
+    let destination = safely_pop_arg!(args, AccountAddress);
 
     // Add own modules to allowed deps
     let allowed_deps = allowed_deps.map(|mut allowed| {
@@ -273,7 +286,9 @@ fn native_request_publish(
     let code_context = context.extensions_mut().get_mut::<NativeCodeContext>();
     if code_context.requested_module_bundle.is_some() {
         // Can't request second time.
-        return Ok(NativeResult::err(cost, EALREADY_REQUESTED));
+        return Err(SafeNativeError::Abort {
+            abort_code: EALREADY_REQUESTED,
+        });
     }
     code_context.requested_module_bundle = Some(PublishRequest {
         destination,
@@ -283,13 +298,7 @@ fn native_request_publish(
         check_compat: policy != ARBITRARY_POLICY,
     });
     // TODO(Gas): charge gas for requesting code load (charge for actual code loading done elsewhere)
-    Ok(NativeResult::ok(cost, smallvec![]))
-}
-
-pub fn make_native_request_publish(gas_params: RequestPublishGasParameters) -> NativeFunction {
-    Arc::new(move |context, ty_args, args| {
-        native_request_publish(&gas_params, context, ty_args, args)
-    })
+    Ok(smallvec![])
 }
 
 /***************************************************************************************************
@@ -301,15 +310,29 @@ pub struct GasParameters {
     pub request_publish: RequestPublishGasParameters,
 }
 
-pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {
+pub fn make_all(
+    gas_params: GasParameters,
+    timed_features: TimedFeatures,
+    features: Arc<Features>,
+) -> impl Iterator<Item = (String, NativeFunction)> {
     let natives = [
         (
             "request_publish",
-            make_native_request_publish(gas_params.request_publish.clone()),
+            make_safe_native(
+                gas_params.request_publish.clone(),
+                timed_features.clone(),
+                features.clone(),
+                native_request_publish,
+            ),
         ),
         (
             "request_publish_with_allowed_deps",
-            make_native_request_publish(gas_params.request_publish),
+            make_safe_native(
+                gas_params.request_publish,
+                timed_features,
+                features,
+                native_request_publish,
+            ),
         ),
     ];
 

@@ -1,0 +1,3 @@
+2023-01-27T18:30:21.462894Z [main] INFO storage/backup/backup-cli/src/metadata/cache.rs:176 Loading all metadata files to memory.
+2023-01-27T18:30:21.638393Z [main] INFO storage/backup/backup-cli/src/metadata/cache.rs:193 Metadata cache loaded. {"total_time":257}
+latest_epoch_ending_epoch: 3316, latest_state_snapshot_epoch: 3305, latest_state_snapshot_version: 417205473, latest_transaction_version: 417000000

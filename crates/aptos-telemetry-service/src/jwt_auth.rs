@@ -1,16 +1,17 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::{
+    context::{Context, JsonWebTokenService},
+    error,
+    errors::{JwtAuthError, ServiceError},
+    types::{auth::Claims, common::NodeType},
+};
 use aptos_types::{chain_id::ChainId, PeerId};
-
 use chrono::Utc;
 use jsonwebtoken::{errors::Error, TokenData};
-use tracing::error;
+use uuid::Uuid;
 use warp::{reject, Rejection};
-
-use crate::context::JsonWebTokenService;
-use crate::{context::Context, types::auth::Claims};
-use crate::{error::ServiceError, types::common::NodeType};
 
 const BEARER: &str = "BEARER ";
 
@@ -20,6 +21,7 @@ pub fn create_jwt_token(
     peer_id: PeerId,
     node_type: NodeType,
     epoch: u64,
+    uuid: Uuid,
 ) -> Result<String, Error> {
     let issued = Utc::now().timestamp();
     let expiration = Utc::now()
@@ -34,6 +36,7 @@ pub fn create_jwt_token(
         epoch,
         exp: expiration as usize,
         iat: issued as usize,
+        run_uuid: uuid,
     };
     jwt_service.encode(claims)
 }
@@ -45,7 +48,9 @@ pub async fn authorize_jwt(
 ) -> anyhow::Result<Claims, Rejection> {
     let decoded: TokenData<Claims> = context.jwt_service().decode(&token).map_err(|e| {
         error!("unable to authorize jwt token: {}", e);
-        reject::custom(ServiceError::unauthorized("invalid authorization token"))
+        reject::custom(ServiceError::unauthorized(
+            JwtAuthError::InvalidAuthToken.into(),
+        ))
     })?;
     let claims = decoded.claims;
 
@@ -53,14 +58,14 @@ pub async fn authorize_jwt(
         Some(info) => info.0,
         None => {
             return Err(reject::custom(ServiceError::unauthorized(
-                "expired authorization token",
+                JwtAuthError::ExpiredAuthToken.into(),
             )));
-        }
+        },
     };
 
     if !allow_roles.contains(&claims.node_type) {
         return Err(reject::custom(ServiceError::forbidden(
-            "the peer does not have access to this resource",
+            JwtAuthError::AccessDenied.into(),
         )));
     }
 
@@ -68,7 +73,7 @@ pub async fn authorize_jwt(
         Ok(claims)
     } else {
         Err(reject::custom(ServiceError::unauthorized(
-            "expired authorization token",
+            JwtAuthError::ExpiredAuthToken.into(),
         )))
     }
 }
@@ -78,9 +83,9 @@ pub async fn jwt_from_header(auth_header: Option<String>) -> anyhow::Result<Stri
         Some(v) => v,
         None => {
             return Err(reject::custom(ServiceError::unauthorized(
-                "no/invalid authorization header",
+                JwtAuthError::from("bearer token missing".to_owned()).into(),
             )))
-        }
+        },
     };
     let auth_header = auth_header.split(',').next().unwrap_or_default();
     if !auth_header
@@ -89,7 +94,7 @@ pub async fn jwt_from_header(auth_header: Option<String>) -> anyhow::Result<Stri
         .eq_ignore_ascii_case(BEARER)
     {
         return Err(reject::custom(ServiceError::unauthorized(
-            "invalid authorization header",
+            JwtAuthError::from("malformed bearer token".to_owned()).into(),
         )));
     }
     Ok(auth_header
@@ -101,10 +106,9 @@ pub async fn jwt_from_header(auth_header: Option<String>) -> anyhow::Result<Stri
 #[cfg(test)]
 mod tests {
 
+    use super::{super::tests::test_context, *};
     use std::collections::HashMap;
-
-    use super::super::tests::test_context;
-    use super::*;
+    use warp::hyper::StatusCode;
 
     #[tokio::test]
     async fn jwt_from_header_valid_bearer() {
@@ -159,6 +163,7 @@ mod tests {
             PeerId::random(),
             NodeType::Validator,
             10,
+            Uuid::default(),
         )
         .unwrap();
         let result =
@@ -171,13 +176,18 @@ mod tests {
             PeerId::random(),
             NodeType::ValidatorFullNode,
             10,
+            Uuid::default(),
         )
         .unwrap();
         let result = authorize_jwt(token, test_context.inner, vec![NodeType::Validator]).await;
         assert!(result.is_err());
+
+        let rejection = result.err().unwrap();
+        let service_error = rejection.find::<ServiceError>().unwrap();
+        assert_eq!(service_error.http_status_code(), StatusCode::FORBIDDEN);
         assert_eq!(
-            *result.err().unwrap().find::<ServiceError>().unwrap(),
-            ServiceError::forbidden("the peer does not have access to this resource",)
-        )
+            service_error.error_as_string(),
+            "authorization error: access denied to this resource"
+        );
     }
 }

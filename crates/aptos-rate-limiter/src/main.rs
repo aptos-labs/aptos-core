@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_infallible::Mutex;
@@ -12,7 +13,6 @@ use futures::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
     Future, SinkExt, StreamExt,
 };
-
 use std::{
     sync::Arc,
     time::{Duration, Instant},

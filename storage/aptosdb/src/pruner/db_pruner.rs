@@ -1,8 +1,9 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{Context, Result};
 use aptos_logger::info;
+use aptos_schemadb::SchemaBatch;
 use aptos_types::transaction::Version;
 use std::cmp::min;
 
@@ -31,6 +32,9 @@ pub trait DBPruner: Send + Sync {
     /// Initializes the least readable version stored in underlying DB storage
     fn initialize_min_readable_version(&self) -> Result<Version>;
 
+    /// Saves the min readable version.
+    fn save_min_readable_version(&self, version: Version, batch: &SchemaBatch) -> Result<()>;
+
     /// Returns the least readable version stores in the DB pruner
     fn min_readable_version(&self) -> Version;
 
@@ -46,7 +50,7 @@ pub trait DBPruner: Send + Sync {
         // Current target version  might be less than the target version to ensure we don't prune
         // more than max_version in one go.
         min(
-            self.min_readable_version() + max_versions as u64,
+            self.min_readable_version() + max_versions,
             self.target_version(),
         )
     }

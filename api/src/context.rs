@@ -1,43 +1,57 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::accept_type::AcceptType;
-use crate::response::{
-    bcs_api_disabled, block_not_found_by_height, block_not_found_by_version,
-    block_pruned_by_height, json_api_disabled, version_not_found, version_pruned, ForbiddenError,
-    InternalError, NotFoundError, ServiceUnavailableError, StdApiError,
+use crate::{
+    accept_type::AcceptType,
+    response::{
+        bcs_api_disabled, block_not_found_by_height, block_not_found_by_version,
+        block_pruned_by_height, json_api_disabled, version_not_found, version_pruned,
+        ForbiddenError, InternalError, NotFoundError, ServiceUnavailableError, StdApiError,
+    },
 };
-use anyhow::{ensure, format_err, Context as AnyhowContext, Result};
+use anyhow::{bail, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_api_types::{
-    AptosErrorCode, AsConverter, BcsBlock, GasEstimation, LedgerInfo, TransactionOnChainData,
+    AptosErrorCode, AsConverter, BcsBlock, GasEstimation, LedgerInfo, ResourceGroup,
+    TransactionOnChainData,
 };
 use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::HashValue;
 use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule};
+use aptos_logger::error;
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
-use aptos_state_view::StateView;
-use aptos_types::account_config::NewBlockEvent;
-use aptos_types::account_view::AccountView;
-use aptos_types::on_chain_config::{GasSchedule, GasScheduleV2, OnChainConfig};
-use aptos_types::transaction::Transaction;
+use aptos_state_view::TStateView;
+use aptos_storage_interface::{
+    state_view::{DbStateView, DbStateViewAtVersion, LatestDbStateCheckpointView},
+    DbReader, Order, MAX_REQUEST_LIMIT,
+};
 use aptos_types::{
+    access_path::{AccessPath, Path},
     account_address::AccountAddress,
+    account_config::NewBlockEvent,
     account_state::AccountState,
+    account_view::AccountView,
     chain_id::ChainId,
     contract_event::EventWithVersion,
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
-    state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix, state_value::StateValue},
+    on_chain_config::{GasSchedule, GasScheduleV2, OnChainConfig},
+    state_store::{
+        state_key::{StateKey, StateKeyInner},
+        state_key_prefix::StateKeyPrefix,
+        state_value::StateValue,
+    },
     transaction::{SignedTransaction, TransactionWithProof, Version},
 };
-use aptos_vm::data_cache::{IntoMoveResolver, StorageAdapter, StorageAdapterOwned};
+use aptos_vm::{
+    data_cache::{IntoMoveResolver, StorageAdapter, StorageAdapterOwned},
+    move_vm_ext::MoveResolverExt,
+};
 use futures::{channel::oneshot, SinkExt};
-use itertools::Itertools;
-use std::sync::RwLock;
-use std::{collections::HashMap, sync::Arc};
-use storage_interface::{
-    state_view::{DbStateView, DbStateViewAtVersion, LatestDbStateCheckpointView},
-    DbReader, Order,
+use move_core_types::language_storage::{ModuleId, StructTag};
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
 };
 
 // Context holds application scope context
@@ -47,7 +61,6 @@ pub struct Context {
     pub db: Arc<dyn DbReader>,
     mp_sender: MempoolClientSender,
     pub node_config: NodeConfig,
-    gas_estimation: Arc<RwLock<GasEstimationCache>>,
     gas_schedule_cache: Arc<RwLock<GasScheduleCache>>,
 }
 
@@ -69,13 +82,6 @@ impl Context {
             db,
             mp_sender,
             node_config,
-            gas_estimation: Arc::new(RwLock::new(GasEstimationCache {
-                last_updated_version: None,
-                last_updated_epoch: None,
-                deprioritized_gas_price: 0,
-                median_gas_price: 0,
-                prioritized_gas_price: 0,
-            })),
             gas_schedule_cache: Arc::new(RwLock::new(GasScheduleCache {
                 last_updated_epoch: None,
                 gas_schedule_params: None,
@@ -91,6 +97,14 @@ impl Context {
         self.node_config.api.max_events_page_size
     }
 
+    pub fn max_account_resources_page_size(&self) -> u16 {
+        self.node_config.api.max_account_resources_page_size
+    }
+
+    pub fn max_account_modules_page_size(&self) -> u16 {
+        self.node_config.api.max_account_modules_page_size
+    }
+
     pub fn move_resolver(&self) -> Result<StorageAdapterOwned<DbStateView>> {
         self.db
             .latest_state_checkpoint_view()
@@ -104,6 +118,22 @@ impl Context {
         self.move_resolver()
             .context("Failed to read latest state checkpoint from DB")
             .map_err(|e| E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info))
+    }
+
+    pub fn state_view<E: StdApiError>(
+        &self,
+        requested_ledger_version: Option<u64>,
+    ) -> Result<(LedgerInfo, u64, DbStateView), E> {
+        let (latest_ledger_info, requested_ledger_version) =
+            self.get_latest_ledger_info_and_verify_lookup_version(requested_ledger_version)?;
+
+        let state_view = self
+            .state_view_at_version(requested_ledger_version)
+            .map_err(|err| {
+                E::internal_with_code(err, AptosErrorCode::InternalError, &latest_ledger_info)
+            })?;
+
+        Ok((latest_ledger_info, requested_ledger_version, state_view))
     }
 
     pub fn state_view_at_version(&self, version: Version) -> Result<DbStateView> {
@@ -217,7 +247,7 @@ impl Context {
     pub fn get_state_value(&self, state_key: &StateKey, version: u64) -> Result<Option<Vec<u8>>> {
         self.db
             .state_view_at_version(Some(version))?
-            .get_state_value(state_key)
+            .get_state_value_bytes(state_key)
     }
 
     pub fn get_state_value_poem<E: InternalError>(
@@ -236,10 +266,148 @@ impl Context {
         address: AccountAddress,
         version: u64,
     ) -> Result<HashMap<StateKey, StateValue>> {
-        self.db
-            .get_state_values_by_key_prefix(&StateKeyPrefix::from(address), version)
+        let mut iter = self.db.get_prefixed_state_value_iterator(
+            &StateKeyPrefix::from(address),
+            None,
+            version,
+        )?;
+        let kvs = iter
+            .by_ref()
+            .take(MAX_REQUEST_LIMIT as usize)
+            .collect::<Result<_>>()?;
+        if iter.next().transpose()?.is_some() {
+            bail!("Too many state items under account ({:?}).", address);
+        }
+        Ok(kvs)
     }
 
+    pub fn get_resources_by_pagination(
+        &self,
+        address: AccountAddress,
+        prev_state_key: Option<&StateKey>,
+        version: u64,
+        limit: u64,
+    ) -> Result<(Vec<(StructTag, Vec<u8>)>, Option<StateKey>)> {
+        let account_iter = self.db.get_prefixed_state_value_iterator(
+            &StateKeyPrefix::from(address),
+            prev_state_key,
+            version,
+        )?;
+        // TODO: Consider rewriting this to consider resource groups:
+        // * If a resource group is found, expand
+        // * Return Option<Result<(PathType, StructTag, Vec<u8>)>>
+        // * Count resources and only include a resource group if it can completely fit
+        // * Get next_key as the first struct_tag not included
+        let mut resource_iter = account_iter
+            .filter_map(|res| match res {
+                Ok((k, v)) => match k.inner() {
+                    StateKeyInner::AccessPath(AccessPath { address: _, path }) => {
+                        match Path::try_from(path.as_slice()) {
+                            Ok(Path::Resource(struct_tag)) => {
+                                Some(Ok((struct_tag, v.into_bytes())))
+                            }
+                            // TODO: Consider expanding to Path::Resource
+                            Ok(Path::ResourceGroup(struct_tag)) => {
+                                Some(Ok((struct_tag, v.into_bytes())))
+                            }
+                            Ok(Path::Code(_)) => None,
+                            Err(e) => Some(Err(anyhow::Error::from(e))),
+                        }
+                    }
+                    _ => {
+                        error!("storage prefix scan return inconsistent key ({:?}) with expected key prefix ({:?}).", k, StateKeyPrefix::from(address));
+                        Some(Err(format_err!( "storage prefix scan return inconsistent key ({:?})", k )))
+                    }
+                },
+                Err(e) => Some(Err(e)),
+            })
+            .take(limit as usize + 1);
+        let kvs = resource_iter
+            .by_ref()
+            .take(limit as usize)
+            .collect::<Result<Vec<(StructTag, Vec<u8>)>>>()?;
+
+        // We should be able to do an unwrap here, otherwise the above db read would fail.
+        let resolver = self.state_view_at_version(version)?.into_move_resolver();
+
+        // Extract resources from resource groups and flatten into all resources
+        let kvs = kvs
+            .into_iter()
+            .map(|(key, value)| {
+                if resolver.is_resource_group(&key) {
+                    // An error here means a storage invariant has been violated
+                    bcs::from_bytes::<ResourceGroup>(&value)
+                        .map(|map| {
+                            map.into_iter()
+                                .map(|(key, value)| (key, value))
+                                .collect::<Vec<_>>()
+                        })
+                        .map_err(|e| e.into())
+                } else {
+                    Ok(vec![(key, value)])
+                }
+            })
+            .collect::<Result<Vec<Vec<(StructTag, Vec<u8>)>>>>()?
+            .into_iter()
+            .flatten()
+            .collect();
+
+        let next_key = if let Some((struct_tag, _v)) = resource_iter.next().transpose()? {
+            Some(StateKey::access_path(AccessPath::new(
+                address,
+                AccessPath::resource_path_vec(struct_tag)?,
+            )))
+        } else {
+            None
+        };
+        Ok((kvs, next_key))
+    }
+
+    pub fn get_modules_by_pagination(
+        &self,
+        address: AccountAddress,
+        prev_state_key: Option<&StateKey>,
+        version: u64,
+        limit: u64,
+    ) -> Result<(Vec<(ModuleId, Vec<u8>)>, Option<StateKey>)> {
+        let account_iter = self.db.get_prefixed_state_value_iterator(
+            &StateKeyPrefix::from(address),
+            prev_state_key,
+            version,
+        )?;
+        let mut module_iter = account_iter
+            .filter_map(|res| match res {
+                Ok((k, v)) => match k.inner() {
+                    StateKeyInner::AccessPath(AccessPath { address: _, path }) => {
+                        match Path::try_from(path.as_slice()) {
+                            Ok(Path::Code(module_id)) => Some(Ok((module_id, v.into_bytes()))),
+                            Ok(Path::Resource(_)) | Ok(Path::ResourceGroup(_)) => None,
+                            Err(e) => Some(Err(anyhow::Error::from(e))),
+                        }
+                    }
+                    _ => {
+                        error!("storage prefix scan return inconsistent key ({:?}) with expected key prefix ({:?}).", k, StateKeyPrefix::from(address));
+                        Some(Err(format_err!( "storage prefix scan return inconsistent key ({:?})", k )))
+                    }
+                },
+                Err(e) => Some(Err(e)),
+            })
+            .take(limit as usize + 1);
+        let kvs = module_iter
+            .by_ref()
+            .take(limit as usize)
+            .collect::<Result<_>>()?;
+        let next_key = module_iter.next().transpose()?.map(|(module_id, _v)| {
+            StateKey::access_path(AccessPath::new(
+                address,
+                AccessPath::code_path_vec(module_id),
+            ))
+        });
+        Ok((kvs, next_key))
+    }
+
+    // This function should be deprecated. DO NOT USE it.
+    // Instead, call either `get_modules_by_pagination` or `get_modules_by_pagination`.
     pub fn get_account_state<E: InternalError>(
         &self,
         address: AccountAddress,
@@ -394,7 +562,7 @@ impl Context {
             .into_iter()
             .map(|t| {
                 // Update the timestamp if the next block occurs
-                if let Transaction::BlockMetadata(ref txn) = t.transaction {
+                if let Some(txn) = t.transaction.try_as_block_metadata() {
                     timestamp = txn.timestamp_usecs();
                 }
                 let txn = converter.try_into_onchain_transaction(timestamp, t)?;
@@ -632,127 +800,28 @@ impl Context {
         &self,
         ledger_info: &LedgerInfo,
     ) -> Result<GasEstimation, E> {
-        // The search size
-        const SEARCH_SIZE: u64 = 100_000;
-        let oldest_search_version = std::cmp::max(
-            ledger_info.ledger_version.0.saturating_sub(SEARCH_SIZE),
-            ledger_info.oldest_ledger_version.0,
-        );
-
-        // If it's cached, let's use that
+        let min_gas_unit_price = self.min_gas_unit_price(ledger_info)?;
+        let second_bucket = match self
+            .node_config
+            .mempool
+            .broadcast_buckets
+            .iter()
+            .enumerate()
+            .nth(1)
         {
-            let gas_estimation = self.gas_estimation.read().unwrap();
-            let (last_updated_epoch, _) = self.get_gas_schedule(ledger_info)?;
+            Some(bucket) => *bucket.1,
+            None => min_gas_unit_price,
+        };
+        Ok(GasEstimation {
+            deprioritized_gas_estimate: Some(min_gas_unit_price),
+            gas_estimate: min_gas_unit_price,
+            prioritized_gas_estimate: Some(second_bucket),
+        })
+    }
 
-            // Cache includes if there was an update on the gas schedule due to epoch changes
-            if gas_estimation.last_updated_version.is_some()
-                && gas_estimation.last_updated_version.unwrap() > oldest_search_version
-                && last_updated_epoch == gas_estimation.last_updated_epoch.unwrap_or_default()
-            {
-                return Ok(gas_estimation.gas_estimate());
-            }
-        }
-
-        // Otherwise, get the estimated amount from storage
-        {
-            let mut gas_estimation = self.gas_estimation.write().unwrap();
-            let (last_updated_epoch, gas_schedule) = self.get_gas_schedule(ledger_info)?;
-
-            // If this has been updated by a different thread, use that instead
-            if gas_estimation.last_updated_version.is_some()
-                && gas_estimation.last_updated_version.unwrap() > oldest_search_version
-                && last_updated_epoch == gas_estimation.last_updated_epoch.unwrap_or_default()
-            {
-                return Ok(gas_estimation.gas_estimate());
-            }
-            let mut gas_prices: Vec<u64> = self
-                .db
-                .get_gas_prices(
-                    oldest_search_version,
-                    SEARCH_SIZE,
-                    ledger_info.ledger_version.0,
-                )
-                .map_err(|err| {
-                    E::internal_with_code(err, AptosErrorCode::InternalError, ledger_info)
-                })?;
-
-            // When there's no gas prices in the last 100k transactions, we're going to set it to
-            // the lowest gas price because the transaction should get through with any amount
-            gas_estimation.last_updated_version = Some(ledger_info.ledger_version.0);
-            gas_estimation.last_updated_epoch = Some(last_updated_epoch);
-            let min_gas_price = gas_schedule.txn.min_price_per_gas_unit.into();
-            let max_gas_price = gas_schedule.txn.max_price_per_gas_unit.into();
-
-            let observed_gas_median = if gas_prices.is_empty() {
-                // This will make it always pick the minimum gas price
-                0
-            } else {
-                // Sort and take the median of the gas prices
-                gas_prices.sort();
-
-                // Median is the center if it's odd, average of the two middle if even
-                let mid = gas_prices.len() / 2;
-                if gas_prices.len() % 2 == 0 {
-                    let lower = gas_prices.get(mid.saturating_sub(1)).unwrap();
-                    let upper = gas_prices.get(mid).unwrap();
-
-                    upper.saturating_add(*lower).saturating_div(2)
-                } else {
-                    *gas_prices.get(mid).unwrap()
-                }
-            };
-
-            // Ensure the price is within the min/max bounds
-            gas_estimation.median_gas_price = std::cmp::min(
-                max_gas_price,
-                std::cmp::max(min_gas_price, observed_gas_median),
-            );
-
-            // Handle prices for "prioritized" and "deprioritized"
-            // There must be at least 1 buckets
-            assert!(!self.node_config.mempool.broadcast_buckets.is_empty());
-            let median_gas_price = gas_estimation.median_gas_price;
-
-            // TODO: Buckets are assumed to be ordered
-            let bucket_index = self
-                .node_config
-                .mempool
-                .broadcast_buckets
-                .iter()
-                .sorted()
-                .enumerate()
-                .find_map(|(index, current_bucket)| {
-                    if median_gas_price >= *current_bucket {
-                        Some(index)
-                    } else {
-                        None
-                    }
-                })
-                .unwrap_or_default();
-
-            // Previous bucket could be the same as the minimum price (if too low)
-            let previous_bucket_price = self
-                .node_config
-                .mempool
-                .broadcast_buckets
-                .get(bucket_index.saturating_sub(1))
-                .copied()
-                .unwrap_or(min_gas_price);
-            // Next bucket could be the same as the current gas price, but we increase by 1 for the estimation
-            let next_bucket_price = self
-                .node_config
-                .mempool
-                .broadcast_buckets
-                .get(bucket_index.saturating_add(1))
-                .copied()
-                .unwrap_or_else(|| median_gas_price.saturating_add(1));
-            // Ensure that bucket prices are within the bounds
-            gas_estimation.deprioritized_gas_price =
-                std::cmp::max(min_gas_price, previous_bucket_price);
-            gas_estimation.prioritized_gas_price = std::cmp::min(max_gas_price, next_bucket_price);
-
-            Ok(gas_estimation.gas_estimate())
-        }
+    fn min_gas_unit_price<E: InternalError>(&self, ledger_info: &LedgerInfo) -> Result<u64, E> {
+        let (_, gas_schedule) = self.get_gas_schedule(ledger_info)?;
+        Ok(gas_schedule.txn.min_price_per_gas_unit.into())
     }
 
     pub fn get_gas_schedule<E: InternalError>(
@@ -800,14 +869,15 @@ impl Context {
 
             let gas_schedule_params =
                 match GasScheduleV2::fetch_config(&storage_adapter).and_then(|gas_schedule| {
+                    let feature_version = gas_schedule.feature_version;
                     let gas_schedule = gas_schedule.to_btree_map();
-                    AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule)
+                    AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule, feature_version)
                 }) {
                     Some(gas_schedule) => Ok(gas_schedule),
                     None => GasSchedule::fetch_config(&storage_adapter)
                         .and_then(|gas_schedule| {
                             let gas_schedule = gas_schedule.to_btree_map();
-                            AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule)
+                            AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule, 0)
                         })
                         .ok_or_else(|| {
                             E::internal_with_code(
@@ -838,40 +908,18 @@ impl Context {
                 if !self.node_config.api.json_output_enabled {
                     return Err(json_api_disabled(api_name));
                 }
-            }
+            },
             AcceptType::Bcs => {
                 if !self.node_config.api.bcs_output_enabled {
                     return Err(bcs_api_disabled(api_name));
                 }
-            }
+            },
         }
         Ok(())
     }
 
     pub fn last_updated_gas_schedule(&self) -> Option<u64> {
         self.gas_schedule_cache.read().unwrap().last_updated_epoch
-    }
-
-    pub fn last_updated_gas_estimation(&self) -> Option<u64> {
-        self.gas_estimation.read().unwrap().last_updated_version
-    }
-}
-
-pub struct GasEstimationCache {
-    last_updated_version: Option<u64>,
-    last_updated_epoch: Option<u64>,
-    deprioritized_gas_price: u64,
-    median_gas_price: u64,
-    prioritized_gas_price: u64,
-}
-
-impl GasEstimationCache {
-    pub fn gas_estimate(&self) -> GasEstimation {
-        GasEstimation {
-            deprioritized_gas_estimate: Some(self.deprioritized_gas_price),
-            gas_estimate: self.median_gas_price,
-            prioritized_gas_estimate: Some(self.prioritized_gas_price),
-        }
     }
 }
 

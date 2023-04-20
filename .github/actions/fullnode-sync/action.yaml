@@ -1,0 +1,47 @@
+name: "Fullnode Sync"
+description: |
+  Runs a fullnode from aptos-core, assuming it is already checked out in the current working directory.
+inputs:
+  TIMEOUT_MINUTES:
+    description: "The number of minutes to wait for fullnode sync to finish."
+    required: true
+  BRANCH:
+    description: "The aptos-core branch to switch to before running the fullnode."
+    required: true
+  NETWORK:
+    description: "The network to connect the fullnode to: devnet, testnet, or mainnet."
+    required: true
+  BOOTSTRAPPING_MODE:
+    description: "The state sync bootstrapping mode for the fullnode."
+    required: true
+  CONTINUOUS_SYNCING_MODE:
+    description: "The state sync continuous syncing mode for the fullnode."
+    required: true
+  DATA_DIR_FILE_PATH:
+    description: "The file path for the node data directory."
+    required: true
+  NODE_LOG_FILE_PATH:
+    description: "The file path for the node logs to be written to."
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Install Dependencies
+      shell: bash
+      run: |
+        echo "${HOME}/bin/" >> $GITHUB_PATH # default INSTALL_DIR to path
+        scripts/dev_setup.sh -b # Install dependencies
+    - name: Run fullnode sync
+      shell: bash
+      run: |
+        source "$HOME/.cargo/env" # Required for allowing python access to cargo
+        pip install -r ${{ github.action_path }}/requirements.txt
+        timeout "${{ inputs.TIMEOUT_MINUTES }}m" python3 ${{ github.action_path }}/fullnode_sync.py
+      env:
+        BRANCH: ${{ inputs.BRANCH }}
+        NETWORK: ${{ inputs.NETWORK }}
+        BOOTSTRAPPING_MODE: ${{ inputs.BOOTSTRAPPING_MODE }}
+        CONTINUOUS_SYNCING_MODE: ${{ inputs.CONTINUOUS_SYNCING_MODE }}
+        DATA_DIR_FILE_PATH: ${{ inputs.DATA_DIR_FILE_PATH }}
+        NODE_LOG_FILE_PATH: ${{ inputs.NODE_LOG_FILE_PATH }}

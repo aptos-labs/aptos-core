@@ -1,17 +1,16 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, format_err, Result};
 use aptos_sdk::transaction_builder::TransactionFactory;
+use aptos_transaction_emitter_lib::{query_sequence_number, Cluster, TxnEmitter};
 use futures::future::join_all;
-use itertools::zip;
-use rand::{rngs::StdRng, Rng, SeedableRng};
-use rand_core::OsRng;
+use rand::{rngs::StdRng, SeedableRng};
 use std::{
     cmp::min,
+    iter::zip,
     time::{Duration, Instant},
 };
-use transaction_emitter_lib::{query_sequence_number, Cluster, TxnEmitter};
 
 pub async fn diag(cluster: &Cluster) -> Result<()> {
     let client = cluster.random_instance().rest_client();
@@ -19,12 +18,12 @@ pub async fn diag(cluster: &Cluster) -> Result<()> {
     let emitter = TxnEmitter::new(
         TransactionFactory::new(cluster.chain_id)
             .with_gas_unit_price(aptos_global_constants::GAS_UNIT_PRICE),
-        StdRng::from_seed(OsRng.gen()),
+        StdRng::from_entropy(),
     );
     let coin_source_account_address = coin_source_account.address();
     let instances: Vec<_> = cluster.all_instances().collect();
     for instance in &instances {
-        print!("Submitting txn through {}...", instance);
+        print!("Submitting a single txn through {}...", instance);
         let deadline = emitter
             .submit_single_transaction(
                 &instance.rest_client(),
@@ -36,7 +35,8 @@ pub async fn diag(cluster: &Cluster) -> Result<()> {
             .map_err(|e| format_err!("Failed to submit txn through {}: {:?}", instance, e))?;
         println!("seq={}", coin_source_account.sequence_number());
         println!(
-            "Waiting all full nodes to get to seq {}",
+            "Waiting for rest endpoint {} to get to seq {}",
+            instance,
             coin_source_account.sequence_number()
         );
         loop {
@@ -67,7 +67,7 @@ pub async fn diag(cluster: &Cluster) -> Result<()> {
                 break;
             }
             if Instant::now() > deadline {
-                bail!("Not all full nodes were updated and transaction expired");
+                bail!("Not all end points were updated and transaction expired");
             }
             tokio::time::sleep(Duration::from_secs(1)).await;
         }

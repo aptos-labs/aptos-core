@@ -1,19 +1,25 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::smoke_test_environment::{new_local_swarm_with_aptos, SwarmBuilder};
-use aptos::common::types::EncodingType;
-use aptos::test::CliTestFramework;
-use aptos_config::config::Peer;
+use crate::{
+    smoke_test_environment::{new_local_swarm_with_aptos, SwarmBuilder},
+    state_sync::test_all_validator_failures,
+    test_utils::{MAX_CONNECTIVITY_WAIT_SECS, MAX_HEALTHY_WAIT_SECS},
+};
+use aptos::{common::types::EncodingType, test::CliTestFramework};
 use aptos_config::{
-    config::{DiscoveryMethod, Identity, NetworkConfig, NodeConfig, PeerSet},
+    config::{
+        DiscoveryMethod, FileDiscovery, Identity, NetworkConfig, NodeConfig, Peer, PeerSet,
+        RestDiscovery,
+    },
     network_id::NetworkId,
 };
 use aptos_crypto::{x25519, x25519::PrivateKey};
+use aptos_forge::{FullNode, Node, NodeExt, Swarm};
 use aptos_genesis::config::HostAndPort;
 use aptos_sdk::move_types::account_address::AccountAddress;
 use aptos_temppath::TempPath;
-use forge::{FullNode, NodeExt, Swarm};
 use std::{
     collections::HashMap,
     path::Path,
@@ -33,15 +39,15 @@ async fn test_connection_limiting() {
     let (private_key, peer_set) =
         generate_private_key_and_peer(&cli, host.clone(), [1u8; 32]).await;
     let discovery_file = create_discovery_file(peer_set.clone());
-    let mut full_node_config = NodeConfig::default_for_validator_full_node();
+    let mut full_node_config = NodeConfig::get_default_vfn_config();
     modify_network_config(&mut full_node_config, &NetworkId::Public, |network| {
         network.discovery_method = DiscoveryMethod::None;
         network.discovery_methods = vec![
             DiscoveryMethod::Onchain,
-            DiscoveryMethod::File(
-                discovery_file.as_ref().to_path_buf(),
-                Duration::from_secs(1),
-            ),
+            DiscoveryMethod::File(FileDiscovery {
+                path: discovery_file.path().to_path_buf(),
+                interval_secs: 1,
+            }),
         ];
         network.max_inbound_connections = 0;
     });
@@ -54,7 +60,7 @@ async fn test_connection_limiting() {
     swarm
         .fullnode_mut(vfn_peer_id)
         .unwrap()
-        .wait_until_healthy(Instant::now() + Duration::from_secs(10))
+        .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_HEALTHY_WAIT_SECS))
         .await
         .unwrap();
 
@@ -63,7 +69,7 @@ async fn test_connection_limiting() {
         .add_full_node(
             &version,
             add_identity_to_config(
-                NodeConfig::default_for_public_full_node(),
+                NodeConfig::get_default_pfn_config(),
                 &NetworkId::Public,
                 private_key,
                 peer_set,
@@ -73,13 +79,13 @@ async fn test_connection_limiting() {
     swarm
         .fullnode_mut(pfn_peer_id)
         .unwrap()
-        .wait_until_healthy(Instant::now() + Duration::from_secs(10))
+        .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_HEALTHY_WAIT_SECS))
         .await
         .unwrap();
     // This node should connect
     FullNode::wait_for_connectivity(
         swarm.fullnode(pfn_peer_id).unwrap(),
-        Instant::now() + Duration::from_secs(10),
+        Instant::now() + Duration::from_secs(MAX_CONNECTIVITY_WAIT_SECS),
     )
     .await
     .unwrap();
@@ -103,7 +109,7 @@ async fn test_connection_limiting() {
         .add_full_node(
             &version,
             add_identity_to_config(
-                NodeConfig::default_for_public_full_node(),
+                NodeConfig::get_default_pfn_config(),
                 &NetworkId::Public,
                 private_key,
                 peer_set,
@@ -115,7 +121,7 @@ async fn test_connection_limiting() {
     swarm
         .fullnode_mut(pfn_peer_id_fail)
         .unwrap()
-        .wait_until_healthy(Instant::now() + Duration::from_secs(10))
+        .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_HEALTHY_WAIT_SECS))
         .await
         .unwrap();
     tokio::time::sleep(Duration::from_secs(5)).await;
@@ -129,6 +135,27 @@ async fn test_connection_limiting() {
             .unwrap()
             .unwrap_or(0)
     );
+}
+
+#[tokio::test]
+async fn test_rest_discovery() {
+    let mut swarm = SwarmBuilder::new_local(1).with_aptos().build().await;
+
+    // Point to an already existing node
+    let (version, rest_endpoint) = {
+        let validator = swarm.validators().next().unwrap();
+        (validator.version(), validator.rest_api_endpoint())
+    };
+    let mut full_node_config = NodeConfig::get_default_pfn_config();
+    let network_config = full_node_config.full_node_networks.first_mut().unwrap();
+    network_config.discovery_method = DiscoveryMethod::Rest(RestDiscovery {
+        url: rest_endpoint,
+        interval_secs: 1,
+    });
+
+    // Start a new node that should connect to the previous node only via REST
+    // The startup wait time should check if it connects successfully
+    swarm.add_full_node(&version, full_node_config).unwrap();
 }
 
 // Currently this test seems flaky: https://github.com/aptos-labs/aptos-core/issues/670
@@ -149,10 +176,10 @@ async fn test_file_discovery() {
                 network.discovery_method = DiscoveryMethod::None;
                 network.discovery_methods = vec![
                     DiscoveryMethod::Onchain,
-                    DiscoveryMethod::File(
-                        (*discovery_file_for_closure2).as_ref().to_path_buf(),
-                        Duration::from_millis(100),
-                    ),
+                    DiscoveryMethod::File(FileDiscovery {
+                        path: discovery_file_for_closure2.path().to_path_buf(),
+                        interval_secs: 1,
+                    }),
                 ];
             });
         }))
@@ -168,6 +195,30 @@ async fn test_file_discovery() {
     tokio::time::sleep(Duration::from_millis(300)).await;
 
     // TODO: Check connection
+}
+
+// TODO: add more complex tests for the peer monitoring service.
+// TODO: move the state sync functions to a utility file (instead of importing directly).
+
+#[tokio::test]
+async fn test_peer_monitoring_service_enabled() {
+    // Create a swarm of 4 validators with peer monitoring enabled
+    let swarm = SwarmBuilder::new_local(4)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, config, _| {
+            config.peer_monitoring_service.enable_peer_monitoring_client = true;
+        }))
+        .build()
+        .await;
+
+    // Create a fullnode config that with peer monitoring enabled
+    let mut vfn_config = NodeConfig::get_default_vfn_config();
+    vfn_config
+        .peer_monitoring_service
+        .enable_peer_monitoring_client = true;
+
+    // Test the ability of the validators to sync
+    test_all_validator_failures(swarm).await;
 }
 
 /// Creates a discovery file with the given `PeerSet`

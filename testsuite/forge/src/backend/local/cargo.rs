@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::Result;
@@ -21,6 +22,10 @@ pub struct Metadata {
 
 pub fn use_release() -> bool {
     option_env!("LOCAL_SWARM_NODE_RELEASE").is_some()
+}
+
+pub fn build_consensus_only_node() -> bool {
+    option_env!("CONSENSUS_ONLY_PERF_TEST").is_some()
 }
 
 pub fn metadata() -> Result<Metadata> {
@@ -104,7 +109,7 @@ fn git_rev_parse<R: AsRef<str>>(metadata: &Metadata, rev: R) -> Result<String> {
 // Determine if the worktree is dirty
 fn git_is_worktree_dirty() -> Result<bool> {
     Command::new("git")
-        .args(&["diff-index", "--name-only", "HEAD", "--"])
+        .args(["diff-index", "--name-only", "HEAD", "--"])
         .output()
         .context("Failed to determine if the worktree is dirty")
         .map(|output| !output.stdout.is_empty())
@@ -152,25 +157,30 @@ pub fn git_merge_base<R: AsRef<str>>(rev: R) -> Result<String> {
     }
 }
 
+pub fn cargo_build_common_args() -> Vec<&'static str> {
+    let use_release = use_release();
+    let consensus_only = build_consensus_only_node();
+    let mut args = vec!["build", "--features=failpoints,indexer"];
+    if consensus_only {
+        args.push("--features=consensus-only-perf-test");
+    }
+    if use_release {
+        args.push("--release");
+    };
+    args
+}
+
 fn cargo_build_aptos_node<D, T>(directory: D, target_directory: T) -> Result<PathBuf>
 where
     D: AsRef<Path>,
     T: AsRef<Path>,
 {
-    let use_release = use_release();
-
     let target_directory = target_directory.as_ref();
     let directory = directory.as_ref();
 
+    let mut args = cargo_build_common_args();
     // build the aptos-node package directly to avoid feature unification issues
-    let mut args = vec![
-        "build",
-        "--package=aptos-node",
-        "--features=failpoints,indexer",
-    ];
-    if use_release {
-        args.push("--release");
-    }
+    args.push("--package=aptos-node");
     info!("Compiling with cargo args: {:?}", args);
     let output = Command::new("cargo")
         .current_dir(directory)
@@ -182,7 +192,7 @@ where
     if output.status.success() {
         let bin_path = target_directory.join(format!(
             "{}/{}{}",
-            if use_release { "release" } else { "debug" },
+            if use_release() { "release" } else { "debug" },
             "aptos-node",
             env::consts::EXE_SUFFIX
         ));
@@ -216,7 +226,7 @@ fn checkout_revision(metadata: &Metadata, revision: &str, to: &Path) -> Result<(
         .arg("--format=tar")
         .arg("--output")
         .arg(&archive_file)
-        .arg(&revision)
+        .arg(revision)
         .output()
         .context("Failed to run git archive")?;
     if !output.status.success() {

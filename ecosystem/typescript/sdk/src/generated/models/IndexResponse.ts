@@ -21,6 +21,10 @@ export type IndexResponse = {
     node_role: RoleType;
     oldest_block_height: U64;
     block_height: U64;
+    /**
+     * Git hash of the build of the API endpoint.  Can be used to determine the exact
+     * software version used by the API endpoint.
+     */
     git_hash?: string;
 };
 

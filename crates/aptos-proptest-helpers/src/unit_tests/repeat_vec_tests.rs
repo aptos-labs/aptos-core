@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::RepeatVec;
@@ -272,16 +273,16 @@ fn repeat_vec_proptest_impl(
                 } else {
                     prop_assert!(test_get.is_some());
                 }
-            }
+            },
             RepeatVecOp::Extend((counter, size)) => {
                 test_vec.extend(counter.clone(), size);
                 naive_vec.extend(counter.clone(), size);
-            }
+            },
             RepeatVecOp::Remove(prop_index) => {
                 let logical_index = scaled_index(prop_index, test_vec.len());
                 test_vec.remove(logical_index);
                 naive_vec.remove(logical_index);
-            }
+            },
             RepeatVecOp::RemoveAll(prop_indexes) => {
                 let logical_indexes: Vec<_> = prop_indexes
                     .into_iter()
@@ -293,7 +294,7 @@ fn repeat_vec_proptest_impl(
 
                 test_vec.remove_all(logical_indexes.iter().copied());
                 naive_vec.remove_all(logical_indexes);
-            }
+            },
         }
 
         prop_assert_eq!(test_vec.len(), naive_vec.len());

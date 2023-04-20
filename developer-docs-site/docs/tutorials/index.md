@@ -1,11 +1,13 @@
 ---
-title: "Developer Tutorials"
+title: "Develop with Aptos SDKs"
 slug: "aptos-quickstarts"
 ---
 
-# Developer Tutorials
+# Develop with the Aptos SDKs
 
 If you are new to the Aptos blockchain, begin with these quickstarts before you get into in-depth development. These tutorials will help you become familiar with how to develop for the Aptos blockchain using the Aptos SDK.
+
+These tutorials are intended for use in devnet or testnet and assume you have already [prepared your development environment for Aptos](../guides/getting-started.md).
 
 ### Install macOS prerequisites
 
@@ -16,15 +18,15 @@ If running macOS, install the following packages in the order specified to take 
     ```bash
     brew install node
     ```
-1. **Yarn**: Install the latest [Yarn](https://classic.yarnpkg.com/lang/en/docs/install/#mac-stable) by executing the below command on your Terminal:
+1. **pnpm**: Install the latest [pnpm](https://pnpm.io/) by executing the below command on your Terminal:
     ```bash
-    brew install yarn
+    curl -fsSL https://get.pnpm.io/install.sh | sh -
     ```
 1. **Poetry**: Install Poetry from [https://python-poetry.org/docs/#installation](https://python-poetry.org/docs/#installation).
 
 ### [Your First Transaction](first-transaction.md)
 
-How to [generate, submit and verify a transaction](first-transaction.md) to the Aptos blockchain. 
+How to [generate, submit and verify a transaction](first-transaction.md) to the Aptos blockchain.
 
 ### [Your First NFT](your-first-nft.md)
 
@@ -32,7 +34,7 @@ Learn the Aptos `token` interface and how to use it to [generate your first NFT]
 
 ### [Your First Move Module](first-move-module.md)
 
-[Write your first Move module](first-move-module.md) for the Aptos blockchain. 
+[Write your first Move module](first-move-module.md) for the Aptos blockchain.
 
 :::tip
 Make sure to run the [Your First Transaction](first-transaction.md) tutorial before running your first Move module.
@@ -45,3 +47,8 @@ Learn how to [build your first dapp](first-dapp.md). Focuses on building the use
 ### [Your First Coin](first-coin.md)
 
 Learn how to [deploy and manage a coin](first-coin.md). The `coin` interface is defined in the [`coin.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move) Move module.
+
+
+### [Your First Multisig](first-multisig.md)
+
+Learn how to perform assorted operations using [K-of-N multisigner authentication](../concepts/accounts.md#multi-signer-authentication).

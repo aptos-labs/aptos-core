@@ -1,35 +1,40 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     block_storage::{BlockReader, BlockStore},
     epoch_manager::LivenessStorageData,
     logging::{LogEvent, LogSchema},
+    monitor,
     network::{IncomingBlockRetrievalRequest, NetworkSender},
     network_interface::ConsensusMsg,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
     state_replication::StateComputer,
 };
 use anyhow::{bail, Context};
+use aptos_consensus_types::{
+    block::Block,
+    block_retrieval::{
+        BlockRetrievalRequest, BlockRetrievalResponse, BlockRetrievalStatus,
+        MAX_BLOCKS_PER_REQUEST, NUM_PEERS_PER_RETRY, NUM_RETRIES, RETRY_INTERVAL_MSEC,
+        RPC_TIMEOUT_MSEC,
+    },
+    common::Author,
+    quorum_cert::QuorumCert,
+    sync_info::SyncInfo,
+};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_types::{
     account_address::AccountAddress, epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures,
 };
-use consensus_types::{
-    block::Block,
-    block_retrieval::{
-        BlockRetrievalRequest, BlockRetrievalResponse, BlockRetrievalStatus,
-        MAX_BLOCKS_PER_REQUEST, MAX_FAILED_ATTEMPTS,
-    },
-    common::Author,
-    quorum_cert::QuorumCert,
-    sync_info::SyncInfo,
-};
 use fail::fail_point;
+use futures::{stream::FuturesUnordered, StreamExt};
 use rand::{prelude::*, Rng};
 use std::{clone::Clone, cmp::min, sync::Arc, time::Duration};
+use tokio::time;
 
 #[derive(Debug, PartialEq, Eq)]
 /// Whether we need to do block retrieval if we want to insert a Quorum Cert.
@@ -46,7 +51,8 @@ impl BlockStore {
     pub fn need_sync_for_ledger_info(&self, li: &LedgerInfoWithSignatures) -> bool {
         (self.ordered_root().round() < li.commit_info().round()
             && !self.block_exists(li.commit_info().id()))
-            || self.commit_root().round() + 2 * self.back_pressure_limit < li.commit_info().round()
+            || self.commit_root().round() + 2 * self.vote_back_pressure_limit
+                < li.commit_info().round()
     }
 
     /// Checks if quorum certificate can be inserted in block store without RPC
@@ -240,7 +246,7 @@ impl BlockStore {
             blocks.first().expect("blocks are empty").id(),
         );
 
-        // Confirm retrival ended when it hit the last block we care about, even if it didn't reach all num_blocks blocks.
+        // Confirm retrieval ended when it hit the last block we care about, even if it didn't reach all num_blocks blocks.
         assert_eq!(
             blocks.last().expect("blocks are empty").id(),
             highest_commit_cert.commit_info().id()
@@ -260,11 +266,15 @@ impl BlockStore {
             .iter()
             .any(|block| block.id() == highest_commit_cert.certified_block().id())
         {
+            info!(
+                "Found forked QC {}, fetching it as well",
+                highest_commit_cert
+            );
             let mut additional_blocks = retriever
                 .retrieve_block_for_qc(
                     highest_commit_cert,
                     1,
-                    highest_commit_cert.commit_info().id(),
+                    highest_commit_cert.certified_block().id(),
                 )
                 .await?;
 
@@ -406,6 +416,86 @@ impl BlockRetriever {
         }
     }
 
+    async fn retrieve_block_for_id_chunk(
+        &mut self,
+        block_id: HashValue,
+        target_block_id: HashValue,
+        retrieve_batch_size: u64,
+        mut peers: Vec<AccountAddress>,
+    ) -> anyhow::Result<BlockRetrievalResponse> {
+        let mut failed_attempt = 0_u32;
+        let mut cur_retry = 0;
+
+        let num_retries = NUM_RETRIES;
+        let request_num_peers = NUM_PEERS_PER_RETRY;
+        let retry_interval = Duration::from_millis(RETRY_INTERVAL_MSEC);
+        let rpc_timeout = Duration::from_millis(RPC_TIMEOUT_MSEC);
+
+        monitor!("retrieve_block_for_id_chunk", {
+            let mut interval = time::interval(retry_interval);
+            let mut futures = FuturesUnordered::new();
+            let request = BlockRetrievalRequest::new_with_target_block_id(
+                block_id,
+                retrieve_batch_size,
+                target_block_id,
+            );
+            loop {
+                tokio::select! {
+                    _ = interval.tick() => {
+                        // send batch request to a set of peers of size request_num_peers (or 1 for the first time)
+                        let next_peers = if cur_retry < num_retries {
+                            let first_atempt = cur_retry == 0;
+                            cur_retry += 1;
+                            self.pick_peers(
+                                first_atempt,
+                                &mut peers,
+                                if first_atempt { 1 } else {request_num_peers}
+                            )
+                        } else {
+                            Vec::new()
+                        };
+
+                        if next_peers.is_empty() && futures.is_empty() {
+                            bail!("Couldn't fetch block")
+                        }
+
+                        for peer in next_peers {
+                            debug!(
+                                LogSchema::new(LogEvent::RetrieveBlock).remote_peer(peer),
+                                block_id = block_id,
+                                "Fetching {} blocks, retry {}, failed attempts {}",
+                                retrieve_batch_size,
+                                cur_retry,
+                                failed_attempt
+                            );
+                            let remote_peer = peer;
+                            let future = self.network.request_block(
+                                request.clone(),
+                                peer,
+                                rpc_timeout,
+                            );
+                            futures.push(async move { (remote_peer, future.await) });
+                        }
+                    }
+                    Some((peer, response)) = futures.next() => {
+                        match response {
+                            Ok(result) => return Ok(result),
+                            e => {
+                                warn!(
+                                    remote_peer = peer,
+                                    block_id = block_id,
+                                    "{:?}, Failed to fetch block",
+                                    e,
+                                );
+                                failed_attempt += 1;
+                            },
+                        }
+                    },
+                }
+            }
+        })
+    }
+
     /// Retrieve n blocks for given block_id from peers
     ///
     /// Returns Result with Vec that if succeeded. This method will
@@ -419,7 +509,7 @@ impl BlockRetriever {
         &mut self,
         block_id: HashValue,
         target_block_id: HashValue,
-        peers: &mut Vec<AccountAddress>,
+        peers: Vec<AccountAddress>,
         num_blocks: u64,
     ) -> anyhow::Result<Vec<Block>> {
         info!(
@@ -433,32 +523,23 @@ impl BlockRetriever {
         if peers.is_empty() {
             bail!("Failed to fetch block {}: no peers available", block_id);
         }
-        let mut failed_attempt = 0_u32;
-        let mut peer = self.pick_peer(failed_attempt, peers);
         while progress < num_blocks {
             // in case this is the last retrieval
             retrieve_batch_size = min(retrieve_batch_size, num_blocks - progress);
 
-            debug!(
-                LogSchema::new(LogEvent::RetrieveBlock).remote_peer(peer),
-                block_id = block_id,
-                "Fetching {} blocks, failed attempt {}",
-                retrieve_batch_size,
-                failed_attempt
+            info!(
+                "Retrieving chunk: {} blocks starting from {}, original start {}",
+                retrieve_batch_size, last_block_id, block_id
             );
+
             let response = self
-                .network
-                .request_block(
-                    BlockRetrievalRequest::new_with_target_block_id(
-                        last_block_id,
-                        retrieve_batch_size,
-                        target_block_id,
-                    ),
-                    peer,
-                    retrieval_timeout(failed_attempt + 1),
+                .retrieve_block_for_id_chunk(
+                    last_block_id,
+                    target_block_id,
+                    retrieve_batch_size,
+                    peers.clone(),
                 )
                 .await;
-
             match response {
                 Ok(result) if matches!(result.status(), BlockRetrievalStatus::Succeeded) => {
                     // extend the result blocks
@@ -466,7 +547,7 @@ impl BlockRetriever {
                     progress += batch.len() as u64;
                     last_block_id = batch.last().unwrap().parent_id();
                     result_blocks.extend(batch);
-                }
+                },
                 Ok(result)
                     if matches!(result.status(), BlockRetrievalStatus::SucceededWithTarget) =>
                 {
@@ -474,25 +555,14 @@ impl BlockRetriever {
                     let batch = result.blocks().clone();
                     result_blocks.extend(batch);
                     break;
-                }
-                e => {
-                    warn!(
-                        remote_peer = peer,
-                        block_id = block_id,
-                        "{:?}, Failed to fetch block, trying another peer",
-                        e,
+                },
+                _e => {
+                    bail!(
+                        "Failed to fetch block {}, for original start {}",
+                        last_block_id,
+                        block_id,
                     );
-                    // select next peer to try
-                    if peers.is_empty() || failed_attempt >= MAX_FAILED_ATTEMPTS {
-                        bail!(
-                            "Failed to fetch block {} in {} attempts",
-                            block_id,
-                            failed_attempt + 1,
-                        );
-                    }
-                    failed_attempt += 1;
-                    peer = self.pick_peer(failed_attempt, peers);
-                }
+                },
             }
         }
         assert_eq!(result_blocks.last().unwrap().id(), target_block_id);
@@ -506,20 +576,20 @@ impl BlockRetriever {
         num_blocks: u64,
         target_block_id: HashValue,
     ) -> anyhow::Result<Vec<Block>> {
-        let mut peers = qc.ledger_info().get_voters(&self.validator_addresses);
+        let peers = qc.ledger_info().get_voters(&self.validator_addresses);
         self.retrieve_block_for_id(
             qc.certified_block().id(),
             target_block_id,
-            &mut peers,
+            peers,
             num_blocks,
         )
         .await
     }
 
-    fn pick_peer(&self, attempt: u32, peers: &mut Vec<AccountAddress>) -> AccountAddress {
+    fn pick_peer(&self, first_atempt: bool, peers: &mut Vec<AccountAddress>) -> AccountAddress {
         assert!(!peers.is_empty(), "pick_peer on empty peer list");
 
-        if attempt == 0 {
+        if first_atempt {
             // remove preferred_peer if its in list of peers
             // (strictly speaking it is not required to be there)
             for i in 0..peers.len() {
@@ -534,17 +604,17 @@ impl BlockRetriever {
         let peer_idx = thread_rng().gen_range(0, peers.len());
         peers.remove(peer_idx)
     }
-}
 
-// Max timeout is 16s=RETRIEVAL_INITIAL_TIMEOUT*(2^RETRIEVAL_MAX_EXP)
-const RETRIEVAL_INITIAL_TIMEOUT: Duration = Duration::from_millis(500);
-const RETRIEVAL_MAX_EXP: u32 = 2;
-
-/// Returns exponentially increasing timeout with
-/// limit of RETRIEVAL_INITIAL_TIMEOUT*(2^RETRIEVAL_MAX_EXP)
-#[allow(clippy::trivially_copy_pass_by_ref)]
-fn retrieval_timeout(attempt: u32) -> Duration {
-    assert!(attempt > 0, "retrieval_timeout attempt can't be 0");
-    let exp = RETRIEVAL_MAX_EXP.min(attempt - 1); // [0..RETRIEVAL_MAX_EXP]
-    RETRIEVAL_INITIAL_TIMEOUT * 2_u32.pow(exp)
+    fn pick_peers(
+        &self,
+        first_atempt: bool,
+        peers: &mut Vec<AccountAddress>,
+        request_num_peers: usize,
+    ) -> Vec<AccountAddress> {
+        let mut result = Vec::new();
+        while !peers.is_empty() && result.len() < request_num_peers {
+            result.push(self.pick_peer(first_atempt && result.is_empty(), peers));
+        }
+        result
+    }
 }

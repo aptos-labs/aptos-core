@@ -1,14 +1,14 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::build_model;
-use codespan_reporting::diagnostic::Severity;
-use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
+use codespan_reporting::{
+    diagnostic::Severity,
+    term::termcolor::{ColorChoice, StandardStream},
+};
 use log::LevelFilter;
 use move_core_types::account_address::AccountAddress;
-use std::collections::BTreeMap;
-use std::path::Path;
-use std::time::Instant;
+use std::{collections::BTreeMap, path::Path, time::Instant};
 use tempfile::TempDir;
 
 #[derive(Debug, Clone, clap::Parser, serde::Serialize, serde::Deserialize)]
@@ -100,10 +100,16 @@ impl ProverOptions {
         self,
         package_path: &Path,
         named_addresses: BTreeMap<String, AccountAddress>,
+        bytecode_version: Option<u32>,
     ) -> anyhow::Result<()> {
         let now = Instant::now();
         let for_test = self.for_test;
-        let model = build_model(package_path, named_addresses, self.filter.clone())?;
+        let model = build_model(
+            package_path,
+            named_addresses,
+            self.filter.clone(),
+            bytecode_version,
+        )?;
         let mut options = self.convert_options();
         // Need to ensure a distinct output.bpl file for concurrent execution. In non-test
         // mode, we actually want to use the static output.bpl for debugging purposes
@@ -123,6 +129,15 @@ impl ProverOptions {
                 .to_string();
             None
         };
+        options.backend.custom_natives =
+            Some(move_prover_boogie_backend::options::CustomNativeOptions {
+                template_bytes: include_bytes!("aptos-natives.bpl").to_vec(),
+                module_instance_names: vec![(
+                    "0x1::object".to_string(),
+                    "object_instances".to_string(),
+                    true,
+                )],
+            });
         let mut writer = StandardStream::stderr(ColorChoice::Auto);
         move_prover::run_move_prover_with_model(&model, &mut writer, options, Some(now))?;
         Ok(())

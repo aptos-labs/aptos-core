@@ -1,20 +1,23 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 #[macro_use]
 extern crate criterion;
 
+use aptos_crypto::{bls12381::DST_BLS_SIG_IN_G2_WITH_POP, test_utils::random_bytes};
+use blake2::{
+    digest::{Update, VariableOutput},
+    Blake2bVar,
+};
+use blake2_rfc::blake2b::Blake2b;
 use criterion::{
     measurement::Measurement, AxisScale, BenchmarkGroup, BenchmarkId, Criterion, PlotConfiguration,
     Throughput,
 };
 use digest::Digest;
 use rand::thread_rng;
-use std::ptr::null;
-
-use aptos_crypto::bls12381::DST_BLS_SIG_IN_G2_WITH_POP;
-use aptos_crypto::test_utils::random_bytes;
 use sha2::{Sha256, Sha512};
+use std::ptr::null;
 use tiny_keccak::{Hasher as KeccakHasher, Keccak};
 
 /// Runs all the benchmarks.
@@ -41,6 +44,8 @@ fn bench_group(c: &mut Criterion) {
         hash_to_g1(&mut group, n, DST_BLS_SIG_IN_G2_WITH_POP);
         hash_to_g2(&mut group, n, DST_BLS_SIG_IN_G2_WITH_POP);
         keccak256(&mut group, n);
+        blake2_blake2b_256(&mut group, n);
+        blake2_rfc_blake2b_256(&mut group, n);
     }
 
     group.finish();
@@ -197,6 +202,52 @@ pub fn hash_to_g2<M: Measurement>(g: &mut BenchmarkGroup<M>, n: usize, dst: &[u8
             },
         )
     });
+}
+
+fn blake2_blake2b_256<M: Measurement>(g: &mut BenchmarkGroup<M>, n: usize) {
+    let mut rng = thread_rng();
+
+    g.throughput(Throughput::Bytes(n as u64));
+
+    g.bench_function(BenchmarkId::new("blake2b-256/crate-blake2", n), move |b| {
+        b.iter_with_setup(
+            || random_bytes(&mut rng, n),
+            |bytes| {
+                assert_eq!(bytes.len(), n);
+
+                let mut hasher = Blake2bVar::new(32).unwrap();
+                hasher.update(&bytes);
+                let mut output = vec![0u8; 32];
+                hasher.finalize_variable(&mut output).unwrap();
+
+                assert_eq!(output.as_slice().len(), 32);
+            },
+        )
+    });
+}
+
+fn blake2_rfc_blake2b_256<M: Measurement>(g: &mut BenchmarkGroup<M>, n: usize) {
+    let mut rng = thread_rng();
+
+    g.throughput(Throughput::Bytes(n as u64));
+
+    g.bench_function(
+        BenchmarkId::new("blake2b-256/crate-blake2-rfc", n),
+        move |b| {
+            b.iter_with_setup(
+                || random_bytes(&mut rng, n),
+                |bytes| {
+                    assert_eq!(bytes.len(), n);
+
+                    // Using the state context.
+                    let mut context = Blake2b::new(32);
+                    context.update(&bytes);
+                    let hash = context.finalize();
+                    assert_eq!(hash.as_bytes().len(), 32);
+                },
+            )
+        },
+    );
 }
 
 criterion_group!(

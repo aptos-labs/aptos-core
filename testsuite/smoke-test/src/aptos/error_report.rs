@@ -1,14 +1,13 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::smoke_test_environment::new_local_swarm_with_aptos;
+use aptos_cached_packages::aptos_stdlib;
+use aptos_forge::{AptosPublicInfo, Swarm};
 use aptos_sdk::{transaction_builder::TransactionBuilder, types::LocalAccount};
 use aptos_types::{
     account_address::AccountAddress, account_config::aptos_test_root_address, chain_id::ChainId,
 };
-use cached_packages::aptos_stdlib;
-use forge::{AptosPublicInfo, Swarm};
-
-use crate::smoke_test_environment::new_local_swarm_with_aptos;
 
 async fn submit_and_check_err<F: Fn(TransactionBuilder) -> TransactionBuilder>(
     local_account: &LocalAccount,

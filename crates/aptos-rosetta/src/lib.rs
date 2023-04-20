@@ -1,28 +1,21 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! Aptos Rosetta API
 //!
 //! [Rosetta API Spec](https://www.rosetta-api.org/docs/Reference.html)
 
-use crate::types::Store;
 use crate::{
     block::BlockRetriever,
     common::{handle_request, with_context},
     error::{ApiError, ApiResult},
+    types::Store,
 };
 use aptos_config::config::ApiConfig;
 use aptos_logger::{debug, warn};
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use aptos_warp_webserver::{logger, Error, WebServer};
-use std::{
-    collections::BTreeMap,
-    convert::Infallible,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
-};
+use std::{collections::BTreeMap, convert::Infallible, sync::Arc};
 use tokio::task::JoinHandle;
 use warp::{
     http::{HeaderValue, Method, StatusCode},
@@ -77,7 +70,7 @@ impl RosettaContext {
                     let pool_addresses: Vec<_> = store
                         .staking_contracts
                         .iter()
-                        .map(|(_operator, pool)| pool.pool_address)
+                        .map(|(_, pool)| pool.pool_address)
                         .collect();
                     for pool_address in pool_addresses {
                         pool_address_to_owner.insert(pool_address, *owner_address);
@@ -121,16 +114,7 @@ pub fn bootstrap(
     rest_client: Option<aptos_rest_client::Client>,
     owner_addresses: Vec<AccountAddress>,
 ) -> anyhow::Result<tokio::runtime::Runtime> {
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .thread_name_fn(|| {
-            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
-            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
-            format!("rosetta-{}", id)
-        })
-        .disable_lifo_slot()
-        .enable_all()
-        .build()
-        .expect("[rosetta] failed to create runtime");
+    let runtime = aptos_runtimes::spawn_named_runtime("rosetta".into(), None);
 
     debug!("Starting up Rosetta server with {:?}", api_config);
 
@@ -186,7 +170,7 @@ pub async fn bootstrap_async(
 /// Collection of all routes for the server
 pub fn routes(
     context: RosettaContext,
-) -> impl Filter<Extract = impl Reply, Error = Infallible> + Clone {
+) -> impl Filter<Extract = (impl Reply,), Error = Infallible> + Clone {
     account::routes(context.clone())
         .or(block::block_route(context.clone()))
         .or(construction::combine_route(context.clone()))
@@ -235,7 +219,7 @@ const HEALTH_CHECK_DEFAULT_SECS: u64 = 300;
 
 pub fn health_check_route(
     server_context: RosettaContext,
-) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
     warp::path!("-" / "healthy")
         .and(warp::path::end())
         .and(warp::query().map(move |params: HealthCheckParams| params))

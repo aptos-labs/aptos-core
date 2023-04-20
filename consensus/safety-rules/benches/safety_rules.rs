@@ -1,11 +1,12 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_consensus_types::block::block_test_utils;
+use aptos_safety_rules::{test_utils, PersistentSafetyStorage, SafetyRulesManager, TSafetyRules};
 use aptos_secure_storage::{InMemoryStorage, KVStorage, OnDiskStorage, Storage, VaultStorage};
 use aptos_types::validator_signer::ValidatorSigner;
-use consensus_types::block::block_test_utils;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use safety_rules::{test_utils, PersistentSafetyStorage, SafetyRulesManager, TSafetyRules};
 use tempfile::NamedTempFile;
 
 const VAULT_HOST: &str = "http://localhost:8200";

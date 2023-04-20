@@ -9,6 +9,7 @@ spec aptos_framework::timestamp {
         requires chain_status::is_operating();
         include UpdateGlobalTimeAbortsIf;
     }
+
     spec schema UpdateGlobalTimeAbortsIf {
         account: signer;
         proposer: address;

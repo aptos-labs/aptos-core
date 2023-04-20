@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::experimental;
@@ -24,8 +25,8 @@ impl From<experimental::errors::Error> for StateSyncError {
     }
 }
 
-impl From<executor_types::Error> for StateSyncError {
-    fn from(e: executor_types::Error) -> Self {
+impl From<aptos_executor_types::Error> for StateSyncError {
+    fn from(e: aptos_executor_types::Error) -> Self {
         StateSyncError { inner: e.into() }
     }
 }
@@ -52,11 +53,14 @@ pub struct VerifyError {
 }
 
 pub fn error_kind(e: &anyhow::Error) -> &'static str {
-    if e.downcast_ref::<executor_types::Error>().is_some() {
+    if e.downcast_ref::<aptos_executor_types::Error>().is_some() {
         return "Execution";
     }
     if let Some(e) = e.downcast_ref::<StateSyncError>() {
-        if e.inner.downcast_ref::<executor_types::Error>().is_some() {
+        if e.inner
+            .downcast_ref::<aptos_executor_types::Error>()
+            .is_some()
+        {
             return "Execution";
         }
         return "StateSync";
@@ -70,7 +74,7 @@ pub fn error_kind(e: &anyhow::Error) -> &'static str {
     if e.downcast_ref::<DbError>().is_some() {
         return "ConsensusDb";
     }
-    if e.downcast_ref::<safety_rules::Error>().is_some() {
+    if e.downcast_ref::<aptos_safety_rules::Error>().is_some() {
         return "SafetyRules";
     }
     if e.downcast_ref::<VerifyError>().is_some() {
@@ -86,7 +90,7 @@ mod tests {
 
     #[test]
     fn conversion_and_downcast() {
-        let error = executor_types::Error::InternalError {
+        let error = aptos_executor_types::Error::InternalError {
             error: "lalala".to_string(),
         };
         let typed_error: StateSyncError = error.into();

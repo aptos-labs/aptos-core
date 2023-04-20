@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 // This is required because a diesel macro makes clippy sad
@@ -87,7 +87,7 @@ impl UserTransaction {
                 entry_function_id_str: match &txn.request.payload {
                     TransactionPayload::EntryFunctionPayload(payload) => {
                         payload.function.to_string()
-                    }
+                    },
                     _ => String::default(),
                 },
                 epoch,

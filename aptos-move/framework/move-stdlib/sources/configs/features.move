@@ -18,7 +18,7 @@ module std::features {
     //   is typically associated with the introduction of new native Move functions, and is only used
     //   from Move code. The owner of this feature is obliged to remove it once this can be done.
     //
-    // - an *ephemeral* feature flag is required to stay around forever. Typically, those flags guard
+    // - an *permanent* feature flag is required to stay around forever. Typically, those flags guard
     //   behavior in native code, and the behavior with or without the feature need to be preserved
     //   for playback.
     //
@@ -41,10 +41,146 @@ module std::features {
 
     /// Whether during upgrade compatibility checking, friend functions should be treated similar like
     /// private functions.
-    /// Lifetime: ephemeral
+    /// Lifetime: permanent
     const TREAT_FRIEND_AS_PRIVATE: u64 = 2;
     public fun treat_friend_as_private(): bool acquires Features {
         is_enabled(TREAT_FRIEND_AS_PRIVATE)
+    }
+
+    /// Whether the new SHA2-512, SHA3-512 and RIPEMD-160 hash function natives are enabled.
+    /// This is needed because of the introduction of new native functions.
+    /// Lifetime: transient
+    const SHA_512_AND_RIPEMD_160_NATIVES: u64 = 3;
+
+    public fun get_sha_512_and_ripemd_160_feature(): u64 { SHA_512_AND_RIPEMD_160_NATIVES }
+
+    public fun sha_512_and_ripemd_160_enabled(): bool acquires Features {
+        is_enabled(SHA_512_AND_RIPEMD_160_NATIVES)
+    }
+
+    /// Whether the new `aptos_stdlib::type_info::chain_id()` native for fetching the chain ID is enabled.
+    /// This is needed because of the introduction of a new native function.
+    /// Lifetime: transient
+    const APTOS_STD_CHAIN_ID_NATIVES: u64 = 4;
+
+    public fun get_aptos_stdlib_chain_id_feature(): u64 { APTOS_STD_CHAIN_ID_NATIVES }
+
+    public fun aptos_stdlib_chain_id_enabled(): bool acquires Features {
+        is_enabled(APTOS_STD_CHAIN_ID_NATIVES)
+    }
+
+    /// Whether to allow the use of binary format version v6.
+    /// Lifetime: transient
+    const VM_BINARY_FORMAT_V6: u64 = 5;
+
+    public fun get_vm_binary_format_v6(): u64 { VM_BINARY_FORMAT_V6 }
+
+    public fun allow_vm_binary_format_v6(): bool acquires Features {
+        is_enabled(VM_BINARY_FORMAT_V6)
+    }
+
+    /// Whether gas fees are collected and distributed to the block proposers.
+    /// Lifetime: transient
+    const COLLECT_AND_DISTRIBUTE_GAS_FEES: u64 = 6;
+
+    public fun get_collect_and_distribute_gas_fees_feature(): u64 { COLLECT_AND_DISTRIBUTE_GAS_FEES }
+
+    public fun collect_and_distribute_gas_fees(): bool acquires Features {
+        is_enabled(COLLECT_AND_DISTRIBUTE_GAS_FEES)
+    }
+
+    /// Whether the new `aptos_stdlib::multi_ed25519::public_key_validate_internal_v2()` native is enabled.
+    /// This is needed because of the introduction of a new native function.
+    /// Lifetime: transient
+    const MULTI_ED25519_PK_VALIDATE_V2_NATIVES: u64 = 7;
+
+    public fun multi_ed25519_pk_validate_v2_feature(): u64 { MULTI_ED25519_PK_VALIDATE_V2_NATIVES }
+
+    public fun multi_ed25519_pk_validate_v2_enabled(): bool acquires Features {
+        is_enabled(MULTI_ED25519_PK_VALIDATE_V2_NATIVES)
+    }
+
+    /// Whether the new BLAKE2B-256 hash function native is enabled.
+    /// This is needed because of the introduction of new native function(s).
+    /// Lifetime: transient
+    const BLAKE2B_256_NATIVE: u64 = 8;
+
+    public fun get_blake2b_256_feature(): u64 { BLAKE2B_256_NATIVE }
+
+    public fun blake2b_256_enabled(): bool acquires Features {
+        is_enabled(BLAKE2B_256_NATIVE)
+    }
+
+    /// Whether resource groups are enabled.
+    /// This is needed because of new attributes for structs and a change in storage representation.
+    const RESOURCE_GROUPS: u64 = 9;
+
+    public fun get_resource_groups_feature(): u64 { RESOURCE_GROUPS }
+
+    public fun resource_groups_enabled(): bool acquires Features {
+        is_enabled(RESOURCE_GROUPS)
+    }
+
+    /// Whether multisig accounts (different from accounts with multi-ed25519 auth keys) are enabled.
+    const MULTISIG_ACCOUNTS: u64 = 10;
+
+    public fun get_multisig_accounts_feature(): u64 { MULTISIG_ACCOUNTS }
+
+    public fun multisig_accounts_enabled(): bool acquires Features {
+        is_enabled(MULTISIG_ACCOUNTS)
+    }
+
+    /// Whether delegation pools are enabled.
+    /// Lifetime: transient
+    const DELEGATION_POOLS: u64 = 11;
+
+    public fun get_delegation_pools_feature(): u64 { DELEGATION_POOLS }
+
+    public fun delegation_pools_enabled(): bool acquires Features {
+        is_enabled(DELEGATION_POOLS)
+    }
+
+    /// Whether generic algebra basic operation support in `crypto_algebra.move` are enabled.
+    ///
+    /// Lifetime: transient
+    const CRYPTOGRAPHY_ALGEBRA_NATIVES: u64 = 12;
+    public fun get_cryptography_algebra_natives_feature(): u64 { CRYPTOGRAPHY_ALGEBRA_NATIVES }
+    public fun cryptography_algebra_enabled(): bool acquires Features {
+        is_enabled(CRYPTOGRAPHY_ALGEBRA_NATIVES)
+    }
+
+    /// Whether the generic algebra implementation for BLS12381 operations are enabled.
+    ///
+    /// Lifetime: transient
+    const BLS12_381_STRUCTURES: u64 = 13;
+    public fun get_bls12_381_strutures_feature(): u64 { BLS12_381_STRUCTURES }
+    public fun bls12_381_structures_enabled(): bool acquires Features {
+        is_enabled(BLS12_381_STRUCTURES)
+    }
+
+    /// Whether native_public_key_validate aborts when a public key of the wrong length is given
+    /// Lifetime: ephemeral
+    const ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH: u64 = 14;
+
+    /// Whether struct constructors are enabled
+    ///
+    /// Lifetime: transient
+    const STRUCT_CONSTRUCTORS: u64 = 15;
+
+    /// Whether reward rate decreases periodically.
+    /// Lifetime: transient
+    const PERIODICAL_REWARD_RATE_DECREASE: u64 = 16;
+    public fun get_periodical_reward_rate_decrease_feature(): u64 { PERIODICAL_REWARD_RATE_DECREASE }
+    public fun periodical_reward_rate_decrease_enabled(): bool acquires Features {
+        is_enabled(PERIODICAL_REWARD_RATE_DECREASE)
+    }
+
+    /// Whether enable paritial governance voting.
+    /// Lifetime: transient
+    const PARTIAL_GOVERNANCE_VOTING: u64 = 17;
+    public fun get_partial_governance_voting(): u64 { PARTIAL_GOVERNANCE_VOTING }
+    public fun partial_governance_voting_enabled(): bool acquires Features {
+        is_enabled(PARTIAL_GOVERNANCE_VOTING)
     }
 
     // ============================================================================================

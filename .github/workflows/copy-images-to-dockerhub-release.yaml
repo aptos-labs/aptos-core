@@ -1,0 +1,23 @@
+name: Copy images to dockerhub on release
+on:
+  push:
+    branches:
+      # release branches
+      - devnet
+      - testnet
+      - mainnet
+      # preview branches
+      - preview
+    tags:
+      - aptos-node-v*
+
+permissions:
+  contents: read
+  id-token: write #required for GCP Workload Identity federation
+
+jobs:
+  copy-images-to-docker-hub:
+    uses: ./.github/workflows/copy-images-to-dockerhub.yaml
+    with:
+      image_tag_prefix: ${{ github.ref_name }}
+    secrets: inherit

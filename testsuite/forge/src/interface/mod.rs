@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 mod admin;
@@ -20,8 +21,8 @@ pub use node::*;
 mod chain_info;
 pub mod system_metrics;
 
+use aptos_framework::ReleaseBundle;
 pub use chain_info::*;
-use framework::ReleaseBundle;
 
 /// A wrapper around a usize in order to represent an opaque version of a Node.
 ///

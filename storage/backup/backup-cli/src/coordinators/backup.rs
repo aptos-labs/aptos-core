@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -8,7 +9,7 @@ use crate::{
         transaction::backup::{TransactionBackupController, TransactionBackupOpt},
     },
     metadata,
-    metadata::cache::MetadataCacheOpt,
+    metadata::{cache::MetadataCacheOpt, Metadata},
     metrics::backup::{
         EPOCH_ENDING_EPOCH, HEARTBEAT_TS, STATE_SNAPSHOT_EPOCH, TRANSACTION_VERSION,
     },
@@ -18,13 +19,13 @@ use crate::{
         GlobalBackupOpt,
     },
 };
-use anyhow::{anyhow, ensure, Result};
+use anyhow::{anyhow, ensure, format_err, Result};
+use aptos_db::backup::backup_handler::DbState;
 use aptos_logger::prelude::*;
 use aptos_types::transaction::Version;
-use aptosdb::backup::backup_handler::DbState;
 use clap::Parser;
 use futures::{stream, Future, StreamExt};
-use std::{fmt::Debug, sync::Arc};
+use std::{collections::HashSet, ffi::OsStr, fmt::Debug, path::Path, sync::Arc};
 use tokio::{
     sync::watch,
     time::{interval, Duration},
@@ -183,7 +184,7 @@ impl BackupCoordinator {
                         .map_err(|e| anyhow!("Receivers should not be cancelled: {}", e))
                         .unwrap()
                 }
-            }
+            },
             Err(e) => warn!(
                 "Failed pulling DbState from local node: {}. Will keep trying.",
                 e
@@ -243,7 +244,7 @@ impl BackupCoordinator {
             self.state_snapshot_interval_epochs,
         );
 
-        // <= becuse db_state.epoch is still open
+        // <= because db_state.epoch is still open
         if db_state.epoch <= epoch {
             // wait for the next db_state update
             return Ok(last_snapshot_epoch_in_backup);
@@ -327,6 +328,91 @@ impl BackupCoordinator {
     }
 }
 
+pub struct BackupCompactor {
+    storage: Arc<dyn BackupStorage>,
+    metadata_cache_opt: MetadataCacheOpt,
+    epoch_ending_file_compact_factor: usize,
+    state_snapshot_file_compact_factor: usize,
+    transaction_file_compact_factor: usize,
+    concurrent_downloads: usize,
+}
+
+impl BackupCompactor {
+    pub fn new(
+        epoch_ending_file_compact_factor: usize,
+        state_snapshot_file_compact_factor: usize,
+        transaction_file_compact_factor: usize,
+        metadata_cache_opt: MetadataCacheOpt,
+        storage: Arc<dyn BackupStorage>,
+        concurrent_downloads: usize,
+    ) -> Self {
+        BackupCompactor {
+            storage,
+            metadata_cache_opt,
+            epoch_ending_file_compact_factor,
+            state_snapshot_file_compact_factor,
+            transaction_file_compact_factor,
+            concurrent_downloads,
+        }
+    }
+
+    pub async fn run(&self) -> Result<()> {
+        info!("Backup compaction started");
+        // sync the metadata from backup storage
+        let mut metaview = metadata::cache::sync_and_load(
+            &self.metadata_cache_opt,
+            Arc::clone(&self.storage),
+            self.concurrent_downloads,
+        )
+        .await?;
+
+        let files = metaview.get_file_handles();
+
+        info!("Start compacting backup metadata files.");
+        // Get all compacted chunks to be written back to storage
+        let mut new_files: HashSet<String> = HashSet::new(); // record overwrite file names
+        for range in metaview.compact_epoch_ending_backups(self.epoch_ending_file_compact_factor)? {
+            let (epoch_range, file_name) =
+                Metadata::compact_epoch_ending_backup_range(range.to_vec())?;
+            self.storage
+                .save_metadata_lines(&file_name, epoch_range.as_slice())
+                .await?;
+            new_files.insert(file_name.to_string());
+        }
+        for range in metaview.compact_transaction_backups(self.transaction_file_compact_factor)? {
+            let (txn_range, file_name) =
+                Metadata::compact_transaction_backup_range(range.to_vec())?;
+            self.storage
+                .save_metadata_lines(&file_name, txn_range.as_slice())
+                .await?;
+            new_files.insert(file_name.to_string());
+        }
+        for range in metaview.compact_state_backups(self.state_snapshot_file_compact_factor)? {
+            let (state_range, file_name) =
+                Metadata::compact_statesnapshot_backup_range(range.to_vec())?;
+            self.storage
+                .save_metadata_lines(&file_name, state_range.as_slice())
+                .await?;
+            new_files.insert(file_name.to_string());
+        }
+
+        // Move the compacted metadata files to the metadata backup folder
+        for file in files {
+            // directly return if any of the backup task fails
+            info!(file = file, "Backup metadata file.");
+            let name = Path::new(&file)
+                .file_name()
+                .and_then(OsStr::to_str)
+                .ok_or_else(|| format_err!("cannot extract filename from {}", file))?;
+            if !new_files.contains(name) {
+                self.storage.backup_metadata_file(&file).await?
+            }
+        }
+
+        Ok(())
+    }
+}
+
 trait Worker<'a, S, Fut: Future<Output = Result<S>> + 'a>:
     Fn(&'a BackupCoordinator, S, DbState) -> Fut
 {
@@ -371,7 +457,7 @@ fn get_next_snapshot(last_in_backup: Option<u64>, db_state: DbState, interval: u
 #[cfg(test)]
 mod tests {
     use crate::coordinators::backup::{get_batch_range, get_next_snapshot};
-    use aptosdb::backup::backup_handler::DbState;
+    use aptos_db::backup::backup_handler::DbState;
 
     #[test]
     fn test_get_batch_range() {

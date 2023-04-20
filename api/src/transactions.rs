@@ -1,7 +1,5 @@
-// Copyright (c) Aptos
-// SPDX-License-Identifier: Apache-2.0
-
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -13,9 +11,10 @@ use crate::{
     generate_error_response, generate_success_response,
     page::Page,
     response::{
-        api_disabled, transaction_not_found_by_hash, transaction_not_found_by_version,
-        BadRequestError, BasicError, BasicErrorWith404, BasicResponse, BasicResponseStatus,
-        BasicResult, BasicResultWith404, InsufficientStorageError, InternalError,
+        api_disabled, api_forbidden, transaction_not_found_by_hash,
+        transaction_not_found_by_version, BadRequestError, BasicError, BasicErrorWith404,
+        BasicResponse, BasicResponseStatus, BasicResult, BasicResultWith404,
+        InsufficientStorageError, InternalError,
     },
     ApiTags,
 };
@@ -34,8 +33,8 @@ use aptos_types::{
     account_view::AccountView,
     mempool_status::MempoolStatusCode,
     transaction::{
-        ExecutionStatus, RawTransaction, RawTransactionWithData, SignedTransaction,
-        TransactionPayload, TransactionStatus,
+        EntryFunction, ExecutionStatus, MultisigTransactionPayload, RawTransaction,
+        RawTransactionWithData, SignedTransaction, TransactionPayload, TransactionStatus,
     },
     vm_status::StatusCode,
 };
@@ -121,8 +120,8 @@ impl VerifyInput for SubmitTransactionsBatchPost {
                 for request in inner.0.iter() {
                     request.verify()?;
                 }
-            }
-            SubmitTransactionsBatchPost::Bcs(_) => {}
+            },
+            SubmitTransactionsBatchPost::Bcs(_) => {},
         }
         Ok(())
     }
@@ -137,10 +136,12 @@ pub struct TransactionsApi {
 impl TransactionsApi {
     /// Get transactions
     ///
-    /// Retrieve on-chain committed transactions. The page size and start can be provided to
-    /// get a specific sequence of transactions.
+    /// Retrieve on-chain committed transactions. The page size and start ledger version
+    /// can be provided to get a specific sequence of transactions.
     ///
-    /// If the version has been pruned, then a 410 will be returned
+    /// If the version has been pruned, then a 410 will be returned.
+    ///
+    /// To retrieve a pending transaction, use /transactions/by_hash.
     #[oai(
         path = "/transactions",
         method = "get",
@@ -206,8 +207,8 @@ impl TransactionsApi {
 
     /// Get transaction by version
     ///
-    /// Retrieves a transaction by a given version.  If the version has been pruned, a 410 will
-    /// be returned.
+    /// Retrieves a transaction by a given version. If the version has been
+    /// pruned, a 410 will be returned.
     #[oai(
         path = "/transactions/by_version/:txn_version",
         method = "get",
@@ -229,10 +230,12 @@ impl TransactionsApi {
 
     /// Get account transactions
     ///
-    /// Retrieves transactions from an account.  If the start version is too far in the past
-    /// a 410 will be returned.
+    /// Retrieves on-chain committed transactions from an account. If the start
+    /// version is too far in the past, a 410 will be returned.
     ///
-    /// If no start version is given, it will start at 0
+    /// If no start version is given, it will start at version 0.
+    ///
+    /// To retrieve a pending transaction, use /transactions/by_hash.
     #[oai(
         path = "/accounts/:address/transactions",
         method = "get",
@@ -244,7 +247,7 @@ impl TransactionsApi {
         accept_type: AcceptType,
         /// Address of account with or without a `0x` prefix
         address: Path<Address>,
-        /// Ledger version to start list of transactions
+        /// Account sequence number to start list of transactions
         ///
         /// If not provided, defaults to showing the latest transactions
         start: Query<Option<U64>>,
@@ -303,11 +306,11 @@ impl TransactionsApi {
                 )
             })?;
         fail_point_poem("endpoint_submit_transaction")?;
-        self.context
-            .check_api_output_enabled("Submit transaction", &accept_type)?;
         if !self.context.node_config.api.transaction_submission_enabled {
             return Err(api_disabled("Submit transaction"));
         }
+        self.context
+            .check_api_output_enabled("Submit transaction", &accept_type)?;
         let ledger_info = self.context.get_latest_ledger_info()?;
         let signed_transaction = self.get_signed_transaction(&ledger_info, data)?;
         self.create(&accept_type, &ledger_info, signed_transaction)
@@ -356,16 +359,16 @@ impl TransactionsApi {
                 )
             })?;
         fail_point_poem("endpoint_submit_batch_transactions")?;
-        self.context
-            .check_api_output_enabled("Submit batch transactions", &accept_type)?;
         if !self.context.node_config.api.transaction_submission_enabled {
             return Err(api_disabled("Submit batch transaction"));
         }
+        self.context
+            .check_api_output_enabled("Submit batch transactions", &accept_type)?;
         let ledger_info = self.context.get_latest_ledger_info()?;
         let signed_transactions_batch = self.get_signed_transactions_batch(&ledger_info, data)?;
         if self.context.max_submit_transaction_batch_size() < signed_transactions_batch.len() {
             return Err(SubmitTransactionError::bad_request_with_code(
-                &format!(
+                format!(
                     "Submitted too many transactions: {}, while limit is {}",
                     signed_transactions_batch.len(),
                     self.context.max_submit_transaction_batch_size(),
@@ -420,11 +423,11 @@ impl TransactionsApi {
                 )
             })?;
         fail_point_poem("endpoint_simulate_transaction")?;
-        self.context
-            .check_api_output_enabled("Simulate transaction", &accept_type)?;
         if !self.context.node_config.api.transaction_simulation_enabled {
             return Err(api_disabled("Simulate transaction"));
         }
+        self.context
+            .check_api_output_enabled("Simulate transaction", &accept_type)?;
         let ledger_info = self.context.get_latest_ledger_info()?;
         let mut signed_transaction = self.get_signed_transaction(&ledger_info, data)?;
 
@@ -440,7 +443,7 @@ impl TransactionsApi {
                         .prioritized_gas_estimate
                         .unwrap_or(gas_estimation.gas_estimate),
                 )
-            }
+            },
             (true, false) => Some(self.context.estimate_gas_price(&ledger_info)?.gas_estimate),
             (false, false) => None,
         };
@@ -541,7 +544,6 @@ impl TransactionsApi {
     /// - Sign the bytes to create the signature.
     /// - Use that as the signature field in something like Ed25519Signature, which you then use to build a TransactionSignature.
     //
-    // TODO: Link an example of how to do this. Use externalDoc.
     #[oai(
         path = "/transactions/encode_submission",
         method = "post",
@@ -561,11 +563,14 @@ impl TransactionsApi {
                 BasicError::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
             })?;
         fail_point_poem("endpoint_encode_submission")?;
+        if !self.context.node_config.api.encode_submission_enabled {
+            return Err(api_forbidden(
+                "Encode submission",
+                "Only JSON is supported as an AcceptType.",
+            ));
+        }
         self.context
             .check_api_output_enabled("Encode submission", &accept_type)?;
-        if !self.context.node_config.api.encode_submission_enabled {
-            return Err(api_disabled("Encode submission"));
-        }
         self.get_signing_message(&accept_type, data.0)
     }
 
@@ -605,7 +610,7 @@ impl TransactionsApi {
                     &latest_ledger_info,
                     BasicResponseStatus::Ok,
                 ))
-            }
+            },
         }
     }
 }
@@ -644,10 +649,10 @@ impl TransactionsApi {
                     &latest_ledger_info,
                     BasicResponseStatus::Ok,
                 ))
-            }
+            },
             AcceptType::Bcs => {
                 BasicResponse::try_from_bcs((data, &latest_ledger_info, BasicResponseStatus::Ok))
-            }
+            },
         }
     }
 
@@ -726,7 +731,7 @@ impl TransactionsApi {
                                     ledger_info,
                                 )
                             })?
-                    }
+                    },
                     TransactionData::Pending(txn) => resolver
                         .as_converter(self.context.db.clone())
                         .try_into_pending_transaction(*txn)
@@ -741,7 +746,7 @@ impl TransactionsApi {
                 };
 
                 BasicResponse::try_from_json((transaction, ledger_info, BasicResponseStatus::Ok))
-            }
+            },
             AcceptType::Bcs => BasicResponse::try_from_bcs((
                 transaction_data,
                 ledger_info,
@@ -796,8 +801,8 @@ impl TransactionsApi {
         address: Address,
     ) -> BasicResultWith404<Vec<Transaction>> {
         // Verify the account exists
-        let account = Account::new(self.context.clone(), address, None)?;
-        account.account_state()?;
+        let account = Account::new(self.context.clone(), address, None, None, None)?;
+        account.get_account_resource()?;
 
         let latest_ledger_info = account.latest_ledger_info;
         // TODO: Return more specific errors from within this function.
@@ -817,7 +822,7 @@ impl TransactionsApi {
             )),
             AcceptType::Bcs => {
                 BasicResponse::try_from_bcs((data, &latest_ledger_info, BasicResponseStatus::Ok))
-            }
+            },
         }
     }
 
@@ -842,38 +847,11 @@ impl TransactionsApi {
                 // Verify the signed transaction
                 match signed_transaction.payload() {
                     TransactionPayload::EntryFunction(entry_function) => {
-                        verify_module_identifier(entry_function.module().name().as_str())
-                            .context("Transaction entry function module invalid")
-                            .map_err(|err| {
-                                SubmitTransactionError::bad_request_with_code(
-                                    err,
-                                    AptosErrorCode::InvalidInput,
-                                    ledger_info,
-                                )
-                            })?;
-
-                        verify_function_identifier(entry_function.function().as_str())
-                            .context("Transaction entry function name invalid")
-                            .map_err(|err| {
-                                SubmitTransactionError::bad_request_with_code(
-                                    err,
-                                    AptosErrorCode::InvalidInput,
-                                    ledger_info,
-                                )
-                            })?;
-                        for arg in entry_function.ty_args() {
-                            let arg: MoveType = arg.into();
-                            arg.verify(0)
-                                .context("Transaction entry function type arg invalid")
-                                .map_err(|err| {
-                                    SubmitTransactionError::bad_request_with_code(
-                                        err,
-                                        AptosErrorCode::InvalidInput,
-                                        ledger_info,
-                                    )
-                                })?;
-                        }
-                    }
+                        TransactionsApi::validate_entry_function_payload_format(
+                            ledger_info,
+                            entry_function,
+                        )?;
+                    },
                     TransactionPayload::Script(script) => {
                         if script.code().is_empty() {
                             return Err(SubmitTransactionError::bad_request_with_code(
@@ -895,13 +873,27 @@ impl TransactionsApi {
                                     )
                                 })?;
                         }
-                    }
-                    TransactionPayload::ModuleBundle(_) => {}
+                    },
+                    TransactionPayload::Multisig(multisig) => {
+                        if let Some(payload) = &multisig.transaction_payload {
+                            match payload {
+                                MultisigTransactionPayload::EntryFunction(entry_function) => {
+                                    TransactionsApi::validate_entry_function_payload_format(
+                                        ledger_info,
+                                        entry_function,
+                                    )?;
+                                },
+                            }
+                        }
+                    },
+
+                    // Deprecated. Will be removed in the future.
+                    TransactionPayload::ModuleBundle(_) => {},
                 }
                 // TODO: Verify script args?
 
                 Ok(signed_transaction)
-            }
+            },
             SubmitTransactionPost::Json(data) => self
                 .context
                 .move_resolver_poem(ledger_info)?
@@ -916,6 +908,46 @@ impl TransactionsApi {
                     )
                 }),
         }
+    }
+
+    // Validates that the module, function, and args in EntryFunction payload are correctly
+    // formatted.
+    fn validate_entry_function_payload_format(
+        ledger_info: &LedgerInfo,
+        payload: &EntryFunction,
+    ) -> Result<(), SubmitTransactionError> {
+        verify_module_identifier(payload.module().name().as_str())
+            .context("Transaction entry function module invalid")
+            .map_err(|err| {
+                SubmitTransactionError::bad_request_with_code(
+                    err,
+                    AptosErrorCode::InvalidInput,
+                    ledger_info,
+                )
+            })?;
+
+        verify_function_identifier(payload.function().as_str())
+            .context("Transaction entry function name invalid")
+            .map_err(|err| {
+                SubmitTransactionError::bad_request_with_code(
+                    err,
+                    AptosErrorCode::InvalidInput,
+                    ledger_info,
+                )
+            })?;
+        for arg in payload.ty_args() {
+            let arg: MoveType = arg.into();
+            arg.verify(0)
+                .context("Transaction entry function type arg invalid")
+                .map_err(|err| {
+                    SubmitTransactionError::bad_request_with_code(
+                        err,
+                        AptosErrorCode::InvalidInput,
+                        ledger_info,
+                    )
+                })?;
+        }
+        Ok(())
     }
 
     /// Parses a batch of signed transactions
@@ -976,7 +1008,7 @@ impl TransactionsApi {
                     &mempool_status.message,
                     AptosErrorCode::MempoolIsFull,
                 ))
-            }
+            },
             MempoolStatusCode::VmError => {
                 if let Some(status) = vm_status_opt {
                     Err(AptosError::new_with_vm_status(
@@ -995,7 +1027,7 @@ impl TransactionsApi {
                         StatusCode::UNKNOWN_STATUS,
                     ))
                 }
-            }
+            },
             MempoolStatusCode::InvalidSeqNumber => Err(AptosError::new_with_error_code(
                 mempool_status.message,
                 AptosErrorCode::SequenceNumberTooOld,
@@ -1048,7 +1080,7 @@ impl TransactionsApi {
                         ledger_info,
                         SubmitTransactionResponseStatus::Accepted,
                     ))
-                }
+                },
                 // With BCS, we don't return the pending transaction for efficiency, because there
                 // is no new information.  The hash can be retrieved by hashing the original
                 // transaction.
@@ -1196,7 +1228,7 @@ impl TransactionsApi {
                                 AptosErrorCode::InternalError,
                                 &ledger_info,
                             ))
-                        }
+                        },
                     }
                 }
                 BasicResponse::try_from_json((
@@ -1204,10 +1236,10 @@ impl TransactionsApi {
                     &ledger_info,
                     BasicResponseStatus::Ok,
                 ))
-            }
+            },
             AcceptType::Bcs => {
                 BasicResponse::try_from_bcs((simulated_txn, &ledger_info, BasicResponseStatus::Ok))
-            }
+            },
         }
     }
 

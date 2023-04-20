@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_aggregator::{
@@ -80,14 +80,14 @@ impl<'a> NativeAggregatorContext<'a> {
                     let delta_op =
                         DeltaOp::new(plus, limit, history.max_positive, history.min_negative);
                     AggregatorChange::Merge(delta_op)
-                }
+                },
                 AggregatorState::NegativeDelta => {
                     let history = history.unwrap();
                     let minus = DeltaUpdate::Minus(value);
                     let delta_op =
                         DeltaOp::new(minus, limit, history.max_positive, history.min_negative);
                     AggregatorChange::Merge(delta_op)
-                }
+                },
             };
             changes.insert(id, change);
         }
@@ -108,7 +108,7 @@ impl AggregatorChangeSet {
                 // If something was changed only in `other` session, add it.
                 btree_map::Entry::Vacant(entry) => {
                     entry.insert(other_change);
-                }
+                },
                 // Otherwise, we might need to aggregate deltas.
                 btree_map::Entry::Occupied(mut entry) => {
                     use AggregatorChange::*;
@@ -122,7 +122,7 @@ impl AggregatorChangeSet {
                                 .apply_to(data)
                                 .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
                             *entry_mut = Write(new_data);
-                        }
+                        },
                         (Merge(delta1), Merge(mut delta2)) => {
                             // `delta1` occurred before `delta2`, therefore we must ensure we merge the latter
                             // one to the initial delta.
@@ -130,12 +130,12 @@ impl AggregatorChangeSet {
                                 .merge_onto(delta1)
                                 .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
                             *entry_mut = Merge(delta2)
-                        }
+                        },
                         // Hashing properties guarantee that aggregator keys should
                         // not collide, making this case impossible.
                         (Delete, _) => unreachable!("resource cannot be accessed after deletion"),
                     }
-                }
+                },
             }
         }
         Ok(())
@@ -145,8 +145,7 @@ impl AggregatorChangeSet {
 #[cfg(test)]
 mod test {
     use super::*;
-    use aptos_aggregator::aggregator_extension::AggregatorHandle;
-    use aptos_types::account_address::AccountAddress;
+    use aptos_aggregator::aggregator_extension::aggregator_id_for_test;
     use claims::assert_matches;
     use move_table_extension::TableHandle;
 
@@ -162,17 +161,8 @@ mod test {
         }
     }
 
-    fn test_id(key: u128) -> AggregatorID {
-        let bytes: Vec<u8> = [key.to_le_bytes(), key.to_le_bytes()]
-            .iter()
-            .flat_map(|b| b.to_vec())
-            .collect();
-        let key = AggregatorHandle(AccountAddress::from_bytes(&bytes).unwrap());
-        AggregatorID::new(TableHandle(AccountAddress::ZERO), key)
-    }
-
     // All aggregators are initialized deterministically based on their ID,
-    // with the follwing spec.
+    // with the following spec.
     //
     //     +-------+---------------+----------+-----+---------+
     //     |  key  | storage value |  create  | get | remove  |
@@ -182,28 +172,28 @@ mod test {
     //     |  300  |               |   yes    |     |   yes   |
     //     |  400  |               |   yes    |     |         |
     //     |  500  |               |          | yes |   yes   |
-    //     |  600  |      300      |          | yes |         |
+    //     |  600  |               |          | yes |         |
     //     |  700  |               |          | yes |         |
     //     |  800  |               |          |     |   yes   |
     //     +-------+---------------+----------+-----+---------+
     fn test_set_up(context: &NativeAggregatorContext) {
         let mut aggregator_data = context.aggregator_data.borrow_mut();
 
-        aggregator_data.create_new_aggregator(test_id(100), 100);
-        aggregator_data.create_new_aggregator(test_id(200), 200);
-        aggregator_data.create_new_aggregator(test_id(300), 300);
-        aggregator_data.create_new_aggregator(test_id(400), 400);
+        aggregator_data.create_new_aggregator(aggregator_id_for_test(100), 100);
+        aggregator_data.create_new_aggregator(aggregator_id_for_test(200), 200);
+        aggregator_data.create_new_aggregator(aggregator_id_for_test(300), 300);
+        aggregator_data.create_new_aggregator(aggregator_id_for_test(400), 400);
 
-        aggregator_data.get_aggregator(test_id(100), 100);
-        aggregator_data.get_aggregator(test_id(200), 200);
-        aggregator_data.get_aggregator(test_id(500), 500);
-        aggregator_data.get_aggregator(test_id(600), 600);
-        aggregator_data.get_aggregator(test_id(700), 700);
+        aggregator_data.get_aggregator(aggregator_id_for_test(100), 100);
+        aggregator_data.get_aggregator(aggregator_id_for_test(200), 200);
+        aggregator_data.get_aggregator(aggregator_id_for_test(500), 500);
+        aggregator_data.get_aggregator(aggregator_id_for_test(600), 600);
+        aggregator_data.get_aggregator(aggregator_id_for_test(700), 700);
 
-        aggregator_data.remove_aggregator(test_id(100));
-        aggregator_data.remove_aggregator(test_id(300));
-        aggregator_data.remove_aggregator(test_id(500));
-        aggregator_data.remove_aggregator(test_id(800));
+        aggregator_data.remove_aggregator(aggregator_id_for_test(100));
+        aggregator_data.remove_aggregator(aggregator_id_for_test(300));
+        aggregator_data.remove_aggregator(aggregator_id_for_test(500));
+        aggregator_data.remove_aggregator(aggregator_id_for_test(800));
     }
 
     #[test]
@@ -214,13 +204,13 @@ mod test {
         test_set_up(&context);
         let AggregatorChangeSet { changes } = context.into_change_set();
 
-        assert!(!changes.contains_key(&test_id(100)));
-        assert_matches!(changes.get(&test_id(200)).unwrap(), Write(0));
-        assert!(!changes.contains_key(&test_id(300)));
-        assert_matches!(changes.get(&test_id(400)).unwrap(), Write(0));
-        assert_matches!(changes.get(&test_id(500)).unwrap(), Delete);
-        assert!(changes.contains_key(&test_id(600)));
-        assert!(changes.contains_key(&test_id(700)));
-        assert_matches!(changes.get(&test_id(800)).unwrap(), Delete);
+        assert!(!changes.contains_key(&aggregator_id_for_test(100)));
+        assert_matches!(changes.get(&aggregator_id_for_test(200)).unwrap(), Write(0));
+        assert!(!changes.contains_key(&aggregator_id_for_test(300)));
+        assert_matches!(changes.get(&aggregator_id_for_test(400)).unwrap(), Write(0));
+        assert_matches!(changes.get(&aggregator_id_for_test(500)).unwrap(), Delete);
+        assert!(changes.contains_key(&aggregator_id_for_test(600)));
+        assert!(changes.contains_key(&aggregator_id_for_test(700)));
+        assert_matches!(changes.get(&aggregator_id_for_test(800)).unwrap(), Delete);
     }
 }

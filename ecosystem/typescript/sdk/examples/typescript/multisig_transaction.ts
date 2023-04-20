@@ -37,7 +37,7 @@ const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptosl
   );
 
   // Each Aptos account stores an auth key. Initial account address can be derived from auth key.
-  // See https://aptos.dev/basics/basics-accounts for more details.
+  // See https://aptos.dev/concepts/accounts for more details.
   const authKey = TxnBuilderTypes.AuthenticationKey.fromMultiEd25519PublicKey(multiSigPublicKey);
 
   // Derive the multisig account address and fund the address with 5000 AptosCoin.

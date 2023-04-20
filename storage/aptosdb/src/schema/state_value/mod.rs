@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module defines the physical storage schema for state value, which is used
@@ -16,15 +16,15 @@
 
 use crate::schema::{ensure_slice_len_gt, STATE_VALUE_CF_NAME};
 use anyhow::Result;
+use aptos_schemadb::{
+    define_schema,
+    schema::{KeyCodec, SeekKeyCodec, ValueCodec},
+};
 use aptos_types::{
     state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix, state_value::StateValue},
     transaction::Version,
 };
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use schemadb::{
-    define_schema,
-    schema::{KeyCodec, SeekKeyCodec, ValueCodec},
-};
 use std::{io::Write, mem::size_of};
 
 type Key = (StateKey, Version);

@@ -1,18 +1,18 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_config::config::HANDSHAKE_VERSION;
 use aptos_crypto::{bls12381, ed25519::Ed25519PublicKey, x25519};
-use aptos_types::account_address::AccountAddressWithChecks;
 use aptos_types::{
-    account_address::AccountAddress,
+    account_address::{AccountAddress, AccountAddressWithChecks},
     chain_id::ChainId,
     network_address::{DnsName, NetworkAddress, Protocol},
     transaction::authenticator::AuthenticationKey,
 };
+use aptos_vm_genesis::{AccountBalance, EmployeePool, Validator, ValidatorWithCommissionRate};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::collections::{BTreeMap, HashSet};
 use std::{
+    collections::{BTreeMap, HashSet},
     convert::TryFrom,
     fs::File,
     io::Read,
@@ -20,7 +20,6 @@ use std::{
     path::Path,
     str::FromStr,
 };
-use vm_genesis::{AccountBalance, EmployeePool, Validator, ValidatorWithCommissionRate};
 
 /// Template for setting up Github for Genesis
 ///
@@ -72,7 +71,7 @@ pub struct Layout {
 impl Layout {
     /// Read the layout from a YAML file on disk
     pub fn from_disk(path: &Path) -> anyhow::Result<Self> {
-        let mut file = File::open(&path).map_err(|e| {
+        let mut file = File::open(path).map_err(|e| {
             anyhow::Error::msg(format!("Failed to open file {}, {}", path.display(), e))
         })?;
         let mut contents = String::new();

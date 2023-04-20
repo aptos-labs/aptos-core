@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{Sleep, SleepTrait, ZERO_DURATION};
@@ -14,7 +15,7 @@ use std::{
     time::Duration,
 };
 
-/// Stream returned by [`TimeService::interval`](crate::TimeService::interval).
+/// Stream returned by [`TimeServiceTrait::interval`](crate::TimeServiceTrait::interval).
 ///
 /// Mostly taken from [`tokio::time::Interval`] but uses our `Sleep` future.
 #[pin_project]

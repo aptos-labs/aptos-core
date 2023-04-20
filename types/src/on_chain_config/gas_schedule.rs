@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::on_chain_config::OnChainConfig;
@@ -24,6 +24,19 @@ pub struct StorageGasSchedule {
     pub per_byte_read: u64,
     pub per_byte_create: u64,
     pub per_byte_write: u64,
+}
+
+impl StorageGasSchedule {
+    pub fn zeros() -> Self {
+        Self {
+            per_item_read: 0,
+            per_item_create: 0,
+            per_item_write: 0,
+            per_byte_read: 0,
+            per_byte_create: 0,
+            per_byte_write: 0,
+        }
+    }
 }
 
 impl GasSchedule {

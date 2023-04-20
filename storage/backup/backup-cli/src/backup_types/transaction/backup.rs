@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -97,7 +98,7 @@ impl TransactionBackupController {
                 chunk_first_ver = current_ver;
             }
 
-            chunk_bytes.extend(&(record_bytes.len() as u32).to_be_bytes());
+            chunk_bytes.extend((record_bytes.len() as u32).to_be_bytes());
             chunk_bytes.extend(&record_bytes);
             current_ver += 1;
         }

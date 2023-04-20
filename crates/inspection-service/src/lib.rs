@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -15,11 +15,9 @@ use aptos_metrics_core::{register_int_counter_vec, IntCounterVec};
 use once_cell::sync::Lazy;
 
 pub static NUM_METRICS: Lazy<IntCounterVec> = Lazy::new(|| {
-    register_int_counter_vec!(
-        "aptos_metrics",
-        "Number of metrics in certain states",
-        &["type"]
-    )
+    register_int_counter_vec!("aptos_metrics", "Number of metrics in certain states", &[
+        "type"
+    ])
     .unwrap()
 });
 

@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 //! This module defines the physical storage schema for db wide miscellaneous metadata entries.
 //! For example, the progress of a db pruner.
@@ -9,15 +9,16 @@
 //! ```
 //!
 
-use crate::schema::DB_METADATA_CF_NAME;
-use crate::state_restore::StateSnapshotProgress;
+use crate::{schema::DB_METADATA_CF_NAME, state_restore::StateSnapshotProgress};
 use anyhow::Result;
-use aptos_types::transaction::Version;
-use schemadb::{
+use aptos_schemadb::{
     define_schema,
     schema::{KeyCodec, ValueCodec},
 };
+use aptos_types::transaction::Version;
 use serde::{Deserialize, Serialize};
+
+type ShardId = usize;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
@@ -48,7 +49,14 @@ pub enum DbMetadataKey {
     LedgerPrunerProgress,
     StateMerklePrunerProgress,
     EpochEndingStateMerklePrunerProgress,
+    StateKvPrunerProgress,
     StateSnapshotRestoreProgress(Version),
+    LedgerCommitProgress,
+    StateKvCommitProgress,
+    OverallCommitProgress,
+    StateKvShardCommitProgress(ShardId),
+    StateMerkleCommitProgress,
+    StateMerkleShardCommitProgress(ShardId),
 }
 
 define_schema!(

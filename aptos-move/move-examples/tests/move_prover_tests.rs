@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::account_address::AccountAddress;
@@ -36,7 +36,6 @@ pub fn run_prover_for_pkg(
     .unwrap();
 }
 
-#[ignore]
 #[test]
 fn test_hello_prover() {
     let named_address = BTreeMap::new();

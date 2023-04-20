@@ -126,6 +126,7 @@ module aptos_token::token_transfers {
         sender: address,
         token_id: TokenId,
     ) acquires PendingClaims {
+        assert!(exists<PendingClaims>(sender), ETOKEN_OFFER_NOT_EXIST);
         let pending_claims =
             &mut borrow_global_mut<PendingClaims>(sender).pending_claims;
         let token_offer_id = create_token_offer_id(signer::address_of(receiver), token_id);
@@ -164,6 +165,7 @@ module aptos_token::token_transfers {
     ) acquires PendingClaims {
         let sender_addr = signer::address_of(sender);
         let token_offer_id = create_token_offer_id(receiver, token_id);
+        assert!(exists<PendingClaims>(sender_addr), ETOKEN_OFFER_NOT_EXIST);
         let pending_claims =
             &mut borrow_global_mut<PendingClaims>(sender_addr).pending_claims;
         let token = table::remove(pending_claims, token_offer_id);
@@ -236,7 +238,7 @@ module aptos_token::token_transfers {
 
         token::create_collection(
             creator,
-            *&collection_name,
+            collection_name,
             string::utf8(b"Collection: Hello, World"),
             string::utf8(b"https://aptos.dev"),
             1,
@@ -249,7 +251,7 @@ module aptos_token::token_transfers {
         let default_types = vector<String>[string::utf8(b"integer"), string::utf8(b"integer")];
         token::create_token_script(
             creator,
-            *&collection_name,
+            collection_name,
             string::utf8(b"Token: Hello, Token"),
             string::utf8(b"Hello, Token"),
             amount,
@@ -265,7 +267,7 @@ module aptos_token::token_transfers {
         );
         token::create_token_id_raw(
             signer::address_of(creator),
-            *&collection_name,
+            collection_name,
             string::utf8(b"Token: Hello, Token"),
             0
         )

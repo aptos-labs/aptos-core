@@ -1,14 +1,15 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_metrics_core::{
-    histogram_opts, op_counters::DurationHistogram, register_histogram, register_histogram_vec,
-    register_int_counter, register_int_counter_vec, register_int_gauge_vec, Histogram,
-    HistogramTimer, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
+    exponential_buckets, histogram_opts, op_counters::DurationHistogram, register_histogram,
+    register_histogram_vec, register_int_counter, register_int_counter_vec, register_int_gauge_vec,
+    Histogram, HistogramTimer, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
 };
+use aptos_short_hex_str::AsShortHexStr;
 use once_cell::sync::Lazy;
-use short_hex_str::AsShortHexStr;
 use std::time::Duration;
 
 // Core mempool index labels
@@ -23,6 +24,7 @@ pub const SIZE_BYTES_LABEL: &str = "size_bytes";
 // Core mempool stages labels
 pub const COMMIT_ACCEPTED_LABEL: &str = "commit_accepted";
 pub const COMMIT_REJECTED_LABEL: &str = "commit_rejected";
+pub const COMMIT_IGNORED_LABEL: &str = "commit_ignored";
 pub const CONSENSUS_READY_LABEL: &str = "consensus_ready";
 pub const CONSENSUS_PULLED_LABEL: &str = "consensus_pulled";
 pub const BROADCAST_READY_LABEL: &str = "broadcast_ready";
@@ -100,6 +102,13 @@ const RANKING_SCORE_BUCKETS: &[f64] = &[
     100.0, 147.0, 215.0, 316.0, 464.0, 681.0, 1000.0, 1468.0, 2154.0, 3162.0, 4642.0, 6813.0,
     10000.0, 14678.0, 21544.0, 31623.0, 46416.0, 68129.0, 100000.0, 146780.0, 215443.0,
 ];
+
+static TRANSACTION_COUNT_BUCKETS: Lazy<Vec<f64>> = Lazy::new(|| {
+    exponential_buckets(
+        /*start=*/ 1.5, /*factor=*/ 1.5, /*count=*/ 20,
+    )
+    .unwrap()
+});
 
 #[cfg(test)]
 mod test {
@@ -231,6 +240,15 @@ pub static CORE_MEMPOOL_GC_EVENT_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
        .unwrap()
 });
 
+/// Counter for number of periodic client garbage-collection (=GC) events that happen with eager
+/// expiration, regardless of how many txns were actually cleaned up in this GC event
+pub static CORE_MEMPOOL_GC_EAGER_EXPIRE_EVENT_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_core_mempool_gc_eager_expire_event_count",
+        "Number of times the periodic garbage-collection event triggers eager expiration, regardless of how many txns were actually removed")
+        .unwrap()
+});
+
 /// Counter tracking time for how long a transaction stayed in core-mempool before being garbage-collected
 pub static CORE_MEMPOOL_GC_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
@@ -257,9 +275,10 @@ static MEMPOOL_SERVICE_TXNS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_mempool_service_transactions",
         "Number of transactions handled in one request/response between mempool and consensus/state sync",
-        &["type"]
+        &["type"],
+        TRANSACTION_COUNT_BUCKETS.clone()
     )
-        .unwrap()
+    .unwrap()
 });
 
 pub fn mempool_service_transactions(label: &'static str, num: usize) {

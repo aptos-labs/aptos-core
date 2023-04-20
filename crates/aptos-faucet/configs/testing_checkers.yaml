@@ -1,0 +1,23 @@
+---
+server_config:
+  api_path_base: ""
+metrics_server_config:
+  listen_port: 9105
+bypasser_configs: []
+checker_configs:
+  - type: "AuthToken"
+    file: "/tmp/auth_tokens.txt"
+  - type: "IpBlocklist"
+    file: "/tmp/ip_blocklist.txt"
+  - type: "RefererBlocklist"
+    file: "/tmp/referer_blocklist.txt"
+  - type: "MagicHeader"
+    magic_header_key: "what_wallet_my_guy"
+    magic_header_value: "the_wallet_that_rocks"
+  - type: "MemoryRatelimit"
+    max_requests_per_day: 1000000000
+funder_config:
+  type: "FakeFunder"
+handler_config:
+  use_helpful_errors: true
+  return_rejections_early: false

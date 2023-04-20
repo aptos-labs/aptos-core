@@ -1,11 +1,23 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
 
+use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, Uniform};
-use aptos_gas::LATEST_GAS_FEATURE_VERSION;
+use aptos_db::AptosDB;
+use aptos_executor::{
+    block_executor::BlockExecutor,
+    db_bootstrapper::{generate_waypoint, maybe_bootstrap},
+};
+use aptos_executor_test_helpers::{
+    bootstrap_genesis, gen_ledger_info_with_sigs, get_test_signed_transaction,
+};
+use aptos_executor_types::BlockExecutorTrait;
+use aptos_gas::{ChangeSetConfigs, LATEST_GAS_FEATURE_VERSION};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
+use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReaderWriter};
 use aptos_temppath::TempPath;
 use aptos_types::{
     access_path::AccessPath,
@@ -27,26 +39,15 @@ use aptos_types::{
     write_set::{WriteOp, WriteSetMut},
 };
 use aptos_vm::AptosVM;
-use aptosdb::AptosDB;
-use cached_packages::aptos_stdlib;
-use executor::{
-    block_executor::BlockExecutor,
-    db_bootstrapper::{generate_waypoint, maybe_bootstrap},
-};
-use executor_test_helpers::{
-    bootstrap_genesis, gen_ledger_info_with_sigs, get_test_signed_transaction,
-};
-use executor_types::BlockExecutorTrait;
 use move_core_types::{
     language_storage::TypeTag,
     move_resource::{MoveResource, MoveStructType},
 };
 use rand::SeedableRng;
-use storage_interface::{state_view::LatestDbStateCheckpointView, DbReaderWriter};
 
 #[test]
 fn test_empty_db() {
-    let genesis = vm_genesis::test_genesis_change_set_and_validators(Some(1));
+    let genesis = aptos_vm_genesis::test_genesis_change_set_and_validators(Some(1));
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis.0));
     let tmp_dir = TempPath::new();
     let db_rw = DbReaderWriter::new(AptosDB::new_for_test(&tmp_dir));
@@ -84,7 +85,7 @@ fn execute_and_commit(txns: Vec<Transaction>, db: &DbReaderWriter, signer: &Vali
     let version = li.ledger_info().version();
     let epoch = li.ledger_info().next_block_epoch();
     let target_version = version + txns.len() as u64;
-    let executor = BlockExecutor::<AptosVM>::new(db.clone());
+    let executor = BlockExecutor::<AptosVM, Transaction>::new(db.clone());
     let output = executor
         .execute_block((block_id, txns), executor.committed_block_id())
         .unwrap();
@@ -186,9 +187,10 @@ fn get_configuration(db: &DbReaderWriter) -> ConfigurationResource {
 }
 
 #[test]
+#[cfg_attr(feature = "consensus-only-perf-test", ignore)]
 fn test_new_genesis() {
-    let genesis = vm_genesis::test_genesis_change_set_and_validators(Some(1));
-    let genesis_key = &vm_genesis::GENESIS_KEYPAIR.0;
+    let genesis = aptos_vm_genesis::test_genesis_change_set_and_validators(Some(1));
+    let genesis_key = &aptos_vm_genesis::GENESIS_KEYPAIR.0;
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis.0));
     // Create bootstrapped DB.
     let tmp_dir = TempPath::new();
@@ -220,11 +222,14 @@ fn test_new_genesis() {
         ChangeSet::new(
             WriteSetMut::new(vec![
                 (
-                    StateKey::AccessPath(access_path_for_config(ValidatorSet::CONFIG_ID)),
+                    StateKey::access_path(
+                        access_path_for_config(ValidatorSet::CONFIG_ID)
+                            .expect("access path in test"),
+                    ),
                     WriteOp::Modification(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
                 ),
                 (
-                    StateKey::AccessPath(AccessPath::new(
+                    StateKey::access_path(AccessPath::new(
                         CORE_CODE_ADDRESS,
                         ConfigurationResource::resource_path(),
                     )),
@@ -233,7 +238,7 @@ fn test_new_genesis() {
                     ),
                 ),
                 (
-                    StateKey::AccessPath(AccessPath::new(
+                    StateKey::access_path(AccessPath::new(
                         account1,
                         CoinStoreResource::resource_path(),
                     )),
@@ -254,7 +259,9 @@ fn test_new_genesis() {
                 ContractEvent::new(
                     *configuration.events().key(),
                     0,
-                    TypeTag::Struct(Box::new(ConfigurationResource::struct_tag())),
+                    TypeTag::Struct(Box::new(
+                        <ConfigurationResource as MoveStructType>::struct_tag(),
+                    )),
                     vec![],
                 ),
                 ContractEvent::new(
@@ -264,7 +271,7 @@ fn test_new_genesis() {
                     vec![],
                 ),
             ],
-            LATEST_GAS_FEATURE_VERSION,
+            &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
         )
         .unwrap(),
     ));

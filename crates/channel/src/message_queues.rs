@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::IntCounterVec;
@@ -143,7 +144,7 @@ impl<K: Eq + Hash + Clone, T> PerKeyQueue<K, T> {
                     let oldest = key_message_queue.pop_front();
                     key_message_queue.push_back(message);
                     oldest
-                }
+                },
             }
         } else {
             key_message_queue.push_back(message);
@@ -158,7 +159,7 @@ impl<K: Eq + Hash + Clone, T> PerKeyQueue<K, T> {
             Some(v) => v,
             _ => {
                 return None;
-            }
+            },
         };
 
         let (message, is_q_empty) = self.pop_from_key_queue(&key);

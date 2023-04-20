@@ -1,10 +1,9 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::tests::common;
-use crate::{assert_success, MoveHarness};
+use crate::{assert_success, tests::common, MoveHarness};
+use aptos_package_builder::PackageBuilder;
 use aptos_types::account_address::AccountAddress;
-use package_builder::PackageBuilder;
 
 /// Test whether `0x1::vector` (and not just `std::vector`) works as expected.
 #[test]

@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{assert_success, tests::common, MoveHarness};
@@ -6,6 +6,7 @@ use aptos_types::{
     account_address::AccountAddress,
     transaction::{ExecutionStatus, TransactionStatus},
 };
+use move_core_types::vm_status::StatusCode::EXECUTION_LIMIT_REACHED;
 use std::time::Instant;
 
 /// Run with `cargo test <test_name> -- --nocapture` to see output.
@@ -34,6 +35,8 @@ fn empty_while_loop() {
 
     assert!(matches!(
         result,
-        TransactionStatus::Keep(ExecutionStatus::OutOfGas { .. })
+        TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
+            EXECUTION_LIMIT_REACHED
+        )))
     ));
 }

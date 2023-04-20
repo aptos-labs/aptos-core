@@ -1,12 +1,13 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::block::Block;
 use anyhow::ensure;
 use aptos_crypto::hash::HashValue;
+use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::validator_verifier::ValidatorVerifier;
 use serde::{Deserialize, Serialize};
-use short_hex_str::AsShortHexStr;
 use std::fmt;
 
 // this number is recommended to be greater than backpressure limit
@@ -15,7 +16,10 @@ use std::fmt;
 // TODO: add a test
 pub const MAX_BLOCKS_PER_REQUEST: u64 = 10;
 
-pub const MAX_FAILED_ATTEMPTS: u32 = 4;
+pub const NUM_RETRIES: usize = 5;
+pub const NUM_PEERS_PER_RETRY: usize = 3;
+pub const RETRY_INTERVAL_MSEC: u64 = 500;
+pub const RPC_TIMEOUT_MSEC: u64 = 5000;
 
 /// RPC to get a chain of block of the given length starting from the given block id.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -33,6 +37,7 @@ impl BlockRetrievalRequest {
             target_block_id: None,
         }
     }
+
     pub fn new_with_target_block_id(
         block_id: HashValue,
         num_blocks: u64,
@@ -44,15 +49,19 @@ impl BlockRetrievalRequest {
             target_block_id: Some(target_block_id),
         }
     }
+
     pub fn block_id(&self) -> HashValue {
         self.block_id
     }
+
     pub fn num_blocks(&self) -> u64 {
         self.num_blocks
     }
+
     pub fn target_block_id(&self) -> Option<HashValue> {
         self.target_block_id
     }
+
     pub fn match_target_id(&self, hash_value: HashValue) -> bool {
         self.target_block_id.map_or(false, |id| id == hash_value)
     }
@@ -152,7 +161,7 @@ impl fmt::Display for BlockRetrievalResponse {
                     .finish()?;
 
                 write!(f, "]")
-            }
+            },
             _ => write!(f, "[BlockRetrievalResponse: status: {:?}]", self.status()),
         }
     }

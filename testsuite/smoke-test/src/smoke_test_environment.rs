@@ -1,21 +1,20 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos::test::CliTestFramework;
-use aptos_config::config::NodeConfig;
-use aptos_config::{keys::ConfigKey, utils::get_available_port};
+use aptos_config::{config::NodeConfig, keys::ConfigKey, utils::get_available_port};
 use aptos_crypto::ed25519::Ed25519PrivateKey;
-use aptos_faucet::FaucetArgs;
+use aptos_faucet_core::server::{FunderKeyEnum, RunConfig};
+use aptos_forge::{ActiveNodesGuard, Factory, LocalFactory, LocalSwarm, Node};
+use aptos_framework::ReleaseBundle;
 use aptos_genesis::builder::{InitConfigFn, InitGenesisConfigFn};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
-use aptos_types::{account_config::aptos_test_root_address, chain_id::ChainId};
-use forge::{ActiveNodesGuard, Node};
-use forge::{Factory, LocalFactory, LocalSwarm};
-use framework::ReleaseBundle;
+use aptos_types::chain_id::ChainId;
 use once_cell::sync::Lazy;
 use rand::rngs::OsRng;
-use std::{num::NonZeroUsize, path::PathBuf, sync::Arc};
+use std::{num::NonZeroUsize, sync::Arc};
 use tokio::task::JoinHandle;
 
 const SWARM_BUILD_NUM_RETRIES: u8 = 3;
@@ -49,12 +48,12 @@ impl SwarmBuilder {
     }
 
     pub fn with_aptos(mut self) -> Self {
-        self.genesis_framework = Some(cached_packages::head_release_bundle().clone());
+        self.genesis_framework = Some(aptos_cached_packages::head_release_bundle().clone());
         self
     }
 
     pub fn with_aptos_testnet(mut self) -> Self {
-        self.genesis_framework = Some(framework::testnet_release_bundle().clone());
+        self.genesis_framework = Some(aptos_framework::testnet_release_bundle().clone());
         self
     }
 
@@ -127,7 +126,7 @@ impl SwarmBuilder {
             match self.build_inner().await {
                 Ok(swarm) => {
                     return swarm;
-                }
+                },
                 Err(err) => warn!("Attempt {} / {} failed with: {}", attempt, num_retries, err),
             }
             attempt += 1;
@@ -137,7 +136,7 @@ impl SwarmBuilder {
     pub async fn build_with_cli(
         &mut self,
         num_cli_accounts: usize,
-    ) -> (LocalSwarm, CliTestFramework, JoinHandle<()>) {
+    ) -> (LocalSwarm, CliTestFramework, JoinHandle<anyhow::Result<()>>) {
         let swarm = self.build().await;
         let chain_id = swarm.chain_id();
         let validator = swarm.validators().next().unwrap();
@@ -192,17 +191,13 @@ pub fn launch_faucet(
     mint_key: Ed25519PrivateKey,
     chain_id: ChainId,
     port: u16,
-) -> JoinHandle<()> {
-    let faucet = FaucetArgs {
-        address: "127.0.0.1".to_string(),
+) -> JoinHandle<anyhow::Result<()>> {
+    let faucet_config = RunConfig::build_for_cli(
+        endpoint,
         port,
-        server_url: endpoint,
-        mint_key_file_path: PathBuf::new(),
-        mint_key: Some(ConfigKey::new(mint_key)),
-        mint_account_address: Some(aptos_test_root_address()),
-        chain_id,
-        maximum_amount: None,
-        do_not_delegate: true,
-    };
-    tokio::spawn(faucet.run())
+        FunderKeyEnum::Key(ConfigKey::new(mint_key)),
+        true,
+        Some(chain_id),
+    );
+    tokio::spawn(faucet_config.run())
 }

@@ -1,4 +1,4 @@
-# Copyright (c) Aptos
+# Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
 """
@@ -96,7 +96,7 @@ if __name__ == "__main__":
 
     input("\nUpdate the module with Alice's address, compile, and press enter.")
 
-    #:!:>publish
+    # :!:>publish
     moon_coin_path = sys.argv[1]
     module_path = os.path.join(
         moon_coin_path, "build", "Examples", "bytecode_modules", "moon_coin.mv"

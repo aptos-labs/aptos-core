@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 import { ApiError, NodeCheckerClient } from "./index";
@@ -7,7 +7,7 @@ test("getConfigurationKeys", async () => {
   const client = new NodeCheckerClient({
     BASE: "http://127.0.0.1:20121",
   });
-  const keys = await client.default.getGetConfigurationKeys();
+  const keys = await client.default.getConfigurations();
   expect(keys.length).toBeGreaterThan(0);
 });
 
@@ -17,9 +17,9 @@ test("checkNode", async () => {
   });
   let results;
   try {
-    results = await client.default.getCheckNode({
+    results = await client.default.getCheck({
       nodeUrl: "http://127.0.0.1",
-      baselineConfigurationName: "local_testnet",
+      baselineConfigurationId: "local_testnet",
     });
   } catch (e) {
     if (e instanceof ApiError) {

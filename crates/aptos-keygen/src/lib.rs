@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::{
@@ -54,6 +54,7 @@ impl KeyGen {
         let ed25519_private_key = self.generate_ed25519_private_key();
         x25519::PrivateKey::from_ed25519_private_bytes(&ed25519_private_key.to_bytes())
     }
+
     /// Generate a x25519 key pair.
     pub fn generate_x25519_keypair(
         &mut self,

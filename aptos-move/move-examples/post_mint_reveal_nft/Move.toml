@@ -1,0 +1,21 @@
+[package]
+name = "test_package"
+version = "0.0.0"
+upgrade_policy = "compatible"
+
+[dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }
+AptosToken = { local = "../../framework/aptos-token" }
+DataStructure = { local = "../data_structures" }
+
+[addresses]
+aptos_framework = "0x1"
+# the source_addr and post_mint_reveal_nft here are for unit test purposes.
+# in production, we should change them:
+# - the source_addr should be the address of the account that creates the resource account
+# - the post_mint_reveal_nft should be put as "_" if we publish the module by using the CLI command
+# "aptos move create-resource-account-and-publish-package ..." because the CLI will automatically link
+# the address to the package. If we are not using the CLI, the post_mint_reveal_nft should be the address
+# of the resource account which is also the module publisher.
+source_addr = "0xcafe"
+post_mint_reveal_nft = "0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5"

@@ -1,16 +1,14 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-
-use std::process::{Command, Stdio};
-
-use anyhow::bail;
-use aptos_logger::info;
-use tempfile::TempDir;
 
 use crate::{
     dump_string_to_file, K8sSwarm, Result, Swarm, SwarmChaos, SwarmNetworkBandwidth,
     SwarmNetworkDelay, SwarmNetworkLoss, SwarmNetworkPartition, KUBECTL_BIN,
 };
+use anyhow::bail;
+use aptos_logger::info;
+use std::process::{Command, Stdio};
+use tempfile::TempDir;
 
 macro_rules! DELAY_NETWORK_CHAOS_TEMPLATE {
     () => {
@@ -60,7 +58,7 @@ impl K8sSwarm {
                     info!("{:?}", delete_networkchaos);
                     let delete_networkchaos_output = Command::new(KUBECTL_BIN)
                         .stdout(Stdio::inherit())
-                        .args(&delete_networkchaos)
+                        .args(delete_networkchaos)
                         .output()
                         .expect("failed to delete all NetworkChaos");
                     if !delete_networkchaos_output.status.success() {
@@ -71,11 +69,11 @@ impl K8sSwarm {
                     }
                 }
                 Ok(())
-            }
+            },
             _ => {
                 let template = self.create_chaos_template(chaos)?;
                 self.remove_chaos_template(template)
-            }
+            },
         }
     }
 
@@ -141,13 +139,19 @@ impl K8sSwarm {
         &self,
         swarm_network_bandwidth: &SwarmNetworkBandwidth,
     ) -> Result<String> {
-        Ok(format!(
-            include_str!(BANDWIDTH_NETWORK_CHAOS_TEMPLATE!()),
-            namespace = self.kube_namespace,
-            rate = swarm_network_bandwidth.rate,
-            limit = swarm_network_bandwidth.limit,
-            buffer = swarm_network_bandwidth.buffer
-        ))
+        let mut network_chaos_specs = vec![];
+
+        for group_network_bandwidth in &swarm_network_bandwidth.group_network_bandwidths {
+            network_chaos_specs.push(format!(
+                include_str!(BANDWIDTH_NETWORK_CHAOS_TEMPLATE!()),
+                namespace = self.kube_namespace,
+                rate = group_network_bandwidth.rate,
+                limit = group_network_bandwidth.limit,
+                buffer = group_network_bandwidth.buffer,
+            ));
+        }
+
+        Ok(network_chaos_specs.join("\n---\n"))
     }
 
     fn create_network_loss_template(

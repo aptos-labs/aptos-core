@@ -3,67 +3,18 @@
 
 # Module `0x1::aggregator`
 
-This module provides an API for aggregatable integers that allow addition,
-subtraction, and reading.
-
-Design rationale (V1)
-=====================
-Aggregator can be seen as a parellizable integer that supports addition,
-subtraction and reading. The first version (V1) of aggregator has the
-the following specification.
-
-add(value: u128)
-Speculatively adds a <code>value</code> to aggregator. This is a cheap operation
-which is parallelizable. If the result of addition overflows a <code>limit</code>
-(one of aggregator's fields), an error is produced and the execution
-aborts.
-
-sub(value: u128)
-Speculatively subtracts a <code>value</code> from aggregator. This is a cheap
-operation which is parallelizable. If the result goes below zero, an
-error is produced and the execution aborts.
-
-read(): u128
-Reads (materializes) the value of an aggregator. This is an expensive
-operation which usually involves reading from the storage.
-
-destroy()
-Destroys and aggregator, also cleaning up storage if necessary.
-
-Note that there is no constructor in <code><a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a></code> API. This is done on purpose.
-For every aggregator, we need to know where its value is stored on chain.
-Currently, Move does not allow fine grained access to struct fields. For
-example, given a struct
-
-struct Foo<A> has key {
-a: A,
-b: u128,
-}
-
-there is no way of getting a value of <code>Foo::a</code> without hardcoding the layout
-of <code>Foo</code> and the field offset. To mitigate this problem, one can use a table.
-Every item stored in the table is uniqely identified by (handle, key) pair:
-<code>handle</code> identifies a table instance, <code>key</code> identifies an item within the table.
-
-So how is this related to aggregator? Well, aggregator can reuse the table's
-approach for fine-grained storage. However, since native functions only see a
-reference to aggregator, we must ensure that both <code>handle</code> and <code>key</code> are
-included as fields. Therefore, the struct looks like
-
-struct Aggregator {
-handle: u128,
-key: u128,
-..
-}
-
-Remaining question is how to generate this (handle, key) pair. For that, we have
-a dedicated struct called <code>AggregatorFactory</code> which is responsible for constructing
-aggregators. See <code><a href="aggregator_factory.md#0x1_aggregator_factory">aggregator_factory</a>.<b>move</b></code> for more details.
-
-Advice to users (V1)
-====================
-Users are encouraged to use "cheap" operations (e.g. additions) to exploit the
-parallelism in execution.
+This module provides an interface for aggregators. Aggregators are similar to
+unsigned integers and support addition and subtraction (aborting on underflow
+or on overflowing a custom upper limit). The difference from integers is that
+aggregators allow to perform both additions and subtractions in parallel across
+multiple transactions, enabling parallel execution. For example, if the first
+transaction is doing <code><a href="aggregator.md#0x1_aggregator_add">add</a>(X, 1)</code> for aggregator resource <code>X</code>, and the second
+is doing <code><a href="aggregator.md#0x1_aggregator_sub">sub</a>(X,3)</code>, they can be executed in parallel avoiding a read-modify-write
+dependency.
+However, reading the aggregator value (i.e. calling <code><a href="aggregator.md#0x1_aggregator_read">read</a>(X)</code>) is an expensive
+operation and should be avoided as much as possible because it reduces the
+parallelism. Moreover, **aggregators can only be created by Aptos Framework (0x1)
+at the moment.**
 
 
 -  [Struct `Aggregator`](#0x1_aggregator_Aggregator)
@@ -74,6 +25,7 @@ parallelism in execution.
 -  [Function `read`](#0x1_aggregator_read)
 -  [Function `destroy`](#0x1_aggregator_destroy)
 -  [Specification](#@Specification_1)
+    -  [Struct `Aggregator`](#@Specification_1_Aggregator)
     -  [Function `add`](#@Specification_1_add)
     -  [Function `sub`](#@Specification_1_sub)
     -  [Function `read`](#@Specification_1_read)
@@ -88,6 +40,8 @@ parallelism in execution.
 
 ## Struct `Aggregator`
 
+Represents an integer which supports parallel additions and subtractions
+across multiple transactions. See the module description for more details.
 
 
 <pre><code><b>struct</b> <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a> <b>has</b> store
@@ -130,7 +84,7 @@ parallelism in execution.
 
 <a name="0x1_aggregator_EAGGREGATOR_OVERFLOW"></a>
 
-When the value of aggregator (actual or accumulated) overflows (raised by native code).
+The value of aggregator overflows. Raised by native code.
 
 
 <pre><code><b>const</b> <a href="aggregator.md#0x1_aggregator_EAGGREGATOR_OVERFLOW">EAGGREGATOR_OVERFLOW</a>: u64 = 1;
@@ -140,7 +94,7 @@ When the value of aggregator (actual or accumulated) overflows (raised by native
 
 <a name="0x1_aggregator_EAGGREGATOR_UNDERFLOW"></a>
 
-When the value of aggregator (actual or accumulated) underflows, i.e goes below zero (raised by native code).
+The value of aggregator underflows (goes below zero). Raised by native code.
 
 
 <pre><code><b>const</b> <a href="aggregator.md#0x1_aggregator_EAGGREGATOR_UNDERFLOW">EAGGREGATOR_UNDERFLOW</a>: u64 = 2;
@@ -150,7 +104,7 @@ When the value of aggregator (actual or accumulated) underflows, i.e goes below 
 
 <a name="0x1_aggregator_ENOT_SUPPORTED"></a>
 
-When aggregator feature is not supported (raised by native code).
+Aggregator feature is not supported. Raised by native code.
 
 
 <pre><code><b>const</b> <a href="aggregator.md#0x1_aggregator_ENOT_SUPPORTED">ENOT_SUPPORTED</a>: u64 = 3;
@@ -280,8 +234,40 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 ## Specification
 
 
+<a name="@Specification_1_Aggregator"></a>
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+### Struct `Aggregator`
+
+
+<pre><code><b>struct</b> <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a> <b>has</b> store
+</code></pre>
+
+
+
+<dl>
+<dt>
+<code>handle: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>key: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>limit: u128</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+
+<pre><code><b>pragma</b> intrinsic;
 </code></pre>
 
 
@@ -298,6 +284,11 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">spec_aggregator_get_val</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>) + value &gt; <a href="aggregator.md#0x1_aggregator_spec_get_limit">spec_get_limit</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>);
+<b>aborts_if</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">spec_aggregator_get_val</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>) + value &gt; MAX_U128;
+<b>ensures</b> <a href="aggregator.md#0x1_aggregator_spec_get_limit">spec_get_limit</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>) == <a href="aggregator.md#0x1_aggregator_spec_get_limit">spec_get_limit</a>(<b>old</b>(<a href="aggregator.md#0x1_aggregator">aggregator</a>));
+<b>ensures</b> <a href="aggregator.md#0x1_aggregator">aggregator</a> == <a href="aggregator.md#0x1_aggregator_spec_aggregator_set_val">spec_aggregator_set_val</a>(<b>old</b>(<a href="aggregator.md#0x1_aggregator">aggregator</a>),
+    <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">spec_aggregator_get_val</a>(<b>old</b>(<a href="aggregator.md#0x1_aggregator">aggregator</a>)) + value);
 </code></pre>
 
 
@@ -314,6 +305,10 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">spec_aggregator_get_val</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>) &lt; value;
+<b>ensures</b> <a href="aggregator.md#0x1_aggregator_spec_get_limit">spec_get_limit</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>) == <a href="aggregator.md#0x1_aggregator_spec_get_limit">spec_get_limit</a>(<b>old</b>(<a href="aggregator.md#0x1_aggregator">aggregator</a>));
+<b>ensures</b> <a href="aggregator.md#0x1_aggregator">aggregator</a> == <a href="aggregator.md#0x1_aggregator_spec_aggregator_set_val">spec_aggregator_set_val</a>(<b>old</b>(<a href="aggregator.md#0x1_aggregator">aggregator</a>),
+    <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">spec_aggregator_get_val</a>(<b>old</b>(<a href="aggregator.md#0x1_aggregator">aggregator</a>)) - value);
 </code></pre>
 
 
@@ -330,6 +325,9 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == <a href="aggregator.md#0x1_aggregator_spec_read">spec_read</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>);
+<b>ensures</b> result &lt;= <a href="aggregator.md#0x1_aggregator_spec_get_limit">spec_get_limit</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>);
 </code></pre>
 
 
@@ -346,7 +344,62 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+
+
+<a name="0x1_aggregator_spec_read"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_read">spec_read</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>): u128;
+</code></pre>
+
+
+
+
+<a name="0x1_aggregator_spec_get_limit"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_get_limit">spec_get_limit</a>(a: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>): u128;
+</code></pre>
+
+
+
+
+<a name="0x1_aggregator_spec_get_handle"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_get_handle">spec_get_handle</a>(a: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>): u128;
+</code></pre>
+
+
+
+
+<a name="0x1_aggregator_spec_get_key"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_get_key">spec_get_key</a>(a: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>): u128;
+</code></pre>
+
+
+
+
+<a name="0x1_aggregator_spec_aggregator_set_val"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_set_val">spec_aggregator_set_val</a>(a: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>, v: u128): <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>;
+</code></pre>
+
+
+
+
+<a name="0x1_aggregator_spec_aggregator_get_val"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">spec_aggregator_get_val</a>(a: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>): u128;
+</code></pre>
+
+
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

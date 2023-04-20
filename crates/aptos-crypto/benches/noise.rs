@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! Don't forget to run this benchmark with AES-NI enable.
@@ -9,15 +10,14 @@
 #[macro_use]
 extern crate criterion;
 
-use criterion::{Criterion, Throughput};
-use rand::SeedableRng;
-use std::convert::TryFrom as _;
-
 use aptos_crypto::{
     noise::{handshake_init_msg_len, handshake_resp_msg_len, NoiseConfig, AES_GCM_TAGLEN},
     test_utils::TEST_SEED,
     x25519, Uniform as _, ValidCryptoMaterial as _,
 };
+use criterion::{Criterion, Throughput};
+use rand::SeedableRng;
+use std::convert::TryFrom as _;
 
 const MSG_SIZE: usize = 4096;
 

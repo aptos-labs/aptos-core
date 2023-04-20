@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Generic, Optional, Sequence, Tuple, TypeVar, TypedDict
 
 import click
+import os
 
 
 @dataclass
@@ -14,11 +15,14 @@ class Verdict:
     subverdicts: Sequence[Verdict]
 
     def format(self, indent=0) -> str:
-        return "\n".join([
-            (indent * "  ") + ("PASS" if self.verdict else "FAIL") + f"ED because {self.reason}",
-        ] + [
-            verdict.format(indent+1) for verdict in self.subverdicts
-        ])
+        return "\n".join(
+            [
+                (indent * "  ")
+                + ("PASS" if self.verdict else "FAIL")
+                + f"ED because {self.reason}",
+            ]
+            + [verdict.format(indent + 1) for verdict in self.subverdicts]
+        )
 
 
 TEvaluationContext = TypeVar("TEvaluationContext")
@@ -72,11 +76,26 @@ def main() -> None:
 
 @dataclass
 class GithubOutput:
+    """
+    Represents a Github Output string
+    It should be written separately to $GITHUB_OUTPUT in the action: https://github.blog/changelog/2022-10-11-github-actions-deprecating-save-state-and-set-output-commands/
+    """
+
     key: str
     value: str
 
     def format(self) -> str:
-        return f"::set-output name={self.key}::{self.value}"
+        return f"{self.key}={self.value}"
+
+
+def write_github_output(output: GithubOutput) -> None:
+    try:
+        with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+            f.write(f"{output.format()}\n")
+    except KeyError:
+        raise Exception(
+            "GITHUB_OUTPUT not set, not writing output. This may be an error with the action setup."
+        )
 
 
 @main.command()
@@ -97,10 +116,8 @@ def changed_files(
     print(verdict.format())
 
     if github_output_key:
-        output = GithubOutput(
-            github_output_key,
-            "true" if verdict.verdict else "false"
-        )
+        output = GithubOutput(github_output_key, "true" if verdict.verdict else "false")
+        write_github_output(output)
         print(output.format())
     else:
         if not verdict.verdict:

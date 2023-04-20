@@ -1,51 +1,63 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::init::Network;
-use crate::common::utils::prompt_yes_with_override;
 use crate::{
-    common::utils::{
-        chain_id, check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
-        get_auth_key, get_sequence_number, read_from_file, start_logger, to_common_result,
-        to_common_success_result, write_to_file, write_to_file_with_opts, write_to_user_only_file,
+    common::{
+        init::Network,
+        utils::{
+            check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
+            get_account_with_state, get_auth_key, get_sequence_number, prompt_yes_with_override,
+            read_from_file, start_logger, to_common_result, to_common_success_result,
+            write_to_file, write_to_file_with_opts, write_to_user_only_file,
+        },
     },
     config::GlobalConfig,
     genesis::git::from_yaml,
+    move_tool::{ArgWithType, MemberId},
 };
-use aptos_crypto::ed25519::Ed25519Signature;
 use aptos_crypto::{
-    ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
+    ed25519::{Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
     x25519, PrivateKey, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
 };
+use aptos_debugger::AptosDebugger;
+use aptos_gas_profiling::FrameName;
 use aptos_global_constants::adjust_gas_headroom;
 use aptos_keygen::KeyGen;
-use aptos_rest_client::aptos_api_types::{ExplainVMStatus, HashValue, UserTransaction};
-use aptos_rest_client::error::RestError;
-use aptos_rest_client::{Client, Transaction};
+use aptos_rest_client::{
+    aptos_api_types::{HashValue, MoveType, ViewRequest},
+    error::RestError,
+    Client, Transaction,
+};
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
-use aptos_types::transaction::{
-    authenticator::AuthenticationKey, SignedTransaction, TransactionPayload,
+use aptos_types::{
+    chain_id::ChainId,
+    transaction::{
+        authenticator::AuthenticationKey, EntryFunction, SignedTransaction, TransactionPayload,
+        TransactionStatus,
+    },
 };
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser};
 use hex::FromHexError;
-use move_core_types::account_address::AccountAddress;
+use move_core_types::{account_address::AccountAddress, language_storage::TypeTag};
 use serde::{Deserialize, Serialize};
-use std::convert::TryFrom;
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
-use std::time::Duration;
 use std::{
     collections::BTreeMap,
+    convert::TryFrom,
     fmt::{Debug, Display, Formatter},
     fs::OpenOptions,
     path::{Path, PathBuf},
     str::FromStr,
-    time::Instant,
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 use thiserror::Error;
 
-const MAX_POSSIBLE_GAS_UNITS: u64 = 1_000_000;
+pub const USER_AGENT: &str = concat!("aptos-cli/", env!("CARGO_PKG_VERSION"));
+const US_IN_SECS: u64 = 1_000_000;
+const ACCEPTED_CLOCK_SKEW_US: u64 = 5 * US_IN_SECS;
+pub const DEFAULT_EXPIRATION_SECS: u64 = 30;
 pub const DEFAULT_PROFILE: &str = "default";
 
 /// A common result to be returned to users
@@ -85,6 +97,8 @@ pub enum CliError {
     UnexpectedError(String),
     #[error("Simulation failed with status: {0}")]
     SimulationError(String),
+    #[error("Coverage failed with status: {0}")]
+    CoverageError(String),
 }
 
 impl CliError {
@@ -104,6 +118,7 @@ impl CliError {
             CliError::UnableToReadFile(_, _) => "UnableToReadFile",
             CliError::UnexpectedError(_) => "UnexpectedError",
             CliError::SimulationError(_) => "SimulationError",
+            CliError::CoverageError(_) => "CoverageError",
         }
     }
 }
@@ -476,7 +491,7 @@ impl EncodingType {
                 let hex_string = String::from_utf8(data)?;
                 Key::from_encoded_string(hex_string.trim())
                     .map_err(|err| CliError::UnableToParse(name, err.to_string()))
-            }
+            },
             EncodingType::Base64 => {
                 let string = String::from_utf8(data)?;
                 let bytes = base64::decode(string.trim())
@@ -484,7 +499,7 @@ impl EncodingType {
                 Key::try_from(bytes.as_slice()).map_err(|err| {
                     CliError::UnableToParse(name, format!("Failed to parse key {:?}", err))
                 })
-            }
+            },
         }
     }
 }
@@ -566,7 +581,7 @@ impl FromStr for EncodingType {
 }
 
 /// An insertable option for use with prompts.
-#[derive(Clone, Copy, Debug, Default, Parser)]
+#[derive(Clone, Copy, Debug, Default, Parser, PartialEq, Eq)]
 pub struct PromptOptions {
     /// Assume yes for all yes/no prompts
     #[clap(long, group = "prompt_options")]
@@ -749,7 +764,7 @@ impl PrivateKeyInputOptions {
                 (None, None) => {
                     let address = account_address_from_public_key(&key.public_key());
                     Ok((key, address))
-                }
+                },
             }
         } else {
             Err(CliError::CommandArgumentError(
@@ -857,7 +872,7 @@ pub struct RestOptions {
     pub(crate) url: Option<reqwest::Url>,
 
     /// Connection timeout in seconds, used for the REST endpoint of the fullnode
-    #[clap(long, default_value = "30", alias = "connection-timeout-s")]
+    #[clap(long, default_value_t = DEFAULT_EXPIRATION_SECS, alias = "connection-timeout-s")]
     pub connection_timeout_secs: u64,
 }
 
@@ -865,7 +880,7 @@ impl RestOptions {
     pub fn new(url: Option<reqwest::Url>, connection_timeout_secs: Option<u64>) -> Self {
         RestOptions {
             url,
-            connection_timeout_secs: connection_timeout_secs.unwrap_or(30),
+            connection_timeout_secs: connection_timeout_secs.unwrap_or(DEFAULT_EXPIRATION_SECS),
         }
     }
 
@@ -887,15 +902,16 @@ impl RestOptions {
     }
 
     pub fn client(&self, profile: &ProfileOptions) -> CliTypedResult<Client> {
-        Ok(Client::new_with_timeout(
+        Ok(Client::new_with_timeout_and_user_agent(
             self.url(profile)?,
             Duration::from_secs(self.connection_timeout_secs),
+            USER_AGENT,
         ))
     }
 }
 
 /// Options for compiling a move package dir
-#[derive(Debug, Parser)]
+#[derive(Debug, Clone, Parser)]
 pub struct MovePackageDir {
     /// Path to a move package (the folder with a Move.toml file)
     #[clap(long, parse(from_os_str))]
@@ -912,6 +928,18 @@ pub struct MovePackageDir {
     /// Note: This will fail if there are duplicates in the Move.toml file remove those first.
     #[clap(long, parse(try_from_str = crate::common::utils::parse_map), default_value = "")]
     pub(crate) named_addresses: BTreeMap<String, AccountAddressWrapper>,
+
+    /// Skip pulling the latest git dependencies
+    ///
+    /// If you don't have a network connection, the compiler may fail due
+    /// to no ability to pull git dependencies.  This will allow overriding
+    /// this for local development.
+    #[clap(long)]
+    pub(crate) skip_fetch_latest_git_deps: bool,
+
+    /// Specify the version of the bytecode the compiler is going to emit.
+    #[clap(long)]
+    pub bytecode_version: Option<u32>,
 }
 
 impl MovePackageDir {
@@ -920,6 +948,8 @@ impl MovePackageDir {
             package_dir: Some(package_dir),
             output_dir: None,
             named_addresses: Default::default(),
+            skip_fetch_latest_git_deps: true,
+            bytecode_version: None,
         }
     }
 
@@ -934,6 +964,11 @@ impl MovePackageDir {
             .into_iter()
             .map(|(key, value)| (key, value.account_address))
             .collect()
+    }
+
+    pub fn add_named_address(&mut self, key: String, value: String) {
+        self.named_addresses
+            .insert(key, AccountAddressWrapper::from_str(&value).unwrap());
     }
 }
 
@@ -960,6 +995,11 @@ pub fn load_account_arg(str: &str) -> Result<AccountAddress, CliError> {
             CliError::CommandArgumentError(format!("Failed to parse AccountAddress {}", err))
         })
     } else if let Ok(account_address) = AccountAddress::from_str(str) {
+        Ok(account_address)
+    } else if let Some(Some(account_address)) =
+        CliConfig::load_profile(Some(str), ConfigSearchMode::CurrentDirAndParents)?
+            .map(|p| p.account)
+    {
         Ok(account_address)
     } else if let Some(Some(private_key)) =
         CliConfig::load_profile(Some(str), ConfigSearchMode::CurrentDirAndParents)?
@@ -1144,7 +1184,7 @@ impl From<&Transaction> for TransactionSummary {
     }
 }
 
-/// A summary of a [`WriteSetChange`] for easy printing
+/// A summary of a `WriteSetChange` for easy printing
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct ChangeSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1166,7 +1206,7 @@ pub struct ChangeSummary {
 
 #[derive(Debug, Default, Parser)]
 pub struct FaucetOptions {
-    /// URL for the faucet endpoint e.g. https://faucet.devnet.aptoslabs.com
+    /// URL for the faucet endpoint e.g. `https://faucet.devnet.aptoslabs.com`
     #[clap(long)]
     faucet_url: Option<reqwest::Url>,
 }
@@ -1194,7 +1234,7 @@ impl FaucetOptions {
 }
 
 /// Gas price options for manipulating how to prioritize transactions
-#[derive(Debug, Default, Eq, Parser, PartialEq)]
+#[derive(Debug, Eq, Parser, PartialEq)]
 pub struct GasOptions {
     /// Gas multiplier per unit of gas
     ///
@@ -1220,6 +1260,21 @@ pub struct GasOptions {
     /// Without a value, it will determine the price based on simulating the current transaction
     #[clap(long)]
     pub max_gas: Option<u64>,
+    /// Number of seconds to expire the transaction
+    ///
+    /// This is the number of seconds from the current local computer time.
+    #[clap(long, default_value_t = DEFAULT_EXPIRATION_SECS)]
+    pub expiration_secs: u64,
+}
+
+impl Default for GasOptions {
+    fn default() -> Self {
+        GasOptions {
+            gas_unit_price: None,
+            max_gas: None,
+            expiration_secs: DEFAULT_EXPIRATION_SECS,
+        }
+    }
 }
 
 /// Common options for interacting with an account for a validator
@@ -1244,6 +1299,11 @@ pub struct TransactionOptions {
     pub(crate) gas_options: GasOptions,
     #[clap(flatten)]
     pub(crate) prompt_options: PromptOptions,
+
+    /// If this option is set, simulate the transaction locally using the debugger and generate
+    /// flamegraphs that reflect the gas usage.
+    #[clap(long)]
+    pub(crate) profile_gas: bool,
 }
 
 impl TransactionOptions {
@@ -1281,6 +1341,11 @@ impl TransactionOptions {
         get_sequence_number(&client, sender_address).await
     }
 
+    pub async fn view(&self, payload: ViewRequest) -> CliTypedResult<Vec<serde_json::Value>> {
+        let client = self.rest_client()?;
+        Ok(client.view(&payload, None).await?.into_inner())
+    }
+
     /// Submit a transaction
     pub async fn submit_transaction(
         &self,
@@ -1288,9 +1353,6 @@ impl TransactionOptions {
     ) -> CliTypedResult<Transaction> {
         let client = self.rest_client()?;
         let (sender_key, sender_address) = self.get_key_and_address()?;
-
-        // Get sequence number for account
-        let sequence_number = self.sequence_number(sender_address).await?;
 
         // Ask to confirm price if the gas unit price is estimated above the lowest value when
         // it is automatically estimated
@@ -1305,6 +1367,27 @@ impl TransactionOptions {
             gas_unit_price
         };
 
+        // Get sequence number for account
+        let (account, state) = get_account_with_state(&client, sender_address).await?;
+        let sequence_number = account.sequence_number;
+
+        // Retrieve local time, and ensure it's within an expected skew of the blockchain
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|err| CliError::UnexpectedError(err.to_string()))?
+            .as_secs();
+        let now_usecs = now * US_IN_SECS;
+
+        // Warn local user that clock is skewed behind the blockchain.
+        // There will always be a little lag from real time to blockchain time
+        if now_usecs < state.timestamp_usecs - ACCEPTED_CLOCK_SKEW_US {
+            eprintln!("Local clock is is skewed from blockchain clock.  Clock is more than {} seconds behind the blockchain {}", ACCEPTED_CLOCK_SKEW_US, state.timestamp_usecs / US_IN_SECS );
+        }
+        let expiration_time_secs = now + self.gas_options.expiration_secs;
+
+        let chain_id = ChainId::new(state.chain_id);
+        // TODO: Check auth key against current private key and provide a better message
+
         let max_gas = if let Some(max_gas) = self.gas_options.max_gas {
             // If the gas unit price was estimated ask, but otherwise you've chosen hwo much you want to spend
             if ask_to_confirm_price {
@@ -1313,13 +1396,14 @@ impl TransactionOptions {
             }
             max_gas
         } else {
-            let transaction_factory = TransactionFactory::new(chain_id(&client).await?)
-                .with_gas_unit_price(gas_unit_price);
+            let transaction_factory =
+                TransactionFactory::new(chain_id).with_gas_unit_price(gas_unit_price);
 
             let unsigned_transaction = transaction_factory
                 .payload(payload.clone())
                 .sender(sender_address)
                 .sequence_number(sequence_number)
+                .expiration_timestamp_secs(expiration_time_secs)
                 .build();
 
             let signed_transaction = SignedTransaction::new(
@@ -1327,33 +1411,28 @@ impl TransactionOptions {
                 sender_key.public_key(),
                 Ed25519Signature::try_from([0u8; 64].as_ref()).unwrap(),
             );
-            // TODO: Cleanup to use the gas price estimation here
-            let simulated_txn = client
-                .simulate_bcs_with_gas_estimation(&signed_transaction, true, false)
+
+            let txns = client
+                .simulate_with_gas_estimation(&signed_transaction, true, false)
                 .await?
                 .into_inner();
+            let simulated_txn = txns.first().unwrap();
 
             // Check if the transaction will pass, if it doesn't then fail
-            // TODO: Add move resolver so we can explain the VM status with a proper error map
-            let status = simulated_txn.info.status();
-            if !status.is_success() {
-                let status = client.explain_vm_status(status);
-                return Err(CliError::SimulationError(status));
+            if !simulated_txn.info.success {
+                return Err(CliError::SimulationError(
+                    simulated_txn.info.vm_status.clone(),
+                ));
             }
 
             // Take the gas used and use a headroom factor on it
-            let adjusted_max_gas = adjust_gas_headroom(
-                simulated_txn.info.gas_used(),
-                simulated_txn
-                    .transaction
-                    .as_signed_user_txn()
-                    .expect("Should be signed user transaction")
-                    .max_gas_amount(),
-            );
+            let gas_used = simulated_txn.info.gas_used.0;
+            let adjusted_max_gas =
+                adjust_gas_headroom(gas_used, simulated_txn.request.max_gas_amount.0);
 
             // Ask if you want to accept the estimate amount
             let upper_cost_bound = adjusted_max_gas * gas_unit_price;
-            let lower_cost_bound = simulated_txn.info.gas_used() * gas_unit_price;
+            let lower_cost_bound = gas_used * gas_unit_price;
             let message = format!(
                     "Do you want to submit a transaction for a range of [{} - {}] Octas at a gas unit price of {} Octas?",
                     lower_cost_bound,
@@ -1364,9 +1443,10 @@ impl TransactionOptions {
         };
 
         // Sign and submit transaction
-        let transaction_factory = TransactionFactory::new(chain_id(&client).await?)
+        let transaction_factory = TransactionFactory::new(chain_id)
             .with_gas_unit_price(gas_unit_price)
-            .with_max_gas_amount(max_gas);
+            .with_max_gas_amount(max_gas)
+            .with_transaction_expiration_time(self.gas_options.expiration_secs);
         let sender_account = &mut LocalAccount::new(sender_address, sender_key, sequence_number);
         let transaction =
             sender_account.sign_with_transaction_builder(transaction_factory.payload(payload));
@@ -1378,67 +1458,168 @@ impl TransactionOptions {
         Ok(response.into_inner())
     }
 
-    pub async fn simulate_transaction(
+    /// Simulate the transaction locally using the debugger, with the gas profiler enabled.
+    pub async fn profile_gas(
         &self,
         payload: TransactionPayload,
-        gas_price: Option<u64>,
-        amount_transfer: Option<u64>,
-    ) -> CliTypedResult<UserTransaction> {
+    ) -> CliTypedResult<TransactionSummary> {
+        println!();
+        println!("Simulating transaction locally with the gas profiler...");
+        println!("This is still experimental so results may be inaccurate.");
+
         let client = self.rest_client()?;
+
+        // Fetch the chain states required for the simulation
+        // TODO(Gas): get the following from the chain
+        const DEFAULT_GAS_UNIT_PRICE: u64 = 100;
+        const DEFAULT_MAX_GAS: u64 = 2_000_000;
+
         let (sender_key, sender_address) = self.get_key_and_address()?;
+        let gas_unit_price = self
+            .gas_options
+            .gas_unit_price
+            .unwrap_or(DEFAULT_GAS_UNIT_PRICE);
+        let (account, state) = get_account_with_state(&client, sender_address).await?;
+        let version = state.version;
+        let chain_id = ChainId::new(state.chain_id);
+        let sequence_number = account.sequence_number;
 
-        // Get sequence number for account
-        let sequence_number = get_sequence_number(&client, sender_address).await?;
+        let balance = client
+            .get_account_balance_at_version(sender_address, version)
+            .await
+            .map_err(|err| CliError::ApiError(err.to_string()))?
+            .into_inner();
 
-        // Estimate gas price if necessary
-        let gas_price = if let Some(gas_price) = gas_price {
-            gas_price
-        } else {
-            self.estimate_gas_price().await?
+        let max_gas = self.gas_options.max_gas.unwrap_or_else(|| {
+            if gas_unit_price == 0 {
+                DEFAULT_MAX_GAS
+            } else {
+                std::cmp::min(balance.coin.value.0 / gas_unit_price, DEFAULT_MAX_GAS)
+            }
+        });
+
+        // Create and sign the transaction
+        let transaction_factory = TransactionFactory::new(chain_id)
+            .with_gas_unit_price(gas_unit_price)
+            .with_max_gas_amount(max_gas)
+            .with_transaction_expiration_time(self.gas_options.expiration_secs);
+        let sender_account = &mut LocalAccount::new(sender_address, sender_key, sequence_number);
+        let transaction =
+            sender_account.sign_with_transaction_builder(transaction_factory.payload(payload));
+        let hash = transaction.clone().committed_hash();
+
+        // Execute the transaction using the debugger
+        let debugger = AptosDebugger::rest_client(client).unwrap();
+        let res = debugger.execute_transaction_at_version_with_gas_profiler(version, transaction);
+        let (vm_status, output, gas_log) = res.map_err(|err| {
+            CliError::UnexpectedError(format!("failed to simulate txn with gas profiler: {}", err))
+        })?;
+
+        // Generate the file name for the flamegraphs
+        let entry_point = gas_log.entry_point();
+
+        let human_readable_name = match entry_point {
+            FrameName::Script => "script".to_string(),
+            FrameName::Function {
+                module_id, name, ..
+            } => {
+                let addr_short = module_id.address().short_str_lossless();
+                let addr_truncated = if addr_short.len() > 4 {
+                    &addr_short[..4]
+                } else {
+                    addr_short.as_str()
+                };
+                format!("0x{}-{}-{}", addr_truncated, module_id.name(), name)
+            },
         };
-        // Simulate transaction
-        // To get my known possible max gas, I need to get my current balance
-        let account_balance = client
-            .get_account_balance(sender_address)
-            .await?
-            .into_inner()
-            .coin
-            .value
-            .0;
+        let raw_file_name = format!("txn-{}-{}", hash, human_readable_name);
 
-        let max_possible_gas = if gas_price == 0 {
-            MAX_POSSIBLE_GAS_UNITS
-        } else if let Some(amount) = amount_transfer {
-            std::cmp::min(
-                account_balance
-                    .saturating_sub(amount)
-                    .saturating_div(gas_price),
-                MAX_POSSIBLE_GAS_UNITS,
-            )
-        } else {
-            std::cmp::min(
-                account_balance.saturating_div(gas_price),
-                MAX_POSSIBLE_GAS_UNITS,
-            )
+        // Create the directory if it does not exist yet.
+        let dir: &Path = Path::new("gas-profiling");
+
+        macro_rules! create_dir {
+            () => {
+                if let Err(err) = std::fs::create_dir(dir) {
+                    if err.kind() != std::io::ErrorKind::AlreadyExists {
+                        return Err(CliError::UnexpectedError(format!(
+                            "failed to create directory {}",
+                            dir.display()
+                        )));
+                    }
+                }
+            };
+        }
+
+        // Generate the execution & IO flamegraph.
+        println!();
+        match gas_log.to_flamegraph(format!("Transaction {} -- Execution & IO", hash))? {
+            Some(graph_bytes) => {
+                create_dir!();
+                let graph_file_path = Path::join(dir, format!("{}.exec_io.svg", raw_file_name));
+                std::fs::write(&graph_file_path, graph_bytes).map_err(|err| {
+                    CliError::UnexpectedError(format!(
+                        "Failed to write flamegraph to file {} : {:?}",
+                        graph_file_path.display(),
+                        err
+                    ))
+                })?;
+                println!(
+                    "Execution & IO Gas flamegraph saved to {}",
+                    graph_file_path.display()
+                );
+            },
+            None => {
+                println!("Skipped generating execution & IO flamegraph");
+            },
+        }
+
+        // Generate the storage fee flamegraph.
+        match gas_log
+            .storage
+            .to_flamegraph(format!("Transaction {} -- Storage Fee", hash))?
+        {
+            Some(graph_bytes) => {
+                create_dir!();
+                let graph_file_path = Path::join(dir, format!("{}.storage.svg", raw_file_name));
+                std::fs::write(&graph_file_path, graph_bytes).map_err(|err| {
+                    CliError::UnexpectedError(format!(
+                        "Failed to write flamegraph to file {} : {:?}",
+                        graph_file_path.display(),
+                        err
+                    ))
+                })?;
+                println!(
+                    "Storage fee flamegraph saved to {}",
+                    graph_file_path.display()
+                );
+            },
+            None => {
+                println!("Skipped generating storage fee flamegraph");
+            },
+        }
+
+        println!();
+
+        // Generate the transaction summary
+
+        // TODO(Gas): double check if this is correct.
+        let success = match output.status() {
+            TransactionStatus::Keep(exec_status) => Some(exec_status.is_success()),
+            TransactionStatus::Discard(_) | TransactionStatus::Retry => None,
         };
 
-        let transaction_factory = TransactionFactory::new(chain_id(&client).await?)
-            .with_gas_unit_price(gas_price)
-            .with_max_gas_amount(max_possible_gas);
-
-        let unsigned_transaction = transaction_factory
-            .payload(payload)
-            .sender(sender_address)
-            .sequence_number(sequence_number)
-            .build();
-
-        let signed_transaction = SignedTransaction::new(
-            unsigned_transaction,
-            sender_key.public_key(),
-            Ed25519Signature::try_from([0u8; 64].as_ref()).unwrap(),
-        );
-        let txns = client.simulate(&signed_transaction).await?.into_inner();
-        Ok(txns.first().unwrap().clone())
+        Ok(TransactionSummary {
+            transaction_hash: hash.into(),
+            gas_used: Some(output.gas_used()),
+            gas_unit_price: Some(gas_unit_price),
+            pending: None,
+            sender: Some(sender_address),
+            sequence_number: None, // The transaction is not comitted so there is no new sequence number.
+            success,
+            timestamp_us: None,
+            version: Some(version), // The transaction is not comitted so there is no new version.
+            vm_status: Some(vm_status.to_string()),
+        })
     }
 
     pub async fn estimate_gas_price(&self) -> CliTypedResult<u64> {
@@ -1489,4 +1670,62 @@ pub struct RotationProofChallenge {
     pub originator: AccountAddress,
     pub current_auth_key: AccountAddress,
     pub new_public_key: Vec<u8>,
+}
+
+/// Common options for constructing an entry function transaction payload.
+#[derive(Debug, Parser)]
+pub struct EntryFunctionArguments {
+    /// Function name as `<ADDRESS>::<MODULE_ID>::<FUNCTION_NAME>`
+    ///
+    /// Example: `0x842ed41fad9640a2ad08fdd7d3e4f7f505319aac7d67e1c0dd6a7cce8732c7e3::message::set_message`
+    #[clap(long)]
+    pub function_id: MemberId,
+
+    /// Arguments combined with their type separated by spaces.
+    ///
+    /// Supported types [u8, u16, u32, u64, u128, u256, bool, hex, string, address, raw, vector<inner_type>]
+    ///
+    /// Example: `address:0x1 bool:true u8:0 u256:1234 'vector<u32>:a,b,c,d'`
+    #[clap(long, multiple_values = true)]
+    pub args: Vec<ArgWithType>,
+
+    /// TypeTag arguments separated by spaces.
+    ///
+    /// Example: `u8 u16 u32 u64 u128 u256 bool address vector signer`
+    #[clap(long, multiple_values = true)]
+    pub type_args: Vec<MoveType>,
+}
+
+impl EntryFunctionArguments {
+    /// Construct and return an entry function payload from function_id, args, and type_args.
+    pub fn create_entry_function_payload(self) -> CliTypedResult<EntryFunction> {
+        let args: Vec<Vec<u8>> = self
+            .args
+            .into_iter()
+            .map(|arg_with_type| arg_with_type.arg)
+            .collect();
+
+        let mut parsed_type_args: Vec<TypeTag> = Vec::new();
+        // These TypeArgs are used for generics
+        for type_arg in self.type_args.into_iter() {
+            let type_tag = TypeTag::try_from(type_arg.clone())
+                .map_err(|err| CliError::UnableToParse("--type-args", err.to_string()))?;
+            parsed_type_args.push(type_tag)
+        }
+
+        Ok(EntryFunction::new(
+            self.function_id.module_id,
+            self.function_id.member_id,
+            parsed_type_args,
+            args,
+        ))
+    }
+}
+
+/// Common options for interactions with a multisig account.
+#[derive(Clone, Debug, Parser, Serialize)]
+pub struct MultisigAccount {
+    /// The address of the multisig account to interact with.
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    pub(crate) multisig_address: AccountAddress,
 }

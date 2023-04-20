@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 import { Deserializer, Serializer, Bytes, Seq, deserializeVector, serializeVector } from "../bcs";
@@ -37,7 +37,7 @@ export class ArgumentABI {
     this.type_tag.serialize(serializer);
   }
 
-  static deserialize(deserializer: Deserializer): TypeArgumentABI {
+  static deserialize(deserializer: Deserializer): ArgumentABI {
     const name = deserializer.deserializeStr();
     const typeTag = TypeTag.deserialize(deserializer);
     return new ArgumentABI(name, typeTag);

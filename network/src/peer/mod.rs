@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! [`Peer`] manages a single connection to a remote peer after the initial connection
@@ -33,13 +34,13 @@ use crate::{
     transport::{self, Connection, ConnectionMetadata},
     ProtocolId,
 };
+use aptos_channels::aptos_channel;
 use aptos_config::network_id::NetworkContext;
 use aptos_logger::prelude::*;
-use aptos_rate_limiter::rate_limit::SharedBucket;
+use aptos_short_hex_str::AsShortHexStr;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::PeerId;
 use bytes::Bytes;
-use channel::aptos_channel;
 use futures::{
     self,
     channel::oneshot,
@@ -49,7 +50,6 @@ use futures::{
 };
 use futures_util::stream::select;
 use serde::Serialize;
-use short_hex_str::AsShortHexStr;
 use std::{fmt, panic, time::Duration};
 use tokio::runtime::Handle;
 use tokio_util::compat::{
@@ -121,7 +121,7 @@ pub struct Peer<TSocket> {
     /// Underlying connection.
     connection: Option<TSocket>,
     /// Channel to notify PeerManager that we've disconnected.
-    connection_notifs_tx: channel::Sender<TransportNotification<TSocket>>,
+    connection_notifs_tx: aptos_channels::Sender<TransportNotification<TSocket>>,
     /// Channel to receive requests from PeerManager to send messages and rpcs.
     peer_reqs_rx: aptos_channel::Receiver<ProtocolId, PeerRequest>,
     /// Channel to notifty PeerManager of new inbound messages and rpcs.
@@ -136,10 +136,6 @@ pub struct Peer<TSocket> {
     max_frame_size: usize,
     /// The maximum size of an inbound or outbound request message
     max_message_size: usize,
-    /// Optional inbound rate limiter
-    inbound_rate_limiter: Option<SharedBucket>,
-    /// Optional outbound rate limiter
-    outbound_rate_limiter: Option<SharedBucket>,
     /// Inbound stream buffer
     inbound_stream: InboundStreamBuffer,
 }
@@ -154,7 +150,7 @@ where
         executor: Handle,
         time_service: TimeService,
         connection: Connection<TSocket>,
-        connection_notifs_tx: channel::Sender<TransportNotification<TSocket>>,
+        connection_notifs_tx: aptos_channels::Sender<TransportNotification<TSocket>>,
         peer_reqs_rx: aptos_channel::Receiver<ProtocolId, PeerRequest>,
         peer_notifs_tx: aptos_channel::Sender<ProtocolId, PeerNotification>,
         inbound_rpc_timeout: Duration,
@@ -162,8 +158,6 @@ where
         max_concurrent_outbound_rpcs: u32,
         max_frame_size: usize,
         max_message_size: usize,
-        inbound_rate_limiter: Option<SharedBucket>,
-        outbound_rate_limiter: Option<SharedBucket>,
     ) -> Self {
         let Connection {
             metadata: connection_metadata,
@@ -196,8 +190,6 @@ where
             state: State::Connected,
             max_frame_size,
             max_message_size,
-            inbound_rate_limiter,
-            outbound_rate_limiter,
             inbound_stream: InboundStreamBuffer::new(max_fragments),
         }
     }
@@ -220,17 +212,9 @@ where
         let (read_socket, write_socket) =
             tokio::io::split(self.connection.take().unwrap().compat());
 
-        let mut reader = MultiplexMessageStream::new(
-            read_socket.compat(),
-            self.max_frame_size,
-            self.inbound_rate_limiter.clone(),
-        )
-        .fuse();
-        let writer = MultiplexMessageSink::new(
-            write_socket.compat_write(),
-            self.max_frame_size,
-            self.outbound_rate_limiter.clone(),
-        );
+        let mut reader =
+            MultiplexMessageStream::new(read_socket.compat(), self.max_frame_size).fuse();
+        let writer = MultiplexMessageSink::new(write_socket.compat_write(), self.max_frame_size);
 
         // Start writer "process" as a separate task. We receive two handles to
         // communicate with the task:
@@ -322,15 +306,15 @@ where
         mut writer: MultiplexMessageSink<impl AsyncWrite + Unpin + Send + 'static>,
         max_frame_size: usize,
         max_message_size: usize,
-    ) -> (channel::Sender<NetworkMessage>, oneshot::Sender<()>) {
+    ) -> (aptos_channels::Sender<NetworkMessage>, oneshot::Sender<()>) {
         let remote_peer_id = connection_metadata.remote_peer_id;
-        let (write_reqs_tx, mut write_reqs_rx): (channel::Sender<NetworkMessage>, _) =
-            channel::new(1024, &counters::PENDING_WIRE_MESSAGES);
+        let (write_reqs_tx, mut write_reqs_rx): (aptos_channels::Sender<NetworkMessage>, _) =
+            aptos_channels::new(1024, &counters::PENDING_WIRE_MESSAGES);
         let (close_tx, mut close_rx) = oneshot::channel();
 
-        let (mut msg_tx, msg_rx) = channel::new(1024, &counters::PENDING_MULTIPLEX_MESSAGE);
+        let (mut msg_tx, msg_rx) = aptos_channels::new(1024, &counters::PENDING_MULTIPLEX_MESSAGE);
         let (stream_msg_tx, stream_msg_rx) =
-            channel::new(1024, &counters::PENDING_MULTIPLEX_STREAM);
+            aptos_channels::new(1024, &counters::PENDING_MULTIPLEX_STREAM);
 
         // this task ends when the multiplex task ends (by dropping the senders)
         let writer_task = async move {
@@ -370,7 +354,7 @@ where
                         network_context,
                         remote_peer_id.short_str()
                     );
-                }
+                },
                 Ok(Err(err)) => {
                     info!(
                         log_context,
@@ -380,7 +364,7 @@ where
                         remote_peer_id.short_str(),
                         err
                     );
-                }
+                },
                 Ok(Ok(())) => {
                     info!(
                         log_context,
@@ -388,7 +372,7 @@ where
                         network_context,
                         remote_peer_id.short_str()
                     );
-                }
+                },
             }
         };
         let multiplex_task = async move {
@@ -439,7 +423,7 @@ where
                     self.remote_peer_id().short_str(),
                     error_msg,
                 );
-            }
+            },
             NetworkMessage::RpcRequest(request) => {
                 if let Err(err) = self
                     .inbound_rpcs
@@ -454,10 +438,10 @@ where
                         err
                     );
                 }
-            }
+            },
             NetworkMessage::RpcResponse(response) => {
                 self.outbound_rpcs.handle_inbound_response(response)
-            }
+            },
         };
         Ok(())
     }
@@ -469,12 +453,12 @@ where
         match message {
             StreamMessage::Header(header) => {
                 self.inbound_stream.new_stream(header)?;
-            }
+            },
             StreamMessage::Fragment(fragment) => {
                 if let Some(message) = self.inbound_stream.append_fragment(fragment)? {
                     self.handle_inbound_network_message(message).await?;
                 }
-            }
+            },
         }
         Ok(())
     }
@@ -482,7 +466,7 @@ where
     async fn handle_inbound_message(
         &mut self,
         message: Result<MultiplexMessage, ReadError>,
-        write_reqs_tx: &mut channel::Sender<NetworkMessage>,
+        write_reqs_tx: &mut aptos_channels::Sender<NetworkMessage>,
     ) -> Result<(), PeerManagerError> {
         trace!(
             NetworkSchema::new(&self.network_context)
@@ -506,19 +490,19 @@ where
 
                     write_reqs_tx.send(message).await?;
                     return Err(err.into());
-                }
+                },
                 ReadError::IoError(_) => {
                     // IoErrors are mostly unrecoverable so just close the connection.
                     self.shutdown(DisconnectReason::ConnectionLost);
                     return Err(err.into());
-                }
+                },
             },
         };
 
         match message {
             MultiplexMessage::Message(message) => {
                 self.handle_inbound_network_message(message).await
-            }
+            },
             MultiplexMessage::Stream(message) => self.handle_inbound_stream_message(message).await,
         }
     }
@@ -563,7 +547,7 @@ where
     async fn handle_outbound_request(
         &mut self,
         request: PeerRequest,
-        write_reqs_tx: &mut channel::Sender<NetworkMessage>,
+        write_reqs_tx: &mut aptos_channels::Sender<NetworkMessage>,
     ) {
         trace!(
             "Peer {} PeerRequest::{:?}",
@@ -592,7 +576,7 @@ where
                         counters::direct_send_messages(&self.network_context, SENT_LABEL).inc();
                         counters::direct_send_bytes(&self.network_context, SENT_LABEL)
                             .inc_by(message_len as u64);
-                    }
+                    },
                     Err(e) => {
                         warn!(
                             NetworkSchema::new(&self.network_context)
@@ -603,9 +587,9 @@ where
                             self.remote_peer_id().short_str(),
                             e,
                         );
-                    }
+                    },
                 }
-            }
+            },
             PeerRequest::SendRpc(request) => {
                 let protocol_id = request.protocol_id;
                 network_application_outbound_traffic(
@@ -628,7 +612,7 @@ where
                         e,
                     );
                 }
-            }
+            },
         }
     }
 

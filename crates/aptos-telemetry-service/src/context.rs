@@ -1,24 +1,72 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::{HashMap, HashSet};
-use std::{convert::Infallible, sync::Arc};
-
-use crate::clients::big_query::TableWriteClient;
-use crate::types::common::EpochedPeerStore;
 use crate::{
-    clients::humio::IngestClient as HumioClient,
-    clients::victoria_metrics_api::Client as MetricsClient,
+    clients::{big_query::TableWriteClient, humio, victoria_metrics_api::Client as MetricsClient},
+    types::common::EpochedPeerStore,
+    LogIngestConfig, MetricsEndpointsConfig,
 };
 use aptos_crypto::{noise, x25519};
 use aptos_infallible::RwLock;
-use aptos_types::chain_id::ChainId;
-use aptos_types::PeerId;
-
+use aptos_types::{chain_id::ChainId, PeerId};
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, TokenData, Validation};
-use serde::de::DeserializeOwned;
-use serde::Serialize;
+use serde::{de::DeserializeOwned, Serialize};
+use std::{
+    collections::{HashMap, HashSet},
+    convert::Infallible,
+    sync::Arc,
+};
 use warp::Filter;
+
+/// Container that holds various metric clients used for sending metrics from
+/// various sources to appropriate backends.
+#[derive(Clone, Default)]
+pub struct GroupedMetricsClients {
+    /// Client(s) for exporting metrics of the running telemetry service
+    pub telemetry_service_metrics_clients: HashMap<String, MetricsClient>,
+    /// Clients for sending metrics from authenticated known nodes
+    pub ingest_metrics_client: HashMap<String, MetricsClient>,
+    /// Clients for sending metrics from authenticated unknown nodes
+    pub untrusted_ingest_metrics_clients: HashMap<String, MetricsClient>,
+}
+
+impl GroupedMetricsClients {
+    #[cfg(test)]
+    pub fn new_empty() -> Self {
+        Self {
+            telemetry_service_metrics_clients: HashMap::new(),
+            ingest_metrics_client: HashMap::new(),
+            untrusted_ingest_metrics_clients: HashMap::new(),
+        }
+    }
+}
+
+impl From<MetricsEndpointsConfig> for GroupedMetricsClients {
+    fn from(config: MetricsEndpointsConfig) -> GroupedMetricsClients {
+        GroupedMetricsClients {
+            telemetry_service_metrics_clients: config.telemetry_service_metrics.make_client(),
+            ingest_metrics_client: config.ingest_metrics.make_client(),
+            untrusted_ingest_metrics_clients: config.untrusted_ingest_metrics.make_client(),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct LogIngestClients {
+    pub known_logs_ingest_client: humio::IngestClient,
+    pub unknown_logs_ingest_client: humio::IngestClient,
+    pub blacklist: Option<HashSet<PeerId>>,
+}
+
+impl From<LogIngestConfig> for LogIngestClients {
+    fn from(config: LogIngestConfig) -> Self {
+        Self {
+            known_logs_ingest_client: config.known_logs_endpoint.make_client(),
+            unknown_logs_ingest_client: config.unknown_logs_endpoint.make_client(),
+            blacklist: config.blacklist_peers,
+        }
+    }
+}
 
 #[derive(Clone, Default)]
 pub struct PeerStoreTuple {
@@ -55,21 +103,21 @@ impl PeerStoreTuple {
 
 #[derive(Clone)]
 pub struct ClientTuple {
-    bigquery_client: TableWriteClient,
-    victoria_metrics_client: MetricsClient,
-    humio_client: HumioClient,
+    bigquery_client: Option<TableWriteClient>,
+    victoria_metrics_clients: Option<GroupedMetricsClients>,
+    log_ingest_clients: Option<LogIngestClients>,
 }
 
 impl ClientTuple {
     pub(crate) fn new(
-        bigquery_client: TableWriteClient,
-        victoria_metrics_client: MetricsClient,
-        humio_client: HumioClient,
+        bigquery_client: Option<TableWriteClient>,
+        victoria_metrics_clients: Option<GroupedMetricsClients>,
+        log_ingest_clients: Option<LogIngestClients>,
     ) -> ClientTuple {
         Self {
             bigquery_client,
-            victoria_metrics_client,
-            humio_client,
+            victoria_metrics_clients,
+            log_ingest_clients,
         }
     }
 }
@@ -113,28 +161,28 @@ impl JsonWebTokenService {
 pub struct Context {
     noise_config: Arc<noise::NoiseConfig>,
     peers: PeerStoreTuple,
-    clients: Option<ClientTuple>,
-    chain_set: HashSet<ChainId>,
+    clients: ClientTuple,
     jwt_service: JsonWebTokenService,
     log_env_map: HashMap<ChainId, HashMap<PeerId, String>>,
+    peer_identities: HashMap<ChainId, HashMap<PeerId, String>>,
 }
 
 impl Context {
     pub fn new(
         private_key: x25519::PrivateKey,
         peers: PeerStoreTuple,
-        clients: Option<ClientTuple>,
-        chain_set: HashSet<ChainId>,
+        clients: ClientTuple,
         jwt_service: JsonWebTokenService,
         log_env_map: HashMap<ChainId, HashMap<PeerId, String>>,
+        peer_identities: HashMap<ChainId, HashMap<PeerId, String>>,
     ) -> Self {
         Self {
             noise_config: Arc::new(noise::NoiseConfig::new(private_key)),
             peers,
             clients,
-            chain_set,
             jwt_service,
             log_env_map,
+            peer_identities,
         }
     }
 
@@ -154,25 +202,29 @@ impl Context {
         &self.jwt_service
     }
 
-    pub fn metrics_client(&self) -> &MetricsClient {
-        &self.clients.as_ref().unwrap().victoria_metrics_client
-    }
-
-    pub fn humio_client(&self) -> &HumioClient {
-        &self.clients.as_ref().unwrap().humio_client
-    }
-
-    pub(crate) fn bigquery_client(&self) -> Option<&TableWriteClient> {
-        self.clients.as_ref().map(|c| &c.bigquery_client)
-    }
-
-    pub fn chain_set(&self) -> &HashSet<ChainId> {
-        &self.chain_set
+    pub fn metrics_client(&self) -> &GroupedMetricsClients {
+        self.clients.victoria_metrics_clients.as_ref().unwrap()
     }
 
     #[cfg(test)]
-    pub fn chain_set_mut(&mut self) -> &mut HashSet<ChainId> {
-        &mut self.chain_set
+    pub fn metrics_client_mut(&mut self) -> &mut GroupedMetricsClients {
+        self.clients.victoria_metrics_clients.as_mut().unwrap()
+    }
+
+    pub fn log_ingest_clients(&self) -> &LogIngestClients {
+        self.clients.log_ingest_clients.as_ref().unwrap()
+    }
+
+    pub(crate) fn bigquery_client(&self) -> Option<&TableWriteClient> {
+        self.clients.bigquery_client.as_ref()
+    }
+
+    pub(crate) fn peer_identities(&self) -> &HashMap<ChainId, HashMap<PeerId, String>> {
+        &self.peer_identities
+    }
+
+    pub fn chain_set(&self) -> HashSet<ChainId> {
+        self.peers.validators.read().keys().cloned().collect()
     }
 
     pub fn log_env_map(&self) -> &HashMap<ChainId, HashMap<PeerId, String>> {

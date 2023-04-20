@@ -1,24 +1,29 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::accept_type::AcceptType;
-use crate::accounts::Account;
-use crate::context::Context;
-use crate::failpoint::fail_point_poem;
-use crate::page::Page;
-use crate::response::BadRequestError;
-use crate::response::{
-    BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404, InternalError,
+use crate::{
+    accept_type::AcceptType,
+    accounts::Account,
+    context::Context,
+    failpoint::fail_point_poem,
+    page::Page,
+    response::{
+        BadRequestError, BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404,
+        InternalError,
+    },
+    ApiTags,
 };
-use crate::ApiTags;
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
     verify_field_identifier, Address, AptosErrorCode, AsConverter, IdentifierWrapper, LedgerInfo,
     MoveStructTag, VerifyInputWithRecursion, VersionedEvent, U64,
 };
 use aptos_types::event::EventKey;
-use poem_openapi::param::Query;
-use poem_openapi::{param::Path, OpenApi};
+use poem_openapi::{
+    param::{Path, Query},
+    OpenApi,
+};
 use std::sync::Arc;
 
 pub struct EventsApi {
@@ -69,8 +74,8 @@ impl EventsApi {
         );
 
         // Ensure that account exists
-        let account = Account::new(self.context.clone(), address.0, None)?;
-        account.account_state()?;
+        let account = Account::new(self.context.clone(), address.0, None, None, None)?;
+        account.verify_account_or_object_resource()?;
         self.list(
             account.latest_ledger_info,
             accept_type,
@@ -131,7 +136,7 @@ impl EventsApi {
             limit.0,
             self.context.max_events_page_size(),
         );
-        let account = Account::new(self.context.clone(), address.0, None)?;
+        let account = Account::new(self.context.clone(), address.0, None, None, None)?;
         let key = account.find_event_key(event_handle.0, field_name.0.into())?;
         self.list(account.latest_ledger_info, accept_type, page, key)
     }
@@ -180,10 +185,10 @@ impl EventsApi {
                     })?;
 
                 BasicResponse::try_from_json((events, &latest_ledger_info, BasicResponseStatus::Ok))
-            }
+            },
             AcceptType::Bcs => {
                 BasicResponse::try_from_bcs((events, &latest_ledger_info, BasicResponseStatus::Ok))
-            }
+            },
         }
     }
 }

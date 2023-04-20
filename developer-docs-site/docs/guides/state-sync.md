@@ -8,7 +8,15 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 # State Synchronization
 
-Nodes in an Aptos network, both the validator nodes and the fullnodes, must always be synchronized to the latest Aptos blockchain state. The state synchronization (state sync) component that runs on each node is responsible for this synchronization. To achieve this synchronization, state sync identifies and fetches new blockchain data from the peers, validates the data and persists it to the local storage.
+Nodes in an Aptos network, both the validator nodes and the fullnodes, must always be synchronized to the latest Aptos blockchain state. The [state synchronization](https://medium.com/aptoslabs/the-evolution-of-state-sync-the-path-to-100k-transactions-per-second-with-sub-second-latency-at-52e25a2c6f10) (state sync) component that runs on each node is responsible for this synchronization. To achieve this synchronization, state sync identifies and fetches new blockchain data from the peers, validates the data and persists it to the local storage.
+
+:::tip Need to start a node quickly?
+If you need to start a node quickly, here's what we recommend by use case:
+  - **Devnet public fullnode**: To sync the entire blockchain history, download [a snapshot](../nodes/full-node/bootstrap-fullnode.md). Otherwise, use [fast sync](state-sync.md#fast-syncing).
+  - **Testnet public fullnode**: To sync the entire blockchain history, download [a snapshot](../nodes/full-node/bootstrap-fullnode.md). Otherwise, use [fast sync](state-sync.md#fast-syncing).
+  - **Mainnet public fullnode**: To sync the entire blockchain history, use [output syncing](state-sync.md#applying-all-transaction-outputs). Otherwise, use [fast sync](state-sync.md#fast-syncing).
+  - **Mainnet validator or validator fullnode**: Use [output syncing](state-sync.md#applying-all-transaction-outputs). Note: [fast sync](state-sync.md#fast-syncing) is not recommended.
+:::
 
 ## State sync modes
 
@@ -48,7 +56,7 @@ configuration file (for example,`fullnode.yaml` or `validator.yaml`):
 
 :::tip Verify node syncing
 While your node is syncing, you'll be able to see the
-[`aptos_state_sync_version{type="synced"}`](/nodes/full-node/fullnode-source-code-or-docker/#verify-initial-synchronization) metric gradually increase.
+[`aptos_state_sync_version{type="synced"}`](../nodes/full-node/fullnode-source-code-or-docker.md#verify-initial-synchronization) metric gradually increase.
 :::
 
 ### Applying all transaction outputs
@@ -66,7 +74,7 @@ node configuration file:
 
 :::tip Verify node syncing
 While your node is syncing, you'll be able to see the
-[`aptos_state_sync_version{type="synced"}`](/nodes/full-node/fullnode-source-code-or-docker/#verify-initial-synchronization) metric gradually increase.
+[`aptos_state_sync_version{type="synced"}`](../nodes/full-node/fullnode-source-code-or-docker.md#verify-initial-synchronization) metric gradually increase.
 :::
 
 ## Fast syncing
@@ -118,6 +126,21 @@ network delays that may occur when initializing slow network connections:
      max_connection_deadline_secs: 1000000 # Tolerate slow peer discovery & connections
 ```
 
+## Running archival nodes
+
+To operate an archival node, which is a fullnode that contains all blockchain data
+since the start of the blockchain's history (that is, genesis), you should:
+1. Run a fullnode and configure it to execute all transactions, or apply all transaction outputs (see above).
+Do not select fast syncing, as the fullnode will not contain all data since genesis.
+2. Disable the ledger pruner, as described in the [Data Pruning document](data-pruning.md#disabling-the-ledger-pruner).
+This will ensure that no data is pruned and the fullnode contains all blockchain data.
+
+:::caution Proceed with caution
+Running and maintaining archival nodes is likely to be expensive and slow
+as the amount of data being stored on the fullnode will continuously grow.
+:::
+
+
 ## Security implications and data integrity
 Each of the different syncing modes perform data integrity verifications to
 ensure that the data being synced to the node has been correctly produced
@@ -144,7 +167,7 @@ All of the syncing modes get their root of trust from the validator set
 and cryptographic signatures from those validators over the blockchain data.
 For more information about how this works, see the [state synchronization blogpost](https://medium.com/aptoslabs/the-evolution-of-state-sync-the-path-to-100k-transactions-per-second-with-sub-second-latency-at-52e25a2c6f10).
 
-## State sync architecture
+# State sync architecture
 
 The state synchronization component is comprised of four sub-components, each with a specific purpose:
 

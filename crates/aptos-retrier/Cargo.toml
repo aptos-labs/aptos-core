@@ -1,16 +1,18 @@
 [package]
 name = "aptos-retrier"
-version = "0.1.0"
-authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Generic retry and exponential backoff"
-repository = "https://github.com/aptos-labs/aptos-core"
-homepage = "https://aptoslabs.com"
-license = "Apache-2.0"
-publish = false
-edition = "2021"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
 
 [dependencies]
-tokio = { version = "1.21.0", features = ["time"] }
-
-aptos-logger = { path = "../../crates/aptos-logger" }
+aptos-logger = { workspace = true }
+tokio = { workspace = true }
 

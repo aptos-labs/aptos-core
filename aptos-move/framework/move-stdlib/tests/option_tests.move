@@ -37,7 +37,7 @@ module std::option_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 0x40001)]
+    #[expected_failure(abort_code = option::EOPTION_NOT_SET)]
     fun option_borrow_none() {
         option::borrow(&option::none<u64>());
     }
@@ -51,7 +51,7 @@ module std::option_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 0x40001)]
+    #[expected_failure(abort_code = option::EOPTION_NOT_SET)]
     fun borrow_mut_none() {
         option::borrow_mut(&mut option::none<u64>());
     }
@@ -80,7 +80,7 @@ module std::option_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 0x40001)]
+    #[expected_failure(abort_code = option::EOPTION_NOT_SET)]
     fun extract_none() {
         option::extract(&mut option::none<u64>());
     }
@@ -107,7 +107,7 @@ module std::option_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 0x40001)]
+    #[expected_failure(abort_code = option::EOPTION_NOT_SET)]
     fun swap_none() {
         option::swap(&mut option::none<u64>(), 1);
     }
@@ -121,7 +121,7 @@ module std::option_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 0x40000)]
+    #[expected_failure(abort_code = option::EOPTION_IS_SET)]
     fun fill_some() {
         option::fill(&mut option::some(3), 0);
     }
@@ -138,7 +138,7 @@ module std::option_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 0x40001)]
+    #[expected_failure(abort_code = option::EOPTION_NOT_SET)]
     fun destroy_some_none() {
         option::destroy_some(option::none<u64>());
     }
@@ -149,7 +149,7 @@ module std::option_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 0x40000)]
+    #[expected_failure(abort_code = option::EOPTION_IS_SET)]
     fun destroy_none_some() {
         option::destroy_none(option::some<u64>(0));
     }
@@ -167,4 +167,65 @@ module std::option_tests {
         let v: vector<u64> = option::to_vec(option::none());
         assert!(vector::is_empty(&v), 0);
     }
+
+    #[test]
+    fun test_for_each() {
+        let r = 0;
+        option::for_each(option::some(1), |x| r = x);
+        assert!(r == 1, 0);
+        r = 0;
+        option::for_each(option::none<u64>(), |x| r = x);
+        assert!(r == 0, 1);
+    }
+
+    #[test]
+    fun test_for_each_ref() {
+        let r = 0;
+        option::for_each_ref(&option::some(1), |x| r = *x);
+        assert!(r == 1, 0);
+        r = 0;
+        option::for_each_ref(&option::none<u64>(), |x| r = *x);
+        assert!(r == 0, 1);
+    }
+
+    #[test]
+    fun test_for_each_mut() {
+        let o = option::some(0);
+        option::for_each_mut(&mut o, |x| *x = 1);
+        assert!(o == option::some(1), 0);
+    }
+
+    #[test]
+    fun test_fold() {
+        let r = option::fold(option::some(1), 1, |a, b| a + b);
+        assert!(r == 2, 0);
+        let r = option::fold(option::none<u64>(), 1, |a, b| a + b);
+        assert!(r == 1, 0);
+    }
+
+    #[test]
+    fun test_map() {
+        let x = option::map(option::some(1), |e| e + 1);
+        assert!(option::extract(&mut x) == 2, 0);
+    }
+
+    #[test]
+    fun test_map_ref() {
+        let x = option::map_ref(&option::some(1), |e| *e + 1);
+        assert!(option::extract(&mut x) == 2, 0);
+    }
+
+    #[test]
+    fun test_filter() {
+        let x = option::filter(option::some(1), |e| *e != 1);
+        assert!(option::is_none(&x), 0);
+    }
+
+    #[test]
+    fun test_any() {
+        let r = option::any(&option::some(1), |e| *e == 1);
+        assert!(r, 0);
+    }
+
+
 }

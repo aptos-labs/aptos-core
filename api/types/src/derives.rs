@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! This file is where we apply a number of traits that allow us to use these
@@ -11,22 +11,21 @@
 //! serialize them as strings, e.g. EntryFunctionId.
 //!
 //! For potential future improvements here, see:
-//! https://github.com/aptos-labs/aptos-core/issues/2319.
+//! <https://github.com/aptos-labs/aptos-core/issues/2319>
 
 // READ ME: You'll see that some of the examples (specifically those for hex
 // strings) have a space at the end. This is necessary to make sure the UI
 // displays the example value correctly. See more here:
 // https://github.com/aptos-labs/aptos-core/pull/2703
 
-use aptos_openapi::{impl_poem_parameter, impl_poem_type};
-use serde_json::json;
-
 use crate::{
     move_types::{MoveAbility, MoveStructValue},
     Address, EntryFunctionId, HashValue, HexEncodedBytes, IdentifierWrapper, MoveModuleId,
-    MoveStructTag, MoveType, U128, U64,
+    MoveStructTag, MoveType, StateKeyWrapper, U128, U256, U64,
 };
+use aptos_openapi::{impl_poem_parameter, impl_poem_type};
 use indoc::indoc;
+use serde_json::json;
 
 impl_poem_type!(
     Address,
@@ -44,6 +43,23 @@ impl_poem_type!(
 
             For example, address 0x0000000000000000000000000000000000000000000000000000000000000001 is represented as 0x1.
         "})
+    )
+);
+
+impl_poem_type!(
+    EntryFunctionId,
+    "string",
+    (
+        example = Some(serde_json::Value::String(
+            "0x1::aptos_coin::transfer".to_string()
+        )),
+        description = Some(indoc! {"
+          Entry function id is string representation of a entry function defined on-chain.
+
+          Format: `{address}::{module name}::{function name}`
+
+          Both `module name` and `function name` are case-sensitive.
+  "})
     )
 );
 
@@ -111,7 +127,7 @@ impl_poem_type!(
           1. Empty chars should be ignored when comparing 2 struct tag ids.
           2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
 
-        See [doc](https://aptos.dev/concepts/basics-accounts) for more details.
+        See [doc](https://aptos.dev/concepts/accounts) for more details.
       "})
     )
 );
@@ -143,9 +159,9 @@ impl_poem_type!(
 
             Move `bool` type value is serialized into `boolean`.
 
-            Move `u8` type value is serialized into `integer`.
+            Move `u8`, `u16` and `u32` type value is serialized into `integer`.
 
-            Move `u64` and `u128` type value is serialized into `string`.
+            Move `u64`, `u128` and `u256` type value is serialized into `string`.
 
             Move `address` type value (32 byte Aptos account address) is serialized into a HexEncodedBytes string.
             For example:
@@ -189,8 +205,11 @@ impl_poem_type!(
                 Values:
                   - bool
                   - u8
+                  - u16
+                  - u32
                   - u64
                   - u128
+                  - u256
                   - address
                   - signer
                   - vector: `vector<{non-reference MoveTypeId}>`
@@ -213,19 +232,13 @@ impl_poem_type!(
 );
 
 impl_poem_type!(
-    EntryFunctionId,
+    StateKeyWrapper,
     "string",
     (
-        example = Some(serde_json::Value::String(
-            "0x1::aptos_coin::transfer".to_string()
-        )),
+        example = Some(serde_json::Value::String("0000000000000000000000000000000000000000000000000000000000000000012f0000000000000000000000000000000000000000000000000000000000000000010d7374616b696e675f70726f7879".to_string())),
         description = Some(indoc! {"
-            Entry function id is string representation of a entry function defined on-chain.
-
-            Format: `{address}::{module name}::{function name}`
-
-            Both `module name` and `function name` are case-sensitive.
-    "})
+          Representation of a StateKey as a hex string. This is used for cursor based pagination.
+        "})
     )
 );
 
@@ -251,13 +264,30 @@ impl_poem_type!(
         example = Some(serde_json::Value::String(
             "340282366920938463463374607431768211454".to_string()
         )),
-        format = Some("uint64"),
+        format = Some("uint128"),
         description = Some(indoc! {"
         A string containing a 128-bit unsigned integer.
 
         We represent u128 values as a string to ensure compatibility with languages such
-        as JavaScript that do not parse u64s in JSON natively.
+        as JavaScript that do not parse u128s in JSON natively.
     "})
+    )
+);
+
+impl_poem_type!(
+    U256,
+    "string",
+    (
+        example = Some(serde_json::Value::String(
+            "340282366920938463463374607431768211454".to_string()
+        )),
+        format = Some("uint256"),
+        description = Some(indoc! {"
+      A string containing a 256-bit unsigned integer.
+
+      We represent u256 values as a string to ensure compatibility with languages such
+      as JavaScript that do not parse u256s in JSON natively.
+  "})
     )
 );
 
@@ -267,6 +297,7 @@ impl_poem_parameter!(
     IdentifierWrapper,
     HexEncodedBytes,
     MoveStructTag,
+    StateKeyWrapper,
     U64,
     U128
 );

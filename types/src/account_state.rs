@@ -1,16 +1,21 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     access_path::Path,
     account_config::{AccountResource, CoinStoreResource},
     account_view::AccountView,
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{
+        state_key::{StateKey, StateKeyInner},
+        state_value::StateValue,
+    },
 };
 use anyhow::{anyhow, Error, Result};
-use move_core_types::language_storage::ModuleId;
 use move_core_types::{
-    account_address::AccountAddress, language_storage::StructTag, move_resource::MoveResource,
+    account_address::AccountAddress,
+    language_storage::{ModuleId, StructTag},
+    move_resource::MoveResource,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
@@ -55,7 +60,7 @@ impl AccountState {
         self.data.iter().filter_map(|(k, v)| {
             match Path::try_from(k).expect("Invalid access path") {
                 Path::Code(_) => Some(v),
-                Path::Resource(_) => None,
+                Path::Resource(_) | Path::ResourceGroup(_) => None,
             }
         })
     }
@@ -65,7 +70,7 @@ impl AccountState {
         self.data.into_iter().filter_map(|(k, v)| {
             match Path::try_from(&k).expect("Invalid access path") {
                 Path::Code(module) => Some((module, v)),
-                Path::Resource(_) => None,
+                Path::Resource(_) | Path::ResourceGroup(_) => None,
             }
         })
     }
@@ -80,6 +85,8 @@ impl AccountState {
             .filter_map(|(k, v)| match Path::try_from(k) {
                 Ok(Path::Resource(struct_tag)) => Some((struct_tag, v.as_ref())),
                 Ok(Path::Code(_)) | Err(_) => None,
+                // TODO: consider flattening into resources, but this isn't currently used
+                Ok(Path::ResourceGroup(struct_tag)) => Some((struct_tag, v.as_ref())),
             })
     }
 
@@ -186,11 +193,11 @@ impl TryFrom<(AccountAddress, &HashMap<StateKey, StateValue>)> for AccountState 
     ) -> Result<Self> {
         let mut btree_map: BTreeMap<Vec<u8>, Vec<u8>> = BTreeMap::new();
         for (key, value) in key_value_map {
-            match key {
-                StateKey::AccessPath(access_path) => {
+            match key.inner() {
+                StateKeyInner::AccessPath(access_path) => {
                     btree_map.insert(access_path.path.clone(), value.bytes().to_vec());
-                }
-                _ => return Err(anyhow!("Encountered unexpected key type {:?}", key)),
+                },
+                _ => return Err(anyhow!("Encountered unexpected key type {:?}", key.inner())),
             }
         }
         Ok(Self::new(account_address, btree_map))

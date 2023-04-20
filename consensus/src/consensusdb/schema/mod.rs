@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 pub(crate) mod block;
@@ -6,7 +7,7 @@ pub(crate) mod quorum_certificate;
 pub(crate) mod single_entry;
 
 use anyhow::{ensure, Result};
-use schemadb::ColumnFamilyName;
+use aptos_schemadb::ColumnFamilyName;
 
 pub(super) const BLOCK_CF_NAME: ColumnFamilyName = "block";
 pub(super) const QC_CF_NAME: ColumnFamilyName = "quorum_certificate";

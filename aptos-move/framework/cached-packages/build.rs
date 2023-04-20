@@ -1,9 +1,8 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use framework::ReleaseTarget;
-use std::env::current_dir;
-use std::path::PathBuf;
+use aptos_framework::ReleaseTarget;
+use std::{env::current_dir, path::PathBuf};
 
 fn main() {
     // Set the below variable to skip the building step. This might be useful if the build
@@ -15,11 +14,39 @@ fn main() {
         prev_dir.pop();
         println!(
             "cargo:rerun-if-changed={}",
+            prev_dir
+                .join("aptos-token-objects")
+                .join("Move.toml")
+                .display()
+        );
+        println!(
+            "cargo:rerun-if-changed={}",
+            prev_dir
+                .join("aptos-token-objects")
+                .join("sources")
+                .display()
+        );
+        println!(
+            "cargo:rerun-if-changed={}",
             prev_dir.join("aptos-token").join("sources").display()
         );
         println!(
             "cargo:rerun-if-changed={}",
             prev_dir.join("aptos-token").join("Move.toml").display()
+        );
+        println!(
+            "cargo:rerun-if-changed={}",
+            prev_dir
+                .join("aptos-token-objects")
+                .join("sources")
+                .display()
+        );
+        println!(
+            "cargo:rerun-if-changed={}",
+            prev_dir
+                .join("aptos-token-objects")
+                .join("Move.toml")
+                .display()
         );
         println!(
             "cargo:rerun-if-changed={}",

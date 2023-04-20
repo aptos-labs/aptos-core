@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -45,6 +46,7 @@ impl AUTransactionGen for P2PTransferGen {
             receiver.account(),
             sender.sequence_number,
             self.amount,
+            1, // sets unit gas price, ensures an aggregator is used for total supply.
         );
 
         // Now figure out whether the transaction will actually work.
@@ -73,7 +75,7 @@ impl AUTransactionGen for P2PTransferGen {
 
                 status = TransactionStatus::Keep(ExecutionStatus::Success);
                 gas_used = sender.peer_to_peer_gas_cost();
-            }
+            },
             (true, true, false) => {
                 // Enough gas to pass validation and to do the transfer, but not enough to succeed
                 // in the epilogue. The transaction will be run and gas will be deducted from the
@@ -92,7 +94,7 @@ impl AUTransactionGen for P2PTransferGen {
                     code: 65542,
                     info: None,
                 });
-            }
+            },
             (true, false, _) => {
                 // Enough to pass validation but not to do the transfer. The transaction will be run
                 // and gas will be deducted from the sender, but no other changes will happen.
@@ -108,13 +110,13 @@ impl AUTransactionGen for P2PTransferGen {
                     code: 65542,
                     info: None,
                 });
-            }
+            },
             (false, _, _) => {
                 // Not enough gas to pass validation. Nothing will happen.
                 status = TransactionStatus::Discard(
                     StatusCode::INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE,
                 );
-            }
+            },
         }
 
         (txn, (status, gas_used))

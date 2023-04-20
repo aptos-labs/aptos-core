@@ -1,12 +1,11 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-mod common_args;
+mod checker;
+mod common;
 pub mod configuration;
-mod evaluator;
-mod evaluators;
-mod metric_collector;
+mod provider;
 mod runner;
 pub mod server;
 
-pub use evaluator::EvaluationSummary;
+pub use checker::CheckSummary;

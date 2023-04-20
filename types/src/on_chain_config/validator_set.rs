@@ -1,9 +1,9 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{on_chain_config::OnChainConfig, validator_info::ValidatorInfo};
 use move_core_types::account_address::AccountAddress;
-
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
@@ -101,8 +101,8 @@ impl OnChainConfig for ValidatorSet {
 }
 
 impl IntoIterator for ValidatorSet {
-    type Item = ValidatorInfo;
     type IntoIter = Chain<IntoIter<Self::Item>, IntoIter<Self::Item>>;
+    type Item = ValidatorInfo;
 
     fn into_iter(self) -> Self::IntoIter {
         self.active_validators

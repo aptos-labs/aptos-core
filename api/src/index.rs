@@ -1,14 +1,16 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::Arc;
-
-use crate::accept_type::AcceptType;
-use crate::context::Context;
-use crate::response::{BasicResponse, BasicResponseStatus, BasicResult};
-use crate::ApiTags;
+use crate::{
+    accept_type::AcceptType,
+    context::Context,
+    response::{BasicResponse, BasicResponseStatus, BasicResult},
+    ApiTags,
+};
 use aptos_api_types::{IndexResponse, IndexResponseBcs};
 use poem_openapi::OpenApi;
+use std::sync::Arc;
 
 /// API for the index, to retrieve the ledger information
 pub struct IndexApi {
@@ -46,11 +48,11 @@ impl IndexApi {
                     &ledger_info,
                     BasicResponseStatus::Ok,
                 ))
-            }
+            },
             AcceptType::Bcs => {
                 let index_response = IndexResponseBcs::new(ledger_info.clone(), node_role);
                 BasicResponse::try_from_bcs((index_response, &ledger_info, BasicResponseStatus::Ok))
-            }
+            },
         }
     }
 }

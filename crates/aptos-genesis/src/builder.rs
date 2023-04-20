@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -22,10 +22,16 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     PrivateKey,
 };
+use aptos_framework::ReleaseBundle;
 use aptos_keygen::KeyGen;
 use aptos_logger::prelude::*;
-use aptos_types::{chain_id::ChainId, transaction::Transaction, waypoint::Waypoint};
-use framework::ReleaseBundle;
+use aptos_types::{
+    chain_id::ChainId,
+    on_chain_config::{GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig},
+    transaction::Transaction,
+    waypoint::Waypoint,
+};
+use aptos_vm_genesis::default_gas_schedule;
 use rand::Rng;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
@@ -162,7 +168,7 @@ impl ValidatorNodeConfig {
     }
 
     fn save_config(&mut self) -> anyhow::Result<()> {
-        Ok(self.config.save(self.dir.join(CONFIG_FILE))?)
+        Ok(self.config.save_to_path(self.dir.join(CONFIG_FILE))?)
     }
 }
 
@@ -359,7 +365,9 @@ impl FullnodeNodeConfig {
     }
 
     fn save_config(&mut self) -> anyhow::Result<()> {
-        self.config.save(self.config_path()).map_err(Into::into)
+        self.config
+            .save_to_path(self.config_path())
+            .map_err(Into::into)
     }
 }
 
@@ -401,6 +409,9 @@ pub struct GenesisConfiguration {
     pub voting_power_increase_limit: u64,
     pub employee_vesting_start: Option<u64>,
     pub employee_vesting_period_duration: Option<u64>,
+    pub consensus_config: OnChainConsensusConfig,
+    pub execution_config: OnChainExecutionConfig,
+    pub gas_schedule: GasScheduleV2,
 }
 
 pub type InitConfigFn = Arc<dyn Fn(usize, &mut NodeConfig, &mut u64) + Send + Sync>;
@@ -480,7 +491,7 @@ impl Builder {
         let root_key = keygen.generate_ed25519_private_key();
 
         // Generate validator configs
-        let template = NodeConfig::default_for_validator();
+        let template = NodeConfig::get_default_validator_config();
         let mut validators: Vec<ValidatorNodeConfig> = (0..self.num_validators.get())
             .map(|i| self.generate_validator_config(i, &mut rng, &template))
             .collect::<anyhow::Result<Vec<ValidatorNodeConfig>>>()?;
@@ -598,6 +609,9 @@ impl Builder {
             voting_power_increase_limit: 50,
             employee_vesting_start: None,
             employee_vesting_period_duration: None,
+            consensus_config: OnChainConsensusConfig::default(),
+            execution_config: OnChainExecutionConfig::default(),
+            gas_schedule: default_gas_schedule(),
         };
         if let Some(init_genesis_config) = &self.init_genesis_config {
             (init_genesis_config)(&mut genesis_config);

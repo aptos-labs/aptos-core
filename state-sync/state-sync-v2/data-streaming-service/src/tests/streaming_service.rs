@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -17,7 +18,7 @@ use crate::{
         MIN_ADVERTISED_TRANSACTION, MIN_ADVERTISED_TRANSACTION_OUTPUT, TOTAL_NUM_STATE_VALUES,
     },
 };
-use aptos_config::config::DataStreamingServiceConfig;
+use aptos_config::config::{AptosDataClientConfig, DataStreamingServiceConfig};
 use claims::{assert_le, assert_matches, assert_ok, assert_some};
 
 macro_rules! unexpected_payload_type {
@@ -60,10 +61,10 @@ async fn test_notifications_state_values() {
                 );
 
                 next_expected_index += num_state_values;
-            }
+            },
             DataPayload::EndOfStream => {
                 return assert_eq!(next_expected_index, TOTAL_NUM_STATE_VALUES)
-            }
+            },
             data_payload => unexpected_payload_type!(data_payload),
         }
     }
@@ -92,14 +93,14 @@ async fn test_notifications_state_values_limited_chunks() {
                 } else {
                     true // We hit a non-contiguous chunk
                 }
-            }
+            },
             DataPayload::EndOfStream => {
                 if next_expected_index != TOTAL_NUM_STATE_VALUES {
                     true // The stream thought it had completed, but the chunk was incomplete
                 } else {
                     return; // All data was received!
                 }
-            }
+            },
             data_payload => unexpected_payload_type!(data_payload),
         };
 
@@ -164,10 +165,10 @@ async fn test_notifications_state_values_multiple_streams() {
                         .await
                         .unwrap();
                 }
-            }
+            },
             DataPayload::EndOfStream => {
                 return assert_eq!(next_expected_index, TOTAL_NUM_STATE_VALUES)
-            }
+            },
             data_payload => unexpected_payload_type!(data_payload),
         }
     }
@@ -214,7 +215,7 @@ async fn test_notifications_continuous_outputs() {
                     if ledger_info.version() == last_output_version && ledger_info.ends_epoch() {
                         next_expected_epoch += 1;
                     }
-                }
+                },
                 data_payload => unexpected_payload_type!(data_payload),
             }
         } else {
@@ -267,10 +268,10 @@ async fn test_notifications_continuous_outputs_target() {
                 if ledger_info.version() == last_output_version && ledger_info.ends_epoch() {
                     next_expected_epoch += 1;
                 }
-            }
+            },
             DataPayload::EndOfStream => {
                 return assert_eq!(next_expected_version, target_version + 1)
-            }
+            },
             data_payload => unexpected_payload_type!(data_payload),
         }
     }
@@ -325,7 +326,7 @@ async fn test_notifications_continuous_outputs_limited_chunks() {
                 } else {
                     true // We hit a non-contiguous chunk
                 }
-            }
+            },
             data_payload => unexpected_payload_type!(data_payload),
         };
 
@@ -417,7 +418,7 @@ async fn test_notifications_continuous_outputs_multiple_streams() {
                 if next_expected_epoch > end_epoch {
                     return;
                 }
-            }
+            },
             data_payload => unexpected_payload_type!(data_payload),
         }
     }
@@ -471,7 +472,7 @@ async fn test_notifications_continuous_transactions() {
                     {
                         next_expected_epoch += 1;
                     }
-                }
+                },
                 data_payload => unexpected_payload_type!(data_payload),
             }
         } else {
@@ -531,7 +532,7 @@ async fn test_notifications_continuous_transactions_limited_chunks() {
                 } else {
                     true // We hit a non-contiguous chunk
                 }
-            }
+            },
             data_payload => unexpected_payload_type!(data_payload),
         };
 
@@ -609,10 +610,10 @@ async fn test_notifications_continuous_transactions_target() {
                 if ledger_info.version() == last_transaction_version && ledger_info.ends_epoch() {
                     next_expected_epoch += 1;
                 }
-            }
+            },
             DataPayload::EndOfStream => {
                 return assert_eq!(next_expected_version, target_version + 1)
-            }
+            },
             data_payload => unexpected_payload_type!(data_payload),
         }
     }
@@ -642,10 +643,10 @@ async fn test_notifications_epoch_ending() {
                     assert_le!(epoch, MAX_ADVERTISED_EPOCH_END);
                     next_expected_epoch += 1;
                 }
-            }
+            },
             DataPayload::EndOfStream => {
                 return assert_eq!(next_expected_epoch, MAX_ADVERTISED_EPOCH_END + 1)
-            }
+            },
             data_payload => unexpected_payload_type!(data_payload),
         }
     }
@@ -675,14 +676,14 @@ async fn test_notifications_epoch_ending_limited_chunks() {
                 } else {
                     true // We hit a non-contiguous chunk
                 }
-            }
+            },
             DataPayload::EndOfStream => {
                 if next_expected_epoch != MAX_ADVERTISED_EPOCH_END + 1 {
                     true // The stream thought it had completed, but the chunk was incomplete
                 } else {
                     return; // All data was received!
                 }
-            }
+            },
             data_payload => unexpected_payload_type!(data_payload),
         };
 
@@ -744,10 +745,10 @@ async fn test_notifications_epoch_ending_multiple_streams() {
                         .await
                         .unwrap();
                 }
-            }
+            },
             DataPayload::EndOfStream => {
                 return assert_eq!(next_expected_epoch, MAX_ADVERTISED_EPOCH_END + 1)
-            }
+            },
             data_payload => unexpected_payload_type!(data_payload),
         }
     }
@@ -794,7 +795,7 @@ async fn test_notifications_subscribe_outputs() {
                     if ledger_info.version() == last_output_version && ledger_info.ends_epoch() {
                         next_expected_epoch += 1;
                     }
-                }
+                },
                 data_payload => unexpected_payload_type!(data_payload),
             }
         } else {
@@ -849,7 +850,7 @@ async fn test_notifications_subscribe_transactions() {
                     {
                         next_expected_epoch += 1;
                     }
-                }
+                },
                 data_payload => unexpected_payload_type!(data_payload),
             }
         } else {
@@ -886,10 +887,10 @@ async fn test_notifications_transaction_outputs() {
 
                 let num_outputs = outputs_with_proof.transactions_and_outputs.len();
                 next_expected_version += num_outputs as u64;
-            }
+            },
             DataPayload::EndOfStream => {
                 return assert_eq!(next_expected_version, MAX_ADVERTISED_TRANSACTION_OUTPUT + 1)
-            }
+            },
             data_payload => unexpected_payload_type!(data_payload),
         }
     }
@@ -925,14 +926,14 @@ async fn test_notifications_transaction_outputs_limited_chunks() {
                 } else {
                     true // We hit a non-contiguous chunk
                 }
-            }
+            },
             DataPayload::EndOfStream => {
                 if next_expected_version != MAX_ADVERTISED_TRANSACTION_OUTPUT + 1 {
                     true // The stream thought it had completed, but the chunk was incomplete
                 } else {
                     return; // All data was received!
                 }
-            }
+            },
             data_payload => unexpected_payload_type!(data_payload),
         };
 
@@ -992,10 +993,10 @@ async fn test_notifications_transactions() {
 
                 let num_transactions = transactions_with_proof.transactions.len();
                 next_expected_transaction += num_transactions as u64;
-            }
+            },
             DataPayload::EndOfStream => {
                 return assert_eq!(next_expected_transaction, MAX_ADVERTISED_TRANSACTION + 1)
-            }
+            },
             data_payload => unexpected_payload_type!(data_payload),
         }
     }
@@ -1031,14 +1032,14 @@ async fn test_notifications_transactions_limited_chunks() {
                 } else {
                     true // We hit a non-contiguous chunk
                 }
-            }
+            },
             DataPayload::EndOfStream => {
                 if next_expected_version != MAX_ADVERTISED_TRANSACTION + 1 {
                     true // The stream thought it had completed, but the chunk was incomplete
                 } else {
                     return; // All data was received!
                 }
-            }
+            },
             data_payload => unexpected_payload_type!(data_payload),
         };
 
@@ -1118,10 +1119,10 @@ async fn test_notifications_transactions_multiple_streams() {
                         .await
                         .unwrap();
                 }
-            }
+            },
             DataPayload::EndOfStream => {
                 return assert_eq!(next_expected_version, MAX_ADVERTISED_TRANSACTION + 1)
-            }
+            },
             data_payload => unexpected_payload_type!(data_payload),
         }
     }
@@ -1430,8 +1431,8 @@ async fn test_terminate_complete_stream() {
                     .await;
                 assert_ok!(result);
                 return;
-            }
-            DataPayload::TransactionOutputsWithProof(_) => {}
+            },
+            DataPayload::TransactionOutputsWithProof(_) => {},
             data_payload => unexpected_payload_type!(data_payload),
         }
     }
@@ -1452,7 +1453,7 @@ async fn test_terminate_stream() {
     // Fetch the first state value notification and then terminate the stream
     let data_notification = get_data_notification(&mut stream_listener).await.unwrap();
     match data_notification.data_payload {
-        DataPayload::StateValuesWithProof(_) => {}
+        DataPayload::StateValuesWithProof(_) => {},
         data_payload => unexpected_payload_type!(data_payload),
     }
 
@@ -1472,7 +1473,7 @@ async fn test_terminate_stream() {
     loop {
         let data_notification = get_data_notification(&mut stream_listener).await.unwrap();
         match data_notification.data_payload {
-            DataPayload::StateValuesWithProof(_) => {}
+            DataPayload::StateValuesWithProof(_) => {},
             DataPayload::EndOfStream => panic!("The stream should have terminated!"),
             data_payload => unexpected_payload_type!(data_payload),
         }
@@ -1520,10 +1521,13 @@ pub fn create_streaming_client_and_server(
         new_streaming_service_client_listener_pair();
 
     // Create a mock data client
+    let aptos_data_client_config = AptosDataClientConfig::default();
     let aptos_data_client = MockAptosDataClient::new(
+        aptos_data_client_config,
         data_beyond_highest_advertised,
         limit_chunk_sizes,
         skip_emulate_network_latencies,
+        true,
     );
 
     // Create the data streaming service config
@@ -1535,6 +1539,7 @@ pub fn create_streaming_client_and_server(
 
     // Create the streaming service and connect it to the listener
     let streaming_service = DataStreamingService::new(
+        aptos_data_client_config,
         data_streaming_service_config,
         aptos_data_client,
         streaming_service_listener,

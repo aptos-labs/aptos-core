@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -6,20 +6,21 @@ use crate::{
     AdvertisedData, GlobalDataSummary, OptimalChunkSizes, ResponseError,
 };
 use aptos_config::{
-    config::{BaseConfig, StorageServiceConfig},
+    config::{AptosDataClientConfig, BaseConfig},
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_logger::prelude::*;
+use aptos_netcore::transport::ConnectionOrigin;
+use aptos_network::application::storage::PeersAndMetadata;
+use aptos_storage_service_types::{
+    requests::StorageServiceRequest, responses::StorageServerSummary,
+};
 use itertools::Itertools;
-use netcore::transport::ConnectionOrigin;
-use network::application::storage::PeerMetadataStorage;
 use std::{
     cmp::min,
     collections::{HashMap, HashSet},
     sync::Arc,
 };
-use storage_service_types::requests::StorageServiceRequest;
-use storage_service_types::responses::StorageServerSummary;
 
 /// Scores for peer rankings based on preferences and behavior.
 const MAX_SCORE: f64 = 100.0;
@@ -48,14 +49,14 @@ impl From<ResponseError> for ErrorType {
         match error {
             ResponseError::InvalidData | ResponseError::InvalidPayloadDataType => {
                 ErrorType::NotUseful
-            }
+            },
             ResponseError::ProofVerificationError => ErrorType::Malicious,
         }
     }
 }
 
-#[derive(Debug)]
-struct PeerState {
+#[derive(Clone, Debug)]
+pub struct PeerState {
     /// The latest observed advertised data for this peer, or `None` if we
     /// haven't polled them yet.
     storage_summary: Option<StorageServerSummary>,
@@ -104,30 +105,29 @@ impl PeerState {
 
 /// Contains all of the unbanned peers' most recent [`StorageServerSummary`] data
 /// advertisements and data-client internal metadata for scoring.
-// TODO(philiphayes): this map needs to be garbage collected
 #[derive(Debug)]
 pub(crate) struct PeerStates {
     base_config: BaseConfig,
-    storage_service_config: StorageServiceConfig,
+    data_client_config: AptosDataClientConfig,
     peer_to_state: HashMap<PeerNetworkId, PeerState>,
     in_flight_priority_polls: HashSet<PeerNetworkId>, // The priority peers with in-flight polls
     in_flight_regular_polls: HashSet<PeerNetworkId>,  // The regular peers with in-flight polls
-    peer_metadata_storage: Arc<PeerMetadataStorage>,
+    peers_and_metadata: Arc<PeersAndMetadata>,
 }
 
 impl PeerStates {
     pub fn new(
         base_config: BaseConfig,
-        storage_service_config: StorageServiceConfig,
-        peer_metadata_storage: Arc<PeerMetadataStorage>,
+        data_client_config: AptosDataClientConfig,
+        peers_and_metadata: Arc<PeersAndMetadata>,
     ) -> Self {
         Self {
             base_config,
-            storage_service_config,
+            data_client_config,
             peer_to_state: HashMap::new(),
             in_flight_priority_polls: HashSet::new(),
             in_flight_regular_polls: HashSet::new(),
-            peer_metadata_storage,
+            peers_and_metadata,
         }
     }
 
@@ -257,18 +257,31 @@ impl PeerStates {
 
         // VFNs should only prioritize validators
         if self
-            .peer_metadata_storage
-            .networks()
+            .peers_and_metadata
+            .get_registered_networks()
             .contains(&NetworkId::Vfn)
         {
             return peer_network_id.is_vfn_network();
         }
 
         // PFNs should only prioritize outbound connections (this targets seed peers and VFNs)
-        if let Some(peer_info) = self.peer_metadata_storage.read(*peer) {
-            if peer_info.active_connection.origin == ConnectionOrigin::Outbound {
-                return true;
-            }
+        match self.peers_and_metadata.get_metadata_for_peer(*peer) {
+            Ok(peer_metadata) => {
+                if peer_metadata.get_connection_metadata().origin == ConnectionOrigin::Outbound {
+                    return true;
+                }
+            },
+            Err(error) => {
+                warn!(
+                    (LogSchema::new(LogEntry::PeerStates)
+                        .event(LogEvent::PriorityAndRegularPeers)
+                        .message(&format!(
+                            "Unable to locate metadata for peer! Error: {:?}",
+                            error
+                        ))
+                        .peer(peer))
+                );
+            },
         }
 
         false
@@ -280,6 +293,12 @@ impl PeerStates {
             .entry(peer)
             .or_default()
             .update_storage_summary(summary);
+    }
+
+    /// Garbage collects the peer states to remove data for disconnected peers
+    pub fn garbage_collect_peer_states(&mut self, connected_peers: Vec<PeerNetworkId>) {
+        self.peer_to_state
+            .retain(|peer_network_id, _| connected_peers.contains(peer_network_id));
     }
 
     /// Calculates a global data summary using all known storage summaries
@@ -338,7 +357,7 @@ impl PeerStates {
 
         // Calculate optimal chunk sizes based on the advertised data
         let optimal_chunk_sizes = calculate_optimal_chunk_sizes(
-            &self.storage_service_config,
+            &self.data_client_config,
             max_epoch_chunk_sizes,
             max_state_chunk_sizes,
             max_transaction_chunk_sizes,
@@ -349,13 +368,19 @@ impl PeerStates {
             optimal_chunk_sizes,
         }
     }
+
+    #[cfg(test)]
+    /// Returns a copy of the peer to states map for test purposes
+    pub fn get_peer_to_states(&self) -> HashMap<PeerNetworkId, PeerState> {
+        self.peer_to_state.clone()
+    }
 }
 
 /// To calculate the optimal chunk size, we take the median for each
 /// chunk size parameter. This works well when we have an honest
 /// majority that mostly agrees on the same chunk sizes.
 pub(crate) fn calculate_optimal_chunk_sizes(
-    config: &StorageServiceConfig,
+    config: &AptosDataClientConfig,
     max_epoch_chunk_sizes: Vec<u64>,
     max_state_chunk_sizes: Vec<u64>,
     max_transaction_chunk_sizes: Vec<u64>,

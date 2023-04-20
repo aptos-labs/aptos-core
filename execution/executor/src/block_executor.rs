@@ -1,43 +1,61 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
 
-use crate::logging::{LogEntry, LogSchema};
+use crate::{
+    components::{block_tree::BlockTree, chunk_output::ChunkOutput},
+    logging::{LogEntry, LogSchema},
+    metrics::{
+        APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS, APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS,
+        APTOS_EXECUTOR_OTHER_TIMERS_SECONDS, APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS,
+        APTOS_EXECUTOR_TRANSACTIONS_SAVED, APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
+    },
+};
 use anyhow::Result;
 use aptos_crypto::HashValue;
+use aptos_executor_types::{BlockExecutorTrait, Error, StateComputeResult};
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
+use aptos_scratchpad::SparseMerkleTree;
 use aptos_state_view::StateViewId;
+use aptos_storage_interface::{
+    async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView, DbReaderWriter,
+};
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures, state_store::state_value::StateValue,
     transaction::Transaction,
 };
-use aptos_vm::VMExecutor;
-use executor_types::{BlockExecutorTrait, Error, StateComputeResult};
+use aptos_vm::AptosVM;
 use fail::fail_point;
-use scratchpad::SparseMerkleTree;
 use std::{marker::PhantomData, sync::Arc};
-use storage_interface::async_proof_fetcher::AsyncProofFetcher;
 
-use crate::{
-    components::{block_tree::BlockTree, chunk_output::ChunkOutput},
-    metrics::{
-        APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS, APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS,
-        APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS, APTOS_EXECUTOR_TRANSACTIONS_SAVED,
-        APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
-    },
-};
-use storage_interface::DbReaderWriter;
-
-pub struct BlockExecutor<V> {
-    pub db: DbReaderWriter,
-    inner: RwLock<Option<BlockExecutorInner<V>>>,
+pub trait TransactionBlockExecutor<T>: Send + Sync {
+    fn execute_transaction_block(
+        transactions: Vec<T>,
+        state_view: CachedStateView,
+    ) -> Result<ChunkOutput>;
 }
 
-impl<V> BlockExecutor<V>
+impl TransactionBlockExecutor<Transaction> for AptosVM {
+    fn execute_transaction_block(
+        transactions: Vec<Transaction>,
+        state_view: CachedStateView,
+    ) -> Result<ChunkOutput> {
+        ChunkOutput::by_transaction_execution::<AptosVM>(transactions, state_view)
+    }
+}
+
+pub struct BlockExecutor<V, T> {
+    pub db: DbReaderWriter,
+    inner: RwLock<Option<BlockExecutorInner<V, T>>>,
+}
+
+impl<V, T> BlockExecutor<V, T>
 where
-    V: VMExecutor,
+    V: TransactionBlockExecutor<T>,
+    T: Send + Sync,
 {
     pub fn new(db: DbReaderWriter) -> Self {
         Self {
@@ -62,9 +80,10 @@ where
     }
 }
 
-impl<V> BlockExecutorTrait for BlockExecutor<V>
+impl<V, T> BlockExecutorTrait<T> for BlockExecutor<V, T>
 where
-    V: VMExecutor,
+    V: TransactionBlockExecutor<T>,
+    T: Send + Sync,
 {
     fn committed_block_id(&self) -> HashValue {
         self.maybe_initialize().expect("Failed to initialize.");
@@ -82,7 +101,7 @@ where
 
     fn execute_block(
         &self,
-        block: (HashValue, Vec<Transaction>),
+        block: (HashValue, Vec<T>),
         parent_block_id: HashValue,
     ) -> Result<StateComputeResult, Error> {
         self.maybe_initialize()?;
@@ -111,15 +130,16 @@ where
     }
 }
 
-struct BlockExecutorInner<V> {
+struct BlockExecutorInner<V, T> {
     db: DbReaderWriter,
     block_tree: BlockTree,
-    phantom: PhantomData<V>,
+    phantom: PhantomData<(V, T)>,
 }
 
-impl<V> BlockExecutorInner<V>
+impl<V, T> BlockExecutorInner<V, T>
 where
-    V: VMExecutor,
+    V: TransactionBlockExecutor<T>,
+    T: Send + Sync,
 {
     pub fn new(db: DbReaderWriter) -> Result<Self> {
         let block_tree = BlockTree::new(&db.reader)?;
@@ -141,9 +161,10 @@ where
     }
 }
 
-impl<V> BlockExecutorInner<V>
+impl<V, T> BlockExecutorInner<V, T>
 where
-    V: VMExecutor,
+    V: TransactionBlockExecutor<T>,
+    T: Send + Sync,
 {
     fn committed_block_id(&self) -> HashValue {
         self.block_tree.root_block().id
@@ -151,9 +172,10 @@ where
 
     fn execute_block(
         &self,
-        block: (HashValue, Vec<Transaction>),
+        block: (HashValue, Vec<T>),
         parent_block_id: HashValue,
     ) -> Result<StateComputeResult, Error> {
+        let _timer = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
         let (block_id, transactions) = block;
         let committed_block = self.block_tree.root_block();
         let mut block_vec = self
@@ -185,12 +207,16 @@ where
                 LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
                 "execute_block"
             );
-            let _timer = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
-            let state_view = parent_view.verified_state_view(
-                StateViewId::BlockExecution { block_id },
-                Arc::clone(&self.db.reader),
-                Arc::new(AsyncProofFetcher::new(self.db.reader.clone())),
-            )?;
+            let state_view = {
+                let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+                    .with_label_values(&["verified_state_view"])
+                    .start_timer();
+                parent_view.verified_state_view(
+                    StateViewId::BlockExecution { block_id },
+                    Arc::clone(&self.db.reader),
+                    Arc::new(AsyncProofFetcher::new(self.db.reader.clone())),
+                )?
+            };
 
             let chunk_output = {
                 let _timer = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.start_timer();
@@ -199,15 +225,21 @@ where
                         "Injected error in vm_execute_block"
                     )))
                 });
-                ChunkOutput::by_transaction_execution::<V>(transactions, state_view)?
+                V::execute_transaction_block(transactions, state_view)?
             };
             chunk_output.trace_log_transaction_status();
 
+            let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+                .with_label_values(&["apply_to_ledger"])
+                .start_timer();
             let (output, _, _) = chunk_output.apply_to_ledger(parent_view)?;
             output
         };
         output.ensure_ends_with_state_checkpoint()?;
 
+        let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+            .with_label_values(&["as_state_compute_result"])
+            .start_timer();
         let block = self
             .block_tree
             .add_block(parent_block_id, block_id, output)?;
@@ -251,13 +283,18 @@ where
         }
 
         let blocks = self.block_tree.get_blocks(&block_ids)?;
-        let txns_to_commit: Vec<_> = blocks
-            .into_iter()
-            .map(|block| block.output.transactions_to_commit())
-            .collect::<Result<Vec<_>>>()?
-            .into_iter()
-            .flatten()
-            .collect();
+        let txns_to_commit: Vec<_> = {
+            let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+                .with_label_values(&["get_txns_to_commit"])
+                .start_timer();
+            blocks
+                .into_iter()
+                .map(|block| block.output.transactions_to_commit())
+                .collect::<Result<Vec<_>>>()?
+                .into_iter()
+                .flatten()
+                .collect()
+        };
         let first_version = committed_block
             .output
             .result_view

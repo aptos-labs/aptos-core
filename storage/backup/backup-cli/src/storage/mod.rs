@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod command_adapter;
@@ -15,7 +16,7 @@ use crate::storage::{
 };
 use anyhow::{ensure, Result};
 use async_trait::async_trait;
-use clap::Parser;
+use clap::{ArgGroup, Parser};
 use once_cell::sync::Lazy;
 #[cfg(test)]
 use proptest::prelude::*;
@@ -101,6 +102,7 @@ impl Arbitrary for ShellSafeName {
 }
 
 #[cfg_attr(test, derive(Debug, Hash, Eq, Ord, PartialEq, PartialOrd))]
+#[derive(Clone)]
 pub struct TextLine(String);
 
 impl TextLine {
@@ -151,7 +153,8 @@ pub trait BackupStorage: Send + Sync {
         &self,
         file_handle: &FileHandleRef,
     ) -> Result<Box<dyn AsyncRead + Send + Unpin>>;
-    /// Asks to save a metadata entry. A metadata entry is one line of text.
+    /// Asks to save a metadata entry and return the File handle of the saved file.
+    /// A metadata entry is one line of text.
     /// The backup system doesn't expect a metadata entry to exclusively map to a single file
     /// handle, or the same file handle when accessed later, so there's no need to return one. This
     /// also means a local cache must download each metadata file from remote at least once, to
@@ -159,7 +162,13 @@ pub trait BackupStorage: Send + Sync {
     /// Behavior on duplicated names is undefined, overwriting the content upon an existing name
     /// is straightforward and acceptable.
     /// See `list_metadata_files`.
-    async fn save_metadata_line(&self, name: &ShellSafeName, content: &TextLine) -> Result<()>;
+    async fn save_metadata_line(
+        &self,
+        name: &ShellSafeName,
+        content: &TextLine,
+    ) -> Result<FileHandle> {
+        self.save_metadata_lines(name, &[content.clone()]).await
+    }
     /// The backup system always asks for all metadata files and cache and build index on top of
     /// the content of them. This means:
     ///   1. The storage is free to reorganise the metadata files, like combining multiple ones to
@@ -167,6 +176,15 @@ pub trait BackupStorage: Send + Sync {
     ///   2. But the cache does expect the content stays the same for a file handle, so when
     /// reorganising metadata files, give them new unique names.
     async fn list_metadata_files(&self) -> Result<Vec<FileHandle>>;
+    /// Move a metadata file to the metadata file backup folder.
+    async fn backup_metadata_file(&self, file_handle: &FileHandleRef) -> Result<()>;
+    /// Save a vector of metadata lines to file and return the file handle of saved file.
+    /// If the file exists, this will overwrite
+    async fn save_metadata_lines(
+        &self,
+        name: &ShellSafeName,
+        lines: &[TextLine],
+    ) -> Result<FileHandle>;
 }
 
 #[derive(Parser)]
@@ -187,6 +205,38 @@ impl StorageOpt {
         Ok(match self {
             StorageOpt::LocalFs(opt) => Arc::new(LocalFs::new_with_opt(opt)),
             StorageOpt::CommandAdapter(opt) => Arc::new(CommandAdapter::new_with_opt(opt).await?),
+        })
+    }
+}
+
+#[derive(Parser)]
+#[clap(group(
+    ArgGroup::new("storage")
+    .required(true)
+    .args(&["local-fs-dir", "command-adapter-config"]),
+))]
+pub struct DBToolStorageOpt {
+    #[clap(
+        long,
+        help = "Select the LocalFs backup storage type, which is used mainly for tests."
+    )]
+    local_fs_dir: Option<LocalFsOpt>,
+    #[clap(
+        long,
+        help = "Select the CommandAdapter backup storage type, which reads shell commands with which \
+    it communicates with either a local file system or a remote cloud storage. Compression or other \
+    fitlers can be added as part of the commands. See a sample config here: \
+    https://github.com/aptos-labs/aptos-networks/tree/main/testnet/backups "
+    )]
+    command_adapter_config: Option<CommandAdapterOpt>,
+}
+
+impl DBToolStorageOpt {
+    pub async fn init_storage(self) -> Result<Arc<dyn BackupStorage>> {
+        Ok(if self.local_fs_dir.is_some() {
+            Arc::new(LocalFs::new_with_opt(self.local_fs_dir.unwrap()))
+        } else {
+            Arc::new(CommandAdapter::new_with_opt(self.command_adapter_config.unwrap()).await?)
         })
     }
 }

@@ -1,11 +1,16 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
+use aptos_storage_interface::{
+    cached_state_view::CachedDbStateView,
+    state_view::{DbStateView, LatestDbStateCheckpointView},
+    DbReader,
+};
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::AccountSequenceInfo,
     account_view::AccountView,
     on_chain_config::OnChainConfigPayload,
     transaction::{SignedTransaction, VMValidatorResult},
@@ -13,10 +18,6 @@ use aptos_types::{
 use aptos_vm::AptosVM;
 use fail::fail_point;
 use std::sync::Arc;
-use storage_interface::state_view::DbStateView;
-use storage_interface::{
-    cached_state_view::CachedDbStateView, state_view::LatestDbStateCheckpointView, DbReader,
-};
 
 #[cfg(test)]
 #[path = "unit_tests/vm_validator_test.rs"]
@@ -96,7 +97,7 @@ impl TransactionValidation for VMValidator {
 pub fn get_account_sequence_number(
     state_view: &DbStateView,
     address: AccountAddress,
-) -> Result<AccountSequenceInfo> {
+) -> Result<u64> {
     fail_point!("vm_validator::get_account_sequence_number", |_| {
         Err(anyhow::anyhow!(
             "Injected error in get_account_sequence_number"
@@ -106,9 +107,7 @@ pub fn get_account_sequence_number(
     let account_state_view = state_view.as_account_with_state_view(&address);
 
     match account_state_view.get_account_resource()? {
-        Some(account_resource) => Ok(AccountSequenceInfo::Sequential(
-            account_resource.sequence_number(),
-        )),
-        None => Ok(AccountSequenceInfo::Sequential(0)),
+        Some(account_resource) => Ok(account_resource.sequence_number()),
+        None => Ok(0),
     }
 }

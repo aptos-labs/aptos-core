@@ -1,13 +1,15 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 /// This module provides various indexes used by Mempool.
 use crate::core_mempool::transaction::{MempoolTransaction, SequenceInfo, TimelineState};
-use crate::shared_mempool::types::MultiBucketTimelineIndexIds;
 use crate::{
     counters,
     logging::{LogEntry, LogSchema},
+    shared_mempool::types::MultiBucketTimelineIndexIds,
 };
+use aptos_consensus_types::common::TransactionSummary;
 use aptos_logger::prelude::*;
 use aptos_types::account_address::AccountAddress;
 use rand::seq::SliceRandom;
@@ -87,15 +89,15 @@ impl PartialOrd for OrderedQueueKey {
 impl Ord for OrderedQueueKey {
     fn cmp(&self, other: &OrderedQueueKey) -> Ordering {
         match self.gas_ranking_score.cmp(&other.gas_ranking_score) {
-            Ordering::Equal => {}
+            Ordering::Equal => {},
             ordering => return ordering,
         }
         match self.expiration_time.cmp(&other.expiration_time).reverse() {
-            Ordering::Equal => {}
+            Ordering::Equal => {},
             ordering => return ordering,
         }
         match self.address.cmp(&other.address) {
-            Ordering::Equal => {}
+            Ordering::Equal => {},
             ordering => return ordering,
         }
         self.sequence_number
@@ -157,6 +159,10 @@ impl TTLIndex {
         }
     }
 
+    pub(crate) fn iter(&self) -> Iter<TTLOrderingKey> {
+        self.data.iter()
+    }
+
     pub(crate) fn size(&self) -> usize {
         self.data.len()
     }
@@ -178,7 +184,7 @@ impl Ord for TTLOrderingKey {
         match self.expiration_time.cmp(&other.expiration_time) {
             Ordering::Equal => {
                 (&self.address, self.sequence_number).cmp(&(&other.address, other.sequence_number))
-            }
+            },
             ordering => ordering,
         }
     }
@@ -415,13 +421,13 @@ impl ParkingLotIndex {
                     );
                     return;
                 }
-            }
+            },
             None => {
                 let seq_nums = [sequence_number].iter().cloned().collect::<BTreeSet<_>>();
                 self.data.push((*sender, seq_nums));
                 self.account_indices.insert(*sender, self.data.len() - 1);
                 true
-            }
+            },
         };
         if is_new_entry {
             self.size += 1;
@@ -461,9 +467,12 @@ impl ParkingLotIndex {
     /// Returns a random "non-ready" transaction (with highest sequence number for that account).
     pub(crate) fn get_poppable(&self) -> Option<TxnPointer> {
         let mut rng = rand::thread_rng();
-        self.data
-            .choose(&mut rng)
-            .and_then(|(sender, txns)| txns.iter().rev().next().map(|seq_num| (*sender, *seq_num)))
+        self.data.choose(&mut rng).and_then(|(sender, txns)| {
+            txns.iter().rev().next().map(|seq_num| TxnPointer {
+                sender: *sender,
+                sequence_number: *seq_num,
+            })
+        })
     }
 
     pub(crate) fn size(&self) -> usize {
@@ -473,19 +482,22 @@ impl ParkingLotIndex {
 
 /// Logical pointer to `MempoolTransaction`.
 /// Includes Account's address and transaction sequence number.
-pub type TxnPointer = (AccountAddress, u64);
+pub type TxnPointer = TransactionSummary;
 
 impl From<&MempoolTransaction> for TxnPointer {
-    fn from(transaction: &MempoolTransaction) -> Self {
-        (
-            transaction.get_sender(),
-            transaction.sequence_info.transaction_sequence_number,
-        )
+    fn from(txn: &MempoolTransaction) -> Self {
+        Self {
+            sender: txn.get_sender(),
+            sequence_number: txn.sequence_info.transaction_sequence_number,
+        }
     }
 }
 
 impl From<&OrderedQueueKey> for TxnPointer {
     fn from(key: &OrderedQueueKey) -> Self {
-        (key.address, key.sequence_number.transaction_sequence_number)
+        Self {
+            sender: key.address,
+            sequence_number: key.sequence_number.transaction_sequence_number,
+        }
     }
 }

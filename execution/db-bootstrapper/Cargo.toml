@@ -1,25 +1,26 @@
 [package]
-name = "db-bootstrapper"
-version = "0.1.0"
-authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+name = "aptos-db-bootstrapper"
 description = "Aptos DB-Bootstrapper"
-repository = "https://github.com/aptos-labs/aptos-core"
-homepage = "https://aptoslabs.com"
-license = "Apache-2.0"
-publish = false
-edition = "2021"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
 
 [dependencies]
-anyhow = "1.0.57"
-bcs = { git = "https://github.com/aptos-labs/bcs", rev = "2cde3e8446c460cb17b0c1d6bac7e27e964ac169" }
-structopt = "0.3.21"
-
-aptos-config = { path = "../../config" }
-aptos-crypto = { path = "../../crates/aptos-crypto" }
-aptos-temppath = { path = "../../crates/aptos-temppath" }
-aptos-types = { path = "../../types" }
-aptos-vm = { path = "../../aptos-move/aptos-vm" }
-
-aptosdb = { path = "../../storage/aptosdb" }
-executor = { path = "../executor" }
-storage-interface = { path = "../../storage/storage-interface" }
+anyhow = { workspace = true }
+aptos-config = { workspace = true }
+aptos-crypto = { workspace = true }
+aptos-db = { workspace = true }
+aptos-executor = { workspace = true }
+aptos-storage-interface = { workspace = true }
+aptos-temppath = { workspace = true }
+aptos-types = { workspace = true }
+aptos-vm = { workspace = true }
+bcs = { workspace = true }
+structopt = { workspace = true }

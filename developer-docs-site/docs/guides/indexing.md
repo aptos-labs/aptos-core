@@ -1,18 +1,18 @@
 ---
-title: "Indexing"
+title: "Use the Aptos Indexer"
 slug: "indexing"
 ---
 
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Indexing
+# Use the Aptos Indexer
 
-## Concept
+This page describes how to employ data from the Aptos Indexer in your apps. To instead operate an indexer, follow [Run an Indexer](../nodes/indexer-fullnode.md).
 
-An application built on the Aptos blockchain, on any blockchain for that matter, requires that the raw data from the blockchain be shaped by the application-specific data model before the application can consume it. The [Aptos Node API](https://fullnode.devnet.aptoslabs.com/v1/spec#/), using which a client can interact with the Aptos blockchain, is not designed to support data shaping. Moreover, the ledger data you get back using this API contains the data only for the transactions **initiated by you**. It does not provide the data for the transactions initiated by the others. This data is insufficient and too slow for an application that must access the blockchain data in an omniscient way to serve multiple users of the application. 
+Typical applications built on the Aptos blockchain, on any blockchain for that matter, require the raw blockchain data to be shaped and stored in an application-specific manner. This is essential to supporting low-latency and rich experiences when consuming blockchain data in end-user apps from millions of users. The [Aptos Node API](https://aptos.dev/nodes/aptos-api-spec#/) provides a lower level, stable and generic API and is not designed to support data shaping or therefore such rich end-user experiences directly.
 
-Indexer is a solution to this problem. See below a high-level block diagram of how Aptos indexing works. 
+The Aptos Indexer is the answer to this need, allowing the data shaping critical to real-time app use. See this high-level diagram for how Aptos indexing works:
 
 <center>
 <ThemedImage
@@ -24,8 +24,6 @@ sources={{
 />
 </center>
 
-## Indexing the Aptos blockchain data
-
 Indexing on the Aptos blockchain works like this:
 
 - Users of a dApp, for example, on an NFT marketplace, interact with the Aptos blockchain via a rich UI presented by the dApp. Behind the scenes, these interactions generate, via smart contracts, the transaction and event data. This raw data is stored in the distributed ledger database, for example, on an Aptos fullnode.
@@ -36,7 +34,7 @@ Indexing on the Aptos blockchain works like this:
 
 Aptos supports the following ways to index the Aptos blockchain. 
 
-1. Use the Aptos-provided indexing service with GraphQL API. This API is rate-limited and is intended only for lightweight applications such as wallets. This option is not recommended for high-bandwidth applications. This indexing service supports the following modules:
+1. Use the Aptos Labs hosted indexing service with GraphQL API. This API is rate-limited and is intended only for lightweight applications such as wallets. This option is not recommended for high-bandwidth applications. This indexing service supports the following modules:
     1. **Token**: Only tokens that implement the Aptos `0x3::token::Token` standard. This indexer will only support 0x3 operations such as mint, create, transfer, offer, claim, and coin token swap. Also see Coin and Token.
     2. **Coin**: Supports only `0x1::coin::CoinStore`. This indexer will index any coins that appear in Aptos `CoinStore` standard but such coins may not have value unless they implement `0x1::coin::CoinInfo`.
 2. Run your own indexer-enabled Aptos fullnode. With this option, the indexer supports, in addition to the above coin and token modules, basic transactions, i.e., each write set, events and signatures. 
@@ -52,11 +50,18 @@ Aptos provides a rate-limited GraphQL API for public use. See below a few exampl
 
 - **Mainnet:** https://cloud.hasura.io/public/graphiql?endpoint=https://indexer.mainnet.aptoslabs.com/v1/graphql
 - **Testnet:** https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql
+- **Devnet:** https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql
+
+### Format of the address
+
+Make sure that the address (either owner address or any Aptos blockchain account address) in the query contains a prefix of `0x` followed by the 64 hex characters, for example, `0xaa921481e07b82a26dbd5d3bc472b9ad82d3e5bfd248bacac160eac51687c2ff`.
 
 ### Running example queries
 
-- Click on [Mainnet GraphQL server](https://cloud.hasura.io/public/graphiql?endpoint=https://indexer.mainnet.aptoslabs.com/v1/graphql) or [Testnet GraphQL server](https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql).
+- Click on [Mainnet GraphQL server](https://cloud.hasura.io/public/graphiql?endpoint=https://indexer.mainnet.aptoslabs.com/v1/graphql) or [Testnet GraphQL server](https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql) or [Devnet GraphQL server](https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql).
 - On the server page, paste the **Query** code from an example into the main query section, and the **Query variables** code from the same example into the QUERY VARIABLES section (below the main query section).
+
+
 
 ### Example token queries
 
@@ -243,9 +248,17 @@ query UserTransactions($limit: Int) {
 }
 ```
 
+### Rate limits
+
+The following rate limit applies for this Aptos-provided indexing service:
+
+- For a web application that calls this Aptos-provided indexer API directly from the client (for example, wallet or explorer), the rate limit is currently 1000 requests per five minutes by IP address. **Note that this limit can change with or without prior notice.** 
+
+If you are running a backend (server-side) application and want to call the indexer programmatically then you should run an indexer-enabled fullnode. 
+
 ## Run an indexer-enabled fullnode
 
-See [Indexer Fullnode](/nodes/indexer-fullnode).
+See [Indexer Fullnode](../nodes/indexer-fullnode.md).
 
 ## Define your own data model
 
@@ -271,7 +284,7 @@ In the below detailed description, an example of indexing and querying for the c
 
 ### 1. Define new table schemas
 
-In this example we use [PostgreSQL](https://www.postgresql.org/) and [Diesel](https://diesel.rs/) as the ORM. To make sure that we make backward-compatible changes without having to reset the database at every upgrade, we use [Diesel migrations](https://docs.diesel.rs/diesel_migrations/index.html) to manage the schema. This is why it is very important to start with generating a new Diesel migration before doing anything else. 
+In this example we use [PostgreSQL](https://www.postgresql.org/) and [Diesel](https://diesel.rs/) as the ORM. To make sure that we make backward-compatible changes without having to reset the database at every upgrade, we use [Diesel migrations](https://docs.rs/diesel_migrations/latest/diesel_migrations/) to manage the schema. This is why it is very important to start with generating a new Diesel migration before doing anything else. 
 
 Make sure you clone the Aptos-core repo by running `git clone https://github.com/aptos-labs/aptos-core.git` and then `cd` into `aptos-core/tree/main/crates/indexer` directory. Then proceed as below. 
 
@@ -351,7 +364,7 @@ pub struct CurrentCoinBalance {
 
 We will also need to specify the parsing logic, where the input is a portion of the transaction. In the case of coin balances, we can find all the details in `WriteSetChanges`, specifically where the write set change type is `write_resources`.
 
-**Where to find the relevant data for parsing**: This requires a combination of understanding the Move module and the structure of the transaction. In the example of coin balance, the contract lives in [coin.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move), specifically the coin struct (search for `struct Coin`) that has a `value` field. We then calook at an [example transaction](https://fullnode.testnet.aptoslabs.com/v1/transactions/by_version/259518) where we find this exact structure in `write_resources`:
+**Where to find the relevant data for parsing**: This requires a combination of understanding the Move module and the structure of the transaction. In the example of coin balance, the contract lives in [coin.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move), specifically the coin struct (search for `struct Coin`) that has a `value` field. We then look at an [example transaction](https://fullnode.testnet.aptoslabs.com/v1/transactions/by_version/259518) where we find this exact structure in `write_resources`:
 
 ```json
 "changes": [
@@ -382,7 +395,7 @@ The `process_transactions` function takes in a vector of transactions with a sta
 See [coin_process.rs](https://github.com/aptos-labs/aptos-core/blob/main/crates/indexer/src/processors/coin_processor.rs) for a relatively straightforward example. You can search for `coin_balances` in the page for the specific code snippet related to coin balances. 
 :::
 
-**How to decide whether to create a new processor:** This is completely up to you. The benefit of creating a new processor is that you are starting from scratch so you will have full control over exactly what gets written to the indexed database. The downside is that you will have to maintain a new fullnode, ssince there is a 1-to-1 mapping between a fullnode and the processor. 
+**How to decide whether to create a new processor:** This is completely up to you. The benefit of creating a new processor is that you are starting from scratch so you will have full control over exactly what gets written to the indexed database. The downside is that you will have to maintain a new fullnode, since there is a 1-to-1 mapping between a fullnode and the processor. 
 
 ### 4. Integrate the new processor
 

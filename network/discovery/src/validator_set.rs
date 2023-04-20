@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -10,12 +11,12 @@ use aptos_config::{
     network_id::NetworkContext,
 };
 use aptos_crypto::x25519;
+use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_logger::prelude::*;
+use aptos_network::{counters::inc_by_with_context, logging::NetworkSchema};
+use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::on_chain_config::{OnChainConfigPayload, ValidatorSet};
-use event_notifications::ReconfigNotificationListener;
 use futures::Stream;
-use network::{counters::inc_by_with_context, logging::NetworkSchema};
-use short_hex_str::AsShortHexStr;
 use std::{
     collections::HashSet,
     pin::Pin,
@@ -105,7 +106,7 @@ impl Stream for ValidatorSetStream {
 }
 
 /// Extracts a set of ConnectivityRequests from a ValidatorSet which are appropriate for a network with type role.
-fn extract_validator_set_updates(
+pub(crate) fn extract_validator_set_updates(
     network_context: NetworkContext,
     node_set: ValidatorSet,
 ) -> PeerSet {
@@ -153,14 +154,14 @@ fn extract_validator_set_updates(
 mod tests {
     use super::*;
     use crate::DiscoveryChangeListener;
+    use aptos_channels::{aptos_channel, message_queues::QueueStyle};
     use aptos_config::config::HANDSHAKE_VERSION;
     use aptos_crypto::{bls12381, x25519::PrivateKey, PrivateKey as PK, Uniform};
+    use aptos_event_notifications::ReconfigNotification;
     use aptos_types::{
         network_address::NetworkAddress, on_chain_config::OnChainConfig,
         validator_config::ValidatorConfig, validator_info::ValidatorInfo, PeerId,
     };
-    use channel::{aptos_channel, message_queues::QueueStyle};
-    use event_notifications::ReconfigNotification;
     use futures::executor::block_on;
     use rand::{rngs::StdRng, SeedableRng};
     use std::{collections::HashMap, sync::Arc, time::Instant};
@@ -180,7 +181,7 @@ mod tests {
         let peer_id = aptos_types::account_address::from_identity_public_key(pubkey);
 
         // Build up the Reconfig Listener
-        let (conn_mgr_reqs_tx, _rx) = channel::new_test(1);
+        let (conn_mgr_reqs_tx, _rx) = aptos_channels::new_test(1);
         let (mut reconfig_sender, reconfig_events) = aptos_channel::new(QueueStyle::LIFO, 1, None);
         let reconfig_listener = ReconfigNotificationListener {
             notification_receiver: reconfig_events,
@@ -235,7 +236,7 @@ mod tests {
         peer_id: PeerId,
         consensus_pubkey: bls12381::PublicKey,
         pubkey: x25519::PublicKey,
-        reconfig_tx: &mut channel::aptos_channel::Sender<(), ReconfigNotification>,
+        reconfig_tx: &mut aptos_channels::aptos_channel::Sender<(), ReconfigNotification>,
     ) {
         let validator_address =
             NetworkAddress::mock().append_prod_protos(pubkey, HANDSHAKE_VERSION);
@@ -260,13 +261,10 @@ mod tests {
         );
         let payload = OnChainConfigPayload::new(1, Arc::new(configs));
         reconfig_tx
-            .push(
-                (),
-                ReconfigNotification {
-                    version: 1,
-                    on_chain_configs: payload,
-                },
-            )
+            .push((), ReconfigNotification {
+                version: 1,
+                on_chain_configs: payload,
+            })
             .unwrap();
     }
 

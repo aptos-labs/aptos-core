@@ -1,8 +1,15 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 /* eslint-disable no-bitwise */
-import { MAX_U128_BIG_INT, MAX_U16_NUMBER, MAX_U32_NUMBER, MAX_U64_BIG_INT, MAX_U8_NUMBER } from "./consts";
+import {
+  MAX_U128_BIG_INT,
+  MAX_U16_NUMBER,
+  MAX_U32_NUMBER,
+  MAX_U64_BIG_INT,
+  MAX_U8_NUMBER,
+  MAX_U256_BIG_INT,
+} from "./consts";
 import { AnyNumber, Bytes, Uint16, Uint32, Uint8 } from "./types";
 
 export class Serializer {
@@ -169,6 +176,21 @@ export class Serializer {
     // write little endian number
     this.serializeU64(low);
     this.serializeU64(high);
+  }
+
+  /**
+   * Serializes a uint256 number.
+   *
+   * BCS layout for "uint256": Sixteen bytes. Binary format in little-endian representation.
+   */
+  @checkNumberRange(BigInt(0), MAX_U256_BIG_INT)
+  serializeU256(value: AnyNumber): void {
+    const low = BigInt(value.toString()) & MAX_U128_BIG_INT;
+    const high = BigInt(value.toString()) >> BigInt(128);
+
+    // write little endian number
+    this.serializeU128(low);
+    this.serializeU128(high);
   }
 
   /**

@@ -1,0 +1,9 @@
+[package]
+name = "ResourceGroupsPrimary"
+version = "0.0.0"
+
+[addresses]
+resource_groups_primary = "_"
+
+[dependencies]
+AptosFramework = { local = "../../../framework/aptos-framework" }

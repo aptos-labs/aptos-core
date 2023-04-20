@@ -1,18 +1,27 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::PromptOptions;
-use crate::common::utils::{dir_default_to_current, write_to_file};
-use crate::genesis::git::{GitOptions, EMPLOYEE_VESTING_ACCOUNTS_FILE, LAYOUT_FILE};
-use crate::genesis::{get_validator_configs, parse_error};
-use crate::{CliCommand, CliTypedResult};
+use crate::{
+    common::{
+        types::PromptOptions,
+        utils::{dir_default_to_current, write_to_file},
+    },
+    genesis::{
+        get_validator_configs,
+        git::{GitOptions, EMPLOYEE_VESTING_ACCOUNTS_FILE, LAYOUT_FILE},
+        parse_error,
+    },
+    CliCommand, CliTypedResult,
+};
 use aptos_genesis::config::{EmployeePoolMap, Layout};
 use aptos_sdk::move_types::account_address::AccountAddress;
 use aptos_types::account_address::{create_vesting_pool_address, default_stake_pool_address};
 use async_trait::async_trait;
 use clap::Parser;
-use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use std::{
+    collections::BTreeMap,
+    path::{Path, PathBuf},
+};
 
 const POOL_ADDRESSES: &str = "pool-addresses.yaml";
 const EMPLOYEE_POOL_ADDRESSES: &str = "employee-pool-addresses.yaml";

@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module defines traits and implementations of
@@ -100,7 +101,7 @@
 #![allow(clippy::integer_arithmetic)]
 use bytes::Bytes;
 use hex::FromHex;
-use more_asserts::{debug_assert_ge, debug_assert_lt};
+use more_asserts::debug_assert_lt;
 use once_cell::sync::{Lazy, OnceCell};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
@@ -216,7 +217,13 @@ impl HashValue {
         debug_assert!(index < Self::LENGTH * 2); // assumed precondition
         let pos = index / 2;
         let shift = if index % 2 == 0 { 4 } else { 0 };
-        (self.hash[pos] >> shift) & 0x0f
+        (self.hash[pos] >> shift) & 0x0F
+    }
+
+    /// Return the `index`-th byte in the bytes.
+    pub fn byte(&self, index: usize) -> u8 {
+        debug_assert!(index < Self::LENGTH); // assumed precondition
+        self.hash[index]
     }
 
     /// Returns a `HashValueBitIterator` over all the bits that represent this `HashValue`.
@@ -439,8 +446,7 @@ impl<'a> HashValueBitIterator<'a> {
     /// Returns the `index`-th bit in the bytes.
     fn get_bit(&self, index: usize) -> bool {
         debug_assert_eq!(self.hash_bytes.len(), HashValue::LENGTH); // invariant
-        debug_assert_lt!(index, self.hash_bytes.len() * 8); // assumed precondition
-        debug_assert_ge!(index, 0); // assumed precondition
+        debug_assert_lt!(index, HashValue::LENGTH_IN_BITS); // assumed precondition
         let pos = index / 8;
         let bit = 7 - index % 8;
         (self.hash_bytes[pos] >> bit) & 1 != 0
@@ -631,6 +637,16 @@ define_hasher! {
 }
 
 define_hasher! {
+    /// The hasher used as a placeholder.
+    (
+        DummyHasher,
+        DUMMY_HASHER,
+        DUMMY_SEED,
+        b"Dummy"
+    )
+}
+
+define_hasher! {
     /// The hasher used only for testing. It doesn't have a salt.
     (TestOnlyHasher, TEST_ONLY_HASHER, TEST_ONLY_SEED, b"")
 }
@@ -659,9 +675,9 @@ pub static GENESIS_BLOCK_ID: Lazy<HashValue> = Lazy::new(|| {
     // This maintains the invariant that block.id() == block.hash(), for
     // the genesis block and allows us to (de/)serialize it consistently
     HashValue::new([
-        0x5e, 0x10, 0xba, 0xd4, 0x5b, 0x35, 0xed, 0x92, 0x9c, 0xd6, 0xd2, 0xc7, 0x09, 0x8b, 0x13,
-        0x5d, 0x02, 0xdd, 0x25, 0x9a, 0xe8, 0x8a, 0x8d, 0x09, 0xf4, 0xeb, 0x5f, 0xba, 0xe9, 0xa6,
-        0xf6, 0xe4,
+        0x5E, 0x10, 0xBA, 0xD4, 0x5B, 0x35, 0xED, 0x92, 0x9C, 0xD6, 0xD2, 0xC7, 0x09, 0x8B, 0x13,
+        0x5D, 0x02, 0xDD, 0x25, 0x9A, 0xE8, 0x8A, 0x8D, 0x09, 0xF4, 0xEB, 0x5F, 0xBA, 0xE9, 0xA6,
+        0xF6, 0xE4,
     ])
 });
 

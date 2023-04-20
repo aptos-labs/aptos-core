@@ -18,31 +18,7 @@ Make sure the following are installed on your local computer:
 Follow the below instructions **twice**, i.e., first on one machine to run a validator node and the second time on another machine to run a validator fullnode. 
 :::
 
-1. Clone the Aptos repo.
-
-      ```bash
-      git clone https://github.com/aptos-labs/aptos-core.git
-      ```
-
-2. `cd` into `aptos-core` directory.
-
-    ```bash
-    cd aptos-core
-    ```
-
-3. Run the `scripts/dev_setup.sh` Bash script as shown below. This will prepare your developer environment.
-
-    ```bash
-    ./scripts/dev_setup.sh
-    ```
-
-4. Update your current shell environment.
-
-    ```bash
-    source ~/.cargo/env
-    ```
-
-With your development environment ready, now you can start to setup your validator node.
+1. Follow steps in [Building Aptos From Source](../../../../guides/building-from-source.md)
 
 5. Checkout the `mainnet` branch using `git checkout --track origin/mainnet`.
 
@@ -105,7 +81,7 @@ With your development environment ready, now you can start to setup your validat
 
     This will create two YAML files in the `~/$WORKSPACE/$USERNAME` directory: `owner.yaml` and `operator.yaml`. 
 
-9. Download the following files by following the download commands on the [Node Files](/nodes/node-files-all-networks/node-files.md) page: 
+9. Download the following files by following the download commands on the [Node Files](../../../node-files-all-networks/node-files.md) page: 
    - `validator.yaml`
    - `fullnode.yaml`
    - `genesis.blob`
@@ -140,18 +116,51 @@ With your development environment ready, now you can start to setup your validat
     - `waypoint.txt`: The waypoint for the genesis transaction (from step 9).
     - `genesis.blob` The genesis binary that contains all the information about the framework, validatorSet and more (from step 9).
 
-12. Start your validator by running the below command:
+12. Start your validator by running the below commands, with the paths assuming you are in the root of the `aptos-core` directory:
 
     ```bash
     cargo clean
-    cargo run -p aptos-node --release -- -f ~/$WORKSPACE/config/validator.yaml
+    cargo build -p aptos-node --release
+    sudo mv target/release/aptos-node /usr/local/bin
+    aptos-node -f ~/$WORKSPACE/config/validator.yaml
     ```
 
     Run validator fullnode on **another machine**:
 
     ```bash
     cargo clean
-    cargo run -p aptos-node --release -- -f ~/$WORKSPACE/config/fullnode.yaml
+    cargo build -p aptos-node --release
+    sudo mv target/release/aptos-node /usr/local/bin
+    aptos-node -f ~/$WORKSPACE/config/fullnode.yaml
     ```
 
-Now you have completed setting up your node.
+Optionally, you may set up `aptos-node` to run as a service controlled by `systemctl` in a file resembling:
+
+```bash
+[Unit]
+Description=Aptos Node Service
+
+[Service]
+User=nodeuser
+Group=nodeuser
+
+LimitNOFILE=500000
+
+#Environment="RUST_LOG=error"
+WorkingDirectory=/home/nodeuser/aptos-core
+ExecStart=/usr/local/bin/aptos-node -f /home/nodeuser/aptos-mainnet/config/validator.yaml
+
+Restart=on-failure
+RestartSec=3s
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=aptos-node
+
+[Install]
+WantedBy=multi-user.target
+```
+
+You have completed setting up your node.
+
+Now proceed to [connecting to the Aptos network](../connect-to-aptos-network.md) and [establishing staking pool operations](../staking-pool-operations.md).

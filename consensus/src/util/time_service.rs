@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::counters;
@@ -57,7 +58,7 @@ pub struct SendTask<T>
 where
     T: Send + 'static,
 {
-    sender: Option<channel::Sender<T>>,
+    sender: Option<aptos_channels::Sender<T>>,
     message: Option<T>,
 }
 
@@ -66,7 +67,7 @@ where
     T: Send + 'static,
 {
     /// Makes new SendTask for given sender and message and wraps it to Box
-    pub fn make(sender: channel::Sender<T>, message: T) -> Box<dyn ScheduledTask> {
+    pub fn make(sender: aptos_channels::Sender<T>, message: T) -> Box<dyn ScheduledTask> {
         Box::new(SendTask {
             sender: Some(sender),
             message: Some(message),
@@ -132,7 +133,7 @@ async fn test_time_service_abort() {
     use futures::StreamExt;
 
     let time_service = ClockTimeService::new(tokio::runtime::Handle::current());
-    let (tx, mut rx) = channel::new_test(10);
+    let (tx, mut rx) = aptos_channels::new_test(10);
     let task1 = SendTask::make(tx.clone(), 1);
     let task2 = SendTask::make(tx.clone(), 2);
     let handle1 = time_service.run_after(Duration::from_millis(100), task1);

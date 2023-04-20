@@ -24,6 +24,14 @@ module aptos_std::from_bcs {
         from_bytes<u8>(v)
     }
 
+    public fun to_u16(v: vector<u8>): u16 {
+        from_bytes<u16>(v)
+    }
+
+    public fun to_u32(v: vector<u8>): u32 {
+        from_bytes<u32>(v)
+    }
+
     public fun to_u64(v: vector<u8>): u64 {
         from_bytes<u64>(v)
     }
@@ -32,8 +40,16 @@ module aptos_std::from_bcs {
         from_bytes<u128>(v)
     }
 
+    public fun to_u256(v: vector<u8>): u256 {
+        from_bytes<u256>(v)
+    }
+
     public fun to_address(v: vector<u8>): address {
         from_bytes<address>(v)
+    }
+
+    public fun to_bytes(v: vector<u8>): vector<u8> {
+        from_bytes<vector<u8>>(v)
     }
 
     public fun to_string(v: vector<u8>): String {
@@ -54,20 +70,20 @@ module aptos_std::from_bcs {
 
 
     #[test_only]
-    use std::bcs::to_bytes;
+    use std::bcs;
 
     #[test]
     fun test_address() {
         let addr = @0x01;
         let addr_vec = x"0000000000000000000000000000000000000000000000000000000000000001";
         let addr_out = to_address(addr_vec);
-        let addr_vec_out = to_bytes(&addr_out);
+        let addr_vec_out = bcs::to_bytes(&addr_out);
         assert!(addr == addr_out, 0);
         assert!(addr_vec == addr_vec_out, 1);
     }
 
     #[test]
-    #[expected_failure(abort_code = 0x10001)]
+    #[expected_failure(abort_code = 0x10001, location = Self)]
     fun test_address_fail() {
         let bad_vec = b"01";
         to_address(bad_vec);

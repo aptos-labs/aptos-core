@@ -1,8 +1,7 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics::OTHER_TIMERS_SECONDS;
-use crate::utils::stream::StreamX;
 use crate::{
     backup_types::{
         epoch_ending::restore::EpochHistory, state_snapshot::manifest::StateSnapshotBackup,
@@ -15,26 +14,35 @@ use crate::{
             VERIFY_STATE_SNAPSHOT_LEAF_INDEX, VERIFY_STATE_SNAPSHOT_TARGET_LEAF_INDEX,
             VERIFY_STATE_SNAPSHOT_VERSION,
         },
+        OTHER_TIMERS_SECONDS,
     },
     storage::{BackupStorage, FileHandle},
     utils::{
-        read_record_bytes::ReadRecordBytes, storage_ext::BackupStorageExt, GlobalRestoreOptions,
-        RestoreRunMode,
+        read_record_bytes::ReadRecordBytes, storage_ext::BackupStorageExt, stream::StreamX,
+        GlobalRestoreOptions, RestoreRunMode,
     },
 };
 use anyhow::{anyhow, ensure, Result};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
+use aptos_storage_interface::StateSnapshotReceiver;
 use aptos_types::{
+    access_path::Path,
     ledger_info::LedgerInfoWithSignatures,
+    on_chain_config::{TimedFeatureOverride, TimedFeatures},
     proof::TransactionInfoWithProof,
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{
+        state_key::{StateKey, StateKeyInner},
+        state_value::StateValue,
+    },
     transaction::Version,
 };
+use aptos_vm::move_vm_ext::verifier_config;
 use clap::Parser;
 use futures::{stream, TryStreamExt};
+use move_binary_format::CompiledModule;
+use move_bytecode_verifier::verify_module_with_config;
 use std::sync::Arc;
-use storage_interface::StateSnapshotReceiver;
 use tokio::time::Instant;
 
 #[derive(Parser)]
@@ -43,6 +51,8 @@ pub struct StateSnapshotRestoreOpt {
     pub manifest_handle: FileHandle,
     #[clap(long = "state-into-version")]
     pub version: Version,
+    #[clap(long)]
+    pub validate_modules: bool,
 }
 
 pub struct StateSnapshotRestoreController {
@@ -56,6 +66,7 @@ pub struct StateSnapshotRestoreController {
     target_version: Version,
     epoch_history: Option<Arc<EpochHistory>>,
     concurrent_downloads: usize,
+    validate_modules: bool,
 }
 
 impl StateSnapshotRestoreController {
@@ -73,6 +84,7 @@ impl StateSnapshotRestoreController {
             target_version: global_opt.target_version,
             epoch_history,
             concurrent_downloads: global_opt.concurrent_downloads,
+            validate_modules: opt.validate_modules,
         }
     }
 
@@ -180,12 +192,19 @@ impl StateSnapshotRestoreController {
         let con = self.concurrent_downloads;
         let mut futs_stream = stream::iter(futs_iter).buffered_x(con * 2, con);
         let mut start = None;
-        while let Some((chunk_idx, chunk, blobs, proof)) = futs_stream.try_next().await? {
+        while let Some((chunk_idx, chunk, mut blobs, proof)) = futs_stream.try_next().await? {
             start = start.or_else(|| Some(Instant::now()));
             let _timer = OTHER_TIMERS_SECONDS
                 .with_label_values(&["add_state_chunk"])
                 .start_timer();
             let receiver = receiver.clone();
+            if self.validate_modules {
+                blobs = tokio::task::spawn_blocking(move || {
+                    Self::validate_modules(&blobs);
+                    blobs
+                })
+                .await?;
+            }
             tokio::task::spawn_blocking(move || {
                 receiver.lock().as_mut().unwrap().add_chunk(blobs, proof)
             })
@@ -205,6 +224,27 @@ impl StateSnapshotRestoreController {
         tokio::task::spawn_blocking(move || receiver.lock().take().unwrap().finish()).await??;
         self.run_mode.finish();
         Ok(())
+    }
+
+    fn validate_modules(blob: &[(StateKey, StateValue)]) {
+        let config = verifier_config(
+            false,
+            // FIXME: feed chain id & timestamp from the state.
+            &TimedFeatures::enable_all().with_override_profile(TimedFeatureOverride::Replay),
+        );
+        for (key, value) in blob {
+            if let StateKeyInner::AccessPath(p) = key.inner() {
+                if let Path::Code(module_id) = p.get_path() {
+                    if let Ok(module) = CompiledModule::deserialize(value.bytes()) {
+                        if let Err(err) = verify_module_with_config(&config, &module) {
+                            error!("Module {:?} failed validation: {:?}", module_id, err);
+                        }
+                    } else {
+                        error!("Module {:?} failed to deserialize", module_id);
+                    }
+                }
+            }
+        }
     }
 
     async fn read_state_value(

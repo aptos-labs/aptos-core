@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::response::BadRequestError;
@@ -44,7 +45,7 @@ impl Page {
         let start = self.start.unwrap_or(default);
         if start > max {
             return Err(E::bad_request_with_code(
-                &format!(
+                format!(
                 "Given start value ({}) is higher than the current ledger version, it must be < {}",
                 start, max
             ),
@@ -62,19 +63,36 @@ impl Page {
 
     /// Get the page size for the request
     pub fn limit<E: BadRequestError>(&self, ledger_info: &LedgerInfo) -> Result<u16, E> {
-        let limit = self.limit.unwrap_or(DEFAULT_PAGE_SIZE);
-        if limit == 0 {
-            return Err(E::bad_request_with_code(
-                &format!("Given limit value ({}) must not be zero", limit),
-                AptosErrorCode::InvalidInput,
-                ledger_info,
-            ));
-        }
-        // If we go over the max page size, we return the max page size
-        if limit > self.max_page_size {
-            Ok(self.max_page_size)
-        } else {
-            Ok(limit)
-        }
+        determine_limit(
+            self.limit,
+            DEFAULT_PAGE_SIZE,
+            self.max_page_size,
+            ledger_info,
+        )
+    }
+}
+
+pub fn determine_limit<E: BadRequestError>(
+    // The limit requested by the user, if any.
+    requested_limit: Option<u16>,
+    // The default limit to use, if requested_limit is None.
+    default_limit: u16,
+    // The ceiling on the limit. If the requested value is higher than this, we just use this value.
+    max_limit: u16,
+    ledger_info: &LedgerInfo,
+) -> Result<u16, E> {
+    let limit = requested_limit.unwrap_or(default_limit);
+    if limit == 0 {
+        return Err(E::bad_request_with_code(
+            format!("Given limit value ({}) must not be zero", limit),
+            AptosErrorCode::InvalidInput,
+            ledger_info,
+        ));
+    }
+    // If we go over the max page size, we return the max page size
+    if limit > max_limit {
+        Ok(max_limit)
+    } else {
+        Ok(limit)
     }
 }

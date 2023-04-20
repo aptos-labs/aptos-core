@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -15,7 +15,7 @@ use warp::Filter;
 
 pub fn list_route(
     server_context: RosettaContext,
-) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
     warp::path!("network" / "list")
         .and(warp::post())
         .and(with_empty_request())
@@ -25,7 +25,7 @@ pub fn list_route(
 
 pub fn options_route(
     server_context: RosettaContext,
-) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
     warp::path!("network" / "options")
         .and(warp::post())
         .and(warp::body::json())
@@ -35,7 +35,7 @@ pub fn options_route(
 
 pub fn status_route(
     server_context: RosettaContext,
-) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
     warp::path!("network" / "status")
         .and(warp::post())
         .and(warp::body::json())

@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics::{
@@ -15,7 +15,7 @@ use thiserror::Error;
 /// It is useful for compressing large data chunks that are
 /// sent across the network (e.g., by state sync and consensus).
 /// Internally, it uses LZ4 in fast mode to compress the data.
-/// See https://github.com/10xGenomics/lz4-rs for more information.
+/// See <https://github.com/10xGenomics/lz4-rs> for more information.
 ///
 /// Note: the crate also exposes some basic compression metrics
 /// that can be used to track the cumulative compression ratio
@@ -62,7 +62,7 @@ pub fn compress(
                 "Failed to compress the data: {}",
                 error
             )));
-        }
+        },
     };
 
     // Ensure that the compressed data size is not greater than the max bytes limit. This can
@@ -112,7 +112,7 @@ pub fn decompress(
                 "Failed to get decompressed size: {}",
                 error
             )));
-        }
+        },
     };
     let mut raw_data = vec![0u8; size];
 

@@ -1,46 +1,50 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::smoke_test_environment::SwarmBuilder;
 use anyhow::anyhow;
-use aptos::common::types::GasOptions;
-use aptos::test::INVALID_ACCOUNT;
-use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
-use aptos_config::config::PersistableConfig;
+use aptos::{
+    account::create::DEFAULT_FUNDED_COINS,
+    common::types::GasOptions,
+    test::{CliTestFramework, INVALID_ACCOUNT},
+};
+use aptos_cached_packages::aptos_stdlib;
 use aptos_config::{config::ApiConfig, utils::get_available_port};
-use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519Signature};
-use aptos_crypto::{HashValue, PrivateKey};
+use aptos_crypto::{
+    ed25519::{Ed25519PrivateKey, Ed25519Signature},
+    HashValue, PrivateKey,
+};
+use aptos_forge::{AptosPublicInfo, LocalSwarm, Node, NodeExt, Swarm};
 use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule};
-use aptos_rest_client::aptos_api_types::{TransactionOnChainData, UserTransaction};
-use aptos_rest_client::{Response, Transaction};
-use aptos_rosetta::common::BlockHash;
-use aptos_rosetta::types::{
-    AccountIdentifier, BlockResponse, Operation, OperationStatusType, OperationType,
-    TransactionType, STAKING_CONTRACT_MODULE, SWITCH_OPERATOR_WITH_SAME_COMMISSION_FUNCTION,
+use aptos_global_constants::GAS_UNIT_PRICE;
+use aptos_rest_client::{
+    aptos_api_types::{TransactionOnChainData, UserTransaction},
+    Response, Transaction,
 };
 use aptos_rosetta::{
     client::RosettaClient,
-    common::{native_coin, BLOCKCHAIN, Y2K_MS},
+    common::{native_coin, BlockHash, BLOCKCHAIN, Y2K_MS},
     types::{
-        AccountBalanceRequest, AccountBalanceResponse, BlockIdentifier, BlockRequest,
-        NetworkIdentifier, NetworkRequest, PartialBlockIdentifier,
+        AccountBalanceRequest, AccountBalanceResponse, AccountIdentifier, BlockIdentifier,
+        BlockRequest, BlockResponse, NetworkIdentifier, NetworkRequest, Operation,
+        OperationStatusType, OperationType, PartialBlockIdentifier, TransactionType,
+        STAKING_CONTRACT_MODULE, SWITCH_OPERATOR_WITH_SAME_COMMISSION_FUNCTION,
     },
     ROSETTA_VERSION,
 };
-use aptos_sdk::transaction_builder::TransactionFactory;
-use aptos_sdk::types::LocalAccount;
-use aptos_types::account_config::CORE_CODE_ADDRESS;
-use aptos_types::on_chain_config::GasScheduleV2;
-use aptos_types::transaction::SignedTransaction;
-use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
-use cached_packages::aptos_stdlib;
-use forge::{AptosPublicInfo, LocalSwarm, Node, NodeExt, Swarm};
-use std::collections::{BTreeMap, HashSet};
-use std::convert::TryFrom;
-use std::str::FromStr;
-use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
-use std::{future::Future, time::Duration};
+use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
+use aptos_types::{
+    account_address::AccountAddress, account_config::CORE_CODE_ADDRESS, chain_id::ChainId,
+    on_chain_config::GasScheduleV2, transaction::SignedTransaction,
+};
+use std::{
+    collections::{BTreeMap, HashSet},
+    convert::TryFrom,
+    future::Future,
+    str::FromStr,
+    sync::Arc,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 use tokio::{task::JoinHandle, time::Instant};
 
 const DEFAULT_MAX_WAIT_MS: u64 = 5000;
@@ -51,7 +55,12 @@ static DEFAULT_INTERVAL_DURATION: Duration = Duration::from_millis(DEFAULT_INTER
 pub async fn setup_test(
     num_nodes: usize,
     num_accounts: usize,
-) -> (LocalSwarm, CliTestFramework, JoinHandle<()>, RosettaClient) {
+) -> (
+    LocalSwarm,
+    CliTestFramework,
+    JoinHandle<anyhow::Result<()>>,
+    RosettaClient,
+) {
     let (swarm, cli, faucet) = SwarmBuilder::new_local(num_nodes)
         .with_init_genesis_config(Arc::new(|genesis_config| {
             genesis_config.epoch_duration_secs = 5;
@@ -157,13 +166,10 @@ async fn test_block_transactions() {
     )
     .await
     .unwrap();
-    assert_eq!(
-        response.block_identifier,
-        BlockIdentifier {
-            index: 0,
-            hash: BlockHash::new(chain_id, 0).to_string()
-        }
-    );
+    assert_eq!(response.block_identifier, BlockIdentifier {
+        index: 0,
+        hash: BlockHash::new(chain_id, 0).to_string()
+    });
 
     // First fund account 1 with lots more gas
     cli.fund_account(0, Some(DEFAULT_FUNDED_COINS * 10))
@@ -276,7 +282,7 @@ async fn test_account_balance() {
 
     let mut account_4 = swarm
         .aptos_public_info()
-        .create_and_fund_user_account(10_000_000)
+        .create_and_fund_user_account(10_000_000_000)
         .await
         .unwrap();
 
@@ -289,13 +295,10 @@ async fn test_account_balance() {
     )
     .await
     .unwrap();
-    assert_eq!(
-        response.block_identifier,
-        BlockIdentifier {
-            index: 0,
-            hash: BlockHash::new(chain_id, 0).to_string()
-        }
-    );
+    assert_eq!(response.block_identifier, BlockIdentifier {
+        index: 0,
+        hash: BlockHash::new(chain_id, 0).to_string()
+    });
 
     // First fund account 1 with lots more gas
     cli.fund_account(0, Some(DEFAULT_FUNDED_COINS * 2))
@@ -363,6 +366,7 @@ async fn test_account_balance() {
             Some(GasOptions {
                 gas_unit_price: None,
                 max_gas: Some(1000),
+                expiration_secs: 30,
             }),
         )
         .await
@@ -423,6 +427,7 @@ async fn test_account_balance() {
         account_2,
         1_000_000,
         10,
+        1,
     )
     .await;
 
@@ -435,6 +440,47 @@ async fn test_account_balance() {
     )
     .await
     .unwrap();
+
+    account_has_balance(
+        &rosetta_client,
+        chain_id,
+        AccountIdentifier::active_stake_account(account_4.address()),
+        1_000_000,
+        1,
+    )
+    .await
+    .unwrap();
+
+    unlock_stake(
+        &swarm.aptos_public_info(),
+        &mut account_4,
+        account_1,
+        1_000,
+        2,
+    )
+    .await;
+
+    // Since unlock_stake was initiated, 1000 APT should be in pending inactive state until lockup ends
+    account_has_balance(
+        &rosetta_client,
+        chain_id,
+        AccountIdentifier::pending_inactive_stake_account(account_4.address()),
+        1_000,
+        2,
+    )
+    .await
+    .unwrap();
+
+    account_has_balance(
+        &rosetta_client,
+        chain_id,
+        AccountIdentifier::inactive_stake_account(account_4.address()),
+        0,
+        2,
+    )
+    .await
+    .unwrap();
+
     /* TODO: Support operator stake account in the future
     account_has_balance(
         &rosetta_client,
@@ -454,6 +500,7 @@ async fn create_staking_contract(
     voter: AccountAddress,
     amount: u64,
     commission_percentage: u64,
+    sequence_number: u64,
 ) -> Response<Transaction> {
     let staking_contract_creation = info
         .transaction_factory()
@@ -464,9 +511,27 @@ async fn create_staking_contract(
             commission_percentage,
             vec![],
         ))
-        .sequence_number(1);
+        .sequence_number(sequence_number);
 
     let txn = account.sign_with_transaction_builder(staking_contract_creation);
+    info.client().submit_and_wait(&txn).await.unwrap()
+}
+
+async fn unlock_stake(
+    info: &AptosPublicInfo<'_>,
+    account: &mut LocalAccount,
+    operator: AccountAddress,
+    amount: u64,
+    sequence_number: u64,
+) -> Response<Transaction> {
+    let unlock_stake = info
+        .transaction_factory()
+        .payload(aptos_stdlib::staking_contract_unlock_stake(
+            operator, amount,
+        ))
+        .sequence_number(sequence_number);
+
+    let txn = account.sign_with_transaction_builder(unlock_stake);
     info.client().submit_and_wait(&txn).await.unwrap()
 }
 
@@ -545,20 +610,6 @@ async fn test_transfer() {
             break;
         }
     }
-    // Attempt to transfer all coins to another user (should fail)
-    rosetta_client
-        .transfer(
-            &network,
-            sender_private_key,
-            receiver,
-            sender_balance,
-            expiry_time(Duration::from_secs(5)).as_secs(),
-            None,
-            None,
-            None,
-        )
-        .await
-        .expect_err("Should fail simulation since we can't transfer all coins");
 
     // Attempt to transfer more than balance to another user (should fail)
     rosetta_client
@@ -576,9 +627,11 @@ async fn test_transfer() {
         .expect_err("Should fail simulation since we can't transfer more than balance coins");
 
     // Attempt to transfer more than balance to another user (should fail)
-    // TODO(Gas): check this
     let transaction_factory = TransactionFactory::new(chain_id)
-        .with_gas_unit_price(1)
+        // We purposely don't set gas unit price here so the builder uses the default.
+        // Note that the default is different in tests. See here:
+        // config/global-constants/src/lib.rs
+        .with_gas_unit_price(GAS_UNIT_PRICE)
         .with_max_gas_amount(1000);
     let txn_payload = aptos_stdlib::aptos_account_transfer(receiver, 100);
     let unsigned_transaction = transaction_factory
@@ -597,7 +650,7 @@ async fn test_transfer() {
         .await
         .expect("Should succeed getting gas estimate")
         .into_inner();
-    let gas_usage = simulation_txn.info.gas_used();
+    let gas_usage = simulation_txn.info.gas_used() * GAS_UNIT_PRICE;
 
     // Attempt to transfer more than balance - gas to another user (should fail)
     rosetta_client
@@ -689,6 +742,7 @@ async fn test_block() {
     // Do some transfers
     let account_id_0 = cli.account_id(0);
     let account_id_1 = cli.account_id(1);
+    let account_id_2 = cli.account_id(2);
     let account_id_3 = cli.account_id(3);
 
     // TODO(greg): revisit after fixing gas estimation
@@ -703,8 +757,12 @@ async fn test_block() {
         .await
         .unwrap()
         .into_inner();
-    let gas_params =
-        AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule.to_btree_map()).unwrap();
+    let feaure_version = gas_schedule.feature_version;
+    let gas_params = AptosGasParameters::from_on_chain_gas_schedule(
+        &gas_schedule.to_btree_map(),
+        feaure_version,
+    )
+    .unwrap();
     let min_gas_price = u64::from(gas_params.txn.min_price_per_gas_unit);
 
     let private_key_0 = cli.private_key(0);
@@ -894,21 +952,41 @@ async fn test_block() {
     .await
     .unwrap_err();
 
-    // This one will fail (and skip estimation of gas)
-    transfer_and_wait(
+    // Test native stake pool and reset lockup support
+    cli.fund_account(2, Some(1000000000000000)).await.unwrap();
+    create_stake_pool_and_wait(
         &rosetta_client,
         &rest_client,
         &network_identifier,
-        private_key_1,
-        AccountAddress::ONE,
-        20,
+        private_key_2,
+        Some(account_id_3),
+        Some(account_id_2),
+        Some(100000000000000),
+        Some(5),
         Duration::from_secs(5),
         None,
-        Some(100000),
-        Some(min_gas_price),
+        None,
+        None,
     )
     .await
-    .unwrap_err();
+    .expect("Should successfully create stake pool");
+
+    // TODO: Verify lockup time changes
+
+    // Reset lockup
+    reset_lockup_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_2,
+        Some(account_id_3),
+        Duration::from_secs(5),
+        None,
+        None,
+        None,
+    )
+    .await
+    .expect("Should successfully reset lockup");
 
     // Successfully, and fail setting a voter
     set_voter_and_wait(
@@ -925,7 +1003,7 @@ async fn test_block() {
     )
     .await
     .expect_err("Set voter shouldn't work with the wrong operator!");
-    let final_txn = set_voter_and_wait(
+    set_voter_and_wait(
         &rosetta_client,
         &rest_client,
         &network_identifier,
@@ -939,6 +1017,53 @@ async fn test_block() {
     )
     .await
     .expect("Set voter should work!");
+
+    // Unlock stake
+    unlock_stake_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_2,
+        Some(account_id_3),
+        Some(10),
+        Duration::from_secs(5),
+        None,
+        None,
+        None,
+    )
+    .await
+    .expect("Should successfully unlock stake");
+
+    // Failed distribution with wrong staker
+    distribute_staking_rewards_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_3,
+        account_id_2,
+        account_id_3,
+        Duration::from_secs(5),
+        None,
+        None,
+        None,
+    )
+    .await
+    .expect_err("Staker has no staking contracts.");
+
+    let final_txn = distribute_staking_rewards_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_3,
+        account_id_3,
+        account_id_2,
+        Duration::from_secs(5),
+        None,
+        None,
+        None,
+    )
+    .await
+    .expect("Distribute staking rewards should work!");
 
     let final_block_to_check = rest_client
         .get_block_by_version(final_txn.info.version.0, false)
@@ -1090,7 +1215,7 @@ async fn parse_block_transactions(
                     actual_txn.transaction,
                     aptos_types::transaction::Transaction::GenesisTransaction(_)
                 ));
-            }
+            },
             TransactionType::User => {
                 assert!(matches!(
                     actual_txn.transaction,
@@ -1098,21 +1223,21 @@ async fn parse_block_transactions(
                 ));
                 // Must have a gas fee
                 assert!(!transaction.operations.is_empty());
-            }
+            },
             TransactionType::BlockMetadata => {
                 assert!(matches!(
                     actual_txn.transaction,
                     aptos_types::transaction::Transaction::BlockMetadata(_)
                 ));
                 assert!(transaction.operations.is_empty());
-            }
+            },
             TransactionType::StateCheckpoint => {
                 assert!(matches!(
                     actual_txn.transaction,
                     aptos_types::transaction::Transaction::StateCheckpoint(_)
                 ));
                 assert!(transaction.operations.is_empty());
-            }
+            },
         }
 
         parse_operations(
@@ -1185,7 +1310,7 @@ async fn parse_operations(
                         "Failed transaction should have failed create account operation"
                     );
                 }
-            }
+            },
             OperationType::Deposit => {
                 let account = operation
                     .account
@@ -1211,8 +1336,10 @@ async fn parse_operations(
                         native_coin(),
                         "Balance should be the native coin"
                     );
-                    let delta =
-                        u64::parse(&amount.value).expect("Should be able to parse amount value");
+                    let delta = amount
+                        .value
+                        .parse::<u64>()
+                        .expect("Should be able to parse amount value");
 
                     // Add with panic on overflow in case of too high of a balance
                     let new_balance = *latest_balance + delta as i128;
@@ -1224,7 +1351,7 @@ async fn parse_operations(
                         "Failed transaction should have failed deposit operation"
                     );
                 }
-            }
+            },
             OperationType::Withdraw => {
                 // Gas is always successful
                 if actual_successful {
@@ -1251,13 +1378,12 @@ async fn parse_operations(
                         native_coin(),
                         "Balance should be the native coin"
                     );
-                    let delta = u64::parse(
-                        amount
-                            .value
-                            .strip_prefix('-')
-                            .expect("Should have a negative number"),
-                    )
-                    .expect("Should be able to parse amount value");
+                    let delta = amount
+                        .value
+                        .strip_prefix('-')
+                        .expect("Should have a negative number")
+                        .parse::<u64>()
+                        .expect("Should be able to parse amount value");
 
                     // Subtract with panic on overflow in case of a negative balance
                     let new_balance = *latest_balance - delta as i128;
@@ -1269,7 +1395,7 @@ async fn parse_operations(
                         "Failed transaction should have failed withdraw operation"
                     );
                 }
-            }
+            },
             OperationType::StakingReward => {
                 let account = operation
                     .account
@@ -1295,8 +1421,10 @@ async fn parse_operations(
                         native_coin(),
                         "Balance should be the native coin"
                     );
-                    let delta =
-                        u64::parse(&amount.value).expect("Should be able to parse amount value");
+                    let delta = amount
+                        .value
+                        .parse::<u64>()
+                        .expect("Should be able to parse amount value");
 
                     // Add with panic on overflow in case of too high of a balance
                     let new_balance = *latest_balance + delta as i128;
@@ -1308,7 +1436,7 @@ async fn parse_operations(
                         "Failed transaction should have failed stake reward operation"
                     );
                 }
-            }
+            },
             OperationType::SetOperator => {
                 if actual_successful {
                     assert_eq!(
@@ -1366,7 +1494,7 @@ async fn parse_operations(
                 } else {
                     panic!("Not a user transaction");
                 }
-            }
+            },
             OperationType::SetVoter => {
                 if actual_successful {
                     assert_eq!(
@@ -1408,7 +1536,7 @@ async fn parse_operations(
                 } else {
                     panic!("Not a user transaction");
                 }
-            }
+            },
             OperationType::Fee => {
                 has_gas_op = true;
                 assert_eq!(OperationStatusType::Success, status);
@@ -1434,13 +1562,12 @@ async fn parse_operations(
                     native_coin(),
                     "Balance should be the native coin"
                 );
-                let delta = u64::parse(
-                    amount
-                        .value
-                        .strip_prefix('-')
-                        .expect("Should have a negative number"),
-                )
-                .expect("Should be able to parse amount value");
+                let delta = amount
+                    .value
+                    .strip_prefix('-')
+                    .expect("Should have a negative number")
+                    .parse::<u64>()
+                    .expect("Should be able to parse amount value");
 
                 // Subtract with panic on overflow in case of a negative balance
                 let new_balance = *latest_balance - delta as i128;
@@ -1455,15 +1582,242 @@ async fn parse_operations(
                             delta,
                             "Gas operation should always match gas used * gas unit price"
                         )
-                    }
+                    },
                     _ => {
                         panic!("Gas transactions should be user transactions!")
-                    }
+                    },
                 };
-            }
+            },
+            OperationType::ResetLockup => {
+                if actual_successful {
+                    assert_eq!(
+                        OperationStatusType::Success,
+                        status,
+                        "Successful transaction should have successful reset lockup operation"
+                    );
+                } else {
+                    assert_eq!(
+                        OperationStatusType::Failure,
+                        status,
+                        "Failed transaction should have failed reset lockup operation"
+                    );
+                }
+
+                // Check that reset lockup was set the same
+                if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
+                    actual_txn.transaction
+                {
+                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
+                        ref payload,
+                    ) = txn.payload()
+                    {
+                        let actual_operator_address: AccountAddress =
+                            bcs::from_bytes(payload.args().first().unwrap()).unwrap();
+                        let operator = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .operator
+                            .as_ref()
+                            .unwrap()
+                            .account_address()
+                            .unwrap();
+                        assert_eq!(actual_operator_address, operator)
+                    } else {
+                        panic!("Not an entry function");
+                    }
+                } else {
+                    panic!("Not a user transaction");
+                }
+            },
             OperationType::InitializeStakePool => {
-                // This is not supported in block reads
-            }
+                if actual_successful {
+                    assert_eq!(
+                        OperationStatusType::Success,
+                        status,
+                        "Successful transaction should have successful initialize stake pool operation"
+                    );
+                } else {
+                    assert_eq!(
+                        OperationStatusType::Failure,
+                        status,
+                        "Failed transaction should have failed initialize stake pool operation"
+                    );
+                }
+
+                // Check that reset lockup was set the same
+                if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
+                    actual_txn.transaction
+                {
+                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
+                        ref payload,
+                    ) = txn.payload()
+                    {
+                        let actual_operator_address: AccountAddress =
+                            bcs::from_bytes(payload.args().get(0).unwrap()).unwrap();
+                        let operator = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .new_operator
+                            .as_ref()
+                            .unwrap()
+                            .account_address()
+                            .unwrap();
+                        assert_eq!(actual_operator_address, operator);
+
+                        let actual_voter_address: AccountAddress =
+                            bcs::from_bytes(payload.args().get(1).unwrap()).unwrap();
+                        let voter = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .new_voter
+                            .as_ref()
+                            .unwrap()
+                            .account_address()
+                            .unwrap();
+                        assert_eq!(actual_voter_address, voter);
+
+                        let actual_stake_amount: u64 =
+                            bcs::from_bytes(payload.args().get(2).unwrap()).unwrap();
+                        let stake = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .staked_balance
+                            .as_ref()
+                            .unwrap()
+                            .0;
+                        assert_eq!(actual_stake_amount, stake);
+
+                        let commission_percentage = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .commission_percentage
+                            .as_ref()
+                            .unwrap()
+                            .0;
+                        let actual_commission: u64 =
+                            bcs::from_bytes(payload.args().get(3).unwrap()).unwrap();
+                        assert_eq!(actual_commission, commission_percentage);
+                    } else {
+                        panic!("Not an entry function");
+                    }
+                } else {
+                    panic!("Not a user transaction");
+                }
+            },
+            OperationType::UnlockStake => {
+                if actual_successful {
+                    assert_eq!(
+                        OperationStatusType::Success,
+                        status,
+                        "Successful transaction should have successful unlock stake operation"
+                    );
+                } else {
+                    assert_eq!(
+                        OperationStatusType::Failure,
+                        status,
+                        "Failed transaction should have failed unlock stake operation"
+                    );
+                }
+
+                // Check that unlock stake was set the same
+                if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
+                    actual_txn.transaction
+                {
+                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
+                        ref payload,
+                    ) = txn.payload()
+                    {
+                        let actual_operator_address: AccountAddress =
+                            bcs::from_bytes(payload.args().first().unwrap()).unwrap();
+                        let operator = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .operator
+                            .as_ref()
+                            .unwrap()
+                            .account_address()
+                            .unwrap();
+                        assert_eq!(actual_operator_address, operator);
+
+                        let actual_amount: u64 =
+                            bcs::from_bytes(payload.args().get(1).unwrap()).unwrap();
+                        let amount = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .amount
+                            .as_ref()
+                            .unwrap()
+                            .0;
+                        assert_eq!(actual_amount, amount);
+                    } else {
+                        panic!("Not an entry function");
+                    }
+                } else {
+                    panic!("Not a user transaction");
+                }
+            },
+            OperationType::DistributeStakingRewards => {
+                if actual_successful {
+                    assert_eq!(
+                        OperationStatusType::Success,
+                        status,
+                        "Successful transaction should have successful distribute operation"
+                    );
+                } else {
+                    assert_eq!(
+                        OperationStatusType::Failure,
+                        status,
+                        "Failed transaction should have failed distribute operation"
+                    );
+                }
+
+                // Check that distribute was set the same
+                if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
+                    actual_txn.transaction
+                {
+                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
+                        ref payload,
+                    ) = txn.payload()
+                    {
+                        let actual_staker_address: AccountAddress =
+                            bcs::from_bytes(payload.args().first().unwrap()).unwrap();
+                        let staker = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .staker
+                            .as_ref()
+                            .unwrap()
+                            .account_address()
+                            .unwrap();
+                        assert_eq!(actual_staker_address, staker);
+
+                        let actual_operator_address: AccountAddress =
+                            bcs::from_bytes(payload.args().get(1).unwrap()).unwrap();
+                        let operator = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .operator
+                            .as_ref()
+                            .unwrap()
+                            .account_address()
+                            .unwrap();
+                        assert_eq!(actual_operator_address, operator);
+                    } else {
+                        panic!("Not an entry function");
+                    }
+                } else {
+                    panic!("Not a user transaction");
+                }
+            },
         }
     }
 
@@ -1510,8 +1864,10 @@ async fn check_balances(
             );
             assert_eq!(
                 expected_balance,
-                u64::parse(&balance.value).expect("Should have a balance from account balance")
-                    as i128,
+                balance
+                    .value
+                    .parse::<u64>()
+                    .expect("Should have a balance from account balance") as i128,
                 "Expected {} to have a balance of {}, but was {} at block {}",
                 account,
                 expected_balance,
@@ -1540,6 +1896,7 @@ async fn test_invalid_transaction_gas_charged() {
             Some(GasOptions {
                 gas_unit_price: None,
                 max_gas: Some(1000),
+                expiration_secs: 30,
             }),
         )
         .await
@@ -1624,11 +1981,11 @@ fn assert_failed_transfer_transaction(
                         receiver,
                         actual_txn.info.success,
                     );
-                }
+                },
                 OperationType::Withdraw => {
                     seen_withdraw = true;
                     assert_withdraw(operation, transfer_amount, sender, actual_txn.info.success);
-                }
+                },
                 _ => panic!("Shouldn't get any other operations"),
             }
         } else if !seen_deposit {
@@ -1878,6 +2235,136 @@ async fn set_voter_and_wait(
         .map_err(ErrorWrapper::AfterSubmission)
 }
 
+async fn create_stake_pool_and_wait(
+    rosetta_client: &RosettaClient,
+    rest_client: &aptos_rest_client::Client,
+    network_identifier: &NetworkIdentifier,
+    sender_key: &Ed25519PrivateKey,
+    operator: Option<AccountAddress>,
+    voter: Option<AccountAddress>,
+    stake_amount: Option<u64>,
+    commission_percentage: Option<u64>,
+    txn_expiry_duration: Duration,
+    sequence_number: Option<u64>,
+    max_gas: Option<u64>,
+    gas_unit_price: Option<u64>,
+) -> Result<Box<UserTransaction>, ErrorWrapper> {
+    let expiry_time = expiry_time(txn_expiry_duration);
+    let txn_hash = rosetta_client
+        .create_stake_pool(
+            network_identifier,
+            sender_key,
+            operator,
+            voter,
+            stake_amount,
+            commission_percentage,
+            expiry_time.as_secs(),
+            sequence_number,
+            max_gas,
+            gas_unit_price,
+        )
+        .await
+        .map_err(ErrorWrapper::BeforeSubmission)?
+        .hash;
+    wait_for_transaction(rest_client, expiry_time, txn_hash)
+        .await
+        .map_err(ErrorWrapper::AfterSubmission)
+}
+
+async fn reset_lockup_and_wait(
+    rosetta_client: &RosettaClient,
+    rest_client: &aptos_rest_client::Client,
+    network_identifier: &NetworkIdentifier,
+    sender_key: &Ed25519PrivateKey,
+    operator: Option<AccountAddress>,
+    txn_expiry_duration: Duration,
+    sequence_number: Option<u64>,
+    max_gas: Option<u64>,
+    gas_unit_price: Option<u64>,
+) -> Result<Box<UserTransaction>, ErrorWrapper> {
+    let expiry_time = expiry_time(txn_expiry_duration);
+    let txn_hash = rosetta_client
+        .reset_lockup(
+            network_identifier,
+            sender_key,
+            operator,
+            expiry_time.as_secs(),
+            sequence_number,
+            max_gas,
+            gas_unit_price,
+        )
+        .await
+        .map_err(ErrorWrapper::BeforeSubmission)?
+        .hash;
+    wait_for_transaction(rest_client, expiry_time, txn_hash)
+        .await
+        .map_err(ErrorWrapper::AfterSubmission)
+}
+
+async fn unlock_stake_and_wait(
+    rosetta_client: &RosettaClient,
+    rest_client: &aptos_rest_client::Client,
+    network_identifier: &NetworkIdentifier,
+    sender_key: &Ed25519PrivateKey,
+    operator: Option<AccountAddress>,
+    amount: Option<u64>,
+    txn_expiry_duration: Duration,
+    sequence_number: Option<u64>,
+    max_gas: Option<u64>,
+    gas_unit_price: Option<u64>,
+) -> Result<Box<UserTransaction>, ErrorWrapper> {
+    let expiry_time = expiry_time(txn_expiry_duration);
+    let txn_hash = rosetta_client
+        .unlock_stake(
+            network_identifier,
+            sender_key,
+            operator,
+            amount,
+            expiry_time.as_secs(),
+            sequence_number,
+            max_gas,
+            gas_unit_price,
+        )
+        .await
+        .map_err(ErrorWrapper::BeforeSubmission)?
+        .hash;
+    wait_for_transaction(rest_client, expiry_time, txn_hash)
+        .await
+        .map_err(ErrorWrapper::AfterSubmission)
+}
+
+async fn distribute_staking_rewards_and_wait(
+    rosetta_client: &RosettaClient,
+    rest_client: &aptos_rest_client::Client,
+    network_identifier: &NetworkIdentifier,
+    sender_key: &Ed25519PrivateKey,
+    operator: AccountAddress,
+    staker: AccountAddress,
+    txn_expiry_duration: Duration,
+    sequence_number: Option<u64>,
+    max_gas: Option<u64>,
+    gas_unit_price: Option<u64>,
+) -> Result<Box<UserTransaction>, ErrorWrapper> {
+    let expiry_time = expiry_time(txn_expiry_duration);
+    let txn_hash = rosetta_client
+        .distribute_staking_rewards(
+            network_identifier,
+            sender_key,
+            operator,
+            staker,
+            expiry_time.as_secs(),
+            sequence_number,
+            max_gas,
+            gas_unit_price,
+        )
+        .await
+        .map_err(ErrorWrapper::BeforeSubmission)?
+        .hash;
+    wait_for_transaction(rest_client, expiry_time, txn_hash)
+        .await
+        .map_err(ErrorWrapper::AfterSubmission)
+}
+
 async fn wait_for_transaction(
     rest_client: &aptos_rest_client::Client,
     expiry_time: Duration,
@@ -1899,7 +2386,7 @@ async fn wait_for_transaction(
             } else {
                 panic!("Transaction is supposed to be a UserTransaction!")
             }
-        }
+        },
         Err(_) => {
             if let Transaction::UserTransaction(txn) = rest_client
                 .get_transaction_by_hash(hash_value)
@@ -1911,7 +2398,7 @@ async fn wait_for_transaction(
             } else {
                 panic!("Failed transaction is supposed to be a UserTransaction!");
             }
-        }
+        },
     }
 }
 

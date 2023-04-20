@@ -1,13 +1,13 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::BTreeMap;
-
 use shadow_rs::{is_release, shadow};
+use std::collections::BTreeMap;
 
 /// Build information keys
 pub const BUILD_BRANCH: &str = "build_branch";
 pub const BUILD_CARGO_VERSION: &str = "build_cargo_version";
+pub const BUILD_CLEAN_CHECKOUT: &str = "build_clean_checkout";
 pub const BUILD_COMMIT_HASH: &str = "build_commit_hash";
 pub const BUILD_TAG: &str = "build_tag";
 pub const BUILD_TIME: &str = "build_time";
@@ -66,6 +66,7 @@ pub fn get_build_information() -> BTreeMap<String, String> {
     // access to the .git directory.
     build_information.insert(BUILD_BRANCH.into(), build::BRANCH.into());
     build_information.insert(BUILD_CARGO_VERSION.into(), build::CARGO_VERSION.into());
+    build_information.insert(BUILD_CLEAN_CHECKOUT.into(), build::GIT_CLEAN.to_string());
     build_information.insert(BUILD_COMMIT_HASH.into(), build::COMMIT_HASH.into());
     build_information.insert(BUILD_TAG.into(), build::TAG.into());
     build_information.insert(BUILD_TIME.into(), build::BUILD_TIME.into());

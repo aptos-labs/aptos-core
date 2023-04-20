@@ -1,16 +1,14 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::counters::{FETCHED_TRANSACTION, UNABLE_TO_FETCH_TRANSACTION};
 use aptos_api::Context;
 use aptos_api_types::{AsConverter, LedgerInfo, Transaction, TransactionOnChainData};
 use aptos_logger::prelude::*;
+use aptos_storage_interface::state_view::DbStateView;
 use aptos_vm::data_cache::StorageAdapterOwned;
-use futures::channel::mpsc;
-use futures::{SinkExt, StreamExt};
-use std::sync::Arc;
-use std::time::Duration;
-use storage_interface::state_view::DbStateView;
+use futures::{channel::mpsc, SinkExt};
+use std::{sync::Arc, time::Duration};
 use tokio::task::JoinHandle;
 
 // Default Values
@@ -48,7 +46,7 @@ impl Fetcher {
 
     pub fn set_highest_known_version(&mut self) -> anyhow::Result<()> {
         let info = self.context.get_latest_ledger_info_wrapped()?;
-        self.highest_known_version = info.ledger_version.0 as u64;
+        self.highest_known_version = info.ledger_version.0;
         self.chain_id = info.chain_id;
         Ok(())
     }
@@ -182,11 +180,8 @@ async fn fetch_raw_txns_with_retries(
 ) -> Vec<TransactionOnChainData> {
     let mut retries = 0;
     loop {
-        match context.get_transactions(
-            starting_version as u64,
-            num_transactions_to_fetch,
-            ledger_version as u64,
-        ) {
+        match context.get_transactions(starting_version, num_transactions_to_fetch, ledger_version)
+        {
             Ok(raw_txns) => return raw_txns,
             Err(err) => {
                 UNABLE_TO_FETCH_TRANSACTION.inc();
@@ -211,7 +206,7 @@ async fn fetch_raw_txns_with_retries(
                     );
                 }
                 tokio::time::sleep(Duration::from_millis(300)).await;
-            }
+            },
         }
     }
 }
@@ -235,7 +230,7 @@ async fn fetch_nexts(
 
     let (_, _, block_event) = context
         .db
-        .get_block_info_by_version(starting_version as u64)
+        .get_block_info_by_version(starting_version)
         .unwrap_or_else(|_| {
             panic!(
                 "Could not get block_info for start version {}",
@@ -257,9 +252,7 @@ async fn fetch_nexts(
         // Do not update block_height if first block is block metadata
         if ind > 0 {
             // Update the timestamp if the next block occurs
-            if let aptos_types::transaction::Transaction::BlockMetadata(ref txn) =
-                raw_txn.transaction
-            {
+            if let Some(txn) = raw_txn.transaction.try_as_block_metadata() {
                 timestamp = txn.timestamp_usecs();
                 epoch = txn.epoch();
                 epoch_bcs = aptos_api_types::U64::from(epoch);
@@ -273,23 +266,23 @@ async fn fetch_nexts(
                 match txn {
                     Transaction::PendingTransaction(_) => {
                         unreachable!("Indexer should never see pending transactions")
-                    }
+                    },
                     Transaction::UserTransaction(ref mut ut) => {
                         ut.info.block_height = Some(block_height_bcs);
                         ut.info.epoch = Some(epoch_bcs);
-                    }
+                    },
                     Transaction::GenesisTransaction(ref mut gt) => {
                         gt.info.block_height = Some(block_height_bcs);
                         gt.info.epoch = Some(epoch_bcs);
-                    }
+                    },
                     Transaction::BlockMetadataTransaction(ref mut bmt) => {
                         bmt.info.block_height = Some(block_height_bcs);
                         bmt.info.epoch = Some(epoch_bcs);
-                    }
+                    },
                     Transaction::StateCheckpointTransaction(ref mut sct) => {
                         sct.info.block_height = Some(block_height_bcs);
                         sct.info.epoch = Some(epoch_bcs);
-                    }
+                    },
                 };
                 txn
             }) {
@@ -307,7 +300,7 @@ async fn fetch_nexts(
                     "Could not convert txn {} from OnChainTransactions: {:?}",
                     txn_version, err
                 );
-            }
+            },
         }
     }
 
@@ -355,7 +348,7 @@ where
             } else {
                 v
             }
-        }
+        },
         None => default,
     }
 }
@@ -432,10 +425,16 @@ impl TransactionFetcher {
 impl TransactionFetcherTrait for TransactionFetcher {
     /// Fetches the next batch based on its internal version counter
     async fn fetch_next_batch(&mut self) -> Vec<Transaction> {
-        self.transaction_receiver
-            .next()
-            .await
-            .expect("No transactions, producer of batches died")
+        // try_next is nonblocking unlike next. It'll try to fetch the next one and return immediately.
+        match self.transaction_receiver.try_next() {
+            Ok(Some(transactions)) => transactions,
+            Ok(None) => {
+                // We never close the channel, so this should never happen
+                panic!("Transaction fetcher channel closed");
+            },
+            // The error here is when the channel is empty which we definitely expect.
+            Err(_) => vec![],
+        }
     }
 
     fn fetch_ledger_info(&mut self) -> LedgerInfo {
@@ -461,12 +460,8 @@ impl TransactionFetcherTrait for TransactionFetcher {
 
         let options2 = self.options.clone();
         let fetcher_handle = tokio::spawn(async move {
-            let mut fetcher = Fetcher::new(
-                context,
-                starting_version as u64,
-                options2,
-                transactions_sender,
-            );
+            let mut fetcher =
+                Fetcher::new(context, starting_version, options2, transactions_sender);
             fetcher.run().await;
         });
         self.fetcher_handle = Some(fetcher_handle);

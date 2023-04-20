@@ -1,21 +1,22 @@
 [package]
-name = "storage-service-client"
-version = "0.1.0"
-authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+name = "aptos-storage-service-client"
 description = "The Aptos storage service (client-side)"
-repository = "https://github.com/aptos-labs/aptos-core"
-homepage = "https://aptoslabs.com"
-license = "Apache-2.0"
-publish = false
-edition = "2021"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
 
 [dependencies]
-async-trait = "0.1.53"
-thiserror = "1.0.31"
-
-aptos-config = { path = "../../../config" }
-aptos-types = { path = "../../../types" }
-
-channel = { path = "../../../crates/channel" }
-network = { path = "../../../network" }
-storage-service-types = { path = "../types" }
+aptos-channels = { workspace = true }
+aptos-config = { workspace = true }
+aptos-network = { workspace = true }
+aptos-storage-service-types = { workspace = true }
+aptos-types = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }

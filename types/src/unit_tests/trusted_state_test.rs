@@ -1,8 +1,9 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::aggregate_signature::{AggregateSignature, PartialSignatures};
 use crate::{
+    aggregate_signature::{AggregateSignature, PartialSignatures},
     block_info::BlockInfo,
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,

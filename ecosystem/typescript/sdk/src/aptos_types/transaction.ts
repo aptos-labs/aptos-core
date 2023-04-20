@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 /* eslint-disable @typescript-eslint/naming-convention */
@@ -6,7 +6,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable max-classes-per-file */
 import { sha3_256 as sha3Hash } from "@noble/hashes/sha3";
-import { HexString } from "../hex_string";
+import { HexString } from "../utils";
 import {
   Deserializer,
   Serializer,
@@ -18,11 +18,13 @@ import {
   deserializeVector,
   serializeVector,
   bcsToBytes,
+  Uint16,
+  Uint256,
 } from "../bcs";
-import { AccountAddress } from "./account_address";
 import { TransactionAuthenticator } from "./authenticator";
 import { Identifier } from "./identifier";
 import { TypeTag } from "./type_tag";
+import { AccountAddress } from "./account_address";
 
 export class RawTransaction {
   /**
@@ -206,6 +208,65 @@ export class EntryFunction {
   }
 }
 
+export class MultiSigTransactionPayload {
+  /**
+   * Contains the payload to run a multisig account transaction.
+   * @param transaction_payload The payload of the multisig transaction. This can only be EntryFunction for now but
+   * Script might be supported in the future.
+   */
+  constructor(public readonly transaction_payload: EntryFunction) {}
+
+  serialize(serializer: Serializer): void {
+    // We can support multiple types of inner transaction payload in the future.
+    // For now it's only EntryFunction but if we support more types, we need to serialize with the right enum values
+    // here
+    serializer.serializeU32AsUleb128(0);
+    this.transaction_payload.serialize(serializer);
+  }
+
+  static deserialize(deserializer: Deserializer): MultiSigTransactionPayload {
+    // TODO: Support other types of payload beside EntryFunction.
+    // This is the enum value indicating which type of payload the multisig tx contains.
+    deserializer.deserializeUleb128AsU32();
+    return new MultiSigTransactionPayload(EntryFunction.deserialize(deserializer));
+  }
+}
+
+export class MultiSig {
+  /**
+   * Contains the payload to run a multisig account transaction.
+   * @param multisig_address The multisig account address the transaction will be executed as.
+   * @param transaction_payload The payload of the multisig transaction. This is optional when executing a multisig
+   *  transaction whose payload is already stored on chain.
+   */
+  constructor(
+    public readonly multisig_address: AccountAddress,
+    public readonly transaction_payload?: MultiSigTransactionPayload,
+  ) {}
+
+  serialize(serializer: Serializer): void {
+    this.multisig_address.serialize(serializer);
+    // Options are encoded with an extra u8 field before the value - 0x0 is none and 0x1 is present.
+    // We use serializeBool below to create this prefix value.
+    if (this.transaction_payload === undefined) {
+      serializer.serializeBool(false);
+    } else {
+      serializer.serializeBool(true);
+      this.transaction_payload.serialize(serializer);
+    }
+  }
+
+  static deserialize(deserializer: Deserializer): MultiSig {
+    const multisig_address = AccountAddress.deserialize(deserializer);
+    const payloadPresent = deserializer.deserializeBool();
+    let transaction_payload;
+    if (payloadPresent) {
+      transaction_payload = MultiSigTransactionPayload.deserialize(deserializer);
+    }
+    return new MultiSig(multisig_address, transaction_payload);
+  }
+}
+
 export class Module {
   /**
    * Contains the bytecode of a Move module that can be published to the Aptos chain.
@@ -351,6 +412,8 @@ export abstract class TransactionPayload {
       // TODO: change to 1 once ModuleBundle has been removed from rust
       case 2:
         return TransactionPayloadEntryFunction.load(deserializer);
+      case 3:
+        return TransactionPayloadMultisig.load(deserializer);
       default:
         throw new Error(`Unknown variant index for TransactionPayload: ${index}`);
     }
@@ -389,6 +452,22 @@ export class TransactionPayloadEntryFunction extends TransactionPayload {
   }
 }
 
+export class TransactionPayloadMultisig extends TransactionPayload {
+  constructor(public readonly value: MultiSig) {
+    super();
+  }
+
+  serialize(serializer: Serializer): void {
+    serializer.serializeU32AsUleb128(3);
+    this.value.serialize(serializer);
+  }
+
+  static load(deserializer: Deserializer): TransactionPayloadMultisig {
+    const value = MultiSig.deserialize(deserializer);
+    return new TransactionPayloadMultisig(value);
+  }
+}
+
 export class ChainId {
   constructor(public readonly value: Uint8) {}
 
@@ -420,6 +499,12 @@ export abstract class TransactionArgument {
         return TransactionArgumentU8Vector.load(deserializer);
       case 5:
         return TransactionArgumentBool.load(deserializer);
+      case 6:
+        return TransactionArgumentU16.load(deserializer);
+      case 7:
+        return TransactionArgumentU32.load(deserializer);
+      case 8:
+        return TransactionArgumentU256.load(deserializer);
       default:
         throw new Error(`Unknown variant index for TransactionArgument: ${index}`);
     }
@@ -439,6 +524,38 @@ export class TransactionArgumentU8 extends TransactionArgument {
   static load(deserializer: Deserializer): TransactionArgumentU8 {
     const value = deserializer.deserializeU8();
     return new TransactionArgumentU8(value);
+  }
+}
+
+export class TransactionArgumentU16 extends TransactionArgument {
+  constructor(public readonly value: Uint16) {
+    super();
+  }
+
+  serialize(serializer: Serializer): void {
+    serializer.serializeU32AsUleb128(6);
+    serializer.serializeU16(this.value);
+  }
+
+  static load(deserializer: Deserializer): TransactionArgumentU16 {
+    const value = deserializer.deserializeU16();
+    return new TransactionArgumentU16(value);
+  }
+}
+
+export class TransactionArgumentU32 extends TransactionArgument {
+  constructor(public readonly value: Uint16) {
+    super();
+  }
+
+  serialize(serializer: Serializer): void {
+    serializer.serializeU32AsUleb128(7);
+    serializer.serializeU32(this.value);
+  }
+
+  static load(deserializer: Deserializer): TransactionArgumentU32 {
+    const value = deserializer.deserializeU32();
+    return new TransactionArgumentU32(value);
   }
 }
 
@@ -471,6 +588,22 @@ export class TransactionArgumentU128 extends TransactionArgument {
   static load(deserializer: Deserializer): TransactionArgumentU128 {
     const value = deserializer.deserializeU128();
     return new TransactionArgumentU128(value);
+  }
+}
+
+export class TransactionArgumentU256 extends TransactionArgument {
+  constructor(public readonly value: Uint256) {
+    super();
+  }
+
+  serialize(serializer: Serializer): void {
+    serializer.serializeU32AsUleb128(8);
+    serializer.serializeU256(this.value);
+  }
+
+  static load(deserializer: Deserializer): TransactionArgumentU256 {
+    const value = deserializer.deserializeU256();
+    return new TransactionArgumentU256(value);
   }
 }
 

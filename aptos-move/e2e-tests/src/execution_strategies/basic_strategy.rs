@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -14,6 +15,7 @@ pub struct BasicStrategy;
 
 impl PartitionStrategy for BasicStrategy {
     type Txn = SignedTransaction;
+
     fn partition(&mut self, block: Block<Self::Txn>) -> Vec<Block<SignedTransaction>> {
         vec![block]
     }
@@ -41,8 +43,9 @@ impl BasicExecutor {
 }
 
 impl Executor for BasicExecutor {
-    type Txn = <BasicStrategy as PartitionStrategy>::Txn;
     type BlockResult = VMStatus;
+    type Txn = <BasicStrategy as PartitionStrategy>::Txn;
+
     fn execute_block(&mut self, txns: Block<Self::Txn>) -> ExecutorResult<Self::BlockResult> {
         let mut block = self.strategy.partition(txns);
         let outputs = self.executor.execute_block(block.remove(0))?;

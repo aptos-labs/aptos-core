@@ -104,7 +104,7 @@ module shared_account::SharedAccount {
         initialize(&user, seed, addresses, numerators);
 
         assert!(exists<SharedAccountEvent>(user_addr), error::not_found(EACCOUNT_NOT_FOUND));
-        *&borrow_global<SharedAccountEvent>(user_addr).resource_addr
+        borrow_global<SharedAccountEvent>(user_addr).resource_addr
     }
 
     #[test(user = @0x1111, test_user1 = @0x1112, test_user2 = @0x1113, core_framework = @aptos_framework)]

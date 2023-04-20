@@ -1,12 +1,13 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::BTreeMap;
-
-use crate::algebra::{AbstractValueSize, AbstractValueSizePerArg};
-use crate::gas_meter::{FromOnChainGasSchedule, InitialGasSchedule, ToOnChainGasSchedule};
-use move_core_types::{account_address::AccountAddress, gas_algebra::NumArgs};
+use crate::{
+    algebra::{AbstractValueSize, AbstractValueSizePerArg},
+    gas_meter::{FromOnChainGasSchedule, InitialGasSchedule, ToOnChainGasSchedule},
+};
+use move_core_types::{account_address::AccountAddress, gas_algebra::NumArgs, u256::U256};
 use move_vm_types::views::{ValueView, ValueVisitor};
+use std::collections::BTreeMap;
 
 crate::params::define_gas_parameters!(
     AbstractValueSizeGasParameters,
@@ -14,20 +15,26 @@ crate::params::define_gas_parameters!(
     [
         // abstract value size
         [u8: AbstractValueSize, "u8", 40],
+        [u16: AbstractValueSize, { 5.. => "u16" }, 40],
+        [u32: AbstractValueSize, { 5.. => "u32" }, 40],
         [u64: AbstractValueSize, "u64", 40],
         [u128: AbstractValueSize, "u128", 40],
+        [u256: AbstractValueSize, { 5.. => "u256" }, 40],
         [bool: AbstractValueSize, "bool", 40],
         [address: AbstractValueSize, "address", 40],
         [struct_: AbstractValueSize, "struct", 40],
         [vector: AbstractValueSize, "vector", 40],
         [reference: AbstractValueSize, "reference", 40],
         [per_u8_packed: AbstractValueSizePerArg, "per_u8_packed", 1],
+        [per_u16_packed: AbstractValueSizePerArg, { 5.. => "per_u16_packed" }, 2],
+        [per_u32_packed: AbstractValueSizePerArg, { 5.. => "per_u32_packed" }, 4],
         [per_u64_packed: AbstractValueSizePerArg, "per_u64_packed", 8],
         [
             per_u128_packed: AbstractValueSizePerArg,
             "per_u128_packed",
             16
         ],
+        [per_u256_packed: AbstractValueSizePerArg, { 5.. => "per_u256_packed" }, 32],
         [
             per_bool_packed: AbstractValueSizePerArg,
             "per_bool_packed",
@@ -79,8 +86,11 @@ where
 {
     deref_visitor_delegate_simple!(
         [visit_u8, u8],
+        [visit_u16, u16],
+        [visit_u32, u32],
         [visit_u64, u64],
         [visit_u128, u128],
+        [visit_u256, U256],
         [visit_bool, bool],
         [visit_address, AccountAddress],
         [visit_vec_u8, &[u8]],
@@ -135,6 +145,16 @@ impl<'a> ValueVisitor for AbstractValueSizeVisitor<'a> {
     }
 
     #[inline]
+    fn visit_u16(&mut self, _depth: usize, _val: u16) {
+        self.size += self.params.u16
+    }
+
+    #[inline]
+    fn visit_u32(&mut self, _depth: usize, _val: u32) {
+        self.size += self.params.u32
+    }
+
+    #[inline]
     fn visit_u64(&mut self, _depth: usize, _val: u64) {
         self.size += self.params.u64;
     }
@@ -142,6 +162,11 @@ impl<'a> ValueVisitor for AbstractValueSizeVisitor<'a> {
     #[inline]
     fn visit_u128(&mut self, _depth: usize, _val: u128) {
         self.size += self.params.u128;
+    }
+
+    #[inline]
+    fn visit_u256(&mut self, _depth: usize, _val: U256) {
+        self.size += self.params.u256
     }
 
     #[inline]
@@ -176,6 +201,18 @@ impl<'a> ValueVisitor for AbstractValueSizeVisitor<'a> {
     }
 
     #[inline]
+    fn visit_vec_u16(&mut self, _depth: usize, vals: &[u16]) {
+        self.size +=
+            self.params.vector + self.params.per_u16_packed * NumArgs::new(vals.len() as u64);
+    }
+
+    #[inline]
+    fn visit_vec_u32(&mut self, _depth: usize, vals: &[u32]) {
+        self.size +=
+            self.params.vector + self.params.per_u32_packed * NumArgs::new(vals.len() as u64);
+    }
+
+    #[inline]
     fn visit_vec_u64(&mut self, _depth: usize, vals: &[u64]) {
         let mut size = self.params.per_u64_packed * NumArgs::new(vals.len() as u64);
         if self.feature_version >= 3 {
@@ -191,6 +228,12 @@ impl<'a> ValueVisitor for AbstractValueSizeVisitor<'a> {
             size += self.params.vector;
         }
         self.size += size;
+    }
+
+    #[inline]
+    fn visit_vec_u256(&mut self, _depth: usize, vals: &[U256]) {
+        self.size +=
+            self.params.vector + self.params.per_u256_packed * NumArgs::new(vals.len() as u64);
     }
 
     #[inline]
@@ -262,6 +305,16 @@ impl AbstractValueSizeGasParameters {
             }
 
             #[inline]
+            fn visit_u16(&mut self, _depth: usize, _val: u16) {
+                self.res = Some(self.params.u16);
+            }
+
+            #[inline]
+            fn visit_u32(&mut self, _depth: usize, _val: u32) {
+                self.res = Some(self.params.u32);
+            }
+
+            #[inline]
             fn visit_u64(&mut self, _depth: usize, _val: u64) {
                 self.res = Some(self.params.u64);
             }
@@ -269,6 +322,11 @@ impl AbstractValueSizeGasParameters {
             #[inline]
             fn visit_u128(&mut self, _depth: usize, _val: u128) {
                 self.res = Some(self.params.u128);
+            }
+
+            #[inline]
+            fn visit_u256(&mut self, _depth: usize, _val: U256) {
+                self.res = Some(self.params.u256);
             }
 
             #[inline]
@@ -311,6 +369,16 @@ impl AbstractValueSizeGasParameters {
             }
 
             #[inline]
+            fn visit_vec_u16(&mut self, depth: usize, vals: &[u16]) {
+                self.visit_vec(depth, vals.len());
+            }
+
+            #[inline]
+            fn visit_vec_u32(&mut self, depth: usize, vals: &[u32]) {
+                self.visit_vec(depth, vals.len());
+            }
+
+            #[inline]
             fn visit_vec_u64(&mut self, depth: usize, vals: &[u64]) {
                 if self.feature_version < 3 {
                     self.res = Some(0.into());
@@ -326,6 +394,11 @@ impl AbstractValueSizeGasParameters {
                 } else {
                     self.visit_vec(depth, vals.len());
                 }
+            }
+
+            #[inline]
+            fn visit_vec_u256(&mut self, depth: usize, vals: &[U256]) {
+                self.visit_vec(depth, vals.len());
             }
 
             #[inline]
@@ -369,6 +442,16 @@ impl AbstractValueSizeGasParameters {
             }
 
             #[inline]
+            fn visit_u16(&mut self, _depth: usize, _val: u16) {
+                self.res = Some(self.params.per_u16_packed * NumArgs::from(1));
+            }
+
+            #[inline]
+            fn visit_u32(&mut self, _depth: usize, _val: u32) {
+                self.res = Some(self.params.per_u32_packed * NumArgs::from(1));
+            }
+
+            #[inline]
             fn visit_u64(&mut self, _depth: usize, _val: u64) {
                 self.res = Some(self.params.per_u64_packed * NumArgs::from(1));
             }
@@ -376,6 +459,11 @@ impl AbstractValueSizeGasParameters {
             #[inline]
             fn visit_u128(&mut self, _depth: usize, _val: u128) {
                 self.res = Some(self.params.per_u128_packed * NumArgs::from(1));
+            }
+
+            #[inline]
+            fn visit_u256(&mut self, _depth: usize, _val: U256) {
+                self.res = Some(self.params.per_u256_packed * NumArgs::from(1));
             }
 
             #[inline]
@@ -416,12 +504,26 @@ impl AbstractValueSizeGasParameters {
             }
 
             #[inline]
+            fn visit_vec_u16(&mut self, depth: usize, vals: &[u16]) {
+                self.visit_vec(depth, vals.len());
+            }
+
+            #[inline]
+            fn visit_vec_u32(&mut self, depth: usize, vals: &[u32]) {
+                self.visit_vec(depth, vals.len());
+            }
+
+            #[inline]
             fn visit_vec_u64(&mut self, depth: usize, vals: &[u64]) {
                 self.visit_vec(depth, vals.len());
             }
 
             #[inline]
             fn visit_vec_u128(&mut self, depth: usize, vals: &[u128]) {
+                self.visit_vec(depth, vals.len());
+            }
+
+            fn visit_vec_u256(&mut self, depth: usize, vals: &[U256]) {
                 self.visit_vec(depth, vals.len());
             }
 
@@ -475,16 +577,22 @@ pub struct MiscGasParameters {
 }
 
 impl FromOnChainGasSchedule for MiscGasParameters {
-    fn from_on_chain_gas_schedule(gas_schedule: &BTreeMap<String, u64>) -> Option<Self> {
+    fn from_on_chain_gas_schedule(
+        gas_schedule: &BTreeMap<String, u64>,
+        feature_version: u64,
+    ) -> Option<Self> {
         Some(Self {
-            abs_val: FromOnChainGasSchedule::from_on_chain_gas_schedule(gas_schedule)?,
+            abs_val: FromOnChainGasSchedule::from_on_chain_gas_schedule(
+                gas_schedule,
+                feature_version,
+            )?,
         })
     }
 }
 
 impl ToOnChainGasSchedule for MiscGasParameters {
-    fn to_on_chain_gas_schedule(&self) -> Vec<(String, u64)> {
-        self.abs_val.to_on_chain_gas_schedule()
+    fn to_on_chain_gas_schedule(&self, feature_version: u64) -> Vec<(String, u64)> {
+        self.abs_val.to_on_chain_gas_schedule(feature_version)
     }
 }
 

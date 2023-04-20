@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -17,13 +18,13 @@ use crate::{
     test_utils::consensus_runtime,
 };
 use aptos_crypto::HashValue;
-use aptos_types::aggregate_signature::AggregateSignature;
+use aptos_safety_rules::Error;
 use aptos_types::{
+    aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     validator_signer::ValidatorSigner,
 };
-use safety_rules::Error;
 
 pub fn prepare_signing_pipeline(
     signing_phase: SigningPhase,
@@ -50,7 +51,7 @@ fn add_signing_phase_test_cases(
         prepare_executed_blocks_with_ordered_ledger_info(&signers[0]);
     let commit_ledger_info = LedgerInfo::new(
         vecblocks.last().unwrap().block_info(),
-        HashValue::from_u64(0xbeef),
+        HashValue::from_u64(0xBEEF),
     );
 
     // happy path
@@ -67,7 +68,7 @@ fn add_signing_phase_test_cases(
 
     let (_, executed_ledger_info) = prepare_executed_blocks_with_executed_ledger_info(&signers[0]);
     let inconsistent_commit_ledger_info =
-        LedgerInfo::new(BlockInfo::random(1), HashValue::from_u64(0xbeef));
+        LedgerInfo::new(BlockInfo::random(1), HashValue::from_u64(0xBEEF));
 
     // inconsistent
     phase_tester.add_test_case(

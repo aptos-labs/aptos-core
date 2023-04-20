@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module provides an API for the PureEdDSA signature scheme over the Ed25519 twisted
@@ -39,7 +39,7 @@ pub const ED25519_SIGNATURE_LENGTH: usize = ed25519_dalek::SIGNATURE_LENGTH;
 
 /// The order of ed25519 as defined in [RFC8032](https://tools.ietf.org/html/rfc8032).
 const L: [u8; 32] = [
-    0xed, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58, 0xd6, 0x9c, 0xf7, 0xa2, 0xde, 0xf9, 0xde, 0x14,
+    0xED, 0xD3, 0xF5, 0x5C, 0x1A, 0x63, 0x12, 0x58, 0xD6, 0x9C, 0xF7, 0xA2, 0xDE, 0xF9, 0xDE, 0x14,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10,
 ];
 
@@ -48,10 +48,8 @@ pub mod ed25519_sigs;
 
 #[cfg(any(test, feature = "fuzzing"))]
 pub use ed25519_keys::keypair_strategy;
-
-pub use ed25519_keys::{Ed25519PrivateKey, Ed25519PublicKey};
-pub use ed25519_sigs::Ed25519Signature;
-
-pub use ed25519_keys::Ed25519PrivateKey as PrivateKey;
-pub use ed25519_keys::Ed25519PublicKey as PublicKey;
-pub use ed25519_sigs::Ed25519Signature as Signature;
+pub use ed25519_keys::{
+    Ed25519PrivateKey, Ed25519PrivateKey as PrivateKey, Ed25519PublicKey,
+    Ed25519PublicKey as PublicKey,
+};
+pub use ed25519_sigs::{Ed25519Signature, Ed25519Signature as Signature};

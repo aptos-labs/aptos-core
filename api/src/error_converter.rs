@@ -1,10 +1,11 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_api_types::mime_types::JSON;
-use aptos_api_types::{AptosError, AptosErrorCode};
-use poem::http::header::{HeaderValue, CONTENT_TYPE};
-use poem::{IntoResponse, Response};
+use aptos_api_types::{mime_types::JSON, AptosError, AptosErrorCode};
+use poem::{
+    http::header::{HeaderValue, CONTENT_TYPE},
+    IntoResponse, Response,
+};
 use poem_openapi::payload::Json;
 
 // The way I'm determining which errors are framework errors is very janky, as

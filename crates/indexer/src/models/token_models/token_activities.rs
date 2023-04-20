@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 // This is required because a diesel macro makes clippy sad
@@ -41,6 +41,7 @@ pub struct TokenActivity {
     pub coin_amount: Option<BigDecimal>,
     pub collection_data_id_hash: String,
     pub transaction_timestamp: chrono::NaiveDateTime,
+    pub event_index: Option<i64>,
 }
 
 /// A simplified TokenActivity (excluded common fields) to reduce code duplication
@@ -58,20 +59,21 @@ impl TokenActivity {
     pub fn from_transaction(transaction: &APITransaction) -> Vec<Self> {
         let mut token_activities = vec![];
         if let APITransaction::UserTransaction(user_txn) = transaction {
-            for event in &user_txn.events {
+            for (index, event) in user_txn.events.iter().enumerate() {
                 let txn_version = user_txn.info.version.0 as i64;
                 let event_type = event.typ.to_string();
-                match TokenEvent::from_event(event_type.as_str(), &event.data, txn_version).unwrap()
+                if let Some(token_event) =
+                    TokenEvent::from_event(event_type.as_str(), &event.data, txn_version).unwrap()
                 {
-                    Some(token_event) => token_activities.push(Self::from_parsed_event(
+                    token_activities.push(Self::from_parsed_event(
                         &event_type,
                         event,
                         &token_event,
                         txn_version,
                         parse_timestamp(user_txn.timestamp.0, txn_version),
-                    )),
-                    None => {}
-                };
+                        index as i64,
+                    ))
+                }
             }
         }
         token_activities
@@ -83,6 +85,7 @@ impl TokenActivity {
         token_event: &TokenEvent,
         txn_version: i64,
         txn_timestamp: chrono::NaiveDateTime,
+        event_index: i64,
     ) -> Self {
         let event_account_address = standardize_address(&event.guid.account_address.to_string());
         let event_creation_number = event.guid.creation_number.0 as i64;
@@ -180,6 +183,7 @@ impl TokenActivity {
             coin_type: token_activity_helper.coin_type,
             coin_amount: token_activity_helper.coin_amount,
             transaction_timestamp: txn_timestamp,
+            event_index: Some(event_index),
         }
     }
 }

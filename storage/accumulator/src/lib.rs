@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -277,7 +278,7 @@ where
                     Some((x, left_hash)) => {
                         assert_eq!(x, sibling);
                         Self::hash_internal_node(left_hash, hash)
-                    }
+                    },
                     None => Self::hash_internal_node(self.reader.get(sibling)?, hash),
                 };
                 pos = pos.parent();
@@ -291,7 +292,7 @@ where
         // placeholder hash nodes as needed on the right, and left siblings that have either
         // been newly created or read from storage.
         let (mut pos, mut hash) = left_siblings.pop().expect("Must have at least one node");
-        for _ in pos.level()..root_level as u32 {
+        for _ in pos.level()..root_level {
             hash = if pos.is_left_child() {
                 Self::hash_internal_node(hash, *ACCUMULATOR_PLACEHOLDER_HASH)
             } else {
@@ -300,7 +301,7 @@ where
                     Some((x, left_hash)) => {
                         assert_eq!(x, sibling);
                         Self::hash_internal_node(left_hash, hash)
-                    }
+                    },
                     None => Self::hash_internal_node(self.reader.get(sibling)?, hash),
                 }
             };
@@ -328,7 +329,7 @@ where
     }
 
     fn rightmost_leaf_index(&self) -> u64 {
-        (self.num_leaves - 1) as u64
+        self.num_leaves - 1
     }
 
     fn get_hash(&self, position: Position) -> Result<HashValue> {
@@ -357,7 +358,7 @@ where
     /// implementation for pub interface `MerkleAccumulator::get_proof`
     fn get_proof(&self, leaf_index: u64) -> Result<AccumulatorProof<H>> {
         ensure!(
-            leaf_index < self.num_leaves as u64,
+            leaf_index < self.num_leaves,
             "invalid leaf_index {}, num_leaves {}",
             leaf_index,
             self.num_leaves
@@ -422,7 +423,7 @@ where
             .checked_add(num_leaves - 1)
             .ok_or_else(|| format_err!("Requesting too many leaves."))?;
         ensure!(
-            last_leaf_index < self.num_leaves as u64,
+            last_leaf_index < self.num_leaves,
             "Invalid last_leaf_index: {}, num_leaves: {}",
             last_leaf_index,
             self.num_leaves,

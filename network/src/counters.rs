@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::protocols::wire::handshake::v1::ProtocolId;
@@ -7,10 +8,10 @@ use aptos_metrics_core::{
     register_histogram_vec, register_int_counter_vec, register_int_gauge, register_int_gauge_vec,
     Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
 };
+use aptos_netcore::transport::ConnectionOrigin;
+use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::PeerId;
-use netcore::transport::ConnectionOrigin;
 use once_cell::sync::Lazy;
-use short_hex_str::AsShortHexStr;
 
 // some type labels
 pub const REQUEST_LABEL: &str = "request";
@@ -156,11 +157,13 @@ pub static APTOS_NETWORK_DISCOVERY_NOTES: Lazy<IntGaugeVec> = Lazy::new(|| {
 });
 
 pub static APTOS_NETWORK_RPC_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
-    register_int_counter_vec!(
-        "aptos_network_rpc_messages",
-        "Number of RPC messages",
-        &["role_type", "network_id", "peer_id", "type", "state"]
-    )
+    register_int_counter_vec!("aptos_network_rpc_messages", "Number of RPC messages", &[
+        "role_type",
+        "network_id",
+        "peer_id",
+        "type",
+        "state"
+    ])
     .unwrap()
 });
 

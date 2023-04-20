@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -11,14 +12,14 @@ use crate::{
     testutils::fake_socket::ReadOnlyTestSocketVec,
     transport::{Connection, ConnectionId, ConnectionMetadata},
 };
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{config::PeerRole, network_id::NetworkContext};
+use aptos_memsocket::MemorySocket;
+use aptos_netcore::transport::ConnectionOrigin;
 use aptos_proptest_helpers::ValueGenerator;
 use aptos_time_service::TimeService;
 use aptos_types::{network_address::NetworkAddress, PeerId};
-use channel::{aptos_channel, message_queues::QueueStyle};
 use futures::{executor::block_on, future, io::AsyncReadExt, sink::SinkExt, stream::StreamExt};
-use memsocket::MemorySocket;
-use netcore::transport::ConnectionOrigin;
 use proptest::{arbitrary::any, collection::vec};
 use std::time::Duration;
 
@@ -28,7 +29,7 @@ pub fn generate_corpus(gen: &mut ValueGenerator) -> Vec<u8> {
     let network_msgs = gen.generate(vec(any::<MultiplexMessage>(), 1..20));
 
     let (write_socket, mut read_socket) = MemorySocket::new_pair();
-    let mut writer = MultiplexMessageSink::new(write_socket, constants::MAX_FRAME_SIZE, None);
+    let mut writer = MultiplexMessageSink::new(write_socket, constants::MAX_FRAME_SIZE);
 
     // Write the `MultiplexMessage`s to a fake socket
     let f_send = async move {
@@ -87,7 +88,7 @@ pub fn fuzz(data: &[u8]) {
     );
     let connection = Connection { socket, metadata };
 
-    let (connection_notifs_tx, connection_notifs_rx) = channel::new_test(8);
+    let (connection_notifs_tx, connection_notifs_rx) = aptos_channels::new_test(8);
     let channel_size = 8;
 
     let (peer_reqs_tx, peer_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, channel_size, None);
@@ -107,8 +108,6 @@ pub fn fuzz(data: &[u8]) {
         constants::MAX_CONCURRENT_OUTBOUND_RPCS,
         constants::MAX_FRAME_SIZE,
         constants::MAX_MESSAGE_SIZE,
-        None,
-        None,
     );
     executor.spawn(peer.start());
 

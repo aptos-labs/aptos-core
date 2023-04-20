@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module implements the functionality to restore a `JellyfishMerkleTree` from small chunks
@@ -26,8 +27,14 @@ use aptos_types::{
     transaction::Version,
 };
 use itertools::Itertools;
-use std::sync::mpsc::{channel, Receiver};
-use std::{cmp::Eq, collections::HashMap, sync::Arc};
+use std::{
+    cmp::Eq,
+    collections::HashMap,
+    sync::{
+        mpsc::{channel, Receiver},
+        Arc,
+    },
+};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum ChildInfo<K> {
@@ -176,7 +183,7 @@ where
     ) -> Result<Self> {
         let tree_reader = Arc::clone(&store);
         let (finished, partial_nodes, previous_leaf) = if let Some(root_node) =
-            tree_reader.get_node_option(&NodeKey::new_empty_path(version))?
+            tree_reader.get_node_option(&NodeKey::new_empty_path(version), "restore")?
         {
             info!("Previous restore is complete, checking root hash.");
             ensure!(
@@ -238,7 +245,7 @@ where
     pub fn previous_key_hash(&self) -> Option<HashValue> {
         if self.finished {
             // Hack: prevent any chunk to be added.
-            Some(HashValue::new([0xff; HashValue::LENGTH]))
+            Some(HashValue::new([0xFF; HashValue::LENGTH]))
         } else {
             self.previous_leaf.as_ref().map(|leaf| leaf.account_key())
         }
@@ -261,7 +268,7 @@ where
         // is not a partial node. Go to the parent node and repeat until we see a node that does
         // not exist. This node and all its ancestors will be the partial nodes.
         let mut node_key = rightmost_leaf_node_key.gen_parent_node_key();
-        while store.get_node_option(&node_key)?.is_some() {
+        while store.get_node_option(&node_key, "restore")?.is_some() {
             node_key = node_key.gen_parent_node_key();
         }
 
@@ -279,7 +286,7 @@ where
 
             for i in 0..previous_child_index.unwrap_or(16) {
                 let child_node_key = node_key.gen_child_node_key(version, (i as u8).into());
-                if let Some(node) = store.get_node_option(&child_node_key)? {
+                if let Some(node) = store.get_node_option(&child_node_key, "restore")? {
                     let child_info = match node {
                         Node::Internal(internal_node) => ChildInfo::Internal {
                             hash: Some(internal_node.hash()),
@@ -297,13 +304,10 @@ where
             // partial node and we do not know its hash yet. For the lowest partial node, we just
             // find all its known children from storage in the loop above.
             if let Some(index) = previous_child_index {
-                internal_info.set_child(
-                    index,
-                    ChildInfo::Internal {
-                        hash: None,
-                        leaf_count: None,
-                    },
-                );
+                internal_info.set_child(index, ChildInfo::Internal {
+                    hash: None,
+                    leaf_count: None,
+                });
             }
 
             partial_nodes.push(internal_info);
@@ -339,7 +343,7 @@ where
                 None => {
                     info!("Skipping entire chunk.");
                     return Ok(());
-                }
+                },
                 Some((0, _)) => chunk,
                 Some((num_to_skip, next_leaf)) => {
                     info!(
@@ -348,7 +352,7 @@ where
                         "Skipping leaves."
                     );
                     chunk.split_off(num_to_skip)
-                }
+                },
             }
         };
         if chunk.is_empty() {
@@ -429,7 +433,7 @@ where
                         );
                         break;
                     }
-                }
+                },
                 None => {
                     // This means that we are going to put a leaf in this position. For all the
                     // descendants on the left, they are now frozen.
@@ -448,7 +452,7 @@ where
                     // We do not add this leaf node to self.frozen_nodes because we don't know its
                     // node key yet. We will know its node key when the next account comes.
                     break;
-                }
+                },
             }
         }
     }
@@ -488,13 +492,10 @@ where
             let new_node_key = NodeKey::new(self.version, visited_nibbles);
 
             let mut internal_info = InternalInfo::new_empty(new_node_key);
-            internal_info.set_child(
-                u8::from(next_nibble) as usize,
-                ChildInfo::Internal {
-                    hash: None,
-                    leaf_count: None,
-                },
-            );
+            internal_info.set_child(u8::from(next_nibble) as usize, ChildInfo::Internal {
+                hash: None,
+                leaf_count: None,
+            });
             self.partial_nodes.push(internal_info);
         }
 
@@ -566,7 +567,7 @@ where
                     .gen_child_node_key(self.version, (rightmost_child_index as u8).into());
                 self.frozen_nodes
                     .insert(child_node_key, node.clone().into());
-            }
+            },
             _ => panic!("Must have at least one child and must not have further internal nodes."),
         }
     }
@@ -600,7 +601,7 @@ where
                     }) => {
                         assert_eq!(hash.replace(node_hash), None);
                         assert_eq!(leaf_count.replace(node_leaf_count), None);
-                    }
+                    },
                     _ => panic!(
                         "Must have at least one child and the rightmost child must not be a leaf."
                     ),
@@ -701,7 +702,7 @@ where
             match &children[0] {
                 Some(ChildInfo::Internal { hash, .. }) => {
                     (*hash.as_ref().expect("The hash must be known."), false)
-                }
+                },
                 Some(ChildInfo::Leaf(node)) => (node.hash(), true),
                 None => (*SPARSE_MERKLE_PLACEHOLDER_HASH, true),
             }
@@ -755,7 +756,7 @@ where
                     self.frozen_nodes.insert(node_key, Node::Null);
                     self.store.write_node_batch(&self.frozen_nodes)?;
                     return Ok(());
-                }
+                },
                 1 => {
                     if let Some(node) = leaf {
                         let node_key = NodeKey::new_empty_path(self.version);
@@ -764,7 +765,7 @@ where
                         self.store.write_node_batch(&self.frozen_nodes)?;
                         return Ok(());
                     }
-                }
+                },
                 _ => (),
             }
         }

@@ -1,36 +1,35 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     access_path_cache::AccessPathCache,
-    counters::*,
-    data_cache::StorageAdapter,
+    data_cache::{MoveResolverWithVMMetadata, StorageAdapter},
     errors::{convert_epilogue_error, convert_prologue_error, expect_only_successful_execution},
-    logging::AdapterLogSchema,
     move_vm_ext::{MoveResolverExt, MoveVmExt, SessionExt, SessionId},
+    system_module_names::{MULTISIG_ACCOUNT_MODULE, VALIDATE_MULTISIG_TRANSACTION},
     transaction_metadata::TransactionMetadata,
 };
 use aptos_aggregator::transaction::TransactionOutputExt;
+use aptos_framework::RuntimeModuleMetadataV1;
 use aptos_gas::{
-    AbstractValueSizeGasParameters, AptosGasParameters, FromOnChainGasSchedule, Gas,
-    NativeGasParameters, StorageGasParameters,
+    AbstractValueSizeGasParameters, AptosGasParameters, ChangeSetConfigs, FromOnChainGasSchedule,
+    Gas, NativeGasParameters, StorageGasParameters,
 };
-use aptos_logger::prelude::*;
+use aptos_logger::{enabled, prelude::*, Level};
 use aptos_state_view::StateView;
-use aptos_types::on_chain_config::{FeatureFlag, Features};
-use aptos_types::transaction::AbortInfo;
 use aptos_types::{
     account_config::{TransactionValidation, APTOS_TRANSACTION_VALIDATION, CORE_CODE_ADDRESS},
+    chain_id::ChainId,
     on_chain_config::{
-        ApprovedExecutionHashes, GasSchedule, GasScheduleV2, OnChainConfig, StorageGasSchedule,
-        Version,
+        ApprovedExecutionHashes, ConfigurationResource, FeatureFlag, Features, GasSchedule,
+        GasScheduleV2, OnChainConfig, StorageGasSchedule, TimedFeatures, Version,
     },
-    transaction::{ExecutionStatus, TransactionOutput, TransactionStatus},
+    transaction::{AbortInfo, ExecutionStatus, Multisig, TransactionOutput, TransactionStatus},
     vm_status::{StatusCode, VMStatus},
 };
-use dashmap::DashMap;
+use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use fail::fail_point;
-use framework::{RuntimeModuleMetadata, APTOS_METADATA_KEY};
 use move_binary_format::{errors::VMResult, CompiledModule};
 use move_core_types::{
     language_storage::ModuleId,
@@ -53,7 +52,7 @@ pub struct AptosVMImpl {
     storage_gas_params: Option<StorageGasParameters>,
     version: Option<Version>,
     transaction_validation: Option<TransactionValidation>,
-    metadata_cache: DashMap<ModuleId, Option<RuntimeModuleMetadata>>,
+    features: Features,
 }
 
 impl AptosVMImpl {
@@ -68,36 +67,53 @@ impl AptosVMImpl {
                     let feature_version = gas_schedule.feature_version;
                     let map = gas_schedule.to_btree_map();
                     (
-                        AptosGasParameters::from_on_chain_gas_schedule(&map),
+                        AptosGasParameters::from_on_chain_gas_schedule(&map, feature_version),
                         feature_version,
                     )
-                }
+                },
                 None => match GasSchedule::fetch_config(&storage) {
                     Some(gas_schedule) => {
                         let map = gas_schedule.to_btree_map();
-                        (AptosGasParameters::from_on_chain_gas_schedule(&map), 0)
-                    }
+                        (AptosGasParameters::from_on_chain_gas_schedule(&map, 0), 0)
+                    },
                     None => (None, 0),
                 },
             };
 
-        let storage_gas_params: Option<StorageGasParameters> = match gas_feature_version {
+        let storage_gas_schedule = match gas_feature_version {
             0 => None,
-            _ => StorageGasSchedule::fetch_config(&storage)
-                .map(|storage_gas_schedule| storage_gas_schedule.into()),
+            _ => StorageGasSchedule::fetch_config(&storage),
         };
 
-        if gas_feature_version >= 2 {
-            if let (Some(gas_params), Some(storage_gas_params)) =
-                (&mut gas_params, &storage_gas_params)
-            {
-                gas_params.natives.table.common.load_base =
-                    u64::from(storage_gas_params.per_item_read).into();
-                gas_params.natives.table.common.load_per_byte =
-                    u64::from(storage_gas_params.per_byte_read).into();
-                gas_params.natives.table.common.load_failure = 0.into();
+        if let (Some(gas_params), Some(storage_gas_schedule)) =
+            (&mut gas_params, &storage_gas_schedule)
+        {
+            match gas_feature_version {
+                2..=6 => {
+                    gas_params.natives.table.common.load_base_legacy =
+                        storage_gas_schedule.per_item_read.into();
+                    gas_params.natives.table.common.load_base_new = 0.into();
+                    gas_params.natives.table.common.load_per_byte =
+                        storage_gas_schedule.per_byte_read.into();
+                    gas_params.natives.table.common.load_failure = 0.into();
+                },
+                7.. => {
+                    gas_params.natives.table.common.load_base_legacy = 0.into();
+                    gas_params.natives.table.common.load_base_new =
+                        storage_gas_schedule.per_item_read.into();
+                    gas_params.natives.table.common.load_per_byte =
+                        storage_gas_schedule.per_byte_read.into();
+                    gas_params.natives.table.common.load_failure = 0.into();
+                },
+                _ => (),
             }
         }
+
+        let storage_gas_params = StorageGasParameters::new(
+            gas_feature_version,
+            gas_params.as_ref(),
+            storage_gas_schedule.as_ref(),
+        );
 
         // TODO(Gas): Right now, we have to use some dummy values for gas parameters if they are not found on-chain.
         //            This only happens in a edge case that is probably related to write set transactions or genesis,
@@ -112,11 +128,26 @@ impl AptosVMImpl {
         };
 
         let features = Features::fetch_config(&storage).unwrap_or_default();
+
+        // If no chain ID is in storage, we assume we are in a testing environment and use ChainId::TESTING
+        let chain_id = ChainId::fetch_config(&storage).unwrap_or_else(ChainId::test);
+
+        let timestamp = ConfigurationResource::fetch_config(&storage)
+            .map(|config| config.last_reconfiguration_time())
+            .unwrap_or(0);
+
+        let mut timed_features = TimedFeatures::new(chain_id, timestamp);
+        if let Some(profile) = crate::AptosVM::get_timed_feature_override() {
+            timed_features = timed_features.with_override_profile(profile)
+        }
+
         let inner = MoveVmExt::new(
             native_gas_params,
             abs_val_size_gas_params,
             gas_feature_version,
-            features.is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+            chain_id.id(),
+            features.clone(),
+            timed_features,
         )
         .expect("should be able to create Move VM; check if there are duplicated natives");
 
@@ -127,7 +158,7 @@ impl AptosVMImpl {
             storage_gas_params,
             version: None,
             transaction_validation: None,
-            metadata_cache: Default::default(),
+            features,
         };
         vm.version = Version::fetch_config(&storage);
         vm.transaction_validation = Self::get_transaction_validation(&StorageAdapter::new(state));
@@ -167,27 +198,25 @@ impl AptosVMImpl {
         log_context: &AdapterLogSchema,
     ) -> Result<&AptosGasParameters, VMStatus> {
         self.gas_params.as_ref().ok_or_else(|| {
-            log_context.alert();
-            error!(*log_context, "VM Startup Failed. Gas Parameters Not Found");
-            VMStatus::Error(StatusCode::VM_STARTUP_FAILURE)
+            speculative_error!(
+                log_context,
+                "VM Startup Failed. Gas Parameters Not Found".into()
+            );
+            VMStatus::Error(StatusCode::VM_STARTUP_FAILURE, None)
         })
     }
 
     pub fn get_storage_gas_parameters(
         &self,
         log_context: &AdapterLogSchema,
-    ) -> Result<Option<&StorageGasParameters>, VMStatus> {
-        match self.gas_feature_version {
-            0 => Ok(None),
-            _ => Ok(Some(self.storage_gas_params.as_ref().ok_or_else(|| {
-                log_context.alert();
-                error!(
-                    *log_context,
-                    "VM Startup Failed. Storage Gas Parameters Not Found"
-                );
-                VMStatus::Error(StatusCode::VM_STARTUP_FAILURE)
-            })?)),
-        }
+    ) -> Result<&StorageGasParameters, VMStatus> {
+        self.storage_gas_params.as_ref().ok_or_else(|| {
+            speculative_error!(
+                log_context,
+                "VM Startup Failed. Storage Gas Parameters Not Found".into()
+            );
+            VMStatus::Error(StatusCode::VM_STARTUP_FAILURE, None)
+        })
     }
 
     pub fn get_gas_feature_version(&self) -> u64 {
@@ -196,10 +225,13 @@ impl AptosVMImpl {
 
     pub fn get_version(&self) -> Result<Version, VMStatus> {
         self.version.clone().ok_or_else(|| {
-            CRITICAL_ERRORS.inc();
-            error!("VM Startup Failed. Version Not Found");
-            VMStatus::Error(StatusCode::VM_STARTUP_FAILURE)
+            alert!("VM Startup Failed. Version Not Found");
+            VMStatus::Error(StatusCode::VM_STARTUP_FAILURE, None)
         })
+    }
+
+    pub fn get_features(&self) -> &Features {
+        &self.features
     }
 
     pub fn check_gas<S: MoveResolverExt>(
@@ -240,13 +272,17 @@ impl AptosVMImpl {
             };
 
             if !valid {
-                warn!(
-                    *log_context,
-                    "[VM] Transaction size too big {} (max {})",
-                    raw_bytes_len,
-                    txn_gas_params.max_transaction_size_in_bytes,
+                speculative_warn!(
+                    log_context,
+                    format!(
+                        "[VM] Transaction size too big {} (max {})",
+                        raw_bytes_len, txn_gas_params.max_transaction_size_in_bytes
+                    ),
                 );
-                return Err(VMStatus::Error(StatusCode::EXCEEDED_MAX_TRANSACTION_SIZE));
+                return Err(VMStatus::Error(
+                    StatusCode::EXCEEDED_MAX_TRANSACTION_SIZE,
+                    None,
+                ));
             }
         }
 
@@ -254,14 +290,17 @@ impl AptosVMImpl {
         // maximum number of gas units bound that we have set for any
         // transaction.
         if txn_data.max_gas_amount() > txn_gas_params.maximum_number_of_gas_units {
-            warn!(
-                *log_context,
-                "[VM] Gas unit error; max {}, submitted {}",
-                txn_gas_params.maximum_number_of_gas_units,
-                txn_data.max_gas_amount(),
+            speculative_warn!(
+                log_context,
+                format!(
+                    "[VM] Gas unit error; max {}, submitted {}",
+                    txn_gas_params.maximum_number_of_gas_units,
+                    txn_data.max_gas_amount()
+                ),
             );
             return Err(VMStatus::Error(
                 StatusCode::MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND,
+                None,
             ));
         }
 
@@ -273,14 +312,17 @@ impl AptosVMImpl {
             .to_unit_round_up_with_params(txn_gas_params);
 
         if txn_data.max_gas_amount() < intrinsic_gas {
-            warn!(
-                *log_context,
-                "[VM] Gas unit error; min {}, submitted {}",
-                intrinsic_gas,
-                txn_data.max_gas_amount(),
+            speculative_warn!(
+                log_context,
+                format!(
+                    "[VM] Gas unit error; min {}, submitted {}",
+                    intrinsic_gas,
+                    txn_data.max_gas_amount()
+                ),
             );
             return Err(VMStatus::Error(
                 StatusCode::MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS,
+                None,
             ));
         }
 
@@ -290,24 +332,34 @@ impl AptosVMImpl {
         #[allow(clippy::absurd_extreme_comparisons)]
         let below_min_bound = txn_data.gas_unit_price() < txn_gas_params.min_price_per_gas_unit;
         if below_min_bound {
-            warn!(
-                *log_context,
-                "[VM] Gas unit error; min {}, submitted {}",
-                txn_gas_params.min_price_per_gas_unit,
-                txn_data.gas_unit_price(),
+            speculative_warn!(
+                log_context,
+                format!(
+                    "[VM] Gas unit error; min {}, submitted {}",
+                    txn_gas_params.min_price_per_gas_unit,
+                    txn_data.gas_unit_price()
+                ),
             );
-            return Err(VMStatus::Error(StatusCode::GAS_UNIT_PRICE_BELOW_MIN_BOUND));
+            return Err(VMStatus::Error(
+                StatusCode::GAS_UNIT_PRICE_BELOW_MIN_BOUND,
+                None,
+            ));
         }
 
         // The submitted gas price is greater than the maximum gas unit price set by the VM.
         if txn_data.gas_unit_price() > txn_gas_params.max_price_per_gas_unit {
-            warn!(
-                *log_context,
-                "[VM] Gas unit error; min {}, submitted {}",
-                txn_gas_params.max_price_per_gas_unit,
-                txn_data.gas_unit_price(),
+            speculative_warn!(
+                log_context,
+                format!(
+                    "[VM] Gas unit error; min {}, submitted {}",
+                    txn_gas_params.max_price_per_gas_unit,
+                    txn_data.gas_unit_price()
+                ),
             );
-            return Err(VMStatus::Error(StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND));
+            return Err(VMStatus::Error(
+                StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND,
+                None,
+            ));
         }
         Ok(())
     }
@@ -415,6 +467,44 @@ impl AptosVMImpl {
             .or_else(|err| convert_prologue_error(transaction_validation, err, log_context))
     }
 
+    /// Run the prologue for a multisig transaction. This needs to verify that:
+    /// 1. The the multisig tx exists
+    /// 2. It has received enough approvals to meet the signature threshold of the multisig account
+    /// 3. If only the payload hash was stored on chain, the provided payload in execution should
+    /// match that hash.
+    pub(crate) fn run_multisig_prologue<S: MoveResolverExt>(
+        &self,
+        session: &mut SessionExt<S>,
+        txn_data: &TransactionMetadata,
+        payload: &Multisig,
+        log_context: &AdapterLogSchema,
+    ) -> Result<(), VMStatus> {
+        let transaction_validation = self.transaction_validation();
+        let unreachable_error = VMStatus::Error(StatusCode::UNREACHABLE, None);
+        let provided_payload = if let Some(payload) = &payload.transaction_payload {
+            bcs::to_bytes(&payload).map_err(|_| unreachable_error.clone())?
+        } else {
+            // Default to empty bytes if payload is not provided.
+            bcs::to_bytes::<Vec<u8>>(&vec![]).map_err(|_| unreachable_error)?
+        };
+
+        session
+            .execute_function_bypass_visibility(
+                &MULTISIG_ACCOUNT_MODULE,
+                VALIDATE_MULTISIG_TRANSACTION,
+                vec![],
+                serialize_values(&vec![
+                    MoveValue::Signer(txn_data.sender),
+                    MoveValue::Address(payload.multisig_address),
+                    MoveValue::vector_u8(provided_payload),
+                ]),
+                &mut UnmeteredGasMeter,
+            )
+            .map(|_return_vals| ())
+            .map_err(expect_no_verification_errors)
+            .or_else(|err| convert_prologue_error(transaction_validation, err, log_context))
+    }
+
     /// Run the epilogue of a transaction by calling into `EPILOGUE_NAME` function stored
     /// in the `ACCOUNT_MODULE` on chain.
     pub(crate) fn run_success_epilogue<S: MoveResolverExt>(
@@ -427,6 +517,7 @@ impl AptosVMImpl {
         fail_point!("move_adapter::run_success_epilogue", |_| {
             Err(VMStatus::Error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                None,
             ))
         });
 
@@ -498,24 +589,29 @@ impl AptosVMImpl {
         module: &ModuleId,
         abort_code: u64,
     ) -> Option<AbortInfo> {
-        let entry = self
-            .metadata_cache
-            .entry(module.clone())
-            .or_insert_with(|| {
-                if let Some(m) = self
-                    .move_vm
-                    .get_module_metadata(module.clone(), &APTOS_METADATA_KEY)
-                {
-                    bcs::from_bytes::<RuntimeModuleMetadata>(&m.value).ok()
-                } else {
-                    None
-                }
-            });
-        if let Some(m) = entry.value() {
+        if let Some(m) = self.extract_module_metadata(module) {
             m.extract_abort_info(abort_code)
         } else {
             None
         }
+    }
+
+    pub(crate) fn extract_module_metadata(
+        &self,
+        module: &ModuleId,
+    ) -> Option<RuntimeModuleMetadataV1> {
+        if self.features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6) {
+            aptos_framework::get_vm_metadata(&self.move_vm, module.clone())
+        } else {
+            aptos_framework::get_vm_metadata_v0(&self.move_vm, module.clone())
+        }
+    }
+
+    pub fn new_move_resolver<'r, R: MoveResolverExt>(
+        &self,
+        r: &'r R,
+    ) -> MoveResolverWithVMMetadata<'r, '_, R> {
+        MoveResolverWithVMMetadata::new(r, &self.move_vm)
     }
 
     pub fn new_session<'r, R: MoveResolverExt>(
@@ -523,7 +619,6 @@ impl AptosVMImpl {
         r: &'r R,
         session_id: SessionId,
     ) -> SessionExt<'r, '_, R> {
-        self.metadata_cache.clear();
         self.move_vm.new_session(r, session_id)
     }
 
@@ -562,22 +657,6 @@ impl<'a> AptosVMInternals<'a> {
     pub fn version(self) -> Result<Version, VMStatus> {
         self.0.get_version()
     }
-
-    /// Executes the given code within the context of a transaction.
-    ///
-    /// The `TransactionDataCache` can be used as a `ChainState`.
-    ///
-    /// If you don't care about the transaction metadata, use `TransactionMetadata::default()`.
-    pub fn with_txn_data_cache<T, S: StateView>(
-        self,
-        state_view: &S,
-        f: impl for<'txn, 'r> FnOnce(SessionExt<'txn, 'r, StorageAdapter<S>>) -> T,
-        session_id: SessionId,
-    ) -> T {
-        let remote_storage = StorageAdapter::new(state_view);
-        let session = self.move_vm().new_session(&remote_storage, session_id);
-        f(session)
-    }
 }
 
 pub(crate) fn get_transaction_output<A: AccessPathCache, S: MoveResolverExt>(
@@ -586,15 +665,16 @@ pub(crate) fn get_transaction_output<A: AccessPathCache, S: MoveResolverExt>(
     gas_left: Gas,
     txn_data: &TransactionMetadata,
     status: ExecutionStatus,
-    gas_feature_version: u64,
+    change_set_configs: &ChangeSetConfigs,
 ) -> Result<TransactionOutputExt, VMStatus> {
     let gas_used = txn_data
         .max_gas_amount()
         .checked_sub(gas_left)
         .expect("Balance should always be less than or equal to max gas amount");
 
-    let session_out = session.finish().map_err(|e| e.into_vm_status())?;
-    let change_set_ext = session_out.into_change_set(ap_cache, gas_feature_version)?;
+    let change_set_ext = session
+        .finish(ap_cache, change_set_configs)
+        .map_err(|e| e.into_vm_status())?;
     let (delta_change_set, change_set) = change_set_ext.into_inner();
     let (write_set, events) = change_set.into_inner();
 

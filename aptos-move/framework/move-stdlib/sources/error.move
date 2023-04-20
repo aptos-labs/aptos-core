@@ -66,8 +66,7 @@ module std::error {
   }
   spec canonical {
     pragma opaque = true;
-    // TODO: `<<` has different meanings in code and spec in case of overvlow.
-    let shl_res = (category * 65536) % 18446744073709551616; // (category << 16)
+    let shl_res = category << 16;
     ensures [concrete] result == shl_res + reason;
     aborts_if [abstract] false;
     ensures [abstract] result == category;

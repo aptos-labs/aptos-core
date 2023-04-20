@@ -10,13 +10,13 @@ resource "random_string" "validator-dns" {
 }
 
 locals {
-  record_name = replace(var.record_name, "<workspace>", terraform.workspace)
+  record_name = replace(var.record_name, "<workspace>", local.workspace_name)
 }
 
 data "kubernetes_service" "validator-lb" {
   count = var.zone_name != "" ? 1 : 0
   metadata {
-    name = "${terraform.workspace}-aptos-node-validator-lb"
+    name = "${local.workspace_name}-aptos-node-validator-lb"
   }
   depends_on = [time_sleep.lb_creation]
 }
@@ -24,7 +24,7 @@ data "kubernetes_service" "validator-lb" {
 data "kubernetes_service" "fullnode-lb" {
   count = var.zone_name != "" ? 1 : 0
   metadata {
-    name = "${terraform.workspace}-aptos-node-fullnode-lb"
+    name = "${local.workspace_name}-aptos-node-fullnode-lb"
   }
   depends_on = [time_sleep.lb_creation]
 }

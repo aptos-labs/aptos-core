@@ -1,7 +1,7 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-import { HexString, MaybeHexString } from "../hex_string";
+import { HexString, MaybeHexString } from "../utils";
 import { Serializer, Deserializer, Bytes } from "../bcs";
 
 export class AccountAddress {
@@ -45,6 +45,37 @@ export class AccountAddress {
     res.set(addressBytes, AccountAddress.LENGTH - addressBytes.length);
 
     return new AccountAddress(res);
+  }
+
+  /**
+   * Checks if the string is a valid AccountAddress
+   * @param addr Hex string can be with a prefix or without a prefix,
+   *   e.g. '0x1aa' or '1aa'. Hex string will be left padded with 0s if too short.
+   */
+  static isValid(addr: MaybeHexString): boolean {
+    // At least one zero is required
+    if (addr === "") {
+      return false;
+    }
+
+    let address = HexString.ensure(addr);
+
+    // If an address hex has odd number of digits, padd the hex string with 0
+    // e.g. '1aa' would become '01aa'.
+    if (address.noPrefix().length % 2 !== 0) {
+      address = new HexString(`0${address.noPrefix()}`);
+    }
+
+    const addressBytes = address.toUint8Array();
+
+    return addressBytes.length <= AccountAddress.LENGTH;
+  }
+
+  /**
+   * Return a hex string from account Address.
+   */
+  toHexString(): MaybeHexString {
+    return HexString.fromUint8Array(this.address).hex();
   }
 
   serialize(serializer: Serializer): void {

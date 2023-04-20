@@ -1,9 +1,13 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! Aptos is a one stop tool for operations, debugging, and other operations with the blockchain
 
 #![forbid(unsafe_code)]
+
+#[cfg(unix)]
+#[global_allocator]
+static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 use aptos::{move_tool, Tool};
 use clap::Parser;
@@ -22,6 +26,6 @@ async fn main() {
         Err(inner) => {
             println!("{}", inner);
             exit(1);
-        }
+        },
     }
 }

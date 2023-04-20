@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -121,20 +122,24 @@ impl EpochChangeProof {
 #[cfg(any(test, feature = "fuzzing"))]
 impl Arbitrary for EpochChangeProof {
     type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
         (vec(any::<LedgerInfoWithSignatures>(), 0..10), any::<bool>())
             .prop_map(|(ledger_infos_with_sigs, more)| Self::new(ledger_infos_with_sigs, more))
             .boxed()
     }
-
-    type Strategy = BoxedStrategy<Self>;
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::aggregate_signature::{AggregateSignature, PartialSignatures};
-    use crate::{block_info::BlockInfo, epoch_state::EpochState, waypoint::Waypoint};
+    use crate::{
+        aggregate_signature::{AggregateSignature, PartialSignatures},
+        block_info::BlockInfo,
+        epoch_state::EpochState,
+        waypoint::Waypoint,
+    };
 
     #[test]
     fn verify_epoch_change_proof() {

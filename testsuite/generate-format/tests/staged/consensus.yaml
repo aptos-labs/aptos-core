@@ -38,6 +38,48 @@ AggregateSignatureWithRounds:
         TYPENAME: AggregateSignature
     - rounds:
         SEQ: U64
+Batch:
+  STRUCT:
+    - batch_info:
+        TYPENAME: BatchInfo
+    - payload:
+        TYPENAME: BatchPayload
+BatchId:
+  STRUCT:
+    - id: U64
+    - nonce: U64
+BatchInfo:
+  STRUCT:
+    - author:
+        TYPENAME: AccountAddress
+    - batch_id:
+        TYPENAME: BatchId
+    - epoch: U64
+    - expiration: U64
+    - digest:
+        TYPENAME: HashValue
+    - num_txns: U64
+    - num_bytes: U64
+    - gas_bucket_start: U64
+BatchMsg:
+  STRUCT:
+    - batches:
+        SEQ:
+          TYPENAME: Batch
+BatchPayload:
+  STRUCT:
+    - author:
+        TYPENAME: AccountAddress
+    - txns:
+        SEQ:
+          TYPENAME: SignedTransaction
+BatchRequest:
+  STRUCT:
+    - epoch: U64
+    - source:
+        TYPENAME: AccountAddress
+    - digest:
+        TYPENAME: HashValue
 BitVec:
   STRUCT:
     - inner: BYTES
@@ -190,6 +232,26 @@ ConsensusMsg:
       CommitDecisionMsg:
         NEWTYPE:
           TYPENAME: CommitDecision
+    9:
+      BatchMsg:
+        NEWTYPE:
+          TYPENAME: BatchMsg
+    10:
+      BatchRequestMsg:
+        NEWTYPE:
+          TYPENAME: BatchRequest
+    11:
+      BatchResponse:
+        NEWTYPE:
+          TYPENAME: Batch
+    12:
+      SignedBatchInfo:
+        NEWTYPE:
+          TYPENAME: SignedBatchInfoMsg
+    13:
+      ProofOfStoreMsg:
+        NEWTYPE:
+          TYPENAME: ProofOfStoreMsg
 ContractEvent:
   ENUM:
     0:
@@ -283,6 +345,19 @@ MultiEd25519PublicKey:
   NEWTYPESTRUCT: BYTES
 MultiEd25519Signature:
   NEWTYPESTRUCT: BYTES
+Multisig:
+  STRUCT:
+    - multisig_address:
+        TYPENAME: AccountAddress
+    - transaction_payload:
+        OPTION:
+          TYPENAME: MultisigTransactionPayload
+MultisigTransactionPayload:
+  ENUM:
+    0:
+      EntryFunction:
+        NEWTYPE:
+          TYPENAME: EntryFunction
 Payload:
   ENUM:
     0:
@@ -290,6 +365,26 @@ Payload:
         NEWTYPE:
           SEQ:
             TYPENAME: SignedTransaction
+    1:
+      InQuorumStore:
+        NEWTYPE:
+          TYPENAME: ProofWithData
+ProofOfStore:
+  STRUCT:
+    - info:
+        TYPENAME: BatchInfo
+    - multi_signature:
+        TYPENAME: AggregateSignature
+ProofOfStoreMsg:
+  STRUCT:
+    - proofs:
+        SEQ:
+          TYPENAME: ProofOfStore
+ProofWithData:
+  STRUCT:
+    - proofs:
+        SEQ:
+          TYPENAME: ProofOfStore
 ProposalMsg:
   STRUCT:
     - proposal:
@@ -327,6 +422,19 @@ Script:
           TYPENAME: TransactionArgument
 Signature:
   NEWTYPESTRUCT: BYTES
+SignedBatchInfo:
+  STRUCT:
+    - info:
+        TYPENAME: BatchInfo
+    - signer:
+        TYPENAME: AccountAddress
+    - signature:
+        TYPENAME: Signature
+SignedBatchInfoMsg:
+  STRUCT:
+    - signed_infos:
+        SEQ:
+          TYPENAME: SignedBatchInfo
 SignedTransaction:
   STRUCT:
     - raw_txn:
@@ -348,6 +456,15 @@ StateKey:
     2:
       Raw:
         NEWTYPE: BYTES
+StateValueMetadata:
+  ENUM:
+    0:
+      V0:
+        STRUCT:
+          - payer:
+              TYPENAME: AccountAddress
+          - deposit: U64
+          - creation_time_usecs: U64
 StructTag:
   STRUCT:
     - address:
@@ -413,6 +530,18 @@ TransactionArgument:
     5:
       Bool:
         NEWTYPE: BOOL
+    6:
+      U16:
+        NEWTYPE: U16
+    7:
+      U32:
+        NEWTYPE: U32
+    8:
+      U256:
+        NEWTYPE:
+          TUPLEARRAY:
+            CONTENT: U8
+            SIZE: 32
 TransactionAuthenticator:
   ENUM:
     0:
@@ -454,6 +583,10 @@ TransactionPayload:
       EntryFunction:
         NEWTYPE:
           TYPENAME: EntryFunction
+    3:
+      Multisig:
+        NEWTYPE:
+          TYPENAME: Multisig
 TwoChainTimeout:
   STRUCT:
     - epoch: U64
@@ -488,6 +621,12 @@ TypeTag:
       struct:
         NEWTYPE:
           TYPENAME: StructTag
+    8:
+      u16: UNIT
+    9:
+      u32: UNIT
+    10:
+      u256: UNIT
 ValidatorConsensusInfo:
   STRUCT:
     - address:
@@ -537,6 +676,23 @@ WriteOp:
         NEWTYPE: BYTES
     2:
       Deletion: UNIT
+    3:
+      CreationWithMetadata:
+        STRUCT:
+          - data: BYTES
+          - metadata:
+              TYPENAME: StateValueMetadata
+    4:
+      ModificationWithMetadata:
+        STRUCT:
+          - data: BYTES
+          - metadata:
+              TYPENAME: StateValueMetadata
+    5:
+      DeletionWithMetadata:
+        STRUCT:
+          - metadata:
+              TYPENAME: StateValueMetadata
 WriteSet:
   ENUM:
     0:

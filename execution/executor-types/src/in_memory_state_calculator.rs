@@ -1,27 +1,27 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::HashMap;
-
-use anyhow::{anyhow, bail, Result};
-use once_cell::sync::Lazy;
-
 use crate::{ParsedTransactionOutput, ProofReader};
+use anyhow::{anyhow, bail, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree};
 use aptos_state_view::account_with_state_cache::AsAccountWithStateCache;
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
+use aptos_storage_interface::{cached_state_view::StateCache, state_delta::StateDelta};
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     account_view::AccountView,
     epoch_state::EpochState,
     event::EventKey,
     on_chain_config,
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{
+        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+    },
     transaction::{Transaction, Version},
-    write_set::{WriteOp, WriteSet},
+    write_set::{TransactionWrite, WriteOp, WriteSet},
 };
-use scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree};
-use storage_interface::{cached_state_view::StateCache, state_delta::StateDelta};
+use dashmap::DashMap;
+use once_cell::sync::Lazy;
+use std::collections::HashMap;
 
 pub static NEW_EPOCH_EVENT_KEY: Lazy<EventKey> = Lazy::new(on_chain_config::new_epoch_event_key);
 
@@ -46,7 +46,7 @@ pub struct InMemoryStateCalculator {
     proof_reader: ProofReader,
 
     //// These changes every time a new txn is added to the calculator.
-    state_cache: HashMap<StateKey, Option<StateValue>>,
+    state_cache: DashMap<StateKey, Option<StateValue>>,
     next_version: Version,
     updates_after_latest: HashMap<StateKey, Option<StateValue>>,
     usage: StateStorageUsage,
@@ -102,8 +102,9 @@ impl InMemoryStateCalculator {
         StateDelta,
         Option<EpochState>,
     )> {
-        let mut state_updates_vec = Vec::new();
-        let mut state_checkpoint_hashes = Vec::new();
+        let num_txns = to_keep.len();
+        let mut state_updates_vec = Vec::with_capacity(num_txns);
+        let mut state_checkpoint_hashes = Vec::with_capacity(num_txns);
 
         for (txn, txn_output) in to_keep {
             let (state_updates, state_checkpoint_hash) = self.add_transaction(txn, txn_output)?;
@@ -147,10 +148,10 @@ impl InMemoryStateCalculator {
             match txn {
                 Transaction::BlockMetadata(_) | Transaction::UserTransaction(_) => {
                     Ok((updated_state_kvs, None))
-                }
+                },
                 Transaction::GenesisTransaction(_) | Transaction::StateCheckpoint(_) => {
                     Ok((updated_state_kvs, Some(self.make_checkpoint()?)))
-                }
+                },
             }
         }
     }
@@ -265,7 +266,7 @@ impl InMemoryStateCalculator {
 // Returns all state key-value pair touched.
 pub fn process_write_set(
     transaction: Option<&Transaction>,
-    state_cache: &mut HashMap<StateKey, Option<StateValue>>,
+    state_cache: &mut DashMap<StateKey, Option<StateValue>>,
     usage: &mut StateStorageUsage,
     write_set: WriteSet,
 ) -> Result<HashMap<StateKey, Option<StateValue>>> {
@@ -280,20 +281,16 @@ pub fn process_write_set(
 
 fn process_state_key_write_op(
     transaction: Option<&Transaction>,
-    state_cache: &mut HashMap<StateKey, Option<StateValue>>,
+    state_cache: &mut DashMap<StateKey, Option<StateValue>>,
     usage: &mut StateStorageUsage,
     state_key: StateKey,
     write_op: WriteOp,
 ) -> Result<(StateKey, Option<StateValue>)> {
     let key_size = state_key.size();
-    let state_value = match write_op {
-        WriteOp::Modification(new_value) | WriteOp::Creation(new_value) => {
-            let value = StateValue::from(new_value);
-            usage.add_item(key_size + value.size());
-            Some(value)
-        }
-        WriteOp::Deletion => None,
-    };
+    let state_value = write_op.as_state_value();
+    if let Some(ref value) = state_value {
+        usage.add_item(key_size + value.size())
+    }
     let cached = state_cache.insert(state_key.clone(), state_value.clone());
     if let Some(old_value_opt) = cached {
         if let Some(old_value) = old_value_opt {
@@ -313,8 +310,8 @@ fn ensure_txn_valid_for_vacant_entry(transaction: &Transaction) -> Result<()> {
         Transaction::GenesisTransaction(_) => (),
         Transaction::BlockMetadata(_) | Transaction::UserTransaction(_) => {
             bail!("Write set should be a subset of read set.")
-        }
-        Transaction::StateCheckpoint(_) => {}
+        },
+        Transaction::StateCheckpoint(_) => {},
     }
     Ok(())
 }

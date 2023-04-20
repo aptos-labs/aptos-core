@@ -1,14 +1,14 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::MoveHarness;
 use aptos_crypto::HashValue;
+use aptos_language_e2e_tests::account::{Account, TransactionBuilder};
 use aptos_types::{
     account_address::AccountAddress,
     on_chain_config::{ApprovedExecutionHashes, OnChainConfig},
     transaction::{Script, TransactionArgument, TransactionStatus},
 };
-use language_e2e_tests::account::{Account, TransactionBuilder};
 
 #[test]
 fn large_transactions() {

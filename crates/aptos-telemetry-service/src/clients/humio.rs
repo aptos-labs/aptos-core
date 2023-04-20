@@ -1,28 +1,34 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::types::humio::UnstructuredLog;
 use anyhow::anyhow;
 use flate2::{write::GzEncoder, Compression};
-use reqwest::{self, Url};
-
-use crate::types::humio::UnstructuredLog;
+use reqwest::{Client as ReqwestClient, Url};
+use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
+use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
 
 pub const PEER_ID_FIELD_NAME: &str = "peer_id";
 pub const EPOCH_FIELD_NAME: &str = "epoch";
 pub const PEER_ROLE_TAG_NAME: &str = "peer_role";
 pub const CHAIN_ID_TAG_NAME: &str = "chain_id";
+pub const RUN_UUID_TAG_NAME: &str = "run_uuid";
 
 #[derive(Clone)]
 pub struct IngestClient {
-    inner: reqwest::Client,
+    inner: ClientWithMiddleware,
     base_url: Url,
     auth_token: String,
 }
 
 impl IngestClient {
     pub fn new(base_url: Url, auth_token: String) -> Self {
+        let retry_policy = ExponentialBackoff::builder().build_with_max_retries(3);
+        let inner = ClientBuilder::new(ReqwestClient::new())
+            .with(RetryTransientMiddleware::new_with_policy(retry_policy))
+            .build();
         Self {
-            inner: reqwest::Client::new(),
+            inner,
             base_url,
             auth_token,
         }

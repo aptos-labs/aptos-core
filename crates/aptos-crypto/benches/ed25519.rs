@@ -1,21 +1,20 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #[macro_use]
 extern crate criterion;
-
-use criterion::{measurement::Measurement, BenchmarkGroup, Criterion, Throughput};
-use curve25519_dalek::{constants::ED25519_BASEPOINT_POINT, scalar::Scalar};
-
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use rand::{distributions, prelude::ThreadRng, thread_rng, Rng};
-use serde::{Deserialize, Serialize};
 
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
     traits::{Signature, SigningKey, Uniform},
     PrivateKey,
 };
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use criterion::{measurement::Measurement, BenchmarkGroup, Criterion, Throughput};
+use curve25519_dalek::{constants::ED25519_BASEPOINT_POINT, scalar::Scalar};
+use rand::{distributions, prelude::ThreadRng, thread_rng, Rng};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, CryptoHasher, BCSCryptoHash, Serialize, Deserialize)]
 pub struct TestAptosCrypto(pub String);

@@ -1,16 +1,17 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{LoadDestination, NetworkLoadTest};
-use aptos_logger::info;
-use forge::{
-    GroupNetworkDelay, NetworkContext, NetworkTest, Swarm, SwarmChaos, SwarmNetworkBandwidth,
-    SwarmNetworkDelay, Test,
+use aptos_forge::{
+    GroupNetworkBandwidth, GroupNetworkDelay, NetworkContext, NetworkTest, Swarm, SwarmChaos,
+    SwarmNetworkBandwidth, SwarmNetworkDelay, Test,
 };
+use aptos_logger::info;
 
-pub struct ThreeRegionSimulationTest;
+/// Represents a test that simulates a network with 3 regions, all in the same cloud.
+pub struct ThreeRegionSameCloudSimulationTest;
 
-impl Test for ThreeRegionSimulationTest {
+impl Test for ThreeRegionSameCloudSimulationTest {
     fn name(&self) -> &'static str {
         "network::three-region-simulation"
     }
@@ -40,14 +41,6 @@ fn create_three_region_swarm_network_delay(swarm: &dyn Swarm) -> SwarmNetworkDel
             correlation_percentage: 50,
         },
         GroupNetworkDelay {
-            name: "af-south-to-us-west".to_string(),
-            source_nodes: af_south.clone(),
-            target_nodes: us_west.clone(),
-            latency_ms: 300,
-            jitter_ms: 50,
-            correlation_percentage: 50,
-        },
-        GroupNetworkDelay {
             name: "us-west-to-eu-north".to_string(),
             source_nodes: us_west.clone(),
             target_nodes: eu_north.clone(),
@@ -56,25 +49,9 @@ fn create_three_region_swarm_network_delay(swarm: &dyn Swarm) -> SwarmNetworkDel
             correlation_percentage: 50,
         },
         GroupNetworkDelay {
-            name: "eu-north-to-us-west".to_string(),
-            source_nodes: eu_north.clone(),
-            target_nodes: us_west.clone(),
-            latency_ms: 150,
-            jitter_ms: 50,
-            correlation_percentage: 50,
-        },
-        GroupNetworkDelay {
             name: "eu-north-to-af-south".to_string(),
             source_nodes: eu_north.clone(),
             target_nodes: af_south.clone(),
-            latency_ms: 200,
-            jitter_ms: 50,
-            correlation_percentage: 50,
-        },
-        GroupNetworkDelay {
-            name: "af-south-to-eu-north".to_string(),
-            source_nodes: af_south.clone(),
-            target_nodes: eu_north.clone(),
             latency_ms: 200,
             jitter_ms: 50,
             correlation_percentage: 50,
@@ -90,16 +67,20 @@ fn create_three_region_swarm_network_delay(swarm: &dyn Swarm) -> SwarmNetworkDel
     }
 }
 
-// 1 Gbps
+/// 1000 mbps network bandwidth simulation between all regions within
+/// the same cloud with dedicated backbone like GCP
 fn create_bandwidth_limit() -> SwarmNetworkBandwidth {
     SwarmNetworkBandwidth {
-        rate: 1000,
-        limit: 20971520,
-        buffer: 10000,
+        group_network_bandwidths: vec![GroupNetworkBandwidth {
+            name: "forge-namespace-1000mbps-bandwidth".to_owned(),
+            rate: 1000, // 1000 megabytes per second
+            limit: 20971520,
+            buffer: 10000,
+        }],
     }
 }
 
-impl NetworkLoadTest for ThreeRegionSimulationTest {
+impl NetworkLoadTest for ThreeRegionSameCloudSimulationTest {
     fn setup(&self, ctx: &mut NetworkContext) -> anyhow::Result<LoadDestination> {
         // inject network delay
         let delay = create_three_region_swarm_network_delay(ctx.swarm());
@@ -111,7 +92,7 @@ impl NetworkLoadTest for ThreeRegionSimulationTest {
         let chaos = SwarmChaos::Bandwidth(bandwidth);
         ctx.swarm().inject_chaos(chaos)?;
 
-        Ok(LoadDestination::AllNodes)
+        Ok(LoadDestination::FullnodesOtherwiseValidators)
     }
 
     fn finish(&self, swarm: &mut dyn Swarm) -> anyhow::Result<()> {
@@ -119,7 +100,7 @@ impl NetworkLoadTest for ThreeRegionSimulationTest {
     }
 }
 
-impl NetworkTest for ThreeRegionSimulationTest {
+impl NetworkTest for ThreeRegionSameCloudSimulationTest {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> anyhow::Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx)
     }

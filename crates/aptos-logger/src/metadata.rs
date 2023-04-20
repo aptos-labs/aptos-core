@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use serde::{Deserialize, Serialize};
@@ -109,6 +110,7 @@ pub struct LevelParseError;
 
 impl FromStr for Level {
     type Err = LevelParseError;
+
     fn from_str(level: &str) -> Result<Level, Self::Err> {
         LOG_LEVEL_NAMES
             .iter()

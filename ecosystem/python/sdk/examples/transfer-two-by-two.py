@@ -1,4 +1,4 @@
-# Copyright (c) Aptos
+# Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
 import os
@@ -29,6 +29,12 @@ if __name__ == "__main__":
     faucet_client.fund_account(carol.address(), 0)
     faucet_client.fund_account(david.address(), 0)
 
+    print("\n=== Initial Balances ===")
+    print(f"Alice: {rest_client.account_balance(alice.address())}")
+    print(f"Bob: {rest_client.account_balance(bob.address())}")
+    print(f"Carol: {rest_client.account_balance(carol.address())}")
+    print(f"David: {rest_client.account_balance(david.address())}")
+
     path = os.path.dirname(__file__)
     filepath = os.path.join(path, "two_by_two_transfer.mv")
     with open(filepath, mode="rb") as file:
@@ -46,12 +52,6 @@ if __name__ == "__main__":
     txn = rest_client.create_multi_agent_bcs_transaction(alice, [bob], payload)
     txn_hash = rest_client.submit_bcs_transaction(txn)
     rest_client.wait_for_transaction(txn_hash)
-
-    print("\n=== Initial Balances ===")
-    print(f"Alice: {rest_client.account_balance(alice.address())}")
-    print(f"Bob: {rest_client.account_balance(bob.address())}")
-    print(f"Carol: {rest_client.account_balance(carol.address())}")
-    print(f"David: {rest_client.account_balance(david.address())}")
 
     print("\n=== Final Balances ===")
     print(f"Alice: {rest_client.account_balance(alice.address())}")

@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -12,6 +12,7 @@ use crate::{
     models::token_models::{
         ans_lookup::{CurrentAnsLookup, CurrentAnsLookupPK},
         collection_datas::{CollectionData, CurrentCollectionData},
+        nft_points::NftPoints,
         token_activities::TokenActivity,
         token_claims::CurrentTokenPendingClaim,
         token_datas::{CurrentTokenData, TokenData},
@@ -33,10 +34,15 @@ pub const NAME: &str = "token_processor";
 pub struct TokenTransactionProcessor {
     connection_pool: PgDbPool,
     ans_contract_address: Option<String>,
+    nft_points_contract: Option<String>,
 }
 
 impl TokenTransactionProcessor {
-    pub fn new(connection_pool: PgDbPool, ans_contract_address: Option<String>) -> Self {
+    pub fn new(
+        connection_pool: PgDbPool,
+        ans_contract_address: Option<String>,
+        nft_points_contract: Option<String>,
+    ) -> Self {
         aptos_logger::info!(
             ans_contract_address = ans_contract_address,
             "init TokenTransactionProcessor"
@@ -44,6 +50,7 @@ impl TokenTransactionProcessor {
         Self {
             connection_pool,
             ans_contract_address,
+            nft_points_contract,
         }
     }
 }
@@ -70,6 +77,7 @@ fn insert_to_db_impl(
     token_activities: &[TokenActivity],
     current_token_claims: &[CurrentTokenPendingClaim],
     current_ans_lookups: &[CurrentAnsLookup],
+    nft_points: &[NftPoints],
 ) -> Result<(), diesel::result::Error> {
     let (tokens, token_ownerships, token_datas, collection_datas) = basic_token_transaction_lists;
     let (current_token_ownerships, current_token_datas, current_collection_datas) =
@@ -84,6 +92,7 @@ fn insert_to_db_impl(
     insert_token_activities(conn, token_activities)?;
     insert_current_token_claims(conn, current_token_claims)?;
     insert_current_ans_lookups(conn, current_ans_lookups)?;
+    insert_nft_points(conn, nft_points)?;
     Ok(())
 }
 
@@ -106,6 +115,7 @@ fn insert_to_db(
     token_activities: Vec<TokenActivity>,
     current_token_claims: Vec<CurrentTokenPendingClaim>,
     current_ans_lookups: Vec<CurrentAnsLookup>,
+    nft_points: Vec<NftPoints>,
 ) -> Result<(), diesel::result::Error> {
     aptos_logger::trace!(
         name = name,
@@ -131,6 +141,7 @@ fn insert_to_db(
                 &token_activities,
                 &current_token_claims,
                 &current_ans_lookups,
+                &nft_points,
             )
         }) {
         Ok(_) => Ok(()),
@@ -148,6 +159,7 @@ fn insert_to_db(
                 let token_activities = clean_data_for_db(token_activities, true);
                 let current_token_claims = clean_data_for_db(current_token_claims, true);
                 let current_ans_lookups = clean_data_for_db(current_ans_lookups, true);
+                let nft_points = clean_data_for_db(nft_points, true);
 
                 insert_to_db_impl(
                     pg_conn,
@@ -160,6 +172,7 @@ fn insert_to_db(
                     &token_activities,
                     &current_token_claims,
                     &current_ans_lookups,
+                    &nft_points,
                 )
             }),
     }
@@ -178,7 +191,11 @@ fn insert_tokens(
             diesel::insert_into(schema::tokens::table)
                 .values(&tokens_to_insert[start_ind..end_ind])
                 .on_conflict((token_data_id_hash, property_version, transaction_version))
-                .do_nothing(),
+                .do_update()
+                .set((
+                    token_properties.eq(excluded(token_properties)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )),
             None,
         )?;
     }
@@ -227,7 +244,10 @@ fn insert_token_datas(
                 .values(&token_datas_to_insert[start_ind..end_ind])
                 .on_conflict((token_data_id_hash, transaction_version))
                 .do_update()
-                .set((description.eq(excluded(description)),)),
+                .set((
+                    default_properties.eq(excluded(default_properties)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )),
             None,
         )?;
     }
@@ -281,6 +301,7 @@ fn insert_current_token_ownerships(
                     last_transaction_version.eq(excluded(last_transaction_version)),
                     collection_data_id_hash.eq(excluded(collection_data_id_hash)),
                     table_type.eq(excluded(table_type)),
+                    inserted_at.eq(excluded(inserted_at)),
                 )),
             Some(" WHERE current_token_ownerships.last_transaction_version <= excluded.last_transaction_version "),
         )?;
@@ -323,6 +344,7 @@ fn insert_current_token_datas(
                     last_transaction_version.eq(excluded(last_transaction_version)),
                     collection_data_id_hash.eq(excluded(collection_data_id_hash)),
                     description.eq(excluded(description)),
+                    inserted_at.eq(excluded(inserted_at)),
                 )),
             Some(" WHERE current_token_datas.last_transaction_version <= excluded.last_transaction_version "),
         )?;
@@ -357,6 +379,7 @@ fn insert_current_collection_datas(
                     description_mutable.eq(excluded(description_mutable)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
                     table_handle.eq(excluded(table_handle)),
+                    inserted_at.eq(excluded(inserted_at)),
                 )),
             Some(" WHERE current_collection_datas.last_transaction_version <= excluded.last_transaction_version "),
         )?;
@@ -383,7 +406,11 @@ fn insert_token_activities(
                     event_creation_number,
                     event_sequence_number,
                 ))
-                .do_nothing(),
+                .do_update()
+                .set((
+                    inserted_at.eq(excluded(inserted_at)),
+                    event_index.eq(excluded(event_index)),
+                )),
             None,
         )?;
     }
@@ -417,6 +444,7 @@ fn insert_current_token_claims(
                     amount.eq(excluded(amount)),
                     table_handle.eq(excluded(table_handle)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
+                    inserted_at.eq(excluded(inserted_at)),
                 )),
             Some(" WHERE current_token_pending_claims.last_transaction_version <= excluded.last_transaction_version "),
         )?;
@@ -443,9 +471,32 @@ fn insert_current_ans_lookups(
                     registered_address.eq(excluded(registered_address)),
                     expiration_timestamp.eq(excluded(expiration_timestamp)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
+                    inserted_at.eq(excluded(inserted_at)),
+                    token_name.eq(excluded(token_name)),
                 )),
                 Some(" WHERE current_ans_lookup.last_transaction_version <= excluded.last_transaction_version "),
             )?;
+    }
+    Ok(())
+}
+
+fn insert_nft_points(
+    conn: &mut PgConnection,
+    items_to_insert: &[NftPoints],
+) -> Result<(), diesel::result::Error> {
+    use schema::nft_points::dsl::*;
+
+    let chunks = get_chunks(items_to_insert.len(), NftPoints::field_count());
+
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::nft_points::table)
+                .values(&items_to_insert[start_ind..end_ind])
+                .on_conflict(transaction_version)
+                .do_nothing(),
+            None,
+        )?;
     }
     Ok(())
 }
@@ -474,6 +525,9 @@ impl TransactionProcessor for TokenTransactionProcessor {
         let mut all_token_datas = vec![];
         let mut all_collection_datas = vec![];
         let mut all_token_activities = vec![];
+
+        // This is likely temporary
+        let mut all_nft_points = vec![];
 
         // Hashmap key will be the PK of the table, we do not want to send duplicates writes to the db within a batch
         let mut all_current_token_ownerships: HashMap<
@@ -522,6 +576,13 @@ impl TransactionProcessor for TokenTransactionProcessor {
             let current_ans_lookups =
                 CurrentAnsLookup::from_transaction(&txn, self.ans_contract_address.clone());
             all_current_ans_lookups.extend(current_ans_lookups);
+
+            // NFT points
+            let nft_points_txn =
+                NftPoints::from_transaction(&txn, self.nft_points_contract.clone());
+            if let Some(nft_points) = nft_points_txn {
+                all_nft_points.push(nft_points);
+            }
         }
 
         // Getting list of values and sorting by pk in order to avoid postgres deadlock since we're doing multi threaded db writes
@@ -589,6 +650,7 @@ impl TransactionProcessor for TokenTransactionProcessor {
             all_token_activities,
             all_current_token_claims,
             all_current_ans_lookups,
+            all_nft_points,
         );
         match tx_result {
             Ok(_) => Ok(ProcessingResult::new(

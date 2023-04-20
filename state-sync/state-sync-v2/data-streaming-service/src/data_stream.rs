@@ -1,22 +1,24 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     data_notification,
     data_notification::{
         DataClientRequest, DataNotification, DataPayload, EpochEndingLedgerInfosRequest,
-        NewTransactionOutputsWithProofRequest, NewTransactionsWithProofRequest, NotificationId,
-        NumberOfStatesRequest, StateValuesWithProofRequest, TransactionOutputsWithProofRequest,
-        TransactionsWithProofRequest,
+        NewTransactionOutputsWithProofRequest, NewTransactionsOrOutputsWithProofRequest,
+        NewTransactionsWithProofRequest, NotificationId, NumberOfStatesRequest,
+        StateValuesWithProofRequest, TransactionOutputsWithProofRequest,
+        TransactionsOrOutputsWithProofRequest, TransactionsWithProofRequest,
     },
     error::Error,
     logging::{LogEntry, LogEvent, LogSchema},
     metrics,
-    metrics::{increment_counter, start_timer},
+    metrics::{increment_counter, increment_counter_multiple, start_timer},
     stream_engine::{DataStreamEngine, StreamEngine},
     streaming_client::{NotificationFeedback, StreamRequest},
 };
-use aptos_config::config::DataStreamingServiceConfig;
+use aptos_config::config::{AptosDataClientConfig, DataStreamingServiceConfig};
 use aptos_data_client::{
     AdvertisedData, AptosDataClient, GlobalDataSummary, Response, ResponseContext, ResponseError,
     ResponsePayload,
@@ -24,9 +26,9 @@ use aptos_data_client::{
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
-use futures::channel::mpsc;
-use futures::{stream::FusedStream, SinkExt, Stream};
+use futures::{channel::mpsc, stream::FusedStream, SinkExt, Stream};
 use std::{
+    cmp::min,
     collections::{BTreeMap, VecDeque},
     pin::Pin,
     sync::Arc,
@@ -54,8 +56,11 @@ pub type PendingClientResponse = Arc<Mutex<Box<data_notification::PendingClientR
 /// proofs must be sent with monotonically increasing versions).
 #[derive(Debug)]
 pub struct DataStream<T> {
-    // The configuration for this data stream
-    config: DataStreamingServiceConfig,
+    // The configuration for the data client
+    data_client_config: AptosDataClientConfig,
+
+    // The configuration for the streaming service
+    streaming_service_config: DataStreamingServiceConfig,
 
     // The unique ID for this data stream. This is useful for logging.
     data_stream_id: DataStreamId,
@@ -100,7 +105,8 @@ pub struct DataStream<T> {
 
 impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
     pub fn new(
-        config: DataStreamingServiceConfig,
+        data_client_config: AptosDataClientConfig,
+        data_stream_config: DataStreamingServiceConfig,
         data_stream_id: DataStreamId,
         stream_request: &StreamRequest,
         aptos_data_client: T,
@@ -109,7 +115,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
     ) -> Result<(Self, DataStreamListener), Error> {
         // Create a new data stream listener
         let (notification_sender, notification_receiver) =
-            mpsc::channel(config.max_data_stream_channel_sizes as usize);
+            mpsc::channel(data_stream_config.max_data_stream_channel_sizes as usize);
         let data_stream_listener = DataStreamListener::new(data_stream_id, notification_receiver);
 
         // Create a new stream engine
@@ -117,7 +123,8 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
 
         // Create a new data stream
         let data_stream = Self {
-            config,
+            data_client_config,
+            streaming_service_config: data_stream_config,
             data_stream_id,
             aptos_data_client,
             stream_engine,
@@ -190,7 +197,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
                     notification_id
                 ))
             })?;
-        let response_error = extract_response_error(notification_feedback);
+        let response_error = extract_response_error(notification_feedback)?;
         self.notify_bad_response(response_context, response_error);
 
         Ok(())
@@ -200,8 +207,10 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
     /// at any given time.
     fn get_max_concurrent_requests(&self) -> u64 {
         match self.stream_engine {
-            StreamEngine::StateStreamEngine(_) => self.config.max_concurrent_state_requests,
-            _ => self.config.max_concurrent_requests,
+            StreamEngine::StateStreamEngine(_) => {
+                self.streaming_service_config.max_concurrent_state_requests
+            },
+            _ => self.streaming_service_config.max_concurrent_requests,
         }
     }
 
@@ -211,7 +220,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
         global_data_summary: &GlobalDataSummary,
     ) -> Result<(), Error> {
         // Determine how many requests (at most) can be sent to the network
-        let num_sent_requests = self.get_sent_data_requests().len() as u64;
+        let num_sent_requests = self.get_sent_data_requests()?.len() as u64;
         let max_concurrent_requests = self.get_max_concurrent_requests();
         let max_num_requests_to_send = max_concurrent_requests
             .checked_sub(num_sent_requests)
@@ -219,16 +228,18 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
                 Error::IntegerOverflow("Max number of requests to send has overflown!".into())
             })?;
 
+        // Send the client requests
         if max_num_requests_to_send > 0 {
             let client_requests = self
                 .stream_engine
                 .create_data_client_requests(max_num_requests_to_send, global_data_summary)?;
             for client_request in &client_requests {
                 // Send the client request
-                let pending_client_response = self.send_client_request(client_request.clone());
+                let pending_client_response =
+                    self.send_client_request(false, client_request.clone());
 
                 // Enqueue the pending response
-                self.get_sent_data_requests()
+                self.get_sent_data_requests()?
                     .push_back(pending_client_response);
             }
 
@@ -245,13 +256,19 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
                 )
             );
         }
+
+        // Update the counters for the pending response queue
+        metrics::set_pending_data_responses(self.get_sent_data_requests()?.len());
+
         Ok(())
     }
 
     /// Sends a given request to the data client to be forwarded to the network
-    /// and returns a pending client response.
+    /// and returns a pending client response. If `request_retry` is true
+    /// exponential backoff takes affect (i.e., to increase the request timeout).
     fn send_client_request(
         &mut self,
+        request_retry: bool,
         data_client_request: DataClientRequest,
     ) -> PendingClientResponse {
         // Create a new pending client response
@@ -262,11 +279,48 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
             },
         )));
 
+        // Calculate the request timeout to use, based on the
+        // request type and the number of previous failures.
+        let request_timeout_ms = if is_subscription_request(&data_client_request) {
+            self.data_client_config.subscription_timeout_ms
+        } else if !request_retry {
+            self.data_client_config.response_timeout_ms
+        } else {
+            let response_timeout_ms = self.data_client_config.response_timeout_ms;
+            let max_response_timeout_ms = self.data_client_config.max_response_timeout_ms;
+
+            // Exponentially increase the timeout based on the number of
+            // previous failures (but bounded by the max timeout).
+            let request_timeout_ms = min(
+                max_response_timeout_ms,
+                response_timeout_ms * (u32::pow(2, self.request_failure_count as u32) as u64),
+            );
+
+            // Update the retry counter and log the request
+            increment_counter_multiple(
+                &metrics::RETRIED_DATA_REQUESTS,
+                data_client_request.get_label(),
+                &request_timeout_ms.to_string(),
+            );
+            info!(
+                (LogSchema::new(LogEntry::RetryDataRequest)
+                    .stream_id(self.data_stream_id)
+                    .message(&format!(
+                        "Retrying data request type: {:?}, with new timeout: {:?} (ms)",
+                        data_client_request.get_label(),
+                        request_timeout_ms.to_string()
+                    )))
+            );
+
+            request_timeout_ms
+        };
+
         // Send the request to the network
         let join_handle = spawn_request_task(
             data_client_request,
             self.aptos_data_client.clone(),
             pending_client_response.clone(),
+            request_timeout_ms,
         );
         self.spawned_tasks.push(join_handle);
 
@@ -326,7 +380,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
         global_data_summary: GlobalDataSummary,
     ) -> Result<(), Error> {
         if self.stream_engine.is_stream_complete()
-            || self.request_failure_count >= self.config.max_request_retry
+            || self.request_failure_count >= self.streaming_service_config.max_request_retry
             || self.send_failure
         {
             if !self.send_failure && self.stream_end_notification_id.is_none() {
@@ -337,12 +391,11 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
 
         // Process any ready data responses
         for _ in 0..self.get_max_concurrent_requests() {
-            if let Some(pending_response) = self.pop_pending_response_queue() {
-                let client_response = pending_response
-                    .lock()
-                    .client_response
-                    .take()
-                    .expect("The client response should be ready!");
+            if let Some(pending_response) = self.pop_pending_response_queue()? {
+                let maybe_client_response = pending_response.lock().client_response.take();
+                let client_response = maybe_client_response.ok_or_else(|| {
+                    Error::UnexpectedErrorEncountered("The client response should be ready!".into())
+                })?;
                 let client_request = &pending_response.lock().client_request.clone();
 
                 match client_response {
@@ -357,11 +410,22 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
                             )?;
                             break;
                         }
-                    }
+                    },
                     Err(error) => {
-                        self.handle_data_client_error(client_request, &error)?;
+                        // If the error was a timeout and the request was a subscription request
+                        // we need to notify the stream engine and not retry the request.
+                        if matches!(
+                            error,
+                            aptos_data_client::Error::TimeoutWaitingForResponse(_)
+                        ) && is_subscription_request(client_request)
+                        {
+                            self.stream_engine
+                                .notify_subscription_timeout(client_request)?;
+                        } else {
+                            self.handle_data_client_error(client_request, &error)?;
+                        };
                         break;
-                    }
+                    },
                 }
             } else {
                 break; // The first response hasn't arrived yet.
@@ -375,9 +439,9 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
 
     /// Pops and returns the first pending client response if the response has
     /// been received. Returns `None` otherwise.
-    fn pop_pending_response_queue(&mut self) -> Option<PendingClientResponse> {
-        let sent_data_requests = self.get_sent_data_requests();
-        if let Some(data_request) = sent_data_requests.front() {
+    fn pop_pending_response_queue(&mut self) -> Result<Option<PendingClientResponse>, Error> {
+        let sent_data_requests = self.get_sent_data_requests()?;
+        let pending_client_response = if let Some(data_request) = sent_data_requests.front() {
             if data_request.lock().client_response.is_some() {
                 // We've received a response! Pop the requests off the queue.
                 sent_data_requests.pop_front()
@@ -386,7 +450,8 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
             }
         } else {
             None
-        }
+        };
+        Ok(pending_client_response)
     }
 
     /// Handles a client response that failed sanity checks
@@ -430,10 +495,10 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
         self.request_failure_count += 1;
 
         // Resend the client request
-        let pending_client_response = self.send_client_request(data_client_request.clone());
+        let pending_client_response = self.send_client_request(true, data_client_request.clone());
 
         // Push the pending response to the head of the sent requests queue
-        self.get_sent_data_requests()
+        self.get_sent_data_requests()?
             .push_front(pending_client_response);
 
         Ok(())
@@ -508,18 +573,20 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
             .notifications_to_responses
             .insert(notification_id, response_context)
         {
-            panic!(
+            Err(Error::UnexpectedErrorEncountered(format!(
                 "Duplicate sent notification ID found! \
                  Notification ID: {:?}, \
                  previous Response context: {:?}",
-                notification_id, response_context,
-            );
+                notification_id, response_context
+            )))
+        } else {
+            self.garbage_collect_notification_response_map()
         }
-        self.garbage_collect_notification_response_map()
     }
 
     fn garbage_collect_notification_response_map(&mut self) -> Result<(), Error> {
-        let max_notification_id_mappings = self.config.max_notification_id_mappings;
+        let max_notification_id_mappings =
+            self.streaming_service_config.max_notification_id_mappings;
         let map_length = self.notifications_to_responses.len() as u64;
         if map_length > max_notification_id_mappings {
             let num_entries_to_remove = map_length
@@ -563,7 +630,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
     pub fn ensure_data_is_available(&self, advertised_data: &AdvertisedData) -> Result<(), Error> {
         if !self
             .stream_engine
-            .is_remaining_data_available(advertised_data)
+            .is_remaining_data_available(advertised_data)?
         {
             return Err(Error::DataIsUnavailable(format!(
                 "Unable to satisfy stream engine: {:?}, with advertised data: {:?}",
@@ -575,10 +642,10 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
 
     /// Assumes the caller has already verified that `sent_data_requests` has
     /// been initialized.
-    fn get_sent_data_requests(&mut self) -> &mut VecDeque<PendingClientResponse> {
-        self.sent_data_requests
-            .as_mut()
-            .expect("Sent data requests should be initialized!")
+    fn get_sent_data_requests(&mut self) -> Result<&mut VecDeque<PendingClientResponse>, Error> {
+        self.sent_data_requests.as_mut().ok_or_else(|| {
+            Error::UnexpectedErrorEncountered("Sent data requests should be initialized!".into())
+        })
     }
 
     #[cfg(test)]
@@ -654,59 +721,77 @@ fn sanity_check_client_response(
                 data_client_response.payload,
                 ResponsePayload::EpochEndingLedgerInfos(_)
             )
-        }
+        },
         DataClientRequest::NewTransactionOutputsWithProof(_) => {
             matches!(
                 data_client_response.payload,
                 ResponsePayload::NewTransactionOutputsWithProof(_)
             )
-        }
+        },
         DataClientRequest::NewTransactionsWithProof(_) => {
             matches!(
                 data_client_response.payload,
                 ResponsePayload::NewTransactionsWithProof(_)
             )
-        }
+        },
+        DataClientRequest::NewTransactionsOrOutputsWithProof(_) => {
+            matches!(
+                data_client_response.payload,
+                ResponsePayload::NewTransactionsWithProof(_)
+            ) || matches!(
+                data_client_response.payload,
+                ResponsePayload::NewTransactionOutputsWithProof(_)
+            )
+        },
         DataClientRequest::NumberOfStates(_) => {
             matches!(
                 data_client_response.payload,
                 ResponsePayload::NumberOfStates(_)
             )
-        }
+        },
         DataClientRequest::StateValuesWithProof(_) => {
             matches!(
                 data_client_response.payload,
                 ResponsePayload::StateValuesWithProof(_)
             )
-        }
+        },
         DataClientRequest::TransactionsWithProof(_) => {
             matches!(
                 data_client_response.payload,
                 ResponsePayload::TransactionsWithProof(_)
             )
-        }
+        },
         DataClientRequest::TransactionOutputsWithProof(_) => {
             matches!(
                 data_client_response.payload,
                 ResponsePayload::TransactionOutputsWithProof(_)
             )
-        }
+        },
+        DataClientRequest::TransactionsOrOutputsWithProof(_) => {
+            matches!(
+                data_client_response.payload,
+                ResponsePayload::TransactionsWithProof(_)
+            ) || matches!(
+                data_client_response.payload,
+                ResponsePayload::TransactionOutputsWithProof(_)
+            )
+        },
     }
 }
 
 /// Transforms the notification feedback into a specific response error that
 /// can be sent to the Aptos data client.
-fn extract_response_error(notification_feedback: &NotificationFeedback) -> ResponseError {
+fn extract_response_error(
+    notification_feedback: &NotificationFeedback,
+) -> Result<ResponseError, Error> {
     match notification_feedback {
-        NotificationFeedback::InvalidPayloadData => ResponseError::InvalidData,
-        NotificationFeedback::PayloadTypeIsIncorrect => ResponseError::InvalidPayloadDataType,
-        NotificationFeedback::PayloadProofFailed => ResponseError::ProofVerificationError,
-        _ => {
-            panic!(
-                "Invalid notification feedback given: {:?}",
-                notification_feedback
-            )
-        }
+        NotificationFeedback::InvalidPayloadData => Ok(ResponseError::InvalidData),
+        NotificationFeedback::PayloadTypeIsIncorrect => Ok(ResponseError::InvalidPayloadDataType),
+        NotificationFeedback::PayloadProofFailed => Ok(ResponseError::ProofVerificationError),
+        _ => Err(Error::UnexpectedErrorEncountered(format!(
+            "Invalid notification feedback given: {:?}",
+            notification_feedback
+        ))),
     }
 }
 
@@ -714,6 +799,7 @@ fn spawn_request_task<T: AptosDataClient + Send + Clone + 'static>(
     data_client_request: DataClientRequest,
     aptos_data_client: T,
     pending_response: PendingClientResponse,
+    request_timeout_ms: u64,
 ) -> JoinHandle<()> {
     // Update the requests sent counter
     increment_counter(
@@ -732,26 +818,49 @@ fn spawn_request_task<T: AptosDataClient + Send + Clone + 'static>(
         // Fetch the client response
         let client_response = match data_client_request {
             DataClientRequest::EpochEndingLedgerInfos(request) => {
-                get_epoch_ending_ledger_infos(aptos_data_client, request).await
-            }
+                get_epoch_ending_ledger_infos(aptos_data_client, request, request_timeout_ms).await
+            },
             DataClientRequest::NewTransactionsWithProof(request) => {
-                get_new_transactions_with_proof(aptos_data_client, request).await
-            }
+                get_new_transactions_with_proof(aptos_data_client, request, request_timeout_ms)
+                    .await
+            },
             DataClientRequest::NewTransactionOutputsWithProof(request) => {
-                get_new_transaction_outputs_with_proof(aptos_data_client, request).await
-            }
+                get_new_transaction_outputs_with_proof(
+                    aptos_data_client,
+                    request,
+                    request_timeout_ms,
+                )
+                .await
+            },
+            DataClientRequest::NewTransactionsOrOutputsWithProof(request) => {
+                get_new_transactions_or_outputs_with_proof(
+                    aptos_data_client,
+                    request,
+                    request_timeout_ms,
+                )
+                .await
+            },
             DataClientRequest::NumberOfStates(request) => {
-                get_number_of_states(aptos_data_client, request).await
-            }
+                get_number_of_states(aptos_data_client, request, request_timeout_ms).await
+            },
             DataClientRequest::StateValuesWithProof(request) => {
-                get_states_values_with_proof(aptos_data_client, request).await
-            }
+                get_states_values_with_proof(aptos_data_client, request, request_timeout_ms).await
+            },
             DataClientRequest::TransactionOutputsWithProof(request) => {
-                get_transaction_outputs_with_proof(aptos_data_client, request).await
-            }
+                get_transaction_outputs_with_proof(aptos_data_client, request, request_timeout_ms)
+                    .await
+            },
             DataClientRequest::TransactionsWithProof(request) => {
-                get_transactions_with_proof(aptos_data_client, request).await
-            }
+                get_transactions_with_proof(aptos_data_client, request, request_timeout_ms).await
+            },
+            DataClientRequest::TransactionsOrOutputsWithProof(request) => {
+                get_transactions_or_outputs_with_proof(
+                    aptos_data_client,
+                    request,
+                    request_timeout_ms,
+                )
+                .await
+            },
         };
 
         // Increment the appropriate counter depending on the response
@@ -761,10 +870,10 @@ fn spawn_request_task<T: AptosDataClient + Send + Clone + 'static>(
                     &metrics::RECEIVED_DATA_RESPONSE,
                     response.payload.get_label(),
                 );
-            }
+            },
             Err(error) => {
                 increment_counter(&metrics::RECEIVED_RESPONSE_ERROR, error.get_label());
-            }
+            },
         }
 
         // Save the response
@@ -775,11 +884,13 @@ fn spawn_request_task<T: AptosDataClient + Send + Clone + 'static>(
 async fn get_states_values_with_proof<T: AptosDataClient + Send + Clone + 'static>(
     aptos_data_client: T,
     request: StateValuesWithProofRequest,
+    request_timeout_ms: u64,
 ) -> Result<Response<ResponsePayload>, aptos_data_client::Error> {
     let client_response = aptos_data_client.get_state_values_with_proof(
         request.version,
         request.start_index,
         request.end_index,
+        request_timeout_ms,
     );
     client_response
         .await
@@ -789,9 +900,13 @@ async fn get_states_values_with_proof<T: AptosDataClient + Send + Clone + 'stati
 async fn get_epoch_ending_ledger_infos<T: AptosDataClient + Send + Clone + 'static>(
     aptos_data_client: T,
     request: EpochEndingLedgerInfosRequest,
+    request_timeout_ms: u64,
 ) -> Result<Response<ResponsePayload>, aptos_data_client::Error> {
-    let client_response =
-        aptos_data_client.get_epoch_ending_ledger_infos(request.start_epoch, request.end_epoch);
+    let client_response = aptos_data_client.get_epoch_ending_ledger_infos(
+        request.start_epoch,
+        request.end_epoch,
+        request_timeout_ms,
+    );
     client_response
         .await
         .map(|response| response.map(ResponsePayload::from))
@@ -800,9 +915,13 @@ async fn get_epoch_ending_ledger_infos<T: AptosDataClient + Send + Clone + 'stat
 async fn get_new_transaction_outputs_with_proof<T: AptosDataClient + Send + Clone + 'static>(
     aptos_data_client: T,
     request: NewTransactionOutputsWithProofRequest,
+    request_timeout_ms: u64,
 ) -> Result<Response<ResponsePayload>, aptos_data_client::Error> {
-    let client_response = aptos_data_client
-        .get_new_transaction_outputs_with_proof(request.known_version, request.known_epoch);
+    let client_response = aptos_data_client.get_new_transaction_outputs_with_proof(
+        request.known_version,
+        request.known_epoch,
+        request_timeout_ms,
+    );
     client_response
         .await
         .map(|response| response.map(ResponsePayload::from))
@@ -811,22 +930,41 @@ async fn get_new_transaction_outputs_with_proof<T: AptosDataClient + Send + Clon
 async fn get_new_transactions_with_proof<T: AptosDataClient + Send + Clone + 'static>(
     aptos_data_client: T,
     request: NewTransactionsWithProofRequest,
+    request_timeout_ms: u64,
 ) -> Result<Response<ResponsePayload>, aptos_data_client::Error> {
     let client_response = aptos_data_client.get_new_transactions_with_proof(
         request.known_version,
         request.known_epoch,
         request.include_events,
+        request_timeout_ms,
     );
     client_response
         .await
         .map(|response| response.map(ResponsePayload::from))
 }
 
+async fn get_new_transactions_or_outputs_with_proof<T: AptosDataClient + Send + Clone + 'static>(
+    aptos_data_client: T,
+    request: NewTransactionsOrOutputsWithProofRequest,
+    request_timeout_ms: u64,
+) -> Result<Response<ResponsePayload>, aptos_data_client::Error> {
+    let client_response = aptos_data_client.get_new_transactions_or_outputs_with_proof(
+        request.known_version,
+        request.known_epoch,
+        request.include_events,
+        request_timeout_ms,
+    );
+    let (context, payload) = client_response.await?.into_parts();
+    Ok(Response::new(context, ResponsePayload::try_from(payload)?))
+}
+
 async fn get_number_of_states<T: AptosDataClient + Send + Clone + 'static>(
     aptos_data_client: T,
     request: NumberOfStatesRequest,
+    request_timeout_ms: u64,
 ) -> Result<Response<ResponsePayload>, aptos_data_client::Error> {
-    let client_response = aptos_data_client.get_number_of_states(request.version);
+    let client_response =
+        aptos_data_client.get_number_of_states(request.version, request_timeout_ms);
     client_response
         .await
         .map(|response| response.map(ResponsePayload::from))
@@ -835,11 +973,13 @@ async fn get_number_of_states<T: AptosDataClient + Send + Clone + 'static>(
 async fn get_transaction_outputs_with_proof<T: AptosDataClient + Send + Clone + 'static>(
     aptos_data_client: T,
     request: TransactionOutputsWithProofRequest,
+    request_timeout_ms: u64,
 ) -> Result<Response<ResponsePayload>, aptos_data_client::Error> {
     let client_response = aptos_data_client.get_transaction_outputs_with_proof(
         request.proof_version,
         request.start_version,
         request.end_version,
+        request_timeout_ms,
     );
     client_response
         .await
@@ -849,14 +989,45 @@ async fn get_transaction_outputs_with_proof<T: AptosDataClient + Send + Clone + 
 async fn get_transactions_with_proof<T: AptosDataClient + Send + Clone + 'static>(
     aptos_data_client: T,
     request: TransactionsWithProofRequest,
+    request_timeout_ms: u64,
 ) -> Result<Response<ResponsePayload>, aptos_data_client::Error> {
     let client_response = aptos_data_client.get_transactions_with_proof(
         request.proof_version,
         request.start_version,
         request.end_version,
         request.include_events,
+        request_timeout_ms,
     );
     client_response
         .await
         .map(|response| response.map(ResponsePayload::from))
+}
+
+async fn get_transactions_or_outputs_with_proof<T: AptosDataClient + Send + Clone + 'static>(
+    aptos_data_client: T,
+    request: TransactionsOrOutputsWithProofRequest,
+    request_timeout_ms: u64,
+) -> Result<Response<ResponsePayload>, aptos_data_client::Error> {
+    let client_response = aptos_data_client.get_transactions_or_outputs_with_proof(
+        request.proof_version,
+        request.start_version,
+        request.end_version,
+        request.include_events,
+        request_timeout_ms,
+    );
+    let (context, payload) = client_response.await?.into_parts();
+    Ok(Response::new(context, ResponsePayload::try_from(payload)?))
+}
+
+/// Returns true iff the given request is a subscription request
+fn is_subscription_request(request: &DataClientRequest) -> bool {
+    matches!(request, DataClientRequest::NewTransactionsWithProof(_))
+        || matches!(
+            request,
+            DataClientRequest::NewTransactionOutputsWithProof(_)
+        )
+        || matches!(
+            request,
+            DataClientRequest::NewTransactionsOrOutputsWithProof(_)
+        )
 }

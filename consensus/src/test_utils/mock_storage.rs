@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -8,19 +9,19 @@ use crate::{
     },
 };
 use anyhow::Result;
+use aptos_consensus_types::{
+    block::Block, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote,
+};
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
+use aptos_storage_interface::DbReader;
 use aptos_types::{
     aggregate_signature::AggregateSignature,
     epoch_change::EpochChangeProof,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::ValidatorSet,
 };
-use consensus_types::{
-    block::Block, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote,
-};
 use std::{collections::HashMap, sync::Arc};
-use storage_interface::DbReader;
 
 pub struct MockSharedStorage {
     // Safety state
@@ -106,28 +107,29 @@ impl MockStorage {
             .block
             .lock()
             .clone()
-            .into_iter()
-            .map(|(_, v)| v)
+            .into_values()
             .collect();
         let quorum_certs = self
             .shared_storage
             .qc
             .lock()
             .clone()
-            .into_iter()
-            .map(|(_, v)| v)
+            .into_values()
             .collect();
         blocks.sort_by_key(Block::round);
+        let last_vote = self.shared_storage.last_vote.lock().clone();
+        let qc = self
+            .shared_storage
+            .highest_2chain_timeout_certificate
+            .lock()
+            .clone();
         RecoveryData::new(
-            self.shared_storage.last_vote.lock().clone(),
+            last_vote,
             ledger_recovery_data,
             blocks,
             RootMetadata::new_empty(),
             quorum_certs,
-            self.shared_storage
-                .highest_2chain_timeout_certificate
-                .lock()
-                .clone(),
+            qc,
         )
     }
 
@@ -154,17 +156,20 @@ impl PersistentLivenessStorage for MockStorage {
         // When the shared storage is empty, we are expected to not able to construct an block tree
         // from it. During test we will intentionally clear shared_storage to simulate the situation
         // of restarting from an empty consensusDB
+        // info!("step 1.3.4.2.3.1");
         let should_check_for_consistency = !(self.shared_storage.block.lock().is_empty()
             && self.shared_storage.qc.lock().is_empty());
         for block in blocks {
             self.shared_storage.block.lock().insert(block.id(), block);
         }
+        // info!("step 1.3.4.2.3.2");
         for qc in quorum_certs {
             self.shared_storage
                 .qc
                 .lock()
                 .insert(qc.certified_block().id(), qc);
         }
+        // info!("step 1.3.4.2.3.3");
         if should_check_for_consistency {
             if let Err(e) = self.verify_consistency() {
                 panic!("invalid db after save tree: {}", e);
@@ -281,7 +286,7 @@ impl PersistentLivenessStorage for EmptyStorage {
             Err(e) => {
                 eprintln!("{}", e);
                 panic!("Construct recovery data during genesis should never fail");
-            }
+            },
         }
     }
 

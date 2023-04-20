@@ -1,10 +1,10 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 #![allow(clippy::extra_unused_lifetimes)]
 use super::{
     move_modules::MoveModule,
     move_resources::MoveResource,
-    move_tables::{TableItem, TableMetadata},
+    move_tables::{CurrentTableItem, TableItem, TableMetadata},
     transactions::TransactionQuery,
 };
 use crate::{
@@ -115,44 +115,48 @@ impl WriteSetChange {
                     transaction_block_height,
                 )),
             ),
-            APIWriteSetChange::WriteTableItem(table_item) => (
-                Self {
-                    transaction_version,
-                    hash: table_item.state_key_hash.clone(),
-                    transaction_block_height,
-                    type_,
-                    address: String::default(),
+            APIWriteSetChange::WriteTableItem(table_item) => {
+                let (ti, cti) = TableItem::from_write_table_item(
+                    table_item,
                     index,
-                },
-                WriteSetChangeDetail::Table(
-                    TableItem::from_write_table_item(
-                        table_item,
-                        index,
-                        transaction_version,
-                        transaction_block_height,
-                    ),
-                    Some(TableMetadata::from_write_table_item(table_item)),
-                ),
-            ),
-            APIWriteSetChange::DeleteTableItem(table_item) => (
-                Self {
                     transaction_version,
-                    hash: table_item.state_key_hash.clone(),
                     transaction_block_height,
-                    type_,
-                    address: String::default(),
-                    index,
-                },
-                WriteSetChangeDetail::Table(
-                    TableItem::from_delete_table_item(
-                        table_item,
-                        index,
+                );
+                (
+                    Self {
                         transaction_version,
+                        hash: table_item.state_key_hash.clone(),
                         transaction_block_height,
+                        type_,
+                        address: String::default(),
+                        index,
+                    },
+                    WriteSetChangeDetail::Table(
+                        ti,
+                        cti,
+                        Some(TableMetadata::from_write_table_item(table_item)),
                     ),
-                    None,
-                ),
-            ),
+                )
+            },
+            APIWriteSetChange::DeleteTableItem(table_item) => {
+                let (ti, cti) = TableItem::from_delete_table_item(
+                    table_item,
+                    index,
+                    transaction_version,
+                    transaction_block_height,
+                );
+                (
+                    Self {
+                        transaction_version,
+                        hash: table_item.state_key_hash.clone(),
+                        transaction_block_height,
+                        type_,
+                        address: String::default(),
+                        index,
+                    },
+                    WriteSetChangeDetail::Table(ti, cti, None),
+                )
+            },
         }
     }
 
@@ -193,7 +197,7 @@ impl WriteSetChange {
 pub enum WriteSetChangeDetail {
     Module(MoveModule),
     Resource(MoveResource),
-    Table(TableItem, Option<TableMetadata>),
+    Table(TableItem, CurrentTableItem, Option<TableMetadata>),
 }
 
 // Prevent conflicts with other things named `WriteSetChange`

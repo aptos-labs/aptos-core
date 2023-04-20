@@ -1,9 +1,8 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use framework::prover::ProverOptions;
-use std::collections::BTreeMap;
-use std::path::PathBuf;
+use aptos_framework::prover::ProverOptions;
+use std::{collections::BTreeMap, path::PathBuf};
 
 // Note: to run these tests, use:
 //
@@ -18,33 +17,45 @@ where
     path
 }
 
+pub fn read_env_var(v: &str) -> String {
+    std::env::var(v).unwrap_or_else(|_| String::new())
+}
+
 pub fn run_prover_for_pkg(path_to_pkg: impl Into<String>) {
     let pkg_path = path_in_crate(path_to_pkg);
     let options = ProverOptions::default_for_test();
-    options
-        .prove(pkg_path.as_path(), BTreeMap::default())
-        .unwrap()
+    let no_tools = read_env_var("BOOGIE_EXE").is_empty()
+        || !options.cvc5 && read_env_var("Z3_EXE").is_empty()
+        || options.cvc5 && read_env_var("CVC5_EXE").is_empty();
+    if no_tools {
+        panic!(
+            "Prover tools are not configured, \
+        See https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/FRAMEWORK-PROVER-GUIDE.md \
+        for instructions, or \
+        use \"-- --skip prover\" to filter out the prover tests"
+        );
+    } else {
+        options
+            .prove(pkg_path.as_path(), BTreeMap::default(), None)
+            .unwrap()
+    }
 }
 
-#[ignore]
 #[test]
 fn move_framework_prover_tests() {
     run_prover_for_pkg("aptos-framework");
 }
 
-#[ignore]
 #[test]
 fn move_token_prover_tests() {
     run_prover_for_pkg("aptos-token");
 }
 
-#[ignore]
 #[test]
 fn move_aptos_stdlib_prover_tests() {
     run_prover_for_pkg("aptos-stdlib");
 }
 
-#[ignore]
 #[test]
 fn move_stdlib_prover_tests() {
     run_prover_for_pkg("move-stdlib");

@@ -22,6 +22,7 @@ Deprecated module
 -  [Function `withdraw_token_from_escrow_internal`](#0x3_token_coin_swap_withdraw_token_from_escrow_internal)
 -  [Function `withdraw_token_from_escrow`](#0x3_token_coin_swap_withdraw_token_from_escrow)
 -  [Function `cancel_token_listing`](#0x3_token_coin_swap_cancel_token_listing)
+-  [Specification](#@Specification_1)
 
 
 <pre><code><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
@@ -425,7 +426,7 @@ Coin owner withdraw coin to swap with tokens listed for swapping at the token ow
 Token owner lists their token for swapping
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="token_coin_swap.md#0x3_token_coin_swap_list_token_for_swap">list_token_for_swap</a>&lt;CoinType&gt;(_token_owner: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _creators_address: <b>address</b>, _collection: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, _name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, _property_version: u64, _token_amount: u64, _min_coin_per_token: u64, _locked_until_secs: u64)
+<pre><code><b>public</b> entry <b>fun</b> <a href="token_coin_swap.md#0x3_token_coin_swap_list_token_for_swap">list_token_for_swap</a>&lt;CoinType&gt;(_token_owner: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _creators_address: <b>address</b>, _collection: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, _name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, _property_version: u64, _token_amount: u64, _min_coin_per_token: u64, _locked_until_secs: u64)
 </code></pre>
 
 
@@ -619,5 +620,14 @@ Cancel token listing for a fixed amount
 
 </details>
 
+<a name="@Specification_1"></a>
 
-[move-book]: https://move-language.github.io/move/introduction.html
+## Specification
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

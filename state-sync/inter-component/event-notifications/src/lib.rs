@@ -1,11 +1,14 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
 
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_infallible::RwLock;
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
+use aptos_storage_interface::{state_view::DbStateViewAtVersion, DbReaderWriter};
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     account_view::AccountView,
@@ -16,7 +19,6 @@ use aptos_types::{
     on_chain_config::{ConfigID, OnChainConfigPayload},
     transaction::Version,
 };
-use channel::{aptos_channel, message_queues::QueueStyle};
 use futures::{channel::mpsc::SendError, stream::FusedStream, Stream};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -27,7 +29,6 @@ use std::{
     sync::Arc,
     task::{Context, Poll},
 };
-use storage_interface::{state_view::DbStateViewAtVersion, DbReaderWriter};
 use thiserror::Error;
 
 #[cfg(test)]
@@ -132,10 +133,10 @@ impl EventSubscriptionService {
             .subscription_id_to_event_subscription
             .insert(subscription_id, event_subscription)
         {
-            panic!(
+            return Err(Error::UnexpectedErrorEncountered(format!(
                 "Duplicate event subscription found! This should not occur! ID: {}, subscription: {:?}",
                 subscription_id, old_subscription
-            );
+            )));
         }
 
         // Update the event key subscriptions to include the new subscription
@@ -174,10 +175,10 @@ impl EventSubscriptionService {
             .reconfig_subscriptions
             .insert(subscription_id, reconfig_subscription)
         {
-            panic!(
+            return Err(Error::UnexpectedErrorEncountered(format!(
                 "Duplicate reconfiguration subscription found! This should not occur! ID: {}, subscription: {:?}",
                 subscription_id, old_subscription
-            );
+            )));
         }
 
         Ok(ReconfigNotificationListener {
@@ -273,10 +274,9 @@ impl EventSubscriptionService {
                 .fetch_config_by_version(*config_id, version)
             {
                 if let Some(old_entry) = config_id_to_config.insert(*config_id, config.clone()) {
-                    panic!(
+                    return Err(Error::UnexpectedErrorEncountered(format!(
                         "Unexpected config values for duplicate config id found! Key: {}, Value: {:?}!",
-                        config_id, old_entry
-                    );
+                        config_id, old_entry)));
                 }
             }
         }
@@ -347,7 +347,7 @@ type SubscriptionId = u64;
 #[derive(Debug)]
 struct EventSubscription {
     pub event_buffer: Vec<ContractEvent>,
-    pub notification_sender: channel::aptos_channel::Sender<(), EventNotification>,
+    pub notification_sender: aptos_channels::aptos_channel::Sender<(), EventNotification>,
 }
 
 impl EventSubscription {
@@ -371,7 +371,7 @@ impl EventSubscription {
 /// corresponding notifications.
 #[derive(Debug)]
 struct ReconfigSubscription {
-    pub notification_sender: channel::aptos_channel::Sender<(), ReconfigNotification>,
+    pub notification_sender: aptos_channels::aptos_channel::Sender<(), ReconfigNotification>,
 }
 
 impl ReconfigSubscription {
@@ -414,7 +414,7 @@ pub type ReconfigNotificationListener = NotificationListener<ReconfigNotificatio
 /// The component responsible for listening to subscription notifications.
 #[derive(Debug)]
 pub struct NotificationListener<T> {
-    pub notification_receiver: channel::aptos_channel::Receiver<(), T>,
+    pub notification_receiver: aptos_channels::aptos_channel::Receiver<(), T>,
 }
 
 impl<T> Stream for NotificationListener<T> {

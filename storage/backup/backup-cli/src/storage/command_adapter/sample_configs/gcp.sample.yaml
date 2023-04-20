@@ -20,9 +20,14 @@ commands:
     # route file handle content to stdout
     gsutil -q cp "gs://$BUCKET/$SUB_DIR/$FILE_HANDLE" - | gzip -cd
   save_metadata_line: |
-    # save the line to a new file under the metadata folder
-    gzip -c | gsutil -q cp - "gs://$BUCKET/$SUB_DIR/metadata/$FILE_NAME"
+    FILE_HANDLE="metadata/$FILE_NAME"
+    echo "$FILE_HANDLE"
+    exec 1>&-
+    gzip -c | gsutil -q cp - "gs://$BUCKET/$SUB_DIR/$FILE_HANDLE" > /dev/null
   list_metadata_files: |
     # list files under the metadata folder
     (gsutil -q ls gs://$BUCKET/$SUB_DIR/metadata/ ||:) \
     | sed -ne "s#gs://.*/metadata/#metadata/#p"
+  backup_metadata_file: |
+    # move metadata file to a metadata_backup folder
+    gsutil mv gs://$BUCKET/$SUB_DIR/metadata/$FILE_NAME gs://$BUCKET/$SUB_DIR/metadata_backup/$FILE_NAME

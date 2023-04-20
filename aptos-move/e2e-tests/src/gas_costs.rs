@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! Gas costs for common transactions.
@@ -137,7 +138,7 @@ pub static PEER_TO_PEER: Lazy<u64> = Lazy::new(|| {
     executor.add_account_data(&sender);
     executor.add_account_data(&receiver);
 
-    let txn = peer_to_peer_txn(sender.account(), receiver.account(), 10, 20_000);
+    let txn = peer_to_peer_txn(sender.account(), receiver.account(), 10, 20_000, 0);
     compute_gas_used(txn, &mut executor)
 });
 
@@ -154,7 +155,7 @@ pub static PEER_TO_PEER_TOO_LOW: Lazy<u64> = Lazy::new(|| {
     executor.add_account_data(&sender);
     executor.add_account_data(&receiver);
 
-    let txn = peer_to_peer_txn(sender.account(), receiver.account(), 10, balance + 1);
+    let txn = peer_to_peer_txn(sender.account(), receiver.account(), 10, balance + 1, 0);
     compute_gas_used(txn, &mut executor)
 });
 
@@ -170,7 +171,7 @@ pub static PEER_TO_PEER_NEW_RECEIVER_FIRST: Lazy<u64> = Lazy::new(|| {
     executor.add_account_data(&sender);
     let receiver = Account::new();
 
-    let txn = peer_to_peer_txn(sender.account(), &receiver, 10, 20_000);
+    let txn = peer_to_peer_txn(sender.account(), &receiver, 10, 20_000, 0);
     compute_gas_used(txn, &mut executor)
 });
 
@@ -185,8 +186,8 @@ pub static PEER_TO_PEER_NEW_RECEIVER_NEXT: Lazy<u64> = Lazy::new(|| {
     executor.add_account_data(&sender);
 
     let txns = vec![
-        peer_to_peer_txn(sender.account(), &Account::new(), 10, 20_000),
-        peer_to_peer_txn(sender.account(), &Account::new(), 11, 20_000),
+        peer_to_peer_txn(sender.account(), &Account::new(), 10, 20_000, 0),
+        peer_to_peer_txn(sender.account(), &Account::new(), 11, 20_000, 0),
     ];
     let output = &executor
         .execute_block(txns)
@@ -209,7 +210,7 @@ pub static PEER_TO_PEER_NEW_RECEIVER_TOO_LOW_FIRST: Lazy<u64> = Lazy::new(|| {
     executor.add_account_data(&sender);
     let receiver = Account::new();
 
-    let txn = peer_to_peer_txn(sender.account(), &receiver, 10, balance + 1);
+    let txn = peer_to_peer_txn(sender.account(), &receiver, 10, balance + 1, 0);
     compute_gas_used(txn, &mut executor)
 });
 
@@ -227,8 +228,8 @@ pub static PEER_TO_PEER_NEW_RECEIVER_TOO_LOW_NEXT: Lazy<u64> = Lazy::new(|| {
     executor.add_account_data(&sender);
 
     let txns = vec![
-        peer_to_peer_txn(sender.account(), &Account::new(), 10, 10_000),
-        peer_to_peer_txn(sender.account(), &Account::new(), 11, balance),
+        peer_to_peer_txn(sender.account(), &Account::new(), 10, 10_000, 0),
+        peer_to_peer_txn(sender.account(), &Account::new(), 11, balance, 0),
     ];
     let output = &executor
         .execute_block(txns)

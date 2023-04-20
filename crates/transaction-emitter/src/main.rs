@@ -1,14 +1,14 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 mod diag;
 
-use ::aptos_logger::{Level, Logger};
 use anyhow::{Context, Result};
+use aptos_logger::{Level, Logger};
+use aptos_transaction_emitter_lib::{emit_transactions, Cluster, ClusterArgs, EmitArgs};
 use clap::{Parser, Subcommand};
 use diag::diag;
-use std::time::Duration;
-use transaction_emitter_lib::{emit_transactions, Cluster, ClusterArgs, EmitArgs};
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -26,6 +26,10 @@ enum TxnEmitterCommand {
     /// This runs the transaction emitter in diag mode, where the focus is on
     /// FullNodes instead of ValidatorNodes. This performs a simple health check.
     Diag(Diag),
+
+    /// Just pings a set of end points and determines if they are reachable and have
+    /// up to date ledger information
+    PingEndPoints(PingEndPoints),
 }
 
 #[derive(Parser, Debug)]
@@ -35,6 +39,12 @@ struct EmitTx {
 
     #[clap(flatten)]
     emit_args: EmitArgs,
+}
+
+#[derive(Parser, Debug)]
+struct PingEndPoints {
+    #[clap(flatten)]
+    cluster_args: ClusterArgs,
 }
 
 #[derive(Parser, Debug)]
@@ -54,20 +64,24 @@ pub async fn main() -> Result<()> {
         TxnEmitterCommand::EmitTx(args) => {
             let stats = emit_transactions(&args.cluster_args, &args.emit_args)
                 .await
-                .context("Emit transactions failed")?;
+                .map_err(|e| panic!("Emit transactions failed {:?}", e))
+                .unwrap();
             println!("Total stats: {}", stats);
-            println!(
-                "Average rate: {}",
-                stats.rate(Duration::from_secs(args.emit_args.duration))
-            );
+            println!("Average rate: {}", stats.rate());
             Ok(())
-        }
+        },
         TxnEmitterCommand::Diag(args) => {
             let cluster = Cluster::try_from_cluster_args(&args.cluster_args)
                 .await
                 .context("Failed to build cluster")?;
             diag(&cluster).await.context("Diag failed")?;
             Ok(())
-        }
+        },
+        TxnEmitterCommand::PingEndPoints(args) => {
+            Cluster::try_from_cluster_args(&args.cluster_args)
+                .await
+                .context("Failed to build cluster")?;
+            Ok(())
+        },
     }
 }

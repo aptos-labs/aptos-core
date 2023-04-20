@@ -1,0 +1,12 @@
+query getDelegatedStakingActivities($delegatorAddress: String, $poolAddress: String) {
+  delegated_staking_activities(
+    where: { delegator_address: { _eq: $delegatorAddress }, pool_address: { _eq: $poolAddress } }
+  ) {
+    amount
+    delegator_address
+    event_index
+    event_type
+    pool_address
+    transaction_version
+  }
+}

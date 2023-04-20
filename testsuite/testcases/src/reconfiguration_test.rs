@@ -1,8 +1,9 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::anyhow;
-use forge::{NetworkContext, NetworkTest, Result, Test};
+use aptos_forge::{NetworkContext, NetworkTest, Result, Test};
 
 pub struct ReconfigurationTest;
 

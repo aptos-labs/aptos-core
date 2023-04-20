@@ -1,10 +1,11 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     requests::{
         DataRequest, EpochEndingLedgerInfoRequest, StateValuesWithProofRequest,
-        TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
+        TransactionOutputsWithProofRequest, TransactionsOrOutputsWithProofRequest,
+        TransactionsWithProofRequest,
     },
     responses::{CompleteDataRange, DataSummary, ProtocolMetadata},
     Epoch, StorageServiceRequest,
@@ -137,6 +138,54 @@ fn test_data_summary_can_service_txn_outputs_request() {
 }
 
 #[test]
+fn test_data_summary_can_service_txns_or_outputs_request() {
+    let summary = DataSummary {
+        synced_ledger_info: Some(create_mock_ledger_info(250)),
+        transactions: Some(create_range(50, 200)),
+        transaction_outputs: Some(create_range(100, 250)),
+        ..Default::default()
+    };
+
+    for compression in [true, false] {
+        // in range (for txns and outputs) and can provide proof => can service
+        assert!(summary.can_service(&txns_or_outputs_request(225, 100, 200, compression)));
+        assert!(summary.can_service(&txns_or_outputs_request(225, 125, 175, compression)));
+        assert!(summary.can_service(&txns_or_outputs_request(225, 100, 100, compression)));
+        assert!(summary.can_service(&txns_or_outputs_request(225, 150, 150, compression)));
+        assert!(summary.can_service(&txns_or_outputs_request(225, 200, 200, compression)));
+        assert!(summary.can_service(&txns_or_outputs_request(250, 200, 200, compression)));
+
+        // in range (for txns but not outputs) and can provide proof => cannot service
+        assert!(!summary.can_service(&txns_or_outputs_request(225, 51, 200, compression)));
+        assert!(!summary.can_service(&txns_or_outputs_request(225, 99, 100, compression)));
+        assert!(!summary.can_service(&txns_or_outputs_request(225, 51, 71, compression)));
+
+        // in range (for outputs but not txns) and can provide proof => cannot service
+        assert!(!summary.can_service(&txns_or_outputs_request(225, 200, 202, compression)));
+        assert!(!summary.can_service(&txns_or_outputs_request(225, 150, 201, compression)));
+        assert!(!summary.can_service(&txns_or_outputs_request(225, 201, 225, compression)));
+
+        // can provide proof, but out of range => cannot service
+        assert!(!summary.can_service(&txns_or_outputs_request(225, 99, 200, compression)));
+        assert!(!summary.can_service(&txns_or_outputs_request(225, 100, 201, compression)));
+        assert!(!summary.can_service(&txns_or_outputs_request(225, 50, 250, compression)));
+        assert!(!summary.can_service(&txns_or_outputs_request(225, 50, 150, compression)));
+        assert!(!summary.can_service(&txns_or_outputs_request(225, 150, 250, compression)));
+
+        // in range, but cannot provide proof => cannot service
+        assert!(!summary.can_service(&txns_or_outputs_request(300, 100, 200, compression)));
+        assert!(!summary.can_service(&txns_or_outputs_request(300, 125, 175, compression)));
+        assert!(!summary.can_service(&txns_or_outputs_request(300, 100, 100, compression)));
+        assert!(!summary.can_service(&txns_or_outputs_request(300, 150, 150, compression)));
+        assert!(!summary.can_service(&txns_or_outputs_request(300, 200, 200, compression)));
+        assert!(!summary.can_service(&txns_or_outputs_request(251, 200, 200, compression)));
+
+        // invalid range
+        assert!(!summary.can_service(&outputs_request(225, 175, 125, compression)));
+    }
+}
+
+#[test]
 fn test_data_summary_can_service_state_chunk_request() {
     let summary = DataSummary {
         synced_ledger_info: Some(create_mock_ledger_info(250)),
@@ -170,17 +219,17 @@ fn test_protocol_metadata_can_service() {
     };
 
     for compression in [true, false] {
-        assert!(metadata.can_service(&txns_request(200, 100, 199, compression)));
-        assert!(!metadata.can_service(&txns_request(200, 100, 200, compression)));
-
+        // Requests with smaller chunk sizes can be serviced
+        assert!(metadata.can_service(&txns_request(200, 100, 101, compression)));
         assert!(metadata.can_service(&epochs_request(100, 199, compression)));
-        assert!(!metadata.can_service(&epochs_request(100, 200, compression)));
-
-        assert!(metadata.can_service(&outputs_request(200, 100, 199, compression)));
-        assert!(!metadata.can_service(&outputs_request(200, 100, 200, compression)));
-
+        assert!(metadata.can_service(&outputs_request(200, 100, 100, compression)));
         assert!(metadata.can_service(&state_values_request(200, 100, 199, compression)));
-        assert!(!metadata.can_service(&state_values_request(200, 100, 200, compression)));
+
+        // Requests with larger chunk sizes (beyond the max) can also be serviced
+        assert!(metadata.can_service(&txns_request(200, 100, 1000, compression)));
+        assert!(metadata.can_service(&epochs_request(100, 10000, compression)));
+        assert!(metadata.can_service(&outputs_request(200, 100, 9999989, compression)));
+        assert!(metadata.can_service(&state_values_request(200, 100, 200, compression)));
     }
 }
 
@@ -242,6 +291,23 @@ fn outputs_request(
             proof_version,
             start_version,
             end_version,
+        });
+    StorageServiceRequest::new(data_request, use_compression)
+}
+
+fn txns_or_outputs_request(
+    proof: Version,
+    start: Version,
+    end: Version,
+    use_compression: bool,
+) -> StorageServiceRequest {
+    let data_request =
+        DataRequest::GetTransactionsOrOutputsWithProof(TransactionsOrOutputsWithProofRequest {
+            proof_version: proof,
+            start_version: start,
+            end_version: end,
+            include_events: true,
+            max_num_output_reductions: 3,
         });
     StorageServiceRequest::new(data_request, use_compression)
 }

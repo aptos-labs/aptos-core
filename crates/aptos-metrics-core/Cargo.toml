@@ -1,17 +1,20 @@
 [package]
 name = "aptos-metrics-core"
-version = "0.1.0"
-authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Aptos metrics shortcuts"
-repository = "https://github.com/aptos-labs/aptos-core"
-homepage = "https://aptoslabs.com"
-license = "Apache-2.0"
-publish = false
-edition = "2021"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
 
 [dependencies]
-anyhow = "1.0.57"
-prometheus = { version = "0.13.0", default-features = false }
+anyhow = { workspace = true }
+prometheus = { workspace = true }
 
 [dev-dependencies]
-claims = "0.7"
+claims = { workspace = true }

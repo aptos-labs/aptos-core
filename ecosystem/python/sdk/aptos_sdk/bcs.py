@@ -1,4 +1,4 @@
-# Copyright (c) Aptos
+# Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
 """
@@ -10,12 +10,14 @@ from __future__ import annotations
 import io
 import typing
 import unittest
+from typing import Dict, List
 
 MAX_U8 = 2**8 - 1
 MAX_U16 = 2**16 - 1
 MAX_U32 = 2**32 - 1
 MAX_U64 = 2**64 - 1
 MAX_U128 = 2**128 - 1
+MAX_U256 = 2**256 - 1
 
 
 class Deserializer:
@@ -38,7 +40,7 @@ class Deserializer:
         else:
             raise Exception("Unexpected boolean value: ", value)
 
-    def bytes(self) -> bytes:
+    def to_bytes(self) -> bytes:
         return self._read(self.uleb128())
 
     def fixed_bytes(self, length: int) -> bytes:
@@ -50,7 +52,7 @@ class Deserializer:
         value_decoder: typing.Callable[[Deserializer], typing.Any],
     ) -> Dict[typing.Any, typing.Any]:
         length = self.uleb128()
-        values = {}
+        values: Dict = {}
         while len(values) < length:
             key = key_decoder(self)
             value = value_decoder(self)
@@ -62,13 +64,13 @@ class Deserializer:
         value_decoder: typing.Callable[[Deserializer], typing.Any],
     ) -> List[typing.Any]:
         length = self.uleb128()
-        values = []
+        values: List = []
         while len(values) < length:
             values.append(value_decoder(self))
         return values
 
     def str(self) -> str:
-        return self.bytes().decode()
+        return self.to_bytes().decode()
 
     def struct(self, struct: typing.Any) -> typing.Any:
         return struct.deserialize(self)
@@ -87,6 +89,9 @@ class Deserializer:
 
     def u128(self) -> int:
         return self._read_int(16)
+
+    def u256(self) -> int:
+        return self._read_int(32)
 
     def uleb128(self) -> int:
         value = 0
@@ -130,7 +135,7 @@ class Serializer:
     def bool(self, value: bool):
         self._write_int(int(value), 1)
 
-    def bytes(self, value: bytes):
+    def to_bytes(self, value: bytes):
         self.uleb128(len(value))
         self._output.write(value)
 
@@ -155,6 +160,7 @@ class Serializer:
             self.fixed_bytes(key)
             self.fixed_bytes(value)
 
+    @staticmethod
     def sequence_serializer(
         value_encoder: typing.Callable[[Serializer, typing.Any], bytes],
     ):
@@ -170,7 +176,7 @@ class Serializer:
             self.fixed_bytes(encoder(value, value_encoder))
 
     def str(self, value: str):
-        self.bytes(value.encode())
+        self.to_bytes(value.encode())
 
     def struct(self, value: typing.Any):
         value.serialize(self)
@@ -205,6 +211,12 @@ class Serializer:
 
         self._write_int(value, 16)
 
+    def u256(self, value: int):
+        if value > MAX_U256:
+            raise Exception(f"Cannot encode {value} into u256")
+
+        self._write_int(value, 32)
+
     def uleb128(self, value: int):
         if value > MAX_U32:
             raise Exception(f"Cannot encode {value} into uleb128")
@@ -223,7 +235,7 @@ class Serializer:
 
 
 def encoder(
-    value: typing.Any, encoder: typing.Callable[[Serializer, typing.Any], None]
+    value: typing.Any, encoder: typing.Callable[[Serializer, typing.Any], typing.Any]
 ) -> bytes:
     ser = Serializer()
     encoder(ser, value)
@@ -262,9 +274,9 @@ class Test(unittest.TestCase):
         in_value = b"1234567890"
 
         ser = Serializer()
-        ser.bytes(in_value)
+        ser.to_bytes(in_value)
         der = Deserializer(ser.output())
-        out_value = der.bytes()
+        out_value = der.to_bytes()
 
         self.assertEqual(in_value, out_value)
 
@@ -356,6 +368,16 @@ class Test(unittest.TestCase):
         ser.u128(in_value)
         der = Deserializer(ser.output())
         out_value = der.u128()
+
+        self.assertEqual(in_value, out_value)
+
+    def test_u256(self):
+        in_value = 111111111111111111111111111111111111111111111111111111111111111111111111111115
+
+        ser = Serializer()
+        ser.u256(in_value)
+        der = Deserializer(ser.output())
+        out_value = der.u256()
 
         self.assertEqual(in_value, out_value)
 

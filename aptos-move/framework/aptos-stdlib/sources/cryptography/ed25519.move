@@ -35,7 +35,13 @@ module aptos_std::ed25519 {
     // Structs
     //
 
-    /// A BCS-serializable message, which one can verify signatures on via `verify_signature_t`
+    #[test_only]
+    /// This struct holds an Ed25519 secret key that can be used to generate Ed25519 signatures during testing.
+    struct SecretKey has drop {
+        bytes: vector<u8>
+    }
+
+    /// A BCS-serializable message, which one can verify signatures on via `signature_verify_strict_t`
     struct SignedMessage<MessageType> has drop {
         type_info: TypeInfo,
         inner: MessageType,
@@ -54,7 +60,7 @@ module aptos_std::ed25519 {
         bytes: vector<u8>
     }
 
-    /// A purported Ed25519 signature that can be verified via `verify_signature_strict` or `verify_signature_strict_t`.
+    /// A purported Ed25519 signature that can be verified via `signature_verify_strict` or `signature_verify_strict_t`.
     struct Signature has copy, drop, store {
         bytes: vector<u8>
     }
@@ -166,6 +172,36 @@ module aptos_std::ed25519 {
         std::hash::sha3_256(pk_bytes)
     }
 
+    #[test_only]
+    /// Generates an Ed25519 key pair.
+    public fun generate_keys(): (SecretKey, ValidatedPublicKey) {
+        let (sk_bytes, pk_bytes) = generate_keys_internal();
+        let sk = SecretKey {
+            bytes: sk_bytes
+        };
+        let pk = ValidatedPublicKey {
+            bytes: pk_bytes
+        };
+        (sk,pk)
+    }
+
+    #[test_only]
+    /// Generates an Ed25519 signature for a given byte array using a given signing key.
+    public fun sign_arbitrary_bytes(sk: &SecretKey, msg: vector<u8>): Signature {
+        Signature {
+            bytes: sign_internal(sk.bytes, msg)
+        }
+    }
+
+    #[test_only]
+    /// Generates an Ed25519 signature for given structured data using a given signing key.
+    public fun sign_struct<T:drop>(sk: &SecretKey, data: T): Signature {
+        let encoded = new_signed_message(data);
+        Signature {
+            bytes: sign_internal(sk.bytes, bcs::to_bytes(&encoded))
+        }
+    }
+
     //
     // Native functions
     //
@@ -186,4 +222,41 @@ module aptos_std::ed25519 {
         public_key: vector<u8>,
         message: vector<u8>
     ): bool;
+
+    #[test_only]
+    /// Generates an Ed25519 key pair.
+    native fun generate_keys_internal(): (vector<u8>, vector<u8>);
+
+    #[test_only]
+    /// Generates an Ed25519 signature for a given byte array using a given signing key.
+    native fun sign_internal(sk: vector<u8>, msg: vector<u8>): vector<u8>;
+
+    //
+    // Tests
+    //
+
+    #[test_only]
+    struct TestMessage has copy, drop {
+        title: vector<u8>,
+        content: vector<u8>,
+    }
+
+    #[test]
+    fun test_gen_sign_verify_combo() {
+        let (sk, vpk) = generate_keys();
+        let pk = public_key_into_unvalidated(vpk);
+
+        let msg1: vector<u8> = x"0123456789abcdef";
+        let sig1 = sign_arbitrary_bytes(&sk, msg1);
+        assert!(signature_verify_strict(&sig1, &pk, msg1), std::error::invalid_state(1));
+
+        let msg2 = TestMessage {
+            title: b"Some Title",
+            content: b"That is it.",
+        };
+        let sig2 = sign_struct(&sk, copy msg2);
+        assert!(signature_verify_strict_t(&sig2, &pk, copy msg2), std::error::invalid_state(2));
+    }
+
+
 }

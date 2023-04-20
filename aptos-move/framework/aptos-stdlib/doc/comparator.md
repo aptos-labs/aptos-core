@@ -95,7 +95,7 @@ Provides a framework for comparing two elements
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="comparator.md#0x1_comparator_is_equal">is_equal</a>(result: &<a href="comparator.md#0x1_comparator_Result">Result</a>): bool {
-    <b>return</b> result.inner == <a href="comparator.md#0x1_comparator_EQUAL">EQUAL</a>
+    result.inner == <a href="comparator.md#0x1_comparator_EQUAL">EQUAL</a>
 }
 </code></pre>
 
@@ -119,7 +119,7 @@ Provides a framework for comparing two elements
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="comparator.md#0x1_comparator_is_smaller_than">is_smaller_than</a>(result: &<a href="comparator.md#0x1_comparator_Result">Result</a>): bool {
-    <b>return</b> result.inner == <a href="comparator.md#0x1_comparator_SMALLER">SMALLER</a>
+    result.inner == <a href="comparator.md#0x1_comparator_SMALLER">SMALLER</a>
 }
 </code></pre>
 
@@ -226,4 +226,4 @@ Provides a framework for comparing two elements
 </details>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

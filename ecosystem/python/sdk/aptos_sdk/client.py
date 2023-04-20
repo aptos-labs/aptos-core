@@ -1,11 +1,12 @@
-# Copyright (c) Aptos
+# Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import httpx
 
+from . import ed25519
 from .account import Account
 from .account_address import AccountAddress
 from .authenticator import Authenticator, Ed25519Authenticator, MultiAgentAuthenticator
@@ -23,16 +24,27 @@ from .type_tag import StructTag, TypeTag
 U64_MAX = 18446744073709551615
 
 
+class ClientConfig:
+    """Common configuration for clients, particularly for submitting transactions"""
+
+    expiration_ttl: int = 600
+    gas_unit_price: int = 100
+    max_gas_amount: int = 100_000
+    transaction_wait_in_seconds: int = 20
+
+
 class RestClient:
     """A wrapper around the Aptos-core Rest API"""
 
     chain_id: int
     client: httpx.Client
+    client_config: ClientConfig
     base_url: str
 
-    def __init__(self, base_url: str):
+    def __init__(self, base_url: str, client_config: ClientConfig = ClientConfig()):
         self.base_url = base_url
         self.client = httpx.Client()
+        self.client_config = client_config
         self.chain_id = int(self.info()["chain_id"])
 
     def close(self):
@@ -42,41 +54,74 @@ class RestClient:
     # Account accessors
     #
 
-    def account(self, account_address: AccountAddress) -> Dict[str, str]:
+    def account(
+        self, account_address: AccountAddress, ledger_version: int = None
+    ) -> Dict[str, str]:
         """Returns the sequence number and authentication key for an account"""
 
-        response = self.client.get(f"{self.base_url}/accounts/{account_address}")
+        if not ledger_version:
+            request = f"{self.base_url}/accounts/{account_address}"
+        else:
+            request = f"{self.base_url}/accounts/{account_address}?ledger_version={ledger_version}"
+
+        response = self.client.get(request)
         if response.status_code >= 400:
             raise ApiError(f"{response.text} - {account_address}", response.status_code)
         return response.json()
 
-    def account_balance(self, account_address: str) -> int:
+    def account_balance(
+        self, account_address: AccountAddress, ledger_version: int = None
+    ) -> int:
         """Returns the test coin balance associated with the account"""
-        return self.account_resource(
-            account_address, "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>"
-        )["data"]["coin"]["value"]
+        resource = self.account_resource(
+            account_address,
+            "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+            ledger_version,
+        )
+        return resource["data"]["coin"]["value"]
 
-    def account_sequence_number(self, account_address: AccountAddress) -> int:
-        account_res = self.account(account_address)
+    def account_sequence_number(
+        self, account_address: AccountAddress, ledger_version: int = None
+    ) -> int:
+        account_res = self.account(account_address, ledger_version)
         return int(account_res["sequence_number"])
 
     def account_resource(
-        self, account_address: AccountAddress, resource_type: str
-    ) -> Optional[Dict[str, Any]]:
-        response = self.client.get(
-            f"{self.base_url}/accounts/{account_address}/resource/{resource_type}"
-        )
+        self,
+        account_address: AccountAddress,
+        resource_type: str,
+        ledger_version: int = None,
+    ) -> Dict[str, Any]:
+        if not ledger_version:
+            request = (
+                f"{self.base_url}/accounts/{account_address}/resource/{resource_type}"
+            )
+        else:
+            request = f"{self.base_url}/accounts/{account_address}/resource/{resource_type}?ledger_version={ledger_version}"
+
+        response = self.client.get(request)
         if response.status_code == 404:
-            return None
+            raise ResourceNotFound(resource_type, resource_type)
         if response.status_code >= 400:
             raise ApiError(f"{response.text} - {account_address}", response.status_code)
         return response.json()
 
     def get_table_item(
-        self, handle: str, key_type: str, value_type: str, key: Any
+        self,
+        handle: str,
+        key_type: str,
+        value_type: str,
+        key: Any,
+        ledger_version: int = None,
     ) -> Any:
+        if not ledger_version:
+            request = f"{self.base_url}/tables/{handle}/item"
+        else:
+            request = (
+                f"{self.base_url}/tables/{handle}/item?ledger_version={ledger_version}"
+            )
         response = self.client.post(
-            f"{self.base_url}/tables/{handle}/item",
+            request,
             json={
                 "key_type": key_type,
                 "value_type": value_type,
@@ -86,6 +131,46 @@ class RestClient:
         if response.status_code >= 400:
             raise ApiError(response.text, response.status_code)
         return response.json()
+
+    def aggregator_value(
+        self,
+        account_address: AccountAddress,
+        resource_type: str,
+        aggregator_path: List[str],
+    ) -> int:
+        source_data = self.account_resource(account_address, resource_type)["data"]
+        data = source_data
+
+        while len(aggregator_path) > 0:
+            key = aggregator_path.pop()
+            if key not in data:
+                raise ApiError(
+                    f"aggregator path not found in data: {source_data}", source_data
+                )
+            data = data[key]
+
+        if "vec" not in data:
+            raise ApiError(f"aggregator not found in data: {source_data}", source_data)
+        data = data["vec"]
+        if len(data) != 1:
+            raise ApiError(f"aggregator not found in data: {source_data}", source_data)
+        data = data[0]
+        if "aggregator" not in data:
+            raise ApiError(f"aggregator not found in data: {source_data}", source_data)
+        data = data["aggregator"]
+        if "vec" not in data:
+            raise ApiError(f"aggregator not found in data: {source_data}", source_data)
+        data = data["vec"]
+        if len(data) != 1:
+            raise ApiError(f"aggregator not found in data: {source_data}", source_data)
+        data = data[0]
+        if "handle" not in data:
+            raise ApiError(f"aggregator not found in data: {source_data}", source_data)
+        if "key" not in data:
+            raise ApiError(f"aggregator not found in data: {source_data}", source_data)
+        handle = data["handle"]
+        key = data["key"]
+        return int(self.get_table_item(handle, "address", "u128", key))
 
     #
     # Ledger accessors
@@ -100,6 +185,31 @@ class RestClient:
     #
     # Transactions
     #
+
+    def simulate_transaction(
+        self,
+        transaction: RawTransaction,
+        sender: Account,
+    ) -> Dict[str, Any]:
+        # Note that simulated transactions are not signed and have all 0 signatures!
+        authenticator = Authenticator(
+            Ed25519Authenticator(
+                sender.public_key(),
+                ed25519.Signature(b"\x00" * 64),
+            )
+        )
+        signed_transaction = SignedTransaction(transaction, authenticator)
+
+        headers = {"Content-Type": "application/x.aptos.signed_transaction+bcs"}
+        response = self.client.post(
+            f"{self.base_url}/transactions/simulate",
+            headers=headers,
+            content=signed_transaction.bytes(),
+        )
+        if response.status_code >= 400:
+            raise ApiError(response.text, response.status_code)
+
+        return response.json()
 
     def submit_bcs_transaction(self, signed_transaction: SignedTransaction) -> str:
         headers = {"Content-Type": "application/x.aptos.signed_transaction+bcs"}
@@ -123,9 +233,11 @@ class RestClient:
         txn_request = {
             "sender": f"{sender.address()}",
             "sequence_number": str(self.account_sequence_number(sender.address())),
-            "max_gas_amount": "10000",
-            "gas_unit_price": "100",
-            "expiration_timestamp_secs": str(int(time.time()) + 600),
+            "max_gas_amount": str(self.client_config.max_gas_amount),
+            "gas_unit_price": str(self.client_config.gas_unit_price),
+            "expiration_timestamp_secs": str(
+                int(time.time()) + self.client_config.expiration_ttl
+            ),
             "payload": payload,
         }
 
@@ -153,6 +265,7 @@ class RestClient:
 
     def transaction_pending(self, txn_hash: str) -> bool:
         response = self.client.get(f"{self.base_url}/transactions/by_hash/{txn_hash}")
+        # TODO(@davidiw): consider raising a different error here, since this is an ambiguous state
         if response.status_code == 404:
             return True
         if response.status_code >= 400:
@@ -160,11 +273,16 @@ class RestClient:
         return response.json()["type"] == "pending_transaction"
 
     def wait_for_transaction(self, txn_hash: str) -> None:
-        """Waits up to 20 seconds for a transaction to move past pending state."""
+        """
+        Waits up to the duration specified in client_config for a transaction to move past pending
+        state.
+        """
 
         count = 0
         while self.transaction_pending(txn_hash):
-            assert count < 20, f"transaction {txn_hash} timed out"
+            assert (
+                count < self.client_config.transaction_wait_in_seconds
+            ), f"transaction {txn_hash} timed out"
             time.sleep(1)
             count += 1
         response = self.client.get(f"{self.base_url}/transactions/by_hash/{txn_hash}")
@@ -187,9 +305,9 @@ class RestClient:
                 sender.address(),
                 self.account_sequence_number(sender.address()),
                 payload,
-                100_000,
-                100,
-                int(time.time()) + 600,
+                self.client_config.max_gas_amount,
+                self.client_config.gas_unit_price,
+                int(time.time()) + self.client_config.expiration_ttl,
                 self.chain_id,
             ),
             [x.address() for x in secondary_accounts],
@@ -216,19 +334,23 @@ class RestClient:
 
         return SignedTransaction(raw_transaction.inner(), authenticator)
 
-    def create_single_signer_bcs_transaction(
+    def create_bcs_transaction(
         self, sender: Account, payload: TransactionPayload
-    ) -> SignedTransaction:
-        raw_transaction = RawTransaction(
+    ) -> RawTransaction:
+        return RawTransaction(
             sender.address(),
             self.account_sequence_number(sender.address()),
             payload,
-            100_000,
-            100,
-            int(time.time()) + 600,
+            self.client_config.max_gas_amount,
+            self.client_config.gas_unit_price,
+            int(time.time()) + self.client_config.expiration_ttl,
             self.chain_id,
         )
 
+    def create_bcs_signed_transaction(
+        self, sender: Account, payload: TransactionPayload
+    ) -> SignedTransaction:
+        raw_transaction = self.create_bcs_transaction(sender, payload)
         signature = sender.sign(raw_transaction.keyed())
         authenticator = Authenticator(
             Ed25519Authenticator(sender.public_key(), signature)
@@ -245,7 +367,7 @@ class RestClient:
 
         payload = {
             "type": "entry_function_payload",
-            "function": "0x1::coin::transfer",
+            "function": "0x1::aptos_account::transfer_coins",
             "type_arguments": ["0x1::aptos_coin::AptosCoin"],
             "arguments": [
                 f"{recipient}",
@@ -254,7 +376,7 @@ class RestClient:
         }
         return self.submit_transaction(sender, payload)
 
-    #:!:>bcs_transfer
+    # :!:>bcs_transfer
     def bcs_transfer(
         self, sender: Account, recipient: AccountAddress, amount: int
     ) -> str:
@@ -264,13 +386,13 @@ class RestClient:
         ]
 
         payload = EntryFunction.natural(
-            "0x1::coin",
-            "transfer",
+            "0x1::aptos_account",
+            "transfer_coins",
             [TypeTag(StructTag.from_str("0x1::aptos_coin::AptosCoin"))],
             transaction_arguments,
         )
 
-        signed_transaction = self.create_single_signer_bcs_transaction(
+        signed_transaction = self.create_bcs_signed_transaction(
             sender, TransactionPayload(payload)
         )
         return self.submit_bcs_transaction(signed_transaction)
@@ -281,7 +403,7 @@ class RestClient:
     # Token transaction wrappers
     #
 
-    #:!:>create_collection
+    # :!:>create_collection
     def create_collection(
         self, account: Account, name: str, description: str, uri: str
     ) -> str:  # <:!:create_collection
@@ -304,12 +426,12 @@ class RestClient:
             transaction_arguments,
         )
 
-        signed_transaction = self.create_single_signer_bcs_transaction(
+        signed_transaction = self.create_bcs_signed_transaction(
             account, TransactionPayload(payload)
         )
         return self.submit_bcs_transaction(signed_transaction)
 
-    #:!:>create_token
+    # :!:>create_token
     def create_token(
         self,
         account: Account,
@@ -336,7 +458,9 @@ class RestClient:
                 Serializer.sequence_serializer(Serializer.bool),
             ),
             TransactionArgument([], Serializer.sequence_serializer(Serializer.str)),
-            TransactionArgument([], Serializer.sequence_serializer(Serializer.bytes)),
+            TransactionArgument(
+                [], Serializer.sequence_serializer(Serializer.to_bytes)
+            ),
             TransactionArgument([], Serializer.sequence_serializer(Serializer.str)),
         ]
 
@@ -346,7 +470,7 @@ class RestClient:
             [],
             transaction_arguments,
         )
-        signed_transaction = self.create_single_signer_bcs_transaction(
+        signed_transaction = self.create_bcs_signed_transaction(
             account, TransactionPayload(payload)
         )
         return self.submit_bcs_transaction(signed_transaction)
@@ -354,8 +478,8 @@ class RestClient:
     def offer_token(
         self,
         account: Account,
-        receiver: str,
-        creator: str,
+        receiver: AccountAddress,
+        creator: AccountAddress,
         collection_name: str,
         token_name: str,
         property_version: int,
@@ -376,7 +500,7 @@ class RestClient:
             [],
             transaction_arguments,
         )
-        signed_transaction = self.create_single_signer_bcs_transaction(
+        signed_transaction = self.create_bcs_signed_transaction(
             account, TransactionPayload(payload)
         )
         return self.submit_bcs_transaction(signed_transaction)
@@ -384,8 +508,8 @@ class RestClient:
     def claim_token(
         self,
         account: Account,
-        sender: str,
-        creator: str,
+        sender: AccountAddress,
+        creator: AccountAddress,
         collection_name: str,
         token_name: str,
         property_version: int,
@@ -404,7 +528,7 @@ class RestClient:
             [],
             transaction_arguments,
         )
-        signed_transaction = self.create_single_signer_bcs_transaction(
+        signed_transaction = self.create_bcs_signed_transaction(
             account, TransactionPayload(payload)
         )
         return self.submit_bcs_transaction(signed_transaction)
@@ -453,9 +577,8 @@ class RestClient:
         token_name: str,
         property_version: int,
     ) -> Any:
-        token_store_handle = self.account_resource(owner, "0x3::token::TokenStore")[
-            "data"
-        ]["tokens"]["handle"]
+        resource = self.account_resource(owner, "0x3::token::TokenStore")
+        token_store_handle = resource["data"]["tokens"]["handle"]
 
         token_id = {
             "token_data_id": {
@@ -493,7 +616,7 @@ class RestClient:
             owner, creator, collection_name, token_name, property_version
         )["amount"]
 
-    #:!:>read_token_data_table
+    # :!:>read_token_data_table
     def get_token_data(
         self,
         creator: AccountAddress,
@@ -501,9 +624,8 @@ class RestClient:
         token_name: str,
         property_version: int,
     ) -> Any:
-        token_data_handle = self.account_resource(creator, "0x3::token::Collections")[
-            "data"
-        ]["token_data"]["handle"]
+        resource = self.account_resource(creator, "0x3::token::Collections")
+        token_data_handle = resource["data"]["token_data"]["handle"]
 
         token_data_id = {
             "creator": creator.hex(),
@@ -519,9 +641,8 @@ class RestClient:
         )  # <:!:read_token_data_table
 
     def get_collection(self, creator: AccountAddress, collection_name: str) -> Any:
-        token_data = self.account_resource(creator, "0x3::token::Collections")["data"][
-            "collection_data"
-        ]["handle"]
+        resource = self.account_resource(creator, "0x3::token::Collections")
+        token_data = resource["data"]["collection_data"]["handle"]
 
         return self.get_table_item(
             token_data,
@@ -538,9 +659,9 @@ class RestClient:
         self, sender: Account, package_metadata: bytes, modules: List[bytes]
     ) -> str:
         transaction_arguments = [
-            TransactionArgument(package_metadata, Serializer.bytes),
+            TransactionArgument(package_metadata, Serializer.to_bytes),
             TransactionArgument(
-                modules, Serializer.sequence_serializer(Serializer.bytes)
+                modules, Serializer.sequence_serializer(Serializer.to_bytes)
             ),
         ]
 
@@ -551,7 +672,7 @@ class RestClient:
             transaction_arguments,
         )
 
-        signed_transaction = self.create_single_signer_bcs_transaction(
+        signed_transaction = self.create_bcs_signed_transaction(
             sender, TransactionPayload(payload)
         )
         return self.submit_bcs_transaction(signed_transaction)
@@ -583,9 +704,18 @@ class FaucetClient:
 
 
 class ApiError(Exception):
-    """Error thrown when the API returns >= 400"""
+    """The API returned a non-success status code, e.g., >= 400"""
 
-    def __init__(self, message, status_code):
+    def __init__(self, message: str, status_code: int):
         # Call the base class constructor with the parameters it needs
         super().__init__(message)
         self.status_code = status_code
+
+
+class ResourceNotFound(Exception):
+    """The underlying resource was not found"""
+
+    def __init__(self, message: str, resource: str):
+        # Call the base class constructor with the parameters it needs
+        super().__init__(message)
+        self.resource = resource

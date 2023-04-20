@@ -1,12 +1,13 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_language_e2e_tests::{
+    account::Account, common_transactions::peer_to_peer_txn, executor::FakeExecutor,
+};
 use aptos_types::{
     account_config::{DepositEvent, WithdrawEvent},
     transaction::{ExecutionStatus, SignedTransaction, TransactionOutput, TransactionStatus},
-};
-use language_e2e_tests::{
-    account::Account, common_transactions::peer_to_peer_txn, executor::FakeExecutor,
 };
 use std::{convert::TryFrom, time::Instant};
 
@@ -21,7 +22,7 @@ fn single_peer_to_peer_with_event() {
     executor.add_account_data(&receiver);
 
     let transfer_amount = 1_000;
-    let txn = peer_to_peer_txn(sender.account(), receiver.account(), 10, transfer_amount);
+    let txn = peer_to_peer_txn(sender.account(), receiver.account(), 10, transfer_amount, 0);
 
     // execute transaction
     let output = executor.execute_transaction(txn);
@@ -71,10 +72,10 @@ fn few_peer_to_peer_with_event() {
 
     // execute transaction
     let txns: Vec<SignedTransaction> = vec![
-        peer_to_peer_txn(sender.account(), receiver.account(), 10, transfer_amount),
-        peer_to_peer_txn(sender.account(), receiver.account(), 11, transfer_amount),
-        peer_to_peer_txn(sender.account(), receiver.account(), 12, transfer_amount),
-        peer_to_peer_txn(sender.account(), receiver.account(), 13, transfer_amount),
+        peer_to_peer_txn(sender.account(), receiver.account(), 10, transfer_amount, 0),
+        peer_to_peer_txn(sender.account(), receiver.account(), 11, transfer_amount, 0),
+        peer_to_peer_txn(sender.account(), receiver.account(), 12, transfer_amount, 0),
+        peer_to_peer_txn(sender.account(), receiver.account(), 13, transfer_amount, 0),
     ];
     let output = executor.execute_block(txns).unwrap();
     for (idx, txn_output) in output.iter().enumerate() {
@@ -164,7 +165,7 @@ pub(crate) fn create_cyclic_transfers(
         let seq_num = sender_resource.sequence_number();
         let receiver = &accounts[(i + 1) % count];
 
-        let txn = peer_to_peer_txn(sender, receiver, seq_num, transfer_amount);
+        let txn = peer_to_peer_txn(sender, receiver, seq_num, transfer_amount, 0);
         txns.push(txn);
         txns_info.push(TxnInfo::new(sender, receiver, transfer_amount));
     }
@@ -191,7 +192,7 @@ fn create_one_to_many_transfers(
     for (i, receiver) in accounts.iter().enumerate().take(count).skip(1) {
         // let receiver = &accounts[i];
 
-        let txn = peer_to_peer_txn(sender, receiver, seq_num + i as u64 - 1, transfer_amount);
+        let txn = peer_to_peer_txn(sender, receiver, seq_num + i as u64 - 1, transfer_amount, 0);
         txns.push(txn);
         txns_info.push(TxnInfo::new(sender, receiver, transfer_amount));
     }
@@ -218,7 +219,7 @@ fn create_many_to_one_transfers(
             .expect("sender must exist");
         let seq_num = sender_resource.sequence_number();
 
-        let txn = peer_to_peer_txn(sender, receiver, seq_num, transfer_amount);
+        let txn = peer_to_peer_txn(sender, receiver, seq_num, transfer_amount, 0);
         txns.push(txn);
         txns_info.push(TxnInfo::new(sender, receiver, transfer_amount));
     }

@@ -1,13 +1,13 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey};
 use aptos_gas::{FeePerGasUnit, Gas, NumBytes};
-use aptos_types::transaction::authenticator::AuthenticationKey;
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
-    transaction::{SignedTransaction, TransactionPayload},
+    transaction::{authenticator::AuthenticationKey, SignedTransaction, TransactionPayload},
 };
 use std::convert::TryFrom;
 
@@ -47,6 +47,9 @@ impl TransactionMetadata {
             script_hash: match txn.payload() {
                 TransactionPayload::Script(s) => HashValue::sha3_256_of(s.code()).to_vec(),
                 TransactionPayload::EntryFunction(_) => vec![],
+                TransactionPayload::Multisig(_) => vec![],
+
+                // Deprecated. Will be removed in the future.
                 TransactionPayload::ModuleBundle(_) => vec![],
             },
             script_size: match txn.payload() {

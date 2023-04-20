@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -28,7 +29,7 @@ impl<K> TreeReader<K> for MockTreeStore<K>
 where
     K: crate::TestKey,
 {
-    fn get_node_option(&self, node_key: &NodeKey) -> Result<Option<Node<K>>> {
+    fn get_node_option(&self, node_key: &NodeKey, _tag: &str) -> Result<Option<Node<K>>> {
         Ok(self.data.read().0.get(node_key).cloned())
     }
 
@@ -84,7 +85,7 @@ where
             Entry::Occupied(o) => bail!("Key {:?} exists.", o.key()),
             Entry::Vacant(v) => {
                 v.insert(node);
-            }
+            },
         }
         Ok(())
     }

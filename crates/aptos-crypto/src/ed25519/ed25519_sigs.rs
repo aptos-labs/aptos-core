@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! This file implements traits for Ed25519 signatures.
@@ -77,7 +77,7 @@ impl Ed25519Signature {
             match s[i].cmp(&L[i]) {
                 Ordering::Less => return true,
                 Ordering::Greater => return false,
-                _ => {}
+                _ => {},
             }
         }
         // As this stage S == L which implies a non canonical S.
@@ -90,8 +90,8 @@ impl Ed25519Signature {
 //////////////////////
 
 impl Signature for Ed25519Signature {
-    type VerifyingKeyMaterial = Ed25519PublicKey;
     type SigningKeyMaterial = Ed25519PrivateKey;
+    type VerifyingKeyMaterial = Ed25519PublicKey;
 
     /// Verifies that the provided signature is valid for the provided message, going beyond the
     /// [RFC8032](https://tools.ietf.org/html/rfc8032) specification, checking both scalar

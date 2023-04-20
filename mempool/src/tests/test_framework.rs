@@ -1,50 +1,56 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::shared_mempool::types::MultiBatchId;
-use crate::tests::common;
 use crate::{
     core_mempool::CoreMempool,
-    network::{MempoolNetworkEvents, MempoolNetworkSender, MempoolSyncMsg},
-    shared_mempool::start_shared_mempool,
-    tests::common::TestTransaction,
-    MempoolClientRequest, MempoolClientSender, QuorumStoreRequest,
+    shared_mempool::{start_shared_mempool, types::MultiBatchId},
+    tests::{common, common::TestTransaction},
+    MempoolClientRequest, MempoolClientSender, MempoolSyncMsg, QuorumStoreRequest,
 };
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
     config::NodeConfig,
     network_id::{NetworkId, PeerNetworkId},
 };
+use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListener};
 use aptos_id_generator::U32IdGenerator;
 use aptos_infallible::{Mutex, RwLock};
-use aptos_types::{
-    account_address::AccountAddress, mempool_status::MempoolStatusCode,
-    on_chain_config::ON_CHAIN_CONFIG_REGISTRY, transaction::SignedTransaction,
-};
-use event_notifications::EventSubscriptionService;
-use futures::{channel::oneshot, SinkExt};
-use mempool_notifications::MempoolNotifier;
-use network::{
-    application::storage::PeerMetadataStorage,
-    peer_manager::{PeerManagerNotification, PeerManagerRequest},
-    protocols::{direct_send::Message, rpc::InboundRpcRequest},
+use aptos_mempool_notifications::MempoolNotifier;
+use aptos_network::{
+    application::{
+        interface::{NetworkClient, NetworkServiceEvents},
+        storage::PeersAndMetadata,
+    },
+    peer_manager::{
+        conn_notifs_channel, ConnectionRequestSender, PeerManagerNotification, PeerManagerRequest,
+        PeerManagerRequestSender,
+    },
+    protocols::{
+        direct_send::Message,
+        network::{NetworkEvents, NetworkSender, NewNetworkEvents, NewNetworkSender},
+        rpc::InboundRpcRequest,
+        wire::handshake::v1::ProtocolId::MempoolDirectSend,
+    },
     testutils::{
         builder::TestFrameworkBuilder,
-        test_framework::{setup_node_networks, TestFramework},
+        test_framework::TestFramework,
         test_node::{
-            ApplicationNetworkHandle, ApplicationNode, InboundNetworkHandle, NodeId,
-            OutboundMessageReceiver, TestNode,
+            ApplicationNode, InboundNetworkHandle, NodeId, OutboundMessageReceiver, TestNode,
         },
     },
     ProtocolId,
 };
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
+use aptos_storage_interface::mock::MockDbReaderWriter;
+use aptos_types::{
+    account_address::AccountAddress, mempool_status::MempoolStatusCode,
+    on_chain_config::OnChainConfigPayload, transaction::SignedTransaction,
 };
-use storage_interface::{mock::MockDbReaderWriter, DbReaderWriter};
+use aptos_vm_validator::mocks::mock_vm_validator::MockVMValidator;
+use futures::{channel::oneshot, SinkExt};
+use std::{collections::HashMap, hash::Hash, sync::Arc};
 use tokio::{runtime::Handle, time::Duration};
 use tokio_stream::StreamExt;
-use vm_validator::mocks::mock_vm_validator::MockVMValidator;
 
 /// An individual mempool node that runs in it's own runtime.
 ///
@@ -67,7 +73,7 @@ pub struct MempoolNode {
     // Networking specifics
     node_id: NodeId,
     peer_network_ids: HashMap<NetworkId, PeerNetworkId>,
-    peer_metadata_storage: Arc<PeerMetadataStorage>,
+    peers_and_metadata: Arc<PeersAndMetadata>,
 
     inbound_handles: HashMap<NetworkId, InboundNetworkHandle>,
     outbound_handles: HashMap<NetworkId, OutboundMessageReceiver>,
@@ -124,8 +130,8 @@ impl ApplicationNode for MempoolNode {
         self.outbound_handles.get_mut(&network_id).unwrap()
     }
 
-    fn get_peer_metadata_storage(&self) -> &PeerMetadataStorage {
-        &self.peer_metadata_storage
+    fn get_peers_and_metadata(&self) -> &PeersAndMetadata {
+        &self.peers_and_metadata
     }
 
     fn peer_network_ids(&self) -> &HashMap<NetworkId, PeerNetworkId> {
@@ -159,7 +165,10 @@ impl MempoolNode {
     /// Asynchronously waits for up to 1 second for txns to appear in mempool
     pub async fn wait_on_txns_in_mempool(&self, txns: &[TestTransaction]) {
         for _ in 0..10 {
-            let block = self.mempool.lock().get_batch(100, 102400, HashSet::new());
+            let block = self
+                .mempool
+                .lock()
+                .get_batch(100, 102400, true, false, vec![]);
 
             if block_contains_all_transactions(&block, txns) {
                 break;
@@ -209,7 +218,10 @@ impl MempoolNode {
         txns: &[TestTransaction],
         condition: Condition,
     ) -> Result<(), (Vec<(AccountAddress, u64)>, Vec<(AccountAddress, u64)>)> {
-        let block = self.mempool.lock().get_batch(100, 102400, HashSet::new());
+        let block = self
+            .mempool
+            .lock()
+            .get_batch(100, 102400, true, false, vec![]);
         if !condition(&block, txns) {
             let actual: Vec<_> = block
                 .iter()
@@ -247,28 +259,23 @@ impl MempoolNode {
         let data = protocol_id.to_bytes(&msg).unwrap().into();
         let (notif, maybe_receiver) = match protocol_id {
             ProtocolId::MempoolDirectSend => (
-                PeerManagerNotification::RecvMessage(
-                    remote_peer_id,
-                    Message {
-                        protocol_id,
-                        mdata: data,
-                    },
-                ),
+                PeerManagerNotification::RecvMessage(remote_peer_id, Message {
+                    protocol_id,
+                    mdata: data,
+                }),
                 None,
             ),
             ProtocolId::MempoolRpc => {
                 let (res_tx, res_rx) = oneshot::channel();
-                let notif = PeerManagerNotification::RecvRpc(
-                    remote_peer_id,
-                    InboundRpcRequest {
-                        protocol_id,
-                        data,
-                        res_tx,
-                    },
-                );
+                let notif = PeerManagerNotification::RecvRpc(remote_peer_id, InboundRpcRequest {
+                    protocol_id,
+                    data,
+                    res_tx,
+                });
                 (notif, Some(res_rx))
-            }
-            _ => panic!("Invalid protocol"),
+            },
+
+            protocol_id => panic!("Invalid protocol id found: {:?}", protocol_id),
         };
         inbound_handle
             .inbound_message_sender
@@ -283,7 +290,7 @@ impl MempoolNode {
                 PeerManagerRequest::SendDirectSend(peer_id, msg) => {
                     assert_eq!(peer_id, remote_peer_id);
                     msg.protocol_id.from_bytes(&msg.mdata).unwrap()
-                }
+                },
                 _ => panic!("Should not be getting an RPC response"),
             }
         };
@@ -345,10 +352,10 @@ impl MempoolNode {
         let (peer_id, protocol_id, data, maybe_rpc_sender) = match message {
             PeerManagerRequest::SendRpc(peer_id, msg) => {
                 (peer_id, msg.protocol_id, msg.data, Some(msg.res_tx))
-            }
+            },
             PeerManagerRequest::SendDirectSend(peer_id, msg) => {
                 (peer_id, msg.protocol_id, msg.mdata, None)
-            }
+            },
         };
         assert_eq!(peer_id, expected_peer_id);
         let mempool_message = common::decompress_and_deserialize(&data.to_vec());
@@ -378,10 +385,10 @@ impl MempoolNode {
                     );
                 }
                 request_id
-            }
+            },
             MempoolSyncMsg::BroadcastTransactionsResponse { .. } => {
                 panic!("We aren't supposed to be getting as response here");
-            }
+            },
         };
         let response = MempoolSyncMsg::BroadcastTransactionsResponse {
             request_id,
@@ -393,13 +400,10 @@ impl MempoolNode {
         if let Some(rpc_sender) = maybe_rpc_sender {
             rpc_sender.send(Ok(bytes.into())).unwrap();
         } else {
-            let notif = PeerManagerNotification::RecvMessage(
-                peer_id,
-                Message {
-                    protocol_id,
-                    mdata: bytes.into(),
-                },
-            );
+            let notif = PeerManagerNotification::RecvMessage(peer_id, Message {
+                protocol_id,
+                mdata: bytes.into(),
+            });
             inbound_handle
                 .inbound_message_sender
                 .push((peer_id, protocol_id), notif)
@@ -441,10 +445,15 @@ impl TestFramework<MempoolNode> for MempoolTestFramework {
             network_id_mapping.insert(network_id, *peer_network_id);
         }
 
-        let (application_handles, inbound_handles, outbound_handles, peer_metadata_storage) =
-            setup_node_networks(&network_ids);
+        let (
+            network_client,
+            network_service_events,
+            inbound_handles,
+            outbound_handles,
+            peers_and_metadata,
+        ) = setup_node_networks(&network_ids);
         let (mempool_client_sender, consensus_to_mempool_sender, mempool_notifications, mempool) =
-            setup_mempool(config, application_handles, peer_metadata_storage.clone());
+            setup_mempool(config, network_client, network_service_events);
 
         MempoolNode {
             node_id,
@@ -456,7 +465,7 @@ impl TestFramework<MempoolNode> for MempoolTestFramework {
             inbound_handles,
             outbound_handles,
             other_inbound_handles: HashMap::new(),
-            peer_metadata_storage,
+            peers_and_metadata,
             request_id_generator: U32IdGenerator::new(),
         }
     }
@@ -466,14 +475,96 @@ impl TestFramework<MempoolNode> for MempoolTestFramework {
     }
 }
 
+/// Setup the multiple networks built for a specific node
+pub fn setup_node_networks(
+    network_ids: &[NetworkId],
+) -> (
+    NetworkClient<MempoolSyncMsg>,
+    NetworkServiceEvents<MempoolSyncMsg>,
+    HashMap<NetworkId, InboundNetworkHandle>,
+    HashMap<NetworkId, OutboundMessageReceiver>,
+    Arc<PeersAndMetadata>,
+) {
+    let peers_and_metadata = PeersAndMetadata::new(network_ids);
+
+    // Build each individual network
+    let mut network_senders = HashMap::new();
+    let mut network_and_events = HashMap::new();
+    let mut inbound_handles = HashMap::new();
+    let mut outbound_handles = HashMap::new();
+    for network_id in network_ids {
+        let (network_sender, network_events, inbound_handle, outbound_handle) =
+            setup_network(peers_and_metadata.clone());
+
+        network_senders.insert(*network_id, network_sender);
+        network_and_events.insert(*network_id, network_events);
+        inbound_handles.insert(*network_id, inbound_handle);
+        outbound_handles.insert(*network_id, outbound_handle);
+    }
+
+    // Create a network client and service events
+    let network_client = NetworkClient::new(
+        vec![MempoolDirectSend],
+        vec![],
+        network_senders,
+        peers_and_metadata.clone(),
+    );
+    let network_service_events = NetworkServiceEvents::new(network_and_events);
+
+    (
+        network_client,
+        network_service_events,
+        inbound_handles,
+        outbound_handles,
+        peers_and_metadata,
+    )
+}
+
+/// Builds all the channels used for networking
+fn setup_network(
+    peers_and_metadata: Arc<PeersAndMetadata>,
+) -> (
+    NetworkSender<MempoolSyncMsg>,
+    NetworkEvents<MempoolSyncMsg>,
+    InboundNetworkHandle,
+    OutboundMessageReceiver,
+) {
+    let (reqs_inbound_sender, reqs_inbound_receiver) = aptos_channel();
+    let (reqs_outbound_sender, reqs_outbound_receiver) = aptos_channel();
+    let (connection_outbound_sender, _connection_outbound_receiver) = aptos_channel();
+    let (connection_inbound_sender, connection_inbound_receiver) = conn_notifs_channel::new();
+
+    // Create the network sender and events
+    let network_sender = NetworkSender::new(
+        PeerManagerRequestSender::new(reqs_outbound_sender),
+        ConnectionRequestSender::new(connection_outbound_sender),
+    );
+    let network_events = NetworkEvents::new(reqs_inbound_receiver, connection_inbound_receiver);
+
+    (
+        network_sender,
+        network_events,
+        InboundNetworkHandle {
+            inbound_message_sender: reqs_inbound_sender,
+            connection_update_sender: connection_inbound_sender,
+            peers_and_metadata,
+        },
+        reqs_outbound_receiver,
+    )
+}
+
+/// A generic FIFO Aptos channel
+fn aptos_channel<K: Eq + Hash + Clone, T>(
+) -> (aptos_channel::Sender<K, T>, aptos_channel::Receiver<K, T>) {
+    static MAX_QUEUE_SIZE: usize = 8;
+    aptos_channel::new(QueueStyle::FIFO, MAX_QUEUE_SIZE, None)
+}
+
 /// Creates a full [`SharedMempool`] and mocks all of the database information.
-///
-/// This hooks in the [`ApplicationNetworkHandle`]s into mempool so that the requests make it all
-/// the way to the [`SharedMempool`]
 fn setup_mempool(
     config: NodeConfig,
-    network_handles: Vec<ApplicationNetworkHandle<MempoolNetworkSender, MempoolNetworkEvents>>,
-    peer_metadata_storage: Arc<PeerMetadataStorage>,
+    network_client: NetworkClient<MempoolSyncMsg>,
+    network_service_events: NetworkServiceEvents<MempoolSyncMsg>,
 ) -> (
     MempoolClientSender,
     futures::channel::mpsc::Sender<QuorumStoreRequest>,
@@ -484,21 +575,29 @@ fn setup_mempool(
     let (ac_endpoint_sender, ac_endpoint_receiver) = mpsc_channel();
     let (quorum_store_sender, quorum_store_receiver) = mpsc_channel();
     let (mempool_notifier, mempool_listener) =
-        mempool_notifications::new_mempool_notifier_listener_pair();
+        aptos_mempool_notifications::new_mempool_notifier_listener_pair();
 
     let mempool = Arc::new(Mutex::new(CoreMempool::new(&config)));
     let vm_validator = Arc::new(RwLock::new(MockVMValidator));
-    let db_rw = Arc::new(RwLock::new(DbReaderWriter::new(MockDbReaderWriter)));
     let db_ro = Arc::new(MockDbReaderWriter);
 
-    let mut event_subscriber = EventSubscriptionService::new(ON_CHAIN_CONFIG_REGISTRY, db_rw);
-    let reconfig_event_subscriber = event_subscriber.subscribe_to_reconfigurations().unwrap();
+    let (reconfig_sender, reconfig_events) = aptos_channel::new(QueueStyle::LIFO, 1, None);
+    let reconfig_event_subscriber = ReconfigNotificationListener {
+        notification_receiver: reconfig_events,
+    };
+    reconfig_sender
+        .push((), ReconfigNotification {
+            version: 1,
+            on_chain_configs: OnChainConfigPayload::new(1, Arc::new(HashMap::new())),
+        })
+        .unwrap();
 
     start_shared_mempool(
         &Handle::current(),
         &config,
         mempool.clone(),
-        network_handles,
+        network_client,
+        network_service_events,
         ac_endpoint_receiver,
         quorum_store_receiver,
         mempool_listener,
@@ -506,7 +605,6 @@ fn setup_mempool(
         db_ro,
         vm_validator,
         vec![sender],
-        peer_metadata_storage,
     );
 
     (

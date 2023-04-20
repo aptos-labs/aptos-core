@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -7,12 +7,12 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use aptos_logger::prelude::*;
-use aptos_types::ledger_info::LedgerInfoWithSignatures;
-use schemadb::{
+use aptos_schemadb::{
     define_schema,
     schema::{KeyCodec, ValueCodec},
     ColumnFamilyName, Options, SchemaBatch, DB,
 };
+use aptos_types::ledger_info::LedgerInfoWithSignatures;
 use serde::{Deserialize, Serialize};
 use std::{path::Path, sync::Arc, time::Instant};
 
@@ -109,7 +109,7 @@ impl PersistentMetadataStorage {
             Some(metadata_value) => {
                 let MetadataValue::StateSnapshotSync(snapshot_progress) = metadata_value;
                 Ok(Some(snapshot_progress))
-            }
+            },
             None => Ok(None),
         }
     }
@@ -130,7 +130,7 @@ impl PersistentMetadataStorage {
                 } else {
                     Ok(snapshot_progress)
                 }
-            }
+            },
             None => Err(Error::StorageError(
                 "No state snapshot progress was found!".into(),
             )),
@@ -160,6 +160,20 @@ impl PersistentMetadataStorage {
                 error
             ))
         })
+    }
+
+    /// Creates new physical DB checkpoint in directory specified by `path`.
+    pub fn create_checkpoint<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+        let start = Instant::now();
+        let state_sync_db_path = path.as_ref().join(STATE_SYNC_DB_NAME);
+        std::fs::remove_dir_all(&state_sync_db_path).unwrap_or(());
+        self.database.create_checkpoint(&state_sync_db_path)?;
+        info!(
+            path = state_sync_db_path,
+            time_ms = %start.elapsed().as_millis(),
+            "Made StateSyncDB checkpoint."
+        );
+        Ok(())
     }
 }
 

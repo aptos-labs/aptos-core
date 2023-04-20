@@ -1,8 +1,11 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::config::{Error, RootPath};
-use aptos_types::transaction::Transaction;
+use crate::config::{
+    config_sanitizer::ConfigSanitizer, utils::RootPath, Error, NodeConfig, RoleType,
+};
+use aptos_types::{chain_id::ChainId, transaction::Transaction};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::File,
@@ -57,7 +60,7 @@ impl Default for ExecutionConfig {
 }
 
 impl ExecutionConfig {
-    pub fn load(&mut self, root_dir: &RootPath) -> Result<(), Error> {
+    pub fn load_from_path(&mut self, root_dir: &RootPath) -> Result<(), Error> {
         if !self.genesis_file_location.as_os_str().is_empty() {
             // Ensure the genesis file exists
             let genesis_path = root_dir.full_path(&self.genesis_file_location);
@@ -99,17 +102,47 @@ impl ExecutionConfig {
         Ok(())
     }
 
-    pub fn save(&mut self, root_dir: &RootPath) -> Result<(), Error> {
+    pub fn save_to_path(&mut self, root_dir: &RootPath) -> Result<(), Error> {
         if let Some(genesis) = &self.genesis {
             if self.genesis_file_location.as_os_str().is_empty() {
                 self.genesis_file_location = PathBuf::from(GENESIS_DEFAULT);
             }
             let path = root_dir.full_path(&self.genesis_file_location);
-            let mut file = File::create(&path).map_err(|e| Error::IO("genesis".into(), e))?;
+            let mut file = File::create(path).map_err(|e| Error::IO("genesis".into(), e))?;
             let data = bcs::to_bytes(&genesis).map_err(|e| Error::BCS("genesis", e))?;
             file.write_all(&data)
                 .map_err(|e| Error::IO("genesis".into(), e))?;
         }
+        Ok(())
+    }
+}
+
+impl ConfigSanitizer for ExecutionConfig {
+    /// Validate and process the execution config according to the given node role and chain ID
+    fn sanitize(
+        node_config: &mut NodeConfig,
+        _node_role: RoleType,
+        chain_id: ChainId,
+    ) -> Result<(), Error> {
+        let sanitizer_name = Self::get_sanitizer_name();
+        let execution_config = &node_config.execution;
+
+        // If this is a mainnet node, ensure that additional verifiers are enabled
+        if chain_id.is_mainnet() {
+            if !execution_config.paranoid_hot_potato_verification {
+                return Err(Error::ConfigSanitizerFailed(
+                    sanitizer_name,
+                    "paranoid_hot_potato_verification must be enabled for mainnet nodes!".into(),
+                ));
+            }
+            if !execution_config.paranoid_type_verification {
+                return Err(Error::ConfigSanitizerFailed(
+                    sanitizer_name,
+                    "paranoid_type_verification must be enabled for mainnet nodes!".into(),
+                ));
+            }
+        }
+
         Ok(())
     }
 }
@@ -119,16 +152,71 @@ mod test {
     use super::*;
     use aptos_temppath::TempPath;
     use aptos_types::{
-        transaction::{ChangeSet, Transaction, WriteSetPayload},
+        transaction::{ChangeSet, NoOpChangeSetChecker, Transaction, WriteSetPayload},
         write_set::WriteSetMut,
     };
+
+    #[test]
+    fn test_sanitize_valid_execution_config() {
+        // Create a node config with a valid execution config
+        let mut node_config = NodeConfig {
+            execution: ExecutionConfig {
+                paranoid_hot_potato_verification: true,
+                paranoid_type_verification: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it succeeds
+        ExecutionConfig::sanitize(&mut node_config, RoleType::Validator, ChainId::mainnet())
+            .unwrap();
+    }
+
+    #[test]
+    fn test_sanitize_hot_potato_mainnet() {
+        // Create a node config with missing paranoid_hot_potato_verification on mainnet
+        let mut node_config = NodeConfig {
+            execution: ExecutionConfig {
+                paranoid_hot_potato_verification: false,
+                paranoid_type_verification: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error =
+            ExecutionConfig::sanitize(&mut node_config, RoleType::Validator, ChainId::mainnet())
+                .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_sanitize_paranoid_type_mainnet() {
+        // Create a node config with missing paranoid_type_verification on mainnet
+        let mut node_config = NodeConfig {
+            execution: ExecutionConfig {
+                paranoid_hot_potato_verification: true,
+                paranoid_type_verification: false,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error =
+            ExecutionConfig::sanitize(&mut node_config, RoleType::Validator, ChainId::mainnet())
+                .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
 
     #[test]
     fn test_no_genesis() {
         let (mut config, path) = generate_config();
         assert_eq!(config.genesis, None);
         let root_dir = RootPath::new_path(path.path());
-        let result = config.load(&root_dir);
+        let result = config.load_from_path(&root_dir);
         assert!(result.is_ok());
         assert_eq!(config.genesis_file_location, PathBuf::new());
     }
@@ -136,17 +224,22 @@ mod test {
     #[test]
     fn test_some_and_load_genesis() {
         let fake_genesis = Transaction::GenesisTransaction(WriteSetPayload::Direct(
-            ChangeSet::new(WriteSetMut::new(vec![]).freeze().unwrap(), vec![], 3).unwrap(),
+            ChangeSet::new(
+                WriteSetMut::new(vec![]).freeze().unwrap(),
+                vec![],
+                &NoOpChangeSetChecker,
+            )
+            .unwrap(),
         ));
         let (mut config, path) = generate_config();
         config.genesis = Some(fake_genesis.clone());
         let root_dir = RootPath::new_path(path.path());
-        config.save(&root_dir).expect("Unable to save");
+        config.save_to_path(&root_dir).expect("Unable to save");
         // Verifies some without path
         assert_eq!(config.genesis_file_location, PathBuf::from(GENESIS_DEFAULT));
 
         config.genesis = None;
-        let result = config.load(&root_dir);
+        let result = config.load_from_path(&root_dir);
         assert!(result.is_ok());
         assert_eq!(config.genesis, Some(fake_genesis));
     }

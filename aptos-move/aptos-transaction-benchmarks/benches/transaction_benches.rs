@@ -1,11 +1,12 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_language_e2e_tests::account_universe::P2PTransferGen;
 use aptos_transaction_benchmarks::{
     measurement::wall_time_measurement, transactions::TransactionBencher,
 };
 use criterion::{criterion_group, criterion_main, measurement::Measurement, Criterion};
-use language_e2e_tests::account_universe::P2PTransferGen;
 use proptest::prelude::*;
 
 //

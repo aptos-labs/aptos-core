@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{
@@ -10,10 +11,9 @@ use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
-use aptos_types::proof::definition::NodeInProof;
 use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble},
-    proof::{SparseMerkleInternalNode, SparseMerkleLeafNode},
+    proof::{definition::NodeInProof, SparseMerkleInternalNode, SparseMerkleLeafNode},
     transaction::Version,
 };
 use proptest::prelude::*;
@@ -26,6 +26,7 @@ impl TreeReader<StateKey> for DummyReader {
     fn get_node_option(
         &self,
         _node_key: &NodeKey,
+        _tag: &str,
     ) -> anyhow::Result<Option<crate::Node<StateKey>>> {
         unimplemented!()
     }
@@ -49,7 +50,7 @@ fn hash_leaf(key: HashValue, value_hash: HashValue) -> HashValue {
 // Generate a random node key with 63 nibbles.
 fn random_63nibbles_node_key() -> NodeKey {
     let mut bytes = HashValue::random().to_vec();
-    *bytes.last_mut().unwrap() &= 0xf0;
+    *bytes.last_mut().unwrap() &= 0xF0;
     NodeKey::new(0 /* version */, NibblePath::new_odd(bytes))
 }
 
@@ -540,15 +541,12 @@ fn test_internal_hash_and_proof() {
             internal_node
                 .get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, index1, None)
                 .unwrap(),
-            (
-                Some(child1_node_key),
-                vec![
-                    hash_x6.into(),
-                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
-                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
-                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into()
-                ]
-            )
+            (Some(child1_node_key), vec![
+                hash_x6.into(),
+                (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                (*SPARSE_MERKLE_PLACEHOLDER_HASH).into()
+            ])
         );
 
         assert_eq!(
@@ -559,15 +557,12 @@ fn test_internal_hash_and_proof() {
                     None
                 )
                 .unwrap(),
-            (
-                None,
-                vec![
-                    hash_x6.into(),
-                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
-                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
-                    hash1.into()
-                ]
-            )
+            (None, vec![
+                hash_x6.into(),
+                (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                hash1.into()
+            ])
         );
         for i in 6..8 {
             assert_eq!(
@@ -578,14 +573,11 @@ fn test_internal_hash_and_proof() {
                         None
                     )
                     .unwrap(),
-                (
-                    None,
-                    vec![
-                        hash_x6.into(),
-                        (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
-                        hash_x1.into()
-                    ]
-                )
+                (None, vec![
+                    hash_x6.into(),
+                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                    hash_x1.into()
+                ])
             );
         }
 
@@ -611,14 +603,11 @@ fn test_internal_hash_and_proof() {
                         None
                     )
                     .unwrap(),
-                (
-                    None,
-                    vec![
-                        hash_x3.into(),
-                        (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
-                        hash_x4.into()
-                    ]
-                )
+                (None, vec![
+                    hash_x3.into(),
+                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                    hash_x4.into()
+                ])
             );
         }
         assert_eq!(
@@ -629,29 +618,23 @@ fn test_internal_hash_and_proof() {
                     None
                 )
                 .unwrap(),
-            (
-                None,
-                vec![
-                    hash_x3.into(),
-                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
-                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
-                    hash2.into()
-                ]
-            )
+            (None, vec![
+                hash_x3.into(),
+                (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                hash2.into()
+            ])
         );
         assert_eq!(
             internal_node
                 .get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, index2, None)
                 .unwrap(),
-            (
-                Some(child2_node_key),
-                vec![
-                    hash_x3.into(),
-                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
-                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
-                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
-                ]
-            )
+            (Some(child2_node_key), vec![
+                hash_x3.into(),
+                (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+            ])
         );
     }
 
@@ -726,15 +709,12 @@ fn test_internal_hash_and_proof() {
                     None
                 )
                 .unwrap(),
-            (
-                Some(child1_node_key),
-                vec![
-                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
-                    hash_x4.into(),
-                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
-                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
-                ]
-            )
+            (Some(child1_node_key), vec![
+                (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                hash_x4.into(),
+                (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+            ])
         );
 
         assert_eq!(
@@ -745,15 +725,12 @@ fn test_internal_hash_and_proof() {
                     None
                 )
                 .unwrap(),
-            (
-                None,
-                vec![
-                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
-                    hash_x4.into(),
-                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
-                    hash1.into(),
-                ]
-            )
+            (None, vec![
+                (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                hash_x4.into(),
+                (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                hash1.into(),
+            ])
         );
 
         for i in 2..4 {
@@ -765,14 +742,11 @@ fn test_internal_hash_and_proof() {
                         None
                     )
                     .unwrap(),
-                (
-                    None,
-                    vec![
-                        (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
-                        hash_x4.into(),
-                        hash_x1.into()
-                    ]
-                )
+                (None, vec![
+                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                    hash_x4.into(),
+                    hash_x1.into()
+                ])
             );
         }
 
@@ -785,14 +759,11 @@ fn test_internal_hash_and_proof() {
                         None
                     )
                     .unwrap(),
-                (
-                    None,
-                    vec![
-                        (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
-                        hash_x2.into(),
-                        hash_x3.into()
-                    ]
-                )
+                (None, vec![
+                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                    hash_x2.into(),
+                    hash_x3.into()
+                ])
             );
         }
 
@@ -804,15 +775,12 @@ fn test_internal_hash_and_proof() {
                     None
                 )
                 .unwrap(),
-            (
-                None,
-                vec![
-                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
-                    hash_x2.into(),
-                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
-                    hash2.into()
-                ]
-            )
+            (None, vec![
+                (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                hash_x2.into(),
+                (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                hash2.into()
+            ])
         );
 
         assert_eq!(
@@ -823,15 +791,12 @@ fn test_internal_hash_and_proof() {
                     None
                 )
                 .unwrap(),
-            (
-                Some(child2_node_key),
-                vec![
-                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
-                    hash_x2.into(),
-                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
-                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
-                ]
-            )
+            (Some(child2_node_key), vec![
+                (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                hash_x2.into(),
+                (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+            ])
         );
 
         for i in 8..16 {
@@ -962,13 +927,13 @@ impl NaiveInternalNode {
         match (&left, &right) {
             (BinaryTreeNode::Null, BinaryTreeNode::Null) => {
                 return BinaryTreeNode::Null;
-            }
+            },
             (BinaryTreeNode::Null, BinaryTreeNode::Child(node))
             | (BinaryTreeNode::Child(node), BinaryTreeNode::Null) => {
                 if node.is_leaf {
                     return BinaryTreeNode::Child(*node);
                 }
-            }
+            },
             _ => (),
         };
 
@@ -993,13 +958,13 @@ impl NaiveInternalNode {
                         siblings.push(node.left.hash().into());
                         current_node = Rc::clone(&node.right);
                     }
-                }
+                },
                 BinaryTreeNode::Child(node) => {
                     return (
                         Some(node_key.gen_child_node_key(node.version, node.index.into())),
                         siblings,
                     )
-                }
+                },
                 BinaryTreeNode::Null => return (None, siblings),
             }
         }

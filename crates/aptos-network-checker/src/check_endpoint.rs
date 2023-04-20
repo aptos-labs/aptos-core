@@ -1,22 +1,23 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::args::CheckEndpointArgs;
 use anyhow::{bail, Context, Result};
 use aptos_config::{
-    config::{RoleType, HANDSHAKE_VERSION},
+    config::{Error, RoleType, HANDSHAKE_VERSION},
     network_id::{NetworkContext, NetworkId},
 };
 use aptos_crypto::x25519::{self, PRIVATE_KEY_SIZE};
-use aptos_types::{account_address, chain_id::ChainId, network_address::NetworkAddress, PeerId};
-use futures::{AsyncReadExt, AsyncWriteExt};
-use network::transport::TCPBufferCfg;
-use network::{
+use aptos_network::{
     noise::{HandshakeAuthMode, NoiseUpgrader},
     protocols::wire::handshake::v1::ProtocolIdSet,
-    transport::{resolve_and_connect, TcpSocket},
-    transport::{upgrade_outbound, UpgradeContext, SUPPORTED_MESSAGING_PROTOCOL},
+    transport::{
+        resolve_and_connect, upgrade_outbound, TCPBufferCfg, TcpSocket, UpgradeContext,
+        SUPPORTED_MESSAGING_PROTOCOL,
+    },
 };
+use aptos_types::{account_address, chain_id::ChainId, network_address::NetworkAddress, PeerId};
+use futures::{AsyncReadExt, AsyncWriteExt};
 use std::{collections::BTreeMap, sync::Arc};
 use tokio::time::Duration;
 
@@ -101,7 +102,12 @@ async fn check_endpoint_with_handshake(
         remote_pubkey,
     )
     .await
-    .with_context(|| format!("Failed to connect to {}", address))?;
+    .map_err(|error| {
+        Error::Unexpected(format!(
+            "Failed to connect to {}. Error: {}",
+            address, error
+        ))
+    })?;
     let msg = format!("Successfully connected to {}", conn.metadata.addr);
 
     // Disconnect.
@@ -115,12 +121,19 @@ async fn check_endpoint_no_handshake(address: NetworkAddress) -> Result<String> 
     let mut socket = resolve_and_connect(address.clone(), TCPBufferCfg::new())
         .await
         .map(TcpSocket::new)
-        .with_context(|| format!("Failed to connect to {}", address))?;
+        .map_err(|error| {
+            Error::Unexpected(format!(
+                "Failed to connect to {}. Error: {}",
+                address, error
+            ))
+        })?;
 
     socket
         .write_all(INVALID_NOISE_HEADER)
         .await
-        .with_context(|| format!("Failed to write to {}", address))?;
+        .map_err(|error| {
+            Error::Unexpected(format!("Failed to write to {}. Error: {}", address, error))
+        })?;
 
     let buf = &mut [0; 1];
     match socket.read(buf).await {
@@ -136,10 +149,10 @@ async fn check_endpoint_no_handshake(address: NetworkAddress) -> Result<String> 
             } else {
                 bail!("Endpoint {} responded with data when it shouldn't", address);
             }
-        }
+        },
         Err(error) => {
             bail!("Failed to read from {} due to error: {:#}", address, error);
-        }
+        },
     }
 }
 
@@ -165,7 +178,7 @@ fn build_upgrade_context(
             network_context,
             private_key,
             // If we had an incoming message, auth mode would matter.
-            HandshakeAuthMode::server_only(),
+            HandshakeAuthMode::server_only(&[network_id]),
         ),
         HANDSHAKE_VERSION,
         supported_protocols,

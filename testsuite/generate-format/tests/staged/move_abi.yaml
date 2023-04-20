@@ -86,3 +86,9 @@ TypeTag:
       struct:
         NEWTYPE:
           TYPENAME: StructTag
+    8:
+      u16: UNIT
+    9:
+      u32: UNIT
+    10:
+      u256: UNIT

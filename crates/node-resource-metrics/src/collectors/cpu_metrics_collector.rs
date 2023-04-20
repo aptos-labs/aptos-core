@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use super::common::NAMESPACE;
@@ -23,7 +23,6 @@ const CPU_VENDOR_LABEL: &str = "vendor";
 /// A Collector for exposing CPU metrics
 pub(crate) struct CpuMetricsCollector {
     system: Arc<Mutex<System>>,
-
     cpu: Desc,
     cpu_info: Desc,
 }

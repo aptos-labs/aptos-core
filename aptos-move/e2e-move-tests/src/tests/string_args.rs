@@ -1,11 +1,17 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_success, assert_vm_status, tests::common, MoveHarness};
-use aptos_types::account_address::AccountAddress;
-use move_core_types::identifier::Identifier;
-use move_core_types::language_storage::{StructTag, TypeTag};
-use move_core_types::{parser::parse_struct_tag, vm_status::StatusCode};
+use crate::{assert_move_abort, assert_success, assert_vm_status, tests::common, MoveHarness};
+use aptos_types::{
+    account_address::AccountAddress,
+    transaction::{AbortInfo, TransactionStatus},
+};
+use move_core_types::{
+    identifier::Identifier,
+    language_storage::{StructTag, TypeTag},
+    parser::parse_struct_tag,
+    vm_status::StatusCode,
+};
 use serde::{Deserialize, Serialize};
 
 /// Mimics `0xcafe::test::ModuleData`
@@ -25,7 +31,15 @@ fn success_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<(Vec<Vec<u8>>, &
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
     assert_success!(h.publish_package(&acc, &common::test_dir_path("string_args.data/pack")));
 
-    let module_data = parse_struct_tag("0xCAFE::test::ModuleData").unwrap();
+    let mut module_data = parse_struct_tag("0xCAFE::test::ModuleData").unwrap();
+    let string_struct = StructTag {
+        address: AccountAddress::from_hex_literal("0x1").expect("valid address"),
+        module: Identifier::new("string").expect("valid identifier"),
+        name: Identifier::new("String").expect("valid identifier"),
+        type_params: vec![],
+    };
+    let string_type = TypeTag::Struct(Box::new(string_struct));
+    module_data.type_params.push(string_type);
 
     // Check in initial state, resource does not exist.
     assert!(!h.exists_resource(acc.address(), module_data.clone()));
@@ -51,11 +65,27 @@ fn success_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<(Vec<Vec<u8>>, &
     }
 }
 
-fn fail(tests: Vec<(&str, Vec<Vec<u8>>, StatusCode)>) {
+fn deserialization_failure() -> impl Fn(TransactionStatus) {
+    let status_code = StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT;
+    move |txn_status| assert_vm_status!(txn_status, status_code)
+}
+
+fn abort_info() -> impl Fn(TransactionStatus) {
+    let abort_info = Some(AbortInfo {
+        reason_name: "EINVALID_UTF8".to_string(),
+        description: "An invalid UTF8 encoding.".to_string(),
+    });
+    move |txn_status| assert_move_abort!(txn_status, abort_info)
+}
+
+fn fail(tests: Vec<(&str, Vec<Vec<u8>>, impl Fn(TransactionStatus))>) {
     fail_generic(vec![], tests)
 }
 
-fn fail_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<Vec<u8>>, StatusCode)>) {
+fn fail_generic(
+    ty_args: Vec<TypeTag>,
+    tests: Vec<(&str, Vec<Vec<u8>>, impl Fn(TransactionStatus))>,
+) {
     let mut h = MoveHarness::new();
 
     // Load the code
@@ -67,10 +97,10 @@ fn fail_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<Vec<u8>>, StatusCod
     // Check in initial state, resource does not exist.
     assert!(!h.exists_resource(acc.address(), module_data));
 
-    for (entry, args, _err) in tests {
+    for (entry, args, err) in tests {
         // Now send hi transaction, after that resource should exist and carry value
         let status = h.run_entry_function(&acc, str::parse(entry).unwrap(), ty_args.clone(), args);
-        assert_vm_status!(status, _err);
+        err(status);
     }
 }
 
@@ -97,6 +127,12 @@ fn string_args_good() {
     let expected_change = "hi there!";
 
     tests.push(("0xcafe::test::hi", vec![(args, expected_change)]));
+
+    let str128 = std::str::from_utf8(&[97u8; 128] as &[u8]).unwrap();
+    tests.push(("0xcafe::test::hi", vec![(
+        vec![bcs::to_bytes(str128.as_bytes()).unwrap()],
+        str128,
+    )]));
 
     // vector of strings
     let mut in_out = vec![];
@@ -271,45 +307,29 @@ fn string_args_bad_utf8() {
     let mut tests = vec![];
 
     // simple strings
-    let args = vec![bcs::to_bytes(&vec![0xf0u8, 0x28u8, 0x8cu8, 0xbcu8]).unwrap()];
-    tests.push((
-        "0xcafe::test::hi",
-        args,
-        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-    ));
+    let args = vec![bcs::to_bytes(&vec![0xF0u8, 0x28u8, 0x8Cu8, 0xBCu8]).unwrap()];
+    tests.push(("0xcafe::test::hi", args, abort_info()));
 
-    let args = vec![bcs::to_bytes(&vec![0xc3u8, 0x28u8]).unwrap()];
-    tests.push((
-        "0xcafe::test::hi",
-        args,
-        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-    ));
+    let args = vec![bcs::to_bytes(&vec![0xC3u8, 0x28u8]).unwrap()];
+    tests.push(("0xcafe::test::hi", args, abort_info()));
 
     // vector of strings
-    let bad = vec![0xc3u8, 0x28u8];
+    let bad = vec![0xC3u8, 0x28u8];
     let s_vec = vec![&bad[..], "hello".as_bytes(), "world".as_bytes()];
     let i = 0u64;
     let args = vec![bcs::to_bytes(&s_vec).unwrap(), bcs::to_bytes(&i).unwrap()];
-    tests.push((
-        "0xcafe::test::str_vec",
-        args,
-        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-    ));
+    tests.push(("0xcafe::test::str_vec", args, abort_info()));
 
-    let bad = vec![0xc3u8, 0x28u8];
+    let bad = vec![0xC3u8, 0x28u8];
     let s_vec = vec![&bad[..], "hello".as_bytes(), "world".as_bytes()];
     let args = vec![bcs::to_bytes(&s_vec).unwrap(), bcs::to_bytes(&i).unwrap()];
-    tests.push((
-        "0xcafe::test::str_vec",
-        args,
-        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-    ));
+    tests.push(("0xcafe::test::str_vec", args, abort_info()));
 
     // vector of vector of strings
     let i = 0u64;
     let j = 0u64;
 
-    let bad = vec![0x40u8, 0xfeu8];
+    let bad = vec![0x40u8, 0xFEu8];
     let s_vec = vec![
         vec![&bad[..], "hello".as_bytes(), "world".as_bytes()],
         vec![
@@ -328,13 +348,9 @@ fn string_args_bad_utf8() {
         bcs::to_bytes(&i).unwrap(),
         bcs::to_bytes(&j).unwrap(),
     ];
-    tests.push((
-        "0xcafe::test::str_vec_vec",
-        args,
-        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-    ));
+    tests.push(("0xcafe::test::str_vec_vec", args, abort_info()));
 
-    let bad = vec![0xf0u8, 0x28u8, 0x8cu8, 0x28u8];
+    let bad = vec![0xF0u8, 0x28u8, 0x8Cu8, 0x28u8];
     let s_vec = vec![
         vec![
             "hi there!".as_bytes(),
@@ -353,13 +369,9 @@ fn string_args_bad_utf8() {
         bcs::to_bytes(&i).unwrap(),
         bcs::to_bytes(&j).unwrap(),
     ];
-    tests.push((
-        "0xcafe::test::str_vec_vec",
-        args,
-        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-    ));
+    tests.push(("0xcafe::test::str_vec_vec", args, abort_info()));
 
-    let bad = vec![0x60u8, 0xffu8];
+    let bad = vec![0x60u8, 0xFFu8];
     let s_vec = vec![
         vec![
             "hi there!".as_bytes(),
@@ -378,11 +390,7 @@ fn string_args_bad_utf8() {
         bcs::to_bytes(&i).unwrap(),
         bcs::to_bytes(&j).unwrap(),
     ];
-    tests.push((
-        "0xcafe::test::str_vec_vec",
-        args,
-        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-    ));
+    tests.push(("0xcafe::test::str_vec_vec", args, abort_info()));
 
     fail(tests);
 }
@@ -404,7 +412,7 @@ fn string_args_chopped() {
         fail(vec![(
             "0xcafe::test::str_vec",
             args,
-            StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
+            deserialization_failure(),
         )]);
         i /= 2;
     }
@@ -420,20 +428,12 @@ fn string_args_bad_length() {
     // length over max size
     let mut args = bcs::to_bytes(&vec![0x30u8; 100000]).unwrap();
     args.truncate(20);
-    tests.push((
-        "0xcafe::test::hi",
-        vec![args],
-        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-    ));
+    tests.push(("0xcafe::test::hi", vec![args], deserialization_failure()));
 
     // length in size but input chopped
     let mut args = bcs::to_bytes(&vec![0x30u8; 30000]).unwrap();
     args.truncate(300);
-    tests.push((
-        "0xcafe::test::hi",
-        vec![args],
-        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-    ));
+    tests.push(("0xcafe::test::hi", vec![args], deserialization_failure()));
 
     // vector of strings
 
@@ -444,11 +444,7 @@ fn string_args_bad_length() {
     bcs_vec.truncate(200);
     let i = 0u64;
     let args = vec![bcs_vec, bcs::to_bytes(&i).unwrap()];
-    tests.push((
-        "0xcafe::test::str_vec",
-        args,
-        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-    ));
+    tests.push(("0xcafe::test::str_vec", args, deserialization_failure()));
 
     // length over max size after 2 big-ish strings
     let bad = vec![0x30u8; 100000];
@@ -457,11 +453,7 @@ fn string_args_bad_length() {
     let mut bcs_vec = bcs::to_bytes(&s_vec).unwrap();
     bcs_vec.truncate(30000);
     let args = vec![bcs_vec, bcs::to_bytes(&i).unwrap()];
-    tests.push((
-        "0xcafe::test::str_vec",
-        args,
-        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-    ));
+    tests.push(("0xcafe::test::str_vec", args, deserialization_failure()));
 
     // length in size but input chopped
     let big = vec![0x30u8; 10000];
@@ -469,11 +461,7 @@ fn string_args_bad_length() {
     let mut bcs_vec = bcs::to_bytes(&s_vec).unwrap();
     bcs_vec.truncate(20000);
     let args = vec![bcs_vec, bcs::to_bytes(&i).unwrap()];
-    tests.push((
-        "0xcafe::test::str_vec",
-        args,
-        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-    ));
+    tests.push(("0xcafe::test::str_vec", args, deserialization_failure()));
 
     // vector of vector of strings
 
@@ -501,11 +489,7 @@ fn string_args_bad_length() {
         bcs::to_bytes(&i).unwrap(),
         bcs::to_bytes(&j).unwrap(),
     ];
-    tests.push((
-        "0xcafe::test::str_vec_vec",
-        args,
-        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-    ));
+    tests.push(("0xcafe::test::str_vec_vec", args, deserialization_failure()));
 
     let bad = vec![0x30u8; 10000];
     let s_vec = vec![
@@ -528,11 +512,7 @@ fn string_args_bad_length() {
         bcs::to_bytes(&i).unwrap(),
         bcs::to_bytes(&j).unwrap(),
     ];
-    tests.push((
-        "0xcafe::test::str_vec_vec",
-        args,
-        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-    ));
+    tests.push(("0xcafe::test::str_vec_vec", args, deserialization_failure()));
 
     let bad = vec![0x30u8; 100000];
     let s_vec = vec![
@@ -555,11 +535,7 @@ fn string_args_bad_length() {
         bcs::to_bytes(&i).unwrap(),
         bcs::to_bytes(&j).unwrap(),
     ];
-    tests.push((
-        "0xcafe::test::str_vec_vec",
-        args,
-        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-    ));
+    tests.push(("0xcafe::test::str_vec_vec", args, deserialization_failure()));
 
     // length over max size with 0 length strings
     let s_vec = vec![vec!["".as_bytes(); 3]; 100000];
@@ -570,7 +546,7 @@ fn string_args_bad_length() {
     // u64 max in ule128 in opposite order so vector swap_remove is good
     // but we need to remove a 0 after to keep the vector consistent... don't ask...
     // u64 max in ule128 in opposite order so vector swap_remove is good
-    let mut u64_max: Vec<u8> = vec![0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff];
+    let mut u64_max: Vec<u8> = vec![0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF];
     let len = u64_max.len();
     bcs_vec.append(&mut u64_max);
     let mut i = 0;
@@ -586,13 +562,37 @@ fn string_args_bad_length() {
         bcs::to_bytes(&j).unwrap(),
     ];
 
-    tests.push((
-        "0xcafe::test::str_vec_vec",
-        args,
-        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-    ));
+    tests.push(("0xcafe::test::str_vec_vec", args, deserialization_failure()));
 
     fail(tests);
+}
+
+#[test]
+fn string_args_non_generic_call() {
+    let tests = vec![("0xcafe::test::non_generic_call", vec![(
+        vec![bcs::to_bytes("hi".as_bytes()).unwrap()],
+        "hi",
+    )])];
+
+    success_generic(vec![], tests);
+}
+
+#[test]
+fn string_args_generic_call() {
+    let tests = vec![("0xcafe::test::generic_call", vec![(
+        vec![bcs::to_bytes("hi".as_bytes()).unwrap()],
+        "hi",
+    )])];
+
+    let string_struct = StructTag {
+        address: AccountAddress::from_hex_literal("0x1").expect("valid address"),
+        module: Identifier::new("string").expect("valid identifier"),
+        name: Identifier::new("String").expect("valid identifier"),
+        type_params: vec![],
+    };
+    let string_type = TypeTag::Struct(Box::new(string_struct));
+
+    success_generic(vec![string_type], tests);
 }
 
 #[test]
@@ -622,8 +622,8 @@ fn string_args_generic_instantiation() {
     ];
     let u8_vec = vec![0xFFu8; 100];
     let u64_vec = vec![std::u64::MAX, std::u64::MAX, std::u64::MAX];
-    let val1 = "hi there! hello".as_bytes();
-    let val2 = long_addr;
+    let val1 = long_addr;
+    let val2 = "hi there! hello".as_bytes();
     let i = 0u64;
     let j = 0u64;
     let args = vec![
@@ -637,11 +637,10 @@ fn string_args_generic_instantiation() {
         bcs::to_bytes(&j).unwrap(),
     ];
 
-    tests.push((
-        "0xcafe::test::generic_multi_vec",
+    tests.push(("0xcafe::test::generic_multi_vec", vec![(
         args,
-        StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
-    ));
+        "hi there! hello",
+    )]));
 
     let address_type = TypeTag::Address;
     let string_struct = StructTag {
@@ -652,5 +651,5 @@ fn string_args_generic_instantiation() {
     };
     let string_type = TypeTag::Struct(Box::new(string_struct));
 
-    fail_generic(vec![address_type, string_type], tests);
+    success_generic(vec![string_type, address_type], tests);
 }

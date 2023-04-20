@@ -1,5 +1,5 @@
 ---
-title: "Creating a Signed Transaction"
+title: "Create a Signed Transaction"
 slug: "creating-a-signed-transaction"
 ---
 
@@ -8,7 +8,7 @@ import TabItem from '@theme/TabItem';
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Creating a Signed Transaction
+# Create a Signed Transaction
 
 All transactions executed on the Aptos blockchain must be signed. This requirement is enforced by the chain for security reasons.
 
@@ -20,7 +20,7 @@ The first step in signing a transaction is to generate the signing message from 
   - Also see the tutorial [Your First Transaction](../tutorials/first-transaction.md) that explains this approach.
 - However, you may prefer instead that your client application, for example, a hardware security module (HSM), be responsible for generating the signed transaction. In this approach, before submitting transactions, a client must:
   - Serialize the transactions into bytes, and
-  - Sign the bytes with the account private key. See [Accounts](../concepts/basics-accounts.md) for how accounts and private keys work.
+  - Sign the bytes with the account private key. See [Accounts](../concepts/accounts.md) for how accounts and private keys work.
 
 This guide will introduce the concepts behind constructing a transaction, generating the appropriate message to sign using the BCS-serialization, and various methods for signing within Aptos.
 
@@ -102,6 +102,18 @@ In addition, in Aptos, any content that is signed or hashed is salted with a uni
 The prefixing step is not shown in the diagram in the [Overview](#overview) section.
 
 :::
+
+### Batch signing
+
+For [batch transactions](https://fullnode.mainnet.aptoslabs.com/v1/spec#/operations/submit_batch_transactions), create vector of `SignedTransactions`, and then BCS encode the vector as a whole, like so:
+
+```shell
+let txn_payload = bcs::to_bytes(&txns.to_vec())?;
+```
+
+For example, see the [`pub async fn submit_batch_bcs(`](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-rest-client/src/lib.rs#L448) reference in `lib.rs`. BCS encode only the array.
+
+> By default, you are limited to 10 batched transactions by the `max_submit_transaction_batch_size` API, which can be overridden if you run your own fullnode by changing the setting: `pub const DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE: usize = 10;`
 
 ### Signature
 
@@ -294,7 +306,7 @@ const signedTransaction: SignedTransaction = {
 ### Step 4. Serializing SignedTransaction
 
 :::note
-This step is not shown in the flow diagram in the [Overiew](#overview) section.
+This step is not shown in the flow diagram in the [Overview](#overview) section.
 :::
 
 Serializing SignedTransaction into bytes with BCS.
@@ -314,8 +326,8 @@ curl -X POST -H "Content-Type: application/x.aptos.signed_transaction+bcs" --dat
 ```
 
 [first_transaction]: /tutorials/first-transaction
-[account]: /concepts/basics-accounts
+[account]: /concepts/accounts
 [rest_spec]: https://fullnode.devnet.aptoslabs.com/v1/spec#/
 [bcs]: https://docs.rs/bcs/latest/bcs/
-[sha3]: https://en.wikipedia.org/wiki/SHA-3
+[SHA3]: https://en.wikipedia.org/wiki/SHA-3
 [ed25519]: https://ed25519.cr.yp.to/

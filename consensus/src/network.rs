@@ -1,37 +1,43 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::block_storage::tracing::{observe_block, BlockStage};
 use crate::{
+    block_storage::tracing::{observe_block, BlockStage},
     counters,
     logging::LogEvent,
     monitor,
-    network_interface::{ConsensusMsg, ConsensusNetworkEvents, ConsensusNetworkSender},
+    network_interface::{ConsensusMsg, ConsensusNetworkClient},
+    quorum_store::types::{Batch, BatchMsg, BatchRequest},
 };
 use anyhow::{anyhow, ensure};
+use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
+use aptos_config::network_id::NetworkId;
+use aptos_consensus_types::{
+    block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse, MAX_BLOCKS_PER_REQUEST},
+    common::Author,
+    experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
+    proof_of_store::{ProofOfStore, ProofOfStoreMsg, SignedBatchInfo, SignedBatchInfoMsg},
+    proposal_msg::ProposalMsg,
+    sync_info::SyncInfo,
+    vote_msg::VoteMsg,
+};
 use aptos_logger::prelude::*;
+use aptos_network::{
+    application::interface::{NetworkClient, NetworkServiceEvents},
+    protocols::{network::Event, rpc::error::RpcError},
+    ProtocolId,
+};
 use aptos_types::{
     account_address::AccountAddress, epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier,
 };
 use bytes::Bytes;
-use channel::{self, aptos_channel, message_queues::QueueStyle};
-use consensus_types::{
-    block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse, MAX_BLOCKS_PER_REQUEST},
-    common::Author,
-    experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
-    proposal_msg::ProposalMsg,
-    sync_info::SyncInfo,
-    vote_msg::VoteMsg,
-};
 use fail::fail_point;
-use futures::{channel::oneshot, stream::select, SinkExt, Stream, StreamExt};
-use network::{
-    protocols::{
-        network::{ApplicationNetworkSender, Event},
-        rpc::error::RpcError,
-    },
-    ProtocolId,
+use futures::{
+    channel::oneshot,
+    stream::{select, select_all},
+    SinkExt, Stream, StreamExt,
 };
 use std::{
     mem::{discriminant, Discriminant},
@@ -47,6 +53,19 @@ pub struct IncomingBlockRetrievalRequest {
     pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
 }
 
+#[derive(Debug)]
+pub struct IncomingBatchRetrievalRequest {
+    pub req: BatchRequest,
+    pub protocol: ProtocolId,
+    pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
+}
+
+#[derive(Debug)]
+pub enum IncomingRpcRequest {
+    BlockRetrieval(IncomingBlockRetrievalRequest),
+    BatchRetrieval(IncomingBatchRetrievalRequest),
+}
+
 /// Just a convenience struct to keep all the network proxy receiving queues in one place.
 /// Will be returned by the NetworkTask upon startup.
 pub struct NetworkReceivers {
@@ -55,32 +74,63 @@ pub struct NetworkReceivers {
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
     >,
-    pub block_retrieval:
-        aptos_channel::Receiver<AccountAddress, (AccountAddress, IncomingBlockRetrievalRequest)>,
+    pub buffer_manager_messages: aptos_channel::Receiver<
+        (AccountAddress, Discriminant<ConsensusMsg>),
+        (AccountAddress, ConsensusMsg),
+    >,
+    pub quorum_store_messages: aptos_channel::Receiver<
+        (AccountAddress, Discriminant<ConsensusMsg>),
+        (AccountAddress, ConsensusMsg),
+    >,
+    pub rpc_rx: aptos_channel::Receiver<AccountAddress, (AccountAddress, IncomingRpcRequest)>,
+}
+
+#[async_trait::async_trait]
+pub trait QuorumStoreSender: Send + Clone {
+    async fn send_batch_request(&self, request: BatchRequest, recipients: Vec<Author>);
+
+    async fn request_batch(
+        &self,
+        request: BatchRequest,
+        recipient: Author,
+        timeout: Duration,
+    ) -> anyhow::Result<Batch>;
+
+    async fn send_batch(&self, batch: Batch, recipients: Vec<Author>);
+
+    async fn send_signed_batch_info_msg(
+        &self,
+        signed_batch_infos: Vec<SignedBatchInfo>,
+        recipients: Vec<Author>,
+    );
+
+    async fn broadcast_batch_msg(&mut self, batches: Vec<Batch>);
+
+    async fn broadcast_proof_of_store_msg(&mut self, proof_of_stores: Vec<ProofOfStore>);
 }
 
 /// Implements the actual networking support for all consensus messaging.
 #[derive(Clone)]
 pub struct NetworkSender {
     author: Author,
-    network_sender: ConsensusNetworkSender,
+    consensus_network_client: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
     // Self sender and self receivers provide a shortcut for sending the messages to itself.
     // (self sending is not supported by the networking API).
     // Note that we do not support self rpc requests as it might cause infinite recursive calls.
-    self_sender: channel::Sender<Event<ConsensusMsg>>,
+    self_sender: aptos_channels::Sender<Event<ConsensusMsg>>,
     validators: ValidatorVerifier,
 }
 
 impl NetworkSender {
     pub fn new(
         author: Author,
-        network_sender: ConsensusNetworkSender,
-        self_sender: channel::Sender<Event<ConsensusMsg>>,
+        consensus_network_client: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
+        self_sender: aptos_channels::Sender<Event<ConsensusMsg>>,
         validators: ValidatorVerifier,
     ) -> Self {
         NetworkSender {
             author,
-            network_sender,
+            consensus_network_client,
             self_sender,
             validators,
         }
@@ -89,7 +139,7 @@ impl NetworkSender {
     /// Tries to retrieve num of blocks backwards starting from id from the given peer: the function
     /// returns a future that is fulfilled with BlockRetrievalResponse.
     pub async fn request_block(
-        &mut self,
+        &self,
         retrieval_request: BlockRetrievalRequest,
         from: Author,
         timeout: Duration,
@@ -108,7 +158,9 @@ impl NetworkSender {
             .inc();
         let response_msg = monitor!(
             "block_retrieval",
-            self.network_sender.send_rpc(from, msg, timeout).await
+            self.consensus_network_client
+                .send_rpc(from, msg, timeout)
+                .await
         )?;
         let response = match response_msg {
             ConsensusMsg::BlockRetrievalResponse(resp) => *resp,
@@ -130,10 +182,9 @@ impl NetworkSender {
 
     /// Tries to send the given msg to all the participants.
     ///
-    /// The future is fulfilled as soon as the message put into the mpsc channel to network
-    /// internal(to provide back pressure), it does not indicate the message is delivered or sent
-    /// out. It does not give indication about when the message is delivered to the recipients,
-    /// as well as there is no indication about the network failures.
+    /// The future is fulfilled as soon as the message is put into the mpsc channel to network
+    /// internal (to provide back pressure), it does not indicate the message is delivered or sent
+    /// out.
     async fn broadcast(&mut self, msg: ConsensusMsg) {
         fail_point!("consensus::send::any", |_| ());
         // Directly send the message to ourself without going through network.
@@ -156,7 +207,7 @@ impl NetworkSender {
             .inc_by(other_validators.len() as u64);
         // Broadcast message over direct-send to all other validators.
         if let Err(err) = self
-            .network_sender
+            .consensus_network_client
             .send_to_many(other_validators.into_iter(), msg)
         {
             warn!(error = ?err, "Error broadcasting message");
@@ -166,7 +217,7 @@ impl NetworkSender {
     /// Tries to send msg to given recipients.
     async fn send(&self, msg: ConsensusMsg, recipients: Vec<Author>) {
         fail_point!("consensus::send::any", |_| ());
-        let network_sender = self.network_sender.clone();
+        let network_sender = self.consensus_network_client.clone();
         let mut self_sender = self.self_sender.clone();
         for peer in recipients {
             if self.author == peer {
@@ -271,66 +322,191 @@ impl NetworkSender {
     }
 }
 
+#[async_trait::async_trait]
+impl QuorumStoreSender for NetworkSender {
+    async fn send_batch_request(&self, request: BatchRequest, recipients: Vec<Author>) {
+        fail_point!("consensus::send::batch_request", |_| ());
+        let msg = ConsensusMsg::BatchRequestMsg(Box::new(request));
+        self.send(msg, recipients).await
+    }
+
+    async fn request_batch(
+        &self,
+        request: BatchRequest,
+        recipient: Author,
+        timeout: Duration,
+    ) -> anyhow::Result<Batch> {
+        let msg = ConsensusMsg::BatchRequestMsg(Box::new(request));
+        let response = self
+            .consensus_network_client
+            .send_rpc(recipient, msg, timeout)
+            .await?;
+        match response {
+            ConsensusMsg::BatchResponse(batch) => {
+                batch.verify()?;
+                Ok(*batch)
+            },
+            _ => Err(anyhow!("Invalid batch response")),
+        }
+    }
+
+    async fn send_batch(&self, batch: Batch, recipients: Vec<Author>) {
+        fail_point!("consensus::send::batch", |_| ());
+        let msg = ConsensusMsg::BatchResponse(Box::new(batch));
+        self.send(msg, recipients).await
+    }
+
+    async fn send_signed_batch_info_msg(
+        &self,
+        signed_batch_infos: Vec<SignedBatchInfo>,
+        recipients: Vec<Author>,
+    ) {
+        fail_point!("consensus::send::signed_batch_info", |_| ());
+        let msg =
+            ConsensusMsg::SignedBatchInfo(Box::new(SignedBatchInfoMsg::new(signed_batch_infos)));
+        self.send(msg, recipients).await
+    }
+
+    async fn broadcast_batch_msg(&mut self, batches: Vec<Batch>) {
+        fail_point!("consensus::send::broadcast_batch", |_| ());
+        let msg = ConsensusMsg::BatchMsg(Box::new(BatchMsg::new(batches)));
+        self.broadcast(msg).await
+    }
+
+    async fn broadcast_proof_of_store_msg(&mut self, proofs: Vec<ProofOfStore>) {
+        fail_point!("consensus::send::proof_of_store", |_| ());
+        let msg = ConsensusMsg::ProofOfStoreMsg(Box::new(ProofOfStoreMsg::new(proofs)));
+        self.broadcast(msg).await
+    }
+}
+
 pub struct NetworkTask {
     consensus_messages_tx: aptos_channel::Sender<
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
     >,
-    block_retrieval_tx:
-        aptos_channel::Sender<AccountAddress, (AccountAddress, IncomingBlockRetrievalRequest)>,
+    buffer_manager_messages_tx: aptos_channel::Sender<
+        (AccountAddress, Discriminant<ConsensusMsg>),
+        (AccountAddress, ConsensusMsg),
+    >,
+    quorum_store_messages_tx: aptos_channel::Sender<
+        (AccountAddress, Discriminant<ConsensusMsg>),
+        (AccountAddress, ConsensusMsg),
+    >,
+    rpc_tx: aptos_channel::Sender<AccountAddress, (AccountAddress, IncomingRpcRequest)>,
     all_events: Box<dyn Stream<Item = Event<ConsensusMsg>> + Send + Unpin>,
 }
 
 impl NetworkTask {
     /// Establishes the initial connections with the peers and returns the receivers.
     pub fn new(
-        network_events: ConsensusNetworkEvents,
-        self_receiver: channel::Receiver<Event<ConsensusMsg>>,
+        network_service_events: NetworkServiceEvents<ConsensusMsg>,
+        self_receiver: aptos_channels::Receiver<Event<ConsensusMsg>>,
     ) -> (NetworkTask, NetworkReceivers) {
-        let (consensus_messages_tx, consensus_messages) =
-            aptos_channel::new(QueueStyle::LIFO, 1, Some(&counters::CONSENSUS_CHANNEL_MSGS));
-        let (block_retrieval_tx, block_retrieval) = aptos_channel::new(
-            QueueStyle::LIFO,
-            1,
-            Some(&counters::BLOCK_RETRIEVAL_CHANNEL_MSGS),
+        let (consensus_messages_tx, consensus_messages) = aptos_channel::new(
+            QueueStyle::FIFO,
+            10,
+            Some(&counters::CONSENSUS_CHANNEL_MSGS),
         );
+        let (buffer_manager_messages_tx, buffer_manager_messages) = aptos_channel::new(
+            QueueStyle::FIFO,
+            100,
+            Some(&counters::BUFFER_MANAGER_CHANNEL_MSGS),
+        );
+        let (quorum_store_messages_tx, quorum_store_messages) = aptos_channel::new(
+            QueueStyle::FIFO,
+            // TODO: tune this value based on quorum store messages with backpressure
+            50,
+            Some(&counters::QUORUM_STORE_CHANNEL_MSGS),
+        );
+        let (rpc_tx, rpc_rx) =
+            aptos_channel::new(QueueStyle::LIFO, 1, Some(&counters::RPC_CHANNEL_MSGS));
+
+        // Verify the network events have been constructed correctly
+        let network_and_events = network_service_events.into_network_and_events();
+        if (network_and_events.values().len() != 1)
+            || !network_and_events.contains_key(&NetworkId::Validator)
+        {
+            panic!("The network has not been setup correctly for consensus!");
+        }
+
+        // Collect all the network events into a single stream
+        let network_events: Vec<_> = network_and_events.into_values().collect();
+        let network_events = select_all(network_events).fuse();
         let all_events = Box::new(select(network_events, self_receiver));
+
         (
             NetworkTask {
                 consensus_messages_tx,
-                block_retrieval_tx,
+                buffer_manager_messages_tx,
+                quorum_store_messages_tx,
+                rpc_tx,
                 all_events,
             },
             NetworkReceivers {
                 consensus_messages,
-                block_retrieval,
+                buffer_manager_messages,
+                quorum_store_messages,
+                rpc_rx,
             },
         )
     }
 
+    fn push_msg(
+        peer_id: AccountAddress,
+        msg: ConsensusMsg,
+        tx: &aptos_channel::Sender<
+            (AccountAddress, Discriminant<ConsensusMsg>),
+            (AccountAddress, ConsensusMsg),
+        >,
+    ) {
+        if let Err(e) = tx.push((peer_id, discriminant(&msg)), (peer_id, msg)) {
+            warn!(
+                remote_peer = peer_id,
+                error = ?e, "Error pushing consensus msg",
+            );
+        }
+    }
+
     pub async fn start(mut self) {
         while let Some(message) = self.all_events.next().await {
-            match message {
+            monitor!("network_main_loop", match message {
                 Event::Message(peer_id, msg) => {
                     counters::CONSENSUS_RECEIVED_MSGS
                         .with_label_values(&[msg.name()])
                         .inc();
-                    if let ConsensusMsg::ProposalMsg(proposal) = &msg {
-                        observe_block(
-                            proposal.proposal().timestamp_usecs(),
-                            BlockStage::NETWORK_RECEIVED,
-                        );
+                    match msg {
+                        ConsensusMsg::BatchRequestMsg(_) | ConsensusMsg::BatchResponse(_) => {
+                            warn!("unexpected rpc msg");
+                        },
+                        quorum_store_msg @ (ConsensusMsg::SignedBatchInfo(_)
+                        | ConsensusMsg::BatchMsg(_)
+                        | ConsensusMsg::ProofOfStoreMsg(_)) => {
+                            Self::push_msg(
+                                peer_id,
+                                quorum_store_msg,
+                                &self.quorum_store_messages_tx,
+                            );
+                        },
+                        buffer_manager_msg @ (ConsensusMsg::CommitVoteMsg(_)
+                        | ConsensusMsg::CommitDecisionMsg(_)) => {
+                            Self::push_msg(
+                                peer_id,
+                                buffer_manager_msg,
+                                &self.buffer_manager_messages_tx,
+                            );
+                        },
+                        consensus_msg => {
+                            if let ConsensusMsg::ProposalMsg(proposal) = &consensus_msg {
+                                observe_block(
+                                    proposal.proposal().timestamp_usecs(),
+                                    BlockStage::NETWORK_RECEIVED,
+                                );
+                            }
+                            Self::push_msg(peer_id, consensus_msg, &self.consensus_messages_tx);
+                        },
                     }
-                    if let Err(e) = self
-                        .consensus_messages_tx
-                        .push((peer_id, discriminant(&msg)), (peer_id, msg))
-                    {
-                        warn!(
-                            remote_peer = peer_id,
-                            error = ?e, "Error pushing consensus msg",
-                        );
-                    }
-                }
+                },
                 Event::RpcRequest(peer_id, msg, protocol, callback) => match msg {
                     ConsensusMsg::BlockRetrievalRequest(request) => {
                         counters::CONSENSUS_RECEIVED_MSGS
@@ -350,27 +526,45 @@ impl NetworkTask {
                             );
                             continue;
                         }
-                        let req_with_callback = IncomingBlockRetrievalRequest {
-                            req: *request,
-                            protocol,
-                            response_sender: callback,
-                        };
-                        if let Err(e) = self
-                            .block_retrieval_tx
-                            .push(peer_id, (peer_id, req_with_callback))
-                        {
+                        let req_with_callback =
+                            IncomingRpcRequest::BlockRetrieval(IncomingBlockRetrievalRequest {
+                                req: *request,
+                                protocol,
+                                response_sender: callback,
+                            });
+                        if let Err(e) = self.rpc_tx.push(peer_id, (peer_id, req_with_callback)) {
                             warn!(error = ?e, "aptos channel closed");
                         }
-                    }
+                    },
+                    ConsensusMsg::BatchRequestMsg(request) => {
+                        counters::CONSENSUS_RECEIVED_MSGS
+                            .with_label_values(&["BatchRetrievalRequest"])
+                            .inc();
+                        debug!(
+                            remote_peer = peer_id,
+                            event = LogEvent::ReceiveBatchRetrieval,
+                            "{:?}",
+                            request
+                        );
+                        let req_with_callback =
+                            IncomingRpcRequest::BatchRetrieval(IncomingBatchRetrievalRequest {
+                                req: *request,
+                                protocol,
+                                response_sender: callback,
+                            });
+                        if let Err(e) = self.rpc_tx.push(peer_id, (peer_id, req_with_callback)) {
+                            warn!(error = ?e, "aptos channel closed");
+                        }
+                    },
                     _ => {
                         warn!(remote_peer = peer_id, "Unexpected msg: {:?}", msg);
                         continue;
-                    }
+                    },
                 },
                 _ => {
                     // Ignore `NewPeer` and `LostPeer` events
-                }
-            }
+                },
+            });
         }
     }
 }

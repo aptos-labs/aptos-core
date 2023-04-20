@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module implements an in-memory Sparse Merkle Tree that is similar to what we use in
@@ -37,10 +38,10 @@
 //! another example, if we want to execute transaction T_{i+2}, we can use the tree S_{i+1} that
 //! has updated values for both account A and B.
 //!
-//! Each version of the tree holds a strong reference (an Arc<Node>) to its root as well as one to
-//! its base tree (S_i is the base tree of S_{i+1} in the above example). The root node in turn,
+//! Each version of the tree holds a strong reference (an `Arc<Node>`) to its root as well as one to
+//! its base tree (`S_i` is the base tree of `S_{i+1}` in the above example). The root node in turn,
 //! recursively holds all descendant nodes created in the same version, and weak references
-//! (a Weak<Node>) to all descendant nodes that was created from previous versions.
+//! (a `Weak<Node>`) to all descendant nodes that was created from previous versions.
 //! With this construction:
 //!     1. Even if a reference to a specific tree is dropped, the nodes belonging to it won't be
 //! dropped as long as trees depending on it still hold strong references to it via the chain of
@@ -89,13 +90,14 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_infallible::Mutex;
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
-use aptos_types::{nibble::nibble_path::NibblePath, proof::SparseMerkleProofExt};
-use std::sync::MutexGuard;
+use aptos_types::{
+    nibble::nibble_path::NibblePath, proof::SparseMerkleProofExt,
+    state_store::state_storage_usage::StateStorageUsage,
+};
 use std::{
     borrow::Borrow,
     collections::{BTreeMap, HashMap},
-    sync::{Arc, Weak},
+    sync::{Arc, MutexGuard, Weak},
 };
 use thiserror::Error;
 
@@ -567,14 +569,14 @@ where
                         node_hashes,
                     );
                     pos.pop();
-                }
+                },
                 NodeInner::Leaf(leaf_node) => {
                     let mut path = NibblePath::new_even(leaf_node.key.to_vec());
                     if !is_nibble {
-                        path.truncate(pos.len() as usize / BITS_IN_NIBBLE + 1);
+                        path.truncate(pos.len() / BITS_IN_NIBBLE + 1);
                     }
                     node_hashes.insert(path, subtree.hash());
-                }
+                },
             }
         }
     }
@@ -589,7 +591,7 @@ where
             } else {
                 // Unused bits in `BitVec` is uninitialized, setting to 0 to make sure.
                 if let Some(b) = bytes.last_mut() {
-                    *b &= 0xf0
+                    *b &= 0xF0
                 }
 
                 Some(NibblePath::new_odd(bytes))
@@ -651,7 +653,7 @@ where
                                     internal_node.left.weak()
                                 };
                                 continue;
-                            } // end NodeInner::Internal
+                            }, // end NodeInner::Internal
                             NodeInner::Leaf(leaf_node) => {
                                 return if leaf_node.key == key {
                                     match &leaf_node.value.data.get_if_in_mem() {
@@ -663,10 +665,10 @@ where
                                 } else {
                                     StateStoreStatus::DoesNotExist
                                 };
-                            } // end NodeInner::Leaf
+                            }, // end NodeInner::Leaf
                         }, // end Some(node) got from mem
                     }
-                } // end SubTree::NonEmpty
+                }, // end SubTree::NonEmpty
             }
         } // end loop
     }

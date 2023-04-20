@@ -1,7 +1,9 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod network;
+pub use network::MempoolSyncMsg;
 mod runtime;
 pub(crate) mod types;
 pub use runtime::bootstrap;

@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! # An implementation of ProxyProtocol for HAProxy
@@ -73,7 +74,7 @@ pub async fn read_header<T: AsyncRead + std::marker::Unpin>(
                 io::ErrorKind::InvalidInput,
                 "ProxyProtocol: Unsupported command or protocol version",
             ));
-        }
+        },
     };
 
     // High 4 bits is family, low 4 bits is protocol
@@ -90,7 +91,7 @@ pub async fn read_header<T: AsyncRead + std::marker::Unpin>(
             // UNSPEC, UDP, and UNIX Steam/datagram
             // Accept connection but ignore address info as per spec
             original_addr.clone()
-        }
+        },
         TCP_IPV4 => {
             // This is not mentioned in the spec, but if it doesn't match we might not read correctly
             if address_size < IPV4_SIZE {
@@ -104,7 +105,7 @@ pub async fn read_header<T: AsyncRead + std::marker::Unpin>(
             let src_port = u16::from_be_bytes(address_bytes[8..10].try_into().unwrap());
             let socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::from(src_addr)), src_port);
             NetworkAddress::from(socket_addr)
-        }
+        },
         TCP_IPV6 => {
             // This is not mentioned in the spec, but if it doesn't match we might not read correctly
             if address_size < IPV6_SIZE {
@@ -119,13 +120,13 @@ pub async fn read_header<T: AsyncRead + std::marker::Unpin>(
 
             let socket_addr = SocketAddr::new(IpAddr::V6(Ipv6Addr::from(src_addr)), src_port);
             NetworkAddress::from(socket_addr)
-        }
+        },
         _ => {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "ProxyProtocol: Unsupported Address Family or Protocol",
             ));
-        }
+        },
     };
 
     Ok(source_address)
@@ -134,8 +135,8 @@ pub async fn read_header<T: AsyncRead + std::marker::Unpin>(
 #[cfg(test)]
 mod test {
     use super::*;
+    use aptos_memsocket::MemorySocket;
     use futures::{executor::block_on, future::join, io::AsyncWriteExt};
-    use memsocket::MemorySocket;
     use std::net::ToSocketAddrs;
 
     const TEST_DATA: &[u8; 4] = &[0xDE, 0xAD, 0xBE, 0xEF];
@@ -245,13 +246,10 @@ mod test {
 
     #[test]
     fn test_local_proxy_protocol() {
-        let address_bytes: [&[u8; 1]; 5] = [
-            &[LOCAL_PROTOCOL],
-            &[UDP_IPV4],
-            &[UDP_IPV6],
-            &[TCP_UNIX],
-            &[UDP_UNIX],
-        ];
+        let address_bytes: [&[u8; 1]; 5] =
+            [&[LOCAL_PROTOCOL], &[UDP_IPV4], &[UDP_IPV6], &[TCP_UNIX], &[
+                UDP_UNIX,
+            ]];
 
         address_bytes
             .iter()

@@ -1,34 +1,20 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 mod handlers;
 
 use crate::handlers::get_routes;
+use aptos_db::AptosDB;
 use aptos_logger::prelude::*;
-use aptosdb::AptosDB;
-use std::{
-    net::SocketAddr,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
-};
-use tokio::runtime::{Builder, Runtime};
+use std::{net::SocketAddr, sync::Arc};
+use tokio::runtime::Runtime;
 
 pub fn start_backup_service(address: SocketAddr, db: Arc<AptosDB>) -> Runtime {
     let backup_handler = db.get_backup_handler();
     let routes = get_routes(backup_handler);
 
-    let runtime = Builder::new_multi_thread()
-        .thread_name_fn(|| {
-            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
-            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
-            format!("backup-{}", id)
-        })
-        .disable_lifo_slot()
-        .enable_all()
-        .build()
-        .expect("[backup] failed to create runtime");
+    let runtime = aptos_runtimes::spawn_named_runtime("backup".into(), None);
 
     // Ensure that we actually bind to the socket first before spawning the
     // server tasks. This helps in tests to prevent races where a client attempts
@@ -66,42 +52,42 @@ mod tests {
         let _rt = start_backup_service(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port), db);
 
         // Endpoint doesn't exist.
-        let resp = get(&format!("http://127.0.0.1:{}/", port)).unwrap();
+        let resp = get(format!("http://127.0.0.1:{}/", port)).unwrap();
         assert_eq!(resp.status(), 404);
-        let resp = get(&format!("http://127.0.0.1:{}/x", port)).unwrap();
+        let resp = get(format!("http://127.0.0.1:{}/x", port)).unwrap();
         assert_eq!(resp.status(), 404);
 
         // Params not provided.
-        let resp = get(&format!("http://127.0.0.1:{}/state_range_proof", port)).unwrap();
+        let resp = get(format!("http://127.0.0.1:{}/state_range_proof", port)).unwrap();
         assert_eq!(resp.status(), 400);
-        let resp = get(&format!(
+        let resp = get(format!(
             "http://127.0.0.1:{}/state_range_proof/{}",
             port, 123
         ))
         .unwrap();
         assert_eq!(resp.status(), 400);
-        let resp = get(&format!("http://127.0.0.1:{}/state_snapshot", port)).unwrap();
+        let resp = get(format!("http://127.0.0.1:{}/state_snapshot", port)).unwrap();
         assert_eq!(resp.status(), 400);
 
         // Params fail to parse (HashValue)
-        let resp = get(&format!("http://127.0.0.1:{}/state_range_proof/1/ff", port)).unwrap();
+        let resp = get(format!("http://127.0.0.1:{}/state_range_proof/1/ff", port)).unwrap();
         assert_eq!(resp.status(), 400);
 
         // Request handler raised Error (non-bootstrapped DB)
-        let resp = get(&format!(
+        let resp = get(format!(
             "http://127.0.0.1:{}/state_range_proof/1/{}",
             port,
             HashValue::zero().to_hex()
         ))
         .unwrap();
         assert_eq!(resp.status(), 500);
-        let resp = get(&format!("http://127.0.0.1:{}/state_root_proof/0", port)).unwrap();
+        let resp = get(format!("http://127.0.0.1:{}/state_root_proof/0", port)).unwrap();
         assert_eq!(resp.status(), 500);
 
         // In an endpoint handled by `reply_with_async_channel_writer', connection terminates
         // prematurely when the channel writer errors. However a 200 is either returned or not
         // before the termination of the connection, resulting in slightly different behavior:
-        let res = get(&format!("http://127.0.0.1:{}/state_snapshot/1", port));
+        let res = get(format!("http://127.0.0.1:{}/state_snapshot/1", port));
         assert!(res.is_err() || res.unwrap().bytes().is_err());
     }
 }

@@ -1,6 +1,9 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
+
 #![forbid(unsafe_code)]
+
 use std::{
     fmt::Debug,
     sync::atomic::{AtomicU32, AtomicU64, Ordering},
@@ -41,7 +44,7 @@ impl IdGenerator<u32> for U32IdGenerator {
 }
 
 /// A generic in order [`IdGenerator`] using an [`AtomicU64`] to guarantee uniqueness
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct U64IdGenerator {
     inner: AtomicU64,
 }

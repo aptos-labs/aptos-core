@@ -18,12 +18,11 @@
 ///
 /// Code snippets to help:
 /// ```
-/// fun init_module(source: &signer) {
+/// fun init_module(resource: &signer) {
 ///   let dev_address = @DEV_ADDR;
-///   let signer_cap = retrieve_resource_account_cap(&source, dev_address);
-///   let lp_signer = create_signer_with_capability(&signer_cap);
+///   let signer_cap = retrieve_resource_account_cap(resource, dev_address);
 ///   let lp = LiquidityPoolInfo { signer_cap: signer_cap, ... };
-///   move_to(&lp_signer, lp);
+///   move_to(resource, lp);
 /// }
 /// ```
 ///
@@ -70,6 +69,8 @@ module aptos_framework::resource_account {
 
     /// Container resource not found in account
     const ECONTAINER_NOT_PUBLISHED: u64 = 1;
+    /// The resource account was not created by the specified source account
+    const EUNAUTHORIZED_NOT_OWNER: u64 = 2;
 
     const ZERO_AUTH_KEY: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000000";
 
@@ -98,7 +99,7 @@ module aptos_framework::resource_account {
     /// account, and rotates the authentication key to either the optional auth key if it is
     /// non-empty (though auth keys are 32-bytes) or the source accounts current auth key. Note,
     /// this function adds additional resource ownership to the resource account and should only be
-    /// used for resource accounts that need access to Coin<AptosCoin>.
+    /// used for resource accounts that need access to `Coin<AptosCoin>`.
     public entry fun create_resource_account_and_fund(
         origin: &signer,
         seed: vector<u8>,
@@ -169,6 +170,7 @@ module aptos_framework::resource_account {
         let resource_addr = signer::address_of(resource);
         let (resource_signer_cap, empty_container) = {
             let container = borrow_global_mut<Container>(source_addr);
+            assert!(simple_map::contains_key(&container.store, &resource_addr), error::invalid_argument(EUNAUTHORIZED_NOT_OWNER));
             let (_resource_addr, signer_cap) = simple_map::remove(&mut container.store, &resource_addr);
             (signer_cap, simple_map::length(&container.store) == 0)
         };
@@ -179,8 +181,7 @@ module aptos_framework::resource_account {
             simple_map::destroy_empty(store);
         };
 
-        let resource = account::create_signer_with_capability(&resource_signer_cap);
-        account::rotate_authentication_key_internal(&resource, ZERO_AUTH_KEY);
+        account::rotate_authentication_key_internal(resource, ZERO_AUTH_KEY);
         resource_signer_cap
     }
 
@@ -195,6 +196,25 @@ module aptos_framework::resource_account {
         let container = borrow_global<Container>(user_addr);
 
         let resource_addr = aptos_framework::account::create_resource_address(&user_addr, seed);
+        let resource_cap = simple_map::borrow(&container.store, &resource_addr);
+
+        let resource = account::create_signer_with_capability(resource_cap);
+        let _resource_cap = retrieve_resource_account_cap(&resource, user_addr);
+    }
+
+    #[test(user = @0x1111)]
+    #[expected_failure(abort_code = 0x10002, location = aptos_std::simple_map)]
+    public entry fun test_create_account_and_retrieve_cap_resource_address_does_not_exist(user: signer) acquires Container {
+        let user_addr = signer::address_of(&user);
+        account::create_account(user_addr);
+
+        let seed = x"01";
+        let seed2 = x"02";
+
+        create_resource_account(&user, seed2, vector::empty());
+        let container = borrow_global<Container>(user_addr);
+
+        let resource_addr = account::create_resource_address(&user_addr, seed);
         let resource_cap = simple_map::borrow(&container.store, &resource_addr);
 
         let resource = account::create_signer_with_capability(resource_cap);
@@ -221,7 +241,7 @@ module aptos_framework::resource_account {
     }
 
     #[test(framework = @0x1, user = @0x2345)]
-    #[expected_failure(abort_code = 0x60005)]
+    #[expected_failure(abort_code = 0x60005, location = aptos_framework::coin)]
     public entry fun without_coin(framework: signer, user: signer) acquires Container {
         let user_addr = signer::address_of(&user);
         aptos_framework::aptos_account::create_account(user_addr);

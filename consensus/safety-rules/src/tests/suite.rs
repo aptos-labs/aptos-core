@@ -1,22 +1,23 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{test_utils, test_utils::make_timeout_cert, Error, TSafetyRules};
-use aptos_crypto::hash::{HashValue, ACCUMULATOR_PLACEHOLDER_HASH};
-use aptos_types::aggregate_signature::AggregateSignature;
-use aptos_types::{
-    block_info::BlockInfo,
-    epoch_state::EpochState,
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    validator_signer::ValidatorSigner,
-    validator_verifier::ValidatorVerifier,
-};
-use consensus_types::{
+use aptos_consensus_types::{
     block::block_test_utils::random_payload,
     common::{Payload, Round},
     quorum_cert::QuorumCert,
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
     vote_proposal::VoteProposal,
+};
+use aptos_crypto::hash::{HashValue, ACCUMULATOR_PLACEHOLDER_HASH};
+use aptos_types::{
+    aggregate_signature::AggregateSignature,
+    block_info::BlockInfo,
+    epoch_state::EpochState,
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    validator_signer::ValidatorSigner,
+    validator_verifier::ValidatorVerifier,
 };
 
 type Proof = test_utils::Proof;
@@ -27,7 +28,7 @@ fn make_proposal_with_qc_and_proof(
     qc: QuorumCert,
     signer: &ValidatorSigner,
 ) -> VoteProposal {
-    test_utils::make_proposal_with_qc_and_proof(Payload::empty(), round, proof, qc, signer)
+    test_utils::make_proposal_with_qc_and_proof(Payload::empty(false), round, proof, qc, signer)
 }
 
 fn make_proposal_with_parent(
@@ -36,7 +37,7 @@ fn make_proposal_with_parent(
     committed: Option<&VoteProposal>,
     signer: &ValidatorSigner,
 ) -> VoteProposal {
-    test_utils::make_proposal_with_parent(Payload::empty(), round, parent, committed, signer)
+    test_utils::make_proposal_with_parent(Payload::empty(false), round, parent, committed, signer)
 }
 
 pub type Callback = Box<dyn Fn() -> (Box<dyn TSafetyRules + Send + Sync>, ValidatorSigner)>;
@@ -184,7 +185,7 @@ fn test_voting_bad_epoch(safety_rules: &Callback) {
 
     let a1 = test_utils::make_proposal_with_qc(round + 1, genesis_qc, &signer);
     let a2 = test_utils::make_proposal_with_parent_and_overrides(
-        Payload::empty(),
+        Payload::empty(false),
         round + 3,
         &a1,
         None,
@@ -231,7 +232,7 @@ fn test_sign_proposal_with_bad_signer(safety_rules: &Callback) {
     let a1 = test_utils::make_proposal_with_qc(round + 1, genesis_qc, &signer);
     safety_rules.sign_proposal(a1.block().block_data()).unwrap();
 
-    let bad_signer = ValidatorSigner::random([0xfu8; 32]);
+    let bad_signer = ValidatorSigner::random([0xFu8; 32]);
     let a2 = make_proposal_with_parent(round + 2, &a1, None, &bad_signer);
     let err = safety_rules
         .sign_proposal(a2.block().block_data())
@@ -255,7 +256,7 @@ fn test_sign_proposal_with_invalid_qc(safety_rules: &Callback) {
     let a1 = test_utils::make_proposal_with_qc(round + 1, genesis_qc, &signer);
     safety_rules.sign_proposal(a1.block().block_data()).unwrap();
 
-    let bad_signer = ValidatorSigner::random([0xfu8; 32]);
+    let bad_signer = ValidatorSigner::random([0xFu8; 32]);
     let a2 = make_proposal_with_parent(round + 2, &a1, Some(&a1), &bad_signer);
     let a3 =
         test_utils::make_proposal_with_qc(round + 3, a2.block().quorum_cert().clone(), &signer);
@@ -341,18 +342,18 @@ fn test_validator_not_in_set(safety_rules: &Callback) {
 
     // validator_signer is set during initialization
     let state = safety_rules.consensus_state().unwrap();
-    assert_eq!(state.in_validator_set(), true);
+    assert!(state.in_validator_set());
 
     let a1 = test_utils::make_proposal_with_qc(round + 1, genesis_qc, &signer);
 
     // remove the validator_signer in next epoch
     let mut next_epoch_state = EpochState::empty();
     next_epoch_state.epoch = 1;
-    let rand_signer = ValidatorSigner::random([0xfu8; 32]);
+    let rand_signer = ValidatorSigner::random([0xFu8; 32]);
     next_epoch_state.verifier =
         ValidatorVerifier::new_single(rand_signer.author(), rand_signer.public_key());
     let a2 = test_utils::make_proposal_with_parent_and_overrides(
-        Payload::empty(),
+        Payload::empty(false),
         round + 2,
         &a1,
         Some(&a1),
@@ -369,7 +370,7 @@ fn test_validator_not_in_set(safety_rules: &Callback) {
     ));
 
     let state = safety_rules.consensus_state().unwrap();
-    assert_eq!(state.in_validator_set(), false);
+    assert!(!state.in_validator_set());
 }
 
 // Tests for fetching a missing validator key from persistent storage.
@@ -386,11 +387,11 @@ fn test_key_not_in_store(safety_rules: &Callback) {
     // from persistent storage
     let mut next_epoch_state = EpochState::empty();
     next_epoch_state.epoch = 1;
-    let rand_signer = ValidatorSigner::random([0xfu8; 32]);
+    let rand_signer = ValidatorSigner::random([0xFu8; 32]);
     next_epoch_state.verifier =
         ValidatorVerifier::new_single(signer.author(), rand_signer.public_key());
     let a2 = test_utils::make_proposal_with_parent_and_overrides(
-        Payload::empty(),
+        Payload::empty(false),
         round + 2,
         &a1,
         Some(&a1),
@@ -406,7 +407,7 @@ fn test_key_not_in_store(safety_rules: &Callback) {
     safety_rules.initialize(&proof).unwrap_err();
 
     let state = safety_rules.consensus_state().unwrap();
-    assert_eq!(state.in_validator_set(), false);
+    assert!(!state.in_validator_set());
 }
 
 fn test_2chain_rules(constructor: &Callback) {

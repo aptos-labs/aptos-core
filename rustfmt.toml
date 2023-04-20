@@ -1,2 +1,11 @@
+combine_control_expr = false
 edition = "2021"
+imports_granularity = "Crate"
+format_macro_matchers = true
+group_imports = "One"
+hex_literal_case = "Upper"
+match_block_trailing_comma = true
+newline_style = "Unix"
+overflow_delimited_expr = true
+reorder_impl_items = true
 use_field_init_shorthand = true

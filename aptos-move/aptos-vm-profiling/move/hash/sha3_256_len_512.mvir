@@ -1,0 +1,31 @@
+module 0x1.M {
+    import 0x1.hash;
+
+    run() {
+        let i: u64;
+        let x: vector<u8>;
+
+    label entry:
+        x = vec_pack_0<u8>();
+        i = 0;
+    label loop1_start:
+        jump_if_false (copy(i) < 512) loop1_end;
+
+        vec_push_back<u8>(&mut x, 77u8);
+
+        i = move(i) + 1;
+        jump loop1_start;
+    label loop1_end:
+
+        i = 0;
+    label loop2_start:
+        jump_if_false (copy(i) < 1000) loop2_end;
+
+        _ = hash.sha3_256(copy(x));
+
+        i = move(i) + 1;
+        jump loop2_start;
+    label loop2_end:
+        return;
+    }
+}

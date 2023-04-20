@@ -1,14 +1,12 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 #[macro_use]
 extern crate criterion;
 
-use criterion::{measurement::Measurement, BenchmarkGroup, Criterion, Throughput};
-
-use rand::{prelude::ThreadRng, thread_rng};
-
 use aptos_crypto::test_utils::random_bytes;
+use criterion::{measurement::Measurement, BenchmarkGroup, Criterion, Throughput};
+use rand::{prelude::ThreadRng, thread_rng};
 
 fn benchmark_groups(c: &mut Criterion) {
     let mut group = c.benchmark_group("secp256k1");

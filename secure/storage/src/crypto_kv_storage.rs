@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{CryptoStorage, Error, KVStorage, PublicKeyResponse};
@@ -44,10 +45,10 @@ impl<T: CryptoKVStorage> CryptoStorage for T {
                 } else {
                     Err(Error::KeyVersionNotFound(name.into(), version.to_string()))
                 }
-            }
+            },
             Err(Error::KeyNotSet(_)) => {
                 Err(Error::KeyVersionNotFound(name.into(), version.to_string()))
-            }
+            },
             Err(e) => Err(e),
         }
     }

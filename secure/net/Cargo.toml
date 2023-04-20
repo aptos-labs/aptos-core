@@ -1,20 +1,23 @@
 [package]
 name = "aptos-secure-net"
-version = "0.1.0"
-authors = ["Aptos Labs <opensource@aptoslabs.com>"]
-repository = "https://github.com/aptos-labs/aptos-core"
 description = "Aptos's Simple Network Substrate"
-homepage = "https://aptoslabs.com"
-license = "Apache-2.0"
-publish = false
-edition = "2021"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
 
 [dependencies]
-once_cell = "1.10.0"
-serde = { version = "1.0.137", features = ["rc"], default-features = false }
-thiserror = "1.0.31"
+aptos-logger = { workspace = true }
+aptos-metrics-core = { workspace = true }
+once_cell = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
 
-aptos-logger = { path = "../../crates/aptos-logger" }
-aptos-metrics-core = { path = "../../crates/aptos-metrics-core" }
 [dev-dependencies]
-aptos-config = { path = "../../config" }
+aptos-config = { workspace = true }

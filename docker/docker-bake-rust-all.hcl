@@ -18,11 +18,15 @@ variable "GIT_SHA" {}
 
 variable "GIT_BRANCH" {}
 
+variable "GIT_CREDENTIALS" {}
+
 variable "GIT_TAG" {}
 
 variable "BUILT_VIA_BUILDKIT" {}
 
 variable "GCP_DOCKER_ARTIFACT_REPO" {}
+
+variable "GCP_DOCKER_ARTIFACT_REPO_US" {}
 
 variable "AWS_ECR_ACCOUNT_NUM" {}
 
@@ -37,8 +41,8 @@ variable "ecr_base" {
 
 variable "NORMALIZED_GIT_BRANCH_OR_PR" {}
 variable "IMAGE_TAG_PREFIX" {}
-variable "BUILD_TEST_IMAGES" {
-  // Whether to build test images
+variable "BUILD_ADDL_TESTING_IMAGES" {
+  // Whether to build additional testing images
   default = "false"
 }
 variable "PROFILE" {
@@ -57,7 +61,8 @@ group "all" {
     "faucet",
     "forge",
     "telemetry-service",
-    BUILD_TEST_IMAGES == "true" ? [
+    "indexer-grpc",
+    BUILD_ADDL_TESTING_IMAGES == "true" ? [
       "validator-testing"
     ] : []
   ])
@@ -74,6 +79,7 @@ target "_common" {
     generate_cache_from("faucet"),
     generate_cache_from("forge"),
     generate_cache_from("telemetry-service"),
+    generate_cache_from("indexer-grpc"),
 
     // testing targets
     generate_cache_from("validator-testing"),
@@ -89,6 +95,7 @@ target "_common" {
     GIT_SHA            = "${GIT_SHA}"
     GIT_BRANCH         = "${GIT_BRANCH}"
     GIT_TAG            = "${GIT_TAG}"
+    GIT_CREDENTIALS    = "${GIT_CREDENTIALS}"
     BUILD_DATE         = "${BUILD_DATE}"
     BUILT_VIA_BUILDKIT = "true"
   }
@@ -143,6 +150,13 @@ target "telemetry-service" {
   tags     = generate_tags("telemetry-service")
 }
 
+target "indexer-grpc" {
+  inherits = ["_common"]
+  target   = "indexer-grpc"
+  cache-to = generate_cache_to("indexer-grpc")
+  tags     = generate_tags("indexer-grpc")
+}
+
 function "generate_cache_from" {
   params = [target]
   result = CI == "true" ? [
@@ -163,6 +177,8 @@ function "generate_tags" {
   result = TARGET_REGISTRY == "remote" ? [
     "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}",
     "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}",
+    "${GCP_DOCKER_ARTIFACT_REPO_US}/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}",
+    "${GCP_DOCKER_ARTIFACT_REPO_US}/${target}:${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}",
     "${ecr_base}/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}",
     ] : [
     "aptos-core/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}-from-local",

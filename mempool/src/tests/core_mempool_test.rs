@@ -1,28 +1,32 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::tests::common::setup_mempool_with_broadcast_buckets;
 use crate::{
     core_mempool::{CoreMempool, MempoolTransaction, TimelineState},
-    tests::common::{add_signed_txn, add_txn, add_txns_to_mempool, setup_mempool, TestTransaction},
+    tests::common::{
+        add_signed_txn, add_txn, add_txns_to_mempool, setup_mempool,
+        setup_mempool_with_broadcast_buckets, TestTransaction,
+    },
 };
 use aptos_config::config::NodeConfig;
+use aptos_consensus_types::common::{TransactionInProgress, TransactionSummary};
 use aptos_crypto::HashValue;
-use aptos_types::mempool_status::MempoolStatusCode;
-use aptos_types::{account_config::AccountSequenceInfo, transaction::SignedTransaction};
+use aptos_types::{
+    mempool_status::MempoolStatusCode, transaction::SignedTransaction, vm_status::DiscardedVMStatus,
+};
 use itertools::Itertools;
-use std::time::SystemTime;
-use std::{collections::HashSet, time::Duration};
+use std::time::{Duration, SystemTime};
 
 #[test]
 fn test_transaction_ordering_only_seqnos() {
     let (mut mempool, mut consensus) = setup_mempool();
 
     // Default ordering: gas price
-    let mut transactions = add_txns_to_mempool(
-        &mut mempool,
-        vec![TestTransaction::new(0, 0, 3), TestTransaction::new(1, 0, 5)],
-    );
+    let mut transactions = add_txns_to_mempool(&mut mempool, vec![
+        TestTransaction::new(0, 0, 3),
+        TestTransaction::new(1, 0, 5),
+    ]);
     assert_eq!(
         consensus.get_block(&mut mempool, 1, 1024),
         vec!(transactions[1].clone())
@@ -34,33 +38,28 @@ fn test_transaction_ordering_only_seqnos() {
 
     // Second level ordering: expiration time
     let (mut mempool, mut consensus) = setup_mempool();
-    transactions = add_txns_to_mempool(
-        &mut mempool,
-        vec![TestTransaction::new(0, 0, 1), TestTransaction::new(1, 0, 1)],
-    );
+    transactions = add_txns_to_mempool(&mut mempool, vec![
+        TestTransaction::new(0, 0, 1),
+        TestTransaction::new(1, 0, 1),
+    ]);
     for transaction in &transactions {
-        assert_eq!(
-            consensus.get_block(&mut mempool, 1, 1024),
-            vec![transaction.clone()]
-        );
+        assert_eq!(consensus.get_block(&mut mempool, 1, 1024), vec![
+            transaction.clone()
+        ]);
     }
 
     // Last level: for same account it should be by sequence number
     let (mut mempool, mut consensus) = setup_mempool();
-    transactions = add_txns_to_mempool(
-        &mut mempool,
-        vec![
-            TestTransaction::new(1, 0, 7),
-            TestTransaction::new(1, 1, 5),
-            TestTransaction::new(1, 2, 1),
-            TestTransaction::new(1, 3, 6),
-        ],
-    );
+    transactions = add_txns_to_mempool(&mut mempool, vec![
+        TestTransaction::new(1, 0, 7),
+        TestTransaction::new(1, 1, 5),
+        TestTransaction::new(1, 2, 1),
+        TestTransaction::new(1, 3, 6),
+    ]);
     for transaction in &transactions {
-        assert_eq!(
-            consensus.get_block(&mut mempool, 1, 1024),
-            vec![transaction.clone()]
-        );
+        assert_eq!(consensus.get_block(&mut mempool, 1, 1024), vec![
+            transaction.clone()
+        ]);
     }
 }
 
@@ -72,14 +71,14 @@ fn test_transaction_metrics() {
     mempool.add_txn(
         txn.clone(),
         txn.gas_unit_price(),
-        AccountSequenceInfo::Sequential(0),
+        0,
         TimelineState::NotReady,
     );
     let txn = TestTransaction::new(1, 0, 2).make_signed_transaction();
     mempool.add_txn(
         txn.clone(),
         txn.gas_unit_price(),
-        AccountSequenceInfo::Sequential(0),
+        0,
         TimelineState::NonQualified,
     );
 
@@ -101,21 +100,19 @@ fn test_transaction_metrics() {
 #[test]
 fn test_update_transaction_in_mempool() {
     let (mut mempool, mut consensus) = setup_mempool();
-    let txns = add_txns_to_mempool(
-        &mut mempool,
-        vec![TestTransaction::new(0, 0, 1), TestTransaction::new(1, 0, 2)],
-    );
+    let txns = add_txns_to_mempool(&mut mempool, vec![
+        TestTransaction::new(0, 0, 1),
+        TestTransaction::new(1, 0, 2),
+    ]);
     let fixed_txns = add_txns_to_mempool(&mut mempool, vec![TestTransaction::new(0, 0, 5)]);
 
     // Check that first transactions pops up first
-    assert_eq!(
-        consensus.get_block(&mut mempool, 1, 1024),
-        vec![fixed_txns[0].clone()]
-    );
-    assert_eq!(
-        consensus.get_block(&mut mempool, 1, 1024),
-        vec![txns[1].clone()]
-    );
+    assert_eq!(consensus.get_block(&mut mempool, 1, 1024), vec![fixed_txns
+        [0]
+    .clone()]);
+    assert_eq!(consensus.get_block(&mut mempool, 1, 1024), vec![
+        txns[1].clone()
+    ]);
 }
 
 #[test]
@@ -139,10 +136,10 @@ fn test_fail_for_same_gas_amount_and_not_same_expiration_time() {
 #[test]
 fn test_update_invalid_transaction_in_mempool() {
     let (mut mempool, mut consensus) = setup_mempool();
-    let txns = add_txns_to_mempool(
-        &mut mempool,
-        vec![TestTransaction::new(0, 0, 1), TestTransaction::new(1, 0, 2)],
-    );
+    let txns = add_txns_to_mempool(&mut mempool, vec![
+        TestTransaction::new(0, 0, 1),
+        TestTransaction::new(1, 0, 2),
+    ]);
     let updated_txn = TestTransaction::make_signed_transaction_with_max_gas_amount(
         &TestTransaction::new(0, 0, 5),
         200,
@@ -151,10 +148,9 @@ fn test_update_invalid_transaction_in_mempool() {
 
     // Since both gas price and mas gas amount were updated, the ordering should not have changed.
     // The second transaction with gas price 2 should come first.
-    assert_eq!(
-        consensus.get_block(&mut mempool, 1, 1024),
-        vec![txns[1].clone()]
-    );
+    assert_eq!(consensus.get_block(&mut mempool, 1, 1024), vec![
+        txns[1].clone()
+    ]);
     let next_tnx = consensus.get_block(&mut mempool, 1, 1024);
     assert_eq!(next_tnx, vec![txns[0].clone()]);
     assert_eq!(next_tnx[0].gas_unit_price(), 1);
@@ -165,17 +161,17 @@ fn test_commit_transaction() {
     let (mut pool, mut consensus) = setup_mempool();
 
     // Test normal flow.
-    let txns = add_txns_to_mempool(
-        &mut pool,
-        vec![TestTransaction::new(0, 0, 1), TestTransaction::new(0, 1, 2)],
-    );
+    let txns = add_txns_to_mempool(&mut pool, vec![
+        TestTransaction::new(0, 0, 1),
+        TestTransaction::new(0, 1, 2),
+    ]);
     for txn in txns {
         pool.commit_transaction(&txn.sender(), txn.sequence_number());
     }
-    let new_txns = add_txns_to_mempool(
-        &mut pool,
-        vec![TestTransaction::new(1, 0, 3), TestTransaction::new(1, 1, 4)],
-    );
+    let new_txns = add_txns_to_mempool(&mut pool, vec![
+        TestTransaction::new(1, 0, 3),
+        TestTransaction::new(1, 1, 4),
+    ]);
     // Should return only txns from new_txns.
     assert_eq!(
         consensus.get_block(&mut pool, 1, 1024),
@@ -191,16 +187,17 @@ fn test_commit_transaction() {
 fn test_reject_transaction() {
     let (mut pool, _) = setup_mempool();
 
-    let txns = add_txns_to_mempool(
-        &mut pool,
-        vec![TestTransaction::new(0, 0, 1), TestTransaction::new(0, 1, 2)],
-    );
+    let txns = add_txns_to_mempool(&mut pool, vec![
+        TestTransaction::new(0, 0, 1),
+        TestTransaction::new(0, 1, 2),
+    ]);
 
     // reject with wrong hash should have no effect
     pool.reject_transaction(
         &TestTransaction::get_address(0),
         0,
         &txns[1].clone().committed_hash(), // hash of other txn
+        &DiscardedVMStatus::MALFORMED,
     );
     assert!(pool
         .get_transaction_store()
@@ -210,6 +207,30 @@ fn test_reject_transaction() {
         &TestTransaction::get_address(0),
         1,
         &txns[0].clone().committed_hash(), // hash of other txn
+        &DiscardedVMStatus::MALFORMED,
+    );
+    assert!(pool
+        .get_transaction_store()
+        .get(&TestTransaction::get_address(0), 1)
+        .is_some());
+
+    // reject with sequence number too new should have no effect
+    // reject with wrong hash should have no effect
+    pool.reject_transaction(
+        &TestTransaction::get_address(0),
+        0,
+        &txns[0].clone().committed_hash(),
+        &DiscardedVMStatus::SEQUENCE_NUMBER_TOO_NEW,
+    );
+    assert!(pool
+        .get_transaction_store()
+        .get(&TestTransaction::get_address(0), 0)
+        .is_some());
+    pool.reject_transaction(
+        &TestTransaction::get_address(0),
+        1,
+        &txns[1].clone().committed_hash(),
+        &DiscardedVMStatus::SEQUENCE_NUMBER_TOO_NEW,
     );
     assert!(pool
         .get_transaction_store()
@@ -221,6 +242,7 @@ fn test_reject_transaction() {
         &TestTransaction::get_address(0),
         0,
         &txns[0].clone().committed_hash(),
+        &DiscardedVMStatus::MALFORMED,
     );
     assert!(pool
         .get_transaction_store()
@@ -230,6 +252,7 @@ fn test_reject_transaction() {
         &TestTransaction::get_address(0),
         1,
         &txns[1].clone().committed_hash(),
+        &DiscardedVMStatus::MALFORMED,
     );
     assert!(pool
         .get_transaction_store()
@@ -241,7 +264,7 @@ fn test_reject_transaction() {
 fn test_system_ttl() {
     // Created mempool with system_transaction_timeout = 0.
     // All transactions are supposed to be evicted on next gc run.
-    let mut config = NodeConfig::random();
+    let mut config = NodeConfig::generate_random_config();
     config.mempool.system_transaction_timeout_secs = 0;
     let mut mempool = CoreMempool::new(&config);
 
@@ -255,7 +278,7 @@ fn test_system_ttl() {
 
     // GC routine should clear transaction from first insert but keep last one.
     mempool.gc();
-    let batch = mempool.get_batch(1, 1024, HashSet::new());
+    let batch = mempool.get_batch(1, 1024, true, false, vec![]);
     assert_eq!(vec![transaction.make_signed_transaction()], batch);
 }
 
@@ -267,11 +290,11 @@ fn test_commit_callback() {
     let txns = add_txns_to_mempool(&mut pool, vec![TestTransaction::new(1, 6, 1)]);
 
     // Check that pool is empty.
-    assert!(pool.get_batch(1, 1024, HashSet::new()).is_empty());
+    assert!(pool.get_batch(1, 1024, true, false, vec![]).is_empty());
     // Transaction 5 got back from consensus.
     pool.commit_transaction(&TestTransaction::get_address(1), 5);
     // Verify that we can execute transaction 6.
-    assert_eq!(pool.get_batch(1, 1024, HashSet::new())[0], txns[0]);
+    assert_eq!(pool.get_batch(1, 1024, true, false, vec![])[0], txns[0]);
 }
 
 #[test]
@@ -284,14 +307,24 @@ fn test_reset_sequence_number_on_failure() {
         .map(|txn| txn.make_signed_transaction().committed_hash())
         .collect();
     // Add two transactions for account.
-    add_txns_to_mempool(
-        &mut pool,
-        vec![TestTransaction::new(1, 0, 1), TestTransaction::new(1, 1, 1)],
-    );
+    add_txns_to_mempool(&mut pool, vec![
+        TestTransaction::new(1, 0, 1),
+        TestTransaction::new(1, 1, 1),
+    ]);
 
     // Notify mempool about failure in arbitrary order
-    pool.reject_transaction(&TestTransaction::get_address(1), 0, &hashes[0]);
-    pool.reject_transaction(&TestTransaction::get_address(1), 1, &hashes[1]);
+    pool.reject_transaction(
+        &TestTransaction::get_address(1),
+        0,
+        &hashes[0],
+        &DiscardedVMStatus::MALFORMED,
+    );
+    pool.reject_transaction(
+        &TestTransaction::get_address(1),
+        1,
+        &hashes[1],
+        &DiscardedVMStatus::MALFORMED,
+    );
 
     // Verify that new transaction for this account can be added.
     assert!(add_txn(&mut pool, TestTransaction::new(1, 0, 1)).is_ok());
@@ -307,15 +340,12 @@ fn view(txns: Vec<SignedTransaction>) -> Vec<u64> {
 #[test]
 fn test_timeline() {
     let mut pool = setup_mempool().0;
-    add_txns_to_mempool(
-        &mut pool,
-        vec![
-            TestTransaction::new(1, 0, 1),
-            TestTransaction::new(1, 1, 1),
-            TestTransaction::new(1, 3, 1),
-            TestTransaction::new(1, 5, 1),
-        ],
-    );
+    add_txns_to_mempool(&mut pool, vec![
+        TestTransaction::new(1, 0, 1),
+        TestTransaction::new(1, 1, 1),
+        TestTransaction::new(1, 3, 1),
+        TestTransaction::new(1, 5, 1),
+    ]);
 
     let (timeline, _) = pool.read_timeline(&vec![0].into(), 10);
     assert_eq!(view(timeline), vec![0, 1]);
@@ -344,15 +374,12 @@ fn test_timeline() {
 #[test]
 fn test_multi_bucket_timeline() {
     let mut pool = setup_mempool_with_broadcast_buckets(vec![0, 101, 201]).0;
-    add_txns_to_mempool(
-        &mut pool,
-        vec![
-            TestTransaction::new(1, 0, 1),   // bucket 0
-            TestTransaction::new(1, 1, 100), // bucket 0
-            TestTransaction::new(1, 3, 200), // bucket 1
-            TestTransaction::new(1, 5, 300), // bucket 2
-        ],
-    );
+    add_txns_to_mempool(&mut pool, vec![
+        TestTransaction::new(1, 0, 1),   // bucket 0
+        TestTransaction::new(1, 1, 100), // bucket 0
+        TestTransaction::new(1, 3, 200), // bucket 1
+        TestTransaction::new(1, 5, 300), // bucket 2
+    ]);
 
     let (timeline, _) = pool.read_timeline(&vec![0, 0, 0].into(), 10);
     assert_eq!(view(timeline), vec![0, 1]);
@@ -397,15 +424,12 @@ fn test_multi_bucket_timeline() {
 #[test]
 fn test_multi_bucket_gas_ranking_update() {
     let mut pool = setup_mempool_with_broadcast_buckets(vec![0, 101, 201]).0;
-    add_txns_to_mempool(
-        &mut pool,
-        vec![
-            TestTransaction::new(1, 0, 1),   // bucket 0
-            TestTransaction::new(1, 1, 100), // bucket 0
-            TestTransaction::new(1, 2, 101), // bucket 1
-            TestTransaction::new(1, 3, 200), // bucket 1
-        ],
-    );
+    add_txns_to_mempool(&mut pool, vec![
+        TestTransaction::new(1, 0, 1),   // bucket 0
+        TestTransaction::new(1, 1, 100), // bucket 0
+        TestTransaction::new(1, 2, 101), // bucket 1
+        TestTransaction::new(1, 3, 200), // bucket 1
+    ]);
 
     // txn 2 and 3 are prioritized
     let (timeline, _) = pool.read_timeline(&vec![0, 0, 0].into(), 2);
@@ -434,15 +458,12 @@ fn test_multi_bucket_gas_ranking_update() {
 #[test]
 fn test_multi_bucket_removal() {
     let mut pool = setup_mempool_with_broadcast_buckets(vec![0, 101, 201]).0;
-    add_txns_to_mempool(
-        &mut pool,
-        vec![
-            TestTransaction::new(1, 0, 1),   // bucket 0
-            TestTransaction::new(1, 1, 100), // bucket 0
-            TestTransaction::new(1, 2, 300), // bucket 2
-            TestTransaction::new(1, 3, 200), // bucket 1
-        ],
-    );
+    add_txns_to_mempool(&mut pool, vec![
+        TestTransaction::new(1, 0, 1),   // bucket 0
+        TestTransaction::new(1, 1, 100), // bucket 0
+        TestTransaction::new(1, 2, 300), // bucket 2
+        TestTransaction::new(1, 3, 200), // bucket 1
+    ]);
 
     let (timeline, _) = pool.read_timeline(&vec![0, 0, 0].into(), 10);
     assert_eq!(view(timeline), vec![0, 1, 2, 3]);
@@ -466,7 +487,7 @@ fn test_multi_bucket_removal() {
 
 #[test]
 fn test_capacity() {
-    let mut config = NodeConfig::random();
+    let mut config = NodeConfig::generate_random_config();
     config.mempool.capacity = 1;
     config.mempool.system_transaction_timeout_secs = 0;
     let mut pool = CoreMempool::new(&config);
@@ -514,7 +535,7 @@ fn test_capacity_bytes() {
     // Set exact limit
     let capacity_bytes = size_bytes;
 
-    let mut config = NodeConfig::random();
+    let mut config = NodeConfig::generate_random_config();
     config.mempool.capacity = 1_000; // Won't hit this limit.
     config.mempool.capacity_bytes = capacity_bytes;
     config.mempool.system_transaction_timeout_secs = 0;
@@ -525,7 +546,7 @@ fn test_capacity_bytes() {
             let status = pool.add_txn(
                 txn.txn,
                 txn.ranking_score,
-                txn.sequence_info.account_sequence_number_type,
+                txn.sequence_info.account_sequence_number,
                 txn.timeline_state,
             );
             assert_eq!(status.code, MempoolStatusCode::Accepted);
@@ -535,7 +556,7 @@ fn test_capacity_bytes() {
             let status = pool.add_txn(
                 txn.txn,
                 txn.ranking_score,
-                txn.sequence_info.account_sequence_number_type,
+                txn.sequence_info.account_sequence_number,
                 txn.timeline_state,
             );
             assert_eq!(status.code, MempoolStatusCode::MempoolIsFull);
@@ -552,14 +573,14 @@ fn new_test_mempool_transaction(address: usize, sequence_number: u64) -> Mempool
         Duration::from_secs(1),
         1,
         TimelineState::NotReady,
-        AccountSequenceInfo::Sequential(0),
+        0,
         SystemTime::now(),
     )
 }
 
 #[test]
 fn test_parking_lot_eviction() {
-    let mut config = NodeConfig::random();
+    let mut config = NodeConfig::generate_random_config();
     config.mempool.capacity = 5;
     let mut pool = CoreMempool::new(&config);
     // Add transactions with the following sequence numbers to Mempool.
@@ -572,7 +593,7 @@ fn test_parking_lot_eviction() {
     }
     // Make sure that we have correct txns in Mempool.
     let mut txns: Vec<_> = pool
-        .get_batch(5, 5120, HashSet::new())
+        .get_batch(5, 5120, true, false, vec![])
         .iter()
         .map(SignedTransaction::sequence_number)
         .collect();
@@ -585,7 +606,7 @@ fn test_parking_lot_eviction() {
 
 #[test]
 fn test_parking_lot_evict_only_for_ready_txn_insertion() {
-    let mut config = NodeConfig::random();
+    let mut config = NodeConfig::generate_random_config();
     config.mempool.capacity = 6;
     let mut pool = CoreMempool::new(&config);
     // Add transactions with the following sequence numbers to Mempool.
@@ -601,7 +622,7 @@ fn test_parking_lot_evict_only_for_ready_txn_insertion() {
 
     // Make sure that we have correct txns in Mempool.
     let mut txns: Vec<_> = pool
-        .get_batch(5, 5120, HashSet::new())
+        .get_batch(5, 5120, true, false, vec![])
         .iter()
         .map(SignedTransaction::sequence_number)
         .collect();
@@ -622,12 +643,7 @@ fn test_gc_ready_transaction() {
 
     // Insert in the middle transaction that's going to be expired.
     let txn = TestTransaction::new(1, 1, 1).make_signed_transaction_with_expiration_time(0);
-    pool.add_txn(
-        txn,
-        1,
-        AccountSequenceInfo::Sequential(0),
-        TimelineState::NotReady,
-    );
+    pool.add_txn(txn, 1, 0, TimelineState::NotReady);
 
     // Insert few transactions after it.
     // They are supposed to be ready because there's a sequential path from 0 to them.
@@ -642,7 +658,7 @@ fn test_gc_ready_transaction() {
     pool.gc_by_expiration_time(Duration::from_secs(1));
 
     // Make sure txns 2 and 3 became not ready and we can't read them from any API.
-    let block = pool.get_batch(1, 1024, HashSet::new());
+    let block = pool.get_batch(1, 1024, true, false, vec![]);
     assert_eq!(block.len(), 1);
     assert_eq!(block[0].sequence_number(), 0);
 
@@ -666,13 +682,8 @@ fn test_clean_stuck_transactions() {
     }
     let db_sequence_number = 10;
     let txn = TestTransaction::new(0, db_sequence_number, 1).make_signed_transaction();
-    pool.add_txn(
-        txn,
-        1,
-        AccountSequenceInfo::Sequential(db_sequence_number),
-        TimelineState::NotReady,
-    );
-    let block = pool.get_batch(1, 1024, HashSet::new());
+    pool.add_txn(txn, 1, db_sequence_number, TimelineState::NotReady);
+    let block = pool.get_batch(1, 1024, true, false, vec![]);
     assert_eq!(block.len(), 1);
     assert_eq!(block[0].sequence_number(), 10);
 }
@@ -682,12 +693,7 @@ fn test_get_transaction_by_hash() {
     let mut pool = setup_mempool().0;
     let db_sequence_number = 10;
     let txn = TestTransaction::new(0, db_sequence_number, 1).make_signed_transaction();
-    pool.add_txn(
-        txn.clone(),
-        1,
-        AccountSequenceInfo::Sequential(db_sequence_number),
-        TimelineState::NotReady,
-    );
+    pool.add_txn(txn.clone(), 1, db_sequence_number, TimelineState::NotReady);
     let hash = txn.clone().committed_hash();
     let ret = pool.get_by_hash(hash);
     assert_eq!(ret, Some(txn));
@@ -701,12 +707,7 @@ fn test_get_transaction_by_hash_after_the_txn_is_updated() {
     let mut pool = setup_mempool().0;
     let db_sequence_number = 10;
     let txn = TestTransaction::new(0, db_sequence_number, 1).make_signed_transaction();
-    pool.add_txn(
-        txn.clone(),
-        1,
-        AccountSequenceInfo::Sequential(db_sequence_number),
-        TimelineState::NotReady,
-    );
+    pool.add_txn(txn.clone(), 1, db_sequence_number, TimelineState::NotReady);
     let hash = txn.committed_hash();
 
     // new txn with higher gas price
@@ -714,7 +715,7 @@ fn test_get_transaction_by_hash_after_the_txn_is_updated() {
     pool.add_txn(
         new_txn.clone(),
         1,
-        AccountSequenceInfo::Sequential(db_sequence_number),
+        db_sequence_number,
         TimelineState::NotReady,
     );
     let new_txn_hash = new_txn.clone().committed_hash();
@@ -728,24 +729,24 @@ fn test_get_transaction_by_hash_after_the_txn_is_updated() {
 
 #[test]
 fn test_bytes_limit() {
-    let mut config = NodeConfig::random();
+    let mut config = NodeConfig::generate_random_config();
     config.mempool.capacity = 100;
     let mut pool = CoreMempool::new(&config);
     // add 100 transacionts
     for seq in 0..100 {
         add_txn(&mut pool, TestTransaction::new(1, seq, 1)).unwrap();
     }
-    let get_all = pool.get_batch(100, 100 * 1024, HashSet::new());
+    let get_all = pool.get_batch(100, 100 * 1024, true, false, vec![]);
     assert_eq!(get_all.len(), 100);
     let txn_size = get_all[0].raw_txn_bytes_len() as u64;
     let limit = 10;
-    let hit_limit = pool.get_batch(100, txn_size * limit, HashSet::new());
+    let hit_limit = pool.get_batch(100, txn_size * limit, true, false, vec![]);
     assert_eq!(hit_limit.len(), limit as usize);
 }
 
 #[test]
 fn test_transaction_store_remove_account_if_empty() {
-    let mut config = NodeConfig::random();
+    let mut config = NodeConfig::generate_random_config();
     config.mempool.capacity = 100;
     let mut pool = CoreMempool::new(&config);
 
@@ -766,13 +767,18 @@ fn test_transaction_store_remove_account_if_empty() {
     add_signed_txn(&mut pool, txn).unwrap();
     assert_eq!(pool.get_transaction_store().get_transactions().len(), 1);
 
-    pool.reject_transaction(&TestTransaction::get_address(2), 2, &hash);
+    pool.reject_transaction(
+        &TestTransaction::get_address(2),
+        2,
+        &hash,
+        &DiscardedVMStatus::MALFORMED,
+    );
     assert_eq!(pool.get_transaction_store().get_transactions().len(), 0);
 }
 
 #[test]
 fn test_sequence_number_behavior_at_capacity() {
-    let mut config = NodeConfig::random();
+    let mut config = NodeConfig::generate_random_config();
     config.mempool.capacity = 2;
     let mut pool = CoreMempool::new(&config);
 
@@ -782,6 +788,100 @@ fn test_sequence_number_behavior_at_capacity() {
     add_txn(&mut pool, TestTransaction::new(2, 0, 1)).unwrap();
     pool.commit_transaction(&TestTransaction::get_address(2), 0);
 
-    let batch = pool.get_batch(10, 10240, HashSet::new());
+    let batch = pool.get_batch(10, 10240, true, false, vec![]);
     assert_eq!(batch.len(), 1);
+}
+
+#[test]
+fn test_not_return_non_full() {
+    let mut config = NodeConfig::generate_random_config();
+    config.mempool.capacity = 2;
+    let mut pool = CoreMempool::new(&config);
+    add_txn(&mut pool, TestTransaction::new(0, 0, 1)).unwrap();
+
+    let batch = pool.get_batch(10, 10240, true, false, vec![]);
+    assert_eq!(batch.len(), 1);
+
+    let batch = pool.get_batch(10, 10240, false, false, vec![]);
+    assert_eq!(batch.len(), 0);
+
+    let batch = pool.get_batch(1, 10240, false, false, vec![]);
+    assert_eq!(batch.len(), 1);
+}
+
+#[test]
+fn test_include_gas_upgraded() {
+    let mut config = NodeConfig::generate_random_config();
+    config.mempool.capacity = 100;
+    let mut pool = CoreMempool::new(&config);
+
+    let sequence_number = 0;
+    let address_index = 0;
+
+    let low_gas_price = 1;
+    add_txn(
+        &mut pool,
+        TestTransaction::new(address_index, sequence_number, low_gas_price),
+    )
+    .unwrap();
+    let low_gas_txn = TransactionInProgress {
+        summary: TransactionSummary::new(
+            TestTransaction::get_address(address_index),
+            sequence_number,
+        ),
+        gas_unit_price: low_gas_price,
+    };
+    let batch = pool.get_batch(10, 10240, true, true, vec![low_gas_txn.clone()]);
+    assert_eq!(batch.len(), 0);
+
+    let high_gas_price = 100;
+    add_txn(
+        &mut pool,
+        TestTransaction::new(address_index, sequence_number, high_gas_price),
+    )
+    .unwrap();
+    let high_gas_txn = TransactionInProgress {
+        summary: TransactionSummary::new(
+            TestTransaction::get_address(address_index),
+            sequence_number,
+        ),
+        gas_unit_price: high_gas_price,
+    };
+
+    // When gas upgraded is allowed and the low gas txn (but not the high gas txn) is excluded, will the high gas txn be included.
+    let batch = pool.get_batch(10, 10240, true, true, vec![low_gas_txn.clone()]);
+    assert_eq!(batch.len(), 1);
+    assert_eq!(
+        batch[0].sender(),
+        TestTransaction::get_address(address_index)
+    );
+    assert_eq!(batch[0].sequence_number(), sequence_number);
+    assert_eq!(batch[0].gas_unit_price(), high_gas_price);
+    // In all other cases, the transaction will be excluded.
+    let batch = pool.get_batch(10, 10240, true, false, vec![low_gas_txn.clone()]);
+    assert_eq!(batch.len(), 0);
+
+    let batch = pool.get_batch(10, 10240, true, true, vec![high_gas_txn.clone()]);
+    assert_eq!(batch.len(), 0);
+    let batch = pool.get_batch(10, 10240, true, false, vec![high_gas_txn.clone()]);
+    assert_eq!(batch.len(), 0);
+
+    let batch = pool.get_batch(10, 10240, true, true, vec![
+        low_gas_txn.clone(),
+        high_gas_txn.clone(),
+    ]);
+    assert_eq!(batch.len(), 0);
+    let batch = pool.get_batch(10, 10240, true, false, vec![
+        low_gas_txn.clone(),
+        high_gas_txn.clone(),
+    ]);
+    assert_eq!(batch.len(), 0);
+
+    let batch = pool.get_batch(10, 10240, true, false, vec![
+        high_gas_txn.clone(),
+        low_gas_txn.clone(),
+    ]);
+    assert_eq!(batch.len(), 0);
+    let batch = pool.get_batch(10, 10240, true, true, vec![high_gas_txn, low_gas_txn]);
+    assert_eq!(batch.len(), 0);
 }

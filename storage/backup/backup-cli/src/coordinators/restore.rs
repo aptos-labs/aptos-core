@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -16,6 +17,7 @@ use crate::{
     utils::{unix_timestamp_sec, GlobalRestoreOptions},
 };
 use anyhow::{anyhow, bail, Result};
+use aptos_executor_types::VerifyExecutionMode;
 use aptos_logger::prelude::*;
 use aptos_types::transaction::Version;
 use clap::Parser;
@@ -86,11 +88,11 @@ impl RestoreCoordinator {
         ret
     }
 
-    async fn run_impl(self) -> Result<()> {
+    async fn run_impl(mut self) -> Result<()> {
         // N.b.
         // The coordinator now focuses on doing one procedure, ignoring the combination of options
         // supported before:
-        //   1. a most recent state snapshot
+        //   1. a most recent state snapshot before --target-version
         //   2. a only transaction and its output, at the state snapshot version
         //   3. the epoch history from 0 up until the latest closed epoch preceding the state
         //      snapshot version.
@@ -98,9 +100,6 @@ impl RestoreCoordinator {
 
         if self.replay_all {
             bail!("--replay--all not supported in this version.");
-        }
-        if self.ledger_history_start_version.is_some() {
-            bail!("--ledger-history-start-version not supported in this version.");
         }
 
         let metadata_view = metadata::cache::sync_and_load(
@@ -141,11 +140,10 @@ impl RestoreCoordinator {
                     .ok_or_else(|| anyhow!("No usable state snapshot."))?
             };
         let version = state_snapshot_backup.version;
+        self.global_opt.target_version = version;
         let epoch_ending_backups = metadata_view.select_epoch_ending_backups(version)?;
-        let transaction_backup = metadata_view
-            .select_transaction_backups(version, version)?
-            .pop()
-            .unwrap();
+        let transaction_backups = metadata_view
+            .select_transaction_backups(self.ledger_history_start_version(), version)?;
         COORDINATOR_TARGET_VERSION.set(version as i64);
         info!(version = version, "Restore target decided.");
 
@@ -170,6 +168,7 @@ impl RestoreCoordinator {
             StateSnapshotRestoreOpt {
                 manifest_handle: state_snapshot_backup.manifest,
                 version,
+                validate_modules: false,
             },
             self.global_opt.clone(),
             Arc::clone(&self.storage),
@@ -178,13 +177,18 @@ impl RestoreCoordinator {
         .run()
         .await?;
 
-        let txn_manifests = vec![transaction_backup.manifest];
+        let txn_manifests = transaction_backups
+            .iter()
+            .map(|e| e.manifest.clone())
+            .collect();
         TransactionRestoreBatchController::new(
             self.global_opt,
             self.storage,
             txn_manifests,
-            Some(version + 1),
+            None,
             epoch_history,
+            VerifyExecutionMode::NoVerify,
+            None,
         )
         .run()
         .await?;
@@ -196,6 +200,11 @@ impl RestoreCoordinator {
 impl RestoreCoordinator {
     fn target_version(&self) -> Version {
         self.global_opt.target_version
+    }
+
+    fn ledger_history_start_version(&self) -> Version {
+        self.ledger_history_start_version
+            .unwrap_or_else(|| self.target_version())
     }
 
     #[allow(dead_code)]

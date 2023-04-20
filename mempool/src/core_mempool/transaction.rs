@@ -1,15 +1,15 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::core_mempool::TXN_INDEX_ESTIMATED_BYTES;
 use aptos_crypto::HashValue;
-use aptos_types::{
-    account_address::AccountAddress, account_config::AccountSequenceInfo,
-    transaction::SignedTransaction,
-};
+use aptos_types::{account_address::AccountAddress, transaction::SignedTransaction};
 use serde::{Deserialize, Serialize};
-use std::mem::size_of;
-use std::time::{Duration, SystemTime};
+use std::{
+    mem::size_of,
+    time::{Duration, SystemTime},
+};
 
 /// Estimated per-txn size minus the raw transaction
 pub const TXN_FIXED_ESTIMATED_BYTES: usize = size_of::<MempoolTransaction>();
@@ -23,6 +23,7 @@ pub struct MempoolTransaction {
     pub timeline_state: TimelineState,
     pub sequence_info: SequenceInfo,
     pub insertion_time: SystemTime,
+    pub was_parked: bool,
 }
 
 impl MempoolTransaction {
@@ -31,30 +32,35 @@ impl MempoolTransaction {
         expiration_time: Duration,
         ranking_score: u64,
         timeline_state: TimelineState,
-        seqno_type: AccountSequenceInfo,
+        seqno: u64,
         insertion_time: SystemTime,
     ) -> Self {
         Self {
             sequence_info: SequenceInfo {
                 transaction_sequence_number: txn.sequence_number(),
-                account_sequence_number_type: seqno_type,
+                account_sequence_number: seqno,
             },
             txn,
             expiration_time,
             ranking_score,
             timeline_state,
             insertion_time,
+            was_parked: false,
         }
     }
+
     pub(crate) fn get_sender(&self) -> AccountAddress {
         self.txn.sender()
     }
+
     pub(crate) fn get_gas_price(&self) -> u64 {
         self.txn.gas_unit_price()
     }
+
     pub(crate) fn get_committed_hash(&self) -> HashValue {
         self.txn.clone().committed_hash()
     }
+
     pub(crate) fn get_estimated_bytes(&self) -> usize {
         self.txn.raw_txn_bytes_len() + TXN_FIXED_ESTIMATED_BYTES + TXN_INDEX_ESTIMATED_BYTES
     }
@@ -75,20 +81,18 @@ pub enum TimelineState {
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub struct SequenceInfo {
     pub transaction_sequence_number: u64,
-    pub account_sequence_number_type: AccountSequenceInfo,
+    pub account_sequence_number: u64,
 }
 
 #[cfg(test)]
 mod test {
     use crate::core_mempool::{MempoolTransaction, TimelineState};
-    use aptos_crypto::ed25519::Ed25519PrivateKey;
-    use aptos_crypto::PrivateKey;
-    use aptos_crypto::SigningKey;
-    use aptos_crypto::Uniform;
-    use aptos_types::account_address::AccountAddress;
-    use aptos_types::account_config::AccountSequenceInfo;
-    use aptos_types::chain_id::ChainId;
-    use aptos_types::transaction::{RawTransaction, Script, SignedTransaction, TransactionPayload};
+    use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
+    use aptos_types::{
+        account_address::AccountAddress,
+        chain_id::ChainId,
+        transaction::{RawTransaction, Script, SignedTransaction, TransactionPayload},
+    };
     use std::time::{Duration, SystemTime};
 
     #[test]
@@ -107,7 +111,7 @@ mod test {
             Duration::from_secs(1),
             1,
             TimelineState::NotReady,
-            AccountSequenceInfo::Sequential(0),
+            0,
             SystemTime::now(),
         )
     }

@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -6,10 +7,10 @@ use crate::{
     AptosDB,
 };
 use anyhow::Result;
+use aptos_storage_interface::DbWriter;
 use aptos_temppath::TempPath;
 use aptos_types::transaction::Version;
 use proptest::prelude::*;
-use storage_interface::DbWriter;
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]

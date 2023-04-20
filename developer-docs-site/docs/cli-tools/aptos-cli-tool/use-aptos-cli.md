@@ -1,11 +1,11 @@
 ---
-title: "Using Aptos CLI"
+title: "Use the Aptos CLI"
 id: "use-aptos-cli"
 ---
 
-# Using Aptos CLI
+# Use the Aptos CLI
 
-The `aptos` tool is a command line interface (CLI) for developing on the Aptos blockchain, debugging, and for node operations. This document describes how to use the `aptos` CLI tool. To install the CLI, see [Install Aptos CLI](install-aptos-cli).
+The `aptos` tool is a command line interface (CLI) for developing on the Aptos blockchain, debugging, and for node operations. This document describes how to use the `aptos` CLI tool. To download or build the CLI, follow [Install Aptos CLI](./index.md).
 
 ## Command line help
 
@@ -262,7 +262,7 @@ $ aptos account fund-with-faucet --account default
 
 ### View an account's balance and transfer events
 
-You can view the balance and transfer events (deposits and withdrawals) either by explicity specying the accound address, as below:
+You can view the balance and transfer events (deposits and withdrawals) either by explicitly specifying the account address, as below:
 
 ```bash
 $ aptos account list --query balance --account 00f1f20ddd0b0dd2291b6e42c97274668c479bca70f07c6b6a80b99720779696
@@ -651,7 +651,7 @@ $ aptos account transfer --account superuser --amount 100
 
 ### Generating a key
 
-To allow generating private keys, you can use the `aptos key generate command`.  You can generate
+To allow generating private keys, you can use the `aptos key generate` command.  You can generate
 either `x25519` or `ed25519` keys.
 ```bash
 $ aptos key generate --key-type ed25519 --output-file output.key
@@ -662,6 +662,23 @@ $ aptos key generate --key-type ed25519 --output-file output.key
   }
 }
 ```
+
+If you are generating an `ed25519` key, you can optionally supply a vanity prefix for the corresponding account address.
+
+```bash
+$ aptos key generate --output-file starts_with_ace.key --vanity-prefix 0xace
+{
+  "Result": {
+    "PrivateKey Path": "starts_with_ace.key",
+    "PublicKey Path": "starts_with_ace.key.pub",
+    "Account Address:": "0xaceffa015e51dcd32c34794c143e19185b3f1be5464dd6184239a37e57e72ea3"
+  }
+}
+```
+
+:::tip
+The more characters you specify, the longer it will take to generate a vanity account.
+:::
 
 ### Generating a peer config
 
@@ -742,10 +759,111 @@ Test result: OK. Total tests: 2; passed: 2; failed: 0
   "Result": "Success"
 }
 ```
+### Generating test coverage details for Move
+The `aptos` CLI can be used to analyze and improve the testing of your Move modules. To use this feature:
+1. In your `aptos-core` source checkout, navigate to the `aptos-move/framework/move-stdlib` directory.
+2. Execute the command:
+   ```bash
+   $ aptos move test --coverage
+   ```
+3. Receive results in standard output containing the result for each test case followed by a basic coverage summary resembling:
+   ```bash
+   BUILDING MoveStdlib
+Running Move unit tests
+[ PASS    ] 0x1::vector_tests::append_empties_is_empty
+[ PASS    ] 0x1::option_tests::borrow_mut_none
+[ PASS    ] 0x1::fixed_point32_tests::ceil_can_round_up_correctly
+[ PASS    ] 0x1::features::test_change_feature_txn
+[ PASS    ] 0x1::bcs_tests::bcs_bool
+[ PASS    ] 0x1::bit_vector_tests::empty_bitvector
+[ PASS    ] 0x1::option_tests::borrow_mut_some
+Test result: OK. Total tests: 149; passed: 149; failed: 0
++-------------------------+
+| Move Coverage Summary   |
++-------------------------+
+Module 0000000000000000000000000000000000000000000000000000000000000001::bcs
+>>> % Module coverage: NaN
+Module 0000000000000000000000000000000000000000000000000000000000000001::fixed_point32
+>>> % Module coverage: 100.00
+Module 0000000000000000000000000000000000000000000000000000000000000001::hash
+>>> % Module coverage: NaN
+Module 0000000000000000000000000000000000000000000000000000000000000001::vector
+>>> % Module coverage: 92.19
+Module 0000000000000000000000000000000000000000000000000000000000000001::error
+>>> % Module coverage: 0.00
+Module 0000000000000000000000000000000000000000000000000000000000000001::acl
+>>> % Module coverage: 0.00
+Module 0000000000000000000000000000000000000000000000000000000000000001::bit_vector
+>>> % Module coverage: 97.32
+Module 0000000000000000000000000000000000000000000000000000000000000001::signer
+>>> % Module coverage: 100.00
+Module 0000000000000000000000000000000000000000000000000000000000000001::features
+>>> % Module coverage: 69.41
+Module 0000000000000000000000000000000000000000000000000000000000000001::option
+>>> % Module coverage: 100.00
+Module 0000000000000000000000000000000000000000000000000000000000000001::string
+>>> % Module coverage: 81.82
++-------------------------+
+| % Move Coverage: 83.50  |
++-------------------------+
+Please use `aptos move coverage -h` for more detailed test coverage of this package
+{
+  "Result": "Success"
+}
+   ```
+
+4. Optionally, narrow down your test runs and results to a specific package name with the `--filter` option, like so:
+   ```bash
+   $ aptos move test --coverage --filter vector
+   ```
+
+   With results like:
+   ```
+   BUILDING MoveStdlib
+   Running Move unit tests
+   [ PASS    ] 0x1::bit_vector_tests::empty_bitvector
+   [ PASS    ] 0x1::vector_tests::append_empties_is_empty
+   [ PASS    ] 0x1::bit_vector_tests::index_bit_out_of_bounds
+   [ PASS    ] 0x1::vector_tests::append_respects_order_empty_lhs
+   ```
+5. Run the `aptos move coverage` command to obtain more detailed coverage information.
+6. Optionally, isolate the results to a module by passing its name to the `--module` option, for example:
+   ```bash
+   $ aptos move coverage source --module signer
+   ```
+
+   With results:
+   ```
+   module std::signer {
+       // Borrows the address of the signer
+       // Conceptually, you can think of the `signer` as being a struct wrapper arround an
+       // address
+       // ```
+       // struct signer has drop { addr: address }
+       // ```
+       // `borrow_address` borrows this inner field
+       native public fun borrow_address(s: &signer): &address;
+
+       // Copies the address of the signer
+       public fun address_of(s: &signer): address {
+           *borrow_address(s)
+       }
+
+    /// Return true only if `s` is a transaction signer. This is a spec function only available in spec.
+    spec native fun is_txn_signer(s: signer): bool;
+
+    /// Return true only if `a` is a transaction signer address. This is a spec function only available in spec.
+    spec native fun is_txn_signer_addr(a: address): bool;
+}
+{
+  "Result": "Success"
+}
+   ```
+6. Find failures and iteratively improve your testing and running these commands to eliminate gaps in your testing coverage.
 
 ### Proving Move
 
-The `aptos` CLI can be used to run [Move Prover](https://github.com/move-language/move/tree/main/language/move-prover) which is a formal verification tool for the Move language. The below example proves the `hello_prover` package in [move-examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples).
+The `aptos` CLI can be used to run [Move Prover](../../guides/prover-guides/index.md), which is a formal verification tool for the Move language. The below example proves the `hello_prover` package in [move-examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples).
 ```bash
 aptos move prove --package-dir aptos-move/move-examples/hello_prover/
 ```
@@ -766,13 +884,49 @@ FAILURE proving 1 modules from package `hello_prover` in 0.067s
 ```
 In this case, see [Install the dependencies of Move Prover](install-aptos-cli#step-3-optional-install-the-dependencies-of-move-prover).
 
-### Debug and print stack trace
+### Profiling gas usage
+
+This *experimental* feature lets you [profile gas usage](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/aptos-gas-profiling) in the Aptos virtual machine locally rather than [simulating transactions](../../concepts/gas-txn-fee.md#estimating-the-gas-units-via-simulation) at the [fullnode](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/simulate_transaction). You may also use it to visualize gas usage in the form of a flame graph.
+
+Run the gas profiler by appending the `--profile-gas` option to the Aptos CLI `move publish`, `move run` or `move run-script` command, for example:
+```bash
+aptos move publish --profile-gas
+```
+
+And receive output resembling:
+```bash
+Compiling, may take a little while to download git dependencies...
+BUILDING empty_fun
+package size 427 bytes
+Simulating transaction locally with the gas profiler...
+This is still experimental so results may be inaccurate.
+Execution & IO Gas flamegraph saved to gas-profiling/txn-69e19ee4-0x1-code-publish_package_txn.exec_io.svg
+Storage fee flamegraph saved to gas-profiling/txn-69e19ee4-0x1-code-publish_package_txn.storage.svg
+{
+  "Result": {
+    "transaction_hash": "0x69e19ee4cc89cb1f84ee21a46e6b281bd8696115aa332275eca38c4857818dfe",
+    "gas_used": 1007,
+    "gas_unit_price": 100,
+    "sender": "dbcbe741d003a7369d87ec8717afb5df425977106497052f96f4e236372f7dd5",
+    "success": true,
+    "version": 473269362,
+    "vm_status": "status EXECUTED of type Execution"
+  }
+}
+```
+
+Find the flame graphs in the newly created `gas-profiling/` directory. To interact with a graph, open the file in a web browser.
+
+Note these limitations of the experimental gas profiling feature:
+
+  * It may produce results that are different from the simulation.
+  * The graphs may contain errors, and the numbers may not add up to the total gas cost as shown in the transaction output.
+
+### Debugging and printing stack trace
 
 In this example, we will use `DebugDemo` in [debug-move-example](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos/debug-move-example).
 
-First, you need to include Move nursery in your Move [toml file](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos/debug-move-example/Move.toml).
-
-Now, you can use `Debug::print` and `Debug::print_stack_trace` in your [DebugDemo Move file](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos/debug-move-example/sources/DebugDemo.move).
+Now, you can use `debug::print` and `debug::print_stack_trace` in your [DebugDemo Move file](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos/debug-move-example/sources/DebugDemo.move).
 
 You can run the following command:
 ```bash
@@ -805,6 +959,14 @@ Operand Stack:
 ### Publishing a Move package with a named address
 
 In this example, we'll use the `HelloBlockchain` in [move-examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples).
+
+:::important
+As an open source project, the source code as well as compiled code published to the Aptos blockchain is inherently open by default. This means code you upload may be downloaded from on-chain data. Even without source access, it is possible to regenerate Move source from Move bytecode. To disable source access, publish with the `--included-artifacts none` argument, like so:
+
+```
+aptos move publish --included-artifacts none
+```
+:::
 
 Publish the package with your account address set for `HelloBlockchain`.
 
@@ -986,6 +1148,10 @@ $ aptos move run --function-id default::message::set_message --args string:hello
 
 ## Node command examples
 
+This section summarizes how to run a local testnet with Aptos CLI. See [Run a Local Testnet with Aptos CLI](../../nodes/local-testnet/using-cli-to-run-a-local-testnet.md) for more details.
+
+For Aptos CLI commands applicable to validator nodes, see the [Owner](../../nodes/validator-node/owner/index.md) and [Voter](../../nodes/validator-node/voter/index.md#steps-using-aptos-cli) instructions.
+
 ### Running a local testnet
 
 You can run a local testnet from the aptos CLI, that will match the version it was built with.  Additionally, it can
@@ -1045,15 +1211,7 @@ The `aptos` tool supports bootstrapping new blockchains through what is known as
 
 ### Prepare aptos-core
 
-The following guide assumes that you have access to the Aptos-core repository or the associated tools. You can download and prepare Aptos-core from [GitHub](https://github.com/aptos-labs/aptos-core):
-
-```
-git clone https://github.com/aptos-labs/aptos-core.git
-cd aptos-core
-git checkout --track origin/testnet
-./scripts/dev_setup.sh
-source ~/.cargo/env
-```
+The following sections rely on tools from the Aptos source. See [Building Aptos From Source](../../guides/building-from-source.md) for setup.
 
 ### The `layout` file
 
@@ -1086,7 +1244,7 @@ The framework will be stored within the `aptos-framework-release` directory.
 
 The `ValidatorConfiguration` file contains:
 
-* `account_address`: The account that manages this validator. This must be derived from the `account_key` provided within te `ValidatorConfiguration` file.
+* `account_address`: The account that manages this validator. This must be derived from the `account_key` provided within the `ValidatorConfiguration` file.
 * `consensus_key`: The public key for authenticating consensus messages from the validator
 * `account_key`: The public key for the account that manages this validator. This is used to derive the `account_address`.
 * `network_key`: The public key for both validator and fullnode network authentication and encryption.
@@ -1133,12 +1291,12 @@ cargo run --package aptos -- \\
 
 ### Generating a genesis and waypoint
 
-`genesis.blob` and the waypoint can be generated after obtaining the `Layout` file, each of the individual `ValidatorConfiguration` files, and the framework release. It is important to validate that the `ValidatorConfiguration` provided in the earlier stage is the same as in the distribution for generating the `genesis.blob`. If there is a mismatch, inform all participants.
+`genesis.blob` and the waypoint can be generated after obtaining the `layout` file, each of the individual `ValidatorConfiguration` files, and the framework release. It is important to validate that the `ValidatorConfiguration` provided in the earlier stage is the same as in the distribution for generating the `genesis.blob`. If there is a mismatch, inform all participants.
 
 To generate the `genesis.blob` and waypoint:
-* Place the `Layout` file in a directory, e.g., `genesis`.
+* Place the `layout` file in a directory, e.g., `genesis`.
 * Place all the `ValidatorConfiguration` files into the `genesis` directory.
-* Ensure that the `ValidatorConfiguration` files are listed under the set of `users` within the `Layout` file.
+* Ensure that the `ValidatorConfiguration` files are listed under the set of `users` within the `layout` file.
 * Make a `framework` directory within the `genesiss` directory and place the framework release `.mv` files into the `framework` directory.
 * Use the `aptos` CLI to generate genesis and waypoint:
 

@@ -1,0 +1,9 @@
+[package]
+name = "TransactationTests"
+version = "0.0.0"
+
+[addresses]
+entry_func_failed= "0x1"
+
+[dependencies]
+AptosFramework = { local = "../../../aptos-move/framework/aptos-framework" }

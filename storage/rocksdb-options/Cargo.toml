@@ -1,15 +1,17 @@
 [package]
 name = "aptos-rocksdb-options"
-version = "0.1.0"
-authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Aptos RocksDb Options"
-repository = "https://github.com/aptos-labs/aptos-core"
-homepage = "https://aptoslabs.com"
-license = "Apache-2.0"
-publish = false
-edition = "2021"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
 
 [dependencies]
-aptos-config = { path = "../../config" }
-
-rocksdb = { version = "0.19.0", default-features = false, features = ["lz4"] }
+aptos-config = { workspace = true }
+rocksdb = { workspace = true }

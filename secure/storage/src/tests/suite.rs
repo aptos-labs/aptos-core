@@ -1,8 +1,8 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{CryptoStorage, Error, KVStorage, Storage};
-
 use aptos_crypto::{
     ed25519::Ed25519PrivateKey, test_utils::TestAptosCrypto, HashValue, PrivateKey, Signature,
     Uniform,

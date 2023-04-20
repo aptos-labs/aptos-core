@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
@@ -21,9 +22,9 @@ fn update_nibble(original_key: &HashValue, n: usize, nibble: u8) -> HashValue {
     assert!(nibble < 16);
     let mut key = original_key.to_vec();
     key[n / 2] = if n % 2 == 0 {
-        key[n / 2] & 0x0f | nibble << 4
+        key[n / 2] & 0x0F | nibble << 4
     } else {
-        key[n / 2] & 0xf0 | nibble
+        key[n / 2] & 0xF0 | nibble
     };
     HashValue::from_slice(&key).unwrap()
 }

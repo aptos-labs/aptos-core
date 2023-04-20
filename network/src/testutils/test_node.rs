@@ -1,8 +1,9 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    application::storage::PeerMetadataStorage,
+    application::{metadata::ConnectionState, storage::PeersAndMetadata},
     peer_manager::{ConnectionNotification, PeerManagerNotification, PeerManagerRequest},
     protocols::{
         direct_send::Message,
@@ -15,22 +16,22 @@ use aptos_config::{
     config::{PeerRole, RoleType},
     network_id::{NetworkContext, NetworkId, PeerNetworkId},
 };
+use aptos_netcore::transport::ConnectionOrigin;
 use aptos_types::PeerId;
 use async_trait::async_trait;
 use futures::StreamExt;
-use netcore::transport::ConnectionOrigin;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 /// A sender to a node to mock an inbound network message from [`PeerManager`]
 pub type InboundMessageSender =
-    channel::aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>;
+    aptos_channels::aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>;
 
 /// A sender to a node to mock an inbound connection from [`PeerManager`]
 pub type ConnectionUpdateSender = crate::peer_manager::conn_notifs_channel::Sender;
 
 /// A receiver to get outbound network messages to [`PeerManager`]
 pub type OutboundMessageReceiver =
-    channel::aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>;
+    aptos_channels::aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>;
 
 /// A connection handle describing the network for a node.
 ///
@@ -42,7 +43,7 @@ pub struct InboundNetworkHandle {
     /// To send new incoming connections or disconnections
     pub connection_update_sender: ConnectionUpdateSender,
     /// To update the local state (normally done by peer manager)
-    pub peer_metadata_storage: Arc<PeerMetadataStorage>,
+    pub peers_and_metadata: Arc<PeersAndMetadata>,
 }
 
 impl InboundNetworkHandle {
@@ -53,12 +54,17 @@ impl InboundNetworkHandle {
         self_peer_network_id: PeerNetworkId,
         conn_metadata: ConnectionMetadata,
     ) {
-        let self_peer_id = self_peer_network_id.peer_id();
-        let network_id = self_peer_network_id.network_id();
-
         // PeerManager pushes this data before it's received by events
-        self.peer_metadata_storage
-            .insert_connection(network_id, conn_metadata.clone());
+        let network_id = self_peer_network_id.network_id();
+        let peer_id = conn_metadata.remote_peer_id;
+        self.peers_and_metadata
+            .insert_connection_metadata(
+                PeerNetworkId::new(network_id, peer_id),
+                conn_metadata.clone(),
+            )
+            .unwrap();
+
+        let self_peer_id = self_peer_network_id.peer_id();
         self.connection_update_sender
             .push(
                 conn_metadata.remote_peer_id,
@@ -80,11 +86,13 @@ impl InboundNetworkHandle {
         let self_peer_id = self_peer_network_id.peer_id();
         let network_id = self_peer_network_id.network_id();
 
-        // PeerManager pushes this data before it's received by events
-        self.peer_metadata_storage.remove(&PeerNetworkId::new(
-            network_id,
-            conn_metadata.remote_peer_id,
-        ));
+        // Set the state of the peer as disconnected
+        let peer_network_id = PeerNetworkId::new(network_id, conn_metadata.remote_peer_id);
+        self.peers_and_metadata
+            .update_connection_state(peer_network_id, ConnectionState::Disconnected)
+            .unwrap();
+
+        // Push the notification of the lost peer
         self.connection_update_sender
             .push(
                 conn_metadata.remote_peer_id,
@@ -97,9 +105,6 @@ impl InboundNetworkHandle {
             .unwrap();
     }
 }
-
-/// An application specific network handle
-pub type ApplicationNetworkHandle<Sender, Events> = (NetworkId, Sender, Events);
 
 /// A unique identifier of a node across the entire network
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -185,7 +190,7 @@ pub trait ApplicationNode {
     /// For receiving messages from other nodes
     fn get_outbound_handle(&mut self, network_id: NetworkId) -> &mut OutboundMessageReceiver;
 
-    fn get_peer_metadata_storage(&self) -> &PeerMetadataStorage;
+    fn get_peers_and_metadata(&self) -> &PeersAndMetadata;
 
     fn peer_network_ids(&self) -> &HashMap<NetworkId, PeerNetworkId>;
 }
@@ -235,20 +240,6 @@ pub trait TestNode: ApplicationNode + Sync {
             self.peer_network_id(network_id),
             metadata,
         );
-    }
-
-    /// Disconnects a node from another node
-    fn disconnect(&self, network_id: NetworkId, metadata: ConnectionMetadata) {
-        let self_metadata = self.conn_metadata(network_id, ConnectionOrigin::Inbound, &[]);
-        let remote_peer_id = metadata.remote_peer_id;
-
-        // Tell the other node it's disconnected
-        let remote_peer_network_id = PeerNetworkId::new(network_id, remote_peer_id);
-        self.get_inbound_handle_for_peer(remote_peer_network_id)
-            .disconnect(self.node_id().role(), remote_peer_network_id, self_metadata);
-
-        // Then disconnect us
-        self.disconnect_self(network_id, metadata);
     }
 
     /// Disconnects only the local side, useful for mocking the other node
@@ -342,10 +333,10 @@ pub trait TestNode: ApplicationNode + Sync {
                 // Forcefully close the oneshot channel, otherwise listening task will hang forever.
                 drop(res_tx);
                 (peer_id, protocol_id, data)
-            }
+            },
             PeerManagerRequest::SendDirectSend(peer_id, message) => {
                 (peer_id, message.protocol_id, message.mdata)
-            }
+            },
         }
     }
 
@@ -362,7 +353,7 @@ pub trait TestNode: ApplicationNode + Sync {
             ),
             PeerManagerRequest::SendDirectSend(peer_id, msg) => {
                 (peer_id, msg.protocol_id, msg.mdata, None)
-            }
+            },
         };
 
         let sender_peer_network_id = self.peer_network_id(network_id);
@@ -372,22 +363,16 @@ pub trait TestNode: ApplicationNode + Sync {
 
         // TODO: Add timeout functionality
         let peer_manager_notif = if let Some((_timeout, res_tx)) = maybe_rpc_info {
-            PeerManagerNotification::RecvRpc(
-                sender_peer_id,
-                InboundRpcRequest {
-                    protocol_id,
-                    data,
-                    res_tx,
-                },
-            )
+            PeerManagerNotification::RecvRpc(sender_peer_id, InboundRpcRequest {
+                protocol_id,
+                data,
+                res_tx,
+            })
         } else {
-            PeerManagerNotification::RecvMessage(
-                sender_peer_id,
-                Message {
-                    protocol_id,
-                    mdata: data,
-                },
-            )
+            PeerManagerNotification::RecvMessage(sender_peer_id, Message {
+                protocol_id,
+                mdata: data,
+            })
         };
         receiver_handle
             .inbound_message_sender

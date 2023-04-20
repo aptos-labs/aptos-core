@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 mod utils;
@@ -8,8 +9,8 @@ use crate::handlers::utils::{
     send_size_prefixed_bcs_bytes, unwrap_or_500, LATENCY_HISTOGRAM,
 };
 use aptos_crypto::hash::HashValue;
+use aptos_db::backup::backup_handler::BackupHandler;
 use aptos_types::transaction::Version;
-use aptosdb::backup::backup_handler::BackupHandler;
 use warp::{filters::BoxedFilter, reply::Reply, Filter};
 
 static DB_STATE: &str = "db_state";

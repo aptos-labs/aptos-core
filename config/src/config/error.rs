@@ -1,10 +1,13 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum Error {
+    #[error("Failed to sanitize the node config! Sanitizer: {0}, Error: {1}")]
+    ConfigSanitizerFailed(String, String),
     #[error("Invariant violation: {0}")]
     InvariantViolation(String),
     #[error("Error accessing {0}: {1}")]
@@ -19,10 +22,8 @@ pub enum Error {
     Unexpected(String),
 }
 
-pub fn invariant(cond: bool, msg: String) -> Result<(), Error> {
-    if !cond {
-        Err(Error::InvariantViolation(msg))
-    } else {
-        Ok(())
+impl From<anyhow::Error> for Error {
+    fn from(error: anyhow::Error) -> Self {
+        Error::Unexpected(error.to_string())
     }
 }

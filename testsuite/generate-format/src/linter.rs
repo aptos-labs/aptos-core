@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use serde_reflection::{ContainerFormat, Error, Format, FormatHolder, Result};
@@ -31,7 +32,7 @@ pub fn lint_bcs_format(format: &ContainerFormat) -> Result<()> {
                 } else {
                     Ok(())
                 }
-            }
+            },
             _ => Ok(()),
         }
     })

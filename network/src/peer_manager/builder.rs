@@ -1,37 +1,35 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    application::storage::PeerMetadataStorage,
+    application::storage::PeersAndMetadata,
     counters,
-    counters::NETWORK_RATE_LIMIT_METRICS,
     noise::{stream::NoiseStream, HandshakeAuthMode},
     peer_manager::{
         conn_notifs_channel, ConnectionRequest, ConnectionRequestSender, PeerManager,
         PeerManagerNotification, PeerManagerRequest, PeerManagerRequestSender,
     },
-    protocols::{network::AppConfig, wire::handshake::v1::ProtocolIdSet},
+    protocols::{
+        network::{NetworkClientConfig, NetworkServiceConfig},
+        wire::handshake::v1::ProtocolIdSet,
+    },
     transport::{self, AptosNetTransport, Connection, APTOS_TCP_TRANSPORT},
     ProtocolId,
 };
-use aptos_config::{
-    config::{PeerSet, RateLimitConfig, HANDSHAKE_VERSION},
-    network_id::NetworkContext,
-};
+use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
+use aptos_config::{config::HANDSHAKE_VERSION, network_id::NetworkContext};
 use aptos_crypto::x25519;
-use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
-use aptos_rate_limiter::rate_limit::TokenBucketRateLimiter;
-use aptos_time_service::TimeService;
-use aptos_types::{chain_id::ChainId, network_address::NetworkAddress, PeerId};
-use channel::{self, aptos_channel, message_queues::QueueStyle};
 #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
-use netcore::transport::memory::MemoryTransport;
-use netcore::transport::{
+use aptos_netcore::transport::memory::MemoryTransport;
+use aptos_netcore::transport::{
     tcp::{TCPBufferCfg, TcpSocket, TcpTransport},
     Transport,
 };
-use std::{clone::Clone, collections::HashMap, fmt::Debug, net::IpAddr, sync::Arc};
+use aptos_time_service::TimeService;
+use aptos_types::{chain_id::ChainId, network_address::NetworkAddress, PeerId};
+use std::{clone::Clone, collections::HashMap, fmt::Debug, sync::Arc};
 use tokio::runtime::Handle;
 
 /// Inbound and Outbound connections are always secured with NoiseIK.  The dialer
@@ -52,13 +50,14 @@ struct TransportContext {
     chain_id: ChainId,
     supported_protocols: ProtocolIdSet,
     authentication_mode: AuthenticationMode,
-    trusted_peers: Arc<RwLock<PeerSet>>,
+    peers_and_metadata: Arc<PeersAndMetadata>,
     enable_proxy_protocol: bool,
 }
 
 impl TransportContext {
-    fn add_protocols(&mut self, protocols: &ProtocolIdSet) {
-        self.supported_protocols = self.supported_protocols.union(protocols);
+    fn add_protocols(&mut self, protocols: &Vec<ProtocolId>) {
+        let protocol_id_set = ProtocolIdSet::from_iter(protocols);
+        self.supported_protocols = self.supported_protocols.union(&protocol_id_set);
     }
 }
 
@@ -69,8 +68,7 @@ struct PeerManagerContext {
     connection_reqs_tx: aptos_channel::Sender<PeerId, ConnectionRequest>,
     connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
 
-    peer_metadata_storage: Arc<PeerMetadataStorage>,
-    trusted_peers: Arc<RwLock<PeerSet>>,
+    peers_and_metadata: Arc<PeersAndMetadata>,
     upstream_handlers:
         HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
     connection_event_handlers: Vec<conn_notifs_channel::Sender>,
@@ -80,8 +78,6 @@ struct PeerManagerContext {
     max_frame_size: usize,
     max_message_size: usize,
     inbound_connection_limit: usize,
-    inbound_rate_limit_config: Option<RateLimitConfig>,
-    outbound_rate_limit_config: Option<RateLimitConfig>,
     tcp_buffer_cfg: TCPBufferCfg,
 }
 
@@ -93,8 +89,7 @@ impl PeerManagerContext {
         connection_reqs_tx: aptos_channel::Sender<PeerId, ConnectionRequest>,
         connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
 
-        peer_metadata_storage: Arc<PeerMetadataStorage>,
-        trusted_peers: Arc<RwLock<PeerSet>>,
+        peers_and_metadata: Arc<PeersAndMetadata>,
         upstream_handlers: HashMap<
             ProtocolId,
             aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
@@ -106,8 +101,6 @@ impl PeerManagerContext {
         max_frame_size: usize,
         max_message_size: usize,
         inbound_connection_limit: usize,
-        inbound_rate_limit_config: Option<RateLimitConfig>,
-        outbound_rate_limit_config: Option<RateLimitConfig>,
         tcp_buffer_cfg: TCPBufferCfg,
     ) -> Self {
         Self {
@@ -116,8 +109,7 @@ impl PeerManagerContext {
             connection_reqs_tx,
             connection_reqs_rx,
 
-            peer_metadata_storage,
-            trusted_peers,
+            peers_and_metadata,
             upstream_handlers,
             connection_event_handlers,
 
@@ -126,8 +118,6 @@ impl PeerManagerContext {
             max_frame_size,
             max_message_size,
             inbound_connection_limit,
-            inbound_rate_limit_config,
-            outbound_rate_limit_config,
             tcp_buffer_cfg,
         }
     }
@@ -150,7 +140,7 @@ impl PeerManagerContext {
 
 #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
 type MemoryPeerManager =
-    PeerManager<AptosNetTransport<MemoryTransport>, NoiseStream<memsocket::MemorySocket>>;
+    PeerManager<AptosNetTransport<MemoryTransport>, NoiseStream<aptos_memsocket::MemorySocket>>;
 type TcpPeerManager = PeerManager<AptosNetTransport<TcpTransport>, NoiseStream<TcpSocket>>;
 
 enum TransportPeerManager {
@@ -178,8 +168,7 @@ impl PeerManagerBuilder {
         time_service: TimeService,
         // TODO(philiphayes): better support multiple listening addrs
         listen_address: NetworkAddress,
-        peer_metadata_storage: Arc<PeerMetadataStorage>,
-        trusted_peers: Arc<RwLock<PeerSet>>,
+        peers_and_metadata: Arc<PeersAndMetadata>,
         authentication_mode: AuthenticationMode,
         channel_size: usize,
         max_concurrent_network_reqs: usize,
@@ -187,8 +176,6 @@ impl PeerManagerBuilder {
         max_message_size: usize,
         enable_proxy_protocol: bool,
         inbound_connection_limit: usize,
-        inbound_rate_limit_config: Option<RateLimitConfig>,
-        outbound_rate_limit_config: Option<RateLimitConfig>,
         tcp_buffer_cfg: TCPBufferCfg,
     ) -> Self {
         // Setup channel to send requests to peer manager.
@@ -208,7 +195,7 @@ impl PeerManagerBuilder {
                 chain_id,
                 supported_protocols: ProtocolIdSet::empty(),
                 authentication_mode,
-                trusted_peers: trusted_peers.clone(),
+                peers_and_metadata: peers_and_metadata.clone(),
                 enable_proxy_protocol,
             }),
             peer_manager_context: Some(PeerManagerContext::new(
@@ -216,8 +203,7 @@ impl PeerManagerBuilder {
                 pm_reqs_rx,
                 connection_reqs_tx,
                 connection_reqs_rx,
-                peer_metadata_storage,
-                trusted_peers,
+                peers_and_metadata,
                 HashMap::new(),
                 Vec::new(),
                 max_concurrent_network_reqs,
@@ -225,8 +211,6 @@ impl PeerManagerBuilder {
                 max_frame_size,
                 max_message_size,
                 inbound_connection_limit,
-                inbound_rate_limit_config,
-                outbound_rate_limit_config,
                 tcp_buffer_cfg,
             )),
             peer_manager: None,
@@ -275,11 +259,11 @@ impl PeerManagerBuilder {
         let (key, auth_mode) = match transport_context.authentication_mode {
             AuthenticationMode::MaybeMutual(key) => (
                 key,
-                HandshakeAuthMode::maybe_mutual(transport_context.trusted_peers),
+                HandshakeAuthMode::maybe_mutual(transport_context.peers_and_metadata),
             ),
             AuthenticationMode::Mutual(key) => (
                 key,
-                HandshakeAuthMode::mutual(transport_context.trusted_peers),
+                HandshakeAuthMode::mutual(transport_context.peers_and_metadata),
             ),
         };
 
@@ -303,7 +287,7 @@ impl PeerManagerBuilder {
                     ),
                     executor,
                 )))
-            }
+            },
             #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
             [Memory(_)] => Some(TransportPeerManager::Memory(self.build_with_transport(
                 AptosNetTransport::new(
@@ -344,16 +328,6 @@ impl PeerManagerBuilder {
             .peer_manager_context
             .take()
             .expect("PeerManager can only be built once");
-        let inbound_rate_limiters = token_bucket_rate_limiter(
-            &self.network_context,
-            "inbound",
-            pm_context.inbound_rate_limit_config,
-        );
-        let outbound_rate_limiters = token_bucket_rate_limiter(
-            &self.network_context,
-            "outbound",
-            pm_context.outbound_rate_limit_config,
-        );
         let peer_mgr = PeerManager::new(
             executor.clone(),
             self.time_service.clone(),
@@ -362,8 +336,7 @@ impl PeerManagerBuilder {
             // TODO(philiphayes): peer manager should take `Vec<NetworkAddress>`
             // (which could be empty, like in client use case)
             self.listen_address.clone(),
-            pm_context.peer_metadata_storage,
-            pm_context.trusted_peers,
+            pm_context.peers_and_metadata,
             pm_context.pm_reqs_rx,
             pm_context.connection_reqs_rx,
             pm_context.upstream_handlers,
@@ -373,8 +346,6 @@ impl PeerManagerBuilder {
             pm_context.max_frame_size,
             pm_context.max_message_size,
             pm_context.inbound_connection_limit,
-            inbound_rate_limiters,
-            outbound_rate_limiters,
         );
 
         // PeerManager constructor appends a public key to the listen_address.
@@ -422,28 +393,19 @@ impl PeerManagerBuilder {
             .tcp_buffer_cfg
     }
 
-    /// Register a peer-to-peer service (i.e., both client and service) for given
-    /// protocols.
-    pub fn add_p2p_service(
-        &mut self,
-        config: &AppConfig,
-    ) -> (
-        (PeerManagerRequestSender, ConnectionRequestSender),
-        (
-            aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
-            conn_notifs_channel::Receiver,
-        ),
-    ) {
-        (self.add_client(config), self.add_service(config))
-    }
-
     /// Register a client that's interested in some set of protocols and return
     /// the outbound channels into network.
     pub fn add_client(
         &mut self,
-        config: &AppConfig,
+        config: &NetworkClientConfig,
     ) -> (PeerManagerRequestSender, ConnectionRequestSender) {
-        self.transport_context().add_protocols(&config.protocols);
+        // Register the direct send and rpc protocols
+        self.transport_context()
+            .add_protocols(&config.direct_send_protocols_and_preferences);
+        self.transport_context()
+            .add_protocols(&config.rpc_protocols_and_preferences);
+
+        // Create the context and return the request senders
         let pm_context = self.peer_manager_context();
         (
             PeerManagerRequestSender::new(pm_context.pm_reqs_tx.clone()),
@@ -454,44 +416,29 @@ impl PeerManagerBuilder {
     /// Register a service for handling some protocols.
     pub fn add_service(
         &mut self,
-        config: &AppConfig,
+        config: &NetworkServiceConfig,
     ) -> (
         aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
         conn_notifs_channel::Receiver,
     ) {
-        self.transport_context().add_protocols(&config.protocols);
+        // Register the direct send and rpc protocols
+        self.transport_context()
+            .add_protocols(&config.direct_send_protocols_and_preferences);
+        self.transport_context()
+            .add_protocols(&config.rpc_protocols_and_preferences);
 
-        let (network_notifs_tx, network_notifs_rx) = config
-            .inbound_queue
-            .expect("Requires a service config")
-            .build();
+        // Create the context and register the protocols
+        let (network_notifs_tx, network_notifs_rx) = config.inbound_queue_config.build();
         let pm_context = self.peer_manager_context();
-        for protocol in config.protocols.iter() {
-            pm_context.add_upstream_handler(protocol, network_notifs_tx.clone());
+        for protocol in config
+            .direct_send_protocols_and_preferences
+            .iter()
+            .chain(&config.rpc_protocols_and_preferences)
+        {
+            pm_context.add_upstream_handler(*protocol, network_notifs_tx.clone());
         }
         let connection_notifs_rx = pm_context.add_connection_event_listener();
 
         (network_notifs_rx, connection_notifs_rx)
     }
-}
-
-/// Builds a token bucket rate limiter with attached metrics
-fn token_bucket_rate_limiter(
-    network_context: &NetworkContext,
-    label: &'static str,
-    input: Option<RateLimitConfig>,
-) -> TokenBucketRateLimiter<IpAddr> {
-    if let Some(config) = input {
-        if config.enabled {
-            return TokenBucketRateLimiter::new(
-                label,
-                network_context.to_string(),
-                config.initial_bucket_fill_percentage,
-                config.ip_byte_bucket_size,
-                config.ip_byte_bucket_rate,
-                Some(NETWORK_RATE_LIMIT_METRICS.clone()),
-            );
-        }
-    }
-    TokenBucketRateLimiter::open(label)
 }

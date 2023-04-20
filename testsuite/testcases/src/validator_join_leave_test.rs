@@ -1,20 +1,15 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{LoadDestination, NetworkLoadTest};
-use aptos::account::create::DEFAULT_FUNDED_COINS;
-use aptos_logger::info;
-use aptos_sdk::crypto::ed25519::Ed25519PrivateKey;
-use aptos_sdk::crypto::PrivateKey;
-use forge::{
+use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
+use aptos_forge::{
     reconfig, NetworkContext, NetworkTest, NodeExt, Result, Swarm, SwarmExt, Test, FORGE_KEY_SEED,
 };
-
 use aptos_keygen::KeyGen;
-
-use aptos::test::CliTestFramework;
-use aptos_types::account_address::AccountAddress;
-use aptos_types::transaction::authenticator::AuthenticationKey;
+use aptos_logger::info;
+use aptos_sdk::crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
+use aptos_types::{account_address::AccountAddress, transaction::authenticator::AuthenticationKey};
 use std::time::Duration;
 use tokio::runtime::Runtime;
 
@@ -30,14 +25,13 @@ impl Test for ValidatorJoinLeaveTest {
 
 impl NetworkLoadTest for ValidatorJoinLeaveTest {
     fn setup(&self, _ctx: &mut NetworkContext) -> Result<LoadDestination> {
-        Ok(LoadDestination::AllValidators)
+        Ok(LoadDestination::FullnodesOtherwiseValidators)
     }
 
     fn test(&self, swarm: &mut dyn Swarm, duration: Duration) -> Result<()> {
         // Verify we have at least 7 validators (i.e., 3f+1, where f is 2)
         // so we can lose 2 validators but still make progress.
-        let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
-        let num_validators = all_validators.len();
+        let num_validators = swarm.validators().count();
         if num_validators < 7 {
             return Err(anyhow::format_err!(
                 "ValidatorSet leaving and rejoining test require at least 7 validators! Given: {:?}.",

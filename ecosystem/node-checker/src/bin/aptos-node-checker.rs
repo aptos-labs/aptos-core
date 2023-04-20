@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
@@ -25,7 +25,9 @@ pub struct RootArgs {
 async fn main() -> Result<()> {
     let root_args = RootArgs::parse();
 
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    aptos_logger::Logger::builder()
+        .level(aptos_logger::Level::Info)
+        .build();
 
     let command = root_args.command;
     let result: Result<()> = match command {

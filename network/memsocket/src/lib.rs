@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_infallible::Mutex;
@@ -52,7 +53,7 @@ impl SwitchBoard {
 /// ```rust,no_run
 /// use std::io::Result;
 ///
-/// use memsocket::{MemoryListener, MemorySocket};
+/// use aptos_memsocket::{MemoryListener, MemorySocket};
 /// use futures::prelude::*;
 ///
 /// async fn write_stormlight(mut stream: MemorySocket) -> Result<()> {
@@ -101,7 +102,7 @@ impl MemoryListener {
     /// Create a MemoryListener bound to port 16:
     ///
     /// ```rust,no_run
-    /// use memsocket::MemoryListener;
+    /// use aptos_memsocket::MemoryListener;
     ///
     /// # fn main () -> ::std::io::Result<()> {
     /// let listener = MemoryListener::bind(16)?;
@@ -161,7 +162,7 @@ impl MemoryListener {
     /// # Examples
     ///
     /// ```rust
-    /// use memsocket::MemoryListener;
+    /// use aptos_memsocket::MemoryListener;
     ///
     /// # fn main () -> ::std::io::Result<()> {
     /// let listener = MemoryListener::bind(16)?;
@@ -183,7 +184,7 @@ impl MemoryListener {
     ///
     /// ```rust,no_run
     /// use futures::prelude::*;
-    /// use memsocket::MemoryListener;
+    /// use aptos_memsocket::MemoryListener;
     ///
     /// # async fn work () -> ::std::io::Result<()> {
     /// let mut listener = MemoryListener::bind(16)?;
@@ -210,7 +211,7 @@ impl MemoryListener {
             Poll::Ready(None) => {
                 let err = Error::new(ErrorKind::Other, "MemoryListener unknown error");
                 Poll::Ready(Err(err))
-            }
+            },
             Poll::Pending => Poll::Pending,
         }
     }
@@ -244,7 +245,7 @@ impl<'a> Stream for Incoming<'a> {
 ///
 /// ```rust, no_run
 /// use futures::prelude::*;
-/// use memsocket::MemorySocket;
+/// use aptos_memsocket::MemorySocket;
 ///
 /// # async fn run() -> ::std::io::Result<()> {
 /// let (mut socket_a, mut socket_b) = MemorySocket::new_pair();
@@ -276,7 +277,7 @@ impl MemorySocket {
     /// # Examples
     ///
     /// ```rust
-    /// use memsocket::MemorySocket;
+    /// use aptos_memsocket::MemorySocket;
     ///
     /// let (socket_a, socket_b) = MemorySocket::new_pair();
     /// ```
@@ -307,7 +308,7 @@ impl MemorySocket {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use memsocket::MemorySocket;
+    /// use aptos_memsocket::MemorySocket;
     ///
     /// # fn main () -> ::std::io::Result<()> {
     /// let socket = MemorySocket::connect(16)?;
@@ -373,7 +374,7 @@ impl AsyncRead for MemorySocket {
                         .take(bytes_to_read)
                         .copy_to_slice(&mut buf[bytes_read..(bytes_read + bytes_to_read)]);
                     bytes_read += bytes_to_read;
-                }
+                },
 
                 // Either we've exhausted our current buffer or don't have one
                 _ => {
@@ -386,12 +387,12 @@ impl AsyncRead for MemorySocket {
                                 } else {
                                     return Poll::Pending;
                                 }
-                            }
+                            },
                             Poll::Ready(Some(buf)) => Some(buf),
                             Poll::Ready(None) => return Poll::Ready(Ok(bytes_read)),
                         }
                     };
-                }
+                },
             }
         }
     }
@@ -416,7 +417,7 @@ impl AsyncWrite for MemorySocket {
                     // Unbounded channels should only ever have "Disconnected" errors
                     unreachable!();
                 }
-            }
+            },
             Poll::Ready(Err(e)) => {
                 if e.is_disconnected() {
                     return Poll::Ready(Err(Error::new(ErrorKind::BrokenPipe, e)));
@@ -424,7 +425,7 @@ impl AsyncWrite for MemorySocket {
 
                 // Unbounded channels should only ever have "Disconnected" errors
                 unreachable!();
-            }
+            },
             Poll::Pending => return Poll::Pending,
         }
 

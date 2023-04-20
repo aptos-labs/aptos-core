@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! `conn_notifs_channel` is a channel which delivers to the receiver only the last of N
@@ -9,8 +10,8 @@
 //! and `conn_notifs_channel::Sender` which behave similarly to existing mpsc data structures.
 
 use crate::peer_manager::ConnectionNotification;
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_types::PeerId;
-use channel::{aptos_channel, message_queues::QueueStyle};
 
 pub type Sender = aptos_channel::Sender<PeerId, ConnectionNotification>;
 pub type Receiver = aptos_channel::Receiver<PeerId, ConnectionNotification>;

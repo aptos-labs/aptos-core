@@ -1,28 +1,27 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common;
 use aptos_types::transaction::{
     ArgumentABI, EntryABI, EntryFunctionABI, TransactionScriptABI, TypeArgumentABI,
 };
+use heck::{CamelCase, ShoutySnakeCase, SnakeCase};
 use move_core_types::{
     account_address::AccountAddress,
-    language_storage::{ModuleId, TypeTag},
+    language_storage::{ModuleId, StructTag, TypeTag},
 };
+use once_cell::sync::Lazy;
 use serde_generate::{
     indent::{IndentConfig, IndentedWriter},
     rust, CodeGeneratorConfig,
 };
-
-use heck::{CamelCase, ShoutySnakeCase, SnakeCase};
-use move_core_types::language_storage::StructTag;
-use once_cell::sync::Lazy;
 use serde_reflection::ContainerFormat;
-use std::str::FromStr;
 use std::{
     collections::BTreeMap,
     io::{Result, Write},
     path::PathBuf,
+    str::FromStr,
 };
 
 /// Output transaction builders in Rust for the given ABIs.
@@ -40,6 +39,7 @@ pub fn output(out: &mut dyn Write, abis: &[EntryABI], local_types: bool) -> Resu
     emitter.output_preamble()?;
     writeln!(emitter.out, "#![allow(dead_code)]")?;
     writeln!(emitter.out, "#![allow(unused_imports)]")?;
+    writeln!(emitter.out, "#![allow(clippy::too_many_arguments)]")?;
 
     emitter.output_script_call_enum_with_imports(abis)?;
 
@@ -121,7 +121,7 @@ where
             writeln!(
                 self.out,
                 r#"
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 // This file was generated. Do not modify!
@@ -186,7 +186,7 @@ where
                                     sf.module_name().name().to_string().to_camel_case(),
                                     abi.name().to_camel_case()
                                 )
-                            }
+                            },
                             _ => abi.name().to_camel_case(),
                         },
                     ],
@@ -256,31 +256,27 @@ impl EntryFunctionCall {
     fn get_external_definitions(local_types: bool) -> serde_generate::ExternalDefinitions {
         let definitions = if local_types {
             vec![
-                (
-                    "move_core_types::language_storage",
-                    vec!["ModuleId", "TypeTag"],
-                ),
+                ("move_core_types::language_storage", vec![
+                    "ModuleId", "TypeTag",
+                ]),
                 ("move_core_types", vec!["ident_str"]),
-                (
-                    "aptos_types::transaction",
-                    vec!["TransactionPayload", "EntryFunction"],
-                ),
+                ("aptos_types::transaction", vec![
+                    "TransactionPayload",
+                    "EntryFunction",
+                ]),
                 ("aptos_types::account_address", vec!["AccountAddress"]),
             ]
         } else {
-            vec![(
-                "aptos_types",
-                vec![
-                    "AccountAddress",
-                    "TypeTag",
-                    "Script",
-                    "EntryFunction",
-                    "TransactionArgument",
-                    "TransactionPayload",
-                    "ModuleId",
-                    "Identifier",
-                ],
-            )]
+            vec![("aptos_types", vec![
+                "AccountAddress",
+                "TypeTag",
+                "Script",
+                "EntryFunction",
+                "TransactionArgument",
+                "TransactionPayload",
+                "ModuleId",
+                "Identifier",
+            ])]
         };
 
         definitions
@@ -729,8 +725,11 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         let (constructor, expr) = match type_tag {
             Bool => ("Bool", "Some(value)".to_string()),
             U8 => ("U8", "Some(value)".to_string()),
+            U16 => ("U16", "Some(value)".to_string()),
+            U32 => ("U32", "Some(value)".to_string()),
             U64 => ("U64", "Some(value)".to_string()),
             U128 => ("U128", "Some(value)".to_string()),
+            U256 => ("U256", "Some(value)".to_string()),
             Address => ("Address", "Some(value)".to_string()),
             Vector(type_tag) => match type_tag.as_ref() {
                 U8 => ("U8Vector", "Some(value)".to_string()),
@@ -857,6 +856,8 @@ fn decode_{}_argument(arg: TransactionArgument) -> Option<{}> {{
             .join(", ")
     }
 
+    // TODO: see if we can avoid passing in local types in this manner
+    #[allow(clippy::only_used_in_recursion)]
     fn quote_type(type_tag: &TypeTag, local_types: bool) -> String {
         use TypeTag::*;
         let str_tag: Lazy<StructTag> =
@@ -864,12 +865,15 @@ fn decode_{}_argument(arg: TransactionArgument) -> Option<{}> {{
         match type_tag {
             Bool => "bool".into(),
             U8 => "u8".into(),
+            U16 => "u16".into(),
+            U32 => "u32".into(),
             U64 => "u64".into(),
             U128 => "u128".into(),
+            U256 => "U256".into(),
             Address => "AccountAddress".into(),
             Vector(type_tag) => {
                 format!("Vec<{}>", Self::quote_type(type_tag.as_ref(), local_types))
-            }
+            },
             Struct(struct_tag) => match struct_tag {
                 tag if &**tag == Lazy::force(&str_tag) => "Vec<u8>".into(),
                 _ => common::type_not_allowed(type_tag),
@@ -892,8 +896,11 @@ fn decode_{}_argument(arg: TransactionArgument) -> Option<{}> {{
         match type_tag {
             Bool => format!("TransactionArgument::Bool({})", name),
             U8 => format!("TransactionArgument::U8({})", name),
+            U16 => format!("TransactionArgument::U16({})", name),
+            U32 => format!("TransactionArgument::U32({})", name),
             U64 => format!("TransactionArgument::U64({})", name),
             U128 => format!("TransactionArgument::U128({})", name),
+            U256 => format!("TransactionArgument::U256({})", name),
             Address => format!("TransactionArgument::Address({})", name),
             Vector(type_tag) => match type_tag.as_ref() {
                 U8 => format!("TransactionArgument::U8Vector({})", name),
@@ -937,7 +944,7 @@ impl crate::SourceInstaller for Installer {
         };
         let dir_path = self.install_dir.join(&name);
         std::fs::create_dir_all(&dir_path)?;
-        let mut cargo = std::fs::File::create(&dir_path.join("Cargo.toml"))?;
+        let mut cargo = std::fs::File::create(dir_path.join("Cargo.toml"))?;
         write!(
             cargo,
             r#"[package]
@@ -955,7 +962,7 @@ aptos-types = {{ path = "../aptos-types", version = "{}" }}
         )?;
         std::fs::create_dir(dir_path.join("src"))?;
         let source_path = dir_path.join("src/lib.rs");
-        let mut source = std::fs::File::create(&source_path)?;
+        let mut source = std::fs::File::create(source_path)?;
         output(&mut source, abis, /* local_types */ false)?;
         Ok(())
     }
@@ -985,14 +992,14 @@ fn swap_keyworded_fields(fields: Option<&mut ContainerFormat>) {
                     _ => (),
                 }
             }
-        }
+        },
         Some(ContainerFormat::Struct(fields)) => {
             for entry in fields.iter_mut() {
                 if entry.name.as_str() == "type_args" {
                     entry.name = String::from("type_params")
                 }
             }
-        }
+        },
         _ => (),
     }
 }

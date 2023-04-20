@@ -1,6 +1,7 @@
 /// A module for generating globally unique identifiers
 module aptos_framework::guid {
     friend aptos_framework::account;
+    friend aptos_framework::object;
 
     /// A globally unique identifier derived from the sender's address and a counter
     struct GUID has drop, store {
@@ -37,7 +38,7 @@ module aptos_framework::guid {
 
     /// Get the non-privileged ID associated with a GUID
     public fun id(guid: &GUID): ID {
-        *&guid.id
+        guid.id
     }
 
     /// Return the account address that created the GUID

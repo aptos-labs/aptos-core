@@ -3,7 +3,7 @@
 This is a simple crate for working with the [Aptos](https://aptos.org) protobufs
 
 
-## Generating protos
+## Getting Started
 We use [buf](https://docs.buf.build/introduction) to generate protos.
 
 installation is easy on mac
@@ -28,9 +28,12 @@ Generating the protos requires `protoc`, as well as a few plugins:
 cargo install protoc-gen-prost
 cargo install protoc-gen-prost-serde
 cargo install protoc-gen-prost-crate
+cargo install protoc-gen-tonic
 ```
 
-Now we can generate the protos:
-```bash
-buf generate
-```
+## Usage
+1. Make changes to protobuf;
+2. `buf lint` for code quality check;
+3. `buf generate` for the generated code;
+4. `pre-commit run --all-files` to add headers to generated code;
+5. Commit your changes.

@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module provides APIs for Boneh-Lynn-Shacham (BLS) aggregate signatures, including
@@ -407,13 +407,13 @@
 //!
 //! References:
 //!
-//! [^bls-ietf-draft]: BLS Signatures; by D. Boneh, S. Gorbunov, R. Wahby, H. Wee, Z. Zhang; https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature
+//! [^bls-ietf-draft]: BLS Signatures; by D. Boneh, S. Gorbunov, R. Wahby, H. Wee, Z. Zhang; <https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature>
 //! [^Bold03]: Threshold Signatures, Multisignatures and Blind Signatures Based on the Gap-Diffie-Hellman-Group Signature Scheme; by Boldyreva, Alexandra; in PKC 2003; 2002
-//! [^BLS04]: Short Signatures from the Weil Pairing; by Boneh, Dan and Lynn, Ben and Shacham, Hovav; in Journal of Cryptology; 2004; https://doi.org/10.1007/s00145-004-0314-9
-//! [^BCM+15e] Subgroup security in pairing-based cryptography; by Paulo S.  L.  M.  Barreto and Craig Costello and Rafael Misoczki and Michael Naehrig and Geovandro C.  C.  F.  Pereira and Gustavo Zanon; in Cryptology ePrint Archive, Paper 2015/247; 2015; https://eprint.iacr.org/2015/247
+//! [^BLS04]: Short Signatures from the Weil Pairing; by Boneh, Dan and Lynn, Ben and Shacham, Hovav; in Journal of Cryptology; 2004; <https://doi.org/10.1007/s00145-004-0314-9>
+//! [^BCM+15e] Subgroup security in pairing-based cryptography; by Paulo S.  L.  M.  Barreto and Craig Costello and Rafael Misoczki and Michael Naehrig and Geovandro C.  C.  F.  Pereira and Gustavo Zanon; in Cryptology ePrint Archive, Paper 2015/247; 2015; <https://eprint.iacr.org/2015/247>
 //! [^LL97] A key recovery attack on discrete log-based schemes using a prime order subgroup; by Lim, Chae Hoon and Lee, Pil Joong; in Advances in Cryptology --- CRYPTO '97; 1997
 //! [^LM07]: Finding Invalid Signatures in Pairing-Based Batches; by Law, Laurie and Matt, Brian J.; in Cryptography and Coding; 2007
-//! [^MOR01]: Accountable-Subgroup Multisignatures: Extended Abstract; by Micali, Silvio and Ohta, Kazuo and Reyzin, Leonid; in Proceedings of the 8th ACM Conference on Computer and Communications Security; 2001; https://doi-org.libproxy.mit.edu/10.1145/501983.502017
+//! [^MOR01]: Accountable-Subgroup Multisignatures: Extended Abstract; by Micali, Silvio and Ohta, Kazuo and Reyzin, Leonid; in Proceedings of the 8th ACM Conference on Computer and Communications Security; 2001; <https://doi-org.libproxy.mit.edu/10.1145/501983.502017>
 //! [^RY07]: The Power of Proofs-of-Possession: Securing Multiparty Signatures against Rogue-Key Attacks; by Ristenpart, Thomas and Yilek, Scott; in Advances in Cryptology - EUROCRYPT 2007; 2007
 
 /// Domain separation tag (DST) for hashing a message before signing it.

@@ -1,0 +1,60 @@
+name: "Ad-hoc Forge Run"
+on: 
+  workflow_dispatch:
+    inputs:
+      IMAGE_TAG:
+        required: true
+        type: string
+        description: The docker image tag to test. If not specified, falls back on GIT_SHA, and then to the latest commits on the current branch
+      FORGE_IMAGE_TAG:
+        required: true 
+        type: string
+        description: The docker image tag to use for forge runner. If not specified, falls back on GIT_SHA, and then to the latest commits on the current branch
+      FORGE_RUNNER_DURATION_SECS:
+        required: false
+        type: string
+        default: "480"
+        description: Duration of the forge test run
+      FORGE_TEST_SUITE:
+        required: false
+        type: string
+        default: land_blocking
+        description: Test suite to run
+      
+env:
+  GIT_SHA: ${{ github.sha }}
+
+permissions:
+  contents: read
+  id-token: write #required for GCP Workload Identity federation which we use to login into Google Artifact Registry
+  issues: write
+  pull-requests: write
+
+jobs:
+  determine-forge-run-metadata:
+    runs-on: ubuntu-latest
+    steps:
+      - name: collect metadata
+        run: |
+          echo "GIT_SHA: ${{ env.GIT_SHA }}"
+          echo "IMAGE_TAG: ${{ inputs.IMAGE_TAG }}"
+          echo "FORGE_IMAGE_TAG: ${{ inputs.FORGE_IMAGE_TAG }}"
+          echo "FORGE_RUNNER_DURATION_SECS: ${{ inputs.FORGE_RUNNER_DURATION_SECS }}"
+          echo "FORGE_TEST_SUITE: ${{ inputs.FORGE_TEST_SUITE }}"
+    outputs:
+      gitSha: ${{ env.GIT_SHA }}
+      imageTag: ${{ inputs.IMAGE_TAG }}
+      forgeImageTag: ${{ inputs.FORGE_IMAGE_TAG }}
+      forgeRunnerDurationSecs: ${{ inputs.FORGE_RUNNER_DURATION_SECS }}
+      forgeTestSuite: ${{ inputs.FORGE_TEST_SUITE }}
+
+  adhoc-forge-test:
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    needs: [ determine-forge-run-metadata ] 
+    secrets: inherit
+    with:
+      GIT_SHA: ${{ needs.determine-forge-run-metadata.outputs.gitSha }}      
+      IMAGE_TAG: ${{ needs.determine-forge-run-metadata.outputs.imageTag }} 
+      FORGE_IMAGE_TAG: ${{ needs.determine-forge-run-metadata.outputs.forgeImageTag }}
+      FORGE_TEST_SUITE: ${{ needs.determine-forge-run-metadata.outputs.forgeTestSuite }} 
+      FORGE_RUNNER_DURATION_SECS: ${{ needs.determine-forge-run-metadata.outputs.forgeRunnerDurationSecs }}

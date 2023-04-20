@@ -1,19 +1,16 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
 
-use crate::docgen::DocgenOptions;
-use crate::release_builder::RELEASE_BUNDLE_EXTENSION;
-use crate::release_bundle::ReleaseBundle;
-use crate::{path_in_crate, BuildOptions, ReleaseOptions};
+use crate::{
+    docgen::DocgenOptions, path_in_crate, release_builder::RELEASE_BUNDLE_EXTENSION,
+    release_bundle::ReleaseBundle, BuildOptions, ReleaseOptions,
+};
 use clap::ArgEnum;
 use move_command_line_common::address::NumericalAddress;
 use once_cell::sync::Lazy;
-use std::collections::BTreeMap;
-use std::fmt::Display;
-use std::path::PathBuf;
-use std::str::FromStr;
+use std::{collections::BTreeMap, fmt::Display, path::PathBuf, str::FromStr};
 
 // ===============================================================================================
 // Release Targets
@@ -70,6 +67,10 @@ impl ReleaseTarget {
                 "aptos-token",
                 Some("cached-packages/src/aptos_token_sdk_builder.rs"),
             ),
+            (
+                "aptos-token-objects",
+                Some("cached-packages/src/aptos_token_objects_sdk_builder.rs"),
+            ),
         ];
         // Currently we don't have experimental packages only included in particular targets.
         result
@@ -114,6 +115,8 @@ impl ReleaseTarget {
                     landing_page_template: Some("doc_template/overview.md".to_string()),
                     references_file: Some("doc_template/references.md".to_string()),
                 }),
+                skip_fetch_latest_git_deps: false,
+                bytecode_version: None,
             },
             packages: packages.iter().map(|(path, _)| path.to_owned()).collect(),
             rust_bindings: packages
@@ -169,12 +172,14 @@ static NAMED_ADDRESSES: Lazy<BTreeMap<String, NumericalAddress>> = Lazy::new(|| 
     let mut result = BTreeMap::new();
     let zero = NumericalAddress::parse_str("0x0").unwrap();
     let one = NumericalAddress::parse_str("0x1").unwrap();
-    let two = NumericalAddress::parse_str("0x2").unwrap();
+    let three = NumericalAddress::parse_str("0x3").unwrap();
+    let four = NumericalAddress::parse_str("0x4").unwrap();
     let resources = NumericalAddress::parse_str("0xA550C18").unwrap();
     result.insert("std".to_owned(), one);
     result.insert("aptos_std".to_owned(), one);
     result.insert("aptos_framework".to_owned(), one);
-    result.insert("aptos_token".to_owned(), two);
+    result.insert("aptos_token".to_owned(), three);
+    result.insert("aptos_token_objects".to_owned(), four);
     result.insert("core_resources".to_owned(), resources);
     result.insert("vm_reserved".to_owned(), zero);
     result

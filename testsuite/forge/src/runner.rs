@@ -1,24 +1,26 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::*;
-use rand::{Rng, SeedableRng};
-use std::fmt::{Display, Formatter};
-use std::sync::Arc;
-use std::time::Duration;
+// TODO going to remove random seed once cluster deployment supports re-run genesis
+use crate::{
+    success_criteria::SuccessCriteria,
+    system_metrics::{MetricsThreshold, SystemMetricsThreshold},
+};
+use aptos_framework::ReleaseBundle;
+use rand::{rngs::OsRng, Rng, SeedableRng};
 use std::{
+    fmt::{Display, Formatter},
     io::{self, Write},
     num::NonZeroUsize,
     process,
+    sync::Arc,
+    time::Duration,
 };
 use structopt::{clap::arg_enum, StructOpt};
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 use tokio::runtime::Runtime;
-// TODO going to remove random seed once cluster deployment supports re-run genesis
-use crate::success_criteria::SuccessCriteria;
-use crate::system_metrics::{MetricsThreshold, SystemMetricsThreshold};
-use framework::ReleaseBundle;
-use rand::rngs::OsRng;
 
 #[derive(Debug, StructOpt)]
 #[structopt(about = "Forged in Fire")]
@@ -105,7 +107,7 @@ pub fn forge_main<F: Factory>(tests: ForgeConfig<'_>, factory: F, options: &Opti
         Err(e) => {
             eprintln!("Failed to run tests:\n{}", e);
             process::exit(101); // Exit with a non-zero exit code if tests failed
-        }
+        },
     }
 }
 
@@ -146,6 +148,9 @@ pub struct ForgeConfig<'cfg> {
 
     /// Success criteria
     success_criteria: SuccessCriteria,
+
+    /// The label of existing DBs to use, if None, will create new db.
+    existing_db_tag: Option<String>,
 }
 
 impl<'cfg> ForgeConfig<'cfg> {
@@ -221,6 +226,11 @@ impl<'cfg> ForgeConfig<'cfg> {
         &mut self.success_criteria
     }
 
+    pub fn with_existing_db(mut self, tag: String) -> Self {
+        self.existing_db_tag = Some(tag);
+        self
+    }
+
     pub fn number_of_tests(&self) -> usize {
         self.admin_tests.len() + self.network_tests.len() + self.aptos_tests.len()
     }
@@ -239,21 +249,16 @@ impl<'cfg> Default for ForgeConfig<'cfg> {
         let forge_run_mode =
             std::env::var("FORGE_RUNNER_MODE").unwrap_or_else(|_| "k8s".to_string());
         let success_criteria = if forge_run_mode.eq("local") {
-            SuccessCriteria::new(600, 60000, true, None, None, None)
+            SuccessCriteria::new(600).add_no_restarts()
         } else {
-            SuccessCriteria::new(
-                3500,
-                10000,
-                true,
-                None,
-                Some(SystemMetricsThreshold::new(
+            SuccessCriteria::new(3500)
+                .add_no_restarts()
+                .add_system_metrics_threshold(SystemMetricsThreshold::new(
                     // Check that we don't use more than 12 CPU cores for 30% of the time.
                     MetricsThreshold::new(12, 30),
                     // Check that we don't use more than 10 GB of memory for 30% of the time.
                     MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
-                )),
-                None,
-            )
+                ))
         };
         Self {
             aptos_tests: vec![],
@@ -269,6 +274,7 @@ impl<'cfg> Default for ForgeConfig<'cfg> {
                 mempool_backlog: 40000,
             }),
             success_criteria,
+            existing_db_tag: None,
         }
     }
 }
@@ -352,6 +358,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                 self.global_duration + Duration::from_secs(NAMESPACE_CLEANUP_DURATION_BUFFER_SECS),
                 self.tests.genesis_helm_config_fn.clone(),
                 self.tests.node_helm_config_fn.clone(),
+                self.tests.existing_db_tag.clone(),
             ))?;
 
             // Run AptosTests
@@ -464,7 +471,7 @@ fn run_test<F: FnOnce() -> Result<()>>(f: F) -> TestResult {
                 println!("::error::{:?}", e);
             }
             TestResult::FailedWithMsg(format!("{:?}", e))
-        }
+        },
     }
 }
 
@@ -493,14 +500,14 @@ impl TestSummary {
             TestResult::Ok => {
                 self.passed += 1;
                 self.write_ok()?;
-            }
+            },
             TestResult::FailedWithMsg(msg) => {
                 self.failed.push(name);
                 self.write_failed()?;
                 writeln!(self.stdout)?;
 
                 write!(self.stdout, "Error: {}", msg)?;
-            }
+            },
         }
         writeln!(self.stdout)?;
         Ok(())

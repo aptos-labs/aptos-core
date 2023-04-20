@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::HashValue;
@@ -56,7 +57,7 @@ impl BlockMetadata {
     pub fn get_prologue_move_args(self, signer: AccountAddress) -> Vec<MoveValue> {
         vec![
             MoveValue::Signer(signer),
-            MoveValue::Address(AccountAddress::from_bytes(&self.id.to_vec()).unwrap()),
+            MoveValue::Address(AccountAddress::from_bytes(self.id.to_vec()).unwrap()),
             MoveValue::U64(self.epoch),
             MoveValue::U64(self.round),
             MoveValue::Address(self.proposer),

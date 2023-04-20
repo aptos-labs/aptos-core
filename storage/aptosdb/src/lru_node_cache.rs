@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::state_merkle_db::Node;
@@ -6,12 +6,18 @@ use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::node_type::NodeKey;
 use aptos_types::{nibble::nibble_path::NibblePath, transaction::Version};
 use lru::LruCache;
+use std::fmt;
 
 const NUM_SHARDS: usize = 256;
 
-#[derive(Debug)]
 pub(crate) struct LruNodeCache {
     shards: [Mutex<LruCache<NibblePath, (Version, Node)>>; NUM_SHARDS],
+}
+
+impl fmt::Debug for LruNodeCache {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "LruCache with {NUM_SHARDS} shards.")
+    }
 }
 
 impl LruNodeCache {

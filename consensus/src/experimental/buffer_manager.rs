@@ -1,26 +1,6 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
-
-use std::sync::{
-    atomic::{AtomicU64, Ordering},
-    Arc,
-};
-
-use futures::{
-    channel::{
-        mpsc::{UnboundedReceiver, UnboundedSender},
-        oneshot,
-    },
-    FutureExt, SinkExt, StreamExt,
-};
-use tokio::time::{Duration, Instant};
-
-use aptos_logger::prelude::*;
-use aptos_types::{
-    account_address::AccountAddress, ledger_info::LedgerInfoWithSignatures,
-    validator_verifier::ValidatorVerifier,
-};
-use consensus_types::{common::Author, executed_block::ExecutedBlock};
 
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
@@ -33,21 +13,37 @@ use crate::{
         pipeline_phase::CountedRequest,
         signing_phase::{SigningRequest, SigningResponse},
     },
+    monitor,
     network::NetworkSender,
     round_manager::VerifiedEvent,
     state_replication::StateComputerCommitCallBackType,
 };
+use aptos_consensus_types::{common::Author, executed_block::ExecutedBlock};
 use aptos_crypto::HashValue;
-use aptos_types::epoch_change::EpochChangeProof;
-use futures::channel::mpsc::unbounded;
+use aptos_logger::prelude::*;
+use aptos_types::{
+    account_address::AccountAddress, epoch_change::EpochChangeProof,
+    ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier,
+};
+use futures::{
+    channel::{
+        mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
+        oneshot,
+    },
+    FutureExt, SinkExt, StreamExt,
+};
 use once_cell::sync::OnceCell;
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc,
+};
+use tokio::time::{Duration, Instant};
 
 pub const COMMIT_VOTE_REBROADCAST_INTERVAL_MS: u64 = 1500;
 pub const LOOP_INTERVAL_MS: u64 = 1500;
 
-pub type ResetAck = ();
-
-pub fn sync_ack_new() -> ResetAck {}
+#[derive(Debug, Default)]
+pub struct ResetAck {}
 
 pub struct ResetRequest {
     pub tx: oneshot::Sender<ResetAck>,
@@ -87,7 +83,7 @@ pub struct BufferManager {
     signing_phase_rx: Receiver<SigningResponse>,
 
     commit_msg_tx: NetworkSender,
-    commit_msg_rx: channel::aptos_channel::Receiver<AccountAddress, VerifiedEvent>,
+    commit_msg_rx: aptos_channels::aptos_channel::Receiver<AccountAddress, VerifiedEvent>,
 
     // we don't hear back from the persisting phase
     persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
@@ -118,7 +114,7 @@ impl BufferManager {
         signing_phase_tx: Sender<CountedRequest<SigningRequest>>,
         signing_phase_rx: Receiver<SigningResponse>,
         commit_msg_tx: NetworkSender,
-        commit_msg_rx: channel::aptos_channel::Receiver<AccountAddress, VerifiedEvent>,
+        commit_msg_rx: aptos_channels::aptos_channel::Receiver<AccountAddress, VerifiedEvent>,
         persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
         block_rx: UnboundedReceiver<OrderedBlocks>,
         reset_rx: UnboundedReceiver<ResetRequest>,
@@ -166,7 +162,7 @@ impl BufferManager {
         duration: Duration,
     ) {
         counters::BUFFER_MANAGER_RETRY_COUNT.inc();
-        spawn_named!(&"retry request", async move {
+        spawn_named!("retry request", async move {
             tokio::time::sleep(duration).await;
             sender
                 .send(request)
@@ -337,7 +333,7 @@ impl BufferManager {
 
         self.stop = stop;
         self.reset().await;
-        tx.send(sync_ack_new()).unwrap();
+        tx.send(ResetAck::default()).unwrap();
         info!("Reset finishes");
     }
 
@@ -355,7 +351,7 @@ impl BufferManager {
             Err(e) => {
                 error!("Execution error {:?}", e);
                 return;
-            }
+            },
         };
         info!(
             "Receive executed response {}",
@@ -402,7 +398,7 @@ impl BufferManager {
             Err(e) => {
                 error!("Signing failed {:?}", e);
                 return;
-            }
+            },
         };
         info!(
             "Receive signing response {}",
@@ -448,11 +444,9 @@ impl BufferManager {
         match commit_msg {
             VerifiedEvent::CommitVote(vote) => {
                 // find the corresponding item
-                info!(
-                    "Receive commit vote {} from {}",
-                    vote.commit_info(),
-                    vote.author()
-                );
+                let author = vote.author();
+                let commit_info = vote.commit_info().clone();
+                info!("Receive commit vote {} from {}", commit_info, author);
                 let target_block_id = vote.commit_info().id();
                 let current_cursor = self
                     .buffer
@@ -462,16 +456,21 @@ impl BufferManager {
                     let new_item = match item.add_signature_if_matched(*vote) {
                         Ok(()) => item.try_advance_to_aggregated(&self.verifier),
                         Err(e) => {
-                            error!("Failed to add commit vote {:?}", e);
+                            error!(
+                                error = ?e,
+                                author = author,
+                                commit_info = commit_info,
+                                "Failed to add commit vote",
+                            );
                             item
-                        }
+                        },
                     };
                     self.buffer.set(&current_cursor, new_item);
                     if self.buffer.get(&current_cursor).is_aggregated() {
                         return Some(target_block_id);
                     }
                 }
-            }
+            },
             VerifiedEvent::CommitDecision(commit_proof) => {
                 let target_block_id = commit_proof.ledger_info().commit_info().id();
                 info!(
@@ -492,10 +491,10 @@ impl BufferManager {
                         return Some(target_block_id);
                     }
                 }
-            }
+            },
             _ => {
                 unreachable!();
-            }
+            },
         }
         None
     }
@@ -540,16 +539,16 @@ impl BufferManager {
             match self.buffer.get(&cursor) {
                 BufferItem::Ordered(_) => {
                     pending_ordered += 1;
-                }
+                },
                 BufferItem::Executed(_) => {
                     pending_executed += 1;
-                }
+                },
                 BufferItem::Signed(_) => {
                     pending_signed += 1;
-                }
+                },
                 BufferItem::Aggregated(_) => {
                     pending_aggregated += 1;
-                }
+                },
             }
             cursor = self.buffer.get_next(&cursor);
         }
@@ -575,26 +574,32 @@ impl BufferManager {
             // advancing the root will trigger sending requests to the pipeline
             ::futures::select! {
                 blocks = self.block_rx.select_next_some() => {
+                    monitor!("buffer_manager_process_ordered", {
                     self.process_ordered_blocks(blocks);
                     if self.execution_root.is_none() {
                         self.advance_execution_root().await;
-                    }
+                    }});
                 },
                 reset_event = self.reset_rx.select_next_some() => {
-                    self.process_reset_request(reset_event).await;
+                    monitor!("buffer_manager_process_reset",
+                    self.process_reset_request(reset_event).await);
                 },
                 response = self.execution_phase_rx.select_next_some() => {
+                    monitor!("buffer_manager_process_execution_response", {
                     self.process_execution_response(response).await;
                     self.advance_execution_root().await;
                     if self.signing_root.is_none() {
                         self.advance_signing_root().await;
-                    }
+                    }});
                 },
                 response = self.signing_phase_rx.select_next_some() => {
+                    monitor!("buffer_manager_process_signing_response", {
                     self.process_signing_response(response).await;
-                    self.advance_signing_root().await;
+                    self.advance_signing_root().await
+                    })
                 },
                 commit_msg = self.commit_msg_rx.select_next_some() => {
+                    monitor!("buffer_manager_process_commit_message",
                     if let Some(aggregated_block_id) = self.process_commit_message(commit_msg) {
                         self.advance_head(aggregated_block_id).await;
                         if self.execution_root.is_none() {
@@ -603,11 +608,13 @@ impl BufferManager {
                         if self.signing_root.is_none() {
                             self.advance_signing_root().await;
                         }
-                    }
+                    });
                 },
                 _ = interval.tick().fuse() => {
+                    monitor!("buffer_manager_process_interval_tick", {
                     self.update_buffer_manager_metrics();
-                    self.rebroadcast_commit_votes_if_needed().await;
+                    self.rebroadcast_commit_votes_if_needed().await
+                    });
                 },
                 // no else branch here because interval.tick will always be available
             }

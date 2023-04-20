@@ -41,6 +41,8 @@ export const $IndexResponse = {
         },
         git_hash: {
             type: 'string',
+            description: `Git hash of the build of the API endpoint.  Can be used to determine the exact
+            software version used by the API endpoint.`,
         },
     },
 } as const;

@@ -1,28 +1,30 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::block_storage::{BlockReader, BlockStore};
-use aptos_crypto::HashValue;
-use aptos_logger::Level;
-use aptos_types::{ledger_info::LedgerInfo, validator_signer::ValidatorSigner};
-use consensus_types::{
+use aptos_consensus_types::{
     block::{block_test_utils::certificate_for_genesis, Block},
     common::{Author, Round},
     executed_block::ExecutedBlock,
     quorum_cert::QuorumCert,
     sync_info::SyncInfo,
 };
+use aptos_crypto::HashValue;
+use aptos_logger::Level;
+use aptos_types::{ledger_info::LedgerInfo, validator_signer::ValidatorSigner};
 use std::{future::Future, sync::Arc, time::Duration};
 use tokio::{runtime, time::timeout};
 
 #[cfg(any(test, feature = "fuzzing"))]
 mod mock_payload_manager;
+pub mod mock_quorum_store_sender;
 mod mock_state_computer;
 mod mock_storage;
 
-use crate::util::mock_time_service::SimulatedTimeService;
+use crate::{payload_manager::PayloadManager, util::mock_time_service::SimulatedTimeService};
+use aptos_consensus_types::{block::block_test_utils::gen_test_certificate, common::Payload};
 use aptos_types::block_info::BlockInfo;
-use consensus_types::{block::block_test_utils::gen_test_certificate, common::Payload};
 pub use mock_payload_manager::MockPayloadManager;
 pub use mock_state_computer::{
     EmptyStateComputer, MockStateComputer, RandomComputeResultStateComputer,
@@ -41,7 +43,7 @@ pub async fn build_simple_tree() -> (Vec<Arc<ExecutedBlock>>, Arc<BlockStore>) {
         .expect("genesis block must exist");
     assert_eq!(block_store.len(), 1);
     assert_eq!(block_store.child_links(), block_store.len() - 1);
-    assert_eq!(block_store.block_exists(genesis_block.id()), true);
+    assert!(block_store.block_exists(genesis_block.id()));
 
     //       ╭--> A1--> A2--> A3
     // Genesis--> B1--> B2
@@ -74,6 +76,7 @@ pub fn build_empty_tree() -> Arc<BlockStore> {
         10, // max pruned blocks in mem
         Arc::new(SimulatedTimeService::new()),
         10,
+        Arc::from(PayloadManager::DirectMempool),
     ))
 }
 
@@ -135,7 +138,7 @@ impl TreeInserter {
                 parent_qc,
                 parent.timestamp_usecs() + 1,
                 round,
-                Payload::empty(),
+                Payload::empty(false),
                 vec![],
             ))
             .await
@@ -198,14 +201,10 @@ pub fn consensus_runtime() -> runtime::Runtime {
         ::aptos_logger::Logger::new().level(Level::Debug).init();
     }
 
-    runtime::Builder::new_multi_thread()
-        .enable_all()
-        .disable_lifo_slot()
-        .build()
-        .expect("Failed to create Tokio runtime!")
+    aptos_runtimes::spawn_named_runtime("consensus".into(), None)
 }
 
-pub fn timed_block_on<F>(runtime: &mut runtime::Runtime, f: F) -> <F as Future>::Output
+pub fn timed_block_on<F>(runtime: &runtime::Runtime, f: F) -> <F as Future>::Output
 where
     F: Future,
 {

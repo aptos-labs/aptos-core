@@ -7,7 +7,7 @@ ADD https://github.com/krallin/tini/releases/download/v0.19.0/tini /tini
 RUN chmod +x /tini
 ENTRYPOINT ["/tini", "--"]
 
-FROM rust:1.64.0-bullseye@sha256:5cf09a76cb9baf4990d121221bbad64927cc5690ee54f246487e302ddc2ba300 AS rust-base
+FROM rust:1.66.1-bullseye@sha256:f72949bcf1daf8954c0e0ed8b7e10ac4c641608f6aa5f0ef7c172c49f35bd9b5 AS rust-base
 WORKDIR /aptos
 RUN apt-get update && apt-get install -y cmake curl clang git pkg-config libssl-dev libpq-dev
 RUN apt-get update && apt-get install binutils lld
@@ -37,8 +37,12 @@ ARG PROFILE
 ENV PROFILE ${PROFILE}
 ARG FEATURES
 ENV FEATURES ${FEATURES}
+ARG GIT_CREDENTIALS
+ENV GIT_CREDENTIALS ${GIT_CREDENTIALS}
 
+RUN GIT_CREDENTIALS="$GIT_CREDENTIALS" git config --global credential.helper store && echo "${GIT_CREDENTIALS}" > ~/.git-credentials
 RUN PROFILE=$PROFILE FEATURES=$FEATURES docker/build-rust-all.sh && rm -rf $CARGO_HOME && rm -rf target
+RUN rm -rf ~/.git-credentials
 
 ### Validator Image ###
 FROM debian-base AS validator
@@ -64,9 +68,8 @@ RUN addgroup --system --gid 6180 aptos && adduser --system --ingroup aptos --no-
 
 RUN mkdir -p /opt/aptos/etc
 COPY --link --from=builder /aptos/dist/aptos-node /usr/local/bin/
-COPY --link --from=builder /aptos/dist/db-backup /usr/local/bin/
-COPY --link --from=builder /aptos/dist/db-bootstrapper /usr/local/bin/
-COPY --link --from=builder /aptos/dist/db-restore /usr/local/bin/
+COPY --link --from=builder /aptos/dist/aptos-db-tool /usr/local/bin/
+COPY --link --from=builder /aptos/dist/aptos-db-bootstrapper /usr/local/bin/
 
 # Admission control
 EXPOSE 8000
@@ -126,10 +129,12 @@ FROM debian-base AS tools
 RUN echo "deb http://deb.debian.org/debian bullseye main" > /etc/apt/sources.list.d/bullseye.list && \
     echo "Package: *\nPin: release n=bullseye\nPin-Priority: 50" > /etc/apt/preferences.d/bullseye
 
-RUN apt-get update && apt-get --no-install-recommends -y \
+RUN apt-get update && apt-get --no-install-recommends --allow-downgrades -y \
     install \
     wget \
     curl \
+    perl-base=5.32.1-4+deb11u1 \
+    git \
     libssl1.1 \
     ca-certificates \
     socat \
@@ -143,14 +148,12 @@ COPY --link docker/tools/boto.cfg /etc/boto.cfg
 RUN wget https://storage.googleapis.com/pub/gsutil.tar.gz -O- | tar --gzip --directory /opt --extract && ln -s /opt/gsutil/gsutil /usr/local/bin
 RUN cd /usr/local/bin && wget "https://storage.googleapis.com/kubernetes-release/release/v1.18.6/bin/linux/amd64/kubectl" -O kubectl && chmod +x kubectl
 
-COPY --link --from=builder /aptos/dist/db-bootstrapper /usr/local/bin/db-bootstrapper
-COPY --link --from=builder /aptos/dist/db-backup /usr/local/bin/db-backup
-COPY --link --from=builder /aptos/dist/db-backup-verify /usr/local/bin/db-backup-verify
-COPY --link --from=builder /aptos/dist/db-restore /usr/local/bin/db-restore
+COPY --link --from=builder /aptos/dist/aptos-db-bootstrapper /usr/local/bin/aptos-db-bootstrapper
+COPY --link --from=builder /aptos/dist/aptos-db-tool /usr/local/bin/aptos-db-tool
 COPY --link --from=builder /aptos/dist/aptos /usr/local/bin/aptos
 COPY --link --from=builder /aptos/dist/aptos-openapi-spec-generator /usr/local/bin/aptos-openapi-spec-generator
 COPY --link --from=builder /aptos/dist/aptos-fn-check-client /usr/local/bin/aptos-fn-check-client
-COPY --link --from=builder /aptos/dist/transaction-emitter /usr/local/bin/transaction-emitter
+COPY --link --from=builder /aptos/dist/aptos-transaction-emitter /usr/local/bin/aptos-transaction-emitter
 
 ### Get Aptos Move releases for genesis ceremony
 RUN mkdir -p /aptos-framework/move
@@ -182,7 +185,7 @@ RUN apt-get update && apt-get install -y \
 
 RUN mkdir -p /aptos/client/data/wallet/
 
-COPY --link --from=builder /aptos/dist/aptos-faucet /usr/local/bin/aptos-faucet
+COPY --link --from=builder /aptos/dist/aptos-faucet-service /usr/local/bin/aptos-faucet-service
 
 #install needed tools
 RUN apt-get update && apt-get install -y procps
@@ -228,6 +231,9 @@ ENV PATH "$PATH:/root/bin"
 
 WORKDIR /aptos
 COPY --link --from=builder /aptos/dist/forge /usr/local/bin/forge
+### Get Aptos Framework Release for forge framework upgrade testing
+COPY --link --from=builder /aptos/aptos-move/framework/ /aptos/aptos-move/framework/
+
 ENV RUST_LOG_FORMAT=json
 
 # add build info
@@ -254,6 +260,7 @@ RUN apt-get update && apt-get install -y \
     iproute2 \
     netcat \
     libpq-dev \
+    curl \
     && apt-get clean && rm -r /var/lib/apt/lists/*
 
 COPY --link --from=builder /aptos/dist/aptos-telemetry-service /usr/local/bin/aptos-telemetry-service
@@ -269,15 +276,59 @@ ENV GIT_BRANCH ${GIT_BRANCH}
 ARG GIT_SHA
 ENV GIT_SHA ${GIT_SHA}
 
+### Indexer GRPC Image ###
+
+FROM debian-base AS indexer-grpc
+
+RUN apt-get update && apt-get install -y \
+    libssl1.1 \
+    ca-certificates \
+    net-tools \
+    tcpdump \
+    iproute2 \
+    netcat \
+    libpq-dev \
+    curl \
+    && apt-get clean && rm -r /var/lib/apt/lists/*
+
+COPY --link --from=builder /aptos/dist/aptos-indexer-grpc-cache-worker /usr/local/bin/aptos-indexer-grpc-cache-worker
+COPY --link --from=builder /aptos/dist/aptos-indexer-grpc-file-store /usr/local/bin/aptos-indexer-grpc-file-store
+COPY --link --from=builder /aptos/dist/aptos-indexer-grpc-data-service /usr/local/bin/aptos-indexer-grpc-data-service
+COPY --link --from=builder /aptos/dist/aptos-indexer-grpc-parser /usr/local/bin/aptos-indexer-grpc-parser
+
+# The health check port
+EXPOSE 8080
+# The gRPC port
+EXPOSE 50501
+
+ENV RUST_LOG_FORMAT=json
+
+# add build info
+ARG GIT_TAG
+ENV GIT_TAG ${GIT_TAG}
+ARG GIT_BRANCH
+ENV GIT_BRANCH ${GIT_BRANCH}
+ARG GIT_SHA
+ENV GIT_SHA ${GIT_SHA}
 
 ### EXPERIMENTAL ###
 
-### Validator Image ###
-FROM validator AS validator-testing
+FROM debian-base as validator-testing-base
 
 RUN apt-get update && apt-get install -y \
+    libssl1.1 \
+    ca-certificates \
+    # Needed to run debugging tools like perf
+    linux-perf \
+    sudo \
+    procps \
+    gdb \
+    curl \
+    # postgres client lib required for indexer
+    libpq-dev \
     # Extra goodies for debugging
     less \
+    git \
     vim \
     nano \
     libjemalloc-dev \
@@ -286,12 +337,69 @@ RUN apt-get update && apt-get install -y \
     ghostscript \
     strace \
     htop \
+    sysstat \
     valgrind \
-    bpfcc-tools \
-    python3-bpfcc \
-    libbpfcc \
-    libbpfcc-dev \
     && apt-get clean && rm -r /var/lib/apt/lists/*
+
+# Install pyroscope for profiling
+RUN curl https://dl.pyroscope.io/release/pyroscope_0.36.0_amd64.deb --output pyroscope_0.36.0_amd64.deb && apt-get install ./pyroscope_0.36.0_amd64.deb
+
+### Because build machine perf might not match run machine perf, we have to symlink
+### Even if version slightly off, still mostly works
+RUN ln -sf /usr/bin/perf_* /usr/bin/perf
+
+RUN echo "deb http://deb.debian.org/debian sid main contrib non-free" >> /etc/apt/sources.list
+RUN echo "deb-src http://deb.debian.org/debian sid main contrib non-free" >> /etc/apt/sources.list
+
+RUN apt-get update && apt-get install -y \
+    arping bison clang-format cmake dh-python \
+    dpkg-dev pkg-kde-tools ethtool flex inetutils-ping iperf \
+    libbpf-dev libclang-11-dev libclang-cpp-dev libedit-dev libelf-dev \
+    libfl-dev libzip-dev linux-libc-dev llvm-11-dev libluajit-5.1-dev \
+    luajit python3-netaddr python3-pyroute2 python3-distutils python3 \
+    && apt-get clean && rm -r /var/lib/apt/lists/*
+
+RUN git clone https://github.com/aptos-labs/bcc.git
+RUN mkdir bcc/build
+WORKDIR bcc/
+RUN git checkout 5258d14cb35ba08a8757a68386bebc9ea05f00c9
+WORKDIR build/
+RUN cmake ..
+RUN make
+RUN make install
+WORKDIR ..
+
+### Validator Image ###
+# We will build a base testing image with the necessary packages and
+# duplicate steps from validator step. This will, however, reduce
+# cache invalidation and reduce build times.
+FROM validator-testing-base  AS validator-testing
+
+RUN addgroup --system --gid 6180 aptos && adduser --system --ingroup aptos --no-create-home --uid 6180 aptos
+
+RUN mkdir -p /opt/aptos/etc
+COPY --link --from=builder /aptos/dist/aptos-node /usr/local/bin/
+COPY --link --from=builder /aptos/dist/aptos-db-tool /usr/local/bin/
+COPY --link --from=builder /aptos/dist/aptos-db-bootstrapper /usr/local/bin/
+
+# Admission control
+EXPOSE 8000
+# Validator network
+EXPOSE 6180
+# Metrics
+EXPOSE 9101
+# Backup
+EXPOSE 6186
+
+# add build info
+ARG BUILD_DATE
+ENV BUILD_DATE ${BUILD_DATE}
+ARG GIT_TAG
+ENV GIT_TAG ${GIT_TAG}
+ARG GIT_BRANCH
+ENV GIT_BRANCH ${GIT_BRANCH}
+ARG GIT_SHA
+ENV GIT_SHA ${GIT_SHA}
 
 # Capture backtrace on error
 ENV RUST_BACKTRACE 1

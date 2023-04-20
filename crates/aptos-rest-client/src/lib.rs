@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 extern crate core;
@@ -6,28 +7,26 @@ extern crate core;
 pub mod aptos;
 pub mod error;
 pub mod faucet;
-
 pub use faucet::FaucetClient;
 pub mod response;
 pub use response::Response;
 pub mod state;
 pub mod types;
 
+use crate::{
+    aptos::{AptosVersion, Balance},
+    error::RestError,
+};
+use anyhow::{anyhow, Result};
 pub use aptos_api_types::{
     self, IndexResponseBcs, MoveModuleBytecode, PendingTransaction, Transaction,
 };
-pub use state::State;
-pub use types::{deserialize_from_prefixed_hex_string, Account, Resource};
-
-use crate::aptos::{AptosVersion, Balance};
-use crate::error::RestError;
-use anyhow::{anyhow, Result};
 use aptos_api_types::{
     deserialize_from_string,
-    mime_types::{BCS, BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE},
-    AptosError, BcsBlock, Block, Bytecode, ExplainVMStatus, GasEstimation, HexEncodedBytes,
-    IndexResponse, MoveModuleId, TransactionData, TransactionOnChainData,
-    TransactionsBatchSubmissionResult, UserTransaction, VersionedEvent,
+    mime_types::{BCS, BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, JSON},
+    AptosError, BcsBlock, Block, GasEstimation, HexEncodedBytes, IndexResponse, MoveModuleId,
+    TransactionData, TransactionOnChainData, TransactionsBatchSubmissionResult, UserTransaction,
+    VersionedEvent, ViewRequest,
 };
 use aptos_crypto::HashValue;
 use aptos_logger::{debug, info, sample, sample::SampleRate};
@@ -37,18 +36,17 @@ use aptos_types::{
     contract_event::EventWithVersion,
     transaction::SignedTransaction,
 };
-use futures::executor::block_on;
-use move_binary_format::CompiledModule;
-use move_core_types::language_storage::{ModuleId, StructTag};
-use reqwest::header::ACCEPT;
-use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient, StatusCode};
+use move_core_types::language_storage::StructTag;
+use reqwest::{
+    header::{ACCEPT, CONTENT_TYPE},
+    Client as ReqwestClient, StatusCode,
+};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::collections::BTreeMap;
-use std::future::Future;
-use std::rc::Rc;
-use std::time::Duration;
+pub use state::State;
+use std::{collections::BTreeMap, future::Future, time::Duration};
 use tokio::time::Instant;
+pub use types::{deserialize_from_prefixed_hex_string, Account, Resource};
 use url::Url;
 
 pub const USER_AGENT: &str = concat!("aptos-client-sdk-rust / ", env!("CARGO_PKG_VERSION"));
@@ -58,6 +56,8 @@ const DEFAULT_INTERVAL_MS: u64 = 1000;
 static DEFAULT_MAX_WAIT_DURATION: Duration = Duration::from_millis(DEFAULT_MAX_WAIT_MS);
 static DEFAULT_INTERVAL_DURATION: Duration = Duration::from_millis(DEFAULT_INTERVAL_MS);
 const DEFAULT_MAX_SERVER_LAG_WAIT_DURATION: Duration = Duration::from_secs(60);
+const RESOURCES_PER_CALL_PAGINATION: u64 = 9999;
+const MODULES_PER_CALL_PAGINATION: u64 = 1000;
 
 type AptosResult<T> = Result<T, RestError>;
 
@@ -70,9 +70,17 @@ pub struct Client {
 
 impl Client {
     pub fn new_with_timeout(base_url: Url, timeout: Duration) -> Self {
+        Client::new_with_timeout_and_user_agent(base_url, timeout, USER_AGENT)
+    }
+
+    pub fn new_with_timeout_and_user_agent(
+        base_url: Url,
+        timeout: Duration,
+        user_agent: &str,
+    ) -> Self {
         let inner = ReqwestClient::builder()
             .timeout(timeout)
-            .user_agent(USER_AGENT)
+            .user_agent(user_agent)
             .cookie_store(true)
             .build()
             .unwrap();
@@ -88,7 +96,7 @@ impl Client {
                 } else {
                     path.to_string()
                 }
-            }
+            },
         };
 
         Self {
@@ -119,7 +127,7 @@ impl Client {
         Ok(self)
     }
 
-    fn build_path(&self, path: &str) -> AptosResult<Url> {
+    pub fn build_path(&self, path: &str) -> AptosResult<Url> {
         Ok(self.base_url.join(&self.version_path_base)?.join(path)?)
     }
 
@@ -287,6 +295,7 @@ impl Client {
         Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
     }
 
+    // TODO: Remove this, just use `get_index`: https://github.com/aptos-labs/aptos-core/issues/5597.
     pub async fn get_ledger_information(&self) -> AptosResult<Response<State>> {
         let response = self.get_index_bcs().await?.map(|r| State {
             chain_id: r.chain_id,
@@ -296,6 +305,7 @@ impl Client {
             oldest_ledger_version: r.oldest_ledger_version.into(),
             oldest_block_height: r.oldest_block_height.into(),
             block_height: r.block_height.into(),
+            cursor: None,
         });
         assert_eq!(response.inner().chain_id, response.state().chain_id);
         assert_eq!(response.inner().epoch, response.state().epoch);
@@ -305,12 +315,58 @@ impl Client {
         Ok(response)
     }
 
+    pub async fn view(
+        &self,
+        request: &ViewRequest,
+        version: Option<u64>,
+    ) -> AptosResult<Response<Vec<serde_json::Value>>> {
+        let request = serde_json::to_string(request)?;
+        let mut url = self.build_path("view")?;
+        if let Some(version) = version {
+            url.set_query(Some(format!("ledger_version={}", version).as_str()));
+        }
+
+        let response = self
+            .inner
+            .post(url)
+            .header(CONTENT_TYPE, JSON)
+            .body(request)
+            .send()
+            .await?;
+
+        self.json(response).await
+    }
+
     pub async fn simulate(
         &self,
         txn: &SignedTransaction,
     ) -> AptosResult<Response<Vec<UserTransaction>>> {
         let txn_payload = bcs::to_bytes(txn)?;
         let url = self.build_path("transactions/simulate")?;
+
+        let response = self
+            .inner
+            .post(url)
+            .header(CONTENT_TYPE, BCS_CONTENT_TYPE)
+            .body(txn_payload)
+            .send()
+            .await?;
+
+        self.json(response).await
+    }
+
+    pub async fn simulate_with_gas_estimation(
+        &self,
+        txn: &SignedTransaction,
+        estimate_max_gas_amount: bool,
+        estimate_max_gas_unit_price: bool,
+    ) -> AptosResult<Response<Vec<UserTransaction>>> {
+        let txn_payload = bcs::to_bytes(txn)?;
+
+        let url = self.build_path(&format!(
+            "transactions/simulate?estimate_max_gas_amount={}&estimate_gas_unit_price={}",
+            estimate_max_gas_amount, estimate_max_gas_unit_price
+        ))?;
 
         let response = self
             .inner
@@ -419,6 +475,7 @@ impl Client {
             .await?;
         self.json(response).await
     }
+
     pub async fn submit_batch_bcs(
         &self,
         txns: &[SignedTransaction],
@@ -544,24 +601,24 @@ impl Client {
         let start = std::time::Instant::now();
         loop {
             let mut chain_timestamp_usecs = None;
-            match fetch(hash).await? {
-                WaitForTransactionResult::Success(result) => {
+            match fetch(hash).await {
+                Ok(WaitForTransactionResult::Success(result)) => {
                     return Ok(result);
-                }
-                WaitForTransactionResult::FailedExecution(vm_status) => {
+                },
+                Ok(WaitForTransactionResult::FailedExecution(vm_status)) => {
                     return Err(anyhow!(
                         "Transaction committed on chain, but failed execution: {}",
                         vm_status
                     ))?;
-                }
-                WaitForTransactionResult::Pending(state) => {
+                },
+                Ok(WaitForTransactionResult::Pending(state)) => {
                     reached_mempool = true;
                     if expiration_timestamp_secs <= state.timestamp_usecs / 1_000_000 {
                         return Err(anyhow!("Transaction expired. It is guaranteed it will not be committed on chain.").into());
                     }
                     chain_timestamp_usecs = Some(state.timestamp_usecs);
-                }
-                WaitForTransactionResult::NotFound(error) => {
+                },
+                Ok(WaitForTransactionResult::NotFound(error)) => {
                     if let RestError::Api(aptos_error_response) = error {
                         if let Some(state) = aptos_error_response.state {
                             if expiration_timestamp_secs <= state.timestamp_usecs / 1_000_000 {
@@ -593,7 +650,10 @@ impl Client {
                             self.path_prefix_string(),
                         )
                     );
-                }
+                },
+                Err(err) => {
+                    debug!("Fetching error, will retry: {}", err);
+                },
             }
 
             if let Some(max_server_lag_wait_duration) = max_server_lag_wait {
@@ -879,20 +939,24 @@ impl Client {
         &self,
         address: AccountAddress,
     ) -> AptosResult<Response<Vec<Resource>>> {
-        let url = self.build_path(&format!("accounts/{}/resources", address))?;
-
-        let response = self.inner.get(url).send().await?;
-
-        self.json(response).await
+        self.paginate_with_cursor(
+            &format!("accounts/{}/resources", address),
+            RESOURCES_PER_CALL_PAGINATION,
+            None,
+        )
+        .await
     }
 
     pub async fn get_account_resources_bcs(
         &self,
         address: AccountAddress,
     ) -> AptosResult<Response<BTreeMap<StructTag, Vec<u8>>>> {
-        let url = self.build_path(&format!("accounts/{}/resources", address))?;
-        let response = self.get_bcs(url).await?;
-        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+        self.paginate_with_cursor_bcs(
+            &format!("accounts/{}/resources", address),
+            RESOURCES_PER_CALL_PAGINATION,
+            None,
+        )
+        .await
     }
 
     pub async fn get_account_resources_at_version(
@@ -900,14 +964,12 @@ impl Client {
         address: AccountAddress,
         version: u64,
     ) -> AptosResult<Response<Vec<Resource>>> {
-        let url = self.build_path(&format!(
-            "accounts/{}/resources?ledger_version={}",
-            address, version
-        ))?;
-
-        let response = self.inner.get(url).send().await?;
-
-        self.json(response).await
+        self.paginate_with_cursor(
+            &format!("accounts/{}/resources", address),
+            RESOURCES_PER_CALL_PAGINATION,
+            Some(version),
+        )
+        .await
     }
 
     pub async fn get_account_resources_at_version_bcs(
@@ -915,12 +977,12 @@ impl Client {
         address: AccountAddress,
         version: u64,
     ) -> AptosResult<Response<BTreeMap<StructTag, Vec<u8>>>> {
-        let url = self.build_path(&format!(
-            "accounts/{}/resources?ledger_version={}",
-            address, version
-        ))?;
-        let response = self.get_bcs(url).await?;
-        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+        self.paginate_with_cursor_bcs(
+            &format!("accounts/{}/resources", address),
+            RESOURCES_PER_CALL_PAGINATION,
+            Some(version),
+        )
+        .await
     }
 
     pub async fn get_resource<T: DeserializeOwned>(
@@ -985,6 +1047,32 @@ impl Client {
         Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
     }
 
+    pub async fn get_account_resource_at_version_bytes(
+        &self,
+        address: AccountAddress,
+        resource_type: &str,
+        version: u64,
+    ) -> AptosResult<Response<Vec<u8>>> {
+        let url = self.build_path(&format!(
+            "accounts/{}/resource/{}?ledger_version={}",
+            address, resource_type, version
+        ))?;
+
+        let response = self.get_bcs(url).await?;
+        Ok(response.map(|inner| inner.to_vec()))
+    }
+
+    pub async fn get_account_resource_bytes(
+        &self,
+        address: AccountAddress,
+        resource_type: &str,
+    ) -> AptosResult<Response<Vec<u8>>> {
+        let url = self.build_path(&format!("accounts/{}/resource/{}", address, resource_type))?;
+
+        let response = self.get_bcs(url).await?;
+        Ok(response.map(|inner| inner.to_vec()))
+    }
+
     pub async fn get_account_resource_at_version(
         &self,
         address: AccountAddress,
@@ -1004,19 +1092,24 @@ impl Client {
         &self,
         address: AccountAddress,
     ) -> AptosResult<Response<Vec<MoveModuleBytecode>>> {
-        let url = self.build_path(&format!("accounts/{}/modules", address))?;
-
-        let response = self.inner.get(url).send().await?;
-        self.json(response).await
+        self.paginate_with_cursor(
+            &format!("accounts/{}/modules", address),
+            MODULES_PER_CALL_PAGINATION,
+            None,
+        )
+        .await
     }
 
     pub async fn get_account_modules_bcs(
         &self,
         address: AccountAddress,
     ) -> AptosResult<Response<BTreeMap<MoveModuleId, Vec<u8>>>> {
-        let url = self.build_path(&format!("accounts/{}/modules", address))?;
-        let response = self.get_bcs(url).await?;
-        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+        self.paginate_with_cursor_bcs(
+            &format!("accounts/{}/modules", address),
+            MODULES_PER_CALL_PAGINATION,
+            None,
+        )
+        .await
     }
 
     pub async fn get_account_module(
@@ -1034,6 +1127,19 @@ impl Client {
         module_name: &str,
     ) -> AptosResult<Response<bytes::Bytes>> {
         let url = self.build_path(&format!("accounts/{}/module/{}", address, module_name))?;
+        self.get_bcs(url).await
+    }
+
+    pub async fn get_account_module_bcs_at_version(
+        &self,
+        address: AccountAddress,
+        module_name: &str,
+        version: u64,
+    ) -> AptosResult<Response<bytes::Bytes>> {
+        let url = self.build_path(&format!(
+            "accounts/{}/module/{}?ledger_version={}",
+            address, module_name, version
+        ))?;
         self.get_bcs(url).await
     }
 
@@ -1167,6 +1273,24 @@ impl Client {
 
         let response = self.post_bcs(url, data).await?;
         Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+    }
+
+    pub async fn get_raw_table_item(
+        &self,
+        table_handle: AccountAddress,
+        key: &[u8],
+        version: u64,
+    ) -> AptosResult<Response<Vec<u8>>> {
+        let url = self.build_path(&format!(
+            "tables/{}/raw_item?ledger_version={}",
+            table_handle, version
+        ))?;
+        let data = json!({
+            "key": hex::encode(key),
+        });
+
+        let response = self.post_bcs(url, data).await?;
+        Ok(response.map(|inner| inner.to_vec()))
     }
 
     pub async fn get_account(&self, address: AccountAddress) -> AptosResult<Response<Account>> {
@@ -1323,7 +1447,7 @@ impl Client {
                 Err(err) => match err {
                     RestError::Api(inner) => {
                         should_retry(inner.status_code, Some(inner.error.clone()))
-                    }
+                    },
                     RestError::Http(status_code, _e) => should_retry(*status_code, None),
                     RestError::Bcs(_)
                     | RestError::Json(_)
@@ -1348,6 +1472,96 @@ impl Client {
         }
 
         result
+    }
+
+    /// This function builds a URL for use in pagination. It handles setting a limit,
+    /// adding the cursor, and adding a ledger version if given.
+    pub fn build_url_for_pagination(
+        &self,
+        base: &str,
+        limit_per_request: u64,
+        ledger_version: Option<u64>,
+        cursor: Option<String>,
+    ) -> AptosResult<Url> {
+        let mut path = format!("{}?limit={}", base, limit_per_request);
+        if let Some(ledger_version) = ledger_version {
+            path = format!("{}&ledger_version={}", path, ledger_version);
+        }
+        if let Some(cursor) = cursor {
+            path = format!("{}&start={}", path, cursor);
+        }
+        self.build_path(&path)
+    }
+
+    /// This function calls an endpoint that has pagination support and paginates
+    /// using the cursor the API returns. It keeps paginating until the API doesn't
+    /// return a cursor anymore. Since the functions calling this function are
+    /// expected to return the data wrapped in a Response (exactly one), we return
+    /// the full results merged together wrapped in the Response we received from
+    /// the final call.
+    pub async fn paginate_with_cursor<T: for<'a> Deserialize<'a>>(
+        &self,
+        base_path: &str,
+        limit_per_request: u64,
+        ledger_version: Option<u64>,
+    ) -> AptosResult<Response<Vec<T>>> {
+        let mut result = Vec::new();
+        let mut cursor: Option<String> = None;
+
+        loop {
+            let url = self.build_url_for_pagination(
+                base_path,
+                limit_per_request,
+                ledger_version,
+                cursor,
+            )?;
+            let raw_response = self.inner.get(url).send().await?;
+            let response: Response<Vec<T>> = self.json(raw_response).await?;
+            cursor = response.state().cursor.clone();
+            if cursor.is_none() {
+                break Ok(response.map(|mut v| {
+                    result.append(&mut v);
+                    result
+                }));
+            } else {
+                result.extend(response.into_inner());
+            }
+        }
+    }
+
+    /// This function works just like `paginate_with_cursor`, but it calls the internal
+    /// helper functions for dealing with BCS data and collects data in the format we
+    /// use for BCS endpoint functions.
+    pub async fn paginate_with_cursor_bcs<T: for<'a> Deserialize<'a> + Ord>(
+        &self,
+        base_path: &str,
+        limit_per_request: u64,
+        ledger_version: Option<u64>,
+    ) -> AptosResult<Response<BTreeMap<T, Vec<u8>>>> {
+        let mut result = BTreeMap::new();
+        let mut cursor: Option<String> = None;
+
+        loop {
+            let url = self.build_url_for_pagination(
+                base_path,
+                limit_per_request,
+                ledger_version,
+                cursor,
+            )?;
+            let response: Response<BTreeMap<T, Vec<u8>>> = self
+                .get_bcs(url)
+                .await?
+                .and_then(|inner| bcs::from_bytes(&inner))?;
+            cursor = response.state().cursor.clone();
+            if cursor.is_none() {
+                break Ok(response.map(|mut v| {
+                    result.append(&mut v);
+                    result
+                }));
+            } else {
+                result.extend(response.into_inner());
+            }
+        }
     }
 }
 
@@ -1416,16 +1630,4 @@ enum WaitForTransactionResult<T> {
     FailedExecution(String),
     Pending(State),
     Success(Response<T>),
-}
-
-impl ExplainVMStatus for Client {
-    // TODO: Add some caching
-    fn get_module_bytecode(&self, module_id: &ModuleId) -> Result<Rc<dyn Bytecode>> {
-        let bytes =
-            block_on(self.get_account_module_bcs(*module_id.address(), module_id.name().as_str()))?
-                .into_inner();
-
-        let compiled_module = CompiledModule::deserialize(bytes.as_ref())?;
-        Ok(Rc::new(compiled_module) as Rc<dyn Bytecode>)
-    }
 }

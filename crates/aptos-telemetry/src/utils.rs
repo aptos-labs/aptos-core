@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -61,7 +61,7 @@ pub fn sum_all_histogram_sums(metric_families: &Vec<MetricFamily>) -> f64 {
     let mut count_sum = 0.0;
     for metric_family in metric_families {
         for metric in metric_family.get_metric() {
-            count_sum += metric.get_histogram().get_sample_sum() as f64
+            count_sum += metric.get_histogram().get_sample_sum()
         }
     }
     count_sum

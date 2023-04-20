@@ -1,10 +1,9 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-
-use std::collections::BTreeMap;
 
 use crate::types::common::EventIdentity;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 /// A useful struct for serialization a telemetry event
 #[derive(Debug, Serialize, Deserialize, Clone)]

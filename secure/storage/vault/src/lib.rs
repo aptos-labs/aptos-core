@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -429,9 +430,9 @@ impl Client {
         version: Option<u32>,
     ) -> Result<Ed25519Signature, Error> {
         let data = if let Some(version) = version {
-            json!({ "input": base64::encode(&data), "key_version": version })
+            json!({ "input": base64::encode(data), "key_version": version })
         } else {
-            json!({ "input": base64::encode(&data) })
+            json!({ "input": base64::encode(data) })
         };
 
         let request = self
@@ -510,13 +511,13 @@ pub fn process_policy_list_response(resp: Response) -> Result<Vec<String>, Error
         200 => {
             let policies: ListPoliciesResponse = serde_json::from_str(&resp.into_string()?)?;
             Ok(policies.policies)
-        }
+        },
         // There are no policies.
         404 => {
             // Explicitly clear buffer so the stream can be re-used.
             resp.into_string()?;
             Ok(vec![])
-        }
+        },
         _ => Err(resp.into()),
     }
 }
@@ -535,13 +536,13 @@ pub fn process_secret_list_response(resp: Response) -> Result<Vec<String>, Error
         200 => {
             let resp: ReadSecretListResponse = serde_json::from_str(&resp.into_string()?)?;
             Ok(resp.data.keys)
-        }
+        },
         // There are no secrets.
         404 => {
             // Explicitly clear buffer so the stream can be re-used.
             resp.into_string()?;
             Ok(vec![])
-        }
+        },
         _ => Err(resp.into()),
     }
 }
@@ -563,12 +564,12 @@ pub fn process_secret_read_response(
             let created_time = data.metadata.created_time.clone();
             let version = data.metadata.version;
             Ok(ReadResponse::new(created_time, value, version))
-        }
+        },
         404 => {
             // Explicitly clear buffer so the stream can be re-used.
             resp.into_string()?;
             Err(Error::NotFound(secret.into(), key.into()))
-        }
+        },
         _ => Err(resp.into()),
     }
 }
@@ -600,12 +601,12 @@ pub fn process_transit_create_response(name: &str, resp: Response) -> Result<(),
             // Explicitly clear buffer so the stream can be re-used.
             resp.into_string()?;
             Ok(())
-        }
+        },
         404 => {
             // Explicitly clear buffer so the stream can be re-used.
             resp.into_string()?;
             Err(Error::NotFound("transit/".into(), name.into()))
-        }
+        },
         _ => Err(resp.into()),
     }
 }
@@ -647,12 +648,12 @@ pub fn process_transit_list_response(resp: Response) -> Result<Vec<String>, Erro
         200 => {
             let list_keys: ListKeysResponse = serde_json::from_str(&resp.into_string()?)?;
             Ok(list_keys.data.keys)
-        }
+        },
         404 => {
             // Explicitly clear buffer so the stream can be re-used.
             resp.into_string()?;
             Err(Error::NotFound("transit/".into(), "keys".into()))
-        }
+        },
         _ => Err(resp.into()),
     }
 }
@@ -674,12 +675,12 @@ pub fn process_transit_read_response(
                 ));
             }
             Ok(read_resp)
-        }
+        },
         404 => {
             // Explicitly clear buffer so the stream can be re-used.
             resp.into_string()?;
             Err(Error::NotFound("transit/".into(), name.into()))
-        }
+        },
         _ => Err(resp.into()),
     }
 }
@@ -691,7 +692,7 @@ pub fn process_transit_restore_response(resp: Response) -> Result<(), Error> {
             // Explicitly clear buffer so the stream can be re-used.
             resp.into_string()?;
             Ok(())
-        }
+        },
         _ => Err(resp.into()),
     }
 }
@@ -706,7 +707,7 @@ pub fn process_transit_sign_response(resp: Response) -> Result<Ed25519Signature,
             .get(2)
             .ok_or_else(|| Error::SerializationError(signature.into()))?;
         Ok(Ed25519Signature::try_from(
-            base64::decode(&signature)?.as_slice(),
+            base64::decode(signature)?.as_slice(),
         )?)
     } else {
         Err(resp.into())
@@ -778,7 +779,7 @@ impl KeyBackup {
     pub fn new(key: &Ed25519PrivateKey) -> Self {
         let mut key_bytes = key.to_bytes().to_vec();
         let pub_key_bytes = key.public_key().to_bytes();
-        key_bytes.extend(&pub_key_bytes);
+        key_bytes.extend(pub_key_bytes);
 
         let now = chrono::Utc::now();
         let time_as_str = now.to_rfc3339();

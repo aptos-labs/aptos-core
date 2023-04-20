@@ -1,9 +1,10 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    exponential_buckets, register_histogram, register_int_counter, register_int_counter_vec,
-    Histogram, IntCounter, IntCounterVec,
+    exponential_buckets, register_histogram, register_histogram_vec, register_int_counter,
+    register_int_counter_vec, Histogram, HistogramVec, IntCounter, IntCounterVec,
 };
 use once_cell::sync::Lazy;
 
@@ -46,6 +47,18 @@ pub static APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS: Lazy<Histogram> = Lazy::new(
         "aptos_executor_vm_execute_block_seconds",
         // metric description
         "The time spent in seconds of vm block execution in Aptos executor",
+        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+    )
+    .unwrap()
+});
+
+pub static APTOS_EXECUTOR_OTHER_TIMERS_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        // metric name
+        "aptos_executor_other_timers_seconds",
+        // metric description
+        "The time spent in seconds of others in Aptos executor",
+        &["name"],
         exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
     )
     .unwrap()

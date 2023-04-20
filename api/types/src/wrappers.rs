@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! The purpose of this file is to define wrappers that we can use in the
@@ -10,15 +10,13 @@
 //! just strings, using the FromStr impl to parse the path param. They can
 //! then be unpacked to the real type beneath.
 
-use crate::VerifyInput;
-use anyhow::bail;
-use aptos_types::event::EventKey;
+use crate::{Address, VerifyInput, U64};
+use anyhow::{bail, Context};
+use aptos_types::{event::EventKey, state_store::state_key::StateKey};
 use move_core_types::identifier::{IdentStr, Identifier};
 use poem_openapi::Object;
 use serde::{Deserialize, Serialize};
 use std::{convert::From, fmt, ops::Deref, str::FromStr};
-
-use crate::{Address, U64};
 
 /// A wrapper of a Move identifier
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -112,5 +110,44 @@ impl From<EventGuid> for EventKey {
             event_key_wrapper.creation_number.0,
             event_key_wrapper.account_address.into(),
         )
+    }
+}
+
+/// This wraps the StateKey, serializing it as hex encoded bytes.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StateKeyWrapper(pub StateKey);
+
+impl fmt::Display for StateKeyWrapper {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let hex_string = hex::encode(
+            self.0
+                .encode()
+                .context("Failed to encode StateKey")
+                .map_err(|_| fmt::Error)?,
+        );
+        write!(f, "{}", hex_string)
+    }
+}
+
+impl FromStr for StateKeyWrapper {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> anyhow::Result<Self, anyhow::Error> {
+        let state_key_prefix: StateKey =
+            StateKey::decode(&hex::decode(s).context("Failed to decode StateKey as hex string")?)
+                .context("Failed to decode StateKey from hex string")?;
+        Ok(StateKeyWrapper(state_key_prefix))
+    }
+}
+
+impl From<StateKey> for StateKeyWrapper {
+    fn from(value: StateKey) -> StateKeyWrapper {
+        Self(value)
+    }
+}
+
+impl From<StateKeyWrapper> for StateKey {
+    fn from(value: StateKeyWrapper) -> StateKey {
+        value.0
     }
 }

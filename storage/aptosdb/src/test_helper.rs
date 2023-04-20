@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 ///! This module provides reusable helpers in tests.
@@ -6,21 +7,19 @@ use super::*;
 use crate::{
     jellyfish_merkle_node::JellyfishMerkleNodeSchema, schema::state_value::StateValueSchema,
 };
-use aptos_types::ledger_info::generate_ledger_info_with_sig;
-
 use aptos_crypto::hash::{CryptoHash, EventAccumulatorHasher, TransactionAccumulatorHasher};
+use aptos_executor_types::ProofReader;
 use aptos_jellyfish_merkle::node_type::{Node, NodeKey};
+use aptos_scratchpad::SparseMerkleTree;
 use aptos_temppath::TempPath;
 use aptos_types::{
     contract_event::ContractEvent,
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
     proof::accumulator::InMemoryAccumulator,
     proptest_types::{AccountInfoUniverse, BlockGen},
 };
-use executor_types::ProofReader;
-use proptest::sample::Index;
-use proptest::{collection::vec, prelude::*};
-use scratchpad::SparseMerkleTree;
+use proptest::{collection::vec, prelude::*, sample::Index};
+use std::fmt::Debug;
 
 prop_compose! {
     pub fn arb_state_kv_sets(
@@ -50,7 +49,7 @@ pub(crate) fn update_store(
     input: impl Iterator<Item = (StateKey, Option<StateValue>)>,
     first_version: Version,
 ) -> HashValue {
-    use storage_interface::{jmt_update_refs, jmt_updates};
+    use aptos_storage_interface::{jmt_update_refs, jmt_updates};
     let mut root_hash = *aptos_crypto::hash::SPARSE_MERKLE_PLACEHOLDER_HASH;
     for (i, (key, value)) in input.enumerate() {
         let value_state_set = vec![(key, value)].into_iter().collect();
@@ -64,16 +63,22 @@ pub(crate) fn update_store(
                 version.checked_sub(1),
             )
             .unwrap();
-        let mut batch = SchemaBatch::new();
+        let ledger_batch = SchemaBatch::new();
+        let sharded_state_kv_batches = new_sharded_kv_schema_batch();
         store
             .put_value_sets(
                 vec![&value_state_set],
                 version,
                 StateStorageUsage::new_untracked(),
-                &mut batch,
+                &ledger_batch,
+                &sharded_state_kv_batches,
             )
             .unwrap();
-        store.ledger_db.write_schemas(batch).unwrap();
+        store.ledger_db.write_schemas(ledger_batch).unwrap();
+        store
+            .state_kv_db
+            .commit(version, sharded_state_kv_batches)
+            .unwrap();
     }
     root_hash
 }
@@ -141,10 +146,11 @@ prop_compose! {
     fn arb_blocks_to_commit_impl(
         num_accounts: usize,
         max_user_txns_per_block: usize,
+        min_blocks: usize,
         max_blocks: usize,
     )(
         mut universe in any_with::<AccountInfoUniverse>(num_accounts).no_shrink(),
-        block_gens in vec(any_with::<BlockGen>(max_user_txns_per_block), 1..=max_blocks),
+        block_gens in vec(any_with::<BlockGen>(max_user_txns_per_block), min_blocks..=max_blocks),
     ) -> Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)> {
         type EventAccumulator = InMemoryAccumulator<EventAccumulatorHasher>;
         type TxnAccumulator = InMemoryAccumulator<TransactionAccumulatorHasher>;
@@ -203,7 +209,19 @@ pub fn arb_blocks_to_commit(
     arb_blocks_to_commit_impl(
         5,  /* num_accounts */
         2,  /* max_user_txn_per_block */
+        1,  /* min_blocks */
         10, /* max_blocks */
+    )
+}
+
+pub fn arb_blocks_to_commit_with_block_nums(
+    min_blocks: usize,
+    max_blocks: usize,
+) -> impl Strategy<Value = Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>> {
+    arb_blocks_to_commit_impl(
+        5, /* num_accounts */
+        2, /* max_user_txn_per_block */
+        min_blocks, max_blocks,
     )
 }
 
@@ -597,13 +615,13 @@ fn verify_account_txns(
         .map(|(account, txns_and_events)| {
             let account = *account;
             let first_seq_num = if let Some((txn, _)) = txns_and_events.first() {
-                txn.as_signed_user_txn().unwrap().sequence_number()
+                txn.try_as_signed_user_txn().unwrap().sequence_number()
             } else {
                 return (account, Vec::new());
             };
 
             let last_txn = &txns_and_events.last().unwrap().0;
-            let last_seq_num = last_txn.as_signed_user_txn().unwrap().sequence_number();
+            let last_seq_num = last_txn.try_as_signed_user_txn().unwrap().sequence_number();
             let limit = last_seq_num + 1;
 
             let acct_txns_with_proof = db
@@ -644,7 +662,7 @@ fn group_txns_by_account(
 ) -> HashMap<AccountAddress, Vec<(Transaction, Vec<ContractEvent>)>> {
     let mut account_to_txns = HashMap::new();
     for txn in txns_to_commit {
-        if let Ok(signed_txn) = txn.transaction().as_signed_user_txn() {
+        if let Some(signed_txn) = txn.transaction().try_as_signed_user_txn() {
             let account = signed_txn.sender();
             account_to_txns
                 .entry(account)
@@ -655,6 +673,64 @@ fn group_txns_by_account(
     account_to_txns
 }
 
+fn assert_items_equal<'a, T: 'a + Debug + Eq>(
+    iter: impl Iterator<Item = &'a T>,
+    db_iter_res: Result<impl Iterator<Item = Result<T>>>,
+) {
+    for (item, db_item) in itertools::zip_eq(iter, db_iter_res.unwrap()) {
+        assert_eq!(item, &db_item.unwrap());
+    }
+}
+
+fn verify_ledger_iterators(
+    db: &AptosDB,
+    txns_to_commit: &[TransactionToCommit],
+    first_version: Version,
+    ledger_info_with_sigs: &LedgerInfoWithSignatures,
+) {
+    let num_txns = txns_to_commit.len() as u64;
+    assert_items_equal(
+        txns_to_commit.iter().map(|t| t.transaction()),
+        db.get_transaction_iterator(first_version, num_txns),
+    );
+    assert_items_equal(
+        txns_to_commit.iter().map(|t| t.transaction_info()),
+        db.get_transaction_info_iterator(first_version, num_txns),
+    );
+    assert_items_equal(
+        txns_to_commit
+            .iter()
+            .map(|t| t.events().to_vec())
+            .collect::<Vec<_>>()
+            .iter(),
+        db.get_events_iterator(first_version, num_txns),
+    );
+    assert_items_equal(
+        txns_to_commit.iter().map(|t| t.write_set()),
+        db.get_write_set_iterator(first_version, num_txns),
+    );
+    let range_proof = db
+        .get_transaction_accumulator_range_proof(
+            first_version,
+            num_txns,
+            ledger_info_with_sigs.ledger_info().version(),
+        )
+        .unwrap();
+    range_proof
+        .verify(
+            ledger_info_with_sigs
+                .ledger_info()
+                .transaction_accumulator_hash(),
+            Some(first_version),
+            &db.get_transaction_info_iterator(first_version, num_txns)
+                .unwrap()
+                .map(|txn_info_res| Ok(txn_info_res?.hash()))
+                .collect::<Result<Vec<_>>>()
+                .unwrap(),
+        )
+        .unwrap()
+}
+
 pub fn verify_committed_transactions(
     db: &AptosDB,
     txns_to_commit: &[TransactionToCommit],
@@ -662,6 +738,7 @@ pub fn verify_committed_transactions(
     ledger_info_with_sigs: &LedgerInfoWithSignatures,
     is_latest: bool,
 ) {
+    verify_ledger_iterators(db, txns_to_commit, first_version, ledger_info_with_sigs);
     let ledger_info = ledger_info_with_sigs.ledger_info();
     let ledger_version = ledger_info.version();
     assert_eq!(
@@ -689,7 +766,10 @@ pub fn verify_committed_transactions(
 
         if !txn_to_commit.is_state_checkpoint() {
             // Fetch and verify transaction itself.
-            let txn = txn_to_commit.transaction().as_signed_user_txn().unwrap();
+            let txn = txn_to_commit
+                .transaction()
+                .try_as_signed_user_txn()
+                .unwrap();
             let txn_with_proof = db
                 .get_transaction_by_hash(txn_to_commit.transaction().hash(), ledger_version, true)
                 .unwrap()
@@ -769,9 +849,9 @@ pub fn verify_committed_transactions(
 }
 
 pub fn put_transaction_info(db: &AptosDB, version: Version, txn_info: &TransactionInfo) {
-    let mut batch = SchemaBatch::new();
+    let batch = SchemaBatch::new();
     db.ledger_store
-        .put_transaction_infos(version, &[txn_info.clone()], &mut batch)
+        .put_transaction_infos(version, &[txn_info.clone()], &batch)
         .unwrap();
     db.ledger_db.write_schemas(batch).unwrap();
 }
@@ -779,6 +859,7 @@ pub fn put_transaction_info(db: &AptosDB, version: Version, txn_info: &Transacti
 pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: StateValue) {
     let leaf_node = Node::new_leaf(key.hash(), value.hash(), (key.clone(), version));
     db.state_merkle_db
+        .metadata_db()
         .put::<JellyfishMerkleNodeSchema>(&NodeKey::new_empty_path(version), &leaf_node)
         .unwrap();
     let smt = SparseMerkleTree::<StateValue>::default()

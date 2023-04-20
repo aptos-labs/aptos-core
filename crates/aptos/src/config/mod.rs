@@ -1,26 +1,22 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::{
-    CliCommand, CliConfig, CliError, CliResult, CliTypedResult, ConfigSearchMode, ProfileSummary,
-    CONFIG_FOLDER,
+use crate::{
+    common::{
+        types::{
+            CliCommand, CliConfig, CliError, CliResult, CliTypedResult, ConfigSearchMode,
+            ProfileSummary, CONFIG_FOLDER,
+        },
+        utils::{create_dir_if_not_exist, current_dir, read_from_file, write_to_user_only_file},
+    },
+    genesis::git::{from_yaml, to_yaml},
+    Tool,
 };
-use crate::common::utils::{
-    create_dir_if_not_exist, current_dir, read_from_file, write_to_user_only_file,
-};
-use crate::genesis::git::{from_yaml, to_yaml};
-use crate::Tool;
 use async_trait::async_trait;
-use clap::ArgEnum;
-use clap::CommandFactory;
-use clap::Parser;
+use clap::{ArgEnum, CommandFactory, Parser};
 use clap_complete::{generate, Shell};
-use serde::Deserialize;
-use serde::Serialize;
-use std::collections::BTreeMap;
-use std::fmt::Formatter;
-use std::path::PathBuf;
-use std::str::FromStr;
+use serde::{Deserialize, Serialize};
+use std::{collections::BTreeMap, fmt::Formatter, path::PathBuf, str::FromStr};
 
 /// Tool for interacting with configuration of the Aptos CLI tool
 ///
@@ -88,6 +84,12 @@ pub struct SetGlobalConfig {
     /// `Global` will put the `.aptos/` folder in your home directory
     #[clap(long)]
     config_type: Option<ConfigType>,
+    /// A configuration for how to expect the prompt response
+    ///
+    /// Option can be one of ["yes", "no", "prompt"], "yes" runs cli with "--assume-yes", where
+    /// "no" runs cli with "--assume-no", default: "prompt"
+    #[clap(long)]
+    default_prompt_response: Option<PromptResponseType>,
 }
 
 #[async_trait]
@@ -103,6 +105,10 @@ impl CliCommand<GlobalConfig> for SetGlobalConfig {
         // Enable all features that are actually listed
         if let Some(config_type) = self.config_type {
             config.config_type = Some(config_type);
+        }
+
+        if let Some(default_prompt_response) = self.default_prompt_response {
+            config.default_prompt_response = default_prompt_response;
         }
 
         config.save()?;
@@ -174,6 +180,9 @@ pub struct GlobalConfig {
     /// Whether to be using Global or Workspace mode
     #[serde(skip_serializing_if = "Option::is_none")]
     pub config_type: Option<ConfigType>,
+    /// Prompt response type
+    #[serde(default)]
+    pub default_prompt_response: PromptResponseType,
 }
 
 impl GlobalConfig {
@@ -201,6 +210,15 @@ impl GlobalConfig {
         match self.config_type.unwrap_or_default() {
             ConfigType::Global => global_folder(),
             ConfigType::Workspace => find_workspace_config(current_dir()?, mode),
+        }
+    }
+
+    /// Get the prompt options from global config
+    pub fn get_default_prompt_response(&self) -> Option<bool> {
+        match self.default_prompt_response {
+            PromptResponseType::Prompt => None,    // prompt
+            PromptResponseType::Yes => Some(true), // assume_yes
+            PromptResponseType::No => Some(false), // assume_no
         }
     }
 
@@ -243,7 +261,7 @@ fn find_workspace_config(
                     break Ok(starting_path.join(CONFIG_FOLDER));
                 }
             }
-        }
+        },
     }
 }
 
@@ -287,6 +305,55 @@ impl FromStr for ConfigType {
             WORKSPACE => Ok(Self::Workspace),
             _ => Err(CliError::CommandArgumentError(
                 "Invalid config type, must be one of [global, workspace]".to_string(),
+            )),
+        }
+    }
+}
+
+const PROMPT: &str = "prompt";
+const ASSUME_YES: &str = "yes";
+const ASSUME_NO: &str = "no";
+
+/// A configuration for how to expect the prompt response
+///
+/// Option can be one of ["yes", "no", "prompt"], "yes" runs cli with "--assume-yes", where
+/// "no" runs cli with "--assume-no", default: "prompt"
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, ArgEnum)]
+pub enum PromptResponseType {
+    /// normal prompt
+    Prompt,
+    /// `--assume-yes`
+    Yes,
+    /// `--assume-no`
+    No,
+}
+
+impl Default for PromptResponseType {
+    fn default() -> Self {
+        Self::Prompt
+    }
+}
+
+impl std::fmt::Display for PromptResponseType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            PromptResponseType::Prompt => PROMPT,
+            PromptResponseType::Yes => ASSUME_YES,
+            PromptResponseType::No => ASSUME_NO,
+        })
+    }
+}
+
+impl FromStr for PromptResponseType {
+    type Err = CliError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().trim() {
+            PROMPT => Ok(Self::Prompt),
+            ASSUME_YES => Ok(Self::Yes),
+            ASSUME_NO => Ok(Self::No),
+            _ => Err(CliError::CommandArgumentError(
+                "Invalid prompt response type, must be one of [yes, no, prompt]".to_string(),
             )),
         }
     }

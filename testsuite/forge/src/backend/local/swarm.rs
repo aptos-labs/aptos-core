@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -11,6 +12,7 @@ use aptos_config::{
     keys::ConfigKey,
     network_id::NetworkId,
 };
+use aptos_framework::ReleaseBundle;
 use aptos_genesis::builder::{FullnodeNodeConfig, InitConfigFn, InitGenesisConfigFn};
 use aptos_infallible::Mutex;
 use aptos_logger::{info, warn};
@@ -21,7 +23,6 @@ use aptos_sdk::{
         PeerId,
     },
 };
-use framework::ReleaseBundle;
 use prometheus_http_query::response::PromqlResult;
 use std::{
     collections::HashMap,
@@ -43,12 +44,12 @@ pub enum SwarmDirectory {
 impl SwarmDirectory {
     pub fn persist(&mut self) {
         match self {
-            SwarmDirectory::Persistent(_) => {}
+            SwarmDirectory::Persistent(_) => {},
             SwarmDirectory::Temporary(_) => {
                 let mut temp = SwarmDirectory::Persistent(PathBuf::new());
                 mem::swap(self, &mut temp);
                 let _ = mem::replace(self, temp.into_persistent());
-            }
+            },
         }
     }
 
@@ -128,7 +129,8 @@ impl LocalSwarm {
         let (root_key, genesis, genesis_waypoint, validators) =
             aptos_genesis::builder::Builder::new(
                 &dir_actual,
-                genesis_framework.unwrap_or_else(|| cached_packages::head_release_bundle().clone()),
+                genesis_framework
+                    .unwrap_or_else(|| aptos_cached_packages::head_release_bundle().clone()),
             )?
             .with_num_validators(number_of_validators)
             .with_init_config(Some(Arc::new(
@@ -140,7 +142,11 @@ impl LocalSwarm {
                     // which cause flakiness in tests.
                     if number_of_validators.get() == 1 {
                         // this delays empty block by (30-1) * 30ms
-                        config.consensus.quorum_store_poll_count = 30;
+                        config.consensus.quorum_store_poll_time_ms = 900;
+                        config
+                            .state_sync
+                            .state_sync_driver
+                            .enable_auto_bootstrapping = true;
                         config
                             .state_sync
                             .state_sync_driver
@@ -201,7 +207,7 @@ impl LocalSwarm {
                 };
 
                 // Since the validator's config has changed we need to save it
-                validator_config.save(validator.config_path())?;
+                validator_config.save_to_path(validator.config_path())?;
                 *validator.config_mut() = validator_config;
 
                 Ok((validator.peer_id(), public_network))
@@ -209,7 +215,7 @@ impl LocalSwarm {
             .collect::<Result<HashMap<_, _>>>()?;
 
         // We print out the root key to make it easy for users to deploy a local faucet
-        let encoded_root_key = hex::encode(&root_key.to_bytes());
+        let encoded_root_key = hex::encode(root_key.to_bytes());
         info!(
             "The root (or mint) key for the swarm is: 0x{}",
             encoded_root_key
@@ -283,18 +289,18 @@ impl LocalSwarm {
                             node.name(),
                             e
                         ));
-                    }
+                    },
                     Err(HealthCheckError::NotRunning(error)) => {
                         return Err(anyhow!(
                             "Node '{}' is not running! Error: {:?}",
                             node.name(),
                             error
                         ));
-                    }
+                    },
                     Err(HealthCheckError::Failure(e)) => {
                         warn!("health check failure: {}", e);
                         break;
-                    }
+                    },
                 }
             }
 

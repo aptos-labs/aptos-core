@@ -35,7 +35,7 @@ Please follow standard fullnode installation guide on aptos.dev (https://aptos.d
 
 ### Running indexer
 ```bash
-cargo run --bin aptos-node --features "indexer"  -- --config <some_path>/fullnode.yaml
+cargo run -p aptos-node --features "indexer" --release -- -f <some_path>/fullnode.yaml
 ```
    * Example fullnode.yaml modification
       ```

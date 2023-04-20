@@ -1,22 +1,24 @@
 [package]
-name = "channel"
-version = "0.1.0"
-authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+name = "aptos-channels"
 description = "An implementation of a channel with configurable QoS"
-repository = "https://github.com/aptos-labs/aptos-core"
-homepage = "https://aptoslabs.com"
-license = "Apache-2.0"
-publish = false
-edition = "2021"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
 
 [dependencies]
-anyhow = "1.0.57"
-futures = "0.3.21"
-
-aptos-infallible = { path = "../../crates/aptos-infallible" }
-aptos-metrics-core = { path = "../../crates/aptos-metrics-core" }
+anyhow = { workspace = true }
+aptos-infallible = { workspace = true }
+aptos-logger = { workspace = true }
+aptos-metrics-core = { workspace = true }
+futures = { workspace = true }
 
 [dev-dependencies]
-tokio = { version = "1.21.0", features = ["full"] }
-
-aptos-types = { path = "../../types" }
+aptos-types = { workspace = true }
+tokio = { workspace = true }

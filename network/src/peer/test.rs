@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -22,11 +23,13 @@ use crate::{
     transport::{Connection, ConnectionId, ConnectionMetadata},
     ProtocolId,
 };
+use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::{config::PeerRole, network_id::NetworkContext};
+use aptos_memsocket::MemorySocket;
+use aptos_netcore::transport::ConnectionOrigin;
 use aptos_time_service::{MockTimeService, TimeService};
 use aptos_types::{network_address::NetworkAddress, PeerId};
 use bytes::Bytes;
-use channel::{self, aptos_channel, message_queues::QueueStyle};
 use futures::{
     channel::oneshot,
     future::{self, FutureExt},
@@ -34,8 +37,6 @@ use futures::{
     stream::{StreamExt, TryStreamExt},
     SinkExt,
 };
-use memsocket::MemorySocket;
-use netcore::transport::ConnectionOrigin;
 use std::{collections::HashSet, str::FromStr, time::Duration};
 use tokio::runtime::{Handle, Runtime};
 use tokio_util::compat::{
@@ -52,7 +53,7 @@ fn build_test_peer(
     Peer<MemorySocket>,
     PeerHandle,
     MemorySocket,
-    channel::Receiver<TransportNotification<MemorySocket>>,
+    aptos_channels::Receiver<TransportNotification<MemorySocket>>,
     aptos_channel::Receiver<ProtocolId, PeerNotification>,
 ) {
     let (a, b) = MemorySocket::new_pair();
@@ -70,7 +71,7 @@ fn build_test_peer(
         socket: a,
     };
 
-    let (connection_notifs_tx, connection_notifs_rx) = channel::new_test(1);
+    let (connection_notifs_tx, connection_notifs_rx) = aptos_channels::new_test(1);
     let (peer_reqs_tx, peer_reqs_rx) =
         aptos_channel::new(QueueStyle::FIFO, NETWORK_CHANNEL_SIZE, None);
     let (peer_notifs_tx, peer_notifs_rx) =
@@ -89,8 +90,6 @@ fn build_test_peer(
         MAX_CONCURRENT_OUTBOUND_RPCS,
         MAX_FRAME_SIZE,
         MAX_MESSAGE_SIZE,
-        None,
-        None,
     );
     let peer_handle = PeerHandle(peer_reqs_tx);
 
@@ -104,13 +103,13 @@ fn build_test_connected_peers(
     (
         Peer<MemorySocket>,
         PeerHandle,
-        channel::Receiver<TransportNotification<MemorySocket>>,
+        aptos_channels::Receiver<TransportNotification<MemorySocket>>,
         aptos_channel::Receiver<ProtocolId, PeerNotification>,
     ),
     (
         Peer<MemorySocket>,
         PeerHandle,
-        channel::Receiver<TransportNotification<MemorySocket>>,
+        aptos_channels::Receiver<TransportNotification<MemorySocket>>,
         aptos_channel::Receiver<ProtocolId, PeerNotification>,
     ),
 ) {
@@ -148,21 +147,21 @@ fn build_network_sink_stream(
     MultiplexMessageStream<impl AsyncRead + '_>,
 ) {
     let (read_half, write_half) = tokio::io::split(connection.compat());
-    let sink = MultiplexMessageSink::new(write_half.compat_write(), MAX_FRAME_SIZE, None);
-    let stream = MultiplexMessageStream::new(read_half.compat(), MAX_FRAME_SIZE, None);
+    let sink = MultiplexMessageSink::new(write_half.compat_write(), MAX_FRAME_SIZE);
+    let stream = MultiplexMessageStream::new(read_half.compat(), MAX_FRAME_SIZE);
     (sink, stream)
 }
 
 async fn assert_disconnected_event(
     peer_id: PeerId,
     reason: DisconnectReason,
-    connection_notifs_rx: &mut channel::Receiver<TransportNotification<MemorySocket>>,
+    connection_notifs_rx: &mut aptos_channels::Receiver<TransportNotification<MemorySocket>>,
 ) {
     match connection_notifs_rx.next().await {
         Some(TransportNotification::Disconnected(metadata, actual_reason)) => {
             assert_eq!(metadata.remote_peer_id, peer_id);
             assert_eq!(actual_reason, reason);
-        }
+        },
         event => panic!("Expected a Disconnected, received: {:?}", event),
     }
 }
@@ -262,7 +261,7 @@ fn peer_recv_message() {
     });
 
     let client = async move {
-        let mut connection = MultiplexMessageSink::new(connection, MAX_FRAME_SIZE, None);
+        let mut connection = MultiplexMessageSink::new(connection, MAX_FRAME_SIZE);
         for _ in 0..30 {
             // The client should then send the network message.
             connection.send(&send_msg).await.unwrap();
@@ -388,7 +387,7 @@ fn peer_recv_rpc() {
                 PeerNotification::RecvRpc(req) => {
                     let response = Ok(Bytes::from("goodbye world"));
                     req.res_tx.send(response).unwrap()
-                }
+                },
                 _ => panic!("Unexpected PeerNotification: {:?}", received),
             }
         }

@@ -1,0 +1,6 @@
+error[E14003]: feature not supported in inlined functions
+  ┌─ tests/move_check/inlining/return.move:3:9
+  │
+3 │         return 5
+  │         ^^^^^^^^ return statements currently not supported
+

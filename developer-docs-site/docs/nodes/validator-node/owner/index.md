@@ -8,16 +8,16 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 # Owner 
 
-This document describes how to use [Aptos CLI](/docs/cli-tools/aptos-cli-tool/index.md) to perform owner operations during validation.
+This document describes how to [use the Aptos CLI](../../../cli-tools/aptos-cli-tool/use-aptos-cli.md) to perform owner operations during validation.
 
 :::tip Petra on Chrome browser only
-The [Petra wallet extension](/docs/guides/install-petra-wallet.md) is supported only on the Chrome browser. However, the extensions for [Brave browser](https://brave.com/) and [Kiwi browser](https://kiwibrowser.com/) and [Microsoft Edge browser](https://www.microsoft.com/en-us/edge) will also work.
+The [Petra wallet extension](../../../guides/install-petra-wallet.md) is supported only on the Chrome browser. However, the extensions for [Brave browser](https://brave.com/) and [Kiwi browser](https://kiwibrowser.com/) and [Microsoft Edge browser](https://www.microsoft.com/en-us/edge) will also work.
 :::
 
 ## Owner operations with CLI
 
 :::tip Testnet vs Mainnet
-The below CLI command examples use mainnet. See the `--rest-url` value for testnet and devnet in [Aptos Blockchain Deployments](/docs/nodes/aptos-deployments.md).
+The below CLI command examples use mainnet. Change the `--network` value for testnet and devnet. View the values in [Aptos Blockchain Deployments](../../aptos-deployments.md) to see how profiles can be configured based on the network.
 :::
 
 ### Initialize CLI
@@ -26,7 +26,7 @@ Initialize CLI with your Petra wallet private key or create new wallet.
 
 ```bash
 aptos init --profile mainnet-owner \
-  --rest-url https://fullnode.mainnet.aptoslabs.com/v1
+  --network mainnet
 ```
 
 You can either enter the private key from an existing wallet, or create new wallet address.

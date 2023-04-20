@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_infallible::{Mutex, RwLock};
@@ -116,11 +117,13 @@ impl<Key: Eq + Hash + Clone + Debug> TokenBucketRateLimiter<Key> {
     /// Retrieve bucket, or create a new one
     pub fn bucket(&self, key: Key) -> SharedBucket {
         self.bucket_inner(key, |label, log_info, key, initial, size, rate, metrics| {
-            Arc::new(Mutex::new(if self.enabled {
-                Bucket::new(label, log_info, key, initial, size, rate, metrics)
-            } else {
-                Bucket::open(label)
-            }))
+            Arc::new(Mutex::new(
+                if self.enabled {
+                    Bucket::new(label, log_info, key, initial, size, rate, metrics)
+                } else {
+                    Bucket::open(label)
+                },
+            ))
         })
     }
 

@@ -56,11 +56,13 @@ module aptos_framework::timestamp {
         };
     }
 
+    #[view]
     /// Gets the current time in microseconds.
     public fun now_microseconds(): u64 acquires CurrentTimeMicroseconds {
         borrow_global<CurrentTimeMicroseconds>(@aptos_framework).microseconds
     }
 
+    #[view]
     /// Gets the current time in seconds.
     public fun now_seconds(): u64 acquires CurrentTimeMicroseconds {
         now_microseconds() / MICRO_CONVERSION_FACTOR

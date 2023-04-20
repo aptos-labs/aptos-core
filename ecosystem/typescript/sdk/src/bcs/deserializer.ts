@@ -1,9 +1,9 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 /* eslint-disable no-bitwise */
 import { MAX_U32_NUMBER } from "./consts";
-import { Bytes, Uint128, Uint16, Uint32, Uint64, Uint8 } from "./types";
+import { Bytes, Uint128, Uint16, Uint256, Uint32, Uint64, Uint8 } from "./types";
 
 export class Deserializer {
   private buffer: ArrayBuffer;
@@ -145,6 +145,19 @@ export class Deserializer {
 
     // combine the two 64-bit values and return (little endian)
     return BigInt((high << BigInt(64)) | low);
+  }
+
+  /**
+   * Deserializes a uint256 number.
+   *
+   * BCS layout for "uint256": Thirty-two bytes. Binary format in little-endian representation.
+   */
+  deserializeU256(): Uint256 {
+    const low = this.deserializeU128();
+    const high = this.deserializeU128();
+
+    // combine the two 128-bit values and return (little endian)
+    return BigInt((high << BigInt(128)) | low);
   }
 
   /**

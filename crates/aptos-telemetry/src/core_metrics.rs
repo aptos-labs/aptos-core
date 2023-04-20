@@ -1,11 +1,11 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{utils, utils::sum_all_histogram_counts};
 use aptos_config::config::NodeConfig;
+use aptos_state_sync_driver::metrics::StorageSynchronizerOperations;
 use aptos_telemetry_service::types::telemetry::TelemetryEvent;
 use prometheus::core::Collector;
-use state_sync_driver::metrics::StorageSynchronizerOperations;
 use std::collections::BTreeMap;
 
 /// Core metrics event name
@@ -25,7 +25,8 @@ const STATE_SYNC_SYNCED_VERSION: &str = "state_sync_synced_version";
 const STATE_SYNC_SYNCED_EPOCH: &str = "state_sync_synced_epoch";
 const STORAGE_LEDGER_VERSION: &str = "storage_ledger_version";
 const STORAGE_MIN_READABLE_LEDGER_VERSION: &str = "storage_min_readable_ledger_version";
-const STORAGE_MIN_READABLE_STATE_VERSION: &str = "storage_min_readable_state_version";
+const STORAGE_MIN_READABLE_STATE_MERKLE_VERSION: &str = "storage_min_readable_state_merkle_version";
+const STORAGE_MIN_READABLE_STATE_KV_VERSION: &str = "storage_min_readable_state_kv_version";
 const TELEMETRY_FAILURE_COUNT: &str = "telemetry_failure_count";
 const TELEMETRY_SUCCESS_COUNT: &str = "telemetry_success_count";
 
@@ -67,15 +68,17 @@ fn collect_core_metrics(core_metrics: &mut BTreeMap<String, String>, node_config
 fn collect_consensus_metrics(core_metrics: &mut BTreeMap<String, String>) {
     core_metrics.insert(
         CONSENSUS_PROPOSALS_COUNT.into(),
-        consensus::counters::PROPOSALS_COUNT.get().to_string(),
+        aptos_consensus::counters::PROPOSALS_COUNT.get().to_string(),
     );
     core_metrics.insert(
         CONSENSUS_LAST_COMMITTED_ROUND.into(),
-        consensus::counters::LAST_COMMITTED_ROUND.get().to_string(),
+        aptos_consensus::counters::LAST_COMMITTED_ROUND
+            .get()
+            .to_string(),
     );
     core_metrics.insert(
         CONSENSUS_TIMEOUT_COUNT.into(),
-        consensus::counters::TIMEOUT_COUNT.get().to_string(),
+        aptos_consensus::counters::TIMEOUT_COUNT.get().to_string(),
     );
     //TODO(joshlind): add block tracing and back pressure!
 }
@@ -110,14 +113,14 @@ fn collect_state_sync_metrics(
 
     core_metrics.insert(
         STATE_SYNC_SYNCED_EPOCH.into(),
-        state_sync_driver::metrics::STORAGE_SYNCHRONIZER_OPERATIONS
+        aptos_state_sync_driver::metrics::STORAGE_SYNCHRONIZER_OPERATIONS
             .with_label_values(&[StorageSynchronizerOperations::SyncedEpoch.get_label()])
             .get()
             .to_string(),
     );
     core_metrics.insert(
         STATE_SYNC_SYNCED_VERSION.into(),
-        state_sync_driver::metrics::STORAGE_SYNCHRONIZER_OPERATIONS
+        aptos_state_sync_driver::metrics::STORAGE_SYNCHRONIZER_OPERATIONS
             .with_label_values(&[StorageSynchronizerOperations::Synced.get_label()])
             .get()
             .to_string(),
@@ -142,19 +145,26 @@ fn collect_state_sync_metrics(
 fn collect_storage_metrics(core_metrics: &mut BTreeMap<String, String>) {
     core_metrics.insert(
         STORAGE_LEDGER_VERSION.into(),
-        aptosdb::metrics::LEDGER_VERSION.get().to_string(),
+        aptos_db::metrics::LEDGER_VERSION.get().to_string(),
     );
     core_metrics.insert(
         STORAGE_MIN_READABLE_LEDGER_VERSION.into(),
-        aptosdb::metrics::PRUNER_LEAST_READABLE_VERSION
-            .with_label_values(&["ledger_pruner"])
+        aptos_db::metrics::PRUNER_VERSIONS
+            .with_label_values(&["ledger_pruner", "min_readable"])
             .get()
             .to_string(),
     );
     core_metrics.insert(
-        STORAGE_MIN_READABLE_STATE_VERSION.into(),
-        aptosdb::metrics::PRUNER_LEAST_READABLE_VERSION
-            .with_label_values(&["state_store"])
+        STORAGE_MIN_READABLE_STATE_MERKLE_VERSION.into(),
+        aptos_db::metrics::PRUNER_VERSIONS
+            .with_label_values(&["state_merkle_pruner", "min_readable"])
+            .get()
+            .to_string(),
+    );
+    core_metrics.insert(
+        STORAGE_MIN_READABLE_STATE_KV_VERSION.into(),
+        aptos_db::metrics::PRUNER_VERSIONS
+            .with_label_values(&["state_kv_pruner", "min_readable"])
             .get()
             .to_string(),
     );

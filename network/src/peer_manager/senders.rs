@@ -1,20 +1,20 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    peer_manager::{types::PeerManagerRequest, ConnectionRequest, PeerManagerError},
     protocols::{
         direct_send::Message,
         rpc::{error::RpcError, OutboundRpcRequest},
     },
     ProtocolId,
 };
+use aptos_channels::{self, aptos_channel};
 use aptos_types::{network_address::NetworkAddress, PeerId};
 use bytes::Bytes;
-use channel::{self, aptos_channel};
 use futures::channel::oneshot;
 use std::time::Duration;
-
-use crate::peer_manager::{types::PeerManagerRequest, ConnectionRequest, PeerManagerError};
 
 /// Convenience wrapper which makes it easy to issue communication requests and await the responses
 /// from PeerManager.

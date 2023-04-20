@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! Logic for account universes. This is not in the parent module to enforce privacy.
@@ -17,7 +18,7 @@ use proptest_derive::Arbitrary;
 
 /// A set of accounts which can be used to construct an initial state.
 ///
-/// For more, see the [`account_universe` module documentation][self].
+/// For more, see the [`account_universe` module documentation].
 #[derive(Clone, Debug)]
 pub struct AccountUniverseGen {
     accounts: Vec<AccountData>,
@@ -26,7 +27,7 @@ pub struct AccountUniverseGen {
 
 /// A set of accounts that has been set up and can now be used to conduct transactions on.
 ///
-/// For more, see the [`account_universe` module documentation][self].
+/// For more, see the [`account_universe` module documentation].
 #[derive(Clone, Debug)]
 pub struct AccountUniverse {
     accounts: Vec<AccountCurrent>,
@@ -181,7 +182,7 @@ impl AccountPicker {
             AccountPickStyle::Limited(limit) => {
                 let remaining = (0..num_accounts).map(|idx| (idx, limit)).collect();
                 AccountPicker::Limited(remaining)
-            }
+            },
         }
     }
 
@@ -191,7 +192,7 @@ impl AccountPicker {
             AccountPicker::Limited(remaining) => {
                 let remaining_idx = index.index(remaining.len());
                 Self::pick_limited(remaining, remaining_idx)
-            }
+            },
         }
     }
 
@@ -206,7 +207,7 @@ impl AccountPicker {
                 let account_idx_1 = Self::pick_limited(remaining, remaining_idx_1);
 
                 [account_idx_1, account_idx_2]
-            }
+            },
         }
     }
 

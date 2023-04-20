@@ -1,10 +1,11 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{common::validate_configuration, read_configuration_from_file};
+use super::{read_configuration_from_file, BaselineConfiguration};
+use crate::checker::build_checkers;
 use anyhow::{Context, Result};
+use aptos_logger::debug;
 use clap::Parser;
-use log::debug;
 use std::path::PathBuf;
 
 #[derive(Clone, Debug, Parser)]
@@ -17,5 +18,10 @@ pub async fn validate(args: Validate) -> Result<()> {
     let configuration = read_configuration_from_file(args.path)?;
     validate_configuration(&configuration).context("Configuration failed validation")?;
     debug!("Validated configuration: {:#?}", configuration);
+    Ok(())
+}
+
+pub fn validate_configuration(node_configuration: &BaselineConfiguration) -> Result<()> {
+    build_checkers(&node_configuration.checkers).context("Failed to build Checkers")?;
     Ok(())
 }

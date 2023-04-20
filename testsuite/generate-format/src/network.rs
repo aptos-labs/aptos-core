@@ -1,12 +1,13 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::{
     traits::Uniform,
     x25519::{PrivateKey, PublicKey},
 };
+use aptos_network::protocols::wire::{handshake, messaging};
 use aptos_types::network_address as address;
-use network::protocols::wire::{handshake, messaging};
 use rand::{rngs::StdRng, SeedableRng};
 use serde_reflection::{Registry, Result, Samples, Tracer, TracerConfig};
 use std::str::FromStr;

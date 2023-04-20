@@ -6,13 +6,52 @@
 Standard math utilities missing in the Move Language.
 
 
+-  [Constants](#@Constants_0)
 -  [Function `max`](#0x1_math128_max)
 -  [Function `min`](#0x1_math128_min)
 -  [Function `average`](#0x1_math128_average)
+-  [Function `clamp`](#0x1_math128_clamp)
 -  [Function `pow`](#0x1_math128_pow)
+-  [Function `floor_log2`](#0x1_math128_floor_log2)
+-  [Function `log2`](#0x1_math128_log2)
+-  [Function `log2_64`](#0x1_math128_log2_64)
+-  [Function `sqrt`](#0x1_math128_sqrt)
+-  [Function `assert_approx_the_same`](#0x1_math128_assert_approx_the_same)
+-  [Specification](#@Specification_1)
+    -  [Function `max`](#@Specification_1_max)
+    -  [Function `min`](#@Specification_1_min)
+    -  [Function `average`](#@Specification_1_average)
+    -  [Function `pow`](#@Specification_1_pow)
 
 
-<pre><code></code></pre>
+<pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<b>use</b> <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32">0x1::fixed_point32</a>;
+<b>use</b> <a href="fixed_point64.md#0x1_fixed_point64">0x1::fixed_point64</a>;
+</code></pre>
+
+
+
+<a name="@Constants_0"></a>
+
+## Constants
+
+
+<a name="0x1_math128_EDIVISION_BY_ZERO"></a>
+
+
+
+<pre><code><b>const</b> <a href="math128.md#0x1_math128_EDIVISION_BY_ZERO">EDIVISION_BY_ZERO</a>: u64 = 2;
+</code></pre>
+
+
+
+<a name="0x1_math128_EINVALID_ARG_FLOOR_LOG2"></a>
+
+Abort value when an invalid argument is provided.
+
+
+<pre><code><b>const</b> <a href="math128.md#0x1_math128_EINVALID_ARG_FLOOR_LOG2">EINVALID_ARG_FLOOR_LOG2</a>: u64 = 1;
+</code></pre>
 
 
 
@@ -95,6 +134,31 @@ Return the average of two.
 
 </details>
 
+<a name="0x1_math128_clamp"></a>
+
+## Function `clamp`
+
+Return x clamped to the interval [lower, upper].
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="math128.md#0x1_math128_clamp">clamp</a>(x: u128, lower: u128, upper: u128): u128
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="math128.md#0x1_math128_clamp">clamp</a>(x: u128, lower: u128, upper: u128): u128 {
+    <b>min</b>(upper, <a href="math128.md#0x1_math128_max">max</a>(lower, x))
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_math128_pow"></a>
 
 ## Function `pow`
@@ -132,5 +196,288 @@ Return the value of n raised to power e
 
 </details>
 
+<a name="0x1_math128_floor_log2"></a>
 
-[move-book]: https://move-language.github.io/move/introduction.html
+## Function `floor_log2`
+
+Returns floor(log2(x))
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="math128.md#0x1_math128_floor_log2">floor_log2</a>(x: u128): u8
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="math128.md#0x1_math128_floor_log2">floor_log2</a>(x: u128): u8 {
+    <b>let</b> res = 0;
+    <b>assert</b>!(x != 0, std::error::invalid_argument(<a href="math128.md#0x1_math128_EINVALID_ARG_FLOOR_LOG2">EINVALID_ARG_FLOOR_LOG2</a>));
+    // Effectively the position of the most significant set bit
+    <b>let</b> n = 64;
+    <b>while</b> (n &gt; 0) {
+        <b>if</b> (x &gt;= (1 &lt;&lt; n)) {
+            x = x &gt;&gt; n;
+            res = res + n;
+        };
+        n = n &gt;&gt; 1;
+    };
+    res
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_math128_log2"></a>
+
+## Function `log2`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="math128.md#0x1_math128_log2">log2</a>(x: u128): <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="math128.md#0x1_math128_log2">log2</a>(x: u128): FixedPoint32 {
+    <b>let</b> integer_part = <a href="math128.md#0x1_math128_floor_log2">floor_log2</a>(x);
+    // Normalize x <b>to</b> [1, 2) in fixed point 32.
+    <b>if</b> (x &gt;= 1 &lt;&lt; 32) {
+        x = x &gt;&gt; (integer_part - 32);
+    } <b>else</b> {
+        x = x &lt;&lt; (32 - integer_part);
+    };
+    <b>let</b> frac = 0;
+    <b>let</b> delta = 1 &lt;&lt; 31;
+    <b>while</b> (delta != 0) {
+        // log x = 1/2 log x^2
+        // x in [1, 2)
+        x = (x * x) &gt;&gt; 32;
+        // x is now in [1, 4)
+        // <b>if</b> x in [2, 4) then log x = 1 + log (x / 2)
+        <b>if</b> (x &gt;= (2 &lt;&lt; 32)) { frac = frac + delta; x = x &gt;&gt; 1; };
+        delta = delta &gt;&gt; 1;
+    };
+    <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_create_from_raw_value">fixed_point32::create_from_raw_value</a> (((integer_part <b>as</b> u64) &lt;&lt; 32) + frac)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_math128_log2_64"></a>
+
+## Function `log2_64`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="math128.md#0x1_math128_log2_64">log2_64</a>(x: u128): <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="math128.md#0x1_math128_log2_64">log2_64</a>(x: u128): FixedPoint64 {
+    <b>let</b> integer_part = <a href="math128.md#0x1_math128_floor_log2">floor_log2</a>(x);
+    // Normalize x <b>to</b> [1, 2) in fixed point 63. To ensure x is smaller then 1&lt;&lt;64
+    <b>if</b> (x &gt;= 1 &lt;&lt; 63) {
+        x = x &gt;&gt; (integer_part - 63);
+    } <b>else</b> {
+        x = x &lt;&lt; (63 - integer_part);
+    };
+    <b>let</b> frac = 0;
+    <b>let</b> delta = 1 &lt;&lt; 63;
+    <b>while</b> (delta != 0) {
+        // log x = 1/2 log x^2
+        // x in [1, 2)
+        x = (x * x) &gt;&gt; 63;
+        // x is now in [1, 4)
+        // <b>if</b> x in [2, 4) then log x = 1 + log (x / 2)
+        <b>if</b> (x &gt;= (2 &lt;&lt; 63)) { frac = frac + delta; x = x &gt;&gt; 1; };
+        delta = delta &gt;&gt; 1;
+    };
+    <a href="fixed_point64.md#0x1_fixed_point64_create_from_raw_value">fixed_point64::create_from_raw_value</a> (((integer_part <b>as</b> u128) &lt;&lt; 64) + frac)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_math128_sqrt"></a>
+
+## Function `sqrt`
+
+Returns square root of x, precisely floor(sqrt(x))
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="math128.md#0x1_math128_sqrt">sqrt</a>(x: u128): u128
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="math128.md#0x1_math128_sqrt">sqrt</a>(x: u128): u128 {
+    <b>if</b> (x == 0) <b>return</b> 0;
+    // Note the plus 1 in the expression. Let n = floor_lg2(x) we have x in [2^n, 2^{n+1}) and thus the answer in
+    // the half-open interval [2^(n/2), 2^{(n+1)/2}). For even n we can write this <b>as</b> [2^(n/2), <a href="math128.md#0x1_math128_sqrt">sqrt</a>(2) 2^{n/2})
+    // for odd n [2^((n+1)/2)/<a href="math128.md#0x1_math128_sqrt">sqrt</a>(2), 2^((n+1)/2). For even n the left end point is integer for odd the right
+    // end point is integer. If we <b>choose</b> <b>as</b> our first approximation the integer end point we have <b>as</b> maximum
+    // relative <a href="../../move-stdlib/doc/error.md#0x1_error">error</a> either (<a href="math128.md#0x1_math128_sqrt">sqrt</a>(2) - 1) or (1 - 1/<a href="math128.md#0x1_math128_sqrt">sqrt</a>(2)) both are smaller then 1/2.
+    <b>let</b> res = 1 &lt;&lt; ((<a href="math128.md#0x1_math128_floor_log2">floor_log2</a>(x) + 1) &gt;&gt; 1);
+    // We <b>use</b> standard newton-rhapson iteration <b>to</b> improve the initial approximation.
+    // The <a href="../../move-stdlib/doc/error.md#0x1_error">error</a> term evolves <b>as</b> delta_i+1 = delta_i^2 / 2 (quadratic convergence).
+    // It turns out that after 5 iterations the delta is smaller than 2^-64 and thus below the treshold.
+    res = (res + x / res) &gt;&gt; 1;
+    res = (res + x / res) &gt;&gt; 1;
+    res = (res + x / res) &gt;&gt; 1;
+    res = (res + x / res) &gt;&gt; 1;
+    res = (res + x / res) &gt;&gt; 1;
+    <b>min</b>(res, x / res)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_math128_assert_approx_the_same"></a>
+
+## Function `assert_approx_the_same`
+
+For functions that approximate a value it's useful to test a value is close
+to the most correct value up to last digit
+
+
+<pre><code><b>fun</b> <a href="math128.md#0x1_math128_assert_approx_the_same">assert_approx_the_same</a>(x: u128, y: u128, precission: u128)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="math128.md#0x1_math128_assert_approx_the_same">assert_approx_the_same</a>(x: u128, y: u128, precission: u128) {
+    <b>if</b> (x &lt; y) {
+        <b>let</b> tmp = x;
+        x = y;
+        y = tmp;
+    };
+    <b>let</b> mult = <a href="math128.md#0x1_math128_pow">pow</a>(10, precission);
+    <b>assert</b>!((x - y) * mult &lt; x, 0);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="@Specification_1"></a>
+
+## Specification
+
+
+<a name="@Specification_1_max"></a>
+
+### Function `max`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="math128.md#0x1_math128_max">max</a>(a: u128, b: u128): u128
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> a &gt;= b ==&gt; result == a;
+<b>ensures</b> a &lt; b ==&gt; result == b;
+</code></pre>
+
+
+
+<a name="@Specification_1_min"></a>
+
+### Function `min`
+
+
+<pre><code><b>public</b> <b>fun</b> <b>min</b>(a: u128, b: u128): u128
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> a &lt; b ==&gt; result == a;
+<b>ensures</b> a &gt;= b ==&gt; result == b;
+</code></pre>
+
+
+
+<a name="@Specification_1_average"></a>
+
+### Function `average`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="math128.md#0x1_math128_average">average</a>(a: u128, b: u128): u128
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == (a + b) / 2;
+</code></pre>
+
+
+
+<a name="@Specification_1_pow"></a>
+
+### Function `pow`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="math128.md#0x1_math128_pow">pow</a>(n: u128, e: u128): u128
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <a href="math128.md#0x1_math128_spec_pow">spec_pow</a>(n, e) &gt; MAX_U128;
+<b>ensures</b> [abstract] result == <a href="math128.md#0x1_math128_spec_pow">spec_pow</a>(n, e);
+</code></pre>
+
+
+
+
+<a name="0x1_math128_spec_pow"></a>
+
+
+<pre><code><b>fun</b> <a href="math128.md#0x1_math128_spec_pow">spec_pow</a>(e: u128, n: u128): u128 {
+   <b>if</b> (e == 0) {
+       1
+   }
+   <b>else</b> {
+       n * <a href="math128.md#0x1_math128_spec_pow">spec_pow</a>(n, e-1)
+   }
+}
+</code></pre>
+
+
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{lru_node_cache::LruNodeCache, state_merkle_db::Node, OTHER_TIMERS_SECONDS};
@@ -8,18 +8,29 @@ use aptos_types::transaction::Version;
 use rayon::prelude::*;
 use std::{
     collections::{HashMap, VecDeque},
+    fmt,
     sync::Arc,
 };
 
 type NodeCache = HashMap<NodeKey, Node>;
 
-#[derive(Debug)]
 pub(crate) struct VersionedNodeCache {
     inner: RwLock<VecDeque<(Version, Arc<NodeCache>)>>,
 }
 
+impl fmt::Debug for VersionedNodeCache {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let entries = self.inner.read();
+        writeln!(f, "Total versions: {}.", entries.len())?;
+        for entry in entries.iter() {
+            writeln!(f, "Version {} has {} elements.", entry.0, entry.1.len())?;
+        }
+        Ok(())
+    }
+}
+
 impl VersionedNodeCache {
-    const NUM_VERSIONS_TO_CACHE: usize = 2;
+    pub(crate) const NUM_VERSIONS_TO_CACHE: usize = 2;
 
     pub fn new() -> Self {
         Self {

@@ -1,10 +1,10 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! Global logger definition and functions
 
 use crate::{counters::STRUCT_LOG_COUNT, error, Event, Metadata};
-
 use once_cell::sync::OnceCell;
 use std::sync::Arc;
 use tracing_subscriber::prelude::*;
@@ -41,36 +41,35 @@ pub(crate) fn enabled(metadata: &Metadata) -> bool {
 }
 
 /// Sets the global `Logger` exactly once
-pub fn set_global_logger(logger: Arc<dyn Logger>, console_port: Option<u16>) {
+pub fn set_global_logger(logger: Arc<dyn Logger>, tokio_console_port: Option<u16>) {
     if LOGGER.set(logger).is_err() {
         eprintln!("Global logger has already been set");
         error!("Global logger has already been set");
         return;
     }
 
-    /*
-     * if console_port is set all tracing::log are captured by the tokio-tracing infrastructure.
-     * else aptos-logger intercepts all tracing::log events
-     * In both scenarios *ALL* aptos-logger::log events are captured by aptos-logger as usual.
-     */
-    #[cfg(feature = "aptos-console")]
+    // If tokio-console is enabled, all tracing::log events are captured by the
+    // tokio-tracing infrastructure. Otherwise, aptos-logger intercepts all
+    // tracing::log events. In both scenarios *all* aptos-logger::log events are
+    // captured by the aptos-logger (as usual).
+    #[cfg(feature = "tokio-console")]
     {
-        if let Some(p) = console_port {
+        if let Some(tokio_console_port) = tokio_console_port {
             let console_layer = console_subscriber::ConsoleLayer::builder()
-                .server_addr(([0, 0, 0, 0], p))
+                .server_addr(([0, 0, 0, 0], tokio_console_port))
                 .spawn();
 
             tracing_subscriber::registry().with(console_layer).init();
             return;
         }
     }
-    if None == console_port {
+    if tokio_console_port.is_none() {
         let _ = tracing::subscriber::set_global_default(
             crate::tracing_adapter::TracingToAptosDataLayer
                 .with_subscriber(tracing_subscriber::Registry::default()),
         );
     } else {
-        error!("console_port was set but has no effect, build with --cfg aptos-console");
+        error!("tokio_console_port was set but has no effect! Build the crate with the 'tokio-console' feature enabled!");
     }
 }
 

@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module provides APIs for _proofs-of-possesion (PoPs)_ used to prevent _rogue-key attacks_,
@@ -147,12 +147,12 @@ impl std::hash::Hash for ProofOfPossession {
 
 impl fmt::Debug for ProofOfPossession {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", hex::encode(&self.to_bytes()))
+        write!(f, "{}", hex::encode(self.to_bytes()))
     }
 }
 
 impl fmt::Display for ProofOfPossession {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", hex::encode(&self.to_bytes()))
+        write!(f, "{}", hex::encode(self.to_bytes()))
     }
 }

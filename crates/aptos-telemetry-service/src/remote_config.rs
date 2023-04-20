@@ -1,22 +1,21 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::types::common::NodeType;
-use crate::{auth::with_auth, context::Context, types::auth::Claims};
-use warp::filters::BoxedFilter;
-use warp::{reply, Filter, Rejection, Reply};
+use crate::{
+    auth::with_auth,
+    context::Context,
+    types::{auth::Claims, common::NodeType},
+};
+use warp::{filters::BoxedFilter, reply, Filter, Rejection, Reply};
 
 pub fn telemetry_log_env(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("config" / "env" / "telemetry-log")
         .and(warp::get())
-        .and(with_auth(
-            context.clone(),
-            vec![
-                NodeType::Validator,
-                NodeType::ValidatorFullNode,
-                NodeType::PublicFullNode,
-            ],
-        ))
+        .and(with_auth(context.clone(), vec![
+            NodeType::Validator,
+            NodeType::ValidatorFullNode,
+            NodeType::PublicFullNode,
+        ]))
         .and(context.filter())
         .and_then(handle_telemetry_log_env)
         .boxed()
@@ -36,15 +35,11 @@ async fn handle_telemetry_log_env(
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-
+    use crate::{jwt_auth::create_jwt_token, tests::test_context, types::common::NodeType};
     use aptos_config::config::PeerSet;
-    use aptos_types::chain_id::ChainId;
-    use aptos_types::PeerId;
-
-    use crate::jwt_auth::create_jwt_token;
-    use crate::tests::test_context;
-    use crate::types::common::NodeType;
+    use aptos_types::{chain_id::ChainId, PeerId};
+    use std::collections::HashMap;
+    use uuid::Uuid;
 
     #[tokio::test]
     async fn test_handle_telemetry_log_env() {
@@ -73,6 +68,7 @@ mod tests {
             peer_id,
             node_type,
             epoch,
+            Uuid::default(),
         )
         .unwrap();
 

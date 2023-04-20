@@ -6,6 +6,10 @@ on:
         required: true
         type: string
         description: a prefix to use for image tags. E.g. `devnet`. It results in an image tag like `:devnet_<git_sha>`
+      GIT_SHA:
+        required: false
+        type: string
+        description: the git sha to use for the image tag. If not provided, the git sha of the triggering branch will be used
   workflow_dispatch:
     inputs:
       image_tag_prefix:
@@ -13,6 +17,10 @@ on:
         type: string
         default: adhoc
         description: a prefix to use for image tags. E.g. `devnet`. It results in an image tag like `:devnet_<git_sha>`
+      GIT_SHA:
+        required: false
+        type: string
+        description: the git sha to use for the image tag. If not provided, the git sha of the triggering branch will be used
 
 permissions:
   contents: read
@@ -24,17 +32,14 @@ jobs:
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
 
-      - uses: ./.github/actions/gar-auth
+      - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
         with:
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
-
-      - name: Login to ECR
-        uses: docker/login-action@49ed152c8eca782a232dede0303416e8f356c37b # pin@v2
-        with:
-          registry: ${{ secrets.AWS_ECR_ACCOUNT_NUM }}.dkr.ecr.us-west-2.amazonaws.com
-          username: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          password: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
       - name: Login to Docker Hub
         uses: docker/login-action@49ed152c8eca782a232dede0303416e8f356c37b # pin@v2
@@ -49,7 +54,7 @@ jobs:
       - name: Release Images
         env:
           FORCE_COLOR: 3 # Force color output as per https://github.com/google/zx#using-github-actions
-          GIT_SHA: ${{ github.sha }}
+          GIT_SHA: ${{ inputs.GIT_SHA || github.sha }} # If GIT_SHA is not provided, use the sha of the triggering branch
           GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ECR_ACCOUNT_NUM }}
           IMAGE_TAG_PREFIX: ${{ inputs.image_tag_prefix }}

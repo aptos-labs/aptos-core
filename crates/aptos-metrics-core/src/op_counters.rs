@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! `OpCounters` is a collection of convenience methods to add arbitrary counters to modules.
@@ -10,7 +10,6 @@ use prometheus::{
     Histogram, HistogramOpts, HistogramTimer, HistogramVec, IntCounterVec, IntGauge, IntGaugeVec,
     Opts,
 };
-
 use std::time::Duration;
 
 /// A small wrapper around Histogram to handle the special case
@@ -27,9 +26,7 @@ impl DurationHistogram {
     }
 
     pub fn observe_duration(&self, d: Duration) {
-        // Duration is full seconds + nanos elapsed from the previous full second
-        let v = d.as_secs() as f64 + f64::from(d.subsec_nanos()) / 1e9;
-        self.histogram.observe(v);
+        self.histogram.observe(d.as_secs_f64());
     }
 
     pub fn start_timer(&self) -> HistogramTimer {

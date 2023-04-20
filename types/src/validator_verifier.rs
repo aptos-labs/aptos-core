@@ -1,23 +1,26 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{account_address::AccountAddress, on_chain_config::ValidatorSet};
-use aptos_crypto::{bls12381, hash::CryptoHash, Signature, VerifyingKey};
+#[cfg(any(test, feature = "fuzzing"))]
+use crate::validator_signer::ValidatorSigner;
+use crate::{
+    account_address::AccountAddress,
+    aggregate_signature::{AggregateSignature, PartialSignatures},
+    on_chain_config::ValidatorSet,
+};
+use anyhow::{ensure, Result};
+use aptos_bitvec::BitVec;
+use aptos_crypto::{bls12381, bls12381::PublicKey, hash::CryptoHash, Signature, VerifyingKey};
+use itertools::Itertools;
+#[cfg(any(test, feature = "fuzzing"))]
+use proptest_derive::Arbitrary;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::{
     collections::{BTreeMap, HashMap},
     fmt,
 };
 use thiserror::Error;
-
-use crate::aggregate_signature::{AggregateSignature, PartialSignatures};
-#[cfg(any(test, feature = "fuzzing"))]
-use crate::validator_signer::ValidatorSigner;
-use anyhow::{ensure, Result};
-use aptos_bitvec::BitVec;
-use aptos_crypto::bls12381::PublicKey;
-#[cfg(any(test, feature = "fuzzing"))]
-use proptest_derive::Arbitrary;
 
 /// Errors possible during signature verification.
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -214,6 +217,10 @@ impl ValidatorVerifier {
         Ok(AggregateSignature::new(masks, Some(aggregated_sig)))
     }
 
+    pub fn get_ordered_account_addresses(&self) -> Vec<AccountAddress> {
+        self.get_ordered_account_addresses_iter().collect_vec()
+    }
+
     /// This function will successfully return when at least quorum_size signatures of known authors
     /// are successfully verified. It creates an aggregated public key using the voter bitmask passed
     /// in the multi-signature and verifies the message passed in the multi-signature using the aggregated
@@ -297,7 +304,7 @@ impl ValidatorVerifier {
         num_validators: u16,
         bitvec: &BitVec,
     ) -> std::result::Result<(), VerifyError> {
-        if bitvec.num_buckets() != BitVec::required_buckets(num_validators as u16) {
+        if bitvec.num_buckets() != BitVec::required_buckets(num_validators) {
             return Err(VerifyError::InvalidBitVec);
         }
         if let Some(last_bit) = bitvec.last_set_bit() {
@@ -464,7 +471,7 @@ pub fn generate_validator_verifier(validators: &[ValidatorSigner]) -> ValidatorV
 
 /// Helper function to get random validator signers and a corresponding validator verifier for
 /// testing.  If custom_voting_power_quorum is not None, set a custom voting power quorum amount.
-/// With pseudo_random_account_address enabled, logs show 0 -> [0000], 1 -> [1000]
+/// With pseudo_random_account_address enabled, logs show `0 -> [0000]`, `1 -> [1000]`
 #[cfg(any(test, feature = "fuzzing"))]
 pub fn random_validator_verifier(
     count: usize,
@@ -486,17 +493,14 @@ pub fn random_validator_verifier(
         ));
         signers.push(random_signer);
     }
-    (
-        signers,
-        match custom_voting_power_quorum {
-            Some(custom_voting_power_quorum) => ValidatorVerifier::new_with_quorum_voting_power(
-                validator_infos,
-                custom_voting_power_quorum,
-            )
-            .expect("Unable to create testing validator verifier"),
-            None => ValidatorVerifier::new(validator_infos),
-        },
-    )
+    (signers, match custom_voting_power_quorum {
+        Some(custom_voting_power_quorum) => ValidatorVerifier::new_with_quorum_voting_power(
+            validator_infos,
+            custom_voting_power_quorum,
+        )
+        .expect("Unable to create testing validator verifier"),
+        None => ValidatorVerifier::new(validator_infos),
+    })
 }
 
 #[cfg(test)]

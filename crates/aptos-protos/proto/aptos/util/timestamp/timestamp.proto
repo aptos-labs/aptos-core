@@ -1,11 +1,9 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 syntax = "proto3";
 
 package aptos.util.timestamp;
-
-option go_package = "github.com/streamingfast/firehose-aptos/types/pb/aptos/util/timestamp;pbtimestamp";
 
 message Timestamp {
   // Represents seconds of UTC time since Unix epoch
