@@ -3,11 +3,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    exponential_buckets, histogram_opts, op_counters::DurationHistogram, register_avg_counter,
-    register_counter, register_gauge, register_gauge_vec, register_histogram,
-    register_histogram_vec, register_int_counter, register_int_counter_vec, register_int_gauge,
-    register_int_gauge_vec, Counter, Gauge, GaugeVec, Histogram, HistogramVec, IntCounter,
-    IntCounterVec, IntGauge, IntGaugeVec,
+    exponential_buckets, op_counters::DurationHistogram, register_avg_counter, register_counter,
+    register_gauge, register_gauge_vec, register_histogram, register_histogram_vec,
+    register_int_counter, register_int_counter_vec, register_int_gauge, register_int_gauge_vec,
+    Counter, Gauge, GaugeVec, Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge,
+    IntGaugeVec,
 };
 use once_cell::sync::Lazy;
 
@@ -507,20 +507,19 @@ pub static NUM_BLOCKS_IN_PIPELINE: Lazy<IntGaugeVec> = Lazy::new(|| {
 //     .unwrap()
 // });
 
-const NUM_CONSENSUS_TRANSACTIONS_BUCKETS: [f64; 30] = [
+const NUM_CONSENSUS_TRANSACTIONS_BUCKETS: [f64; 24] = [
     5.0, 10.0, 20.0, 40.0, 75.0, 100.0, 200.0, 400.0, 800.0, 1200.0, 1800.0, 2500.0, 3300.0,
-    4000.0, 4700.0, 5500.0, 6500.0, 7500.0, 9000.0, 11500.0, 13000.0, 14500.0, 16500.0, 18500.0,
-    21000.0, 24000.0, 27000.0, 30000.0, 35000.0, 40000.0,
+    4000.0, 5000.0, 6500.0, 8000.0, 10000.0, 12500.0, 15000.0, 18000.0, 21000.0, 25000.0, 30000.0,
 ];
 
 /// Histogram for the number of txns per (committed) blocks.
 pub static NUM_TXNS_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
-    let histogram_opts = histogram_opts!(
+    register_histogram!(
         "aptos_consensus_num_txns_per_block",
         "Histogram for the number of txns per (committed) blocks.",
         NUM_CONSENSUS_TRANSACTIONS_BUCKETS.to_vec()
-    );
-    register_histogram!(histogram_opts).unwrap()
+    )
+    .unwrap()
 });
 
 /// Traces block movement throughout the node
@@ -533,20 +532,17 @@ pub static BLOCK_TRACING: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
-const CONSENSUS_WAIT_DURATION_BUCKETS: [f64; 17] = [
-    0.02, 0.04, 0.06, 0.08, 0.10, 0.125, 0.15, 0.175, 0.2, 0.225, 0.25, 0.3, 0.4, 0.6, 0.8, 2.0,
-    4.0,
+const CONSENSUS_WAIT_DURATION_BUCKETS: [f64; 19] = [
+    0.005, 0.01, 0.015, 0.02, 0.04, 0.06, 0.08, 0.10, 0.125, 0.15, 0.175, 0.2, 0.225, 0.25, 0.3,
+    0.4, 0.6, 0.8, 2.0,
 ];
 
 /// Histogram of the time it requires to wait before inserting blocks into block store.
 /// Measured as the block's timestamp minus local timestamp.
 pub static WAIT_DURATION_S: Lazy<DurationHistogram> = Lazy::new(|| {
-    let histogram_opts = histogram_opts!(
-        "aptos_consensus_wait_duration_s",
-        "Histogram of the time it requires to wait before inserting blocks into block store. Measured as the block's timestamp minus the local timestamp.",
-        CONSENSUS_WAIT_DURATION_BUCKETS.to_vec()
-    );
-    DurationHistogram::new(register_histogram!(histogram_opts).unwrap())
+    DurationHistogram::new(register_histogram!("aptos_consensus_wait_duration_s",
+    "Histogram of the time it requires to wait before inserting blocks into block store. Measured as the block's timestamp minus the local timestamp.",
+    CONSENSUS_WAIT_DURATION_BUCKETS.to_vec()).unwrap())
 });
 
 ///////////////////
@@ -704,12 +700,12 @@ const PROPSER_ELECTION_DURATION_BUCKETS: [f64; 17] = [
 
 /// Time it takes for proposer election to compute proposer (when not cached)
 pub static PROPOSER_ELECTION_DURATION: Lazy<Histogram> = Lazy::new(|| {
-    let histogram_opts = histogram_opts!(
+    register_histogram!(
         "aptos_consensus_proposer_election_duration",
         "Time it takes for proposer election to compute proposer (when not cached)",
         PROPSER_ELECTION_DURATION_BUCKETS.to_vec()
-    );
-    register_histogram!(histogram_opts).unwrap()
+    )
+    .unwrap()
 });
 
 /// Count of the number of blocks that have ready batches to execute.

@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    exponential_buckets, histogram_opts, register_histogram, register_int_counter,
-    register_int_counter_vec, register_int_gauge, Histogram, IntCounter, IntCounterVec, IntGauge,
+    exponential_buckets, register_histogram, register_int_counter, register_int_counter_vec,
+    register_int_gauge, Histogram, IntCounter, IntCounterVec, IntGauge,
 };
 use once_cell::sync::Lazy;
 
@@ -13,14 +13,14 @@ const BLOCK_EXECUTION_TIME_BUCKETS: [f64; 16] = [
 ];
 
 pub static BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS: Lazy<Histogram> = Lazy::new(|| {
-    let histogram_opts = histogram_opts!(
+    register_histogram!(
         // metric name
         "block_executor_execute_block_seconds",
         // metric description
         "The time spent in seconds for executing a block in block executor",
         BLOCK_EXECUTION_TIME_BUCKETS.to_vec()
-    );
-    register_histogram!(histogram_opts).unwrap()
+    )
+    .unwrap()
 });
 
 pub static BLOCK_EXECUTOR_CONCURRENCY: Lazy<IntGauge> = Lazy::new(|| {
@@ -32,14 +32,14 @@ pub static BLOCK_EXECUTOR_CONCURRENCY: Lazy<IntGauge> = Lazy::new(|| {
 });
 
 pub static BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS: Lazy<Histogram> = Lazy::new(|| {
-    let histogram_opts = histogram_opts!(
+    register_histogram!(
         // metric name
         "block_executor_signature_verification_seconds",
         // metric description
         "The time spent in seconds for signature verification of a block in executor",
         exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
-    );
-    register_histogram!(histogram_opts).unwrap()
+    )
+    .unwrap()
 });
 
 /// Count the number of transactions that brake invariants of VM.
@@ -82,19 +82,18 @@ pub static SYSTEM_TRANSACTIONS_EXECUTED: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
-const NUM_BLOCK_TRANSACTIONS_BUCKETS: [f64; 30] = [
+const NUM_BLOCK_TRANSACTIONS_BUCKETS: [f64; 24] = [
     5.0, 10.0, 20.0, 40.0, 75.0, 100.0, 200.0, 400.0, 800.0, 1200.0, 1800.0, 2500.0, 3300.0,
-    4000.0, 4700.0, 5500.0, 6500.0, 7500.0, 9000.0, 11500.0, 13000.0, 14500.0, 16500.0, 18500.0,
-    21000.0, 24000.0, 27000.0, 30000.0, 35000.0, 40000.0,
+    4000.0, 5000.0, 6500.0, 8000.0, 10000.0, 12500.0, 15000.0, 18000.0, 21000.0, 25000.0, 30000.0,
 ];
 
 pub static BLOCK_TRANSACTION_COUNT: Lazy<Histogram> = Lazy::new(|| {
-    let histogram_opts = histogram_opts!(
+    register_histogram!(
         "aptos_vm_num_txns_per_block",
         "Number of transactions per block",
         NUM_BLOCK_TRANSACTIONS_BUCKETS.to_vec()
-    );
-    register_histogram!(histogram_opts).unwrap()
+    )
+    .unwrap()
 });
 
 const TRANSACTION_EXECUTION_TIME_BUCKETS: [f64; 20] = [
@@ -103,12 +102,12 @@ const TRANSACTION_EXECUTION_TIME_BUCKETS: [f64; 20] = [
 ];
 
 pub static TXN_TOTAL_SECONDS: Lazy<Histogram> = Lazy::new(|| {
-    let histogram_opts = histogram_opts!(
+    register_histogram!(
         "aptos_vm_txn_total_seconds",
         "Execution time per user transaction",
         TRANSACTION_EXECUTION_TIME_BUCKETS.to_vec()
-    );
-    register_histogram!(histogram_opts).unwrap()
+    )
+    .unwrap()
 });
 
 const TRANSACTION_VALIDATION_TIME_BUCKETS: [f64; 14] = [
@@ -117,12 +116,12 @@ const TRANSACTION_VALIDATION_TIME_BUCKETS: [f64; 14] = [
 ];
 
 pub static TXN_VALIDATION_SECONDS: Lazy<Histogram> = Lazy::new(|| {
-    let histogram_opts = histogram_opts!(
+    register_histogram!(
         "aptos_vm_txn_validation_seconds",
         "Validation time per user transaction",
         TRANSACTION_VALIDATION_TIME_BUCKETS.to_vec()
-    );
-    register_histogram!(histogram_opts).unwrap()
+    )
+    .unwrap()
 });
 
 const TXN_GAS_USAGE_BUCKETS: [f64; 22] = [
@@ -131,10 +130,10 @@ const TXN_GAS_USAGE_BUCKETS: [f64; 22] = [
 ];
 
 pub static TXN_GAS_USAGE: Lazy<Histogram> = Lazy::new(|| {
-    let histogram_opts = histogram_opts!(
+    register_histogram!(
         "aptos_vm_txn_gas_usage",
         "Gas used per transaction",
         TXN_GAS_USAGE_BUCKETS.to_vec()
-    );
-    register_histogram!(histogram_opts).unwrap()
+    )
+    .unwrap()
 });
