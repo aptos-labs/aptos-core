@@ -64,7 +64,7 @@ module token_objects::hero {
         collection::create_unlimited_collection(
             account,
             string::utf8(b"collection description"),
-            *&collection,
+            collection,
             option::none(),
             string::utf8(b"collection uri"),
         );
@@ -84,7 +84,7 @@ module token_objects::hero {
         let on_chain_config = borrow_global<OnChainConfig>(signer::address_of(creator));
         token::create_named_token(
             creator,
-            *&on_chain_config.collection,
+            on_chain_config.collection,
             description,
             name,
             option::none(),

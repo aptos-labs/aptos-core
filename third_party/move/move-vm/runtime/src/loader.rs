@@ -663,8 +663,7 @@ impl Loader {
         ) {
             Ok(script) => script,
             Err(err) => {
-                error!("[VM] deserializer for script returned error: {:?}", err,);
-                let msg = format!("Deserialization error: {:?}", err);
+                let msg = format!("[VM] deserializer for script returned error: {:?}", err);
                 return Err(PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
                     .with_message(msg)
                     .finish(Location::Script));
@@ -682,13 +681,7 @@ impl Loader {
                 self.verify_script_dependencies(&script, loaded_deps)?;
                 Ok(script)
             },
-            Err(err) => {
-                error!(
-                    "[VM] bytecode verifier returned errors for script: {:?}",
-                    err
-                );
-                Err(err)
-            },
+            Err(err) => Err(err),
         }
     }
 
@@ -1159,7 +1152,6 @@ impl Loader {
             Ok(bytes) => bytes,
             Err(err) if allow_loading_failure => return Err(err),
             Err(err) => {
-                error!("[VM] Error fetching module with id {:?}", id);
                 return Err(expect_no_verification_errors(err));
             },
         };

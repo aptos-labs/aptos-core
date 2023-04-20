@@ -17,6 +17,7 @@ module aptos_framework::reconfiguration {
     friend aptos_framework::aptos_governance;
     friend aptos_framework::block;
     friend aptos_framework::consensus_config;
+    friend aptos_framework::execution_config;
     friend aptos_framework::gas_schedule;
     friend aptos_framework::genesis;
     friend aptos_framework::version;

@@ -321,8 +321,8 @@ module aptos_token_objects::token {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
-        create_collection_helper(creator, *&collection_name, 1);
-        create_token_helper(creator, *&collection_name, *&token_name);
+        create_collection_helper(creator, collection_name, 1);
+        create_token_helper(creator, collection_name, token_name);
 
         let creator_address = signer::address_of(creator);
         let token_addr = create_token_address(&creator_address, &collection_name, &token_name);
@@ -399,8 +399,8 @@ module aptos_token_objects::token {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
-        create_collection_helper(creator, *&collection_name, 1);
-        create_token_helper(creator, *&collection_name, token_name);
+        create_collection_helper(creator, collection_name, 1);
+        create_token_helper(creator, collection_name, token_name);
         create_token_helper(creator, collection_name, string::utf8(b"bad"));
     }
 
@@ -410,8 +410,8 @@ module aptos_token_objects::token {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
-        create_collection_helper(creator, *&collection_name, 2);
-        create_token_helper(creator, *&collection_name, *&token_name);
+        create_collection_helper(creator, collection_name, 2);
+        create_token_helper(creator, collection_name, token_name);
         create_token_helper(creator, collection_name, token_name);
     }
 
@@ -420,7 +420,7 @@ module aptos_token_objects::token {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
-        create_collection_helper(creator, *&collection_name, 1);
+        create_collection_helper(creator, collection_name, 1);
         let mutator_ref = create_token_with_mutation_ref(creator, collection_name, token_name);
         let token = object::address_to_object<Token>(
             create_token_address(&signer::address_of(creator), &collection_name, &token_name),
@@ -428,7 +428,7 @@ module aptos_token_objects::token {
 
         let description = string::utf8(b"no fail");
         assert!(description != description(token), 0);
-        set_description(&mutator_ref, *&description);
+        set_description(&mutator_ref, description);
         assert!(description == description(token), 1);
     }
 
@@ -437,7 +437,7 @@ module aptos_token_objects::token {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
-        create_collection_helper(creator, *&collection_name, 1);
+        create_collection_helper(creator, collection_name, 1);
         let mutator_ref = create_token_with_mutation_ref(creator, collection_name, token_name);
         let token = object::address_to_object<Token>(
             create_token_address(&signer::address_of(creator), &collection_name, &token_name),
@@ -445,7 +445,7 @@ module aptos_token_objects::token {
 
         let name = string::utf8(b"no fail");
         assert!(name != name(token), 0);
-        set_name(&mutator_ref, *&name);
+        set_name(&mutator_ref, name);
         assert!(name == name(token), 2);
     }
 
@@ -454,7 +454,7 @@ module aptos_token_objects::token {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
-        create_collection_helper(creator, *&collection_name, 1);
+        create_collection_helper(creator, collection_name, 1);
         let mutator_ref = create_token_with_mutation_ref(creator, collection_name, token_name);
         let token = object::address_to_object<Token>(
             create_token_address(&signer::address_of(creator), &collection_name, &token_name),
@@ -462,7 +462,7 @@ module aptos_token_objects::token {
 
         let uri = string::utf8(b"no fail");
         assert!(uri != uri(token), 0);
-        set_uri(&mutator_ref, *&uri);
+        set_uri(&mutator_ref, uri);
         assert!(uri == uri(token), 1);
     }
 
@@ -471,7 +471,7 @@ module aptos_token_objects::token {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
-        create_collection_helper(creator, *&collection_name, 1);
+        create_collection_helper(creator, collection_name, 1);
         let constructor_ref = create_named_token(
             creator,
             collection_name,
@@ -494,7 +494,7 @@ module aptos_token_objects::token {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
-        create_collection_helper(creator, *&collection_name, 1);
+        create_collection_helper(creator, collection_name, 1);
         let constructor_ref = create_named_token(
             creator,
             collection_name,
@@ -520,7 +520,7 @@ module aptos_token_objects::token {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
-        create_collection_helper(creator, *&collection_name, 1);
+        create_collection_helper(creator, collection_name, 1);
         account::create_account_for_test(signer::address_of(creator));
         let constructor_ref = create_from_account(
             creator,

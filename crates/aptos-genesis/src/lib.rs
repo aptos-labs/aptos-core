@@ -23,7 +23,7 @@ use aptos_storage_interface::DbReaderWriter;
 use aptos_temppath::TempPath;
 use aptos_types::{
     chain_id::ChainId,
-    on_chain_config::{GasScheduleV2, OnChainConsensusConfig},
+    on_chain_config::{GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig},
     transaction::Transaction,
     waypoint::Waypoint,
 };
@@ -68,6 +68,7 @@ pub struct GenesisInfo {
     pub voting_power_increase_limit: u64,
 
     pub consensus_config: OnChainConsensusConfig,
+    pub execution_config: OnChainExecutionConfig,
     pub gas_schedule: GasScheduleV2,
 }
 
@@ -103,6 +104,7 @@ impl GenesisInfo {
             voting_duration_secs: genesis_config.voting_duration_secs,
             voting_power_increase_limit: genesis_config.voting_power_increase_limit,
             consensus_config: genesis_config.consensus_config.clone(),
+            execution_config: genesis_config.execution_config.clone(),
             gas_schedule: genesis_config.gas_schedule.clone(),
         })
     }
@@ -138,6 +140,7 @@ impl GenesisInfo {
                 employee_vesting_period_duration: 5 * 60, // 5 minutes
             },
             &self.consensus_config,
+            &self.execution_config,
             &self.gas_schedule,
         )
     }

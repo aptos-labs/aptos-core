@@ -1,39 +1,33 @@
 #!/usr/bin/env python3
 
-# Copyright © Aptos Foundation
-# SPDX-License-Identifier: Apache-2.0
-
-import subprocess
-import re
+import subprocess, re
 
 # Set the tps threshold for block size 1k, 10k and 50k
-THRESHOLD_1k = 3700  # 4800
-THRESHOLD_10k = 4200  # 5400
-THRESHOLD_50k = 4200  # 5600
+BLOCK_SIZES = ["1k", "10k", "50k"]
+THRESHOLDS = {"1k": 4000, "10k": 4500, "50k": 4500}
+THRESHOLD_NOISE = 0.1
 
 # Run the VM sequential execution with performance optimizations enabled
 target_directory = "aptos-move/aptos-transaction-benchmarks/src/"
-command = "cargo run --profile performance main false true"
-output = subprocess.check_output(command, shell=True, text=True, cwd=target_directory)
+output = subprocess.check_output(
+    "cargo run --profile performance main false true",
+    shell=True,
+    text=True,
+    cwd=target_directory,
+)
 print(output)
 
-# Parse the numbers from the output using regex
-tps_1k = int(re.findall(r"Avg Sequential TPS = (\d+)", output)[0])
-tps_10k = int(re.findall(r"Avg Sequential TPS = (\d+)", output)[1])
-tps_50k = int(re.findall(r"Avg Sequential TPS = (\d+)", output)[2])
-
-print(f"Average Sequential TPS for 1k block: {tps_1k}, Threshold TPS: {THRESHOLD_1k}")
-print(
-    f"Average Sequential TPS for 10k block: {tps_10k}, Threshold TPS: {THRESHOLD_10k}"
-)
-print(
-    f"Average Sequential TPS for 50k block: {tps_50k}, Threshold TPS: {THRESHOLD_50k}"
-)
-
-# Check if any threshold is not met
-if tps_1k < THRESHOLD_1k or tps_10k < THRESHOLD_10k or tps_50k < THRESHOLD_50k:
-    print("Sequential TPS below the threshold")
+fail = False
+for i, block_size in enumerate(BLOCK_SIZES):
+    tps = int(re.findall(r"Avg Sequential TPS = (\d+)", output)[i])
+    print(
+        f"Average Sequential TPS for {block_size} block: {tps}, Threshold TPS: {THRESHOLDS[block_size]}"
+    )
+    diff = (tps - THRESHOLDS[block_size]) / THRESHOLDS[block_size]
+    if abs(diff) > THRESHOLD_NOISE:
+        print(
+            f"Sequential TPS {tps} {'below' if diff < 0 else 'above'} the threshold {THRESHOLDS[block_size]} by {abs(diff)*100:.0f}% (more than {THRESHOLD_NOISE*100:.0f}%). Please {'optimize' if diff < 0 else 'increase the hard-coded TPS threshold since you improved'} the execution performance. :)\n"
+        )
+        fail = True
+if fail:
     exit(1)
-else:
-    print("Sequential TPS above the threshold")
-    exit(0)

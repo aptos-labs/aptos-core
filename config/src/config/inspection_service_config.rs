@@ -46,7 +46,7 @@ impl ConfigSanitizer for InspectionServiceConfig {
 
         // Verify that mainnet validators do not expose the configuration
         if node_role.is_validator()
-            && chain_id.is_mainnet()?
+            && chain_id.is_mainnet()
             && inspection_service_config.expose_configuration
         {
             return Err(Error::ConfigSanitizerFailed(

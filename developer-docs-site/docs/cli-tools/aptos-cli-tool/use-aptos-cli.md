@@ -960,20 +960,20 @@ Operand Stack:
 
 In this example, we'll use the `HelloBlockchain` in [move-examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples).
 
-:::important
-As an open source project, the source code as well as compiled code published to the Aptos blockchain is inherently open by default. This means code you upload may be downloaded from on-chain data. Even without source access, it is possible to regenerate Move source from Move bytecode. To disable source access, publish with the `--included-artifacts none` argument, like so:
-
-```
-aptos move publish --included-artifacts none
-```
-:::
-
 Publish the package with your account address set for `HelloBlockchain`.
 
 Here, you need to change 8946741e5c907c43c9e042b3739993f32904723f8e2d1491564d38959b59ac71 to your account address.
 ```bash
 $ aptos move publish --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses HelloBlockchain=8946741e5c907c43c9e042b3739993f32904723f8e2d1491564d38959b59ac71
 ```
+
+:::tip
+As an open source project, the source code as well as compiled code published to the Aptos blockchain is inherently open by default. This means code you upload may be downloaded from on-chain data. Even without source access, it is possible to regenerate Move source from Move bytecode. To disable source access, publish with the `--included-artifacts none` argument, like so:
+
+```
+aptos move publish --included-artifacts none
+```
+:::
 
 You can additionally use named profiles for the addresses.  The first placeholder is `default`
 ```bash
@@ -1148,6 +1148,10 @@ $ aptos move run --function-id default::message::set_message --args string:hello
 
 ## Node command examples
 
+This section summarizes how to run a local testnet with Aptos CLI. See [Run a Local Testnet with Aptos CLI](../../nodes/local-testnet/using-cli-to-run-a-local-testnet.md) for more details.
+
+For Aptos CLI commands applicable to validator nodes, see the [Owner](../../nodes/validator-node/owner/index.md) and [Voter](../../nodes/validator-node/voter/index.md#steps-using-aptos-cli) instructions.
+
 ### Running a local testnet
 
 You can run a local testnet from the aptos CLI, that will match the version it was built with.  Additionally, it can
@@ -1207,15 +1211,7 @@ The `aptos` tool supports bootstrapping new blockchains through what is known as
 
 ### Prepare aptos-core
 
-The following guide assumes that you have access to the Aptos-core repository or the associated tools. You can download and prepare Aptos-core from [GitHub](https://github.com/aptos-labs/aptos-core):
-
-```
-git clone https://github.com/aptos-labs/aptos-core.git
-cd aptos-core
-git checkout --track origin/testnet
-./scripts/dev_setup.sh
-source ~/.cargo/env
-```
+The following sections rely on tools from the Aptos source. See [Building Aptos From Source](../../guides/building-from-source.md) for setup.
 
 ### The `layout` file
 

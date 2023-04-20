@@ -4,7 +4,7 @@
 
 //! Tasks that are executed by coordinators (short-lived compared to coordinators)
 use crate::{
-    core_mempool::{CoreMempool, TimelineState, TxnPointer},
+    core_mempool::{CoreMempool, TimelineState},
     counters,
     logging::{LogEntry, LogEvent, LogSchema},
     network::{BroadcastError, MempoolSyncMsg},
@@ -35,7 +35,6 @@ use futures::{channel::oneshot, stream::FuturesUnordered};
 use rayon::prelude::*;
 use std::{
     cmp,
-    collections::HashSet,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -450,13 +449,10 @@ pub(crate) fn process_quorum_store_request<NetworkClient, TransactionValidator>(
             max_txns,
             max_bytes,
             return_non_full,
-            transactions,
+            include_gas_upgraded,
+            exclude_transactions,
             callback,
         ) => {
-            let exclude_transactions: HashSet<TxnPointer> = transactions
-                .iter()
-                .map(|txn| (txn.sender, txn.sequence_number))
-                .collect();
             let txns;
             {
                 let lock_timer = counters::mempool_service_start_latency_timer(
@@ -482,8 +478,13 @@ pub(crate) fn process_quorum_store_request<NetworkClient, TransactionValidator>(
                     counters::GET_BLOCK_GET_BATCH_LABEL,
                     counters::REQUEST_SUCCESS_LABEL,
                 );
-                txns =
-                    mempool.get_batch(max_txns, max_bytes, return_non_full, exclude_transactions);
+                txns = mempool.get_batch(
+                    max_txns,
+                    max_bytes,
+                    return_non_full,
+                    include_gas_upgraded,
+                    exclude_transactions,
+                );
             }
 
             // mempool_service_transactions is logged inside get_batch

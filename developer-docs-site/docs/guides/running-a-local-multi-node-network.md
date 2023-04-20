@@ -15,33 +15,7 @@ For deploying a local network with a single node, see [Running Local Testnet](..
 
 ## Before you proceed
 
-Make sure you cloned the Aptos source GitHub repo by following these steps:
-
-1. Clone the Aptos repo.
-
-```bash
-git clone https://github.com/aptos-labs/aptos-core.git
-```
-
-2. `cd` into aptos-core directory.
-
-```bash
-cd aptos-core
-```
-
-3. Run the scripts/dev_setup.sh Bash script as shown below. This will prepare your developer environment.
-
-```bash
-./scripts/dev_setup.sh
-```
-
-3. Update your current shell environment.
-
-```bash
-source ~/.cargo/env
-```
-
-With your development environment ready, now you can proceed below.
+This guide assumes you have done the steps in [Building Aptos From Source](building-from-source.md)
 
 ## Running multiple validators
 

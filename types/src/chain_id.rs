@@ -78,32 +78,27 @@ pub struct ChainId(u8);
 
 impl ChainId {
     /// Returns true iff the chain ID matches devnet
-    pub fn is_devnet(&self) -> Result<bool> {
-        let named_chain = self.get_named_chain()?;
-        Ok(named_chain == NamedChain::DEVNET)
+    pub fn is_devnet(&self) -> bool {
+        self.matches_named_chain(NamedChain::DEVNET)
     }
 
     /// Returns true iff the chain ID matches testnet
-    pub fn is_testnet(&self) -> Result<bool> {
-        let named_chain = self.get_named_chain()?;
-        Ok(named_chain == NamedChain::TESTNET)
+    pub fn is_testnet(&self) -> bool {
+        self.matches_named_chain(NamedChain::TESTNET)
     }
 
     /// Returns true iff the chain ID matches mainnet
-    pub fn is_mainnet(&self) -> Result<bool> {
-        let named_chain = self.get_named_chain()?;
-        Ok(named_chain == NamedChain::MAINNET)
+    pub fn is_mainnet(&self) -> bool {
+        self.matches_named_chain(NamedChain::MAINNET)
     }
 
-    /// Returns the named chain relating to the chain ID
-    fn get_named_chain(&self) -> Result<NamedChain> {
-        NamedChain::from_chain_id(self).map_err(|error| {
-            format_err!(
-                "Error fetching the named chain for chain id: {:?}, error: {:?}",
-                &self,
-                error
-            )
-        })
+    /// Returns true iff the chain ID matches the given named chain
+    fn matches_named_chain(&self, expected_chain: NamedChain) -> bool {
+        if let Ok(named_chain) = NamedChain::from_chain_id(self) {
+            named_chain == expected_chain
+        } else {
+            false
+        }
     }
 }
 

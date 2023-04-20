@@ -8,11 +8,9 @@ use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{transaction::SignedTransaction, LocalAccount},
 };
-use async_trait::async_trait;
 use rand::{rngs::StdRng, SeedableRng};
 use std::sync::Arc;
 
-#[allow(dead_code)]
 pub struct PublishPackageGenerator {
     rng: StdRng,
     package_handler: Arc<RwLock<PackageHandler>>,
@@ -33,7 +31,6 @@ impl PublishPackageGenerator {
     }
 }
 
-#[async_trait]
 impl TransactionGenerator for PublishPackageGenerator {
     fn generate_transactions(
         &mut self,
@@ -82,9 +79,8 @@ impl PublishPackageCreator {
     }
 }
 
-#[async_trait]
 impl TransactionGeneratorCreator for PublishPackageCreator {
-    async fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator> {
+    fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator> {
         Box::new(PublishPackageGenerator::new(
             StdRng::from_entropy(),
             self.package_handler.clone(),
