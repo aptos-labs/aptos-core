@@ -53,6 +53,9 @@ module veiled_coin::veiled_coin {
     /// Ciphertext has wrong value when unwrapping
     const ECIPHERTEXT_WRONG_VALUE: u64 = 10;
 
+    /// Value used was larger than vector size in vector cut
+    const EEINDEX_OUT_OF_BOUNDS: u64 = 11;
+
     //
     // Constants
     //
@@ -88,68 +91,81 @@ module veiled_coin::veiled_coin {
         alpha4: Scalar,
     }
 
-    // TODO: Replace trim with more gas efficient function
-    /// Deserializes and returns a VeiledWithdrawalProof given its byte representation
+    /// Given a vector `vec`, removes the last `cut_len` elements of `vec` and 
+    /// returns them in order
+    fun cut_vector<T>(vec: &mut vector<T>, cut_len: u64): vector<T> {
+        let len = vector::length(vec);
+        let res = vector::empty();
+        assert!(len >= cut_len, EEINDEX_OUT_OF_BOUNDS);
+        while (cut_len > 0) {
+            vector::push_back(&mut res, vector::pop_back(vec));
+            cut_len = cut_len - 1;
+        };
+        vector::reverse(&mut res);
+        res
+    }
+
+    /// Deserializes and returns a VeiledWithdrawalProof given its byte representation.
     fun deserialize_sigma_proof<CoinType>(proof_bytes: vector<u8>): Option<SigmaProof<CoinType>> {
         assert!(vector::length<u8>(&proof_bytes) == 288, EBYTES_WRONG_LENGTH);
-        let trimmed_bytes_x1 = vector::trim<u8>(&mut proof_bytes, 32);
-        let x1 = ristretto255::new_point_from_bytes(proof_bytes);
+        let x1_bytes = cut_vector<u8>(&mut proof_bytes, 32);
+        let x1 = ristretto255::new_point_from_bytes(x1_bytes);
         if (!std::option::is_some<RistrettoPoint>(&x1)) {
             return std::option::none<SigmaProof<CoinType>>()
         };
         let x1 = std::option::extract<RistrettoPoint>(&mut x1);
 
-        let trimmed_bytes_x2 = vector::trim(&mut trimmed_bytes_x1, 32);    
-        let x2 = ristretto255::new_point_from_bytes(trimmed_bytes_x1);
+        let x2_bytes = cut_vector<u8>(&mut proof_bytes, 32);    
+        let x2 = ristretto255::new_point_from_bytes(x2_bytes);
         if (!std::option::is_some<RistrettoPoint>(&x2)) {
             return std::option::none<SigmaProof<CoinType>>()
         };
         let x2 = std::option::extract<RistrettoPoint>(&mut x2);    
 
-        let trimmed_bytes_x3 = vector::trim(&mut trimmed_bytes_x2, 32);    
-        let x3 = ristretto255::new_point_from_bytes(trimmed_bytes_x2);
+        let x3_bytes = cut_vector<u8>(&mut proof_bytes, 32);    
+        let x3 = ristretto255::new_point_from_bytes(x3_bytes);
         if (!std::option::is_some<RistrettoPoint>(&x3)) {
             return std::option::none<SigmaProof<CoinType>>()
         };
         let x3 = std::option::extract<RistrettoPoint>(&mut x3);
 
-        let trimmed_bytes_x4 = vector::trim(&mut trimmed_bytes_x3, 32);    
-        let x4 = ristretto255::new_point_from_bytes(trimmed_bytes_x3);
+        let x4_bytes = cut_vector<u8>(&mut proof_bytes, 32);    
+        let x4 = ristretto255::new_point_from_bytes(x4_bytes);
         if (!std::option::is_some<RistrettoPoint>(&x4)) {
             return std::option::none<SigmaProof<CoinType>>()
         };
         let x4 = std::option::extract<RistrettoPoint>(&mut x4);
 
-        let trimmed_bytes_x5 = vector::trim(&mut trimmed_bytes_x4, 32);    
-        let x5 = ristretto255::new_point_from_bytes(trimmed_bytes_x4);
+        let x5_bytes = cut_vector<u8>(&mut proof_bytes, 32);    
+        let x5 = ristretto255::new_point_from_bytes(x5_bytes);
         if (!std::option::is_some<RistrettoPoint>(&x5)) {
             return std::option::none<SigmaProof<CoinType>>()
         };
         let x5 = std::option::extract<RistrettoPoint>(&mut x5);
 
-        let trimmed_bytes_alpha1 = vector::trim(&mut trimmed_bytes_x5, 32);
-        let alpha1 = ristretto255::new_scalar_from_bytes(trimmed_bytes_x5);
+        let alpha1_bytes = cut_vector<u8>(&mut proof_bytes, 32);
+        let alpha1 = ristretto255::new_scalar_from_bytes(alpha1_bytes);
         if (!std::option::is_some(&alpha1)) {
             return std::option::none<SigmaProof<CoinType>>()
         };
         let alpha1 = std::option::extract(&mut alpha1);
 
-        let trimmed_bytes_alpha2 = vector::trim(&mut trimmed_bytes_alpha1, 32);
-        let alpha2 = ristretto255::new_scalar_from_bytes(trimmed_bytes_alpha1);
+        let alpha2_bytes = cut_vector<u8>(&mut proof_bytes, 32);
+        let alpha2 = ristretto255::new_scalar_from_bytes(alpha2_bytes);
         if (!std::option::is_some(&alpha2)) {
             return std::option::none<SigmaProof<CoinType>>()
         };
         let alpha2 = std::option::extract(&mut alpha2);
 
-        let trimmed_bytes_alpha3 = vector::trim(&mut trimmed_bytes_alpha2, 32);
-        let alpha3 = ristretto255::new_scalar_from_bytes(trimmed_bytes_alpha2);
+        let alpha3_bytes = cut_vector<u8>(&mut proof_bytes, 32);
+        let alpha3 = ristretto255::new_scalar_from_bytes(alpha3_bytes);
         if (!std::option::is_some(&alpha3)) {
             return std::option::none<SigmaProof<CoinType>>()
         };
         let alpha3 = std::option::extract(&mut alpha3);
 
-        let _trimmed_bytes_alpha4 = vector::trim(&mut trimmed_bytes_alpha3, 32);
-        let alpha4 = ristretto255::new_scalar_from_bytes(trimmed_bytes_alpha3);
+        let alpha4_bytes = cut_vector<u8>(&mut proof_bytes, 32);
+        let alpha4 = ristretto255::new_scalar_from_bytes(alpha4_bytes);
         if (!std::option::is_some(&alpha4)) {
             return std::option::none<SigmaProof<CoinType>>()
         };
@@ -764,7 +780,7 @@ module veiled_coin::veiled_coin {
         let alpha3_bytes = ristretto255::scalar_to_bytes(&proof.alpha3);
         let alpha4_bytes = ristretto255::scalar_to_bytes(&proof.alpha4); 
 
-        let bytes = vector::empty<u8>();
+        /*let bytes = vector::empty<u8>();
         vector::append<u8>(&mut bytes, x1_bytes);
         vector::append<u8>(&mut bytes, x2_bytes);
         vector::append<u8>(&mut bytes, x3_bytes);
@@ -773,7 +789,19 @@ module veiled_coin::veiled_coin {
         vector::append<u8>(&mut bytes, alpha1_bytes);
         vector::append<u8>(&mut bytes, alpha2_bytes);
         vector::append<u8>(&mut bytes, alpha3_bytes);
+        vector::append<u8>(&mut bytes, alpha4_bytes);*/
+
+        let bytes = vector::empty<u8>();
         vector::append<u8>(&mut bytes, alpha4_bytes);
+        vector::append<u8>(&mut bytes, alpha3_bytes);
+        vector::append<u8>(&mut bytes, alpha2_bytes);
+        vector::append<u8>(&mut bytes, alpha1_bytes);
+        vector::append<u8>(&mut bytes, x5_bytes);
+        vector::append<u8>(&mut bytes, x4_bytes);
+        vector::append<u8>(&mut bytes, x3_bytes);
+        vector::append<u8>(&mut bytes, x2_bytes);
+        vector::append<u8>(&mut bytes, x1_bytes);
+
         bytes
     }
 
