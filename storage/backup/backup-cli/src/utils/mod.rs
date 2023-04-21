@@ -8,7 +8,7 @@ pub mod read_record_bytes;
 pub mod storage_ext;
 pub(crate) mod stream;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 pub mod test_utils;
 
 use anyhow::{anyhow, Result};

@@ -31,5 +31,6 @@ owo-colors = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]
+aptos-backup-cli = { workspace = true, features = ["testing"] }
 aptos-backup-service = { workspace = true }
 aptos-executor-test-helpers = { workspace = true }
