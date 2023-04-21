@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { AccountAddress } from "../../aptos_types";
+import { Uint32 } from "../../bcs";
 import { Deserializer } from "../../bcs/deserializer";
 import {
   bcsSerializeBool,
@@ -15,6 +16,7 @@ import {
   bcsSerializeUint64,
   bcsToBytes,
   deserializeVector,
+  serialization2DVectorWithFunc,
   serializeVector,
   serializeVectorWithFunc,
 } from "../../bcs/helper";
@@ -93,4 +95,36 @@ test("bcsSerializeFixedBytes", () => {
 
 test("serializeVectorWithFunc", () => {
   expect(serializeVectorWithFunc([false, true], "serializeBool")).toEqual(new Uint8Array([0x2, 0x0, 0x1]));
+});
+
+test("serialization2DVectorWithFunc", () => {
+  // Test with a 2D boolean array
+  const boolArray = [
+    [false, true],
+    [true, false, true]
+  ];
+  expect(serialization2DVectorWithFunc(boolArray, "serializeBool"))
+    .toEqual(new Uint8Array([0x2, 0x2, 0x0, 0x1, 0x3, 0x1, 0x0, 0x1]));
+  
+  // Test with a 2D integer array
+  const intArray: Uint32[][] = [
+    [1, 2, 3],
+    [4, 5]
+  ];
+  expect(serialization2DVectorWithFunc(intArray, "serializeU32AsUleb128"))
+    .toEqual(new Uint8Array([0x2, 0x3, 0x1, 0x2, 0x3, 0x2, 0x4, 0x5]));
+  
+  // Test with a 2D string array
+  const stringArray = [
+    ["hello", "world"],
+    ["foo", "bar", "baz"]
+  ];
+  expect(serialization2DVectorWithFunc(stringArray, "serializeStr"))
+    .toEqual(new Uint8Array([0x2, 0x2, 0x5, 0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x5, 0x77, 0x6f, 0x72, 
+      0x6c, 0x64, 0x3, 0x3, 0x66, 0x6f, 0x6f, 0x3, 0x62, 0x61, 0x72, 0x3, 0x62, 0x61, 0x7a]));
+  
+  // Test with an empty 2D array
+  const emptyArray: any[][] = [];
+  expect(serialization2DVectorWithFunc(emptyArray, "serializeBool"))
+    .toEqual(new Uint8Array([0x0]));
 });

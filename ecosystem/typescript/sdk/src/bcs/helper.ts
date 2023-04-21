@@ -45,6 +45,44 @@ export function deserializeVector(deserializer: Deserializer, cls: any): any[] {
   return list;
 }
 
+/**
+ * Serializes a 2D vector with specified item serialization function.
+ * Very dynamic function and bypasses static typechecking.
+ */
+export function serialization2DVectorWithFunc(value: any[][], func: string): Bytes {
+  const serializer = new Serializer()
+  serializer.serializeU32AsUleb128(value.length)
+  const f = (serializer as any)[func]
+  value.forEach((innerValue) => {
+    serializer.serializeU32AsUleb128(innerValue.length)
+    innerValue.forEach((item) => {
+      f.call(serializer, item)
+    })
+  })
+  return serializer.getBytes()
+}
+
+export function bcsVectorToBytes<T extends Serializable>(value: T[]): Bytes {
+  const serializer = new Serializer()
+  serializer.serializeU32AsUleb128(value.length)
+  value.forEach((innerValue) => {
+    innerValue.serialize(serializer)
+  })
+  return serializer.getBytes()
+}
+
+export function bcs2DVectorToBytes<T extends Serializable>(value: T[][]): Bytes {
+  const serializer = new Serializer()
+  serializer.serializeU32AsUleb128(value.length)
+  value.forEach((innerValue) => {
+    serializer.serializeU32AsUleb128(innerValue.length)
+    innerValue.forEach((item) => {
+      item.serialize(serializer)
+    })
+  })
+  return serializer.getBytes()
+}
+
 export function bcsToBytes<T extends Serializable>(value: T): Bytes {
   const serializer = new Serializer();
   value.serialize(serializer);
