@@ -151,11 +151,6 @@ const config = {
               },
               {
                 type: "doc",
-                label: "Read Blockchain Data",
-                docId: "/category/data",
-              },
-              {
-                type: "doc",
                 label: "Interact with the Blockchain",
                 docId: "guides/index",
               },

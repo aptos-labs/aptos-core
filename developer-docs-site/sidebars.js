@@ -114,25 +114,13 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Read Blockchain Data",
-      collapsible: true,
-      collapsed: true,
-      link: {
-        type: "generated-index",
-        title: "Read Blockchain Data",
-        description: "Use the Aptos API and indexer to read the Aptos blockchain state.",
-        slug: "/category/data",
-        keywords: ["data"],
-      },
-      items: ["guides/aptos-apis", "guides/indexing"],
-    },
-    {
-      type: "category",
       label: "Interact with the Blockchain",
       link: { type: "doc", id: "guides/index" },
       collapsible: true,
       collapsed: true,
       items: [
+        "guides/aptos-apis",
+        "guides/indexing",
         "guides/sign-a-transaction",
         "guides/resource-accounts",
         "guides/aptos-names-service-package",
