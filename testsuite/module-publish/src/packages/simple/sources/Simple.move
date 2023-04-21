@@ -16,7 +16,7 @@ module 0xABCD::Simple {
     use aptos_std::table::{Self, Table};
     use aptos_framework::account;
     use std::option::{Self, Option};
-    use aptos_std::string_utils::{to_string_with_canonical_addresses};
+    use aptos_std::string_utils::{to_string};
 
     // Through the constant pool it will be possible to change this
     // constant to be as big or as small as desired.
@@ -427,7 +427,6 @@ module 0xABCD::Simple {
 
     struct MinterConfig has key {
         signer_cap: account::SignerCapability,
-        minting_enabled: bool,
         minted_tokens: Table<address, Option<Token>>,
         tokendata_id: TokenDataId,
     }
@@ -458,7 +457,6 @@ module 0xABCD::Simple {
         // Create the Minter resource and publish it under the creator's address
         move_to(creator, MinterConfig {
             signer_cap,
-            minting_enabled: true,
             minted_tokens: table::new(),
             tokendata_id
         });
@@ -534,67 +532,69 @@ module 0xABCD::Simple {
 
     /// Mint NFT and store it in a table
     public entry fun token_v1_mint_and_store_nft_sequential(user: &signer, creator_address: address) acquires MinterConfig {
-        let creator = &get_signer(creator_address);
+        let resource_signer = &get_signer(creator_address);
+        let resource_signer_address = signer::address_of(resource_signer);
 
         // Make the tokendata name unique by appending a ` #` and the current supply + 1
-        let current_supply_opt = token::get_collection_supply(creator_address, string::utf8(COLLECTION_NAME));
+        let current_supply_opt = token::get_collection_supply(resource_signer_address, string::utf8(COLLECTION_NAME));
         let index = option::extract(&mut current_supply_opt) + 1;
         let tokendata_name = build_token_name(string::utf8(TOKEN_NAME), index);
 
-        let tokendata_id = create_token_data(creator, string::utf8(TOKEN_URI), tokendata_name, 1);
-        let token_id = token::mint_token(creator, tokendata_id, 1);
-        let token = token::withdraw_token(creator, token_id, 1);
+        let tokendata_id = create_token_data(resource_signer, string::utf8(TOKEN_URI), tokendata_name, 1);
+        let token_id = token::mint_token(resource_signer, tokendata_id, 1);
+        let token = token::withdraw_token(resource_signer, token_id, 1);
         set_token_minted(signer::address_of(user), creator_address, token);
     }
 
     /// Mint NFT and transfer it to the user
     public entry fun token_v1_mint_and_transfer_nft_sequential(user: &signer, creator_address: address) acquires MinterConfig {
-        let creator = &get_signer(creator_address);
+        let resource_signer = &get_signer(creator_address);
+        let resource_signer_address = signer::address_of(resource_signer);
 
         // Make the tokendata name unique by appending a ` #` and the current supply + 1
-        let current_supply_opt = token::get_collection_supply(creator_address, string::utf8(COLLECTION_NAME));
+        let current_supply_opt = token::get_collection_supply(resource_signer_address, string::utf8(COLLECTION_NAME));
         let index = option::extract(&mut current_supply_opt) + 1;
         let tokendata_name = build_token_name(string::utf8(TOKEN_NAME), index);
 
-        let tokendata_id = create_token_data(creator, string::utf8(TOKEN_URI), tokendata_name, 1);
-        let token_id = token::mint_token(creator, tokendata_id, 1);
-        token::direct_transfer(creator, user, token_id, 1);
+        let tokendata_id = create_token_data(resource_signer, string::utf8(TOKEN_URI), tokendata_name, 1);
+        let token_id = token::mint_token(resource_signer, tokendata_id, 1);
+        token::direct_transfer(resource_signer, user, token_id, 1);
     }
 
     /// Mint NFT and store it in a table
     public entry fun token_v1_mint_and_store_nft_parallel(user: &signer, creator_address: address) acquires MinterConfig {
-        let creator = &get_signer(creator_address);
-        let token_name = to_string_with_canonical_addresses<address>(&signer::address_of(user));
-        let tokendata_id = create_token_data(creator, string::utf8(TOKEN_URI), token_name, 1);
-        let token_id = token::mint_token(creator, tokendata_id, 1);
-        let token = token::withdraw_token(creator, token_id, 1);
+        let resource_signer = &get_signer(creator_address);
+        let token_name = to_string<address>(&signer::address_of(user));
+        let tokendata_id = create_token_data(resource_signer, string::utf8(TOKEN_URI), token_name, 1);
+        let token_id = token::mint_token(resource_signer, tokendata_id, 1);
+        let token = token::withdraw_token(resource_signer, token_id, 1);
         set_token_minted(signer::address_of(user), creator_address, token);
     }
 
     /// Mint NFT and transfer it to the user
     public entry fun token_v1_mint_and_transfer_nft_parallel(user: &signer, creator_address: address) acquires MinterConfig {
-        let creator = &get_signer(creator_address);
-        let token_name = to_string_with_canonical_addresses<address>(&signer::address_of(user));
-        let tokendata_id = create_token_data(creator, string::utf8(TOKEN_URI), token_name, 1);
-        let token_id = token::mint_token(creator, tokendata_id, 1);
-        token::direct_transfer(creator, user, token_id, 1);
+        let resource_signer = &get_signer(creator_address);
+        let token_name = to_string<address>(&signer::address_of(user));
+        let tokendata_id = create_token_data(resource_signer, string::utf8(TOKEN_URI), token_name, 1);
+        let token_id = token::mint_token(resource_signer, tokendata_id, 1);
+        token::direct_transfer(resource_signer, user, token_id, 1);
     }
 
     /// Mint FT and store it in a table
     public entry fun token_v1_mint_and_store_ft(user: &signer, creator_address: address) acquires MinterConfig {
-        let creator = &get_signer(creator_address);
+        let resource_signer = &get_signer(creator_address);
         let tokendata_id = borrow_global<MinterConfig>(creator_address).tokendata_id;
-        let token_id = token::mint_token(creator, tokendata_id, 1);
-        let token = token::withdraw_token(creator, token_id, 1);
+        let token_id = token::mint_token(resource_signer, tokendata_id, 1);
+        let token = token::withdraw_token(resource_signer, token_id, 1);
         set_token_minted(signer::address_of(user), creator_address, token);
     }
 
     /// Mint FT and transfer it to the user
     public entry fun token_v1_mint_and_transfer_ft(user: &signer, creator_address: address) acquires MinterConfig {
-        let creator = &get_signer(creator_address);
+        let resource_signer = &get_signer(creator_address);
         let tokendata_id = borrow_global<MinterConfig>(creator_address).tokendata_id;
-        let token_id = token::mint_token(creator, tokendata_id, 1);
-        token::direct_transfer(creator, user, token_id, 1);
+        let token_id = token::mint_token(resource_signer, tokendata_id, 1);
+        token::direct_transfer(resource_signer, user, token_id, 1);
     }
 
 }
