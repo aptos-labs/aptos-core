@@ -4,7 +4,6 @@
 
 use move_binary_format::errors::{PartialVMError, VMError};
 use move_core_types::vm_status::{StatusCode, StatusType};
-use tracing::error;
 //
 // Utility functions
 //
@@ -32,7 +31,6 @@ pub fn expect_no_verification_errors(err: VMError) -> VMError {
                 _ => unreachable!(),
             };
 
-            error!("[VM] {}", message);
             PartialVMError::new(major_status)
                 .with_message(message)
                 .at_indices(indices)

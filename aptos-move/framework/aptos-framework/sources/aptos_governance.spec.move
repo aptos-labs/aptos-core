@@ -250,6 +250,8 @@ spec aptos_framework::aptos_governance {
         use aptos_framework::transaction_fee;
         use aptos_framework::staking_config;
 
+        pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved)
+
         aborts_if !system_addresses::is_aptos_framework_address(signer::address_of(aptos_framework));
 
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;

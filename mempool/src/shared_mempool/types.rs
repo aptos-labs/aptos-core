@@ -12,7 +12,7 @@ use aptos_config::{
     config::{MempoolConfig, RoleType},
     network_id::PeerNetworkId,
 };
-use aptos_consensus_types::common::{RejectedTransactionSummary, TransactionSummary};
+use aptos_consensus_types::common::{RejectedTransactionSummary, TransactionInProgress};
 use aptos_crypto::HashValue;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_network::{
@@ -167,8 +167,10 @@ pub enum QuorumStoreRequest {
         u64,
         // return non full
         bool,
+        // include gas upgraded
+        bool,
         // transactions to exclude from the requested batch
-        Vec<TransactionSummary>,
+        Vec<TransactionInProgress>,
         // callback to respond to
         oneshot::Sender<Result<QuorumStoreResponse>>,
     ),
@@ -189,14 +191,16 @@ impl fmt::Display for QuorumStoreRequest {
                 max_txns,
                 max_bytes,
                 return_non_full,
+                include_gas_upgraded,
                 excluded_txns,
                 _,
             ) => {
                 format!(
-                    "GetBatchRequest [max_txns: {}, max_bytes: {}, return_non_full: {}, excluded_txns_length: {}]",
+                    "GetBatchRequest [max_txns: {}, max_bytes: {}, return_non_full: {}, include_gas_upgraded: {}, excluded_txns_length: {}]",
                     max_txns,
                     max_bytes,
                     return_non_full,
+                    include_gas_upgraded,
                     excluded_txns.len()
                 )
             },

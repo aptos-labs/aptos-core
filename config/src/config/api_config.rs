@@ -125,7 +125,7 @@ impl ConfigSanitizer for ApiConfig {
         }
 
         // Verify that failpoints are not enabled in mainnet
-        if chain_id.is_mainnet()? && api_config.failpoints_enabled {
+        if chain_id.is_mainnet() && api_config.failpoints_enabled {
             return Err(Error::ConfigSanitizerFailed(
                 sanitizer_name,
                 "Failpoints are not supported on mainnet nodes!".into(),

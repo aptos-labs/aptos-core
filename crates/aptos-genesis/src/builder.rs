@@ -27,7 +27,7 @@ use aptos_keygen::KeyGen;
 use aptos_logger::prelude::*;
 use aptos_types::{
     chain_id::ChainId,
-    on_chain_config::{GasScheduleV2, OnChainConsensusConfig},
+    on_chain_config::{GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig},
     transaction::Transaction,
     waypoint::Waypoint,
 };
@@ -410,6 +410,7 @@ pub struct GenesisConfiguration {
     pub employee_vesting_start: Option<u64>,
     pub employee_vesting_period_duration: Option<u64>,
     pub consensus_config: OnChainConsensusConfig,
+    pub execution_config: OnChainExecutionConfig,
     pub gas_schedule: GasScheduleV2,
 }
 
@@ -609,6 +610,7 @@ impl Builder {
             employee_vesting_start: None,
             employee_vesting_period_duration: None,
             consensus_config: OnChainConsensusConfig::default(),
+            execution_config: OnChainExecutionConfig::default(),
             gas_schedule: default_gas_schedule(),
         };
         if let Some(init_genesis_config) = &self.init_genesis_config {

@@ -1015,8 +1015,10 @@ dependencies = [
  "aptos-state-view",
  "aptos-storage-interface",
  "aptos-temppath",
+ "aptos-transaction-generator-lib",
  "aptos-types",
  "aptos-vm",
+ "async-trait",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "chrono",
  "criterion",
@@ -1030,6 +1032,7 @@ dependencies = [
  "rayon",
  "serde 1.0.149",
  "structopt",
+ "tokio",
  "toml",
 ]
 
@@ -2397,6 +2400,7 @@ dependencies = [
  "clap 3.2.23",
  "futures",
  "git2 0.16.1",
+ "handlebars",
  "hex",
  "move-binary-format",
  "move-core-types",
@@ -11213,6 +11217,7 @@ dependencies = [
  "aptos-types",
  "aptos-vault-client",
  "aptos-vm",
+ "aptos-vm-genesis",
  "aptos-writeset-generator",
  "async-trait",
  "base64 0.13.0",
@@ -11231,6 +11236,7 @@ dependencies = [
  "serde_yaml 0.8.26",
  "tokio",
  "url",
+ "walkdir",
 ]
 
 [[package]]

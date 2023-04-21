@@ -172,6 +172,42 @@ impl FatType {
     }
 }
 
+impl From<&TypeTag> for FatType {
+    fn from(tag: &TypeTag) -> FatType {
+        use FatType::*;
+        match tag {
+            TypeTag::Bool => Bool,
+            TypeTag::U8 => U8,
+            TypeTag::U16 => U16,
+            TypeTag::U32 => U32,
+            TypeTag::U64 => U64,
+            TypeTag::U128 => U128,
+            TypeTag::Address => Address,
+            TypeTag::Signer => Signer,
+            TypeTag::Vector(inner) => Vector(Box::new(inner.as_ref().into())),
+            TypeTag::Struct(inner) => Struct(Box::new(inner.as_ref().into())),
+            TypeTag::U256 => U256,
+        }
+    }
+}
+
+impl From<&StructTag> for FatStructType {
+    fn from(struct_tag: &StructTag) -> FatStructType {
+        FatStructType {
+            address: struct_tag.address,
+            module: struct_tag.module.clone(),
+            name: struct_tag.name.clone(),
+            abilities: WrappedAbilitySet(AbilitySet::EMPTY), // We can't get abilities from a struct tag
+            ty_args: struct_tag
+                .type_params
+                .iter()
+                .map(|inner| inner.into())
+                .collect(),
+            layout: vec![], // We can't get field types from struct tag
+        }
+    }
+}
+
 impl TryInto<MoveStructLayout> for &FatStructType {
     type Error = PartialVMError;
 

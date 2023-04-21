@@ -147,6 +147,7 @@ pub fn verify_script_with_config(config: &VerifierConfig, script: &CompiledScrip
     .unwrap_or_else(|_| {
         Err(
             PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION)
+                .with_message("[VM] bytecode verifier panicked for script".to_string())
                 .finish(Location::Undefined),
         )
     });

@@ -17,7 +17,7 @@ use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse, MAX_BLOCKS_PER_REQUEST},
     common::Author,
     experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
-    proof_of_store::{ProofOfStore, SignedBatchInfo},
+    proof_of_store::{ProofOfStore, ProofOfStoreMsg, SignedBatchInfo, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
     sync_info::SyncInfo,
     vote_msg::VoteMsg,
@@ -98,15 +98,15 @@ pub trait QuorumStoreSender: Send + Clone {
 
     async fn send_batch(&self, batch: Batch, recipients: Vec<Author>);
 
-    async fn send_signed_batch_info(
+    async fn send_signed_batch_info_msg(
         &self,
-        signed_batch_info: SignedBatchInfo,
+        signed_batch_infos: Vec<SignedBatchInfo>,
         recipients: Vec<Author>,
     );
 
-    async fn broadcast_batch_msg(&mut self, batch: Batch);
+    async fn broadcast_batch_msg(&mut self, batches: Vec<Batch>);
 
-    async fn broadcast_proof_of_store(&mut self, proof_of_store: ProofOfStore);
+    async fn broadcast_proof_of_store_msg(&mut self, proof_of_stores: Vec<ProofOfStore>);
 }
 
 /// Implements the actual networking support for all consensus messaging.
@@ -356,25 +356,26 @@ impl QuorumStoreSender for NetworkSender {
         self.send(msg, recipients).await
     }
 
-    async fn send_signed_batch_info(
+    async fn send_signed_batch_info_msg(
         &self,
-        signed_batch_info: SignedBatchInfo,
+        signed_batch_infos: Vec<SignedBatchInfo>,
         recipients: Vec<Author>,
     ) {
         fail_point!("consensus::send::signed_batch_info", |_| ());
-        let msg = ConsensusMsg::SignedBatchInfo(Box::new(signed_batch_info));
+        let msg =
+            ConsensusMsg::SignedBatchInfo(Box::new(SignedBatchInfoMsg::new(signed_batch_infos)));
         self.send(msg, recipients).await
     }
 
-    async fn broadcast_batch_msg(&mut self, batch: Batch) {
+    async fn broadcast_batch_msg(&mut self, batches: Vec<Batch>) {
         fail_point!("consensus::send::broadcast_batch", |_| ());
-        let msg = ConsensusMsg::BatchMsg(Box::new(BatchMsg::new(batch)));
+        let msg = ConsensusMsg::BatchMsg(Box::new(BatchMsg::new(batches)));
         self.broadcast(msg).await
     }
 
-    async fn broadcast_proof_of_store(&mut self, proof_of_store: ProofOfStore) {
+    async fn broadcast_proof_of_store_msg(&mut self, proofs: Vec<ProofOfStore>) {
         fail_point!("consensus::send::proof_of_store", |_| ());
-        let msg = ConsensusMsg::ProofOfStoreMsg(Box::new(proof_of_store));
+        let msg = ConsensusMsg::ProofOfStoreMsg(Box::new(ProofOfStoreMsg::new(proofs)));
         self.broadcast(msg).await
     }
 }

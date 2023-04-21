@@ -86,7 +86,7 @@ impl ConfigSanitizer for SafetyRulesConfig {
         }
 
         // Verify that the secure backend is appropriate for mainnet validators
-        if chain_id.is_mainnet()? && node_role.is_validator() {
+        if chain_id.is_mainnet() && node_role.is_validator() {
             if safety_rules_config.backend.is_github() {
                 return Err(Error::ConfigSanitizerFailed(
                     sanitizer_name,
@@ -102,7 +102,7 @@ impl ConfigSanitizer for SafetyRulesConfig {
         }
 
         // Verify that the safety rules service is set to local for optimal performance
-        if chain_id.is_mainnet()? && !safety_rules_config.service.is_local() {
+        if chain_id.is_mainnet() && !safety_rules_config.service.is_local() {
             return Err(Error::ConfigSanitizerFailed(
                 sanitizer_name,
                 format!("The safety rules service should be set to local in mainnet for optimal performance! Given config: {:?}", &safety_rules_config.service)
@@ -110,7 +110,7 @@ impl ConfigSanitizer for SafetyRulesConfig {
         }
 
         // Verify that the safety rules test config is not enabled in mainnet
-        if chain_id.is_mainnet()? && safety_rules_config.test.is_some() {
+        if chain_id.is_mainnet() && safety_rules_config.test.is_some() {
             return Err(Error::ConfigSanitizerFailed(
                 sanitizer_name,
                 "The safety rules test config should not be used in mainnet!".to_string(),

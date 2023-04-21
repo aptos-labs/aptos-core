@@ -10,7 +10,7 @@ use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse},
     epoch_retrieval::EpochRetrievalRequest,
     experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
-    proof_of_store::{ProofOfStore, SignedBatchInfo},
+    proof_of_store::{ProofOfStoreMsg, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
     sync_info::SyncInfo,
     vote_msg::VoteMsg,
@@ -58,9 +58,9 @@ pub enum ConsensusMsg {
     BatchResponse(Box<Batch>),
     /// Quorum Store: Send a signed batch digest. This is a vote for the batch and a promise that
     /// the batch of transactions was received and will be persisted until batch expiration.
-    SignedBatchInfo(Box<SignedBatchInfo>),
+    SignedBatchInfo(Box<SignedBatchInfoMsg>),
     /// Quorum Store: Broadcast a certified proof of store (a digest that received 2f+1 votes).
-    ProofOfStoreMsg(Box<ProofOfStore>),
+    ProofOfStoreMsg(Box<ProofOfStoreMsg>),
 }
 
 /// Network type for consensus

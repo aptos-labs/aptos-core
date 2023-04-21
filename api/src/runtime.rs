@@ -9,6 +9,7 @@ use crate::{
     view_function::ViewFunctionApi,
 };
 use anyhow::Context as AnyhowContext;
+use aptos_api_types::X_APTOS_CLIENT;
 use aptos_config::config::{ApiConfig, NodeConfig};
 use aptos_logger::info;
 use aptos_mempool::MempoolClientSender;
@@ -169,7 +170,11 @@ pub fn attach_poem_to_runtime(
             // https://stackoverflow.com/a/24689738/3846032
             .allow_credentials(true)
             .allow_methods(vec![Method::GET, Method::POST])
-            .allow_headers(vec![header::CONTENT_TYPE, header::ACCEPT]);
+            .allow_headers(vec![
+                header::HeaderName::from_static(X_APTOS_CLIENT),
+                header::CONTENT_TYPE,
+                header::ACCEPT,
+            ]);
 
         // Build routes for the API
         let route = Route::new()

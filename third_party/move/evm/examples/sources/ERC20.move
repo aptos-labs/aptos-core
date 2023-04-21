@@ -52,13 +52,13 @@ module Evm::ERC20 {
     #[callable, view]
     /// Returns the name of the token
     public fun name(): String acquires State {
-        *&borrow_global<State>(self()).name
+        borrow_global<State>(self()).name
     }
 
     #[callable, view]
     /// Returns the symbol of the token, usually a shorter version of the name.
     public fun symbol(): String acquires State {
-        *&borrow_global<State>(self()).symbol
+        borrow_global<State>(self()).symbol
     }
 
     #[callable, view]
@@ -70,7 +70,7 @@ module Evm::ERC20 {
     #[callable, view]
     /// Returns the total supply of the token.
     public fun totalSupply(): U256 acquires State {
-        *&borrow_global<State>(self()).total_supply
+        borrow_global<State>(self()).total_supply
     }
 
     #[callable, view]
