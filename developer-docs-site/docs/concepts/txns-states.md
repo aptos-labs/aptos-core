@@ -69,7 +69,7 @@ Currently the SDKs [Python](https://github.com/aptos-labs/aptos-core/blob/b0fe7e
 All operations on the Aptos blockchain should be available via entry point calls. While one could submit multiple transactions calling entry points in series, many such operations may benefit from being called atomically from a single transaction. A script payload transaction can call any entry point or public function defined within any module.
 
 :::tip Move book
-Currently there are no tutorials in this guide on script payloads, but the [Move book](../guides/move-guides/book/modules-and-scripts.md) does go in some depth.
+Currently there are no tutorials in this guide on script payloads, but the [Move book](../move/book/modules-and-scripts.md) does go in some depth.
 :::
 
 :::tip Read more
@@ -122,5 +122,5 @@ In the figure:
 - Accounts **A** and **B**: Represent Alice's and Bob's accounts on the Aptos blockchain.
 - **S<sub>*i-1*</sub>** : Represents the (*i-1*)-the state of the blockchain. In this state, Alice's account **A** has a balance of 110 APT (Aptos coins), and Bob's account **B** has a balance of 52 APT.
 - **T<sub>*i*</sub>** : This is the *i*-th transaction executed on the blockchain. In this example, it represents Alice sending 10 APT to Bob.
-- **Apply()**: This is a deterministic function that always returns the same final state for a specific initial state and a specific transaction. If the current state of the blockchain is **S<sub>*i-1*</sub>**, and transaction **T<sub>*i*</sub>** is executed on the state **S<sub>*i-1*</sub>**, then the new state of the blockchain is always **S<sub>*i*</sub>**. The Aptos blockchain uses the [Move language](../guides/move-guides/book/SUMMARY.md) to implement the deterministic execution function **Apply()**.
+- **Apply()**: This is a deterministic function that always returns the same final state for a specific initial state and a specific transaction. If the current state of the blockchain is **S<sub>*i-1*</sub>**, and transaction **T<sub>*i*</sub>** is executed on the state **S<sub>*i-1*</sub>**, then the new state of the blockchain is always **S<sub>*i*</sub>**. The Aptos blockchain uses the [Move language](../move/book/SUMMARY.md) to implement the deterministic execution function **Apply()**.
 - **S<sub>*i*</sub>** : This is the *i*-the state of the blockchain. When the transaction **T<sub>*i*</sub>** is applied to the blockchain, it generates the new state **S<sub>*i*</sub>** (an outcome of applying **Apply(S<sub>*i-1*</sub>, T<sub>*i*</sub>)** to **S<sub>*i-1*</sub>** and **T<sub>*i*</sub>**). This causes Alice’s account balance to be reduced by 10 to 100 APT and Bob’s account balance to be increased by 10 to 62 APT. The new state **S<sub>*i*</sub>** shows these updated balances.

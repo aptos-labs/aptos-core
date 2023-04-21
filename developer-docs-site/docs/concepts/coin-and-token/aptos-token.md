@@ -160,7 +160,7 @@ As shown in the diagram above, token-related data are stored at both the creator
 
 ### Struct-level resources
 
-The following tables describe fields at the struct level. For the definitive list, see the [Move reference documentation](../../guides/move-guides/index.md#aptos-move-documentation) for the [Aptos Token Framework](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/doc/overview.md).
+The following tables describe fields at the struct level. For the definitive list, see the [Move reference documentation](../../move/index.md#aptos-move-documentation) for the [Aptos Token Framework](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/doc/overview.md).
 
 #### Resource stored at the creator’s address
 

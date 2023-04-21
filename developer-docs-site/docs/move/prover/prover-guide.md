@@ -10,7 +10,7 @@ This is the user guide for the Move Prover. This document accompanies the
 
 ## Running the Move Prover
 
-The Move Prover is invoked via the [Aptos CLI](../../cli-tools/aptos-cli-tool/use-aptos-cli.md#move-examples). In order to call the CLI, you must have a [*Move package*](../move-guides/book/packages.md) in place. In the simplest case, a Move package is defined by a directory with a set of `.move` files in it and a manifest of the name `Move.toml`. You can create a new Move package at a given location by running the command: `aptos move init --name <name>`
+The Move Prover is invoked via the [Aptos CLI](../../cli-tools/aptos-cli-tool/use-aptos-cli.md#move-examples). In order to call the CLI, you must have a [*Move package*](../book/packages.md) in place. In the simplest case, a Move package is defined by a directory with a set of `.move` files in it and a manifest of the name `Move.toml`. You can create a new Move package at a given location by running the command: `aptos move init --name <name>`
 
 Once the package exists, call the Move Prover from the directory to be tested or by supplying its path to the `--package-dir` argument:
 

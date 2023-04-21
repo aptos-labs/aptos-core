@@ -267,7 +267,7 @@ then there is a guarantee that T_N will never be included in the blockchain.
 
 - **Move** is a new programming language that implements all the transactions on the Aptos blockchain.
 - It has two different kinds of code &mdash; [transaction scripts](#transaction-script) and [Move modules](#move-module).
-- Move is a safe and secure programming language for web3 that emphasizes access control and scarcity. It is the programming language used to build the Aptos blockchain. You can read more about it in [Move on Aptos](../guides/move-guides/move-on-aptos.md).
+- Move is a safe and secure programming language for web3 that emphasizes access control and scarcity. It is the programming language used to build the Aptos blockchain. You can read more about it in [Move on Aptos](../move/move-on-aptos.md).
 
 ### Move Bytecode
 
@@ -413,7 +413,7 @@ See [`table.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move
 - A single transaction script can send funds to multiple recipients and invoke procedures from several different modules.
 - A transaction script **is not** stored in the global state and cannot be invoked by other transaction scripts. It is a single-use program.
 
-To see example uses of transaction scripts, follow [Move scripts](../guides/move-guides/move-scripts.md) and the [Your First Multisig](../tutorials/first-multisig.md) tutorial.
+To see example uses of transaction scripts, follow [Move scripts](../move/move-scripts.md) and the [Your First Multisig](../tutorials/first-multisig.md) tutorial.
 
 ## V
 

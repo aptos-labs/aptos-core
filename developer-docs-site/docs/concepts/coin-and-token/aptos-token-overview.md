@@ -14,7 +14,7 @@ For details, see the official [Aptos Token](./aptos-token.md) standard.
 One of the major applications of blockchains is token generation and use; this use requires a standard defining
 the pattern a token must comply with. The Aptos team and communities have been moving
 fast and steadily to support various projects and creators to launch their tokens on the Aptos
-blockchain. As a new L1 blockchain equipped with the [Move programming language](../../guides/move-guides/index.md) - a relatively new language exclusively designed for the safety of smart contracts - our token standard inevitably differs from other
+blockchain. As a new L1 blockchain equipped with the [Move programming language](../../move/index.md) - a relatively new language exclusively designed for the safety of smart contracts - our token standard inevitably differs from other
 blockchains. In this document, we will briefly compare the token standard of Aptos with those of Ethereum and Solana.
 
 ## Account model

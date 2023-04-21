@@ -14,7 +14,7 @@ The Move transactional testing feature described in this document is in explorat
 
 If you are a smart contract developer using the Move language, then you can use the Move transactional tests to write and run end-to-end tests. 
 
-This tutorial walks you through the steps for writing and running end-to-end Move transactional tests using the [Aptos CLI](../../cli-tools/aptos-cli-tool/use-aptos-cli.md). 
+This tutorial walks you through the steps for writing and running end-to-end Move transactional tests using the [Aptos CLI](../cli-tools/aptos-cli-tool/use-aptos-cli.md). 
 
 Compared to the Move unit tests, which are useful for verifying the intra-module code correctness, the Move transactional tests enable you to test a broader spectrum of use cases, such as publishing the Move modules and the inter-module interactions. 
 

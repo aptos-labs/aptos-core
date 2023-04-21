@@ -17,24 +17,19 @@ To efficiently write smart contracts in Aptos, we recommend you first:
 
 Start here to learn how the Move language works on the Aptos blockchain. 
 
-- ### [Aptos CLI Move commands](../../cli-tools/aptos-cli-tool/use-aptos-cli.md#move-examples)
-- ### [Aptos Move Book](book/SUMMARY.md)
+- ### [Aptos CLI Move commands](../cli-tools/aptos-cli-tool/use-aptos-cli.md#move-examples)
+- ### [The Move Book](book/SUMMARY.md)
 - ### [Move on Aptos](./move-on-aptos.md)
 - ### [Move Primitives Tutorial](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/move-tutorial)
-- ### [Use Bytecode for Dependencies](./bytecode-dependencies.md)
-- ### [Gas and Transaction Fees](../../concepts/gas-txn-fee.md)
-- ### [How Base Gas Works](../../concepts/base-gas.md)
-- ### [Interact with the Move VM](../interacting-with-the-blockchain.md)
-- ### [Your First Move module](../../tutorials/first-move-module.md)
+- ### [Your First Move module](../tutorials/first-move-module.md)
 - ### [Mint NFT with Aptos CLI](./mint-nft-cli.md)
-- ### [Upgrading Move Code](./book/package-upgrades.md)
 - ### [Aptos Move Examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples)
 - ### [End-to-End Aptos Move Tests](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/e2e-move-tests/src/tests)
 - ### [Move language channel](https://discord.com/channels/945856774056083548/955573698868432896) in [Aptos Discord](https://discord.gg/aptoslabs).
 
 ## Aptos Move reference
 
-Then review our auto-generated contents for more [Move References](../../reference/move.md).
+Then review our auto-generated contents for more [Move References](../reference/move.md).
 
 ## Move tools
 
@@ -42,17 +37,17 @@ Use these tools to enhance your Move development experience.
 
 ### Aptos CLI
 
-The [Aptos command line interface](../../cli-tools/aptos-cli-tool/index.md) (CLI) helps you test development, as many of the functions in our SDKs have corresponding commands.
+The [Aptos command line interface](../cli-tools/aptos-cli-tool/index.md) (CLI) helps you test development, as many of the functions in our SDKs have corresponding commands.
 
 
 ### Aptos Simulation API
 
-Use the [Aptos Simulation API](../../concepts/gas-txn-fee.md#estimating-the-gas-units-via-simulation) to test your apps, understanding the blockchain is in an ever-changing state. For example, an auction where people are selling, bidding, and buying will return varying results second by second. Gambling apps may generate wildly different results in a short time. So depending upon your application, you should expect some randomness. So guard your users by keeping simulations realistic.
+Use the [Aptos Simulation API](../concepts/gas-txn-fee.md#estimating-the-gas-units-via-simulation) to test your apps, understanding the blockchain is in an ever-changing state. For example, an auction where people are selling, bidding, and buying will return varying results second by second. Gambling apps may generate wildly different results in a short time. So depending upon your application, you should expect some randomness. So guard your users by keeping simulations realistic.
 
 
 ### Move Prover
 
-Install the [Move Prover](../../cli-tools/install-move-prover.md) dependencies after installing the Aptos CLI If you want to use the Move Prover to validate your Move code.
+Install the [Move Prover](../cli-tools/install-move-prover.md) dependencies after installing the Aptos CLI If you want to use the Move Prover to validate your Move code.
 
 ### Move Debugger
 
@@ -68,7 +63,7 @@ Install these IDE plugins for the Move language to gain some handy features:
 - [Syntax highlighting for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=damirka.move-syntax)
 - [Move analyzer for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=move.move-analyzer): Supports advanced code navigation and syntax highlighting.
 - [Move language plugin for Jetbrains IDEs](https://plugins.jetbrains.com/plugin/14721-move-language): Supports syntax highlighting, code navigation, renames, formatting, type checks and code generation.
-- [Remix IDE Plugin](../../community/contributions/remix-ide-plugin.md): Offers a web-based development environment. It is a no-setup tool with a graphical interface for developing Move modules.
+- [Remix IDE Plugin](../community/contributions/remix-ide-plugin.md): Offers a web-based development environment. It is a no-setup tool with a graphical interface for developing Move modules.
 
 ## Supporting Move resources
 
@@ -81,7 +76,6 @@ Use these external resources to learn about the core Move programming language.
 * [Collection of nestable Move resources](https://github.com/taoheorg/taohe)
 * [Move-Lang tag on Stack Overflow](https://stackoverflow.com/questions/tagged/move-lang)
 * [Move language repository](https://github.com/move-language/move)
-* [Move by example](https://move-book.com/)
 * [Awesome Move resources](https://github.com/MystenLabs/awesome-move)
 
 Add your own recommended Move resources here. Simply click *Edit this page* below to go to the source and trigger editing there. See [Markdown syntax](https://www.markdownguide.org/basic-syntax/) for help.

@@ -19,7 +19,7 @@ Your Move code will fail compile-time checks for transaction arguments and produ
 
 #### Workaround
 
-Follow semantic rules for [entry modifiers](../docs/guides/move-guides/book/functions.md#entry-modifier) and avoid using an entry function that returns a value or passes a structure as a parameter. If such entry functions are already in use and you cannot remove them due to [compatibility issues](../docs/guides/move-guides/book/package-upgrades.md#compatibility-rules), use the `#[legacy_entry_fun]` attribute to allow your code to compile. See [coin.move]((../../../../aptos-move/framework/aptos-framework/sources/coin.move#L362)) for usage examples.
+Follow semantic rules for [entry modifiers](../docs/move/book/functions.md#entry-modifier) and avoid using an entry function that returns a value or passes a structure as a parameter. If such entry functions are already in use and you cannot remove them due to [compatibility issues](../docs/move/book/package-upgrades.md#compatibility-rules), use the `#[legacy_entry_fun]` attribute to allow your code to compile. See [coin.move]((../../../../aptos-move/framework/aptos-framework/sources/coin.move#L362)) for usage examples.
 
 ## Nodes
 
