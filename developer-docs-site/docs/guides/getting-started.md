@@ -114,4 +114,4 @@ This section contains links to frequently referred Aptos developer resources.
 
 ### IDE plugins for Move language
 
-Install the [IDE plugins for the Move language](../move/index.md#ides-for-move) for even more handy features.
+Install the [IDE plugins for the Move language](../move/move-on-aptos/start-building.md#ides-for-move) for even more handy features.

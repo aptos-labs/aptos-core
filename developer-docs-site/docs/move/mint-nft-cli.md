@@ -148,7 +148,7 @@ See [create_nft.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-m
 
 ## 2. Use resource account for automation
 
-This part maps to the demonstration in [create_nft_with_resource_account.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/move-examples/mint_nft/2-Using-Resource-Account/sources/create_nft_with_resource_account.move) and introduces the Aptos concept of [resource accounts](../guides/resource-accounts.md).
+This part maps to the demonstration in [create_nft_with_resource_account.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/move-examples/mint_nft/2-Using-Resource-Account/sources/create_nft_with_resource_account.move) and introduces the Aptos concept of [resource accounts](../move/move-on-aptos/resource-accounts.md).
 
 Since the Move model often requires knowing the signer of a transaction, Aptos provides resource accounts for assigning signer capability. Creating resource accounts enables access to the signer capability for automated use. With this ability, resource accounts can publish Move modules and automatically sign for transactions and minting. The signer capability can be assigned to the resource account or placed in storage locally within the module.
 
@@ -479,7 +479,7 @@ Create two accounts on devnet for deploying and managing this contract:
 
 ### Prepare resource account from source account
 
-In this section, we will create a [resource account](../guides/resource-accounts.md) from the `source-account` and publish the module on devnet under the resource account’s address. A resource account is used here to programmatically signed for transactions and avoids the need for multiple signatures.
+In this section, we will create a [resource account](../move/move-on-aptos/resource-accounts.md) from the `source-account` and publish the module on devnet under the resource account’s address. A resource account is used here to programmatically signed for transactions and avoids the need for multiple signatures.
 
 In the [NFT Tutorial](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/mint_nft) smart contract, we store the resource account’s signer capability in the `ModuleData` resource so that it can automatically sign for transactions in the contract. If we don’t store the signer capability within the module, we’d need to provide the resource account’s signer; but we no longer have access to the resource account’s signer because the resource account is meant to be autonomous, and the contracts published under a resource account are immutable. Once the contract is published, the resource account no longer has access to the signer.
 

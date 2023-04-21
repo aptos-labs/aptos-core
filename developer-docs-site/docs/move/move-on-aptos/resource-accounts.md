@@ -1,9 +1,9 @@
 ---
-title: "Use Resource Accounts in Apps"
+title: "Resource Accounts"
 slug: "resource-accounts"
 ---
 
-# Use Resource Accounts in Apps
+# Resource Accounts
 
 A [resource account](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/resource_account.move) is a developer feature used to manage resources independent of an account managed by a user, specifically publishing modules and automatically signing for transactions. For example, a developer may use a resource account to manage an account for module publishing, say managing a contract. The contract itself does not require a signer post initialization. A resource account gives you the means for the module to provide a signer to other modules and sign transactions on behalf of the module.
 

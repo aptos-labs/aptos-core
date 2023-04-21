@@ -68,7 +68,7 @@ Click the **Refresh** button in the upper right corner of the plug-in to apply
 
 ## Step 4: Create the Project
 
-In Aptos, you can write smart contracts with the [Move programming language](../../move/index.md). **WELLDONE Code** provides two features to help developers new to Aptos and Move.
+In Aptos, you can write smart contracts with the [Move programming language](../../move/move-on-aptos.md). **WELLDONE Code** provides two features to help developers new to Aptos and Move.
 
 ### Select a template
 

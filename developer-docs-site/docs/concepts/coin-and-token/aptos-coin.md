@@ -82,7 +82,7 @@ Coin users can:
 
 ### Coin module key struct
 
-The following tables describe fields at the struct level. For the definitive list, see the [Move reference documentation](../../move/index.md#aptos-move-documentation) for the [Aptos Framework](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/overview.md) containing [`coin`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/coin.md).
+The following tables describe fields at the struct level. For the definitive list, see the [Aptos Framework](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/overview.md) containing [`coin`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/coin.md).
 
 ##### [`Coin`](https://github.com/aptos-labs/aptos-core/blob/744c2def47cddced878fda9bbd5633022fdb083a/aptos-move/framework/aptos-framework/sources/coin.move#L68)
 
