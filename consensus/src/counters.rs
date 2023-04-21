@@ -540,11 +540,17 @@ pub static NUM_BLOCKS_IN_PIPELINE: Lazy<IntGaugeVec> = Lazy::new(|| {
 //     .unwrap()
 // });
 
+const NUM_CONSENSUS_TRANSACTIONS_BUCKETS: [f64; 24] = [
+    5.0, 10.0, 20.0, 40.0, 75.0, 100.0, 200.0, 400.0, 800.0, 1200.0, 1800.0, 2500.0, 3300.0,
+    4000.0, 5000.0, 6500.0, 8000.0, 10000.0, 12500.0, 15000.0, 18000.0, 21000.0, 25000.0, 30000.0,
+];
+
 /// Histogram for the number of txns per (committed) blocks.
 pub static NUM_TXNS_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "aptos_consensus_num_txns_per_block",
-        "Histogram for the number of txns per (committed) blocks."
+        "Histogram for the number of txns per (committed) blocks.",
+        NUM_CONSENSUS_TRANSACTIONS_BUCKETS.to_vec()
     )
     .unwrap()
 });
@@ -559,14 +565,17 @@ pub static BLOCK_TRACING: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
+const CONSENSUS_WAIT_DURATION_BUCKETS: [f64; 19] = [
+    0.005, 0.01, 0.015, 0.02, 0.04, 0.06, 0.08, 0.10, 0.125, 0.15, 0.175, 0.2, 0.225, 0.25, 0.3,
+    0.4, 0.6, 0.8, 2.0,
+];
+
 /// Histogram of the time it requires to wait before inserting blocks into block store.
 /// Measured as the block's timestamp minus local timestamp.
 pub static WAIT_DURATION_S: Lazy<DurationHistogram> = Lazy::new(|| {
-    DurationHistogram::new(
-        register_histogram!("aptos_consensus_wait_duration_s",
-            "Histogram of the time it requires to wait before inserting blocks into block store. Measured as the block's timestamp minus the local timestamp."
-        ).unwrap()
-    )
+    DurationHistogram::new(register_histogram!("aptos_consensus_wait_duration_s",
+    "Histogram of the time it requires to wait before inserting blocks into block store. Measured as the block's timestamp minus the local timestamp.",
+    CONSENSUS_WAIT_DURATION_BUCKETS.to_vec()).unwrap())
 });
 
 ///////////////////
@@ -717,11 +726,17 @@ pub static BUFFER_MANAGER_RETRY_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+const PROPSER_ELECTION_DURATION_BUCKETS: [f64; 17] = [
+    0.001, 0.002, 0.003, 0.004, 0.006, 0.008, 0.01, 0.012, 0.014, 0.0175, 0.02, 0.025, 0.05, 0.25,
+    0.5, 1.0, 2.0,
+];
+
 /// Time it takes for proposer election to compute proposer (when not cached)
 pub static PROPOSER_ELECTION_DURATION: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "aptos_consensus_proposer_election_duration",
-        "Time it takes for proposer election to compute proposer (when not cached)"
+        "Time it takes for proposer election to compute proposer (when not cached)",
+        PROPSER_ELECTION_DURATION_BUCKETS.to_vec()
     )
     .unwrap()
 });
