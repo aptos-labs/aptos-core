@@ -1362,8 +1362,10 @@ fn changing_working_quorum_test_helper(
             let block_size = (target_tps / 4) as u64;
             helm_values["validator"]["config"]["consensus"]["max_sending_block_txns"] =
                 block_size.into();
-            helm_values["validator"]["config"]["consensus"]["max_receiving_block_txns"] =
-                block_size.into();
+            helm_values["validator"]["config"]["consensus"]
+                ["max_sending_block_txns_quorum_store_override"] = block_size.into();
+            helm_values["validator"]["config"]["consensus"]
+                ["max_receiving_block_txns_quorum_store_override"] = block_size.into();
             helm_values["validator"]["config"]["consensus"]["round_initial_timeout_ms"] =
                 500.into();
             helm_values["validator"]["config"]["consensus"]
