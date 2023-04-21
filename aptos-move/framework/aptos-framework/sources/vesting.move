@@ -390,20 +390,24 @@ module aptos_framework::vesting {
 
     #[view]
     /// Return the shareholder address given the beneficiary address in a given vesting contract. If there are multiple
-    /// shareholders with the same beneficiary address, only the first shareholder is returned.
+    /// shareholders with the same beneficiary address, only the first shareholder is returned. If the given beneficiary
+    /// address is actually a shareholder address, just return the address back.
     ///
-    /// This returns 0x0 if no shareholder is found for the given beneficiary.
-    public fun shareholder(vesting_contract_address: address, beneficiary: address): address acquires VestingContract {
+    /// This returns 0x0 if no shareholder is found for the given beneficiary / the address is not a shareholder itself.
+    public fun shareholder(vesting_contract_address: address, shareholder_or_beneficiary: address): address acquires VestingContract {
         assert_active_vesting_contract(vesting_contract_address);
 
         let shareholders = &shareholders(vesting_contract_address);
+        if (vector::contains(shareholders, &shareholder_or_beneficiary)) {
+            return shareholder_or_beneficiary
+        };
         let vesting_contract = borrow_global<VestingContract>(vesting_contract_address);
         let i = 0;
         let len = vector::length(shareholders);
         while (i < len) {
             let shareholder = *vector::borrow(shareholders, i);
             // This will still return the shareholder if shareholder == beneficiary.
-            if (beneficiary == get_beneficiary(vesting_contract, shareholder)) {
+            if (shareholder_or_beneficiary == get_beneficiary(vesting_contract, shareholder)) {
                 return shareholder
             };
             i = i + 1;
@@ -1777,6 +1781,32 @@ module aptos_framework::vesting {
         // Reset the beneficiary with a random account. This should failed.
         set_beneficiary_resetter(admin, contract_address, signer::address_of(resetter));
         reset_beneficiary(random, contract_address, @11);
+    }
+
+    #[test(aptos_framework = @0x1, admin = @0x123, resetter = @0x234, random = @0x345)]
+    public entry fun test_shareholder(
+        aptos_framework: &signer,
+        admin: &signer,
+    ) acquires AdminStore, VestingContract {
+        let admin_address = signer::address_of(admin);
+        setup(aptos_framework, &vector[admin_address, @11, @12]);
+        let contract_address = setup_vesting_contract(
+            admin, &vector[@11], &vector[GRANT_AMOUNT], admin_address, 0);
+
+        // Confirm that the lookup returns the same address when a shareholder is
+        // passed for which there is no beneficiary.
+        assert!(shareholder(contract_address, @11) == @11, 0);
+
+        // Set a beneficiary for @11.
+        set_beneficiary(admin, contract_address, @11, @12);
+        assert!(beneficiary(contract_address, @11) == @12, 0);
+
+        // Confirm that lookup from beneficiary to shareholder works when a beneficiary
+        // is set.
+        assert!(shareholder(contract_address, @12) == @11, 0);
+
+        // Confirm that it returns 0x0 when the address is not in the map.
+        assert!(shareholder(contract_address, @33) == @0x0, 0);
     }
 
     #[test_only]
