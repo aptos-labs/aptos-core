@@ -193,10 +193,7 @@ const sidebars = {
           label: "Getting Started",
           collapsible: true,
           collapsed: true,
-          items: [
-            "move/book/introduction",
-            "move/book/modules-and-scripts",
-          ],
+          items: ["move/book/introduction", "move/book/modules-and-scripts"],
         },
         {
           type: "category",
@@ -242,20 +239,14 @@ const sidebars = {
           label: "Global Storage",
           collapsible: true,
           collapsed: true,
-          items: [
-            "move/book/global-storage-structure",
-            "move/book/global-storage-operators",
-          ],
+          items: ["move/book/global-storage-structure", "move/book/global-storage-operators"],
         },
         {
           type: "category",
           label: "Reference",
           collapsible: true,
           collapsed: true,
-          items: [
-            "move/book/standard-library",
-            "move/book/coding-conventions",
-          ],
+          items: ["move/book/standard-library", "move/book/coding-conventions"],
         },
       ],
     },
@@ -265,11 +256,7 @@ const sidebars = {
       link: { type: "doc", id: "move/prover/index" },
       collapsible: true,
       collapsed: true,
-      items: [
-        "move/prover/prover-guide",
-        "move/prover/spec-lang",
-        "move/prover/supporting-resources",
-      ],
+      items: ["move/prover/prover-guide", "move/prover/spec-lang", "move/prover/supporting-resources"],
     },
   ],
   nodeSidebar: [
