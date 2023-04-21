@@ -283,11 +283,6 @@ const config = {
                 type: "doc",
                 docId: "reference/glossary",
               },
-              {
-                label: "Issues and Workarounds",
-                type: "doc",
-                docId: "issues-and-workarounds",
-              },
             ],
           },
           {

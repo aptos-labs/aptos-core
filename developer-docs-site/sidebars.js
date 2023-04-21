@@ -451,7 +451,6 @@ const sidebars = {
     },
     "reference/move",
     "reference/glossary",
-    "issues-and-workarounds",
   ],
   comSidebar: [
     {

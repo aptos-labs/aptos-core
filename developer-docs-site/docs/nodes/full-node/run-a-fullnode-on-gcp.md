@@ -221,10 +221,6 @@ devnet0-aptos-fullnode-0   1/1     Running   0          56s
 
 ## Configure identity and seed peers
 
-:::tip Errors? 
-See [Issues and Workarounds](../../issues-and-workarounds.md) if you get any errors.
-:::
-
 ### Static identity
 
 If you want to configure your node with a static identity, first see the [Network Identity For Fullnode](./network-identity-fullnode.md) for how to generate the keys, and then follow the below instructions to configure your Terraform file.
