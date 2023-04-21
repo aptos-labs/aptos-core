@@ -255,16 +255,11 @@ const config = {
           {
             type: "dropdown",
             label: "Reference",
-            to: "reference/aptos-ref-docs",
+            to: "nodes/aptos-api-spec",
             position: "left",
             items: [
               {
-                label: "Aptos References",
-                type: "doc",
-                docId: "reference/index",
-              },
-              {
-                label: "REST API",
+                label: "Aptos REST API Spec",
                 type: "doc",
                 docId: "nodes/aptos-api-spec",
               },
@@ -274,7 +269,7 @@ const config = {
                 docId: "sdks/index",
               },
               {
-                label: "Move References",
+                label: "Aptos Move Framework",
                 type: "doc",
                 docId: "reference/move",
               },

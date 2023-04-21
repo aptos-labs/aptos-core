@@ -427,7 +427,6 @@ const sidebars = {
       value: "Aptos References",
       className: "sidebar-title",
     },
-    "reference/index",
     "nodes/aptos-api-spec",
     {
       type: "category",
