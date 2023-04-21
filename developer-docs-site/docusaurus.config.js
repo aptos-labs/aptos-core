@@ -390,45 +390,8 @@ const config = {
       {
         redirects: [
           {
-            to: "/move/book/package-upgrades",
-            from: "/move/upgrading-move-code",
-          },
-          {
-            to: "/nodes/full-node/public-fullnode",
-            from: "/nodes/full-node/fullnode-for-devnet",
-          },
-          {
-            to: "/nodes/full-node/public-fullnode",
-            from: "/tutorials/run-a-fullnode",
-          },
-          {
-            to: "/nodes/aptos-deployments",
-            from: "/tutorials/local-testnet-devnet-and-incentivized-testnet",
-          },
-          {
-            to: "/nodes/full-node/run-a-fullnode-on-gcp",
-            from: "/tutorials/run-a-fullnode-on-gcp",
-          },
-          {
-            to: "/nodes/validator-node/validators",
-            from: [
-              "/tutorials/validator-node/run-validator-node-using-gcp",
-              "/tutorials/validator-node/run-validator-node-using-aws",
-              "/tutorials/validator-node/run-validator-node-using-azure",
-              "/tutorials/validator-node/run-validator-node-using-docker",
-              "/tutorials/validator-node/run-validator-node-using-source",
-            ],
-          },
-          {
             to: "/concepts",
             from: [
-              "/basics/basics-txns-states",
-              "/basics/basics-accounts",
-              "/basics/basics-events",
-              "/basics/basics-gas-txn-fee",
-              "/basics/basics-fullnodes",
-              "/basics/basics-validator-nodes",
-              "/basics/basics-node-networks-sync",
               "/concepts/aptos-concepts",
               "/whats-new-in-docs",
             ],
@@ -438,100 +401,20 @@ const config = {
             from: ["/guides/basics-life-of-txn"],
           },
           {
-            to: "/concepts/txns-states",
-            from: ["/concepts/basics-txns-states"],
-          },
-          {
-            to: "/concepts/accounts",
-            from: ["/concepts/basics-accounts"],
-          },
-          {
-            to: "/concepts/events",
-            from: ["/concepts/basics-events"],
-          },
-          {
-            to: "/concepts/gas-txn-fee",
-            from: ["/concepts/basics-gas-txn-fee"],
-          },
-          {
-            to: "/concepts/fullnodes",
-            from: ["/concepts/basics-fullnodes"],
-          },
-          {
-            to: "/concepts/validator-nodes",
-            from: ["/concepts/basics-validator-nodes"],
-          },
-          {
-            to: "/concepts/node-networks-sync",
-            from: ["/concepts/basics-node-networks-sync"],
-          },
-          {
-            to: "/nodes/local-testnet/run-a-local-testnet",
-            from: "/nodes/run-a-local-testnet",
-          },
-          {
-            to: "/concepts/staking",
-            from: "/nodes/staking",
-          },
-          {
-            to: "/tutorials/your-first-nft",
-            from: "/tutorials/your-first-nft-sdk",
-          },
-          {
-            to: "/tutorials/your-first-transaction",
-            from: "/tutorials/your-first-transaction-sdk",
-          },
-          {
-            to: "/tutorials/first-move-module",
-            from: "/tutorials/first-move-module-cli",
-          },
-          {
-            to: "/sdks/ts-sdk/index",
-            from: "/sdks/typescript-sdk",
-          },
-          {
-            to: "/guides/explore-aptos",
-            from: ["/guides/use-aptos-explorer"],
-          },
-          {
-            to: "/guides/getting-started",
-            from: "/aptos-developer-resources",
-          },
-          {
-            to: "/concepts/txns-states",
-            from: "/concepts/merkle-proof",
-          },
-          {
-            to: "/nodes/validator-node/operator/connect-to-aptos-network",
-            from: "/nodes/ait/connect-to-testnet",
-          },
-          {
-            to: "/nodes/validator-node/operator/node-requirements",
-            from: "/nodes/ait/node-requirements",
-          },
-          {
-            to: "/nodes/validator-node/operator/node-liveness-criteria",
-            from: "/nodes/ait/node-liveness-criteria",
-          },
-          {
-            to: "/issues-and-workarounds",
-            from: "/nodes/full-node/troubleshooting-fullnode-setup",
-          },
-          {
-            to: "/move/mint-nft-cli",
-            from: "/concepts/coin-and-token/nft-airdrop-example",
+            to: "/move/book/package-upgrades",
+            from: "/move/upgrading-move-code",
           },
           {
             to: "/move/book/packages",
             from: "/move/bytecode-dependencies",
           },
           {
-            to: "/move/move-on-aptos",
-            from: "/guides/interacting-with-the-blockchain",
+            to: "/move/mint-nft-cli",
+            from: "/concepts/coin-and-token/nft-airdrop-example",
           },
           {
-            to: "/guides/state-sync",
-            from: "/concepts/state-sync",
+            to: "/move/move-on-aptos",
+            from: "/guides/interacting-with-the-blockchain",
           },
         ],
         createRedirects(existingPath) {
