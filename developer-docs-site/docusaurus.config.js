@@ -145,6 +145,11 @@ const config = {
                 docId: "tutorials/index",
               },
               {
+                label: "Learn the Move Language",
+                type: "doc",
+                docId: "move/move-on-aptos",
+              },
+              {
                 type: "doc",
                 label: "Follow the Aptos Standards",
                 docId: "concepts/coin-and-token/index",
@@ -168,29 +173,6 @@ const config = {
                 type: "doc",
                 label: "Build E2E Dapp on Aptos",
                 docId: "tutorials/build-e2e-dapp/index",
-              },
-            ],
-          },
-          {
-            type: "dropdown",
-            label: "Move",
-            to: "move/move-on-aptos",
-            position: "left",
-            items: [
-              {
-                label: "Move on Aptos",
-                type: "doc",
-                docId: "move/move-on-aptos",
-              },
-              {
-                label: "The Move Book",
-                type: "doc",
-                docId: "move/book/SUMMARY",
-              },
-              {
-                label: "The Move Prover Book",
-                type: "doc",
-                docId: "move/prover/index",
               },
             ],
           },
