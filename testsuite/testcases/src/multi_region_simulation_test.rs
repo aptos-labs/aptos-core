@@ -3,8 +3,8 @@
 
 use crate::{LoadDestination, NetworkLoadTest};
 use aptos_forge::{
-    GroupNetworkBandwidth, NetworkContext, NetworkTest, Swarm, SwarmChaos,
-    SwarmNetworkBandwidth, Test, GroupNetEm, SwarmNetEm, GroupCpuStress, SwarmCpuStress,
+    NetworkContext, NetworkTest, Swarm, SwarmChaos,
+    Test, GroupNetEm, SwarmNetEm, GroupCpuStress, SwarmCpuStress,
 };
 use aptos_logger::info;
 use aptos_types::PeerId;
@@ -50,7 +50,7 @@ fn get_link_stats_table() -> BTreeMap<String, BTreeMap<String, (u64, f64)>> {
 /// Creates a SwarmNetworkDelay
 fn create_multi_region_swarm_network_chaos(
     all_validators: Vec<PeerId>,
-) -> (SwarmNetEm, SwarmNetworkBandwidth, SwarmCpuStress) {
+) -> (SwarmNetEm, SwarmCpuStress) {
     let link_stats_table = get_link_stats_table();
 
     assert!(all_validators.len() >= link_stats_table.len());
@@ -60,10 +60,7 @@ fn create_multi_region_swarm_network_chaos(
 
     let validator_chunks = all_validators.chunks_exact(approx_validators_per_region);
 
-    let (mut group_netems, mut group_network_bandwidths): (
-        Vec<GroupNetEm>,
-        Vec<GroupNetworkBandwidth>,
-    ) = validator_chunks
+    let mut group_netems: Vec<GroupNetEm> = validator_chunks
         .clone()
         .zip(link_stats_table.iter().clone())
         .combinations(2)
@@ -81,22 +78,12 @@ fn create_multi_region_swarm_network_chaos(
                 delay_correlation_percentage: 50,
                 loss_percentage: 3,
                 loss_correlation_percentage: 50,
+                rate: *bandwidth / 8,
             };
             info!("netem {:?}", netem);
 
-            let bandwidth = GroupNetworkBandwidth {
-                name: format!("{}-to-{}-bandwidth", from_region, to_region),
-                source_nodes: from_chunk.to_vec(),
-                target_nodes: to_chunk.to_vec(),
-                rate: bandwidth / 8,
-                limit: 20971520,
-                buffer: 10000,
-            };
-            info!("bandwidth {:?}", bandwidth);
-
-            (netem, bandwidth)
-        })
-        .unzip();
+            netem
+        }).collect();
 
     let (mut self_delays, mut group_cpu_stresses): (Vec<GroupNetEm>, Vec<GroupCpuStress>) = validator_chunks.clone().zip(link_stats_table.iter().clone()).enumerate().map(|(idx, (chunk, (region, _)))| {
         let cpu_stress = GroupCpuStress {
@@ -114,6 +101,7 @@ fn create_multi_region_swarm_network_chaos(
             delay_correlation_percentage: 50,
             loss_percentage: 1,
             loss_correlation_percentage: 50,
+            rate: 10 * 1024 * 1024 * 1024 / 8, // 10 Gbps
         };
         (delay, cpu_stress)
     }).unzip();
@@ -128,9 +116,6 @@ fn create_multi_region_swarm_network_chaos(
     info!("remaining: {:?}", remaining_validators);
     if !remaining_validators.is_empty() {
         group_netems[0]
-            .source_nodes
-            .append(remaining_validators.to_vec().as_mut());
-        group_network_bandwidths[0]
             .source_nodes
             .append(remaining_validators.to_vec().as_mut());
         self_delays[0]
@@ -148,9 +133,6 @@ fn create_multi_region_swarm_network_chaos(
         SwarmNetEm {
             group_netems: itertools::concat(vec![self_delays, group_netems]),
         },
-        SwarmNetworkBandwidth {
-            group_network_bandwidths,
-        },
         SwarmCpuStress {
             group_cpu_stresses,
         }
@@ -165,17 +147,13 @@ impl NetworkLoadTest for MultiRegionMultiCloudSimulationTest {
             .map(|v| v.peer_id())
             .collect::<Vec<_>>();
 
-        let (netem, bandwidth, cpu) = create_multi_region_swarm_network_chaos(all_validators);
+        let (netem, cpu) = create_multi_region_swarm_network_chaos(all_validators);
 
-        // inject bandwidth limit
-        let chaos = SwarmChaos::Bandwidth(bandwidth);
-        ctx.swarm().inject_chaos(chaos)?;
-
-        // inject network delay
+        // inject netem chaos
         let chaos = SwarmChaos::NetEm(netem);
         ctx.swarm().inject_chaos(chaos)?;
 
-        // inject network delay
+        // inject cpu stress
         let chaos = SwarmChaos::CpuStress(cpu);
         ctx.swarm().inject_chaos(chaos)?;
 
@@ -202,13 +180,13 @@ mod tests {
         aptos_logger::Logger::new().init();
 
         let all_validators = (0..8).map(|_| PeerId::random()).collect();
-        let (delay, bandwidth) = create_multi_region_swarm_network_chaos(all_validators);
+        let (delay, cpu_stress) = create_multi_region_swarm_network_chaos(all_validators);
 
         assert_eq!(delay.group_network_delays.len(), 6);
         assert_eq!(bandwidth.group_network_bandwidths.len(), 6);
 
         let all_validators: Vec<PeerId> = (0..10).map(|_| PeerId::random()).collect();
-        let (delay, bandwidth) = create_multi_region_swarm_network_chaos(all_validators);
+        let (delay, cpu_stress) = create_multi_region_swarm_network_chaos(all_validators);
 
         assert_eq!(delay.group_network_delays.len(), 6);
         assert_eq!(bandwidth.group_network_bandwidths.len(), 6);

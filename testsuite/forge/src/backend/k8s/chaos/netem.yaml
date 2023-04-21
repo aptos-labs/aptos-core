@@ -18,6 +18,10 @@ spec:
   loss:
     loss: "{loss_percentage}"
     correlation: "{loss_correlation_percentage}"
+  bandwidth:
+    rate: "{rate}mbps"
+    limit: 20971520 # placeholder value. not supported by tc netem
+    buffer: 10000 # placeholder value. not supported by tc netem
   direction: both
   target:
     selector:

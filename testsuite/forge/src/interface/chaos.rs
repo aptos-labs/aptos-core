@@ -105,6 +105,7 @@ pub struct GroupNetEm {
     pub delay_correlation_percentage: u64,
     pub loss_percentage: u64,
     pub loss_correlation_percentage: u64,
+    pub rate: u64,
 }
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
