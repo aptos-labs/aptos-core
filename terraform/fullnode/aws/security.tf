@@ -3,7 +3,7 @@
 data "kubernetes_all_namespaces" "all" {}
 
 locals {
-  kubernetes_master_version = substr(aws_eks_cluster.aptos.version, 0, 4)
+  kubernetes_master_version = substr(data.aws_eks_cluster.aptos.version, 0, 4)
   baseline_pss_labels = {
     "pod-security.kubernetes.io/audit"   = "baseline"
     "pod-security.kubernetes.io/warn"    = "baseline"

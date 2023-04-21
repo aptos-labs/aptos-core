@@ -79,17 +79,17 @@ spec aptos_framework::staking_config {
     }
 
     spec get_reward_rate(config: &StakingConfig): (u64, u64) {
-        aborts_if features::spec_reward_rate_decrease_enabled();
+        include StakingRewardsConfigRequirement;
     }
 
     spec calculate_and_save_latest_epoch_rewards_rate(): FixedPoint64 {
         aborts_if !exists<StakingRewardsConfig>(@aptos_framework);
-        aborts_if !features::spec_reward_rate_decrease_enabled();
+        aborts_if !features::spec_periodical_reward_rate_decrease_enabled();
         include StakingRewardsConfigRequirement;
     }
 
     spec calculate_and_save_latest_rewards_config(): StakingRewardsConfig {
-        requires features::spec_reward_rate_decrease_enabled();
+        requires features::spec_periodical_reward_rate_decrease_enabled();
         include StakingRewardsConfigRequirement;
         aborts_if !exists<StakingRewardsConfig>(@aptos_framework);
     }
@@ -134,7 +134,7 @@ spec aptos_framework::staking_config {
         new_rewards_rate_denominator: u64,
     ) {
         use std::signer;
-        aborts_if features::spec_reward_rate_decrease_enabled();
+        aborts_if features::spec_periodical_reward_rate_decrease_enabled();
         let addr = signer::address_of(aptos_framework);
         aborts_if addr != @aptos_framework;
         aborts_if new_rewards_rate_denominator <= 0;
@@ -209,7 +209,7 @@ spec aptos_framework::staking_config {
 
     spec schema StakingRewardsConfigRequirement {
         requires exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
-        include features::spec_reward_rate_decrease_enabled() ==> StakingRewardsConfigEnabledRequirement;
+        include features::spec_periodical_reward_rate_decrease_enabled() ==> StakingRewardsConfigEnabledRequirement;
     }
 
     spec schema StakingRewardsConfigEnabledRequirement {

@@ -5,14 +5,16 @@ use crate::{
     error::Error,
     logging::{LogEntry, LogSchema},
     metrics,
-    metrics::{increment_counter, start_timer, LRU_CACHE_HIT, LRU_CACHE_PROBE},
+    metrics::{
+        increment_counter, start_timer, LRU_CACHE_HIT, LRU_CACHE_PROBE, SUBSCRIPTION_EVENT_ADD,
+    },
     network::ResponseSender,
     storage::StorageReaderInterface,
     subscription::DataSubscriptionRequest,
 };
 use aptos_config::network_id::PeerNetworkId;
 use aptos_infallible::{Mutex, RwLock};
-use aptos_logger::{debug, error, sample, sample::SampleRate};
+use aptos_logger::{debug, error, sample, sample::SampleRate, warn};
 use aptos_network::ProtocolId;
 use aptos_storage_service_types::{
     requests::{
@@ -91,15 +93,17 @@ impl<T: StorageReaderInterface> Handler<T> {
         }
 
         // Process the request and return the response to the client
-        let response = self.process_request(protocol_id, request.clone());
+        let response = self.process_request(&peer_network_id, protocol_id, request.clone(), false);
         self.send_response(request, response, response_sender);
     }
 
     /// Processes the given request and returns the response
     pub(crate) fn process_request(
         &self,
+        peer_network_id: &PeerNetworkId,
         protocol: ProtocolId,
         request: StorageServiceRequest,
+        subscription_related: bool,
     ) -> aptos_storage_service_types::Result<StorageServiceResponse> {
         // Time the request processing (the timer will stop when it's dropped)
         let _timer = start_timer(
@@ -119,7 +123,9 @@ impl<T: StorageReaderInterface> Handler<T> {
                 );
                 error!(LogSchema::new(LogEntry::StorageServiceError)
                     .error(&error)
-                    .request(&request));
+                    .peer_network_id(peer_network_id)
+                    .request(&request)
+                    .subscription_related(subscription_related));
 
                 // Return an appropriate response to the client
                 match error {
@@ -193,15 +199,32 @@ impl<T: StorageReaderInterface> Handler<T> {
         // Create the subscription request
         let subscription_request = DataSubscriptionRequest::new(
             protocol_id,
-            request,
+            request.clone(),
             response_sender,
             self.time_service.clone(),
         );
 
-        // Store the subscription for when there is new data
-        self.data_subscriptions
+        // Store the subscription and check if any existing subscriptions were found
+        if self
+            .data_subscriptions
             .lock()
-            .insert(peer_network_id, subscription_request);
+            .insert(peer_network_id, subscription_request)
+            .is_some()
+        {
+            warn!(LogSchema::new(LogEntry::SubscriptionRequest)
+                .error(&Error::InvalidRequest(
+                    "An active subscription was already found for the peer!".into()
+                ))
+                .peer_network_id(&peer_network_id)
+                .request(&request));
+        }
+
+        // Update the subscription metrics
+        increment_counter(
+            &metrics::SUBSCRIPTION_EVENT,
+            protocol_id,
+            SUBSCRIPTION_EVENT_ADD.into(),
+        );
     }
 
     /// Processes a storage service request for which the response
