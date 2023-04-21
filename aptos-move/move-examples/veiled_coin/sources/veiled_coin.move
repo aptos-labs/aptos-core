@@ -71,14 +71,17 @@ module veiled_coin::veiled_coin {
     // Core data structures.
     //
 
-    // TODO: Describe in comment
+    /// Contains the data necessary to prove that a veiled coin transfer can occur,
+    /// given also a sender and a recipient, and one ciphertext each for the sender
+    /// and recipient which encrypt the amount to be sent using each user's public key. 
     struct VeiledTransferProof<phantom CoinType> has drop {
         updated_balance_proof: RangeProof,
         transferred_amount_proof: RangeProof,
         sigma_proof: SigmaProof<CoinType>,
     }
 
-    // TODO: Describe in comment
+    /// Contains the data necessary for a sigma protocol proof used for veiled coin transfers.
+    /// A more detailed description can be found in the documentation of verify_withdrawal_sigma_protocol
     struct SigmaProof<phantom CoinType> has drop {
         x1: RistrettoPoint,
         x2: RistrettoPoint, 
@@ -106,6 +109,9 @@ module veiled_coin::veiled_coin {
     }
 
     /// Deserializes and returns a VeiledWithdrawalProof given its byte representation.
+    /// Elements at the end of the SigmaProof struct are expected to be at the start
+    /// of the byte vector, and serialized using the serialization formats in the 
+    /// ristretto255 module.  
     fun deserialize_sigma_proof<CoinType>(proof_bytes: vector<u8>): Option<SigmaProof<CoinType>> {
         assert!(vector::length<u8>(&proof_bytes) == 288, EBYTES_WRONG_LENGTH);
         let x1_bytes = cut_vector<u8>(&mut proof_bytes, 32);
@@ -345,7 +351,13 @@ module veiled_coin::veiled_coin {
 
     /// Verifies a sigma proof needed to perform a private withdrawal. The relation is described on
     /// page 14 of the Zether paper: https://crypto.stanford.edu/~buenz/papers/zether.pdf
-    // TODO: Finish description
+    /// Specifically, this protocol proves that `withdrawal_ct` and `deposit_ct` encrypt the same 
+    /// amount b^* using the same randomness r, with `sender_pubkey` and `recipient_pubkey` 
+    /// respectively. It additionally proves that `sender_pubkey` was generated with the sender's 
+    /// secret key sk, and that `balance` equals the correct updated value b' once `withdrawal_ct` 
+    /// has been subtracted from it. 
+    /// Note that r, sk, b^*, b' are all secret values given only to the prover. The protocol's 
+    /// zero-knowledge property ensures they are not revealed. 
     fun verify_withdrawal_sigma_protocol<CoinType>(sender_pubkey: &elgamal::Pubkey, recipient_pubkey: &Pubkey, balance: &Ciphertext, withdrawal_ct: &Ciphertext, deposit_ct: &Ciphertext, proof: &SigmaProof<CoinType>) {
         let sender_pubkey_point = elgamal::get_point_from_pubkey(sender_pubkey);
         let recipient_pubkey_point = elgamal::get_point_from_pubkey(recipient_pubkey);
@@ -645,7 +657,8 @@ module veiled_coin::veiled_coin {
     const SOME_RANDOMNESS_8: vector<u8> = x"d2c7b42b75503bfc7b1932783786d227ebf88f79da752b68f6b865a9c179640c";
 
     #[test_only]                           
-    // TODO: Describe in comment
+    /// Proves the sigma protocol used for veiled coin transfers.
+    /// A more detailed description can be found in the documentation for verify_withdrawal_sigma_protocol
     public fun generate_sigma_proof<CoinType>(
         source_pubkey: &elgamal::Pubkey, 
         dest_pubkey: &elgamal::Pubkey, 
@@ -767,8 +780,10 @@ module veiled_coin::veiled_coin {
         }
     }
 
-    // TODO: Describe in comment 
     #[test_only]
+    /// Given a sigma proof, serializes it into byte form. 
+    /// Elements at the end of the SigmaProof struct are placed into the vector first,
+    /// using the serialization formats in the ristretto255 module. 
     public fun serialize_sigma_proof<CoinType>(proof: &SigmaProof<CoinType>): vector<u8> {
         let x1_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x1));
         let x2_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x2));
@@ -779,17 +794,6 @@ module veiled_coin::veiled_coin {
         let alpha2_bytes = ristretto255::scalar_to_bytes(&proof.alpha2);
         let alpha3_bytes = ristretto255::scalar_to_bytes(&proof.alpha3);
         let alpha4_bytes = ristretto255::scalar_to_bytes(&proof.alpha4); 
-
-        /*let bytes = vector::empty<u8>();
-        vector::append<u8>(&mut bytes, x1_bytes);
-        vector::append<u8>(&mut bytes, x2_bytes);
-        vector::append<u8>(&mut bytes, x3_bytes);
-        vector::append<u8>(&mut bytes, x4_bytes);
-        vector::append<u8>(&mut bytes, x5_bytes);
-        vector::append<u8>(&mut bytes, alpha1_bytes);
-        vector::append<u8>(&mut bytes, alpha2_bytes);
-        vector::append<u8>(&mut bytes, alpha3_bytes);
-        vector::append<u8>(&mut bytes, alpha4_bytes);*/
 
         let bytes = vector::empty<u8>();
         vector::append<u8>(&mut bytes, alpha4_bytes);
@@ -828,7 +832,6 @@ module veiled_coin::veiled_coin {
        let transfer_val = new_scalar_from_u64(50);
        let (_, dest_pubkey) = generate_elgamal_keypair(SOME_RANDOMNESS_3);
        let balance_ct = elgamal::new_ciphertext_with_basepoint(&balance_val, &balance_rand, &source_pubkey);
-       //let source_randomness = ristretto255::scalar_neg(&rand);
        let transfer_rand = ristretto255::new_scalar_from_sha2_512(SOME_RANDOMNESS_4);
        let (_, withdraw_ct) = bulletproofs::prove_range_elgamal(&transfer_val, &transfer_rand, &source_pubkey, MAX_BITS_IN_VALUE, VEILED_COIN_DST);
        let new_balance_val = new_scalar_from_u64(100);
