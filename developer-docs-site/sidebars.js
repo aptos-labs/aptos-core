@@ -35,7 +35,14 @@ const sidebars = {
         "concepts/gas-txn-fee",
         "concepts/base-gas",
         "concepts/blocks",
-        "concepts/blockchain",
+        {
+          type: "category",
+          label: "Aptos Blockchain Deep Dive",
+          link: { type: "doc", id: "concepts/blockchain" },
+          collapsible: true,
+          collapsed: true,
+          items: ["concepts/validator-nodes", "concepts/fullnodes", "concepts/node-networks-sync"],
+        },
         "concepts/staking",
         "concepts/governance",
       ],
@@ -56,6 +63,7 @@ const sidebars = {
       link: { type: "doc", id: "releases/index" },
       items: ["releases/mainnet-release", "releases/testnet-release", "releases/devnet-release"],
     },
+    "nodes/aptos-deployments",
     "guides/explore-aptos",
     "guides/system-integrators-guide",
   ],
@@ -272,27 +280,7 @@ const sidebars = {
       value: "Run Nodes",
       className: "sidebar-title",
     },
-    {
-      type: "category",
-      label: "Learn about Nodes",
-      collapsible: true,
-      collapsed: true,
-      link: { type: "doc", id: "nodes/nodes-landing" },
-      items: ["concepts/node-networks-sync", "nodes/aptos-deployments", "nodes/leaderboard-metrics"],
-    },
-    /** Delete during clean up
-    {
-      type: "category",
-      label: "AIT-3",
-      link: { type: "doc", id: "nodes/ait/index" },
-      collapsible: true,
-      collapsed: true,
-      items: [
-        "nodes/ait/whats-new-in-ait3",
-        "nodes/ait/steps-in-ait3",
-
-      ],
-    },  */
+    "nodes/nodes-landing",
     {
       type: "category",
       label: "Develop Locally",
@@ -313,7 +301,6 @@ const sidebars = {
       collapsible: true,
       collapsed: true,
       items: [
-        "concepts/validator-nodes",
         {
           type: "category",
           label: "Owner",
@@ -359,6 +346,7 @@ const sidebars = {
           link: { type: "doc", id: "nodes/validator-node/voter/index" },
           items: [],
         },
+        "nodes/leaderboard-metrics",
       ],
     },
     {
@@ -368,7 +356,6 @@ const sidebars = {
       collapsible: true,
       collapsed: true,
       items: [
-        "concepts/fullnodes",
         "nodes/full-node/fullnode-source-code-or-docker",
         "nodes/full-node/bootstrap-fullnode",
         "nodes/full-node/update-fullnode-with-new-releases",
@@ -403,13 +390,14 @@ const sidebars = {
         "guides/data-pruning",
         {
           type: "category",
-          label: "Node Files For Mainnet",
+          label: "Node Files",
           collapsible: true,
           collapsed: true,
           link: { type: "doc", id: "nodes/node-files-all-networks/node-files" },
           items: [
-            "nodes/node-files-all-networks/node-files-devnet",
+            "nodes/node-files-all-networks/node-files",
             "nodes/node-files-all-networks/node-files-testnet",
+            "nodes/node-files-all-networks/node-files-devnet",
           ],
         },
       ],
