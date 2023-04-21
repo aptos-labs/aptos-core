@@ -381,10 +381,7 @@ const config = {
         redirects: [
           {
             to: "/concepts",
-            from: [
-              "/concepts/aptos-concepts",
-              "/whats-new-in-docs",
-            ],
+            from: ["/concepts/aptos-concepts", "/whats-new-in-docs"],
           },
           {
             to: "/concepts/blockchain",
@@ -408,10 +405,10 @@ const config = {
           },
         ],
         createRedirects(existingPath) {
-          if (existingPath.includes('/move')) {
+          if (existingPath.includes("/move")) {
             return [
-              existingPath.replace('/move/prover', '/guides/prover-guides'),
-              existingPath.replace('/move', '/guides/move-guides'),
+              existingPath.replace("/move/prover", "/guides/prover-guides"),
+              existingPath.replace("/move", "/guides/move-guides"),
             ];
           }
           return undefined;
