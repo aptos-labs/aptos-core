@@ -466,19 +466,6 @@ module 0xABCD::Simple {
         account::create_signer_with_capability(&borrow_global<MinterConfig>(account_address).signer_cap)
     }
 
-    fun u64_to_string(value: u64): String {
-        if (value == 0) {
-            return string::utf8(b"0")
-        };
-        let buffer = vector::empty<u8>();
-        while (value != 0) {
-            vector::push_back(&mut buffer, ((48 + value % 10) as u8));
-            value = value / 10;
-        };
-        vector::reverse(&mut buffer);
-        string::utf8(buffer)
-    }
-
     fun set_token_minted(user_address: address, creator_address: address, token: Token) acquires MinterConfig {
         let minted_tokens = &mut borrow_global_mut<MinterConfig>(creator_address).minted_tokens;
         table::add(minted_tokens, user_address, option::some(token));
@@ -487,7 +474,7 @@ module 0xABCD::Simple {
     /// Make the tokendata name unique by appending a ` #` and the index
     fun build_token_name(token_prefix: String, index: u64): String {
         string::append_utf8(&mut token_prefix, b" #");
-        string::append(&mut token_prefix, u64_to_string(index));
+        string::append(&mut token_prefix, to_string<u64>(&index));
         token_prefix
     }
 
