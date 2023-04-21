@@ -969,7 +969,7 @@ fn individual_workload_tests(test_name: String, config: ForgeConfig) -> ForgeCon
                 "publishing" => 60,
                 "write_new_resource" => 3700,
                 "module_loading" => 1800,
-                "token_v1" => 1000,
+                "token_v1" => 700,
                 _ => unreachable!("{}", test_name),
             })
             .add_no_restarts()
