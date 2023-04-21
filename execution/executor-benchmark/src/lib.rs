@@ -31,6 +31,7 @@ use aptos_transaction_generator_lib::{
     create_txn_generator_creator, TransactionGeneratorCreator, TransactionType,
 };
 use gen_executor::DbGenInitTransactionExecutor;
+use pipeline::PipelineConfig;
 use std::{
     fs,
     path::Path,
@@ -38,7 +39,6 @@ use std::{
     time::Instant,
 };
 use tokio::runtime::Runtime;
-use transaction_generator::MAX_ACCOUNTS_INVOLVED_IN_P2P;
 
 pub fn init_db_and_executor<V>(
     config: &NodeConfig,
@@ -85,13 +85,14 @@ pub fn run_benchmark<V>(
     num_transfer_blocks: usize,
     transaction_type: Option<TransactionType>,
     transactions_per_sender: usize,
+    num_main_signer_accounts: usize,
     source_dir: impl AsRef<Path>,
     checkpoint_dir: impl AsRef<Path>,
     verify_sequence_numbers: bool,
     pruner_config: PrunerConfig,
     use_state_kv_db: bool,
     use_sharded_state_merkle_db: bool,
-    split_stages: bool,
+    pipeline_config: PipelineConfig,
 ) where
     V: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
 {
@@ -109,17 +110,25 @@ pub fn run_benchmark<V>(
 
     let (db, executor) = init_db_and_executor::<V>(&config);
 
-    let transaction_generator_creator = transaction_type
-        .map(|transaction_type| init_workload::<V, _>(transaction_type, db.clone(), &source_dir));
+    let transaction_generator_creator = transaction_type.map(|transaction_type| {
+        init_workload::<V, _>(
+            transaction_type,
+            num_main_signer_accounts,
+            db.clone(),
+            &source_dir,
+            pipeline_config.clone(),
+        )
+    });
 
     let version = db.reader.get_latest_version().unwrap();
-    let (pipeline, block_sender) = Pipeline::new(executor, version, split_stages);
+    let (pipeline, block_sender) = Pipeline::new(executor, version, pipeline_config);
     let mut generator = TransactionGenerator::new_with_existing_db(
         db.clone(),
         genesis_key,
         block_sender,
         source_dir,
         version,
+        Some(num_main_signer_accounts),
     );
 
     let start_time = Instant::now();
@@ -141,9 +150,9 @@ pub fn run_benchmark<V>(
     info!(
         "Overall TPS: {}: {} txn/s",
         if let Some(ttype) = transaction_type {
-            format!("{:?}", ttype)
+            format!("{:?} via txn generator", ttype)
         } else {
-            "transfer".to_string()
+            "raw transfer".to_string()
         },
         delta_v as f32 / elapsed
     );
@@ -155,21 +164,27 @@ pub fn run_benchmark<V>(
 
 fn init_workload<V, P: AsRef<Path>>(
     transaction_type: TransactionType,
+    num_main_signer_accounts: usize,
     db: DbReaderWriter,
     db_dir: &P,
+    pipeline_config: PipelineConfig,
 ) -> Box<dyn TransactionGeneratorCreator>
 where
     V: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
 {
     let version = db.reader.get_latest_version().unwrap();
     let (pipeline, block_sender) =
-        Pipeline::<V>::new(BlockExecutor::new(db.clone()), version, false);
+        Pipeline::<V>::new(BlockExecutor::new(db.clone()), version, pipeline_config);
 
     let runtime = Runtime::new().unwrap();
 
     let num_existing_accounts = TransactionGenerator::read_meta(db_dir);
-    let num_cached_accounts = std::cmp::min(num_existing_accounts, MAX_ACCOUNTS_INVOLVED_IN_P2P);
-    let mut accounts_cache = TransactionGenerator::gen_user_account_cache(num_cached_accounts);
+    // let num_cached_accounts = std::cmp::min(num_existing_accounts, num_main_signer_accounts);
+    let accounts_cache =
+        TransactionGenerator::gen_user_account_cache(db.reader.clone(), num_existing_accounts);
+
+    let (mut main_signer_accounts, burner_accounts) =
+        accounts_cache.split(num_main_signer_accounts);
     let transaction_factory = TransactionGenerator::create_transaction_factory();
 
     let (txn_generator_creator, _address_pool, _account_pool) = runtime.block_on(async {
@@ -183,7 +198,8 @@ where
         create_txn_generator_creator(
             &[vec![(transaction_type, 1)]],
             1,
-            accounts_cache.accounts_mut(),
+            &mut main_signer_accounts,
+            burner_accounts,
             &db_gen_init_transaction_executor,
             &transaction_factory,
             &transaction_factory,
@@ -207,6 +223,7 @@ pub fn add_accounts<V>(
     verify_sequence_numbers: bool,
     use_state_kv_db: bool,
     use_sharded_state_merkle_db: bool,
+    pipeline_config: PipelineConfig,
 ) where
     V: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
 {
@@ -226,6 +243,7 @@ pub fn add_accounts<V>(
         verify_sequence_numbers,
         use_state_kv_db,
         use_sharded_state_merkle_db,
+        pipeline_config,
     );
 }
 
@@ -239,6 +257,7 @@ fn add_accounts_impl<V>(
     verify_sequence_numbers: bool,
     use_state_kv_db: bool,
     use_sharded_state_merkle_db: bool,
+    pipeline_config: PipelineConfig,
 ) where
     V: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
 {
@@ -251,7 +270,7 @@ fn add_accounts_impl<V>(
 
     let version = db.reader.get_latest_version().unwrap();
 
-    let (pipeline, block_sender) = Pipeline::new(executor, version, false);
+    let (pipeline, block_sender) = Pipeline::new(executor, version, pipeline_config);
 
     let mut generator = TransactionGenerator::new_with_existing_db(
         db.clone(),
@@ -259,6 +278,7 @@ fn add_accounts_impl<V>(
         block_sender,
         &source_dir,
         version,
+        None,
     );
 
     let start_time = Instant::now();
@@ -307,21 +327,31 @@ fn add_accounts_impl<V>(
 
 #[cfg(test)]
 mod tests {
-    use crate::{benchmark_transaction::BenchmarkTransaction, fake_executor::FakeExecutor};
+    use crate::{
+        benchmark_transaction::BenchmarkTransaction, fake_executor::FakeExecutor,
+        pipeline::PipelineConfig,
+    };
     use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
     use aptos_executor::block_executor::TransactionBlockExecutor;
     use aptos_temppath::TempPath;
+    use aptos_transaction_generator_lib::args::TransactionTypeArg;
     use aptos_vm::AptosVM;
 
-    fn test_generic_benchmark<E>(verify_sequence_numbers: bool)
-    where
+    fn test_generic_benchmark<E>(
+        transaction_type: Option<TransactionTypeArg>,
+        verify_sequence_numbers: bool,
+    ) where
         E: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
     {
+        aptos_logger::Logger::new().init();
+
         let storage_dir = TempPath::new();
         let checkpoint_dir = TempPath::new();
 
-        crate::db_generator::run::<E>(
-            25, /* num_accounts */
+        println!("db_generator::create_db_with_accounts");
+
+        crate::db_generator::create_db_with_accounts::<E>(
+            30, /* num_accounts */
             // TODO(Gas): double check if this is correct
             100_000_000, /* init_account_balance */
             5,           /* block_size */
@@ -330,31 +360,48 @@ mod tests {
             verify_sequence_numbers,
             false,
             false,
+            PipelineConfig {
+                split_stages: false,
+                allow_discards: false,
+                allow_aborts: false,
+            },
         );
+
+        println!("run_benchmark");
 
         super::run_benchmark::<E>(
             6, /* block_size */
             5, /* num_transfer_blocks */
-            None,
-            2, /* transactions per sender */
+            transaction_type.map(|t| t.materialize()),
+            2,  /* transactions per sender */
+            25, /* num_main_signer_accounts */
             storage_dir.as_ref(),
             checkpoint_dir,
             verify_sequence_numbers,
             NO_OP_STORAGE_PRUNER_CONFIG,
             false,
             false,
-            false,
+            PipelineConfig {
+                split_stages: true,
+                allow_discards: false,
+                allow_aborts: false,
+            },
         );
     }
 
     #[test]
     fn test_benchmark() {
-        test_generic_benchmark::<AptosVM>(true);
+        test_generic_benchmark::<AptosVM>(None, true);
+    }
+
+    #[test]
+    fn test_benchmark_transaction() {
+        test_generic_benchmark::<AptosVM>(Some(TransactionTypeArg::CreateNewResource), true);
     }
 
     #[test]
     fn test_fake_benchmark() {
         // correct execution not yet implemented, so cannot be checked for validity
-        test_generic_benchmark::<FakeExecutor>(false);
+        test_generic_benchmark::<FakeExecutor>(None, false);
     }
 }
