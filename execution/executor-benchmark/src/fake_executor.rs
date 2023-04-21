@@ -17,11 +17,17 @@ use aptos_types::{
     contract_event::ContractEvent,
     event::EventKey,
     transaction::{ExecutionStatus, Transaction, TransactionOutput, TransactionStatus},
+    vm_status::AbortLocation,
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
-use move_core_types::{language_storage::TypeTag, move_resource::MoveStructType};
+use move_core_types::{
+    identifier::Identifier,
+    language_storage::{ModuleId, TypeTag},
+    move_resource::MoveStructType,
+};
 use once_cell::sync::{Lazy, OnceCell};
 use rayon::{prelude::*, ThreadPool, ThreadPoolBuilder};
+use std::str::FromStr;
 
 pub struct FakeExecutor {}
 
@@ -46,26 +52,13 @@ impl FakeExecutor {
         }
     }
 
-    fn handle_transfer(
-        _sender: AccountAddress,
-        _receiver: AccountAddress,
-        _amount: u64,
-        _state_view: &CachedStateView,
-    ) -> Result<TransactionOutput> {
-        // TODO(grao): Implement this function.
-        Ok(TransactionOutput::new(
-            Default::default(),
-            vec![],
-            /*gas_used=*/ 1,
-            TransactionStatus::Keep(ExecutionStatus::Success),
-        ))
-    }
-
-    fn handle_account_creation(
+    fn handle_account_creation_and_transfer(
         sender_address: AccountAddress,
         new_account_address: AccountAddress,
         initial_balance: u64,
         state_view: &CachedStateView,
+        fail_on_existing: bool,
+        fail_on_missing: bool,
     ) -> Result<TransactionOutput> {
         let _timer = TIMER.with_label_values(&["account_creation"]).start_timer();
         let sender_account_key = DbAccessUtil::new_state_key_account(sender_address);
@@ -86,28 +79,10 @@ impl FakeExecutor {
         let new_account_key = DbAccessUtil::new_state_key_account(new_account_address);
         let new_coin_store_key = DbAccessUtil::new_state_key_aptos_coin(new_account_address);
 
-        {
+        let new_account = {
             let _timer = TIMER.with_label_values(&["read_new_account"]).start_timer();
-            let new_account_already_exists =
-                DbAccessUtil::get_account(&new_account_key, state_view)?.is_some();
-            if new_account_already_exists {
-                // This is to handle the case that we re-create seed accounts when adding more
-                // accounts into an existing db. In real VM this will be an abort, I choose to
-                // return Success here, for simplicity.
-                return Ok(TransactionOutput::new(
-                    Default::default(),
-                    vec![],
-                    0,
-                    TransactionStatus::Keep(ExecutionStatus::Success),
-                ));
-            }
-        }
-        {
-            let _timer = TIMER
-                .with_label_values(&["read_new_coin_store"])
-                .start_timer();
-            assert!(DbAccessUtil::get_coin_store(&new_coin_store_key, state_view)?.is_none());
-        }
+            DbAccessUtil::get_account(&new_account_key, state_view)?
+        };
 
         // Note: numbers below may not be real. When runninng in parallel there might be conflicts.
         sender_coin_store.coin -= initial_balance;
@@ -117,23 +92,12 @@ impl FakeExecutor {
 
         sender_account.sequence_number += 1;
 
-        let new_account = Account {
-            authentication_key: new_account_address.to_vec(),
-            ..Default::default()
-        };
-
-        let new_coin_store = CoinStore {
-            coin: initial_balance,
-            ..Default::default()
-        };
-
         let mut total_supply: u128 =
             DbAccessUtil::get_value(&TOTAL_SUPPLY_STATE_KEY, state_view)?.unwrap();
         total_supply -= gas as u128;
 
         // TODO(grao): Add other reads to match the read set of the real transaction.
-
-        let write_set = vec![
+        let mut write_set = vec![
             (
                 sender_account_key,
                 WriteOp::Modification(bcs::to_bytes(&sender_account)?),
@@ -143,18 +107,86 @@ impl FakeExecutor {
                 WriteOp::Modification(bcs::to_bytes(&sender_coin_store)?),
             ),
             (
-                new_account_key,
-                WriteOp::Creation(bcs::to_bytes(&new_account)?),
-            ),
-            (
-                new_coin_store_key,
-                WriteOp::Creation(bcs::to_bytes(&new_coin_store)?),
-            ),
-            (
                 TOTAL_SUPPLY_STATE_KEY.clone(),
                 WriteOp::Modification(bcs::to_bytes(&total_supply)?),
             ),
         ];
+
+        if new_account.is_some() {
+            if fail_on_existing {
+                return Ok(TransactionOutput::new(
+                    Default::default(),
+                    vec![],
+                    0,
+                    TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+                        location: AbortLocation::Module(ModuleId::new(
+                            AccountAddress::ONE,
+                            Identifier::from_str("account").unwrap(),
+                        )),
+                        code: 7,
+                        info: None,
+                    }),
+                ));
+            }
+
+            let mut new_coin_store = {
+                let _timer = TIMER
+                    .with_label_values(&["read_new_coin_store"])
+                    .start_timer();
+                DbAccessUtil::get_coin_store(&new_coin_store_key, state_view)?.unwrap()
+            };
+
+            if initial_balance != 0 {
+                new_coin_store.coin += initial_balance;
+
+                write_set.push((
+                    new_coin_store_key,
+                    WriteOp::Modification(bcs::to_bytes(&new_coin_store)?),
+                ));
+            }
+        } else {
+            if fail_on_missing {
+                return Ok(TransactionOutput::new(
+                    Default::default(),
+                    vec![],
+                    0,
+                    TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+                        location: AbortLocation::Module(ModuleId::new(
+                            AccountAddress::ONE,
+                            Identifier::from_str("account").unwrap(),
+                        )),
+                        code: 7,
+                        info: None,
+                    }),
+                ));
+            }
+
+            {
+                let _timer = TIMER
+                    .with_label_values(&["read_new_coin_store"])
+                    .start_timer();
+                assert!(DbAccessUtil::get_coin_store(&new_coin_store_key, state_view)?.is_none());
+            }
+
+            let new_account = Account {
+                authentication_key: new_account_address.to_vec(),
+                ..Default::default()
+            };
+
+            let new_coin_store = CoinStore {
+                coin: initial_balance,
+                ..Default::default()
+            };
+
+            write_set.push((
+                new_account_key,
+                WriteOp::Creation(bcs::to_bytes(&new_account)?),
+            ));
+            write_set.push((
+                new_coin_store_key,
+                WriteOp::Creation(bcs::to_bytes(&new_coin_store)?),
+            ));
+        }
 
         // TODO(grao): Some values are fake, because I'm lazy.
         let events = vec![
@@ -200,18 +232,24 @@ impl TransactionBlockExecutor<BenchmarkTransaction> for FakeExecutor {
                 .par_iter()
                 .map(|txn| match &txn.extra_info {
                     Some(extra_info) => match &extra_info {
-                        ExtraInfo::TransferInfo(transfer_info) => Self::handle_transfer(
-                            transfer_info.sender,
-                            transfer_info.receiver,
-                            transfer_info.amount,
-                            &state_view,
-                        ),
+                        ExtraInfo::TransferInfo(transfer_info) => {
+                            Self::handle_account_creation_and_transfer(
+                                transfer_info.sender,
+                                transfer_info.receiver,
+                                transfer_info.amount,
+                                &state_view,
+                                false,
+                                true,
+                            )
+                        },
                         ExtraInfo::AccountCreationInfo(account_creation_info) => {
-                            Self::handle_account_creation(
+                            Self::handle_account_creation_and_transfer(
                                 account_creation_info.sender,
                                 account_creation_info.new_account,
                                 account_creation_info.initial_balance,
                                 &state_view,
+                                false,
+                                false,
                             )
                         },
                     },
@@ -225,30 +263,41 @@ impl TransactionBlockExecutor<BenchmarkTransaction> for FakeExecutor {
                                     f.function().as_str(),
                                 ) {
                                     (AccountAddress::ONE, "coin", "transfer") => {
-                                        Self::handle_transfer(
+                                        Self::handle_account_creation_and_transfer(
                                             user_txn.sender(),
                                             bcs::from_bytes(&f.args()[0]).unwrap(),
                                             bcs::from_bytes(&f.args()[1]).unwrap(),
                                             &state_view,
+                                            false,
+                                            true,
                                         )
                                     },
                                     (AccountAddress::ONE, "aptos_account", "transfer") => {
-                                        Self::handle_account_creation(
+                                        Self::handle_account_creation_and_transfer(
                                             user_txn.sender(),
                                             bcs::from_bytes(&f.args()[0]).unwrap(),
                                             bcs::from_bytes(&f.args()[1]).unwrap(),
                                             &state_view,
+                                            false,
+                                            false,
                                         )
                                     },
                                     (AccountAddress::ONE, "aptos_account", "create_account") => {
-                                        Self::handle_account_creation(
+                                        Self::handle_account_creation_and_transfer(
                                             user_txn.sender(),
                                             bcs::from_bytes(&f.args()[0]).unwrap(),
                                             0,
                                             &state_view,
+                                            true,
+                                            false,
                                         )
                                     },
-                                    _ => unimplemented!(),
+                                    _ => unimplemented!(
+                                        "{} {}::{}",
+                                        *f.module().address(),
+                                        f.module().name().as_str(),
+                                        f.function().as_str()
+                                    ),
                                 }
                             },
                             _ => unimplemented!(),
