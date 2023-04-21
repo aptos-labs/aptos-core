@@ -174,53 +174,38 @@ const config = {
           {
             type: "dropdown",
             label: "Move",
-            to: "guides/move-guides/aptos-move-guides",
+            to: "move/aptos-move-guides",
             position: "left",
             items: [
               {
                 label: "Write Move Smart Contracts",
                 type: "doc",
-                docId: "guides/move-guides/index",
+                docId: "move/index",
               },
               {
                 label: "Move on Aptos",
                 type: "doc",
-                docId: "guides/move-guides/move-on-aptos",
+                docId: "move/move-on-aptos",
               },
               {
                 label: "Move Structure",
                 type: "doc",
-                docId: "guides/move-guides/move-structure",
+                docId: "move/move-structure",
               },
               {
                 label: "Move Scripts",
                 type: "doc",
-                docId: "guides/move-guides/move-scripts",
-              },
-              {
-                label: "Bytecode for Dependencies",
-                type: "doc",
-                docId: "guides/move-guides/bytecode-dependencies",
-              },
-              {
-                label: "How Base Gas Works",
-                type: "doc",
-                docId: "concepts/base-gas",
-              },
-              {
-                label: "Interact with Move VM",
-                type: "doc",
-                docId: "guides/interacting-with-the-blockchain",
+                docId: "move/move-scripts",
               },
               {
                 label: "The Move Book",
                 type: "doc",
-                docId: "guides/move-guides/book/SUMMARY",
+                docId: "move/book/SUMMARY",
               },
               {
                 label: "The Move Prover Book",
                 type: "doc",
-                docId: "guides/prover-guides/index",
+                docId: "move/prover/index",
               },
             ],
           },
@@ -405,8 +390,8 @@ const config = {
       {
         redirects: [
           {
-            to: "/guides/move-guides/book/package-upgrades",
-            from: "/guides/move-guides/upgrading-move-code",
+            to: "/move/book/package-upgrades",
+            from: "/move/upgrading-move-code",
           },
           {
             to: "/nodes/full-node/public-fullnode",
@@ -533,14 +518,31 @@ const config = {
             from: "/nodes/full-node/troubleshooting-fullnode-setup",
           },
           {
-            to: "/guides/move-guides/mint-nft-cli",
+            to: "/move/mint-nft-cli",
             from: "/concepts/coin-and-token/nft-airdrop-example",
+          },
+          {
+            to: "/move/book/packages",
+            from: "/move/bytecode-dependencies",
+          },
+          {
+            to: "/move/move-on-aptos",
+            from: "/guides/interacting-with-the-blockchain",
           },
           {
             to: "/guides/state-sync",
             from: "/concepts/state-sync",
           },
         ],
+        createRedirects(existingPath) {
+          if (existingPath.includes('/move')) {
+            return [
+              existingPath.replace('/move/prover', '/guides/prover-guides'),
+              existingPath.replace('/move', '/guides/move-guides'),
+            ];
+          }
+          return undefined;
+        },
       },
     ],
     () => ({

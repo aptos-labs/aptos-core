@@ -24,7 +24,7 @@ Once published, the definition of a struct in Move is immutable. Structs themsel
 
 In Move, each account may have only one resource of a given type. This is because an account in Move resembles a hashmap whereby there will be only one `Coin` type, for instance. The hashmap is a mapping of resource type or module name to resource value. This is why Aptos offers the holder patterns of `CoinStore` and `TokenStore`, to provide an abstraction for holding multiple coins and tokens. These holders will contain tables or use generics for storage.
 
-Aptos employs [Merkle trees](../../reference/glossary.md#merkle-trees) for efficient state synchronization and authenticated storage reads.
+Aptos employs [Merkle trees](../reference/glossary.md#merkle-trees) for efficient state synchronization and authenticated storage reads.
 
 ## Signers
 
@@ -89,7 +89,7 @@ Then:
         signer_cap: account::SignerCapability,
 ```
 
-The signer capability allows the module to sign autonomously. The [resource account](../resource-accounts.md) prevents anyone from getting the private key and is entirely controlled by the contract.
+The signer capability allows the module to sign autonomously. The [resource account](../guides/resource-accounts.md) prevents anyone from getting the private key and is entirely controlled by the contract.
 
 ## Module data
 
@@ -115,6 +115,6 @@ In this manner, you can later use the signer capability already stored in module
 
 ## Accounts
 
-When you are minting an NFT, for example, the NFT is stored under your [account](../../concepts/accounts.md) address. When you submit a transaction, you sign the transaction. Find your account configuration information in `.aptos/config.yaml` relative to where you run `aptos init` (below).
+When you are minting an NFT, for example, the NFT is stored under your [account](../concepts/accounts.md) address. When you submit a transaction, you sign the transaction. Find your account configuration information in `.aptos/config.yaml` relative to where you run `aptos init` (below).
 
-[Resource accounts](../resource-accounts.md) allow the delegation of signing transactions. You create a resource account to grant a signer capability that can be stored in a new resource on the same account and can sign transactions autonomously. The signer capability is protected as no one has access to the private key for the resource account.
+[Resource accounts](../guides/resource-accounts.md) allow the delegation of signing transactions. You create a resource account to grant a signer capability that can be stored in a new resource on the same account and can sign transactions autonomously. The signer capability is protected as no one has access to the private key for the resource account.

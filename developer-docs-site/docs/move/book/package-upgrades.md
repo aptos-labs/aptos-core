@@ -42,8 +42,8 @@ Aptos checks compatibility at the time a Move package is published via an Aptos 
 To upgrade already published Move code, simply attempt to republish the code at
 the same address that it was previously published. This can be done by following the
 instructions for code compilation and publishing using the
-[Aptos CLI](../../../cli-tools/aptos-cli-tool/use-aptos-cli.md). For an example,
-see the [Your First Move Module](../../../tutorials/first-move-module.md) tutorial.
+[Aptos CLI](../../cli-tools/aptos-cli-tool/use-aptos-cli.md). For an example,
+see the [Your First Move Module](../../tutorials/first-move-module.md) tutorial.
 
 ## Upgrade policies
 
@@ -118,4 +118,4 @@ only after that transaction ends.
 The Aptos framework itself, including all the on-chain administration logic, is
 an example for programmatic upgrade. The framework is marked as `compatible`.
 Upgrades happen via specific generated governance scripts. For more details,
-see [Aptos Governance](../../../concepts/governance.md).
+see [Aptos Governance](../../concepts/governance.md).

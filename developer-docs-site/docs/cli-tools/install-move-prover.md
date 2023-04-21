@@ -5,7 +5,7 @@ id: "install-move-prover"
 
 # Install the Move Prover to Validate Code
 
-If you want to use the [Move Prover](../guides/prover-guides/index.md) to validate your Move code, install the Move Prover dependencies after [installing the CLI binary](aptos-cli-tool/install-aptos-cli.md).
+If you want to use the [Move Prover](../move/prover/index.md) to validate your Move code, install the Move Prover dependencies after [installing the CLI binary](aptos-cli-tool/install-aptos-cli.md).
 
 For some sweet examples, see:
 https://github.com/Zellic/move-prover-examples

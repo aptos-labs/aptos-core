@@ -149,7 +149,7 @@ Anyone would be able to remove coins from the `account`.
 
 ### Resource accounts
 
-Since the Move model often requires knowing the signer of a transaction, Aptos provides [resource accounts](../../guides/resource-accounts.md) for assigning signer capability. Creating resource accounts enables access to the signer capability for automated use. The signer capability can be retrieved by the resource account's signer in combination with the address of the source account that created the resource account or placed in storage locally in the module. See the [`resource_signer_cap`](https://github.com/aptos-labs/aptos-core/blob/04ef2f2d02435a75dbf904b696d017e1040ecdd4/aptos-move/move-examples/mint_nft/2-Using-Resource-Account/sources/create_nft_with_resource_account.move#L136) reference in `create_nft_with_resource_account.move`.
+Since the Move model often requires knowing the signer of a transaction, Aptos provides [resource accounts](../guides/resource-accounts.md) for assigning signer capability. Creating resource accounts enables access to the signer capability for automated use. The signer capability can be retrieved by the resource account's signer in combination with the address of the source account that created the resource account or placed in storage locally in the module. See the [`resource_signer_cap`](https://github.com/aptos-labs/aptos-core/blob/04ef2f2d02435a75dbf904b696d017e1040ecdd4/aptos-move/move-examples/mint_nft/2-Using-Resource-Account/sources/create_nft_with_resource_account.move#L136) reference in `create_nft_with_resource_account.move`.
 
 When you create a resource account you also grant that account the signer capability. The only field inside the signer capability is the `address` of the signer. To see how we create a signer from the signer capability, review the [`let resource_signer`](https://github.com/aptos-labs/aptos-core/blob/916d8b40232040ce1eeefbb0278411c5007a26e8/aptos-move/move-examples/mint_nft/2-Using-Resource-Account/sources/create_nft_with_resource_account.move#L156) function in `create_nft_with_resource_account.move`.
 
@@ -161,7 +161,7 @@ To further prevent signer vulnerabilities, monitor your calls in your wallet eve
 * The NFT creation event exists.
 * No NFT withdrawal events exist.
 
-See [resource accounts](../../guides/resource-accounts.md) to learn more.
+See [resource accounts](../guides/resource-accounts.md) to learn more.
 
 ### Coins
 

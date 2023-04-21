@@ -42,7 +42,7 @@ Help organize events, develop content and more for the ecosystem by joining the 
 
 We at Aptos love direct contributions in the form of [pull requests](https://github.com/aptos-labs/aptos-core/pulls). Help us make small fixes to code. Follow our coding conventions for:
 
-* [Move](../guides/move-guides/book/coding-conventions.md)
+* [Move](../move/book/coding-conventions.md)
 * [Rust](./rust-coding-guidelines.md)
 
 ## Update the documentation

@@ -8,7 +8,7 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 # Use Remix IDE Plugin
 
-This tutorial explains how to deploy and run Move modules with the [WELLDONE Code Remix IDE](https://docs.welldonestudio.io/code) plugin. This tool offers a graphical interface for developing Move [modules](../../guides/move-guides/book/modules-and-scripts.md#modules). 
+This tutorial explains how to deploy and run Move modules with the [WELLDONE Code Remix IDE](https://docs.welldonestudio.io/code) plugin. This tool offers a graphical interface for developing Move [modules](../../move/book/modules-and-scripts.md#modules). 
 
 Here are the steps to use the Remix IDE plugin for Move (described in detail below):
 
@@ -68,7 +68,7 @@ Click the **Refresh** button in the upper right corner of the plug-in to apply
 
 ## Step 4: Create the Project
 
-In Aptos, you can write smart contracts with the [Move programming language](../../guides/move-guides/index.md). **WELLDONE Code** provides two features to help developers new to Aptos and Move.
+In Aptos, you can write smart contracts with the [Move programming language](../../move/index.md). **WELLDONE Code** provides two features to help developers new to Aptos and Move.
 
 ### Select a template
 

@@ -863,7 +863,7 @@ Please use `aptos move coverage -h` for more detailed test coverage of this pack
 
 ### Proving Move
 
-The `aptos` CLI can be used to run [Move Prover](../../guides/prover-guides/index.md), which is a formal verification tool for the Move language. The below example proves the `hello_prover` package in [move-examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples).
+The `aptos` CLI can be used to run [Move Prover](../../move/prover/index.md), which is a formal verification tool for the Move language. The below example proves the `hello_prover` package in [move-examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples).
 ```bash
 aptos move prove --package-dir aptos-move/move-examples/hello_prover/
 ```
