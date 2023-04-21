@@ -174,28 +174,13 @@ const config = {
           {
             type: "dropdown",
             label: "Move",
-            to: "move/aptos-move-guides",
+            to: "move/move-on-aptos",
             position: "left",
             items: [
-              {
-                label: "Write Move Smart Contracts",
-                type: "doc",
-                docId: "move/index",
-              },
               {
                 label: "Move on Aptos",
                 type: "doc",
                 docId: "move/move-on-aptos",
-              },
-              {
-                label: "Move Structure",
-                type: "doc",
-                docId: "move/move-structure",
-              },
-              {
-                label: "Move Scripts",
-                type: "doc",
-                docId: "move/move-scripts",
               },
               {
                 label: "The Move Book",

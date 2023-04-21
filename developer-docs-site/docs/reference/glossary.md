@@ -328,7 +328,7 @@ then there is a guarantee that T_N will never be included in the blockchain.
 
 - The contract itself does not require a signer post initialization. A resource account gives you the means for the module to provide a signer to other modules and sign transactions on behalf of the module.
 
-See [Resource accounts](../guides/resource-accounts.md) for instructions on use.
+See [Resource accounts](../move/move-on-aptos/resource-accounts.md) for instructions on use.
 
 ### REST Service
 
@@ -413,7 +413,7 @@ See [`table.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move
 - A single transaction script can send funds to multiple recipients and invoke procedures from several different modules.
 - A transaction script **is not** stored in the global state and cannot be invoked by other transaction scripts. It is a single-use program.
 
-To see example uses of transaction scripts, follow [Move scripts](../move/move-scripts.md) and the [Your First Multisig](../tutorials/first-multisig.md) tutorial.
+To see example uses of transaction scripts, follow [Move scripts](../move/move-on-aptos/move-scripts.md) and the [Your First Multisig](../tutorials/first-multisig.md) tutorial.
 
 ## V
 

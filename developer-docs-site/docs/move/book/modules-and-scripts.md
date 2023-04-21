@@ -9,7 +9,7 @@ A Move source file (or **compilation unit**) may contain multiple modules and sc
 ### Scripts
 
 :::tip Tutorial
-To learn how to publish and execute a Move script, follow the [Move Scripts](../move-scripts.md) example.
+To learn how to publish and execute a Move script, follow the [Move Scripts](../move-on-aptos/move-scripts.md) example.
 :::
 
 

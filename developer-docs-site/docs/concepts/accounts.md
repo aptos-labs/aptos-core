@@ -216,4 +216,4 @@ Typically, a resource account is used for two main purposes:
 - Store and isolate resources; a module creates a resource account just to host specific resources.
 - Publish module as a standalone (resource) account, a building block in a decentralized design where no private keys can control the resource account. The ownership (SignerCap) can be kept in another module, such as governance.
 
-Find more details on creating and using these at [using resource accounts in your app](../guides/resource-accounts.md).
+Find more details on creating and using these at [using resource accounts in your app](../move/move-on-aptos/resource-accounts.md).
