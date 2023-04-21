@@ -293,7 +293,7 @@ how to use the Move package system as a Rust library.
 
 ## Using Bytecode for Dependencies
 
-Move bytecode can be used as a dependencies when the Move source code for those dependencies are not available locally. To use this feature, you will need co-locate the files in directories at the same level and then specify their paths in the corresponding `Move.toml` files.
+Move bytecode can be used as dependencies when the Move source code for those dependencies are not available locally. To use this feature, you will need co-locate the files in directories at the same level and then specify their paths in the corresponding `Move.toml` files.
 
 ## Requirements and limitations
 
@@ -303,18 +303,18 @@ Note, both `aptos move prove` and `aptos move test` commands, currently, do not 
 
 ## Recommended structure
 
-We use an example to illustrate the dev flow of using this feature. Suppose we want to compile the package `A` . The package layout is:
+We use an example to illustrate the dev flow of using this feature. Suppose we want to compile the package `A`. The package layout is:
 ```rust
 ./A
 ├── Move.toml
 ├── sources
-  ├ A.move
+  ├ AModule.move
 ```
 
-`A.move` is defined below, depending on the modules `Bar`and `Foo`:
+`A.move` is defined below, depending on the modules `Bar` and `Foo`:
 
 ```rust
-module A::A {
+module A::AModule {
     use B::Bar;
     use C::Foo;
     public fun foo(): u64 {
@@ -325,7 +325,7 @@ module A::A {
 
 Suppose the source of `Bar` and `Foo` are not available but the corresponding bytecode `Bar.mv` and `Foo.mv` are available locally. To use them as dependencies, we would:
 
-Specify `Move.toml` for `Bar` and `Foo` . Note that named addresses are already instantiated with the actual address in the bytecode. In our example, the actual address for `C` is already bound to `0x3`. As a result, `[addresses]` must be specified `C` as `0x3`, as shown below:
+Specify `Move.toml` for `Bar` and `Foo`. Note that named addresses are already instantiated with the actual address in the bytecode. In our example, the actual address for `C` is already bound to `0x3`. As a result, `[addresses]` must be specified `C` as `0x3`, as shown below:
 
 ```rust
 [package]
