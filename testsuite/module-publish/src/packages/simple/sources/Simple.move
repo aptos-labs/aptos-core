@@ -12,7 +12,7 @@ module 0xABCD::Simple {
     use std::signer;
     use std::string::{Self, String, utf8};
     use std::vector;
-    use aptos_token::token::{Self, Token, TokenDataId};
+    use aptos_token::token::{Self, Token, TokenId, TokenDataId};
     use aptos_std::table::{Self, Table};
     use aptos_framework::account;
     use std::option::{Self, Option};
@@ -414,12 +414,12 @@ module 0xABCD::Simple {
     //
 
     // Token URI used for NFT Mints
-    const COLLECTION_NAME: vector<u8> = b"The Renfield Collection";
-    const COLLECTION_DESCRIPTION: vector<u8> = b"An NFT collection for the Renfield Movie";
+    const COLLECTION_NAME: vector<u8> = b"An NFT Collection Name";
+    const COLLECTION_DESCRIPTION: vector<u8> = b"An NFT Collection Description";
     const COLLECTION_URL: vector<u8> = b"";
-    const TOKEN_URI: vector<u8> = b"https://dnjj3np4qtts5.cloudfront.net/movie-poster.png";
+    const TOKEN_URI: vector<u8> = b"https://aptos.dev";
     const TOKEN_DESCRIPTION: vector<u8> = b"";
-    const TOKEN_NAME: vector<u8> = b"Renfield Collectible";
+    const TOKEN_NAME: vector<u8> = b"NFT Collectible";
 
     // Royalty Config for NFTs (0/100 = 0%)
     const ROYALTY_POINTS_NUMERATOR: u64 = 0;
@@ -530,54 +530,53 @@ module 0xABCD::Simple {
     }
 
 
-    /// Mint NFT and store it in a table
-    public entry fun token_v1_mint_and_store_nft_sequential(user: &signer, creator_address: address) acquires MinterConfig {
-        let resource_signer = &get_signer(creator_address);
-        let resource_signer_address = signer::address_of(resource_signer);
+    fun mint_nft_sequential(creator_address: address) : (signer, TokenId) acquires MinterConfig {
+        let resource_signer = get_signer(creator_address);
+        let resource_signer_address = signer::address_of(&resource_signer);
 
         // Make the tokendata name unique by appending a ` #` and the current supply + 1
         let current_supply_opt = token::get_collection_supply(resource_signer_address, string::utf8(COLLECTION_NAME));
         let index = option::extract(&mut current_supply_opt) + 1;
         let tokendata_name = build_token_name(string::utf8(TOKEN_NAME), index);
 
-        let tokendata_id = create_token_data(resource_signer, string::utf8(TOKEN_URI), tokendata_name, 1);
-        let token_id = token::mint_token(resource_signer, tokendata_id, 1);
-        let token = token::withdraw_token(resource_signer, token_id, 1);
+        let tokendata_id = create_token_data(&resource_signer, string::utf8(TOKEN_URI), tokendata_name, 1);
+        let token_id = token::mint_token(&resource_signer, tokendata_id, 1);
+        (resource_signer, token_id)
+    }
+
+    fun mint_nft_parallel(user: &signer, creator_address: address) : (signer, TokenId) acquires MinterConfig {
+        let resource_signer = get_signer(creator_address);
+        let token_name = to_string<address>(&signer::address_of(user));
+        let tokendata_id = create_token_data(&resource_signer, string::utf8(TOKEN_URI), token_name, 1);
+        let token_id = token::mint_token(&resource_signer, tokendata_id, 1);
+        (resource_signer, token_id)
+    }
+
+
+    /// Mint NFT and store it in a table
+    public entry fun token_v1_mint_and_store_nft_sequential(user: &signer, creator_address: address) acquires MinterConfig {
+        let (resource_signer, token_id) = mint_nft_sequential(creator_address);
+        let token = token::withdraw_token(&resource_signer, token_id, 1);
         set_token_minted(signer::address_of(user), creator_address, token);
     }
 
     /// Mint NFT and transfer it to the user
     public entry fun token_v1_mint_and_transfer_nft_sequential(user: &signer, creator_address: address) acquires MinterConfig {
-        let resource_signer = &get_signer(creator_address);
-        let resource_signer_address = signer::address_of(resource_signer);
-
-        // Make the tokendata name unique by appending a ` #` and the current supply + 1
-        let current_supply_opt = token::get_collection_supply(resource_signer_address, string::utf8(COLLECTION_NAME));
-        let index = option::extract(&mut current_supply_opt) + 1;
-        let tokendata_name = build_token_name(string::utf8(TOKEN_NAME), index);
-
-        let tokendata_id = create_token_data(resource_signer, string::utf8(TOKEN_URI), tokendata_name, 1);
-        let token_id = token::mint_token(resource_signer, tokendata_id, 1);
-        token::direct_transfer(resource_signer, user, token_id, 1);
+        let (resource_signer, token_id) = mint_nft_sequential(creator_address);
+        token::direct_transfer(&resource_signer, user, token_id, 1);
     }
 
     /// Mint NFT and store it in a table
     public entry fun token_v1_mint_and_store_nft_parallel(user: &signer, creator_address: address) acquires MinterConfig {
-        let resource_signer = &get_signer(creator_address);
-        let token_name = to_string<address>(&signer::address_of(user));
-        let tokendata_id = create_token_data(resource_signer, string::utf8(TOKEN_URI), token_name, 1);
-        let token_id = token::mint_token(resource_signer, tokendata_id, 1);
-        let token = token::withdraw_token(resource_signer, token_id, 1);
+        let (resource_signer, token_id) = mint_nft_parallel(user, creator_address);
+        let token = token::withdraw_token(&resource_signer, token_id, 1);
         set_token_minted(signer::address_of(user), creator_address, token);
     }
 
     /// Mint NFT and transfer it to the user
     public entry fun token_v1_mint_and_transfer_nft_parallel(user: &signer, creator_address: address) acquires MinterConfig {
-        let resource_signer = &get_signer(creator_address);
-        let token_name = to_string<address>(&signer::address_of(user));
-        let tokendata_id = create_token_data(resource_signer, string::utf8(TOKEN_URI), token_name, 1);
-        let token_id = token::mint_token(resource_signer, tokendata_id, 1);
-        token::direct_transfer(resource_signer, user, token_id, 1);
+        let (resource_signer, token_id) = mint_nft_parallel(user, creator_address);
+        token::direct_transfer(&resource_signer, user, token_id, 1);
     }
 
     /// Mint FT and store it in a table
