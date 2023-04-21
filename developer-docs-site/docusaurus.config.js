@@ -213,12 +213,12 @@ const config = {
                 docId: "guides/interacting-with-the-blockchain",
               },
               {
-                label: "Aptos Move Book",
+                label: "The Move Book",
                 type: "doc",
                 docId: "guides/move-guides/book/SUMMARY",
               },
               {
-                label: "Move Prover Book",
+                label: "The Move Prover Book",
                 type: "doc",
                 docId: "guides/prover-guides/index",
               },
