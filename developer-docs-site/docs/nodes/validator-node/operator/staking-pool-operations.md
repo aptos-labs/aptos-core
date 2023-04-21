@@ -21,10 +21,6 @@ Make sure that this step is performed by the owner. See [Initialize staking pool
 
 ## Joining validator set
 
-:::danger Errors? 
-**The validator node cannot sync until the stake pool becomes active.** If you see errors, see the [Issues and Workarounds](../../../issues-and-workarounds.md).
-:::
-
 Follow the below steps to set up the validator node using the operator account and join the validator set.
 
 :::tip Mainnet vs Testnet
@@ -100,7 +96,7 @@ aptos node join-validator-set \
 The validator set is updated at every epoch change. You will see your validator node joining the validator set only in the next epoch. Both validator and validator fullnode will start syncing once your validator is in the validator set.
 
 :::tip When is next epoch?
-Run the command `aptos node get-stake-pool` as shown in [Checking your stake pool information](#checking-your-stake-pool-information). You can also follow these steps: [How to find out when the next epoch starts](../../../issues-and-workarounds.md#how-to-find-out-when-the-next-epoch-starts).
+You can see it on the [Aptos Explorer](https://explorer.aptoslabs.com/validators) or by running the command `aptos node get-stake-pool` as shown in [Checking your stake pool information](#checking-your-stake-pool-information).
 :::
 
 ### 6. Check the validator set
