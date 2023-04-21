@@ -47,6 +47,7 @@ pub struct DagDriver {
     dag: Dag,
     bullshark: Arc<Mutex<Bullshark>>,
     rb_tx: Sender<ReliableBroadcastCommand>,
+    rb_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
     network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
     time_service: Arc<dyn TimeService>,
 }
@@ -87,7 +88,10 @@ impl DagDriver {
             genesis_block_id,
         )));
 
-        spawn_named!("reliable_broadcast", rb.start(rb_network_msg_rx, rb_rx));
+        let (rb_close_tx, close_rx) = oneshot::channel();
+
+        spawn_named!("reliable_broadcast", rb.
+            start(rb_network_msg_rx, rb_rx, close_rx));
         // spawn_named!("bullshark", bullshark.start(dag_bullshark_rx));
 
         Self {
@@ -108,6 +112,7 @@ impl DagDriver {
             ),
             bullshark,
             rb_tx,
+            rb_close_tx: Some(rb_close_tx),
             network_msg_rx,
             time_service,
         }
@@ -233,11 +238,17 @@ impl DagDriver {
                 },
 
                 close_req = close_rx.select_next_some() => {
+                    if let Some(close_tx) = self.rb_close_tx.take() {
+                        let (ack_tx, ack_rx) = oneshot::channel();
+                        close_tx.send(ack_tx).expect("[DagDriver] failed to drop rb");
+                        ack_rx.await.expect("[DagDriver] failed to drop rb");
+                    }
                     if let Ok(ack_sender) = close_req {
                         ack_sender.send(()).expect("[DagDriver] Fail to ack shutdown");
                     }
                     break;
                 }
+
             }
         }
     }
