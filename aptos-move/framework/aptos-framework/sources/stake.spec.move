@@ -96,6 +96,7 @@ spec aptos_framework::stake {
 
         ensures stake_pool.active.value == pre_stake_pool.active.value - min_amount;
         ensures stake_pool.pending_inactive.value == pre_stake_pool.pending_inactive.value + min_amount;
+        ensures amount <= pre_stake_pool.active.value ==> (stake_pool.pending_inactive.value == pre_stake_pool.pending_inactive.value + amount);
     }
 
     // Only active validator can update locked_until_secs.
@@ -160,6 +161,75 @@ spec aptos_framework::stake {
 
         ensures stake_pool.pending_inactive.value == pre_stake_pool.pending_inactive.value - min_amount;
         ensures stake_pool.active.value == pre_stake_pool.active.value + min_amount;
+        ensures stake_pool.pending_inactive.value == pre_stake_pool.pending_inactive.value - min_amount;
+    }
+
+    spec fun spec_get_stake_by_signer(stake_pool_owner: signer): StakePool {
+        let owner_address = signer::address_of(stake_pool_owner);
+        let ownership_cap = global<OwnerCapability>(owner_address);
+        global<StakePool>(ownership_cap.pool_address)
+    }
+
+    spec withdraw(owner: &signer, withdraw_amount: u64) {
+        modifies global<StakePool>(pool_address);
+        modifies global<aptos_framework::coin::CoinStore<AptosCoin>>(owner_address);
+        let owner_address = signer::address_of(owner);
+        let ownership_cap = global<OwnerCapability>(owner_address);
+        let pool_address = ownership_cap.pool_address;
+        let validator_inactive_condition = (spec_get_validator_state_inactive(pool_address) &&
+            timestamp::now_seconds() >= spec_get_lockup_secs(pool_address));
+        let old_inactive_coin = global<StakePool>(pool_address).inactive.value;
+        let old_pending_inactive_coin = global<StakePool>(pool_address).pending_inactive.value;
+        let old_inactive_pending_combined = old_inactive_coin + old_pending_inactive_coin;
+        ensures validator_inactive_condition ==>
+            spec_get_stake_by_signer(owner).pending_inactive.value == 0;
+        ensures validator_inactive_condition ==>
+            spec_get_stake_by_signer(owner).pending_inactive.value == 0;
+        ensures !validator_inactive_condition ==>
+             global<coin::CoinStore<AptosCoin>>(owner_address).coin.value
+        == old(global<coin::CoinStore<AptosCoin>>(owner_address)).coin.value + min(withdraw_amount, old_inactive_coin);
+        ensures (!validator_inactive_condition && withdraw_amount <= old_inactive_coin) ==>
+            global<coin::CoinStore<AptosCoin>>(owner_address).coin.value
+                == old(global<coin::CoinStore<AptosCoin>>(owner_address)).coin.value + withdraw_amount;
+        ensures (!validator_inactive_condition && withdraw_amount > old_inactive_coin) ==>
+            global<coin::CoinStore<AptosCoin>>(owner_address).coin.value
+                == old(global<coin::CoinStore<AptosCoin>>(owner_address)).coin.value + old_inactive_coin;
+        ensures validator_inactive_condition ==>
+            global<coin::CoinStore<AptosCoin>>(owner_address).coin.value
+                == old(global<coin::CoinStore<AptosCoin>>(owner_address)).coin.value + min(withdraw_amount, old_inactive_pending_combined);
+        ensures (validator_inactive_condition && withdraw_amount <= old_inactive_pending_combined) ==>
+            global<coin::CoinStore<AptosCoin>>(owner_address).coin.value
+                == old(global<coin::CoinStore<AptosCoin>>(owner_address)).coin.value + withdraw_amount;
+        ensures (validator_inactive_condition && withdraw_amount > old_inactive_pending_combined) ==>
+            global<coin::CoinStore<AptosCoin>>(owner_address).coin.value
+                == old(global<coin::CoinStore<AptosCoin>>(owner_address)).coin.value + old_inactive_pending_combined;
+    }
+
+    spec withdraw_with_cap(owner_cap: &OwnerCapability, withdraw_amount: u64): Coin<AptosCoin> {
+        let pool_address = owner_cap.pool_address;
+        modifies global<StakePool>(pool_address);
+        let old_inactive_coin = global<StakePool>(pool_address).inactive.value;
+        let old_pending_inactive_coin = global<StakePool>(pool_address).pending_inactive.value;
+        let old_inactive_pending_combined = old_inactive_coin + old_pending_inactive_coin;
+        let validator_inactive_condition = (spec_get_validator_state_inactive(pool_address) &&
+            timestamp::now_seconds() >= spec_get_lockup_secs(pool_address));
+        ensures validator_inactive_condition ==>
+            global<StakePool>(pool_address).pending_inactive.value == 0;
+        ensures !validator_inactive_condition ==>
+            old_pending_inactive_coin == global<StakePool>(pool_address).pending_inactive.value;
+        ensures withdraw_amount == 0 ==> result.value == 0;
+        ensures (withdraw_amount == 0 && !validator_inactive_condition) ==> old_inactive_coin
+            == global<StakePool>(pool_address).inactive.value;
+        ensures (withdraw_amount == 0 && validator_inactive_condition) ==> old_inactive_pending_combined
+            == global<StakePool>(pool_address).inactive.value;
+        ensures global<StakePool>(pool_address).locked_until_secs == old(global<StakePool>(pool_address).locked_until_secs);
+        ensures !validator_inactive_condition ==>
+            global<StakePool>(pool_address).inactive.value == old_inactive_coin - min(withdraw_amount, old_inactive_coin);
+        ensures !validator_inactive_condition ==> result.value == min(withdraw_amount, old_inactive_coin);
+        ensures validator_inactive_condition ==>
+             global<StakePool>(pool_address).inactive.value == old_inactive_pending_combined - min(withdraw_amount, old_inactive_pending_combined);
+        ensures validator_inactive_condition ==>
+            result.value == min(withdraw_amount, old_inactive_pending_combined);
     }
 
     spec rotate_consensus_key(
@@ -320,6 +390,10 @@ spec aptos_framework::stake {
         ensures [abstract] result == spec_find_validator(v,addr);
     }
 
+    spec fun find_validator_bool(v: vector<ValidatorInfo>, addr: address): bool {
+        exists i in 0..len(v): v[i].addr == addr
+    }
+
     spec append {
         pragma opaque, verify = false;
         aborts_if false;
@@ -343,6 +417,7 @@ spec aptos_framework::stake {
     spec is_current_epoch_validator {
         include ResourceRequirement;
         aborts_if !spec_has_stake_pool(pool_address);
+        aborts_if !exists<ValidatorSet>(@aptos_framework);
         ensures result == spec_is_current_epoch_validator(pool_address);
     }
 
@@ -357,6 +432,24 @@ spec aptos_framework::stake {
                 && !spec_contains(validator_set.active_validators, pool_address)
                 && !spec_contains(validator_set.pending_inactive, pool_address)
         );
+    }
+
+    spec fun spec_get_validator_state_inactive(pool_address: address): bool {
+        let validator_set = borrow_global<ValidatorSet>(@aptos_framework);
+        let result = if (find_validator_bool(validator_set.pending_active, pool_address)) {
+            VALIDATOR_STATUS_PENDING_ACTIVE
+        } else if (find_validator_bool(validator_set.active_validators, pool_address)) {
+            VALIDATOR_STATUS_ACTIVE
+        } else if (find_validator_bool(validator_set.pending_inactive, pool_address)) {
+            VALIDATOR_STATUS_PENDING_INACTIVE
+        } else {
+            VALIDATOR_STATUS_INACTIVE
+        };
+        result == VALIDATOR_STATUS_INACTIVE
+    }
+
+    spec fun spec_get_lockup_secs(pool_address: address): u64 {
+        global<StakePool>(pool_address).locked_until_secs
     }
 
     spec add_stake_with_cap {

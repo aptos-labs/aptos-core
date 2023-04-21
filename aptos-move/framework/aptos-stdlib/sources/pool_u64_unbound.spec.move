@@ -35,13 +35,21 @@ spec aptos_std::pool_u64_unbound {
     }
 
     spec balance(pool: &Pool, shareholder: address): u64 {
+        pragma opaque;
         let shares = spec_shares(pool, shareholder);
         let total_coins = pool.total_coins;
         aborts_if pool.total_coins > 0 && pool.total_shares > 0 && (shares * total_coins) / pool.total_shares > MAX_U64;
         ensures result == spec_shares_to_amount_with_total_coins(pool, shares, total_coins);
     }
 
+    spec fun spec_balance(pool: Pool, shareholder: address): u64 {
+        let shares = spec_shares(pool, shareholder);
+        let total_coins = pool.total_coins;
+        spec_shares_to_amount_with_total_coins(pool, shares, total_coins)
+    }
+
     spec buy_in(pool: &mut Pool, shareholder: address, coins_amount: u64): u128 {
+        pragma opaque;
         let new_shares = spec_amount_to_shares_with_total_coins(pool, coins_amount, pool.total_coins);
         aborts_if pool.total_coins + coins_amount > MAX_U64;
         aborts_if pool.total_shares + new_shares > MAX_U128;
@@ -49,7 +57,12 @@ spec aptos_std::pool_u64_unbound {
         include coins_amount > 0 ==> AddSharesEnsures { new_shares: new_shares };
         ensures pool.total_coins == old(pool.total_coins) + coins_amount;
         ensures pool.total_shares == old(pool.total_shares) + new_shares;
+        ensures forall addr: address : (addr != shareholder) ==> (spec_shares(pool, addr) == spec_shares(old(pool), addr));
+        ensures forall addr: address : ((addr != shareholder) && !table::spec_contains(old(pool).shares, addr)) ==> !table::spec_contains(pool.shares, addr);
         ensures result == new_shares;
+        ensures coins_amount == 0 ==> spec_shares(pool, shareholder) == spec_shares(old(pool), shareholder);
+        ensures coins_amount > 0 ==> spec_shares(pool, shareholder) == spec_shares(old(pool), shareholder) +
+            new_shares;
     }
 
     spec add_shares(pool: &mut Pool, shareholder: address, new_shares: u128): u128 {
@@ -94,18 +107,20 @@ spec aptos_std::pool_u64_unbound {
     }
 
     spec amount_to_shares_with_total_coins(pool: &Pool, coins_amount: u64, total_coins: u64): u128 {
+        pragma opaque;
         aborts_if pool.total_coins > 0 && pool.total_shares > 0
             && (coins_amount * pool.total_shares) / total_coins > MAX_U128;
         aborts_if (pool.total_coins == 0 || pool.total_shares == 0)
             && coins_amount * pool.scaling_factor > MAX_U128;
         aborts_if pool.total_coins > 0 && pool.total_shares > 0 && total_coins == 0;
-        ensures result == spec_amount_to_shares_with_total_coins(pool, coins_amount, total_coins);
+        ensures [abstract] result == spec_amount_to_shares_with_total_coins(pool, coins_amount, total_coins);
     }
 
     spec shares_to_amount_with_total_coins(pool: &Pool, shares: u128, total_coins: u64): u64 {
+        pragma opaque;
         aborts_if pool.total_coins > 0 && pool.total_shares > 0
             && (shares * total_coins) / pool.total_shares > MAX_U64;
-        ensures result == spec_shares_to_amount_with_total_coins(pool, shares, total_coins);
+        ensures [abstract] result == spec_shares_to_amount_with_total_coins(pool, shares, total_coins);
     }
 
     spec fun spec_shares_to_amount_with_total_coins(pool: Pool, shares: u128, total_coins: u64): u64 {
@@ -133,6 +148,7 @@ spec aptos_std::pool_u64_unbound {
         ensures pool.total_shares == old(pool.total_shares) - shares_to_redeem;
         include shares_to_redeem > 0 ==> DeductSharesEnsures { num_shares: shares_to_redeem };
         ensures result == redeemed_coins;
+        ensures result <= MAX_U64;
     }
 
     spec transfer_shares(
@@ -161,11 +177,11 @@ spec aptos_std::pool_u64_unbound {
     spec deduct_shares(pool: &mut Pool, shareholder: address, num_shares: u128): u128 {
         aborts_if !spec_contains(pool, shareholder);
         aborts_if spec_shares(pool, shareholder) < num_shares;
-
         include DeductSharesEnsures;
         let remaining_shares = table::spec_get(pool.shares, shareholder) - num_shares;
         ensures remaining_shares > 0 ==> result == table::spec_get(pool.shares, shareholder);
         ensures remaining_shares == 0 ==> result == 0;
+        ensures remaining_shares > 0 ==> table::spec_get(pool.shares, shareholder) == remaining_shares;
     }
     spec schema DeductSharesEnsures {
         pool: Pool;

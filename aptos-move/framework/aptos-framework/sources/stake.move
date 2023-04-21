@@ -2451,7 +2451,7 @@ module aptos_framework::stake {
         staking_config::initialize_rewards(
             aptos_framework,
             fixed_point64::create_from_rational(1, 100),
-        fixed_point64::create_from_rational(3, 1000),
+            fixed_point64::create_from_rational(3, 1000),
             one_year_in_secs,
             genesis_time_in_secs,
             fixed_point64::create_from_rational(50, 100),

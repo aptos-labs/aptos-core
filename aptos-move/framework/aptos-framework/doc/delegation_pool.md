@@ -129,6 +129,18 @@ transferred to A
 -  [Struct `VoteEvent`](#0x1_delegation_pool_VoteEvent)
 -  [Struct `CreateProposalEvent`](#0x1_delegation_pool_CreateProposalEvent)
 -  [Struct `DelegateVotingPowerEvent`](#0x1_delegation_pool_DelegateVotingPowerEvent)
+-  [Resource `Ghost$ghost_share_redeem`](#0x1_delegation_pool_Ghost$ghost_share_redeem)
+-  [Resource `Ghost$sync_commission_active`](#0x1_delegation_pool_Ghost$sync_commission_active)
+-  [Resource `Ghost$sync_commission_pending_inactive`](#0x1_delegation_pool_Ghost$sync_commission_pending_inactive)
+-  [Resource `Ghost$sync_delegation_pool_snap_before_buy_in`](#0x1_delegation_pool_Ghost$sync_delegation_pool_snap_before_buy_in)
+-  [Resource `Ghost$sync_inactive_snap_before_buy_in`](#0x1_delegation_pool_Ghost$sync_inactive_snap_before_buy_in)
+-  [Resource `Ghost$add_stake_pool_share_after_sync`](#0x1_delegation_pool_Ghost$add_stake_pool_share_after_sync)
+-  [Resource `Ghost$add_stake_pool_share_before_2nd_buy_in`](#0x1_delegation_pool_Ghost$add_stake_pool_share_before_2nd_buy_in)
+-  [Resource `Ghost$ghost_source_pool`](#0x1_delegation_pool_Ghost$ghost_source_pool)
+-  [Resource `Ghost$ghost_dest_pool`](#0x1_delegation_pool_Ghost$ghost_dest_pool)
+-  [Resource `Ghost$pre_inactive_shares_OLC_delegator`](#0x1_delegation_pool_Ghost$pre_inactive_shares_OLC_delegator)
+-  [Resource `Ghost$pre_active_shares_OLC_delegator`](#0x1_delegation_pool_Ghost$pre_active_shares_OLC_delegator)
+-  [Resource `Ghost$ghost_amount`](#0x1_delegation_pool_Ghost$ghost_amount)
 -  [Constants](#@Constants_0)
 -  [Function `owner_cap_exists`](#0x1_delegation_pool_owner_cap_exists)
 -  [Function `get_owned_pool_address`](#0x1_delegation_pool_get_owned_pool_address)
@@ -196,6 +208,40 @@ transferred to A
 -  [Function `update_governanace_records_for_redeem_pending_inactive_shares`](#0x1_delegation_pool_update_governanace_records_for_redeem_pending_inactive_shares)
 -  [Function `multiply_then_divide`](#0x1_delegation_pool_multiply_then_divide)
 -  [Specification](#@Specification_1)
+    -  [Resource `DelegationPool`](#@Specification_1_DelegationPool)
+    -  [Function `owner_cap_exists`](#@Specification_1_owner_cap_exists)
+    -  [Function `get_owned_pool_address`](#@Specification_1_get_owned_pool_address)
+    -  [Function `delegation_pool_exists`](#@Specification_1_delegation_pool_exists)
+    -  [Function `observed_lockup_cycle`](#@Specification_1_observed_lockup_cycle)
+    -  [Function `operator_commission_percentage`](#@Specification_1_operator_commission_percentage)
+    -  [Function `shareholders_count_active_pool`](#@Specification_1_shareholders_count_active_pool)
+    -  [Function `get_delegation_pool_stake`](#@Specification_1_get_delegation_pool_stake)
+    -  [Function `get_pending_withdrawal`](#@Specification_1_get_pending_withdrawal)
+    -  [Function `get_stake`](#@Specification_1_get_stake)
+    -  [Function `get_add_stake_fee`](#@Specification_1_get_add_stake_fee)
+    -  [Function `can_withdraw_pending_inactive`](#@Specification_1_can_withdraw_pending_inactive)
+    -  [Function `initialize_delegation_pool`](#@Specification_1_initialize_delegation_pool)
+    -  [Function `assert_owner_cap_exists`](#@Specification_1_assert_owner_cap_exists)
+    -  [Function `assert_delegation_pool_exists`](#@Specification_1_assert_delegation_pool_exists)
+    -  [Function `assert_min_active_balance`](#@Specification_1_assert_min_active_balance)
+    -  [Function `assert_min_pending_inactive_balance`](#@Specification_1_assert_min_pending_inactive_balance)
+    -  [Function `coins_to_redeem_to_ensure_min_stake`](#@Specification_1_coins_to_redeem_to_ensure_min_stake)
+    -  [Function `coins_to_transfer_to_ensure_min_stake`](#@Specification_1_coins_to_transfer_to_ensure_min_stake)
+    -  [Function `retrieve_stake_pool_owner`](#@Specification_1_retrieve_stake_pool_owner)
+    -  [Function `set_operator`](#@Specification_1_set_operator)
+    -  [Function `set_delegated_voter`](#@Specification_1_set_delegated_voter)
+    -  [Function `add_stake`](#@Specification_1_add_stake)
+    -  [Function `unlock`](#@Specification_1_unlock)
+    -  [Function `reactivate_stake`](#@Specification_1_reactivate_stake)
+    -  [Function `withdraw`](#@Specification_1_withdraw)
+    -  [Function `withdraw_internal`](#@Specification_1_withdraw_internal)
+    -  [Function `pending_inactive_shares_pool_mut`](#@Specification_1_pending_inactive_shares_pool_mut)
+    -  [Function `amount_to_shares_to_redeem`](#@Specification_1_amount_to_shares_to_redeem)
+    -  [Function `redeem_active_shares`](#@Specification_1_redeem_active_shares)
+    -  [Function `redeem_inactive_shares`](#@Specification_1_redeem_inactive_shares)
+    -  [Function `calculate_stake_pool_drift`](#@Specification_1_calculate_stake_pool_drift)
+    -  [Function `synchronize_delegation_pool`](#@Specification_1_synchronize_delegation_pool)
+    -  [Function `multiply_then_divide`](#@Specification_1_multiply_then_divide)
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
@@ -876,6 +922,330 @@ This struct should be stored in the delegation pool resource account.
 </dd>
 <dt>
 <code>voter: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_delegation_pool_Ghost$ghost_share_redeem"></a>
+
+## Resource `Ghost$ghost_share_redeem`
+
+
+
+<pre><code><b>struct</b> Ghost$<a href="delegation_pool.md#0x1_delegation_pool_ghost_share_redeem">ghost_share_redeem</a> <b>has</b> <b>copy</b>, drop, store, key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>v: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_delegation_pool_Ghost$sync_commission_active"></a>
+
+## Resource `Ghost$sync_commission_active`
+
+
+
+<pre><code><b>struct</b> Ghost$<a href="delegation_pool.md#0x1_delegation_pool_sync_commission_active">sync_commission_active</a> <b>has</b> <b>copy</b>, drop, store, key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>v: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_delegation_pool_Ghost$sync_commission_pending_inactive"></a>
+
+## Resource `Ghost$sync_commission_pending_inactive`
+
+
+
+<pre><code><b>struct</b> Ghost$<a href="delegation_pool.md#0x1_delegation_pool_sync_commission_pending_inactive">sync_commission_pending_inactive</a> <b>has</b> <b>copy</b>, drop, store, key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>v: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_delegation_pool_Ghost$sync_delegation_pool_snap_before_buy_in"></a>
+
+## Resource `Ghost$sync_delegation_pool_snap_before_buy_in`
+
+
+
+<pre><code><b>struct</b> Ghost$<a href="delegation_pool.md#0x1_delegation_pool_sync_delegation_pool_snap_before_buy_in">sync_delegation_pool_snap_before_buy_in</a> <b>has</b> <b>copy</b>, drop, store, key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>v: <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">delegation_pool::DelegationPool</a></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_delegation_pool_Ghost$sync_inactive_snap_before_buy_in"></a>
+
+## Resource `Ghost$sync_inactive_snap_before_buy_in`
+
+
+
+<pre><code><b>struct</b> Ghost$<a href="delegation_pool.md#0x1_delegation_pool_sync_inactive_snap_before_buy_in">sync_inactive_snap_before_buy_in</a> <b>has</b> <b>copy</b>, drop, store, key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>v: <a href="../../aptos-stdlib/doc/pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">pool_u64_unbound::Pool</a></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_delegation_pool_Ghost$add_stake_pool_share_after_sync"></a>
+
+## Resource `Ghost$add_stake_pool_share_after_sync`
+
+
+
+<pre><code><b>struct</b> Ghost$<a href="delegation_pool.md#0x1_delegation_pool_add_stake_pool_share_after_sync">add_stake_pool_share_after_sync</a> <b>has</b> <b>copy</b>, drop, store, key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>v: <a href="../../aptos-stdlib/doc/pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">pool_u64_unbound::Pool</a></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_delegation_pool_Ghost$add_stake_pool_share_before_2nd_buy_in"></a>
+
+## Resource `Ghost$add_stake_pool_share_before_2nd_buy_in`
+
+
+
+<pre><code><b>struct</b> Ghost$<a href="delegation_pool.md#0x1_delegation_pool_add_stake_pool_share_before_2nd_buy_in">add_stake_pool_share_before_2nd_buy_in</a> <b>has</b> <b>copy</b>, drop, store, key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>v: <a href="../../aptos-stdlib/doc/pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">pool_u64_unbound::Pool</a></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_delegation_pool_Ghost$ghost_source_pool"></a>
+
+## Resource `Ghost$ghost_source_pool`
+
+
+
+<pre><code><b>struct</b> Ghost$<a href="delegation_pool.md#0x1_delegation_pool_ghost_source_pool">ghost_source_pool</a> <b>has</b> <b>copy</b>, drop, store, key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>v: <a href="../../aptos-stdlib/doc/pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">pool_u64_unbound::Pool</a></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_delegation_pool_Ghost$ghost_dest_pool"></a>
+
+## Resource `Ghost$ghost_dest_pool`
+
+
+
+<pre><code><b>struct</b> Ghost$<a href="delegation_pool.md#0x1_delegation_pool_ghost_dest_pool">ghost_dest_pool</a> <b>has</b> <b>copy</b>, drop, store, key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>v: <a href="../../aptos-stdlib/doc/pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">pool_u64_unbound::Pool</a></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_delegation_pool_Ghost$pre_inactive_shares_OLC_delegator"></a>
+
+## Resource `Ghost$pre_inactive_shares_OLC_delegator`
+
+
+
+<pre><code><b>struct</b> Ghost$<a href="delegation_pool.md#0x1_delegation_pool_pre_inactive_shares_OLC_delegator">pre_inactive_shares_OLC_delegator</a> <b>has</b> <b>copy</b>, drop, store, key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>v: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_delegation_pool_Ghost$pre_active_shares_OLC_delegator"></a>
+
+## Resource `Ghost$pre_active_shares_OLC_delegator`
+
+
+
+<pre><code><b>struct</b> Ghost$<a href="delegation_pool.md#0x1_delegation_pool_pre_active_shares_OLC_delegator">pre_active_shares_OLC_delegator</a> <b>has</b> <b>copy</b>, drop, store, key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>v: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_delegation_pool_Ghost$ghost_amount"></a>
+
+## Resource `Ghost$ghost_amount`
+
+
+
+<pre><code><b>struct</b> Ghost$<a href="delegation_pool.md#0x1_delegation_pool_ghost_amount">ghost_amount</a> <b>has</b> <b>copy</b>, drop, store, key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>v: u64</code>
 </dt>
 <dd>
 
@@ -2712,9 +3082,17 @@ Add <code>amount</code> of coins to the delegation pool <code>pool_address</code
     <a href="coin.md#0x1_coin_transfer">coin::transfer</a>&lt;AptosCoin&gt;(delegator, pool_address, amount);
     <a href="stake.md#0x1_stake_add_stake">stake::add_stake</a>(&<a href="delegation_pool.md#0x1_delegation_pool_retrieve_stake_pool_owner">retrieve_stake_pool_owner</a>(pool), amount);
 
+    <b>spec</b> {
+        <b>update</b> <a href="delegation_pool.md#0x1_delegation_pool_add_stake_pool_share_after_sync">add_stake_pool_share_after_sync</a> = pool.active_shares;
+    };
+
     // but buy shares for delegator just for the remaining amount after fee
     <a href="delegation_pool.md#0x1_delegation_pool_buy_in_active_shares">buy_in_active_shares</a>(pool, delegator_address, amount - add_stake_fee);
     <a href="delegation_pool.md#0x1_delegation_pool_assert_min_active_balance">assert_min_active_balance</a>(pool, delegator_address);
+
+    <b>spec</b> {
+        <b>update</b> <a href="delegation_pool.md#0x1_delegation_pool_add_stake_pool_share_before_2nd_buy_in">add_stake_pool_share_before_2nd_buy_in</a> = pool.active_shares;
+    };
 
     // grant temporary ownership over `add_stake` fees <b>to</b> a separate shareholder in order <b>to</b>:
     // - not mistake them for rewards <b>to</b> pay the operator from
@@ -2769,12 +3147,23 @@ at most how much active stake there is on the stake pool.
     <b>let</b> pool = <b>borrow_global_mut</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
     <b>let</b> delegator_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(delegator);
 
+    <b>spec</b> {
+        <b>update</b> <a href="delegation_pool.md#0x1_delegation_pool_pre_inactive_shares_OLC_delegator">pre_inactive_shares_OLC_delegator</a> = pool_u64::spec_balance(<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pool.inactive_shares, pool.observed_lockup_cycle), delegator_address);
+        <b>update</b> <a href="delegation_pool.md#0x1_delegation_pool_pre_active_shares_OLC_delegator">pre_active_shares_OLC_delegator</a> = pool_u64::spec_balance(pool.active_shares, delegator_address);
+    };
+
     amount = <a href="delegation_pool.md#0x1_delegation_pool_coins_to_transfer_to_ensure_min_stake">coins_to_transfer_to_ensure_min_stake</a>(
         &pool.active_shares,
         <a href="delegation_pool.md#0x1_delegation_pool_pending_inactive_shares_pool">pending_inactive_shares_pool</a>(pool),
         delegator_address,
         amount,
     );
+
+    <b>spec</b>{
+        <b>update</b> <a href="delegation_pool.md#0x1_delegation_pool_ghost_source_pool">ghost_source_pool</a> = pool.active_shares;
+        <b>update</b> <a href="delegation_pool.md#0x1_delegation_pool_ghost_dest_pool">ghost_dest_pool</a> = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pool.inactive_shares, pool.observed_lockup_cycle);
+    };
+
     amount = <a href="delegation_pool.md#0x1_delegation_pool_redeem_active_shares">redeem_active_shares</a>(pool, delegator_address, amount);
 
     <a href="stake.md#0x1_stake_unlock">stake::unlock</a>(&<a href="delegation_pool.md#0x1_delegation_pool_retrieve_stake_pool_owner">retrieve_stake_pool_owner</a>(pool), amount);
@@ -2822,6 +3211,11 @@ Move <code>amount</code> of coins from pending_inactive to active.
     <b>let</b> pool = <b>borrow_global_mut</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
     <b>let</b> delegator_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(delegator);
 
+    <b>spec</b> {
+         <b>update</b> <a href="delegation_pool.md#0x1_delegation_pool_pre_inactive_shares_OLC_delegator">pre_inactive_shares_OLC_delegator</a> = pool_u64::spec_balance(<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pool.inactive_shares, pool.observed_lockup_cycle), delegator_address);
+         <b>update</b> <a href="delegation_pool.md#0x1_delegation_pool_pre_active_shares_OLC_delegator">pre_active_shares_OLC_delegator</a> = pool_u64::spec_balance(pool.active_shares, delegator_address);
+    };
+
     amount = <a href="delegation_pool.md#0x1_delegation_pool_coins_to_transfer_to_ensure_min_stake">coins_to_transfer_to_ensure_min_stake</a>(
         <a href="delegation_pool.md#0x1_delegation_pool_pending_inactive_shares_pool">pending_inactive_shares_pool</a>(pool),
         &pool.active_shares,
@@ -2829,7 +3223,16 @@ Move <code>amount</code> of coins from pending_inactive to active.
         amount,
     );
     <b>let</b> observed_lockup_cycle = pool.observed_lockup_cycle;
+
+    <b>spec</b>{
+        <b>update</b> <a href="delegation_pool.md#0x1_delegation_pool_ghost_source_pool">ghost_source_pool</a> = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pool.inactive_shares, pool.observed_lockup_cycle);
+        <b>update</b> <a href="delegation_pool.md#0x1_delegation_pool_ghost_dest_pool">ghost_dest_pool</a> = pool.active_shares;
+    };
+
     amount = <a href="delegation_pool.md#0x1_delegation_pool_redeem_inactive_shares">redeem_inactive_shares</a>(pool, delegator_address, amount, observed_lockup_cycle);
+    <b>spec</b> {
+        <b>update</b> <a href="delegation_pool.md#0x1_delegation_pool_ghost_amount">ghost_amount</a> = amount;
+    };
 
     <a href="stake.md#0x1_stake_reactivate_stake">stake::reactivate_stake</a>(&<a href="delegation_pool.md#0x1_delegation_pool_retrieve_stake_pool_owner">retrieve_stake_pool_owner</a>(pool), amount);
 
@@ -2920,6 +3323,11 @@ Withdraw <code>amount</code> of owned inactive stake from the delegation pool at
     // <a href="stake.md#0x1_stake">stake</a> pool will inactivate entire pending_inactive <a href="stake.md#0x1_stake">stake</a> at `<a href="stake.md#0x1_stake_withdraw">stake::withdraw</a>` <b>to</b> make it withdrawable
     // however, bypassing the inactivation of excess <a href="stake.md#0x1_stake">stake</a> (inactivated but not withdrawn) <b>ensures</b>
     // the OLC is not advanced indefinitely on `unlock`-`withdraw` paired calls
+
+    <b>spec</b> {
+        <b>update</b> <a href="delegation_pool.md#0x1_delegation_pool_ghost_amount">ghost_amount</a> = amount;
+    };
+
     <b>if</b> (<a href="delegation_pool.md#0x1_delegation_pool_can_withdraw_pending_inactive">can_withdraw_pending_inactive</a>(pool_address)) {
         // get excess <a href="stake.md#0x1_stake">stake</a> before being entirely inactivated
         <b>let</b> (_, _, _, pending_inactive) = <a href="stake.md#0x1_stake_get_stake">stake::get_stake</a>(pool_address);
@@ -2951,6 +3359,7 @@ Withdraw <code>amount</code> of owned inactive stake from the delegation pool at
             amount_withdrawn: amount,
         },
     );
+
 }
 </code></pre>
 
@@ -3278,6 +3687,9 @@ escape inactivation when current lockup ends.
         <a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(&pool.inactive_shares, lockup_cycle),
         shareholder,
         coins_amount);
+    <b>spec</b> {
+      <b>update</b> <a href="delegation_pool.md#0x1_delegation_pool_ghost_share_redeem">ghost_share_redeem</a> = shares_to_redeem;
+    };
     // silently exit <b>if</b> not a shareholder otherwise redeem would fail <b>with</b> `ESHAREHOLDER_NOT_FOUND`
     <b>if</b> (shares_to_redeem == 0) <b>return</b> 0;
 
@@ -3412,7 +3824,10 @@ shares pools, assign commission to operator and eventually prepare delegation po
         commission_active,
         commission_pending_inactive
     ) = <a href="delegation_pool.md#0x1_delegation_pool_calculate_stake_pool_drift">calculate_stake_pool_drift</a>(pool);
-
+    <b>spec</b> {
+        <b>update</b> <a href="delegation_pool.md#0x1_delegation_pool_sync_commission_active">sync_commission_active</a> = commission_active;
+        <b>update</b> <a href="delegation_pool.md#0x1_delegation_pool_sync_commission_pending_inactive">sync_commission_pending_inactive</a> = commission_pending_inactive;
+    };
     // zero `pending_active` <a href="stake.md#0x1_stake">stake</a> indicates that either there are no `add_stake` fees or
     // previous epoch <b>has</b> ended and should release the shares owning the existing fees
     <b>let</b> (_, _, pending_active, _) = <a href="stake.md#0x1_stake_get_stake">stake::get_stake</a>(pool_address);
@@ -3434,7 +3849,11 @@ shares pools, assign commission to operator and eventually prepare delegation po
         <a href="delegation_pool.md#0x1_delegation_pool_pending_inactive_shares_pool_mut">pending_inactive_shares_pool_mut</a>(pool),
         pending_inactive - commission_pending_inactive
     );
-
+    <b>spec</b> {
+        <b>assert</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pool.inactive_shares, pool.observed_lockup_cycle).total_coins == pending_inactive - commission_pending_inactive;
+        <b>update</b> <a href="delegation_pool.md#0x1_delegation_pool_sync_delegation_pool_snap_before_buy_in">sync_delegation_pool_snap_before_buy_in</a> = pool;
+        <b>update</b> <a href="delegation_pool.md#0x1_delegation_pool_sync_inactive_snap_before_buy_in">sync_inactive_snap_before_buy_in</a> = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(<a href="delegation_pool.md#0x1_delegation_pool_sync_delegation_pool_snap_before_buy_in">sync_delegation_pool_snap_before_buy_in</a>.inactive_shares, pool.observed_lockup_cycle);
+    };
     // reward operator its commission out of uncommitted active rewards (`add_stake` fees already excluded)
     <a href="delegation_pool.md#0x1_delegation_pool_buy_in_active_shares">buy_in_active_shares</a>(pool, <a href="stake.md#0x1_stake_get_operator">stake::get_operator</a>(pool_address), commission_active);
     // reward operator its commission out of uncommitted pending_inactive rewards
@@ -3464,6 +3883,10 @@ shares pools, assign commission to operator and eventually prepare delegation po
             pool.observed_lockup_cycle,
             <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_create_with_scaling_factor">pool_u64::create_with_scaling_factor</a>(<a href="delegation_pool.md#0x1_delegation_pool_SHARES_SCALING_FACTOR">SHARES_SCALING_FACTOR</a>)
         );
+    };
+    <b>spec</b> {
+        <b>assert</b> !lockup_cycle_ended ==&gt; <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pool.inactive_shares, pool.observed_lockup_cycle).total_coins == pending_inactive;
+        <b>assert</b> pool.total_coins_inactive &lt;= <a href="delegation_pool.md#0x1_delegation_pool_spec_get_stake">spec_get_stake</a>(pool).inactive.value;
     }
 }
 </code></pre>
@@ -3694,7 +4117,1143 @@ Deprecated, prefer math64::mul_div
 
 
 
-<pre><code><b>pragma</b> verify=<b>false</b>;
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>pragma</b> aborts_if_is_partial;
+<b>apply</b> <a href="stake.md#0x1_stake_ResourceRequirement">stake::ResourceRequirement</a> <b>to</b> *;
+<b>apply</b> <a href="delegation_pool.md#0x1_delegation_pool_NullShareholderAddrRequirement">NullShareholderAddrRequirement</a> <b>to</b>
+withdraw, add_stake, unlock, reactivate_stake, synchronize_delegation_pool;
+<b>apply</b> <a href="delegation_pool.md#0x1_delegation_pool_GlobalPendingWithdrawlOwner">GlobalPendingWithdrawlOwner</a> <b>to</b> *;
+<b>apply</b> <a href="delegation_pool.md#0x1_delegation_pool_TotalCoinInactiveLEInactiveStakePool">TotalCoinInactiveLEInactiveStakePool</a> <b>to</b>
+withdraw, add_stake, unlock, reactivate_stake, synchronize_delegation_pool;
+<b>apply</b> <a href="delegation_pool.md#0x1_delegation_pool_WithdrawRequirements">WithdrawRequirements</a>  {
+    pool: <b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address)
+} <b>to</b> withdraw, add_stake, unlock, reactivate_stake, synchronize_delegation_pool;
+<b>invariant</b> <b>forall</b> addr: <b>address</b>: <b>exists</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(addr) ==&gt; <b>exists</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(addr);
+<b>invariant</b> <b>forall</b> addr: <b>address</b>: <b>exists</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(addr) ==&gt; (<b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(addr).stake_pool_signer_cap.<a href="account.md#0x1_account">account</a> == addr);
+<a name="0x1_delegation_pool_ghost_share_redeem"></a>
+<b>global</b> <a href="delegation_pool.md#0x1_delegation_pool_ghost_share_redeem">ghost_share_redeem</a>: u64;
+<a name="0x1_delegation_pool_sync_commission_active"></a>
+<b>global</b> <a href="delegation_pool.md#0x1_delegation_pool_sync_commission_active">sync_commission_active</a>: u64;
+<a name="0x1_delegation_pool_sync_commission_pending_inactive"></a>
+<b>global</b> <a href="delegation_pool.md#0x1_delegation_pool_sync_commission_pending_inactive">sync_commission_pending_inactive</a>: u64;
+<a name="0x1_delegation_pool_sync_delegation_pool_snap_before_buy_in"></a>
+<b>global</b> <a href="delegation_pool.md#0x1_delegation_pool_sync_delegation_pool_snap_before_buy_in">sync_delegation_pool_snap_before_buy_in</a>: <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>;
+<a name="0x1_delegation_pool_sync_inactive_snap_before_buy_in"></a>
+<b>global</b> <a href="delegation_pool.md#0x1_delegation_pool_sync_inactive_snap_before_buy_in">sync_inactive_snap_before_buy_in</a>: <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_Pool">pool_u64::Pool</a>;
+<a name="0x1_delegation_pool_add_stake_pool_share_after_sync"></a>
+<b>global</b> <a href="delegation_pool.md#0x1_delegation_pool_add_stake_pool_share_after_sync">add_stake_pool_share_after_sync</a>: <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_Pool">pool_u64::Pool</a>;
+<a name="0x1_delegation_pool_add_stake_pool_share_before_2nd_buy_in"></a>
+<b>global</b> <a href="delegation_pool.md#0x1_delegation_pool_add_stake_pool_share_before_2nd_buy_in">add_stake_pool_share_before_2nd_buy_in</a>: <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_Pool">pool_u64::Pool</a>;
+<a name="0x1_delegation_pool_ghost_source_pool"></a>
+<b>global</b> <a href="delegation_pool.md#0x1_delegation_pool_ghost_source_pool">ghost_source_pool</a>: <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_Pool">pool_u64::Pool</a>;
+<a name="0x1_delegation_pool_ghost_dest_pool"></a>
+<b>global</b> <a href="delegation_pool.md#0x1_delegation_pool_ghost_dest_pool">ghost_dest_pool</a>: <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_Pool">pool_u64::Pool</a>;
+<a name="0x1_delegation_pool_pre_inactive_shares_OLC_delegator"></a>
+<b>global</b> <a href="delegation_pool.md#0x1_delegation_pool_pre_inactive_shares_OLC_delegator">pre_inactive_shares_OLC_delegator</a>: u64;
+<a name="0x1_delegation_pool_pre_active_shares_OLC_delegator"></a>
+<b>global</b> <a href="delegation_pool.md#0x1_delegation_pool_pre_active_shares_OLC_delegator">pre_active_shares_OLC_delegator</a>: u64;
+<a name="0x1_delegation_pool_ghost_amount"></a>
+<b>global</b> <a href="delegation_pool.md#0x1_delegation_pool_ghost_amount">ghost_amount</a>: u64;
+</code></pre>
+
+
+
+<a name="@Specification_1_DelegationPool"></a>
+
+### Resource `DelegationPool`
+
+
+<pre><code><b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a> <b>has</b> key
+</code></pre>
+
+
+
+<dl>
+<dt>
+<code>active_shares: <a href="../../aptos-stdlib/doc/pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">pool_u64_unbound::Pool</a></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>observed_lockup_cycle: <a href="delegation_pool.md#0x1_delegation_pool_ObservedLockupCycle">delegation_pool::ObservedLockupCycle</a></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>inactive_shares: <a href="../../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<a href="delegation_pool.md#0x1_delegation_pool_ObservedLockupCycle">delegation_pool::ObservedLockupCycle</a>, <a href="../../aptos-stdlib/doc/pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">pool_u64_unbound::Pool</a>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>pending_withdrawals: <a href="../../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<b>address</b>, <a href="delegation_pool.md#0x1_delegation_pool_ObservedLockupCycle">delegation_pool::ObservedLockupCycle</a>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>stake_pool_signer_cap: <a href="account.md#0x1_account_SignerCapability">account::SignerCapability</a></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>total_coins_inactive: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>operator_commission_percentage: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>add_stake_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="delegation_pool.md#0x1_delegation_pool_AddStakeEvent">delegation_pool::AddStakeEvent</a>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>reactivate_stake_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="delegation_pool.md#0x1_delegation_pool_ReactivateStakeEvent">delegation_pool::ReactivateStakeEvent</a>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>unlock_stake_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="delegation_pool.md#0x1_delegation_pool_UnlockStakeEvent">delegation_pool::UnlockStakeEvent</a>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>withdraw_stake_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="delegation_pool.md#0x1_delegation_pool_WithdrawStakeEvent">delegation_pool::WithdrawStakeEvent</a>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>distribute_commission_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DistributeCommissionEvent">delegation_pool::DistributeCommissionEvent</a>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+
+<pre><code><b>invariant</b> <b>forall</b> delegator_address: <b>address</b>: <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(pending_withdrawals, delegator_address)
+    ==&gt; <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(inactive_shares,
+    <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pending_withdrawals, delegator_address)), delegator_address) != 0;
+<b>invariant</b> <b>forall</b> delegator_address: <b>address</b>: <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(pending_withdrawals, delegator_address) ==&gt;
+    (<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pending_withdrawals, delegator_address).index
+        &lt;= observed_lockup_cycle.index);
+<b>invariant</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(inactive_shares, observed_lockup_cycle);
+</code></pre>
+
+
+
+
+<a name="0x1_delegation_pool_NullShareholderAddrRequirement"></a>
+
+
+<pre><code><b>schema</b> <a href="delegation_pool.md#0x1_delegation_pool_NullShareholderAddrRequirement">NullShareholderAddrRequirement</a> {
+    pool_address: <b>address</b>;
+    <b>requires</b> <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address).operator_address != <a href="delegation_pool.md#0x1_delegation_pool_NULL_SHAREHOLDER">NULL_SHAREHOLDER</a>;
+    <b>requires</b> pool_address != <a href="delegation_pool.md#0x1_delegation_pool_NULL_SHAREHOLDER">NULL_SHAREHOLDER</a>;
+}
+</code></pre>
+
+
+
+
+<a name="0x1_delegation_pool_PoolDelegatorAddressNotEq"></a>
+
+
+<pre><code><b>schema</b> <a href="delegation_pool.md#0x1_delegation_pool_PoolDelegatorAddressNotEq">PoolDelegatorAddressNotEq</a> {
+    pool_address: <b>address</b>;
+    delegator_address: <b>address</b>;
+    <b>requires</b> pool_address != delegator_address;
+}
+</code></pre>
+
+
+
+
+<a name="0x1_delegation_pool_GlobalPendingWithdrawlOwner"></a>
+
+
+<pre><code><b>schema</b> <a href="delegation_pool.md#0x1_delegation_pool_GlobalPendingWithdrawlOwner">GlobalPendingWithdrawlOwner</a> {
+    <b>invariant</b> <b>forall</b> addr: <b>address</b>: <b>exists</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(addr)
+        ==&gt; (<b>exists</b>&lt;<a href="stake.md#0x1_stake_OwnerCapability">stake::OwnerCapability</a>&gt;(addr) && <b>global</b>&lt;<a href="stake.md#0x1_stake_OwnerCapability">stake::OwnerCapability</a>&gt;(addr).pool_address == addr);
+}
+</code></pre>
+
+
+
+
+<a name="0x1_delegation_pool_TotalCoinInactiveLEInactiveStakePool"></a>
+
+
+<pre><code><b>schema</b> <a href="delegation_pool.md#0x1_delegation_pool_TotalCoinInactiveLEInactiveStakePool">TotalCoinInactiveLEInactiveStakePool</a> {
+    pool_address: <b>address</b>;
+    <b>invariant</b> <b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address).total_coins_inactive &lt;=
+        <a href="delegation_pool.md#0x1_delegation_pool_spec_get_stake">spec_get_stake</a>(<b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address)).inactive.value;
+}
+</code></pre>
+
+
+
+
+<a name="0x1_delegation_pool_WithdrawRequirements"></a>
+
+
+<pre><code><b>schema</b> <a href="delegation_pool.md#0x1_delegation_pool_WithdrawRequirements">WithdrawRequirements</a> {
+    pool: <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>;
+    <b>requires</b> <b>exists</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool.stake_pool_signer_cap.<a href="account.md#0x1_account">account</a>);
+    <b>requires</b> pool.total_coins_inactive &lt;= <a href="delegation_pool.md#0x1_delegation_pool_spec_get_stake">spec_get_stake</a>(pool).inactive.value;
+}
+</code></pre>
+
+
+
+
+<a name="0x1_delegation_pool_RedeemInactive"></a>
+
+
+<pre><code><b>schema</b> <a href="delegation_pool.md#0x1_delegation_pool_RedeemInactive">RedeemInactive</a> {
+    pool_address: <b>address</b>;
+    <b>ensures</b> <b>forall</b> i in 0..<b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address).observed_lockup_cycle.index:
+        <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(<b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address).inactive_shares, <a href="delegation_pool.md#0x1_delegation_pool_ObservedLockupCycle">ObservedLockupCycle</a>{index: i}) ==&gt;
+            <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(<b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address).inactive_shares, <a href="delegation_pool.md#0x1_delegation_pool_ObservedLockupCycle">ObservedLockupCycle</a>{index: i}).total_coins
+                &lt;= <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(<b>old</b>(<b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address)).inactive_shares, <a href="delegation_pool.md#0x1_delegation_pool_ObservedLockupCycle">ObservedLockupCycle</a>{index: i}).total_coins;
+}
+</code></pre>
+
+
+
+
+<a name="0x1_delegation_pool_spec_multiply_then_divide"></a>
+
+
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_spec_multiply_then_divide">spec_multiply_then_divide</a>(x: u64, y: u64, z: u64): u64;
+</code></pre>
+
+
+
+<a name="@Specification_1_owner_cap_exists"></a>
+
+### Function `owner_cap_exists`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_owner_cap_exists">owner_cap_exists</a>(addr: <b>address</b>): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>aborts_if</b> <b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_get_owned_pool_address"></a>
+
+### Function `get_owned_pool_address`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_get_owned_pool_address">get_owned_pool_address</a>(owner: <b>address</b>): <b>address</b>
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolOwnership">DelegationPoolOwnership</a>&gt;(owner);
+</code></pre>
+
+
+
+<a name="@Specification_1_delegation_pool_exists"></a>
+
+### Function `delegation_pool_exists`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_delegation_pool_exists">delegation_pool_exists</a>(addr: <b>address</b>): bool
+</code></pre>
+
+
+Return whether a delegation pool exists at supplied address <code>addr</code>.
+
+
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>aborts_if</b> <b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_observed_lockup_cycle"></a>
+
+### Function `observed_lockup_cycle`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_observed_lockup_cycle">observed_lockup_cycle</a>(pool_address: <b>address</b>): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
+</code></pre>
+
+
+
+<a name="@Specification_1_operator_commission_percentage"></a>
+
+### Function `operator_commission_percentage`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_operator_commission_percentage">operator_commission_percentage</a>(pool_address: <b>address</b>): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
+</code></pre>
+
+
+
+<a name="@Specification_1_shareholders_count_active_pool"></a>
+
+### Function `shareholders_count_active_pool`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_shareholders_count_active_pool">shareholders_count_active_pool</a>(pool_address: <b>address</b>): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
+</code></pre>
+
+
+
+<a name="@Specification_1_get_delegation_pool_stake"></a>
+
+### Function `get_delegation_pool_stake`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_get_delegation_pool_stake">get_delegation_pool_stake</a>(pool_address: <b>address</b>): (u64, u64, u64, u64)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
+<b>aborts_if</b> !<a href="stake.md#0x1_stake_stake_pool_exists">stake::stake_pool_exists</a>(pool_address);
+</code></pre>
+
+
+
+<a name="@Specification_1_get_pending_withdrawal"></a>
+
+### Function `get_pending_withdrawal`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_get_pending_withdrawal">get_pending_withdrawal</a>(pool_address: <b>address</b>, delegator_address: <b>address</b>): (bool, u64)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>pragma</b> aborts_if_is_partial;
+<b>aborts_if</b> !<a href="delegation_pool.md#0x1_delegation_pool_delegation_pool_exists">delegation_pool_exists</a>(pool_address);
+</code></pre>
+
+
+
+<a name="@Specification_1_get_stake"></a>
+
+### Function `get_stake`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_get_stake">get_stake</a>(pool_address: <b>address</b>, delegator_address: <b>address</b>): (u64, u64, u64)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>true</b>;
+</code></pre>
+
+
+
+
+<a name="0x1_delegation_pool_spec_get_add_stake_fee"></a>
+
+
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_spec_get_add_stake_fee">spec_get_add_stake_fee</a>(pool_address: <b>address</b>, amount: u64): u64;
+</code></pre>
+
+
+
+<a name="@Specification_1_get_add_stake_fee"></a>
+
+### Function `get_add_stake_fee`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_get_add_stake_fee">get_add_stake_fee</a>(pool_address: <b>address</b>, amount: u64): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+<b>ensures</b> [abstract] result == <a href="delegation_pool.md#0x1_delegation_pool_spec_get_add_stake_fee">spec_get_add_stake_fee</a>(pool_address, amount);
+</code></pre>
+
+
+
+<a name="@Specification_1_can_withdraw_pending_inactive"></a>
+
+### Function `can_withdraw_pending_inactive`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_can_withdraw_pending_inactive">can_withdraw_pending_inactive</a>(pool_address: <b>address</b>): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>pragma</b> opaque;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">stake::ValidatorSet</a>&gt;(@aptos_framework);
+<b>ensures</b> result == <a href="delegation_pool.md#0x1_delegation_pool_spec_can_withdraw_pending_inactive">spec_can_withdraw_pending_inactive</a>(pool_address);
+</code></pre>
+
+
+
+
+<a name="0x1_delegation_pool_spec_can_withdraw_pending_inactive"></a>
+
+
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_spec_can_withdraw_pending_inactive">spec_can_withdraw_pending_inactive</a>(pool_address: <b>address</b>): bool {
+   <a href="stake.md#0x1_stake_spec_get_validator_state_inactive">stake::spec_get_validator_state_inactive</a>(pool_address) &&
+       <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &gt;= <a href="stake.md#0x1_stake_spec_get_lockup_secs">stake::spec_get_lockup_secs</a>(pool_address)
+}
+</code></pre>
+
+
+
+<a name="@Specification_1_initialize_delegation_pool"></a>
+
+### Function `initialize_delegation_pool`
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_initialize_delegation_pool">initialize_delegation_pool</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, operator_commission_percentage: u64, delegation_pool_creation_seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>pragma</b> aborts_if_is_partial = <b>true</b>;
+<b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_DELEGATION_POOLS">features::DELEGATION_POOLS</a>);
+<b>aborts_if</b> <b>exists</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolOwnership">DelegationPoolOwnership</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner));
+<b>aborts_if</b> operator_commission_percentage &gt; <a href="delegation_pool.md#0x1_delegation_pool_MAX_FEE">MAX_FEE</a>;
+<b>ensures</b> <b>exists</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolOwnership">DelegationPoolOwnership</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner));
+<b>let</b> <b>post</b> pool_address = <b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolOwnership">DelegationPoolOwnership</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner)).pool_address;
+<b>ensures</b> <b>exists</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
+<b>ensures</b> <a href="stake.md#0x1_stake_stake_pool_exists">stake::stake_pool_exists</a>(pool_address);
+<b>let</b> <b>post</b> pool = <b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
+<b>ensures</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(pool.inactive_shares, pool.observed_lockup_cycle);
+<b>let</b> <b>post</b> stake_pool = <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address);
+<b>ensures</b> pool.active_shares.total_coins == <a href="coin.md#0x1_coin_value">coin::value</a>(stake_pool.active) + <a href="coin.md#0x1_coin_value">coin::value</a>(stake_pool.pending_active);
+<b>ensures</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pool.inactive_shares,pool.observed_lockup_cycle).total_coins == <a href="coin.md#0x1_coin_value">coin::value</a>(stake_pool.pending_inactive);
+<b>ensures</b> pool.total_coins_inactive == <a href="coin.md#0x1_coin_value">coin::value</a>(stake_pool.inactive);
+</code></pre>
+
+
+
+<a name="@Specification_1_assert_owner_cap_exists"></a>
+
+### Function `assert_owner_cap_exists`
+
+
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_assert_owner_cap_exists">assert_owner_cap_exists</a>(owner: <b>address</b>)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>aborts_if</b> !<a href="delegation_pool.md#0x1_delegation_pool_owner_cap_exists">owner_cap_exists</a>(owner);
+</code></pre>
+
+
+
+<a name="@Specification_1_assert_delegation_pool_exists"></a>
+
+### Function `assert_delegation_pool_exists`
+
+
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_assert_delegation_pool_exists">assert_delegation_pool_exists</a>(pool_address: <b>address</b>)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>aborts_if</b> !<a href="delegation_pool.md#0x1_delegation_pool_delegation_pool_exists">delegation_pool_exists</a>(pool_address);
+</code></pre>
+
+
+
+<a name="@Specification_1_assert_min_active_balance"></a>
+
+### Function `assert_min_active_balance`
+
+
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_assert_min_active_balance">assert_min_active_balance</a>(pool: &<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">delegation_pool::DelegationPool</a>, delegator_address: <b>address</b>)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>let</b> <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64">pool_u64</a> = pool.active_shares;
+<b>include</b> <a href="delegation_pool.md#0x1_delegation_pool_AssertMinActiveBalanceAbortsIf">AssertMinActiveBalanceAbortsIf</a>;
+</code></pre>
+
+
+
+<a name="@Specification_1_assert_min_pending_inactive_balance"></a>
+
+### Function `assert_min_pending_inactive_balance`
+
+
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_assert_min_pending_inactive_balance">assert_min_pending_inactive_balance</a>(pool: &<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">delegation_pool::DelegationPool</a>, delegator_address: <b>address</b>)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>let</b> observed_lockup_cycle = pool.observed_lockup_cycle;
+<b>aborts_if</b> !<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(pool.inactive_shares, observed_lockup_cycle);
+<b>let</b> <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64">pool_u64</a> = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pool.inactive_shares, observed_lockup_cycle);
+<b>include</b> <a href="delegation_pool.md#0x1_delegation_pool_AssertMinActiveBalanceAbortsIf">AssertMinActiveBalanceAbortsIf</a>;
+</code></pre>
+
+
+
+<a name="@Specification_1_coins_to_redeem_to_ensure_min_stake"></a>
+
+### Function `coins_to_redeem_to_ensure_min_stake`
+
+
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_coins_to_redeem_to_ensure_min_stake">coins_to_redeem_to_ensure_min_stake</a>(src_shares_pool: &<a href="../../aptos-stdlib/doc/pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">pool_u64_unbound::Pool</a>, shareholder: <b>address</b>, amount: u64): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>include</b> <a href="delegation_pool.md#0x1_delegation_pool_AmountToSharesToRedeemAbortsIf">AmountToSharesToRedeemAbortsIf</a> {
+    shares_pool: src_shares_pool,
+};
+</code></pre>
+
+
+
+<a name="@Specification_1_coins_to_transfer_to_ensure_min_stake"></a>
+
+### Function `coins_to_transfer_to_ensure_min_stake`
+
+
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_coins_to_transfer_to_ensure_min_stake">coins_to_transfer_to_ensure_min_stake</a>(src_shares_pool: &<a href="../../aptos-stdlib/doc/pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">pool_u64_unbound::Pool</a>, dst_shares_pool: &<a href="../../aptos-stdlib/doc/pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">pool_u64_unbound::Pool</a>, shareholder: <b>address</b>, amount: u64): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>include</b> <a href="delegation_pool.md#0x1_delegation_pool_AmountToSharesToRedeemAbortsIf">AmountToSharesToRedeemAbortsIf</a> {
+    shares_pool: src_shares_pool,
+};
+</code></pre>
+
+
+
+<a name="@Specification_1_retrieve_stake_pool_owner"></a>
+
+### Function `retrieve_stake_pool_owner`
+
+
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_retrieve_stake_pool_owner">retrieve_stake_pool_owner</a>(pool: &<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">delegation_pool::DelegationPool</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(result) == pool.stake_pool_signer_cap.<a href="account.md#0x1_account">account</a>;
+</code></pre>
+
+
+
+<a name="@Specification_1_set_operator"></a>
+
+### Function `set_operator`
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_set_operator">set_operator</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_operator: <b>address</b>)
+</code></pre>
+
+
+
+
+<pre><code><b>let</b> pool_address = <b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolOwnership">DelegationPoolOwnership</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner)).pool_address;
+<b>include</b> <a href="delegation_pool.md#0x1_delegation_pool_NullShareholderAddrRequirement">NullShareholderAddrRequirement</a>;
+<b>include</b> <a href="delegation_pool.md#0x1_delegation_pool_TotalCoinInactiveLEInactiveStakePool">TotalCoinInactiveLEInactiveStakePool</a>;
+<b>include</b> <a href="delegation_pool.md#0x1_delegation_pool_WithdrawRequirements">WithdrawRequirements</a> {
+    pool: <b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address)
+};
+<b>include</b> <a href="delegation_pool.md#0x1_delegation_pool_PoolDelegatorAddressNotEq">PoolDelegatorAddressNotEq</a> {
+    delegator_address: <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address).operator_address
+};
+<b>pragma</b> verify = <b>true</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_set_delegated_voter"></a>
+
+### Function `set_delegated_voter`
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_set_delegated_voter">set_delegated_voter</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_voter: <b>address</b>)
+</code></pre>
+
+
+
+
+<pre><code><b>let</b> pool_address = <b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolOwnership">DelegationPoolOwnership</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner)).pool_address;
+<b>include</b> <a href="delegation_pool.md#0x1_delegation_pool_NullShareholderAddrRequirement">NullShareholderAddrRequirement</a>;
+<b>include</b> <a href="delegation_pool.md#0x1_delegation_pool_TotalCoinInactiveLEInactiveStakePool">TotalCoinInactiveLEInactiveStakePool</a>;
+<b>include</b> <a href="delegation_pool.md#0x1_delegation_pool_WithdrawRequirements">WithdrawRequirements</a> {
+    pool: <b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address)
+};
+<b>include</b> <a href="delegation_pool.md#0x1_delegation_pool_PoolDelegatorAddressNotEq">PoolDelegatorAddressNotEq</a> {
+    delegator_address: <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address).operator_address
+};
+<b>pragma</b> verify = <b>true</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_add_stake"></a>
+
+### Function `add_stake`
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_add_stake">add_stake</a>(delegator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pool_address: <b>address</b>, amount: u64)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>pragma</b> aborts_if_is_partial = <b>true</b>;
+<b>include</b> <a href="delegation_pool.md#0x1_delegation_pool_PoolDelegatorAddressNotEq">PoolDelegatorAddressNotEq</a> {
+    delegator_address: <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address).operator_address
+};
+<b>include</b> <a href="delegation_pool.md#0x1_delegation_pool_PoolDelegatorAddressNotEq">PoolDelegatorAddressNotEq</a>;
+<b>aborts_if</b> amount &gt; 0 && !<b>exists</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
+<b>let</b> delegator_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(delegator);
+<b>let</b> pre_pool = <b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
+<b>let</b> pre_stake_pool = <a href="delegation_pool.md#0x1_delegation_pool_spec_get_stake">spec_get_stake</a>(pre_pool);
+<b>let</b> pre_stake_active_value = pre_stake_pool.active.value;
+<b>let</b> pre_stake_pending_active_value = pre_stake_pool.pending_active.value;
+<b>let</b> <b>post</b> pool = <b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
+<b>let</b> <b>post</b> stake_pool = <a href="delegation_pool.md#0x1_delegation_pool_spec_get_stake">spec_get_stake</a>(pool);
+<b>let</b> <b>post</b> stake_active_value = stake_pool.active.value;
+<b>let</b> <b>post</b> stake_pending_active_value = stake_pool.pending_active.value;
+<b>ensures</b> pre_stake_active_value + pre_stake_pending_active_value + amount == stake_active_value + stake_pending_active_value;
+<b>ensures</b> amount &gt; 0 ==&gt; <b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address).active_shares.total_coins
+    == <a href="coin.md#0x1_coin_value">coin::value</a>(<b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address).active) + <a href="coin.md#0x1_coin_value">coin::value</a>(<b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address).pending_active);
+<b>ensures</b> amount &gt; 0 ==&gt; <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(pool.active_shares, <a href="delegation_pool.md#0x1_delegation_pool_NULL_SHAREHOLDER">NULL_SHAREHOLDER</a>) ==
+    <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(<a href="delegation_pool.md#0x1_delegation_pool_add_stake_pool_share_before_2nd_buy_in">add_stake_pool_share_before_2nd_buy_in</a>, <a href="delegation_pool.md#0x1_delegation_pool_NULL_SHAREHOLDER">NULL_SHAREHOLDER</a>)
+        + <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_amount_to_shares_with_total_coins">pool_u64::spec_amount_to_shares_with_total_coins</a>(<a href="delegation_pool.md#0x1_delegation_pool_add_stake_pool_share_before_2nd_buy_in">add_stake_pool_share_before_2nd_buy_in</a>,
+    <a href="delegation_pool.md#0x1_delegation_pool_spec_get_add_stake_fee">spec_get_add_stake_fee</a>(pool_address, amount), <a href="delegation_pool.md#0x1_delegation_pool_add_stake_pool_share_before_2nd_buy_in">add_stake_pool_share_before_2nd_buy_in</a>.total_coins);
+<b>ensures</b> (amount &gt; 0 && <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address).operator_address != delegator_address) ==&gt; <a href="coin.md#0x1_coin_balance">coin::balance</a>&lt;AptosCoin&gt;(delegator_address) == <b>old</b>(<a href="coin.md#0x1_coin_balance">coin::balance</a>&lt;AptosCoin&gt;(delegator_address)) - amount;
+<b>ensures</b> <b>global</b>&lt;AptosCoin&gt;(pool_address) == <b>old</b>(<b>global</b>&lt;AptosCoin&gt;(pool_address));
+</code></pre>
+
+
+
+<a name="@Specification_1_unlock"></a>
+
+### Function `unlock`
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_unlock">unlock</a>(delegator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pool_address: <b>address</b>, amount: u64)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>pragma</b> aborts_if_is_partial;
+<b>requires</b> amount &gt; 0;
+<b>include</b> <a href="delegation_pool.md#0x1_delegation_pool_PoolDelegatorAddressNotEq">PoolDelegatorAddressNotEq</a> {
+    delegator_address: <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address).operator_address
+};
+<b>include</b> <a href="delegation_pool.md#0x1_delegation_pool_PoolDelegatorAddressNotEq">PoolDelegatorAddressNotEq</a>;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
+<b>let</b> pre_pool = <b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
+<b>let</b> delegator_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(delegator);
+<b>let</b> <b>post</b> pool = <b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
+<b>let</b> pre_stake_pool = <a href="delegation_pool.md#0x1_delegation_pool_spec_get_stake">spec_get_stake</a>(pre_pool);
+<b>let</b> <b>post</b> stake_pool = <a href="delegation_pool.md#0x1_delegation_pool_spec_get_stake">spec_get_stake</a>(pool);
+<b>ensures</b> <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares_to_amount_with_total_coins">pool_u64::spec_shares_to_amount_with_total_coins</a>(<a href="delegation_pool.md#0x1_delegation_pool_ghost_source_pool">ghost_source_pool</a>,
+    <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(<a href="delegation_pool.md#0x1_delegation_pool_ghost_source_pool">ghost_source_pool</a>, delegator_address) -
+        <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(pool.active_shares, delegator_address),
+    <a href="delegation_pool.md#0x1_delegation_pool_ghost_source_pool">ghost_source_pool</a>.total_coins)
+    == <a href="delegation_pool.md#0x1_delegation_pool_ghost_amount">ghost_amount</a>;
+<b>ensures</b> <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(<b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address).inactive_shares, <b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address).observed_lockup_cycle), delegator_address)
+    - <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(<a href="delegation_pool.md#0x1_delegation_pool_ghost_dest_pool">ghost_dest_pool</a>, delegator_address)
+    == <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_amount_to_shares_with_total_coins">pool_u64::spec_amount_to_shares_with_total_coins</a>(<a href="delegation_pool.md#0x1_delegation_pool_ghost_dest_pool">ghost_dest_pool</a>, <a href="delegation_pool.md#0x1_delegation_pool_ghost_amount">ghost_amount</a>, <a href="delegation_pool.md#0x1_delegation_pool_ghost_dest_pool">ghost_dest_pool</a>.total_coins);
+<b>let</b> <b>post</b> inactive_shares_OLC_delegator = pool_u64::spec_balance(<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pool.inactive_shares, pool.observed_lockup_cycle), delegator_address);
+<b>let</b> <b>post</b> active_shares_OLC_delegator = pool_u64::spec_balance(pool.active_shares, delegator_address);
+<b>ensures</b> <a href="delegation_pool.md#0x1_delegation_pool_pre_inactive_shares_OLC_delegator">pre_inactive_shares_OLC_delegator</a> + <a href="delegation_pool.md#0x1_delegation_pool_pre_active_shares_OLC_delegator">pre_active_shares_OLC_delegator</a> &lt;= inactive_shares_OLC_delegator + active_shares_OLC_delegator;
+<b>ensures</b> <a href="delegation_pool.md#0x1_delegation_pool_ghost_source_pool">ghost_source_pool</a>.total_coins
+    - <b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address).active_shares.total_coins == <a href="delegation_pool.md#0x1_delegation_pool_ghost_amount">ghost_amount</a>;
+<b>ensures</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pool.inactive_shares, pool.observed_lockup_cycle).total_coins - <a href="delegation_pool.md#0x1_delegation_pool_ghost_dest_pool">ghost_dest_pool</a>.total_coins == <a href="delegation_pool.md#0x1_delegation_pool_ghost_amount">ghost_amount</a>;
+<b>ensures</b> stake_pool.active.value - pre_stake_pool.pending_inactive.value ==
+    pre_stake_pool.pending_inactive.value - stake_pool.pending_inactive.value;
+<b>ensures</b> pre_stake_pool.pending_active == stake_pool.pending_active;
+<b>ensures</b> <b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address).active_shares.total_coins == stake_pool.active.value + stake_pool.pending_active.value;
+</code></pre>
+
+
+
+<a name="@Specification_1_reactivate_stake"></a>
+
+### Function `reactivate_stake`
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_reactivate_stake">reactivate_stake</a>(delegator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pool_address: <b>address</b>, amount: u64)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>pragma</b> aborts_if_is_partial;
+<b>include</b> <a href="delegation_pool.md#0x1_delegation_pool_PoolDelegatorAddressNotEq">PoolDelegatorAddressNotEq</a> {
+    delegator_address: <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address).operator_address
+};
+<b>include</b> <a href="delegation_pool.md#0x1_delegation_pool_PoolDelegatorAddressNotEq">PoolDelegatorAddressNotEq</a>;
+<b>aborts_if</b> <b>exists</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
+<b>let</b> pre_pool = <b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
+<b>let</b> delegator_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(delegator);
+<b>let</b> <b>post</b> pool = <b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
+<b>let</b> pre_stake_pool = <a href="delegation_pool.md#0x1_delegation_pool_spec_get_stake">spec_get_stake</a>(pre_pool);
+<b>let</b> <b>post</b> stake_pool = <a href="delegation_pool.md#0x1_delegation_pool_spec_get_stake">spec_get_stake</a>(pool);
+<b>requires</b> amount &gt; 0;
+<b>ensures</b> <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares_to_amount_with_total_coins">pool_u64::spec_shares_to_amount_with_total_coins</a>(<a href="delegation_pool.md#0x1_delegation_pool_ghost_source_pool">ghost_source_pool</a>,
+    <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(<a href="delegation_pool.md#0x1_delegation_pool_ghost_source_pool">ghost_source_pool</a>, delegator_address) -
+        <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(<b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address).inactive_shares, <b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address).observed_lockup_cycle), delegator_address),
+    <a href="delegation_pool.md#0x1_delegation_pool_ghost_source_pool">ghost_source_pool</a>.total_coins)
+    == <a href="delegation_pool.md#0x1_delegation_pool_ghost_amount">ghost_amount</a>;
+<b>ensures</b> <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(<b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address).active_shares, delegator_address) - <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(<a href="delegation_pool.md#0x1_delegation_pool_ghost_dest_pool">ghost_dest_pool</a>, delegator_address)
+    == <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_amount_to_shares_with_total_coins">pool_u64::spec_amount_to_shares_with_total_coins</a>(<a href="delegation_pool.md#0x1_delegation_pool_ghost_dest_pool">ghost_dest_pool</a>,
+    <a href="delegation_pool.md#0x1_delegation_pool_ghost_amount">ghost_amount</a>, <a href="delegation_pool.md#0x1_delegation_pool_ghost_dest_pool">ghost_dest_pool</a>.total_coins);
+<b>let</b> <b>post</b> inactive_shares_OLC_delegator = pool_u64::spec_balance(<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pool.inactive_shares, pool.observed_lockup_cycle), delegator_address);
+<b>let</b> <b>post</b> active_shares_OLC_delegator = pool_u64::spec_balance(pool.active_shares, delegator_address);
+<b>ensures</b> <a href="delegation_pool.md#0x1_delegation_pool_pre_inactive_shares_OLC_delegator">pre_inactive_shares_OLC_delegator</a> + <a href="delegation_pool.md#0x1_delegation_pool_pre_active_shares_OLC_delegator">pre_active_shares_OLC_delegator</a> &lt;= inactive_shares_OLC_delegator + active_shares_OLC_delegator;
+<b>ensures</b> <a href="delegation_pool.md#0x1_delegation_pool_ghost_source_pool">ghost_source_pool</a>.total_coins - <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pool.inactive_shares, pool.observed_lockup_cycle).total_coins == <a href="delegation_pool.md#0x1_delegation_pool_ghost_amount">ghost_amount</a>;
+<b>ensures</b> <b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address).active_shares.total_coins - <a href="delegation_pool.md#0x1_delegation_pool_ghost_dest_pool">ghost_dest_pool</a>.total_coins == <a href="delegation_pool.md#0x1_delegation_pool_ghost_amount">ghost_amount</a>;
+<b>ensures</b> stake_pool.active.value - pre_stake_pool.pending_inactive.value ==
+    pre_stake_pool.pending_inactive.value - stake_pool.pending_inactive.value;
+<b>ensures</b> pre_stake_pool.pending_active == stake_pool.pending_active;
+<b>ensures</b> <b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address).active_shares.total_coins == stake_pool.active.value + stake_pool.pending_active.value;
+</code></pre>
+
+
+
+<a name="@Specification_1_withdraw"></a>
+
+### Function `withdraw`
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_withdraw">withdraw</a>(delegator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pool_address: <b>address</b>, amount: u64)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>pragma</b> aborts_if_is_partial;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
+<b>aborts_if</b> amount == 0;
+<b>let</b> pool = <b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
+<b>include</b> <a href="delegation_pool.md#0x1_delegation_pool_PoolDelegatorAddressNotEq">PoolDelegatorAddressNotEq</a> {
+    delegator_address: <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address).operator_address
+};
+<b>include</b> <a href="delegation_pool.md#0x1_delegation_pool_PoolDelegatorAddressNotEq">PoolDelegatorAddressNotEq</a> {
+    delegator_address: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(delegator)
+};
+<b>aborts_if</b> <b>exists</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
+</code></pre>
+
+
+
+<a name="@Specification_1_withdraw_internal"></a>
+
+### Function `withdraw_internal`
+
+
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_withdraw_internal">withdraw_internal</a>(pool: &<b>mut</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">delegation_pool::DelegationPool</a>, delegator_address: <b>address</b>, amount: u64)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>pragma</b> aborts_if_is_partial;
+<b>let</b> pool_address = pool.stake_pool_signer_cap.<a href="account.md#0x1_account">account</a>;
+<b>include</b> <a href="delegation_pool.md#0x1_delegation_pool_PoolDelegatorAddressNotEq">PoolDelegatorAddressNotEq</a>;
+<b>include</b> <a href="delegation_pool.md#0x1_delegation_pool_WithdrawRequirements">WithdrawRequirements</a>;
+<b>let</b> withdrawal_exists = <a href="delegation_pool.md#0x1_delegation_pool_spec_pending_withdrawal_exists_first">spec_pending_withdrawal_exists_first</a>(pool, delegator_address);
+<b>let</b> withdrawal_olc = <a href="delegation_pool.md#0x1_delegation_pool_spec_pending_withdrawal_exists_second">spec_pending_withdrawal_exists_second</a>(pool, delegator_address);
+<b>let</b> allow_withdraw = (withdrawal_exists &&
+    (withdrawal_olc.index &lt; pool.observed_lockup_cycle.index || <a href="delegation_pool.md#0x1_delegation_pool_spec_can_withdraw_pending_inactive">spec_can_withdraw_pending_inactive</a>(pool_address)));
+<b>ensures</b> !allow_withdraw
+    ==&gt; <b>old</b>(<b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(delegator_address)).<a href="coin.md#0x1_coin">coin</a>.value == <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(delegator_address).<a href="coin.md#0x1_coin">coin</a>.value;
+<b>ensures</b> !allow_withdraw ==&gt; <b>old</b>(pool) == pool;
+<b>let</b> pre_stake_pool = <a href="delegation_pool.md#0x1_delegation_pool_spec_get_stake">spec_get_stake</a>(pool);
+<b>let</b> <b>post</b> stake_pool = <a href="delegation_pool.md#0x1_delegation_pool_spec_get_stake">spec_get_stake</a>(pool);
+<b>ensures</b> withdrawal_exists ==&gt; <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(<b>old</b>(pool).inactive_shares,
+     withdrawal_olc), delegator_address) != 0;
+<b>ensures</b> (allow_withdraw && amount &gt; 0 && <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(<b>old</b>(<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pool.inactive_shares, withdrawal_olc)), delegator_address) ==
+    <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pool.inactive_shares, withdrawal_olc), delegator_address)) ==&gt;
+    <a href="delegation_pool.md#0x1_delegation_pool_ghost_amount">ghost_amount</a> == 0;
+<b>ensures</b> (allow_withdraw && amount &gt; 0) ==&gt; <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(delegator_address).<a href="coin.md#0x1_coin">coin</a>.value
+   == <b>old</b>(<b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(delegator_address)).<a href="coin.md#0x1_coin">coin</a>.value + <a href="delegation_pool.md#0x1_delegation_pool_ghost_amount">ghost_amount</a>;
+<b>ensures</b> (allow_withdraw && amount &gt; 0) ==&gt;
+    <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(<b>old</b>(pool).inactive_shares, withdrawal_olc).total_coins - <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pool.inactive_shares, withdrawal_olc).total_coins == <a href="delegation_pool.md#0x1_delegation_pool_ghost_amount">ghost_amount</a>;
+<b>ensures</b> (amount &gt; 0 && withdrawal_exists &&
+    (withdrawal_olc.index == pool.observed_lockup_cycle.index && <a href="delegation_pool.md#0x1_delegation_pool_spec_can_withdraw_pending_inactive">spec_can_withdraw_pending_inactive</a>(pool_address)))
+    ==&gt; <a href="coin.md#0x1_coin_value">coin::value</a>(<b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool.stake_pool_signer_cap.<a href="account.md#0x1_account">account</a>).pending_inactive)
+    == <a href="coin.md#0x1_coin_value">coin::value</a>(<b>old</b>(<b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool.stake_pool_signer_cap.<a href="account.md#0x1_account">account</a>)).pending_inactive) - <a href="delegation_pool.md#0x1_delegation_pool_ghost_amount">ghost_amount</a>;
+<b>ensures</b> (amount &gt; 0 && withdrawal_exists &&
+    (withdrawal_olc.index == pool.observed_lockup_cycle.index && <a href="delegation_pool.md#0x1_delegation_pool_spec_can_withdraw_pending_inactive">spec_can_withdraw_pending_inactive</a>(pool_address)))
+    ==&gt; <a href="coin.md#0x1_coin_value">coin::value</a>(<b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool.stake_pool_signer_cap.<a href="account.md#0x1_account">account</a>).inactive)
+    == <a href="coin.md#0x1_coin_value">coin::value</a>(<b>old</b>(<b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool.stake_pool_signer_cap.<a href="account.md#0x1_account">account</a>)).inactive);
+<b>ensures</b> withdrawal_olc.index &lt; <b>old</b>(pool).observed_lockup_cycle.index ==&gt; pre_stake_pool.pending_inactive.value == stake_pool.pending_inactive.value;
+</code></pre>
+
+
+
+
+<a name="0x1_delegation_pool_spec_pending_withdrawal_exists_first"></a>
+
+
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_spec_pending_withdrawal_exists_first">spec_pending_withdrawal_exists_first</a>(pool: <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, delegator_address: <b>address</b>): bool {
+   <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(pool.pending_withdrawals, delegator_address)
+}
+</code></pre>
+
+
+
+
+<a name="0x1_delegation_pool_spec_pending_withdrawal_exists_second"></a>
+
+
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_spec_pending_withdrawal_exists_second">spec_pending_withdrawal_exists_second</a>(pool: <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, delegator_address: <b>address</b>): <a href="delegation_pool.md#0x1_delegation_pool_ObservedLockupCycle">ObservedLockupCycle</a> {
+   <b>if</b> (<a href="delegation_pool.md#0x1_delegation_pool_spec_pending_withdrawal_exists_first">spec_pending_withdrawal_exists_first</a>(pool, delegator_address)) {
+       <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pool.pending_withdrawals, delegator_address)
+   } <b>else</b> {
+       <a href="delegation_pool.md#0x1_delegation_pool_ObservedLockupCycle">ObservedLockupCycle</a> { index: 0 }
+   }
+}
+</code></pre>
+
+
+
+<a name="@Specification_1_pending_inactive_shares_pool_mut"></a>
+
+### Function `pending_inactive_shares_pool_mut`
+
+
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_pending_inactive_shares_pool_mut">pending_inactive_shares_pool_mut</a>(pool: &<b>mut</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">delegation_pool::DelegationPool</a>): &<b>mut</b> <a href="../../aptos-stdlib/doc/pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">pool_u64_unbound::Pool</a>
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>let</b> observed_lockup_cycle = pool.observed_lockup_cycle;
+<b>aborts_if</b> !<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(pool.inactive_shares, observed_lockup_cycle);
+</code></pre>
+
+
+
+<a name="@Specification_1_amount_to_shares_to_redeem"></a>
+
+### Function `amount_to_shares_to_redeem`
+
+
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_amount_to_shares_to_redeem">amount_to_shares_to_redeem</a>(shares_pool: &<a href="../../aptos-stdlib/doc/pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">pool_u64_unbound::Pool</a>, shareholder: <b>address</b>, coins_amount: u64): u128
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>true</b>;
+<b>include</b> <a href="delegation_pool.md#0x1_delegation_pool_AmountToSharesToRedeemAbortsIf">AmountToSharesToRedeemAbortsIf</a>;
+<b>ensures</b> result == <a href="delegation_pool.md#0x1_delegation_pool_spec_amount_to_shares_to_redeem">spec_amount_to_shares_to_redeem</a>(shares_pool, shareholder, coins_amount);
+<b>ensures</b> coins_amount == <a href="delegation_pool.md#0x1_delegation_pool_MAX_U64">MAX_U64</a> ==&gt; result == <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(shares_pool, shareholder);
+</code></pre>
+
+
+
+
+<a name="0x1_delegation_pool_AmountToSharesToRedeemAbortsIf"></a>
+
+
+<pre><code><b>schema</b> <a href="delegation_pool.md#0x1_delegation_pool_AmountToSharesToRedeemAbortsIf">AmountToSharesToRedeemAbortsIf</a> {
+    shares_pool: <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_Pool">pool_u64::Pool</a>;
+    shareholder: <b>address</b>;
+    <b>let</b> shares = <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(shares_pool, shareholder);
+    <b>let</b> total_coins = shares_pool.total_coins;
+    <b>aborts_if</b> shares_pool.total_coins &gt; 0 && shares_pool.total_shares &gt; 0 && (shares * total_coins) / shares_pool.total_shares &gt; <a href="delegation_pool.md#0x1_delegation_pool_MAX_U64">MAX_U64</a>;
+}
+</code></pre>
+
+
+
+
+<a name="0x1_delegation_pool_spec_amount_to_shares_to_redeem"></a>
+
+
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_spec_amount_to_shares_to_redeem">spec_amount_to_shares_to_redeem</a>(
+   shares_pool: <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_Pool">pool_u64::Pool</a>,
+   shareholder: <b>address</b>,
+   coins_amount: u64,
+): u128 {
+   <b>let</b> shares = <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(shares_pool, shareholder);
+   <b>let</b> total_coins = shares_pool.total_coins;
+   <b>let</b> balance = <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares_to_amount_with_total_coins">pool_u64::spec_shares_to_amount_with_total_coins</a>(shares_pool, shares, total_coins);
+   <b>if</b> (coins_amount &gt;= balance) {
+       shares
+   } <b>else</b> {
+       <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_amount_to_shares_with_total_coins">pool_u64::spec_amount_to_shares_with_total_coins</a>(shares_pool, coins_amount, total_coins)
+   }
+}
+</code></pre>
+
+
+
+<a name="@Specification_1_redeem_active_shares"></a>
+
+### Function `redeem_active_shares`
+
+
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_redeem_active_shares">redeem_active_shares</a>(pool: &<b>mut</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">delegation_pool::DelegationPool</a>, shareholder: <b>address</b>, coins_amount: u64): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>pragma</b> aborts_if_is_partial;
+<b>let</b> shares_pool = pool.active_shares;
+<b>let</b> shares_to_redeem = <a href="delegation_pool.md#0x1_delegation_pool_spec_amount_to_shares_to_redeem">spec_amount_to_shares_to_redeem</a>(pool.active_shares, shareholder, coins_amount);
+<b>let</b> redeemed_coins = <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares_to_amount_with_total_coins">pool_u64::spec_shares_to_amount_with_total_coins</a>(shares_pool, shares_to_redeem, shares_pool.total_coins);
+<b>aborts_if</b> <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(shares_pool, shareholder) &lt; shares_to_redeem;
+<b>aborts_if</b> shares_pool.total_coins &lt; redeemed_coins;
+<b>aborts_if</b> shares_pool.total_shares &lt; shares_to_redeem;
+<b>ensures</b> <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(shares_pool, shareholder) == shares_to_redeem ==&gt; !<a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_contains">pool_u64::spec_contains</a>(pool.active_shares, shareholder);
+<b>ensures</b> coins_amount == <a href="delegation_pool.md#0x1_delegation_pool_MAX_U64">MAX_U64</a> ==&gt; !<a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_contains">pool_u64::spec_contains</a>(pool.active_shares, shareholder);
+<b>ensures</b> <b>forall</b> addr: <b>address</b>: addr != shareholder ==&gt; <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(pool.active_shares, addr) == <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(<b>old</b>(pool).active_shares, addr);
+</code></pre>
+
+
+
+<a name="@Specification_1_redeem_inactive_shares"></a>
+
+### Function `redeem_inactive_shares`
+
+
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_redeem_inactive_shares">redeem_inactive_shares</a>(pool: &<b>mut</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">delegation_pool::DelegationPool</a>, shareholder: <b>address</b>, coins_amount: u64, lockup_cycle: <a href="delegation_pool.md#0x1_delegation_pool_ObservedLockupCycle">delegation_pool::ObservedLockupCycle</a>): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>pragma</b> aborts_if_is_partial;
+<b>ensures</b> <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(<b>old</b>(pool).inactive_shares, lockup_cycle), shareholder) != 0 && <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pool.inactive_shares,lockup_cycle), shareholder) == 0 ==&gt; !<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(pool.pending_withdrawals, shareholder);
+<b>ensures</b> (lockup_cycle.index &lt; <b>old</b>(pool).observed_lockup_cycle.index
+    && <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(<b>old</b>(pool).inactive_shares,lockup_cycle), shareholder) != 0
+    && <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(<b>old</b>(pool).inactive_shares,lockup_cycle).total_coins - result == 0)
+    ==&gt; !<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(pool.inactive_shares, lockup_cycle);
+<b>ensures</b> (<a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(<b>old</b>(pool).inactive_shares, lockup_cycle), shareholder) != 0
+    && <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pool.inactive_shares,lockup_cycle), shareholder) == 0) ==&gt;
+    <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares_to_amount_with_total_coins">pool_u64::spec_shares_to_amount_with_total_coins</a>(
+        <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(<b>old</b>(pool.inactive_shares), lockup_cycle),
+        <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(<b>old</b>(pool).inactive_shares, lockup_cycle), shareholder),
+        <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(<b>old</b>(pool.inactive_shares), lockup_cycle).total_coins
+    ) == result;
+<b>ensures</b> <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pool.inactive_shares,lockup_cycle), shareholder) !=
+    <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(<b>old</b>(pool).inactive_shares,lockup_cycle), shareholder) ==&gt;
+    <a href="delegation_pool.md#0x1_delegation_pool_ghost_share_redeem">ghost_share_redeem</a> == <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(<b>old</b>(pool).inactive_shares,lockup_cycle), shareholder) -
+        <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pool.inactive_shares,lockup_cycle), shareholder);
+<b>ensures</b> <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pool.inactive_shares,lockup_cycle), shareholder) !=
+    <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(<b>old</b>(pool).inactive_shares,lockup_cycle), shareholder) ==&gt; (<a href="delegation_pool.md#0x1_delegation_pool_ghost_share_redeem">ghost_share_redeem</a> == <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(<b>old</b>(pool).inactive_shares,lockup_cycle), shareholder) -
+    <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pool.inactive_shares,lockup_cycle), shareholder)) && (
+result == <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares_to_amount_with_total_coins">pool_u64::spec_shares_to_amount_with_total_coins</a>(<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(<b>old</b>(pool.inactive_shares), lockup_cycle),
+    <a href="delegation_pool.md#0x1_delegation_pool_ghost_share_redeem">ghost_share_redeem</a>, <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(<b>old</b>(pool.inactive_shares), lockup_cycle).total_coins));
+<b>ensures</b> result &lt;= <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(<b>old</b>(pool.inactive_shares), lockup_cycle).total_coins;
+</code></pre>
+
+
+
+<a name="@Specification_1_calculate_stake_pool_drift"></a>
+
+### Function `calculate_stake_pool_drift`
+
+
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_calculate_stake_pool_drift">calculate_stake_pool_drift</a>(pool: &<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">delegation_pool::DelegationPool</a>): (bool, u64, u64, u64, u64)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>pragma</b> opaque;
+<b>let</b> pool_address = <a href="delegation_pool.md#0x1_delegation_pool_get_pool_address">get_pool_address</a>(pool);
+<b>aborts_if</b> pool.total_coins_inactive &gt; <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address).inactive.value;
+<b>let</b> pre_stake = <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address);
+<b>ensures</b> <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address) == <b>old</b>(<b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address));
+<b>ensures</b> result_2 == <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address).active.value
+    + <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address).pending_active.value;
+<b>ensures</b> result_1 == (<a href="delegation_pool.md#0x1_delegation_pool_spec_get_stake">spec_get_stake</a>(pool).inactive.value &gt; pool.total_coins_inactive);
+<b>ensures</b> result_1 &lt;==&gt; pool.total_coins_inactive &lt; <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address).inactive.value;
+<b>ensures</b> result_1 ==&gt; result_3 == pre_stake.inactive.value - pool.total_coins_inactive;
+<b>ensures</b> !result_1 &lt;==&gt; pool.total_coins_inactive == <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address).inactive.value;
+<b>ensures</b> !result_1 ==&gt; result_3 == pre_stake.pending_inactive.value;
+</code></pre>
+
+
+
+
+<a name="0x1_delegation_pool_spec_get_stake"></a>
+
+
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_spec_get_stake">spec_get_stake</a>(pool: <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>): <a href="stake.md#0x1_stake_StakePool">stake::StakePool</a> {
+   <b>let</b> pool_address = pool.stake_pool_signer_cap.<a href="account.md#0x1_account">account</a>;
+   <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address)
+}
+</code></pre>
+
+
+
+<a name="@Specification_1_synchronize_delegation_pool"></a>
+
+### Function `synchronize_delegation_pool`
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_synchronize_delegation_pool">synchronize_delegation_pool</a>(pool_address: <b>address</b>)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>pragma</b> aborts_if_is_strict = <b>false</b>;
+<b>include</b> <a href="delegation_pool.md#0x1_delegation_pool_PoolDelegatorAddressNotEq">PoolDelegatorAddressNotEq</a> {
+    delegator_address: <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address).operator_address
+};
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
+<b>let</b> pre_pool = <b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
+<b>let</b> pre_stake_pool = <a href="delegation_pool.md#0x1_delegation_pool_spec_get_stake">spec_get_stake</a>(pre_pool);
+<b>let</b> pre_stake_active_value = pre_stake_pool.active.value;
+<b>let</b> pre_stake_pending_active_value = pre_stake_pool.pending_active.value;
+<b>let</b> pre_stake_pending_inactive_value = pre_stake_pool.pending_inactive.value;
+<b>let</b> <b>post</b> pool = <b>global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
+<b>let</b> <b>post</b> stake_pool = <a href="delegation_pool.md#0x1_delegation_pool_spec_get_stake">spec_get_stake</a>(pool);
+<b>let</b> <b>post</b> stake_pending_inactive_value = stake_pool.pending_inactive.value;
+<b>let</b> pre_inactive = pre_stake_pool.inactive.value;
+<b>let</b> lockup_cycle_ended = pre_inactive &gt; pre_pool.total_coins_inactive;
+<b>ensures</b> pool.active_shares.total_coins == pre_stake_active_value + pre_stake_pending_active_value;
+<b>ensures</b> !lockup_cycle_ended ==&gt; <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pool.inactive_shares, pool.observed_lockup_cycle).total_coins == pre_stake_pending_inactive_value;
+<b>ensures</b> lockup_cycle_ended ==&gt; (<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pool.inactive_shares, pool.observed_lockup_cycle).total_coins == 0);
+<b>ensures</b> pool.total_coins_inactive == stake_pool.inactive.value;
+<b>ensures</b> pre_inactive &gt; pre_pool.total_coins_inactive &lt;==&gt; pre_pool.observed_lockup_cycle.index + 1 == pool.observed_lockup_cycle.index;
+<b>ensures</b> (pre_pool.observed_lockup_cycle.index + 1 == pool.observed_lockup_cycle.index) ==&gt; <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(pool.inactive_shares, pool.observed_lockup_cycle);
+<b>ensures</b> (pre_pool.observed_lockup_cycle.index + 1 == pool.observed_lockup_cycle.index) ==&gt; <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pool.inactive_shares, pool.observed_lockup_cycle).total_coins == 0;
+<b>ensures</b> (pre_pool.observed_lockup_cycle.index + 1 == pool.observed_lockup_cycle.index)
+      ==&gt; <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pool.inactive_shares, pre_pool.observed_lockup_cycle).total_coins == pre_inactive - pre_pool.total_coins_inactive;
+<b>ensures</b> pre_stake_pending_active_value == 0 ==&gt; !<a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_contains">pool_u64::spec_contains</a>(pool.active_shares, <a href="delegation_pool.md#0x1_delegation_pool_NULL_SHAREHOLDER">NULL_SHAREHOLDER</a>);
+<b>ensures</b> pre_stake_pending_active_value != 0 ==&gt; <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(pool.active_shares, <a href="delegation_pool.md#0x1_delegation_pool_NULL_SHAREHOLDER">NULL_SHAREHOLDER</a>) == <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(pre_pool.active_shares, <a href="delegation_pool.md#0x1_delegation_pool_NULL_SHAREHOLDER">NULL_SHAREHOLDER</a>);
+<b>ensures</b> <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(<a href="delegation_pool.md#0x1_delegation_pool_sync_delegation_pool_snap_before_buy_in">sync_delegation_pool_snap_before_buy_in</a>.active_shares, <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address).operator_address)
+    + <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_amount_to_shares_with_total_coins">pool_u64::spec_amount_to_shares_with_total_coins</a>(<a href="delegation_pool.md#0x1_delegation_pool_sync_delegation_pool_snap_before_buy_in">sync_delegation_pool_snap_before_buy_in</a>.active_shares, <a href="delegation_pool.md#0x1_delegation_pool_sync_commission_active">sync_commission_active</a>,
+    <a href="delegation_pool.md#0x1_delegation_pool_sync_delegation_pool_snap_before_buy_in">sync_delegation_pool_snap_before_buy_in</a>.active_shares.total_coins)
+    == <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(pool.active_shares, <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address).operator_address);
+<b>ensures</b> <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(<a href="delegation_pool.md#0x1_delegation_pool_sync_inactive_snap_before_buy_in">sync_inactive_snap_before_buy_in</a>, <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address).operator_address)
+    + <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_amount_to_shares_with_total_coins">pool_u64::spec_amount_to_shares_with_total_coins</a>(<a href="delegation_pool.md#0x1_delegation_pool_sync_inactive_snap_before_buy_in">sync_inactive_snap_before_buy_in</a>, <a href="delegation_pool.md#0x1_delegation_pool_sync_commission_pending_inactive">sync_commission_pending_inactive</a>,
+    <a href="delegation_pool.md#0x1_delegation_pool_sync_inactive_snap_before_buy_in">sync_inactive_snap_before_buy_in</a>.total_coins) ==
+    <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pool.inactive_shares, pre_pool.observed_lockup_cycle), <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address).operator_address);
+<b>ensures</b> <b>forall</b> delegator: <b>address</b>: (delegator != <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address).operator_address && delegator != <a href="delegation_pool.md#0x1_delegation_pool_NULL_SHAREHOLDER">NULL_SHAREHOLDER</a>) ==&gt; (<a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(pool.active_shares, delegator) == <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(pre_pool.active_shares, delegator));
+<b>ensures</b> stake_pending_inactive_value == pre_stake_pending_inactive_value;
+</code></pre>
+
+
+
+<a name="@Specification_1_multiply_then_divide"></a>
+
+### Function `multiply_then_divide`
+
+
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_multiply_then_divide">multiply_then_divide</a>(x: u64, y: u64, z: u64): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>aborts_if</b> z == 0;
+<b>ensures</b> [concrete] result == (x * y) / z;
+<b>ensures</b> [abstract] result == <a href="delegation_pool.md#0x1_delegation_pool_spec_multiply_then_divide">spec_multiply_then_divide</a>(x, y, z);
 </code></pre>
 
 
