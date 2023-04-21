@@ -954,7 +954,7 @@ fn individual_workload_tests(test_name: String, config: ForgeConfig) -> ForgeCon
                         use_account_pool: false,
                     },
                     "token_v1" => TransactionType::CallCustomModules {
-                        entry_point: EntryPoints::TokenV1MintAndTransferFT,
+                        entry_point: EntryPoints::TokenV1MintAndTransferNFTSequential,
                         num_modules: 1,
                         use_account_pool: false,
                     },
