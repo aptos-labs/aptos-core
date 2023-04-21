@@ -8,16 +8,18 @@ use aptos_config::config::{
 use aptos_executor::block_executor::TransactionBlockExecutor;
 use aptos_executor_benchmark::{
     benchmark_transaction::BenchmarkTransaction, fake_executor::FakeExecutor,
+    pipeline::PipelineConfig,
 };
 use aptos_metrics_core::{register_int_gauge, IntGauge};
 use aptos_push_metrics::MetricsPusher;
+use aptos_transaction_generator_lib::args::TransactionTypeArg;
 use aptos_vm::AptosVM;
+use clap::{Parser, Subcommand};
 use once_cell::sync::Lazy;
 use std::{
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
-use structopt::StructOpt;
 
 #[cfg(unix)]
 #[global_allocator]
@@ -28,33 +30,33 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 pub static START_TIME: Lazy<IntGauge> =
     Lazy::new(|| register_int_gauge!("node_process_start_time", "Start time").unwrap());
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Parser)]
 struct PrunerOpt {
-    #[structopt(long)]
+    #[clap(long)]
     enable_state_pruner: bool,
 
-    #[structopt(long)]
+    #[clap(long)]
     enable_epoch_snapshot_pruner: bool,
 
-    #[structopt(long)]
+    #[clap(long)]
     enable_ledger_pruner: bool,
 
-    #[structopt(long, default_value = "100000")]
+    #[clap(long, default_value = "100000")]
     state_prune_window: u64,
 
-    #[structopt(long, default_value = "100000")]
+    #[clap(long, default_value = "100000")]
     epoch_snapshot_prune_window: u64,
 
-    #[structopt(long, default_value = "100000")]
+    #[clap(long, default_value = "100000")]
     ledger_prune_window: u64,
 
-    #[structopt(long, default_value = "500")]
+    #[clap(long, default_value = "500")]
     ledger_pruning_batch_size: usize,
 
-    #[structopt(long, default_value = "500")]
+    #[clap(long, default_value = "500")]
     state_pruning_batch_size: usize,
 
-    #[structopt(long, default_value = "500")]
+    #[clap(long, default_value = "500")]
     epoch_snapshot_pruning_batch_size: usize,
 }
 
@@ -81,39 +83,60 @@ impl PrunerOpt {
     }
 }
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Parser)]
+pub struct PipelineOpt {
+    #[clap(long)]
+    split_stages: bool,
+    #[clap(long)]
+    allow_discards: bool,
+    #[clap(long)]
+    allow_aborts: bool,
+}
+
+impl PipelineOpt {
+    fn pipeline_config(&self) -> PipelineConfig {
+        PipelineConfig {
+            split_stages: self.split_stages,
+            allow_discards: self.allow_discards,
+            allow_aborts: self.allow_aborts,
+        }
+    }
+}
+
+#[derive(Parser, Debug)]
 struct Opt {
-    #[structopt(long, default_value = "10000")]
+    #[clap(long, default_value = "10000")]
     block_size: usize,
 
-    #[structopt(long, default_value = "5")]
+    #[clap(long, default_value = "5")]
     transactions_per_sender: usize,
 
-    #[structopt(long)]
+    #[clap(long, default_value = "1000000")]
+    main_signer_accounts: usize,
+
+    #[clap(long)]
     concurrency_level: Option<usize>,
 
-    #[structopt(flatten)]
+    #[clap(flatten)]
     pruner_opt: PrunerOpt,
 
-    #[structopt(long)]
+    #[clap(long)]
     use_state_kv_db: bool,
 
-    #[structopt(long)]
+    #[clap(long)]
     use_sharded_state_merkle_db: bool,
 
-    #[structopt(long)]
-    split_stages: bool,
+    #[clap(flatten)]
+    pipeline_opt: PipelineOpt,
 
-    #[structopt(subcommand)]
+    #[clap(subcommand)]
     cmd: Command,
 
-    #[structopt(
-        long,
-        about = "Verify sequence number of all the accounts after execution finishes"
-    )]
+    /// Verify sequence number of all the accounts after execution finishes
+    #[clap(long)]
     verify_sequence_numbers: bool,
 
-    #[structopt(long)]
+    #[clap(long)]
     use_fake_executor: bool,
 }
 
@@ -133,49 +156,45 @@ impl Opt {
     }
 }
 
-#[derive(Debug, StructOpt)]
+#[derive(Subcommand, Debug)]
 enum Command {
     CreateDb {
-        #[structopt(long, parse(from_os_str))]
+        #[clap(long, parse(from_os_str))]
         data_dir: PathBuf,
 
-        #[structopt(long, default_value = "1000000")]
+        #[clap(long, default_value = "1000000")]
         num_accounts: usize,
 
-        #[structopt(long, default_value = "10000000000")]
+        #[clap(long, default_value = "10000000000")]
         init_account_balance: u64,
     },
     RunExecutor {
-        #[structopt(
-            long,
-            default_value = "1000",
-            about = "number of transfer blocks to run"
-        )]
+        /// number of transfer blocks to run
+        #[clap(long, default_value = "1000")]
         blocks: usize,
 
-        // TODO change to clap, to align with txn-emitter, and can reuse enums
-        // #[structopt(
-        //     long,
-        //     about = "Workload (transaction type). Uses raw coin transfer if not set, and if set uses transaction-generator-lib to generate it"
-        // )]
-        // transaction_type: Option<TransactionTypeArg>,
-        #[structopt(long, parse(from_os_str))]
+        /// Workload (transaction type). Uses raw coin transfer if not set,
+        /// and if set uses transaction-generator-lib to generate it
+        #[clap(long, arg_enum, ignore_case = true)]
+        transaction_type: Option<TransactionTypeArg>,
+
+        #[clap(long, parse(from_os_str))]
         data_dir: PathBuf,
 
-        #[structopt(long, parse(from_os_str))]
+        #[clap(long, parse(from_os_str))]
         checkpoint_dir: PathBuf,
     },
     AddAccounts {
-        #[structopt(long, parse(from_os_str))]
+        #[clap(long, parse(from_os_str))]
         data_dir: PathBuf,
 
-        #[structopt(long, parse(from_os_str))]
+        #[clap(long, parse(from_os_str))]
         checkpoint_dir: PathBuf,
 
-        #[structopt(long, default_value = "1000000")]
+        #[clap(long, default_value = "1000000")]
         num_new_accounts: usize,
 
-        #[structopt(long, default_value = "1000000")]
+        #[clap(long, default_value = "1000000")]
         init_account_balance: u64,
     },
 }
@@ -190,7 +209,7 @@ where
             num_accounts,
             init_account_balance,
         } => {
-            aptos_executor_benchmark::db_generator::run::<E>(
+            aptos_executor_benchmark::db_generator::create_db_with_accounts::<E>(
                 num_accounts,
                 init_account_balance,
                 opt.block_size,
@@ -199,29 +218,28 @@ where
                 opt.verify_sequence_numbers,
                 opt.use_state_kv_db,
                 opt.use_sharded_state_merkle_db,
+                opt.pipeline_opt.pipeline_config(),
             );
         },
         Command::RunExecutor {
             blocks,
-            // transaction_type,
+            transaction_type,
             data_dir,
             checkpoint_dir,
         } => {
             aptos_executor_benchmark::run_benchmark::<E>(
                 opt.block_size,
                 blocks,
-                None,
-                // Some(TransactionTypeArg::CoinTransfer).map(|t| t.materialize()),
-                // Some(TransactionTypeArg::PublishPackage).map(|t| t.materialize()),
-                // transaction_type.map(|t| t.materialize()),
+                transaction_type.map(|t| t.materialize()),
                 opt.transactions_per_sender,
+                opt.main_signer_accounts,
                 data_dir,
                 checkpoint_dir,
                 opt.verify_sequence_numbers,
                 opt.pruner_opt.pruner_config(),
                 opt.use_state_kv_db,
                 opt.use_sharded_state_merkle_db,
-                opt.split_stages,
+                opt.pipeline_opt.pipeline_config(),
             );
         },
         Command::AddAccounts {
@@ -240,13 +258,14 @@ where
                 opt.verify_sequence_numbers,
                 opt.use_state_kv_db,
                 opt.use_sharded_state_merkle_db,
+                opt.pipeline_opt.pipeline_config(),
             );
         },
     }
 }
 
 fn main() {
-    let opt = Opt::from_args();
+    let opt = Opt::parse();
     aptos_logger::Logger::new().init();
     START_TIME.set(
         SystemTime::now()

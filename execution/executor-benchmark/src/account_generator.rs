@@ -76,18 +76,17 @@ impl AccountCache {
         }
     }
 
+    pub fn split(mut self, index: usize) -> (Vec<LocalAccount>, Vec<LocalAccount>) {
+        let other = self.accounts.split_off(index);
+        (self.accounts.into(), other.into())
+    }
+
     pub fn len(&self) -> usize {
         self.accounts.len()
     }
 
     pub fn accounts(&self) -> &VecDeque<LocalAccount> {
         &self.accounts
-    }
-
-    pub fn accounts_mut(&mut self) -> &mut [LocalAccount] {
-        self.accounts.make_contiguous();
-
-        self.accounts.as_mut_slices().0
     }
 
     pub fn grow(&mut self, n: usize) {
