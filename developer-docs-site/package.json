@@ -15,7 +15,7 @@
     "write-heading-ids": "docusaurus write-heading-ids",
     "typecheck": "tsc",
     "fmt": "prettier --write '**/*.(tsx|ts|js)'",
-    "lint": "pnpm install --frozen-lockfile --silent && prettier --check '**/*.(tsx|ts|js)'",
+    "lint": "pnpm install --frozen-lockfile && prettier --check '**/*.(tsx|ts|js)'",
     "contributors": "scripts/contributors.js"
   },
   "dependencies": {
