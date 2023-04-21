@@ -70,7 +70,7 @@ fn create_multi_region_swarm_network_chaos(
 
             let (bandwidth, latency) = stats.get(*to_region).unwrap();
             let netem = GroupNetEm {
-                name: format!("{}-to-{}-delay", from_region, to_region),
+                name: format!("{}-to-{}-netem", from_region, to_region),
                 source_nodes: from_chunk.to_vec(),
                 target_nodes: to_chunk.to_vec(),
                 delay_latency_ms: *latency as u64,
@@ -78,7 +78,7 @@ fn create_multi_region_swarm_network_chaos(
                 delay_correlation_percentage: 50,
                 loss_percentage: 3,
                 loss_correlation_percentage: 50,
-                rate: *bandwidth / 8,
+                rate: *bandwidth / 1e6 as u64,
             };
             info!("netem {:?}", netem);
 
@@ -93,7 +93,7 @@ fn create_multi_region_swarm_network_chaos(
             load_per_worker: 100,
         };
         let delay = GroupNetEm {
-            name: format!("{}-self-delay", region),
+            name: format!("{}-self-netem", region),
             source_nodes: chunk.to_vec(),
             target_nodes: chunk.to_vec(),
             delay_latency_ms: 50,
@@ -101,7 +101,7 @@ fn create_multi_region_swarm_network_chaos(
             delay_correlation_percentage: 50,
             loss_percentage: 1,
             loss_correlation_percentage: 50,
-            rate: 10 * 1024 * 1024 * 1024 / 8, // 10 Gbps
+            rate: 10 * 1000, // 10 Gbps
         };
         (delay, cpu_stress)
     }).unzip();
