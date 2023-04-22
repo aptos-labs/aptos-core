@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::{config_sanitizer::ConfigSanitizer, Error, NodeConfig, RoleType},
+    config::{config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig},
     utils,
 };
 use aptos_logger::{Level, CHANNEL_SIZE};
@@ -62,10 +62,9 @@ impl LoggerConfig {
 }
 
 impl ConfigSanitizer for LoggerConfig {
-    /// Validate and process the logger config according to the given node role and chain ID
     fn sanitize(
         node_config: &mut NodeConfig,
-        _node_role: RoleType,
+        _node_type: NodeType,
         _chain_id: ChainId,
     ) -> Result<(), Error> {
         let sanitizer_name = Self::get_sanitizer_name();
@@ -118,7 +117,7 @@ mod tests {
 
         // Verify that the config fails sanitization (the tokio-console feature is missing!)
         let error =
-            LoggerConfig::sanitize(&mut node_config, RoleType::Validator, ChainId::testnet())
+            LoggerConfig::sanitize(&mut node_config, NodeType::Validator, ChainId::testnet())
                 .unwrap_err();
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
     }

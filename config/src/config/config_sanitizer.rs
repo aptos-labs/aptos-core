@@ -3,9 +3,9 @@
 
 use crate::{
     config::{
-        ApiConfig, BaseConfig, ConsensusConfig, Error, ExecutionConfig, IndexerConfig,
-        IndexerGrpcConfig, InspectionServiceConfig, LoggerConfig, MempoolConfig, NodeConfig,
-        PeerMonitoringServiceConfig, RoleType, StateSyncConfig, StorageConfig,
+        node_config_loader::NodeType, ApiConfig, BaseConfig, ConsensusConfig, Error,
+        ExecutionConfig, IndexerConfig, IndexerGrpcConfig, InspectionServiceConfig, LoggerConfig,
+        MempoolConfig, NodeConfig, PeerMonitoringServiceConfig, StateSyncConfig, StorageConfig,
     },
     network_id::NetworkId,
 };
@@ -30,7 +30,7 @@ pub trait ConfigSanitizer {
     /// Validate and process the config according to the given node role and chain ID
     fn sanitize(
         _node_config: &mut NodeConfig,
-        _node_role: RoleType,
+        _node_type: NodeType,
         _chain_id: ChainId,
     ) -> Result<(), Error> {
         unimplemented!("sanitize() must be implemented for each sanitizer!");
@@ -40,25 +40,25 @@ pub trait ConfigSanitizer {
 impl ConfigSanitizer for NodeConfig {
     fn sanitize(
         node_config: &mut NodeConfig,
-        node_role: RoleType,
+        node_type: NodeType,
         chain_id: ChainId,
     ) -> Result<(), Error> {
         // Sanitize all of the sub-configs
-        ApiConfig::sanitize(node_config, node_role, chain_id)?;
-        BaseConfig::sanitize(node_config, node_role, chain_id)?;
-        ConsensusConfig::sanitize(node_config, node_role, chain_id)?;
-        ExecutionConfig::sanitize(node_config, node_role, chain_id)?;
-        sanitize_failpoints_config(node_config, node_role, chain_id)?;
-        sanitize_fullnode_network_configs(node_config, node_role, chain_id)?;
-        IndexerConfig::sanitize(node_config, node_role, chain_id)?;
-        IndexerGrpcConfig::sanitize(node_config, node_role, chain_id)?;
-        InspectionServiceConfig::sanitize(node_config, node_role, chain_id)?;
-        LoggerConfig::sanitize(node_config, node_role, chain_id)?;
-        MempoolConfig::sanitize(node_config, node_role, chain_id)?;
-        PeerMonitoringServiceConfig::sanitize(node_config, node_role, chain_id)?;
-        StateSyncConfig::sanitize(node_config, node_role, chain_id)?;
-        StorageConfig::sanitize(node_config, node_role, chain_id)?;
-        sanitize_validator_network_config(node_config, node_role, chain_id)?;
+        ApiConfig::sanitize(node_config, node_type, chain_id)?;
+        BaseConfig::sanitize(node_config, node_type, chain_id)?;
+        ConsensusConfig::sanitize(node_config, node_type, chain_id)?;
+        ExecutionConfig::sanitize(node_config, node_type, chain_id)?;
+        sanitize_failpoints_config(node_config, node_type, chain_id)?;
+        sanitize_fullnode_network_configs(node_config, node_type, chain_id)?;
+        IndexerConfig::sanitize(node_config, node_type, chain_id)?;
+        IndexerGrpcConfig::sanitize(node_config, node_type, chain_id)?;
+        InspectionServiceConfig::sanitize(node_config, node_type, chain_id)?;
+        LoggerConfig::sanitize(node_config, node_type, chain_id)?;
+        MempoolConfig::sanitize(node_config, node_type, chain_id)?;
+        PeerMonitoringServiceConfig::sanitize(node_config, node_type, chain_id)?;
+        StateSyncConfig::sanitize(node_config, node_type, chain_id)?;
+        StorageConfig::sanitize(node_config, node_type, chain_id)?;
+        sanitize_validator_network_config(node_config, node_type, chain_id)?;
 
         Ok(()) // All configs passed validation
     }
@@ -83,10 +83,10 @@ fn get_config_name<T: ?Sized>() -> &'static str {
         .unwrap_or("UnknownConfig")
 }
 
-/// Validate and process the failpoints config according to the node role and chain ID
+/// Sanitize the failpoints config according to the node role and chain ID
 fn sanitize_failpoints_config(
     node_config: &mut NodeConfig,
-    _node_role: RoleType,
+    _node_type: NodeType,
     chain_id: ChainId,
 ) -> Result<(), Error> {
     let sanitizer_name = FAILPOINTS_SANITIZER_NAME.to_string();
@@ -124,17 +124,17 @@ fn sanitize_failpoints_config(
     Ok(())
 }
 
-/// Validate and process the fullnode network configs according to the node role and chain ID
+/// Sanitize the fullnode network configs according to the node role and chain ID
 fn sanitize_fullnode_network_configs(
     node_config: &mut NodeConfig,
-    node_role: RoleType,
+    node_type: NodeType,
     _chain_id: ChainId,
 ) -> Result<(), Error> {
     let sanitizer_name = FULLNODE_NETWORKS_SANITIZER_NAME.to_string();
     let fullnode_networks = &mut node_config.full_node_networks;
 
     // Verify that the fullnode network configs are not empty for fullnodes
-    if fullnode_networks.is_empty() && !node_role.is_validator() {
+    if fullnode_networks.is_empty() && !node_type.is_validator() {
         return Err(Error::ConfigSanitizerFailed(
             sanitizer_name,
             "Fullnode networks cannot be empty for fullnodes!".into(),
@@ -172,17 +172,17 @@ fn sanitize_fullnode_network_configs(
     Ok(())
 }
 
-/// Validate and process the validator network config according to the node role and chain ID
+/// Sanitize the validator network config according to the node role and chain ID
 fn sanitize_validator_network_config(
     node_config: &mut NodeConfig,
-    node_role: RoleType,
+    node_type: NodeType,
     _chain_id: ChainId,
 ) -> Result<(), Error> {
     let sanitizer_name = VALIDATOR_NETWORK_SANITIZER_NAME.to_string();
     let validator_network = &mut node_config.validator_network;
 
     // Verify that the validator network config is not empty for validators
-    if validator_network.is_none() && node_role.is_validator() {
+    if validator_network.is_none() && node_type.is_validator() {
         return Err(Error::ConfigSanitizerFailed(
             sanitizer_name,
             "Validator network config cannot be empty for validators!".into(),
@@ -200,7 +200,7 @@ fn sanitize_validator_network_config(
         }
 
         // Verify that the node is a validator
-        if !node_role.is_validator() {
+        if !node_type.is_validator() {
             return Err(Error::ConfigSanitizerFailed(
                 sanitizer_name,
                 "The validator network config cannot be set for non-validators!".into(),
@@ -227,8 +227,8 @@ mod tests {
     use crate::{config::NetworkConfig, network_id::NetworkId};
 
     #[test]
-    fn test_sanitize_missing_fullnode_network_configs() {
-        // Create a fullnode config with empty fullnode network configs
+    fn test_sanitize_missing_pfn_network_configs() {
+        // Create a PFN config with empty fullnode network configs
         let mut node_config = NodeConfig {
             full_node_networks: vec![],
             ..Default::default()
@@ -237,7 +237,25 @@ mod tests {
         // Sanitize the config and verify that it fails
         let error = sanitize_fullnode_network_configs(
             &mut node_config,
-            RoleType::FullNode,
+            NodeType::PublicFullnode,
+            ChainId::mainnet(),
+        )
+        .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_sanitize_missing_vfn_network_configs() {
+        // Create a VFN config with empty fullnode network configs
+        let mut node_config = NodeConfig {
+            full_node_networks: vec![],
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error = sanitize_fullnode_network_configs(
+            &mut node_config,
+            NodeType::ValidatorFullnode,
             ChainId::testnet(),
         )
         .unwrap_err();
@@ -258,7 +276,7 @@ mod tests {
         // Sanitize the config and verify that it fails
         let error = sanitize_fullnode_network_configs(
             &mut node_config,
-            RoleType::FullNode,
+            NodeType::PublicFullnode,
             ChainId::testnet(),
         )
         .unwrap_err();
@@ -285,7 +303,7 @@ mod tests {
         // Sanitize the config and verify that it fails
         let error = sanitize_fullnode_network_configs(
             &mut node_config,
-            RoleType::FullNode,
+            NodeType::ValidatorFullnode,
             ChainId::testnet(),
         )
         .unwrap_err();
@@ -303,7 +321,7 @@ mod tests {
         // Sanitize the config and verify that it fails
         let error = sanitize_validator_network_config(
             &mut node_config,
-            RoleType::Validator,
+            NodeType::Validator,
             ChainId::testnet(),
         )
         .unwrap_err();
@@ -325,7 +343,7 @@ mod tests {
         // Sanitize the config (for a fullnode) and verify that it fails
         let error = sanitize_validator_network_config(
             &mut node_config,
-            RoleType::FullNode,
+            NodeType::PublicFullnode,
             ChainId::testnet(),
         )
         .unwrap_err();
@@ -347,7 +365,7 @@ mod tests {
         // Sanitize the config
         sanitize_validator_network_config(
             &mut node_config,
-            RoleType::Validator,
+            NodeType::Validator,
             ChainId::testnet(),
         )
         .unwrap();

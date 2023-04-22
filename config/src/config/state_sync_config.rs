@@ -2,7 +2,9 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::config::{config_sanitizer::ConfigSanitizer, Error, NodeConfig, RoleType};
+use crate::config::{
+    config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig,
+};
 use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
 
@@ -262,10 +264,9 @@ impl Default for AptosDataClientConfig {
 }
 
 impl ConfigSanitizer for StateSyncConfig {
-    /// Validate and process the state sync config according to the given node role and chain ID
     fn sanitize(
         _node_config: &mut NodeConfig,
-        _node_role: RoleType,
+        _node_type: NodeType,
         _chain_id: ChainId,
     ) -> Result<(), Error> {
         Ok(()) // TODO: add validation of higher-level properties once we have variable configs
