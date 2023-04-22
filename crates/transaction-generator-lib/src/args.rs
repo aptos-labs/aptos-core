@@ -21,10 +21,13 @@ pub enum TransactionTypeArg {
     ModifyTenGlobalResources,
     TokenV1NFTMintAndStoreSequential,
     TokenV1NFTMintAndTransferSequential,
+    TokenV1NFTMintAndTransferSequential20Collections,
     TokenV1NFTMintAndStoreParallel,
     TokenV1NFTMintAndTransferParallel,
     TokenV1FTMintAndStore,
     TokenV1FTMintAndTransfer,
+    TokenV1FTMintAndTransfer20Collections,
+    Batch100Transfer,
 }
 
 impl Default for TransactionTypeArg {
@@ -95,6 +98,13 @@ impl TransactionTypeArg {
                     use_account_pool: false,
                 }
             },
+            TransactionTypeArg::TokenV1NFTMintAndTransferSequential20Collections => {
+                TransactionType::CallCustomModules {
+                    entry_point: EntryPoints::TokenV1MintAndTransferNFTSequential,
+                    num_modules: 20,
+                    use_account_pool: false,
+                }
+            },
             TransactionTypeArg::TokenV1NFTMintAndStoreParallel => {
                 TransactionType::CallCustomModules {
                     entry_point: EntryPoints::TokenV1MintAndStoreNFTParallel,
@@ -118,6 +128,14 @@ impl TransactionTypeArg {
                 entry_point: EntryPoints::TokenV1MintAndTransferFT,
                 num_modules: 1,
                 use_account_pool: false,
+            },
+            TransactionTypeArg::TokenV1FTMintAndTransfer20Collections => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::TokenV1MintAndTransferFT,
+                num_modules: 20,
+                use_account_pool: false,
+            },
+            TransactionTypeArg::Batch100Transfer => {
+                TransactionType::BatchTransfer { batch_size: 100 }
             },
         }
     }

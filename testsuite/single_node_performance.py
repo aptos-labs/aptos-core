@@ -9,10 +9,13 @@ import os
 import tempfile
 from tabulate import tabulate
 
+
+# numbers are based on the machine spec used by github action
+# Local machine numbers will be higher.
 EXPECTED_TPS = {
     ("no-op", False): 18500.0,
     ("coin-transfer", False): 12000.0,
-    ("coin-transfer", True): 20000.0,
+    ("coin-transfer", True): 19500.0,
     ("account-generation", False): 10200.0,
     ("account-generation", True): 16900.0,
     ("create-new-account-resource", False): 12000.0,
@@ -20,11 +23,13 @@ EXPECTED_TPS = {
     ("modify-ten-global-resources", False): 10700.0,
     ("large-module-working-set-no-op", False): 2550.0,
     ("publish-package", False): 135.0,
-    # ("batch100-transfer", False): 300,
-    # ("batch100-transfer", True): 500,
+    ("batch100-transfer", False): 300,
+    ("batch100-transfer", True): 500,
     # ("token-v1ft-mint-and-store", False): 1000.0,
     ("token-v1ft-mint-and-transfer", False): 1700.0,
     ("token-v1nft-mint-and-transfer-sequential", False): 1100.0,
+    ("token-v1ft-mint-and-transfer20-collections", False): 6000.0,
+    ("token-v1nft-mint-and-transfer-sequential20-collections", False): 4000.0,
     # ("token-v1nft-mint-and-transfer-parallel", False): 1000.0,
     # ("token-v1nft-mint-and-store-sequential", False): 1000.0,
     # ("token-v1nft-mint-and-store-parallel", False): 1000.0,
@@ -32,7 +37,7 @@ EXPECTED_TPS = {
 
 NOISE_FRACTION = 0.1
 
-# assert on production TPS
+# use production concurrency level for assertions
 CONCURRENCY_LEVEL = 8
 BLOCK_SIZE = 10000
 NUM_BLOCKS = 15
