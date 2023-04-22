@@ -3,7 +3,7 @@
 
 use crate::{
     benchmark_transaction::{BenchmarkTransaction, ExtraInfo},
-    db_access::{Account, CoinStore, DbAccessUtil, TOTAL_SUPPLY_STATE_KEY},
+    db_access::{Account, CoinStore, DbAccessUtil},
     metrics::TIMER,
 };
 use anyhow::Result;
@@ -16,6 +16,7 @@ use aptos_types::{
     account_config::{deposit::DepositEvent, withdraw::WithdrawEvent},
     contract_event::ContractEvent,
     event::EventKey,
+    state_store::state_key::StateKey,
     transaction::{ExecutionStatus, Transaction, TransactionOutput, TransactionStatus},
     vm_status::AbortLocation,
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -27,7 +28,32 @@ use move_core_types::{
 };
 use once_cell::sync::{Lazy, OnceCell};
 use rayon::{prelude::*, ThreadPool, ThreadPoolBuilder};
-use std::str::FromStr;
+use std::{collections::HashMap, str::FromStr};
+
+struct IncrementalOutput {
+    write_set: Vec<(StateKey, WriteOp)>,
+    events: Vec<ContractEvent>,
+}
+
+impl IncrementalOutput {
+    fn into_success_output(self) -> Result<TransactionOutput> {
+        Ok(TransactionOutput::new(
+            WriteSetMut::new(self.write_set).freeze()?,
+            self.events,
+            /*gas_used=*/ 1,
+            TransactionStatus::Keep(ExecutionStatus::Success),
+        ))
+    }
+
+    fn append(&mut self, mut other: IncrementalOutput) {
+        self.write_set.append(&mut other.write_set);
+        self.events.append(&mut other.events);
+    }
+
+    fn to_abort(status: TransactionStatus) -> TransactionOutput {
+        TransactionOutput::new(Default::default(), vec![], 0, status)
+    }
+}
 
 pub struct FakeExecutor {}
 
@@ -52,15 +78,11 @@ impl FakeExecutor {
         }
     }
 
-    fn handle_account_creation_and_transfer(
+    fn withdraw_from_signer(
         sender_address: AccountAddress,
-        new_account_address: AccountAddress,
-        initial_balance: u64,
+        transfer_amount: u64,
         state_view: &CachedStateView,
-        fail_on_existing: bool,
-        fail_on_missing: bool,
-    ) -> Result<TransactionOutput> {
-        let _timer = TIMER.with_label_values(&["account_creation"]).start_timer();
+    ) -> Result<Result<IncrementalOutput, TransactionStatus>> {
         let sender_account_key = DbAccessUtil::new_state_key_account(sender_address);
         let mut sender_account = {
             let _timer = TIMER
@@ -76,28 +98,22 @@ impl FakeExecutor {
             DbAccessUtil::get_coin_store(&sender_coin_store_key, state_view)?.unwrap()
         };
 
-        let new_account_key = DbAccessUtil::new_state_key_account(new_account_address);
-        let new_coin_store_key = DbAccessUtil::new_state_key_aptos_coin(new_account_address);
-
-        let new_account = {
-            let _timer = TIMER.with_label_values(&["read_new_account"]).start_timer();
-            DbAccessUtil::get_account(&new_account_key, state_view)?
-        };
-
         // Note: numbers below may not be real. When runninng in parallel there might be conflicts.
-        sender_coin_store.coin -= initial_balance;
+        sender_coin_store.coin -= transfer_amount;
 
         let gas = 1;
         sender_coin_store.coin -= gas;
 
         sender_account.sequence_number += 1;
 
-        let mut total_supply: u128 =
-            DbAccessUtil::get_value(&TOTAL_SUPPLY_STATE_KEY, state_view)?.unwrap();
-        total_supply -= gas as u128;
+        // add total supply via aggregators?
+
+        // let mut total_supply: u128 =
+        //     DbAccessUtil::get_value(&TOTAL_SUPPLY_STATE_KEY, state_view)?.unwrap();
+        // total_supply -= gas as u128;
 
         // TODO(grao): Add other reads to match the read set of the real transaction.
-        let mut write_set = vec![
+        let write_set = vec![
             (
                 sender_account_key,
                 WriteOp::Modification(bcs::to_bytes(&sender_account)?),
@@ -106,87 +122,11 @@ impl FakeExecutor {
                 sender_coin_store_key,
                 WriteOp::Modification(bcs::to_bytes(&sender_coin_store)?),
             ),
-            (
-                TOTAL_SUPPLY_STATE_KEY.clone(),
-                WriteOp::Modification(bcs::to_bytes(&total_supply)?),
-            ),
+            // (
+            //     TOTAL_SUPPLY_STATE_KEY.clone(),
+            //     WriteOp::Modification(bcs::to_bytes(&total_supply)?),
+            // ),
         ];
-
-        if new_account.is_some() {
-            if fail_on_existing {
-                return Ok(TransactionOutput::new(
-                    Default::default(),
-                    vec![],
-                    0,
-                    TransactionStatus::Keep(ExecutionStatus::MoveAbort {
-                        location: AbortLocation::Module(ModuleId::new(
-                            AccountAddress::ONE,
-                            Identifier::from_str("account").unwrap(),
-                        )),
-                        code: 7,
-                        info: None,
-                    }),
-                ));
-            }
-
-            let mut new_coin_store = {
-                let _timer = TIMER
-                    .with_label_values(&["read_new_coin_store"])
-                    .start_timer();
-                DbAccessUtil::get_coin_store(&new_coin_store_key, state_view)?.unwrap()
-            };
-
-            if initial_balance != 0 {
-                new_coin_store.coin += initial_balance;
-
-                write_set.push((
-                    new_coin_store_key,
-                    WriteOp::Modification(bcs::to_bytes(&new_coin_store)?),
-                ));
-            }
-        } else {
-            if fail_on_missing {
-                return Ok(TransactionOutput::new(
-                    Default::default(),
-                    vec![],
-                    0,
-                    TransactionStatus::Keep(ExecutionStatus::MoveAbort {
-                        location: AbortLocation::Module(ModuleId::new(
-                            AccountAddress::ONE,
-                            Identifier::from_str("account").unwrap(),
-                        )),
-                        code: 7,
-                        info: None,
-                    }),
-                ));
-            }
-
-            {
-                let _timer = TIMER
-                    .with_label_values(&["read_new_coin_store"])
-                    .start_timer();
-                assert!(DbAccessUtil::get_coin_store(&new_coin_store_key, state_view)?.is_none());
-            }
-
-            let new_account = Account {
-                authentication_key: new_account_address.to_vec(),
-                ..Default::default()
-            };
-
-            let new_coin_store = CoinStore {
-                coin: initial_balance,
-                ..Default::default()
-            };
-
-            write_set.push((
-                new_account_key,
-                WriteOp::Creation(bcs::to_bytes(&new_account)?),
-            ));
-            write_set.push((
-                new_coin_store_key,
-                WriteOp::Creation(bcs::to_bytes(&new_coin_store)?),
-            ));
-        }
 
         // TODO(grao): Some values are fake, because I'm lazy.
         let events = vec![
@@ -196,20 +136,193 @@ impl FakeExecutor {
                 TypeTag::Struct(Box::new(WithdrawEvent::struct_tag())),
                 sender_address.to_vec(),
             ),
-            ContractEvent::new(
-                EventKey::new(0, new_account_address),
-                0,
-                TypeTag::Struct(Box::new(DepositEvent::struct_tag())),
-                new_account_address.to_vec(),
-            ),
             // TODO(grao): CoinRegisterEvent
         ];
-        Ok(TransactionOutput::new(
-            WriteSetMut::new(write_set).freeze()?,
-            events,
-            /*gas_used=*/ gas,
-            TransactionStatus::Keep(ExecutionStatus::Success),
-        ))
+        Ok(Ok(IncrementalOutput { write_set, events }))
+    }
+
+    fn deposit(
+        recepient_address: AccountAddress,
+        transfer_amount: u64,
+        state_view: &CachedStateView,
+        fail_on_existing: bool,
+        fail_on_missing: bool,
+    ) -> Result<Result<IncrementalOutput, TransactionStatus>> {
+        let recepient_account_key = DbAccessUtil::new_state_key_account(recepient_address);
+        let recepient_coin_store_key = DbAccessUtil::new_state_key_aptos_coin(recepient_address);
+
+        let recepient_account = {
+            let _timer = TIMER.with_label_values(&["read_new_account"]).start_timer();
+            DbAccessUtil::get_account(&recepient_account_key, state_view)?
+        };
+
+        let mut write_set = Vec::new();
+        if recepient_account.is_some() {
+            if fail_on_existing {
+                return Ok(Err(TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+                    location: AbortLocation::Module(ModuleId::new(
+                        AccountAddress::ONE,
+                        Identifier::from_str("account").unwrap(),
+                    )),
+                    code: 7,
+                    info: None,
+                })));
+            }
+
+            let mut recepient_coin_store = {
+                let _timer = TIMER
+                    .with_label_values(&["read_new_coin_store"])
+                    .start_timer();
+                DbAccessUtil::get_coin_store(&recepient_coin_store_key, state_view)?.unwrap()
+            };
+
+            if transfer_amount != 0 {
+                recepient_coin_store.coin += transfer_amount;
+
+                write_set.push((
+                    recepient_coin_store_key,
+                    WriteOp::Modification(bcs::to_bytes(&recepient_coin_store)?),
+                ));
+            }
+        } else {
+            if fail_on_missing {
+                return Ok(Err(TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+                    location: AbortLocation::Module(ModuleId::new(
+                        AccountAddress::ONE,
+                        Identifier::from_str("account").unwrap(),
+                    )),
+                    code: 8,
+                    info: None,
+                })));
+            }
+
+            {
+                let _timer = TIMER
+                    .with_label_values(&["read_new_coin_store"])
+                    .start_timer();
+                assert!(
+                    DbAccessUtil::get_coin_store(&recepient_coin_store_key, state_view)?.is_none()
+                );
+            }
+
+            let recepient_account = Account {
+                authentication_key: recepient_address.to_vec(),
+                ..Default::default()
+            };
+
+            let recepient_coin_store = CoinStore {
+                coin: transfer_amount,
+                ..Default::default()
+            };
+
+            write_set.push((
+                recepient_account_key,
+                WriteOp::Creation(bcs::to_bytes(&recepient_account)?),
+            ));
+            write_set.push((
+                recepient_coin_store_key,
+                WriteOp::Creation(bcs::to_bytes(&recepient_coin_store)?),
+            ));
+        }
+
+        let events = vec![ContractEvent::new(
+            EventKey::new(0, recepient_address),
+            0,
+            TypeTag::Struct(Box::new(DepositEvent::struct_tag())),
+            recepient_address.to_vec(),
+        )];
+        Ok(Ok(IncrementalOutput { write_set, events }))
+    }
+
+    fn handle_account_creation_and_transfer(
+        sender_address: AccountAddress,
+        recepient_address: AccountAddress,
+        transfer_amount: u64,
+        state_view: &CachedStateView,
+        fail_on_existing: bool,
+        fail_on_missing: bool,
+    ) -> Result<TransactionOutput> {
+        let _timer = TIMER.with_label_values(&["account_creation"]).start_timer();
+
+        let mut output = {
+            let output = Self::withdraw_from_signer(sender_address, transfer_amount, state_view)?;
+            match output {
+                Ok(output) => output,
+                Err(status) => return Ok(IncrementalOutput::to_abort(status)),
+            }
+        };
+
+        let deposit_output = Self::deposit(
+            recepient_address,
+            transfer_amount,
+            state_view,
+            fail_on_existing,
+            fail_on_missing,
+        )?;
+
+        match deposit_output {
+            Ok(deposit_output) => {
+                output.append(deposit_output);
+                output.into_success_output()
+            },
+            Err(status) => Ok(IncrementalOutput::to_abort(status)),
+        }
+    }
+
+    fn handle_batch_account_creation_and_transfer(
+        sender_address: AccountAddress,
+        recepient_addresses: Vec<AccountAddress>,
+        transfer_amounts: Vec<u64>,
+        state_view: &CachedStateView,
+        fail_on_existing: bool,
+        fail_on_missing: bool,
+    ) -> Result<TransactionOutput> {
+        let mut deltas = HashMap::new();
+        for (recepient, amount) in recepient_addresses
+            .into_iter()
+            .zip(transfer_amounts.into_iter())
+        {
+            let amount = amount as i64;
+            deltas
+                .entry(recepient)
+                .and_modify(|counter| *counter += amount)
+                .or_insert(amount);
+            deltas
+                .entry(sender_address)
+                .and_modify(|counter| *counter -= amount)
+                .or_insert(-amount);
+        }
+
+        let amount_to_sender = -deltas.remove(&sender_address).unwrap_or(0);
+
+        assert!(amount_to_sender >= 0);
+        let mut output = {
+            let output =
+                Self::withdraw_from_signer(sender_address, amount_to_sender as u64, state_view)?;
+            match output {
+                Ok(output) => output,
+                Err(status) => return Ok(IncrementalOutput::to_abort(status)),
+            }
+        };
+
+        for (recepient_address, transfer_amount) in deltas.into_iter() {
+            output.append({
+                let deposit_output = Self::deposit(
+                    recepient_address,
+                    transfer_amount as u64,
+                    state_view,
+                    fail_on_existing,
+                    fail_on_missing,
+                )?;
+
+                match deposit_output {
+                    Ok(deposit_output) => deposit_output,
+                    Err(status) => return Ok(IncrementalOutput::to_abort(status)),
+                }
+            });
+        }
+
+        output.into_success_output()
     }
 
     fn handle_state_checkpoint() -> Result<TransactionOutput> {
@@ -290,6 +403,16 @@ impl TransactionBlockExecutor<BenchmarkTransaction> for FakeExecutor {
                                             &state_view,
                                             true,
                                             false,
+                                        )
+                                    },
+                                    (AccountAddress::ONE, "aptos_account", "batch_transfer") => {
+                                        Self::handle_batch_account_creation_and_transfer(
+                                            user_txn.sender(),
+                                            bcs::from_bytes(&f.args()[0]).unwrap(),
+                                            bcs::from_bytes(&f.args()[1]).unwrap(),
+                                            &state_view,
+                                            false,
+                                            true,
                                         )
                                     },
                                     _ => unimplemented!(
