@@ -719,11 +719,7 @@ impl AptosVM {
             match CompiledModule::deserialize(module_blob.code()) {
                 Ok(module) => {
                     // verify the module doesn't exist
-                    if session
-                        .get_data_store()
-                        .load_module(&module.self_id())
-                        .is_ok()
-                    {
+                    if session.load_module(&module.self_id()).is_ok() {
                         return Err(verification_error(
                             StatusCode::DUPLICATE_MODULE_NAME,
                             IndexKind::AddressIdentifier,
@@ -914,7 +910,7 @@ impl AptosVM {
             let mut exists = BTreeSet::new();
             for m in &modules {
                 let id = m.self_id();
-                if session.get_data_store().exists_module(&id)? {
+                if session.exists_module(&id)? {
                     exists.insert(id);
                 }
             }
