@@ -19,7 +19,8 @@ use aptos_types::{
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
     write_set::{TransactionWrite, WriteOp},
 };
-use claims::assert_none;
+use claims::{assert_none, assert_ok};
+use once_cell::sync::OnceCell;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
 use proptest_derive::Arbitrary;
 use std::{
@@ -455,16 +456,32 @@ where
                     writes_and_deltas[write_idx].0.clone(),
                     writes_and_deltas[write_idx].1.clone(),
                     reads_result,
+                    OnceCell::new(),
                 ))
             },
-            Transaction::SkipRest => ExecutionStatus::SkipRest(Output(vec![], vec![], vec![])),
+            Transaction::SkipRest => ExecutionStatus::SkipRest(Output::skip_output()),
             Transaction::Abort => ExecutionStatus::Abort(txn_idx as usize),
         }
     }
 }
 
 #[derive(Debug)]
-pub struct Output<K, V>(Vec<(K, V)>, Vec<(K, DeltaOp)>, Vec<Option<Vec<u8>>>);
+pub struct Output<K, V>(
+    Vec<(K, V)>,
+    Vec<(K, DeltaOp)>,
+    Vec<Option<Vec<u8>>>,
+    pub(crate) OnceCell<Vec<(K, WriteOp)>>,
+);
+
+impl<K, V> Output<K, V>
+where
+    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
+    V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
+{
+    pub(crate) fn delta_writes(&self) -> Vec<(K, WriteOp)> {
+        self.3.get().cloned().expect("Delta writes must be set")
+    }
+}
 
 impl<K, V> TransactionOutput for Output<K, V>
 where
@@ -482,7 +499,11 @@ where
     }
 
     fn skip_output() -> Self {
-        Self(vec![], vec![], vec![])
+        Self(vec![], vec![], vec![], OnceCell::new())
+    }
+
+    fn incorporate_delta_writes(&self, delta_writes: Vec<(K, WriteOp)>) {
+        assert_ok!(self.3.set(delta_writes));
     }
 }
 
@@ -621,7 +642,7 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
                     (None, Some(v)) => {
                         assert_eq!(serialize(v), *value);
                     },
-                    (Some(_), Some(_)) => unreachable!("A"),
+                    (Some(_), Some(_)) => unreachable!(),
                     (None, None) => {
                         assert_eq!(deserialize(value), STORAGE_AGGREGATOR_VALUE);
                     },
@@ -648,14 +669,14 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
                     .iter()
                     .take(*skip_at)
                     .zip(expected_results.iter())
-                    .for_each(|(Output(_, _, result), expected_results)| {
+                    .for_each(|(Output(_, _, result, _), expected_results)| {
                         Self::check_result(expected_results, result)
                     });
 
                 results
                     .iter()
                     .skip(*skip_at)
-                    .for_each(|Output(_, _, result)| assert!(result.is_empty()))
+                    .for_each(|Output(_, _, result, _)| assert!(result.is_empty()))
             },
             (Self::DeltaFailure(fail_idx, expected_results), Ok(results)) => {
                 // Check_result asserts internally, so no need to return a bool.
@@ -663,14 +684,14 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
                     .iter()
                     .take(*fail_idx)
                     .zip(expected_results.iter())
-                    .for_each(|(Output(_, _, result), expected_results)| {
+                    .for_each(|(Output(_, _, result, _), expected_results)| {
                         Self::check_result(expected_results, result)
                     });
             },
             (Self::Success(expected_results), Ok(results)) => results
                 .iter()
                 .zip(expected_results.iter())
-                .for_each(|(Output(_, _, result), expected_result)| {
+                .for_each(|(Output(_, _, result, _), expected_result)| {
                     Self::check_result(expected_result, result);
                 }),
             _ => panic!("Incomparable execution outcomes"),

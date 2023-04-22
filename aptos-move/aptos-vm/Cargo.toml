@@ -20,6 +20,7 @@ aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
 aptos-framework =  { workspace = true }
 aptos-gas = { workspace = true }
+aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-move-stdlib = { workspace = true }

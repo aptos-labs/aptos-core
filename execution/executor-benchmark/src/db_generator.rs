@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{add_accounts_impl, benchmark_transaction::BenchmarkTransaction};
+use crate::{add_accounts_impl, benchmark_transaction::BenchmarkTransaction, PipelineConfig};
 use aptos_config::{
     config::{
         PrunerConfig, RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS,
@@ -19,7 +19,7 @@ use aptos_storage_interface::DbReaderWriter;
 use aptos_vm::AptosVM;
 use std::{fs, path::Path};
 
-pub fn run<V>(
+pub fn create_db_with_accounts<V>(
     num_accounts: usize,
     init_account_balance: u64,
     block_size: usize,
@@ -28,6 +28,7 @@ pub fn run<V>(
     verify_sequence_numbers: bool,
     use_state_kv_db: bool,
     use_sharded_state_merkle_db: bool,
+    pipeline_config: PipelineConfig,
 ) where
     V: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
 {
@@ -56,6 +57,7 @@ pub fn run<V>(
         verify_sequence_numbers,
         use_state_kv_db,
         use_sharded_state_merkle_db,
+        pipeline_config,
     );
 }
 

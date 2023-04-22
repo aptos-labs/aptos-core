@@ -31,7 +31,6 @@ use move_vm_types::{
     views::TypeView,
 };
 use std::{cmp::min, collections::VecDeque, fmt::Write, sync::Arc};
-use tracing::error;
 
 macro_rules! debug_write {
     ($($toks: tt)*) => {
@@ -563,13 +562,7 @@ impl Interpreter {
                 }
                 Ok(gv)
             },
-            Err(e) => {
-                error!(
-                    "[VM] error loading resource at ({}, {:?}): {:?} from data store",
-                    addr, ty, e
-                );
-                Err(e)
-            },
+            Err(e) => Err(e),
         }
     }
 
@@ -686,7 +679,6 @@ impl Interpreter {
     fn maybe_core_dump(&self, mut err: VMError, current_frame: &Frame) -> VMError {
         // a verification error cannot happen at runtime so change it into an invariant violation.
         if err.status_type() == StatusType::Verification {
-            error!("Verification error during runtime: {:?}", err);
             let new_err = PartialVMError::new(StatusCode::VERIFICATION_ERROR);
             let new_err = match err.message() {
                 None => new_err,
@@ -695,12 +687,15 @@ impl Interpreter {
             err = new_err.finish(err.location().clone())
         }
         if err.status_type() == StatusType::InvariantViolation {
+            let location = err.location().clone();
             let state = self.internal_state_str(current_frame);
-
-            error!(
-                "Error: {:?}\nCORE DUMP: >>>>>>>>>>>>\n{}\n<<<<<<<<<<<<\n",
-                err, state,
-            );
+            err = err
+                .to_partial()
+                .append_message_with_separator(
+                    '\n',
+                    format!("CORE DUMP: >>>>>>>>>>>>\n{}\n<<<<<<<<<<<<\n", state),
+                )
+                .finish(location);
         }
         err
     }

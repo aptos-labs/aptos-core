@@ -3,12 +3,11 @@
 
 use crate::{
     config::{
-        default_if_zero, default_if_zero_u8, env_or_default, invariant, must_be_set,
-        persistable_config::PersistableConfig, utils::RootPath, ApiConfig, BaseConfig,
-        ConsensusConfig, Error, ExecutionConfig, IndexerConfig, IndexerGrpcConfig,
-        InspectionServiceConfig, LoggerConfig, MempoolConfig, NetworkConfig,
-        PeerMonitoringServiceConfig, SafetyRulesTestConfig, StateSyncConfig, StorageConfig,
-        DEFAULT_BATCH_SIZE, DEFAULT_FETCH_TASKS, DEFAULT_PROCESSOR_TASKS,
+        node_config_loader::NodeConfigLoader, persistable_config::PersistableConfig,
+        utils::RootPath, ApiConfig, BaseConfig, ConsensusConfig, Error, ExecutionConfig,
+        IndexerConfig, IndexerGrpcConfig, InspectionServiceConfig, LoggerConfig, MempoolConfig,
+        NetworkConfig, PeerMonitoringServiceConfig, SafetyRulesTestConfig, StateSyncConfig,
+        StorageConfig,
     },
     network_id::NetworkId,
 };
@@ -90,26 +89,8 @@ impl NodeConfig {
     /// steps. Note: paths used in the node config are either absolute or
     /// relative to the config location.
     pub fn load_from_path<P: AsRef<Path>>(input_path: P) -> Result<Self, Error> {
-        // Load the node config from disk
-        let mut node_config = Self::load_config(&input_path)?;
-
-        // Load the execution config
-        let input_dir = RootPath::new(input_path);
-        node_config.execution.load(&input_dir)?;
-
-        // Validate the node config
-        node_config.validate_config()?;
-
-        // Update the data directory
-        node_config.set_data_dir(node_config.get_data_dir().to_path_buf());
-        Ok(node_config)
-    }
-
-    /// Validate the node config for consistency and correctness
-    pub fn validate_config(&mut self) -> Result<(), Error> {
-        self.validate_indexer_configs()?;
-        self.validate_indexer_grpc_configs()?;
-        self.validate_network_configs()
+        let node_config_loader = NodeConfigLoader::new(input_path);
+        node_config_loader.load_and_sanitize_config()
     }
 
     /// Returns the peer ID of the node based on the role
@@ -137,123 +118,16 @@ impl NodeConfig {
         }
     }
 
-    /// Validate `IndexerConfig`, ensuring that it's set up correctly
-    /// Additionally, handles any strange missing default cases
-    fn validate_indexer_configs(&mut self) -> Result<(), Error> {
-        if !self.indexer.enabled {
-            return Ok(());
-        }
-
-        self.indexer.postgres_uri = env_or_default(
-            "INDEXER_DATABASE_URL",
-            self.indexer.postgres_uri.clone(),
-            must_be_set("postgres_uri", "INDEXER_DATABASE_URL"),
-        );
-
-        self.indexer.processor = env_or_default(
-            "PROCESSOR_NAME",
-            self.indexer
-                .processor
-                .clone()
-                .or_else(|| Some("default_processor".to_string())),
-            None,
-        );
-
-        self.indexer.starting_version = match std::env::var("STARTING_VERSION").ok() {
-            None => self.indexer.starting_version,
-            Some(s) => match s.parse::<u64>() {
-                Ok(version) => Some(version),
-                Err(_) => {
-                    // Doing this instead of failing. This will allow a processor to have STARTING_VERSION: undefined when deploying
-                    aptos_logger::warn!(
-                        "Invalid STARTING_VERSION: {}, using {:?} instead",
-                        s,
-                        self.indexer.starting_version
-                    );
-                    self.indexer.starting_version
-                },
-            },
-        };
-
-        self.indexer.skip_migrations = self.indexer.skip_migrations.or(Some(false));
-        self.indexer.check_chain_id = self.indexer.check_chain_id.or(Some(true));
-        self.indexer.batch_size = default_if_zero(
-            self.indexer.batch_size.map(|v| v as u64),
-            DEFAULT_BATCH_SIZE as u64,
-        )
-        .map(|v| v as u16);
-        self.indexer.fetch_tasks = default_if_zero(
-            self.indexer.fetch_tasks.map(|v| v as u64),
-            DEFAULT_FETCH_TASKS as u64,
-        )
-        .map(|v| v as u8);
-        self.indexer.processor_tasks =
-            default_if_zero_u8(self.indexer.processor_tasks, DEFAULT_PROCESSOR_TASKS);
-        self.indexer.emit_every = self.indexer.emit_every.or(Some(0));
-        self.indexer.gap_lookback_versions = env_or_default(
-            "GAP_LOOKBACK_VERSIONS",
-            self.indexer.gap_lookback_versions.or(Some(1_500_000)),
-            None,
-        );
-
-        Ok(())
-    }
-
-    /// Validate `IndexerGrpcConfig`, ensuring that it's set up correctly
-    /// Additionally, handles any strange missing default cases
-    fn validate_indexer_grpc_configs(&mut self) -> Result<(), Error> {
-        if !self.indexer_grpc.enabled {
-            return Ok(());
-        }
-
-        self.indexer_grpc.address = self
-            .indexer_grpc
-            .address
-            .clone()
-            .or_else(|| Some("0.0.0.0:50051".to_string()));
-
-        self.indexer_grpc.processor_task_count =
-            self.indexer_grpc.processor_task_count.or(Some(20));
-
-        self.indexer_grpc.processor_batch_size =
-            self.indexer_grpc.processor_batch_size.or(Some(1000));
-
-        self.indexer_grpc.output_batch_size = self.indexer_grpc.output_batch_size.or(Some(100));
-
-        Ok(())
-    }
-
-    /// Checks `NetworkConfig` setups so that they exist on proper networks
-    /// Additionally, handles any strange missing default cases
-    fn validate_network_configs(&mut self) -> Result<(), Error> {
-        if self.base.role.is_validator() {
-            invariant(
-                self.validator_network.is_some(),
-                "Missing a validator network config for a validator node".into(),
-            )?;
-        } else {
-            invariant(
-                self.validator_network.is_none(),
-                "Provided a validator network config for a full_node node".into(),
-            )?;
-        }
-
-        if let Some(network) = &mut self.validator_network {
-            network.load_validator_network()?;
-            network.mutual_authentication = true; // This should always be the default for validators
-        }
-        for network in &mut self.full_node_networks {
-            network.load_fullnode_network()?;
-        }
-
-        Ok(())
-    }
-
-    pub fn save<P: AsRef<Path>>(&mut self, output_path: P) -> Result<(), Error> {
+    /// Save the node config to the given path
+    pub fn save_to_path<P: AsRef<Path>>(&mut self, output_path: P) -> Result<(), Error> {
+        // Save the execution config to disk.
         let output_dir = RootPath::new(&output_path);
-        self.execution.save(&output_dir)?;
-        // This must be last as calling save on subconfigs may change their fields
+        self.execution.save_to_path(&output_dir)?;
+
+        // Write the node config to disk. Note: this must be called last
+        // as calling save_to_path() on subconfigs may change fields.
         self.save_config(&output_path)?;
+
         Ok(())
     }
 
@@ -346,33 +220,17 @@ impl NodeConfig {
 
 /// Parses the given serialized config into a node config
 fn parse_serialized_node_config(serialized_config: &str, caller: &'static str) -> NodeConfig {
-    // Parse the node config
-    let mut node_config =
-        NodeConfig::parse_serialized_config(serialized_config).unwrap_or_else(|error| {
-            panic!(
-                "Failed to parse node config! Caller: {}, Error: {}",
-                caller, error
-            )
-        });
-
-    // Validate the config
-    node_config.validate_config().unwrap_or_else(|error| {
+    NodeConfig::parse_serialized_config(serialized_config).unwrap_or_else(|error| {
         panic!(
-            "Config validation failed! Caller: {}, Error: {}",
+            "Failed to parse node config! Caller: {}, Error: {}",
             caller, error
         )
-    });
-
-    node_config
+    })
 }
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::{
-        config::{NodeConfig, SafetyRulesConfig},
-        network_id::NetworkId,
-    };
+    use crate::config::{NodeConfig, SafetyRulesConfig};
 
     #[test]
     fn verify_config_defaults() {
@@ -383,16 +241,5 @@ mod test {
 
         // Verify the safety rules config default
         SafetyRulesConfig::get_default_config();
-    }
-
-    #[test]
-    fn validate_invalid_network_id() {
-        let mut config = NodeConfig::get_default_pfn_config();
-        let network = config.full_node_networks.iter_mut().next().unwrap();
-        network.network_id = NetworkId::Validator;
-        assert!(matches!(
-            config.validate_network_configs(),
-            Err(Error::InvariantViolation(_))
-        ));
     }
 }

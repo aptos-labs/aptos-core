@@ -3,12 +3,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    ast::{Exp, ExpData, LocalVarDecl, ModuleName, Operation, QualifiedSymbol, QuantKind, Value},
+    ast::{
+        Exp, ExpData, LocalVarDecl, ModuleName, Operation, Pattern, QualifiedSymbol, QuantKind,
+        Value,
+    },
     builder::{
         model_builder::{ConstEntry, LocalVarEntry, SpecFunEntry},
         module_builder::ModuleBuilder,
     },
-    model::{FieldId, Loc, ModuleId, NodeId, QualifiedId, SpecFunId, StructId},
+    model::{FieldId, Loc, ModuleId, NodeId, QualifiedId, QualifiedInstId, SpecFunId, StructId},
     symbol::{Symbol, SymbolPool},
     ty::{PrimitiveType, Substitution, Type, TypeDisplayContext, Variance, BOOL_TYPE},
 };
@@ -178,11 +181,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         let var = Type::Var(self.type_var_counter);
         self.type_var_counter += 1;
         var
-    }
-
-    /// Shortcut to create a new node id.
-    fn new_node_id(&self) -> NodeId {
-        self.parent.parent.env.new_node_id()
     }
 
     /// Shortcut to create a new node id and assigns type and location to it.
@@ -736,6 +734,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         }
     }
 
+    /// Require that imperative features are allowed.
+    fn require_imperative(&self, loc: &Loc) {
+        if !self.translating_move_fun {
+            self.error(loc, "expression construct not supported in specifications")
+        }
+    }
+
     /// Translates an expression, with given expected type, which might be a type variable.
     pub fn translate_exp(&mut self, exp: &EA::Exp, expected_type: &Type) -> ExpData {
         let loc = self.to_loc(&exp.loc);
@@ -836,9 +841,14 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let id = self.new_node_id_with_type_loc(&ty, &loc);
                 ExpData::Call(id, Operation::Tuple, vec![])
             },
-            EA::Exp_::Assign(..) => {
-                self.error(&loc, "assignment only allowed in spec var updates");
-                self.new_error_exp()
+            EA::Exp_::Assign(lhs, rhs) => {
+                self.require_imperative(&loc);
+                let ty = self.fresh_type_var();
+                let lhs = self.translate_lvalue_list(lhs, &ty);
+                let rhs = self.translate_exp(rhs, &ty);
+                // The type of the assign is Unit
+                let id = self.new_node_id_with_type_loc(&Type::unit(), &loc);
+                ExpData::Assign(id, lhs, rhs.into_exp())
             },
             EA::Exp_::Dereference(exp) | EA::Exp_::Borrow(_, exp) => {
                 if self.translating_fun_as_spec_fun {
@@ -868,6 +878,81 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 self.new_error_exp()
             },
         }
+    }
+
+    fn translate_lvalue_list(&mut self, list: &EA::LValueList, expected_type: &Type) -> Pattern {
+        let (mut tys, mut args): (Vec<Type>, Vec<Pattern>) = list
+            .value
+            .iter()
+            .map(|lv| {
+                let ty = self.fresh_type_var();
+                let pat = self.translate_lvalue(lv, &ty);
+                (ty, pat)
+            })
+            .unzip();
+        let ty = if tys.len() > 1 || tys.is_empty() {
+            Type::Tuple(tys)
+        } else {
+            tys.pop().unwrap()
+        };
+        let loc = self.to_loc(&list.loc);
+        let ty = self.check_type(&loc, &ty, expected_type, "in tuple");
+        let id = self.new_node_id_with_type_loc(&ty, &loc);
+        if args.len() > 1 || args.is_empty() {
+            Pattern::Tuple(id, args)
+        } else {
+            args.pop().unwrap()
+        }
+    }
+
+    fn translate_lvalue(&mut self, lv: &EA::LValue, expected_type: &Type) -> Pattern {
+        let loc = &self.to_loc(&lv.loc);
+        match &lv.value {
+            EA::LValue_::Var(maccess, None) => {
+                let name = match &maccess.value {
+                    EA::ModuleAccess_::Name(n) => n,
+                    EA::ModuleAccess_::ModuleAccess(_, n) => n,
+                };
+                let id = self.new_node_id_with_type_loc(expected_type, loc);
+                if name.value.as_str() == "_" {
+                    Pattern::Wildcard(id)
+                } else {
+                    let name = self.symbol_pool().make(&name.value);
+                    Pattern::Var(id, name)
+                }
+            },
+            EA::LValue_::Unpack(maccess, generics, args) => {
+                if let Some((struct_id, mut args)) =
+                    self.translate_fields(loc, maccess, generics, args, |s, field_ty, lvalue| {
+                        s.translate_lvalue(lvalue, field_ty)
+                    })
+                {
+                    if args.is_empty() {
+                        // TODO: The move compiler inserts a dummy field with the value of false
+                        // for structs with no fields. We simulate this here for now.
+                        let fresh_var = self.fresh_type_var();
+                        let id = self.new_node_id_with_type_loc(&fresh_var, loc);
+                        args.push(Pattern::Wildcard(id))
+                    }
+                    let ty = struct_id.to_type();
+                    let id = self.new_node_id_with_type_loc(&ty, loc);
+                    Pattern::Struct(id, struct_id, args)
+                } else {
+                    // Error reported
+                    self.new_error_pat(loc)
+                }
+            },
+            _ => {
+                self.error(loc, "unsupported language construct");
+                self.new_error_pat(loc)
+            },
+        }
+    }
+
+    fn new_error_pat(&mut self, loc: &Loc) -> Pattern {
+        let fresh_var = self.fresh_type_var();
+        let id = self.new_node_id_with_type_loc(&fresh_var, loc);
+        Pattern::Error(id)
     }
 
     pub fn translate_value(&mut self, v: &EA::Value) -> Option<(Value, Type)> {
@@ -1107,91 +1192,126 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         seq: &EA::Sequence,
         expected_type: &Type,
     ) -> ExpData {
-        let n = seq.len();
-        if n == 0 {
-            self.error(loc, "block sequence cannot be empty");
-            return self.new_error_exp();
-        }
-        // Process all items before the last one, which must be bindings, and accumulate
-        // declarations for them.
-        let mut decls = vec![];
-        let seq = seq.iter().collect_vec();
-        for item in &seq[0..seq.len() - 1] {
+        let items = seq.iter().collect_vec();
+        self.translate_seq_recursively(loc, &items, expected_type)
+    }
+
+    fn new_unit_exp(&mut self, loc: &Loc) -> ExpData {
+        let node_id = self.new_node_id_with_type_loc(&Type::unit(), loc);
+        ExpData::Sequence(node_id, vec![])
+    }
+
+    fn translate_seq_recursively(
+        &mut self,
+        loc: &Loc,
+        items: &[&EA::SequenceItem],
+        expected_type: &Type,
+    ) -> ExpData {
+        if items.is_empty() {
+            self.require_imperative(loc);
+            self.check_type(loc, &Type::unit(), expected_type, "in sequence");
+            self.new_unit_exp(loc)
+        } else {
+            use EA::SequenceItem_::*;
+            let item = items[0];
+            let item_loc = self.to_loc(&item.loc);
             match &item.value {
-                EA::SequenceItem_::Bind(list, exp) => {
-                    let (t, e) = self.translate_exp_free(exp);
-                    if list.value.len() != 1 {
-                        self.error(
-                            &self.to_loc(&list.loc),
-                            "[current restriction] tuples not supported in let",
-                        );
-                        return ExpData::Invalid(self.new_node_id());
+                Bind(lvlist, _) | Declare(lvlist, _) => {
+                    // Determine type and binding for this declaration
+                    let (ty, binding) = match &item.value {
+                        Bind(_, exp) => {
+                            let (ty, exp) = self.translate_exp_free(exp);
+                            (ty, Some(exp.into_exp()))
+                        },
+                        Declare(_, Some(ty)) => (self.translate_type(ty), None),
+                        Declare(_, None) => (self.fresh_type_var(), None),
+                        _ => unreachable!(),
+                    };
+                    // Translate the lhs lvalue list into a pattern
+                    let pat = self.translate_lvalue_list(lvlist, &ty);
+                    // Declare the variables in the pattern
+                    self.enter_scope();
+                    for (id, name) in pat.vars() {
+                        let var_ty = self.get_node_type(id);
+                        let var_loc = self.get_node_loc(id);
+                        self.define_local(&var_loc, name, var_ty, None, None);
                     }
-                    let bind_loc = self.to_loc(&list.value[0].loc);
-                    match &list.value[0].value {
-                        EA::LValue_::Var(maccess, _) => {
-                            let name = match &maccess.value {
-                                EA::ModuleAccess_::Name(n) => n,
-                                EA::ModuleAccess_::ModuleAccess(_, n) => n,
-                            };
-                            // Define the local. Currently we mimic
-                            // Rust/ML semantics here, allowing to shadow with each let,
-                            // thus entering a new scope.
-                            self.enter_scope();
-                            let name = self.symbol_pool().make(&name.value);
-                            self.define_local(&bind_loc, name, t.clone(), None, None);
-                            let id = self.new_node_id_with_type_loc(&t, &bind_loc);
-                            decls.push(LocalVarDecl {
-                                id,
-                                name,
-                                binding: Some(e.into_exp()),
-                            });
-                        },
-                        EA::LValue_::Unpack(..) => {
-                            self.error(
-                                &bind_loc,
-                                "[current restriction] unpack not supported in let",
-                            );
-                            return ExpData::Invalid(self.new_node_id());
-                        },
+                    // Translate the rest of the sequence, if there is any
+                    let rest = if items.len() == 1 {
+                        // If the bind item has no successor, assume an empty block.
+                        self.require_imperative(loc);
+                        self.check_type(loc, expected_type, &Type::unit(), "in sequence");
+                        self.new_unit_exp(loc)
+                    } else {
+                        self.translate_seq_recursively(loc, &items[1..], expected_type)
+                    };
+                    // Return result
+                    self.exit_scope();
+                    self.new_bind_exp(loc, &item_loc, pat, binding, rest.into_exp())
+                },
+                Seq(exp) if matches!(exp.value, EA::Exp_::Spec(..)) => {
+                    // Skip specification blocks
+                    self.translate_seq_recursively(loc, &items[1..], expected_type)
+                },
+                Seq(exp) if items.len() > 1 => {
+                    let exp = self.translate_exp(exp, &Type::unit());
+                    if self.translating_fun_as_spec_fun
+                        && matches!(exp, ExpData::Call(_, Operation::NoOp, _))
+                    {
+                        // Skip assert! statements when translating move functions as spec functions
+                        self.translate_seq_recursively(loc, &items[1..], expected_type)
+                    } else {
+                        // This is an actual imperative sequence `s;rest`.
+                        self.require_imperative(loc);
+                        let rest = self.translate_seq_recursively(loc, &items[1..], expected_type);
+                        let id = self.new_node_id_with_type_loc(expected_type, loc);
+                        ExpData::Sequence(id, vec![exp.into_exp(), rest.into_exp()])
                     }
                 },
-                EA::SequenceItem_::Seq(e) => {
-                    let translated = self.translate_exp(e, expected_type);
-                    match translated {
-                        ExpData::Call(_, Operation::NoOp, _) => { /* allow assert statement */ },
-                        _ => self.error(
-                            &self.to_loc(&item.loc),
-                            "only binding `let p = e; ...` allowed here",
-                        ),
-                    }
-                },
-                _ => self.error(
-                    &self.to_loc(&item.loc),
-                    "only binding `let p = e; ...` allowed here",
-                ),
+                Seq(exp) => self.translate_exp(exp, expected_type),
             }
         }
+    }
 
-        // Process the last element, which must be an Exp item.
-        let last = match &seq[n - 1].value {
-            EA::SequenceItem_::Seq(e) => self.translate_exp(e, expected_type),
-            _ => {
-                self.error(
-                    &self.to_loc(&seq[n - 1].loc),
-                    "expected an expression as the last element of the block",
-                );
-                self.new_error_exp()
+    /// Create binding expression.
+    // TODO: refactor ExpData::Block to support patterns. For now, map to
+    //   LocalVarDecl or create an error if that is not possible.
+    fn new_bind_exp(
+        &mut self,
+        loc: &Loc,
+        bind_loc: &Loc,
+        pat: Pattern,
+        binding: Option<Exp>,
+        body: Exp,
+    ) -> ExpData {
+        let mut lvars = vec![];
+        let mut errors = false;
+        match pat {
+            Pattern::Var(id, name) => lvars.push(LocalVarDecl { id, name, binding }),
+            Pattern::Tuple(_, args) if binding.is_none() => {
+                for arg in args {
+                    if let Pattern::Var(id, name) = arg {
+                        lvars.push(LocalVarDecl {
+                            id,
+                            name,
+                            binding: None,
+                        });
+                    } else {
+                        errors = true
+                    }
+                }
             },
-        };
-
-        // Exit the scopes for variable bindings
-        for _ in 0..decls.len() {
-            self.exit_scope();
+            _ => errors = true,
         }
-
-        let id = self.new_node_id_with_type_loc(expected_type, loc);
-        ExpData::Block(id, decls, last.into_exp())
+        if errors {
+            self.error(bind_loc, "unpack style binding not yet implemented");
+            self.new_error_exp()
+        } else {
+            // The type of the result is the type of the body
+            let ty = self.get_node_type(body.node_id());
+            let id = self.new_node_id_with_type_loc(&ty, loc);
+            ExpData::Block(id, lvars, body)
+        }
     }
 
     /// Translates a name. Reports an error if the name is not found.
@@ -1815,6 +1935,47 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         fields: &EA::Fields<EA::Exp>,
         expected_type: &Type,
     ) -> ExpData {
+        if let Some((struct_id, field_args)) =
+            self.translate_fields(loc, maccess, generics, fields, |s, field_ty, exp| {
+                s.translate_exp(exp, field_ty)
+            })
+        {
+            let struct_ty = struct_id.to_type();
+            let struct_ty = self.check_type(loc, &struct_ty, expected_type, "in pack expression");
+            let mut field_args = field_args.into_iter().map(|e| e.into_exp()).collect_vec();
+            if field_args.is_empty() {
+                // The move compiler inserts a dummy field with the value of false
+                // for structs with no fields. This is also what we find in the
+                // Model metadata (i.e. a field `dummy_field`). We simulate this here
+                // for now, though it would be better to remove it everywhere as it
+                // can be confusing to users. However, its currently hard to do this,
+                // because a user could also have defined the `dummy_field`.
+                let id = self.new_node_id_with_type_loc(&BOOL_TYPE, loc);
+                field_args.push(ExpData::Value(id, Value::Bool(false)).into_exp());
+            }
+            let id = self.new_node_id_with_type_loc(&struct_ty, loc);
+            self.set_node_instantiation(id, struct_id.inst);
+            ExpData::Call(
+                id,
+                Operation::Pack(struct_id.module_id, struct_id.id),
+                field_args,
+            )
+        } else {
+            // Error already reported
+            self.new_error_exp()
+        }
+    }
+
+    /// Generic field translator, used to for the `Pack` primitive (`Fields<EA:Exp>`) and the
+    /// `Unpack` case (`Fields<EA::LValue>`).
+    fn translate_fields<T, S>(
+        &mut self,
+        loc: &Loc,
+        maccess: &EA::ModuleAccess,
+        generics: &Option<Vec<EA::Type>>,
+        fields: &EA::Fields<T>,
+        mut field_translator: impl FnMut(&mut Self, &Type, &T) -> S,
+    ) -> Option<(QualifiedInstId<StructId>, Vec<S>)> {
         let struct_name = self.parent.module_access_to_qualified(maccess);
         let struct_name_loc = self.to_loc(&maccess.loc);
         let generics = generics.as_ref().map(|ts| self.translate_types(ts));
@@ -1824,18 +1985,21 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 self.make_instantiation(entry.type_params.len(), vec![], generics);
             if let Some(msg) = diag {
                 self.error(loc, &msg);
-                return self.new_error_exp();
+                return None;
             }
             if let Some(field_decls) = &entry.fields {
                 let mut fields_not_covered: BTreeSet<Symbol> = BTreeSet::new();
                 fields_not_covered.extend(field_decls.keys());
                 let mut args = BTreeMap::new();
-                for (name_loc, name_, (_, exp)) in fields.iter() {
+                for (name_loc, name_, (_, value)) in fields.iter() {
                     let field_name = self.symbol_pool().make(name_);
                     if let Some((idx, field_ty)) = field_decls.get(&field_name) {
-                        let exp = self.translate_exp(exp, &field_ty.instantiate(&instantiation));
+                        // Translate the abstract value of the field, passing in its instantiated
+                        // type.
+                        let translated =
+                            field_translator(self, &field_ty.instantiate(&instantiation), value);
+                        args.insert(idx, translated);
                         fields_not_covered.remove(&field_name);
-                        args.insert(idx, exp);
                     } else {
                         self.error(
                             &self.to_loc(&name_loc),
@@ -1858,40 +2022,27 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                                 .join(", ")
                         ),
                     );
-                    self.new_error_exp()
+                    None
                 } else {
-                    let struct_ty =
-                        Type::Struct(entry.module_id, entry.struct_id, instantiation.clone());
-                    let struct_ty =
-                        self.check_type(loc, &struct_ty, expected_type, "in pack expression");
-                    let mut args = args
+                    let struct_id = entry
+                        .module_id
+                        .qualified_inst(entry.struct_id, instantiation);
+                    let args = args
                         .into_iter()
                         .sorted_by_key(|(i, _)| *i)
-                        .map(|(_, e)| e.into_exp())
+                        .map(|(_, value)| value)
                         .collect_vec();
-                    if args.is_empty() {
-                        // The move compiler inserts a dummy field with the value of false
-                        // for structs with no fields. This is also what we find in the
-                        // Model metadata (i.e. a field `dummy_field`). We simulate this here
-                        // for now, though it would be better to remove it everywhere as it
-                        // can be confusing to users. However, its currently hard to do this,
-                        // because a user could also have defined the `dummy_field`.
-                        let id = self.new_node_id_with_type_loc(&BOOL_TYPE, loc);
-                        args.push(ExpData::Value(id, Value::Bool(false)).into_exp());
-                    }
-                    let id = self.new_node_id_with_type_loc(&struct_ty, loc);
-                    self.set_node_instantiation(id, instantiation);
-                    ExpData::Call(id, Operation::Pack(entry.module_id, entry.struct_id), args)
+                    Some((struct_id, args))
                 }
             } else {
                 self.error(
                     &struct_name_loc,
                     &format!(
-                        "native struct `{}` cannot be packed",
+                        "native struct `{}` cannot be packed or unpacked",
                         struct_name.display(self.symbol_pool())
                     ),
                 );
-                self.new_error_exp()
+                None
             }
         } else {
             self.error(
@@ -1901,7 +2052,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     struct_name.display(self.symbol_pool())
                 ),
             );
-            self.new_error_exp()
+            None
         }
     }
 

@@ -619,7 +619,7 @@ function install_solidity {
 }
 
 function install_pnpm {
-    curl -fsSL https://get.pnpm.io/install.sh | "${PRE_COMMAND[@]}" env PNPM_VERSION=7.14.2 SHELL="$(which bash)" bash -
+    curl -fsSL https://get.pnpm.io/install.sh | "${PRE_COMMAND[@]}" env PNPM_VERSION=8.2.0 SHELL="$(which bash)" bash -
 }
 
 function install_python3 {

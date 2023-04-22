@@ -37,7 +37,7 @@ async fn test_full_node_bootstrap_state_snapshot() {
     let validator = swarm.validators_mut().next().unwrap();
     let mut config = validator.config().clone();
     config.state_sync.storage_service.max_state_chunk_size = 2;
-    config.save(validator.config_path()).unwrap();
+    config.save_to_path(validator.config_path()).unwrap();
     validator.restart().await.unwrap();
     validator
         .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_HEALTHY_WAIT_SECS))

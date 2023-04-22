@@ -26,31 +26,9 @@ The rest of this document describes:
 
 ## Using the Aptos-core source code
 
-1. Clone the Aptos repo.
+1. Follow steps in [Building Aptos From Source](../../guides/building-from-source.md)
 
-    ```
-    git clone https://github.com/aptos-labs/aptos-core.git
-    ```
-
-2. `cd` into `aptos-core` directory.
-
-    ```
-    cd aptos-core
-    ```
-
-3. Run the `scripts/dev_setup.sh` Bash script as shown below. This will prepare your developer environment.
-
-    ```
-    ./scripts/dev_setup.sh
-    ```
-
-4. Update your current shell environment.
-
-    ```
-    source ~/.cargo/env
-    ```
-
-5. With your development environment ready, now you can start your testnet network. Before you proceed, make a note of the following:
+1. With your development environment ready, now you can start your testnet network. Before you proceed, make a note of the following:
 
     :::tip
      - When you run the below command to start the local testnet, your terminal will enter into an interactive mode, with a message `Aptos is running, press ctrl-c to exit`. Hence, you will need to open another shell terminal for the subsequent steps described in this section.

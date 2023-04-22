@@ -1271,13 +1271,13 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "rate(quorum_store_num_total_txns_left_on_commit_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval]) / rate(quorum_store_num_total_txns_left_on_commit_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
+          "expr": "rate(quorum_store_num_total_txns_left_on_update_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval]) / rate(quorum_store_num_total_txns_left_on_update_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "NUM_TOTAL_TXNS_LEFT_ON_COMMIT",
+      "title": "NUM_TOTAL_TXNS_LEFT_ON_UPDATE",
       "type": "timeseries"
     },
     {
@@ -1326,13 +1326,13 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "rate(quorum_store_num_total_proofs_left_on_commit_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval]) / rate(quorum_store_num_total_proofs_left_on_commit_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
+          "expr": "rate(quorum_store_num_total_proofs_left_on_update_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval]) / rate(quorum_store_num_total_proofs_left_on_update_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$__rate_interval])",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "NUM_TOTAL_PROOFS_LEFT_ON_COMMIT",
+      "title": "NUM_TOTAL_PROOFS_LEFT_ON_UPDATE",
       "type": "timeseries"
     },
     {
@@ -2336,13 +2336,7 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          }
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
         },
         "overrides": []
       },
@@ -2561,6 +2555,6 @@
   "timezone": "",
   "title": "quorum-store",
   "uid": "SnI98V7Vz",
-  "version": 4,
+  "version": 5,
   "weekStart": ""
 }

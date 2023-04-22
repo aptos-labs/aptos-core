@@ -222,6 +222,11 @@ const config = {
                 type: "doc",
                 docId: "guides/move-guides/book/SUMMARY",
               },
+              {
+                label: "Move Prover Book",
+                type: "doc",
+                docId: "guides/prover-guides/index",
+              },
             ],
           },
           {

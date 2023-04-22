@@ -463,7 +463,6 @@ dependencies = [
  "claims",
  "criterion",
  "crossbeam",
- "crossbeam-queue",
  "dashmap",
  "move-binary-format",
  "num_cpus",
@@ -547,6 +546,7 @@ dependencies = [
  "aptos-types",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "byteorder",
+ "cfg-if",
  "get_if_addrs",
  "mirai-annotations",
  "poem-openapi",
@@ -1014,10 +1014,13 @@ dependencies = [
  "aptos-state-view",
  "aptos-storage-interface",
  "aptos-temppath",
+ "aptos-transaction-generator-lib",
  "aptos-types",
  "aptos-vm",
+ "async-trait",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "chrono",
+ "clap 3.2.23",
  "criterion",
  "indicatif 0.15.0",
  "itertools",
@@ -1028,7 +1031,7 @@ dependencies = [
  "rand 0.7.3",
  "rayon",
  "serde 1.0.149",
- "structopt",
+ "tokio",
  "toml",
 ]
 
@@ -1500,6 +1503,7 @@ dependencies = [
  "aptos-crash-handler",
  "aptos-indexer-grpc-utils",
  "aptos-logger",
+ "aptos-metrics-core",
  "aptos-moving-average",
  "aptos-protos",
  "aptos-runtimes",
@@ -1516,7 +1520,6 @@ dependencies = [
  "serde_yaml 0.8.26",
  "tokio",
  "tonic",
- "warp",
 ]
 
 [[package]]
@@ -1527,21 +1530,22 @@ dependencies = [
  "aptos-crash-handler",
  "aptos-indexer-grpc-utils",
  "aptos-logger",
+ "aptos-metrics-core",
  "aptos-moving-average",
  "aptos-protos",
  "aptos-runtimes",
  "clap 3.2.23",
  "cloud-storage",
  "futures",
- "prost",
+ "once_cell",
  "redis",
+ "serde 1.0.149",
  "serde_json",
  "tokio",
  "tokio-stream",
  "tonic",
  "tonic-reflection",
  "uuid",
- "warp",
 ]
 
 [[package]]
@@ -1552,16 +1556,17 @@ dependencies = [
  "aptos-crash-handler",
  "aptos-indexer-grpc-utils",
  "aptos-logger",
+ "aptos-metrics-core",
  "aptos-moving-average",
  "aptos-runtimes",
  "clap 3.2.23",
  "cloud-storage",
  "futures-util",
+ "once_cell",
  "redis",
  "serde 1.0.149",
  "serde_json",
  "tokio",
- "warp",
 ]
 
 [[package]]
@@ -1620,10 +1625,9 @@ dependencies = [
 
 [[package]]
 name = "aptos-indexer-grpc-parser"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "anyhow",
- "aptos-bitvec",
  "aptos-crash-handler",
  "aptos-indexer-grpc-utils",
  "aptos-logger",
@@ -1631,7 +1635,6 @@ dependencies = [
  "aptos-moving-average",
  "aptos-protos",
  "aptos-runtimes",
- "aptos-types",
  "async-trait",
  "base64 0.13.0",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
@@ -1645,17 +1648,11 @@ dependencies = [
  "hex",
  "once_cell",
  "prost",
- "regex",
- "reqwest",
- "reqwest-middleware",
- "reqwest-retry",
  "serde 1.0.149",
  "serde_json",
  "sha2 0.9.9",
  "tokio",
  "tonic",
- "url",
- "warp",
 ]
 
 [[package]]
@@ -1663,14 +1660,18 @@ name = "aptos-indexer-grpc-utils"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-inspection-service",
  "aptos-logger",
  "aptos-protos",
  "backoff",
+ "base64 0.13.0",
  "cloud-storage",
  "futures",
  "futures-core",
  "futures-util",
  "itertools",
+ "prometheus",
+ "prost",
  "redis",
  "redis-test",
  "serde 1.0.149",
@@ -1678,6 +1679,7 @@ dependencies = [
  "serde_yaml 0.8.26",
  "tokio",
  "tonic",
+ "warp",
 ]
 
 [[package]]
@@ -1949,6 +1951,7 @@ dependencies = [
  "aptos-infallible",
  "aptos-types",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
+ "claims",
  "crossbeam",
  "dashmap",
  "proptest",
@@ -2397,6 +2400,7 @@ dependencies = [
  "clap 3.2.23",
  "futures",
  "git2 0.16.1",
+ "handlebars",
  "hex",
  "move-binary-format",
  "move-core-types",
@@ -3172,6 +3176,7 @@ dependencies = [
  "aptos-crypto-derive",
  "aptos-framework",
  "aptos-gas",
+ "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-move-stdlib",
@@ -6792,9 +6797,9 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "1.9.1"
+version = "1.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10a35a97730320ffe8e2d410b5d3b69279b98d2c14bdb8b70ea89ecf7888d41e"
+checksum = "bd070e393353796e801d209ad339e89596eb4c8d430d18ede6a1cced8fafbd99"
 dependencies = [
  "autocfg",
  "hashbrown 0.12.3",
@@ -7820,6 +7825,7 @@ version = "0.0.3"
 dependencies = [
  "anyhow",
  "arbitrary 1.1.7",
+ "indexmap",
  "move-core-types",
  "once_cell",
  "proptest",
@@ -11212,6 +11218,7 @@ dependencies = [
  "aptos-types",
  "aptos-vault-client",
  "aptos-vm",
+ "aptos-vm-genesis",
  "aptos-writeset-generator",
  "async-trait",
  "base64 0.13.0",
@@ -11230,6 +11237,7 @@ dependencies = [
  "serde_yaml 0.8.26",
  "tokio",
  "url",
+ "walkdir",
 ]
 
 [[package]]

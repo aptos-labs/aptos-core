@@ -88,7 +88,10 @@ pub trait AbstractInterpreter: TransferFunctions {
             // subsequent crashes
             let post_state = self.execute_block(block_id, pre_state, function_view, meter)?;
 
-            let mut next_block_candidate = function_view.cfg().next_block(block_id);
+            let mut next_block_candidates = vec![];
+            if let Some(next) = function_view.cfg().next_block(block_id) {
+                next_block_candidates.push(next);
+            }
             // propagate postcondition of this block to successor blocks
             for successor_block_id in function_view.cfg().successors(block_id) {
                 match inv_map.get_mut(successor_block_id) {
@@ -109,7 +112,7 @@ pub trait AbstractInterpreter: TransferFunctions {
                                     .cfg()
                                     .is_back_edge(block_id, *successor_block_id)
                                 {
-                                    next_block_candidate = Some(*successor_block_id);
+                                    next_block_candidates.push(*successor_block_id);
                                 }
                             },
                         }
@@ -123,7 +126,9 @@ pub trait AbstractInterpreter: TransferFunctions {
                     },
                 }
             }
-            next_block = next_block_candidate;
+            next_block = next_block_candidates
+                .into_iter()
+                .min_by_key(|block_id| function_view.cfg().traversal_index(*block_id));
         }
         Ok(())
     }

@@ -11,6 +11,8 @@ use once_cell::sync::Lazy;
 /// Useful metric constants for the storage service
 pub const LRU_CACHE_HIT: &str = "lru_cache_hit";
 pub const LRU_CACHE_PROBE: &str = "lru_cache_probe";
+pub const SUBSCRIPTION_EVENT_ADD: &str = "subscription_event_add";
+pub const SUBSCRIPTION_EVENT_EXPIRE: &str = "subscription_event_expire";
 
 /// Counter for lru cache events in the storage service (server-side)
 pub static LRU_CACHE_EVENT: Lazy<IntCounterVec> = Lazy::new(|| {
@@ -79,6 +81,16 @@ pub static STORAGE_REQUEST_PROCESSING_LATENCY: Lazy<HistogramVec> = Lazy::new(||
         "aptos_storage_service_server_request_latency",
         "Time it takes to process a storage service request",
         &["protocol", "request_type"]
+    )
+    .unwrap()
+});
+
+/// Counter for subscription request events
+pub static SUBSCRIPTION_EVENT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_storage_service_server_subscription_event",
+        "Counters related to subscription events",
+        &["protocol", "event"]
     )
     .unwrap()
 });

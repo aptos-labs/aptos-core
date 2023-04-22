@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics::{HISTOGRAM, REQUEST_SOURCE_CLIENT, RESPONSE_STATUS};
+use aptos_api_types::X_APTOS_CLIENT;
 use aptos_logger::{
     debug, info,
     prelude::{sample, SampleRate},
@@ -36,6 +37,10 @@ pub async fn middleware_log<E: Endpoint>(next: E, request: Request) -> Result<Re
         user_agent: request
             .headers()
             .get(header::USER_AGENT)
+            .and_then(|v| v.to_str().ok().map(|v| v.to_string())),
+        aptos_client: request
+            .headers()
+            .get(X_APTOS_CLIENT)
             .and_then(|v| v.to_str().ok().map(|v| v.to_string())),
         elapsed: Duration::from_secs(0),
         forwarded: request
@@ -79,7 +84,7 @@ pub async fn middleware_log<E: Endpoint>(next: E, request: Request) -> Result<Re
     // Push a counter based on the request source, sliced up by endpoint + method.
     REQUEST_SOURCE_CLIENT
         .with_label_values(&[
-            determine_request_source_client(&log.user_agent),
+            determine_request_source_client(&log.aptos_client),
             response
                 .data::<OperationId>()
                 .map(|operation_id| operation_id.0)
@@ -91,22 +96,22 @@ pub async fn middleware_log<E: Endpoint>(next: E, request: Request) -> Result<Re
     Ok(response)
 }
 
-// In the User-Agent, each of our clients include a string that identifies that client.
-// This string follows a particular format: <identifier>/<version>, where <identifier>
-// always starts with `aptos-`. Using this knowledge, we can extract the request source
-// from the user agent string. You can see more specifics about how we extract info from
-// the string by looking at the regex we match on.
-fn determine_request_source_client(user_agent: &Option<String>) -> &str {
-    // If the user agent is not set, we can't determine the request source.
-    let user_agent = match user_agent {
-        Some(user_agent) => user_agent,
+// Each of our clients includes a header value called X_APTOS_CLIENT that identifies
+// that client. This string follows a particular format: <identifier>/<version>,
+// where <identifier> always starts with `aptos-`. This function ensure this string
+// matches the specified format and returns it if it does. You can see more specifics
+// about how we extract info from the string by looking at the regex we match on.
+fn determine_request_source_client(aptos_client: &Option<String>) -> &str {
+    // If the header is not set we can't determine the request source.
+    let aptos_client = match aptos_client {
+        Some(aptos_client) => aptos_client,
         None => return REQUEST_SOURCE_CLIENT_UNKNOWN,
     };
 
     // If there were no matches, we can't determine the request source. If there are
     // multiple matches for some reason, instead of logging nothing, we use whatever
     // value we matched on last.
-    match REQUEST_SOURCE_CLIENT_REGEX.find_iter(user_agent).last() {
+    match REQUEST_SOURCE_CLIENT_REGEX.find_iter(aptos_client).last() {
         Some(capture) => capture.as_str(),
         None => REQUEST_SOURCE_CLIENT_UNKNOWN,
     }
@@ -124,6 +129,7 @@ pub struct HttpRequestLog {
     pub status: u16,
     referer: Option<String>,
     user_agent: Option<String>,
+    aptos_client: Option<String>,
     #[schema(debug)]
     pub elapsed: std::time::Duration,
     forwarded: Option<String>,

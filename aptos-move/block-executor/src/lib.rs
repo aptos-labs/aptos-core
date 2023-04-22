@@ -139,7 +139,6 @@ subsequent incarnation to finish.
 pub mod counters;
 pub mod errors;
 pub mod executor;
-pub mod output_delta_resolver;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod proptest_types;
 mod scheduler;

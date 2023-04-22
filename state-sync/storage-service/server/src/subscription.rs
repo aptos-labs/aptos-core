@@ -2,8 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    error::Error, handler::Handler, metrics::increment_network_frame_overflow,
-    network::ResponseSender, storage::StorageReaderInterface, LogEntry, LogSchema,
+    error::Error,
+    handler::Handler,
+    metrics,
+    metrics::{increment_counter, increment_network_frame_overflow, SUBSCRIPTION_EVENT_EXPIRE},
+    network::ResponseSender,
+    storage::StorageReaderInterface,
+    LogEntry, LogSchema,
 };
 use aptos_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
 use aptos_infallible::{Mutex, RwLock};
@@ -198,6 +203,7 @@ pub(crate) fn handle_active_data_subscriptions<T: StorageReaderInterface>(
                 lru_response_cache.clone(),
                 storage.clone(),
                 time_service.clone(),
+                &peer,
                 data_subscription,
                 target_ledger_info,
             ) {
@@ -241,6 +247,7 @@ pub(crate) fn get_peers_with_ready_subscriptions<T: StorageReaderInterface>(
                     data_subscriptions.clone(),
                     highest_known_epoch,
                     lru_response_cache.clone(),
+                    peer,
                     data_subscription.protocol,
                     storage.clone(),
                     time_service.clone(),
@@ -281,6 +288,7 @@ fn get_epoch_ending_ledger_info<T: StorageReaderInterface>(
     data_subscriptions: Arc<Mutex<HashMap<PeerNetworkId, DataSubscriptionRequest>>>,
     epoch: u64,
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
+    peer_network_id: &PeerNetworkId,
     protocol: ProtocolId,
     storage: T,
     time_service: TimeService,
@@ -303,7 +311,8 @@ fn get_epoch_ending_ledger_info<T: StorageReaderInterface>(
         storage,
         time_service,
     );
-    let storage_response = handler.process_request(protocol, storage_request);
+    let storage_response =
+        handler.process_request(peer_network_id, protocol, storage_request, true);
 
     // Verify the response
     match storage_response {
@@ -337,6 +346,7 @@ fn notify_peer_of_new_data<T: StorageReaderInterface>(
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
     storage: T,
     time_service: TimeService,
+    peer_network_id: &PeerNetworkId,
     subscription: DataSubscriptionRequest,
     target_ledger_info: LedgerInfoWithSignatures,
 ) -> aptos_storage_service_types::Result<(), Error> {
@@ -351,8 +361,12 @@ fn notify_peer_of_new_data<T: StorageReaderInterface>(
                 storage,
                 time_service,
             );
-            let storage_response =
-                handler.process_request(subscription.protocol, storage_request.clone());
+            let storage_response = handler.process_request(
+                peer_network_id,
+                subscription.protocol,
+                storage_request.clone(),
+                true,
+            );
 
             // Transform the missing data into a subscription response
             let transformed_data_response = match storage_response {
@@ -450,6 +464,17 @@ pub(crate) fn remove_expired_data_subscriptions(
     data_subscriptions: Arc<Mutex<HashMap<PeerNetworkId, DataSubscriptionRequest>>>,
 ) {
     data_subscriptions.lock().retain(|_, data_subscription| {
+        // Update the expired subscription metrics
+        if data_subscription.is_expired(config.max_subscription_period_ms) {
+            let protocol = data_subscription.protocol;
+            increment_counter(
+                &metrics::SUBSCRIPTION_EVENT,
+                protocol,
+                SUBSCRIPTION_EVENT_EXPIRE.into(),
+            );
+        }
+
+        // Only retain non-expired subscriptions
         !data_subscription.is_expired(config.max_subscription_period_ms)
     });
 }

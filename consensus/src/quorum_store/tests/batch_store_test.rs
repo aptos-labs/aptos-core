@@ -17,7 +17,7 @@ use aptos_types::{
     account_address::AccountAddress, transaction::SignedTransaction,
     validator_verifier::random_validator_verifier,
 };
-use claims::{assert_err, assert_none, assert_ok, assert_ok_eq, assert_some};
+use claims::{assert_err, assert_ok, assert_ok_eq};
 use futures::executor::block_on;
 use once_cell::sync::Lazy;
 use std::sync::{
@@ -71,6 +71,7 @@ fn request_for_test(
             *digest,
             10,
             num_bytes,
+            0,
         ),
         maybe_payload,
     )
@@ -245,7 +246,7 @@ fn test_get_local_batch() {
     let digest_1 = HashValue::random();
     let request_1 = request_for_test(&digest_1, 50, 20, Some(vec![]));
     // Should be stored in memory and DB.
-    assert_some!(store.persist(request_1));
+    assert!(!store.persist(vec![request_1]).is_empty());
 
     block_on(store.update_certified_timestamp(40));
 
@@ -253,18 +254,18 @@ fn test_get_local_batch() {
     assert!(digest_2 != digest_1);
     // Expiration is before 40.
     let request_2_expired = request_for_test(&digest_2, 30, 20, Some(vec![]));
-    assert_none!(store.persist(request_2_expired));
+    assert!(store.persist(vec![request_2_expired]).is_empty());
     // Proper (in the future) expiration.
     let request_2 = request_for_test(&digest_2, 55, 20, Some(vec![]));
     // Should be stored in DB only
-    assert_some!(store.persist(request_2));
+    assert!(!store.persist(vec![request_2]).is_empty());
 
     let digest_3 = HashValue::random();
     assert!(digest_3 != digest_1);
     assert!(digest_3 != digest_2);
     let request_3 = request_for_test(&digest_3, 56, 1970, Some(vec![]));
     // Out of quota - should not be stored
-    assert_none!(store.persist(request_3.clone()));
+    assert!(store.persist(vec![request_3.clone()]).is_empty());
 
     assert_ok!(store.get_batch_from_local(&digest_1));
     assert_ok!(store.get_batch_from_local(&digest_2));
@@ -276,7 +277,7 @@ fn test_get_local_batch() {
     // Value w. digest_3 was never persisted
     assert_err!(store.get_batch_from_local(&digest_3));
     // Since payload is cleared, we can now persist value w. digest_3
-    assert_some!(store.persist(request_3));
+    assert!(!store.persist(vec![request_3]).is_empty());
     assert_ok!(store.get_batch_from_local(&digest_3));
 
     block_on(store.update_certified_timestamp(52));

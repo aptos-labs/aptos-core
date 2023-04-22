@@ -22,8 +22,8 @@ use aptos_types::{
     chain_id::ChainId,
     contract_event::ContractEvent,
     on_chain_config::{
-        FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, TimedFeatures,
-        APTOS_MAX_KNOWN_VERSION,
+        FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
+        TimedFeatures, APTOS_MAX_KNOWN_VERSION,
     },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
 };
@@ -118,12 +118,14 @@ pub fn encode_aptos_mainnet_genesis_transaction(
 
     // On-chain genesis process.
     let consensus_config = OnChainConsensusConfig::default();
+    let execution_config = OnChainExecutionConfig::default();
     let gas_schedule = default_gas_schedule();
     initialize(
         &mut session,
         chain_id,
         genesis_config,
         &consensus_config,
+        &execution_config,
         &gas_schedule,
     );
     initialize_features(&mut session);
@@ -186,6 +188,7 @@ pub fn encode_genesis_transaction(
     chain_id: ChainId,
     genesis_config: &GenesisConfiguration,
     consensus_config: &OnChainConsensusConfig,
+    execution_config: &OnChainExecutionConfig,
     gas_schedule: &GasScheduleV2,
 ) -> Transaction {
     Transaction::GenesisTransaction(WriteSetPayload::Direct(encode_genesis_change_set(
@@ -195,6 +198,7 @@ pub fn encode_genesis_transaction(
         chain_id,
         genesis_config,
         consensus_config,
+        execution_config,
         gas_schedule,
     )))
 }
@@ -206,6 +210,7 @@ pub fn encode_genesis_change_set(
     chain_id: ChainId,
     genesis_config: &GenesisConfiguration,
     consensus_config: &OnChainConsensusConfig,
+    execution_config: &OnChainExecutionConfig,
     gas_schedule: &GasScheduleV2,
 ) -> ChangeSet {
     validate_genesis_config(genesis_config);
@@ -234,6 +239,7 @@ pub fn encode_genesis_change_set(
         chain_id,
         genesis_config,
         consensus_config,
+        execution_config,
         gas_schedule,
     );
     initialize_features(&mut session);
@@ -365,6 +371,7 @@ fn initialize(
     chain_id: ChainId,
     genesis_config: &GenesisConfiguration,
     consensus_config: &OnChainConsensusConfig,
+    execution_config: &OnChainExecutionConfig,
     gas_schedule: &GasScheduleV2,
 ) {
     let gas_schedule_blob =
@@ -372,6 +379,9 @@ fn initialize(
 
     let consensus_config_bytes =
         bcs::to_bytes(consensus_config).expect("Failure serializing genesis consensus config");
+
+    let execution_config_bytes =
+        bcs::to_bytes(execution_config).expect("Failure serializing genesis consensus config");
 
     // Calculate the per-epoch rewards rate, represented as 2 separate ints (numerator and
     // denominator).
@@ -395,6 +405,7 @@ fn initialize(
             MoveValue::U8(chain_id.id()),
             MoveValue::U64(APTOS_MAX_KNOWN_VERSION.major),
             MoveValue::vector_u8(consensus_config_bytes),
+            MoveValue::vector_u8(execution_config_bytes),
             MoveValue::U64(epoch_interval_usecs),
             MoveValue::U64(genesis_config.min_stake),
             MoveValue::U64(genesis_config.max_stake),
@@ -809,6 +820,7 @@ pub fn generate_test_genesis(
             employee_vesting_period_duration: 5 * 60, // 5 minutes
         },
         &OnChainConsensusConfig::default(),
+        &OnChainExecutionConfig::default(),
         &default_gas_schedule(),
     );
     (genesis, test_validators)
@@ -830,6 +842,7 @@ pub fn generate_mainnet_genesis(
         ChainId::test(),
         &mainnet_genesis_config(),
         &OnChainConsensusConfig::default(),
+        &OnChainExecutionConfig::default(),
         &default_gas_schedule(),
     );
     (genesis, test_validators)
