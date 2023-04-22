@@ -28,7 +28,7 @@ See [Accounts](../concepts/accounts.md) for more information.
 
 ### API
 
-- An **Application Programming Interface (API)(** is a set of protocols and tools that allow users to interact with Aptos blockchain nodes and client networks via external applications. Aptos offers a REST API for this purpose. See the [Aptos API reference](https://aptos.dev/nodes/aptos-api-spec#/) documentation and [Use the Aptos API](../guides/aptos-apis.md) for more details.
+- An **Application Programming Interface (API)(** is a set of protocols and tools that allow users to interact with Aptos blockchain nodes and client networks via external applications. Aptos offers a REST API for this purpose. See the [Aptos API reference](https://aptos.dev/nodes/aptos-api-spec#/) documentation and [Use the Aptos API](../integration/aptos-apis.md) for more details.
 
 ### APT
 
@@ -112,7 +112,7 @@ An **Aptos node** is a peer entity of the Aptos network that tracks the state of
 
 ### CLI
 
-- **Command line interface** refers to the Aptos CLI used for developing on the Aptos blockchain, operating nodes, and debugging issues. Find out more at [Use the Aptos CLI](../cli-tools/aptos-cli-tool/use-aptos-cli.md). 
+- **Command line interface** refers to the Aptos CLI used for developing on the Aptos blockchain, operating nodes, and debugging issues. Find out more at [Use the Aptos CLI](../tools/aptos-cli-tool/use-aptos-cli.md). 
 
 ### Client
 
@@ -217,7 +217,7 @@ then there is a guarantee that T_N will never be included in the blockchain.
 
 ### Indexer
 
-- **[Indexer](../guides/indexing.md)** is the component of Aptos that retrieves, processes, and efficiently stores raw data in the database to provide speedy access to the Aptos blockchain state.
+- **[Indexer](../integration/indexing.md)** is the component of Aptos that retrieves, processes, and efficiently stores raw data in the database to provide speedy access to the Aptos blockchain state.
 
 ## L
 

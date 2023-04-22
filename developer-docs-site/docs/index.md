@@ -25,13 +25,13 @@ See the newest Aptos releases in the [Latest Releases](./releases/index.md) list
   
   <div class="col">
     <div class="card card-body h-100 d-flex flex-column" >
-    <a href="guides/getting-started" class="card-title card-link stretched-link"> <h2>Getting started</h2></a>
+    <a href="/category/environment" class="card-title card-link stretched-link"> <h2>Getting started</h2></a>
     <p class="card-text">Begin by setting up your Aptos development environment.</p>
 </div>
   </div>
   <div class="col">
     <div class="card card-body h-100 d-flex flex-column">
-    <a href="tutorials/aptos-quickstarts/" class="card-title card-link stretched-link"> <h2>Run quickstart tutorials</h2></a>
+    <a href="tutorials" class="card-title card-link stretched-link"> <h2>Run quickstart tutorials</h2></a>
     <p class="card-text">Submit your first transaction, write your first Move module, deploy your first coin, and more.</p>
 </div>
 </div>
@@ -44,22 +44,22 @@ See the newest Aptos releases in the [Latest Releases](./releases/index.md) list
 <div class="row row-cols-1 row-cols-md-2a g-4">
   <div class="col">
     <div class="card card-body h-100 d-flex flex-column">
-    <a href="concepts/aptos-concepts" class="card-title card-link stretched-link"> <h2>Concepts</h2></a>
+    <a href="concepts" class="card-title card-link stretched-link"> <h2>Concepts</h2></a>
     <p class="card-text">Learn the key concepts of the Aptos blockchain, including transactions, accounts, gas and transaction fees, nodes, and more. </p>
-</div>
-</div>
-  <div class="col">
-    <div class="card card-body h-100 d-flex flex-column" >
-    <a href="guides/aptos-guides" class="card-title card-link stretched-link"> <h2>How it works</h2></a>
-    <p class="card-text">How does interacting with the Aptos blockchain work, how Move works on Aptos, how to create a signed transaction, and more.</p>
-</div>
+    </div>
   </div>
   <div class="col">
     <div class="card card-body h-100 d-flex flex-column">
     <a href="move/move-on-aptos" class="card-title card-link stretched-link"> <h2>Move on Aptos</h2></a>
     <p class="card-text">Learn how Move works on the Aptos blockchain.</p>
-</div>
-</div>
+    </div>
+  </div>
+  <div class="col">
+    <div class="card card-body h-100 d-flex flex-column" >
+    <a href="integration" class="card-title card-link stretched-link"> <h2>How it works</h2></a>
+    <p class="card-text">How to build applications on Aptos.</p>
+    </div>
+  </div>
 </div>
 </div>
 
@@ -96,7 +96,7 @@ See the newest Aptos releases in the [Latest Releases](./releases/index.md) list
 <div class="col">
     <div class="card h-100" >
     <div class="card-body d-flex flex-column" >
-    <a href="/cli-tools/aptos-cli-tool/use-aptos-cli" class="card-title card-link stretched-link"> <h2>CLI</h2></a>
+    <a href="/tools/aptos-cli-tool/use-aptos-cli" class="card-title card-link stretched-link"> <h2>CLI</h2></a>
     <p class="card-text">CLI for developing and deploying on the Aptos blockchain.</p>
 </div>
 </div>

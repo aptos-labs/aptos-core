@@ -8,7 +8,7 @@ slug: "aptos-api"
 If you provide blockchain services to your customers and wish to employ the [Aptos API](https://aptos.dev/nodes/aptos-api-spec/#/), then this guide is for you. This guide will walk you through all you need to integrate the Aptos blockchain into your platform with the Aptos API.
 
 :::tip
-Also see the [System Integrators Guide](./system-integrators-guide.md) for a thorough walkthrough of Aptos integration.
+Also see the [System Integrators Guide](../guides/system-integrators-guide.md) for a thorough walkthrough of Aptos integration.
 :::
 
 ## Understanding rate limits
@@ -24,7 +24,7 @@ Most integrations into the Aptos blockchain benefit from a holistic and comprehe
 * As transactions execute, they may emit events. [Events](../concepts/events.md) are hints about changes in on-chain data.
 
 :::important
-Ensure the [fullnode](../nodes/aptos-deployments.md) you're communicating with is up to date. The fullnode must reach the version containing your transaction to retrieve relevant data from it. There can be latency from the fullnodes retrieving state from [validator fullnodes](../concepts/fullnodes.md), which in turn rely upon [validator nodes](../concepts/validator-nodes.md) as the source of truth.
+Ensure the [fullnode](../nodes/deployments.md) you're communicating with is up to date. The fullnode must reach the version containing your transaction to retrieve relevant data from it. There can be latency from the fullnodes retrieving state from [validator fullnodes](../concepts/fullnodes.md), which in turn rely upon [validator nodes](../concepts/validator-nodes.md) as the source of truth.
 :::
 
 The storage service on a node employs two forms of pruning that erase data from nodes: 
@@ -50,9 +50,9 @@ View functions do not modify blockchain state. A [View](https://github.com/aptos
 * related [Move](https://github.com/aptos-labs/aptos-core/blob/90c33dc7a18662839cd50f3b70baece0e2dbfc71/aptos-move/framework/aptos-framework/sources/coin.move#L226) code
 * [specification](https://github.com/aptos-labs/aptos-core/blob/90c33dc7a18662839cd50f3b70baece0e2dbfc71/api/doc/spec.yaml#L8513).
 
-The View function operates like the [Aptos Simulation API](./system-integrators-guide.md#testing-transactions-or-transaction-pre-execution), though with no side effects and a accessible output path. The function is immutable if tagged as `#[view]`, the compiler will confirm it so and if fail otherwise. View functions can be called via the `/view` endpoint. Calls to view functions require the module and function names along with input type parameters and values.
+The View function operates like the [Aptos Simulation API](../guides/system-integrators-guide.md#testing-transactions-or-transaction-pre-execution), though with no side effects and a accessible output path. The function is immutable if tagged as `#[view]`, the compiler will confirm it so and if fail otherwise. View functions can be called via the `/view` endpoint. Calls to view functions require the module and function names along with input type parameters and values.
 
-In order to use the View functions, you need to pass `--bytecode-version 6` to the [Aptos CLI](../cli-tools/aptos-cli-tool/index.md) when publishing the module.
+In order to use the View functions, you need to pass `--bytecode-version 6` to the [Aptos CLI](../tools/install-cli/index.md) when publishing the module.
 
 > Note: Calling View functions is not yet supported by the Aptos CLI.
 

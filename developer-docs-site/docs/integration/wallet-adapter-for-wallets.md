@@ -5,7 +5,7 @@ id: "wallet-adapter-for-wallets"
 
 # Wallet Adapter For Wallet Builders
 
-To gain from dapps in the Aptos Ecosystem and provide your users the functionality they are looking for in a wallet, your wallet plugin should follow the [Aptos Wallet Standard](./wallet-standard.md) and be built from the Aptos Wallet Adapter.
+To gain from dapps in the Aptos Ecosystem and provide your users the functionality they are looking for in a wallet, your wallet plugin should follow the [Aptos Wallet Standard](../standards/wallets.md) and be built from the Aptos Wallet Adapter.
 
 The [wallet-adapter-plugin-template](https://github.com/aptos-labs/wallet-adapter-plugin-template) repository gives wallet builders a pre-made class with all required wallet functionality following the Aptos Wallet Standard for easy and fast development.
 

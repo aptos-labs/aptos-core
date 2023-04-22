@@ -29,7 +29,7 @@ Follow the instructions here to conduct typical work in the Aptos Explorer.
 
 ### Select a network
 
-The Aptos Explorer renders data from all Aptos networks: Mainnet, Testnet, Devnet, and your local host if configured. See [Aptos Blockchain Deployments](../nodes/aptos-deployments.md) for a detailed view of their purposes and differences.
+The Aptos Explorer renders data from all Aptos networks: Mainnet, Testnet, Devnet, and your local host if configured. See [Aptos Blockchain Deployments](../nodes/deployments.md) for a detailed view of their purposes and differences.
 
 To select a network in the [Aptos Explorer](https://explorer.aptoslabs.com/), load the explorer and use the *Select Network* drop-down menu at the top right to select your desired network.
 

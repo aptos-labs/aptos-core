@@ -38,7 +38,7 @@ Now that you know what you would like to accomplish, you need to determine:
 - Do I need a `Move.toml`?
 - How do I run my script with the CLI?
 
-Let us run through how to execute a Move script with a step-by-step example using the [Aptos CLI](../../cli-tools/aptos-cli-tool/use-aptos-cli.md).
+Let us run through how to execute a Move script with a step-by-step example using the [Aptos CLI](../../tools/aptos-cli-tool/use-aptos-cli.md).
 
 1. Make a new directory for your work:
 ```sh
@@ -46,7 +46,7 @@ mkdir testing
 cd testing
 ```
 
-2. Set up the Aptos CLI and [create an account](../../cli-tools/aptos-cli-tool/use-aptos-cli#initialize-local-configuration-and-create-an-account):
+2. Set up the Aptos CLI and [create an account](../../tools/aptos-cli-tool/use-aptos-cli#initialize-local-configuration-and-create-an-account):
 ```sh
 aptos init
 ```

@@ -1,6 +1,5 @@
 ---
 title: "Mint NFTs with the Mint Tool"
-slug: "nft-minting-tool"
 ---
 
 import ThemedImage from '@theme/ThemedImage';
@@ -20,7 +19,7 @@ The Aptos Non-Fungible Token (NFT) Minting Tool allows NFT creators to upload as
 
 ### Install Aptos CLI
 
-[Install the Aptos CLI](../../cli-tools/aptos-cli-tool/index.md). The Aptos CLI is needed for compiling and deploying the minting contract.
+[Install the Aptos CLI](../../tools/install-cli/index.md). The Aptos CLI is needed for compiling and deploying the minting contract.
 
 ### Configure Aptos account
 

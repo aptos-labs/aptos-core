@@ -1,6 +1,5 @@
 ---
-title: "Follow the Aptos Standards"
-slug: "index"
+title: "Embrace the Aptos Standards"
 ---
 
 # Aptos Standards
@@ -27,8 +26,8 @@ The [Token module](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move
 See [Aptos Token >](./aptos-token.md)
 
 ## Wallet standards
-### [Aptos Wallet standards](../../guides/wallet-standard.md)
+### [Aptos Wallet standards](./wallets.md)
 
 The wallet standards ensure that all wallets use the same functionality for key features.  This includes:
 - The same mnemonic so that wallets can be moved between providers.
-- [Wallet adapter](../../concepts/wallet-adapter-concept.md) so that all applications can interact seamlessly with a common interface.
+- [Wallet adapter](../integration/wallet-adapter-concept.md) so that all applications can interact seamlessly with a common interface.

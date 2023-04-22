@@ -1,6 +1,5 @@
 ---
 title: "Use the Aptos Indexer"
-slug: "indexing"
 ---
 
 import ThemedImage from '@theme/ThemedImage';

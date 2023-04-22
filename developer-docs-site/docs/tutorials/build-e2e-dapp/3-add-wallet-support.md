@@ -7,9 +7,7 @@ id: "add-wallet-support"
 
 In the third chapter of the tutorial on [building an end-to-end dapp on Aptos](./index.md), you will be adding _wallet_ support to your [React app](./2-set-up-react-app.md). You now need a wallet to submit a transaction to the blockchain.
 
-Aptos provides a [wallet adapter](../../concepts/wallet-adapter-concept.md) that saves us time and work in implementing wallets logic and a UI package we can use to add a wallet connect button and a wallet selector modal.
-
-You can read about it more in the [Wallet Adapter Concept](../../concepts/wallet-adapter-concept.md) page.
+Aptos provides a [wallet adapter](../../integration/wallet-adapter-concept.md) that supports many ecosystem wallets to offering a common interface and UI package that can be used to add a wallet connect button and a wallet selector modal.
 
 1. Stop the local server if running.
 2. In the `client` folder, run:

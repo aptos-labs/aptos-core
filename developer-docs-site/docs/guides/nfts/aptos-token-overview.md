@@ -8,7 +8,7 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 # Compare Aptos Token Standards
 
 :::tip Aptos token standard
-For details, see the official [Aptos Token](./aptos-token.md) standard.
+For details, see the official [Aptos Token](../../standards/aptos-token.md) standard.
 :::
 
 One of the major applications of blockchains is token generation and use; this use requires a standard defining
@@ -36,7 +36,7 @@ stores only contract code while all the associated data is stored in non-executa
 by the executable account.
 
 ### Aptos
-The [accounts](../accounts.md) in Aptos are homogeneous in that they can store both smart contracts and data. But
+The [accounts](../../concepts/accounts.md) in Aptos are homogeneous in that they can store both smart contracts and data. But
 distinct from Ethereum, the associated data of a smart contract is distributed across the space
 of all accounts. The associated data of a contract in Ethereum is broken into pieces
 stored in its owner's account. For example, an NFT smart contract will store all the NFTs and their

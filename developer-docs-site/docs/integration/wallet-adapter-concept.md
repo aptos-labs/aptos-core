@@ -32,7 +32,7 @@ In addition, creating and implementing a wallet is also not an easy task,
 When we started building a wallet adapter, we wanted to provide an adapter that can be easy enough for wallets to integrate with and for dapps to use and implement.
 
 For that, we provide an [Aptos Wallet Adapter](https://github.com/aptos-labs/aptos-wallet-adapter) monorepo for wallet and dapps creators to ease development and ensure a smooth process in building projects on the Aptos network.
-The Aptos Wallet Adapter acts as a service between dapps and wallets and exposes APIs for dapps to interact with the wallets by following our [Wallet Standard](../guides/wallet-standard.md). This in turns allows dapps to support many wallets with minimal integration efforts, and for wallets to follow a known standard and gain visibility.
+The Aptos Wallet Adapter acts as a service between dapps and wallets and exposes APIs for dapps to interact with the wallets by following our [Wallet Standard](../standards/wallets.md). This in turns allows dapps to support many wallets with minimal integration efforts, and for wallets to follow a known standard and gain visibility.
 
 ## Adapter structure
 
@@ -72,7 +72,7 @@ If a wallet supports functions that are not part of the basic plugin interface, 
 
 The light [Adapter React package](https://github.com/aptos-labs/aptos-wallet-adapter/tree/main/packages/wallet-adapter-react) is for dapps to import and use. The package contains a `Provider` and a `Context` to implement and use within your app.
 
-Follow the [Wallet Adapter For Dapp Builders](../guides/wallet-adapter-for-dapp.md) guide on how to use the provider package on your dapp.
+Follow the [Wallet Adapter For Dapp Builders](./wallet-adapter-for-dapp.md) guide on how to use the provider package on your dapp.
 
 ### Adapter Template plugin
 
@@ -80,7 +80,7 @@ Wallets looking to integrate with the adapter should implement their own wallet 
 
 The [Wallet Adapter Plugin Template repo](https://github.com/aptos-labs/wallet-adapter-plugin-template) holds a pre-made class, a test file, and some config files to help you build and publish the plugin as an NPM package.
 
-Follow the [Wallet Adapter For Wallet Builders](../guides/wallet-adapter-for-wallets.md) on how to use the template to implement and publish your wallet plugin.
+Follow the [Wallet Adapter For Wallet Builders](./wallet-adapter-for-wallets.md) on how to use the template to implement and publish your wallet plugin.
 
 <center>
 <ThemedImage

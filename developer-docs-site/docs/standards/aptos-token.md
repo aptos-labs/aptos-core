@@ -1,6 +1,5 @@
 ---
 title: "Aptos Token"
-id: "aptos-token"
 ---
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
@@ -8,7 +7,7 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 # Aptos Token
 
 :::tip Aptos Token standards compared
-Also see the [comparison of Aptos Token standards](./aptos-token-overview.md).
+Also see the [comparison of Aptos Token standards](../guides/nfts/aptos-token-overview.md).
 :::
 
 

@@ -1,6 +1,5 @@
 ---
 title: "Mint NFTs with the Aptos CLI"
-slug: "mint-nft-cli"
 ---
 
 # Mint NFTs with the Aptos CLI
@@ -11,10 +10,9 @@ This code lab lets you use the Aptos CLI to mint non-fungible tokens (NFTs) in A
 
 This tutorial assumes you have:
 
-* your [environment set up](../guides/getting-started.md)
 * a [GitHub account](https://docs.github.com/en/get-started/signing-up-for-github/signing-up-for-a-new-github-account)
 * the [GitHub CLI](https://cli.github.com/)
-* the [Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md) (or you can run from [aptos-core](https://github.com/aptos-labs/aptos-core) source via `cargo run`)
+* the [Aptos CLI](../../tools/install-cli/index.md) (or you can run from [aptos-core](https://github.com/aptos-labs/aptos-core) source via `cargo run`)
 * the `aptos-core` repository checked out: `git clone https://github.com/aptos-labs/aptos-core.git`
 
 Then:
@@ -46,7 +44,7 @@ In this section, we create a collection and token. This work maps to the demonst
 
 ### Create an account
 
-1. [Install the Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md) and note its [many uses](../cli-tools/aptos-cli-tool/use-aptos-cli.md) for later if you haven't experienced its goodness already.
+1. [Install the Aptos CLI](../../tools/install-cli/index.md).
 
 2. Create a default (typical) account on Aptos devnet to receive the NFT by running the following command and selecting `devnet`:
   ```shell
@@ -148,7 +146,7 @@ See [create_nft.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-m
 
 ## 2. Use resource account for automation
 
-This part maps to the demonstration in [create_nft_with_resource_account.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/move-examples/mint_nft/2-Using-Resource-Account/sources/create_nft_with_resource_account.move) and introduces the Aptos concept of [resource accounts](../move/move-on-aptos/resource-accounts.md).
+This part maps to the demonstration in [create_nft_with_resource_account.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/move-examples/mint_nft/2-Using-Resource-Account/sources/create_nft_with_resource_account.move) and introduces the Aptos concept of [resource accounts](../../move/move-on-aptos/resource-accounts.md).
 
 Since the Move model often requires knowing the signer of a transaction, Aptos provides resource accounts for assigning signer capability. Creating resource accounts enables access to the signer capability for automated use. With this ability, resource accounts can publish Move modules and automatically sign for transactions and minting. The signer capability can be assigned to the resource account or placed in storage locally within the module.
 
@@ -337,7 +335,7 @@ We prepare the module for production by:
 
 * adding a `TokenMintingEvent` to emit a custom event for tracking minting of tokens from this module.
 * enabling signature verification and ntroducing the concept of a proof challenge to prevent bot spamming.
-* including [unit tests](./book/unit-testing.md) to make sure our code works as expected.
+* including [unit tests](../../move/book/unit-testing.md) to make sure our code works as expected.
 
 
 ### Publish the module under a resource account
@@ -479,7 +477,7 @@ Create two accounts on devnet for deploying and managing this contract:
 
 ### Prepare resource account from source account
 
-In this section, we will create a [resource account](../move/move-on-aptos/resource-accounts.md) from the `source-account` and publish the module on devnet under the resource account’s address. A resource account is used here to programmatically signed for transactions and avoids the need for multiple signatures.
+In this section, we will create a [resource account](../../move/move-on-aptos/resource-accounts.md) from the `source-account` and publish the module on devnet under the resource account’s address. A resource account is used here to programmatically signed for transactions and avoids the need for multiple signatures.
 
 In the [NFT Tutorial](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/mint_nft) smart contract, we store the resource account’s signer capability in the `ModuleData` resource so that it can automatically sign for transactions in the contract. If we don’t store the signer capability within the module, we’d need to provide the resource account’s signer; but we no longer have access to the resource account’s signer because the resource account is meant to be autonomous, and the contracts published under a resource account are immutable. Once the contract is published, the resource account no longer has access to the signer.
 
@@ -589,4 +587,4 @@ public entry fun airdrop(whitelist: vector<address>) acquires ModuleData {
 ```
 
 After offering the token, the wallet receiver (eg: [Petra](https://petra.app/)) would see the offer as shown below:
-![petra_screenshot.png](../../static/img/token-airdrop.png)
+![petra_screenshot.png](../../../static/img/token-airdrop.png)
