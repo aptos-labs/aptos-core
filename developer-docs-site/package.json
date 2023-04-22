@@ -46,6 +46,7 @@
     "remark-math": "^3.0.1",
     "shelljs": "^0.8.5",
     "stream": "^0.0.2",
+    "ts-node": "^10.9.1",
     "unist-util-visit": "4.1.0",
     "unist-util-visit-children": "2.0.0",
     "url": "^0.11.0",

@@ -268,6 +268,10 @@ const config = {
                 type: "doc",
                 docId: "community/aptos-style",
               },
+              {
+                label: "Contributors",
+                href: "/community/contributors",
+              },
             ],
           },
         ],
