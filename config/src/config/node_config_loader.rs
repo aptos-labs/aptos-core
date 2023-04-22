@@ -16,6 +16,45 @@ use aptos_types::{
 };
 use std::path::Path;
 
+/// A simple enum to represent the type of a node
+/// as determined from the config file.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NodeType {
+    Validator,
+    ValidatorFullnode,
+    PublicFullnode,
+}
+
+impl NodeType {
+    pub fn is_validator(self) -> bool {
+        self == NodeType::Validator
+    }
+
+    pub fn is_validator_fullnode(self) -> bool {
+        self == NodeType::ValidatorFullnode
+    }
+
+    /// Returns the type of the node as determined by the node config
+    pub fn extract_from_config(node_config: &NodeConfig) -> Self {
+        // Validator nodes are trivial to detect
+        if node_config.base.role.is_validator() {
+            return NodeType::Validator;
+        }
+
+        // Otherwise, we must decipher between VFNs and PFNs
+        // based on the presence of a VFN network.
+        let vfn_network_found = node_config
+            .full_node_networks
+            .iter()
+            .any(|network| network.network_id.is_vfn_network());
+        if vfn_network_found {
+            NodeType::ValidatorFullnode
+        } else {
+            NodeType::PublicFullnode
+        }
+    }
+}
+
 /// A simple node config loader that performs basic config
 /// sanitization and post-processing.
 pub struct NodeConfigLoader<P> {
@@ -51,7 +90,7 @@ impl<P: AsRef<Path>> NodeConfigLoader<P> {
 /// Sanitize the node config for the current environment
 fn sanitize_node_config(node_config: &mut NodeConfig) -> Result<(), Error> {
     // Get the role and chain_id for the node
-    let node_role = node_config.base.role;
+    let node_type = NodeType::extract_from_config(node_config);
     let chain_id = match get_chain_id(node_config) {
         Ok(chain_id) => chain_id,
         Err(error) => {
@@ -61,7 +100,7 @@ fn sanitize_node_config(node_config: &mut NodeConfig) -> Result<(), Error> {
     };
 
     // Sanitize the node config
-    NodeConfig::sanitize(node_config, node_role, chain_id)
+    NodeConfig::sanitize(node_config, node_type, chain_id)
 }
 
 /// Get the chain ID for the node

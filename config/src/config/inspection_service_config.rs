@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::{config_sanitizer::ConfigSanitizer, Error, NodeConfig, RoleType},
+    config::{config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig},
     utils,
 };
 use aptos_types::chain_id::ChainId;
@@ -35,17 +35,16 @@ impl InspectionServiceConfig {
 }
 
 impl ConfigSanitizer for InspectionServiceConfig {
-    /// Validate and process the inspection service config according to the given node role and chain ID
     fn sanitize(
         node_config: &mut NodeConfig,
-        node_role: RoleType,
+        node_type: NodeType,
         chain_id: ChainId,
     ) -> Result<(), Error> {
         let sanitizer_name = Self::get_sanitizer_name();
         let inspection_service_config = &node_config.inspection_service;
 
         // Verify that mainnet validators do not expose the configuration
-        if node_role.is_validator()
+        if node_type.is_validator()
             && chain_id.is_mainnet()
             && inspection_service_config.expose_configuration
         {
@@ -77,8 +76,12 @@ mod tests {
         };
 
         // Verify that the configuration is sanitized successfully
-        InspectionServiceConfig::sanitize(&mut node_config, RoleType::FullNode, ChainId::mainnet())
-            .unwrap()
+        InspectionServiceConfig::sanitize(
+            &mut node_config,
+            NodeType::PublicFullnode,
+            ChainId::mainnet(),
+        )
+        .unwrap()
     }
 
     #[test]
@@ -95,7 +98,7 @@ mod tests {
         // Verify that sanitization fails for mainnet
         let error = InspectionServiceConfig::sanitize(
             &mut node_config,
-            RoleType::Validator,
+            NodeType::Validator,
             ChainId::mainnet(),
         )
         .unwrap_err();

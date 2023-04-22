@@ -3,7 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::config::{
-    config_sanitizer::ConfigSanitizer, utils::RootPath, Error, NodeConfig, RoleType,
+    config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, utils::RootPath, Error,
+    NodeConfig,
 };
 use aptos_types::{chain_id::ChainId, transaction::Transaction};
 use serde::{Deserialize, Serialize};
@@ -118,10 +119,9 @@ impl ExecutionConfig {
 }
 
 impl ConfigSanitizer for ExecutionConfig {
-    /// Validate and process the execution config according to the given node role and chain ID
     fn sanitize(
         node_config: &mut NodeConfig,
-        _node_role: RoleType,
+        _node_type: NodeType,
         chain_id: ChainId,
     ) -> Result<(), Error> {
         let sanitizer_name = Self::get_sanitizer_name();
@@ -169,7 +169,7 @@ mod test {
         };
 
         // Sanitize the config and verify that it succeeds
-        ExecutionConfig::sanitize(&mut node_config, RoleType::Validator, ChainId::mainnet())
+        ExecutionConfig::sanitize(&mut node_config, NodeType::Validator, ChainId::mainnet())
             .unwrap();
     }
 
@@ -187,7 +187,7 @@ mod test {
 
         // Sanitize the config and verify that it fails
         let error =
-            ExecutionConfig::sanitize(&mut node_config, RoleType::Validator, ChainId::mainnet())
+            ExecutionConfig::sanitize(&mut node_config, NodeType::Validator, ChainId::mainnet())
                 .unwrap_err();
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
     }
@@ -206,7 +206,7 @@ mod test {
 
         // Sanitize the config and verify that it fails
         let error =
-            ExecutionConfig::sanitize(&mut node_config, RoleType::Validator, ChainId::mainnet())
+            ExecutionConfig::sanitize(&mut node_config, NodeType::Validator, ChainId::mainnet())
                 .unwrap_err();
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
     }

@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::config::{
-    config_sanitizer::ConfigSanitizer, Error, NodeConfig, QuorumStoreConfig, RoleType,
-    SafetyRulesConfig,
+    config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig,
+    QuorumStoreConfig, SafetyRulesConfig,
 };
 use aptos_types::chain_id::ChainId;
 use cfg_if::cfg_if;
@@ -350,17 +350,16 @@ impl ConsensusConfig {
 }
 
 impl ConfigSanitizer for ConsensusConfig {
-    /// Validate and process the consensus config according to the given node role and chain ID
     fn sanitize(
         node_config: &mut NodeConfig,
-        node_role: RoleType,
+        node_type: NodeType,
         chain_id: ChainId,
     ) -> Result<(), Error> {
         let sanitizer_name = Self::get_sanitizer_name();
 
         // Verify that the safety rules config is valid
-        SafetyRulesConfig::sanitize(node_config, node_role, chain_id)?;
-        QuorumStoreConfig::sanitize(node_config, node_role, chain_id)?;
+        SafetyRulesConfig::sanitize(node_config, node_type, chain_id)?;
+        QuorumStoreConfig::sanitize(node_config, node_type, chain_id)?;
 
         // Verify that the consensus-only feature is not enabled in mainnet
         if chain_id.is_mainnet() && is_consensus_only_perf_test_enabled() {
