@@ -105,7 +105,7 @@ const sidebars = {
             "move/move-on-aptos/resource-accounts",
             "move/move-on-aptos/modules-on-aptos",
             "move/move-on-aptos/move-scripts",
-            "move/move-on-aptos/start-building",
+            "move/move-on-aptos/cli",
           ],
         },
         {
