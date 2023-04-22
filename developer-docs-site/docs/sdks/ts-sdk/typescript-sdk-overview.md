@@ -115,13 +115,13 @@ const accountNFTs = await provider.getAccountNFTs("0x123");
 
 The [AptosClient](https://aptos-labs.github.io/ts-sdk-doc/classes/AptosClient.html) class exposes the methods for retrieving the account resources, transactions, modules and events.
 
-In addition, the `AptosClient` component supports submitting transactions in BCS format, which prepares and signs the raw transactions on the client-side. This method leverages the BCS Library and Transaction Builder for constructing the transaction payloads. See the guide [Creating a Signed Transaction](../../guides/sign-a-transaction.md) for instructions.
+In addition, the `AptosClient` component supports submitting transactions in BCS format, which prepares and signs the raw transactions on the client-side. This method leverages the BCS Library and Transaction Builder for constructing the transaction payloads. See the guide [Creating a Signed Transaction](../../integration/sign-a-transaction.md) for instructions.
 
 You can use the `AptosClient` class directly or the `Provider` class.
 
 ### IndexerClient class
 
-The `IndexerClient` class exposes functions to query the [Aptos Indexer](../../guides/indexing.md). The Aptos Indexer fulfills this need, allowing the data shaping critical to real-time app use.
+The `IndexerClient` class exposes functions to query the [Aptos Indexer](../../integration/indexing.md). The Aptos Indexer fulfills this need, allowing the data shaping critical to real-time app use.
 
 You can use the `IndexerClient` class directly or the `Provider` class.
 

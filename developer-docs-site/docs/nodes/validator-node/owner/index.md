@@ -8,12 +8,12 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 # Owner 
 
-This document describes how to [use the Aptos CLI](../../../cli-tools/aptos-cli-tool/use-aptos-cli.md) to perform owner operations during validation.
+This document describes how to [use the Aptos CLI](../../../tools/aptos-cli-tool/use-aptos-cli.md) to perform owner operations during validation.
 
 ## Owner operations with CLI
 
 :::tip Testnet vs Mainnet
-The below CLI command examples use mainnet. Change the `--network` value for testnet and devnet. View the values in [Aptos Blockchain Deployments](../../aptos-deployments.md) to see how profiles can be configured based on the network.
+The below CLI command examples use mainnet. Change the `--network` value for testnet and devnet. View the values in [Aptos Blockchain Deployments](../../deployments.md) to see how profiles can be configured based on the network.
 :::
 
 ### Initialize CLI

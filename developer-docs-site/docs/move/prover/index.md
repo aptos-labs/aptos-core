@@ -16,7 +16,7 @@ The Move Prover exists to make contracts more *trustworthy*; it:
 
 For more information, refer to the documentation:
 
-- [Installation](../../cli-tools/install-move-prover.md) 
+- [Installation](../../tools/install-cli/install-move-prover.md) 
 - [Move Prover User Guide](prover-guide.md)
 - [Move Specification Language](spec-lang.md)
 - [Move Prover Supporting Resources](supporting-resources.md)

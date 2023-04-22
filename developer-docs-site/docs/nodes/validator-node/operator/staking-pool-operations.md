@@ -24,7 +24,7 @@ Make sure that this step is performed by the owner. See [Initialize staking pool
 Follow the below steps to set up the validator node using the operator account and join the validator set.
 
 :::tip Mainnet vs Testnet
-The below CLI command examples use mainnet. Change the `--network` value for testnet and devnet. View the values in [Aptos Blockchain Deployments](../../aptos-deployments.md) to see how profiles can be configured based on the network.
+The below CLI command examples use mainnet. Change the `--network` value for testnet and devnet. View the values in [Aptos Blockchain Deployments](../../deployments.md) to see how profiles can be configured based on the network.
 :::
 
 ### 1. Initialize Aptos CLI
@@ -124,7 +124,7 @@ To check the details of your stake pool, run the below CLI command with the `get
 The below command is for an example owner address `e7be097a90c18f6bdd53efe0e74bf34393cac2f0ae941523ea196a47b6859edb`. 
 
 :::tip
-For testnet or devnet `--url` field values, see [Aptos Blockchain Deployments](../../aptos-deployments.md).
+For testnet or devnet `--url` field values, see [Aptos Blockchain Deployments](../../deployments.md).
 :::
 
 ```bash

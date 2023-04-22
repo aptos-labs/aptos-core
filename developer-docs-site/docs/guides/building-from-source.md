@@ -1,6 +1,5 @@
 ---
 title: "Building Aptos From Source"
-slug: "build-from-source"
 ---
 
 import Tabs from '@theme/Tabs';
@@ -8,7 +7,7 @@ import TabItem from '@theme/TabItem';
 
 # Building Aptos From Source
 
-[Binary releases are available](../cli-tools/aptos-cli-tool/index.md), but if you want to build from source or develop on the Aptos tools, this is how.
+[Binary releases are available](../tools/install-cli/index.md), but if you want to build from source or develop on the Aptos tools, this is how.
 
 ## Supported operating systems
 

@@ -8,7 +8,7 @@ slug: "start-building"
 To start developing smart contracts on the Aptos blockchain, we recommend the following resources:
 
 - [The Move Book](../book/SUMMARY.md)
-- [Aptos CLI Move commands](../../cli-tools/aptos-cli-tool/use-aptos-cli.md#move-examples)
+- [Aptos CLI Move commands](../../tools/aptos-cli-tool/use-aptos-cli.md#move-examples)
 - [Aptos Move Examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples)
 - [End-to-End Aptos Move Tests](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/e2e-move-tests/src/tests)
 - [Move language channel](https://discord.com/channels/945856774056083548/955573698868432896) in [Aptos Discord](https://discord.gg/aptoslabs).
@@ -20,7 +20,7 @@ Use these tools to enhance your Move development experience.
 
 ### Aptos CLI
 
-The [Aptos command line interface](../../cli-tools/aptos-cli-tool/index.md) (CLI) helps you test development, as many of the functions in our SDKs have corresponding commands.
+The [Aptos command line interface](../../tools/install-cli/index.md) (CLI) helps you test development, as many of the functions in our SDKs have corresponding commands.
 
 
 ### Aptos Simulation API
@@ -29,7 +29,7 @@ Use the [Aptos Simulation API](../../concepts/gas-txn-fee.md#estimating-the-gas-
 
 ### Move Prover
 
-Install the [Move Prover](../../cli-tools/install-move-prover.md) dependencies after installing the Aptos CLI If you want to use the Move Prover to validate your Move code.
+Install the [Move Prover](../../tools/install-cli/install-move-prover.md) dependencies after installing the Aptos CLI If you want to use the Move Prover to validate your Move code.
 
 ### Move Debugger
 

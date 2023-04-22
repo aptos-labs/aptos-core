@@ -44,7 +44,7 @@ See [Aptos Blockchain Deep Dive](./blockchain.md) for a comprehensive descriptio
 
 ### Contents of a Transaction
 
-A [signed transaction](../guides/sign-a-transaction.md) on the blockchain contains the following information:
+A [signed transaction](../integration/sign-a-transaction.md) on the blockchain contains the following information:
 
 - **Signature**: The sender uses a digital signature to verify that they signed the transaction (i.e., authentication).
 - **Sender address**: The sender's [account address](./accounts.md#account-address).

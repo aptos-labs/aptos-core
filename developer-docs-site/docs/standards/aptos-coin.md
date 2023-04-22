@@ -1,6 +1,5 @@
 ---
 title: "Aptos Coin"
-id: "aptos-coin"
 ---
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';

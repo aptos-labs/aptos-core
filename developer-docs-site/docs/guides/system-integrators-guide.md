@@ -35,15 +35,15 @@ There are four well-supported networks for integrating with the Aptos blockchain
 1. [Testnet](https://fullnode.testnet.aptoslabs.com/v1/spec#/) -- a shared resource for the community, data will be preserved, network configuration will mimic Mainnet.
 1. [Mainnet](https://fullnode.mainnet.aptoslabs.com/v1/spec#/) -- a production network with real assets.
 
-See [Aptos Blockchain Deployments](../nodes/aptos-deployments.md) for full details on each environment. See [Check out release branch](./getting-started.md#check-out-release-branch) for the commands to download the versions of Aptos tied to those networks.
+See [Aptos Blockchain Deployments](../nodes/deployments.md) for full details on each environment.
 
 ### Run a local testnet
 
 There are two options for running a local testnet:
 * Directly [run a local testnet](../nodes/local-testnet/run-a-local-testnet.md) using either the [Aptos-core source code](../nodes/local-testnet/run-a-local-testnet.md#using-the-aptos-core-source-code) or a [Docker image](../nodes/local-testnet/run-a-local-testnet.md#using-docker). These paths are useful for testing changes to the Aptos-core codebase or framework, or for building services on top of the Aptos blockchain, respectively.
-* [Install the Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md) and 2) start a [local node with a faucet](../nodes/local-testnet/using-cli-to-run-a-local-testnet.md#starting-a-local-testnet-with-a-faucet). This path is useful for developing on the Aptos blockchain, debugging Move contracts, and testing node operations.
+* [Install the Aptos CLI](../tools/install-cli/index.md) and 2) start a [local node with a faucet](../nodes/local-testnet/using-cli-to-run-a-local-testnet.md#starting-a-local-testnet-with-a-faucet). This path is useful for developing on the Aptos blockchain, debugging Move contracts, and testing node operations.
 
-Either of these methods will expose a [REST API service](./aptos-apis.md) at `http://127.0.0.1:8080` and a Faucet API service at `http://127.0.0.1:8000` for option 1 run a local testnet or `http://127.0.0.1:8081` for option 2 install the Aptos CLI. The applications will output the location of the services.
+Either of these methods will expose a [REST API service](../integration/aptos-apis.md) at `http://127.0.0.1:8080` and a Faucet API service at `http://127.0.0.1:8000` for option 1 run a local testnet or `http://127.0.0.1:8081` for option 2 install the Aptos CLI. The applications will output the location of the services.
 
 ### Production network access
 
@@ -84,7 +84,7 @@ Aptos currently provides three SDKs:
 2. [Python](../sdks/python-sdk.md)
 3. [Rust](../sdks/rust-sdk.md)
 
-Almost all developers will benefit from exploring the CLI. [Using the CLI](../cli-tools/aptos-cli-tool/use-aptos-cli.md) demonstrates how the CLI can be used to which includes creating accounts, transferring coins, and publishing modules.
+Almost all developers will benefit from exploring the CLI. [Using the CLI](../tools/aptos-cli-tool/use-aptos-cli.md) demonstrates how the CLI can be used to which includes creating accounts, transferring coins, and publishing modules.
 
 ## Accounts on Aptos
 
@@ -98,7 +98,7 @@ At creation, an [Aptos account](https://github.com/aptos-labs/aptos-core/blob/88
 * An [event handle](../concepts/events.md) for all new types of coins added to the account.
 * An event handle for all key rotations for the account.
 
-Read more about [Accounts](../concepts/accounts.md) and [set one up](../cli-tools/aptos-cli-tool/use-aptos-cli#initialize-local-configuration-and-create-an-account).
+Read more about [Accounts](../concepts/accounts.md) and [set one up](../tools/aptos-cli-tool/use-aptos-cli#initialize-local-configuration-and-create-an-account).
 
 ## Transactions
 
@@ -502,7 +502,7 @@ To learn more about coin creation, make ["Your First Coin"](../tutorials/first-c
 
 ## Integrating with the faucet
 
-This tutorial is for SDK and wallet developers who want to integrate with the [Aptos Faucet](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos-faucet). If you are a dapp developer, you should access the faucet through an existing [SDK](../tutorials/first-transaction.md) or [CLI](../cli-tools/aptos-cli-tool/use-aptos-cli#initialize-local-configuration-and-create-an-account) instead.
+This tutorial is for SDK and wallet developers who want to integrate with the [Aptos Faucet](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos-faucet). If you are a dapp developer, you should access the faucet through an existing [SDK](../tutorials/first-transaction.md) or [CLI](../tools/aptos-cli-tool/use-aptos-cli#initialize-local-configuration-and-create-an-account) instead.
 
 ### Differences between devnet and testnet
 What are the differences between devnet and testnet? Effectively none. In the past, the testnet faucet had a Captcha in front of it, making it unqueryable by normal means. This is no longer true.

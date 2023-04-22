@@ -98,18 +98,23 @@ const config = {
           {
             type: "dropdown",
             label: "Start",
-            to: "concepts",
+            to: "aptos-white-paper",
             position: "left",
             items: [
-              {
-                label: "Learn Aptos Concepts",
-                type: "doc",
-                docId: "concepts/index",
-              },
               {
                 label: "Read the Aptos White Paper",
                 type: "doc",
                 docId: "aptos-white-paper/index",
+              },
+              {
+                label: "Learn about Aptos",
+                type: "doc",
+                docId: "concepts/index",
+              },
+              {
+                label: "Explore Aptos",
+                type: "doc",
+                docId: "guides/explore-aptos",
               },
               {
                 label: "Latest Releases",
@@ -117,9 +122,9 @@ const config = {
                 docId: "releases/index",
               },
               {
-                label: "Explore Aptos",
+                label: "Deployments",
                 type: "doc",
-                docId: "guides/explore-aptos",
+                docId: "nodes/deployments",
               },
               {
                 label: "Integrate with Aptos",
@@ -131,17 +136,12 @@ const config = {
           {
             type: "dropdown",
             label: "Build",
-            to: "guides/getting-started",
+            to: "tutorials",
             position: "left",
             items: [
               {
-                label: "Prepare Your Environment",
                 type: "doc",
-                docId: "guides/getting-started",
-              },
-              {
-                type: "doc",
-                label: "Learn from Onboarding Tutorials",
+                label: "Start with Onboarding Tutorials",
                 docId: "tutorials/index",
               },
               {
@@ -151,18 +151,18 @@ const config = {
               },
               {
                 type: "doc",
-                label: "Follow the Aptos Standards",
-                docId: "concepts/coin-and-token/index",
+                label: "Embrace the Aptos Standards",
+                docId: "standards/index",
               },
               {
                 type: "doc",
-                label: "Interact with the Blockchain",
-                docId: "guides/index",
+                label: "Integrate with Aptos",
+                docId: "integration/index",
               },
               {
                 type: "doc",
-                label: "Integrate with Wallets",
-                docId: "concepts/wallet-adapter-concept",
+                label: "Configure Your Environment",
+                docId: "/category/environment",
               },
               {
                 type: "doc",
@@ -186,11 +186,6 @@ const config = {
                 label: "Learn about Nodes",
                 type: "doc",
                 docId: "nodes/nodes-landing",
-              },
-              {
-                type: "doc",
-                label: "Develop Locally",
-                docId: "nodes/local-testnet/index",
               },
               {
                 label: "Run a Validator",
@@ -229,11 +224,6 @@ const config = {
                 label: "Aptos REST API Spec",
                 type: "doc",
                 docId: "nodes/aptos-api-spec",
-              },
-              {
-                label: "Aptos SDKs",
-                type: "doc",
-                docId: "sdks/index",
               },
               {
                 label: "Aptos Move Framework",
@@ -345,32 +335,7 @@ const config = {
     [
       "@docusaurus/plugin-client-redirects",
       {
-        redirects: [
-          {
-            to: "/concepts",
-            from: ["/concepts/aptos-concepts", "/whats-new-in-docs"],
-          },
-          {
-            to: "/concepts/blockchain",
-            from: ["/guides/basics-life-of-txn"],
-          },
-          {
-            to: "/move/book/package-upgrades",
-            from: "/move/upgrading-move-code",
-          },
-          {
-            to: "/move/book/packages",
-            from: "/move/bytecode-dependencies",
-          },
-          {
-            to: "/move/mint-nft-cli",
-            from: "/concepts/coin-and-token/nft-airdrop-example",
-          },
-          {
-            to: "/move/move-on-aptos",
-            from: "/guides/interacting-with-the-blockchain",
-          },
-        ],
+        redirects: [],
         createRedirects(existingPath) {
           if (existingPath.includes("/move")) {
             return [
