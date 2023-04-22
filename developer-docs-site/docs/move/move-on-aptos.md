@@ -46,3 +46,27 @@ The Aptos framework ships with many useful libraries:
 * A [timestamp service](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/timestamp.move) that provides a monotonically increasing clock that maps to the actual current unixtime
 
 With updates frequently.
+
+## More Resources
+
+To start developing smart contracts on the Aptos blockchain, we recommend the following resources:
+
+- [Aptos Move Examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples)
+- [End-to-End Aptos Move Tests](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/e2e-move-tests/src/tests)
+- [Move language channel](https://discord.com/channels/945856774056083548/955573698868432896) in [Aptos Discord](https://discord.gg/aptoslabs).
+- [Aptos Move Framework](../reference/move.md).
+
+There are several IDE plugins available for Aptos and the Move language:
+
+- [Syntax highlighting for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=damirka.move-syntax)
+- [Move language plugin for Jetbrains IDEs](https://plugins.jetbrains.com/plugin/14721-move-language): Supports syntax highlighting, code navigation, renames, formatting, type checks and code generation.
+- [Remix IDE Plugin](../community/contributions/remix-ide-plugin.md): Offers a web-based development environment. It is a no-setup tool with a graphical interface for developing Move modules.
+
+Use these external resources to learn about the Move programming language:
+
+* [Teach yourself Move on Aptos](https://github.com/econia-labs/teach-yourself-move).
+* [Formal Verification, the Move Language, and the Move Prover](https://www.certik.com/resources/blog/2wSOZ3mC55AB6CYol6Q2rP-formal-verification-the-move-language-and-the-move-prover)
+* [IMCODING Move Tutorials](https://imcoding.online/courses/move-language)
+* [Pontem Move Playground](https://playground.pontem.network/)
+* [Collection of nestable Move resources](https://github.com/taoheorg/taohe)
+* [Move-Lang tag on Stack Overflow](https://stackoverflow.com/questions/tagged/move-lang)
