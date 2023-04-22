@@ -305,14 +305,10 @@ impl AptosVM {
         // Also, it is worth mentioning that current VM error handling is
         // rather ugly and has a lot of legacy code. This makes proper error
         // handling quite challenging.
-        let delta_write_set_mut = user_txn_change_set_ext
+        let delta_write_set = user_txn_change_set_ext
             .delta_change_set()
             .clone()
-            .try_into_write_set_mut(storage)
-            .expect("something terrible happened when applying aggregator deltas");
-        let delta_write_set = delta_write_set_mut
-            .freeze()
-            .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, None))?;
+            .try_into_write_set(storage)?;
         let storage_with_changes =
             DeltaStateView::new(&storage_with_changes, &delta_write_set).into_move_resolver();
 
@@ -661,14 +657,10 @@ impl AptosVM {
 
         let storage_with_changes =
             DeltaStateView::new(storage, inner_function_change_set_ext.write_set());
-        let delta_write_set_mut = inner_function_change_set_ext
+        let delta_write_set = inner_function_change_set_ext
             .delta_change_set()
             .clone()
-            .try_into_write_set_mut(storage)
-            .expect("something terrible happened when applying aggregator deltas");
-        let delta_write_set = delta_write_set_mut
-            .freeze()
-            .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, None))?;
+            .try_into_write_set(storage)?;
         let storage_with_changes =
             DeltaStateView::new(&storage_with_changes, &delta_write_set).into_move_resolver();
         let resolver = self.0.new_move_resolver(&storage_with_changes);
