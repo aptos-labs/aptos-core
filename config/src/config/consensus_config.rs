@@ -357,7 +357,7 @@ impl ConfigSanitizer for ConsensusConfig {
     ) -> Result<(), Error> {
         let sanitizer_name = Self::get_sanitizer_name();
 
-        // Verify that the safety rules config is valid
+        // Verify that the safety rules and quorum store configs are valid
         SafetyRulesConfig::sanitize(node_config, node_type, chain_id)?;
         QuorumStoreConfig::sanitize(node_config, node_type, chain_id)?;
 

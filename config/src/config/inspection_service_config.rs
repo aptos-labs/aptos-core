@@ -2,11 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::{config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig},
+    config::{
+        config_optimizer::ConfigOptimizer, config_sanitizer::ConfigSanitizer,
+        node_config_loader::NodeType, Error, NodeConfig,
+    },
     utils,
 };
 use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
+use serde_yaml::Value;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -54,15 +58,131 @@ impl ConfigSanitizer for InspectionServiceConfig {
             ));
         }
 
-        // TODO: Verify that system information is not exposed for mainnet validators
-
         Ok(())
+    }
+}
+
+impl ConfigOptimizer for InspectionServiceConfig {
+    fn optimize(
+        node_config: &mut NodeConfig,
+        local_config_yaml: &Value,
+        _node_type: NodeType,
+        chain_id: ChainId,
+    ) -> Result<bool, Error> {
+        let inspection_service_config = &mut node_config.inspection_service;
+        let local_inspection_config_yaml = &local_config_yaml["inspection_service"];
+
+        // Enable all endpoints for non-mainnet nodes (to aid debugging)
+        let mut modified_config = false;
+        if !chain_id.is_mainnet() {
+            if local_inspection_config_yaml["expose_configuration"].is_null() {
+                inspection_service_config.expose_configuration = true;
+                modified_config = true;
+            }
+
+            if local_inspection_config_yaml["expose_system_information"].is_null() {
+                inspection_service_config.expose_system_information = true;
+                modified_config = true;
+            }
+        }
+
+        Ok(modified_config)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_optimize_mainnet_config() {
+        // Create an inspection service config with all endpoints disabled
+        let mut node_config = NodeConfig {
+            inspection_service: InspectionServiceConfig {
+                expose_configuration: false,
+                expose_system_information: false,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Optimize the config and verify no modifications are made
+        let modified_config = InspectionServiceConfig::optimize(
+            &mut node_config,
+            &serde_yaml::from_str("{}").unwrap(), // An empty local config,
+            NodeType::PublicFullnode,
+            ChainId::mainnet(),
+        )
+        .unwrap();
+        assert!(!modified_config);
+
+        // Verify both endpoints are still disabled
+        assert!(!node_config.inspection_service.expose_configuration);
+        assert!(!node_config.inspection_service.expose_system_information);
+    }
+
+    #[test]
+    fn test_optimize_testnet_config() {
+        // Create an inspection service config with all endpoints disabled
+        let mut node_config = NodeConfig {
+            inspection_service: InspectionServiceConfig {
+                expose_configuration: false,
+                expose_system_information: false,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Optimize the config and verify modifications are made
+        let modified_config = InspectionServiceConfig::optimize(
+            &mut node_config,
+            &serde_yaml::from_str("{}").unwrap(), // An empty local config,
+            NodeType::PublicFullnode,
+            ChainId::testnet(),
+        )
+        .unwrap();
+        assert!(modified_config);
+
+        // Verify both endpoints are now enabled
+        assert!(node_config.inspection_service.expose_configuration);
+        assert!(node_config.inspection_service.expose_system_information);
+    }
+
+    #[test]
+    fn test_optimize_testnet_partial_config() {
+        // Create an inspection service config with all endpoints disabled
+        let mut node_config = NodeConfig {
+            inspection_service: InspectionServiceConfig {
+                expose_configuration: false,
+                expose_system_information: false,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Create a local config YAML with the configuration endpoint disabled
+        let local_config_yaml = serde_yaml::from_str(
+            r#"
+            inspection_service:
+                expose_configuration: false
+            "#,
+        )
+        .unwrap();
+
+        // Optimize the config and verify modifications are made
+        let modified_config = InspectionServiceConfig::optimize(
+            &mut node_config,
+            &local_config_yaml,
+            NodeType::PublicFullnode,
+            ChainId::testnet(),
+        )
+        .unwrap();
+        assert!(modified_config);
+
+        // Verify only the system information endpoint is now enabled
+        assert!(!node_config.inspection_service.expose_configuration);
+        assert!(node_config.inspection_service.expose_system_information);
+    }
 
     #[test]
     fn test_sanitize_valid_service_config() {
