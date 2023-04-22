@@ -1,16 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    config::{
-        node_config_loader::NodeType, ApiConfig, BaseConfig, ConsensusConfig, Error,
-        ExecutionConfig, IndexerConfig, IndexerGrpcConfig, InspectionServiceConfig, LoggerConfig,
-        MempoolConfig, NodeConfig, PeerMonitoringServiceConfig, StateSyncConfig, StorageConfig,
-    },
-    network_id::NetworkId,
+use crate::config::{
+    node_config_loader::NodeType,
+    utils::{are_failpoints_enabled, get_config_name},
+    ApiConfig, BaseConfig, ConsensusConfig, Error, ExecutionConfig, IndexerConfig,
+    IndexerGrpcConfig, InspectionServiceConfig, LoggerConfig, MempoolConfig, NodeConfig,
+    PeerMonitoringServiceConfig, StateSyncConfig, StorageConfig,
 };
 use aptos_types::chain_id::ChainId;
-use cfg_if::cfg_if;
 use std::collections::HashSet;
 
 // Useful sanitizer constants
@@ -27,7 +25,7 @@ pub trait ConfigSanitizer {
         config_name + SANITIZER_STRING
     }
 
-    /// Validate and process the config according to the given node role and chain ID
+    /// Validate and process the config according to the given node type and chain ID
     fn sanitize(
         _node_config: &mut NodeConfig,
         _node_type: NodeType,
@@ -62,25 +60,6 @@ impl ConfigSanitizer for NodeConfig {
 
         Ok(()) // All configs passed validation
     }
-}
-
-/// Returns true iff failpoints are enabled
-fn are_failpoints_enabled() -> bool {
-    cfg_if! {
-        if #[cfg(feature = "failpoints")] {
-            true
-        } else {
-            false
-        }
-    }
-}
-
-/// Returns the name of the given config type
-fn get_config_name<T: ?Sized>() -> &'static str {
-    std::any::type_name::<T>()
-        .split("::")
-        .last()
-        .unwrap_or("UnknownConfig")
 }
 
 /// Sanitize the failpoints config according to the node role and chain ID
@@ -193,10 +172,10 @@ fn sanitize_validator_network_config(
     if let Some(validator_network_config) = validator_network {
         let network_id = validator_network_config.network_id;
         if !network_id.is_validator_network() {
-            // TODO: improve the defaults!
-            // We must override the network ID to be a validator
-            // network ID as the config defaults to a public network ID.
-            validator_network_config.network_id = NetworkId::Validator;
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "The validator network config must have a validator network ID!".into(),
+            ));
         }
 
         // Verify that the node is a validator
@@ -209,9 +188,10 @@ fn sanitize_validator_network_config(
 
         // Ensure that mutual authentication is enabled
         if !validator_network_config.mutual_authentication {
-            // TODO: improve the defaults!
-            // We must enable mutual authentication for validators
-            validator_network_config.mutual_authentication = true;
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "Mutual authentication must be enabled for the validator network!".into(),
+            ));
         }
 
         // Prepare the network id
@@ -252,7 +232,7 @@ mod tests {
             ..Default::default()
         };
 
-        // Sanitize the config and verify that it fails
+        // Sanitize the PFN config and verify that it fails
         let error = sanitize_fullnode_network_configs(
             &mut node_config,
             NodeType::ValidatorFullnode,
@@ -362,16 +342,34 @@ mod tests {
             ..Default::default()
         };
 
-        // Sanitize the config
-        sanitize_validator_network_config(
+        // Sanitize the config and verify that it fails
+        let error = sanitize_validator_network_config(
             &mut node_config,
             NodeType::Validator,
             ChainId::testnet(),
         )
-        .unwrap();
+        .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
 
-        // Verify that mutual authentication is now enabled
-        let validator_network = node_config.validator_network.unwrap();
-        assert!(validator_network.mutual_authentication);
+    #[test]
+    fn test_sanitize_validator_incorrect_network_id() {
+        // Create a validator config with the wrong network ID
+        let mut node_config = NodeConfig {
+            validator_network: Some(NetworkConfig {
+                network_id: NetworkId::Public,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error = sanitize_validator_network_config(
+            &mut node_config,
+            NodeType::Validator,
+            ChainId::testnet(),
+        )
+        .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
     }
 }
