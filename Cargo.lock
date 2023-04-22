@@ -4189,30 +4189,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3b5ca7a04898ad4bcd41c90c5285445ff5b791899bb1b0abdd2a2aa791211d7"
 
 [[package]]
-name = "bytecode-interpreter-crypto"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "curve25519-dalek-fiat",
- "ed25519-dalek-fiat",
- "sha2 0.9.9",
- "sha3 0.9.1",
-]
-
-[[package]]
-name = "bytecode-interpreter-testsuite"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "datatest-stable",
- "move-command-line-common",
- "move-prover-test-utils",
- "move-stackless-bytecode-interpreter",
- "move-stdlib",
- "move-unit-test",
-]
-
-[[package]]
 name = "bytecode-verifier-libfuzzer"
 version = "0.0.0"
 dependencies = [
@@ -5057,20 +5033,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "curve25519-dalek-fiat"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44339b9ecede7f72a0d3b012bf9bb5a616dc8bfde23ce544e42da075c87198f0"
-dependencies = [
- "byteorder",
- "digest 0.9.0",
- "fiat-crypto",
- "rand_core 0.6.4",
- "subtle",
- "zeroize",
-]
-
-[[package]]
 name = "darling"
 version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5456,21 +5418,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ed25519-dalek-fiat"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97c6ac152eba578c1c53d2cefe8ad02e239e3d6f971b0f1ef3cb54cd66037fa0"
-dependencies = [
- "curve25519-dalek-fiat",
- "ed25519",
- "rand 0.8.5",
- "serde 1.0.149",
- "serde_bytes",
- "sha2 0.9.9",
- "zeroize",
-]
-
-[[package]]
 name = "either"
 version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5798,12 +5745,6 @@ checksum = "a7a407cfaa3385c4ae6b23e84623d48c2798d06e3e6a1878f7f59f17b3f86499"
 dependencies = [
  "instant",
 ]
-
-[[package]]
-name = "fiat-crypto"
-version = "0.1.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "35354cf6bf9d259374646f419a25c7dd0bb208d291e44dc73db557542fe017fc"
 
 [[package]]
 name = "field_count"
@@ -8385,25 +8326,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "move-stackless-bytecode-interpreter"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bytecode-interpreter-crypto",
- "clap 3.2.23",
- "codespan-reporting",
- "datatest-stable",
- "itertools",
- "move-binary-format",
- "move-core-types",
- "move-model",
- "move-prover-test-utils",
- "move-stackless-bytecode",
- "num",
- "serde 1.0.149",
-]
-
-[[package]]
 name = "move-stdlib"
 version = "0.1.1"
 dependencies = [
@@ -8525,7 +8447,6 @@ dependencies = [
  "move-ir-compiler",
  "move-ir-types",
  "move-resource-viewer",
- "move-stackless-bytecode-interpreter",
  "move-stdlib",
  "move-symbol-pool",
  "move-vm-runtime",
@@ -8559,7 +8480,6 @@ dependencies = [
  "move-ir-types",
  "move-model",
  "move-resource-viewer",
- "move-stackless-bytecode-interpreter",
  "move-stdlib",
  "move-symbol-pool",
  "move-table-extension",
@@ -11248,20 +11168,6 @@ checksum = "66d72b759436ae32898a2af0a14218dbf55efde3feeb170eb623637db85ee1e0"
 dependencies = [
  "libc",
  "winapi 0.3.9",
-]
-
-[[package]]
-name = "spec-flatten"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap 3.2.23",
- "itertools",
- "move-compiler",
- "move-model",
- "move-prover",
- "move-stackless-bytecode",
- "pretty",
 ]
 
 [[package]]

@@ -389,13 +389,13 @@ pub enum ExpData {
     /// Represents an invocation of a function value, as a lambda.
     Invoke(NodeId, Exp, Vec<Exp>),
     /// Represents a lambda.
-    Lambda(NodeId, Vec<LocalVarDecl>, Exp),
+    Lambda(NodeId, Pattern, Exp),
     /// Represents a quantified formula over multiple variables and ranges.
     Quant(
         NodeId,
         QuantKind,
         /// Ranges
-        Vec<(LocalVarDecl, Exp)>,
+        Vec<(Pattern, Exp)>,
         /// Triggers
         Vec<Vec<Exp>>,
         /// Optional `where` clause
@@ -403,9 +403,9 @@ pub enum ExpData {
         /// Body
         Exp,
     ),
-    /// Represents a block which contains a set of variable bindings and an expression
-    /// for which those are defined.
-    Block(NodeId, Vec<LocalVarDecl>, Exp),
+    /// Represents a block `Block(id, pattern, optional_binding, scope)` which binds
+    /// a pattern, making the bound variables available in scope.
+    Block(NodeId, Pattern, Option<Exp>, Exp),
     /// Represents a conditional.
     IfElse(NodeId, Exp, Exp, Exp),
 
@@ -540,10 +540,13 @@ impl ExpData {
         let mut visitor = |up: bool, e: &ExpData| {
             use ExpData::*;
             let decls = match e {
-                Lambda(_, decls, _) | Block(_, decls, _) => {
-                    decls.iter().map(|d| d.name).collect_vec()
+                Lambda(_, pat, _) | Block(_, pat, _, _) => {
+                    pat.vars().iter().map(|(_, d)| *d).collect_vec()
                 },
-                Quant(_, _, decls, ..) => decls.iter().map(|(d, _)| d.name).collect_vec(),
+                Quant(_, _, ranges, ..) => ranges
+                    .iter()
+                    .flat_map(|(pat, _)| pat.vars().into_iter().map(|(_, name)| name))
+                    .collect_vec(),
                 _ => vec![],
             };
             if !up {
@@ -682,10 +685,7 @@ impl ExpData {
             },
             Lambda(_, _, body) => body.visit_pre_post(visitor),
             Quant(_, _, ranges, triggers, condition, body) => {
-                for (decl, range) in ranges {
-                    if let Some(binding) = &decl.binding {
-                        binding.visit_pre_post(visitor);
-                    }
+                for (_, range) in ranges {
                     range.visit_pre_post(visitor);
                 }
                 for trigger in triggers {
@@ -698,11 +698,9 @@ impl ExpData {
                 }
                 body.visit_pre_post(visitor);
             },
-            Block(_, decls, body) => {
-                for decl in decls {
-                    if let Some(def) = &decl.binding {
-                        def.visit_pre_post(visitor);
-                    }
+            Block(_, _, binding, body) => {
+                if let Some(exp) = binding {
+                    exp.visit_pre_post(visitor)
                 }
                 body.visit_pre_post(visitor)
             },
@@ -984,15 +982,6 @@ pub enum Operation {
 /// A label used for referring to a specific memory in Global and Exists expressions.
 pub type MemoryLabel = GlobalId;
 
-/// Declaration of local variable with an optional binding. The type is annotated at the
-/// declaration.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct LocalVarDecl {
-    pub id: NodeId,
-    pub name: Symbol,
-    pub binding: Option<Exp>,
-}
-
 /// A pattern, either a variable, a tuple, or a struct instantiation applied to a sequence of patterns.
 /// Carries a node_id which has (at least) a type and location.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -1005,11 +994,31 @@ pub enum Pattern {
 }
 
 impl Pattern {
+    /// Returns the node id of the pattern.
+    pub fn node_id(&self) -> NodeId {
+        match self {
+            Pattern::Var(id, _)
+            | Pattern::Wildcard(id)
+            | Pattern::Tuple(id, _)
+            | Pattern::Struct(id, _, _)
+            | Pattern::Error(id) => *id,
+        }
+    }
+
     /// Returns the variables in this pattern, per node_id and name.
     pub fn vars(&self) -> Vec<(NodeId, Symbol)> {
         let mut result = vec![];
         Self::collect_vars(&mut result, self);
         result
+    }
+
+    /// Returns true if this pattern is a simple variable or tuple of variables.
+    pub fn is_simple_decl(&self) -> bool {
+        match self {
+            Pattern::Var(..) => true,
+            Pattern::Tuple(_, pats) => pats.iter().all(|p| matches!(p, Pattern::Var(..))),
+            _ => false,
+        }
     }
 
     fn collect_vars(r: &mut Vec<(NodeId, Symbol)>, p: &Pattern) {
@@ -1321,18 +1330,23 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
                     self.fmt_exps(args)
                 )
             },
-            Lambda(_, decls, body) => {
-                write!(f, "|{}| {}", self.fmt_decls(decls), body.display(self.env))
+            Lambda(_, pat, body) => {
+                write!(f, "|{}| {}", self.fmt_pattern(pat), body.display(self.env))
             },
-            Block(_, decls, body) => {
+            Block(_, pat, binding, body) => {
                 write!(
                     f,
-                    "{{let {}; {}}}",
-                    self.fmt_decls(decls),
+                    "{{let {}{}; {}}}",
+                    self.fmt_pattern(pat),
+                    if let Some(exp) = binding {
+                        format!(" = {}", exp.display(self.env))
+                    } else {
+                        "".to_string()
+                    },
                     body.display(self.env)
                 )
             },
-            Quant(_, kind, decls, triggers, opt_where, body) => {
+            Quant(_, kind, ranges, triggers, opt_where, body) => {
                 let triggers_str = triggers
                     .iter()
                     .map(|trigger| format!("{{{}}}", self.fmt_exps(trigger)))
@@ -1347,7 +1361,7 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
                     f,
                     "{} {}{}{}: {}",
                     kind,
-                    self.fmt_quant_decls(decls),
+                    self.fmt_quant_ranges(ranges),
                     triggers_str,
                     where_str,
                     body.display(self.env)
@@ -1388,19 +1402,6 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
 }
 
 impl<'a> ExpDisplay<'a> {
-    fn fmt_decls(&self, decls: &[LocalVarDecl]) -> String {
-        decls.iter().map(|decl| self.fmt_decl(decl)).join(", ")
-    }
-
-    fn fmt_decl(&self, decl: &LocalVarDecl) -> String {
-        let binding = if let Some(exp) = &decl.binding {
-            format!(" = {}", exp.display(self.env))
-        } else {
-            "".to_string()
-        };
-        format!("{}{}", decl.name.display(self.env.symbol_pool()), binding)
-    }
-
     fn fmt_patterns(&self, patterns: &[Pattern]) -> String {
         patterns.iter().map(|pat| self.fmt_pattern(pat)).join(", ")
     }
@@ -1448,16 +1449,10 @@ impl<'a> ExpDisplay<'a> {
         }
     }
 
-    fn fmt_quant_decls(&self, decls: &[(LocalVarDecl, Exp)]) -> String {
-        decls
+    fn fmt_quant_ranges(&self, ranges: &[(Pattern, Exp)]) -> String {
+        ranges
             .iter()
-            .map(|(decl, domain)| {
-                format!(
-                    "{}: {}",
-                    decl.name.display(self.env.symbol_pool()),
-                    domain.display(self.env)
-                )
-            })
+            .map(|(pat, domain)| format!("{}: {}", self.fmt_pattern(pat), domain.display(self.env)))
             .join(", ")
     }
 
