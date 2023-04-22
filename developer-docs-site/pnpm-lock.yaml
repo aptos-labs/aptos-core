@@ -82,6 +82,9 @@ dependencies:
   stream:
     specifier: ^0.0.2
     version: 0.0.2
+  ts-node:
+    specifier: ^10.9.1
+    version: 10.9.1(@types/node@18.15.13)(typescript@4.8.2)
   unist-util-visit:
     specifier: 4.1.0
     version: 4.1.0
