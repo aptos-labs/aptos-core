@@ -29,7 +29,7 @@ import pathlib
 import shutil
 import sys
 
-from cases.account import test_account_create, test_account_fund_with_faucet
+from cases.account import test_account_create, test_account_fund_with_faucet, test_account_lookup_address
 from cases.init import test_init
 from common import Network
 from local_testnet import run_node, stop_node, wait_for_startup
@@ -102,6 +102,7 @@ def run_tests(run_helper):
     # Run account tests.
     test_account_fund_with_faucet(run_helper)
     test_account_create(run_helper)
+    test_account_lookup_address(run_helper)
 
 
 def main():
