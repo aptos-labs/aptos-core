@@ -1462,11 +1462,11 @@ fn quorum_store_reconfig_enable_test(forge_config: ForgeConfig<'static>) -> Forg
 
 fn multi_region_multi_cloud_simulation_test(config: ForgeConfig<'static>) -> ForgeConfig<'static> {
     config
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
         .with_emit_job(
             EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad {
-                    mempool_backlog: 200_000,
+                    mempool_backlog: 600_000,
                 })
                 .txn_expiration_time_secs(5 * 60),
         )
