@@ -8,6 +8,7 @@ pub mod package_hooks;
 mod show;
 pub mod stored_package;
 mod transactional_tests_runner;
+mod disassembler;
 
 use crate::{
     account::derive_resource_account::ResourceAccountSeed,
@@ -70,6 +71,7 @@ use std::{
 pub use stored_package::*;
 use tokio::task;
 use transactional_tests_runner::TransactionalTestOpts;
+use crate::move_tool::disassembler::AptosDisassembler;
 
 /// Tool for Move related operations
 ///
@@ -84,6 +86,7 @@ pub enum MoveTool {
     #[clap(subcommand)]
     Coverage(coverage::CoveragePackage),
     CreateResourceAccountAndPublishPackage(CreateResourceAccountAndPublishPackage),
+    Disassemble(AptosDisassembler),
     Document(DocumentPackage),
     Download(DownloadPackage),
     Init(InitPackage),
@@ -110,6 +113,7 @@ impl MoveTool {
             MoveTool::CreateResourceAccountAndPublishPackage(tool) => {
                 tool.execute_serialized_success().await
             },
+            MoveTool::Disassemble(tool) => tool.execute_serialized().await,
             MoveTool::Document(tool) => tool.execute_serialized().await,
             MoveTool::Download(tool) => tool.execute_serialized().await,
             MoveTool::Init(tool) => tool.execute_serialized_success().await,
