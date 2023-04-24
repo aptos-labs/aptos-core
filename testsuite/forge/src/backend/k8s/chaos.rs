@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    dump_string_to_file, K8sSwarm, Result, Swarm, SwarmChaos, SwarmNetworkBandwidth,
-    SwarmNetworkDelay, SwarmNetworkLoss, SwarmNetworkPartition, KUBECTL_BIN, SwarmNetEm, SwarmCpuStress,
+    dump_string_to_file, K8sSwarm, Result, Swarm, SwarmChaos, SwarmCpuStress, SwarmNetEm,
+    SwarmNetworkBandwidth, SwarmNetworkDelay, SwarmNetworkLoss, SwarmNetworkPartition, KUBECTL_BIN,
 };
 use anyhow::bail;
 use aptos_logger::info;

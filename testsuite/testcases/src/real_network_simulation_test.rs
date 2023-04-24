@@ -3,8 +3,8 @@
 
 use crate::{LoadDestination, NetworkLoadTest};
 use aptos_forge::{
-    NetworkContext, NetworkTest, Swarm, SwarmChaos,
-    Test, GroupNetEm, SwarmNetEm, GroupCpuStress, SwarmCpuStress,
+    GroupCpuStress, GroupNetEm, NetworkContext, NetworkTest, Swarm, SwarmChaos, SwarmCpuStress,
+    SwarmNetEm, Test,
 };
 use aptos_logger::info;
 use aptos_types::PeerId;
@@ -21,13 +21,14 @@ macro_rules! FOUR_REGION_LINK_STATS_CSV {
     };
 }
 
-/// A test to simulate network between multiple regions in different clouds.
-/// It currently supports only 4 regions, due to ChaosMesh limitations.
-pub struct MultiRegionMultiCloudSimulationTest {}
+/// A test to simulate a real (e.g. mainnet, previewnet) network with multiple regions
+/// in different clouds and varying CPU performance. It currently supports only 4
+/// regions, due to ChaosMesh limitations.
+pub struct RealNetworkSimulationTest {}
 
-impl Test for MultiRegionMultiCloudSimulationTest {
+impl Test for RealNetworkSimulationTest {
     fn name(&self) -> &'static str {
-        "network::multi-region-multi-cloud-simulation"
+        "network::real-network-simulation"
     }
 }
 
@@ -83,28 +84,35 @@ fn create_multi_region_swarm_network_chaos(
             info!("netem {:?}", netem);
 
             netem
-        }).collect();
+        })
+        .collect();
 
-    let (mut self_delays, mut group_cpu_stresses): (Vec<GroupNetEm>, Vec<GroupCpuStress>) = validator_chunks.clone().zip(link_stats_table.iter().clone()).enumerate().map(|(idx, (chunk, (region, _)))| {
-        let cpu_stress = GroupCpuStress {
-            name: format!("{}-cpu-stress", region),
-            target_nodes: chunk.to_vec(),
-            num_workers: (number_of_regions - idx) as u64,
-            load_per_worker: 100,
-        };
-        let delay = GroupNetEm {
-            name: format!("{}-self-netem", region),
-            source_nodes: chunk.to_vec(),
-            target_nodes: chunk.to_vec(),
-            delay_latency_ms: 50,
-            delay_jitter_ms: 5,
-            delay_correlation_percentage: 50,
-            loss_percentage: 1,
-            loss_correlation_percentage: 50,
-            rate: 10 * 1000, // 10 Gbps
-        };
-        (delay, cpu_stress)
-    }).unzip();
+    let (mut self_delays, mut group_cpu_stresses): (Vec<GroupNetEm>, Vec<GroupCpuStress>) =
+        validator_chunks
+            .clone()
+            .zip(link_stats_table.iter().clone())
+            .enumerate()
+            .map(|(idx, (chunk, (region, _)))| {
+                let cpu_stress = GroupCpuStress {
+                    name: format!("{}-cpu-stress", region),
+                    target_nodes: chunk.to_vec(),
+                    num_workers: (number_of_regions - idx) as u64,
+                    load_per_worker: 100,
+                };
+                let delay = GroupNetEm {
+                    name: format!("{}-self-netem", region),
+                    source_nodes: chunk.to_vec(),
+                    target_nodes: chunk.to_vec(),
+                    delay_latency_ms: 50,
+                    delay_jitter_ms: 5,
+                    delay_correlation_percentage: 50,
+                    loss_percentage: 1,
+                    loss_correlation_percentage: 50,
+                    rate: 10 * 1000, // 10 Gbps
+                };
+                (delay, cpu_stress)
+            })
+            .unzip();
 
     let remainder = validator_chunks.remainder();
     let remaining_validators: Vec<PeerId> = validator_chunks
@@ -133,13 +141,11 @@ fn create_multi_region_swarm_network_chaos(
         SwarmNetEm {
             group_netems: itertools::concat(vec![self_delays, group_netems]),
         },
-        SwarmCpuStress {
-            group_cpu_stresses,
-        }
+        SwarmCpuStress { group_cpu_stresses },
     )
 }
 
-impl NetworkLoadTest for MultiRegionMultiCloudSimulationTest {
+impl NetworkLoadTest for RealNetworkSimulationTest {
     fn setup(&self, ctx: &mut NetworkContext) -> anyhow::Result<LoadDestination> {
         let all_validators = ctx
             .swarm()
@@ -165,7 +171,7 @@ impl NetworkLoadTest for MultiRegionMultiCloudSimulationTest {
     }
 }
 
-impl NetworkTest for MultiRegionMultiCloudSimulationTest {
+impl NetworkTest for RealNetworkSimulationTest {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> anyhow::Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx)
     }
@@ -174,32 +180,45 @@ impl NetworkTest for MultiRegionMultiCloudSimulationTest {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::vec;
 
     #[test]
     fn test_create_multi_region_swarm_network_chaos() {
         aptos_logger::Logger::new().init();
 
         let all_validators = (0..8).map(|_| PeerId::random()).collect();
-        let (delay, cpu_stress) = create_multi_region_swarm_network_chaos(all_validators);
+        let (netem, cpu_stress) = create_multi_region_swarm_network_chaos(all_validators);
 
-        assert_eq!(delay.group_network_delays.len(), 6);
-        assert_eq!(bandwidth.group_network_bandwidths.len(), 6);
+        assert_eq!(netem.group_netems.len(), 10);
+        assert_eq!(cpu_stress.group_cpu_stresses.len(), 4);
 
         let all_validators: Vec<PeerId> = (0..10).map(|_| PeerId::random()).collect();
-        let (delay, cpu_stress) = create_multi_region_swarm_network_chaos(all_validators);
+        let (netem, cpu_stress) = create_multi_region_swarm_network_chaos(all_validators.clone());
 
-        assert_eq!(delay.group_network_delays.len(), 6);
-        assert_eq!(bandwidth.group_network_bandwidths.len(), 6);
-        assert_eq!(delay.group_network_delays[0].source_nodes.len(), 4);
-        assert_eq!(delay.group_network_delays[0].target_nodes.len(), 2);
-        assert_eq!(
-            bandwidth.group_network_bandwidths[0],
-            GroupNetworkBandwidth {
-                name: "aws--ap-northeast-1-to-aws--eu-west-1-bandwidth".to_owned(),
-                rate: 5160960,
-                limit: 20971520,
-                buffer: 10000,
-            }
-        )
+        assert_eq!(netem.group_netems.len(), 10);
+        assert_eq!(cpu_stress.group_cpu_stresses.len(), 4);
+        assert_eq!(netem.group_netems[0].source_nodes.len(), 4);
+        assert_eq!(netem.group_netems[0].target_nodes.len(), 4);
+        assert_eq!(netem.group_netems[0], GroupNetEm {
+            name: "aws--ap-northeast-1-self-netem".to_owned(),
+            rate: 10000,
+            source_nodes: vec![
+                all_validators[0],
+                all_validators[1],
+                all_validators[8],
+                all_validators[9],
+            ],
+            target_nodes: vec![
+                all_validators[0],
+                all_validators[1],
+                all_validators[8],
+                all_validators[9],
+            ],
+            delay_latency_ms: 50,
+            delay_jitter_ms: 5,
+            delay_correlation_percentage: 50,
+            loss_percentage: 1,
+            loss_correlation_percentage: 50
+        })
     }
 }

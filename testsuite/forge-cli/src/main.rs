@@ -21,12 +21,12 @@ use aptos_testcases::{
     generate_traffic,
     load_vs_perf_benchmark::{LoadVsPerfBenchmark, TransactinWorkload, Workloads},
     modifiers::{ExecutionDelayConfig, ExecutionDelayTest},
-    multi_region_simulation_test::MultiRegionMultiCloudSimulationTest,
     network_bandwidth_test::NetworkBandwidthTest,
     network_loss_test::NetworkLossTest,
     network_partition_test::NetworkPartitionTest,
     performance_test::PerformanceBenchmark,
     quorum_store_onchain_enable_test::QuorumStoreOnChainEnableTest,
+    real_network_simulation_test::RealNetworkSimulationTest,
     reconfiguration_test::ReconfigurationTest,
     state_sync_performance::{
         StateSyncFullnodeFastSyncPerformance, StateSyncFullnodePerformance,
@@ -1470,7 +1470,7 @@ fn multi_region_multi_cloud_simulation_test(config: ForgeConfig<'static>) -> For
                 })
                 .txn_expiration_time_secs(5 * 60),
         )
-        .with_network_tests(vec![&MultiRegionMultiCloudSimulationTest {}])
+        .with_network_tests(vec![&RealNetworkSimulationTest {}])
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // no epoch change.
             helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
