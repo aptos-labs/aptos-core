@@ -175,6 +175,10 @@ impl FunctionTargetsHolder {
 
     /// Adds a new function target. The target will be initialized from the Move byte code.
     pub fn add_target(&mut self, func_env: &FunctionEnv<'_>) {
+        // Skip inlined functions, they do not have associated bytecode.
+        if func_env.is_inline() {
+            return;
+        }
         let generator = StacklessBytecodeGenerator::new(func_env);
         let data = generator.generate_function();
         self.targets
@@ -221,6 +225,10 @@ impl FunctionTargetsHolder {
         &'env self,
         func_env: &'env FunctionEnv<'env>,
     ) -> Vec<(FunctionVariant, FunctionTarget<'env>)> {
+        assert!(
+            !func_env.is_inline(),
+            "attempt to get bytecode function target for inline function"
+        );
         self.targets
             .get(&func_env.get_qualified_id())
             .expect("function targets exist")
@@ -324,9 +332,9 @@ impl FunctionTargetPipeline {
         for fun_id in targets.get_funs() {
             let src_idx = nodes.get(&fun_id).unwrap();
             let fun_env = env.get_function(fun_id);
-            for callee in fun_env.get_called_functions() {
+            for callee in fun_env.get_called_functions().expect("called functions") {
                 let dst_idx = nodes
-                    .get(&callee)
+                    .get(callee)
                     .expect("callee is not in function targets");
                 graph.add_edge(*src_idx, *dst_idx, ());
             }
@@ -346,7 +354,12 @@ impl FunctionTargetPipeline {
             for node_idx in scc {
                 let fun_id = *graph.node_weight(node_idx).unwrap();
                 let fun_env = env.get_function(fun_id);
-                if !is_cyclic && fun_env.get_called_functions().contains(&fun_id) {
+                if !is_cyclic
+                    && fun_env
+                        .get_called_functions()
+                        .expect("called functions")
+                        .contains(&fun_id)
+                {
                     is_cyclic = true;
                 }
                 let inserted = part.insert(fun_id);
@@ -393,7 +406,12 @@ impl FunctionTargetPipeline {
             let fun_env = env.get_function(fun);
             worklist.push((
                 fun,
-                fun_env.get_called_functions().into_iter().collect_vec(),
+                fun_env
+                    .get_called_functions()
+                    .expect("called functions")
+                    .iter()
+                    .cloned()
+                    .collect_vec(),
             ));
         }
 
@@ -453,7 +471,7 @@ impl FunctionTargetPipeline {
 
             // update the worklist
             for (_, callees) in worklist.iter_mut() {
-                callees.retain(|e| e != &call_id);
+                callees.retain(|e| *e != call_id);
             }
         }
 

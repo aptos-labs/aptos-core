@@ -7,8 +7,9 @@ use itertools::Itertools;
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 use move_compiler::parser::keywords::{BUILTINS, CONTEXTUAL_KEYWORDS, KEYWORDS};
+use move_core_types::account_address::AccountAddress;
 use move_model::{
-    ast::{ModuleName, SpecBlockInfo, SpecBlockTarget},
+    ast::{Address, ModuleName, SpecBlockInfo, SpecBlockTarget},
     code_writer::{CodeWriter, CodeWriterLabel},
     emit, emitln,
     model::{
@@ -18,7 +19,6 @@ use move_model::{
     symbol::Symbol,
     ty::TypeDisplayContext,
 };
-use num::BigUint;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -388,7 +388,7 @@ impl<'env> Docgen<'env> {
             info!(
                 "{} `{}` in file `{}/{}` {}",
                 Self::module_modifier(m.get_name()),
-                m.get_name().display_full(m.symbol_pool()),
+                m.get_name().display_full(m.env),
                 out_dir,
                 i.target_file,
                 if !m.is_target() {
@@ -529,7 +529,7 @@ impl<'env> Docgen<'env> {
             &format!(
                 "{} `{}`",
                 Self::module_modifier(module_env.get_name()),
-                module_env.get_name().display_full(module_env.symbol_pool())
+                module_env.get_name().display_full(module_env.env)
             ),
             &info.label,
         );
@@ -560,7 +560,7 @@ impl<'env> Docgen<'env> {
                     .env
                     .get_module(*id)
                     .get_name()
-                    .display_full(module_env.symbol_pool())
+                    .display_full(module_env.env)
                     .to_string()
             })
             .sorted();
@@ -570,7 +570,7 @@ impl<'env> Docgen<'env> {
         self.end_code();
 
         if self.options.include_dep_diagrams {
-            let module_name = module_env.get_name().display(module_env.symbol_pool());
+            let module_name = module_env.get_name().display(module_env.env);
             self.gen_dependency_diagram(module_env.get_id(), true);
             self.begin_collapsed(&format!(
                 "Show all the modules that \"{}\" depends on directly or indirectly",
@@ -664,9 +664,9 @@ impl<'env> Docgen<'env> {
             let curr_env = self.env.get_function(id);
             let curr_name = name_of(&curr_env);
             let next_list = if is_forward {
-                curr_env.get_called_functions()
+                curr_env.get_called_functions().cloned().unwrap_or_default()
             } else {
-                curr_env.get_calling_functions()
+                curr_env.get_calling_functions().unwrap_or_default()
             };
 
             if fun_env.module_env.get_id() == curr_env.module_env.get_id() {
@@ -675,7 +675,7 @@ impl<'env> Docgen<'env> {
                 let module_name = curr_env
                     .module_env
                     .get_name()
-                    .display(curr_env.module_env.symbol_pool());
+                    .display(curr_env.module_env.env);
                 dot_src_lines.push(format!("\tsubgraph cluster_{} {{", module_name));
                 dot_src_lines.push(format!("\t\tlabel = \"{}\";", module_name));
                 dot_src_lines.push(format!(
@@ -716,7 +716,7 @@ impl<'env> Docgen<'env> {
     /// Generate a forward (or backward) dependency diagram (.svg) for the given module.
     fn gen_dependency_diagram(&self, module_id: ModuleId, is_forward: bool) {
         let module_env = self.env.get_module(module_id);
-        let module_name = module_env.get_name().display(module_env.symbol_pool());
+        let module_name = module_env.get_name().display(module_env.env);
 
         let mut dot_src_lines: Vec<String> = vec!["digraph G {".to_string()];
         let mut visited: BTreeSet<ModuleId> = BTreeSet::new();
@@ -727,16 +727,16 @@ impl<'env> Docgen<'env> {
 
         while let Some(id) = queue.pop_front() {
             let mod_env = self.env.get_module(id);
-            let mod_name = mod_env.get_name().display(mod_env.symbol_pool());
+            let mod_name = mod_env.get_name().display(mod_env.env);
             let dep_list = if is_forward {
-                mod_env.get_used_modules(false)
+                mod_env.get_used_modules(false).clone()
             } else {
                 mod_env.get_using_modules(false)
             };
             dot_src_lines.push(format!("\t{}", mod_name));
             for dep_id in dep_list.iter().filter(|dep_id| **dep_id != id) {
                 let dep_env = self.env.get_module(*dep_id);
-                let dep_name = dep_env.get_name().display(dep_env.symbol_pool());
+                let dep_name = dep_env.get_name().display(dep_env.env);
                 if is_forward {
                     dot_src_lines.push(format!("\t{} -> {}", mod_name, dep_name));
                 } else {
@@ -888,7 +888,7 @@ impl<'env> Docgen<'env> {
             }
             self.item_text(&format!(
                 "[`{}`]({})",
-                module_env.get_name().display_full(module_env.symbol_pool()),
+                module_env.get_name().display_full(module_env.env),
                 self.ref_for_module(&module_env)
             ))
         }
@@ -961,18 +961,17 @@ impl<'env> Docgen<'env> {
         format!(
             "const {}: {} = {};",
             name,
-            const_env.get_type().display(&TypeDisplayContext::WithEnv {
-                env: self.env,
-                type_param_names: None,
-            }),
-            const_env.get_value(),
+            const_env
+                .get_type()
+                .display(&TypeDisplayContext::new(self.env)),
+            const_env.module_env.env.display(&const_env.get_value()),
         )
     }
 
     /// Generates code signature for a struct.
     fn struct_header_display(&self, struct_env: &StructEnv<'_>) -> String {
         let name = self.name_string(struct_env.get_name());
-        let type_params = self.type_parameter_list_display(&struct_env.get_named_type_parameters());
+        let type_params = self.type_parameter_list_display(struct_env.get_type_parameters());
         let ability_tokens = self.ability_tokens(struct_env.get_abilities());
         if ability_tokens.is_empty() {
             format!("struct {}{}", name, type_params)
@@ -1067,7 +1066,7 @@ impl<'env> Docgen<'env> {
             .iter()
             .map(|Parameter(name, ty)| format!("{}: {}", self.name_string(*name), ty.display(tctx)))
             .join(", ");
-        let return_types = func_env.get_return_types();
+        let return_types = func_env.get_result_type().flatten();
         let return_str = match return_types.len() {
             0 => "".to_owned(),
             1 => format!(": {}", return_types[0].display(tctx)),
@@ -1086,7 +1085,7 @@ impl<'env> Docgen<'env> {
             func_env.visibility_str(),
             entry_str,
             name,
-            self.type_parameter_list_display(&func_env.get_named_type_parameters()),
+            self.type_parameter_list_display(&func_env.get_type_parameters()),
             params,
             return_str
         )
@@ -1312,17 +1311,12 @@ impl<'env> Docgen<'env> {
 
     /// Creates a type display context for a function.
     fn type_display_context_for_fun(&self, func_env: &FunctionEnv<'_>) -> TypeDisplayContext<'_> {
-        let type_param_names = Some(
-            func_env
-                .get_named_type_parameters()
-                .iter()
-                .map(|TypeParameter(name, _)| *name)
-                .collect_vec(),
-        );
-        TypeDisplayContext::WithEnv {
-            env: self.env,
-            type_param_names,
-        }
+        let type_param_names = func_env
+            .get_type_parameters()
+            .iter()
+            .map(|TypeParameter(name, _)| *name)
+            .collect_vec();
+        TypeDisplayContext::new_with_params(self.env, type_param_names)
     }
 
     /// Creates a type display context for a struct.
@@ -1330,17 +1324,12 @@ impl<'env> Docgen<'env> {
         &self,
         struct_env: &StructEnv<'_>,
     ) -> TypeDisplayContext<'_> {
-        let type_param_names = Some(
-            struct_env
-                .get_named_type_parameters()
-                .iter()
-                .map(|TypeParameter(name, _)| *name)
-                .collect_vec(),
-        );
-        TypeDisplayContext::WithEnv {
-            env: self.env,
-            type_param_names,
-        }
+        let type_param_names = struct_env
+            .get_type_parameters()
+            .iter()
+            .map(|TypeParameter(name, _)| *name)
+            .collect_vec();
+        TypeDisplayContext::new_with_params(self.env, type_param_names)
     }
 
     /// Increments section nest.
@@ -1474,10 +1463,10 @@ impl<'env> Docgen<'env> {
                     let code = chars.take_while_ref(non_code_filter).collect::<String>();
                     // consume the remaining '`'. Report an error if we find an unmatched '`'.
                     assert!(
-                                            chars.next() == Some('`'),
-                                            "Missing backtick found in {} while generating documentation for the following text: \"{}\"",
-                                            self.current_module.as_ref().unwrap().get_name().display_full(self.env.symbol_pool()), text,
-                                        );
+                       chars.next() == Some('`'),
+                       "Missing backtick found in {} while generating documentation for the following text: \"{}\"",
+                       self.current_module.as_ref().unwrap().get_name().display_full(self.env), text,
+                   );
 
                     write!(
                         &mut decorated_text,
@@ -1587,8 +1576,11 @@ impl<'env> Docgen<'env> {
                 // Cannot resolve.
                 return None;
             }
-            let addr = BigUint::parse_bytes(parts[0][2..].as_bytes(), 16)?;
-            let mname = ModuleName::new(addr, self.env.symbol_pool().make(parts[1]));
+            let addr = AccountAddress::from_hex_literal(parts[0]).ok()?;
+            let mname = ModuleName::new(
+                Address::Numerical(addr),
+                self.env.symbol_pool().make(parts[1]),
+            );
             parts = &parts[2..];
             Some(self.env.find_module(&mname)?)
         } else {
@@ -1658,7 +1650,7 @@ impl<'env> Docgen<'env> {
     fn make_label_for_module(&self, module_env: &ModuleEnv<'_>) -> String {
         module_env
             .get_name()
-            .display_full(self.env.symbol_pool())
+            .display_full(self.env)
             .to_string()
             .replace("::", "_")
     }
@@ -1745,7 +1737,7 @@ impl<'env> Docgen<'env> {
 
     /// Display a type parameter.
     fn type_parameter_display(&self, tp: &TypeParameter) -> String {
-        let ability_tokens = self.ability_tokens(tp.1 .0);
+        let ability_tokens = self.ability_tokens(tp.1.abilities);
         if ability_tokens.is_empty() {
             self.name_string(tp.0).to_string()
         } else {

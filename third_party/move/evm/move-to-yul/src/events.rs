@@ -227,7 +227,7 @@ pub(crate) fn define_emit_fun_for_send(
         // example: 0x00000000000000000000000000000003::AccountStateMachine::deposit
         let message_str = format!(
             "0x{}::{}",
-            fun.module_env.self_address(),
+            fun.module_env.self_address().expect_numerical(),
             fun.get_full_name_str().replace("send_", "")
         );
         let hash_bytes = Sha3_256::digest(message_str.as_bytes());

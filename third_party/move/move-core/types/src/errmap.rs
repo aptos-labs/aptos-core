@@ -2,7 +2,6 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::language_storage::ModuleId;
 use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -25,7 +24,7 @@ pub struct ErrorMapping {
     /// The set of error categories and their descriptions
     pub error_categories: BTreeMap<u64, ErrorDescription>,
     /// The set of modules, and the module-specific errors
-    pub module_error_maps: BTreeMap<ModuleId, BTreeMap<u64, ErrorDescription>>,
+    pub module_error_maps: BTreeMap<String, BTreeMap<u64, ErrorDescription>>,
 }
 
 impl ErrorMapping {
@@ -45,15 +44,18 @@ impl ErrorMapping {
 
     pub fn add_module_error(
         &mut self,
-        module_id: ModuleId,
+        module_name: &str,
         abort_code: u64,
         description: ErrorDescription,
     ) -> Result<()> {
-        let module_error_map = self.module_error_maps.entry(module_id.clone()).or_default();
+        let module_error_map = self
+            .module_error_maps
+            .entry(module_name.to_owned())
+            .or_default();
         if let Some(previous_entry) = module_error_map.insert(abort_code, description) {
             bail!(format!(
                 "Duplicate entry for abort code {} found in {}, previous entry: {:#?}",
-                abort_code, module_id, previous_entry
+                abort_code, module_name, previous_entry
             ))
         }
         Ok(())
@@ -71,9 +73,9 @@ impl ErrorMapping {
         file.write_all(&bytes).unwrap();
     }
 
-    pub fn get_explanation(&self, module: &ModuleId, output_code: u64) -> Option<ErrorDescription> {
+    pub fn get_explanation(&self, module_name: &str, output_code: u64) -> Option<ErrorDescription> {
         self.module_error_maps
-            .get(module)
+            .get(module_name)
             .and_then(|module_map| module_map.get(&output_code).cloned())
     }
 }

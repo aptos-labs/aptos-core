@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    ast::{Exp, ExpData, Operation, Pattern, QuantKind, TempIndex, Value},
+    ast::{Address, Exp, ExpData, Operation, Pattern, QuantKind, TempIndex, Value},
     model::{
         FieldEnv, FunctionEnv, GlobalEnv, Loc, NodeId, QualifiedId, QualifiedInstId, SpecFunId,
         StructId,
@@ -12,7 +12,7 @@ use crate::{
     ty::{PrimitiveType, Type, BOOL_TYPE, NUM_TYPE},
 };
 use itertools::Itertools;
-use num::BigUint;
+use move_core_types::account_address::AccountAddress;
 
 /// A trait that defines a generator for `Exp`.
 pub trait ExpGenerator<'env> {
@@ -64,9 +64,9 @@ pub trait ExpGenerator<'env> {
     }
 
     /// Make an address constant.
-    fn mk_address_const(&self, value: BigUint) -> Exp {
+    fn mk_address_const(&self, value: AccountAddress) -> Exp {
         let node_id = self.new_node(Type::Primitive(PrimitiveType::Address), None);
-        ExpData::Value(node_id, Value::Address(value)).into_exp()
+        ExpData::Value(node_id, Value::Address(Address::Numerical(value))).into_exp()
     }
 
     /// Makes a Call expression.
@@ -272,7 +272,7 @@ pub trait ExpGenerator<'env> {
             .get_module(mem.module_id)
             .into_struct(mem.id);
         let type_inst = (0..struct_env.get_type_parameters().len())
-            .map(|i| Type::TypeParameter(i as u16))
+            .map(Type::new_param)
             .collect_vec();
         let struct_ty = Type::Struct(mem.module_id, mem.id, type_inst);
         let value = self.mk_local("$rsc", struct_ty.clone());

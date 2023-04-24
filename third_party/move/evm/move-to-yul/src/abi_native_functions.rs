@@ -93,10 +93,13 @@ impl NativeFunctions {
                 size_var
             );
 
-            let fun_ret_types = fun.get_return_types();
-            let abi_decode_from_memory =
-                gen.parent
-                    .generate_abi_tuple_decoding_ret(ctx, &sig, fun_ret_types.clone(), true);
+            let fun_ret_type = fun.get_result_type();
+            let abi_decode_from_memory = gen.parent.generate_abi_tuple_decoding_ret(
+                ctx,
+                &sig,
+                fun_ret_type.clone().flatten(),
+                true,
+            );
 
             emitln!(
                 ctx.writer,
@@ -113,7 +116,7 @@ impl NativeFunctions {
                     .call_builtin_str(ctx, YulFunction::AbortBuiltin, std::iter::empty())
             );
 
-            if !fun_ret_types.is_empty() {
+            if !fun_ret_type.is_unit() {
                 emit!(ctx.writer, "{} := ", results);
             }
             emitln!(
@@ -276,7 +279,7 @@ impl SoliditySignature {
         }
         let mut ret_type_lst = vec![];
 
-        for move_ty in fun.get_return_types() {
+        for move_ty in fun.get_result_type().flatten() {
             let solidity_ty = SolidityType::translate_from_move(ctx, &move_ty, false);
             ret_type_lst.push((solidity_ty, SignatureDataLocation::Memory));
         }
@@ -301,7 +304,7 @@ impl SoliditySignature {
         }
         let mut ret_type_lst = vec![];
 
-        for move_ty in fun.get_return_types() {
+        for move_ty in fun.get_result_type().flatten() {
             let solidity_ty = SolidityType::translate_from_move(ctx, &move_ty, true);
             ret_type_lst.push((solidity_ty, SignatureDataLocation::Memory));
         }

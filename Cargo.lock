@@ -3222,7 +3222,6 @@ dependencies = [
  "once_cell",
  "proptest",
  "rayon",
- "read-write-set-dynamic",
  "serde 1.0.149",
  "serde_json",
  "smallvec",
@@ -7899,8 +7898,6 @@ dependencies = [
  "move-vm-test-utils",
  "move-vm-types",
  "once_cell",
- "read-write-set",
- "read-write-set-dynamic",
  "reqwest",
  "serde 1.0.149",
  "serde_json",
@@ -8034,6 +8031,7 @@ dependencies = [
  "itertools",
  "log",
  "move-compiler",
+ "move-core-types",
  "move-model",
  "move-prover",
  "move-prover-test-utils",
@@ -8298,16 +8296,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "move-read-write-set-types"
-version = "0.0.3"
-dependencies = [
- "anyhow",
- "move-binary-format",
- "move-core-types",
- "serde 1.0.149",
-]
-
-[[package]]
 name = "move-resource-viewer"
 version = "0.1.0"
 dependencies = [
@@ -8342,7 +8330,6 @@ dependencies = [
  "move-ir-to-bytecode",
  "move-model",
  "move-prover-test-utils",
- "move-read-write-set-types",
  "move-stdlib",
  "num",
  "once_cell",
@@ -10090,31 +10077,6 @@ dependencies = [
  "crossbeam-deque",
  "crossbeam-utils",
  "num_cpus",
-]
-
-[[package]]
-name = "read-write-set"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "move-binary-format",
- "move-bytecode-utils",
- "move-core-types",
- "move-model",
- "move-read-write-set-types",
- "move-stackless-bytecode",
- "read-write-set-dynamic",
-]
-
-[[package]]
-name = "read-write-set-dynamic"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "move-binary-format",
- "move-bytecode-utils",
- "move-core-types",
- "move-read-write-set-types",
 ]
 
 [[package]]
