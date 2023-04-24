@@ -41,8 +41,9 @@ mod txn_emitter;
 #[cfg(test)]
 mod upgrade;
 
-#[cfg(test)]
-mod smoke_test_environment;
+/////// 0L /////////
+// #[cfg(test)]
+pub mod smoke_test_environment;
 
 #[cfg(test)]
 mod test_utils;

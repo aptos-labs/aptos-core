@@ -5,6 +5,7 @@
 use aptos_transactional_test_harness::run_aptos_test;
 
 //////// 0L ////////
-// 0L: libra and aptos-core repos must be in the same dir
+// 0L: TRX_TESTS_PATH: the path of ol-fw trans. tests 
+// e.g. /opt/libra-v7//transactional-tests/tests/
 // datatest_stable::harness!(run_aptos_test, "tests", r".*\.(mvir|move)$");
-datatest_stable::harness!(run_aptos_test, "../../../libra-v7/transactional-tests/tests", r".*\.(mvir|move)$");
+datatest_stable::harness!(run_aptos_test, env!("TRX_TESTS_PATH"), r".*\.(mvir|move)$");
