@@ -13,7 +13,7 @@ pub mod aptos_token_sdk_builder;
 //////// 0L ///////
 // 0L: libra and aptos-core repos must be in the same dir
 // const HEAD_RELEASE_BUNDLE_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/head.mrb"));
-const HEAD_RELEASE_BUNDLE_BYTES: &[u8] = include_bytes!("../../../../../libra/head.mrb");
+const HEAD_RELEASE_BUNDLE_BYTES: &[u8] = include_bytes!("../../../../../libra-v7/head.mrb");
 
 #[cfg(windows)]
 const HEAD_RELEASE_BUNDLE_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "\\head.mrb"));
