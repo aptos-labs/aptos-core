@@ -36,6 +36,7 @@ aptos-vm = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
 chrono = { workspace = true }
+clap = { workspace = true }
 criterion = { workspace = true }
 indicatif = { workspace = true }
 itertools = { workspace = true }
@@ -45,7 +46,6 @@ once_cell = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
-structopt = { workspace = true }
 tokio = { workspace = true }
 toml = { workspace = true }
 

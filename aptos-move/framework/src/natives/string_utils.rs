@@ -22,8 +22,8 @@ use move_vm_types::{
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, fmt::Write, ops::Deref, sync::Arc};
 
-struct FormatContext<'a, 'b, 'c, 'd> {
-    context: &'d mut SafeNativeContext<'a, 'b, 'c>,
+struct FormatContext<'a, 'b, 'c, 'd, 'e> {
+    context: &'d mut SafeNativeContext<'a, 'b, 'c, 'e>,
     base_gas: InternalGas,
     per_byte_gas: InternalGas,
     max_depth: usize,

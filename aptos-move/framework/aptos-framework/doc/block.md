@@ -689,7 +689,7 @@ The BlockResource existed under the @aptos_framework.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> verify_duration_estimate = 120;
 <b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
 <b>requires</b> <a href="system_addresses.md#0x1_system_addresses_is_vm">system_addresses::is_vm</a>(vm);
 <b>requires</b> proposer == @vm_reserved || <a href="stake.md#0x1_stake_spec_is_current_epoch_validator">stake::spec_is_current_epoch_validator</a>(proposer);

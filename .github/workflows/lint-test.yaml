@@ -47,7 +47,7 @@ jobs:
           node-version-file: .node-version
       - uses: pnpm/action-setup@v2
         with:
-          version: 7.14.2
+          version: 8.2.0
       # install packages for examples
       - run: cd ./ecosystem/typescript/sdk/examples/typescript && pnpm install
       - run: cd ./ecosystem/typescript/sdk/examples/javascript && pnpm install
@@ -75,7 +75,7 @@ jobs:
           node-version-file: .node-version
       - uses: pnpm/action-setup@v2
         with:
-          version: 7.14.2
+          version: 8.2.0
       - run: pnpm lint
         working-directory: developer-docs-site
       - run: sudo apt update -y && sudo apt install -y aspell aspell-en

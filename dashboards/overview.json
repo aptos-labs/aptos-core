@@ -97,7 +97,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.0-cloud.4.a016665c",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -155,7 +155,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.0-cloud.4.a016665c",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -213,7 +213,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.0-cloud.4.a016665c",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -272,7 +272,7 @@
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.0-cloud.4.a016665c",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -335,7 +335,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.0-cloud.4.a016665c",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -388,7 +388,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.0-cloud.4.a016665c",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -447,7 +447,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.0-cloud.4.a016665c",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -504,7 +504,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.0-cloud.4.a016665c",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -567,7 +567,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.0-cloud.4.a016665c",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -612,9 +612,10 @@
         "minVizWidth": 0,
         "orientation": "horizontal",
         "reduceOptions": { "calcs": [], "fields": "", "values": true },
-        "showUnfilled": true
+        "showUnfilled": true,
+        "valueMode": "color"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.0-cloud.4.a016665c",
       "targets": [
         {
           "datasource": { "type": "grafana-bigquery-datasource", "uid": "${BigQuery}" },
@@ -673,7 +674,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.0-cloud.4.a016665c",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -721,9 +722,10 @@
         "minVizWidth": 0,
         "orientation": "horizontal",
         "reduceOptions": { "calcs": [], "fields": "", "limit": 10, "values": true },
-        "showUnfilled": true
+        "showUnfilled": true,
+        "valueMode": "color"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.0-cloud.4.a016665c",
       "targets": [
         {
           "datasource": { "type": "grafana-bigquery-datasource", "uid": "${BigQuery}" },
@@ -765,7 +767,7 @@
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.0-cloud.4.a016665c",
       "targets": [
         {
           "datasource": { "type": "grafana-bigquery-datasource", "uid": "${BigQuery}" },
@@ -817,7 +819,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.0-cloud.4.a016665c",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -877,7 +879,7 @@
         "showThresholdLabels": false,
         "showThresholdMarkers": true
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.0-cloud.4.a016665c",
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -925,7 +927,7 @@
         "showThresholdLabels": false,
         "showThresholdMarkers": true
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.0-cloud.4.a016665c",
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -967,7 +969,7 @@
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.0-cloud.4.a016665c",
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -990,7 +992,7 @@
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },
-          "custom": { "align": "auto", "displayMode": "auto", "inspect": false },
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false },
           "mappings": [],
           "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
         },
@@ -999,8 +1001,12 @@
       "gridPos": { "h": 5, "w": 5, "x": 11, "y": 10 },
       "id": 72,
       "isNew": false,
-      "options": { "footer": { "fields": "", "reducer": ["sum"], "show": false }, "showHeader": true },
-      "pluginVersion": "9.1.1",
+      "options": {
+        "cellHeight": "sm",
+        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+        "showHeader": true
+      },
+      "pluginVersion": "9.5.0-cloud.4.a016665c",
       "scroll": false,
       "span": 0,
       "targets": [
@@ -1066,7 +1072,7 @@
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.0-cloud.4.a016665c",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -1092,7 +1098,7 @@
       "error": false,
       "fieldConfig": {
         "defaults": {
-          "custom": { "align": "auto", "displayMode": "auto", "inspect": false },
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -1107,8 +1113,12 @@
       "gridPos": { "h": 5, "w": 5, "x": 19, "y": 10 },
       "id": 142,
       "isNew": false,
-      "options": { "footer": { "fields": "", "reducer": ["sum"], "show": false }, "showHeader": true },
-      "pluginVersion": "9.1.1",
+      "options": {
+        "cellHeight": "sm",
+        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+        "showHeader": true
+      },
+      "pluginVersion": "9.5.0-cloud.4.a016665c",
       "scroll": false,
       "span": 0,
       "targets": [
@@ -1146,7 +1156,7 @@
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
-              "custom": { "align": "auto", "displayMode": "auto", "inspect": false },
+              "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false },
               "mappings": [],
               "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
               "unit": "none"
@@ -1357,7 +1367,7 @@
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
-              "custom": { "align": "auto", "displayMode": "auto", "inspect": false },
+              "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false },
               "mappings": [],
               "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
               "unit": "none"
@@ -1402,7 +1412,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "fieldConfig": {
             "defaults": {
-              "custom": { "align": "auto", "displayMode": "auto", "filterable": true, "inspect": false },
+              "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "filterable": true, "inspect": false },
               "mappings": [],
               "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] }
             },
@@ -1496,7 +1506,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.0-cloud.4.a016665c",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -3541,7 +3551,7 @@
     }
   ],
   "refresh": "1m",
-  "schemaVersion": 37,
+  "schemaVersion": 38,
   "style": "dark",
   "tags": ["aptos-core"],
   "templating": {
@@ -3571,7 +3581,7 @@
       },
       {
         "description": "BigQuery data source",
-        "hide": 0,
+        "hide": 2,
         "includeAll": false,
         "multi": false,
         "name": "BigQuery",
@@ -3704,6 +3714,6 @@
   "timezone": "",
   "title": "overview",
   "uid": "overview",
-  "version": 10,
+  "version": 11,
   "weekStart": ""
 }
