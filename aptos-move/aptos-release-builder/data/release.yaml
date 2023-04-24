@@ -53,9 +53,9 @@ proposals:
   - name: step_5
     metadata:
       title: "Enable Quorum Store"
-      description: "AIP-X: Quorum Store is a production-optimized implementation of Narwhal [1], that improves consensus throughput."
+      description: "AIP-26: Quorum Store is a production-optimized implementation of Narwhal [1], that improves consensus throughput."
       source_code_url: "TBD"
-      discussion_url: "TBD"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/108"
     execution_mode: MultiStep
     update_sequence:
     - Consensus:
@@ -78,9 +78,9 @@ proposals:
   - name: step_6
     metadata:
       title: "Enable Transaction Shuffling"
-      description: "TBD"
+      description: "AIP-27: Sender Aware Transaction Shuffling"
       source_code_url: "TBD"
-      discussion_url: "TBD"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/109"
     execution_mode: MultiStep
     update_sequence:
     - Execution:

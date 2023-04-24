@@ -7,8 +7,8 @@
 
 use crate::{
     ast::{
-        Condition, ConditionKind, Exp, ExpData, GlobalInvariant, LocalVarDecl, MemoryLabel,
-        Operation, Spec, TempIndex, TraceKind,
+        Condition, ConditionKind, Exp, ExpData, GlobalInvariant, MemoryLabel, Operation, Spec,
+        TempIndex, TraceKind,
     },
     exp_generator::ExpGenerator,
     exp_rewriter::ExpRewriterFunctions,
@@ -755,8 +755,8 @@ impl<'a, 'b, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, 'b
         }
     }
 
-    fn rewrite_enter_scope<'c>(&mut self, decls: impl Iterator<Item = &'c LocalVarDecl>) {
-        self.shadowed.push(decls.map(|d| d.name).collect())
+    fn rewrite_enter_scope<'c>(&mut self, decls: impl Iterator<Item = &'c (NodeId, Symbol)>) {
+        self.shadowed.push(decls.map(|(_, name)| *name).collect())
     }
 
     fn rewrite_exit_scope(&mut self) {

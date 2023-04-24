@@ -27,6 +27,8 @@ module aptos_framework::object {
     use aptos_framework::from_bcs;
     use aptos_framework::guid;
 
+    friend aptos_framework::primary_fungible_store;
+
     /// An object already exists at this address
     const EOBJECT_EXISTS: u64 = 1;
     /// An object does not exist at this address

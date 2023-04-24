@@ -5,8 +5,9 @@ use crate::delta_change_set::{deserialize, DeltaChangeSet};
 use anyhow::bail;
 use aptos_state_view::StateView;
 use aptos_types::{
+    state_store::state_key::StateKey,
     transaction::{ChangeSet, CheckChangeSet, TransactionOutput},
-    write_set::{TransactionWrite, WriteOp, WriteSet, WriteSetMut},
+    write_set::{TransactionWrite, WriteOp, WriteSet},
 };
 use std::{collections::btree_map, sync::Arc};
 
@@ -203,12 +204,15 @@ impl TransactionOutputExt {
         // rather ugly and has a lot of legacy code. This makes proper error
         // handling quite challenging.
         delta_change_set
-            .try_into_write_set_mut(state_view)
+            .take(state_view)
             .map(|materialized_deltas| Self::merge_delta_writes(txn_output, materialized_deltas))
             .expect("Failed to apply aggregator delta outputs")
     }
 
-    pub fn output_with_delta_writes(self, delta_writes: WriteSetMut) -> TransactionOutput {
+    pub fn output_with_delta_writes(
+        self,
+        delta_writes: Vec<(StateKey, WriteOp)>,
+    ) -> TransactionOutput {
         let (delta_change_set, txn_output) = self.into();
 
         // First, check if output of transaction should be discarded or delta
@@ -226,14 +230,15 @@ impl TransactionOutputExt {
 
     fn merge_delta_writes(
         output: TransactionOutput,
-        delta_writes: WriteSetMut,
+        delta_writes: Vec<(StateKey, WriteOp)>,
     ) -> TransactionOutput {
         let (write_set, events, gas_used, status) = output.unpack();
-        // We expect to have only a few delta changes, so add them to
-        // the write set of the transaction.
-        let write_set_mut = write_set.into_mut();
-        // TODO: Is it okay to panic here?
-        let write_set_mut = write_set_mut.squash(delta_writes).unwrap();
+        let mut write_set_mut = write_set.into_mut();
+
+        // Add the delta writes to the write set of the transaction.
+        delta_writes
+            .into_iter()
+            .for_each(|item| write_set_mut.insert(item));
 
         TransactionOutput::new(write_set_mut.freeze().unwrap(), events, gas_used, status)
     }

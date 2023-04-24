@@ -61,7 +61,7 @@ This dual-ownership design is one of the bases of state safety in Aptos Move and
 
 ## Viewing a resource
 
-Resources are stored within specific accounts. Resources can be located by searching within the owner's account for the resource at its full query path inclusive of its address and module. Resources can be viewed on the [Aptos Explorer](https://explorer.aptoslabs.com/) by searching for the owning account or be directly fetched from a fullnode's API. See [Interacting with the blockchain](../guides/interacting-with-the-blockchain.md) for more information.
+Resources are stored within specific accounts. Resources can be located by searching within the owner's account for the resource at its full query path inclusive of its address and module. Resources can be viewed on the [Aptos Explorer](https://explorer.aptoslabs.com/) by searching for the owning account or be directly fetched from a fullnode's API.
 
 ## How resources are stored
 

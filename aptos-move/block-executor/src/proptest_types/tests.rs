@@ -56,8 +56,7 @@ fn run_transactions<K, V>(
             Task<KeyType<K>, ValueType<V>>,
             EmptyDataView<KeyType<K>, ValueType<V>>,
         >::new(num_cpus::get())
-        .execute_transactions_parallel((), &transactions, &data_view)
-        .map(|zipped| zipped.into_iter().map(|(res, _)| res).collect());
+        .execute_transactions_parallel((), &transactions, &data_view);
 
         if module_access.0 && module_access.1 {
             assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);
@@ -65,7 +64,6 @@ fn run_transactions<K, V>(
         }
 
         let baseline = ExpectedOutput::generate_baseline(&transactions, None);
-
         baseline.assert_output(&output);
     }
 }
@@ -182,8 +180,7 @@ fn deltas_writes_mixed() {
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         >::new(num_cpus::get())
-        .execute_transactions_parallel((), &transactions, &data_view)
-        .map(|zipped| zipped.into_iter().map(|(res, _)| res).collect());
+        .execute_transactions_parallel((), &transactions, &data_view);
 
         let baseline = ExpectedOutput::generate_baseline(&transactions, None);
         baseline.assert_output(&output);
@@ -218,18 +215,22 @@ fn deltas_resolver() {
         .collect();
 
     for _ in 0..20 {
-        let (output, resolved) = BlockExecutor::<
+        let output = BlockExecutor::<
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         >::new(num_cpus::get())
-        .execute_transactions_parallel((), &transactions, &data_view)
-        .unwrap()
-        .into_iter()
-        .unzip();
+        .execute_transactions_parallel((), &transactions, &data_view);
 
-        let baseline = ExpectedOutput::generate_baseline(&transactions, Some(resolved));
-        baseline.assert_output(&Ok(output));
+        let delta_writes = output
+            .as_ref()
+            .expect("Must be success")
+            .iter()
+            .map(|out| out.delta_writes())
+            .collect();
+
+        let baseline = ExpectedOutput::generate_baseline(&transactions, Some(delta_writes));
+        baseline.assert_output(&output);
     }
 }
 

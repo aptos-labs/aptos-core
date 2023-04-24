@@ -14,21 +14,21 @@ use move_binary_format::{
 use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet, Event},
+    gas_algebra::NumBytes,
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
-    resolver::MoveResolver,
     value::MoveTypeLayout,
 };
 use move_vm_types::{
-    data_store::DataStore,
     gas::GasMeter,
     loaded_data::runtime_types::{CachedStructIndex, StructType, Type},
+    values::GlobalValue,
 };
 use std::{borrow::Borrow, sync::Arc};
 
-pub struct Session<'r, 'l, S> {
+pub struct Session<'r, 'l> {
     pub(crate) runtime: &'l VMRuntime,
-    pub(crate) data_cache: TransactionDataCache<'r, 'l, S>,
+    pub(crate) data_cache: TransactionDataCache<'r>,
     pub(crate) native_extensions: NativeContextExtensions<'r>,
 }
 
@@ -43,7 +43,7 @@ pub struct SerializedReturnValues {
     pub return_values: Vec<(Vec<u8>, MoveTypeLayout)>,
 }
 
-impl<'r, 'l, S: MoveResolver> Session<'r, 'l, S> {
+impl<'r, 'l> Session<'r, 'l> {
     /// Execute a Move function with the given arguments. This is mainly designed for an external
     /// environment to invoke system logic written in Move.
     ///
@@ -258,7 +258,7 @@ impl<'r, 'l, S: MoveResolver> Session<'r, 'l, S> {
     /// This MUST NOT be called if there is a previous invocation that failed with an invariant violation.
     pub fn finish(self) -> VMResult<(ChangeSet, Vec<Event>)> {
         self.data_cache
-            .into_effects()
+            .into_effects(self.runtime.loader())
             .map_err(|e| e.finish(Location::Undefined))
     }
 
@@ -272,9 +272,30 @@ impl<'r, 'l, S: MoveResolver> Session<'r, 'l, S> {
             ..
         } = self;
         let (change_set, events) = data_cache
-            .into_effects()
+            .into_effects(self.runtime.loader())
             .map_err(|e| e.finish(Location::Undefined))?;
         Ok((change_set, events, native_extensions))
+    }
+
+    /// Try to load a resource from remote storage and create a corresponding GlobalValue
+    /// that is owned by the data store.
+    pub fn load_resource(
+        &mut self,
+        addr: AccountAddress,
+        ty: &Type,
+    ) -> PartialVMResult<(&mut GlobalValue, Option<Option<NumBytes>>)> {
+        self.data_cache
+            .load_resource(self.runtime.loader(), addr, ty)
+    }
+
+    /// Get the serialized format of a `CompiledModule` given a `ModuleId`.
+    pub fn load_module(&self, module_id: &ModuleId) -> VMResult<Vec<u8>> {
+        self.data_cache.load_module(module_id)
+    }
+
+    /// Check if this module exists.
+    pub fn exists_module(&self, module_id: &ModuleId) -> VMResult<bool> {
+        self.data_cache.exists_module(module_id)
     }
 
     /// Load a script and all of its types into cache
@@ -356,15 +377,10 @@ impl<'r, 'l, S: MoveResolver> Session<'r, 'l, S> {
 
     /// Gets the abilities for this type, at it's particular instantiation
     pub fn get_type_abilities(&self, ty: &Type) -> VMResult<AbilitySet> {
-        self.runtime
+        self.runtime /**/
             .loader()
             .abilities(ty)
             .map_err(|e| e.finish(Location::Undefined))
-    }
-
-    /// Gets the underlying data store
-    pub fn get_data_store(&mut self) -> &mut dyn DataStore {
-        &mut self.data_cache
     }
 
     /// Gets the underlying native extensions.

@@ -1327,7 +1327,8 @@ fn changing_working_quorum_test_helper(
                 500.into();
             helm_values["validator"]["config"]["consensus"]
                 ["round_timeout_backoff_exponent_base"] = 1.0.into();
-            helm_values["validator"]["config"]["consensus"]["quorum_store_poll_count"] = 1.into();
+            helm_values["validator"]["config"]["consensus"]["quorum_store_poll_time_ms"] =
+                100.into();
 
             let mut min_block_txns = block_size;
             let mut chain_health_backoff = ConsensusConfig::default().chain_health_backoff;

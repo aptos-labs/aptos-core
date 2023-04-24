@@ -18,7 +18,7 @@ This tutorial details how to compile, test, publish and interact with Move modul
 
 ## Step 1: Install the CLI
 
-[Install the precompiled binary for the Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md).
+[Install the precompiled binary for the Aptos CLI](../tools/install-cli/index.md).
 
 ---
 
@@ -199,7 +199,7 @@ Upon success, the CLI will print out the following:
 }
 ```
 
-The `set_message` function modifies the `hello_blockchain` `MessageHolder` resource. A resource is a data structure that is stored in [global storage](../guides/move-guides/book/structs-and-resources.md#storing-resources-in-global-storage). The resource can be read by querying the following REST API:
+The `set_message` function modifies the `hello_blockchain` `MessageHolder` resource. A resource is a data structure that is stored in [global storage](../move/book/structs-and-resources.md#storing-resources-in-global-storage). The resource can be read by querying the following REST API:
 
 ```bash
 
