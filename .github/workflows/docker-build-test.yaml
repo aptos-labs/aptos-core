@@ -36,7 +36,6 @@ on: # build on main branch OR when a PR is labeled with `CICD:build-images`
       - aptos-release-v*
       # experimental branches
       - performance_benchmark
-      - quorum-store
       - preview
 
 # cancel redundant builds
