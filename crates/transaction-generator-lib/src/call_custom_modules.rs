@@ -83,18 +83,44 @@ impl CallCustomModulesCreator {
     ) -> Self {
         let mut rng = StdRng::from_entropy();
         assert!(accounts.len() >= num_modules);
-        let mut requests = Vec::with_capacity(accounts.len());
+        let mut publish_requests = Vec::with_capacity(accounts.len());
         let mut package_handler = PackageHandler::new();
         let mut packages = Vec::new();
         for account in accounts.iter_mut().take(num_modules) {
             let package = package_handler.pick_package(&mut rng, account);
             let txn = package.publish_transaction(account, &init_txn_factory);
-            requests.push(txn);
+            publish_requests.push(txn);
             packages.push((package, account.address()));
         }
-        info!("Publishing {} packages", requests.len());
-        txn_executor.execute_transactions(&requests).await.unwrap();
-        info!("Done publishing {} packages", requests.len());
+        info!("Publishing {} packages", publish_requests.len());
+        txn_executor
+            .execute_transactions(&publish_requests)
+            .await
+            .unwrap();
+        info!("Done publishing {} packages", publish_requests.len());
+
+        // For Token V1/V2 transactions, we first need to initialize collections before generating mint/transfer transactions.
+        // The initial_entry_point is the initialize_collection method for the Token transactions.
+        let mut initial_requests = Vec::with_capacity(accounts.len());
+        if let Some(initial_entry_point) = entry_point.initialize_entry_point() {
+            for account in accounts.iter_mut().take(num_modules) {
+                let package = package_handler.pick_package(&mut rng, account);
+                let request = package.use_specific_transaction(
+                    initial_entry_point,
+                    account,
+                    &init_txn_factory,
+                    Some(&mut rng),
+                    Some(&account.address()),
+                );
+                initial_requests.push(request);
+            }
+            info!("Initializing {} collections", initial_requests.len());
+            txn_executor
+                .execute_transactions(&initial_requests)
+                .await
+                .unwrap();
+            info!("Done initializing {} collections", initial_requests.len());
+        }
 
         Self {
             txn_factory,
