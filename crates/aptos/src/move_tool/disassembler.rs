@@ -16,6 +16,7 @@ use async_trait::async_trait;
 use move_bytecode_source_map::{mapping::SourceMapping, utils::source_map_from_file};
 use move_ir_types::location::Spanned;
 
+/// Disassemble the Move bytecode pointed to
 #[derive(Debug, Parser)]
 pub struct AptosDisassembler {
     /// Skip printing of private functions.
@@ -125,6 +126,6 @@ impl CliCommand<String> for AptosDisassembler {
 
         let disassemble_string = disassembler.disassemble().expect("Unable to dissassemble");
 
-        return Ok(format!("Result: {}", disassemble_string));
+        return Ok(disassemble_string);
     }
 }
