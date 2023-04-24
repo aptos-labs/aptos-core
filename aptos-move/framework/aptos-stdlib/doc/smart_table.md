@@ -401,7 +401,7 @@ Note: This method may occasionally cost much more gas when triggering bucket spl
     <b>let</b> bucket = <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> <a href="table.md#0x1_table">table</a>.buckets, index);
     // We set a per-bucket limit here <b>with</b> a upper bound (10000) that nobody should normally reach.
     <b>assert</b>!(<a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(bucket) &lt;= 10000, <a href="../../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="smart_table.md#0x1_smart_table_EEXCEED_MAX_BUCKET_SIZE">EEXCEED_MAX_BUCKET_SIZE</a>));
-    <b>assert</b>!(vector::all(bucket, | entry | {
+    <b>assert</b>!(<a href="../../move-stdlib/doc/vector.md#0x1_vector_all">vector::all</a>(bucket, | entry | {
         <b>let</b> e: &<a href="smart_table.md#0x1_smart_table_Entry">Entry</a>&lt;K, V&gt; = entry;
         &e.key != &key
     }), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="smart_table.md#0x1_smart_table_EALREADY_EXIST">EALREADY_EXIST</a>));
@@ -450,7 +450,7 @@ Decide which is the next bucket to split and split it into two with the elements
     };
     <b>let</b> old_bucket = <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> <a href="table.md#0x1_table">table</a>.buckets, to_split);
     // partition the bucket, [0..p) stays in <b>old</b> bucket, [p..len) goes <b>to</b> new bucket
-    <b>let</b> p = vector::partition(old_bucket, |e| {
+    <b>let</b> p = <a href="../../move-stdlib/doc/vector.md#0x1_vector_partition">vector::partition</a>(old_bucket, |e| {
         <b>let</b> entry: &<a href="smart_table.md#0x1_smart_table_Entry">Entry</a>&lt;K, V&gt; = e; // Explicit type <b>to</b> satisfy compiler
         <a href="smart_table.md#0x1_smart_table_bucket_index">bucket_index</a>(<a href="table.md#0x1_table">table</a>.level, <a href="table.md#0x1_table">table</a>.num_buckets, entry.<a href="../../move-stdlib/doc/hash.md#0x1_hash">hash</a>) != new_bucket_index
     });
@@ -650,7 +650,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
     <b>let</b> <a href="../../move-stdlib/doc/hash.md#0x1_hash">hash</a> = sip_hash_from_value(&key);
     <b>let</b> index = <a href="smart_table.md#0x1_smart_table_bucket_index">bucket_index</a>(<a href="table.md#0x1_table">table</a>.level, <a href="table.md#0x1_table">table</a>.num_buckets, <a href="../../move-stdlib/doc/hash.md#0x1_hash">hash</a>);
     <b>let</b> bucket = <a href="table_with_length.md#0x1_table_with_length_borrow">table_with_length::borrow</a>(&<a href="table.md#0x1_table">table</a>.buckets, index);
-    vector::any(bucket, | entry | {
+    <a href="../../move-stdlib/doc/vector.md#0x1_vector_any">vector::any</a>(bucket, | entry | {
         <b>let</b> e: &<a href="smart_table.md#0x1_smart_table_Entry">Entry</a>&lt;K, V&gt; = entry;
         e.<a href="../../move-stdlib/doc/hash.md#0x1_hash">hash</a> == <a href="../../move-stdlib/doc/hash.md#0x1_hash">hash</a> && &e.key == &key
     })

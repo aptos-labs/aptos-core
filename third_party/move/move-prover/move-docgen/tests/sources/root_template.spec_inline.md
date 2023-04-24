@@ -7,14 +7,14 @@
 
 This document contains the description of multiple move scripts.
 
-The script <code><a href="root_template_script3.md#0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff_yet_another">yet_another</a></code> is documented in its own file.
+The script <code><a href="root_template_script3.md#0x1_yet_another">yet_another</a></code> is documented in its own file.
 
 -  [Some Scripts](#@Some_Scripts_1)
-    -  [Module `0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff::some`](#0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff_some)
-        -  [Function `some`](#0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff_some_some)
+    -  [Module `0x1::some`](#0x1_some)
+        -  [Function `some`](#0x1_some_some)
 -  [Other Scripts](#@Other_Scripts_2)
-    -  [Module `0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff::other`](#0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff_other)
-        -  [Function `other`](#0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff_other_other)
+    -  [Module `0x1::other`](#0x1_other)
+        -  [Function `other`](#0x1_other_other)
 -  [Some other scripts from a module](#@Some_other_scripts_from_a_module_3)
     -  [Module `0x1::OneTypeOfScript`](#0x1_OneTypeOfScript)
         -  [Function `script1`](#0x1_OneTypeOfScript_script1)
@@ -32,9 +32,9 @@ The script <code><a href="root_template_script3.md#0xfffffffffffffffffffffffffff
 
 
 
-<a name="0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff_some"></a>
+<a name="0x1_some"></a>
 
-### Module `0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff::some`
+### Module `0x1::some`
 
 
 
@@ -42,14 +42,14 @@ The script <code><a href="root_template_script3.md#0xfffffffffffffffffffffffffff
 
 
 
-<a name="0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff_some_some"></a>
+<a name="0x1_some_some"></a>
 
 #### Function `some`
 
 This script does really nothing but just aborts.
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="root.md#0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff_some">some</a>&lt;T&gt;(_account: signer)
+<pre><code><b>fun</b> <a href="root.md#0x1_some">some</a>&lt;T&gt;(_account: signer)
 </code></pre>
 
 
@@ -58,7 +58,7 @@ This script does really nothing but just aborts.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="root.md#0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff_some">some</a>&lt;T&gt;(_account: signer) {
+<pre><code><b>fun</b> <a href="root.md#0x1_some">some</a>&lt;T&gt;(_account: signer) {
     <b>abort</b> 1
 }
 </code></pre>
@@ -87,9 +87,9 @@ This script does really nothing but just aborts.
 
 
 
-<a name="0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff_other"></a>
+<a name="0x1_other"></a>
 
-### Module `0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff::other`
+### Module `0x1::other`
 
 
 
@@ -97,14 +97,14 @@ This script does really nothing but just aborts.
 
 
 
-<a name="0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff_other_other"></a>
+<a name="0x1_other_other"></a>
 
 #### Function `other`
 
 This script does also abort.
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="root.md#0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff_other">other</a>&lt;T&gt;(_account: signer)
+<pre><code><b>fun</b> <a href="root.md#0x1_other">other</a>&lt;T&gt;(_account: signer)
 </code></pre>
 
 
@@ -113,7 +113,7 @@ This script does also abort.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="root.md#0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff_other">other</a>&lt;T&gt;(_account: signer) {
+<pre><code><b>fun</b> <a href="root.md#0x1_other">other</a>&lt;T&gt;(_account: signer) {
     <b>abort</b> 2
 }
 </code></pre>
@@ -267,6 +267,6 @@ This is another script
 
 -  [`0x1::AnotherTypeOfScript`](root.md#0x1_AnotherTypeOfScript)
 -  [`0x1::OneTypeOfScript`](root.md#0x1_OneTypeOfScript)
--  [`0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff::other`](root.md#0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff_other)
--  [`0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff::some`](root.md#0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff_some)
--  [`0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff::yet_another`](root_template_script3.md#0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff_yet_another)
+-  [`0x1::other`](root.md#0x1_other)
+-  [`0x1::some`](root.md#0x1_some)
+-  [`0x1::yet_another`](root_template_script3.md#0x1_yet_another)

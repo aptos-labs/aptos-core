@@ -117,7 +117,6 @@ mod delta_state_view;
 mod errors;
 pub mod move_vm_ext;
 pub mod natives;
-pub mod read_write_set_analysis;
 pub mod sharded_block_executor;
 pub mod system_module_names;
 pub mod transaction_metadata;
