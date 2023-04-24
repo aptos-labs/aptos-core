@@ -7,7 +7,7 @@ use aptos_config::config::{
 };
 use aptos_executor::block_executor::TransactionBlockExecutor;
 use aptos_executor_benchmark::{
-    benchmark_transaction::BenchmarkTransaction, fake_executor::FakeExecutor,
+    benchmark_transaction::BenchmarkTransaction, native_executor::NativeExecutor,
     pipeline::PipelineConfig,
 };
 use aptos_metrics_core::{register_int_gauge, IntGauge};
@@ -137,7 +137,7 @@ struct Opt {
     verify_sequence_numbers: bool,
 
     #[clap(long)]
-    use_fake_executor: bool,
+    use_native_executor: bool,
 }
 
 impl Opt {
@@ -280,10 +280,10 @@ fn main() {
         .build_global()
         .expect("Failed to build rayon global thread pool.");
     AptosVM::set_concurrency_level_once(opt.concurrency_level());
-    FakeExecutor::set_concurrency_level_once(opt.concurrency_level());
+    NativeExecutor::set_concurrency_level_once(opt.concurrency_level());
 
-    if opt.use_fake_executor {
-        run::<FakeExecutor>(opt);
+    if opt.use_native_executor {
+        run::<NativeExecutor>(opt);
     } else {
         run::<AptosVM>(opt);
     }
