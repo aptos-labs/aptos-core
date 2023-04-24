@@ -22,7 +22,7 @@ use aptos_executor_types::VerifyExecutionMode;
 use aptos_logger::prelude::*;
 use aptos_types::transaction::Version;
 use clap::Parser;
-use std::sync::Arc;
+use std::{cmp::max, sync::Arc};
 
 #[derive(Parser)]
 pub struct RestoreCoordinatorOpt {
@@ -95,15 +95,6 @@ impl RestoreCoordinator {
     /// We basically introduce a ledger history start version (lhs), a replay start version (rs) and target version
     /// We directly store the write set and key values between (lhs, rs) and replay txn from (rs, target]
     async fn run_impl(self) -> Result<()> {
-        // N.b.
-        // The coordinator now focuses on doing one procedure, ignoring the combination of options
-        // supported before:
-        //   1. a most recent state snapshot before --target-version
-        //   2. a only transaction and its output, at the state snapshot version
-        //   3. the epoch history from 0 up until the latest closed epoch preceding the state
-        //      snapshot version.
-        // And it does so in a resume-able way.
-
         if self.replay_all {
             bail!("--replay--all not supported in this version.");
         }
@@ -114,21 +105,6 @@ impl RestoreCoordinator {
             self.global_opt.concurrent_downloads,
         )
         .await?;
-
-        let next_txn_version = self
-            .global_opt
-            .run_mode
-            .get_next_expected_transaction_version()?;
-        if next_txn_version != 0 {
-            // DB is already in workable state
-            info!(
-                next_txn_version = next_txn_version,
-                "DB is ready to accept transactions, start the node to catch up with the chain. \
-                If the node is unable to catch up because the DB is too old, delete the data folder \
-                and bootstrap again.",
-            );
-            return Ok(());
-        }
 
         let target_version = self.global_opt.target_version;
         COORDINATOR_TARGET_VERSION.set(target_version as i64);
@@ -157,23 +133,43 @@ impl RestoreCoordinator {
             snapshot_before_lhs.version
         );
 
-        if let Some(version) = self.global_opt.run_mode.get_in_progress_state_snapshot()? {
-            info!(
-                version = version,
-                "Found in progress state snapshot restore",
-            );
-            ensure!(snapshot_before_lhs.version == version, "Inconsistent in-progress state snapshot version, please delete the data folder and try again.");
-        }
-        info!(target_version = target_version, "Restore target decided.");
+        // Two flags for resuming from a previous in-progress restore
+        // Expected version can be used to tell where to resume when applying writesets or replaying txns
+        // Tree restore in progress can be used to tell the status of 2nd snapshot restore
+        let expected_version = self
+            .global_opt
+            .run_mode
+            .get_next_expected_transaction_version()?;
+        let tree_restore_in_progress = self
+            .global_opt
+            .run_mode
+            .get_state_leaf_count(snapshot_before_target.version)
+            > 0;
+
+        info!(
+            lhs = lhs,
+            target_version = target_version,
+            "Starting restore DB from version {} to {}, snapshot_before_lhs: {}, snapshot_before_target: {}, tree restore in progress: {}, expected_version: {} \n\
+            Note: we only guarantee resume from previous in-progress restore. If you want to restore a new DB, please either specify a new target db dir or delete previous in-progress DB in the target db dir.
+            ",
+            lhs,
+            target_version,
+            snapshot_before_lhs.version,
+            snapshot_before_target.version,
+            tree_restore_in_progress,
+            expected_version,
+        );
         let transaction_backups = metadata_view
             .select_transaction_backups(snapshot_before_lhs.version, target_version)?;
         let epoch_ending_backups = metadata_view.select_epoch_ending_backups(target_version)?;
-        // This is used to t
         let mut expected_txn_history_so_far = None;
 
         // Restore the the state kv between lhs and rs
-        if snapshot_before_lhs.version < snapshot_before_target.version {
-            let start_version = snapshot_before_lhs.version + 1;
+        // Ensure the expected_version is smaller than target_version in case we want to resume from in-progress restore
+        if snapshot_before_lhs.version < snapshot_before_target.version
+            && expected_version <= snapshot_before_target.version
+        {
+            let start_version = max(snapshot_before_lhs.version + 1, expected_version); // resume from the in-progress version
             let epoch_handles = epoch_ending_backups
                 .iter()
                 .filter(|e| e.first_version <= snapshot_before_target.version)
@@ -192,19 +188,22 @@ impl RestoreCoordinator {
             } else {
                 None
             };
-            StateSnapshotRestoreController::new(
-                StateSnapshotRestoreOpt {
-                    manifest_handle: snapshot_before_lhs.manifest,
-                    version: snapshot_before_lhs.version,
-                    validate_modules: false,
-                    restore_mode: StateSnapshotRestoreMode::KvOnly,
-                },
-                self.global_opt.clone(),
-                Arc::clone(&self.storage),
-                epoch_history.clone(),
-            )
-            .run()
-            .await?;
+            // Only restore the snapshot if the expected version is smaller than the snapshot version
+            if expected_version <= snapshot_before_lhs.version {
+                StateSnapshotRestoreController::new(
+                    StateSnapshotRestoreOpt {
+                        manifest_handle: snapshot_before_lhs.manifest,
+                        version: snapshot_before_lhs.version,
+                        validate_modules: false,
+                        restore_mode: StateSnapshotRestoreMode::KvOnly,
+                    },
+                    self.global_opt.clone(),
+                    Arc::clone(&self.storage),
+                    epoch_history.clone(),
+                )
+                .run()
+                .await?;
+            }
             let txn_manifests = transaction_backups
                 .iter()
                 .filter(|e| {
@@ -224,7 +223,7 @@ impl RestoreCoordinator {
                 epoch_history.clone(),
                 VerifyExecutionMode::NoVerify,
                 None,
-                None,
+                Some(start_version as Version),
             )
             .run()
             .await?;
@@ -235,11 +234,13 @@ impl RestoreCoordinator {
 
         // Restore the full snapshot and replay till the target version
         {
+            let start_version = max(expected_version, snapshot_before_target.version + 1);
             let epoch_handles = epoch_ending_backups
                 .iter()
                 .filter(|e| e.first_version <= target_version)
                 .map(|backup| backup.manifest.clone())
                 .collect();
+
             let epoch_history = if !self.skip_epoch_endings {
                 Some(Arc::new(
                     EpochHistoryRestoreController::new(
@@ -253,41 +254,52 @@ impl RestoreCoordinator {
             } else {
                 None
             };
-            // For boostrap DB to latest version, we want to use default mode
-            let restore_mode = if expected_txn_history_so_far.is_some() {
-                StateSnapshotRestoreMode::TreeOnly
-            } else {
-                StateSnapshotRestoreMode::Default
-            };
-            StateSnapshotRestoreController::new(
-                StateSnapshotRestoreOpt {
-                    manifest_handle: snapshot_before_target.manifest.clone(),
-                    version: snapshot_before_target.version,
-                    validate_modules: false,
-                    restore_mode,
-                },
-                self.global_opt.clone(),
-                Arc::clone(&self.storage),
-                epoch_history.clone(),
-            )
-            .run()
-            .await?;
+
+            if expected_version <= snapshot_before_target.version {
+                // For boostrap DB to latest version, we want to use default mode
+                let restore_mode =
+                    if expected_txn_history_so_far.is_some() || tree_restore_in_progress {
+                        StateSnapshotRestoreMode::TreeOnly
+                    } else {
+                        StateSnapshotRestoreMode::Default
+                    };
+
+                StateSnapshotRestoreController::new(
+                    StateSnapshotRestoreOpt {
+                        manifest_handle: snapshot_before_target.manifest.clone(),
+                        version: snapshot_before_target.version,
+                        validate_modules: false,
+                        restore_mode,
+                    },
+                    self.global_opt.clone(),
+                    Arc::clone(&self.storage),
+                    epoch_history.clone(),
+                )
+                .run()
+                .await?;
+            }
 
             let txn_manifests = transaction_backups
                 .iter()
-                .filter(|e| e.last_version >= snapshot_before_target.version)
+                .filter(|e| e.last_version >= start_version)
                 .map(|e| e.manifest.clone())
                 .collect();
 
+            // First version is none if expected version is 0 otherwise it is start version
+            let first_version = if expected_version == 0 {
+                None
+            } else {
+                Some(start_version)
+            };
             TransactionRestoreBatchController::new(
                 self.global_opt,
                 self.storage,
                 txn_manifests,
-                Some(snapshot_before_target.version + 1),
+                Some(start_version),
                 epoch_history,
                 VerifyExecutionMode::NoVerify,
                 None,
-                expected_txn_history_so_far,
+                first_version,
             )
             .run()
             .await?;

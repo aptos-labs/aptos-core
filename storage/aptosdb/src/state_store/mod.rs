@@ -593,6 +593,7 @@ impl StateStore {
         &self,
         write_sets: Vec<WriteSet>,
         first_version: Version,
+        batch: &SchemaBatch,
         sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
@@ -615,6 +616,15 @@ impl StateStore {
 
         let value_state_sets =
             value_state_sets_raw.iter().collect();
+
+        self.put_stats_and_indices(
+            &value_state_sets,
+            first_version,
+            StateStorageUsage::new_untracked(),
+            batch,
+            sharded_state_kv_batches,
+        )?;
+
         self.put_state_value(value_state_sets, first_version, sharded_state_kv_batches)?;
 
         Ok(())

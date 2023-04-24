@@ -250,6 +250,15 @@ impl RestoreRunMode {
         }
     }
 
+    pub fn get_state_leaf_count(&self, version: Version) -> usize {
+        match self {
+            RestoreRunMode::Restore { restore_handler } => {
+                restore_handler.get_state_leaf_count(version)
+            },
+            RestoreRunMode::Verify => 0,
+        }
+    }
+
     pub fn get_in_progress_state_snapshot(&self) -> Result<Option<Version>> {
         match self {
             RestoreRunMode::Restore { restore_handler } => {

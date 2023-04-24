@@ -2102,8 +2102,7 @@ impl DbWriter for AptosDB {
                 &transaction_infos,
                 &events,
                 wsets,
-                Some(&mut batch),
-                Some(&mut sharded_kv_batch), // we don't need to commit this batch since the key value should already be recovered from the snapshot
+                Option::Some((&mut batch, &mut sharded_kv_batch)),
             )?;
 
             // Save the epoch ending ledger infos
