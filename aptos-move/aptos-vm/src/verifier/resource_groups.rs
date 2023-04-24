@@ -118,13 +118,10 @@ pub(crate) fn extract_resource_group_metadata_from_module<S: MoveResolverExt>(
     BTreeMap<String, ResourceGroupScope>,
     BTreeMap<String, StructTag>,
 )> {
-    let metadata = session
-        .get_data_store()
-        .load_module(module_id)
-        .map(|module| {
-            CompiledModule::deserialize(&module)
-                .map(|module| aptos_framework::get_metadata_from_compiled_module(&module))
-        });
+    let metadata = session.load_module(module_id).map(|module| {
+        CompiledModule::deserialize(&module)
+            .map(|module| aptos_framework::get_metadata_from_compiled_module(&module))
+    });
 
     if let Ok(Ok(Some(metadata))) = metadata {
         extract_resource_group_metadata(&metadata)

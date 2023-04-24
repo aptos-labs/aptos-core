@@ -245,13 +245,35 @@ fn test_staking_rewards() {
         rewards_rate_denominator,
     );
 
-    // Another 0.5 year passed. Rewards rate halves. New rewards rate is 0.5% every epoch.
+    // Another 0.5 year passed. Rewards rate halves. New rewards after this epoch rate is 0.5% every epoch.
     // Both validators propose a block in the current epoch. Both should receive rewards.
     harness.new_block_with_metadata(validator_1_address, vec![]);
     harness.new_block_with_metadata(validator_2_address, vec![]);
     harness.fast_forward(one_year_in_secs / 2);
     harness.new_epoch();
+    update_stake_amount_and_assert_with_errors(
+        &mut harness,
+        &mut stake_amount_1,
+        validator_1_address,
+        rewards_rate,
+        rewards_rate_denominator,
+    );
+    update_stake_amount_and_assert_with_errors(
+        &mut harness,
+        &mut stake_amount_2,
+        validator_2_address,
+        rewards_rate,
+        rewards_rate_denominator,
+    );
     rewards_rate = rewards_rate * rewards_rate_decrease_rate_bps / bps_denominator;
+
+    // Another new epoch, both validators receive rewards in 0.5% every epoch.
+    // Another year passed. Rewards rate halves but it cannot be lower than 0.3%.
+    // New rewards rate of the next epoch is 0.3% every epoch.
+    harness.new_block_with_metadata(validator_1_address, vec![]);
+    harness.new_block_with_metadata(validator_2_address, vec![]);
+    harness.fast_forward(one_year_in_secs);
+    harness.new_epoch();
     update_stake_amount_and_assert_with_errors(
         &mut harness,
         &mut stake_amount_1,
@@ -267,11 +289,8 @@ fn test_staking_rewards() {
         rewards_rate_denominator,
     );
 
-    // Another year passed. Rewards rate halves but it cannot be lower than 0.3%.
-    // New rewards rate is 0.3% every epoch.
     // Validator 1 misses one proposal but has one successful so they receive half of the rewards.
     harness.new_block_with_metadata(validator_1_address, vec![index_1]);
-    harness.fast_forward(one_year_in_secs);
     harness.new_epoch();
     rewards_rate = min_rewards_rate / 2;
     update_stake_amount_and_assert_with_errors(

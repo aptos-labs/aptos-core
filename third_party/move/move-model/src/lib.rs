@@ -9,7 +9,6 @@ use crate::{
     builder::{model_builder::ModelBuilder, module_builder::BytecodeModule},
     model::{FunId, FunctionData, GlobalEnv, Loc, ModuleData, ModuleId, StructId},
     options::ModelBuilderOptions,
-    simplifier::{SpecRewriter, SpecRewriterPipeline},
 };
 use builder::module_builder::ModuleBuilder;
 use codespan::ByteIndex;
@@ -59,7 +58,6 @@ pub mod intrinsics;
 pub mod model;
 pub mod options;
 pub mod pragmas;
-pub mod simplifier;
 pub mod spec_translator;
 pub mod symbol;
 pub mod ty;
@@ -613,19 +611,6 @@ fn run_model_compiler(
 
     // After all specs have been processed, warn about any unused schemas.
     builder.warn_unused_schemas();
-
-    // Apply simplification passes
-    run_spec_simplifier(env);
-}
-
-fn run_spec_simplifier(env: &mut GlobalEnv) {
-    let options = env
-        .get_extension::<ModelBuilderOptions>()
-        .expect("options for model builder");
-    let mut rewriter = SpecRewriterPipeline::new(&options.simplification_pipeline);
-    rewriter
-        .override_with_rewrite(env)
-        .unwrap_or_else(|e| panic!("Failed to run spec simplification: {}", e))
 }
 
 fn retrospective_lambda_lifting(

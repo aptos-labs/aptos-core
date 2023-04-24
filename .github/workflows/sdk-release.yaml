@@ -63,7 +63,7 @@ jobs:
       # https://github.com/actions/setup-node/issues/182
       - uses: pnpm/action-setup@v2
         with:
-          version: 7.14.2
+          version: 8.2.0
 
       # When using high-perf-docker, the CI is actually run with two containers
       # in a k8s pod, one for docker commands run in the CI steps (docker), and

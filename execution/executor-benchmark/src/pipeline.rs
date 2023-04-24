@@ -17,6 +17,13 @@ use std::{
     thread::JoinHandle,
 };
 
+#[derive(Clone, Debug)]
+pub struct PipelineConfig {
+    pub split_stages: bool,
+    pub allow_discards: bool,
+    pub allow_aborts: bool,
+}
+
 pub struct Pipeline<V> {
     join_handles: Vec<JoinHandle<()>>,
     phantom: PhantomData<V>,
@@ -30,7 +37,7 @@ where
     pub fn new(
         executor: BlockExecutor<V, BenchmarkTransaction>,
         version: Version,
-        split_stages: bool,
+        config: PipelineConfig,
     ) -> (Self, mpsc::SyncSender<Vec<BenchmarkTransaction>>) {
         let parent_block_id = executor.committed_block_id();
         let executor_1 = Arc::new(executor);
@@ -39,7 +46,7 @@ where
         let (block_sender, block_receiver) =
             mpsc::sync_channel::<Vec<BenchmarkTransaction>>(50 /* bound */);
         let (commit_sender, commit_receiver) =
-            mpsc::sync_channel(if split_stages { 10000 } else { 3 } /* bound */);
+            mpsc::sync_channel(if config.split_stages { 10000 } else { 3 } /* bound */);
 
         let exe_thread = std::thread::Builder::new()
             .name("txn_executor".to_string())
@@ -49,6 +56,8 @@ where
                     parent_block_id,
                     version,
                     Some(commit_sender),
+                    config.allow_discards,
+                    config.allow_aborts,
                 );
                 while let Ok(transactions) = block_receiver.recv() {
                     info!("Received block of size {:?} to execute", transactions.len());
@@ -57,7 +66,7 @@ where
             })
             .expect("Failed to spawn transaction executor thread.");
 
-        let (start_commit_tx, start_commit_rx) = if split_stages {
+        let (start_commit_tx, start_commit_rx) = if config.split_stages {
             let (start_commit_tx, start_commit_rx) = mpsc::sync_channel::<()>(1);
             (Some(start_commit_tx), Some(start_commit_rx))
         } else {

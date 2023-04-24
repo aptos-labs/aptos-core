@@ -26,7 +26,7 @@ spec aptos_framework::consensus_config {
         use aptos_framework::transaction_fee;
         use aptos_framework::staking_config;
 
-        pragma verify = false; // TODO: set to false because of timeout
+        pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved)
 
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
         include staking_config::StakingRewardsConfigRequirement;

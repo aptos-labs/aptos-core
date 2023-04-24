@@ -17,8 +17,8 @@ For a more comprehensive view of this process, see [Build an End-to-End Dapp on 
 We will use the:
 
 * [TypeScript SDK](../sdks/ts-sdk/index.md)
-* [Petra Wallet](../guides/install-petra-wallet.md)
-* [Aptos CLI](../cli-tools/aptos-cli-tool/use-aptos-cli.md)
+* [Petra Wallet](https://petra.app)
+* [Aptos CLI](../tools/aptos-cli-tool/use-aptos-cli.md)
 
 :::tip Full source code
 
@@ -29,8 +29,7 @@ We recommend becoming familiar with the newer full source code documented in the
 
 ### Aptos Wallet
 
-Before starting this tutorial, you'll need a chrome extension wallet to interact with the dapp. You can first install
-the [Petra wallet extension](../guides/install-petra-wallet.md) for use in this tutorial.
+Before starting this tutorial, you'll need a chrome extension wallet to interact with the dapp, such as, the the [Petra wallet extension](https://petra.app).
 
 If you haven't installed the Petra wallet extension before:
 1. Open the Wallet and click **Create a new wallet**. Then click **Create account** to create an Aptos Account.
@@ -52,7 +51,7 @@ Ensure your account has sufficient funds to perform transactions by clicking the
 
 We will also be installing the Aptos CLI so that we can publish 
 
-1. Install the [Aptos CLI](../cli-tools/aptos-cli-tool/index.md).
+1. Install the [Aptos CLI](../tools/install-cli/index.md).
 
 2. Run `aptos init --profile my-first-nft`.
 
@@ -841,6 +840,6 @@ This concludes the tutorial.
 
 ## Supporting documentation
 
-* [Aptos CLI](../cli-tools/aptos-cli-tool/use-aptos-cli.md)
+* [Aptos CLI](../tools/aptos-cli-tool/use-aptos-cli.md)
 * [TypeScript SDK](../sdks/ts-sdk/index.md)
-* [Wallet Standard](../guides/wallet-standard.md)
+* [Wallet Standard](../standards/wallets.md)

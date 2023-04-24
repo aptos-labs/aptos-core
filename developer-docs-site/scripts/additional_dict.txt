@@ -396,6 +396,7 @@ monorepo
 multinode
 multisig
 multisignature
+multisigner
 namespace
 natively
 nestable

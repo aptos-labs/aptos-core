@@ -175,6 +175,15 @@ Staking reward configurations that will be stored with the @aptos_framework acco
 ## Constants
 
 
+<a name="0x1_staking_config_MAX_U64"></a>
+
+
+
+<pre><code><b>const</b> <a href="staking_config.md#0x1_staking_config_MAX_U64">MAX_U64</a>: u128 = 18446744073709551615;
+</code></pre>
+
+
+
 <a name="0x1_staking_config_BPS_DENOMINATOR"></a>
 
 Denominator of number in basis points. 1 bps(basis points) = 0.01%.
@@ -536,8 +545,7 @@ withdraw all funds).
 
 ## Function `get_reward_rate`
 
-DEPRECATING
-Return the reward rate.
+Return the reward rate of this epoch.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="staking_config.md#0x1_staking_config_get_reward_rate">get_reward_rate</a>(config: &<a href="staking_config.md#0x1_staking_config_StakingConfig">staking_config::StakingConfig</a>): (u64, u64)
@@ -549,9 +557,25 @@ Return the reward rate.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="staking_config.md#0x1_staking_config_get_reward_rate">get_reward_rate</a>(config: &<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>): (u64, u64) {
-    <b>assert</b>!(!<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_periodical_reward_rate_decrease_enabled">features::periodical_reward_rate_decrease_enabled</a>(), <a href="staking_config.md#0x1_staking_config_EDEPRECATED_FUNCTION">EDEPRECATED_FUNCTION</a>);
-    (config.rewards_rate, config.rewards_rate_denominator)
+<pre><code><b>public</b> <b>fun</b> <a href="staking_config.md#0x1_staking_config_get_reward_rate">get_reward_rate</a>(config: &<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>): (u64, u64) <b>acquires</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a> {
+    <b>let</b> (rewards_rate, rewards_rate_denominator) = <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_periodical_reward_rate_decrease_enabled">features::periodical_reward_rate_decrease_enabled</a>()) {
+        <b>let</b> epoch_rewards_rate = <b>borrow_global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a>&gt;(@aptos_framework).rewards_rate;
+        <b>if</b> (<a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_is_zero">fixed_point64::is_zero</a>(epoch_rewards_rate)) {
+            (0u64, 1u64)
+        } <b>else</b> {
+            // Maximize denominator for higher precision.
+            // Restriction: nominator &lt;= <a href="staking_config.md#0x1_staking_config_MAX_REWARDS_RATE">MAX_REWARDS_RATE</a> && denominator &lt;= <a href="staking_config.md#0x1_staking_config_MAX_U64">MAX_U64</a>
+            <b>let</b> denominator = <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_divide_u128">fixed_point64::divide_u128</a>((<a href="staking_config.md#0x1_staking_config_MAX_REWARDS_RATE">MAX_REWARDS_RATE</a> <b>as</b> u128), epoch_rewards_rate);
+            <b>if</b> (denominator &gt; <a href="staking_config.md#0x1_staking_config_MAX_U64">MAX_U64</a>) {
+                denominator = <a href="staking_config.md#0x1_staking_config_MAX_U64">MAX_U64</a>
+            };
+            <b>let</b> nominator = (<a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_multiply_u128">fixed_point64::multiply_u128</a>(denominator, epoch_rewards_rate) <b>as</b> u64);
+            (nominator, (denominator <b>as</b> u64))
+        }
+    } <b>else</b> {
+        (config.rewards_rate, config.rewards_rate_denominator)
+    };
+    (rewards_rate, rewards_rate_denominator)
 }
 </code></pre>
 
@@ -1146,7 +1170,7 @@ StakingRewardsConfig does not exist under the aptos_framework before creating it
 
 
 
-<pre><code><b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_reward_rate_decrease_enabled">features::spec_reward_rate_decrease_enabled</a>();
+<pre><code><b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">StakingRewardsConfigRequirement</a>;
 </code></pre>
 
 
@@ -1163,7 +1187,7 @@ StakingRewardsConfig does not exist under the aptos_framework before creating it
 
 
 <pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a>&gt;(@aptos_framework);
-<b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_reward_rate_decrease_enabled">features::spec_reward_rate_decrease_enabled</a>();
+<b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_periodical_reward_rate_decrease_enabled">features::spec_periodical_reward_rate_decrease_enabled</a>();
 <b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">StakingRewardsConfigRequirement</a>;
 </code></pre>
 
@@ -1180,7 +1204,7 @@ StakingRewardsConfig does not exist under the aptos_framework before creating it
 
 
 
-<pre><code><b>requires</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_reward_rate_decrease_enabled">features::spec_reward_rate_decrease_enabled</a>();
+<pre><code><b>requires</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_periodical_reward_rate_decrease_enabled">features::spec_periodical_reward_rate_decrease_enabled</a>();
 <b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">StakingRewardsConfigRequirement</a>;
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a>&gt;(@aptos_framework);
 </code></pre>
@@ -1247,7 +1271,7 @@ The <code>rewards_rate</code> which is the numerator is limited to be <code>&lt;
 rewards_rate/rewards_rate_denominator <= 1.
 
 
-<pre><code><b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_reward_rate_decrease_enabled">features::spec_reward_rate_decrease_enabled</a>();
+<pre><code><b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_periodical_reward_rate_decrease_enabled">features::spec_periodical_reward_rate_decrease_enabled</a>();
 <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
 <b>aborts_if</b> addr != @aptos_framework;
 <b>aborts_if</b> new_rewards_rate_denominator &lt;= 0;

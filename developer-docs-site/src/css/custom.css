@@ -1200,3 +1200,24 @@ html[data-theme='dark'] .sidebar-divider {
     margin-left: 1rem;
   }
 }
+
+.contributors {
+  margin-left: 50px;
+  margin-right: 50px;
+}
+
+.contributors-list {
+  display: flex;
+  flex-wrap: wrap;
+  margin: auto;
+}
+
+.contributor {
+  width: 210px;
+  padding: 5px;
+}
+
+.contributor-pic {
+  height: 60px;
+  width: 60px;
+}

@@ -170,7 +170,7 @@ Ensure the caller is admin and <code><a href="consensus_config.md#0x1_consensus_
 When setting now time must be later than last_reconfiguration_time.
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> verify_duration_estimate = 120;
 <b>include</b> <a href="transaction_fee.md#0x1_transaction_fee_RequiresCollectedFeesPerValueLeqBlockAptosSupply">transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply</a>;
 <b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">staking_config::StakingRewardsConfigRequirement</a>;
 <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);

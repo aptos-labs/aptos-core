@@ -171,30 +171,30 @@ macro_rules! safely_pop_type_arg {
 }
 
 #[allow(unused)]
-pub struct SafeNativeContext<'a, 'b, 'c> {
+pub struct SafeNativeContext<'a, 'b, 'c, 'd> {
     timed_features: &'c TimedFeatures,
     features: Arc<Features>,
-    inner: &'c mut NativeContext<'a, 'b>,
+    inner: &'c mut NativeContext<'a, 'b, 'd>,
 
     gas_budget: InternalGas,
     gas_used: InternalGas,
 }
 
-impl<'a, 'b, 'c> Deref for SafeNativeContext<'a, 'b, 'c> {
-    type Target = NativeContext<'a, 'b>;
+impl<'a, 'b, 'c, 'd> Deref for SafeNativeContext<'a, 'b, 'c, 'd> {
+    type Target = NativeContext<'a, 'b, 'd>;
 
     fn deref(&self) -> &Self::Target {
         self.inner
     }
 }
 
-impl<'a, 'b, 'c> DerefMut for SafeNativeContext<'a, 'b, 'c> {
+impl<'a, 'b, 'c, 'd> DerefMut for SafeNativeContext<'a, 'b, 'c, 'd> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.inner
     }
 }
 
-impl<'a, 'b, 'c> SafeNativeContext<'a, 'b, 'c> {
+impl<'a, 'b, 'c, 'd> SafeNativeContext<'a, 'b, 'c, 'd> {
     /// Always remember: first charge gas, then execute!
     ///
     /// In other words, this function **MUST** always be called **BEFORE** executing **any**
