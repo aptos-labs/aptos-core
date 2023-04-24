@@ -282,9 +282,9 @@ module veiled_coin::veiled_coin {
         sender: &signer, 
         recipient: address, 
         amount: u32, 
-        range_proof_updated_balance_bytes: vector<u8>) acquires VeiledCoinStore, VeiledCoinMinter
+        range_proof_updated_balance: vector<u8>) acquires VeiledCoinStore, VeiledCoinMinter
     {
-        let range_proof_updated_balance = bulletproofs::range_proof_from_bytes(range_proof_updated_balance_bytes);
+        let range_proof_updated_balance = bulletproofs::range_proof_from_bytes(range_proof_updated_balance);
     
         let c = unwrap_to_coin<CoinType>(sender, amount, &range_proof_updated_balance);
         coin::deposit<CoinType>(recipient, c);
@@ -302,8 +302,8 @@ module veiled_coin::veiled_coin {
         recipient: address, 
         withdraw_ct: vector<u8>, 
         deposit_ct: vector<u8>, 
-        range_proof_updated_balance_bytes: vector<u8>, 
-        range_proof_transferred_amount_bytes: vector<u8>,
+        range_proof_updated_balance: vector<u8>, 
+        range_proof_transferred_amount: vector<u8>,
         sigma_proof_bytes: vector<u8>) acquires VeiledCoinStore 
     {
         let private_withdraw_amount = elgamal::new_ciphertext_from_bytes(withdraw_ct);
@@ -313,8 +313,8 @@ module veiled_coin::veiled_coin {
         let sigma_proof = deserialize_sigma_proof<CoinType>(sigma_proof_bytes);
         assert!(std::option::is_some(&sigma_proof), EDESERIALIZATION_FAILED);
 
-        let updated_balance_proof = bulletproofs::range_proof_from_bytes(range_proof_updated_balance_bytes);
-        let transferred_amount_proof = bulletproofs::range_proof_from_bytes(range_proof_transferred_amount_bytes);
+        let updated_balance_proof = bulletproofs::range_proof_from_bytes(range_proof_updated_balance);
+        let transferred_amount_proof = bulletproofs::range_proof_from_bytes(range_proof_transferred_amount);
 
         let transfer_proof = VeiledTransferProof { updated_balance_proof, transferred_amount_proof, sigma_proof: std::option::extract(&mut sigma_proof) };
 
@@ -555,8 +555,8 @@ module veiled_coin::veiled_coin {
     public fun unwrap_to_coin<CoinType>(
         sender: &signer, 
         amount: u32,
-        range_proof_updated_balance: &RangeProof): Coin<CoinType> acquires VeiledCoinStore, VeiledCoinMinter {
-    // resource account signer should exist as wrap_to_coin should already have been called
+        updated_balance: &RangeProof): Coin<CoinType> acquires VeiledCoinStore, VeiledCoinMinter {
+        // resource account signer should exist as wrap_to_coin should already have been called
         let rsrc_acc_signer = get_resource_account_signer();
         let scalar_amount = new_scalar_from_u64((amount as u64));
         let computed_ct = elgamal::new_ciphertext_no_randomness(&scalar_amount);
@@ -564,7 +564,7 @@ module veiled_coin::veiled_coin {
         let sender_addr = signer::address_of(sender);
         let sender_coin_store = borrow_global_mut<VeiledCoinStore<CoinType>>(sender_addr);
 
-        withdraw(sender, computed_ct, sender_coin_store, range_proof_updated_balance, &std::option::none());
+        withdraw(sender, computed_ct, sender_coin_store, updated_balance, &std::option::none());
         coin::withdraw(&rsrc_acc_signer, (amount as u64))
     }
 
@@ -628,8 +628,8 @@ module veiled_coin::veiled_coin {
         account: &signer,
         withdraw_amount: Ciphertext,
         coin_store: &mut VeiledCoinStore<CoinType>,
-        range_proof_updated_balance: &RangeProof,
-        range_proof_transferred_amount: &Option<RangeProof>,
+        updated_balance: &RangeProof,
+        transferred_amount: &Option<RangeProof>,
     ) {
         let account_addr = signer::address_of(account);
         assert!(
@@ -658,9 +658,9 @@ module veiled_coin::veiled_coin {
     // and therefore that 'bal' >= 'amount'. Note that when unwrapping some amount of 
     // VeiledCoin, `amount` will be public and already enforced to be 32 bits so that checking
         // the range proof for its size is unnecessary. 
-        assert!(bulletproofs::verify_range_proof_elgamal(&private_balance, range_proof_updated_balance, pubkey, MAX_BITS_IN_VALUE, VEILED_COIN_DST), ERANGE_PROOF_VERIFICATION_FAILED);
-        if (std::option::is_some(range_proof_transferred_amount)) {
-            assert!(bulletproofs::verify_range_proof_elgamal(&withdraw_amount, &std::option::extract(&mut *range_proof_transferred_amount), pubkey, MAX_BITS_IN_VALUE, VEILED_COIN_DST), ERANGE_PROOF_VERIFICATION_FAILED);
+        assert!(bulletproofs::verify_range_proof_elgamal(&private_balance, updated_balance, pubkey, MAX_BITS_IN_VALUE, VEILED_COIN_DST), ERANGE_PROOF_VERIFICATION_FAILED);
+        if (std::option::is_some(transferred_amount)) {
+            assert!(bulletproofs::verify_range_proof_elgamal(&withdraw_amount, &std::option::extract(&mut *transferred_amount), pubkey, MAX_BITS_IN_VALUE, VEILED_COIN_DST), ERANGE_PROOF_VERIFICATION_FAILED);
         };
         coin_store.private_balance = elgamal::compress_ciphertext(&private_balance);
     }
