@@ -178,8 +178,6 @@ async fn test_no_failures() {
     )
     .await
     .unwrap();
-
-    assert!(false);
 }
 
 #[tokio::test]
