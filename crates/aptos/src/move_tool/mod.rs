@@ -3,12 +3,12 @@
 
 mod aptos_debug_natives;
 pub mod coverage;
+mod disassembler;
 mod manifest;
 pub mod package_hooks;
 mod show;
 pub mod stored_package;
 mod transactional_tests_runner;
-mod disassembler;
 
 use crate::{
     account::derive_resource_account::ResourceAccountSeed,
@@ -26,6 +26,7 @@ use crate::{
     governance::CompileScriptFunction,
     move_tool::{
         coverage::SummaryCoverage,
+        disassembler::Disassemble,
         manifest::{Dependency, ManifestNamedAddress, MovePackageManifest, PackageInfo},
     },
     CliCommand, CliResult,
@@ -71,7 +72,6 @@ use std::{
 pub use stored_package::*;
 use tokio::task;
 use transactional_tests_runner::TransactionalTestOpts;
-use crate::move_tool::disassembler::AptosDisassembler;
 
 /// Tool for Move related operations
 ///
@@ -86,7 +86,7 @@ pub enum MoveTool {
     #[clap(subcommand)]
     Coverage(coverage::CoveragePackage),
     CreateResourceAccountAndPublishPackage(CreateResourceAccountAndPublishPackage),
-    Disassemble(AptosDisassembler),
+    Disassemble(Disassemble),
     Document(DocumentPackage),
     Download(DownloadPackage),
     Init(InitPackage),
