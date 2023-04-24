@@ -103,46 +103,22 @@ pub(crate) fn save_transactions(
     txn_infos: &[TransactionInfo],
     events: &[Vec<ContractEvent>],
     write_sets: Vec<WriteSet>,
-    existing_batch: Option<&mut SchemaBatch>,
-    sharded_kv_schema_batch: Option<&mut ShardedStateKvSchemaBatch>,
+    existing_batch: Option<(&mut SchemaBatch, &mut ShardedStateKvSchemaBatch)>,
 ) -> Result<()> {
     if let Some(existing_batch) = existing_batch {
-        if let Some(sharded_kv_schema_batch) = sharded_kv_schema_batch {
-            save_transactions_impl(
-                ledger_store,
-                transaction_store,
-                event_store,
-                state_store,
-                first_version,
-                txns,
-                txn_infos,
-                events,
-                write_sets.as_ref(),
-                existing_batch,
-                sharded_kv_schema_batch,
-            )?;
-        } else {
-            let mut sharded_kv_schema_batch = new_sharded_kv_schema_batch();
-            save_transactions_impl(
-                ledger_store,
-                transaction_store,
-                event_store,
-                Arc::clone(&state_store),
-                first_version,
-                txns,
-                txn_infos,
-                events,
-                write_sets.as_ref(),
-                existing_batch,
-                &mut sharded_kv_schema_batch,
-            )?;
-            // get the last version and commit to the state kv db
-            let last_version = first_version + txns.len() as u64 - 1;
-            state_store
-                .state_db
-                .state_kv_db
-                .commit(last_version, sharded_kv_schema_batch)?;
-        }
+        save_transactions_impl(
+            ledger_store,
+            transaction_store,
+            event_store,
+            state_store,
+            first_version,
+            txns,
+            txn_infos,
+            events,
+            write_sets.as_ref(),
+            existing_batch.0,
+            existing_batch.1,
+        )?;
     } else {
         let mut batch = SchemaBatch::new();
         let mut sharded_kv_schema_batch = new_sharded_kv_schema_batch();
@@ -159,13 +135,15 @@ pub(crate) fn save_transactions(
             &mut batch,
             &mut sharded_kv_schema_batch,
         )?;
-        db.write_schemas(batch)?;
         // get the last version and commit to the state kv db
+        // commit the state kv before ledger in case of failure happens
         let last_version = first_version + txns.len() as u64 - 1;
         state_store
             .state_db
             .state_kv_db
             .commit(last_version, sharded_kv_schema_batch)?;
+
+        db.write_schemas(batch)?;
     }
 
     Ok(())
@@ -239,7 +217,7 @@ pub(crate) fn save_transactions_impl(
         transaction_store.put_write_set(first_version + idx as Version, ws, batch)?;
     }
     // only write kv and not update the state tree
-    state_store.put_write_sets(write_sets.to_vec(), first_version, state_kv_batches)?;
+    state_store.put_write_sets(write_sets.to_vec(), first_version, batch, state_kv_batches)?;
 
     Ok(())
 }

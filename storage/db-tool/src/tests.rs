@@ -18,7 +18,8 @@ use aptos_types::{
     transaction::Version,
 };
 use clap::Parser;
-use std::{ops::Deref, sync::Arc, time::Duration};
+use std::{ops::Deref, path::PathBuf, sync::Arc, time::Duration};
+use tokio::runtime::Runtime;
 
 #[test]
 fn test_various_cmd_parsing() {
@@ -392,16 +393,19 @@ fn test_backup_compaction() {
 }
 
 #[cfg(test)]
-fn db_restore_test_setup(start: Version, end: Version) {
+fn db_restore_test_setup(
+    start: Version,
+    end: Version,
+    backup_dir: PathBuf,
+    new_db_dir: PathBuf,
+) -> (Runtime, String) {
     use aptos_db::utils::iterators::PrefixedStateValueIterator;
     use aptos_storage_interface::DbReader;
     use itertools::zip_eq;
+
     let db = test_execution_with_storage_impl();
-    let backup_dir = TempPath::new();
-    backup_dir.create_as_dir().unwrap();
     let (rt, port) = start_local_backup_service(Arc::clone(&db));
     let server_addr = format!(" http://localhost:{}", port);
-
     // Backup the local_test DB
     rt.block_on(
         DBTool::try_parse_from([
@@ -416,7 +420,7 @@ fn db_restore_test_setup(start: Version, end: Version) {
             "--end-epoch",
             "1",
             "--local-fs-dir",
-            backup_dir.path().to_str().unwrap(),
+            backup_dir.as_path().to_str().unwrap(),
         ])
         .unwrap()
         .run(),
@@ -436,7 +440,7 @@ fn db_restore_test_setup(start: Version, end: Version) {
             "--end-epoch",
             "2",
             "--local-fs-dir",
-            backup_dir.path().to_str().unwrap(),
+            backup_dir.as_path().to_str().unwrap(),
         ])
         .unwrap()
         .run(),
@@ -454,7 +458,7 @@ fn db_restore_test_setup(start: Version, end: Version) {
             "--state-snapshot-epoch",
             "0",
             "--local-fs-dir",
-            backup_dir.path().to_str().unwrap(),
+            backup_dir.as_path().to_str().unwrap(),
         ])
         .unwrap()
         .run(),
@@ -472,7 +476,7 @@ fn db_restore_test_setup(start: Version, end: Version) {
             "--state-snapshot-epoch",
             "1",
             "--local-fs-dir",
-            backup_dir.path().to_str().unwrap(),
+            backup_dir.as_path().to_str().unwrap(),
         ])
         .unwrap()
         .run(),
@@ -490,7 +494,7 @@ fn db_restore_test_setup(start: Version, end: Version) {
             "--state-snapshot-epoch",
             "2",
             "--local-fs-dir",
-            backup_dir.path().to_str().unwrap(),
+            backup_dir.as_path().to_str().unwrap(),
         ])
         .unwrap()
         .run(),
@@ -509,7 +513,7 @@ fn db_restore_test_setup(start: Version, end: Version) {
             "--num_transactions",
             "15",
             "--local-fs-dir",
-            backup_dir.path().to_str().unwrap(),
+            backup_dir.as_path().to_str().unwrap(),
         ])
         .unwrap()
         .run(),
@@ -528,14 +532,13 @@ fn db_restore_test_setup(start: Version, end: Version) {
             "--num_transactions",
             "15",
             "--local-fs-dir",
-            backup_dir.path().to_str().unwrap(),
+            backup_dir.as_path().to_str().unwrap(),
         ])
         .unwrap()
         .run(),
     )
     .unwrap();
     // boostrap a historical DB starting from version 1 to version 12
-    let new_db_dir = TempPath::new();
     rt.block_on(
         DBTool::try_parse_from([
             "aptos-db-tool",
@@ -546,9 +549,9 @@ fn db_restore_test_setup(start: Version, end: Version) {
             "--target-version",
             format!("{}", end).as_str(),
             "--target-db-dir",
-            new_db_dir.path().to_str().unwrap(),
+            new_db_dir.as_path().to_str().unwrap(),
             "--local-fs-dir",
-            backup_dir.path().to_str().unwrap(),
+            backup_dir.as_path().to_str().unwrap(),
         ])
         .unwrap()
         .run(),
@@ -556,13 +559,8 @@ fn db_restore_test_setup(start: Version, end: Version) {
     .unwrap();
 
     // verify the new DB has the same data as the original DB
-    let (ledger_db, tree_db, _) = AptosDB::open_dbs(
-        new_db_dir.path().to_path_buf(),
-        RocksdbConfigs::default(),
-        true,
-        0,
-    )
-    .unwrap();
+    let (ledger_db, tree_db, _) =
+        AptosDB::open_dbs(new_db_dir, RocksdbConfigs::default(), true, 0).unwrap();
 
     // assert the kv are the same in db and new_db
     // current all the kv are still stored in the ledger db
@@ -602,16 +600,69 @@ fn db_restore_test_setup(start: Version, end: Version) {
         "root hash at version {} doesn't exist",
         second_snapshot_version,
     );
-
-    rt.shutdown_timeout(Duration::from_secs(1));
+    (rt, server_addr)
 }
 #[test]
 fn test_restore_db_with_replay() {
+    let backup_dir = TempPath::new();
+    backup_dir.create_as_dir().unwrap();
+    let new_db_dir = TempPath::new();
     // Test the basic db boostrap that replays from previous snapshot to the target version
-    db_restore_test_setup(16, 16);
+    let (rt, _) = db_restore_test_setup(
+        16,
+        16,
+        PathBuf::from(backup_dir.path()),
+        PathBuf::from(new_db_dir.path()),
+    );
+    rt.shutdown_timeout(Duration::from_secs(1));
 }
 #[test]
 fn test_restore_archive_db() {
+    let backup_dir = TempPath::new();
+    backup_dir.create_as_dir().unwrap();
+    let new_db_dir = TempPath::new();
     // Test the db boostrap in some historical range with all the kvs restored
-    db_restore_test_setup(1, 16);
+    let (rt, _) = db_restore_test_setup(
+        1,
+        16,
+        PathBuf::from(backup_dir.path()),
+        PathBuf::from(new_db_dir.path()),
+    );
+    rt.shutdown_timeout(Duration::from_secs(1));
+}
+
+#[test]
+fn test_resume_db_restore() {
+    let backup_dir = TempPath::new();
+    backup_dir.create_as_dir().unwrap();
+    let new_db_dir = TempPath::new();
+    new_db_dir.create_as_dir().unwrap();
+    // Test the basic db boostrap that replays from previous snapshot to the target version
+    let (rt, _) = db_restore_test_setup(
+        1,
+        16,
+        PathBuf::from(backup_dir.path()),
+        PathBuf::from(new_db_dir.path()),
+    );
+    // boostrap a historical DB starting from version 1 to version 18
+    // This only replays the txn from txn 17 to 18
+    rt.block_on(
+        DBTool::try_parse_from([
+            "aptos-db-tool",
+            "restore",
+            "bootstrap-db",
+            "--ledger-history-start-version",
+            "1",
+            "--target-version",
+            "18",
+            "--target-db-dir",
+            new_db_dir.path().to_str().unwrap(),
+            "--local-fs-dir",
+            backup_dir.path().to_str().unwrap(),
+        ])
+        .unwrap()
+        .run(),
+    )
+    .unwrap();
+    rt.shutdown_timeout(Duration::from_secs(1));
 }

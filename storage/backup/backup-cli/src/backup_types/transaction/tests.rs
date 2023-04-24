@@ -140,6 +140,7 @@ fn end_to_end() {
     ) {
         assert_eq!(restore_ws, org_ws);
     }
+
     // Get all the key value pairs and compare if they are the same
     let state_key_value_pairs_old = src_db
         .get_prefixed_state_value_iterator(

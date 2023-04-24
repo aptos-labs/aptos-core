@@ -556,7 +556,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         Ok(end_version)
     }
 
-    /// Consume end_version - begin_version txns from the mutable input arguments
+    /// Consume 'end_version - begin_version' txns from the mutable input arguments
     /// It's guaranteed that there's no known broken versions or epoch endings in the range.
     fn remove_and_apply(
         &self,

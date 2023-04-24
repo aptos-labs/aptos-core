@@ -425,7 +425,7 @@ impl TransactionRestoreBatchController {
                         first_version = global_first_version;
                     }
 
-                    // identify txn that to be saved before the first_to_replay version
+                    // identify txns to be saved before the first_to_replay version
                     if first_version < first_to_replay {
                         let num_to_save =
                             (min(first_to_replay, last_version + 1) - first_version) as usize;
@@ -454,6 +454,7 @@ impl TransactionRestoreBatchController {
                             "Transactions saved."
                         );
                     }
+
                     // create iterator of txn and its outputs to be replayed after the snapshot.
                     Ok(stream::iter(
                         izip!(txns, txn_infos, write_sets, event_vecs)

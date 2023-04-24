@@ -84,18 +84,24 @@ impl FromStr for StateSnapshotRestoreMode {
 struct StateValueRestore<K, V> {
     version: Version,
     db: Arc<dyn StateValueWriter<K, V>>,
+    restore_mode: StateSnapshotRestoreMode,
 }
 
 impl<K: Key + CryptoHash + Eq + Hash, V: Value> StateValueRestore<K, V> {
-    pub fn new<D: 'static + StateValueWriter<K, V>>(db: Arc<D>, version: Version) -> Self {
-        Self { version, db }
+    pub fn new<D: 'static + StateValueWriter<K, V>>(
+        db: Arc<D>,
+        version: Version,
+        restore_mode_opt: Option<StateSnapshotRestoreMode>,
+    ) -> Self {
+        let restore_mode = restore_mode_opt.unwrap_or_default();
+        Self {
+            version,
+            db,
+            restore_mode,
+        }
     }
 
-    pub fn add_chunk(
-        &mut self,
-        mut chunk: Vec<(K, V)>,
-        restore_mode: StateSnapshotRestoreMode,
-    ) -> Result<()> {
+    pub fn add_chunk(&mut self, mut chunk: Vec<(K, V)>) -> Result<()> {
         // load progress
         let progress_opt = self.db.get_progress(self.version)?;
 
@@ -123,7 +129,7 @@ impl<K: Key + CryptoHash + Eq + Hash, V: Value> StateValueRestore<K, V> {
             usage.add_item(k.key_size() + v.value_size());
         }
 
-        let kv_batch: StateValueBatch<K, Option<V>> = match restore_mode {
+        let kv_batch: StateValueBatch<K, Option<V>> = match self.restore_mode {
             StateSnapshotRestoreMode::TreeOnly => StateValueBatch::new(),
             _ => chunk
                 .into_iter()
@@ -178,6 +184,7 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotRestore<K, V> {
             kv_restore: Arc::new(Mutex::new(Some(StateValueRestore::new(
                 Arc::clone(value_store),
                 version,
+                Some(restore_mode),
             )))),
             restore_mode,
         })
@@ -199,6 +206,7 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotRestore<K, V> {
             kv_restore: Arc::new(Mutex::new(Some(StateValueRestore::new(
                 Arc::clone(value_store),
                 version,
+                Some(restore_mode),
             )))),
             restore_mode,
         })
@@ -245,7 +253,7 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotReceiver<K, V>
                 .lock()
                 .as_mut()
                 .unwrap()
-                .add_chunk(chunk.clone(), self.restore_mode)
+                .add_chunk(chunk.clone())
         };
 
         let tree_fn = || {
@@ -262,13 +270,8 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotReceiver<K, V>
         // tree after crashing.
         match self.restore_mode {
             StateSnapshotRestoreMode::KvOnly => kv_fn()?,
-            StateSnapshotRestoreMode::TreeOnly => {
+            StateSnapshotRestoreMode::TreeOnly | StateSnapshotRestoreMode::Default => {
                 // We run kv_fn with TreeOnly to restore the usage of DB
-                let (r1, r2) = IO_POOL.join(kv_fn, tree_fn);
-                r1?;
-                r2?;
-            },
-            StateSnapshotRestoreMode::Default => {
                 let (r1, r2) = IO_POOL.join(kv_fn, tree_fn);
                 r1?;
                 r2?;
@@ -281,14 +284,10 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotReceiver<K, V>
     fn finish(self) -> Result<()> {
         match self.restore_mode {
             StateSnapshotRestoreMode::KvOnly => self.kv_restore.lock().take().unwrap().finish()?,
-            StateSnapshotRestoreMode::TreeOnly => {
+            StateSnapshotRestoreMode::TreeOnly | StateSnapshotRestoreMode::Default => {
                 // for tree only mode, we also need to write the usage to DB
                 self.kv_restore.lock().take().unwrap().finish()?;
                 self.tree_restore.lock().take().unwrap().finish_impl()?
-            },
-            StateSnapshotRestoreMode::Default => {
-                self.kv_restore.lock().take().unwrap().finish()?;
-                self.tree_restore.lock().take().unwrap().finish_impl()?;
             },
         }
         Ok(())
@@ -297,14 +296,10 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotReceiver<K, V>
     fn finish_box(self: Box<Self>) -> Result<()> {
         match self.restore_mode {
             StateSnapshotRestoreMode::KvOnly => self.kv_restore.lock().take().unwrap().finish()?,
-            StateSnapshotRestoreMode::TreeOnly => {
+            StateSnapshotRestoreMode::TreeOnly | StateSnapshotRestoreMode::Default => {
                 // for tree only mode, we also need to write the usage to DB
                 self.kv_restore.lock().take().unwrap().finish()?;
                 self.tree_restore.lock().take().unwrap().finish_impl()?
-            },
-            StateSnapshotRestoreMode::Default => {
-                self.kv_restore.lock().take().unwrap().finish()?;
-                self.tree_restore.lock().take().unwrap().finish_impl()?;
             },
         }
         Ok(())
