@@ -22,14 +22,16 @@ use aptos_block_executor::{
         TransactionOutput as BlockExecutorTransactionOutput,
     },
 };
+use aptos_infallible::Mutex;
 use aptos_state_view::StateView;
 use aptos_types::{
     state_store::state_key::StateKey,
     transaction::{Transaction, TransactionOutput, TransactionStatus},
-    write_set::{WriteOp, WriteSet, WriteSetMut},
+    write_set::{WriteOp, WriteSet},
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
 use move_core_types::vm_status::VMStatus;
+use once_cell::sync::OnceCell;
 use rayon::prelude::*;
 use std::time::Instant;
 
@@ -39,42 +41,39 @@ impl BlockExecutorTransaction for PreprocessedTransaction {
 }
 
 // Wrapper to avoid orphan rule
-#[derive(PartialEq, Debug)]
-pub(crate) struct AptosTransactionOutput(TransactionOutputExt);
+#[derive(Debug)]
+pub(crate) struct AptosTransactionOutput {
+    output_ext: Mutex<Option<TransactionOutputExt>>,
+    committed_output: OnceCell<TransactionOutput>,
+}
 
 impl AptosTransactionOutput {
-    pub fn new(output: TransactionOutputExt) -> Self {
-        Self(output)
+    pub(crate) fn new(output: TransactionOutputExt) -> Self {
+        Self {
+            output_ext: Mutex::new(Some(output)),
+            committed_output: OnceCell::new(),
+        }
     }
 
-    pub fn into(self) -> TransactionOutputExt {
-        self.0
+    fn take_output(mut self) -> TransactionOutput {
+        match self.committed_output.take() {
+            Some(output) => output,
+            None => self
+                .output_ext
+                .lock()
+                .take()
+                .expect("Output must be set")
+                .output_with_delta_writes(vec![]),
+        }
     }
 }
 
 impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     type Txn = PreprocessedTransaction;
 
-    fn get_writes(&self) -> Vec<(StateKey, WriteOp)> {
-        self.0
-            .txn_output()
-            .write_set()
-            .iter()
-            .map(|(key, op)| (key.clone(), op.clone()))
-            .collect()
-    }
-
-    fn get_deltas(&self) -> Vec<(StateKey, DeltaOp)> {
-        self.0
-            .delta_change_set()
-            .iter()
-            .map(|(key, op)| (key.clone(), *op))
-            .collect()
-    }
-
     /// Execution output for transactions that comes after SkipRest signal.
     fn skip_output() -> Self {
-        Self(TransactionOutputExt::from(TransactionOutput::new(
+        Self::new(TransactionOutputExt::from(TransactionOutput::new(
             WriteSet::default(),
             vec![],
             0,
@@ -82,9 +81,55 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         )))
     }
 
+    /// Should never be called after incorporate_delta_writes, as it will consume
+    /// output_ext to prepare an output with deltas.
+    fn get_writes(&self) -> Vec<(StateKey, WriteOp)> {
+        self.output_ext
+            .lock()
+            .as_ref()
+            .expect("Output to be set to get writes")
+            .txn_output()
+            .write_set()
+            .iter()
+            .map(|(key, op)| (key.clone(), op.clone()))
+            .collect()
+    }
+
+    /// Should never be called after incorporate_delta_writes, as it will consume
+    /// output_ext to prepare an output with deltas.
+    fn get_deltas(&self) -> Vec<(StateKey, DeltaOp)> {
+        self.output_ext
+            .lock()
+            .as_ref()
+            .expect("Output to be set to get deltas")
+            .delta_change_set()
+            .iter()
+            .map(|(key, op)| (key.clone(), *op))
+            .collect()
+    }
+
+    /// Can be called (at most) once after transaction is committed to internally
+    /// include the delta outputs with the transaction outputs.
+    fn incorporate_delta_writes(&self, delta_writes: Vec<(StateKey, WriteOp)>) {
+        assert!(
+            self.committed_output
+                .set(
+                    self.output_ext
+                        .lock()
+                        .take()
+                        .expect("Output must be set to combine with deltas")
+                        .output_with_delta_writes(delta_writes),
+                )
+                .is_ok(),
+            "Could not combine TransactionOutputExt with deltas"
+        );
+    }
+
     /// Return the amount of gas consumed by the transaction.
     fn gas_used(&self) -> u64 {
-        self.0.txn_output().gas_used()
+        self.committed_output
+            .get()
+            .map_or(0, |output| output.gas_used())
     }
 }
 
@@ -122,35 +167,22 @@ impl BlockAptosVM {
             maybe_gas_limit,
         );
 
-        let ret = executor
-            .execute_block(state_view, signature_verified_block, state_view)
-            .map(|results| {
-                // Process the outputs in parallel, combining delta writes with other writes.
-                // TODO: merge with rolling commit_hook (via trait) inside parallel executor.
-                RAYON_EXEC_POOL.install(|| {
-                    results
-                        .into_par_iter()
-                        .map(|(output, delta_writes)| {
-                            output      // AptosTransactionOutput
-                            .into()     // TransactionOutputExt
-                            .output_with_delta_writes(WriteSetMut::new(delta_writes))
-                        })
-                        .collect()
-                })
-            });
-
-        // Flush the speculative logs of the committed transactions.
-        let pos = ret
-            .as_ref()
-            .ok()
-            .and_then(|outputs: &Vec<TransactionOutput>| {
-                outputs.iter().position(|o| o.status().is_retry())
-            });
-
-        flush_speculative_logs(pos.unwrap_or(num_txns));
+        let ret = executor.execute_block(state_view, signature_verified_block, state_view);
 
         match ret {
-            Ok(outputs) => Ok(outputs),
+            Ok(outputs) => {
+                let output_vec: Vec<TransactionOutput> = outputs
+                    .into_iter()
+                    .map(|output| output.take_output())
+                    .collect();
+
+                // Flush the speculative logs of the committed transactions.
+                let pos = output_vec.iter().position(|o| o.status().is_retry());
+
+                flush_speculative_logs(pos.unwrap_or(num_txns));
+
+                Ok(output_vec)
+            },
             Err(Error::ModulePathReadWrite) => {
                 unreachable!("[Execution]: Must be handled by sequential fallback")
             },
@@ -190,7 +222,15 @@ impl BlockAptosVM {
         );
         println!("Parallel execution starts...");
         let timer = Instant::now();
-        let ret = executor.execute_block(state_view, signature_verified_block, state_view);
+        let par_ret = executor
+            .execute_block(state_view, signature_verified_block, state_view)
+            .map(|outputs| {
+                outputs
+                    .into_iter()
+                    .map(|output| output.take_output())
+                    .collect()
+            });
+
         let exec_t = timer.elapsed();
         println!(
             "Parallel execution finishes, TPS = {}",
@@ -198,19 +238,6 @@ impl BlockAptosVM {
         );
 
         flush_speculative_logs(block_size);
-
-        // Merge the delta outputs for parallel execution in order to compare results.
-        // TODO: remove after this becomes part of the rolling commit_hook.
-        let par_ret = ret.map(|results| {
-            results
-                .into_iter()
-                .map(|(output, delta_writes)| {
-                    output // AptosTransactionOutput
-                    .into() // TransactionOutputExt
-                    .output_with_delta_writes(WriteSetMut::new(delta_writes))
-                })
-                .collect()
-        });
 
         (
             block_size * 1000 / exec_t.as_millis() as usize,
@@ -247,25 +274,19 @@ impl BlockAptosVM {
         );
         println!("Sequential execution starts...");
         let seq_timer = Instant::now();
-        let seq_ret = seq_executor.execute_block(state_view, signature_verified_block, state_view);
+        let seq_ret = seq_executor
+            .execute_block(state_view, signature_verified_block, state_view)
+            .map(|outputs| {
+                outputs
+                    .into_iter()
+                    .map(|output| output.take_output())
+                    .collect()
+            });
         let seq_exec_t = seq_timer.elapsed();
         println!(
             "Sequential execution finishes, TPS = {}",
             block_size * 1000 / seq_exec_t.as_millis() as usize
         );
-
-        // Sequential execution does not have deltas, assert and convert to the same type.
-        let seq_ret: Result<Vec<TransactionOutput>, Error<VMStatus>> = seq_ret.map(|results| {
-            results
-                .into_iter()
-                .map(|(output, deltas)| {
-                    assert_eq!(deltas.len(), 0);
-                    output
-                        .into()
-                        .output_with_delta_writes(WriteSetMut::new(vec![]))
-                })
-                .collect()
-        });
 
         (
             block_size * 1000 / seq_exec_t.as_millis() as usize,

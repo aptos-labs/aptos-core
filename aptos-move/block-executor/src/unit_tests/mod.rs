@@ -34,11 +34,9 @@ where
         num_cpus::get(),
         None,
     )
-    .execute_transactions_parallel((), &transactions, &data_view)
-    .map(|zipped| zipped.into_iter().map(|(res, _)| res).collect());
+    .execute_transactions_parallel((), &transactions, &data_view);
 
     let baseline = ExpectedOutput::generate_baseline(&transactions, None, None);
-
     baseline.assert_output(&output);
 }
 

@@ -391,6 +391,10 @@ impl Scheduler {
 
         let mut stored_deps = self.txn_dependency[dep_txn_idx as usize].lock();
 
+        // Note: is_executed & suspend calls acquire (a different, status) mutex, while holding
+        // (dependency) mutex. This is the only place in scheduler where a thread may hold > 1
+        // mutexes. Thus, acquisitions always happen in the same order (here), may not deadlock.
+
         if self.is_executed(dep_txn_idx, true).is_some() {
             // Current status of dep_txn_idx is 'executed', so the dependency got resolved.
             // To avoid zombie dependency (and losing liveness), must return here and
@@ -415,6 +419,8 @@ impl Scheduler {
         // Safe to add dependency here (still holding the lock) - finish_execution of txn
         // dep_txn_idx is guaranteed to acquire the same lock later and clear the dependency.
         stored_deps.push(txn_idx);
+
+        // Stored deps gets unlocked here.
 
         DependencyResult::Dependency(dep_condvar)
     }

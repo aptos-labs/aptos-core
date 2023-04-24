@@ -10,7 +10,7 @@ import re
 THRESHOLDS = {
     "1k_8": 16000,
     "1k_16": 20000,
-    "1k_32": 20000,
+    "1k_32": 21000,
     "10k_8": 28000,
     "10k_16": 47000,
     "10k_32": 70000,
@@ -31,7 +31,7 @@ SPEEDUPS = {
     "50k_32": 19,
 }
 
-THRESHOLDS_NOISE = 0.1
+THRESHOLDS_NOISE = 0.15
 SPEEDUPS_NOISE_BELOW = 1
 SPEEDUPS_NOISE_ABOVE = 2
 

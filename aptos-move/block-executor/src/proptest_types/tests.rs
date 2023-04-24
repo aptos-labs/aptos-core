@@ -58,8 +58,7 @@ fn run_transactions<K, V>(
             Task<KeyType<K>, ValueType<V>>,
             EmptyDataView<KeyType<K>, ValueType<V>>,
         >::new(num_cpus::get(), maybe_gas_limit)
-        .execute_transactions_parallel((), &transactions, &data_view)
-        .map(|zipped| zipped.into_iter().map(|(res, _)| res).collect());
+        .execute_transactions_parallel((), &transactions, &data_view);
 
         if module_access.0 && module_access.1 {
             assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);
@@ -67,7 +66,6 @@ fn run_transactions<K, V>(
         }
 
         let baseline = ExpectedOutput::generate_baseline(&transactions, None, maybe_gas_limit);
-
         baseline.assert_output(&output);
     }
 }
@@ -182,8 +180,7 @@ fn deltas_writes_mixed_with_gas_limit(num_txns: usize, maybe_gas_limit: Option<u
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         >::new(num_cpus::get(), maybe_gas_limit)
-        .execute_transactions_parallel((), &transactions, &data_view)
-        .map(|zipped| zipped.into_iter().map(|(res, _)| res).collect());
+        .execute_transactions_parallel((), &transactions, &data_view);
 
         let baseline = ExpectedOutput::generate_baseline(&transactions, None, maybe_gas_limit);
         baseline.assert_output(&output);
@@ -216,19 +213,23 @@ fn deltas_resolver_with_gas_limit(num_txns: usize, maybe_gas_limit: Option<u64>)
         .collect();
 
     for _ in 0..20 {
-        let (output, resolved) = BlockExecutor::<
+        let output = BlockExecutor::<
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         >::new(num_cpus::get(), maybe_gas_limit)
-        .execute_transactions_parallel((), &transactions, &data_view)
-        .unwrap()
-        .into_iter()
-        .unzip();
+        .execute_transactions_parallel((), &transactions, &data_view);
+
+        let delta_writes = output
+            .as_ref()
+            .expect("Must be success")
+            .iter()
+            .map(|out| out.delta_writes())
+            .collect();
 
         let baseline =
-            ExpectedOutput::generate_baseline(&transactions, Some(resolved), maybe_gas_limit);
-        baseline.assert_output(&Ok(output));
+            ExpectedOutput::generate_baseline(&transactions, Some(delta_writes), maybe_gas_limit);
+        baseline.assert_output(&output);
     }
 }
 

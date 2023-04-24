@@ -240,6 +240,14 @@ impl TransactionBlockExecutor<BenchmarkTransaction> for FakeExecutor {
                                             &state_view,
                                         )
                                     },
+                                    (AccountAddress::ONE, "aptos_account", "create_account") => {
+                                        Self::handle_account_creation(
+                                            user_txn.sender(),
+                                            bcs::from_bytes(&f.args()[0]).unwrap(),
+                                            0,
+                                            &state_view,
+                                        )
+                                    },
                                     _ => unimplemented!(),
                                 }
                             },
