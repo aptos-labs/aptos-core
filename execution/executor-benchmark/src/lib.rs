@@ -6,9 +6,9 @@ mod account_generator;
 pub mod benchmark_transaction;
 pub mod db_access;
 pub mod db_generator;
-pub mod fake_executor;
 mod gen_executor;
 mod metrics;
+pub mod native_executor;
 pub mod pipeline;
 pub mod transaction_committer;
 pub mod transaction_executor;
@@ -328,7 +328,7 @@ fn add_accounts_impl<V>(
 #[cfg(test)]
 mod tests {
     use crate::{
-        benchmark_transaction::BenchmarkTransaction, fake_executor::FakeExecutor,
+        benchmark_transaction::BenchmarkTransaction, native_executor::NativeExecutor,
         pipeline::PipelineConfig,
     };
     use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
@@ -400,8 +400,8 @@ mod tests {
     }
 
     #[test]
-    fn test_fake_benchmark() {
+    fn test_native_benchmark() {
         // correct execution not yet implemented, so cannot be checked for validity
-        test_generic_benchmark::<FakeExecutor>(None, false);
+        test_generic_benchmark::<NativeExecutor>(None, false);
     }
 }

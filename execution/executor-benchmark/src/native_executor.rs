@@ -55,24 +55,26 @@ impl IncrementalOutput {
     }
 }
 
-pub struct FakeExecutor {}
+pub struct NativeExecutor {}
 
-static FAKE_EXECUTOR_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
-static FAKE_EXECUTOR_POOL: Lazy<ThreadPool> = Lazy::new(|| {
+static NATIVE_EXECUTOR_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
+static NATIVE_EXECUTOR_POOL: Lazy<ThreadPool> = Lazy::new(|| {
     ThreadPoolBuilder::new()
-        .num_threads(FakeExecutor::get_concurrency_level())
-        .thread_name(|index| format!("fake_exe_{}", index))
+        .num_threads(NativeExecutor::get_concurrency_level())
+        .thread_name(|index| format!("native_exe_{}", index))
         .build()
         .unwrap()
 });
 
-impl FakeExecutor {
+impl NativeExecutor {
     pub fn set_concurrency_level_once(concurrency_level: usize) {
-        FAKE_EXECUTOR_CONCURRENCY_LEVEL.set(concurrency_level).ok();
+        NATIVE_EXECUTOR_CONCURRENCY_LEVEL
+            .set(concurrency_level)
+            .ok();
     }
 
     pub fn get_concurrency_level() -> usize {
-        match FAKE_EXECUTOR_CONCURRENCY_LEVEL.get() {
+        match NATIVE_EXECUTOR_CONCURRENCY_LEVEL.get() {
             Some(concurrency_level) => *concurrency_level,
             None => 32,
         }
@@ -107,7 +109,6 @@ impl FakeExecutor {
         sender_account.sequence_number += 1;
 
         // add total supply via aggregators?
-
         // let mut total_supply: u128 =
         //     DbAccessUtil::get_value(&TOTAL_SUPPLY_STATE_KEY, state_view)?.unwrap();
         // total_supply -= gas as u128;
@@ -129,35 +130,32 @@ impl FakeExecutor {
         ];
 
         // TODO(grao): Some values are fake, because I'm lazy.
-        let events = vec![
-            ContractEvent::new(
-                EventKey::new(0, sender_address),
-                0,
-                TypeTag::Struct(Box::new(WithdrawEvent::struct_tag())),
-                sender_address.to_vec(),
-            ),
-            // TODO(grao): CoinRegisterEvent
-        ];
+        let events = vec![ContractEvent::new(
+            EventKey::new(0, sender_address),
+            0,
+            TypeTag::Struct(Box::new(WithdrawEvent::struct_tag())),
+            sender_address.to_vec(),
+        )];
         Ok(Ok(IncrementalOutput { write_set, events }))
     }
 
     fn deposit(
-        recepient_address: AccountAddress,
+        recipient_address: AccountAddress,
         transfer_amount: u64,
         state_view: &CachedStateView,
         fail_on_existing: bool,
         fail_on_missing: bool,
     ) -> Result<Result<IncrementalOutput, TransactionStatus>> {
-        let recepient_account_key = DbAccessUtil::new_state_key_account(recepient_address);
-        let recepient_coin_store_key = DbAccessUtil::new_state_key_aptos_coin(recepient_address);
+        let recipient_account_key = DbAccessUtil::new_state_key_account(recipient_address);
+        let recipient_coin_store_key = DbAccessUtil::new_state_key_aptos_coin(recipient_address);
 
-        let recepient_account = {
+        let recipient_account = {
             let _timer = TIMER.with_label_values(&["read_new_account"]).start_timer();
-            DbAccessUtil::get_account(&recepient_account_key, state_view)?
+            DbAccessUtil::get_account(&recipient_account_key, state_view)?
         };
 
         let mut write_set = Vec::new();
-        if recepient_account.is_some() {
+        if recipient_account.is_some() {
             if fail_on_existing {
                 return Ok(Err(TransactionStatus::Keep(ExecutionStatus::MoveAbort {
                     location: AbortLocation::Module(ModuleId::new(
@@ -169,19 +167,19 @@ impl FakeExecutor {
                 })));
             }
 
-            let mut recepient_coin_store = {
+            let mut recipient_coin_store = {
                 let _timer = TIMER
                     .with_label_values(&["read_new_coin_store"])
                     .start_timer();
-                DbAccessUtil::get_coin_store(&recepient_coin_store_key, state_view)?.unwrap()
+                DbAccessUtil::get_coin_store(&recipient_coin_store_key, state_view)?.unwrap()
             };
 
             if transfer_amount != 0 {
-                recepient_coin_store.coin += transfer_amount;
+                recipient_coin_store.coin += transfer_amount;
 
                 write_set.push((
-                    recepient_coin_store_key,
-                    WriteOp::Modification(bcs::to_bytes(&recepient_coin_store)?),
+                    recipient_coin_store_key,
+                    WriteOp::Modification(bcs::to_bytes(&recipient_coin_store)?),
                 ));
             }
         } else {
@@ -201,42 +199,44 @@ impl FakeExecutor {
                     .with_label_values(&["read_new_coin_store"])
                     .start_timer();
                 assert!(
-                    DbAccessUtil::get_coin_store(&recepient_coin_store_key, state_view)?.is_none()
+                    DbAccessUtil::get_coin_store(&recipient_coin_store_key, state_view)?.is_none()
                 );
             }
 
-            let recepient_account = Account {
-                authentication_key: recepient_address.to_vec(),
+            let recipient_account = Account {
+                authentication_key: recipient_address.to_vec(),
                 ..Default::default()
             };
 
-            let recepient_coin_store = CoinStore {
+            let recipient_coin_store = CoinStore {
                 coin: transfer_amount,
                 ..Default::default()
             };
 
             write_set.push((
-                recepient_account_key,
-                WriteOp::Creation(bcs::to_bytes(&recepient_account)?),
+                recipient_account_key,
+                WriteOp::Creation(bcs::to_bytes(&recipient_account)?),
             ));
             write_set.push((
-                recepient_coin_store_key,
-                WriteOp::Creation(bcs::to_bytes(&recepient_coin_store)?),
+                recipient_coin_store_key,
+                WriteOp::Creation(bcs::to_bytes(&recipient_coin_store)?),
             ));
         }
 
-        let events = vec![ContractEvent::new(
-            EventKey::new(0, recepient_address),
-            0,
-            TypeTag::Struct(Box::new(DepositEvent::struct_tag())),
-            recepient_address.to_vec(),
-        )];
+        let events = vec![
+            ContractEvent::new(
+                EventKey::new(0, recipient_address),
+                0,
+                TypeTag::Struct(Box::new(DepositEvent::struct_tag())),
+                recipient_address.to_vec(),
+            ), // TODO(grao): CoinRegisterEvent
+        ];
         Ok(Ok(IncrementalOutput { write_set, events }))
     }
 
     fn handle_account_creation_and_transfer(
         sender_address: AccountAddress,
-        recepient_address: AccountAddress,
+        recipient_address: AccountAddress,
         transfer_amount: u64,
         state_view: &CachedStateView,
         fail_on_existing: bool,
@@ -253,7 +253,7 @@ impl FakeExecutor {
         };
 
         let deposit_output = Self::deposit(
-            recepient_address,
+            recipient_address,
             transfer_amount,
             state_view,
             fail_on_existing,
@@ -271,20 +271,20 @@ impl FakeExecutor {
 
     fn handle_batch_account_creation_and_transfer(
         sender_address: AccountAddress,
-        recepient_addresses: Vec<AccountAddress>,
+        recipient_addresses: Vec<AccountAddress>,
         transfer_amounts: Vec<u64>,
         state_view: &CachedStateView,
         fail_on_existing: bool,
         fail_on_missing: bool,
     ) -> Result<TransactionOutput> {
         let mut deltas = HashMap::new();
-        for (recepient, amount) in recepient_addresses
+        for (recipient, amount) in recipient_addresses
             .into_iter()
             .zip(transfer_amounts.into_iter())
         {
             let amount = amount as i64;
             deltas
-                .entry(recepient)
+                .entry(recipient)
                 .and_modify(|counter| *counter += amount)
                 .or_insert(amount);
             deltas
@@ -305,10 +305,10 @@ impl FakeExecutor {
             }
         };
 
-        for (recepient_address, transfer_amount) in deltas.into_iter() {
+        for (recipient_address, transfer_amount) in deltas.into_iter() {
             output.append({
                 let deposit_output = Self::deposit(
-                    recepient_address,
+                    recipient_address,
                     transfer_amount as u64,
                     state_view,
                     fail_on_existing,
@@ -335,12 +335,12 @@ impl FakeExecutor {
     }
 }
 
-impl TransactionBlockExecutor<BenchmarkTransaction> for FakeExecutor {
+impl TransactionBlockExecutor<BenchmarkTransaction> for NativeExecutor {
     fn execute_transaction_block(
         transactions: Vec<BenchmarkTransaction>,
         state_view: CachedStateView,
     ) -> Result<ChunkOutput> {
-        let transaction_outputs = FAKE_EXECUTOR_POOL.install(|| {
+        let transaction_outputs = NATIVE_EXECUTOR_POOL.install(|| {
             transactions
                 .par_iter()
                 .map(|txn| match &txn.extra_info {
