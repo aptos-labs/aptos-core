@@ -358,62 +358,23 @@ module veiled_coin::veiled_coin {
     /// has been subtracted from it. 
     /// Note that r, sk, b^*, b' are all secret values given only to the prover. The protocol's 
     /// zero-knowledge property ensures they are not revealed. 
-    fun verify_withdrawal_sigma_protocol<CoinType>(sender_pubkey: &elgamal::Pubkey, recipient_pubkey: &Pubkey, balance: &Ciphertext, withdrawal_ct: &Ciphertext, deposit_ct: &Ciphertext, proof: &SigmaProof<CoinType>) {
+    fun verify_withdrawal_sigma_protocol<CoinType>(
+        sender_pubkey: &Pubkey, 
+        recipient_pubkey: &Pubkey, 
+        balance_ct: &Ciphertext, 
+        withdrawal_ct: &Ciphertext, 
+        deposit_ct: &Ciphertext, 
+        proof: &SigmaProof<CoinType>) 
+    {
         let sender_pubkey_point = elgamal::get_point_from_pubkey(sender_pubkey);
         let recipient_pubkey_point = elgamal::get_point_from_pubkey(recipient_pubkey);
         let (big_c, d) = elgamal::ciphertext_as_points(withdrawal_ct);
         let (bar_c, _) = elgamal::ciphertext_as_points(deposit_ct);
-        let (c_L, c_R) = elgamal::ciphertext_as_points(balance);
+        let (c_L, c_R) = elgamal::ciphertext_as_points(balance_ct);
 
-        // TODO: Can this be optimized so we don't re-serialize the proof for fiat-shamir?
-        // c <- H(g,y,\bar{y},C_L,C_R,C,D,\bar{C},X_1,X_2,X_3,X_4,X_5)
-        let hash_input = vector::empty<u8>();
-
-        let basepoint_bytes = ristretto255::point_to_bytes(&ristretto255::basepoint_compressed());
-        vector::append<u8>(&mut hash_input, basepoint_bytes);
-
-        let y = elgamal::get_compressed_point_from_pubkey(sender_pubkey);
-        let y_bytes = ristretto255::point_to_bytes(&y);
-        vector::append<u8>(&mut hash_input, y_bytes);
-
-        let y_bar = elgamal::get_compressed_point_from_pubkey(recipient_pubkey);
-        let y_bar_bytes = ristretto255::point_to_bytes(&y_bar);
-        vector::append<u8>(&mut hash_input, y_bar_bytes);
-
-        let c_L_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(c_L));
-        vector::append<u8>(&mut hash_input, c_L_bytes);
-
-        let c_R_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(c_R));
-        vector::append<u8>(&mut hash_input, c_R_bytes);
-
-        let big_c_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(big_c));
-        vector::append<u8>(&mut hash_input, big_c_bytes);
-
-        let d_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(d));
-        vector::append<u8>(&mut hash_input, d_bytes);
-
-        let bar_c_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(bar_c));
-        vector::append<u8>(&mut hash_input, bar_c_bytes);
-
-        let x_1_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x1));
-        vector::append<u8>(&mut hash_input, x_1_bytes);
-
-        let x_2_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x2));
-        vector::append<u8>(&mut hash_input, x_2_bytes);
-
-        let x_3_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x3));
-        vector::append<u8>(&mut hash_input, x_3_bytes);
-
-        let x_4_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x4));
-        vector::append<u8>(&mut hash_input, x_4_bytes);
-
-        let x_5_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x5));
-        vector::append<u8>(&mut hash_input, x_5_bytes);
-
-        vector::append<u8>(&mut hash_input, FIAT_SHAMIR_SIGMA_DST);
-
-        let c = ristretto255::new_scalar_from_sha2_512(hash_input);
-
+        // TODO: Can be optimized so we don't re-serialize the proof for fiat-shamir
+        let c = sigma_protocol_fiat_shamir<CoinType>(sender_pubkey, recipient_pubkey, withdrawal_ct, deposit_ct, balance_ct, &proof.x1, &proof.x2, &proof.x3, &proof.x4, &proof.x5);
+        
         // c * D + X1 =? \alpha_1 * g
         let d_acc = ristretto255::point_mul(d, &c);    
         ristretto255::point_add_assign(&mut d_acc, &proof.x1);
@@ -452,6 +413,75 @@ module veiled_coin::veiled_coin {
         let g_alpha4 = ristretto255::basepoint_mul(&proof.alpha4);
         ristretto255::point_add_assign(&mut neg_D, &g_alpha4);
         assert!(ristretto255::point_equals(&neg_C, &neg_D), ESIGMA_PROTOCOL_VERIFY_FAILED);
+    }
+
+    // TODO: Describe in comment
+    /// Computes the challenge value as c <- H(g,y,\bar{y},C_L,C_R,C,D,\bar{C},X_1,X_2,X_3,X_4,X_5)
+    /// for the transfer relation sigma protocol using the fiat-shamir transform, where the notation 
+    /// used above is that in the Zether paper as described in the documentation for verify_withdrawal_sigma_protocol
+    fun sigma_protocol_fiat_shamir<CoinType>(
+        sender_pubkey: &Pubkey,
+        recipient_pubkey: &Pubkey,
+        withdrawal_ct: &Ciphertext,
+        deposit_ct: &Ciphertext,
+        balance_ct: &Ciphertext,
+        x1: &RistrettoPoint,
+        x2: &RistrettoPoint,
+        x3: &RistrettoPoint,
+        x4: &RistrettoPoint,
+        x5: &RistrettoPoint): Scalar
+    { 
+        let (big_c, d) = elgamal::ciphertext_as_points(withdrawal_ct);
+        let (bar_c, _) = elgamal::ciphertext_as_points(deposit_ct);
+        let (c_L, c_R) = elgamal::ciphertext_as_points(balance_ct);
+
+        // c <- H(g,y,\bar{y},C_L,C_R,C,D,\bar{C},X_1,X_2,X_3,X_4,X_5)
+        let hash_input = vector::empty<u8>();
+
+        let basepoint_bytes = ristretto255::point_to_bytes(&ristretto255::basepoint_compressed());
+        vector::append<u8>(&mut hash_input, basepoint_bytes);
+
+        let y = elgamal::get_compressed_point_from_pubkey(sender_pubkey);
+        let y_bytes = ristretto255::point_to_bytes(&y);
+        vector::append<u8>(&mut hash_input, y_bytes);
+
+        let y_bar = elgamal::get_compressed_point_from_pubkey(recipient_pubkey);
+        let y_bar_bytes = ristretto255::point_to_bytes(&y_bar);
+        vector::append<u8>(&mut hash_input, y_bar_bytes);
+
+        let c_L_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(c_L));
+        vector::append<u8>(&mut hash_input, c_L_bytes);
+
+        let c_R_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(c_R));
+        vector::append<u8>(&mut hash_input, c_R_bytes);
+
+        let big_c_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(big_c));
+        vector::append<u8>(&mut hash_input, big_c_bytes);
+
+        let d_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(d));
+        vector::append<u8>(&mut hash_input, d_bytes);
+
+        let bar_c_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(bar_c));
+        vector::append<u8>(&mut hash_input, bar_c_bytes);
+
+        let x_1_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(x1));
+        vector::append<u8>(&mut hash_input, x_1_bytes);
+
+        let x_2_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(x2));
+        vector::append<u8>(&mut hash_input, x_2_bytes);
+
+        let x_3_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(x3));
+        vector::append<u8>(&mut hash_input, x_3_bytes);
+
+        let x_4_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(x4));
+        vector::append<u8>(&mut hash_input, x_4_bytes);
+
+        let x_5_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(x5));
+        vector::append<u8>(&mut hash_input, x_5_bytes);
+
+        vector::append<u8>(&mut hash_input, FIAT_SHAMIR_SIGMA_DST);
+
+        ristretto255::new_scalar_from_sha2_512(hash_input)
     }
 
     //
@@ -695,61 +725,14 @@ module veiled_coin::veiled_coin {
 
         // X5 <- g^{x4}(C_R/D)^{x2}
         let big_x5 = ristretto255::basepoint_mul(&x4);
-        let (c_L, c_R) = elgamal::ciphertext_as_points(source_balance_ct);
-        let (big_c, big_d) = elgamal::ciphertext_as_points(withdraw_ct);
+        let (_, c_R) = elgamal::ciphertext_as_points(source_balance_ct);
+        let (_, big_d) = elgamal::ciphertext_as_points(withdraw_ct);
         let neg_d = ristretto255::point_neg(big_d);
         let c_R_acc = ristretto255::point_add(c_R, &neg_d);
         ristretto255::point_mul_assign(&mut c_R_acc, &x2);
         ristretto255::point_add_assign(&mut big_x5, &c_R_acc);
 
-        let (bar_c, _) = elgamal::ciphertext_as_points(deposit_ct);
-        // c <- H(g,y,\bar{y},C_L,C_R,C,D,\bar{C},X_1,X_2,X_3,X_4,X_5)
-        let hash_input = vector::empty<u8>();
-
-        let basepoint_bytes = ristretto255::point_to_bytes(&ristretto255::basepoint_compressed());
-        vector::append<u8>(&mut hash_input, basepoint_bytes);
-
-        let y = elgamal::get_compressed_point_from_pubkey(source_pubkey);
-        let y_bytes = ristretto255::point_to_bytes(&y);
-        vector::append<u8>(&mut hash_input, y_bytes);
-
-        let y_bar = elgamal::get_compressed_point_from_pubkey(dest_pubkey);
-        let y_bar_bytes = ristretto255::point_to_bytes(&y_bar);
-        vector::append<u8>(&mut hash_input, y_bar_bytes);
-
-        let c_L_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(c_L));
-        vector::append<u8>(&mut hash_input, c_L_bytes);
-
-        let c_R_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(c_R));
-        vector::append<u8>(&mut hash_input, c_R_bytes);
-
-        let big_c_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(big_c));
-        vector::append<u8>(&mut hash_input, big_c_bytes);
-
-        let big_d_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(big_d));
-        vector::append<u8>(&mut hash_input, big_d_bytes);
-
-        let bar_c_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(bar_c));
-        vector::append<u8>(&mut hash_input, bar_c_bytes);
-
-        let x_1_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&big_x1));
-        vector::append<u8>(&mut hash_input, x_1_bytes);
-
-        let x_2_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&big_x2));
-        vector::append<u8>(&mut hash_input, x_2_bytes);
-
-        let x_3_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&big_x3));
-        vector::append<u8>(&mut hash_input, x_3_bytes);
-
-        let x_4_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&big_x4));
-        vector::append<u8>(&mut hash_input, x_4_bytes);
-
-        let x_5_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&big_x5));
-        vector::append<u8>(&mut hash_input, x_5_bytes);
-
-        vector::append<u8>(&mut hash_input, FIAT_SHAMIR_SIGMA_DST);
-
-        let c = ristretto255::new_scalar_from_sha2_512(hash_input);
+        let c = sigma_protocol_fiat_shamir<CoinType>(source_pubkey, dest_pubkey, withdraw_ct, deposit_ct, source_balance_ct, &big_x1, &big_x2, &big_x3, &big_x4, &big_x5);
 
         // alpha_1 <- x1 + c * r
         let alpha1 = ristretto255::scalar_mul(&c, r);
