@@ -80,7 +80,7 @@ fn main() {
 
     // Add authentication interceptor.
     runtime.spawn(async move {
-        let server = DatastreamServer::new(config);
+        let server = DatastreamServer::new(config).accept_gzip().send_gzip();
         let svc = IndexerStreamServer::with_interceptor(server, authentication_inceptor);
         Server::builder()
             .add_service(reflection_service)
