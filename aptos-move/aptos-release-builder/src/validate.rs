@@ -24,6 +24,9 @@ use std::{
 };
 use url::Url;
 
+pub const FAST_RESOLUTION_TIME: u64 = 30;
+pub const DEFAULT_RESOLUTION_TIME: u64 = 43200;
+
 #[derive(Clone, Debug)]
 pub struct NetworkConfig {
     pub endpoint: Url,
