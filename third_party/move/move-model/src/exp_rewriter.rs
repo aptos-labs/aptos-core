@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    ast::{Exp, ExpData, LocalVarDecl, MemoryLabel, Operation, Pattern, TempIndex, Value},
+    ast::{Exp, ExpData, MemoryLabel, Operation, Pattern, TempIndex, Value},
     model::{GlobalEnv, ModuleId, NodeId, SpecVarId},
     symbol::Symbol,
     ty::Type,
@@ -105,7 +105,7 @@ pub trait ExpRewriterFunctions {
     // Functions to specialize for the rewriting problem
     // --------------------------------------------------
 
-    fn rewrite_enter_scope<'a>(&mut self, decls: impl Iterator<Item = &'a LocalVarDecl>) {}
+    fn rewrite_enter_scope<'a>(&mut self, vars: impl Iterator<Item = &'a (NodeId, Symbol)>) {}
     fn rewrite_exit_scope(&mut self) {}
     fn rewrite_node_id(&mut self, id: NodeId) -> Option<NodeId> {
         None
@@ -134,10 +134,16 @@ pub trait ExpRewriterFunctions {
     fn rewrite_invoke(&mut self, id: NodeId, target: &Exp, args: &[Exp]) -> Option<Exp> {
         None
     }
-    fn rewrite_lambda(&mut self, id: NodeId, vars: &[LocalVarDecl], body: &Exp) -> Option<Exp> {
+    fn rewrite_lambda(&mut self, id: NodeId, pat: &Pattern, body: &Exp) -> Option<Exp> {
         None
     }
-    fn rewrite_block(&mut self, id: NodeId, vars: &[LocalVarDecl], body: &Exp) -> Option<Exp> {
+    fn rewrite_block(
+        &mut self,
+        id: NodeId,
+        pat: &Pattern,
+        binding: &Option<Exp>,
+        body: &Exp,
+    ) -> Option<Exp> {
         None
     }
     fn rewrite_pattern(&mut self, pat: &Pattern) -> Option<Pattern> {
@@ -146,7 +152,7 @@ pub trait ExpRewriterFunctions {
     fn rewrite_quant(
         &mut self,
         id: NodeId,
-        vars: &[(LocalVarDecl, Exp)],
+        ranges: &[(Pattern, Exp)],
         triggers: &[Vec<Exp>],
         cond: &Option<Exp>,
         body: &Exp,
@@ -236,38 +242,51 @@ pub trait ExpRewriterFunctions {
                     exp
                 }
             },
-            Lambda(id, vars, body) => {
+            Lambda(id, pat, body) => {
                 let (id_changed, new_id) = self.internal_rewrite_id(id);
-                let (vars_changed, new_vars) = self.internal_rewrite_decls(vars);
-                self.rewrite_enter_scope(new_vars.iter());
+                let (pat_changed, new_pat) = self.internal_rewrite_pattern(pat);
+                self.rewrite_enter_scope(new_pat.vars().iter());
                 let (body_changed, new_body) = self.internal_rewrite_exp(body);
                 self.rewrite_exit_scope();
-                if let Some(new_exp) = self.rewrite_lambda(new_id, &new_vars, &new_body) {
+                if let Some(new_exp) = self.rewrite_lambda(new_id, &new_pat, &new_body) {
                     new_exp
-                } else if id_changed || vars_changed || body_changed {
-                    Lambda(new_id, new_vars, new_body).into_exp()
+                } else if id_changed || pat_changed || body_changed {
+                    Lambda(new_id, new_pat, new_body).into_exp()
                 } else {
                     exp
                 }
             },
-            Block(id, vars, body) => {
+            Block(id, pat, binding, body) => {
                 let (id_changed, new_id) = self.internal_rewrite_id(id);
-                let (vars_changed, new_vars) = self.internal_rewrite_decls(vars);
-                self.rewrite_enter_scope(new_vars.iter());
+                let (pat_changed, new_pat) = self.internal_rewrite_pattern(pat);
+                let (binding_changed, new_binding) = if let Some(b) = binding {
+                    let (changed, b) = self.internal_rewrite_exp(b);
+                    (changed, Some(b))
+                } else {
+                    (false, None)
+                };
+                self.rewrite_enter_scope(new_pat.vars().iter());
                 let (body_changed, new_body) = self.internal_rewrite_exp(body);
                 self.rewrite_exit_scope();
-                if let Some(new_exp) = self.rewrite_block(new_id, &new_vars, &new_body) {
+                if let Some(new_exp) = self.rewrite_block(new_id, &new_pat, &new_binding, &new_body)
+                {
                     new_exp
-                } else if id_changed || vars_changed || body_changed {
-                    Block(new_id, new_vars, new_body).into_exp()
+                } else if id_changed || pat_changed || binding_changed || body_changed {
+                    Block(new_id, new_pat, new_binding, new_body).into_exp()
                 } else {
                     exp
                 }
             },
             Quant(id, kind, ranges, triggers, cond, body) => {
                 let (id_changed, new_id) = self.internal_rewrite_id(id);
-                let (ranges_changed, new_ranges) = self.internal_rewrite_quant_decls(ranges);
-                self.rewrite_enter_scope(ranges.iter().map(|(decl, _)| decl));
+                let (ranges_changed, new_ranges) = self.internal_rewrite_quant_ranges(ranges);
+                self.rewrite_enter_scope(
+                    ranges
+                        .iter()
+                        .flat_map(|(pat, _)| pat.vars())
+                        .collect::<Vec<_>>()
+                        .iter(),
+                );
                 let mut triggers_changed = false;
                 let new_triggers = triggers
                     .iter()
@@ -439,54 +458,21 @@ pub trait ExpRewriterFunctions {
         }
     }
 
-    fn internal_rewrite_decls(&mut self, decls: &[LocalVarDecl]) -> (bool, Vec<LocalVarDecl>) {
-        let mut change = false;
-        let new_decls = decls
-            .iter()
-            .map(|d| LocalVarDecl {
-                id: {
-                    let (c, id) = self.internal_rewrite_id(&d.id);
-                    change = change || c;
-                    id
-                },
-                name: d.name,
-                binding: d.binding.as_ref().map(|e| {
-                    let (c, new_e) = self.internal_rewrite_exp(e);
-                    change = change || c;
-                    new_e
-                }),
-            })
-            .collect();
-        (change, new_decls)
-    }
-
-    fn internal_rewrite_quant_decls(
+    fn internal_rewrite_quant_ranges(
         &mut self,
-        decls: &[(LocalVarDecl, Exp)],
-    ) -> (bool, Vec<(LocalVarDecl, Exp)>) {
+        ranges: &[(Pattern, Exp)],
+    ) -> (bool, Vec<(Pattern, Exp)>) {
         let mut change = false;
-        let new_decls = decls
+        let new_ranges = ranges
             .iter()
-            .map(|(d, e)| {
-                assert!(d.binding.is_none());
-                (
-                    LocalVarDecl {
-                        id: {
-                            let (c, id) = self.internal_rewrite_id(&d.id);
-                            change = change || c;
-                            id
-                        },
-                        name: d.name,
-                        binding: None,
-                    },
-                    {
-                        let (c, new_e) = self.internal_rewrite_exp(e);
-                        change = change || c;
-                        new_e
-                    },
-                )
+            .map(|(pat, exp)| {
+                let (pat_changed, new_pat) = self.internal_rewrite_pattern(pat);
+                change = change || pat_changed;
+                let (exp_changed, new_exp) = self.internal_rewrite_exp(exp);
+                change = change || exp_changed;
+                (new_pat, new_exp)
             })
             .collect();
-        (change, new_decls)
+        (change, new_ranges)
     }
 }

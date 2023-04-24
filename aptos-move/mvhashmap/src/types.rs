@@ -10,6 +10,12 @@ pub type TxnIndex = u32;
 pub type Incarnation = u32;
 pub type Version = (TxnIndex, Incarnation);
 
+#[derive(Clone, Copy, PartialEq)]
+pub(crate) enum Flag {
+    Done,
+    Estimate,
+}
+
 /// Returned as Err(..) when failed to read from the multi-version data-structure.
 #[derive(Debug, PartialEq, Eq)]
 pub enum MVDataError {

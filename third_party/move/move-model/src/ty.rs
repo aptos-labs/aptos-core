@@ -30,7 +30,7 @@ pub enum Type {
     Reference(bool, Box<Type>),
 
     // Types only appearing in specifications
-    Fun(Vec<Type>, Box<Type>),
+    Fun(Box<Type>, Box<Type>),
     TypeDomain(Box<Type>),
     ResourceDomain(ModuleId, StructId, Option<Vec<Type>>),
 
@@ -315,7 +315,9 @@ impl Type {
 
     /// A helper function to do replacement of type parameters.
     fn replace(&self, params: Option<&[Type]>, subs: Option<&Substitution>) -> Type {
-        let replace_vec = |types: &[Type]| types.iter().map(|t| t.replace(params, subs)).collect();
+        let replace_vec = |types: &[Type]| -> Vec<Type> {
+            types.iter().map(|t| t.replace(params, subs)).collect()
+        };
         match self {
             Type::TypeParameter(i) => {
                 if let Some(ps) = params {
@@ -343,9 +345,10 @@ impl Type {
                 Type::Reference(*is_mut, Box::new(bt.replace(params, subs)))
             },
             Type::Struct(mid, sid, args) => Type::Struct(*mid, *sid, replace_vec(args)),
-            Type::Fun(args, result) => {
-                Type::Fun(replace_vec(args), Box::new(result.replace(params, subs)))
-            },
+            Type::Fun(arg, result) => Type::Fun(
+                Box::new(arg.replace(params, subs)),
+                Box::new(result.replace(params, subs)),
+            ),
             Type::Tuple(args) => Type::Tuple(replace_vec(args)),
             Type::Vector(et) => Type::Vector(Box::new(et.replace(params, subs))),
             Type::TypeDomain(et) => Type::TypeDomain(Box::new(et.replace(params, subs))),
@@ -368,7 +371,7 @@ impl Type {
             match self {
                 Type::Reference(_, bt) => bt.contains(p),
                 Type::Struct(_, _, args) => contains_vec(args),
-                Type::Fun(args, result) => contains_vec(args) || result.contains(p),
+                Type::Fun(arg, result) => arg.contains(p) || result.contains(p),
                 Type::Tuple(args) => contains_vec(args),
                 Type::Vector(et) => et.contains(p),
                 _ => false,
@@ -382,7 +385,7 @@ impl Type {
         match self {
             Var(_) => true,
             Tuple(ts) => ts.iter().any(|t| t.is_incomplete()),
-            Fun(ts, r) => ts.iter().any(|t| t.is_incomplete()) || r.is_incomplete(),
+            Fun(a, r) => a.is_incomplete() || r.is_incomplete(),
             Struct(_, _, ts) => ts.iter().any(|t| t.is_incomplete()),
             Vector(et) => et.is_incomplete(),
             Reference(_, bt) => bt.is_incomplete(),
@@ -403,8 +406,8 @@ impl Type {
         use Type::*;
         match self {
             Tuple(ts) => ts.iter().for_each(|t| t.module_usage(usage)),
-            Fun(ts, r) => {
-                ts.iter().for_each(|t| t.module_usage(usage));
+            Fun(a, r) => {
+                a.module_usage(usage);
                 r.module_usage(usage);
             },
             Struct(mid, _, ts) => {
@@ -502,9 +505,9 @@ impl Type {
                 vars.insert(*id);
             },
             Tuple(ts) => ts.iter().for_each(|t| t.internal_get_vars(vars)),
-            Fun(ts, r) => {
+            Fun(a, r) => {
+                a.internal_get_vars(vars);
                 r.internal_get_vars(vars);
-                ts.iter().for_each(|t| t.internal_get_vars(vars));
             },
             Struct(_, _, ts) => ts.iter().for_each(|t| t.internal_get_vars(vars)),
             Vector(et) => et.internal_get_vars(vars),
@@ -525,14 +528,33 @@ impl Type {
             Type::Vector(bt) => bt.visit(visitor),
             Type::Struct(_, _, tys) => visit_slice(tys, visitor),
             Type::Reference(_, ty) => ty.visit(visitor),
-            Type::Fun(tys, ty) => {
-                visit_slice(tys, visitor);
+            Type::Fun(a, ty) => {
+                a.visit(visitor);
                 ty.visit(visitor);
             },
             Type::TypeDomain(bt) => bt.visit(visitor),
             _ => {},
         }
         visitor(self)
+    }
+
+    /// If this is a tuple, return its elements, otherwise a vector with the given type.
+    pub fn flatten(self) -> Vec<Type> {
+        if let Type::Tuple(tys) = self {
+            tys
+        } else {
+            vec![self]
+        }
+    }
+
+    /// If this is a vector of more than one type, make a tuple out of it, otherwise return the
+    /// type.
+    pub fn tuple(mut tys: Vec<Type>) -> Type {
+        if tys.is_empty() || tys.len() > 1 {
+            Type::Tuple(tys)
+        } else {
+            tys.pop().unwrap()
+        }
     }
 }
 
@@ -674,9 +696,9 @@ impl Substitution {
                     "tuples",
                 )?));
             },
-            (Type::Fun(ts1, r1), Type::Fun(ts2, r2)) => {
+            (Type::Fun(a1, r1), Type::Fun(a2, r2)) => {
                 return Ok(Type::Fun(
-                    self.unify_vec(sub_variance, ts1, ts2, "functions")?,
+                    Box::new(self.unify(sub_variance, a1, a2)?),
                     Box::new(self.unify(sub_variance, r1, r2)?),
                 ));
             },
@@ -1229,9 +1251,9 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
                 }
                 f.write_str(">")
             },
-            Fun(ts, t) => {
+            Fun(a, t) => {
                 f.write_str("|")?;
-                comma_list(f, ts)?;
+                write!(f, "{}", a.display(self.context))?;
                 f.write_str("|")?;
                 write!(f, "{}", t.display(self.context))
             },

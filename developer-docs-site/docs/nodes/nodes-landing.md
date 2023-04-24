@@ -184,7 +184,7 @@ Also learn how to run a public fullnode on a local network and connect to either
         <div class="card-body">
         </div>
         <div class="list-group list-group-flush">
-          <a href="/nodes/aptos-deployments" class="list-group-item">
+          <a href="/nodes/deployments" class="list-group-item">
             <div class="d-flex w-100 justify-content-between">
               <h4 class="mb-1">Aptos blockchain deployments</h4>
             </div>
@@ -202,7 +202,7 @@ Also learn how to run a public fullnode on a local network and connect to either
             </div>
             <small>All the files you need while deploying nodes, whether on mainnet, testnet or devnet.</small>
           </a>
-          <a href="/guides/indexing" class="list-group-item">
+          <a href="/integration/indexing" class="list-group-item">
             <div class="d-flex w-100 justify-content-between">
               <h4 class="mb-1">Indexing</h4>
             </div>

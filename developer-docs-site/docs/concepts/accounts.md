@@ -12,7 +12,7 @@ However, a resource can also be used to represent other on-chain capabilities, i
 
 Each account on the Aptos blockchain is identified by a 32-byte account address. An account can store data, and the account stores
 this data in resources. The initial resource is the account data itself (authentication key and sequence number).
-Additional resources like currency or NFTs are added after creating the account. And you may employ the [Aptos Name Service](../guides/aptos-name-service-connector.md) at [www.aptosnames.com](https://www.aptosnames.com/) to secure .apt domains for key accounts to make them memorable and unique.
+Additional resources like currency or NFTs are added after creating the account. And you can employ the [Aptos Name Service](../integration/aptos-name-service-connector.md) at [www.aptosnames.com](https://www.aptosnames.com/) to secure .apt domains for key accounts to make them memorable and unique.
 
 Different from other blockchains where accounts and addresses are implicit, accounts on Aptos are explicit and need to be
 created before they can hold resources and modules. The account can be created explicitly or implicitly by transferring Aptos tokens (APT) there.
@@ -216,4 +216,4 @@ Typically, a resource account is used for two main purposes:
 - Store and isolate resources; a module creates a resource account just to host specific resources.
 - Publish module as a standalone (resource) account, a building block in a decentralized design where no private keys can control the resource account. The ownership (SignerCap) can be kept in another module, such as governance.
 
-Find more details on creating and using these at [using resource accounts in your app](../guides/resource-accounts.md).
+Find more details on creating and using these at [using resource accounts in your app](../move/move-on-aptos/resource-accounts.md).

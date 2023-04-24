@@ -118,8 +118,7 @@ where
             Task<KeyType<K>, ValueType<V>>,
             EmptyDataView<KeyType<K>, ValueType<V>>,
         >::new(num_cpus::get())
-        .execute_transactions_parallel((), &self.transactions, &data_view)
-        .map(|zipped| zipped.into_iter().map(|(res, _)| res).collect());
+        .execute_transactions_parallel((), &self.transactions, &data_view);
 
         self.expected_output.assert_output(&output);
     }

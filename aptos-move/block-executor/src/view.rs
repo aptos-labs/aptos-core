@@ -5,7 +5,7 @@ use crate::{
     counters, scheduler::Scheduler, task::Transaction, txn_last_input_output::ReadDescriptor,
 };
 use anyhow::Result;
-use aptos_aggregator::delta_change_set::{deserialize, serialize, DeltaOp};
+use aptos_aggregator::delta_change_set::{deserialize, serialize};
 use aptos_logger::error;
 use aptos_mvhashmap::{
     types::{MVCodeError, MVCodeOutput, MVDataError, MVDataOutput, TxnIndex},
@@ -19,8 +19,7 @@ use aptos_types::{
     write_set::TransactionWrite,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
-use move_binary_format::errors::Location;
-use std::{cell::RefCell, collections::BTreeMap, hash::Hash, sync::Arc};
+use std::{cell::RefCell, collections::BTreeMap, fmt::Debug, hash::Hash, sync::Arc};
 
 /// A struct that is always used by a single thread performing an execution task. The struct is
 /// passed to the VM and acts as a proxy to resolve reads first in the shared multi-version
@@ -43,15 +42,15 @@ pub(crate) enum ReadResult<V> {
     Value(Arc<V>),
     // Similar to above, but the value was aggregated and is an integer.
     U128(u128),
-    // Read failed while resolving a delta.
-    Unresolved(DeltaOp),
+    // Read could not resolve the delta (no base value).
+    Unresolved,
     // Read did not return anything.
     None,
 }
 
 impl<
         'a,
-        K: ModulePath + PartialOrd + Ord + Send + Clone + Hash + Eq,
+        K: ModulePath + PartialOrd + Ord + Send + Clone + Debug + Hash + Eq,
         V: TransactionWrite + Send + Sync,
     > MVHashMapView<'a, K, V>
 {
@@ -86,7 +85,12 @@ impl<
         self.versioned_map.fetch_code(key, txn_idx)
     }
 
-    /// Captures a read from the VM execution.
+    fn set_aggregator_base_value(&self, key: &K, value: u128) {
+        self.versioned_map.set_aggregator_base_value(key, value);
+    }
+
+    /// Captures a read from the VM execution, but not unresolved deltas, as in this case it is the
+    /// callers responsibility to set the aggregator's base value and call fetch_data again.
     fn fetch_data(&self, key: &K, txn_idx: TxnIndex) -> ReadResult<V> {
         use MVDataError::*;
         use MVDataOutput::*;
@@ -112,12 +116,7 @@ impl<
                         .push(ReadDescriptor::from_storage(key.clone()));
                     return ReadResult::None;
                 },
-                Err(Unresolved(delta)) => {
-                    self.captured_reads
-                        .borrow_mut()
-                        .push(ReadDescriptor::from_unresolved(key.clone(), delta));
-                    return ReadResult::Unresolved(delta);
-                },
+                Err(Unresolved(_)) => return ReadResult::Unresolved,
                 Err(Dependency(dep_idx)) => {
                     // `self.txn_idx` estimated to depend on a write from `dep_idx`.
                     match self.scheduler.wait_for_dependency(txn_idx, dep_idx) {
@@ -234,21 +233,31 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TStateView for LatestView<
                         Err(NotFound) => self.base_view.get_state_value(state_key),
                     }
                 },
-                None => match map.fetch_data(state_key, self.txn_idx) {
-                    ReadResult::Value(v) => Ok(v.as_state_value()),
-                    ReadResult::U128(v) => Ok(Some(StateValue::new_legacy(serialize(&v)))),
-                    ReadResult::Unresolved(delta) => {
+                None => {
+                    let mut mv_value = map.fetch_data(state_key, self.txn_idx);
+
+                    if matches!(mv_value, ReadResult::Unresolved) {
                         let from_storage =
                             self.base_view.get_state_value_bytes(state_key)?.map_or(
                                 Err(VMStatus::Error(StatusCode::STORAGE_ERROR, None)),
                                 |bytes| Ok(deserialize(&bytes)),
                             )?;
-                        let result = delta
-                            .apply_to(from_storage)
-                            .map_err(|pe| pe.finish(Location::Undefined).into_vm_status())?;
-                        Ok(Some(StateValue::new_legacy(serialize(&result))))
-                    },
-                    ReadResult::None => self.get_base_value(state_key),
+
+                        // Store base value in the versioned data-structure directly, so subsequent
+                        // reads can be resolved to U128 directly without storage calls.
+                        map.set_aggregator_base_value(state_key, from_storage);
+
+                        mv_value = map.fetch_data(state_key, self.txn_idx);
+                    }
+
+                    match mv_value {
+                        ReadResult::Value(v) => Ok(v.as_state_value()),
+                        ReadResult::U128(v) => Ok(Some(StateValue::new_legacy(serialize(&v)))),
+                        ReadResult::None => self.get_base_value(state_key),
+                        ReadResult::Unresolved => unreachable!(
+                            "Must be resolved as base value is recorded in the MV data structure"
+                        ),
+                    }
                 },
             },
             ViewMapKind::BTree(map) => map.get(state_key).map_or_else(

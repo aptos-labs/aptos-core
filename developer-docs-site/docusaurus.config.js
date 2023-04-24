@@ -98,13 +98,23 @@ const config = {
           {
             type: "dropdown",
             label: "Start",
-            to: "whats-new-in-docs",
+            to: "aptos-white-paper",
             position: "left",
             items: [
               {
-                label: "See What's New",
+                label: "Read the Aptos White Paper",
                 type: "doc",
-                docId: "whats-new-in-docs",
+                docId: "aptos-white-paper/index",
+              },
+              {
+                label: "Learn about Aptos",
+                type: "doc",
+                docId: "concepts/index",
+              },
+              {
+                label: "Explore Aptos",
+                type: "doc",
+                docId: "guides/explore-aptos",
               },
               {
                 label: "Latest Releases",
@@ -112,19 +122,9 @@ const config = {
                 docId: "releases/index",
               },
               {
-                label: "Read the Aptos White Paper",
+                label: "Deployments",
                 type: "doc",
-                docId: "aptos-white-paper/index",
-              },
-              {
-                label: "Learn Aptos Concepts",
-                type: "doc",
-                docId: "concepts/index",
-              },
-              {
-                label: "Prepare Your Environment",
-                type: "doc",
-                docId: "guides/getting-started",
+                docId: "nodes/deployments",
               },
               {
                 label: "Integrate with Aptos",
@@ -135,140 +135,44 @@ const config = {
           },
           {
             type: "dropdown",
-            label: "Apps",
-            to: "concepts/coin-and-token/index",
+            label: "Build",
+            to: "tutorials",
             position: "left",
             items: [
               {
                 type: "doc",
-                label: "Follow the Aptos Standards",
-                docId: "concepts/coin-and-token/index",
-              },
-              {
-                type: "doc",
-                label: "Read Blockchain Data",
-                docId: "/category/data",
-              },
-              {
-                type: "doc",
-                label: "Interact with the Blockchain",
-                docId: "guides/index",
-              },
-              {
-                type: "doc",
-                label: "Develop with the SDKs",
+                label: "Start with Onboarding Tutorials",
                 docId: "tutorials/index",
               },
               {
+                label: "Learn the Move Language",
                 type: "doc",
-                label: "Integrate with Wallets",
-                docId: "concepts/wallet-adapter-concept",
+                docId: "move/move-on-aptos",
+              },
+              {
+                type: "doc",
+                label: "Embrace the Aptos Standards",
+                docId: "standards/index",
+              },
+              {
+                type: "doc",
+                label: "Integrate with Aptos",
+                docId: "integration/index",
+              },
+              {
+                type: "doc",
+                label: "Configure Your Environment",
+                docId: "/category/environment",
+              },
+              {
+                type: "doc",
+                label: "Create NFTs on Aptos",
+                docId: "/category/nft",
               },
               {
                 type: "doc",
                 label: "Build E2E Dapp on Aptos",
                 docId: "tutorials/build-e2e-dapp/index",
-              },
-            ],
-          },
-          {
-            type: "dropdown",
-            label: "Move",
-            to: "guides/move-guides/aptos-move-guides",
-            position: "left",
-            items: [
-              {
-                label: "Write Move Smart Contracts",
-                type: "doc",
-                docId: "guides/move-guides/index",
-              },
-              {
-                label: "Move on Aptos",
-                type: "doc",
-                docId: "guides/move-guides/move-on-aptos",
-              },
-              {
-                label: "Move Structure",
-                type: "doc",
-                docId: "guides/move-guides/move-structure",
-              },
-              {
-                label: "Move Scripts",
-                type: "doc",
-                docId: "guides/move-guides/move-scripts",
-              },
-              {
-                label: "Bytecode for Dependencies",
-                type: "doc",
-                docId: "guides/move-guides/bytecode-dependencies",
-              },
-              {
-                label: "How Base Gas Works",
-                type: "doc",
-                docId: "concepts/base-gas",
-              },
-              {
-                label: "Interact with Move VM",
-                type: "doc",
-                docId: "guides/interacting-with-the-blockchain",
-              },
-              {
-                label: "Your First Move Module",
-                type: "doc",
-                docId: "tutorials/first-move-module",
-              },
-              {
-                label: "Aptos Move Book",
-                type: "doc",
-                docId: "guides/move-guides/book/SUMMARY",
-              },
-              {
-                label: "Move Prover Book",
-                type: "doc",
-                docId: "guides/prover-guides/index",
-              },
-            ],
-          },
-          {
-            type: "dropdown",
-            label: "Tokens",
-            to: "/category/nft",
-            position: "left",
-            items: [
-              {
-                type: "doc",
-                label: "Create Tokens on Aptos",
-                docId: "/category/nft",
-              },
-              {
-                type: "doc",
-                label: "Compare Token Standards",
-                docId: "concepts/coin-and-token/aptos-token-comparison",
-              },
-              {
-                type: "doc",
-                label: "Mint NFTs with the SDKs",
-                docId: "tutorials/your-first-nft",
-              },
-              {
-                type: "doc",
-                label: "Mint NFTs with the Aptos CLI",
-                docId: "guides/move-guides/mint-nft-cli",
-              },
-              {
-                type: "doc",
-                label: "Mint FTs with On-Chain Data",
-                docId: "concepts/coin-and-token/onchain-data",
-              },
-              {
-                type: "doc",
-                label: "Mint NFTs with the Mint Tool",
-                docId: "concepts/coin-and-token/nft-minting-tool",
-              },
-              {
-                type: "doc",
-                label: "Airdrop Aptos Tokens",
-                docId: "concepts/coin-and-token/nft-airdrop-example",
               },
             ],
           },
@@ -282,11 +186,6 @@ const config = {
                 label: "Learn about Nodes",
                 type: "doc",
                 docId: "nodes/nodes-landing",
-              },
-              {
-                type: "doc",
-                label: "Develop Locally",
-                docId: "nodes/local-testnet/index",
               },
               {
                 label: "Run a Validator",
@@ -318,26 +217,16 @@ const config = {
           {
             type: "dropdown",
             label: "Reference",
-            to: "reference/aptos-ref-docs",
+            to: "nodes/aptos-api-spec",
             position: "left",
             items: [
               {
-                label: "Aptos References",
-                type: "doc",
-                docId: "reference/index",
-              },
-              {
-                label: "REST API",
+                label: "Aptos REST API Spec",
                 type: "doc",
                 docId: "nodes/aptos-api-spec",
               },
               {
-                label: "Aptos SDKs",
-                type: "doc",
-                docId: "sdks/index",
-              },
-              {
-                label: "Move References",
+                label: "Aptos Move Framework",
                 type: "doc",
                 docId: "reference/move",
               },
@@ -346,28 +235,18 @@ const config = {
                 type: "doc",
                 docId: "reference/glossary",
               },
-              {
-                label: "Issues and Workarounds",
-                type: "doc",
-                docId: "issues-and-workarounds",
-              },
             ],
           },
           {
             type: "dropdown",
             label: "Community",
-            to: "community/help-index",
+            to: "community",
             position: "left",
             items: [
               {
                 label: "Help the Aptos Ecosystem",
                 type: "doc",
                 docId: "community/index",
-              },
-              {
-                label: "Community Highlights",
-                type: "doc",
-                docId: "community/contributions/index",
               },
               {
                 label: "External Resources",
@@ -388,6 +267,10 @@ const config = {
                 label: "Follow Aptos Style",
                 type: "doc",
                 docId: "community/aptos-style",
+              },
+              {
+                label: "Contributors",
+                href: "/community/contributors",
               },
             ],
           },
@@ -456,130 +339,16 @@ const config = {
     [
       "@docusaurus/plugin-client-redirects",
       {
-        redirects: [
-          {
-            to: "/guides/move-guides/book/package-upgrades",
-            from: "/guides/move-guides/upgrading-move-code",
-          },
-          {
-            to: "/nodes/full-node/public-fullnode",
-            from: "/nodes/full-node/fullnode-for-devnet",
-          },
-          {
-            to: "/nodes/full-node/public-fullnode",
-            from: "/tutorials/run-a-fullnode",
-          },
-          {
-            to: "/nodes/aptos-deployments",
-            from: "/tutorials/local-testnet-devnet-and-incentivized-testnet",
-          },
-          {
-            to: "/nodes/full-node/run-a-fullnode-on-gcp",
-            from: "/tutorials/run-a-fullnode-on-gcp",
-          },
-          {
-            to: "/nodes/validator-node/validators",
-            from: [
-              "/tutorials/validator-node/run-validator-node-using-gcp",
-              "/tutorials/validator-node/run-validator-node-using-aws",
-              "/tutorials/validator-node/run-validator-node-using-azure",
-              "/tutorials/validator-node/run-validator-node-using-docker",
-              "/tutorials/validator-node/run-validator-node-using-source",
-            ],
-          },
-          {
-            to: "/concepts/aptos-concepts",
-            from: [
-              "/basics/basics-txns-states",
-              "/basics/basics-accounts",
-              "/basics/basics-events",
-              "/basics/basics-gas-txn-fee",
-              "/basics/basics-fullnodes",
-              "/basics/basics-validator-nodes",
-              "/basics/basics-node-networks-sync",
-            ],
-          },
-          {
-            to: "/concepts/txns-states",
-            from: ["/concepts/basics-txns-states"],
-          },
-          {
-            to: "/concepts/accounts",
-            from: ["/concepts/basics-accounts"],
-          },
-          {
-            to: "/concepts/events",
-            from: ["/concepts/basics-events"],
-          },
-          {
-            to: "/concepts/gas-txn-fee",
-            from: ["/concepts/basics-gas-txn-fee"],
-          },
-          {
-            to: "/concepts/fullnodes",
-            from: ["/concepts/basics-fullnodes"],
-          },
-          {
-            to: "/concepts/validator-nodes",
-            from: ["/concepts/basics-validator-nodes"],
-          },
-          {
-            to: "/concepts/node-networks-sync",
-            from: ["/concepts/basics-node-networks-sync"],
-          },
-          {
-            to: "/nodes/local-testnet/run-a-local-testnet",
-            from: "/nodes/run-a-local-testnet",
-          },
-          {
-            to: "/concepts/staking",
-            from: "/nodes/staking",
-          },
-          {
-            to: "/tutorials/your-first-nft",
-            from: "/tutorials/your-first-nft-sdk",
-          },
-          {
-            to: "/tutorials/your-first-transaction",
-            from: "/tutorials/your-first-transaction-sdk",
-          },
-          {
-            to: "/tutorials/first-move-module",
-            from: "/tutorials/first-move-module-cli",
-          },
-          {
-            to: "/sdks/ts-sdk/index",
-            from: "/sdks/typescript-sdk",
-          },
-          {
-            to: "/guides/getting-started",
-            from: "/aptos-developer-resources",
-          },
-          {
-            to: "/concepts/txns-states",
-            from: "/concepts/merkle-proof",
-          },
-          {
-            to: "/nodes/validator-node/operator/connect-to-aptos-network",
-            from: "/nodes/ait/connect-to-testnet",
-          },
-          {
-            to: "/nodes/validator-node/operator/node-requirements",
-            from: "/nodes/ait/node-requirements",
-          },
-          {
-            to: "/nodes/validator-node/operator/node-liveness-criteria",
-            from: "/nodes/ait/node-liveness-criteria",
-          },
-          {
-            to: "/issues-and-workarounds",
-            from: "/nodes/full-node/troubleshooting-fullnode-setup",
-          },
-          {
-            to: "/guides/state-sync",
-            from: "/concepts/state-sync",
-          },
-        ],
+        redirects: [],
+        createRedirects(existingPath) {
+          if (existingPath.includes("/move")) {
+            return [
+              existingPath.replace("/move/prover", "/guides/prover-guides"),
+              existingPath.replace("/move", "/guides/move-guides"),
+            ];
+          }
+          return undefined;
+        },
       },
     ],
     () => ({
