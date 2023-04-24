@@ -21,7 +21,7 @@ Aptos SDK Release v1.7.2
 
 |Release | Git Tag | Commit Hash|
 |---|---|---|
-|[Aptos CLI Release v1.0.9](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-cli-v1.0.9)| `aptos-cli-v1.0.9` | `f7eae8b477e6fa9cf7dc036739755c3d82138136` |
+|[Aptos CLI Release v1.0.11](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-cli-v1.0.11)| `aptos-cli-v1.0.11` | `6b610f4fc36098662dd0742ecc16687b8b535bb3` |
 
 ## Aptos Node
 

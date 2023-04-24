@@ -149,7 +149,7 @@ See the Rust [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/mai
 In the first step, the `transfer-coin` example initializes both the REST and faucet clients:
 
 - The REST client interacts with the REST API.
-- The faucet client interacts with the devnet Faucet service for [creating and funding accounts](../guides/get-test-funds.md).
+- The faucet client interacts with the devnet Faucet service for creating and funding accounts.
 
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">

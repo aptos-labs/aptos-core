@@ -2382,7 +2382,7 @@ Mutate the token_properties of one token.
         <b>let</b> new_token = <a href="token.md#0x3_token_Token">Token</a> {
             id: new_token_id,
             amount: 1,
-            token_properties: *&token_data.default_properties,
+            token_properties: token_data.default_properties,
         };
         <a href="token.md#0x3_token_direct_deposit">direct_deposit</a>(token_owner, new_token);
         <a href="token.md#0x3_token_update_token_property_internal">update_token_property_internal</a>(token_owner, new_token_id, keys, values, types);
@@ -2743,7 +2743,7 @@ Withdraw the token with a capability
     withdraw_proof: <a href="token.md#0x3_token_WithdrawCapability">WithdrawCapability</a>,
 ): <a href="token.md#0x3_token_Token">Token</a> <b>acquires</b> <a href="token.md#0x3_token_TokenStore">TokenStore</a> {
     // verify the delegation hasn't expired yet
-    <b>assert</b>!(<a href="../../aptos-framework/doc/timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &lt;= *&withdraw_proof.expiration_sec, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="token.md#0x3_token_EWITHDRAW_PROOF_EXPIRES">EWITHDRAW_PROOF_EXPIRES</a>));
+    <b>assert</b>!(<a href="../../aptos-framework/doc/timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &lt;= withdraw_proof.expiration_sec, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="token.md#0x3_token_EWITHDRAW_PROOF_EXPIRES">EWITHDRAW_PROOF_EXPIRES</a>));
 
     <a href="token.md#0x3_token_withdraw_with_event_internal">withdraw_with_event_internal</a>(
         withdraw_proof.token_owner,
@@ -2778,7 +2778,7 @@ Withdraw the token with a capability.
     withdraw_amount: u64,
 ): (<a href="token.md#0x3_token_Token">Token</a>, Option&lt;<a href="token.md#0x3_token_WithdrawCapability">WithdrawCapability</a>&gt;) <b>acquires</b> <a href="token.md#0x3_token_TokenStore">TokenStore</a> {
     // verify the delegation hasn't expired yet
-    <b>assert</b>!(<a href="../../aptos-framework/doc/timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &lt;= *&withdraw_proof.expiration_sec, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="token.md#0x3_token_EWITHDRAW_PROOF_EXPIRES">EWITHDRAW_PROOF_EXPIRES</a>));
+    <b>assert</b>!(<a href="../../aptos-framework/doc/timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &lt;= withdraw_proof.expiration_sec, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="token.md#0x3_token_EWITHDRAW_PROOF_EXPIRES">EWITHDRAW_PROOF_EXPIRES</a>));
 
     <b>assert</b>!(withdraw_amount &lt;= withdraw_proof.amount, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="token.md#0x3_token_EINSUFFICIENT_WITHDRAW_CAPABILITY_AMOUNT">EINSUFFICIENT_WITHDRAW_CAPABILITY_AMOUNT</a>));
 
@@ -2890,7 +2890,7 @@ Create a new collection to hold tokens
     <b>let</b> mutability_config = <a href="token.md#0x3_token_create_collection_mutability_config">create_collection_mutability_config</a>(&mutate_setting);
     <b>let</b> collection = <a href="token.md#0x3_token_CollectionData">CollectionData</a> {
         description,
-        name: *&name,
+        name: name,
         uri,
         supply: 0,
         maximum,
@@ -2903,7 +2903,7 @@ Create a new collection to hold tokens
         &<b>mut</b> collection_handle.create_collection_events,
         <a href="token.md#0x3_token_CreateCollectionEvent">CreateCollectionEvent</a> {
             creator: account_addr,
-            collection_name: *&name,
+            collection_name: name,
             uri,
             description,
             maximum,
@@ -3833,10 +3833,10 @@ if property_version > 0, return the property value stored at owner's token store
         <b>let</b> all_token_data = &<b>borrow_global</b>&lt;<a href="token.md#0x3_token_Collections">Collections</a>&gt;(creator_addr).token_data;
         <b>assert</b>!(<a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(all_token_data, token_id.token_data_id), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="token.md#0x3_token_ETOKEN_DATA_NOT_PUBLISHED">ETOKEN_DATA_NOT_PUBLISHED</a>));
         <b>let</b> token_data = <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(all_token_data, token_id.token_data_id);
-        *&token_data.default_properties
+        token_data.default_properties
     } <b>else</b> {
         <b>let</b> tokens = &<b>borrow_global</b>&lt;<a href="token.md#0x3_token_TokenStore">TokenStore</a>&gt;(owner).tokens;
-        *&<a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(tokens, token_id).token_properties
+        <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(tokens, token_id).token_properties
     }
 }
 </code></pre>

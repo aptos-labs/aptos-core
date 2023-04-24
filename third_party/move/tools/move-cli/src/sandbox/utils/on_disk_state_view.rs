@@ -23,6 +23,7 @@ use move_ir_types::location::Spanned;
 use move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue, MoveValueAnnotator};
 use std::{
     convert::{TryFrom, TryInto},
+    fmt::Debug,
     fs,
     path::{Path, PathBuf},
 };
@@ -401,21 +402,17 @@ impl OnDiskStateView {
 }
 
 impl ModuleResolver for OnDiskStateView {
-    type Error = anyhow::Error;
-
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
+    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, anyhow::Error> {
         self.get_module_bytes(module_id)
     }
 }
 
 impl ResourceResolver for OnDiskStateView {
-    type Error = anyhow::Error;
-
     fn get_resource(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, Self::Error> {
+    ) -> Result<Option<Vec<u8>>, anyhow::Error> {
         self.get_resource_bytes(*address, struct_tag.clone())
     }
 }

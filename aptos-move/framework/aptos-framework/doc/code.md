@@ -569,7 +569,7 @@ package.
     };
 
     // Assign the upgrade counter.
-    *&<b>mut</b> pack.upgrade_number = upgrade_number;
+    pack.upgrade_number = upgrade_number;
 
     // Update registry
     <b>let</b> policy = pack.upgrade_policy;

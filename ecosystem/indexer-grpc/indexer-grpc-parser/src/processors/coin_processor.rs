@@ -17,13 +17,13 @@ use crate::{
 use anyhow::bail;
 use aptos_logger::error;
 use aptos_protos::transaction::testing1::v1::Transaction;
-use aptos_types::APTOS_COIN_TYPE;
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods, PgConnection};
 use field_count::FieldCount;
 use std::{collections::HashMap, fmt::Debug};
 
 pub const NAME: &str = "coin_processor";
+const APTOS_COIN_TYPE_STR: &str = "0x1::aptos_coin::AptosCoin";
 pub struct CoinTransactionProcessor {
     connection_pool: PgDbPool,
 }
@@ -255,7 +255,7 @@ impl ProcessorTrait for CoinTransactionProcessor {
         // get aptos_coin info for supply tracking
         // TODO: This only needs to be fetched once. Need to persist somehow
         let maybe_aptos_coin_info =
-            &CoinInfoQuery::get_by_coin_type(APTOS_COIN_TYPE.to_string(), &mut conn).unwrap();
+            &CoinInfoQuery::get_by_coin_type(APTOS_COIN_TYPE_STR.to_string(), &mut conn).unwrap();
 
         let mut all_coin_activities = vec![];
         let mut all_coin_balances = vec![];

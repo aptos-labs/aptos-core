@@ -24,14 +24,14 @@ use crate::{
     persistent_liveness_storage::PersistentLivenessStorage,
     quorum_store::types::BatchMsg,
 };
-use anyhow::{bail, ensure, Context, Result};
+use anyhow::{bail, ensure, Context};
 use aptos_channels::aptos_channel;
 use aptos_config::config::ConsensusConfig;
 use aptos_consensus_types::{
     block::Block,
     common::{Author, Round},
     experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
-    proof_of_store::{ProofOfStore, SignedBatchInfo},
+    proof_of_store::{ProofOfStoreMsg, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
     quorum_cert::QuorumCert,
     sync_info::SyncInfo,
@@ -69,8 +69,8 @@ pub enum UnverifiedEvent {
     CommitVote(Box<CommitVote>),
     CommitDecision(Box<CommitDecision>),
     BatchMsg(Box<BatchMsg>),
-    SignedBatchInfo(Box<SignedBatchInfo>),
-    ProofOfStoreMsg(Box<ProofOfStore>),
+    SignedBatchInfo(Box<SignedBatchInfoMsg>),
+    ProofOfStoreMsg(Box<ProofOfStoreMsg>),
 }
 
 pub const BACK_PRESSURE_POLLING_INTERVAL_MS: u64 = 10;
@@ -82,6 +82,7 @@ impl UnverifiedEvent {
         validator: &ValidatorVerifier,
         quorum_store_enabled: bool,
         self_message: bool,
+        max_num_batches: usize,
     ) -> Result<VerifiedEvent, VerifyError> {
         Ok(match self {
             //TODO: no need to sign and verify the proposal
@@ -113,32 +114,32 @@ impl UnverifiedEvent {
             },
             UnverifiedEvent::BatchMsg(b) => {
                 if !self_message {
-                    b.verify(peer_id)?;
+                    b.verify(peer_id, max_num_batches)?;
                 }
                 VerifiedEvent::BatchMsg(b)
             },
             UnverifiedEvent::SignedBatchInfo(sd) => {
                 if !self_message {
-                    sd.verify(peer_id, validator)?;
+                    sd.verify(peer_id, max_num_batches, validator)?;
                 }
                 VerifiedEvent::SignedBatchInfo(sd)
             },
             UnverifiedEvent::ProofOfStoreMsg(p) => {
                 if !self_message {
-                    p.verify(validator)?;
+                    p.verify(max_num_batches, validator)?;
                 }
                 VerifiedEvent::ProofOfStoreMsg(p)
             },
         })
     }
 
-    pub fn epoch(&self) -> u64 {
+    pub fn epoch(&self) -> anyhow::Result<u64> {
         match self {
-            UnverifiedEvent::ProposalMsg(p) => p.epoch(),
-            UnverifiedEvent::VoteMsg(v) => v.epoch(),
-            UnverifiedEvent::SyncInfo(s) => s.epoch(),
-            UnverifiedEvent::CommitVote(cv) => cv.epoch(),
-            UnverifiedEvent::CommitDecision(cd) => cd.epoch(),
+            UnverifiedEvent::ProposalMsg(p) => Ok(p.epoch()),
+            UnverifiedEvent::VoteMsg(v) => Ok(v.epoch()),
+            UnverifiedEvent::SyncInfo(s) => Ok(s.epoch()),
+            UnverifiedEvent::CommitVote(cv) => Ok(cv.epoch()),
+            UnverifiedEvent::CommitDecision(cd) => Ok(cd.epoch()),
             UnverifiedEvent::BatchMsg(b) => b.epoch(),
             UnverifiedEvent::SignedBatchInfo(sd) => sd.epoch(),
             UnverifiedEvent::ProofOfStoreMsg(p) => p.epoch(),
@@ -172,8 +173,8 @@ pub enum VerifiedEvent {
     CommitVote(Box<CommitVote>),
     CommitDecision(Box<CommitDecision>),
     BatchMsg(Box<BatchMsg>),
-    SignedBatchInfo(Box<SignedBatchInfo>),
-    ProofOfStoreMsg(Box<ProofOfStore>),
+    SignedBatchInfo(Box<SignedBatchInfoMsg>),
+    ProofOfStoreMsg(Box<ProofOfStoreMsg>),
     // local messages
     LocalTimeout(Round),
     // Shutdown the NetworkListener
@@ -450,7 +451,7 @@ impl RoundManager {
         }
     }
 
-    pub async fn process_delayed_proposal_msg(&mut self, proposal: Block) -> Result<()> {
+    pub async fn process_delayed_proposal_msg(&mut self, proposal: Block) -> anyhow::Result<()> {
         if proposal.round() != self.round_state.current_round() {
             bail!(
                 "Discarding stale delayed proposal {}, current round {}",
@@ -633,7 +634,7 @@ impl RoundManager {
     /// 3. Try to vote for it following the safety rules.
     /// 4. In case a validator chooses to vote, send the vote to the representatives at the next
     /// round.
-    async fn process_proposal(&mut self, proposal: Block) -> Result<()> {
+    async fn process_proposal(&mut self, proposal: Block) -> anyhow::Result<()> {
         let author = proposal
             .author()
             .expect("Proposal should be verified having an author");
@@ -747,7 +748,7 @@ impl RoundManager {
         });
     }
 
-    pub async fn process_verified_proposal(&mut self, proposal: Block) -> Result<()> {
+    pub async fn process_verified_proposal(&mut self, proposal: Block) -> anyhow::Result<()> {
         let proposal_round = proposal.round();
         let vote = self
             .execute_and_vote(proposal)

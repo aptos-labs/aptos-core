@@ -1,9 +1,9 @@
 ---
-title: "How Base Gas Works"
+title: "Computing Transaction Gas"
 id: "base-gas"
 ---
 
-# How Base Gas Works
+# Computing Transaction Gas
 
 Aptos transactions by default charge a base gas fee, regardless of market conditions.
 For each transaction, this "base gas" amount is based on three conditions:

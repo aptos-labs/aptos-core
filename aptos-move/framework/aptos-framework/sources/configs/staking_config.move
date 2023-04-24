@@ -10,6 +10,7 @@ module aptos_framework::staking_config {
     use aptos_std::math_fixed64;
 
     friend aptos_framework::genesis;
+    friend aptos_framework::stake;
 
     /// Stake lockup duration cannot be zero.
     const EZERO_LOCKUP_DURATION: u64 = 1;
@@ -40,6 +41,8 @@ module aptos_framework::staking_config {
     const BPS_DENOMINATOR: u64 = 10000;
     /// 1 year => 365 * 24 * 60 * 60
     const ONE_YEAR_IN_SECS: u64 = 31536000;
+
+    const MAX_U64: u128 = 18446744073709551615;
 
 
     /// Validator set configurations that will be stored with the @aptos_framework account.
@@ -183,11 +186,26 @@ module aptos_framework::staking_config {
         config.recurring_lockup_duration_secs
     }
 
-    /// DEPRECATING
-    /// Return the reward rate.
-    public fun get_reward_rate(config: &StakingConfig): (u64, u64) {
-        assert!(!features::periodical_reward_rate_decrease_enabled(), EDEPRECATED_FUNCTION);
-        (config.rewards_rate, config.rewards_rate_denominator)
+    /// Return the reward rate of this epoch.
+    public fun get_reward_rate(config: &StakingConfig): (u64, u64) acquires StakingRewardsConfig {
+        let (rewards_rate, rewards_rate_denominator) = if (features::periodical_reward_rate_decrease_enabled()) {
+            let epoch_rewards_rate = borrow_global<StakingRewardsConfig>(@aptos_framework).rewards_rate;
+            if (fixed_point64::is_zero(epoch_rewards_rate)) {
+                (0u64, 1u64)
+            } else {
+                // Maximize denominator for higher precision.
+                // Restriction: nominator <= MAX_REWARDS_RATE && denominator <= MAX_U64
+                let denominator = fixed_point64::divide_u128((MAX_REWARDS_RATE as u128), epoch_rewards_rate);
+                if (denominator > MAX_U64) {
+                    denominator = MAX_U64
+                };
+                let nominator = (fixed_point64::multiply_u128(denominator, epoch_rewards_rate) as u64);
+                (nominator, (denominator as u64))
+            }
+        } else {
+            (config.rewards_rate, config.rewards_rate_denominator)
+        };
+        (rewards_rate, rewards_rate_denominator)
     }
 
     /// Return the joining limit %.
@@ -195,8 +213,8 @@ module aptos_framework::staking_config {
         config.voting_power_increase_limit
     }
 
-    /// Return the rewards rate of a epoch in the format of (nominator, denominator).
-    public fun calculate_and_save_latest_epoch_rewards_rate(): FixedPoint64 acquires StakingRewardsConfig {
+    /// Calculate and save the latest rewards rate.
+    public(friend) fun calculate_and_save_latest_epoch_rewards_rate(): FixedPoint64 acquires StakingRewardsConfig {
         assert!(features::periodical_reward_rate_decrease_enabled(), error::invalid_state(EDISABLED_FUNCTION));
         let staking_rewards_config = calculate_and_save_latest_rewards_config();
         staking_rewards_config.rewards_rate

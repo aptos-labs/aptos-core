@@ -10,7 +10,7 @@ use aptos_state_view::StateView;
 use aptos_types::{
     state_store::state_key::StateKey,
     vm_status::{StatusCode, VMStatus},
-    write_set::{WriteOp, WriteSetMut},
+    write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult};
 use std::collections::BTreeMap;
@@ -110,6 +110,11 @@ impl DeltaOp {
     /// correctly.
     pub fn merge_onto(&mut self, previous_delta: DeltaOp) -> PartialVMResult<()> {
         use DeltaUpdate::*;
+
+        assert_eq!(
+            self.limit, previous_delta.limit,
+            "Cannot merge deltas with different limits",
+        );
 
         // First, update the history values of this delta given that it starts from
         // +value or -value instead of 0. We should do this check to avoid cases like this:
@@ -312,21 +317,34 @@ impl DeltaChangeSet {
         &mut self.delta_change_set
     }
 
+    pub(crate) fn take(
+        self,
+        state_view: &impl StateView,
+    ) -> anyhow::Result<Vec<(StateKey, WriteOp)>, VMStatus> {
+        let mut ret = Vec::with_capacity(self.delta_change_set.len());
+
+        for (state_key, delta_op) in self.delta_change_set {
+            let write_op = delta_op.try_into_write_op(state_view, &state_key)?;
+            ret.push((state_key, write_op));
+        }
+
+        Ok(ret)
+    }
+
     /// Consumes the delta change set and tries to materialize it. Returns a
     /// mutable write set if materialization succeeds (mutability since we want
     /// to merge these writes with transaction outputs).
-    pub fn try_into_write_set_mut(
+    pub fn try_into_write_set(
         self,
         state_view: &impl StateView,
-    ) -> anyhow::Result<WriteSetMut, VMStatus> {
-        let mut materialized_write_set = vec![];
-        for (state_key, delta_op) in self.delta_change_set {
-            let write_op = delta_op.try_into_write_op(state_view, &state_key)?;
-            materialized_write_set.push((state_key, write_op));
-        }
+    ) -> anyhow::Result<WriteSet, VMStatus> {
+        let materialized_write_set = self
+            .take(state_view)
+            .expect("something terrible happened when applying aggregator deltas");
 
-        // All deltas are applied successfully.
-        Ok(WriteSetMut::new(materialized_write_set))
+        WriteSetMut::new(materialized_write_set)
+            .freeze()
+            .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, None))
     }
 }
 

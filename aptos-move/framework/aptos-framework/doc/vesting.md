@@ -1499,12 +1499,13 @@ Return the list of all shareholders in the vesting contract.
 ## Function `shareholder`
 
 Return the shareholder address given the beneficiary address in a given vesting contract. If there are multiple
-shareholders with the same beneficiary address, only the first shareholder is returned.
+shareholders with the same beneficiary address, only the first shareholder is returned. If the given beneficiary
+address is actually a shareholder address, just return the address back.
 
-This returns 0x0 if no shareholder is found for the given beneficiary.
+This returns 0x0 if no shareholder is found for the given beneficiary / the address is not a shareholder itself.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_shareholder">shareholder</a>(vesting_contract_address: <b>address</b>, beneficiary: <b>address</b>): <b>address</b>
+<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_shareholder">shareholder</a>(vesting_contract_address: <b>address</b>, shareholder_or_beneficiary: <b>address</b>): <b>address</b>
 </code></pre>
 
 
@@ -1513,17 +1514,20 @@ This returns 0x0 if no shareholder is found for the given beneficiary.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_shareholder">shareholder</a>(vesting_contract_address: <b>address</b>, beneficiary: <b>address</b>): <b>address</b> <b>acquires</b> <a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_shareholder">shareholder</a>(vesting_contract_address: <b>address</b>, shareholder_or_beneficiary: <b>address</b>): <b>address</b> <b>acquires</b> <a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a> {
     <a href="vesting.md#0x1_vesting_assert_active_vesting_contract">assert_active_vesting_contract</a>(vesting_contract_address);
 
     <b>let</b> shareholders = &<a href="vesting.md#0x1_vesting_shareholders">shareholders</a>(vesting_contract_address);
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_contains">vector::contains</a>(shareholders, &shareholder_or_beneficiary)) {
+        <b>return</b> shareholder_or_beneficiary
+    };
     <b>let</b> vesting_contract = <b>borrow_global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(vesting_contract_address);
     <b>let</b> i = 0;
     <b>let</b> len = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(shareholders);
     <b>while</b> (i &lt; len) {
         <b>let</b> shareholder = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(shareholders, i);
         // This will still <b>return</b> the shareholder <b>if</b> shareholder == beneficiary.
-        <b>if</b> (beneficiary == <a href="vesting.md#0x1_vesting_get_beneficiary">get_beneficiary</a>(vesting_contract, shareholder)) {
+        <b>if</b> (shareholder_or_beneficiary == <a href="vesting.md#0x1_vesting_get_beneficiary">get_beneficiary</a>(vesting_contract, shareholder)) {
             <b>return</b> shareholder
         };
         i = i + 1;
@@ -2910,7 +2914,7 @@ staking_contract and stake modules.
 ### Function `shareholder`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_shareholder">shareholder</a>(vesting_contract_address: <b>address</b>, beneficiary: <b>address</b>): <b>address</b>
+<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_shareholder">shareholder</a>(vesting_contract_address: <b>address</b>, shareholder_or_beneficiary: <b>address</b>): <b>address</b>
 </code></pre>
 
 

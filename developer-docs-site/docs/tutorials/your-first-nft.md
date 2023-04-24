@@ -1,5 +1,5 @@
 ---
-title: "Mint NFTs with the SDKs"
+title: "Your First NFT"
 slug: "your-first-nft"
 ---
 
@@ -8,7 +8,7 @@ import TabItem from '@theme/TabItem';
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Mint NFTs with the Aptos SDKs
+# Your First NFT
 
 This tutorial describes how to create and transfer NFTs on the Aptos blockchain. The Aptos implementation for core NFTs can be found in the [token.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move) Move module.
 

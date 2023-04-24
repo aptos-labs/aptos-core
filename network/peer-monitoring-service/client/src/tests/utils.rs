@@ -25,10 +25,10 @@ use aptos_peer_monitoring_service_types::{
 };
 use aptos_time_service::{MockTimeService, TimeService, TimeServiceTrait};
 use aptos_types::{network_address::NetworkAddress, PeerId};
-use maplit::hashmap;
+use maplit::btreemap;
 use rand::{rngs::OsRng, Rng};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashSet},
     future::Future,
     sync::Arc,
     time::{Duration, Instant},
@@ -92,13 +92,34 @@ pub fn config_without_node_info_requests() -> NodeConfig {
 }
 
 /// Returns a simple connected peers map for testing purposes
-pub fn create_connected_peers_map() -> HashMap<PeerNetworkId, ConnectionMetadata> {
-    hashmap! { PeerNetworkId::random() => ConnectionMetadata::new(NetworkAddress::mock(), PeerId::random(), PeerRole::Unknown) }
+pub fn create_connected_peers_map() -> BTreeMap<PeerNetworkId, ConnectionMetadata> {
+    btreemap! { PeerNetworkId::random() => ConnectionMetadata::new(NetworkAddress::mock(), PeerId::random(), PeerRole::Unknown) }
+}
+
+/// Returns a build info map that is too large
+pub fn create_large_build_info_map() -> BTreeMap<String, String> {
+    let mut build_info = BTreeMap::new();
+    for i in 0..100_000 {
+        build_info.insert(i.to_string(), i.to_string());
+    }
+    build_info
+}
+
+/// Returns a connected peers map that is too large
+pub fn create_large_connected_peers_map() -> BTreeMap<PeerNetworkId, ConnectionMetadata> {
+    let mut peers = BTreeMap::new();
+    for _ in 0..100_000 {
+        peers.insert(
+            PeerNetworkId::random(),
+            ConnectionMetadata::new(NetworkAddress::mock(), PeerId::random(), PeerRole::Unknown),
+        );
+    }
+    peers
 }
 
 /// Creates a network info response with the given data
 pub fn create_network_info_response(
-    connected_peers: &HashMap<PeerNetworkId, ConnectionMetadata>,
+    connected_peers: &BTreeMap<PeerNetworkId, ConnectionMetadata>,
     distance_from_validators: u64,
 ) -> NetworkInformationResponse {
     NetworkInformationResponse {
@@ -109,7 +130,7 @@ pub fn create_network_info_response(
 
 /// Creates a node info response with the given data
 pub fn create_node_info_response(
-    git_hash: String,
+    build_information: BTreeMap<String, String>,
     highest_synced_epoch: u64,
     highest_synced_version: u64,
     ledger_timestamp_usecs: u64,
@@ -117,7 +138,7 @@ pub fn create_node_info_response(
     uptime: Duration,
 ) -> NodeInformationResponse {
     NodeInformationResponse {
-        git_hash,
+        build_information,
         highest_synced_epoch,
         highest_synced_version,
         ledger_timestamp_usecs,
@@ -298,7 +319,7 @@ pub fn create_random_network_info_response() -> NetworkInformationResponse {
 /// Creates a new network info response with random values
 pub fn create_random_node_info_response() -> NodeInformationResponse {
     // Create the random values
-    let git_hash = aptos_build_info::get_git_hash();
+    let build_information = aptos_build_info::get_build_information();
     let highest_synced_epoch = get_random_u64();
     let highest_synced_version = get_random_u64();
     let ledger_timestamp_usecs = get_random_u64();
@@ -307,7 +328,7 @@ pub fn create_random_node_info_response() -> NodeInformationResponse {
 
     // Create and return the node info response
     create_node_info_response(
-        git_hash,
+        build_information,
         highest_synced_epoch,
         highest_synced_version,
         ledger_timestamp_usecs,
@@ -410,7 +431,7 @@ pub fn update_network_info_for_peer(
     peers_and_metadata: Arc<PeersAndMetadata>,
     peer_network_id: &PeerNetworkId,
     peer_state: &mut PeerState,
-    connected_peers: HashMap<PeerNetworkId, ConnectionMetadata>,
+    connected_peers: BTreeMap<PeerNetworkId, ConnectionMetadata>,
     distance_from_validators: u64,
     response_time_secs: f64,
 ) {
@@ -508,6 +529,7 @@ pub async fn verify_and_handle_network_info_request(
         false,
         false,
         false,
+        false,
     )
     .await;
 
@@ -548,6 +570,7 @@ pub async fn verify_and_handle_node_info_request(
         network_id,
         mock_monitoring_server,
         node_info_response.clone(),
+        false,
         false,
         false,
     )
@@ -702,6 +725,7 @@ pub async fn verify_network_info_request_and_respond(
     network_info_response: NetworkInformationResponse,
     respond_with_invalid_distance: bool,
     respond_with_invalid_message: bool,
+    respond_with_large_message: bool,
     skip_sending_a_response: bool,
 ) {
     // Create a task that waits for the request and sends a response
@@ -724,6 +748,12 @@ pub async fn verify_network_info_request_and_respond(
                     PeerMonitoringServiceResponse::LatencyPing(LatencyPingResponse {
                         ping_counter: 10,
                     })
+                } else if respond_with_large_message {
+                    // Respond with a large message
+                    PeerMonitoringServiceResponse::NetworkInformation(create_network_info_response(
+                        &create_large_connected_peers_map(),
+                        network_info_response.distance_from_validators,
+                    ))
                 } else {
                     // Send a valid response
                     PeerMonitoringServiceResponse::NetworkInformation(network_info_response)
@@ -751,8 +781,9 @@ pub async fn verify_network_info_request_and_respond(
 pub async fn verify_node_info_request_and_respond(
     network_id: &NetworkId,
     mock_monitoring_server: &mut MockMonitoringServer,
-    node_info_response: NodeInformationResponse,
+    mut node_info_response: NodeInformationResponse,
     respond_with_invalid_message: bool,
+    respond_with_large_message: bool,
     skip_sending_a_response: bool,
 ) {
     // Create a task that waits for the request and sends a response
@@ -769,6 +800,10 @@ pub async fn verify_node_info_request_and_respond(
                     PeerMonitoringServiceResponse::LatencyPing(LatencyPingResponse {
                         ping_counter: 10,
                     })
+                } else if respond_with_large_message {
+                    // Respond with a large message
+                    node_info_response.build_information = create_large_build_info_map();
+                    PeerMonitoringServiceResponse::NodeInformation(node_info_response)
                 } else {
                     // Send a valid response
                     PeerMonitoringServiceResponse::NodeInformation(node_info_response)

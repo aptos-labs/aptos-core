@@ -8,7 +8,7 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 # Staking
 
 :::tip Consensus
-We strongly recommend that you read the consensus section of [Aptos Blockchain Deep Dive](../guides/basics-life-of-txn.md#consensus) before proceeding further. 
+We strongly recommend that you read the consensus section of [Aptos Blockchain Deep Dive](./blockchain.md#consensus) before proceeding further. 
 :::
 
 In a distributed system like blockchain, executing a transaction is distinct from updating the state of the ledger and persisting the results in storage. An agreement, i.e., consensus, must be reached by a quorum of validators on the ordering of transactions and their execution results before these results are persisted in storage and the state of the ledger is updated. 
@@ -121,7 +121,7 @@ sources={{
 />
 
 There are two edge cases to call out:
-1. If a validator's stake drops below the required minimum, that validator can be moved from active state directly to the inactive state during an epoch change. This happens only during an epoch change.
+1. If a validator's stake drops below the required [minimum](#minimum-and-maximum-stake), that validator will be moved from active state directly to the inactive state during an epoch change. This happens only during an epoch change.
 2. Aptos governance can also directly remove validators from the active set. **Note that governance proposals will always trigger an epoch change.**
 
 ### Stake state
@@ -179,7 +179,7 @@ For step-by-step instructions on how to join the validator set, see: [Joining Va
 
 ### Minimum and maximum stake
 
-You must stake the required minimum amount to join the validator set. Moreover, you can only stake up to the maximum stake amount. 
+You must stake the required minimum amount to join the validator set. Moreover, you can only stake up to the maximum stake amount. The current required minimum for staking is 1M APT tokens.
 
 If at any time after joining the validator set, your current staked amount exceeds the maximum allowed stake (for example as the rewards are added to your staked amount), then your voting power and the rewards will be calculated only using the maximum allowed stake amount, and not your current staked amount. 
 

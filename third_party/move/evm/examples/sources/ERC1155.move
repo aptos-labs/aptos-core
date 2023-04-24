@@ -70,7 +70,7 @@ module Evm::ERC1155 {
     #[callable, view]
     /// Returns the name of the token
     public fun uri(): String acquires State {
-        *&borrow_global<State>(self()).uri
+        borrow_global<State>(self()).uri
     }
 
     #[callable, view]

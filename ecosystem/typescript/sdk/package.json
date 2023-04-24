@@ -22,7 +22,7 @@
     "_build:browser": "tsup --platform browser --format iife --global-name aptosSDK --minify",
     "_build:node": "tsup --format cjs,esm --dts",
     "lint": "eslint \"**/*.ts\"",
-    "test": "jest",
+    "test": "pnpm run publish-ans-contract && jest",
     "_fmt": "prettier 'scripts/**/*.ts' 'src/**/*.ts' 'examples/**/*.js' 'examples/**/*.ts' '.eslintrc.js'",
     "fmt": "pnpm _fmt --write",
     "fmt:check": "pnpm _fmt --check",

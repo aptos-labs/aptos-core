@@ -4,7 +4,7 @@
 use crate::{monitor, quorum_store::counters};
 use anyhow::Result;
 use aptos_consensus_types::{
-    common::{Payload, PayloadFilter, TransactionSummary},
+    common::{Payload, PayloadFilter, TransactionInProgress, TransactionSummary},
     request_response::{GetPayloadCommand, GetPayloadResponse},
 };
 use aptos_logger::prelude::*;
@@ -47,10 +47,18 @@ impl DirectMempoolQuorumStore {
         exclude_txns: Vec<TransactionSummary>,
     ) -> Result<Vec<SignedTransaction>, anyhow::Error> {
         let (callback, callback_rcv) = oneshot::channel();
+        let exclude_txns: Vec<_> = exclude_txns
+            .iter()
+            .map(|txn| TransactionInProgress {
+                summary: *txn,
+                gas_unit_price: 0,
+            })
+            .collect();
         let msg = QuorumStoreRequest::GetBatchRequest(
             max_items,
             max_bytes,
             return_non_full,
+            false,
             exclude_txns,
             callback,
         );

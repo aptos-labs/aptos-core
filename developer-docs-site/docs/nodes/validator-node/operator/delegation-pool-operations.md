@@ -16,8 +16,8 @@ The operator address will receive the pool commission that was set at the initia
 
 ## Prerequisites
 
-1. [Install](../../../cli-tools/aptos-cli-tool/index.md) and [configure](../../../cli-tools/aptos-cli-tool/use-aptos-cli.md#configuration-examples) the Aptos CLI. If you are looking to develop on the Aptos blockchain, debug apps, or perform node operations, the Aptos tool offers a command line interface for these purposes.
-2. [Initialize local configuration and create an account](../../../cli-tools/aptos-cli-tool/use-aptos-cli.md#initialize-local-configuration-and-create-an-account) on the Aptos blockchain.
+1. [Install](../../../tools/install-cli/index.md) and [configure](../../../tools/aptos-cli-tool/use-aptos-cli.md#configuration-examples) the Aptos CLI. If you are looking to develop on the Aptos blockchain, debug apps, or perform node operations, the Aptos tool offers a command line interface for these purposes.
+2. [Initialize local configuration and create an account](../../../tools/aptos-cli-tool/use-aptos-cli.md#initialize-local-configuration-and-create-an-account) on the Aptos blockchain.
 
 ## Connect to Aptos network
 
@@ -114,7 +114,7 @@ Delegation pool owners have access to specific methods designed for modifying th
   
 ## Check delegation pool information
 
-Until the delegation pool has received 1 million APT and the validator has been added to the set of active validators, there will be no rewards to track during each cycle. In order to obtain information about a delegation pool, use the Aptos [View functon](../../../guides/aptos-apis.md#reading-state-with-the-view-function).
+Until the delegation pool has received 1 million APT and the validator has been added to the set of active validators, there will be no rewards to track during each cycle. In order to obtain information about a delegation pool, use the Aptos [View functon](../../../integration/aptos-apis.md#reading-state-with-the-view-function).
 
 * `get_owned_pool_address(owner: address): address` -  Returns the address of the delegation pool belonging to the owner, or produces an error if there is no delegation pool associated with the owner.
 
@@ -155,7 +155,20 @@ Alternatively, you can use Aptos CLI to call View functions.
 
 ```bash
  aptos move view [OPTIONS] --function-id <FUNCTION_ID>
-
 ```
 
 To discover the available options and the process for making an `aptos move view` call, access the help information with `aptos move view --help`. This will display the required arguments for invoking the view functions.
+
+
+## Compute delegation pool rewards earned
+Use this formula to calculate *rewards earned* for `active` and `pending_inactive` staking. This formula assumes that different stake operations such as `unlock` and `reactivate` take out the *principals* first and then *rewards*. Therefore, *rewards earned* may vary based upon how the formula you use is constructed:
+
+1. Get the amount of `active` and `pending_inactive` staking from the [`get_stake`](https://github.com/aptos-labs/aptos-core/blob/ed63ab756cda61439287304ed89bbb156fcbeaed/aptos-move/framework/aptos-framework/sources/delegation_pool.move#L321) view function.
+
+2. Calculate principal:
+    - "active principal" = **AddStakeEvent** - **UnlockStakeEvent** + **ReactivateStakeEvent**. If at any point during the iteration, "active principal" < 0, reset to 0. Negative principal could happen when the amount users `unlock` or `reactivate` include rewards earned from staking.
+    - "pending inactive principal" = **UnlockStakeEvent** - **ReactivateStakeEvent**. If at any point during the iteration, "pending inactive principal" < 0, reset to 0. Negative principal could happen when the amount users `unlock` or `reactivate` include rewards earned from staking.
+
+3. Compute rewards earned:
+    - active_rewards = `active` - *active principal*.
+    - pending_inactive_rewards = `pending_inactive` - "pending inactive principal".

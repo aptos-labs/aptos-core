@@ -26,9 +26,7 @@ impl DurationHistogram {
     }
 
     pub fn observe_duration(&self, d: Duration) {
-        // Duration is full seconds + nanos elapsed from the previous full second
-        let v = d.as_secs() as f64 + f64::from(d.subsec_nanos()) / 1e9;
-        self.histogram.observe(v);
+        self.histogram.observe(d.as_secs_f64());
     }
 
     pub fn start_timer(&self) -> HistogramTimer {

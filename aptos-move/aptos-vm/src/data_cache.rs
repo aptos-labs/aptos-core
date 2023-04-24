@@ -63,22 +63,18 @@ impl<'a, 'm, S: MoveResolverExt> MoveResolverExt for MoveResolverWithVMMetadata<
 }
 
 impl<'a, 'm, S: MoveResolverExt> ModuleResolver for MoveResolverWithVMMetadata<'a, 'm, S> {
-    type Error = VMError;
-
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
+    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Error> {
         self.move_resolver.get_module(module_id)
     }
 }
 
 impl<'a, 'm, S: MoveResolverExt> ResourceResolver for MoveResolverWithVMMetadata<'a, 'm, S> {
-    type Error = VMError;
-
     fn get_resource(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, Self::Error> {
-        self.get_any_resource(address, struct_tag)
+    ) -> Result<Option<Vec<u8>>, Error> {
+        Ok(self.get_any_resource(address, struct_tag)?)
     }
 }
 
@@ -158,24 +154,20 @@ impl<'a, S: StateView> MoveResolverExt for StorageAdapter<'a, S> {
 }
 
 impl<'a, S: StateView> ModuleResolver for StorageAdapter<'a, S> {
-    type Error = VMError;
-
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
+    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Error> {
         // REVIEW: cache this?
         let ap = AccessPath::from(module_id);
-        self.get(ap).map_err(|e| e.finish(Location::Undefined))
+        Ok(self.get(ap).map_err(|e| e.finish(Location::Undefined))?)
     }
 }
 
 impl<'a, S: StateView> ResourceResolver for StorageAdapter<'a, S> {
-    type Error = VMError;
-
     fn get_resource(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, Self::Error> {
-        self.get_any_resource(address, struct_tag)
+    ) -> Result<Option<Vec<u8>>, Error> {
+        Ok(self.get_any_resource(address, struct_tag)?)
     }
 }
 
@@ -239,9 +231,7 @@ impl<S> DerefMut for StorageAdapterOwned<S> {
 }
 
 impl<S: StateView> ModuleResolver for StorageAdapterOwned<S> {
-    type Error = VMError;
-
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
+    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Error> {
         self.as_move_resolver().get_module(module_id)
     }
 }
@@ -271,13 +261,11 @@ impl<S: StateView> MoveResolverExt for StorageAdapterOwned<S> {
 }
 
 impl<S: StateView> ResourceResolver for StorageAdapterOwned<S> {
-    type Error = VMError;
-
     fn get_resource(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, Self::Error> {
+    ) -> Result<Option<Vec<u8>>, Error> {
         self.as_move_resolver().get_resource(address, struct_tag)
     }
 }

@@ -2,13 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    assert_abort, assert_success, get_stake_pool, get_validator_config, get_validator_set,
-    initialize_staking, join_validator_set, leave_validator_set, rotate_consensus_key,
-    setup_staking, tests::common, unlock_stake, withdraw_stake, MoveHarness,
+    assert_success, get_stake_pool, get_validator_config, get_validator_set, initialize_staking,
+    join_validator_set, leave_validator_set, rotate_consensus_key, setup_staking, tests::common,
+    unlock_stake, withdraw_stake, MoveHarness,
 };
 use aptos_cached_packages::aptos_stdlib;
 use aptos_types::account_address::{default_stake_pool_address, AccountAddress};
-use move_core_types::language_storage::CORE_CODE_ADDRESS;
 use once_cell::sync::Lazy;
 use std::collections::BTreeMap;
 
@@ -105,33 +104,6 @@ fn test_staking_end_to_end() {
     let stake_pool = get_stake_pool(&harness, &owner_address);
     assert_eq!(stake_pool.active, 0);
     assert_eq!(stake_pool.inactive, 0);
-}
-
-#[test]
-fn test_staking_mainnet() {
-    // TODO: Update to have custom validators/accounts with initial balances at genesis.
-    let mut harness = MoveHarness::new_mainnet();
-
-    // Validator there's at least one validator in the validator set.
-    let validator_set = get_validator_set(&harness);
-    assert_eq!(validator_set.active_validators.len(), 1);
-
-    // Verify that aptos framework account cannot mint coins.
-    let aptos_framework_account = harness.new_account_at(CORE_CODE_ADDRESS);
-    assert_abort!(
-        harness.run_transaction_payload(
-            &aptos_framework_account,
-            aptos_stdlib::aptos_coin_mint(CORE_CODE_ADDRESS, 1000),
-        ),
-        _
-    );
-
-    // Verify that new validators can join post genesis.
-    let validator = harness.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap());
-    assert_success!(setup_staking(&mut harness, &validator, 100_000_000_000_000));
-    harness.new_epoch();
-    let validator_set = get_validator_set(&harness);
-    assert_eq!(validator_set.active_validators.len(), 2);
 }
 
 #[test]
@@ -273,13 +245,35 @@ fn test_staking_rewards() {
         rewards_rate_denominator,
     );
 
-    // Another 0.5 year passed. Rewards rate halves. New rewards rate is 0.5% every epoch.
+    // Another 0.5 year passed. Rewards rate halves. New rewards after this epoch rate is 0.5% every epoch.
     // Both validators propose a block in the current epoch. Both should receive rewards.
     harness.new_block_with_metadata(validator_1_address, vec![]);
     harness.new_block_with_metadata(validator_2_address, vec![]);
     harness.fast_forward(one_year_in_secs / 2);
     harness.new_epoch();
+    update_stake_amount_and_assert_with_errors(
+        &mut harness,
+        &mut stake_amount_1,
+        validator_1_address,
+        rewards_rate,
+        rewards_rate_denominator,
+    );
+    update_stake_amount_and_assert_with_errors(
+        &mut harness,
+        &mut stake_amount_2,
+        validator_2_address,
+        rewards_rate,
+        rewards_rate_denominator,
+    );
     rewards_rate = rewards_rate * rewards_rate_decrease_rate_bps / bps_denominator;
+
+    // Another new epoch, both validators receive rewards in 0.5% every epoch.
+    // Another year passed. Rewards rate halves but it cannot be lower than 0.3%.
+    // New rewards rate of the next epoch is 0.3% every epoch.
+    harness.new_block_with_metadata(validator_1_address, vec![]);
+    harness.new_block_with_metadata(validator_2_address, vec![]);
+    harness.fast_forward(one_year_in_secs);
+    harness.new_epoch();
     update_stake_amount_and_assert_with_errors(
         &mut harness,
         &mut stake_amount_1,
@@ -295,11 +289,8 @@ fn test_staking_rewards() {
         rewards_rate_denominator,
     );
 
-    // Another year passed. Rewards rate halves but it cannot be lower than 0.3%.
-    // New rewards rate is 0.3% every epoch.
     // Validator 1 misses one proposal but has one successful so they receive half of the rewards.
     harness.new_block_with_metadata(validator_1_address, vec![index_1]);
-    harness.fast_forward(one_year_in_secs);
     harness.new_epoch();
     rewards_rate = min_rewards_rate / 2;
     update_stake_amount_and_assert_with_errors(

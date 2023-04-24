@@ -26,31 +26,9 @@ The rest of this document describes:
 
 ## Using the Aptos-core source code
 
-1. Clone the Aptos repo.
+1. Follow steps in [Building Aptos From Source](../../guides/building-from-source.md)
 
-    ```
-    git clone https://github.com/aptos-labs/aptos-core.git
-    ```
-
-2. `cd` into `aptos-core` directory.
-
-    ```
-    cd aptos-core
-    ```
-
-3. Run the `scripts/dev_setup.sh` Bash script as shown below. This will prepare your developer environment.
-
-    ```
-    ./scripts/dev_setup.sh
-    ```
-
-4. Update your current shell environment.
-
-    ```
-    source ~/.cargo/env
-    ```
-
-5. With your development environment ready, now you can start your testnet network. Before you proceed, make a note of the following:
+1. With your development environment ready, now you can start your testnet network. Before you proceed, make a note of the following:
 
     :::tip
      - When you run the below command to start the local testnet, your terminal will enter into an interactive mode, with a message `Aptos is running, press ctrl-c to exit`. Hence, you will need to open another shell terminal for the subsequent steps described in this section.
@@ -119,7 +97,7 @@ Completed generating configuration:
 Aptos is running, press ctrl-c to exit
 ```
 
-Use the [Aptos CLI tool](../../cli-tools/aptos-cli-tool/index.md) to interact with your local testnet. The above output contains information you will use for starting the [Aptos CLI tool](../../cli-tools/aptos-cli-tool/use-aptos-cli.md):
+Use the [Aptos CLI tool](../../tools/install-cli/index.md) to interact with your local testnet. The above output contains information you will use for starting the [Aptos CLI tool](../../tools/aptos-cli-tool/use-aptos-cli.md):
 
 * `Aptos root key path`: The root key (also known as the mint or faucet key) controls the account that can mint tokens. Available in the docker compose folder under `aptos_root_key`.
 * `Waypoint`: A verifiable checkpoint of the blockchain (available in the docker compose folder under waypoint.txt)
@@ -132,4 +110,4 @@ At this point, you will have a special root account at `0x1` that can perform th
 
 * [Your first transaction](../../tutorials/first-transaction.md) to learn how to submit transactions.
 * [Your first Move module](../../tutorials/first-move-module.md) to learn how to create Move modules.
-* [Interacting with the Aptos Blockchain](../../guides/interacting-with-the-blockchain.md) to learn how to mint coins.
+* [Interacting with the Aptos Blockchain](../../tutorials/first-coin.md) to learn how to mint coins.
