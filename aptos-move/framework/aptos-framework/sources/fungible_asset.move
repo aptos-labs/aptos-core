@@ -16,7 +16,7 @@ module aptos_framework::fungible_asset {
     /// The transfer ref and the fungible asset do not match.
     const ETRANSFER_REF_AND_FUNGIBLE_ASSET_MISMATCH: u64 = 2;
     /// Store is disabled from sending and receiving this fungible asset.
-    const EUNGATED_TRANSFER_IS_NOT_ALLOWED: u64 = 3;
+    const ESTORE_IS_FROZEN: u64 = 3;
     /// Insufficient balance to withdraw or transfer.
     const EINSUFFICIENT_BALANCE: u64 = 4;
     /// The fungible asset's supply has exceeded maximum.
@@ -85,15 +85,15 @@ module aptos_framework::fungible_asset {
         metadata: Object<Metadata>,
         /// The balance of the fungible metadata.
         balance: u64,
-        /// Fungible Assets transferring is a common operation, this allows for freezing/unfreezing accounts.
-        allow_ungated_balance_transfer: bool,
+        /// If true, owner transfer is disabled that only `TransferRef` can move in/out from this store.
+        frozen: bool,
     }
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     struct FungibleAssetEvents has key {
         deposit_events: event::EventHandle<DepositEvent>,
         withdraw_events: event::EventHandle<WithdrawEvent>,
-        set_ungated_transfer_events: event::EventHandle<SetUngatedTransferEvent>,
+        frozen_events: event::EventHandle<FrozenEvent>,
     }
 
     /// FungibleAsset can be passed into function for type safety and to guarantee a specific amount.
@@ -129,9 +129,9 @@ module aptos_framework::fungible_asset {
         amount: u64,
     }
 
-    /// Emitted when a store's ungated transfer permission is updated.
-    struct SetUngatedTransferEvent has drop, store {
-        transfer_allowed: bool,
+    /// Emitted when a store's frozen status is updated.
+    struct FrozenEvent has drop, store {
+        frozen: bool,
     }
 
     /// Make an existing object fungible by adding the Metadata resource.
@@ -270,12 +270,11 @@ module aptos_framework::fungible_asset {
     }
 
     #[view]
-    /// Return whether a store can freely send or receive fungible assets.
+    /// Return whether a store is frozen.
     ///
-    /// If the store has not been created, we default to returning true so deposits can be sent to it.
-    public fun ungated_balance_transfer_allowed<T: key>(store: Object<T>): bool acquires FungibleStore {
-        !store_exists(object::object_address(&store)) ||
-            borrow_store_resource(&store).allow_ungated_balance_transfer
+    /// If the store has not been created, we default to returning false so deposits can be sent to it.
+    public fun is_frozen<T: key>(store: Object<T>): bool acquires FungibleStore {
+        store_exists(object::object_address(&store)) && borrow_store_resource(&store).frozen
     }
 
     public fun asset_metadata(fa: &FungibleAsset): Object<Metadata> {
@@ -320,13 +319,13 @@ module aptos_framework::fungible_asset {
         move_to(store_obj, FungibleStore {
             metadata,
             balance: 0,
-            allow_ungated_balance_transfer: true,
+            frozen: false,
         });
         move_to(store_obj,
             FungibleAssetEvents {
                 deposit_events: object::new_event_handle<DepositEvent>(store_obj),
                 withdraw_events: object::new_event_handle<WithdrawEvent>(store_obj),
-                set_ungated_transfer_events: object::new_event_handle<SetUngatedTransferEvent>(store_obj),
+                frozen_events: object::new_event_handle<FrozenEvent>(store_obj),
             }
         );
 
@@ -337,17 +336,17 @@ module aptos_framework::fungible_asset {
     public fun remove_store(delete_ref: &DeleteRef) acquires FungibleStore, FungibleAssetEvents {
         let store = &object::object_from_delete_ref<FungibleStore>(delete_ref);
         let addr = object::object_address(store);
-        let FungibleStore { metadata: _, balance, allow_ungated_balance_transfer: _ }
+        let FungibleStore { metadata: _, balance, frozen: _ }
             = move_from<FungibleStore>(addr);
         assert!(balance == 0, error::permission_denied(EBALANCE_IS_NOT_ZERO));
         let FungibleAssetEvents {
             deposit_events,
             withdraw_events,
-            set_ungated_transfer_events,
+            frozen_events,
         } = move_from<FungibleAssetEvents>(addr);
         event::destroy_handle(deposit_events);
         event::destroy_handle(withdraw_events);
-        event::destroy_handle(set_ungated_transfer_events);
+        event::destroy_handle(frozen_events);
     }
 
     /// Withdraw `amount` of the fungible asset from `store` by the owner.
@@ -357,13 +356,13 @@ module aptos_framework::fungible_asset {
         amount: u64,
     ): FungibleAsset acquires FungibleStore, FungibleAssetEvents {
         assert!(object::owns(store, signer::address_of(owner)), error::permission_denied(ENOT_STORE_OWNER));
-        assert!(ungated_balance_transfer_allowed(store), error::invalid_argument(EUNGATED_TRANSFER_IS_NOT_ALLOWED));
+        assert!(!is_frozen(store), error::invalid_argument(ESTORE_IS_FROZEN));
         withdraw_internal(object::object_address(&store), amount)
     }
 
     /// Deposit `amount` of the fungible asset to `store`.
     public fun deposit<T: key>(store: Object<T>, fa: FungibleAsset) acquires FungibleStore, FungibleAssetEvents {
-        assert!(ungated_balance_transfer_allowed(store), error::invalid_argument(EUNGATED_TRANSFER_IS_NOT_ALLOWED));
+        assert!(!is_frozen(store), error::invalid_argument(ESTORE_IS_FROZEN));
         deposit_internal(store, fa);
     }
 
@@ -386,20 +385,20 @@ module aptos_framework::fungible_asset {
     }
 
     /// Enable/disable a store's ability to do direct transfers of the fungible asset.
-    public fun set_ungated_transfer<T: key>(
+    public fun set_frozen_flag<T: key>(
         ref: &TransferRef,
         store: Object<T>,
-        allow: bool,
+        frozen: bool,
     ) acquires FungibleStore, FungibleAssetEvents {
         assert!(
             ref.metadata == store_metadata(store),
             error::invalid_argument(ETRANSFER_REF_AND_STORE_MISMATCH),
         );
         let store_addr = object::object_address(&store);
-        borrow_global_mut<FungibleStore>(store_addr).allow_ungated_balance_transfer = allow;
+        borrow_global_mut<FungibleStore>(store_addr).frozen = frozen;
 
         let events = borrow_global_mut<FungibleAssetEvents>(store_addr);
-        event::emit_event(&mut events.set_ungated_transfer_events, SetUngatedTransferEvent { transfer_allowed: allow });
+        event::emit_event(&mut events.frozen_events, FrozenEvent { frozen });
     }
 
     /// Burns a fungible asset
@@ -424,7 +423,7 @@ module aptos_framework::fungible_asset {
         burn(ref, withdraw_internal(store_addr, amount));
     }
 
-    /// Withdraw `amount` of the fungible asset from the `store` ignoring `allow_ungated_transfer`.
+    /// Withdraw `amount` of the fungible asset from the `store` ignoring `frozen`.
     public fun withdraw_with_ref<T: key>(
         ref: &TransferRef,
         store: Object<T>,
@@ -437,7 +436,7 @@ module aptos_framework::fungible_asset {
         withdraw_internal(object::object_address(&store), amount)
     }
 
-    /// Deposit the fungible asset into the `store` ignoring `allow_ungated_transfer`.
+    /// Deposit the fungible asset into the `store` ignoring `frozen`.
     public fun deposit_with_ref<T: key>(
         ref: &TransferRef,
         store: Object<T>,
@@ -450,7 +449,7 @@ module aptos_framework::fungible_asset {
         deposit_internal(store, fa);
     }
 
-    /// Transfer `amount` of the fungible asset with `TransferRef` even ungated transfer is disabled.
+    /// Transfer `amount` of the fungible asset with `TransferRef` even it is frozen.
     public fun transfer_with_ref<T: key>(
         transfer_ref: &TransferRef,
         from: Object<T>,
@@ -684,20 +683,20 @@ module aptos_framework::fungible_asset {
         assert!(balance(creator_store) == 10, 5);
         assert!(balance(aaron_store) == 60, 6);
 
-        set_ungated_transfer(&transfer_ref, aaron_store, false);
-        assert!(!ungated_balance_transfer_allowed(aaron_store), 7);
+        set_frozen_flag(&transfer_ref, aaron_store, true);
+        assert!(is_frozen(aaron_store), 7);
     }
 
     #[test(creator = @0xcafe)]
     #[expected_failure(abort_code = 0x10003, location = Self)]
-    fun test_ungated_transfer(
+    fun test_frozen(
         creator: &signer
     ) acquires Metadata, FungibleStore, FungibleAssetEvents {
         let (mint_ref, transfer_ref, _burn_ref, _) = create_fungible_asset(creator);
 
         let creator_store = create_test_store(creator, mint_ref.metadata);
         let fa = mint(&mint_ref, 100);
-        set_ungated_transfer(&transfer_ref, creator_store, false);
+        set_frozen_flag(&transfer_ref, creator_store, true);
         deposit(creator_store, fa);
     }
 
@@ -712,14 +711,14 @@ module aptos_framework::fungible_asset {
         let aaron_store = create_test_store(aaron, metadata);
 
         let fa = mint(&mint_ref, 100);
-        set_ungated_transfer(&transfer_ref, creator_store, false);
-        set_ungated_transfer(&transfer_ref, aaron_store, false);
+        set_frozen_flag(&transfer_ref, creator_store, true);
+        set_frozen_flag(&transfer_ref, aaron_store, true);
         deposit_with_ref(&transfer_ref, creator_store, fa);
         transfer_with_ref(&transfer_ref, creator_store, aaron_store, 80);
         assert!(balance(creator_store) == 20, 1);
         assert!(balance(aaron_store) == 80, 2);
-        assert!(!ungated_balance_transfer_allowed(creator_store), 3);
-        assert!(!ungated_balance_transfer_allowed(aaron_store), 4);
+        assert!(!!is_frozen(creator_store), 3);
+        assert!(!!is_frozen(aaron_store), 4);
     }
 
     #[test(creator = @0xcafe)]
