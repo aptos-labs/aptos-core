@@ -147,7 +147,7 @@ pub enum EntryPoints {
     /// Increment destination resource - COUNTER_STEP
     StepDst,
     /// Initialize Token V1 NFT collection
-    InitializeCollection,
+    TokenV1InitializeCollection,
     /// Mint an NFT token. Should be called only after InitializeCollection is called
     TokenV1MintAndStoreNFTParallel,
     TokenV1MintAndStoreNFTSequential,
@@ -210,9 +210,10 @@ impl EntryPoints {
                 bytes_make_or_change(rng, module_id, data_len)
             },
             EntryPoints::StepDst => step_dst(module_id, other.expect("Must provide other")),
-            EntryPoints::InitializeCollection => {
-                get_payload_void(module_id, ident_str!("initialize_collection").to_owned())
-            },
+            EntryPoints::TokenV1InitializeCollection => get_payload_void(
+                module_id,
+                ident_str!("token_v1_initialize_collection").to_owned(),
+            ),
             EntryPoints::TokenV1MintAndStoreNFTParallel => get_payload(
                 module_id,
                 ident_str!("token_v1_mint_and_store_nft_parallel").to_owned(),
@@ -255,7 +256,7 @@ impl EntryPoints {
             | EntryPoints::TokenV1MintAndStoreNFTSequential
             | EntryPoints::TokenV1MintAndTransferNFTParallel
             | EntryPoints::TokenV1MintAndTransferNFTSequential => {
-                Some(EntryPoints::InitializeCollection)
+                Some(EntryPoints::TokenV1InitializeCollection)
             },
             _ => None,
         }

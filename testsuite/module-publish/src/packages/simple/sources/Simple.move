@@ -431,7 +431,7 @@ module 0xABCD::Simple {
         tokendata_id: TokenDataId,
     }
 
-    public entry fun initialize_collection(creator: &signer) {
+    public entry fun token_v1_initialize_collection(creator: &signer) {
         // Create the signer capability for the collection
         let (resource_signer, signer_cap) = account::create_resource_account(creator, vector::empty());
 
@@ -452,7 +452,7 @@ module 0xABCD::Simple {
         );
 
         // Create token data for fungible token
-        let tokendata_id = create_token_data(&resource_signer, string::utf8(TOKEN_URI), string::utf8(TOKEN_NAME), 5000000);
+        let tokendata_id = token_v1_create_token_data(&resource_signer, string::utf8(TOKEN_URI), string::utf8(TOKEN_NAME), 5000000);
 
         // Create the Minter resource and publish it under the creator's address
         move_to(creator, MinterConfig {
@@ -478,7 +478,7 @@ module 0xABCD::Simple {
         token_prefix
     }
 
-    fun create_token_data(
+    fun token_v1_create_token_data(
         creator: &signer,
         token_uri: String,
         tokendata_name: String,
@@ -526,7 +526,7 @@ module 0xABCD::Simple {
         let index = option::extract(&mut current_supply_opt) + 1;
         let tokendata_name = build_token_name(string::utf8(TOKEN_NAME), index);
 
-        let tokendata_id = create_token_data(&resource_signer, string::utf8(TOKEN_URI), tokendata_name, 1);
+        let tokendata_id = token_v1_create_token_data(&resource_signer, string::utf8(TOKEN_URI), tokendata_name, 1);
         let token_id = token::mint_token(&resource_signer, tokendata_id, 1);
         (resource_signer, token_id)
     }
@@ -534,7 +534,7 @@ module 0xABCD::Simple {
     fun mint_nft_parallel(user: &signer, creator_address: address) : (signer, TokenId) acquires MinterConfig {
         let resource_signer = get_signer(creator_address);
         let token_name = to_string<address>(&signer::address_of(user));
-        let tokendata_id = create_token_data(&resource_signer, string::utf8(TOKEN_URI), token_name, 1);
+        let tokendata_id = token_v1_create_token_data(&resource_signer, string::utf8(TOKEN_URI), token_name, 1);
         let token_id = token::mint_token(&resource_signer, tokendata_id, 1);
         (resource_signer, token_id)
     }
