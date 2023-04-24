@@ -28,7 +28,7 @@ use aptos_gas::{
     AptosGasMeter, AptosGasParameters, ChangeSetConfigs, Gas, StandardGasMeter,
     StorageGasParameters,
 };
-use aptos_logger::prelude::*;
+use aptos_logger::{enabled, prelude::*, Level};
 use aptos_state_view::StateView;
 use aptos_types::{
     account_config,
@@ -44,7 +44,9 @@ use aptos_types::{
     vm_status::{AbortLocation, DiscardedVMStatus, StatusCode, VMStatus},
     write_set::WriteSet,
 };
-use aptos_vm_logging::{init_speculative_logs, log_schema::AdapterLogSchema};
+use aptos_vm_logging::{
+    init_speculative_logs, log_schema::AdapterLogSchema, speculative_error, speculative_log,
+};
 use fail::fail_point;
 use move_binary_format::{
     access::ModuleAccess,
@@ -59,6 +61,7 @@ use move_core_types::{
     language_storage::{ModuleId, TypeTag},
     transaction_argument::convert_txn_args,
     value::{serialize_values, MoveValue},
+    vm_status::StatusType,
 };
 use move_vm_runtime::session::SerializedReturnValues;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -302,14 +305,10 @@ impl AptosVM {
         // Also, it is worth mentioning that current VM error handling is
         // rather ugly and has a lot of legacy code. This makes proper error
         // handling quite challenging.
-        let delta_write_set_mut = user_txn_change_set_ext
+        let delta_write_set = user_txn_change_set_ext
             .delta_change_set()
             .clone()
-            .try_into_write_set_mut(storage)
-            .expect("something terrible happened when applying aggregator deltas");
-        let delta_write_set = delta_write_set_mut
-            .freeze()
-            .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, None))?;
+            .try_into_write_set(storage)?;
         let storage_with_changes =
             DeltaStateView::new(&storage_with_changes, &delta_write_set).into_move_resolver();
 
@@ -658,14 +657,10 @@ impl AptosVM {
 
         let storage_with_changes =
             DeltaStateView::new(storage, inner_function_change_set_ext.write_set());
-        let delta_write_set_mut = inner_function_change_set_ext
+        let delta_write_set = inner_function_change_set_ext
             .delta_change_set()
             .clone()
-            .try_into_write_set_mut(storage)
-            .expect("something terrible happened when applying aggregator deltas");
-        let delta_write_set = delta_write_set_mut
-            .freeze()
-            .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, None))?;
+            .try_into_write_set(storage)?;
         let storage_with_changes =
             DeltaStateView::new(&storage_with_changes, &delta_write_set).into_move_resolver();
         let resolver = self.0.new_move_resolver(&storage_with_changes);
@@ -724,11 +719,7 @@ impl AptosVM {
             match CompiledModule::deserialize(module_blob.code()) {
                 Ok(module) => {
                     // verify the module doesn't exist
-                    if session
-                        .get_data_store()
-                        .load_module(&module.self_id())
-                        .is_ok()
-                    {
+                    if session.load_module(&module.self_id()).is_ok() {
                         return Err(verification_error(
                             StatusCode::DUPLICATE_MODULE_NAME,
                             IndexKind::AddressIdentifier,
@@ -919,7 +910,7 @@ impl AptosVM {
             let mut exists = BTreeSet::new();
             for m in &modules {
                 let id = m.self_id();
-                if session.get_data_store().exists_module(&id)? {
+                if session.exists_module(&id)? {
                     exists.insert(id);
                 }
             }
@@ -1113,6 +1104,13 @@ impl AptosVM {
                 if new_published_modules_loaded {
                     self.0.mark_loader_cache_as_invalid();
                 };
+
+                if err.status_type() == StatusType::InvariantViolation {
+                    speculative_error!(
+                        log_context,
+                        format!("[VM] discarded txn with error {:?}", err)
+                    );
+                }
 
                 let txn_status = TransactionStatus::from(err.clone());
                 if txn_status.is_discarded() {

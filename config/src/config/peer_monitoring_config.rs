@@ -100,7 +100,7 @@ impl ConfigSanitizer for PeerMonitoringServiceConfig {
         let peer_monitoring_config = &node_config.peer_monitoring_service;
 
         // Verify the peer monitoring service is not enabled in mainnet
-        if chain_id.is_mainnet()? && peer_monitoring_config.enable_peer_monitoring_client {
+        if chain_id.is_mainnet() && peer_monitoring_config.enable_peer_monitoring_client {
             return Err(Error::ConfigSanitizerFailed(
                 sanitizer_name,
                 "The peer monitoring service is not enabled in mainnet!".to_string(),

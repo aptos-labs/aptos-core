@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::types::{MVCodeError, MVCodeOutput, TxnIndex};
+use crate::types::{Flag, MVCodeError, MVCodeOutput, TxnIndex};
 use aptos_crypto::hash::{DefaultHasher, HashValue};
 use aptos_types::{
     executable::{Executable, ExecutableDescriptor},
@@ -12,22 +12,14 @@ use dashmap::DashMap;
 use std::{
     collections::{btree_map::BTreeMap, HashMap},
     hash::Hash,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
+    sync::Arc,
 };
-
-const FLAG_DONE: usize = 0;
-const FLAG_ESTIMATE: usize = 1;
 
 /// Every entry in shared multi-version data-structure has an "estimate" flag
 /// and some content.
 struct Entry<V: TransactionWrite> {
-    /// Used to mark the entry as a "write estimate". Even though the entry
-    /// lives inside the DashMap and the entry access will have barriers, we
-    /// still make the flag Atomic to provide acq/rel semantics on its own.
-    flag: AtomicUsize,
+    /// Used to mark the entry as a "write estimate".
+    flag: Flag,
 
     /// The contents of the module as produced by the VM (can be WriteOp based on a
     /// blob or CompiledModule, but must satisfy TransactionWrite to be able to
@@ -55,7 +47,7 @@ pub struct VersionedCode<K, V: TransactionWrite, X: Executable> {
 }
 
 impl<V: TransactionWrite> Entry<V> {
-    pub fn new_write_from(flag: usize, module: V) -> Entry<V> {
+    pub fn new_write_from(module: V) -> Entry<V> {
         let hash = module
             .extract_raw_bytes()
             .map(|bytes| {
@@ -66,18 +58,18 @@ impl<V: TransactionWrite> Entry<V> {
             .expect("Module can't be deleted");
 
         Entry {
-            flag: AtomicUsize::new(flag),
+            flag: Flag::Done,
             module: Arc::new(module),
             hash,
         }
     }
 
-    pub fn flag(&self) -> usize {
-        self.flag.load(Ordering::Acquire)
+    pub fn flag(&self) -> Flag {
+        self.flag
     }
 
-    pub fn mark_estimate(&self) {
-        self.flag.store(FLAG_ESTIMATE, Ordering::Release);
+    pub fn mark_estimate(&mut self) {
+        self.flag = Flag::Estimate;
     }
 }
 
@@ -94,13 +86,10 @@ impl<V: TransactionWrite, X: Executable> VersionedValue<V, X> {
         use MVCodeError::*;
 
         if let Some((idx, entry)) = self.versioned_map.range(0..txn_idx).next_back() {
-            let flag = entry.flag();
-            if flag == FLAG_ESTIMATE {
+            if entry.flag() == Flag::Estimate {
                 // Found a dependency.
                 return Err(Dependency(*idx));
             }
-            // The entry should be populated.
-            debug_assert!(flag == FLAG_DONE);
 
             Ok((entry.module.clone(), entry.hash))
         } else {
@@ -123,19 +112,17 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite, X: Executable> VersionedCode<K, 
     }
 
     pub(crate) fn mark_estimate(&self, key: &K, txn_idx: TxnIndex) {
-        let v = self.values.get(key).expect("Path must exist");
+        let mut v = self.values.get_mut(key).expect("Path must exist");
         v.versioned_map
-            .get(&txn_idx)
+            .get_mut(&txn_idx)
             .expect("Entry by the txn must exist to mark estimate")
             .mark_estimate();
     }
 
     pub(crate) fn write(&self, key: &K, txn_idx: TxnIndex, data: V) {
         let mut v = self.values.entry(key.clone()).or_default();
-        v.versioned_map.insert(
-            txn_idx,
-            CachePadded::new(Entry::new_write_from(FLAG_DONE, data)),
-        );
+        v.versioned_map
+            .insert(txn_idx, CachePadded::new(Entry::new_write_from(data)));
     }
 
     pub(crate) fn store_executable(

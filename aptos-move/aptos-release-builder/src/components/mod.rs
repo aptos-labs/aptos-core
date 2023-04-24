@@ -9,7 +9,10 @@ use aptos_rest_client::Client;
 use aptos_temppath::TempPath;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
-    on_chain_config::{GasScheduleV2, OnChainConfig, OnChainConsensusConfig, Version},
+    on_chain_config::{
+        ExecutionConfigV1, GasScheduleV2, OnChainConfig, OnChainConsensusConfig,
+        OnChainExecutionConfig, TransactionShufflerType, Version,
+    },
 };
 use futures::executor::block_on;
 use handlebars::Handlebars;
@@ -23,6 +26,7 @@ use std::{
 use url::Url;
 
 pub mod consensus_config;
+pub mod execution_config;
 pub mod feature_flags;
 pub mod framework;
 pub mod gas;
@@ -66,6 +70,7 @@ pub enum ReleaseEntry {
     Version(Version),
     FeatureFlag(Features),
     Consensus(OnChainConsensusConfig),
+    Execution(OnChainExecutionConfig),
     RawScript(PathBuf),
 }
 
@@ -177,6 +182,21 @@ impl ReleaseEntry {
                     )?);
                 }
             },
+            ReleaseEntry::Execution(execution_config) => {
+                if !fetch_and_equals(client, execution_config)? {
+                    result.append(
+                        &mut execution_config::generate_execution_config_upgrade_proposal(
+                            execution_config,
+                            is_testnet,
+                            if is_multi_step {
+                                get_execution_hash(result)
+                            } else {
+                                "".to_owned().into_bytes()
+                            },
+                        )?,
+                    );
+                }
+            },
             ReleaseEntry::RawScript(script_path) => {
                 let base_path =
                     PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join(script_path.as_path());
@@ -262,6 +282,11 @@ impl ReleaseEntry {
             ReleaseEntry::Consensus(consensus_config) => {
                 if !fetch_and_equals(client_opt, consensus_config)? {
                     bail!("Consensus config mismatch: Expected {:?}", consensus_config);
+                }
+            },
+            ReleaseEntry::Execution(execution_config) => {
+                if !fetch_and_equals(client_opt, execution_config)? {
+                    bail!("Consensus config mismatch: Expected {:?}", execution_config);
                 }
             },
         }
@@ -465,6 +490,9 @@ impl Default for ReleaseConfig {
                             disabled: vec![],
                         }),
                         ReleaseEntry::Consensus(OnChainConsensusConfig::default()),
+                        ReleaseEntry::Execution(OnChainExecutionConfig::V1(ExecutionConfigV1 {
+                            transaction_shuffler_type: TransactionShufflerType::SenderAwareV1(32),
+                        })),
                         ReleaseEntry::RawScript(PathBuf::from(
                             "data/proposals/empty_multi_step.move",
                         )),

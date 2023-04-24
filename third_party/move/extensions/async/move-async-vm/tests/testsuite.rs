@@ -2,7 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::bail;
+use anyhow::{bail, Error};
 use itertools::Itertools;
 use move_async_vm::{
     actor_metadata,
@@ -141,7 +141,7 @@ impl Harness {
 
     fn publish_module(
         &self,
-        session: &mut AsyncSession<HarnessProxy>,
+        session: &mut AsyncSession,
         id: &IdentStr,
         gas: &mut GasStatus,
         done: &mut BTreeSet<Identifier>,
@@ -377,9 +377,7 @@ struct HarnessProxy<'a> {
 }
 
 impl<'a> ModuleResolver for HarnessProxy<'a> {
-    type Error = ();
-
-    fn get_module(&self, id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
+    fn get_module(&self, id: &ModuleId) -> Result<Option<Vec<u8>>, Error> {
         Ok(self
             .harness
             .module_cache
@@ -389,13 +387,11 @@ impl<'a> ModuleResolver for HarnessProxy<'a> {
 }
 
 impl<'a> ResourceResolver for HarnessProxy<'a> {
-    type Error = ();
-
     fn get_resource(
         &self,
         address: &AccountAddress,
         typ: &StructTag,
-    ) -> Result<Option<Vec<u8>>, Self::Error> {
+    ) -> Result<Option<Vec<u8>>, Error> {
         let res = self
             .harness
             .resource_store

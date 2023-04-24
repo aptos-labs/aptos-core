@@ -29,7 +29,6 @@ move-core-types = { path = "../../move-core/types" }
 move-ir-types = { path = "../../move-ir/types" }
 move-model = { path = "../../move-model" }
 move-resource-viewer = { path = "../move-resource-viewer" }
-move-stackless-bytecode-interpreter = { path = "../../move-prover/interpreter" }
 move-stdlib = { path = "../../move-stdlib", features = ["testing"] }
 move-symbol-pool = { path = "../../move-symbol-pool" }
 move-table-extension = { path = "../../extensions/move-table-extension" }

@@ -14,9 +14,7 @@ use move_abigen::AbigenOptions;
 use move_compiler::shared::NumericalAddress;
 use move_docgen::DocgenOptions;
 use move_errmapgen::ErrmapOptions;
-use move_model::{
-    model::VerificationScope, options::ModelBuilderOptions, simplifier::SimplificationPass,
-};
+use move_model::{model::VerificationScope, options::ModelBuilderOptions};
 use move_prover_boogie_backend::options::{BoogieOptions, VectorTheory};
 use move_stackless_bytecode::options::{AutoTraceLevel, ProverOptions};
 use once_cell::sync::Lazy;
@@ -26,7 +24,6 @@ use simplelog::{
 };
 use std::{
     collections::BTreeMap,
-    str::FromStr,
     sync::atomic::{AtomicBool, Ordering},
 };
 
@@ -659,13 +656,6 @@ impl Options {
         }
         if matches.is_present("ignore-pragma-opaque-internal-only") {
             options.model_builder.ignore_pragma_opaque_internal_only = true;
-        }
-        if matches.occurrences_of("simplification-pipeline") > 0 {
-            for name in get_vec("simplification-pipeline") {
-                let pass = SimplificationPass::from_str(&name)
-                    .map_err(|e| anyhow!("Unknown simplification pass: {}", e))?;
-                options.model_builder.simplification_pipeline.push(pass);
-            }
         }
         if matches.is_present("docgen") {
             options.run_docgen = true;

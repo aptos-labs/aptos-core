@@ -7,7 +7,7 @@ proposals:
       description: ""
       source_code_url: ""
       discussion_url: ""
-    execution_mode: MultiStep
+    execution_mode: SingleStep
     update_sequence:
       - RawScript: data/proposals/empty.move
   - name: framework
@@ -72,4 +72,7 @@ proposals:
                   weight_by_voting_power: true
                   use_history_from_previous_epoch_max_count: 5
             max_failed_authors_to_store: 10
+      - Execution:
+          V1:
+            transaction_shuffler_type: no_shuffling
       - RawScript: data/proposals/empty_multi_step.move

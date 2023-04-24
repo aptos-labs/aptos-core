@@ -6,6 +6,10 @@ export const FAUCET_URL = process.env.APTOS_FAUCET_URL!;
 export const API_TOKEN = process.env.API_TOKEN!;
 export const FAUCET_AUTH_TOKEN = process.env.FAUCET_AUTH_TOKEN!;
 
+// account to use for ANS tests, this account matches the one in sdk-release.yaml
+export const ANS_OWNER_ADDRESS = "0x585fc9f0f0c54183b039ffc770ca282ebd87307916c215a3e692f2f8e4305e82";
+export const ANS_OWNER_PK = "0x37368b46ce665362562c6d1d4ec01a08c8644c488690df5a17e13ba163e20221";
+
 /**
  * Returns an instance of a FaucetClient with NODE_URL and FAUCET_URL from the
  * environment. If the FAUCET_AUTH_TOKEN environment variable is set, it will
