@@ -403,6 +403,7 @@ fn get_changelog(prev_commit: Option<&String>, upstream_commit: &str) -> String 
 fn get_test_suite(suite_name: &str, duration: Duration) -> Result<ForgeConfig<'static>> {
     match suite_name {
         "land_blocking" => Ok(land_blocking_test_suite(duration)),
+        "land_blocking_three_region" => Ok(land_blocking_three_region_test_suite(duration)),
         "local_test_suite" => Ok(local_test_suite()),
         "pre_release" => Ok(pre_release_suite()),
         "run_forever" => Ok(run_forever()),
@@ -991,6 +992,11 @@ fn validator_reboot_stress_test(config: ForgeConfig) -> ForgeConfig {
         }))
 }
 
+fn apply_quorum_store_configs_for_single_node(helm_values: &mut serde_yaml::Value) {
+    helm_values["validator"]["config"]["consensus"]["quorum_store"]["back_pressure"]
+        ["dynamic_max_txn_per_s"] = 5500.into();
+}
+
 fn single_vfn_perf(config: ForgeConfig) -> ForgeConfig {
     config
         .with_initial_validator_count(NonZeroUsize::new(1).unwrap())
@@ -1001,6 +1007,9 @@ fn single_vfn_perf(config: ForgeConfig) -> ForgeConfig {
                 .add_no_restarts()
                 .add_wait_for_catchup_s(240),
         )
+        .with_node_helm_config_fn(Arc::new(|helm_values| {
+            apply_quorum_store_configs_for_single_node(helm_values);
+        }))
 }
 
 fn setup_test(config: ForgeConfig) -> ForgeConfig {
@@ -1079,6 +1088,9 @@ fn network_partition(config: ForgeConfig) -> ForgeConfig {
                 .add_no_restarts()
                 .add_wait_for_catchup_s(240),
         )
+        .with_node_helm_config_fn(Arc::new(|helm_values| {
+            apply_quorum_store_configs_for_single_node(helm_values);
+        }))
 }
 
 fn compat(config: ForgeConfig) -> ForgeConfig {
@@ -1258,6 +1270,36 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
         )
 }
 
+// TODO: Replace land_blocking when performance reaches on par with current land_blocking
+fn land_blocking_three_region_test_suite(duration: Duration) -> ForgeConfig<'static> {
+    ForgeConfig::default()
+        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_fullnode_count(10)
+        .with_network_tests(vec![&ThreeRegionSameCloudSimulationTest])
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+            // Have single epoch change in land blocking
+            helm_values["chain"]["epoch_duration_secs"] = 300.into();
+        }))
+        .with_success_criteria(
+            SuccessCriteria::new(3500)
+                .add_no_restarts()
+                .add_wait_for_catchup_s(
+                    // Give at least 60s for catchup, give 10% of the run for longer durations.
+                    (duration.as_secs() / 10).max(60),
+                )
+                .add_system_metrics_threshold(SystemMetricsThreshold::new(
+                    // Check that we don't use more than 12 CPU cores for 30% of the time.
+                    MetricsThreshold::new(12, 30),
+                    // Check that we don't use more than 10 GB of memory for 30% of the time.
+                    MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
+                ))
+                .add_chain_progress(StateProgressThreshold {
+                    max_no_progress_secs: 10.0,
+                    max_round_gap: 4,
+                }),
+        )
+}
+
 fn pre_release_suite() -> ForgeConfig<'static> {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
@@ -1321,8 +1363,10 @@ fn changing_working_quorum_test_helper(
             let block_size = (target_tps / 4) as u64;
             helm_values["validator"]["config"]["consensus"]["max_sending_block_txns"] =
                 block_size.into();
-            helm_values["validator"]["config"]["consensus"]["max_receiving_block_txns"] =
-                block_size.into();
+            helm_values["validator"]["config"]["consensus"]
+                ["max_sending_block_txns_quorum_store_override"] = block_size.into();
+            helm_values["validator"]["config"]["consensus"]
+                ["max_receiving_block_txns_quorum_store_override"] = block_size.into();
             helm_values["validator"]["config"]["consensus"]["round_initial_timeout_ms"] =
                 500.into();
             helm_values["validator"]["config"]["consensus"]

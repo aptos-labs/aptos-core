@@ -22,7 +22,6 @@ on:
         description: The git SHA1 to checkout. This affects the Forge test runner that is used. If not specified, the latest main will be used
   schedule:
     - cron: "0 9 * * *" # the main branch cadence
-    - cron: "0 21 * * *" # the QS "quorum-store" branch cadence
   pull_request:
     paths:
       - ".github/workflows/forge-stable.yaml"
@@ -54,9 +53,6 @@ jobs:
             if [[ "${{ github.event.schedule }}" == "0 9 * * *" ]]; then
               echo "Branch: main"
               echo "BRANCH=main" >> $GITHUB_OUTPUT
-            elif [[ "${{ github.event.schedule }}" == "0 21 * * *" ]]; then
-              echo "Branch: quorum-store"
-              echo "BRANCH=quorum-store" >> $GITHUB_OUTPUT
             else
               echo "Unknown schedule: ${{ github.event.schedule }}"
               exit 1
