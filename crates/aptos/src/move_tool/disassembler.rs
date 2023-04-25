@@ -23,22 +23,6 @@ use std::{fs, path::PathBuf};
 /// Disassemble the Move bytecode pointed to
 #[derive(Debug, Parser)]
 pub struct Disassemble {
-    /// Skip printing of private functions.
-    #[clap(long)]
-    pub skip_private: bool,
-
-    /// Do not print the disassembled bytecodes of each function.
-    #[clap(long)]
-    pub skip_code: bool,
-
-    /// Do not print locals of each function.
-    #[clap(long)]
-    pub skip_locals: bool,
-
-    /// Do not print the basic blocks of each function.
-    #[clap(long)]
-    pub skip_basic_blocks: bool,
-
     /// Treat input file as a script (default is to treat file as a module)
     #[clap(long)]
     pub is_script: bool,
@@ -81,10 +65,10 @@ impl CliCommand<String> for Disassemble {
         let source_map = source_map_from_file(&source_map_path);
 
         let disassembler_options = DisassemblerOptions {
-            print_code: !self.skip_code,
-            only_externally_visible: self.skip_private,
-            print_basic_blocks: !self.skip_basic_blocks,
-            print_locals: !self.skip_locals,
+            print_code: true,
+            only_externally_visible: false,
+            print_basic_blocks: true,
+            print_locals: true,
         };
 
         let no_loc = Spanned::unsafe_no_loc(()).loc;
