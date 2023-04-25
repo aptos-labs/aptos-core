@@ -81,10 +81,14 @@ pub trait MoveResolverExt:
     }
 
     fn is_resource_group(&self, struct_tag: &StructTag) -> bool {
-        (|| self.get_module_metadata(struct_tag.module_id())?
-            .struct_attributes
-            .get(struct_tag.name.as_ident_str().as_str())?
-            .iter()
-            .find(|attr| attr.is_resource_group()))().is_some()
+        (|| {
+            self.get_module_metadata(struct_tag.module_id())?
+                .struct_attributes
+                .get(struct_tag.name.as_ident_str().as_str())?
+                .iter()
+                .find(|attr| attr.is_resource_group())
+                .map(|_| ())
+        })()
+        .is_some()
     }
 }
