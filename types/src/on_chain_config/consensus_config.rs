@@ -28,11 +28,7 @@ impl OnChainConsensusConfig {
 
     /// Decouple execution from consensus or not.
     pub fn decoupled_execution(&self) -> bool {
-        match &self {
-            OnChainConsensusConfig::V1(config) | OnChainConsensusConfig::V2(config) => {
-                config.decoupled_execution
-            },
-        }
+        true
     }
 
     // Trim the list of failed authors from immediatelly preceeding rounds
