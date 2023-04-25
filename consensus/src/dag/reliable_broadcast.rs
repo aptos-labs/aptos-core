@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
@@ -15,8 +17,9 @@ use aptos_logger::info;
 use aptos_types::{
     validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier, PeerId,
 };
-use futures::StreamExt;
+use futures::{FutureExt, StreamExt};
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
+use futures_channel::oneshot;
 use tokio::{sync::mpsc::Receiver, time};
 
 #[allow(dead_code)]
@@ -179,12 +182,13 @@ impl ReliableBroadcast {
         mut self,
         mut network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
         mut command_rx: Receiver<ReliableBroadcastCommand>,
+        close_rx: oneshot::Receiver<oneshot::Sender<()>>
     ) {
         // TODO: think about tick readability and races.
         let mut interval = time::interval(Duration::from_millis(500)); // TODO: time out should be slightly more than one network round trip.
+        let mut close_rx = close_rx.into_stream();
 
         loop {
-            // TODO: shutdown
             tokio::select! {
                 biased;
 
@@ -224,6 +228,14 @@ impl ReliableBroadcast {
                     }
 
                 },
+
+                close_req = close_rx.select_next_some() => {
+                    if let Ok(ack_sender) = close_req {
+                        ack_sender.send(()).expect("[ReliableBroadcast] Fail to ack shutdown");
+                    }
+                    break;
+                }
+
             }
         }
     }
