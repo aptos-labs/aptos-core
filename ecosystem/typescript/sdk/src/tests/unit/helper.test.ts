@@ -16,7 +16,7 @@ import {
   bcsSerializeUint64,
   bcsToBytes,
   deserializeVector,
-  serialization2DVectorWithFunc,
+  serializeNDimensionalArrayWithFunc,
   serializeVector,
   serializeVectorWithFunc,
 } from "../../bcs/helper";
@@ -97,13 +97,13 @@ test("serializeVectorWithFunc", () => {
   expect(serializeVectorWithFunc([false, true], "serializeBool")).toEqual(new Uint8Array([0x2, 0x0, 0x1]));
 });
 
-test("serialization2DVectorWithFunc", () => {
+test("serializeNDimensionalArrayWithFunc", () => {
   // Test with a 2D boolean array
   const boolArray = [
     [false, true],
     [true, false, true]
   ];
-  expect(serialization2DVectorWithFunc(boolArray, "serializeBool"))
+  expect(serializeNDimensionalArrayWithFunc(boolArray, "serializeBool"))
     .toEqual(new Uint8Array([0x2, 0x2, 0x0, 0x1, 0x3, 0x1, 0x0, 0x1]));
   
   // Test with a 2D integer array
@@ -111,7 +111,7 @@ test("serialization2DVectorWithFunc", () => {
     [1, 2, 3],
     [4, 5]
   ];
-  expect(serialization2DVectorWithFunc(intArray, "serializeU32AsUleb128"))
+  expect(serializeNDimensionalArrayWithFunc(intArray, "serializeU32AsUleb128"))
     .toEqual(new Uint8Array([0x2, 0x3, 0x1, 0x2, 0x3, 0x2, 0x4, 0x5]));
   
   // Test with a 2D string array
@@ -119,12 +119,82 @@ test("serialization2DVectorWithFunc", () => {
     ["hello", "world"],
     ["foo", "bar", "baz"]
   ];
-  expect(serialization2DVectorWithFunc(stringArray, "serializeStr"))
+  expect(serializeNDimensionalArrayWithFunc(stringArray, "serializeStr"))
     .toEqual(new Uint8Array([0x2, 0x2, 0x5, 0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x5, 0x77, 0x6f, 0x72, 
       0x6c, 0x64, 0x3, 0x3, 0x66, 0x6f, 0x6f, 0x3, 0x62, 0x61, 0x72, 0x3, 0x62, 0x61, 0x7a]));
   
   // Test with an empty 2D array
   const emptyArray: any[][] = [];
-  expect(serialization2DVectorWithFunc(emptyArray, "serializeBool"))
+  expect(serializeNDimensionalArrayWithFunc(emptyArray, "serializeBool"))
     .toEqual(new Uint8Array([0x0]));
+
+  // Test with 3D boolean array
+  const threeDBoolArray = [
+    [
+      [false, true],
+      [true, false],
+    ],
+    [
+      [true, true],
+      [false, false],
+    ],
+  ];
+  expect(serializeNDimensionalArrayWithFunc(threeDBoolArray, "serializeBool"))
+    .toEqual(new Uint8Array([
+      0x2, // Outer array length
+      0x2, // First inner array length
+      0x2, 0x0, 0x1, // First inner array values
+      0x2, 0x1, 0x0, // Second inner array values
+      0x2, // Second inner array length
+      0x2, 0x1, 0x1, // First inner array values
+      0x2, 0x0, 0x0, // Second inner array values
+    ])
+  );
+
+  // Test with 3D Uint32 array
+  const threeDUint32Array: Uint32[][][] = [
+    [
+      [1, 2],
+      [3, 4],
+    ],
+    [
+      [5, 6],
+      [7, 8],
+    ],
+  ];
+  expect(serializeNDimensionalArrayWithFunc(threeDUint32Array, "serializeU32AsUleb128"))
+    .toEqual(new Uint8Array([
+      0x2, // Outer array length
+      0x2, // First inner array length
+      0x2, 0x1, 0x2, // First inner array values
+      0x2, 0x3, 0x4, // Second inner array values
+      0x2, // Second inner array length
+      0x2, 0x5, 0x6, // First inner array values
+      0x2, 0x7, 0x8, // Second inner array values
+    ])
+  );
+
+  // Test with 3D string array
+  const threeDStringArray: string[][][] = [
+    [
+      ["a", "b"],
+      ["c", "d"],
+    ],
+    [
+      ["e", "f"],
+      ["g", "h"],
+    ],
+  ];
+  expect(serializeNDimensionalArrayWithFunc(threeDStringArray, "serializeStr"))
+    .toEqual(new Uint8Array([
+      0x2, // Outer array length
+      0x2, // First inner array length
+      0x2, 0x1, 0x61, 0x1, 0x62, // First inner array values
+      0x2, 0x1, 0x63, 0x1, 0x64, // Second inner array values
+      0x2, // Second inner array length
+      0x2, 0x1, 0x65, 0x1, 0x66, // First inner array values
+      0x2, 0x1, 0x67, 0x1, 0x68, // Second inner array values
+    ])
+  );
 });
+
