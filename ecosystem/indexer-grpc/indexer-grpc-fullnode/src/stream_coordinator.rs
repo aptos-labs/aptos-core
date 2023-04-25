@@ -10,12 +10,11 @@ use aptos_api::context::Context;
 use aptos_api_types::{AsConverter, Transaction as APITransaction, TransactionOnChainData};
 use aptos_logger::{error, info, sample, sample::SampleRate};
 use aptos_protos::{
-    datastream::v1::{
-        raw_datastream_response, RawDatastreamResponse, TransactionOutput, TransactionsOutput,
+    internal::fullnode::v1::{
+        transactions_from_node_response, TransactionsFromNodeResponse, TransactionsOutput,
     },
     transaction::testing1::v1::Transaction as TransactionPB,
 };
-use prost::Message;
 use std::{
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -33,7 +32,7 @@ pub struct IndexerStreamCoordinator {
     pub output_batch_size: u16,
     pub highest_known_version: u64,
     pub context: Arc<Context>,
-    pub transactions_sender: mpsc::Sender<Result<RawDatastreamResponse, tonic::Status>>,
+    pub transactions_sender: mpsc::Sender<Result<TransactionsFromNodeResponse, tonic::Status>>,
 }
 
 // Single batch of transactions to fetch, convert, and stream
@@ -50,7 +49,7 @@ impl IndexerStreamCoordinator {
         processor_task_count: u16,
         processor_batch_size: u16,
         output_batch_size: u16,
-        transactions_sender: mpsc::Sender<Result<RawDatastreamResponse, tonic::Status>>,
+        transactions_sender: mpsc::Sender<Result<TransactionsFromNodeResponse, tonic::Status>>,
     ) -> Self {
         Self {
             current_version: request_start_version,
@@ -89,11 +88,10 @@ impl IndexerStreamCoordinator {
                 let api_txns = Self::convert_to_api_txns(context, raw_txns).await;
                 api_txns.first().map(record_fetched_transaction_latency);
                 let pb_txns = Self::convert_to_pb_txns(api_txns);
-                let encoded = Self::encode_pb_txns(pb_txns);
                 // Wrap in stream response object and send to channel
-                for chunk in encoded.chunks(output_batch_size as usize) {
-                    let item = RawDatastreamResponse {
-                        response: Some(raw_datastream_response::Response::Data(
+                for chunk in pb_txns.chunks(output_batch_size as usize) {
+                    let item = TransactionsFromNodeResponse {
+                        response: Some(transactions_from_node_response::Response::Data(
                             TransactionsOutput {
                                 transactions: chunk.to_vec(),
                             },
@@ -108,7 +106,7 @@ impl IndexerStreamCoordinator {
                         },
                     }
                 }
-                Ok(encoded.last().unwrap().version)
+                Ok(pb_txns.last().unwrap().version)
             });
             tasks.push(task);
         }
@@ -326,27 +324,6 @@ impl IndexerStreamCoordinator {
             .map(|txn| {
                 let info = txn.transaction_info().unwrap();
                 convert_transaction(txn, info.block_height.unwrap().0, info.epoch.unwrap().0)
-            })
-            .collect()
-    }
-
-    fn encode_pb_txns(pb_txns: Vec<TransactionPB>) -> Vec<TransactionOutput> {
-        pb_txns
-            .iter()
-            .map(|txn| {
-                let mut buf = vec![];
-                txn.encode(&mut buf).unwrap_or_else(|_| {
-                    panic!(
-                        "Could not convert protobuf transaction to bytes '{:?}'",
-                        txn
-                    )
-                });
-                let encoded_proto_data = base64::encode(buf);
-                TransactionOutput {
-                    encoded_proto_data,
-                    version: txn.version,
-                    timestamp: txn.timestamp.clone(),
-                }
             })
             .collect()
     }

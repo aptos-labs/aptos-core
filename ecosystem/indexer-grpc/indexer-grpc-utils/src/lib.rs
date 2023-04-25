@@ -8,19 +8,17 @@ pub mod file_store_operator;
 
 use aptos_inspection_service::inspection_service::encode_metrics;
 use aptos_protos::{
-    datastream::v1::indexer_stream_client::IndexerStreamClient,
-    transaction::testing1::v1::Transaction, util::timestamp::Timestamp,
+    internal::fullnode::v1::fullnode_data_client::FullnodeDataClient, util::timestamp::Timestamp,
 };
 use prometheus::TextEncoder;
-use prost::Message;
 use warp::{http::Response, Filter};
 
-pub type GrpcClientType = IndexerStreamClient<tonic::transport::Channel>;
+pub type GrpcClientType = FullnodeDataClient<tonic::transport::Channel>;
 
 /// Create a gRPC client with exponential backoff.
 pub async fn create_grpc_client(address: String) -> GrpcClientType {
     backoff::future::retry(backoff::ExponentialBackoff::default(), || async {
-        match IndexerStreamClient::connect(address.clone()).await {
+        match FullnodeDataClient::connect(address.clone()).await {
             Ok(client) => {
                 aptos_logger::info!(
                     address = address.clone(),
@@ -72,11 +70,6 @@ pub async fn register_probes_and_metrics_handler(port: u16) {
     warp::serve(readiness.or(metrics_endpoint))
         .run(([0, 0, 0, 0], port))
         .await;
-}
-
-pub fn decode_transaction_bytes(encoded_pb: &str) -> Option<Transaction> {
-    let transaction_pb = base64::decode(encoded_pb).ok()?;
-    Transaction::decode(transaction_pb.as_slice()).ok()
 }
 
 pub fn time_diff_since_pb_timestamp_in_secs(timestamp: &Timestamp) -> f64 {

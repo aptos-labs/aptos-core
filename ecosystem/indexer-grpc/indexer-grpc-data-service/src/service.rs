@@ -10,18 +10,17 @@ use aptos_indexer_grpc_utils::{
     cache_operator::{CacheBatchGetStatus, CacheOperator},
     config::IndexerGrpcConfig,
     constants::{GRPC_AUTH_TOKEN_HEADER, GRPC_REQUEST_NAME_HEADER},
-    decode_transaction_bytes,
     file_store_operator::FileStoreOperator,
     time_diff_since_pb_timestamp_in_secs, EncodedTransactionWithVersion,
 };
 use aptos_logger::{error, info, warn};
 use aptos_moving_average::MovingAverage;
-use aptos_protos::datastream::v1::{
-    indexer_stream_server::IndexerStream,
-    raw_datastream_response::Response as DatastreamProtoResponse, RawDatastreamRequest,
-    RawDatastreamResponse, StreamStatus, TransactionOutput, TransactionsOutput,
+use aptos_protos::{
+    indexer::v1::{raw_data_server::RawData, GetTransactionsRequest, TransactionsResponse},
+    transaction::testing1::v1::Transaction,
 };
 use futures::Stream;
+use prost::Message;
 use serde::{Deserialize, Serialize};
 use std::{pin::Pin, sync::Arc, time::Duration};
 use tokio::sync::{
@@ -31,8 +30,7 @@ use tokio::sync::{
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
-
-type ResponseStream = Pin<Box<dyn Stream<Item = Result<RawDatastreamResponse, Status>> + Send>>;
+type ResponseStream = Pin<Box<dyn Stream<Item = Result<TransactionsResponse, Status>> + Send>>;
 
 #[derive(Clone, Serialize, Deserialize)]
 struct RequestMetadata {
@@ -57,12 +55,12 @@ const RESPONSE_CHANNEL_FULL_BACKOFF_DURATION_MS: u64 = 1000;
 // the server will not fetch more data from the cache and file store until the channel is not full.
 const MAX_RESPONSE_CHANNEL_SIZE: usize = 40;
 
-pub struct DatastreamServer {
+pub struct RawDataServer {
     pub redis_client: Arc<redis::Client>,
     pub server_config: IndexerGrpcConfig,
 }
 
-impl DatastreamServer {
+impl RawDataServer {
     pub fn new(config: IndexerGrpcConfig) -> Self {
         Self {
             redis_client: Arc::new(
@@ -84,12 +82,12 @@ enum TransactionsDataStatus {
     DataGap,
 }
 
-/// DatastreamServer handles the raw datastream requests from cache and file store.
+/// RawDataServer handles the get transactions requests from cache and file store.
 #[tonic::async_trait]
-impl IndexerStream for DatastreamServer {
-    type RawDatastreamStream = ResponseStream;
+impl RawData for RawDataServer {
+    type GetTransactionsStream = ResponseStream;
 
-    /// RawDatastream is a streaming GRPC endpoint:
+    /// GetTransactionsStream is a streaming GRPC endpoint:
     /// 1. Fetches data from cache and file store.
     ///    1.1. If the data is beyond the current head of cache, retry after a short sleep.
     ///    1.2. If the data is not in cache, fetch the data from file store.
@@ -97,13 +95,14 @@ impl IndexerStream for DatastreamServer {
     ///    1.4  If error happens, retry after a short sleep.
     /// 2. Push data into channel to stream to the client.
     ///    2.1. If the channel is full, do not fetch and retry after a short sleep.
-    async fn raw_datastream(
+    async fn get_transactions(
         &self,
-        req: Request<RawDatastreamRequest>,
-    ) -> Result<Response<Self::RawDatastreamStream>, Status> {
+        req: Request<GetTransactionsRequest>,
+    ) -> Result<Response<Self::GetTransactionsStream>, Status> {
+        // Get request identity. The request is already authenticated by the interceptor.
         let request_metadata = match get_request_metadata(&req) {
             Ok(request_metadata) => request_metadata,
-            Err(e) => return Result::Err(e),
+            _ => return Result::Err(Status::aborted("Invalid request token")),
         };
 
         // Response channel to stream the data to the client.
@@ -173,16 +172,6 @@ impl IndexerStream for DatastreamServer {
                 request_metadata = request_metadata,
                 "[Indexer Data] New request received."
             );
-            tx.send(Ok(RawDatastreamResponse {
-                chain_id: chain_id as u32,
-                response: Some(DatastreamProtoResponse::Status(StreamStatus {
-                    r#type: 1,
-                    start_version: current_version,
-                    ..StreamStatus::default()
-                })),
-            }))
-            .await
-            .unwrap();
             loop {
                 // 1. Fetch data from cache and file store.
                 let transaction_data =
@@ -215,16 +204,19 @@ impl IndexerStream for DatastreamServer {
                     };
 
                 // 2. Push the data to the response channel, i.e. stream the data to the client.
-                let current_batch_size = transaction_data.len();
-                let end_of_batch_version = transaction_data.last().unwrap().1;
-                let first_transaction_in_batch =
-                    decode_transaction_bytes(transaction_data.first().unwrap().0.as_ref()).unwrap();
-                let data_latency_in_secs = first_transaction_in_batch
+                let resp_item =
+                    get_transactions_response_builder(transaction_data, chain_id as u32);
+                let current_batch_size = resp_item.transactions.as_slice().len();
+                let end_of_batch_version =
+                    resp_item.transactions.as_slice().last().unwrap().version;
+                let data_latency_in_secs = resp_item
+                    .transactions
+                    .first()
+                    .unwrap()
                     .timestamp
                     .as_ref()
                     .map(time_diff_since_pb_timestamp_in_secs);
-                let resp_item = raw_datastream_response_builder(transaction_data, chain_id as u32);
-                match tx.try_send(Result::<RawDatastreamResponse, Status>::Ok(resp_item)) {
+                match tx.try_send(Result::<TransactionsResponse, Status>::Ok(resp_item)) {
                     Ok(_) => {
                         PROCESSED_BATCH_SIZE
                             .with_label_values(&[
@@ -327,28 +319,22 @@ impl IndexerStream for DatastreamServer {
         });
         let output_stream = ReceiverStream::new(rx);
         Ok(Response::new(
-            Box::pin(output_stream) as Self::RawDatastreamStream
+            Box::pin(output_stream) as Self::GetTransactionsStream
         ))
     }
 }
 
-/// Builds the response for the raw datastream request. Partial batch is ok, i.e., a batch with transactions < 1000.
-fn raw_datastream_response_builder(
+/// Builds the response for the get transactions request. Partial batch is ok, i.e., a batch with transactions < 1000.
+fn get_transactions_response_builder(
     data: Vec<EncodedTransactionWithVersion>,
     chain_id: u32,
-) -> RawDatastreamResponse {
-    RawDatastreamResponse {
-        response: Some(DatastreamProtoResponse::Data(TransactionsOutput {
-            transactions: data
-                .into_iter()
-                .map(|(encoded, version)| TransactionOutput {
-                    encoded_proto_data: encoded,
-                    version,
-                    ..TransactionOutput::default()
-                })
-                .collect(),
-        })),
-        chain_id,
+) -> TransactionsResponse {
+    TransactionsResponse {
+        chain_id: Some(chain_id as u64),
+        transactions: data
+            .into_iter()
+            .map(|(encoded, _)| Transaction::decode(encoded.as_bytes()).unwrap())
+            .collect(),
     }
 }
 
@@ -431,7 +417,7 @@ async fn data_fetch_error_handling(
 }
 
 /// Gets the request metadata. Useful for logging.
-fn get_request_metadata(req: &Request<RawDatastreamRequest>) -> tonic::Result<RequestMetadata> {
+fn get_request_metadata(req: &Request<GetTransactionsRequest>) -> tonic::Result<RequestMetadata> {
     // Request id.
     let request_id = Uuid::new_v4().to_string();
 
