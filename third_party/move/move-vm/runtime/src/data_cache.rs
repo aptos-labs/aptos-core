@@ -21,9 +21,10 @@ use move_vm_types::{
     values::{GlobalValue, Value},
 };
 use std::collections::btree_map::BTreeMap;
+use std::sync::Arc;
 
 pub struct AccountDataCache {
-    data_map: BTreeMap<Type, (MoveTypeLayout, GlobalValue)>,
+    data_map: BTreeMap<Type, (Arc<MoveTypeLayout>, GlobalValue)>,
     module_map: BTreeMap<Identifier, (Vec<u8>, bool)>,
 }
 
@@ -101,12 +102,12 @@ impl<'r, 'l, S: MoveRefResolver> TransactionDataCache<'r, 'l, S> {
                 match op {
                     Op::New(val) => {
                         let resource = Resource::from_value_layout(val.freeze()?, layout);
-                        // let resource = Resource::from_blob(val.simple_serialize(&layout).expect("success"));
+                        // let resource = Resource::from_blob(val.simple_serialize(layout.as_ref()).expect("success"));
                         resources.insert(struct_tag, Op::New(resource));
                     },
                     Op::Modify(val) => {
                         let resource = Resource::from_value_layout(val.freeze()?, layout);
-                        // let resource = Resource::from_blob(val.simple_serialize(&layout).expect("success"));
+                        // let resource = Resource::from_blob(val.simple_serialize(layout.as_ref()).expect("success"));
                         resources.insert(struct_tag, Op::Modify(resource));
                     },
                     Op::Delete => {
@@ -185,7 +186,7 @@ impl<'r, 'l, S: MoveRefResolver> DataStore for TransactionDataCache<'r, 'l, S> {
                 },
             };
 
-            let mut ty_layout: Option<MoveTypeLayout> = None;
+            let mut ty_layout: Option<Arc<MoveTypeLayout>> = None;
 
             let gv = match self.remote.get_resource_ref(&addr, &ty_tag) {
                 Ok(Some(resource)) => {
@@ -194,7 +195,7 @@ impl<'r, 'l, S: MoveRefResolver> DataStore for TransactionDataCache<'r, 'l, S> {
                             load_res = Some(Some(NumBytes::new(blob.len() as u64)));
                             // TODO(Gas): Shall we charge for this?
                             let layout = self.loader.type_to_type_layout(ty)?;
-                            let val = match Value::simple_deserialize(blob, &layout) {
+                            let val = match Value::simple_deserialize(blob.as_ref(), &layout) {
                                 Some(val) => val,
                                 None => {
                                     let msg = format!(
@@ -207,7 +208,7 @@ impl<'r, 'l, S: MoveRefResolver> DataStore for TransactionDataCache<'r, 'l, S> {
                                     .with_message(msg));
                                 },
                             };
-                            ty_layout = Some(layout);
+                            ty_layout = Some(Arc::new(layout));
                             GlobalValue::cached(val)?
                         },
                         Resource::Cached(frozen_val, layout, _num_bytes) => {
@@ -223,7 +224,7 @@ impl<'r, 'l, S: MoveRefResolver> DataStore for TransactionDataCache<'r, 'l, S> {
                 },
                 Ok(None) => {
                     load_res = Some(None);
-                    ty_layout = Some(self.loader.type_to_type_layout(ty)?);
+                    ty_layout = Some(Arc::new(self.loader.type_to_type_layout(ty)?));
                     GlobalValue::none()
                 },
                 Err(err) => {

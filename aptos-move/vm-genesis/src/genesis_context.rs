@@ -71,7 +71,7 @@ impl TRemoteCache for GenesisStateView {
         // TODO: Should we change `state_data` to ensure it is not stored as blobs?
         Ok(self
             .get_state_value_bytes(state_key)?
-            .map(|blob| ResourceRef::new(Resource::Serialized(blob))))
+            .map(|blob| ResourceRef::new(Resource::from_blob(blob))))
     }
 
     fn get_aggregator_value(&self, state_key: &Self::Key) -> Result<Option<u128>> {

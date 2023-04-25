@@ -149,7 +149,7 @@ impl TRemoteCache for FakeDataStore {
     fn get_move_resource(&self, state_key: &Self::Key) -> anyhow::Result<Option<ResourceRef>> {
         Ok(self
             .get_state_value_bytes(state_key)?
-            .map(|blob| ResourceRef::new(Resource::Serialized(blob))))
+            .map(|blob| ResourceRef::new(Resource::from_blob(blob))))
     }
 
     fn get_aggregator_value(&self, state_key: &Self::Key) -> Result<Option<u128>> {

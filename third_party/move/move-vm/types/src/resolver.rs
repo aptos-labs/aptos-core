@@ -13,17 +13,17 @@ use std::{fmt::Debug, sync::Arc};
 /// Reference to any Move data. It encapsulates implementation details about
 /// how data is managed internally and should be efficiently cloneable.
 #[derive(Clone, Debug)]
-pub struct MoveRef<T>(Arc<T>);
+pub struct MoveRef<T>(T);
 
 impl<T> MoveRef<T> {
     pub fn new(data: T) -> Self {
-        Self(Arc::new(data))
+        Self(data)
     }
 }
 
 impl<T> AsRef<T> for MoveRef<T> {
     fn as_ref(&self) -> &T {
-        self.0.as_ref()
+        &self.0
     }
 }
 
@@ -32,13 +32,13 @@ pub type ResourceRef = MoveRef<Resource>;
 
 impl ModuleRef {
     pub fn into_bytes(self) -> Option<Vec<u8>> {
-        self.0.as_ref().as_bytes()
+        self.0.as_bytes()
     }
 }
 
 impl ResourceRef {
     pub fn into_bytes(self) -> Option<Vec<u8>> {
-        self.0.as_ref().as_bytes()
+        self.0.as_bytes()
     }
 }
 
@@ -46,32 +46,32 @@ impl ResourceRef {
 #[derive(Clone, Debug)]
 pub enum Resource {
     /// Resource serialized as bytes.
-    Serialized(Vec<u8>),
+    Serialized(Arc<Vec<u8>>),
     /// Non-serialized resource, with a type layout and its size in bytes.
-    Cached(FrozenValue, MoveTypeLayout, usize),
+    Cached(Arc<FrozenValue>, Arc<MoveTypeLayout>, usize),
 }
 
 impl Resource {
-    pub fn from_value_layout(value: FrozenValue, layout: MoveTypeLayout) -> Self {
+    pub fn from_value_layout(value: FrozenValue, layout: Arc<MoveTypeLayout>) -> Self {
         // TODO: FrozenValue should carry the size (we know it during construction), and so
         // we can pass it here. For now, use arbitrary value.
-        Self::Cached(value, layout, 1)
+        Self::Cached(Arc::new(value), layout, 1)
     }
 
     pub fn from_blob(blob: Vec<u8>) -> Self {
-        Self::Serialized(blob)
+        Self::Serialized(Arc::new(blob))
     }
 
     pub fn as_bytes(&self) -> Option<Vec<u8>> {
         match self {
-            Self::Serialized(blob) => Some(blob.clone()),
+            Self::Serialized(blob) => Some(blob.as_ref().clone()),
             Self::Cached(value, layout, _) => value.simple_serialize(layout),
         }
     }
 
     pub fn into_bytes(self) -> Option<Vec<u8>> {
         match self {
-            Self::Serialized(blob) => Some(blob),
+            Self::Serialized(blob) => Some(blob.as_ref().clone()),
             Self::Cached(value, layout, _) => value.simple_serialize(&layout),
         }
     }
