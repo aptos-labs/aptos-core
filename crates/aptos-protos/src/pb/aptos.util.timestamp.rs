@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 
 // @generated
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Timestamp {
     /// Represents seconds of UTC time since Unix epoch

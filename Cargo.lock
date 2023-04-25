@@ -1510,10 +1510,12 @@ dependencies = [
  "aptos-runtimes",
  "async-trait",
  "backoff",
+ "base64 0.13.0",
  "clap 3.2.23",
  "futures",
  "futures-core",
  "once_cell",
+ "prost",
  "redis",
  "redis-test",
  "serde 1.0.149",
@@ -1535,10 +1537,12 @@ dependencies = [
  "aptos-moving-average",
  "aptos-protos",
  "aptos-runtimes",
+ "base64 0.13.0",
  "clap 3.2.23",
  "cloud-storage",
  "futures",
  "once_cell",
+ "prost",
  "redis",
  "serde 1.0.149",
  "serde_json",
@@ -1614,7 +1618,6 @@ dependencies = [
  "move-core-types",
  "move-package",
  "once_cell",
- "prost",
  "rand 0.7.3",
  "regex",
  "serde 1.0.149",
@@ -2343,7 +2346,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-protos"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "pbjson",
  "prost",
