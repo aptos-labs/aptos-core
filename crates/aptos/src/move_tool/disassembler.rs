@@ -37,9 +37,10 @@ pub struct Disassemble {
     #[clap(long)]
     pub is_script: bool,
 
-    /// The path to the bytecode file to disassemble; let's call it file.mv. We assume that two
-    /// other files reside under the same directory: a source map file.mvsm (possibly) and the Move
-    /// source code file.move.
+    /// The path to the bytecode file to disassemble; 
+    ///
+    /// let's call it file.mv. We assume that two other files reside under the same directory:
+    /// a source map file.mvsm (possibly) and the Move source code file.move.
     #[clap(long)]
     pub bytecode_path: PathBuf,
 
