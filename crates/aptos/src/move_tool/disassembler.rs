@@ -2,8 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::{
-    types::{CliCommand, CliError, CliTypedResult},
-    utils::read_from_file,
+    types::{CliCommand, CliError, CliTypedResult, PromptOptions},
+    utils::{
+        check_if_file_exists, create_dir_if_not_exist, dir_default_to_current, read_from_file,
+        write_to_user_only_file,
+    },
 };
 use anyhow::Context;
 use async_trait::async_trait;
@@ -19,8 +22,6 @@ use move_coverage::coverage_map::CoverageMap;
 use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use move_ir_types::location::Spanned;
 use std::{fs, path::PathBuf};
-use crate::common::types::PromptOptions;
-use crate::common::utils::{check_if_file_exists, create_dir_if_not_exist, dir_default_to_current, write_to_user_only_file};
 
 const DISASSEMBLED_CODE_FILE: &str = "disassembled-code.yaml";
 
@@ -138,7 +139,7 @@ impl CliCommand<String> for Disassemble {
         write_to_user_only_file(
             disassemble_file.as_path(),
             DISASSEMBLED_CODE_FILE,
-            &disassemble_string.as_bytes(),
+            disassemble_string.as_bytes(),
         )?;
 
         Ok(disassemble_file.as_path().display().to_string())
