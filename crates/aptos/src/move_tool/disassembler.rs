@@ -19,6 +19,10 @@ use move_coverage::coverage_map::CoverageMap;
 use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use move_ir_types::location::Spanned;
 use std::{fs, path::PathBuf};
+use crate::common::types::PromptOptions;
+use crate::common::utils::{check_if_file_exists, create_dir_if_not_exist, dir_default_to_current, write_to_user_only_file};
+
+const DISASSEMBLED_CODE_FILE: &str = "disassembled-code.yaml";
 
 /// Disassemble the Move bytecode pointed to
 #[derive(Debug, Parser)]
@@ -37,6 +41,13 @@ pub struct Disassemble {
     /// disassembled output.
     #[clap(long)]
     pub code_coverage_path: Option<PathBuf>,
+
+    /// Output directory for the key files
+    #[clap(long, parse(from_os_str))]
+    pub(crate) output_dir: Option<PathBuf>,
+
+    #[clap(flatten)]
+    pub(crate) prompt_options: PromptOptions,
 }
 
 #[async_trait]
@@ -110,6 +121,21 @@ impl CliCommand<String> for Disassemble {
         let disassemble_string = disassembler
             .disassemble()
             .map_err(|_err| CliError::UnexpectedError("Unable to disassemble".to_string()))?;
-        Ok(disassemble_string)
+
+        let output_dir = dir_default_to_current(self.output_dir.clone())?;
+        let disassemble_file = output_dir.join(DISASSEMBLED_CODE_FILE);
+        check_if_file_exists(disassemble_file.as_path(), self.prompt_options)?;
+
+        // Create the directory if it doesn't exist
+        create_dir_if_not_exist(output_dir.as_path())?;
+
+        // write to file
+        write_to_user_only_file(
+            disassemble_file.as_path(),
+            DISASSEMBLED_CODE_FILE,
+            &disassemble_string.as_bytes(),
+        )?;
+
+        Ok(disassemble_file.as_path().display().to_string())
     }
 }
