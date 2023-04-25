@@ -21,6 +21,8 @@ use std::{
     },
 };
 use tonic::{
+    codec::CompressionEncoding,
+    codegen::InterceptedService,
     metadata::{Ascii, MetadataValue},
     transport::Server,
     Request, Status,
@@ -80,11 +82,14 @@ fn main() {
 
     // Add authentication interceptor.
     runtime.spawn(async move {
-        let server = DatastreamServer::new(config).accept_gzip().send_gzip();
-        let svc = IndexerStreamServer::with_interceptor(server, authentication_inceptor);
+        let server = DatastreamServer::new(config);
+        let svc = IndexerStreamServer::new(server)
+            .send_compressed(CompressionEncoding::Gzip)
+            .accept_compressed(CompressionEncoding::Gzip);
+        let svc_with_interceptor = InterceptedService::new(svc, authentication_inceptor);
         Server::builder()
             .add_service(reflection_service)
-            .add_service(svc)
+            .add_service(svc_with_interceptor)
             .serve(grpc_address.to_socket_addrs().unwrap().next().unwrap())
             .await
             .unwrap();
