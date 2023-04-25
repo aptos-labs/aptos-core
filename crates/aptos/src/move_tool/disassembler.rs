@@ -25,6 +25,11 @@ use crate::common::utils::{check_if_file_exists, create_dir_if_not_exist, dir_de
 const DISASSEMBLED_CODE_FILE: &str = "disassembled-code.yaml";
 
 /// Disassemble the Move bytecode pointed to
+///
+/// For example, if you want to disassemble on chain module:
+/// 1. Download the package - aptos move download
+/// 2. Compile the package - aptos move compile
+/// 3. Cd to package and disassemble - aptos move disassemble --bytecode-path ./test.mv
 #[derive(Debug, Parser)]
 pub struct Disassemble {
     /// Treat input file as a script (default is to treat file as a module)
