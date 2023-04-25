@@ -113,6 +113,15 @@ The maximum range supported by the Bulletproofs library is [0, 2^{64}).
 
 
 
+<a name="0x1_bulletproofs_SOME_RANDOMNESS"></a>
+
+
+
+<pre><code><b>const</b> <a href="bulletproofs.md#0x1_bulletproofs_SOME_RANDOMNESS">SOME_RANDOMNESS</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [167, 199, 180, 43, 117, 80, 59, 252, 123, 25, 50, 120, 55, 134, 210, 39, 235, 248, 143, 121, 218, 117, 43, 104, 246, 184, 101, 169, 193, 121, 100, 12];
+</code></pre>
+
+
+
 <a name="0x1_bulletproofs_get_max_range_bits"></a>
 
 ## Function `get_max_range_bits`

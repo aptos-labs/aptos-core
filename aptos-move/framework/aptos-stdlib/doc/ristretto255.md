@@ -384,6 +384,16 @@ Expected more than zero scalars as input.
 
 
 
+<a name="0x1_ristretto255_HASH_BASE_POINT"></a>
+
+The hash of the basepoint of the Ristretto255 group using new_point_from_sha2_512(basepoint_compressed().data)
+
+
+<pre><code><b>const</b> <a href="ristretto255.md#0x1_ristretto255_HASH_BASE_POINT">HASH_BASE_POINT</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [144, 202, 17, 205, 108, 98, 39, 203, 10, 188, 57, 226, 113, 12, 68, 74, 230, 97, 126, 168, 24, 152, 231, 22, 53, 63, 52, 16, 217, 101, 102, 5];
+</code></pre>
+
+
+
 <a name="0x1_ristretto255_L_MINUS_ONE"></a>
 
 <code><a href="ristretto255.md#0x1_ristretto255_ORDER_ELL">ORDER_ELL</a></code> - 1: i.e., the "largest", reduced scalar in the field
@@ -623,7 +633,8 @@ For use as the random value basepoint in Pedersen commitments
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_hash_to_point_base">hash_to_point_base</a>(): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
-    <a href="ristretto255.md#0x1_ristretto255_new_point_from_sha2_512">new_point_from_sha2_512</a>(<a href="ristretto255.md#0x1_ristretto255_basepoint_compressed">basepoint_compressed</a>().data)
+    <b>let</b> comp_res = <a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">CompressedRistretto</a> { data: <a href="ristretto255.md#0x1_ristretto255_HASH_BASE_POINT">HASH_BASE_POINT</a> };
+    <a href="ristretto255.md#0x1_ristretto255_point_decompress">point_decompress</a>(&comp_res)
 }
 </code></pre>
 
