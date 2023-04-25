@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::{CliCommand, CliError, CliTypedResult};
+use crate::common::{
+    types::{CliCommand, CliError, CliTypedResult},
+    utils::read_from_file,
+};
 use anyhow::Context;
 use async_trait::async_trait;
 use clap::Parser;
@@ -15,10 +18,7 @@ use move_command_line_common::files::{
 use move_coverage::coverage_map::CoverageMap;
 use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use move_ir_types::location::Spanned;
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{fs, path::PathBuf};
 
 /// Disassemble the Move bytecode pointed to
 #[derive(Debug, Parser)]
@@ -62,29 +62,23 @@ impl CliCommand<String> for Disassemble {
     }
 
     async fn execute(self) -> CliTypedResult<String> {
-        let move_extension = MOVE_EXTENSION;
-        let mv_bytecode_extension = MOVE_COMPILED_EXTENSION;
-        let source_map_extension = SOURCE_MAP_EXTENSION;
-
-        let source_path = Path::new(&self.bytecode_path);
-        let extension = source_path
+        let bytecode_path = self.bytecode_path.as_path();
+        let extension = bytecode_path
             .extension()
             .context("Missing file extension for bytecode file")?;
-        if extension != mv_bytecode_extension {
+        if extension != MOVE_COMPILED_EXTENSION {
             return Err(CliError::UnexpectedError(format!(
                 "Bad source file extension {:?}; expected {}",
-                extension, mv_bytecode_extension
+                extension, MOVE_COMPILED_EXTENSION
             )));
         }
 
-        let bytecode_bytes =
-            fs::read(&self.bytecode_path).context("Unable to read bytecode file")?;
+        let bytecode_bytes = read_from_file(bytecode_path)?;
+        let move_path = bytecode_path.with_extension(MOVE_EXTENSION);
+        let source_map_path = bytecode_path.with_extension(SOURCE_MAP_EXTENSION);
 
-        let source_path = Path::new(&self.bytecode_path).with_extension(move_extension);
-        let source = fs::read_to_string(&source_path).ok();
-        let source_map = source_map_from_file(
-            &Path::new(&self.bytecode_path).with_extension(source_map_extension),
-        );
+        let source = fs::read_to_string(move_path).ok();
+        let source_map = source_map_from_file(&source_map_path);
 
         let disassembler_options = DisassemblerOptions {
             print_code: !self.skip_code,
@@ -93,32 +87,28 @@ impl CliCommand<String> for Disassemble {
             print_locals: !self.skip_locals,
         };
 
-        // TODO: make source mapping work with the Move source language
         let no_loc = Spanned::unsafe_no_loc(()).loc;
         let module: CompiledModule;
         let script: CompiledScript;
         let bytecode = if self.is_script {
             script = CompiledScript::deserialize(&bytecode_bytes)
-                .expect("Script blob can't be deserialized");
+                .context("Script blob can't be deserialized")?;
             BinaryIndexedView::Script(&script)
         } else {
             module = CompiledModule::deserialize(&bytecode_bytes)
-                .expect("Module blob can't be deserialized");
+                .context("Module blob can't be deserialized")?;
             BinaryIndexedView::Module(&module)
         };
 
-        let mut source_mapping = {
-            if let Ok(s) = source_map {
-                SourceMapping::new(s, bytecode)
-            } else {
-                SourceMapping::new_from_view(bytecode, no_loc)
-                    .context("Unable to build dummy source mapping")?
-            }
+        let mut source_mapping = if let Ok(s) = source_map {
+            SourceMapping::new(s, bytecode)
+        } else {
+            SourceMapping::new_from_view(bytecode, no_loc)
+                .context("Unable to build dummy source mapping")?
         };
 
         if let Some(source_code) = source {
-            source_mapping
-                .with_source_code((source_path.to_str().unwrap().to_string(), source_code));
+            source_mapping.with_source_code((bytecode_path.display().to_string(), source_code));
         }
 
         let mut disassembler = Disassembler::new(source_mapping, disassembler_options);
@@ -126,12 +116,16 @@ impl CliCommand<String> for Disassemble {
         if let Some(file_path) = &self.code_coverage_path {
             disassembler.add_coverage_map(
                 CoverageMap::from_binary_file(file_path)
-                    .unwrap()
+                    .map_err(|_err| {
+                        CliError::UnexpectedError("Unable to read from file_path".to_string())
+                    })?
                     .to_unified_exec_map(),
             );
         }
 
-        let disassemble_string = disassembler.disassemble().expect("Unable to dissassemble");
+        let disassemble_string = disassembler
+            .disassemble()
+            .map_err(|_err| CliError::UnexpectedError("Unable to disassemble".to_string()))?;
         Ok(disassemble_string)
     }
 }
