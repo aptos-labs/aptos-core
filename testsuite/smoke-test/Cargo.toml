@@ -48,7 +48,7 @@ tokio = { workspace = true }
 url = { workspace = true }
 walkdir = { workspace = true }
 
-[dev-dependencies]
+# [dev-dependencies] /////// 0L /////////
 aptos-backup-cli = { workspace = true }
 aptos-genesis = { workspace = true }
 aptos-infallible = { workspace = true }

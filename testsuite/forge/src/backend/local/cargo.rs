@@ -47,7 +47,10 @@ pub fn get_aptos_node_binary_from_worktree() -> Result<(String, PathBuf)> {
         revision.push_str("-dirty");
     }
 
-    let bin_path = cargo_build_aptos_node(&metadata.workspace_root, &metadata.target_directory)?;
+    /////// 0L ///////// 
+    // e.g. ZAPATOS_BIN_PATH=/opt/zapatos/target/debug/ 
+    // let bin_path = cargo_build_aptos_node(&metadata.workspace_root, &metadata.target_directory)?;
+    let bin_path = PathBuf::from(concat!(env!("ZAPATOS_BIN_PATH"), "/aptos-node"));
 
     Ok((revision, bin_path))
 }
