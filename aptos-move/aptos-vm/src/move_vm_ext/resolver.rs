@@ -14,6 +14,17 @@ use move_core_types::{
 use move_table_extension::TableResolver;
 use std::collections::BTreeMap;
 
+fn get_resource_group_from_metadata(
+    struct_tag: &StructTag,
+    metadata: Option<aptos_framework::RuntimeModuleMetadataV1>,
+) -> Option<StructTag> {
+    metadata?
+        .struct_attributes
+        .get(struct_tag.name.as_ident_str().as_str())?
+        .iter()
+        .find_map(|attr| attr.get_resource_group_member())
+}
+
 pub trait MoveResolverExt:
     MoveResolver + TableResolver + StateStorageUsageResolver + ConfigStorage + StateView
 {
@@ -37,7 +48,7 @@ pub trait MoveResolverExt:
         struct_tag: &StructTag,
     ) -> Result<Option<Vec<u8>>, VMError> {
         let metadata = self.get_module_metadata(struct_tag.module_id());
-        let resource_group = Self::get_resource_group_from_metadata(struct_tag, metadata);
+        let resource_group = get_resource_group_from_metadata(struct_tag, metadata);
         if let Some(resource_group) = resource_group {
             self.get_resource_from_group(address, struct_tag, &resource_group)
         } else {
@@ -66,23 +77,7 @@ pub trait MoveResolverExt:
 
     fn get_resource_group(&self, struct_tag: &StructTag) -> Result<Option<StructTag>, VMError> {
         let metadata = self.get_module_metadata(struct_tag.module_id());
-        Ok(Self::get_resource_group_from_metadata(struct_tag, metadata))
-    }
-
-    fn get_resource_group_from_metadata(
-        struct_tag: &StructTag,
-        metadata: Option<aptos_framework::RuntimeModuleMetadataV1>,
-    ) -> Option<StructTag> {
-        metadata.and_then(|metadata| {
-            metadata
-                .struct_attributes
-                .get(struct_tag.name.as_ident_str().as_str())
-                .and_then(|attrs| {
-                    attrs
-                        .iter()
-                        .find_map(|attr| attr.get_resource_group_member())
-                })
-        })
+        Ok(get_resource_group_from_metadata(struct_tag, metadata))
     }
 
     fn is_resource_group(&self, struct_tag: &StructTag) -> bool {
