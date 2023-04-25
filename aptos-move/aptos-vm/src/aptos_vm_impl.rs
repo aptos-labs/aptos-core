@@ -43,10 +43,9 @@ use std::sync::Arc;
 
 pub const MAXIMUM_APPROVED_TRANSACTION_SIZE: u64 = 1024 * 1024;
 
-#[derive(Clone)]
-/// A wrapper to make VMRuntime standalone and thread safe.
+/// A wrapper to make VMRuntime standalone
 pub struct AptosVMImpl {
-    move_vm: Arc<MoveVmExt>,
+    move_vm: MoveVmExt,
     gas_feature_version: u64,
     gas_params: Option<AptosGasParameters>,
     storage_gas_params: Option<StorageGasParameters>,
@@ -152,7 +151,7 @@ impl AptosVMImpl {
         .expect("should be able to create Move VM; check if there are duplicated natives");
 
         let mut vm = Self {
-            move_vm: Arc::new(inner),
+            move_vm: inner,
             gas_feature_version,
             gas_params,
             storage_gas_params,
