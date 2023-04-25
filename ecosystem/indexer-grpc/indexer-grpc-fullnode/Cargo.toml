@@ -22,7 +22,6 @@ futures = { workspace = true }
 hex = { workspace = true }
 hyper = { workspace = true }
 once_cell = { workspace = true }
-prost = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }

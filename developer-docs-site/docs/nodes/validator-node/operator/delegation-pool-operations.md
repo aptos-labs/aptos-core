@@ -16,8 +16,8 @@ The operator address will receive the pool commission that was set at the initia
 
 ## Prerequisites
 
-1. [Install](../../../cli-tools/aptos-cli-tool/index.md) and [configure](../../../cli-tools/aptos-cli-tool/use-aptos-cli.md#configuration-examples) the Aptos CLI. If you are looking to develop on the Aptos blockchain, debug apps, or perform node operations, the Aptos tool offers a command line interface for these purposes.
-2. [Initialize local configuration and create an account](../../../cli-tools/aptos-cli-tool/use-aptos-cli.md#initialize-local-configuration-and-create-an-account) on the Aptos blockchain.
+1. [Install](../../../tools/install-cli/index.md) and [configure](../../../tools/aptos-cli-tool/use-aptos-cli.md#configuration-examples) the Aptos CLI. If you are looking to develop on the Aptos blockchain, debug apps, or perform node operations, the Aptos tool offers a command line interface for these purposes.
+2. [Initialize local configuration and create an account](../../../tools/aptos-cli-tool/use-aptos-cli.md#initialize-local-configuration-and-create-an-account) on the Aptos blockchain.
 
 ## Connect to Aptos network
 
@@ -114,7 +114,7 @@ Delegation pool owners have access to specific methods designed for modifying th
   
 ## Check delegation pool information
 
-Until the delegation pool has received 1 million APT and the validator has been added to the set of active validators, there will be no rewards to track during each cycle. In order to obtain information about a delegation pool, use the Aptos [View functon](../../../guides/aptos-apis.md#reading-state-with-the-view-function).
+Until the delegation pool has received 1 million APT and the validator has been added to the set of active validators, there will be no rewards to track during each cycle. In order to obtain information about a delegation pool, use the Aptos [View functon](../../../integration/aptos-apis.md#reading-state-with-the-view-function).
 
 * `get_owned_pool_address(owner: address): address` -  Returns the address of the delegation pool belonging to the owner, or produces an error if there is no delegation pool associated with the owner.
 

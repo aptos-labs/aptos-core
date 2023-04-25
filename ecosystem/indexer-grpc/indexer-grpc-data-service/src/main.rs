@@ -1,13 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_indexer_grpc_data_service::service::DatastreamServer;
+use aptos_indexer_grpc_data_service::service::RawDataServer;
 use aptos_indexer_grpc_utils::register_probes_and_metrics_handler;
 use aptos_protos::{
-    datastream::v1::{
-        indexer_stream_server::IndexerStreamServer,
-        FILE_DESCRIPTOR_SET as DATASTREAM_V1_FILE_DESCRIPTOR_SET,
-    },
+    internal::fullnode::v1::FILE_DESCRIPTOR_SET as DATASTREAM_V1_FILE_DESCRIPTOR_SET,
     transaction::testing1::v1::FILE_DESCRIPTOR_SET as TRANSACTION_V1_TESTING_FILE_DESCRIPTOR_SET,
     util::timestamp::FILE_DESCRIPTOR_SET as UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET,
 };
@@ -80,8 +77,11 @@ fn main() {
 
     // Add authentication interceptor.
     runtime.spawn(async move {
-        let server = DatastreamServer::new(config);
-        let svc = IndexerStreamServer::with_interceptor(server, authentication_inceptor);
+        let server = RawDataServer::new(config);
+        let svc = aptos_protos::indexer::v1::raw_data_server::RawDataServer::with_interceptor(
+            server,
+            authentication_inceptor,
+        );
         Server::builder()
             .add_service(reflection_service)
             .add_service(svc)

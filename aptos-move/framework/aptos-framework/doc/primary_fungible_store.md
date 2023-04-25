@@ -14,7 +14,7 @@ This defines the module for interacting with primary stores of accounts/objects,
 -  [Function `primary_store`](#0x1_primary_fungible_store_primary_store)
 -  [Function `primary_store_exists`](#0x1_primary_fungible_store_primary_store_exists)
 -  [Function `balance`](#0x1_primary_fungible_store_balance)
--  [Function `ungated_balance_transfer_allowed`](#0x1_primary_fungible_store_ungated_balance_transfer_allowed)
+-  [Function `is_frozen`](#0x1_primary_fungible_store_is_frozen)
 -  [Function `withdraw`](#0x1_primary_fungible_store_withdraw)
 -  [Function `deposit`](#0x1_primary_fungible_store_deposit)
 -  [Function `transfer`](#0x1_primary_fungible_store_transfer)
@@ -264,14 +264,14 @@ Get the balance of <code><a href="account.md#0x1_account">account</a></code>'s p
 
 </details>
 
-<a name="0x1_primary_fungible_store_ungated_balance_transfer_allowed"></a>
+<a name="0x1_primary_fungible_store_is_frozen"></a>
 
-## Function `ungated_balance_transfer_allowed`
+## Function `is_frozen`
 
-Return whether the given account's primary store can do direct transfers.
+Return whether the given account's primary store is frozen.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_ungated_balance_transfer_allowed">ungated_balance_transfer_allowed</a>&lt;T: key&gt;(<a href="account.md#0x1_account">account</a>: <b>address</b>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_is_frozen">is_frozen</a>&lt;T: key&gt;(<a href="account.md#0x1_account">account</a>: <b>address</b>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool
 </code></pre>
 
 
@@ -280,11 +280,11 @@ Return whether the given account's primary store can do direct transfers.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_ungated_balance_transfer_allowed">ungated_balance_transfer_allowed</a>&lt;T: key&gt;(<a href="account.md#0x1_account">account</a>: <b>address</b>, metadata: Object&lt;T&gt;): bool {
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_is_frozen">is_frozen</a>&lt;T: key&gt;(<a href="account.md#0x1_account">account</a>: <b>address</b>, metadata: Object&lt;T&gt;): bool {
     <b>if</b> (<a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_exists">primary_store_exists</a>(<a href="account.md#0x1_account">account</a>, metadata)) {
-        <a href="fungible_asset.md#0x1_fungible_asset_ungated_balance_transfer_allowed">fungible_asset::ungated_balance_transfer_allowed</a>(<a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store">primary_store</a>(<a href="account.md#0x1_account">account</a>, metadata))
+        <a href="fungible_asset.md#0x1_fungible_asset_is_frozen">fungible_asset::is_frozen</a>(<a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store">primary_store</a>(<a href="account.md#0x1_account">account</a>, metadata))
     } <b>else</b> {
-        <b>true</b>
+        <b>false</b>
     }
 }
 </code></pre>

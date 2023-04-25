@@ -469,7 +469,7 @@ to the most correct value up to last digit
 <a name="0x1_math128_spec_pow"></a>
 
 
-<pre><code><b>fun</b> <a href="math128.md#0x1_math128_spec_pow">spec_pow</a>(e: u128, n: u128): u128 {
+<pre><code><b>fun</b> <a href="math128.md#0x1_math128_spec_pow">spec_pow</a>(n: u128, e: u128): u128 {
    <b>if</b> (e == 0) {
        1
    }

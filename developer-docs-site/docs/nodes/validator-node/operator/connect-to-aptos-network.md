@@ -63,7 +63,7 @@ aptos node get-stake-pool \
 ### Using Terraform
 
 1. Increase the `era` number in your Terraform configuration. When this configuration is applied, it will wipe the data.
-2. Update `chain_id` to 1 (for mainnet). The chain IDs for other Aptos networks are in [Aptos Blockchain Deployments](../../aptos-deployments.md).
+2. Update `chain_id` to 1 (for mainnet). The chain IDs for other Aptos networks are in [Aptos Blockchain Deployments](../../deployments.md).
 3. Update your Docker image to the [latest release](../../../releases/index.md) of the network branch (e.g. mainnet, testnet).
 4. Close the metrics port and the REST API port for validator. 
 5. [Optional] You can use fast sync to bootstrap your node if the network has been running for a long time (e.g. testnet). by adding the following Helm values in your `main.tf ` file:

@@ -2,7 +2,6 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::simplifier::SimplificationPass;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -20,7 +19,4 @@ pub struct ModelBuilderOptions {
     /// Ignore the "opaque" pragma on all function specs when possible. The opaque can be ignored
     /// as long as the function spec has no property marked as `[concrete]` or `[abstract]`.
     pub ignore_pragma_opaque_when_possible: bool,
-
-    /// List of simplification passes and the order each pass to be executed
-    pub simplification_pipeline: Vec<SimplificationPass>,
 }

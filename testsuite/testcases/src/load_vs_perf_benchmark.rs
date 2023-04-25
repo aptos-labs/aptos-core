@@ -60,6 +60,7 @@ pub enum TransactinWorkload {
     CoinTransfer,
     CoinTransferUnique,
     NftMint,
+    TokenV1,
 }
 
 impl TransactinWorkload {
@@ -145,6 +146,11 @@ impl TransactinWorkload {
                 ])
             },
             Self::NftMint => request.transaction_type(TransactionType::NftMintAndTransfer),
+            Self::TokenV1 => request.transaction_type(TransactionType::CallCustomModules {
+                entry_point: EntryPoints::TokenV1MintAndTransferNFTParallel,
+                num_modules: 1,
+                use_account_pool: false,
+            }),
         }
     }
 }
