@@ -535,9 +535,7 @@ impl EpochManager {
             close_tx
                 .send(ack_tx)
                 .expect("[EpochManager] Fail to drop DagDriver");
-            ack_rx
-                .await
-                .expect("[EpochManager] Fail to drop DagDriver");
+            ack_rx.await.expect("[EpochManager] Fail to drop DagDriver");
         }
         self.round_manager_tx = None;
 

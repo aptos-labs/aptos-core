@@ -18,8 +18,8 @@ use aptos_types::{
     validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier, PeerId,
 };
 use futures::{FutureExt, StreamExt};
-use std::{collections::BTreeMap, sync::Arc, time::Duration};
 use futures_channel::oneshot;
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
 use tokio::{sync::mpsc::Receiver, time};
 
 #[allow(dead_code)]
@@ -182,7 +182,7 @@ impl ReliableBroadcast {
         mut self,
         mut network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
         mut command_rx: Receiver<ReliableBroadcastCommand>,
-        close_rx: oneshot::Receiver<oneshot::Sender<()>>
+        close_rx: oneshot::Receiver<oneshot::Sender<()>>,
     ) {
         // TODO: think about tick readability and races.
         let mut interval = time::interval(Duration::from_millis(500)); // TODO: time out should be slightly more than one network round trip.

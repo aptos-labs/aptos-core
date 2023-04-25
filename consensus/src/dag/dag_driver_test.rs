@@ -40,9 +40,9 @@ use aptos_types::{
     validator_verifier::random_validator_verifier,
 };
 use futures::{channel::mpsc, stream::select, FutureExt, Stream, StreamExt};
+use futures_channel::oneshot;
 use maplit::hashmap;
 use std::{iter::FromIterator, sync::Arc};
-use futures_channel::oneshot;
 use tokio::runtime::Runtime;
 
 /// Auxiliary struct that is setting up node environment for the test.
@@ -190,7 +190,10 @@ impl NodeSetup {
 
     async fn start(&mut self) {
         let (_close_tx, close_rx) = oneshot::channel();
-        spawn_named!("dag-driver", self.dag_driver.take().unwrap().start(close_rx));
+        spawn_named!(
+            "dag-driver",
+            self.dag_driver.take().unwrap().start(close_rx)
+        );
         loop {
             match self.next_network_message().await {
                 ConsensusMsg::NodeMsg(msg) => self

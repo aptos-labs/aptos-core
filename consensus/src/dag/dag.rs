@@ -655,9 +655,9 @@ impl Dag {
             // Node not in the system
             Entry::Vacant(_) => {
                 if missing_parents.is_empty() {
-                    self.add_to_dag(certified_node).await; // TODO: should persist inside
+                    self.add_to_dag(certified_node).await;
                 } else {
-                    self.add_to_pending(certified_node, missing_parents); // TODO: should persist inside
+                    self.add_to_pending(certified_node, missing_parents);
                 }
             },
 

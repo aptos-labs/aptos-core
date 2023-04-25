@@ -28,8 +28,8 @@ use aptos_types::{
     validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier, PeerId,
 };
 use futures::{FutureExt, StreamExt};
-use std::{collections::HashSet, sync::Arc, time::Duration};
 use futures_channel::oneshot;
+use std::{collections::HashSet, sync::Arc, time::Duration};
 use tokio::{
     sync::{mpsc::Sender, Mutex},
     time,
@@ -90,8 +90,10 @@ impl DagDriver {
 
         let (rb_close_tx, close_rx) = oneshot::channel();
 
-        spawn_named!("reliable_broadcast", rb.
-            start(rb_network_msg_rx, rb_rx, close_rx));
+        spawn_named!(
+            "reliable_broadcast",
+            rb.start(rb_network_msg_rx, rb_rx, close_rx)
+        );
         // spawn_named!("bullshark", bullshark.start(dag_bullshark_rx));
 
         Self {
