@@ -3,7 +3,7 @@
 import * as Gen from "../generated/index";
 import { AptosAccount, getAddressFromAccountOrAddress } from "../account/aptos_account";
 import { AptosClient, OptionalTransactionArgs } from "../providers/aptos_client";
-import { MaybeHexString, APTOS_COIN } from "../utils";
+import { MaybeHexString, APTOS_COIN, NetworkToIndexerAPI, NodeAPIToNetwork } from "../utils";
 import { TransactionBuilderRemoteABI } from "../transaction_builder";
 import { FungibleAsset } from "./fungible_asset_client";
 import { Provider } from "../providers";
@@ -59,15 +59,16 @@ export class CoinClient {
       assetAddress?: MaybeHexString;
     },
   ): Promise<string> {
-    console.warn(
-      "CoinClient.transfer() will soon be deprecated, to send coins (i.e fungible assets) please use `FungibleAsset()` class",
-    );
     if (extraArgs?.assetAddress) {
       // asking for a fungible asset object
       if (!extraArgs.coinType) {
         throw Error("Need to provide an asset type");
       }
-      const provider = new Provider({ fullnodeUrl: this.aptosClient.nodeUrl, indexerUrl: this.aptosClient.nodeUrl });
+      console.warn("to transfer a fungible asset, use `FungibleAsset()` class for a better support");
+      const provider = new Provider({
+        fullnodeUrl: this.aptosClient.nodeUrl,
+        indexerUrl: NetworkToIndexerAPI[NodeAPIToNetwork[this.aptosClient.nodeUrl]] ?? this.aptosClient.nodeUrl,
+      });
       const fungibleAsset = new FungibleAsset(provider);
       if (to instanceof AptosAccount) {
         to = to.address();
@@ -110,15 +111,16 @@ export class CoinClient {
       assetAddress?: MaybeHexString;
     },
   ): Promise<bigint | Gen.MoveValue[]> {
-    console.warn(
-      "CoinClient.checkBalance() will soon be deprecated, to check account's coin balance (i.e fungible assets) please use `FungibleAsset()` class",
-    );
     if (extraArgs?.assetAddress) {
       // asking for a fungible asset object
       if (!extraArgs.coinType) {
         throw Error("Need to provide an asset type");
       }
-      const provider = new Provider({ fullnodeUrl: this.aptosClient.nodeUrl, indexerUrl: this.aptosClient.nodeUrl });
+      console.warn("to check balance for a fungible asset, use `FungibleAsset()` class for a better support");
+      const provider = new Provider({
+        fullnodeUrl: this.aptosClient.nodeUrl,
+        indexerUrl: NetworkToIndexerAPI[NodeAPIToNetwork[this.aptosClient.nodeUrl]] ?? this.aptosClient.nodeUrl,
+      });
       const fungibleAsset = new FungibleAsset(provider);
       if (account instanceof AptosAccount) {
         account = account.address();
