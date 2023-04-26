@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::config::{
-    config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig,
+    config_optimizer::ConfigOptimizer, config_sanitizer::ConfigSanitizer,
+    node_config_loader::NodeType, utils::is_network_perf_test_enabled, Error, NodeConfig,
 };
 use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
+use serde_yaml::Value;
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -20,6 +22,7 @@ pub struct PeerMonitoringServiceConfig {
     pub network_monitoring: NetworkMonitoringConfig,
     pub node_monitoring: NodeMonitoringConfig,
     pub peer_monitor_interval_usec: u64, // The interval (usec) between peer monitor executions
+    pub performance_monitoring: PerformanceMonitoringConfig,
 }
 
 impl Default for PeerMonitoringServiceConfig {
@@ -35,6 +38,7 @@ impl Default for PeerMonitoringServiceConfig {
             network_monitoring: NetworkMonitoringConfig::default(),
             node_monitoring: NodeMonitoringConfig::default(),
             peer_monitor_interval_usec: 1_000_000, // 1 second
+            performance_monitoring: PerformanceMonitoringConfig::default(),
         }
     }
 }
@@ -75,6 +79,34 @@ impl Default for NetworkMonitoringConfig {
     }
 }
 
+// Note: to enable performance monitoring, the compilation feature "network-perf-test" is required.
+// Simply enabling the config values here will not enable performance monitoring.
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct PerformanceMonitoringConfig {
+    pub enable_direct_send_testing: bool, // Whether or not to enable direct send test mode
+    pub direct_send_data_size: u64,       // The amount of data to send in each request
+    pub direct_send_interval_usec: u64,   // The interval (microseconds) between requests
+    pub enable_rpc_testing: bool,         // Whether or not to enable RPC test mode
+    pub rpc_data_size: u64,               // The amount of data to send in each RPC request
+    pub rpc_interval_usec: u64,           // The interval (microseconds) between RPC requests
+    pub rpc_timeout_ms: u64,              // The timeout (ms) for each RPC request
+}
+
+impl Default for PerformanceMonitoringConfig {
+    fn default() -> Self {
+        Self {
+            enable_direct_send_testing: false, // Disabled by default
+            direct_send_data_size: 512 * 1024, // 512KB
+            direct_send_interval_usec: 1000,   // 1ms
+            enable_rpc_testing: false,         // Disabled by default
+            rpc_data_size: 512 * 1024,         // 512KB
+            rpc_interval_usec: 1000,           // 1ms
+            rpc_timeout_ms: 10_000,            // 10 seconds
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct NodeMonitoringConfig {
@@ -108,7 +140,46 @@ impl ConfigSanitizer for PeerMonitoringServiceConfig {
             ));
         };
 
+        // Verify that performance monitoring is not enabled in mainnet
+        let performance_monitoring_config = &peer_monitoring_config.performance_monitoring;
+        if chain_id.is_mainnet()
+            && (is_network_perf_test_enabled()
+                || performance_monitoring_config.enable_direct_send_testing
+                || performance_monitoring_config.enable_rpc_testing)
+        {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "Performance monitoring should not be enabled in mainnet!".to_string(),
+            ));
+        };
+
         Ok(())
+    }
+}
+
+impl ConfigOptimizer for PeerMonitoringServiceConfig {
+    fn optimize(
+        node_config: &mut NodeConfig,
+        local_config_yaml: &Value,
+        _node_type: NodeType,
+        _chain_id: ChainId,
+    ) -> Result<bool, Error> {
+        let peer_monitoring_config = &mut node_config.peer_monitoring_service;
+        let local_performance_config_yaml =
+            &local_config_yaml["peer_monitoring_service"]["performance_monitoring"];
+
+        // Enable RPC testing if the network-perf-test feature is enabled
+        let mut modified_config = false;
+        if local_performance_config_yaml["enable_rpc_testing"].is_null()
+            && is_network_perf_test_enabled()
+        {
+            peer_monitoring_config
+                .performance_monitoring
+                .enable_rpc_testing = true;
+            modified_config = true;
+        }
+
+        Ok(modified_config)
     }
 }
 
