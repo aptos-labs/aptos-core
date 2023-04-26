@@ -28,10 +28,14 @@ pub struct StateSyncConfig {
 /// blockchain state, e.g., directly download the latest states.
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub enum BootstrappingMode {
-    ApplyTransactionOutputsFromGenesis, // Applies transaction outputs (starting at genesis)
-    DownloadLatestStates, // Downloads the state keys and values (at the latest version)
-    ExecuteTransactionsFromGenesis, // Executes transactions (starting at genesis)
-    ExecuteOrApplyFromGenesis, // Executes transactions or applies outputs from genesis (whichever is faster)
+    /// Applies transaction outputs (starting at genesis)
+    ApplyTransactionOutputsFromGenesis,
+    /// Downloads the state keys and values (at the latest version)
+    DownloadLatestStates,
+    /// Executes transactions (starting at genesis)
+    ExecuteTransactionsFromGenesis,
+    /// Executes transactions or applies outputs from genesis (whichever is faster)
+    ExecuteOrApplyFromGenesis,
 }
 
 impl BootstrappingMode {
@@ -54,9 +58,12 @@ impl BootstrappingMode {
 /// continuously executing all transactions.
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub enum ContinuousSyncingMode {
-    ApplyTransactionOutputs, // Applies transaction outputs to stay up-to-date
-    ExecuteTransactions,     // Executes transactions to stay up-to-date
-    ExecuteTransactionsOrApplyOutputs, // Executes transactions or applies outputs to stay up-to-date (whichever is faster)
+    /// Applies transaction outputs to stay up-to-date
+    ApplyTransactionOutputs,
+    /// Executes transactions to stay up-to-date
+    ExecuteTransactions,
+    /// Executes transactions or applies outputs to stay up-to-date (whichever is faster)
+    ExecuteTransactionsOrApplyOutputs,
 }
 
 impl ContinuousSyncingMode {
@@ -74,18 +81,30 @@ impl ContinuousSyncingMode {
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct StateSyncDriverConfig {
-    pub bootstrapping_mode: BootstrappingMode, // The mode by which to bootstrap
-    pub commit_notification_timeout_ms: u64, // The max time taken to process a commit notification
-    pub continuous_syncing_mode: ContinuousSyncingMode, // The mode by which to sync after bootstrapping
-    pub enable_auto_bootstrapping: bool, // Enable auto-bootstrapping if no peers are found after `max_connection_deadline_secs`
-    pub fallback_to_output_syncing_secs: u64, // The duration to fallback to output syncing after an execution failure
-    pub progress_check_interval_ms: u64, // The interval (ms) at which to check state sync progress
-    pub max_connection_deadline_secs: u64, // The max time (secs) to wait for connections from peers before auto-bootstrapping
-    pub max_consecutive_stream_notifications: u64, // The max number of notifications to process per driver loop
-    pub max_num_stream_timeouts: u64, // The max number of stream timeouts allowed before termination
-    pub max_pending_data_chunks: u64, // The max number of data chunks pending execution or commit
-    pub max_stream_wait_time_ms: u64, // The max time (ms) to wait for a data stream notification
-    pub num_versions_to_skip_snapshot_sync: u64, // The version lag we'll tolerate before snapshot syncing
+    /// The mode by which to bootstrap
+    pub bootstrapping_mode: BootstrappingMode,
+    /// The maximum time taken to process a commit notification
+    pub commit_notification_timeout_ms: u64,
+    /// The mode by which to sync after bootstrapping
+    pub continuous_syncing_mode: ContinuousSyncingMode,
+    /// Enable auto-bootstrapping if no peers are found after `max_connection_deadline_secs`
+    pub enable_auto_bootstrapping: bool,
+    /// The interval (ms) to refresh the storage summary
+    pub fallback_to_output_syncing_secs: u64,
+    /// The interval (ms) at which to check state sync progress
+    pub progress_check_interval_ms: u64,
+    /// The maximum time (secs) to wait for connections from peers before auto-bootstrapping
+    pub max_connection_deadline_secs: u64,
+    /// The maximum number of notifications to process per driver loop
+    pub max_consecutive_stream_notifications: u64,
+    /// The maximum number of stream timeouts allowed before termination
+    pub max_num_stream_timeouts: u64,
+    /// The maximum number of data chunks pending execution or commit
+    pub max_pending_data_chunks: u64,
+    /// The maximum time (ms) to wait for a data stream notification
+    pub max_stream_wait_time_ms: u64,
+    /// The version lag we'll tolerate before snapshot syncing
+    pub num_versions_to_skip_snapshot_sync: u64,
 }
 
 /// The default state sync driver config will be the one that gets (and keeps)
@@ -112,16 +131,26 @@ impl Default for StateSyncDriverConfig {
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct StorageServiceConfig {
-    pub max_concurrent_requests: u64, // Max num of concurrent storage server tasks
-    pub max_epoch_chunk_size: u64,    // Max num of epoch ending ledger infos per chunk
-    pub max_lru_cache_size: u64,      // Max num of items in the lru cache before eviction
-    pub max_network_channel_size: u64, // Max num of pending network messages
-    pub max_network_chunk_bytes: u64, // Max num of bytes to send per network message
-    pub max_state_chunk_size: u64,    // Max num of state keys and values per chunk
-    pub max_subscription_period_ms: u64, // Max period (ms) of pending subscription requests
-    pub max_transaction_chunk_size: u64, // Max num of transactions per chunk
-    pub max_transaction_output_chunk_size: u64, // Max num of transaction outputs per chunk
-    pub storage_summary_refresh_interval_ms: u64, // The interval (ms) to refresh the storage summary
+    /// Maximum number of concurrent storage server tasks
+    pub max_concurrent_requests: u64,
+    /// Maximum number of epoch ending ledger infos per chunk
+    pub max_epoch_chunk_size: u64,
+    /// Maximum number of items in the lru cache before eviction
+    pub max_lru_cache_size: u64,
+    /// Maximum number of pending network messages
+    pub max_network_channel_size: u64,
+    /// Maximum number of bytes to send per network message
+    pub max_network_chunk_bytes: u64,
+    /// Maximum number of state keys and values per chunk
+    pub max_state_chunk_size: u64,
+    /// Maximum period (ms) of pending subscription requests
+    pub max_subscription_period_ms: u64,
+    /// Maximum number of transactions per chunk
+    pub max_transaction_chunk_size: u64,
+    /// Maximum number of transaction outputs per chunk
+    pub max_transaction_output_chunk_size: u64,
+    /// The interval (ms) to refresh the storage summary
+    pub storage_summary_refresh_interval_ms: u64,
 }
 
 impl Default for StorageServiceConfig {
@@ -144,29 +173,29 @@ impl Default for StorageServiceConfig {
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct DataStreamingServiceConfig {
-    // The interval (milliseconds) at which to refresh the global data summary.
+    /// The interval (milliseconds) at which to refresh the global data summary.
     pub global_summary_refresh_interval_ms: u64,
 
-    // Maximum number of concurrent data client requests (per stream).
+    /// Maximum number of concurrent data client requests (per stream).
     pub max_concurrent_requests: u64,
 
-    // Maximum number of concurrent data client requests (per stream) for state keys/values.
+    /// Maximum number of concurrent data client requests (per stream) for state keys/values.
     pub max_concurrent_state_requests: u64,
 
-    // Maximum channel sizes for each data stream listener. If messages are not
-    // consumed, they will be dropped (oldest messages first). The remaining
-    // messages will be retrieved using FIFO ordering.
+    /// Maximum channel sizes for each data stream listener. If messages are not
+    /// consumed, they will be dropped (oldest messages first). The remaining
+    /// messages will be retrieved using FIFO ordering.
     pub max_data_stream_channel_sizes: u64,
 
-    // Maximum number of retries for a single client request before a data
-    // stream will terminate.
+    /// Maximum number of retries for a single client request before a data
+    /// stream will terminate.
     pub max_request_retry: u64,
 
-    // Maximum number of notification ID to response context mappings held in
-    // memory. Once the number grows beyond this value, garbage collection occurs.
+    /// Maximum number of notification ID to response context mappings held in
+    /// memory. Once the number grows beyond this value, garbage collection occurs.
     pub max_notification_id_mappings: u64,
 
-    // The interval (milliseconds) at which to check the progress of each stream.
+    /// The interval (milliseconds) at which to check the progress of each stream.
     pub progress_check_interval_ms: u64,
 }
 
@@ -187,18 +216,30 @@ impl Default for DataStreamingServiceConfig {
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct AptosDataClientConfig {
-    pub max_epoch_chunk_size: u64, // Max num of epoch ending ledger infos per chunk
-    pub max_num_in_flight_priority_polls: u64, // Max num of in-flight polls for priority peers
-    pub max_num_in_flight_regular_polls: u64, // Max num of in-flight polls for regular peers
-    pub max_num_output_reductions: u64, // The max num of output reductions before transactions are returned
-    pub max_response_timeout_ms: u64, // Max timeout (in ms) when waiting for a response (after exponential increases)
-    pub max_state_chunk_size: u64,    // Max num of state keys and values per chunk
-    pub max_transaction_chunk_size: u64, // Max num of transactions per chunk
-    pub max_transaction_output_chunk_size: u64, // Max num of transaction outputs per chunk
-    pub response_timeout_ms: u64,     // First timeout (in ms) when waiting for a response
-    pub subscription_timeout_ms: u64, // Timeout (in ms) when waiting for a subscription response
-    pub summary_poll_interval_ms: u64, // Interval (in ms) between data summary polls
-    pub use_compression: bool,        // Whether or not to request compression for incoming data
+    /// Maximum number of epoch ending ledger infos per chunk
+    pub max_epoch_chunk_size: u64,
+    /// Maximum number of in-flight polls for priority peers
+    pub max_num_in_flight_priority_polls: u64,
+    /// Maximum number of in-flight polls for regular peers
+    pub max_num_in_flight_regular_polls: u64,
+    /// Maximum number of output reductions before transactions are returned
+    pub max_num_output_reductions: u64,
+    /// Maximum timeout (in ms) when waiting for a response (after exponential increases)
+    pub max_response_timeout_ms: u64,
+    /// Maximum number of state keys and values per chunk
+    pub max_state_chunk_size: u64,
+    /// Maximum number of transactions per chunk
+    pub max_transaction_chunk_size: u64,
+    /// Maximum number of transaction outputs per chunk
+    pub max_transaction_output_chunk_size: u64,
+    /// First timeout (in ms) when waiting for a response
+    pub response_timeout_ms: u64,
+    /// Timeout (in ms) when waiting for a subscription response
+    pub subscription_timeout_ms: u64,
+    /// Interval (in ms) between data summary polls
+    pub summary_poll_interval_ms: u64,
+    /// Whether or not to request compression for incoming data
+    pub use_compression: bool,
 }
 
 impl Default for AptosDataClientConfig {
