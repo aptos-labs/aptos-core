@@ -84,8 +84,6 @@ module aptos_framework::fungible_asset {
         /// The Uniform Resource Identifier (uri) pointing to an image that can be used as the icon for this fungible
         /// asset.
         icon_uri: String,
-        /// The entity who issued this fungible asset.
-        issuer: String,
     }
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
@@ -153,7 +151,6 @@ module aptos_framework::fungible_asset {
         symbol: String,
         decimals: u8,
         icon_uri: String,
-        issuer: String,
     ): Object<Metadata> {
         assert!(!object::can_generate_delete_ref(constructor_ref), error::invalid_argument(EOBJECT_IS_DELETABLE));
         let metadata_object_signer = &object::generate_signer(constructor_ref);
@@ -174,7 +171,6 @@ module aptos_framework::fungible_asset {
                 symbol,
                 decimals,
                 icon_uri,
-                issuer,
             }
         );
         object::object_from_constructor_ref<Metadata>(constructor_ref)
@@ -592,8 +588,7 @@ module aptos_framework::fungible_asset {
             string::utf8(b"TEST"),
             string::utf8(b"@@"),
             0,
-            string::utf8(b"http://www.example.com"),
-            string::utf8(b"native"),
+            string::utf8(b"http://www.example.com/favicon.ico"),
         );
         let mint_ref = generate_mint_ref(constructor_ref);
         let burn_ref = generate_burn_ref(constructor_ref);

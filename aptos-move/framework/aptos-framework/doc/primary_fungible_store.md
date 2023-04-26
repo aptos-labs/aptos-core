@@ -3,7 +3,21 @@
 
 # Module `0x1::primary_fungible_store`
 
-This defines the module for interacting with primary stores of accounts/objects, which have deterministic addresses
+This module provides a way for creators of fungible assets to enable support for creating primary (deterministic)
+stores for their users. This is useful for assets that are meant to be used as a currency, as it allows users to
+easily create a store for their account and deposit/withdraw/transfer fungible assets to/from it.
+
+The transfer flow works as below:
+1. The sender calls <code>transfer</code> on the fungible asset metadata object to transfer <code>amount</code> of fungible asset to
+<code>recipient</code>.
+2. The fungible asset metadata object calls <code>ensure_primary_store_exists</code> to ensure that the sender's primary store
+exists. If it doesn't, it creates it.
+3. The fungible asset metadata object calls <code>ensure_primary_store_exists</code> to ensure that the recipient's primary
+store exists. If it doesn't, it creates it.
+4. The fungible asset metadata object calls <code>withdraw</code> on the sender's primary store to withdraw <code>amount</code> of
+fungible asset from it. This emits an withdraw event.
+5. The fungible asset metadata object calls <code>deposit</code> on the recipient's primary store to deposit <code>amount</code> of
+fungible asset to it. This emits an deposit event.
 
 
 -  [Resource `DeriveRefPod`](#0x1_primary_fungible_store_DeriveRefPod)
@@ -34,7 +48,9 @@ This defines the module for interacting with primary stores of accounts/objects,
 
 ## Resource `DeriveRefPod`
 
-Resource stored on the fungible asset metadata object to allow creating primary stores for it.
+A resource that holds the derive ref for the fungible asset metadata object. This is used to create primary
+stores for users with deterministic addresses so that users can easily deposit/withdraw/transfer fungible
+assets.
 
 
 <pre><code><b>struct</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_DeriveRefPod">DeriveRefPod</a> <b>has</b> key
@@ -62,11 +78,12 @@ Resource stored on the fungible asset metadata object to allow creating primary 
 
 ## Function `create_primary_store_enabled_fungible_asset`
 
-Creators of fungible assets can call this to enable support for creating primary (deterministic) stores for
-their users.
+Create a fungible asset with primary store support. When users transfer fungible assets to each other, their
+primary stores will be created automatically if they don't exist. Primary stores have deterministic addresses
+so that users can easily deposit/withdraw/transfer fungible assets.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_create_primary_store_enabled_fungible_asset">create_primary_store_enabled_fungible_asset</a>(constructor_ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>, monitoring_supply_with_maximum: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u128&gt;&gt;, name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, symbol: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, decimals: u8)
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_create_primary_store_enabled_fungible_asset">create_primary_store_enabled_fungible_asset</a>(constructor_ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>, monitoring_supply_with_maximum: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u128&gt;&gt;, name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, symbol: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, decimals: u8, icon_uri: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, issuer: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>)
 </code></pre>
 
 
@@ -81,8 +98,18 @@ their users.
     name: String,
     symbol: String,
     decimals: u8,
+    icon_uri: String,
+    issuer: String,
 ) {
-    <a href="fungible_asset.md#0x1_fungible_asset_add_fungibility">fungible_asset::add_fungibility</a>(constructor_ref, monitoring_supply_with_maximum, name, symbol, decimals);
+    <a href="fungible_asset.md#0x1_fungible_asset_add_fungibility">fungible_asset::add_fungibility</a>(
+        constructor_ref,
+        monitoring_supply_with_maximum,
+        name,
+        symbol,
+        decimals,
+        icon_uri,
+        issuer,
+    );
     <b>let</b> metadata_obj = &<a href="object.md#0x1_object_generate_signer">object::generate_signer</a>(constructor_ref);
     <b>move_to</b>(metadata_obj, <a href="primary_fungible_store.md#0x1_primary_fungible_store_DeriveRefPod">DeriveRefPod</a> {
         metadata_derive_ref: <a href="object.md#0x1_object_generate_derive_ref">object::generate_derive_ref</a>(constructor_ref),
@@ -98,6 +125,7 @@ their users.
 
 ## Function `ensure_primary_store_exists`
 
+Ensure that the primary store object for the given address exists. If it doesn't, create it.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>&lt;T: key&gt;(owner: <b>address</b>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">fungible_asset::FungibleStore</a>&gt;
@@ -165,6 +193,7 @@ Create a primary store object to hold fungible asset for the given address.
 
 ## Function `primary_store_address`
 
+Get the address of the primary store for the given account.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_address">primary_store_address</a>&lt;T: key&gt;(owner: <b>address</b>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <b>address</b>
@@ -190,6 +219,7 @@ Create a primary store object to hold fungible asset for the given address.
 
 ## Function `primary_store`
 
+Get the primary store object for the given account.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store">primary_store</a>&lt;T: key&gt;(owner: <b>address</b>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">fungible_asset::FungibleStore</a>&gt;
@@ -215,6 +245,7 @@ Create a primary store object to hold fungible asset for the given address.
 
 ## Function `primary_store_exists`
 
+Return whether the given account's primary store exists.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_exists">primary_store_exists</a>&lt;T: key&gt;(<a href="account.md#0x1_account">account</a>: <b>address</b>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool
@@ -297,7 +328,7 @@ Return whether the given account's primary store is frozen.
 
 ## Function `withdraw`
 
-Withdraw <code>amount</code> of fungible asset from <code>store</code> by the owner.
+Withdraw <code>amount</code> of fungible asset from the given account's primary store.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_withdraw">withdraw</a>&lt;T: key&gt;(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, amount: u64): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>
@@ -323,7 +354,7 @@ Withdraw <code>amount</code> of fungible asset from <code>store</code> by the ow
 
 ## Function `deposit`
 
-Deposit <code>amount</code> of fungible asset to the given account's primary store.
+Deposit fungible asset <code>fa</code> to the given account's primary store.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_deposit">deposit</a>(owner: <b>address</b>, fa: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>)
