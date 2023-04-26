@@ -3,6 +3,7 @@
 
 use aptos_config::{config::PeerRole, network_id::PeerNetworkId};
 use aptos_types::{network_address::NetworkAddress, PeerId};
+use cfg_block::cfg_block;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, time::Duration};
 use thiserror::Error;
@@ -15,6 +16,9 @@ pub enum PeerMonitoringServiceResponse {
     NetworkInformation(NetworkInformationResponse), // Holds the response for network information
     NodeInformation(NodeInformationResponse), // Holds the response for node information
     ServerProtocolVersion(ServerProtocolVersionResponse), // Returns the current server protocol version
+
+    #[cfg(feature = "network-perf-test")] // Disabled by default
+    PerformanceMonitoringResponse(PerformanceMonitoringResponse), // A response for performance monitoring requests
 }
 
 impl PeerMonitoringServiceResponse {
@@ -25,6 +29,9 @@ impl PeerMonitoringServiceResponse {
             Self::NetworkInformation(_) => "network_information",
             Self::NodeInformation(_) => "node_information",
             Self::ServerProtocolVersion(_) => "server_protocol_version",
+
+            #[cfg(feature = "network-perf-test")] // Disabled by default
+            Self::PerformanceMonitoringResponse(_) => "performance_monitoring_response",
         }
     }
 
@@ -121,6 +128,20 @@ impl TryFrom<PeerMonitoringServiceResponse> for NetworkInformationResponse {
     }
 }
 
+impl TryFrom<PeerMonitoringServiceResponse> for NodeInformationResponse {
+    type Error = UnexpectedResponseError;
+
+    fn try_from(response: PeerMonitoringServiceResponse) -> crate::Result<Self, Self::Error> {
+        match response {
+            PeerMonitoringServiceResponse::NodeInformation(inner) => Ok(inner),
+            _ => Err(UnexpectedResponseError(format!(
+                "expected node_information_response, found {}",
+                response.get_label()
+            ))),
+        }
+    }
+}
+
 impl TryFrom<PeerMonitoringServiceResponse> for ServerProtocolVersionResponse {
     type Error = UnexpectedResponseError;
 
@@ -135,16 +156,26 @@ impl TryFrom<PeerMonitoringServiceResponse> for ServerProtocolVersionResponse {
     }
 }
 
-impl TryFrom<PeerMonitoringServiceResponse> for NodeInformationResponse {
-    type Error = UnexpectedResponseError;
+cfg_block! {
+    #[cfg(feature = "network-perf-test")] { // Disabled by default
+        /// A response for performance monitoring requests
+        #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+        pub struct PerformanceMonitoringResponse {
+            pub response_counter: u64, // A monotonically increasing counter to verify responses
+        }
 
-    fn try_from(response: PeerMonitoringServiceResponse) -> crate::Result<Self, Self::Error> {
-        match response {
-            PeerMonitoringServiceResponse::NodeInformation(inner) => Ok(inner),
-            _ => Err(UnexpectedResponseError(format!(
-                "expected node_information_response, found {}",
-                response.get_label()
-            ))),
+        impl TryFrom<PeerMonitoringServiceResponse> for PerformanceMonitoringResponse {
+            type Error = UnexpectedResponseError;
+
+            fn try_from(response: PeerMonitoringServiceResponse) -> crate::Result<Self, Self::Error> {
+                match response {
+                    PeerMonitoringServiceResponse::PerformanceMonitoringResponse(inner) => Ok(inner),
+                    _ => Err(UnexpectedResponseError(format!(
+                        "expected performance_monitoring_response, found {}",
+                        response.get_label()
+                    ))),
+                }
+            }
         }
     }
 }

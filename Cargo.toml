@@ -398,6 +398,7 @@ blst = "0.3.7"
 byteorder = "1.4.3"
 bytes = "1.1.0"
 chrono = { version = "0.4.19", features = ["clock", "serde"] }
+cfg_block = "0.1.1"
 cfg-if = "1.0.0"
 claims = "0.7"
 clap = { version = "3.2.23", features = ["derive", "env", "suggestions"] }
