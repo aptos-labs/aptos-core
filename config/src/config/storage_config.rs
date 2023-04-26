@@ -24,11 +24,17 @@ pub const BUFFERED_STATE_TARGET_ITEMS: usize = 100_000;
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct RocksdbConfig {
+    /// Maximum number of files open by RocksDB at one time
     pub max_open_files: i32,
+    /// Maximum size of the RocksDB write ahead log (WAL)
     pub max_total_wal_size: u64,
+    /// Maximum number of background threads for Rocks DB
     pub max_background_jobs: i32,
+    /// Block cache size for Rocks DB
     pub block_cache_size: u64,
+    /// Block size for Rocks DB
     pub block_size: u64,
+    /// Whether cache index and filter blocks into block cache.
     pub cache_index_and_filter_blocks: bool,
 }
 
@@ -86,8 +92,11 @@ impl Default for RocksdbConfigs {
 #[serde(default, deny_unknown_fields)]
 pub struct StorageConfig {
     pub backup_service_address: SocketAddr,
+    /// Top level directory to store the RocksDB
     pub dir: PathBuf,
+    /// Storage pruning configuration
     pub storage_pruner_config: PrunerConfig,
+    /// Subdirectory for storage in tests only
     #[serde(skip)]
     data_dir: PathBuf,
     /// AptosDB persists the state authentication structure off the critical path
