@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_indexer_grpc_data_service::service::RawDataServer;
+use aptos_indexer_grpc_data_service::service::RawDataServerWrapper;
 use aptos_indexer_grpc_utils::register_probes_and_metrics_handler;
 use aptos_protos::{
     internal::fullnode::v1::FILE_DESCRIPTOR_SET as DATASTREAM_V1_FILE_DESCRIPTOR_SET,
@@ -79,7 +79,7 @@ fn main() {
 
     // Add authentication interceptor.
     runtime.spawn(async move {
-        let server = RawDataServer::new(config);
+        let server = RawDataServerWrapper::new(config);
         let svc = aptos_protos::indexer::v1::raw_data_server::RawDataServer::new(server)
             .send_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Gzip);
