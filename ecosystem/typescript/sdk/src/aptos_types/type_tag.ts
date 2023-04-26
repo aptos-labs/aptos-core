@@ -437,7 +437,7 @@ export class TypeTagParser {
     }
     if (tokenTy === "GENERIC") {
       if (this.typeTags.length === 0) {
-        bail("Can't convert generic type to a tag type since typeTags array is empty.");
+        bail("Can't convert generic type since no typeTags were specified.");
       }
       // a generic tokenVal has the format of `T<digit>`, for example `T1`.
       // The digit (i.e 1) indicates the the index of this type in the typeTags array.
