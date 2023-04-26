@@ -49,3 +49,19 @@ jobs:
       - name: Run parallel execution benchmark in performance build mode
         shell: bash
         run: testsuite/parallel_execution_performance.py
+
+  single-node-performance:
+    timeout-minutes: 60
+    runs-on: executor-benchmark-runner
+    steps:
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+        with:
+          ref: ${{ inputs.GIT_SHA }}
+
+      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+
+      - name: Run single node execution benchmark in performance build mode
+        shell: bash
+        run: TABULATE_INSTALL=lib-only pip install tabulate && testsuite/single_node_performance.py
