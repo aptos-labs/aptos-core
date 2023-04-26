@@ -17,6 +17,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@adobe/fetch": "3.6.3",
     "aptos": "latest",
     "dotenv": "16.0.1",
     "ffi-napi": "^4.0.3",

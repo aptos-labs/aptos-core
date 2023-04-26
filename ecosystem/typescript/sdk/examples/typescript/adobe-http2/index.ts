@@ -1,6 +1,6 @@
 import { AptosAccount, AptosClient, BCS, HexString, TxnBuilderTypes } from "../../../dist";
 import { Timer } from "timer-node";
-import { fetch } from "fetch-h2";
+import { fetch } from "@adobe/fetch";
 import { exit } from "process";
 
 const FULLNODE_URL = "http2://0.0.0.0:8080/v1";
@@ -43,14 +43,28 @@ async function main() {
   console.log(timer.time());
 
   // read accounts
-  const balances: Promise<any>[] = [];
+  const balances: string[] = [];
   for (let j = 0; j < readAmplification; j++) {
     for (let i = 0; i < accounts.length; i++) {
-      balances.push(get(`accounts/${accounts[i].address().hex()}`));
+      balances.push(`${FULLNODE_URL}/accounts/${accounts[i].address().hex()}`);
     }
   }
 
-  await Promise.all(balances);
+  // send requests
+  const responses = await Promise.all(
+    balances.map((url) =>
+      fetch(url, {
+        headers: {
+          "content-type": "application/json",
+        },
+      }),
+    ),
+  );
+
+  // read bodies
+  await Promise.all(responses.map((resp) => resp.json()));
+
+  //await Promise.all(balances);
   console.log("accounts checked");
   console.log(timer.time());
 
@@ -83,6 +97,7 @@ async function main() {
   }
 
   transactionsHashes = await Promise.all(transactionsHashes);
+
   console.log("transactions submitted");
   console.log(timer.time());
   // check for transactions
@@ -130,9 +145,10 @@ async function transafer(sender: AptosAccount, recipient: string, sequenceNumber
 }
 
 async function get(path: string): Promise<any> {
+  console.log(path);
   const response = await fetch(`${FULLNODE_URL}/${path}`, {
     headers: {
-      "Content-Type": "application/json",
+      "content-type": "application/json",
     },
   });
   const res = await response.json();
